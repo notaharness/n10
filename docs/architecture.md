@@ -33,6 +33,7 @@ apps/cli/                        — The published `n10` package: the command, t
   src/screens/reviews/           — Reviews tab (DiffFileList, DiffViewer, ReviewDetailPane)
   src/hooks/                     — Ink-coupled hooks (useTerminal, useScrollWheel, useRawStdinForward, useDiffListScrollSync)
   scripts/prepare-publish.mjs    — Assembles dist/ into the package: the CLI bundle, the desktop build under desktop/, the manifest
+  scripts/test-installed.sh      — Installs a packed tarball globally and runs it (CI's Package workflow)
 apps/desktop/                    — Electron GUI shell, shipped inside `@notaharness/n10`: host services over @n10/engine and @n10/core, a renderer over its own query layer
   src/main/                      — Electron main: window chrome + security posture (window.ts), N10_QA_STEPS hook
   src/main/host-worker.ts        — The session host: a utility process running every host service and PTY client
