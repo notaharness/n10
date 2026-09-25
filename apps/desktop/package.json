@@ -176,6 +176,7 @@
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^5.1.2",
     "electron": "^39.2.6",
+    "electron-builder": "^26.15.3",
     "tailwindcss": "^4.1.14",
     "vite": "^7.1.11"
   },
