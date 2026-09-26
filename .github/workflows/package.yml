@@ -45,10 +45,7 @@ jobs:
     needs: pack
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Electron 39's postinstall extracts nothing under Node 24.16 and later
-    # (its extract-zip stalls), which leaves `n10` unable to start the
-    # desktop. Stay on 24.15 until Electron is upgraded past that installer.
-    container: node:24.15-bookworm
+    container: node:24-bookworm
     steps:
       # The test script only: nothing from the workspace is installed.
       - uses: actions/checkout@v4

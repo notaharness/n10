@@ -42,9 +42,8 @@ PATH and matches the running app's version.
 
 `apps/cli/scripts/test-installed.sh` installs a packed tarball into a scratch
 global prefix and runs the CLI, the TUI and the desktop under Xvfb.
-`.github/workflows/package.yml` runs it in a clean `node` container (pinned
-Node version; see its comment) on pull requests that touch packaging, and as
-the release gate.
+`.github/workflows/package.yml` runs it in a clean `node:24` container on pull
+requests that touch packaging, and as the release gate.
 
 ## Release workflow
 
