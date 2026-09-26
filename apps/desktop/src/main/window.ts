@@ -125,11 +125,13 @@ export interface ShowableWindow {
 /**
  * Show a window created hidden on the first of two events, once:
  * `did-finish-load`, the page having loaded, which for this local page
- * usually comes first and costs a frame of the window's background
- * colour; or `ready-to-show`, the first frame, which on a display
- * stack whose first frame never comes (GPU initialisation failing
- * quietly under Wayland) never fires at all. Both listeners go when
- * either fires: a reload later must not show a window the user hid.
+ * usually comes first and may briefly show the background colour
+ * before the page renders; or `ready-to-show`, the first frame, which
+ * on some Linux stacks never fires for a hidden window (Electron 38
+ * and later, electron/electron#48859, where a maintainer suggests
+ * `did-finish-load`; FreeTube did the same in its PR #8294). Both
+ * listeners go when either fires: a reload later must not show a
+ * window the user hid.
  */
 export function showWhenReadyOrLoaded(win: ShowableWindow): void {
   const show = () => {
