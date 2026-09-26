@@ -1,0 +1,304 @@
+{
+  "value": [
+    {
+      "repository": {
+        "id": "a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71",
+        "name": "repo",
+        "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71",
+        "project": {
+          "id": "6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c",
+          "name": "proj",
+          "state": "unchanged",
+          "visibility": "unchanged",
+          "lastUpdateTime": "0001-01-01T00:00:00"
+        }
+      },
+      "pullRequestId": 5101,
+      "codeReviewId": 5101,
+      "status": "active",
+      "createdBy": {
+        "displayName": "Author",
+        "url": "https://dev.azure.com/fabrikam/_apis/Identities/2b4d6f80-1a3c-4e5f-8a7b-9c0d1e2f3a4b",
+        "_links": {
+          "avatar": {
+            "href": "https://dev.azure.com/fabrikam/_apis/GraphProfile/MemberAvatars/2b4d6f80-1a3c-4e5f-8a7b-9c0d1e2f3a4b"
+          }
+        },
+        "id": "2b4d6f80-1a3c-4e5f-8a7b-9c0d1e2f3a4b",
+        "uniqueName": "author@example.com",
+        "imageUrl": "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=2b4d6f80-1a3c-4e5f-8a7b-9c0d1e2f3a4b"
+      },
+      "creationDate": "2026-09-20T10:15:00.000Z",
+      "title": "Group approved by a teammate",
+      "description": "",
+      "sourceRefName": "refs/heads/feat/teammate-approved",
+      "targetRefName": "refs/heads/main",
+      "mergeStatus": "succeeded",
+      "isDraft": false,
+      "mergeId": "00005101-0000-4000-8000-000000000000",
+      "lastMergeSourceCommit": {
+        "commitId": "d510111111111111111111111111111111111111",
+        "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/commits/d510111111111111111111111111111111111111"
+      },
+      "lastMergeTargetCommit": {
+        "commitId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/commits/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "lastMergeCommit": {
+        "commitId": "cccccccccccccccccccccccccccccccccccccccc",
+        "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/commits/cccccccccccccccccccccccccccccccccccccccc"
+      },
+      "reviewers": [
+        {
+          "reviewerUrl": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/pullRequests/5101/reviewers/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+          "vote": 10,
+          "hasDeclined": false,
+          "isRequired": true,
+          "isFlagged": false,
+          "displayName": "[proj]\\Core Team",
+          "url": "https://dev.azure.com/fabrikam/_apis/Identities/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+          "_links": {
+            "avatar": {
+              "href": "https://dev.azure.com/fabrikam/_apis/GraphProfile/MemberAvatars/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1"
+            }
+          },
+          "id": "5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+          "uniqueName": "vstfs:///Classification/TeamProject/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c\\Core Team",
+          "imageUrl": "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+          "isContainer": true
+        },
+        {
+          "reviewerUrl": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/pullRequests/5101/reviewers/0f4e8d2c-6b1a-4c3e-9d7f-5a2b8c1e4f60",
+          "vote": 10,
+          "hasDeclined": false,
+          "isRequired": false,
+          "isFlagged": false,
+          "votedFor": [
+            {
+              "reviewerUrl": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/pullRequests/5101/reviewers/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+              "vote": 0,
+              "displayName": "[proj]\\Core Team",
+              "url": "https://dev.azure.com/fabrikam/_apis/Identities/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+              "_links": {
+                "avatar": {
+                  "href": "https://dev.azure.com/fabrikam/_apis/GraphProfile/MemberAvatars/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1"
+                }
+              },
+              "id": "5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+              "uniqueName": "vstfs:///Classification/TeamProject/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c\\Core Team",
+              "imageUrl": "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+              "isContainer": true
+            }
+          ],
+          "displayName": "Teammate",
+          "url": "https://dev.azure.com/fabrikam/_apis/Identities/0f4e8d2c-6b1a-4c3e-9d7f-5a2b8c1e4f60",
+          "_links": {
+            "avatar": {
+              "href": "https://dev.azure.com/fabrikam/_apis/GraphProfile/MemberAvatars/0f4e8d2c-6b1a-4c3e-9d7f-5a2b8c1e4f60"
+            }
+          },
+          "id": "0f4e8d2c-6b1a-4c3e-9d7f-5a2b8c1e4f60",
+          "uniqueName": "teammate@example.com",
+          "imageUrl": "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=0f4e8d2c-6b1a-4c3e-9d7f-5a2b8c1e4f60"
+        },
+        {
+          "reviewerUrl": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/pullRequests/5101/reviewers/c7d2e9a0-1b3f-4a6c-8e5d-9f0a2b4c6d8e",
+          "vote": 0,
+          "hasDeclined": false,
+          "isRequired": false,
+          "isFlagged": false,
+          "displayName": "[proj]\\Release Approvers",
+          "url": "https://dev.azure.com/fabrikam/_apis/Identities/c7d2e9a0-1b3f-4a6c-8e5d-9f0a2b4c6d8e",
+          "_links": {
+            "avatar": {
+              "href": "https://dev.azure.com/fabrikam/_apis/GraphProfile/MemberAvatars/c7d2e9a0-1b3f-4a6c-8e5d-9f0a2b4c6d8e"
+            }
+          },
+          "id": "c7d2e9a0-1b3f-4a6c-8e5d-9f0a2b4c6d8e",
+          "uniqueName": "vstfs:///Classification/TeamProject/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c\\Release Approvers",
+          "imageUrl": "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=c7d2e9a0-1b3f-4a6c-8e5d-9f0a2b4c6d8e",
+          "isContainer": true
+        }
+      ],
+      "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/pullRequests/5101",
+      "supportsIterations": true
+    },
+    {
+      "repository": {
+        "id": "a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71",
+        "name": "repo",
+        "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71",
+        "project": {
+          "id": "6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c",
+          "name": "proj",
+          "state": "unchanged",
+          "visibility": "unchanged",
+          "lastUpdateTime": "0001-01-01T00:00:00"
+        }
+      },
+      "pullRequestId": 5102,
+      "codeReviewId": 5102,
+      "status": "active",
+      "createdBy": {
+        "displayName": "Author",
+        "url": "https://dev.azure.com/fabrikam/_apis/Identities/2b4d6f80-1a3c-4e5f-8a7b-9c0d1e2f3a4b",
+        "_links": {
+          "avatar": {
+            "href": "https://dev.azure.com/fabrikam/_apis/GraphProfile/MemberAvatars/2b4d6f80-1a3c-4e5f-8a7b-9c0d1e2f3a4b"
+          }
+        },
+        "id": "2b4d6f80-1a3c-4e5f-8a7b-9c0d1e2f3a4b",
+        "uniqueName": "author@example.com",
+        "imageUrl": "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=2b4d6f80-1a3c-4e5f-8a7b-9c0d1e2f3a4b"
+      },
+      "creationDate": "2026-09-20T10:15:00.000Z",
+      "title": "Group asked, nobody has voted",
+      "description": "",
+      "sourceRefName": "refs/heads/feat/group-pending",
+      "targetRefName": "refs/heads/main",
+      "mergeStatus": "succeeded",
+      "isDraft": false,
+      "mergeId": "00005102-0000-4000-8000-000000000000",
+      "lastMergeSourceCommit": {
+        "commitId": "d510211111111111111111111111111111111111",
+        "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/commits/d510211111111111111111111111111111111111"
+      },
+      "lastMergeTargetCommit": {
+        "commitId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/commits/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "lastMergeCommit": {
+        "commitId": "cccccccccccccccccccccccccccccccccccccccc",
+        "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/commits/cccccccccccccccccccccccccccccccccccccccc"
+      },
+      "reviewers": [
+        {
+          "reviewerUrl": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/pullRequests/5102/reviewers/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+          "vote": 0,
+          "hasDeclined": false,
+          "isRequired": true,
+          "isFlagged": false,
+          "displayName": "[proj]\\Core Team",
+          "url": "https://dev.azure.com/fabrikam/_apis/Identities/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+          "_links": {
+            "avatar": {
+              "href": "https://dev.azure.com/fabrikam/_apis/GraphProfile/MemberAvatars/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1"
+            }
+          },
+          "id": "5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+          "uniqueName": "vstfs:///Classification/TeamProject/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c\\Core Team",
+          "imageUrl": "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+          "isContainer": true
+        }
+      ],
+      "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/pullRequests/5102",
+      "supportsIterations": true
+    },
+    {
+      "repository": {
+        "id": "a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71",
+        "name": "repo",
+        "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71",
+        "project": {
+          "id": "6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c",
+          "name": "proj",
+          "state": "unchanged",
+          "visibility": "unchanged",
+          "lastUpdateTime": "0001-01-01T00:00:00"
+        }
+      },
+      "pullRequestId": 5103,
+      "codeReviewId": 5103,
+      "status": "active",
+      "createdBy": {
+        "displayName": "Author",
+        "url": "https://dev.azure.com/fabrikam/_apis/Identities/2b4d6f80-1a3c-4e5f-8a7b-9c0d1e2f3a4b",
+        "_links": {
+          "avatar": {
+            "href": "https://dev.azure.com/fabrikam/_apis/GraphProfile/MemberAvatars/2b4d6f80-1a3c-4e5f-8a7b-9c0d1e2f3a4b"
+          }
+        },
+        "id": "2b4d6f80-1a3c-4e5f-8a7b-9c0d1e2f3a4b",
+        "uniqueName": "author@example.com",
+        "imageUrl": "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=2b4d6f80-1a3c-4e5f-8a7b-9c0d1e2f3a4b"
+      },
+      "creationDate": "2026-09-20T10:15:00.000Z",
+      "title": "Group approved by me",
+      "description": "",
+      "sourceRefName": "refs/heads/feat/i-approved",
+      "targetRefName": "refs/heads/main",
+      "mergeStatus": "succeeded",
+      "isDraft": false,
+      "mergeId": "00005103-0000-4000-8000-000000000000",
+      "lastMergeSourceCommit": {
+        "commitId": "d510311111111111111111111111111111111111",
+        "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/commits/d510311111111111111111111111111111111111"
+      },
+      "lastMergeTargetCommit": {
+        "commitId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/commits/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "lastMergeCommit": {
+        "commitId": "cccccccccccccccccccccccccccccccccccccccc",
+        "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/commits/cccccccccccccccccccccccccccccccccccccccc"
+      },
+      "reviewers": [
+        {
+          "reviewerUrl": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/pullRequests/5103/reviewers/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+          "vote": 10,
+          "hasDeclined": false,
+          "isRequired": true,
+          "isFlagged": false,
+          "displayName": "[proj]\\Core Team",
+          "url": "https://dev.azure.com/fabrikam/_apis/Identities/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+          "_links": {
+            "avatar": {
+              "href": "https://dev.azure.com/fabrikam/_apis/GraphProfile/MemberAvatars/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1"
+            }
+          },
+          "id": "5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+          "uniqueName": "vstfs:///Classification/TeamProject/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c\\Core Team",
+          "imageUrl": "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+          "isContainer": true
+        },
+        {
+          "reviewerUrl": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/pullRequests/5103/reviewers/9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b",
+          "vote": 10,
+          "hasDeclined": false,
+          "isRequired": false,
+          "isFlagged": false,
+          "votedFor": [
+            {
+              "reviewerUrl": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/pullRequests/5103/reviewers/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+              "vote": 0,
+              "displayName": "[proj]\\Core Team",
+              "url": "https://dev.azure.com/fabrikam/_apis/Identities/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+              "_links": {
+                "avatar": {
+                  "href": "https://dev.azure.com/fabrikam/_apis/GraphProfile/MemberAvatars/5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1"
+                }
+              },
+              "id": "5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+              "uniqueName": "vstfs:///Classification/TeamProject/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c\\Core Team",
+              "imageUrl": "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1",
+              "isContainer": true
+            }
+          ],
+          "displayName": "Me",
+          "url": "https://dev.azure.com/fabrikam/_apis/Identities/9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b",
+          "_links": {
+            "avatar": {
+              "href": "https://dev.azure.com/fabrikam/_apis/GraphProfile/MemberAvatars/9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b"
+            }
+          },
+          "id": "9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b",
+          "uniqueName": "me@example.com",
+          "imageUrl": "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b"
+        }
+      ],
+      "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/a1f3c2d4-7b6e-4e1f-9c0a-3d5b2e8f6a71/pullRequests/5103",
+      "supportsIterations": true
+    }
+  ],
+  "count": 3
+}
