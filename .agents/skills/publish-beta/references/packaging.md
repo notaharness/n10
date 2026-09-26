@@ -74,6 +74,10 @@ checks neither.
 `publish` can be re-run: when the version is already on npm, it skips the
 OIDC check and the publish and only sets the dist-tags.
 
+Every release run, a rehearsal included, builds the Linux packages
+(`.github/workflows/linux-packages.yml`); `publish` waits for them, so nothing
+is published unless every package built.
+
 The `github-release` job creates the GitHub release with generated notes,
 marked as a prerelease for a prerelease version, and attaches every artifact
 named `release-*` from the run. Jobs that build release assets upload under
