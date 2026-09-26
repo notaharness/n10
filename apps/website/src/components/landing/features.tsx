@@ -50,7 +50,6 @@ const features: Feature[] = [
     ),
   },
   {
-    media: 'tmux',
     label: 'tmux',
     href: '/docs/getting-started#3-launch-an-agent',
     title: 'Sessions are plain tmux',
@@ -104,7 +103,7 @@ export function Features() {
         <OrchestraFeature />
         {features.map((feature, i) => (
           <FeatureSection
-            key={feature.media}
+            key={feature.href}
             {...feature}
             reverse={i % 2 === 1}
           />

@@ -59,6 +59,8 @@ COMMANDS['git log'] = COMMANDS['git log --oneline'] ?? [];
 /** Commands whose answer does not depend on the directory. */
 const ANYWHERE = new Set(['whoami', 'tmux ls', 'help']);
 
+// Faint lines use `dim`, which reads in either theme: zsh's scrollback
+// is written once and not repainted when the theme changes.
 const HISTORY: readonly { cmd: string; out: readonly (string | Span[])[] }[] = [
   {
     cmd: 'npx nx affected -t lint --base=master',
@@ -73,15 +75,15 @@ const HISTORY: readonly { cmd: string; out: readonly (string | Span[])[] }[] = [
       '',
       [
         ['   ✔', ['green']],
-        ['  nx run core:lint', ['gray']],
+        ['  nx run core:lint', ['dim']],
       ],
       [
         ['   ✔', ['green']],
-        ['  nx run app-core:lint', ['gray']],
+        ['  nx run app-core:lint', ['dim']],
       ],
       [
         ['   ✔', ['green']],
-        ['  nx run desktop:lint', ['gray']],
+        ['  nx run desktop:lint', ['dim']],
       ],
       '',
       [
