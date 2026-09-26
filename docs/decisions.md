@@ -97,24 +97,30 @@ Linux, so it may work, but nothing here specifically supports it.
 Names are labels; tags carry identity. n10 and the Orchestra skill's bash
 scripts create ordinary tmux sessions using the same user options:
 
-| Session user option       | Meaning                               |
-| ------------------------- | ------------------------------------- |
-| `@orchestra-spawner`      | Creator, such as `n10` or `orchestra` |
-| `@orchestra-repo`         | Canonical main checkout path          |
-| `@orchestra-session-type` | `worktree`, `shell` or `agent`        |
-| `@orchestra-branch`       | Exact branch for a worktree session   |
-| `@orchestra-agent`        | Agent used for the most recent launch |
+| Session user option        | Meaning                                                  |
+| -------------------------- | -------------------------------------------------------- |
+| `@orchestra-spawner`       | Creator, such as `n10` or `orchestra`                    |
+| `@orchestra-repo`          | Canonical main checkout path                             |
+| `@orchestra-session-type`  | `worktree`, `shell` or `agent`                           |
+| `@orchestra-worktree-path` | A worktree session's checkout: its identity              |
+| `@orchestra-branch`        | Branch a worktree session was created for (task context) |
+| `@orchestra-agent`         | Agent used for the most recent launch                    |
 
 The shared names live in `session-identity.ts`. Creator/reporting metadata
 survives attachment and restart; a successful new process updates its agent
 metadata. Tags contain data, never arbitrary commands to execute. They live
 only as long as the tmux session, and do not provide persistence after reboot.
 
-Worktree lookup matches canonical repository plus exact branch. A terminal
-lookup uses its actual allocated tmux target. `session-resolver.ts` obtains one
-listing and applies those rules for attach, discovery, liveness and cleanup.
-A session lacking a spawner or recognized type is foreign; worktree sessions
-also require a repo tag. A familiar name alone never authorizes attachment or
+Worktree lookup matches canonical repository plus canonical checkout path —
+the physical path as resolved on the machine holding it (`pwd -P` there,
+`realpath` locally). The branch never identifies a checkout: a `git switch`,
+a rename or a restart keeps the session its worktree's, and a second worktree
+on the original branch never claims it. A terminal lookup uses its actual
+allocated tmux target. `session-resolver.ts` obtains one listing and applies
+those rules for attach, discovery, liveness and cleanup. A session lacking a
+spawner or recognized type is foreign; worktree sessions also require repo
+and worktree-path tags, with no fallback to `#{session_path}` or the branch
+(sessions are closed before an upgrade, not migrated). A familiar name alone never authorizes attachment or
 termination. Duplicate worktree identities resolve to the oldest session;
 extras are listed, never silently killed.
 
@@ -123,7 +129,7 @@ canonical main checkout's basename; `/`, `.` and `:` become `-`. A label longer
 than 200 characters keeps its first 195 plus a four-digit hash suffix. Name
 collisions add `-2`, `-3`, and so on, always from the original preferred label.
 A duplicate-name race retries allocation without adopting the other session.
-Core registry keys are JSON tuples: `["worktree", repo, exactBranch]` or
+Core registry keys are JSON tuples: `["worktree", repo, canonicalCheckout]` or
 `["terminal", actualTmuxName]`. Display labels never address registry entries.
 
 ## Discovery, restart and terminal lifecycle
@@ -334,5 +340,5 @@ daemon's control socket and the UI's gating. Code cites these as
 | D13 | The desktop itself is the mailbox subscriber (`msg.subscribe` on its own control connection), and `msg.ack` means "the pane or the Claude inbox received the text". Anything else is `msg.defer` with the reason.                                                                                      | The desktop already reaches every pane and inbox a report lands in, so it is the only thing in a position to ack honestly. A subscriber holds one envelope at a time, so each is settled at once; a target with no live connection is deferred and retried by a later subscription, and a refusal stays deferred and visible until dismissed.                                                                                            |
 | D14 | The relay resolves an envelope's target against this machine's own registries, never the envelope's say-so, delivers only for a sender granted `all` (D17), caps its size and strips control characters first.                                                                                         | This is the boundary at which a peer's bytes become input to a local agent. The check belongs at the edge that owns the consequence, rather than resting on an assumption that some layer below already made it.                                                                                                                                                                                                                         |
 | D15 | The desktop uses a beam daemon already running and leaves it on quit. Otherwise it starts one with `--exit-with-parent`, and on quit stops it through the child: its stdin closed, then a kill.                                                                                                        | A daemon started from the CLI or a service is not the app's. The app's own stops with it, crash included, so this machine leaves its peers' lists. Unenrolled, a daemon serves only its socket (beam docs/02): D8's cost is one idle process.                                                                                                                                                                                            |
-| D16 | Plain `n10` opens the desktop, `n10 --tui` the TUI, `n10 util` the review utility, all one package. The desktop's local sessions still get `n10` and `beam` from a directory first on their PATH; the `n10` there runs `util` with the app's own code and forwards the rest to the next `n10` on PATH. | One package with one executable cannot conflict with itself on install, and a TUI user downloading Electron is the accepted cost. A session's `n10 util` must work where no `n10` is on its PATH (a dev build, `npx`) and match the running app when a global one differs, and a dependency's executable, beam, never reaches the PATH. The app's Electron runs the shim as Node, so nothing else is needed. beam stays its own command. |
+| D16 | Plain `n10` opens the desktop, `n10 --tui` the TUI, `n10 util` the review utility, all one package. The desktop's local sessions still get `n10` and `beam` from a directory first on their PATH; the `n10` there runs `util` with the app's own code and forwards the rest to the next `n10` on PATH. | One package with one executable cannot conflict with itself on install, and a TUI user never has to download the Electron binary. A session's `n10 util` must work where no `n10` is on its PATH (a dev build, `npx`) and match the running app when a global one differs, and a dependency's executable, beam, never reaches the PATH. The app's Electron runs the shim as Node, so nothing else is needed. beam stays its own command. |
 | D17 | Delivery into a session, pane or Claude inbox, needs the sender's grant here to be `all`; `msg` is the mailbox alone. A `claude:<id>` target then reaches any live Claude session registered with that id.                                                                                             | An `all` peer can already run anything here through `beam exec`, so typing into an agent gives it nothing more; a `msg` machine, one that should only report (beam docs/01), could otherwise start work through an agent. Nothing local says which Claude session supervises remote players, and a player's tags are its machine's say-so.                                                                                               |
