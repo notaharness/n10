@@ -88,11 +88,6 @@ describe('installSecondLaunch', () => {
 
   const launch = (data: unknown) =>
     app.emit('second-instance', {}, ['n10'], '/', data);
-  const navigate = (isMainFrame: boolean, isSameDocument: boolean) =>
-    win.webContents.emit('did-start-navigation', {
-      isMainFrame,
-      isSameDocument,
-    });
 
   beforeEach(() => {
     app.removeAllListeners();
@@ -129,16 +124,42 @@ describe('installSecondLaunch', () => {
     expect(open).toHaveBeenCalledExactlyOnceWith(repo);
   });
 
-  it('keeps launches for the next page once the page navigates away', () => {
+  it('keeps the claim through a navigation that has only started', () => {
+    // main's will-navigate may yet refuse it, leaving the page in place.
     claimLaunchRepo();
-    navigate(false, false);
-    navigate(true, true);
+    win.webContents.emit('did-start-navigation', {
+      isMainFrame: true,
+      isSameDocument: false,
+    });
+    launch({ startDir: repo });
+    expect(open).toHaveBeenCalledExactlyOnceWith(repo);
+  });
+
+  it('keeps launches for the next page once another document commits', () => {
+    claimLaunchRepo();
+    win.webContents.emit('did-navigate', {}, 'file:///index.html');
+    launch({ startDir: repo });
+    expect(open).not.toHaveBeenCalled();
+    expect(claimLaunchRepo()).toBe(repo);
+  });
+
+  it('keeps launches for the next page once the page fails to load', () => {
+    claimLaunchRepo();
+    win.webContents.emit('did-fail-load', {}, -6, 'FAILED', 'x', false);
     launch({ startDir: other });
     expect(open).toHaveBeenCalledExactlyOnceWith(other);
 
-    navigate(true, false);
+    win.webContents.emit('did-fail-load', {}, -6, 'FAILED', 'x', true);
     launch({ startDir: repo });
     expect(open).toHaveBeenCalledOnce();
+    expect(claimLaunchRepo()).toBe(repo);
+  });
+
+  it('keeps launches for the next page once the renderer dies', () => {
+    claimLaunchRepo();
+    win.webContents.emit('render-process-gone', {}, { reason: 'crashed' });
+    launch({ startDir: repo });
+    expect(open).not.toHaveBeenCalled();
     expect(claimLaunchRepo()).toBe(repo);
   });
 

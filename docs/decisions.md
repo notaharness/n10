@@ -204,7 +204,9 @@ does; a launch naming the repository on screen changes nothing.
 Main cannot see when a page has subscribed to menu commands, so the page claims
 launches (`takeLaunchRepo`) once subscribed and the gate has its first answer,
 taking any launch that waited. Main sends later launches only to a page that has
-claimed; navigating away or closing the window gives the claim up. A launch
+claimed. The claim ends when another document commits, an error page replaces
+the page, its renderer dies or the window closes; not when a navigation starts,
+since `will-navigate` may refuse it and leave the page listening. A launch
 during startup, a reload or renderer recovery therefore waits for the next page
 instead of going to one that is not listening.
 

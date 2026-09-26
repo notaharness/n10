@@ -66,9 +66,16 @@ function bringForward(): void {
  */
 export function installSecondLaunch(open: (cwd: string) => void): void {
   app.on('browser-window-created', (_event, win) => {
-    win.webContents.on('did-start-navigation', (details) => {
-      if (details.isMainFrame && !details.isSameDocument) releaseLaunchRepo();
+    // The claim is the page's, so it ends when another document commits,
+    // an error page replaces the page, or its renderer dies. Not when a
+    // navigation starts: main's will-navigate may still refuse it, and
+    // the page then carries on listening.
+    const contents = win.webContents;
+    contents.on('did-navigate', releaseLaunchRepo);
+    contents.on('did-fail-load', (_e, _code, _text, _url, isMainFrame) => {
+      if (isMainFrame) releaseLaunchRepo();
     });
+    contents.on('render-process-gone', releaseLaunchRepo);
     win.on('closed', releaseLaunchRepo);
   });
   app.on('second-instance', (_event, _argv, _cwd, data) => {
