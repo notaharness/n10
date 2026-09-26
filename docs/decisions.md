@@ -167,6 +167,13 @@ Stop, terminal close and worktree removal terminate the matching session,
 including when no local connection exists. `removeWorktreeSession` owns shared
 stop/remove/delete operations with the captured repository.
 
+Worktree removal is one flow in core. `checkWorktreeRemoval` decides what the
+user must confirm (clear, a live agent, work only `force` removes, or a refusal)
+and each shell renders its own prompt from that verdict. `removeWorktreeSession`
+scans discovery before and after removing, so the shells learn of n10's
+removals through `onChanged`, as they learn of `git worktree remove`: discovery
+can only report the removal of a worktree it has seen.
+
 Carry output sequence numbers across reattachment and restart so mounted
 terminals accept subsequent chunks. Resize on fit and when `spawnedAt` changes,
 even if the session name and dimensions are unchanged. `paneTerminalGrid`
