@@ -18,11 +18,12 @@ import { usePublication, type Publication } from './publication.js';
 
 const EXPANDED_KEY = 'n10.fleet.expanded';
 
+/** Expanded unless this machine's user collapsed it. */
 function readExpanded(): boolean {
   try {
-    return localStorage.getItem(EXPANDED_KEY) === '1';
+    return localStorage.getItem(EXPANDED_KEY) !== '0';
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -30,7 +31,7 @@ function storeExpanded(expanded: boolean): void {
   try {
     localStorage.setItem(EXPANDED_KEY, expanded ? '1' : '0');
   } catch {
-    // A convenience only: the section opens collapsed next time.
+    // A convenience only: the section opens expanded next time.
   }
 }
 

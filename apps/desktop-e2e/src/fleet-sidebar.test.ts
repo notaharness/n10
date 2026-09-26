@@ -37,6 +37,16 @@ test.describe('Fleet in the sidebar', () => {
     });
   });
 
+  test('starts expanded, and remembers a collapse', async ({ desktop }) => {
+    const { page } = desktop;
+    await expect(fleetToggle(page)).toHaveAttribute('aria-expanded', 'true');
+    await expect(fleetView(page)).toBeVisible();
+    await collapseFleet(page);
+    await page.reload();
+    await expect(fleetToggle(page)).toHaveAttribute('aria-expanded', 'false');
+    await expect(fleetView(page)).toHaveCount(0);
+  });
+
   test('a running ceremony leaves the workspace usable', async ({
     desktop,
     beam,
@@ -96,9 +106,13 @@ test.describe('Fleet in the sidebar', () => {
         'Manage your machines, passkeys and fleet recovery in the sidebar’s Fleet section.'
       )
     ).toBeVisible();
+    // The sidebar's own, and no second one in Settings.
     await expect(
-      page.getByRole('button', { name: /Create a fleet/ })
-    ).toHaveCount(0);
+      page.getByRole('button', { name: 'Create a fleet' })
+    ).toHaveCount(1);
+    await expect(
+      fleetView(page).getByRole('button', { name: 'Create a fleet' })
+    ).toBeVisible();
 
     await page.getByRole('button', { name: 'Hide sidebar' }).click();
     await page.getByRole('button', { name: 'Show Fleet' }).click();
