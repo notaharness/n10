@@ -171,7 +171,7 @@ export interface FakeGitHub {
  * Install a fake `gh` for one test.
  *
  * Returns the environment additions the app must be launched with: a
- * bin directory at the front of PATH holding an executable named `gh`,
+ * PATH prefix holding an executable named `gh` (appEnv adds the base PATH),
  * and the scenario it should answer from. The GitHub provider shells
  * out to `gh` for every remote call, so this is the whole seam — no
  * production code knows it is under test.
@@ -219,7 +219,7 @@ export function installFakeGh(
   writeFileSync(scenarioPath, JSON.stringify(scenario, null, 2), 'utf8');
 
   return {
-    PATH: `${binDir}:${process.env.PATH ?? ''}`,
+    PATH: binDir,
     N10_FAKE_GH: scenarioPath,
     ...(scenario.latencyMs
       ? { N10_FAKE_GH_LATENCY_MS: String(scenario.latencyMs) }
