@@ -14,6 +14,8 @@ interface UserAgentData {
 }
 
 function osFrom(name: string): Platform['os'] {
+  // iOS user agents say `like Mac OS X`.
+  if (/iphone|ipad|ipod/i.test(name)) return undefined;
   if (/mac/i.test(name)) return 'mac';
   // Android's user agent names Linux too.
   if (/linux/i.test(name) && !/android/i.test(name)) return 'linux';

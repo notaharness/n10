@@ -24,7 +24,7 @@ function Heading({ title, note }: { title: string; note?: string }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
       <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-      <span className="text-fd-muted-foreground text-sm">{note}</span>
+      {note && <span className="text-fd-muted-foreground text-sm">{note}</span>}
     </div>
   );
 }
@@ -89,8 +89,8 @@ export default function DownloadPage() {
               <Heading title="Linux packages" note="x64 and arm64" />
               <p className="text-fd-muted-foreground mt-2 text-sm text-pretty">
                 n10 Desktop without Node.js, installed as{' '}
-                <code>n10-desktop</code>. The <code>n10</code> command, with the
-                terminal UI and <code>n10 util</code>, still comes from npm.
+                <code>n10-desktop</code>. The terminal UI and the{' '}
+                <code>n10</code> command in your own shell still come from npm.
               </p>
               <div className="mt-6 flex flex-col gap-6">
                 <Package format="deb" title=".deb">
@@ -98,11 +98,13 @@ export default function DownloadPage() {
                   Git with it.
                 </Package>
                 <Package format="appImage" title="AppImage">
-                  Any distribution. Where AppArmor blocks Electron&apos;s
-                  sandbox, as on Ubuntu 24.04 and later, it starts with{' '}
-                  <code>--no-sandbox</code> by itself. Sessions that outlive it
-                  can&apos;t run <code>n10 util</code> or <code>beam</code>{' '}
-                  until it runs again; the .deb has no such gap.
+                  Any distribution with libfuse2 (
+                  <code>sudo apt install libfuse2t64</code> on Ubuntu 24.04).
+                  Where AppArmor blocks Electron&apos;s sandbox, as on Ubuntu
+                  24.04 and later, it starts with <code>--no-sandbox</code> by
+                  itself. Sessions that outlive it can&apos;t run{' '}
+                  <code>n10 util</code> or <code>beam</code> until it runs
+                  again; the .deb has no such gap.
                 </Package>
               </div>
             </PlatformCard>
