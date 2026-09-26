@@ -27,6 +27,7 @@ let liveSessions = new Set<string>();
 /** Sessions whose agent exited: still in the registry, no longer alive. */
 let exitedSessions = new Set<string>();
 const killSessionMock = vi.fn();
+const checkWorktreeRemovalMock = vi.fn();
 
 vi.mock('@n10/core', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -35,13 +36,13 @@ vi.mock('@n10/core', async (importOriginal) => ({
     liveSessions.has(name) || exitedSessions.has(name),
   isSessionAlive: (name: string) => liveSessions.has(name),
   stopSession: (name: string) => killSessionMock(name),
+  checkWorktreeRemoval: (branch: string) => checkWorktreeRemovalMock(branch),
 }));
 
 vi.mock('@n10/worktree-manager', async (importOriginal) => ({
   ...(await importOriginal<typeof WorktreeManagerModule>()),
   listWorktrees: vi.fn(),
   listAllBranches: vi.fn(),
-  canRemoveBranch: vi.fn(),
   createWorktree: vi.fn(),
   rebaseOntoMaster: vi.fn(),
 }));
@@ -53,7 +54,6 @@ vi.mock('node:child_process', async (importOriginal) => ({
 
 import { spawn } from 'node:child_process';
 import {
-  canRemoveBranch,
   createWorktree,
   listAllBranches,
   listWorktrees,
@@ -280,7 +280,7 @@ beforeEach(() => {
   exitedSessions = new Set();
   vi.mocked(listWorktrees).mockResolvedValue([]);
   vi.mocked(listAllBranches).mockResolvedValue([]);
-  vi.mocked(canRemoveBranch).mockResolvedValue({ safe: true });
+  checkWorktreeRemovalMock.mockResolvedValue({ verdict: 'clear' });
   vi.mocked(createWorktree).mockResolvedValue(null);
   vi.mocked(rebaseOntoMaster).mockResolvedValue('success');
   vi.mocked(spawn).mockReturnValue({
@@ -538,6 +538,7 @@ describe('sidebar handler — delete-branch', () => {
     await t.settle();
 
     expect(t.asyncOps.run.mock.calls[0]?.[0]).toBe('check-delete');
+    expect(checkWorktreeRemovalMock).toHaveBeenCalledExactlyOnceWith('alpha');
     expect(t.sessions.performDelete).toHaveBeenCalledExactlyOnceWith(
       worktreeSessionKey('/wt/alpha'),
       'alpha'
@@ -546,7 +547,7 @@ describe('sidebar handler — delete-branch', () => {
   });
 
   it('asks yes/no before killing a still-running agent', async () => {
-    liveSessions.add(worktreeSessionKey('/wt/alpha'));
+    checkWorktreeRemovalMock.mockResolvedValue({ verdict: 'agent-running' });
     const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
     vi.mocked(listWorktrees).mockResolvedValue([
       worktree('/wt/alpha', 'alpha'),
@@ -566,13 +567,13 @@ describe('sidebar handler — delete-branch', () => {
   });
 
   it.each(['uncommitted changes', 'not pushed to upstream'])(
-    'requires typing the branch name when unsafe: %s',
+    'requires typing the branch name when forcing past: %s',
     async (reason) => {
       const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
       vi.mocked(listWorktrees).mockResolvedValue([
         worktree('/wt/alpha', 'alpha'),
       ]);
-      vi.mocked(canRemoveBranch).mockResolvedValue({ safe: false, reason });
+      checkWorktreeRemovalMock.mockResolvedValue({ verdict: 'force', reason });
 
       press(KEYS.deleteBranch(), t.ctx);
       await t.settle();
@@ -591,13 +592,13 @@ describe('sidebar handler — delete-branch', () => {
     }
   );
 
-  it('flashes and stops for a non-overridable unsafe reason', async () => {
+  it('flashes and stops when core refuses the removal', async () => {
     const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
     vi.mocked(listWorktrees).mockResolvedValue([
       worktree('/wt/alpha', 'alpha'),
     ]);
-    vi.mocked(canRemoveBranch).mockResolvedValue({
-      safe: false,
+    checkWorktreeRemovalMock.mockResolvedValue({
+      verdict: 'refused',
       reason: 'protected branch',
     });
 
@@ -623,7 +624,7 @@ describe('sidebar handler — delete-branch', () => {
     );
     expect(t.pane.setReconnectKey).toHaveBeenCalledOnce();
     expect(t.sessions.refreshSessions).toHaveBeenCalledOnce();
-    expect(canRemoveBranch).not.toHaveBeenCalled();
+    expect(checkWorktreeRemovalMock).not.toHaveBeenCalled();
   });
 
   it("uses the checkout's session for a running review PR", async () => {
