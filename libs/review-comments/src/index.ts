@@ -6,10 +6,13 @@ export type {
 export {
   commentDirPath,
   commentFilePath,
+  draftRepoKey,
+  isDraftRepoKey,
   readComments,
   appendComment,
   updateComment,
   removeComment,
+  type DraftScope,
 } from './lib/comment-store.js';
 export {
   postReviewComments,

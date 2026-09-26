@@ -193,6 +193,7 @@ interface CtxOpts {
 }
 
 const PR_ID = 1;
+const DRAFT_REPO = '0123456789abcdef';
 
 function makeCtx(
   pane: DiffViewerHandlerCtx['pane'],
@@ -236,6 +237,7 @@ function makeCommentCtx(opts: CtxOpts) {
   return {
     comments: opts.comments ?? [],
     prId: opts.prId ?? PR_ID,
+    drafts: { repo: DRAFT_REPO, prId: opts.prId ?? PR_ID },
     positions: opts.positions ?? new Map(),
     selectedReviewPr: {
       id: opts.prId ?? PR_ID,
@@ -682,7 +684,11 @@ describe('diff-viewer handler — post-comment', () => {
       asyncOpsRun: run,
     });
     handleDiffViewerInput('p', makeKey(), ctx);
-    expect(updateComment).toHaveBeenCalledWith(7, 'd1', { status: 'posting' });
+    expect(updateComment).toHaveBeenCalledWith(
+      { repo: DRAFT_REPO, prId: 7 },
+      'd1',
+      { status: 'posting' }
+    );
     expect(run).toHaveBeenCalledWith('post-comment', expect.any(Function));
   });
 
@@ -731,7 +737,11 @@ describe('diff-viewer handler — post-comment', () => {
     });
     handleDiffViewerInput('p', makeKey(), ctx);
     await captured!();
-    expect(updateComment).toHaveBeenCalledWith(7, 'd1', { status: 'draft' });
+    expect(updateComment).toHaveBeenCalledWith(
+      { repo: DRAFT_REPO, prId: 7 },
+      'd1',
+      { status: 'draft' }
+    );
     expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
       'Post failed: network down'
     );

@@ -31,6 +31,8 @@ const state = vi.hoisted(() => ({
   tmuxSnapshots: new Map<string, { incarnation: unknown }>(),
   onData: new Map<string, (data: string) => void>(),
   configByCwd: {} as Record<string, unknown>,
+  /** The project config each review launch was built from. */
+  reviewProjects: [] as unknown[],
   createFails: new Set<string>(),
   /** Prompts core's checkoutPlan delivered into a live agent. */
   injected: [] as { name: string; prompt: string }[],
@@ -181,11 +183,18 @@ vi.mock('@n10/core', async (importOriginal) => {
       },
       { name: 'Codex', agent: { id: 'codex' } },
     ],
-    buildReviewLaunchRequest: (pr: { id: number }, instruction?: string) => ({
-      intent: 'review',
-      prompt: `review #${pr.id}${instruction ? `: ${instruction}` : ''}`,
-      systemGuidance: 'guidance',
-    }),
+    buildReviewLaunchRequest: (
+      pr: { id: number },
+      project: unknown,
+      instruction?: string
+    ) => {
+      state.reviewProjects.push(project);
+      return {
+        intent: 'review',
+        prompt: `review #${pr.id}${instruction ? `: ${instruction}` : ''}`,
+        systemGuidance: 'guidance',
+      };
+    },
     launchSession: async (spec: {
       name: string;
       cwd: string;
@@ -274,6 +283,7 @@ beforeEach(async () => {
   state.tmuxSnapshots = new Map();
   state.onData = new Map();
   state.configByCwd = {};
+  state.reviewProjects = [];
   state.createFails = new Set();
   state.injected = [];
   state.checkoutFails = new Set();
@@ -874,6 +884,8 @@ describe('launchReviewAgent', () => {
       prompt: 'review #42: focus on error handling',
       systemGuidance: 'guidance',
     });
+    // The open repository's project names where the agent's drafts go.
+    expect(state.reviewProjects).toEqual([{ fromCwd: '/repo-a' }]);
   });
 
   it('rejects overlapping reviews with different instructions instead of dropping a prompt', async () => {

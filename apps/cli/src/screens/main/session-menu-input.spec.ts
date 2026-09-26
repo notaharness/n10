@@ -1,4 +1,5 @@
 import { worktreeSessionKey } from '@n10/core';
+import { draftRepoKey } from '@n10/review-comments';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type * as CoreModule from '@n10/core';
 import type * as WorktreeManagerModule from '@n10/worktree-manager';
@@ -143,7 +144,13 @@ function makeCtx(opts: {
     sessions,
     sidebar,
     terminal: { paneCols: 80, paneRows: 24 },
-    config: { config: { vendorAuth: {}, vendorProject: {} } },
+    config: {
+      config: {
+        vendor: 'github',
+        vendorAuth: {},
+        vendorProject: { owner: 'acme', repo: 'widgets' },
+      },
+    },
     selectedItem: opts.selectedItem,
     sessionNameForTerminal:
       opts.sessionName === undefined
@@ -356,6 +363,10 @@ describe('session menu — review', () => {
     expect(params.branch).toBe('feat/thing');
     expect(params.request.intent).toBe('continue-or-seed');
     expect(params.request.prompt).toContain('Review PR #7');
+    // The agent's drafts go under this repository's key.
+    expect(params.request.systemGuidance).toContain(
+      `--repo=${draftRepoKey('github', { owner: 'acme', repo: 'widgets' })}`
+    );
     expect(t.nav.setFocus).toHaveBeenCalledExactlyOnceWith('terminal');
   });
 

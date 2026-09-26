@@ -3,10 +3,14 @@ import { watch } from 'node:fs';
 import {
   readComments,
   commentDirPath,
+  type DraftScope,
   type ReviewComment,
 } from '@n10/review-comments';
 
-export function useReviewComments(prId: number | null): ReviewComment[] {
+export function useReviewComments(scope: DraftScope | null): ReviewComment[] {
+  // Primitives, so a scope rebuilt each render does not re-subscribe.
+  const repo = scope?.repo ?? null;
+  const prId = scope?.prId ?? null;
   // Revision counter bumped by file watcher to trigger re-reads
   const [revision, setRevision] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -16,9 +20,9 @@ export function useReviewComments(prId: number | null): ReviewComment[] {
   }, []);
 
   useEffect(() => {
-    if (prId === null) return;
+    if (repo === null || prId === null) return;
 
-    const dir = commentDirPath(prId);
+    const dir = commentDirPath({ repo, prId });
     let watcher: ReturnType<typeof watch> | null = null;
 
     try {
@@ -34,11 +38,12 @@ export function useReviewComments(prId: number | null): ReviewComment[] {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       watcher?.close();
     };
-  }, [prId, bumpRevision]);
+  }, [repo, prId, bumpRevision]);
 
-  // Derive comments from prId + revision (re-reads on file change or prId change)
+  // Derive comments from the scope + revision (re-reads on file change
+  // or scope change)
   return useMemo(
-    () => (prId !== null ? readComments(prId) : []),
+    () => (repo !== null && prId !== null ? readComments({ repo, prId }) : []),
     // `revision` reads as unnecessary because the body never looks at
     // it, and that is precisely its job: the watcher above bumps it
     // when the drafts file changes on disk, and re-reading the file is
@@ -48,6 +53,6 @@ export function useReviewComments(prId: number | null): ReviewComment[] {
     // useSyncExternalStore needs a referentially stable snapshot, which
     // readComments cannot give without a cache layer it does not have.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
-    [prId, revision]
+    [repo, prId, revision]
   );
 }

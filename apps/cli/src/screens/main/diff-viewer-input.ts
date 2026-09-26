@@ -23,7 +23,7 @@ function handleInlineEditMode(
 ): void {
   if (key.escape) {
     if (ctx.commentCtx) {
-      updateComment(ctx.commentCtx.prId, editingCommentId, {
+      updateComment(ctx.commentCtx.drafts, editingCommentId, {
         body: ctx.pane.editBuffer,
       });
     }
@@ -51,7 +51,7 @@ function handleDeleteConfirmMode(
   pendingDeleteCommentId: string
 ): void {
   if (input === 'y' && ctx.commentCtx) {
-    removeComment(ctx.commentCtx.prId, pendingDeleteCommentId);
+    removeComment(ctx.commentCtx.drafts, pendingDeleteCommentId);
     ctx.pane.setPendingDeleteCommentId(null);
     ctx.pane.setSelectedCommentId(null);
     return;

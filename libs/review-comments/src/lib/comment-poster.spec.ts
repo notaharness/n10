@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PostContext } from './comment-poster.js';
+import type { DraftScope } from './comment-store.js';
 import type { ReviewComment } from './types.js';
 
 /**
@@ -21,16 +22,21 @@ const env = vi.hoisted(() => ({
   fetches: [] as { url: string; init: RequestInit }[],
   fetchOk: true,
   fetchStatus: 200,
-  marked: [] as { id: string; patch: Record<string, unknown> }[],
+  marked: [] as {
+    scope: DraftScope;
+    id: string;
+    patch: Record<string, unknown>;
+  }[],
 }));
 
-vi.mock('./comment-store.js', () => ({
+vi.mock('./comment-store.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   updateComment: (
-    _prId: number,
+    scope: DraftScope,
     id: string,
     patch: Record<string, unknown>
   ) => {
-    env.marked.push({ id, patch });
+    env.marked.push({ scope, id, patch });
     return true;
   },
 }));
@@ -62,6 +68,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 const { postReviewComments } = await import('./comment-poster.js');
+const { draftRepoKey } = await import('./comment-store.js');
 
 function comment(over: Partial<ReviewComment> = {}): ReviewComment {
   return {
@@ -319,10 +326,26 @@ describe('marking comments posted', () => {
       [comment({ id: 'a' }), comment({ id: 'b' })],
       github
     );
-    expect(env.marked).toEqual([
+    expect(env.marked.map(({ id, patch }) => ({ id, patch }))).toEqual([
       { id: 'a', patch: { status: 'posted' } },
       { id: 'b', patch: { status: 'posted' } },
     ]);
+  });
+
+  /** A draft is stored under the repository it is for; marking another
+   *  repository's #7 would leave this one's draft to be posted twice. */
+  it('marks the drafts of the repository it posted to', async () => {
+    await postReviewComments([comment()], azure);
+    expect(env.marked.map((m) => m.scope)).toEqual([
+      { repo: draftRepoKey('azure-devops', azure.vendorProject), prId: 7 },
+    ]);
+  });
+
+  it('posts nothing when no repository is configured', async () => {
+    await expect(
+      postReviewComments([comment()], { ...azure, vendorProject: {} })
+    ).rejects.toThrow('No repository is configured');
+    expect(env.fetches).toEqual([]);
   });
 
   it('marks nothing when the post failed', async () => {

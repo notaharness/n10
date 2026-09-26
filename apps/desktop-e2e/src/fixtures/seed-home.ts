@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { draftRepoKey } from '@n10/review-comments';
 import {
   fakeGhProjectConfig,
   installFakeGh,
@@ -112,8 +113,8 @@ export function seedHome(
     'utf8'
   );
 
-  seedProjectConfig(n10, repoPath, opts);
-  seedDrafts(n10, opts.drafts);
+  const projectConfig = seedProjectConfig(n10, repoPath, opts);
+  seedDrafts(n10, projectConfig, opts.drafts);
 
   if (opts.desktopPrefs) {
     writeFileSync(
@@ -130,11 +131,11 @@ function seedProjectConfig(
   n10: string,
   repoPath: string,
   opts: Pick<HomeSeed, 'projectConfig' | 'fakeGitHub'>
-): void {
+): Record<string, unknown> | undefined {
   const projectConfig =
     opts.projectConfig ??
     (opts.fakeGitHub ? fakeGhProjectConfig(opts.fakeGitHub) : undefined);
-  if (!projectConfig) return;
+  if (!projectConfig) return undefined;
   // Per-project config lives under a hash of the repo path — see
   // projectKey() in @n10/vcs-core's config store.
   const key = createHash('sha256').update(repoPath).digest('hex').slice(0, 16);
@@ -145,18 +146,36 @@ function seedProjectConfig(
     JSON.stringify(projectConfig, null, 2),
     'utf8'
   );
+  return projectConfig;
 }
 
+/** Where the review agent writes a PR's drafts in this HOME:
+ *  ~/.n10/reviews/<repository key>/pr-<id>. */
+export function draftsFile(
+  n10: string,
+  projectConfig: Record<string, unknown> | undefined,
+  prId: number
+): string {
+  const repo = draftRepoKey(
+    projectConfig?.vendor as string | undefined,
+    (projectConfig?.vendorProject ?? {}) as Record<string, string>
+  );
+  if (!repo) throw new Error('Drafts need a project that names a repository');
+  return join(n10, 'reviews', repo, `pr-${prId}`, 'comments.json');
+}
+
+/** Drafts are stored per repository, so they need the project that
+ *  names it. */
 function seedDrafts(
   n10: string,
+  projectConfig: Record<string, unknown> | undefined,
   drafts: Record<number, unknown[]> | undefined
 ): void {
   for (const [prId, comments] of Object.entries(drafts ?? {})) {
-    // Same layout the review agent writes to: ~/.n10/reviews/pr-<id>.
-    const dir = join(n10, 'reviews', `pr-${prId}`);
-    mkdirSync(dir, { recursive: true });
+    const file = draftsFile(n10, projectConfig, Number(prId));
+    mkdirSync(dirname(file), { recursive: true });
     writeFileSync(
-      join(dir, 'comments.json'),
+      file,
       JSON.stringify({ prId: Number(prId), comments }, null, 2),
       'utf8'
     );

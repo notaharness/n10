@@ -1,4 +1,5 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
+import { draftRepoKey, type DraftScope } from '@n10/review-comments';
 import { useDiffData } from './useDiffData.js';
 import { useReviewComments } from './useReviewComments.js';
 import { useRemoteComments } from './useRemoteComments.js';
@@ -18,8 +19,16 @@ export function useDiffBundle(
   headSha: string | undefined
 ) {
   const diff = useDiffData(prNumber, sourceBranch, targetBranch, headSha);
-  const comments = useReviewComments(prNumber);
   const { provider, config } = useConfig();
+  // This repository's drafts for the PR: another repository's #7 is a
+  // different pull request.
+  const repo = draftRepoKey(config.vendor, config.vendorProject);
+  const draftScope = useMemo<DraftScope | null>(
+    () =>
+      repo !== null && prNumber !== null ? { repo, prId: prNumber } : null,
+    [repo, prNumber]
+  );
+  const comments = useReviewComments(draftScope);
   const { refreshPr, flashStatus } = useSessionActions();
   const onFetchError = useCallback(
     (msg: string) => flashStatus(`Failed to load comments: ${msg}`),
@@ -38,7 +47,7 @@ export function useDiffBundle(
     onResolvedChange,
     onFetchError
   );
-  return { ...diff, comments, remote };
+  return { ...diff, comments, draftScope, remote };
 }
 
 export type DiffBundle = ReturnType<typeof useDiffBundle>;

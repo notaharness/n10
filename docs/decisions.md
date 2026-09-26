@@ -266,6 +266,17 @@ Babysitter thread reads use the provider throttle and TTL outside the list-cycle
 budget. GitHub gets rollup and counts with its list query and needs no equivalent
 per-row cache-reset methods. `request-budget.spec.ts` checks request counts.
 
+## Review drafts
+
+A review agent's drafts live in `~/.n10/reviews/<repo>/pr-<id>/comments.json`.
+`<repo>` is `draftRepoKey`: a hash of the provider and the project fields the
+poster addresses (GitHub owner/repo, Azure org/project/repo), case-folded. A PR
+number alone is shared by every repository, and a draft read under the wrong
+one would be posted to it. The agent's worktree cannot derive the key, so the
+review launch names it (`add-comment --repo=`); the poster derives the same key
+from its own post context, so a draft is marked posted in the repository it was
+posted to.
+
 ## Diff generation and rendering
 
 PR diffs compare commits so review anchors remain stable. Bare worktree diffs

@@ -5,7 +5,11 @@ import {
   resolveComment,
   withAgentFooter,
 } from './conventional.js';
-import { updateComment } from './comment-store.js';
+import {
+  draftRepoKey,
+  updateComment,
+  type DraftScope,
+} from './comment-store.js';
 
 function execWithStdin(
   cmd: string,
@@ -75,12 +79,29 @@ export interface PostContext {
   headSha?: string;
 }
 
+/**
+ * The drafts a post marks as posted: those stored for the repository
+ * the post goes to. Derived here from the same project fields the
+ * request is addressed with, so the two cannot name different
+ * repositories. Settled before anything is sent: a comment posted but
+ * never marked would be posted again on the next try.
+ */
+function draftScopeOf(ctx: PostContext): DraftScope {
+  if (ctx.vendor !== 'github' && ctx.vendor !== 'azure-devops') {
+    throw new Error(`Unsupported vendor: ${String(ctx.vendor)}`);
+  }
+  const repo = draftRepoKey(ctx.vendor, ctx.vendorProject);
+  if (!repo) throw new Error('No repository is configured to post to');
+  return { repo, prId: ctx.prId };
+}
+
 export async function postReviewComments(
   comments: ReviewComment[],
   ctx: PostContext,
   event: 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES' = 'COMMENT'
 ): Promise<void> {
   assertPostable(comments);
+  const drafts = draftScopeOf(ctx);
   if (ctx.vendor === 'github') {
     await postGitHub(comments, ctx, event);
   } else if (ctx.vendor === 'azure-devops') {
@@ -91,7 +112,7 @@ export async function postReviewComments(
 
   // Mark all as posted
   for (const comment of comments) {
-    updateComment(ctx.prId, comment.id, { status: 'posted' });
+    updateComment(drafts, comment.id, { status: 'posted' });
   }
 }
 

@@ -7,6 +7,9 @@ import {
   openNewTerminalDialog,
 } from './setup/terminals.js';
 
+/** Any repository key will do: the command only needs a valid one. */
+const REPO_KEY = '0123456789abcdef';
+
 /**
  * A session the desktop launches reaches the app's own `n10` and `beam`
  * on its PATH, with no n10 CLI installed (the fixture PATH has none),
@@ -27,7 +30,7 @@ test.describe('Session PATH', () => {
     ).toBeVisible({ timeout: 15_000 });
     await focusTerminal(page);
     await page.keyboard.type(
-      'n10 util add-comment --pr=7 --file=a.ts --lineStart=1 --lineEnd=1 --severity=nit --body=from-a-session' +
+      `n10 util add-comment --repo=${REPO_KEY} --pr=7 --file=a.ts --lineStart=1 --lineEnd=1 --severity=nit --body=from-a-session` +
         ' && echo "beam=$(beam version) dir=$BEAM_CONFIG_DIR"\n',
       { delay: 10 }
     );
@@ -38,7 +41,7 @@ test.describe('Session PATH', () => {
     await expect(visibleText(page, /beam=\d+\.\d+\.\d+\S* dir=/)).toBeVisible();
     const stored = JSON.parse(
       readFileSync(
-        join(fixtureHome, '.n10', 'reviews', 'pr-7', 'comments.json'),
+        join(fixtureHome, '.n10', 'reviews', REPO_KEY, 'pr-7', 'comments.json'),
         'utf8'
       )
     ) as { comments: { body: string; file: string }[] };

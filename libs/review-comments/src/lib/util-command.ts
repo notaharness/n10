@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { appendComment } from './comment-store.js';
+import {
+  appendComment,
+  isDraftRepoKey,
+  type DraftScope,
+} from './comment-store.js';
 import { resolveComment } from './conventional.js';
 import type { CommentSeverity, ReviewComment } from './types.js';
 
@@ -29,11 +33,32 @@ export function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
+/**
+ * Which drafts the comment joins: the repository the review's launch
+ * instructions name, which keeps its #7 apart from every other
+ * repository's, and the pull request.
+ */
+function parseScope(parsed: Record<string, string>): DraftScope {
+  if (!isDraftRepoKey(parsed.repo)) {
+    console.error(
+      '--repo must be the repository key given in the review instructions'
+    );
+    process.exit(1);
+  }
+  const prId = parseInt(parsed.pr, 10);
+  if (isNaN(prId)) {
+    console.error('--pr must be a number');
+    process.exit(1);
+  }
+  return { repo: parsed.repo, prId };
+}
+
 function handleAddComment(args: string[]): void {
   const parsed = parseArgs(args);
 
   const missing: string[] = [];
   for (const field of [
+    'repo',
     'pr',
     'file',
     'lineStart',
@@ -46,7 +71,7 @@ function handleAddComment(args: string[]): void {
   if (missing.length > 0) {
     console.error(`Missing required fields: ${missing.join(', ')}`);
     console.error(
-      'Usage: n10 util add-comment --pr=<id> --file=<path> --lineStart=<n> --lineEnd=<n> --severity=<critical|major|minor|nit> --body=<text> [--side=LEFT|RIGHT] [--thread=<id>]'
+      'Usage: n10 util add-comment --repo=<key> --pr=<id> --file=<path> --lineStart=<n> --lineEnd=<n> --severity=<critical|major|minor|nit> --body=<text> [--side=LEFT|RIGHT] [--thread=<id>]'
     );
     process.exit(1);
   }
@@ -65,11 +90,7 @@ function handleAddComment(args: string[]): void {
     process.exit(1);
   }
 
-  const prId = parseInt(parsed.pr, 10);
-  if (isNaN(prId)) {
-    console.error('--pr must be a number');
-    process.exit(1);
-  }
+  const scope = parseScope(parsed);
 
   const lineStart = parseInt(parsed.lineStart, 10);
   const lineEnd = parseInt(parsed.lineEnd, 10);
@@ -100,7 +121,7 @@ function handleAddComment(args: string[]): void {
     ...(parsed.thread ? { threadId: parsed.thread } : {}),
   };
 
-  appendComment(prId, comment);
+  appendComment(scope, comment);
   console.log(comment.id);
 }
 

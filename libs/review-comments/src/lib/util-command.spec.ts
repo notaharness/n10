@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
@@ -56,7 +56,9 @@ describe('add-comment', () => {
   let util: typeof Util;
 
   const PR = 7;
+  const REPO = '0123456789abcdef';
   const BASE = [
+    `--repo=${REPO}`,
     `--pr=${PR}`,
     '--file=src/undo.c',
     '--lineStart=12',
@@ -88,7 +90,14 @@ describe('add-comment', () => {
    * nothing about the file that is actually the contract.
    */
   const stored = (): ReviewComment[] => {
-    const path = join(home, '.n10', 'reviews', `pr-${PR}`, 'comments.json');
+    const path = join(
+      home,
+      '.n10',
+      'reviews',
+      REPO,
+      `pr-${PR}`,
+      'comments.json'
+    );
     return (
       JSON.parse(readFileSync(path, 'utf8')) as {
         comments: ReviewComment[];
@@ -129,6 +138,7 @@ describe('add-comment', () => {
   it('raises the stored severity to match a louder header in the body', async () => {
     await util.handleUtilCommand([
       'add-comment',
+      `--repo=${REPO}`,
       `--pr=${PR}`,
       '--file=src/undo.c',
       '--lineStart=12',
@@ -142,6 +152,7 @@ describe('add-comment', () => {
   it('will not let an accidental label quieten the declared severity', async () => {
     await util.handleUtilCommand([
       'add-comment',
+      `--repo=${REPO}`,
       `--pr=${PR}`,
       '--file=src/undo.c',
       '--lineStart=12',
@@ -150,6 +161,30 @@ describe('add-comment', () => {
       '--body=Note: this drops writes on crash',
     ]);
     expect(stored()[0].severity).toBe('critical');
+  });
+
+  /** Without a repository the draft would land under a bare PR
+   *  number, which every repository has. */
+  it.each([
+    ['missing', BASE.filter((a) => !a.startsWith('--repo='))],
+    ['not a key', [...BASE.slice(1), '--repo=../elsewhere']],
+  ])('refuses a --repo that is %s', async (_, args) => {
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('exit');
+    });
+    const error = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    try {
+      await expect(
+        util.handleUtilCommand(['add-comment', ...args])
+      ).rejects.toThrow('exit');
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(existsSync(join(home, '.n10', 'reviews'))).toBe(false);
+    } finally {
+      exit.mockRestore();
+      error.mockRestore();
+    }
   });
 
   it('leaves threadId off a draft that answers nothing', async () => {

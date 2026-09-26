@@ -1,7 +1,8 @@
-import type { PullRequestInfo } from '@n10/vcs-core';
+import type { AppConfig, PullRequestInfo } from '@n10/vcs-core';
 import {
   CONVENTIONAL_DECORATIONS,
   CONVENTIONAL_LABELS,
+  draftRepoKey,
 } from '@n10/review-comments';
 import type { LaunchRequest } from './launch-session.js';
 
@@ -18,14 +19,23 @@ export function buildReviewLaunchRequest(
     PullRequestInfo,
     'id' | 'title' | 'sourceBranch' | 'targetBranch' | 'createdByDisplayName'
   >,
+  project: Pick<AppConfig, 'vendor' | 'vendorProject'>,
   additionalInstruction?: string
 ): LaunchRequest {
+  // The agent's drafts are stored per repository, and the agent's
+  // worktree cannot tell it which one: the key comes from the
+  // reviewer's own project config.
+  const repo = draftRepoKey(project.vendor, project.vendorProject);
+  if (!repo) {
+    throw new Error('No repository is configured for review comments');
+  }
   // Reusable how-to guidance (installed as a system prompt for agents
   // that support it, e.g. Claude; folded into the prompt otherwise).
   const systemGuidance =
     `To add review comments, use this command:\n` +
-    `  n10 util add-comment --pr=${pr.id} --file=<path> --lineStart=<n> --lineEnd=<n> --severity=<critical|major|minor|nit> --body="<comment>"\n\n` +
+    `  n10 util add-comment --repo=${repo} --pr=${pr.id} --file=<path> --lineStart=<n> --lineEnd=<n> --severity=<critical|major|minor|nit> --body="<comment>"\n\n` +
     `Rules:\n` +
+    `- Pass --repo exactly as given: it names the repository this pull request belongs to\n` +
     `- File paths are relative to the repo root\n` +
     `- lineStart/lineEnd are 1-based line numbers in the NEW version of the file\n` +
     `- Use --side=LEFT only when commenting on removed/deleted lines\n` +

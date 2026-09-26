@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as ReviewCommentsModule from '@n10/review-comments';
-import type { ReviewComment } from '@n10/review-comments';
+import type { DraftScope, ReviewComment } from '@n10/review-comments';
 
 /**
  * Draft posting is the one host path that mutates somebody else's
@@ -13,6 +13,8 @@ import type { ReviewComment } from '@n10/review-comments';
 
 const state = vi.hoisted(() => ({
   comments: [] as ReviewComment[],
+  /** Every scope the store was asked to read or write. */
+  scopes: [] as DraftScope[],
   config: {} as Record<string, unknown>,
   posts: [] as { ids: string[]; event: string }[],
   failOn: null as string | null,
@@ -26,42 +28,59 @@ vi.mock('@n10/vcs-core', () => ({
   readConfig: () => state.config,
 }));
 
-vi.mock('@n10/review-comments', async () => ({
-  // The real one: settling a body's header against its severity is
-  // logic under test here, not a collaborator to stub out.
-  resolveComment: (
-    await vi.importActual<typeof ReviewCommentsModule>('@n10/review-comments')
-  ).resolveComment,
-  readComments: () => state.comments.map((c) => ({ ...c })),
-  updateComment: (_prId: number, id: string, patch: Partial<ReviewComment>) => {
-    const found = state.comments.find((c) => c.id === id);
-    if (!found) return false;
-    Object.assign(found, patch);
-    return true;
-  },
-  removeComment: (_prId: number, id: string) => {
-    const before = state.comments.length;
-    state.comments = state.comments.filter((c) => c.id !== id);
-    return state.comments.length < before;
-  },
-  postReviewComments: (
-    comments: ReviewComment[],
-    _ctx: unknown,
-    event: string
-  ) => {
-    const ids = comments.map((c) => c.id);
-    state.posts.push({ ids, event });
-    if (state.failOn && ids.includes(state.failOn)) {
-      return Promise.reject(new Error('provider said no'));
-    }
-    for (const c of comments) {
-      const found = state.comments.find((x) => x.id === c.id);
-      if (found) found.status = 'posted';
-    }
-    return Promise.resolve(undefined);
-  },
-}));
+vi.mock('@n10/review-comments', async () => {
+  const actual = await vi.importActual<typeof ReviewCommentsModule>(
+    '@n10/review-comments'
+  );
+  return {
+    // The real ones: settling a body's header against its severity,
+    // and which repository a project's drafts belong to, are logic
+    // under test here, not collaborators to stub out.
+    resolveComment: actual.resolveComment,
+    draftRepoKey: actual.draftRepoKey,
+    readComments: (scope: DraftScope) => {
+      state.scopes.push(scope);
+      return state.comments.map((c) => ({ ...c }));
+    },
+    updateComment: (
+      scope: DraftScope,
+      id: string,
+      patch: Partial<ReviewComment>
+    ) => {
+      state.scopes.push(scope);
+      const found = state.comments.find((c) => c.id === id);
+      if (!found) return false;
+      Object.assign(found, patch);
+      return true;
+    },
+    removeComment: (scope: DraftScope, id: string) => {
+      state.scopes.push(scope);
+      const before = state.comments.length;
+      state.comments = state.comments.filter((c) => c.id !== id);
+      return state.comments.length < before;
+    },
+    postReviewComments: (
+      comments: ReviewComment[],
+      _ctx: unknown,
+      event: string
+    ) => {
+      const ids = comments.map((c) => c.id);
+      state.posts.push({ ids, event });
+      if (state.failOn && ids.includes(state.failOn)) {
+        return Promise.reject(new Error('provider said no'));
+      }
+      for (const c of comments) {
+        const found = state.comments.find((x) => x.id === c.id);
+        if (found) found.status = 'posted';
+      }
+      return Promise.resolve(undefined);
+    },
+  };
+});
 
+const ReviewComments = await vi.importActual<typeof ReviewCommentsModule>(
+  '@n10/review-comments'
+);
 const {
   deleteDraftComment,
   listDraftComments,
@@ -75,7 +94,12 @@ function draft(id: string, status: ReviewComment['status'] = 'draft') {
 
 beforeEach(() => {
   state.comments = [draft('a'), draft('b'), draft('c')];
-  state.config = { vendor: 'github', vendorAuth: {}, vendorProject: {} };
+  state.scopes = [];
+  state.config = {
+    vendor: 'github',
+    vendorAuth: {},
+    vendorProject: { owner: 'acme', repo: 'widgets' },
+  };
   state.posts = [];
   state.failOn = null;
 });
@@ -102,6 +126,32 @@ describe('PR id validation', () => {
 
   it('accepts a positive integer', () => {
     expect(() => listDraftComments(42)).not.toThrow();
+  });
+});
+
+describe('the drafts a PR id means', () => {
+  const widgets = ReviewComments.draftRepoKey('github', {
+    owner: 'acme',
+    repo: 'widgets',
+  });
+
+  /** Every repository has a #7; the open one decides whose. */
+  it('are the open repository’s, for every read and write', async () => {
+    listDraftComments(7);
+    updateDraftComment(7, 'a', { body: 'x' });
+    deleteDraftComment(7, 'b');
+    await postDraftComments({ prId: 7, headSha: 'sha' });
+    expect(new Set(state.scopes.map((s) => JSON.stringify(s)))).toEqual(
+      new Set([JSON.stringify({ repo: widgets, prId: 7 })])
+    );
+  });
+
+  it('are none when the project names no repository', () => {
+    state.config = { vendor: 'github', vendorAuth: {}, vendorProject: {} };
+    expect(listDraftComments(7)).toEqual([]);
+    expect(() => updateDraftComment(7, 'a', { body: 'x' })).toThrow(
+      'No repository is configured'
+    );
   });
 });
 
@@ -212,7 +262,11 @@ describe('postDraftComments', () => {
   });
 
   it('does not require a head SHA on Azure DevOps', async () => {
-    state.config = { vendor: 'azure-devops', vendorAuth: {} };
+    state.config = {
+      vendor: 'azure-devops',
+      vendorAuth: {},
+      vendorProject: { org: 'acme', project: 'p', repo: 'widgets' },
+    };
     await expect(postDraftComments({ prId: 1 })).resolves.toBe(3);
   });
 });

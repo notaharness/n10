@@ -192,9 +192,13 @@ export {
 export async function launchReviewAgent(req: ReviewLaunchRequest): Promise<{
   name: string;
 }> {
-  requireRepo();
+  const repoCwd = requireRepo();
   const branch = req.pr.sourceBranch;
-  const request = buildReviewLaunchRequest(req.pr, req.instruction);
+  const request = buildReviewLaunchRequest(
+    req.pr,
+    readConfig(repoCwd),
+    req.instruction
+  );
   return launchAgent({
     branch,
     intent: 'seed',

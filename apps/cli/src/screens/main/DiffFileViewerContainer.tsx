@@ -111,14 +111,16 @@ export function DiffFileViewerContainer({
         diffTotalRows,
         rowMap,
         sectionAnchorRows,
-        commentCtx: selectedPr
-          ? {
-              comments: diffBundle.comments,
-              prId: selectedPr.id,
-              positions: commentPositions,
-              selectedReviewPr: selectedPr,
-            }
-          : undefined,
+        commentCtx:
+          selectedPr && diffBundle.draftScope
+            ? {
+                comments: diffBundle.comments,
+                prId: selectedPr.id,
+                drafts: diffBundle.draftScope,
+                positions: commentPositions,
+                selectedReviewPr: selectedPr,
+              }
+            : undefined,
         remoteCtx: {
           threads: fileRemoteThreads,
           replyToThread: diffBundle.remote.replyToThread,
