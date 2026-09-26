@@ -10,7 +10,9 @@ import {
   tabs,
   visibleText,
 } from './setup/app.js';
+import { execFileSync } from 'node:child_process';
 import { renameSync } from 'node:fs';
+import { join } from 'node:path';
 import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 
 /**
@@ -105,6 +107,32 @@ test.describe('Tabs across repositories', () => {
     // And it closes like any other tab.
     await tab(page, new RegExp(BRANCH)).getByLabel('Close tab').click();
     await expect(tab(page, new RegExp(BRANCH))).toHaveCount(0);
+  });
+
+  // Nothing watches a repository while another is open, so the removal
+  // is found when alpha opens again — and its tab has to go then rather
+  // than wait on a row that will never come back.
+  test('a worktree removed while its repository was closed takes its tab with it', async ({
+    desktop,
+  }) => {
+    const { page, repoPath } = desktop;
+    await createWorktree(page, BRANCH);
+    await expect(tab(page, new RegExp(BRANCH))).toBeVisible();
+
+    await switchRepo(page, otherRepo);
+    await expect(
+      tab(page, new RegExp(`${ALPHA}\\s*/\\s*${BRANCH}`))
+    ).toBeVisible();
+    execFileSync(
+      'git',
+      ['worktree', 'remove', join(repoPath, '.claude', 'worktrees', BRANCH)],
+      { cwd: repoPath, stdio: 'ignore' }
+    );
+
+    await switchRepo(page, repoPath);
+    await expect(tab(page, new RegExp(BRANCH))).toHaveCount(0, {
+      timeout: 20_000,
+    });
   });
 
   test('two repositories keep a tab each for the same branch name', async ({

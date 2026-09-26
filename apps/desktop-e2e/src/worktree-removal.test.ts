@@ -1,7 +1,7 @@
 import { sessionBranch } from './setup/session-keys.js';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import {
@@ -126,6 +126,44 @@ test.describe('Worktree removal', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(sidebarRow(page, new RegExp(BRANCH))).toBeVisible();
   });
+});
+
+/**
+ * Removing a worktree without n10 — from a shell, a script, another
+ * tool. The app has to notice on its own, and a tab left behind would
+ * sit on a loading screen forever waiting for a row that is gone.
+ * Nothing is pressed after the removal: noticing is the whole point.
+ */
+test.describe('Worktree removed outside n10', () => {
+  const removals: [string, (repoPath: string, dir: string) => void][] = [
+    [
+      'git worktree remove',
+      (repoPath, dir) =>
+        execFileSync('git', ['worktree', 'remove', dir], {
+          cwd: repoPath,
+          stdio: 'ignore',
+        }),
+    ],
+    [
+      'deleting its directory',
+      (_repoPath, dir) => rmSync(dir, { recursive: true, force: true }),
+    ],
+  ];
+
+  for (const [how, remove] of removals) {
+    test(`${how} closes its tab and drops its row`, async ({ desktop }) => {
+      const { page, repoPath } = desktop;
+      await createWorktree(page, BRANCH);
+      await expect(tab(page, new RegExp(BRANCH))).toBeVisible();
+
+      remove(repoPath, join(repoPath, '.claude', 'worktrees', BRANCH));
+
+      await expect(tab(page, new RegExp(BRANCH))).toHaveCount(0, {
+        timeout: 20_000,
+      });
+      await expect(sidebarRow(page, new RegExp(BRANCH))).toHaveCount(0);
+    });
+  }
 });
 
 test.describe('Worktree removal (running agent)', () => {

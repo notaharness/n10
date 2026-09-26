@@ -2,7 +2,13 @@ import type { Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
-import { newWorktreeButton, sidebar, sidebarRow, tabs } from './setup/app.js';
+import {
+  createWorktree,
+  newWorktreeButton,
+  sidebar,
+  sidebarRow,
+  tabs,
+} from './setup/app.js';
 import { armContextMenuChoice } from './setup/menu.js';
 
 /**
@@ -169,30 +175,26 @@ test.describe('A worktree whose directory was deleted', () => {
     repo: { worktrees: [{ branch: 'ghost', deleteDirectory: true }] },
   });
 
-  test('does not stop the app from starting', async ({ desktop }) => {
-    // git still has the registration; every path that shells into the
-    // directory now fails. The window must still come up.
-    await workspaceIsUsable(desktop.page);
-    await expect(sidebarRow(desktop.page, /ghost/)).toBeVisible();
-  });
-
-  test('can still be removed, which is how the user cleans it up', async ({
+  // git keeps the registration until something prunes it, but there is
+  // no checkout left: the worktree is gone, as if removed.
+  test('does not stop the app from starting, and has no row', async ({
     desktop,
   }) => {
-    const { page, app } = desktop;
-    // git keeps listing a worktree whose directory is gone until
-    // something prunes it, so the row is there to act on.
-    const row = sidebarRow(page, /ghost/);
-    await expect(row).toBeVisible();
+    await workspaceIsUsable(desktop.page);
+    await expect(sidebarRow(desktop.page, /ghost/)).toHaveCount(0);
+  });
 
-    await armContextMenuChoice(app, 'Remove worktree…');
-    await row.click({ button: 'right' });
-    const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText('Remove worktree?')).toBeVisible();
-    await dialog
-      .getByRole('button', { name: /^(Remove|Force remove)$/ })
-      .click();
+  // The registration keeps the branch checked out as far as git is
+  // concerned; checking it out again has to clear it first.
+  test('checks its branch out again', async ({ desktop }) => {
+    const { page, repoPath } = desktop;
+    await workspaceIsUsable(page);
 
-    await expect(sidebarRow(page, /ghost/)).toHaveCount(0);
+    await createWorktree(page, 'ghost');
+
+    await expect(sidebarRow(page, /ghost/)).toBeVisible();
+    expect(existsSync(join(repoPath, '.claude', 'worktrees', 'ghost'))).toBe(
+      true
+    );
   });
 });
