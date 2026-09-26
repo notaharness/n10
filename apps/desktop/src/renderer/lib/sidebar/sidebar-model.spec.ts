@@ -328,8 +328,6 @@ describe('prStatusIndicator', () => {
     expect(call([], 'succeeded').tone).toBe('muted');
   });
 
-  /** Azure lists a teammate's vote for a team twice: on the team's row
-   *  and on the teammate's own, which names the team in `votedFor`. */
   it('counts a team answered by a listed teammate as one vote', () => {
     const team = 'vstfs:///Classification/TeamProject/proj\\Core Team';
     const out = prStatusIndicator(
