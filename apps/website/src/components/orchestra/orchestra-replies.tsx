@@ -1,3 +1,5 @@
+import { withCode } from '@/components/inline-code';
+
 /**
  * One pair of real orchestrator replies from the benchmark in
  * notaharness/plugins#9, from two drafts of the unreleased guidance
@@ -17,13 +19,6 @@ const pair = {
     'should slugs be ASCII-only ("cafe-uber") or keep Unicode letters ("café-über")?',
   ],
 };
-
-/** Renders `backticked` spans as code, the rest as text. */
-function withCode(line: string) {
-  return line
-    .split('`')
-    .map((part, i) => (i % 2 === 1 ? <code key={part}>{part}</code> : part));
-}
 
 function Quotes({ label, lines }: { label: string; lines: string[] }) {
   return (
