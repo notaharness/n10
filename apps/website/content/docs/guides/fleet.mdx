@@ -3,17 +3,23 @@ title: Run agents on your other machines
 description: Join your machines into a Beam fleet from n10 Desktop, then launch worktrees, agents and terminals on any of them.
 ---
 
-Fleet is n10 Desktop's view of your [Beam](/docs/beam) fleet: the machines
-you own, joined under one passkey. Once the fleet has a second machine, you
-can launch worktrees, agents and terminals on it from this one.
+Fleet shows your [Beam](/docs/beam) fleet in n10 Desktop: the machines you
+own, joined under one passkey. Once the fleet has a second machine, you can
+launch worktrees, agents and terminals on it from this one.
 
-Open it with the **Fleet** button in the title bar. Your passkey provider
-must support the WebAuthn PRF extension; Fleet's **Passkey compatibility**
-note lists what vendors document.
+Fleet is a section at the bottom of the sidebar, below your repositories.
+Before you open a repository, it sits beside the repository picker. It
+starts expanded; click its header to collapse it, and the header then shows
+the fleet's state. The machine count in the status bar, and **Show Fleet**
+in Settings → Machines, bring it back into view. Setting up, pairing, adding
+a machine and resetting all happen inside the section.
+
+Your passkey provider must support the WebAuthn PRF extension; Fleet's
+**Passkey compatibility** note lists what vendors document.
 
 ## Create a fleet
 
-On your first machine, open Fleet and choose **Create a fleet**. Name this
+On your first machine, choose **Create a fleet** in the Fleet section. Name this
 machine and the fleet, or keep the defaults, and choose **Create fleet**.
 Two passkey prompts follow:
 
@@ -26,7 +32,7 @@ fingerprint as n10 before you approve. Each link expires after five minutes.
 
 ## Add a machine
 
-- **Another machine with n10 Desktop**: open Fleet there, choose
+- **Another machine with n10 Desktop**: in its Fleet section, choose
   **Join an existing fleet**, name the machine and choose **Join fleet**.
   Approve **Authorize this machine** with the fleet's existing passkey; don't
   create a new one.
@@ -39,7 +45,7 @@ fingerprint as n10 before you approve. Each link expires after five minutes.
   ```
 
 After joining, compare the fleet fingerprint on the new machine with the one
-in Fleet on a machine already in the fleet (`beam status` on a headless
+in the Fleet section of a machine already in the fleet (`beam status` on a headless
 one). In n10, answer **Fingerprints match** or **They don't match**. If they
 don't match, the machine joined a different fleet: choose
 **Reset fleet on this machine…** and join again.
@@ -51,7 +57,7 @@ dialog get a **Machine** selector, and the command palette gets
 **Open terminal on buildbox** for each connected machine.
 
 The worktree, the tmux session and the agent all run on the machine you
-pick, and the terminal shows up in n10 like any other. That machine needs:
+pick, for a new branch or an existing one, and the terminal shows up in n10 like any other. That machine needs:
 
 - a clone of the repository at the same path as on this machine;
 - tmux 3.2 or newer;
@@ -75,12 +81,15 @@ An [Orchestra](/docs/orchestra) player started on another machine with
 `--machine` reports back over Beam. While n10 Desktop runs, it delivers those
 reports to the orchestrator on this machine: a Claude session, or an agent
 session n10 started, and only from machines allowed
-**Shells and messages**.
+**Shells and messages**. n10 doesn't deliver to a Codex orchestrator; run
+Orchestra's `relay.sh` for that, as its
+[README](https://github.com/notaharness/plugins/tree/main/orchestra#other-machines)
+describes.
 
 ## Revoke a machine, or start over
 
-Choose **Revoke buildbox…** from a machine's menu and approve one passkey
-prompt. The fleet stops accepting that machine for good. Revoking doesn't
+Choose **Revoke buildbox…** from a machine's menu. A dialog opens; approve
+its one passkey prompt. The fleet stops accepting that machine for good. Revoking doesn't
 erase anything on it.
 
 **Reset fleet on this machine…** takes this machine out of its fleet, so you
@@ -90,7 +99,9 @@ again.
 
 ## Limitations
 
-- Checking out an existing branch, removing a branch and rebasing are not
-  yet supported on another machine.
+- On another machine, n10 can launch an agent on a new or existing branch,
+  but can't yet check out a branch on its own, remove a worktree or rebase.
+- Plans go to an agent on this machine only; see
+  [plans](/docs/guides/plans).
 - The terminal UI has no Fleet.
 - Headless machines must run macOS or Linux.
