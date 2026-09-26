@@ -277,6 +277,11 @@ review launch names it (`add-comment --repo=`); the poster derives the same key
 from its own post context, so a draft is marked posted in the repository it was
 posted to.
 
+Agents, the TUI and the desktop all rewrite the file. Each read-modify-write
+runs under an O_EXCL lock file beside it; a lock older than five seconds belongs
+to a dead writer and is taken over. Readers take no lock: writes go to a unique
+temporary file and are renamed into place.
+
 ## Diff generation and rendering
 
 PR diffs compare commits so review anchors remain stable. Bare worktree diffs

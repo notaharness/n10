@@ -1,13 +1,17 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import {
+  existsSync,
   mkdtempSync,
   readdirSync,
   rmSync,
+  utimesSync,
   writeFileSync,
   mkdirSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as CommentStore from './comment-store.js';
 import type { ReviewComment } from './types.js';
@@ -189,14 +193,115 @@ describe('appendComment', () => {
     expect(stored).toHaveLength(2);
   });
 
-  it('leaves no temporary file behind', () => {
+  it('leaves neither a temporary file nor its lock behind', () => {
     // Writes go to a .tmp and are renamed into place, so a reader never
     // sees a partial file. A leftover .tmp means the rename did not
-    // happen.
+    // happen; a leftover .lock would stall the next writer.
     store.appendComment(SCOPE, comment('one'));
     const entries = readdirSync(store.commentDirPath(SCOPE));
     expect(entries).toEqual(['comments.json']);
   });
+
+  it('takes over a lock left by a writer that died holding it', () => {
+    const lock = `${store.commentFilePath(SCOPE)}.lock`;
+    mkdirSync(store.commentDirPath(SCOPE), { recursive: true });
+    writeFileSync(lock, '');
+    const aMinuteAgo = new Date(Date.now() - 60_000);
+    utimesSync(lock, aMinuteAgo, aMinuteAgo);
+
+    store.appendComment(SCOPE, comment('one'));
+    expect(store.readComments(SCOPE).map((c) => c.id)).toEqual(['one']);
+    expect(existsSync(lock)).toBe(false);
+  });
+});
+
+/**
+ * Review agents append through their own `n10 util add-comment`
+ * processes while the TUI or the desktop edits and posts, so two
+ * processes can be inside a read-modify-write at once. Real processes,
+ * because the store is synchronous: nothing within one can interleave.
+ */
+describe('concurrent writers', () => {
+  const storeSource = fileURLToPath(
+    new URL('./comment-store.ts', import.meta.url)
+  );
+
+  /**
+   * A process that appends `id`. Its reads of the drafts file stop
+   * after reading until `go` exists, which holds a writer between its
+   * read and its write for as long as the test needs it there; `read-<id>`
+   * says that it has read.
+   */
+  function writer(bundle: string, id: string) {
+    const code = `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const read = fs.readFileSync;
+      fs.readFileSync = function (path, ...rest) {
+        const value = read.call(this, path, ...rest);
+        if (String(path).endsWith('comments.json')) {
+          fs.writeFileSync(${JSON.stringify(
+            join(home, 'read-')
+          )} + ${JSON.stringify(id)}, '');
+          while (!fs.existsSync(${JSON.stringify(join(home, 'go'))})) {
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+          }
+        }
+        return value;
+      };
+      syncBuiltinESMExports();
+      const { appendComment } = await import(${JSON.stringify(bundle)});
+      appendComment(${JSON.stringify(SCOPE)}, ${JSON.stringify(comment(id))});
+    `;
+    const child = spawn(process.execPath, ['--input-type=module', '-e', code], {
+      env: { ...process.env, HOME: home },
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    let stderr = '';
+    child.stderr.on('data', (d) => (stderr += d));
+    return new Promise<{ code: number | null; stderr: string }>((resolve) =>
+      child.on('close', (code) => resolve({ code, stderr }))
+    );
+  }
+
+  const until = async (done: () => boolean, ms: number) => {
+    const deadline = Date.now() + ms;
+    while (!done() && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  };
+
+  it('keeps both comments when two processes append at once', async () => {
+    const bundle = join(home, 'comment-store.mjs');
+    await build({
+      entryPoints: [storeSource],
+      outfile: bundle,
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      logLevel: 'silent',
+    });
+    // The file has to exist for a writer to be held after reading it.
+    store.appendComment(SCOPE, comment('seed'));
+
+    const hasRead = (id: string) => existsSync(join(home, `read-${id}`));
+    const writers = [writer(bundle, 'one'), writer(bundle, 'two')];
+    // Without a lock both read the same snapshot and wait here; with
+    // one, the second is still waiting for the lock when this gives up.
+    await until(() => hasRead('one') || hasRead('two'), 5_000);
+    await until(() => hasRead('one') && hasRead('two'), 500);
+    writeFileSync(join(home, 'go'), '');
+
+    for (const result of await Promise.all(writers)) {
+      expect(result).toEqual({ code: 0, stderr: '' });
+    }
+    expect(
+      store
+        .readComments(SCOPE)
+        .map((c) => c.id)
+        .sort()
+    ).toEqual(['one', 'seed', 'two']);
+  }, 20_000);
 });
 
 describe('updateComment', () => {
