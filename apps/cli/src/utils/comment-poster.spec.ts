@@ -15,6 +15,13 @@ vi.mock('@n10/review-comments', async (importOriginal) => {
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
 function makeComment(overrides?: Partial<ReviewComment>): ReviewComment {
   return {
     id: 'c1',
@@ -36,11 +43,7 @@ describe('postAzureDevOps via fetch()', () => {
   });
 
   it('sends correct URL, auth header, and thread body', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: () => Promise.resolve(''),
-    });
+    mockFetch.mockResolvedValue(json({ id: 1 }));
 
     const comment = makeComment();
     await postReviewComments([comment], {
@@ -75,11 +78,7 @@ describe('postAzureDevOps via fetch()', () => {
   });
 
   it('throws on non-ok response', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 401,
-      text: () => Promise.resolve('Unauthorized'),
-    });
+    mockFetch.mockResolvedValue(json({}, 401));
 
     await expect(
       postReviewComments([makeComment()], {
@@ -88,7 +87,7 @@ describe('postAzureDevOps via fetch()', () => {
         vendorProject: { org: 'o', project: 'p', repo: 'r' },
         prId: 1,
       })
-    ).rejects.toThrow('Azure DevOps API 401');
+    ).rejects.toThrow('Azure DevOps rejected the access token');
   });
 });
 

@@ -8,6 +8,7 @@ import {
 } from './build-status.js';
 import { deriveBuildRunStatus } from './builds.js';
 import { resetAdoTransport } from './request.js';
+import { createPullRequestThread } from './threads.js';
 import {
   parseReviewer,
   parsePullRequest,
@@ -1801,5 +1802,101 @@ describe('fetchCommentThreads thread anchoring', () => {
       },
     ]);
     expect(threads[0].isResolved).toBe(expected);
+  });
+});
+
+/**
+ * The draft poster's one Azure write. It goes through the transport so
+ * that Azure's ways of saying no that fetch calls success — above all
+ * the sign-in page an expired PAT gets — cannot mark a draft posted.
+ */
+describe('createPullRequestThread', () => {
+  const thread = {
+    content: 'issue: this leaks',
+    file: 'src/a.ts',
+    side: 'RIGHT' as const,
+    lineStart: 3,
+    lineEnd: 5,
+  };
+  const post = () =>
+    createPullRequestThread({ pat: 'test-pat' }, testProject, 7, thread);
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('posts the thread to the pull request and answers its id', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ id: 101 }));
+    await expect(post()).resolves.toBe(101);
+
+    const [url, init] = mockFetch.mock.calls[0]! as [string, RequestInit];
+    expect(url).toBe(
+      'https://dev.azure.com/myorg/myproject/_apis/git/repositories/myrepo/pullrequests/7/threads?api-version=7.1'
+    );
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({
+      comments: [
+        { parentCommentId: 0, content: 'issue: this leaks', commentType: 1 },
+      ],
+      threadContext: {
+        filePath: '/src/a.ts',
+        rightFileStart: { line: 3, offset: 1 },
+        rightFileEnd: { line: 5, offset: 1 },
+      },
+      status: 1,
+    });
+  });
+
+  /** Removed lines exist only in the old version of the file. */
+  it('anchors a LEFT thread on the old side of the diff only', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ id: 101 }));
+    await createPullRequestThread({ pat: 't' }, testProject, 7, {
+      ...thread,
+      side: 'LEFT',
+    });
+    const [, init] = mockFetch.mock.calls[0]! as [string, RequestInit];
+    expect(
+      (JSON.parse(String(init.body)) as { threadContext: unknown })
+        .threadContext
+    ).toEqual({
+      filePath: '/src/a.ts',
+      leftFileStart: { line: 3, offset: 1 },
+      leftFileEnd: { line: 5, offset: 1 },
+    });
+  });
+
+  it('reads the recorded sign-in page as a rejected token', async () => {
+    const signIn = readFileSync(
+      new URL('./__fixtures__/signin-page.html', import.meta.url),
+      'utf8'
+    );
+    mockFetch.mockResolvedValue(
+      response(signIn, { status: 203, contentType: 'text/html' })
+    );
+    await expect(post()).rejects.toMatchObject({ kind: 'auth' });
+  });
+
+  it('refuses a success that is not a created thread', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({}));
+    await expect(post()).rejects.toMatchObject({
+      kind: 'unexpected-response',
+    });
+  });
+
+  it('drops the cached threads, so the new one shows on the next read', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ value: [] }));
+    await azureDevOpsProvider.fetchCommentThreads!(
+      { pat: 't' },
+      testProject,
+      7
+    );
+    mockFetch.mockResolvedValueOnce(jsonResponse({ id: 101 }));
+    await post();
+    await azureDevOpsProvider.fetchCommentThreads!(
+      { pat: 't' },
+      testProject,
+      7
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 });

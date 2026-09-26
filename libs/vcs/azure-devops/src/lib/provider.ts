@@ -52,7 +52,7 @@ interface RawReviewer {
   isContainer?: boolean;
 }
 
-function toAdoConfig(
+export function toAdoConfig(
   auth: Record<string, string>,
   project: Record<string, string>
 ): AdoConfig {
@@ -73,7 +73,7 @@ function toAdoConfig(
  *  drop the cached threads of 10 through 19 and 100 through 199 too.
  *  The individual-thread keys carry a further segment, so those are
  *  the one place a prefix is meant — and it ends at the separator. */
-function invalidatePr(config: AdoConfig, prId: number): void {
+export function invalidatePr(config: AdoConfig, prId: number): void {
   const repo = `${config.org}/${config.project}/${config.repo}`;
   // The memo too, or the sidebar's comment badge would keep the count
   // from before the write for the rest of its life.
