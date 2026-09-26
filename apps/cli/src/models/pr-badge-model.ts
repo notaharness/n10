@@ -1,5 +1,6 @@
 import {
   isBlockingDecision,
+  reviewersToCount,
   type BuildStatusState,
   type PullRequestInfo,
 } from '@n10/vcs-core';
@@ -114,7 +115,8 @@ export function prBadgeModel(
   pr: PullRequestInfo,
   sidebarWidth: number
 ): PrBadgeModel {
-  const reviewers = pr.reviewers ?? [];
+  // A teammate's vote for a team is listed on both rows; it is one vote.
+  const reviewers = reviewersToCount(pr.reviewers ?? []);
   const approved = reviewers.filter((r) => r.decision === 'approved').length;
   const color = reviewColor(reviewers);
   const activeComments = pr.activeCommentCount ?? 0;

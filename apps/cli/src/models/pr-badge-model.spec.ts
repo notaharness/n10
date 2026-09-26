@@ -172,6 +172,24 @@ describe('prBadgeModel — text', () => {
     expect(prBadgeModel(pr, 40).reviewText).toBe('2/3 approved');
   });
 
+  /** Azure lists a teammate's vote for a team twice: on the team's row
+   *  and on the teammate's own, which names the team in `votedFor`. */
+  it('counts a team answered by a listed teammate as one vote', () => {
+    const team = 'vstfs:///Classification/TeamProject/proj\\Core Team';
+    const pr = pullRequest({
+      reviewers: [
+        { identifier: team, displayName: 'Core Team', decision: 'approved' },
+        {
+          identifier: 'teammate@example.com',
+          displayName: 'Teammate',
+          decision: 'approved',
+          votedFor: [team],
+        },
+      ],
+    });
+    expect(prBadgeModel(pr, 40).reviewText).toBe('1/1 approved');
+  });
+
   it('says nothing about reviews when there are no reviewers', () => {
     expect(prBadgeModel(pullRequest({ reviewers: [] }), 40).reviewText).toBe(
       ''
