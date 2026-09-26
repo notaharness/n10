@@ -59,8 +59,12 @@ describe('RemoteSessionPoller (D3: one list-sessions call fans out to every back
       onState: (s) => bStates.push(s),
       onUnreachable: () => undefined,
     });
-    await flushImmediatePoll();
+    await vi.advanceTimersByTimeAsync(0);
+    run.mockClear();
+    aStates.length = 0;
+    bStates.length = 0;
 
+    await vi.advanceTimersByTimeAsync(1000);
     expect(run).toHaveBeenCalledTimes(1);
     expect(aStates).toEqual([
       {
@@ -70,7 +74,50 @@ describe('RemoteSessionPoller (D3: one list-sessions call fans out to every back
         exitSignal: undefined,
       },
     ]);
-    expect(bStates).toEqual([
+    expect(bStates).toEqual(aStates);
+    poller.dispose();
+  });
+
+  it('gives a subscription made while a listing is in flight only a listing requested after it', async () => {
+    const listings: ((
+      result: Awaited<ReturnType<MachineExecutor['run']>>
+    ) => void)[] = [];
+    run.mockImplementation(
+      () =>
+        new Promise<Awaited<ReturnType<MachineExecutor['run']>>>((resolve) =>
+          listings.push(resolve)
+        )
+    );
+    const poller = new RemoteSessionPoller(executor, 1000);
+    const unsubscribe = poller.subscribe('a', {
+      onState: () => undefined,
+      onUnreachable: () => undefined,
+    });
+    await flushImmediatePoll();
+    // The pane is respawned and a new backend subscribes under the
+    // same name before the listing that saw the dead pane arrives.
+    unsubscribe();
+    const states: { found: boolean; paneDead: boolean }[] = [];
+    poller.subscribe('a', {
+      onState: (s) => states.push(s),
+      onUnreachable: () => undefined,
+    });
+    listings[0]!({
+      stdout: listSessionsOutput([{ name: 'a', paneDead: true, exitCode: 0 }]),
+      stderr: '',
+      code: 0,
+    });
+    await flushImmediatePoll();
+    expect(states).toEqual([]);
+
+    expect(listings).toHaveLength(2);
+    listings[1]!({
+      stdout: listSessionsOutput([{ name: 'a' }]),
+      stderr: '',
+      code: 0,
+    });
+    await flushImmediatePoll();
+    expect(states).toEqual([
       {
         found: true,
         paneDead: false,
@@ -78,9 +125,6 @@ describe('RemoteSessionPoller (D3: one list-sessions call fans out to every back
         exitSignal: undefined,
       },
     ]);
-
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(run).toHaveBeenCalledTimes(2);
     poller.dispose();
   });
 
