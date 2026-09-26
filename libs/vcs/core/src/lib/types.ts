@@ -66,6 +66,10 @@ export interface PullRequestReviewer {
    *  after a verdict, where `decision` still holds that verdict. Absent
    *  where the list does not say. */
   requested?: boolean;
+  /** A group reviewer the signed-in user belongs to. Asking the group
+   *  asks the user, but its `decision` is whoever voted for the group,
+   *  never the user's own. */
+  includesViewer?: boolean;
 }
 
 /** The provider holds a request for this reviewer's verdict. Where the
