@@ -9,7 +9,7 @@ const features: Feature[] = [
     href: '/docs/guides/agent-reviews',
     title: 'An agent drafts the review, you post it',
     description:
-      'An agent drafts review comments on your pull requests or a colleague’s. Triage them by severity, then edit, skip or post each one under your name. Only comments you choose to post are published.',
+      'An agent drafts review comments on pull requests that involve you, yours or a colleague’s. Triage them by severity, then edit, skip or post each one under your name. Only comments you choose to post are published.',
   },
   {
     media: 'review-in-place',
@@ -33,7 +33,7 @@ const features: Feature[] = [
     href: '/docs/guides/babysit',
     title: 'Send CI failures and review feedback to agents',
     description:
-      'Enable Babysit on a pull request to send CI failures, review comments and merge conflicts to its agent. n10 batches updates and sends them when the agent is idle.',
+      'Enable Babysit on a pull request to send CI failures, review comments and merge conflicts to its agent. n10 batches updates and sends them once the agent’s terminal goes quiet.',
   },
   {
     media: 'tui',
@@ -55,10 +55,9 @@ const features: Feature[] = [
     title: 'Sessions are plain tmux',
     description: (
       <>
-        Every agent and terminal n10 starts is an ordinary tmux session; an
-        agent&apos;s is named after its repository and branch. Attach from any
-        terminal with <code>tmux attach</code>. Quitting n10 detaches the
-        sessions without stopping them.
+        Every agent and terminal n10 starts is an ordinary tmux session with a
+        readable name. Attach from any terminal with <code>tmux attach</code>.
+        Quitting n10 detaches the sessions without stopping them.
       </>
     ),
     scene: <TmuxScene />,

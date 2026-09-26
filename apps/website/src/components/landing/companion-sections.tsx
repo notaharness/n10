@@ -149,8 +149,8 @@ export function OrchestraFeature() {
       <p>
         Orchestra is our orchestrator plugin for agents such as Claude Code and
         Codex. Your agent assigns tasks to other agents in separate tmux
-        sessions and Git worktrees. Use it without n10 Desktop, or add Beam to
-        run agents across machines.
+        sessions, each in its own Git worktree or a directory you choose. Use it
+        without n10 Desktop, or add Beam to run agents across machines.
       </p>
       <p>
         Adopt n10, Beam and Orchestra independently. n10 manages sessions and
