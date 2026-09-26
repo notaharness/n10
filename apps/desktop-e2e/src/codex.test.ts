@@ -2,12 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
-import {
-  codexCalls,
-  codexWorked,
-  controlCodex,
-  installCodex,
-} from './setup/codex.js';
+import { fakeCli } from './setup/fake-cli.js';
 import { agentSpinner, createWorktree, sessionMenu } from './setup/app.js';
 import { findN10SessionFor, socketEnv, tagTmuxSession } from './setup/tmux.js';
 import {
@@ -16,11 +11,13 @@ import {
   terminalTabs,
 } from './setup/terminals.js';
 
+const codex = fakeCli('codex');
+
 test.use({
   fakeGitHub: { prs: [] },
   n10Config: { agentId: 'codex' },
   env: async ({ fixtureHome }, provide) => {
-    await provide(installCodex(fixtureHome));
+    await provide(codex.install(fixtureHome));
   },
 });
 
@@ -38,11 +35,11 @@ test('Codex worktree launch, activity and recorded-agent continuation in Desktop
     .getByRole('button', { name: 'Start new session', exact: true })
     .click();
   await expect(page.getByText('fake-codex-ready').first()).toBeVisible();
-  expect(codexCalls(cwd)).toMatchObject([{ args: [], cwd }]);
-  controlCodex(cwd, 'busy');
+  expect(codex.calls(cwd)).toMatchObject([{ args: [], cwd }]);
+  codex.control(cwd, 'busy');
   await expect(agentSpinner(page).first()).toBeVisible({ timeout: 10_000 });
-  await expect.poll(() => codexWorked(cwd)).toBe(true);
-  controlCodex(cwd, 'idle');
+  await expect.poll(() => codex.worked(cwd)).toBe(true);
+  codex.control(cwd, 'idle');
   await expect(agentSpinner(page)).toHaveCount(0, { timeout: 10_000 });
   const name = findN10SessionFor('codex-life', homeDir)!;
   tagTmuxSession(
@@ -53,7 +50,7 @@ test('Codex worktree launch, activity and recorded-agent continuation in Desktop
     },
     homeDir
   );
-  controlCodex(cwd, 'exit');
+  codex.control(cwd, 'exit');
   await expect
     .poll(() =>
       page.evaluate(async () =>
@@ -80,7 +77,7 @@ test('Codex worktree launch, activity and recorded-agent continuation in Desktop
     .getByRole('button', { name: 'Continue with Codex', exact: true })
     .click();
   await expect(page.getByText('fake-codex-resumed').first()).toBeVisible();
-  expect(codexCalls(cwd)).toMatchObject([
+  expect(codex.calls(cwd)).toMatchObject([
     { args: [] },
     { args: ['resume', '--last'], cwd },
   ]);
@@ -109,8 +106,8 @@ test('Codex standalone terminal resumes in its existing Desktop tab', async ({
   await openNewTerminalDialog(app, page);
   await confirmNewTerminal(page, 'Agent');
   await expect(page.getByText('fake-codex-ready').first()).toBeVisible();
-  expect(codexCalls(repoPath)).toMatchObject([{ args: [], cwd: repoPath }]);
-  controlCodex(repoPath, 'exit');
+  expect(codex.calls(repoPath)).toMatchObject([{ args: [], cwd: repoPath }]);
+  codex.control(repoPath, 'exit');
   const resume = page.getByRole('button', {
     name: 'Resume agent',
     exact: true,
@@ -118,7 +115,7 @@ test('Codex standalone terminal resumes in its existing Desktop tab', async ({
   await expect(resume).toBeVisible({ timeout: 15_000 });
   await resume.click();
   await expect(page.getByText('fake-codex-resumed').first()).toBeVisible();
-  expect(codexCalls(repoPath)).toMatchObject([
+  expect(codex.calls(repoPath)).toMatchObject([
     { args: [] },
     { args: ['resume', '--last'] },
   ]);

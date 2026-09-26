@@ -242,8 +242,9 @@ record argv/cwd, resume only in a cwd with a prior launch, and produce changing
 ANSI output before becoming quiet. They exercise both shells' launch/resume
 flows and busy/idle indicators, plus Desktop standalone agent terminals.
 `launch-dialog.test.ts` verifies the selected Codex review agent receives its
-instructions and review guidance intact. Every fake runs in an isolated HOME
-and tmux socket; no real Codex session or account is used.
+instructions and review guidance intact. Both shells use the shared
+`libs/core/tests/fixtures/fake-vendor-cli.mjs` through their `setup/fake-cli.ts`
+helpers. Every fake runs in an isolated HOME and tmux socket; no real Codex session or account is used.
 
 Activity is inferred from terminal output, not Codex model/tool events. Quiet
 network or tool work can appear idle. These tests verify n10's integration,

@@ -5,14 +5,16 @@ import { sessionMenu, sidebarRow, startSessionFromMenu } from './setup/app.js';
 import { armContextMenuChoice } from './setup/menu.js';
 import type { ElectronApplication } from '@playwright/test';
 import { findN10SessionFor, socketEnv, tagTmuxSession } from './setup/tmux.js';
-import { codexCalls, installCodex } from './setup/codex.js';
+import { fakeCli } from './setup/fake-cli.js';
+
+const codex = fakeCli('codex');
 
 const BRANCH = 'launch-dialog';
 const TITLE = `Launch ${'a-very-long-unbroken-title-'.repeat(18)}`;
 const REPORT_TIME = '2026-09-09T14:32:00Z';
 test.use({
   env: async ({ fixtureHome }, provide) => {
-    await provide(installCodex(fixtureHome));
+    await provide(codex.install(fixtureHome));
   },
   fakeGitHub: {
     username: 'tester',
@@ -206,7 +208,7 @@ test('Review sends its selected agent and instructions to the same guarded workt
     .getByRole('button', { name: 'Stop and start review', exact: true })
     .click();
   await expect(page.getByText('fake-codex-ready').first()).toBeVisible();
-  const [{ args }] = codexCalls(join(repoPath, '.claude/worktrees', BRANCH));
+  const [{ args }] = codex.calls(join(repoPath, '.claude/worktrees', BRANCH));
   expect(args).toHaveLength(2);
   expect(args[0]).toBe('--');
   expect(args.join('\n')).toContain(
