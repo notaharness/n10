@@ -9,6 +9,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: 'https://n10.is' },
     { url: 'https://n10.is/beam' },
+    { url: 'https://n10.is/download' },
     { url: 'https://n10.is/orchestra' },
     ...docs,
   ];
