@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { BeamFeature, OrchestraFeature } from './companion-sections';
 import { FeatureSection, type Feature } from './feature-section';
 
 const features: Feature[] = [
@@ -52,8 +53,13 @@ const features: Feature[] = [
 
 export function Features() {
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 py-20 sm:py-28">
+    <section className="mx-auto w-full max-w-6xl px-4 pt-4 pb-20 sm:pb-28">
+      <h2 className="mb-16 text-2xl font-semibold tracking-tight sm:mb-20 sm:text-3xl">
+        Features
+      </h2>
       <div className="flex flex-col gap-24 sm:gap-32">
+        <BeamFeature />
+        <OrchestraFeature />
         {features.map((feature, i) => (
           <FeatureSection
             key={feature.media}

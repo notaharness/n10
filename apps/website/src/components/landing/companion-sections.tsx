@@ -7,8 +7,9 @@ import { cn } from '@/lib/cn';
 
 /**
  * Beam and Orchestra, the two notaharness tools that work on their own
- * and compose with n10. Each gets the feature layout with its own
- * page's scene in the frame instead of a recording.
+ * and compose with n10. They lead the feature list, in the feature
+ * layout with their own page's scene in the frame instead of a
+ * recording.
  */
 function CompanionSection({
   label,
@@ -17,7 +18,6 @@ function CompanionSection({
   links,
   scene,
   reverse = false,
-  className,
 }: {
   label: string;
   title: string;
@@ -25,53 +25,50 @@ function CompanionSection({
   links: { text: string; href: string }[];
   scene: ReactNode;
   reverse?: boolean;
-  className?: string;
 }) {
   return (
-    <section className={cn('mx-auto w-full max-w-6xl px-4', className)}>
-      <div className="grid items-center gap-10 md:grid-cols-12 md:gap-14">
-        <div className={cn('min-w-0 md:col-span-5', reverse && 'md:order-2')}>
-          <p className="text-fd-primary font-mono text-xs tracking-wide">
-            {label}
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
-            {title}
-          </h2>
-          <div className="text-fd-muted-foreground mt-4 flex flex-col gap-3 leading-relaxed text-pretty">
-            {children}
-          </div>
-          <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2">
-            {links.map(({ text, href }) => (
-              <Link
-                key={href}
-                href={href}
-                className="text-fd-primary group inline-flex items-center gap-1 text-sm font-medium"
-              >
-                {text}
-                <ArrowRight
-                  className="size-3.5 transition-transform group-hover:translate-x-0.5"
-                  aria-hidden
-                />
-              </Link>
-            ))}
-          </div>
+    <div className="grid items-center gap-10 md:grid-cols-12 md:gap-14">
+      <div className={cn('min-w-0 md:col-span-5', reverse && 'md:order-2')}>
+        <p className="text-fd-primary font-mono text-xs tracking-wide">
+          {label}
+        </p>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+          {title}
+        </h2>
+        <div className="text-fd-muted-foreground mt-4 flex flex-col gap-3 leading-relaxed text-pretty">
+          {children}
         </div>
-        <div className="relative min-w-0 md:col-span-7">
-          <div
-            aria-hidden
-            className={cn(
-              'n10-pane absolute top-6 -bottom-3 rounded-xl',
-              reverse
-                ? 'n10-pane--sand right-6 -left-3'
-                : 'n10-pane--sage -right-3 left-6'
-            )}
-          />
-          <div className="n10-frame bg-fd-card relative overflow-hidden rounded-xl">
-            {scene}
-          </div>
+        <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2">
+          {links.map(({ text, href }) => (
+            <Link
+              key={href}
+              href={href}
+              className="text-fd-primary group inline-flex items-center gap-1 text-sm font-medium"
+            >
+              {text}
+              <ArrowRight
+                className="size-3.5 transition-transform group-hover:translate-x-0.5"
+                aria-hidden
+              />
+            </Link>
+          ))}
         </div>
       </div>
-    </section>
+      <div className="relative min-w-0 md:col-span-7">
+        <div
+          aria-hidden
+          className={cn(
+            'n10-pane absolute top-6 -bottom-3 rounded-xl',
+            reverse
+              ? 'n10-pane--sand right-6 -left-3'
+              : 'n10-pane--sage -right-3 left-6'
+          )}
+        />
+        <div className="n10-frame bg-fd-card relative overflow-hidden rounded-xl">
+          {scene}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -111,7 +108,7 @@ function TailscaleCredit() {
   );
 }
 
-export function BeamSection() {
+export function BeamFeature() {
   return (
     <CompanionSection
       label="Beam"
@@ -121,8 +118,6 @@ export function BeamSection() {
         { text: 'About Beam', href: '/beam' },
       ]}
       scene={<BeamMesh className="mx-auto w-full px-6 pt-4 pb-2" />}
-      reverse
-      className="pt-20 sm:pt-28"
     >
       <p>
         Beam joins the machines you own into a fleet with one passkey. There are
@@ -142,7 +137,7 @@ export function BeamSection() {
   );
 }
 
-export function OrchestraSection() {
+export function OrchestraFeature() {
   return (
     <CompanionSection
       label="Orchestra"
@@ -153,7 +148,6 @@ export function OrchestraSection() {
       ]}
       scene={<OrchestraStage className="mx-auto w-full px-4 pb-2" />}
       reverse
-      className="pb-20 sm:pb-28"
     >
       <p>
         Orchestra is a plugin for the agent you already use, such as Claude Code
