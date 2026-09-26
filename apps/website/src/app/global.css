@@ -713,6 +713,14 @@
   fill: var(--color-fd-muted-foreground);
 }
 
+/* Unreadably small on a phone; OrchestraStage lists the players below
+ * the scene there instead. */
+@media (max-width: 639px) {
+  .orchestra-nameplate {
+    display: none;
+  }
+}
+
 /* A report or an answer on its way: a note that hops from one place to
  * the other. Two keyframe legs with ease-in-out make the hop. */
 .orchestra-note {

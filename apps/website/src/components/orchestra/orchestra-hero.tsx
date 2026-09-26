@@ -14,9 +14,10 @@ export function OrchestraHero() {
         </h1>
         <p className="text-fd-muted-foreground max-w-2xl text-lg text-pretty">
           Orchestra gives one coding agent two skills for assigning work to
-          others. Each player works in its own tmux session and Git worktree
-          with Claude Code or Codex. It runs on this machine, and reaches your
-          other machines through n10 Desktop or Beam.
+          others. Each player works in its own tmux session, in a Git worktree
+          or an existing directory, with Claude Code, Codex, Gemini, Copilot or
+          OpenCode. It runs on this machine, and reaches your other machines
+          through n10 Desktop or Beam.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Link href="#install" className={buttonVariants({ size: 'lg' })}>

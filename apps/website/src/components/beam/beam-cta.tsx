@@ -1,3 +1,4 @@
+import { wrapAtSpaces } from '@/components/inline-code';
 import Link from 'next/link';
 import { CopyButton } from '@/components/copy-button';
 import { buttonVariants } from '@/components/ui/button';
@@ -18,9 +19,9 @@ export function BeamCta() {
             Try Beam
           </h2>
           <div className="n10-frame bg-fd-background mx-auto mt-6 flex max-w-md items-center gap-2 rounded-lg py-1.5 pr-1.5 pl-4">
-            <code className="flex-1 overflow-x-auto text-left font-mono text-sm whitespace-nowrap">
-              <span className="text-fd-primary/70 select-none">$ </span>
-              {INSTALL}
+            <code className="min-w-0 flex-1 text-left font-mono text-sm">
+              <span className="text-fd-primary/70 select-none">$&nbsp;</span>
+              {wrapAtSpaces(INSTALL)}
             </code>
             <CopyButton text={INSTALL} label="Copy the Beam install command" />
           </div>

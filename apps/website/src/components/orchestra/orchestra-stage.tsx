@@ -96,6 +96,19 @@ export function OrchestraStage({ className }: { className?: string }) {
           <Icon className="size-4" aria-hidden />
         </button>
       </div>
+      {/* The nameplates are too small to read on a phone, so they give
+          way to this list there (see .orchestra-nameplate in global.css). */}
+      <ul className="mt-3 flex flex-wrap justify-center gap-2 font-mono text-xs sm:hidden">
+        {PLAYERS.map((spec) => (
+          <li
+            key={spec.id}
+            className="border-fd-border bg-fd-card rounded-full border px-2.5 py-1"
+          >
+            {spec.branch}
+            <span className="text-fd-muted-foreground"> · {spec.agent}</span>
+          </li>
+        ))}
+      </ul>
       <p className="sr-only" aria-live="polite">
         {latest ? `${latest.head}: ${latest.text}` : ''}
       </p>
