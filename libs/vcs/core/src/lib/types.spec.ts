@@ -113,18 +113,12 @@ describe('reviewersToCount', () => {
   it('keeps a group nobody listed has voted for', () => {
     const pending = { ...team, decision: 'no-response' as const };
     const other = { ...teammate, votedFor: undefined };
-    expect(reviewersToCount([pending, other])).toEqual([pending, other]);
+    const none = { ...teammate, identifier: 'b@example.com', votedFor: [] };
+    const rows = [pending, other, none];
+    expect(reviewersToCount(rows)).toEqual(rows);
   });
 
   it('keeps a group whose voter is not listed', () => {
     expect(reviewersToCount([team])).toEqual([team]);
-  });
-
-  it('leaves every row alone when nobody voted for a group', () => {
-    const rows = [
-      { ...teammate, votedFor: undefined },
-      { ...teammate, identifier: 'b@example.com', votedFor: [] },
-    ];
-    expect(reviewersToCount(rows)).toEqual(rows);
   });
 });
