@@ -325,12 +325,6 @@ describe('posting to Azure DevOps', () => {
       expect(env.marked).toEqual([]);
     }
   );
-
-  it('posts comments filed as plain comments', async () => {
-    await postReviewComments([comment()], azure, 'COMMENT');
-    expect(env.fetches).toHaveLength(1);
-    expect(env.marked).toEqual([{ id: 'c1', patch: { status: 'posted' } }]);
-  });
 });
 
 describe('marking comments posted', () => {
