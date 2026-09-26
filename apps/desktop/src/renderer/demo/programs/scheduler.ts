@@ -1,85 +1,56 @@
 /**
  * The clock every scripted program runs on. It only advances while the
- * demo is on screen, so scrolling away freezes every agent
- * mid-sentence. The agents already running when the page loads are
- * ambient: the visitor's first click or key holds them, so nothing
- * moves under their hands, until the visitor types into one of them,
- * which adopts it. Whatever the visitor starts plays as usual. Under
- * reduced motion the demo starts `instant`: programs lay out their end
- * state at once instead of scheduling anything.
+ * demo is on screen, so scrolling away freezes every agent mid-sentence.
+ * Scripts end at a natural resting point (a prompt waiting for an
+ * answer, or done), so nothing moves for long on its own. Under reduced
+ * motion the demo starts `instant`: programs lay out their end state at
+ * once instead of scheduling anything.
  */
-export class Clock {
-  held = false;
-}
-
 interface Task {
-  left: number;
+  at: number;
   fn: () => void;
   every?: number;
-  clock?: Clock;
 }
 
 const TICK_MS = 50;
 
 class Scheduler {
   instant = false;
+  private now = 0;
   private playing = true;
-  private interacted = false;
-  private readonly ambient = new Set<Clock>();
-  private readonly tasks = new Set<Task>();
+  private tasks = new Set<Task>();
+  private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.instant =
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    setInterval(() => this.tick(), TICK_MS);
+    this.timer = setInterval(() => this.tick(), TICK_MS);
   }
 
   setPlaying(playing: boolean): void {
     this.playing = playing;
   }
 
-  /** A clock for a program running before the visitor arrives. */
-  ambientClock(): Clock {
-    const clock = new Clock();
-    clock.held = this.interacted;
-    this.ambient.add(clock);
-    return clock;
-  }
-
-  /** The visitor clicked or typed somewhere: hold the ambient programs. */
-  interact(): void {
-    this.interacted = true;
-    for (const clock of this.ambient) clock.held = true;
-  }
-
-  /** The visitor is using this program: it plays from now on. */
-  adopt(clock: Clock | undefined): void {
-    if (!clock) return;
-    this.ambient.delete(clock);
-    clock.held = false;
-  }
-
   /** Runs `fn` after `ms` of playing time; returns a cancel. */
-  after(ms: number, fn: () => void, clock?: Clock): () => void {
-    const task: Task = { left: ms, fn, clock };
+  after(ms: number, fn: () => void): () => void {
+    const task: Task = { at: this.now + ms, fn };
     this.tasks.add(task);
     return () => this.tasks.delete(task);
   }
 
-  every(ms: number, fn: () => void, clock?: Clock): () => void {
-    const task: Task = { left: ms, fn, every: ms, clock };
+  every(ms: number, fn: () => void): () => void {
+    const task: Task = { at: this.now + ms, fn, every: ms };
     this.tasks.add(task);
     return () => this.tasks.delete(task);
   }
 
   private tick(): void {
-    if (!this.playing) return;
+    if (!this.playing || !this.timer) return;
+    this.now += TICK_MS;
     for (const task of [...this.tasks]) {
-      if (task.clock?.held || !this.tasks.has(task)) continue;
-      task.left -= TICK_MS;
-      if (task.left > 0) continue;
-      if (task.every) task.left += task.every;
+      if (task.at > this.now || !this.tasks.has(task)) continue;
+      if (task.every) task.at += task.every;
       else this.tasks.delete(task);
       task.fn();
     }

@@ -1,6 +1,6 @@
 import type { Program, Tty } from '../../host/sessions.js';
 import { ESC, LiveScreen, fit, onThemeChange, type Span } from '../ansi.js';
-import { scheduler, type Clock } from '../scheduler.js';
+import { scheduler } from '../scheduler.js';
 import { renderBlock, type Block } from './blocks.js';
 
 /**
@@ -56,11 +56,7 @@ export class ClaudeCode implements Program {
   private transcript: { block: Block; gap: boolean }[] = [];
   private offTheme: (() => void) | null = null;
 
-  /** `clock` is set for an agent already running when the page loads. */
-  constructor(
-    private readonly script: ClaudeScript,
-    private readonly clock?: Clock
-  ) {}
+  constructor(private readonly script: ClaudeScript) {}
 
   start(tty: Tty): void {
     this.tty = tty;
@@ -81,13 +77,11 @@ export class ClaudeCode implements Program {
 
   /** A turn typed into the conversation from outside (n10's plan). */
   say(text: string, beats: readonly Beat[]): void {
-    scheduler.adopt(this.clock);
     this.commit([{ kind: 'prompt', text }]);
     this.enqueue(beats);
   }
 
   input(data: string): void {
-    scheduler.adopt(this.clock);
     if (this.gate) this.answerKey(data);
     else this.type(data);
   }
@@ -116,7 +110,7 @@ export class ClaudeCode implements Program {
     }
     this.busy = true;
     if (scheduler.instant) this.apply(beat);
-    else scheduler.after(beat.after, () => this.apply(beat), this.clock);
+    else scheduler.after(beat.after, () => this.apply(beat));
   }
 
   private apply(beat: Beat): void {
@@ -140,15 +134,11 @@ export class ClaudeCode implements Program {
     this.stopSpin?.();
     this.stopSpin = null;
     if (verb && !scheduler.instant) {
-      this.stopSpin = scheduler.every(
-        SPIN_MS,
-        () => {
-          this.frame += 1;
-          if (this.working) this.working.ms += SPIN_MS;
-          this.draw();
-        },
-        this.clock
-      );
+      this.stopSpin = scheduler.every(SPIN_MS, () => {
+        this.frame += 1;
+        if (this.working) this.working.ms += SPIN_MS;
+        this.draw();
+      });
     }
     this.draw();
   }

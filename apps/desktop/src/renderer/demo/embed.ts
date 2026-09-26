@@ -3,9 +3,9 @@ import { scheduler } from './programs/scheduler.js';
 
 /**
  * The page embedding the demo drives two things: whether the scripted
- * agents play (paused off screen), and the theme,
- * which follows the page's. Messages come from the embedder only, and
- * only these two are acted on.
+ * agents play (paused off screen), and the theme, which follows the
+ * page's. Messages come from the embedder only, and only these two are
+ * acted on.
  */
 interface EmbedMessage {
   type: 'n10-demo';
@@ -38,16 +38,6 @@ export function requestedTheme(): 'light' | 'dark' | null {
   }
   const theme = new URLSearchParams(window.location.search).get('theme');
   return theme === 'light' || theme === 'dark' ? theme : null;
-}
-
-/** The visitor's first click or key holds the agents already running. */
-export function watchForVisitor(): void {
-  const interact = () => scheduler.interact();
-  window.addEventListener('pointerdown', interact, {
-    capture: true,
-    once: true,
-  });
-  window.addEventListener('keydown', interact, { capture: true, once: true });
 }
 
 export function listenToEmbedder(): void {
