@@ -280,6 +280,8 @@ test.describe('Revoking a member', () => {
 
     beam!.failCeremony('bad-assertion');
     await expect(dialog.getByText(/The passkey request failed/)).toBeVisible();
+    // The result takes focus, not the dialog it replaced a step inside.
+    await expect(dialog.getByRole('alert')).toBeFocused();
     await dialog.getByRole('button', { name: 'Try again' }).click();
     await expect(dialog.getByTestId('ceremony-url')).toBeVisible();
     expect(beam!.ops('revoke.start')).toHaveLength(2);

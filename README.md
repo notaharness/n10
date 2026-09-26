@@ -8,7 +8,7 @@ n10 runs coding agents in Git worktrees and lets you review their pull requests,
   <img alt="n10 Desktop showing worktrees and pull request status beside a code diff with inline review comments" src="docs/media/hero.png">
 </picture>
 
-Every branch gets its own worktree and agent session, so you can have several features and reviews going at once without stashing changes or touching your main checkout. n10 shows each worktree's pull request, CI checks, reviews and conflicts. An agent can draft review comments for you to post, and you can hand review comments on your own pull requests to an agent as one task, without opening GitHub.com or Azure DevOps.
+Every branch gets its own worktree and agent session, so you can have several features and reviews going at once without stashing changes, and agents never edit your main checkout. n10 shows each worktree's pull request, CI checks, reviews and conflicts. An agent can draft review comments for you to post, and you can hand review comments on your own pull requests to an agent as one task, without opening GitHub.com or Azure DevOps.
 
 n10 works with Claude, Codex, Gemini, Copilot and OpenCode, and with GitHub and Azure DevOps. It is in beta: I use it every day, but expect rough edges.
 
@@ -18,7 +18,7 @@ Documentation: **[n10.is/docs](https://n10.is/docs)**
 
 You need:
 
-- Git, Node.js 20 or newer, and tmux 3.2 or newer.
+- Linux or macOS, with Git 2.38 or newer, Node.js 22.12 or newer, and tmux 3.2 or newer.
 - An agent CLI on your `PATH`, signed in: `claude`, `codex`, `gemini`, `copilot` or `opencode`.
 - For GitHub, the [`gh` CLI](https://cli.github.com), signed in. For Azure DevOps, a personal access token.
 - On Linux, `build-essential` and `python3`, to compile `node-pty` during the install.
@@ -40,7 +40,7 @@ n10          # open n10 Desktop
 n10 --tui    # or run the terminal UI
 ```
 
-n10 reads your Git remote and fills in the project settings. Press `⌘N` (`Ctrl+N` on Linux and Windows), type a branch name and choose **Create branch … and open a worktree**. n10 creates the worktree and offers to launch your agent in it.
+n10 reads your Git remote and fills in the project settings. Press `⌘N` (`Ctrl+N` on Linux), type a branch name and choose **Create branch … and open a worktree**. n10 creates the worktree and offers to launch your agent in it.
 
 Agents run in tmux, so quitting n10 leaves them running, and n10 reconnects when you open it again. The [getting started guide](https://n10.is/docs/getting-started) walks through the rest.
 
@@ -64,7 +64,7 @@ Add the review comments you want addressed to a plan, with a note on each if you
 
 ### Babysit a pull request
 
-Right-click a pull request and choose **Babysit pull request**. n10 tells its agent about failing checks, new review comments and conflicts, batched and sent when the agent is idle.
+Right-click a pull request and choose **Babysit pull request**. While n10 runs with that repository open, it tells the pull request's agent about failing checks, new review comments and conflicts, in batches sent when the agent's terminal has gone quiet.
 
 ![Enabling Babysit on a pull request and sending CI failures and review comments to its agent](docs/media/babysit.gif)
 
