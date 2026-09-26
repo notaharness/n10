@@ -135,11 +135,13 @@ export const PROGRAMS = {
     });
   },
 
-  /** A pull request just babysat. beam #39 has news for its agent. */
-  babysit(pr: PullRequestInfo, repo: RepoState, hub: SessionHub): void {
-    if (repo.cwd !== BEAM || pr.id !== PR_HOMEPAGE.id) return;
+  /** A pull request just babysat: beam #39 has news for its agent.
+   *  Returns a cancel for when babysitting stops. */
+  babysit(pr: PullRequestInfo, repo: RepoState, hub: SessionHub): () => void {
     const agent = hub.get(HOMEPAGE_SESSION)?.program;
-    if (agent instanceof ClaudeCode) babysitHomepage(repo, agent);
+    if (repo.cwd !== BEAM || pr.id !== PR_HOMEPAGE.id) return () => undefined;
+    if (!(agent instanceof ClaudeCode)) return () => undefined;
+    return babysitHomepage(repo, agent);
   },
 
   shell(cwd: string, branch?: string): Zsh {

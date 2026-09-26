@@ -33,19 +33,24 @@ const GRID_CSS = `#wterm-root { --term-font-size: 15px; --term-row-height: 19px;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const answers = () =>
+  fetch(ORIGIN, { method: 'HEAD' }).then(
+    () => true,
+    () => false
+  );
+
 async function startHost() {
+  // Anything already on the port, such as a host a crashed run left
+  // behind, would answer for the one started here.
+  if (await answers()) throw new Error(`port ${PORT} is already in use`);
   const host = spawn('node', [HOST], {
     cwd: ROOT,
     env: { ...process.env, PORT: String(PORT) },
     stdio: ['ignore', 'ignore', 'inherit'],
   });
-  for (let i = 0; i < 100; i += 1) {
-    try {
-      await fetch(ORIGIN, { method: 'HEAD' });
-      return host;
-    } catch {
-      await sleep(100);
-    }
+  for (let i = 0; i < 100 && host.exitCode === null; i += 1) {
+    if (await answers()) return host;
+    await sleep(100);
   }
   host.kill('SIGTERM');
   throw new Error(
@@ -135,11 +140,12 @@ async function take(d, page) {
 export async function recordTui(browser, theme, makeDirector) {
   const { buildScenario } = await import(pathToFileURL(SCENARIO).href);
   const scenario = buildScenario();
-  const host = await startHost();
   const page = await browser.newPage({
     viewport: { width: 1280, height: 800 },
   });
+  let host;
   try {
+    host = await startHost();
     const res = await fetch(`${ORIGIN}/spawn`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -148,7 +154,7 @@ export async function recordTui(browser, theme, makeDirector) {
         homeDir: scenario.home,
         cols: 120,
         rows: 40,
-        env: { ...scenario.env, TMUX_TMPDIR: scenario.home },
+        env: scenario.env,
       }),
     });
     if (!res.ok) throw new Error(`/spawn failed: ${res.status}`);
@@ -167,7 +173,7 @@ export async function recordTui(browser, theme, makeDirector) {
   } finally {
     await page.close();
     await fetch(`${ORIGIN}/kill`, { method: 'POST' }).catch(() => undefined);
-    host.kill('SIGTERM');
+    host?.kill('SIGTERM');
     killScratchSessions(scenario.home);
     rmSync(scenario.home, { recursive: true, force: true });
     rmSync(dirname(scenario.repo), { recursive: true, force: true });

@@ -3,10 +3,9 @@
  * Records the README media: launches the built desktop app on a
  * dedicated Xvfb display at 2x device scale, drives it like a user
  * (gliding cursor, real typing), records with ffmpeg (x11grab) and
- * downscales to palette-optimized GIFs. Stills come from Playwright
- * screenshots at the same 2x scale.
+ * downscales to palette-optimized GIFs.
  *
- *   node apps/desktop-e2e/demo/capture.mjs [hero|worktrees|review|plan|babysit|all]
+ *   node apps/desktop-e2e/demo/capture.mjs [worktrees|review|review-in-place|plan|babysit|tui|all]
  *
  * Requires `nx build desktop` first, plus Xvfb and ffmpeg on PATH.
  * Output lands in docs/media/.

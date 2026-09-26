@@ -1,3 +1,4 @@
+import { composeBabysitPrompt, type BabysitReport } from '@n10/core/plan';
 import type { RemoteCommentThread } from '../../../../host/contract.js';
 import { PR_HOMEPAGE } from '../../data/beam.js';
 import { thread } from '../../data/threads.js';
@@ -9,7 +10,7 @@ import type { Beat, ClaudeCode } from './claude-code.js';
  * Babysitting beam #39. Once it is babysat, CI fails on formatting and
  * a teammate asks for the commands to be marked up; when the news has
  * settled, the babysitter briefs #39's idle agent in one message, which
- * fixes both, pushes and resolves the thread.
+ * fixes both, pushes and resolves the thread. It plays once a page.
  */
 const CODE_THREAD: RemoteCommentThread = thread(
   'PRRT_kwDONb7k3c86Tq4Hn',
@@ -19,16 +20,25 @@ const CODE_THREAD: RemoteCommentThread = thread(
   1
 );
 
-/** Core's babysit update (`composeBabysitPrompt`), as the agent gets it. */
-const UPDATE =
-  `Status update for PR #${PR_HOMEPAGE.id} ("${PR_HOMEPAGE.title}", ` +
-  `${PR_HOMEPAGE.sourceBranch} → ${PR_HOMEPAGE.targetBranch}):\n\n` +
-  'CI: failed (new verdict since you were last told). Find out why and fix it.\n' +
-  `Conflicts: none against the latest origin/${PR_HOMEPAGE.targetBranch}.\n\n` +
-  'Unresolved review threads that are new or have new comments since you were last told:\n\n' +
-  `### 1. worker/public/index.html:96  (thread ${CODE_THREAD.id})\n` +
-  `@${CODE_THREAD.comments[0]?.author}: ${CODE_THREAD.comments[0]?.body}\n\n` +
-  'Address whatever needs addressing and push your changes. Each thread above is named by the id its provider uses, so you can answer the ones you handled.';
+const REPORT: BabysitReport = {
+  buildStatus: 'failed',
+  lastToldBuildStatus: 'pending',
+  ciChanged: true,
+  conflictsChanged: false,
+  conflictCount: 0,
+  newThreads: [
+    {
+      id: CODE_THREAD.id,
+      file: CODE_THREAD.file,
+      line: CODE_THREAD.lineStart,
+      comments: CODE_THREAD.comments.map(({ author, body }) => ({
+        author,
+        body,
+      })),
+      lastCommentIsOwn: false,
+    },
+  ],
+};
 
 function fixBeats(repo: RepoState): Beat[] {
   const id = PR_HOMEPAGE.id;
@@ -156,8 +166,15 @@ function fixBeats(repo: RepoState): Beat[] {
   ];
 }
 
-export function babysitHomepage(repo: RepoState, agent: ClaudeCode): void {
-  scheduler.after(2500, () => {
+let briefed = false;
+
+/** Starts the story; returns a cancel for whatever has not played yet. */
+export function babysitHomepage(
+  repo: RepoState,
+  agent: ClaudeCode
+): () => void {
+  if (briefed) return () => undefined;
+  const news = scheduler.after(2500, () => {
     repo.threads[PR_HOMEPAGE.id] = {
       threads: [CODE_THREAD],
       generalComments: [],
@@ -165,5 +182,26 @@ export function babysitHomepage(repo: RepoState, agent: ClaudeCode): void {
     repo.updatePr(PR_HOMEPAGE.id, { buildStatus: 'failed' });
     repo.recount(PR_HOMEPAGE.id);
   });
-  scheduler.after(5500, () => agent.say(UPDATE, fixBeats(repo)));
+  const deliver = () => {
+    briefed = true;
+    agent.say(composeBabysitPrompt(PR_HOMEPAGE, REPORT), fixBeats(repo));
+  };
+  // Like the real babysitter, it never interrupts a turn.
+  let waiting: () => void = () => undefined;
+  const brief = scheduler.after(5500, () => {
+    if (agent.idle) {
+      deliver();
+      return;
+    }
+    waiting = scheduler.every(500, () => {
+      if (!agent.idle) return;
+      waiting();
+      deliver();
+    });
+  });
+  return () => {
+    news();
+    brief();
+    waiting();
+  };
 }

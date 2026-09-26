@@ -52,6 +52,8 @@ export function createWorktreeHost(
 ): WorktreeHost {
   // The demo pushes no sync notices or babysitter changes.
   const never = new Channel<never>();
+  /** Cancels for scripted babysit updates still to play, by PR id. */
+  const scripted = new Map<number, () => void>();
   const repo = () => state.repo();
   return {
     getSidebarModel: () => later({ cwd: repo().cwd, items: repo().sidebar }),
@@ -90,10 +92,13 @@ export function createWorktreeHost(
         (item) => item.pr?.id === prId,
         (item) => ({ ...item, babysit: status })
       );
-      PROGRAMS.babysit(pr, repo(), hub);
+      scripted.get(prId)?.();
+      scripted.set(prId, PROGRAMS.babysit(pr, repo(), hub));
       return later(status);
     },
     stopBabysit: (prId) => {
+      scripted.get(prId)?.();
+      scripted.delete(prId);
       repo().updateItem(
         (item) => item.pr?.id === prId,
         (item) => ({ ...item, babysit: undefined })

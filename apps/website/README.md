@@ -96,8 +96,9 @@ that needs no credentials, and runs the real `deploy` once
 The landing page's feature clips (`public/media/<clip>-<theme>.{webm,mp4}`
 and `<clip>-<theme>-poster.webp`) exist in both themes. `DemoVideo`
 (`src/components/demo-video.tsx`) plays the one matching the site's theme
-and swaps recordings on a toggle without a reload; its poster is a
-`ThemeImage`, so only the shown theme's still is fetched.
+and swaps recordings on a toggle without a reload, at the same time into
+the clip; its poster is a `ThemeImage`, so only the shown theme's still
+is fetched.
 
 `scripts/record-media/record.mjs` re-records them. The desktop clips are
 scripted with Playwright against the standalone demo (`sync-demo`), on

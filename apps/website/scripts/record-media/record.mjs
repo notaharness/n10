@@ -36,6 +36,9 @@ function parseArgs(argv) {
   for (const name of names) {
     if (!CLIPS.includes(name)) throw new Error(`Unknown clip: ${name}`);
   }
+  if (theme !== undefined && !THEMES.includes(theme)) {
+    throw new Error(`Unknown theme: ${theme}`);
+  }
   return {
     themes: theme ? [theme] : THEMES,
     names: names.length ? names : CLIPS,

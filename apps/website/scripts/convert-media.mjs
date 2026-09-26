@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const WIDTH = 1024;
+const POSTER_WIDTH = 768;
 const outDir = fileURLToPath(new URL('../public/media', import.meta.url));
 
 function ffmpeg(args) {
@@ -71,14 +72,17 @@ export function encodeClip({ frames, name, fps, poster }) {
     join(outDir, `${name}.webm`),
   ]);
 
+  // The poster shows for a moment before playback, or under reduced
+  // motion, so it is smaller than the video it stands in for.
   ffmpeg([
     '-i',
     join(frames, `${String(poster).padStart(5, '0')}.png`),
-    ...scale,
+    '-vf',
+    `scale=${POSTER_WIDTH}:-2:flags=lanczos`,
     '-c:v',
     'libwebp',
     '-quality',
-    '80',
+    '60',
     join(outDir, `${name}-poster.webp`),
   ]);
 }

@@ -35,10 +35,13 @@ function useSiteTheme(): 'light' | 'dark' | null {
  *
  * The poster is a `ThemeImage` behind the video rather than the
  * `poster` attribute, so CSS picks it by the `.dark` class before
- * hydration and only the visible one is fetched. The video itself is
- * keyed by theme: a theme change swaps in the other recording, which
- * picks up at the same moment, since both are recorded from the same
- * script on the same clock. Nothing is fetched for a theme not shown.
+ * hydration and only the visible one is fetched. It carries the alt
+ * text until the video, which carries it after, renders. The video is
+ * keyed by theme: a theme change swaps in the other recording at the
+ * same time into the clip. The desktop clips are recorded from one
+ * script on one clock, so the frames line up; the terminal clip is
+ * filmed in real time and may be a few frames apart. Nothing is
+ * fetched for a theme not shown.
  *
  * Under prefers-reduced-motion it doesn't autoplay: the poster shows,
  * with controls to play it. `autoplay` is never server-rendered, since
@@ -81,7 +84,7 @@ export function DemoVideo({
       <ThemeImage
         name={name}
         suffix="-poster"
-        alt=""
+        alt={theme ? '' : alt}
         className="absolute inset-0 size-full object-cover"
       />
       {theme && (
