@@ -153,6 +153,14 @@ export function noteSeen(name: string): void {
   if (state) state.lastSeenAt = Date.now();
 }
 
+/** Whether the session produced output after the user last saw it
+ * (`noteSeen`). Output the user watched does not need their attention,
+ * even if the session only reads as idle after they moved away. */
+export function hasUnseenOutput(name: string): boolean {
+  const state = sessions.get(name);
+  return state?.lastDataAt != null && state.lastDataAt > state.lastSeenAt;
+}
+
 /**
  * How long the session has produced nothing, in ms — the raw fact
  * behind `snapshot().active`, for callers whose idea of idle is longer

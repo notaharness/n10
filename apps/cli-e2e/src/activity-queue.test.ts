@@ -3,10 +3,12 @@ import { sidebarLocator } from './setup/sidebar.js';
 import { createSession, waitForSidebarFocused } from './setup/sessions.js';
 
 // Both sessions run the same fake-agent (aiCommand is global). We rely
-// on the active→idle edge being detected after the 4s burst plus the
+// on the active→idle edge being detected after the 8s burst plus the
 // 2s idle window, while we focus into the second session and let the
-// first one transition behind us.
-const aiCommand = fakeAgentCommand({ bursts: 1, burstMs: 4_000 });
+// first one transition behind us. Only output the user has not seen
+// queues a session, so the burst has to outlast creating the second
+// session (~4s with the picker's 2s settle).
+const aiCommand = fakeAgentCommand({ bursts: 1, burstMs: 8_000 });
 
 test.describe('Activity queue (Ctrl+Space, setting on)', () => {
   test.use({

@@ -3,11 +3,12 @@ import { createSession, waitForSidebarFocused } from './setup/sessions.js';
 
 test.use({
   n10Config: {
-    // 4s of bursts comfortably exceeds MIN_ACTIVE_MS=300, so the
-    // session becomes flash-eligible. After the burst ends, the watcher
-    // detects the active→idle transition (~ACTIVITY_IDLE_MS=2s later)
-    // and fires the info toast.
-    aiCommand: fakeAgentCommand({ bursts: 1, burstMs: 4_000 }),
+    // The toast is for output the user has not seen, so the burst has to
+    // outlast creating the second session (~4s with the picker's 2s
+    // settle). After the burst ends, the watcher detects the
+    // active→idle transition (~ACTIVITY_IDLE_MS=2s later) and fires the
+    // info toast.
+    aiCommand: fakeAgentCommand({ bursts: 1, burstMs: 8_000 }),
     autoHideSidebar: false,
     keybindPreset: 'vim',
   },

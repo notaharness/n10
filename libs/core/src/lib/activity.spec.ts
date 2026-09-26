@@ -4,6 +4,7 @@ import {
   __resetForTests,
   attach,
   detach,
+  hasUnseenOutput,
   noteInput,
   noteSeen,
   snapshot,
@@ -128,6 +129,24 @@ describe('activity', () => {
     vi.advanceTimersByTime(ACTIVITY_IDLE_MS + 1);
 
     expect(snapshot('s1').flashing).toBe(false);
+  });
+
+  it('reports output as unseen until noteSeen acknowledges it', () => {
+    const pty = new MockPty();
+    attach('s1', pty.asPty());
+    expect(hasUnseenOutput('s1')).toBe(false);
+
+    vi.advanceTimersByTime(100);
+    pty.emit('xxxx');
+    expect(hasUnseenOutput('s1')).toBe(true);
+
+    vi.advanceTimersByTime(100);
+    noteSeen('s1');
+    vi.advanceTimersByTime(ACTIVITY_IDLE_MS + 1);
+    // Lapsing into idle after the user saw the output leaves it seen.
+    expect(snapshot('s1').active).toBe(false);
+    expect(hasUnseenOutput('s1')).toBe(false);
+    expect(hasUnseenOutput('unknown')).toBe(false);
   });
 
   it('detach unsubscribes from the PTY and makes future calls no-ops', () => {

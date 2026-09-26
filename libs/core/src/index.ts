@@ -53,6 +53,7 @@ export {
   noteSeen,
   snapshot,
   idleFor,
+  hasUnseenOutput,
   __resetForTests as __resetActivityForTests,
 } from './lib/activity.js';
 export type { ActivitySnapshot } from './lib/activity.js';
