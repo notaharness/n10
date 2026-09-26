@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Keep the Copilot contract aligned with apps/cli-e2e/src/fixtures/fake-copilot.mjs.
 // Offline Copilot CLI contract, including native global continuation fallback.
 // Never delegates to an installed CLI. Control files live in the fixture cwd.
 import {

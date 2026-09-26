@@ -16,6 +16,7 @@ import {
 } from './setup/terminals.js';
 
 test.use({
+  fakeGitHub: { prs: [] },
   n10Config: { agentId: 'copilot' },
   env: async ({ fixtureHome }, provide) => {
     await provide(installCopilot(fixtureHome));

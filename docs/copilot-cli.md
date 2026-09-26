@@ -56,6 +56,8 @@ produces controlled ANSI output, idle periods and process exits without delegati
 to the installed binary. Tests use fixture HOME directories and isolated tmux
 sockets with TMUX unset; no account or model is involved.
 
+Choose an unused `PORT` when another worktree runs the TUI browser bridge.
+
 ```sh
 npx nx test core
 PORT=5198 npx nx e2e cli-e2e -- copilot.test.ts

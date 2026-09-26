@@ -1,3 +1,4 @@
+// Keep the Copilot contract aligned with apps/desktop-e2e/src/setup/copilot.ts.
 import {
   chmodSync,
   copyFileSync,
