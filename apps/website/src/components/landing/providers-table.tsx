@@ -2,7 +2,7 @@ const providers = [
   {
     name: 'GitHub',
     auth: 'Authenticated gh CLI',
-    coverage: 'Unit, offline end-to-end, and live integration',
+    coverage: 'Unit, offline end-to-end, and live integration tests',
   },
   {
     name: 'Azure DevOps',
@@ -17,12 +17,11 @@ export function ProvidersTable() {
       <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-20 md:grid-cols-12 md:gap-14 sm:py-24">
         <div className="min-w-0 md:col-span-5">
           <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            Version control providers
+            GitHub and Azure DevOps support
           </h2>
           <p className="text-fd-muted-foreground mt-4 leading-relaxed text-pretty">
-            GitLab, Bitbucket and other providers are not supported yet.
-            Provider integrations use the interface in <code>libs/vcs/</code>,
-            and contributions are welcome.
+            GitLab, Bitbucket and other providers are not supported. Additional
+            integrations can implement the interface in <code>libs/vcs/</code>.
           </p>
         </div>
         <div className="min-w-0 md:col-span-7">

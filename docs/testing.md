@@ -131,10 +131,11 @@ starting another. Browser launch may require the agent environment's approval.
 ## README media
 
 `apps/desktop-e2e/demo/capture.mjs` drives the built app under Xvfb with fake gh
-and a paced demo agent, then records GIFs and stills into `docs/media/`.
-The TUI capture uses the wterm bridge. `theme-slider.py` makes the light/dark
-hero wipe. Raw captures are ignored under `docs/media/raw/`.
-Read the demo directory's README before recording.
+and a paced demo agent, then records GIFs into `docs/media/`. The TUI capture
+uses the wterm bridge. Raw captures are ignored under `docs/media/raw/`.
+Read the demo directory's README before recording. The hero stills are
+screenshots of the website's desktop demo: `record-media/record.mjs hero` in
+`apps/website/scripts`.
 
 ## Integration Tests
 

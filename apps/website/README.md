@@ -93,7 +93,28 @@ that needs no credentials, and runs the real `deploy` once
 
 ## Media
 
-`scripts/convert-media.mjs` re-encodes the GIFs in `docs/media/` into
-`public/media/`. It needs ffmpeg and the output changes only when a demo is
-re-recorded, so run it by hand and commit the result rather than making the
-build depend on ffmpeg.
+The landing page's feature clips (`public/media/<clip>-<theme>.{webm,mp4}`
+and `<clip>-<theme>-poster.webp`) exist in both themes. `DemoVideo`
+(`src/components/demo-video.tsx`) plays the one matching the site's theme
+and swaps recordings on a toggle without a reload, at the same time into
+the clip; its poster is a `ThemeImage`, so only the shown theme's still
+is fetched.
+
+`scripts/record-media/record.mjs` re-records them. The desktop clips are
+scripted with Playwright against the standalone demo (`sync-demo`), on
+Playwright's fake clock, so each run produces the same frames. The `tui`
+clip films the real TUI through `cli-wterm-host` against the README
+demo's fixture repository. `scripts/convert-media.mjs` encodes the frames.
+The `hero` target instead writes the root README's stills,
+`docs/media/hero.png` and `hero-light.png`: the demo at rest, at 2x.
+
+```sh
+npx nx run website:sync-demo
+npx nx run-many -t build -p cli cli-wterm-host
+node apps/website/scripts/record-media/record.mjs            # every clip, both themes
+node apps/website/scripts/record-media/record.mjs plan --theme=light
+```
+
+It needs ffmpeg, and tmux for the `tui` clip. The output changes only
+when a clip is re-recorded, so run it by hand and commit the result
+rather than making the build depend on ffmpeg and a browser.

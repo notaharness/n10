@@ -16,7 +16,7 @@ const mono = Geist_Mono({
 export const metadata: Metadata = {
   title: {
     template: '%s | n10',
-    default: "n10 | Keep up with your agents' pull requests",
+    default: 'n10 | Like an IDE for agents',
   },
   description:
     'Run coding agents in Git worktrees and review their pull requests, and your colleagues’, in one place. Sessions are plain tmux.',
