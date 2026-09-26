@@ -1226,7 +1226,10 @@ and later) the deb installs a profile, and the AppImage's launcher adds
 Release assets have versionless names, listed in
 `apps/desktop/release-assets.json`, so
 `https://github.com/notaharness/n10/releases/latest/download/<name>` always
-serves the current release; the website's download links read that file.
+serves the current release. Each release attaches that file too, and the
+website's download links read the released copy
+(`releases/latest/download/release-assets.json`), never `master`'s, which may
+name assets the latest release does not have.
 During the beta there is one channel: a `-beta` GitHub release is not marked a
 prerelease, so `releases/latest`, npm's `latest` and a future updater agree.
 A separate beta channel comes with 1.0, alongside the updater's channel

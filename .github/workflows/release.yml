@@ -143,7 +143,8 @@ jobs:
           path: package
       - run: npm publish --dry-run --tag "$DIST_TAG" ./package/*.tgz
 
-  # Release assets are the artifacts named release-*.
+  # Attach every file release-assets.json names from release-* artifacts,
+  # plus the manifest itself so the release records its download names.
   github-release:
     if: github.event_name == 'push'
     needs: [version, publish]
@@ -151,13 +152,22 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: apps/desktop/release-assets.json
+          sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v4
         with:
           pattern: release-*
           path: assets
           merge-multiple: true
       - run: |
-          mapfile -t assets < <(find assets -type f 2>/dev/null)
+          manifest=apps/desktop/release-assets.json
+          assets=("$manifest")
+          for name in $(jq -er '.[][][]' "$manifest"); do
+            [ -f "assets/$name" ] || { echo "::error::$name was not built"; exit 1; }
+            assets+=("assets/$name")
+          done
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             --verify-tag --generate-notes --prerelease="$PRERELEASE" "${assets[@]}"
         env:
