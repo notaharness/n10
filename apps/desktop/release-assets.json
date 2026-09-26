@@ -1,0 +1,12 @@
+{
+  "linux": {
+    "x64": {
+      "deb": "n10-desktop_amd64.deb",
+      "appImage": "n10-desktop-x86_64.AppImage"
+    },
+    "arm64": {
+      "deb": "n10-desktop_arm64.deb",
+      "appImage": "n10-desktop-arm64.AppImage"
+    }
+  }
+}

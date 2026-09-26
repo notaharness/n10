@@ -1,10 +1,11 @@
 name: Release
 
-# A vX.Y.Z tag releases X.Y.Z: it packs and tests the package (package.yml),
-# publishes that tarball to npm through trusted publishing, and creates the
-# GitHub release.
-# Run by hand, it rehearses the release of the selected ref's version:
-# everything but the GitHub release, and npm publish with --dry-run.
+# A vX.Y.Z tag releases X.Y.Z: it packs and tests the npm package
+# (package.yml) and builds the Linux packages (linux-packages.yml), publishes
+# that tarball to npm through trusted publishing, and creates the GitHub
+# release with the Linux packages attached.
+# Run by hand, it rehearses the release of the selected ref's version: the
+# same builds, and npm publish with --dry-run; nothing is published.
 on:
   push:
     tags: ['v*']
@@ -35,11 +36,17 @@ jobs:
       contents: read
     uses: ./.github/workflows/package.yml
 
+  linux-packages:
+    needs: version
+    permissions:
+      contents: read
+    uses: ./.github/workflows/linux-packages.yml
+
   # Its own job, so a GitHub release that fails after publishing can be
   # re-run alone. Why only `latest`: publish-beta's packaging notes.
   publish:
     if: github.event_name == 'push'
-    needs: package
+    needs: [package, linux-packages]
     runs-on: ubuntu-latest
     # Its deployment rule admits only v* tags; npm's trusted publisher names it.
     environment: npm
@@ -59,7 +66,7 @@ jobs:
   # A dispatched rehearsal: outside the tag-only environment, with no token.
   rehearse:
     if: github.event_name == 'workflow_dispatch'
-    needs: package
+    needs: [package, linux-packages]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-node@v4
@@ -71,8 +78,9 @@ jobs:
           path: package
       - run: npm publish --dry-run --tag latest package/*.tgz
 
-  # Release assets are the artifacts named release-*. The Linux package jobs
-  # (#122) join `needs` and upload their .deb and AppImage under that prefix.
+  # Release assets are the artifacts named release-*. A beta is not marked a
+  # prerelease: until the updater brings a beta channel, releases/latest,
+  # npm's latest and the updater follow one channel.
   github-release:
     if: github.event_name == 'push'
     needs: publish
@@ -88,7 +96,6 @@ jobs:
       - run: |
           mapfile -t assets < <(find assets -type f 2>/dev/null)
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-            --verify-tag --generate-notes --prerelease="$PRERELEASE" "${assets[@]}"
+            --verify-tag --generate-notes --latest "${assets[@]}"
         env:
           GH_TOKEN: ${{ github.token }}
-          PRERELEASE: ${{ contains(github.ref_name, '-') }}
