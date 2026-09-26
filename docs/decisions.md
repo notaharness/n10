@@ -195,11 +195,18 @@ resolves that directory as a first launch would and sends it as the
 single-instance lock's `additionalData`. `argv` is not used: Chromium may
 reorder and extend it, and it carries neither the launcher's environment nor
 whether a terminal started the process. The running app passes over a
-directory that is not a repository, as startup does, and holds a launch that
-arrives before the window's first load. The renderer receives the directory as
-`open-repo` with a path. The repository gate handles that command above both
-screens, so the start screen and the workspace open it as the picker does; a
-launch naming the repository on screen changes nothing.
+directory that is not a repository, as startup does, and a relative one, which
+it would resolve against the wrong working directory. The renderer receives the
+directory as `open-repo` with a path. The repository gate handles that command
+above both screens, so the start screen and the workspace open it as the picker
+does; a launch naming the repository on screen changes nothing.
+
+Main cannot see when a page has subscribed to menu commands, so the page claims
+launches (`takeLaunchRepo`) once subscribed and the gate has its first answer,
+taking any launch that waited. Main sends later launches only to a page that has
+claimed; navigating away or closing the window gives the claim up. A launch
+during startup, a reload or renderer recovery therefore waits for the next page
+instead of going to one that is not listening.
 
 Use native menus and dialogs where the OS supports the interaction. The review
 workspace has a navigation rail and one content pane; keep the terminal mounted

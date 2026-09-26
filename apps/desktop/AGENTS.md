@@ -36,7 +36,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - A later launch sends its start directory as the single-instance lock's
   `additionalData` (`main/second-launch.ts`), never through `argv`. The
   running app opens it as `open-repo` with a path, which the gate in
-  `App.tsx` handles for both screens.
+  `App.tsx` handles for both screens. Launches wait in
+  `services/launch-repo.ts` until the page claims them (`takeLaunchRepo`).
 - Sidebar answers are stamped with the repo they describe
   (`getSidebarSnapshot`) and the renderer drops answers for a repo it is not
   showing (`loadSidebarModel`). A switch is in flight for several awaits.

@@ -10,7 +10,7 @@
  * other process's environment (the npm launcher's `N10_START_DIR`) nor
  * whether a terminal started it.
  */
-import { resolve } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 import { app, BrowserWindow } from 'electron';
 import {
   offerLaunchRepo,
@@ -35,14 +35,16 @@ export function secondLaunchData(
 /**
  * The repository a second launch asks for, by its real path. Null when
  * it names none, or names a directory that is not a repository, which
- * a first launch passes over too.
+ * a first launch passes over too. A relative path is refused rather
+ * than resolved against this process's working directory, which is not
+ * the one the launch meant.
  */
 export function requestedRepo(data: unknown): string | null {
   const startDir =
     typeof data === 'object' && data !== null
       ? (data as SecondLaunch).startDir
       : undefined;
-  if (typeof startDir !== 'string' || startDir === '') return null;
+  if (typeof startDir !== 'string' || !isAbsolute(startDir)) return null;
   const cwd = canonicalRepoPath(startDir);
   if (isGitRepo(cwd)) return cwd;
   console.warn(`[desktop] second launch: not a git repo: ${startDir}`);

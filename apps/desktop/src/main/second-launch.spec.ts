@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const app = new EventEmitter();
@@ -72,6 +72,13 @@ describe('requestedRepo', () => {
     for (const data of [undefined, null, 'x', {}, { startDir: 7 }]) {
       expect(requestedRepo(data)).toBeNull();
     }
+  });
+
+  it('refuses a relative start dir, which this process would resolve against its own cwd', () => {
+    expect(
+      requestedRepo({ startDir: relative(process.cwd(), repo) })
+    ).toBeNull();
+    expect(requestedRepo({ startDir: '' })).toBeNull();
   });
 });
 
