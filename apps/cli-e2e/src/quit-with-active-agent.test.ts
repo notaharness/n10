@@ -1,18 +1,14 @@
 import { test, expect, fakeAgentCommand } from './fixtures/n10.js';
 import { wtermHost } from './setup/constants.js';
-import {
-  createSession,
-  pressUntil,
-  waitForSidebarFocused,
-} from './setup/sessions.js';
+import { createSession, waitForSidebarFocused } from './setup/sessions.js';
+import { listTaggedSessions } from './setup/tmux.js';
 
-// Regression for issue #56: pressing 'q' did not quit n10 while an
-// agent PTY was still running, because Ink's exit() only unmounts the
-// React tree — the live node-pty children kept the event loop alive.
+// Regression for issue #56: 'q' must quit n10 while agents are running.
+// Quitting detaches rather than kills, so every agent's tmux session
+// keeps its original process for the next launch to reattach.
 //
-// We assert that n10's PTY is gone after 'q' by polling the wterm
-// host's `/status` endpoint, which reports whether `activePty` (the
-// n10 process) is still attached.
+// The wterm host's `/status` reports whether n10's own PTY is still
+// alive; the test's private tmux server shows what became of the agents.
 test.use({
   n10Config: {
     aiCommand: fakeAgentCommand({
@@ -24,52 +20,51 @@ test.use({
   },
 });
 
-interface Status {
-  ptyAlive: boolean;
+const BRANCHES = ['quit-a', 'quit-b'];
+
+async function n10Running(host: string): Promise<boolean> {
+  const r = await fetch(`${host}/status`);
+  return ((await r.json()) as { ptyAlive: boolean }).ptyAlive;
 }
 
-async function fetchStatus(baseURL: string): Promise<Status> {
-  const r = await fetch(`${baseURL}/status`);
-  return (await r.json()) as Status;
+/** The pane pid of `branch`'s agent while it runs: `undefined` for a
+ *  missing session, a dead pane or the launch placeholder. */
+function agentPid(branch: string, homeDir: string): number | undefined {
+  const session = listTaggedSessions(homeDir).find(
+    (s) => s.type === 'worktree' && s.branch === branch
+  );
+  if (!session || session.paneDead) return undefined;
+  return session.paneStartCommand.includes('fake-agent')
+    ? session.panePid
+    : undefined;
 }
 
-test.describe('Quit with active agent (#56)', () => {
-  test("'q' exits n10 cleanly even while an agent PTY is running", async ({
+test.describe('Quit with running agents (#56)', () => {
+  test("one 'q' quits n10 and leaves every agent running in tmux", async ({
     n10,
     baseURL,
   }) => {
     const host = wtermHost(baseURL);
+    const agentPids = () => BRANCHES.map((b) => agentPid(b, n10.homeDir));
 
-    await createSession(n10.term, 'busy-q', { start: true });
+    for (const branch of BRANCHES) {
+      await createSession(n10.term, branch, { start: true });
+      await expect
+        .poll(() => agentPid(branch, n10.homeDir), { timeout: 20_000 })
+        .toBeDefined();
+      // Back to the sidebar, where 'c' creates and 'q' quits.
+      await n10.term.write('\x00');
+      await waitForSidebarFocused(n10.term);
+    }
+    const running = agentPids();
+    expect(running).not.toContain(undefined);
+    expect(await n10Running(host)).toBe(true);
 
-    // Wait for the agent's banner so we know the PTY is up and bursting
-    // before we try to quit.
-    await expect(
-      n10.term.getByText('n10-fake-agent-ready').first()
-    ).toBeVisible({ timeout: 10_000 });
+    // A single press: re-pressing would hide a swallowed or ignored 'q'.
+    await n10.term.press('q');
+    await expect.poll(() => n10Running(host), { timeout: 10_000 }).toBe(false);
 
-    // Escape back to the sidebar so 'q' is interpreted as sidebar.quit.
-    await n10.term.write('\x00');
-    await waitForSidebarFocused(n10.term);
-
-    // Sanity: n10 is still up.
-    expect((await fetchStatus(host)).ptyAlive).toBe(true);
-
-    // The fix under test: this should actually exit n10.
-    //
-    // `pressUntil` rather than a longer poll. Two things can fail here and
-    // a bigger timeout only covers one: `handleExit` races
-    // settlePendingRuns() against EXIT_GRACE_MS (3s) before process.exit
-    // (slow, so waiting helps), and the 'q' can be dropped outright after
-    // the preceding Ctrl+Space (waiting never helps).
-    //
-    // Re-pressing is safe: 'q' is idempotent in the sidebar, and once
-    // n10 is tearing down the keystroke is a no-op — the client only
-    // sends on an OPEN socket and the host ignores input with no PTY.
-    await pressUntil(
-      n10.term,
-      'q',
-      async () => !(await fetchStatus(host)).ptyAlive
-    );
+    // Same live process in each session: detached, not killed or restarted.
+    expect(agentPids()).toEqual(running);
   });
 });
