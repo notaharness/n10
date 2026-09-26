@@ -4,6 +4,7 @@ import {
   removeWorktree,
   deleteBranch,
 } from '@n10/worktree-manager';
+import { rescanSessionDiscovery } from '../discovery/session-discovery.js';
 import { isSessionAlive } from '../pty-registry.js';
 import { stopSession } from './stop-session.js';
 import { getRepoRoot } from '../repo-root.js';
@@ -62,7 +63,10 @@ export async function checkWorktreeRemoval(
 /** Stop the agent in the checkout that has `branch`, before deleting
  *  that checkout. The session belongs to the checkout, so it is found by
  *  the worktree's path — never by the branch it was created for, which
- *  another worktree may have checked out since. */
+ *  another worktree may have checked out since.
+ *
+ *  Resolves once session discovery has seen the result, so the shells
+ *  learn of this removal the way they learn of one made outside n10. */
 export async function removeWorktreeSession(
   branch: string,
   force: boolean,
@@ -73,5 +77,6 @@ export async function removeWorktreeSession(
   if (key) stopSession(key);
   const removed = await removeWorktree(branch, { force, cwd });
   if (removed) await deleteBranch(branch, true, cwd);
+  await rescanSessionDiscovery();
   return removed;
 }

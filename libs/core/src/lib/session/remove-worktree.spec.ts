@@ -11,6 +11,9 @@ vi.mock('../pty-registry.js', () => ({
   isSessionAlive: (key: string) => state.alive.has(key),
   killSession: (key: string) => state.calls.push(['kill', key]),
 }));
+vi.mock('../discovery/session-discovery.js', () => ({
+  rescanSessionDiscovery: async () => state.calls.push(['rescan']),
+}));
 vi.mock('../session-backend.js', () => ({
   killPersistedTmuxSession: (key: string) =>
     state.calls.push(['persisted', key]),
@@ -51,7 +54,16 @@ describe('removeWorktreeSession', () => {
       ['kill', LOGIN_KEY],
       ['remove', 'feature/login', { force: true, cwd: '/repo-a' }],
       ['delete', 'feature/login', true, '/repo-a'],
+      ['rescan'],
     ]);
+  });
+
+  // The shells learn of this removal through discovery, as they do of
+  // one made outside n10; a failed removal still stopped the agent.
+  it('has discovery look again whether or not git removed the checkout', async () => {
+    state.removed = false;
+    await removeWorktreeSession('feature/login', false, '/repo-a');
+    expect(state.calls.at(-1)).toEqual(['rescan']);
   });
 
   it('keeps the branch if checkout removal fails', async () => {
