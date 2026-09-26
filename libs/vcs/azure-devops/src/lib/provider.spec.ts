@@ -153,6 +153,19 @@ describe('parseReviewer', () => {
       ).not.toHaveProperty('includesViewer');
     });
 
+    it('names the groups a member voted for, by their identifier', () => {
+      const member = {
+        displayName: 'Teammate',
+        uniqueName: 'teammate@example.com',
+        vote: 10,
+        votedFor: [{ uniqueName: team.uniqueName }, {}],
+      };
+      expect(parseReviewer(member).votedFor).toEqual([team.uniqueName]);
+      expect(parseReviewer({ ...member, votedFor: [] })).not.toHaveProperty(
+        'votedFor'
+      );
+    });
+
     it('marks only groups, never a person who shares an id', () => {
       expect(
         parseReviewer({ ...team, isContainer: false }, myTeamIds)
@@ -1130,6 +1143,7 @@ describe('azureDevOpsProvider', () => {
           displayName: 'Teammate',
           identifier: 'teammate@example.com',
           decision: 'approved',
+          votedFor: [coreTeam.identifier],
         },
         {
           displayName: '[proj]\\Release Approvers',
@@ -1147,6 +1161,7 @@ describe('azureDevOpsProvider', () => {
           displayName: 'Me',
           identifier: 'me@example.com',
           decision: 'approved',
+          votedFor: [coreTeam.identifier],
         },
       ]);
     });

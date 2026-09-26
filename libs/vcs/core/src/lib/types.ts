@@ -70,6 +70,19 @@ export interface PullRequestReviewer {
    *  asks the user, but its `decision` is whoever voted for the group,
    *  never the user's own. */
   includesViewer?: boolean;
+  /** The `identifier`s of the groups this reviewer's vote was cast for.
+   *  Such a group's row carries this same vote. */
+  votedFor?: string[];
+}
+
+/** The reviewers a tally counts: one row per vote. A group answered by
+ *  a member who is listed too carries that member's vote, so only the
+ *  member is counted; any other group counts as its own reviewer. */
+export function reviewersToCount<
+  R extends Pick<PullRequestReviewer, 'identifier' | 'votedFor'>
+>(reviewers: readonly R[]): R[] {
+  const answered = new Set(reviewers.flatMap((r) => r.votedFor ?? []));
+  return reviewers.filter((r) => !answered.has(r.identifier));
 }
 
 /** The provider holds a request for this reviewer's verdict. Where the
