@@ -263,7 +263,7 @@ describe('prStatusIndicator', () => {
     d === 'changes-requested' || d === 'waiting-for-author' || d === 'rejected';
   const call = (decisions: ReviewDecision[], ci?: string) =>
     prStatusIndicator(
-      decisions.map((decision) => ({ decision })),
+      decisions.map((decision, i) => ({ identifier: `r${i}`, decision })),
       ci,
       isBlocking
     );
@@ -326,6 +326,31 @@ describe('prStatusIndicator', () => {
     // CI can escalate a row's urgency; it cannot vouch for it.
     expect(call(PARTIAL, 'succeeded').tone).toBe('muted');
     expect(call([], 'succeeded').tone).toBe('muted');
+  });
+
+  /** Azure lists a teammate's vote for a team twice: on the team's row
+   *  and on the teammate's own, which names the team in `votedFor`. */
+  it('counts a team answered by a listed teammate as one vote', () => {
+    const team = 'vstfs:///Classification/TeamProject/proj\\Core Team';
+    const out = prStatusIndicator(
+      [
+        { identifier: team, decision: 'approved' },
+        {
+          identifier: 'teammate@example.com',
+          decision: 'approved',
+          votedFor: [team],
+        },
+      ],
+      'succeeded',
+      isBlocking
+    );
+    expect({ approved: out.approved, total: out.total }).toEqual({
+      approved: 1,
+      total: 1,
+    });
+    expect(out.label).toBe(
+      'Ready to merge — CI passed, all 1 reviewer approved'
+    );
   });
 
   it('keeps both axes readable however the glyph resolves', () => {
