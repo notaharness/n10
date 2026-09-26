@@ -1,7 +1,8 @@
 'use client';
 
-import { Pause, Play } from 'lucide-react';
+import { MousePointerClick } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { cn } from '@/lib/cn';
 import {
   useEffect,
   useRef,
@@ -19,13 +20,14 @@ import {
  * hero shows a screenshot and the demo costs nothing.
  *
  * The page tells it two things by message: whether to play (paused off
- * screen and by the button) and the theme, when the site's changes.
+ * screen) and the theme, when the site's changes. The demo itself holds
+ * its running agents once the visitor clicks or types in it, and under
+ * reduced motion starts at the end state, so there is no play control.
  */
 const SRC = '/desktop-demo/demo/index.html';
 const WINDOW = { width: 1280, height: 800 };
 /** Tailwind's `lg`, which the hero uses to swap the screenshot out. */
 const WIDE = '(min-width: 64rem)';
-const REDUCED = '(prefers-reduced-motion: reduce)';
 
 function useMedia(query: string): boolean {
   return useSyncExternalStore(
@@ -81,11 +83,7 @@ export function DesktopDemo({ className }: { className?: string }) {
   const inView = useInView(box);
   const { resolvedTheme } = useTheme();
   const wide = useMedia(WIDE);
-  const reduced = useMedia(REDUCED);
-  const [paused, setPaused] = useState(false);
-  const playing = inView && !paused;
-
-  useEffect(() => send(frame.current, { playing }), [playing]);
+  useEffect(() => send(frame.current, { playing: inView }), [inView]);
 
   useEffect(() => {
     if (resolvedTheme === 'light' || resolvedTheme === 'dark') {
@@ -93,10 +91,12 @@ export function DesktopDemo({ className }: { className?: string }) {
     }
   }, [resolvedTheme]);
 
-  const Icon = paused ? Play : Pause;
-
   return (
-    <div className={className}>
+    <div className={cn('relative', className)}>
+      <p className="border-fd-border bg-fd-card text-fd-muted-foreground absolute -top-3 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap">
+        <MousePointerClick className="size-3.5" aria-hidden />
+        Try a preview
+      </p>
       <div
         ref={box}
         className="n10-frame bg-fd-card relative w-full overflow-hidden rounded-xl"
@@ -107,7 +107,7 @@ export function DesktopDemo({ className }: { className?: string }) {
             ref={frame}
             src={SRC}
             title="n10 Desktop, running on sample data"
-            onLoad={(event) => send(event.currentTarget, { playing })}
+            onLoad={(event) => send(event.currentTarget, { playing: inView })}
             className="absolute top-0 left-0 origin-top-left border-0"
             style={{
               width: WINDOW.width,
@@ -116,19 +116,6 @@ export function DesktopDemo({ className }: { className?: string }) {
               visibility: scale ? 'visible' : 'hidden',
             }}
           />
-        )}
-      </div>
-      {/* Moving content needs a way to stop it (WCAG 2.2.2). */}
-      <div className="text-fd-muted-foreground mt-2 flex justify-end">
-        {!reduced && (
-          <button
-            type="button"
-            onClick={() => setPaused(!paused)}
-            aria-label={paused ? 'Play the demo' : 'Pause the demo'}
-            className="hover:bg-fd-accent hover:text-fd-foreground focus-visible:ring-fd-ring inline-flex size-8 shrink-0 items-center justify-center rounded-md transition-colors outline-none focus-visible:ring-2"
-          >
-            <Icon className="size-4" aria-hidden />
-          </button>
         )}
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { CopyButton } from '@/components/copy-button';
+import { cn } from '@/lib/cn';
 
 const INSTALL = 'npm install -g @notaharness/n10';
 
@@ -12,9 +13,9 @@ const worksWith = [
   'Azure DevOps',
 ];
 
-export function InstallStrip() {
+export function InstallStrip({ className }: { className?: string }) {
   return (
-    <section className="mx-auto w-full max-w-3xl px-4 py-8">
+    <div className={cn('w-full max-w-3xl', className)}>
       <div className="n10-frame bg-fd-card flex items-center gap-3 overflow-hidden rounded-xl py-2.5 pr-2.5 pl-4 sm:pl-5">
         <div className="flex min-w-0 flex-1 flex-col gap-x-6 gap-y-0.5 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-fd-muted-foreground text-xs font-medium">
@@ -47,6 +48,6 @@ export function InstallStrip() {
           MIT licensed
         </a>
       </p>
-    </section>
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { DesktopDemo } from '@/components/landing/desktop-demo';
+import { InstallStrip } from '@/components/landing/install-strip';
 import { HeroBackdrop } from '@/components/hero-backdrop';
 import { Logo } from '@/components/logo';
 import { ThemeImage } from '@/components/theme-image';
@@ -24,24 +25,24 @@ export function Hero() {
           project
         </p>
         <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
-          n10, Like an IDE for agents
+          Like an IDE for agents
         </h1>
         <p className="text-fd-muted-foreground mt-6 max-w-2xl text-lg text-pretty">
-          Agents in worktrees, sessions in plain tmux, review in one place.
-          Close n10 and your agents keep running; <code>tmux attach</code> still
-          works.
+          Run multiple agents on multiple machines and connect from anywhere, no
+          SSH or VPN required
         </p>
+        <InstallStrip className="mt-10" />
         <div className="relative mt-10 w-full sm:mt-12">
           <div
             aria-hidden
             className="n10-stage-glow absolute inset-x-[6%] -top-6 bottom-[35%]"
           />
-          {/* Phones and narrow tablets get the screenshot; the demo
-              needs a window wide enough to use and never loads there. */}
+          {/* Phones and narrow tablets get a screenshot of the demo; the
+              demo needs a window wide enough to use and never loads there. */}
           <div className="relative lg:hidden">
             <ThemeImage
-              name="hero"
-              alt="n10 Desktop showing worktrees and pull request status beside a code diff with inline review comments"
+              name="hero-demo"
+              alt="n10 Desktop with worktrees and pull requests in the sidebar, beside a Claude Code agent asking permission to run the end-to-end tests"
               className="n10-frame w-full rounded-xl"
             />
           </div>
