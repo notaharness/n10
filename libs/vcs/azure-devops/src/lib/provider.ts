@@ -22,6 +22,7 @@ import type { AdoConfig } from './client.js';
 import { authHeaders, baseUrl } from './client.js';
 import {
   adoGet,
+  adoGetAll,
   adoSend,
   counted,
   invalidateAdoCache,
@@ -346,7 +347,7 @@ export async function fetchActivePullRequests(
   myTeamIds: ReadonlySet<string> = new Set(),
   viewerId: string | null = null
 ): Promise<ParsedPullRequest[]> {
-  const data = await adoGet<{ value?: unknown[] }>(
+  const rows = await adoGetAll<Record<string, unknown>>(
     'fetchActivePullRequests',
     `${config.org}/${config.project}/${config.repo}/active-prs`,
     // Dedupe only: both shells already decide how often to ask, and
@@ -358,7 +359,7 @@ export async function fetchActivePullRequests(
     authHeaders(config.pat),
     `repository ${config.repo}`
   );
-  return ((data.value ?? []) as Record<string, unknown>[]).map((raw) =>
+  return rows.map((raw) =>
     parsePullRequest(raw, project, myTeamIds, viewerId)
   );
 }
@@ -827,6 +828,9 @@ async function setAdoThreadResolved(
 
 // ── VcsProvider implementation ──────────────────────────────────────
 
+/** How far back the merged-branch sweep looks for completed pull requests. */
+const MERGED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
 export const azureDevOpsProvider: VcsProvider = {
   id: 'azure-devops',
   displayName: 'Azure DevOps',
@@ -966,19 +970,24 @@ export const azureDevOpsProvider: VcsProvider = {
     // A failed lookup answers with no merged branches rather than
     // throwing: the sweep that consumes this deletes branches, and
     // "the request failed" must never read as "nothing is merged".
-    const data = await adoGet<{ value?: { sourceRefName?: string }[] }>(
+    // Closed in the last thirty days, the window the GitHub provider
+    // searches: completed pull requests accumulate for the life of a
+    // repository, and reading every page of them each sweep would cost
+    // more the older it gets.
+    const since = new Date(Date.now() - MERGED_WINDOW_MS).toISOString();
+    const rows = await adoGetAll<{ sourceRefName?: string }>(
       'fetchMergedBranches',
       `${config.org}/${config.project}/${config.repo}/completed-prs`,
       TTL.mergedPrs,
-      `${baseUrl(
-        config
-      )}/pullrequests?searchCriteria.status=completed&api-version=7.1`,
+      `${baseUrl(config)}/pullrequests?searchCriteria.status=completed` +
+        `&searchCriteria.queryTimeRangeType=closed` +
+        `&searchCriteria.minTime=${encodeURIComponent(since)}&api-version=7.1`,
       authHeaders(config.pat),
       `repository ${config.repo}`
-    ).catch(() => ({ value: [] as { sourceRefName?: string }[] }));
+    ).catch(() => [] as { sourceRefName?: string }[]);
     const branchSet = new Set(branches);
     const matched = new Set<string>();
-    for (const pr of data.value ?? []) {
+    for (const pr of rows) {
       const source = (pr.sourceRefName ?? '').replace(/^refs\/heads\//, '');
       if (branchSet.has(source)) matched.add(source);
     }
