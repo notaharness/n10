@@ -40,12 +40,14 @@ export function useSessionManager(
     return filtered;
   }, []);
 
+  // No refresh of its own: core's removal has discovery look again, and
+  // `onDiscovered` below re-reads the rows, as it does for a worktree
+  // removed outside n10.
   const performDelete = useCallback(
     async (_sessionName: string, branch: string) => {
       await removeWorktreeSession(branch, true);
-      await refreshSessions();
     },
-    [refreshSessions]
+    []
   );
 
   // Attach to an agent session that was started outside this process —
@@ -72,9 +74,9 @@ export function useSessionManager(
     }
   );
 
-  // Something outside this process changed the worktrees or the live
-  // sessions. Both are read from disk by refreshSessions, so re-reading
-  // is the whole response.
+  // Something changed the worktrees or the live sessions — outside this
+  // process, or a removal core made here. Both are read from disk by
+  // refreshSessions, so re-reading is the whole response.
   const onDiscovered = useEffectEvent(() => {
     void refreshSessions();
   });
