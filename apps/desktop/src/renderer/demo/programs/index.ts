@@ -7,6 +7,7 @@ import { N10, PR_FLEET, PR_TABS } from '../data/n10.js';
 import type { DemoSession, SessionHub } from '../host/sessions.js';
 import type { RepoState } from '../host/state.js';
 import { ClaudeCode, type Beat } from './claude/claude-code.js';
+import { scheduler } from './scheduler.js';
 import { FLEET } from './claude/script-fleet.js';
 import { HOMEPAGE } from './claude/script-homepage.js';
 import { reviewScript } from './claude/script-review.js';
@@ -63,16 +64,24 @@ const planBeats = (pr: PullRequestInfo, repo: RepoState) =>
 export const PROGRAMS = {
   boot(hub: SessionHub): void {
     const fleet = PR_FLEET.sourceBranch;
-    hub.spawn(sessionKey(N10, fleet), new ClaudeCode(FLEET), {
-      repo: N10,
-      branch: fleet,
-      machine: 'local',
-    });
-    hub.spawn(HOMEPAGE_SESSION, new ClaudeCode(HOMEPAGE), {
-      repo: BEAM,
-      branch: PR_HOMEPAGE.sourceBranch,
-      machine: DESKTOP,
-    });
+    hub.spawn(
+      sessionKey(N10, fleet),
+      new ClaudeCode(FLEET, scheduler.ambientClock()),
+      {
+        repo: N10,
+        branch: fleet,
+        machine: 'local',
+      }
+    );
+    hub.spawn(
+      HOMEPAGE_SESSION,
+      new ClaudeCode(HOMEPAGE, scheduler.ambientClock()),
+      {
+        repo: BEAM,
+        branch: PR_HOMEPAGE.sourceBranch,
+        machine: DESKTOP,
+      }
+    );
     hub.spawn(
       JSON.stringify(['terminal', 'n10-shell']),
       new Zsh(N10, 'master'),
