@@ -29,8 +29,10 @@ publishing; no npm login or token is involved.
 
    The workflow fails before building when the tag does not match
    `apps/cli/package.json`.
+
 5. Watch the run (`gh run watch`), then verify `latest` points to the new
-   version and the release exists:
+   version and the release exists with the four Linux packages named in
+   `apps/desktop/release-assets.json`:
 
    ```sh
    npm view @notaharness/n10 dist-tags --json

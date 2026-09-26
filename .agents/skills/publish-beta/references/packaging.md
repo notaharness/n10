@@ -60,6 +60,10 @@ Trusted publishing authenticates `npm publish` only, not `npm dist-tag`, so a
 release sets one tag: `latest`. Every release, prerelease or not, is what a
 plain `npm install -g @notaharness/n10` installs.
 
-The `github-release` job creates the GitHub release with generated notes and
-attaches every artifact named `release-*` from the run. Jobs that build
-release assets upload under that prefix and join its `needs`.
+Every release run, a rehearsal included, builds the Linux packages
+(`.github/workflows/linux-packages.yml`); `publish` waits for them, so nothing
+is published unless every package built.
+
+The `github-release` job creates the GitHub release with generated notes,
+marked latest and never a prerelease (one channel during the beta; see
+decisions.md), and attaches every artifact named `release-*` from the run.

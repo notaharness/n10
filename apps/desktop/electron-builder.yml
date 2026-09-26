@@ -26,9 +26,13 @@ linux:
   synopsis: Coding agents in git worktrees, and reviews of their pull requests
   maintainer: notaharness <notaharness@users.noreply.github.com>
   vendor: notaharness
-  artifactName: ${productName}-${version}-${arch}.${ext}
   syncDesktopName: true
+# Versionless release asset names (docs/decisions.md). Keep
+# release-assets.json in step: the release uploads the files it names.
+appImage:
+  artifactName: n10-desktop-${arch}.AppImage
 deb:
+  artifactName: n10-desktop_${arch}.deb
   # electron-builder's defaults, which setting depends replaces, then
   # the ALSA library Electron links, which minimal systems lack (named
   # first, so apt does not pick an ALSA emulation), and what n10 runs.
