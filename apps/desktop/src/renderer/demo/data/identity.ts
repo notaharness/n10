@@ -35,12 +35,30 @@ export interface RepoData {
 
 /** A worktree session's key, as core builds it (`worktreeSessionKey`):
  *  the machine is appended only when it is not this one. */
+/** Core's key for the agent session in a branch's worktree: keyed by
+ *  the checkout (`worktreeSessionKey`), qualified by a remote machine. */
 export function sessionKey(repo: string, branch: string, machine = 'local') {
+  const path = worktreeDir(repo, branch);
   return JSON.stringify(
     machine === 'local'
-      ? ['worktree', repo, branch]
-      : ['worktree', repo, branch, machine]
+      ? ['worktree', repo, path]
+      : ['worktree', repo, path, machine]
   );
+}
+
+/** A worktree's agent session as the sidebar lists it. */
+export function worktreeSession(
+  repo: string,
+  branch: string,
+  running: boolean,
+  machine = 'local'
+) {
+  return {
+    name: sessionKey(repo, branch, machine),
+    running,
+    branch,
+    path: worktreeDir(repo, branch),
+  };
 }
 
 /** Where n10's default Worktree Path puts a branch's checkout. */
