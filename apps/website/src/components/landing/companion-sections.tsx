@@ -112,7 +112,7 @@ export function BeamFeature() {
   return (
     <CompanionSection
       label="Beam"
-      title="Your other machines, without SSH"
+      title="Connect to your machines without SSH"
       links={[
         { text: 'Read the guide', href: '/docs/guides/fleet' },
         { text: 'About Beam', href: '/beam' },
@@ -120,17 +120,14 @@ export function BeamFeature() {
       scene={<BeamMesh className="mx-auto w-full px-6 pt-4 pb-2" />}
     >
       <p>
-        Beam joins the machines you own into a fleet with one passkey. There are
-        no SSH keys to copy, no ports to forward and no Tailscale account. In
-        n10 Desktop you pick a machine when you launch, and the worktree, tmux
-        session and agent run there.
+        Beam makes connecting simpler than SSH: one passkey, no SSH keys, no
+        port forwarding and no Tailscale account. Use it on its own, or pick a
+        machine in n10 Desktop to run a worktree, tmux session and agent there.
       </p>
       <p>
-        Machines talk over WireGuard tunnels, directly when they can and through
-        a relay when they can&apos;t. Beam gets those from Tailcat,
-        Tailscale&apos;s open-source library, and uses it without
-        Tailscale&apos;s control plane. Your shells and commands never pass
-        through beam.n10.is.
+        Machines connect over WireGuard, directly when possible or through a
+        relay. Beam uses Tailcat without Tailscale&apos;s control plane. Your
+        shells and commands never pass through beam.n10.is.
       </p>
       <TailscaleCredit />
     </CompanionSection>
@@ -141,7 +138,7 @@ export function OrchestraFeature() {
   return (
     <CompanionSection
       label="Orchestra"
-      title="Let one agent hand work to others"
+      title="Orchestrate agents with your own agent"
       links={[
         { text: 'Read the guide', href: '/docs/orchestra' },
         { text: 'About Orchestra', href: '/orchestra' },
@@ -150,17 +147,16 @@ export function OrchestraFeature() {
       reverse
     >
       <p>
-        Orchestra is a plugin for the agent you already use, such as Claude Code
-        or Codex. It gives that agent two skills for assigning branch-sized
-        tasks to other agents, each in its own tmux session and Git worktree. It
-        works with or without n10 Desktop, and with Beam the other agents can
-        run on your other machines.
+        Orchestra is our orchestrator plugin for agents such as Claude Code and
+        Codex. Your agent assigns tasks to other agents in separate tmux
+        sessions and Git worktrees. Use it without n10 Desktop, or add Beam to
+        run agents across machines.
       </p>
       <p>
-        n10, Beam and Orchestra are separate tools. Each works on its own, and
-        they compose: n10 shows and reviews the work, Beam reaches the machines,
-        Orchestra hands out the tasks. n10 is not an agent harness; it starts
-        whichever agent you configure.
+        Adopt n10, Beam and Orchestra independently. n10 manages sessions and
+        code review, Beam connects machines, and Orchestra coordinates agents.
+        n10 is agent-agnostic, not an agent harness: it runs whichever agent you
+        configure.
       </p>
     </CompanionSection>
   );

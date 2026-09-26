@@ -14,6 +14,8 @@ export interface Feature {
   alt?: string;
   /** Docs page that covers this feature in full. */
   href: string;
+  /** Shown in the frame instead of the recording named by `media`. */
+  scene?: ReactNode;
 }
 
 /**
@@ -28,6 +30,7 @@ export function FeatureSection({
   description,
   alt,
   href,
+  scene,
   reverse = false,
 }: Feature & { reverse?: boolean }) {
   return (
@@ -63,11 +66,17 @@ export function FeatureSection({
               : 'n10-pane--sage -right-3 left-6'
           )}
         />
-        <DemoVideo
-          name={media}
-          alt={alt ?? title}
-          className="n10-frame relative w-full rounded-xl"
-        />
+        {scene ? (
+          <div className="n10-frame bg-fd-card relative overflow-hidden rounded-xl">
+            {scene}
+          </div>
+        ) : (
+          <DemoVideo
+            name={media}
+            alt={alt ?? title}
+            className="n10-frame relative w-full rounded-xl"
+          />
+        )}
       </div>
     </div>
   );
