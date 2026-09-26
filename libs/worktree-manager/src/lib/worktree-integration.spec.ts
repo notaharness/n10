@@ -173,6 +173,26 @@ describe('integration: createWorktree / removeWorktree', () => {
   });
 });
 
+describe('integration: a worktree deleted from disk', () => {
+  it('is not listed, and its branch checks out again', async () => {
+    const { repoDir } = setupGitRepo();
+    process.chdir(repoDir);
+
+    const path = await createWorktree('ghost');
+    expect(path).not.toBeNull();
+    rmSync(path!, { recursive: true, force: true });
+
+    expect((await listWorktrees()).map((w) => w.branch)).not.toContain('ghost');
+    // git still has it registered, which would refuse `worktree add`
+    // for the branch and the directory alike.
+    expect(await createWorktree('ghost')).toBe(path);
+    expect(existsSync(path!)).toBe(true);
+    expect((await listWorktrees()).map((w) => w.branch)).toContain('ghost');
+
+    await removeWorktree('ghost');
+  });
+});
+
 describe('integration: canRemoveBranch', () => {
   it('should detect uncommitted changes in worktree', async () => {
     const { repoDir } = setupGitRepo();

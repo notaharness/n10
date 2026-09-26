@@ -17,7 +17,12 @@ import {
 } from './machine.js';
 import { assertShellSafeRef } from './refs.js';
 import { worktreeDir } from './worktree-resolver.js';
-import { listWorktrees, type WorktreeInfo } from './worktree-list.js';
+import {
+  listWorktreeRegistrations,
+  listWorktrees,
+  type WorktreeInfo,
+} from './worktree-list.js';
+import { clearDeletedWorktrees } from './deleted-worktrees.js';
 import { getMainBranch } from './branches.js';
 
 /**
@@ -74,10 +79,12 @@ export async function createWorktree(
   if (isRemoteMachine(machine))
     return createWorktreeRemote(branch, cwd, relativeDir, absoluteDir, machine);
 
-  const existingPath = await worktreePathForBranch(branch, cwd);
-  if (existingPath) return existingPath;
+  const { present, deleted } = await listWorktreeRegistrations(cwd);
+  const existing = present.find((w) => w.branch === branch);
+  if (existing) return existing.path;
   // A derived directory may belong to another branch. Never run an agent there.
   if (existsSync(absoluteDir)) return null;
+  await clearDeletedWorktrees(deleted, branch, absoluteDir, cwd);
 
   try {
     // Try existing branch first
@@ -189,9 +196,11 @@ export async function checkoutWorktree(
   // directory — is what stops a branch that is already checked out
   // somewhere from reading as "no worktree, and git refused to make
   // one", which for a babysitter means silently doing nothing.
-  const existingPath = await worktreePathForBranch(branch, cwd);
-  if (existingPath) return existingPath;
+  const { present, deleted } = await listWorktreeRegistrations(cwd);
+  const existing = present.find((w) => w.branch === branch);
+  if (existing) return existing.path;
   if (existsSync(absoluteDir)) return null;
+  await clearDeletedWorktrees(deleted, branch, absoluteDir, cwd);
 
   try {
     await exec(

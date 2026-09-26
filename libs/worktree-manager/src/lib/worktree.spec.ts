@@ -11,6 +11,7 @@ import { assertShellSafeRef, branchToSessionName } from './refs.js';
 import {
   parseWorktrees,
   listWorktrees,
+  listWorktreesStrict,
   worktreeSessionName,
 } from './worktree-list.js';
 import {
@@ -75,17 +76,20 @@ function resolve(stdout = '') {
  * every platform, which is what git's porcelain does.
  */
 function worktreeListPorcelain(
-  entries: { branch: string; dir?: string }[],
+  entries: { branch: string; dir?: string; deleted?: boolean }[],
   root = process.cwd()
 ) {
   const cwd = root.replace(/\\/g, '/');
-  const blocks = entries.map(({ branch, dir }) =>
+  const blocks = entries.map(({ branch, dir, deleted }) =>
     [
       `worktree ${cwd}/${
         dir ?? `.claude/worktrees/${branchToSessionName(branch)}`
       }`,
       'HEAD abc123',
       `branch refs/heads/${branch}`,
+      ...(deleted
+        ? ['prunable gitdir file points to non-existent location']
+        : []),
       '',
     ].join('\0')
   );
@@ -184,6 +188,38 @@ describe('createWorktree', () => {
     expect(mockExec).toHaveBeenCalledTimes(1);
     expect(mockExec).not.toHaveBeenCalledWith(
       expect.stringContaining('worktree add'),
+      expect.anything()
+    );
+  });
+
+  // `rm -rf` leaves git's registration behind, which keeps the branch
+  // checked out and the directory taken as far as `git worktree add`
+  // is concerned.
+  it("clears a deleted worktree's registration before checking its branch out again", async () => {
+    mockExec
+      .mockResolvedValueOnce(
+        worktreeListPorcelain([{ branch: 'feature/auth', deleted: true }])
+      )
+      .mockResolvedValueOnce(resolve())
+      .mockResolvedValueOnce(resolve());
+    const result = await createWorktree('feature/auth');
+    expect(result).toContain('.claude/worktrees/feature-auth');
+    expect(mockExec.mock.calls.map(([command]) => command)).toEqual([
+      'git worktree list --porcelain -z',
+      `git worktree remove "${process.cwd()}/.claude/worktrees/feature-auth"`,
+      'git worktree add ".claude/worktrees/feature-auth" "feature/auth"',
+    ]);
+  });
+
+  it("leaves another branch's deleted worktree registered", async () => {
+    mockExec
+      .mockResolvedValueOnce(
+        worktreeListPorcelain([{ branch: 'other', deleted: true }])
+      )
+      .mockResolvedValueOnce(resolve());
+    await createWorktree('feature/auth');
+    expect(mockExec).not.toHaveBeenCalledWith(
+      expect.stringContaining('worktree remove'),
       expect.anything()
     );
   });
@@ -848,6 +884,24 @@ describe('parseWorktrees', () => {
     expect(result[0]!.branch).toBe('');
   });
 
+  // `rm -rf` on a worktree leaves git's registration, marked prunable.
+  // There is no checkout left: the worktree is gone.
+  it('leaves out a worktree whose directory was deleted', () => {
+    const output = [
+      'worktree /home/user/repo',
+      'HEAD abc123',
+      'branch refs/heads/main',
+      '',
+      'worktree /home/user/repo/.claude/worktrees/ghost',
+      'HEAD def456',
+      'branch refs/heads/ghost',
+      'prunable gitdir file points to non-existent location',
+      '',
+    ].join('\0');
+
+    expect(parseWorktrees(output).map((w) => w.branch)).toEqual(['main']);
+  });
+
   it('should return empty array for empty output', () => {
     expect(parseWorktrees('')).toEqual([]);
     expect(parseWorktrees('\n')).toEqual([]);
@@ -856,6 +910,14 @@ describe('parseWorktrees', () => {
 
 describe('listWorktrees', () => {
   const cwd = process.cwd();
+
+  // Discovery reads a worktree missing from its listing as removed.
+  it('answers none when git fails, where the strict listing rejects', async () => {
+    mockExec.mockRejectedValueOnce(new Error('not a git repository'));
+    expect(await listWorktrees()).toEqual([]);
+    mockExec.mockRejectedValueOnce(new Error('not a git repository'));
+    await expect(listWorktreesStrict()).rejects.toThrow('not a git repository');
+  });
 
   it('should return only resolver-owned entries, excluding main worktree', async () => {
     mockExec.mockResolvedValueOnce(
