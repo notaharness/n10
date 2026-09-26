@@ -9,7 +9,7 @@ import { TEAMMATE } from './identity.js';
  * review it really got, anchored to lines of its final diff.
  */
 
-function thread(
+export function thread(
   id: string,
   file: string | null,
   line: number | null,
