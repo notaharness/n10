@@ -15,7 +15,7 @@ function Mismatch({ onReset }: { onReset: () => void }) {
       >
         Fleet fingerprints do not match
       </h3>
-      <p className="text-sm">
+      <p className="text-base">
         This machine joined a different fleet. Stop using its remote
         connections. Reset the fleet on this machine, then join again using your
         known fleet passkey and a fresh link.
@@ -39,10 +39,10 @@ export function FingerprintCheck({ fleetId }: { fleetId: string }) {
   return (
     <div className="space-y-2 border-t border-border pt-3">
       <h4 className="font-medium">Check the fleet fingerprint</h4>
-      <p className="font-mono text-base select-all">
+      <p className="font-mono text-lg select-all">
         {fingerprintGroups(fleetId)}
       </p>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-base text-muted-foreground">
         Compare this with Fleet on a machine already in your fleet, or run beam
         status there. Matching names are not enough.
       </p>

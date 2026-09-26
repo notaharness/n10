@@ -4,6 +4,7 @@ import type {
 } from '../../../host/contract-machines.js';
 import { useFleet } from '../../lib/fleet/fleet-context.js';
 import { publicationText } from '../../lib/fleet/publication.js';
+import { FocusScope } from '../../lib/fleet/use-focus-on-mount.js';
 import { fingerprintGroups } from '../../lib/machines/machine-model.js';
 import { CeremonyFailure } from '../fleet/CeremonyFailure.js';
 import { CeremonyProgress } from '../fleet/CeremonyProgress.js';
@@ -123,7 +124,9 @@ export function RevokeMachineDialog({ machine }: { machine: MachineView }) {
             </span>
           </DialogDescription>
         </DialogHeader>
-        <RevokeBody machine={machine} revoke={revoke} onClose={onClose} />
+        <FocusScope>
+          <RevokeBody machine={machine} revoke={revoke} onClose={onClose} />
+        </FocusScope>
       </DialogContent>
     </Dialog>
   );
