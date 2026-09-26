@@ -1,3 +1,4 @@
+import { withCode } from '@/components/inline-code';
 import Link from 'next/link';
 
 /**
@@ -50,7 +51,7 @@ const tools = [
     name: 'Beam',
     href: '/beam',
     blurb:
-      'Every orchestrator script except relay.sh takes --machine with the name of a machine in your Beam fleet. The Git and tmux commands run on that machine, and reports come back through the fleet or wait on disk while your laptop is closed.',
+      'Every orchestrator script except `relay.sh` takes `--machine` with the name of a machine in your Beam fleet. The Git and tmux commands run on that machine, and reports come back through the fleet or wait on disk while your laptop is closed.',
   },
 ];
 
@@ -82,7 +83,7 @@ export function OrchestraTags() {
                   {tool.name}
                 </Link>
                 <p className="text-fd-muted-foreground mt-1 text-sm leading-relaxed">
-                  {tool.blurb}
+                  {withCode(tool.blurb)}
                 </p>
               </div>
             ))}

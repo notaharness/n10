@@ -1,13 +1,14 @@
+import { withCode } from '@/components/inline-code';
 const steps = [
   {
     title: 'Create a fleet',
     description:
-      'Run beam init --label laptop on the first machine. Two passkey prompts, in a browser or through a QR code on a terminal, create the fleet passkey and authorize the machine.',
+      'Run `beam init --label laptop` on the first machine. Two passkey prompts, in a browser or through a QR code on a terminal, create the fleet passkey and authorize the machine.',
   },
   {
     title: 'Join from each machine',
     description:
-      'Run beam join --label buildbox and approve with the same passkey, from your phone if the machine is headless. Check that the fleet fingerprint it prints matches beam status on a machine already in the fleet.',
+      'Run `beam join --label buildbox` and approve with the same passkey, from your phone if the machine is headless. Check that the fleet fingerprint it prints matches `beam status` on a machine already in the fleet.',
   },
   {
     title: 'Run the agent there',
@@ -33,7 +34,7 @@ export function BeamHow() {
             </div>
             <h3 className="mt-2 font-semibold">{step.title}</h3>
             <p className="text-fd-muted-foreground mt-2 text-sm">
-              {step.description}
+              {withCode(step.description)}
             </p>
           </div>
         ))}

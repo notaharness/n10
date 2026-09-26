@@ -1,3 +1,4 @@
+import { withCode } from '@/components/inline-code';
 import { BeamStreamsDiagram } from '@/components/beam/beam-streams-diagram';
 
 const streams = [
@@ -11,7 +12,7 @@ const streams = [
     name: 'beam exec',
     title: 'Run one command',
     description:
-      'Run one command on another machine, like ssh host cmd. Input and output are piped through, and beam exec exits with the remote exit code.',
+      'Run one command on another machine, like `ssh host cmd`. Input and output are piped through, and `beam exec` exits with the remote exit code.',
   },
   {
     name: 'beam msg',
@@ -41,7 +42,7 @@ export function BeamStreams() {
             </code>
             <h3 className="mt-2 font-semibold">{stream.title}</h3>
             <p className="text-fd-muted-foreground mt-2 text-sm">
-              {stream.description}
+              {withCode(stream.description)}
             </p>
           </div>
         ))}

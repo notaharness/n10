@@ -30,19 +30,25 @@ export function ProvidersTable() {
             <table className="w-full text-left text-sm">
               <thead className="text-fd-muted-foreground text-xs">
                 <tr>
-                  <th className="px-5 py-3 font-medium">Provider</th>
-                  <th className="px-5 py-3 font-medium">Authentication</th>
-                  <th className="px-5 py-3 font-medium">Test coverage</th>
+                  <th className="px-3 py-3 font-medium sm:px-5">Provider</th>
+                  <th className="px-3 py-3 font-medium sm:px-5">
+                    Authentication
+                  </th>
+                  <th className="px-3 py-3 font-medium sm:px-5">
+                    Test coverage
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-fd-border border-fd-border divide-y border-t">
                 {providers.map((provider) => (
                   <tr key={provider.name}>
-                    <td className="px-5 py-3.5 font-medium whitespace-nowrap">
+                    <td className="px-3 py-3.5 align-top font-medium whitespace-nowrap sm:px-5">
                       {provider.name}
                     </td>
-                    <td className="px-5 py-3.5">{provider.auth}</td>
-                    <td className="text-fd-muted-foreground px-5 py-3.5">
+                    <td className="px-3 py-3.5 align-top sm:px-5">
+                      {provider.auth}
+                    </td>
+                    <td className="text-fd-muted-foreground px-3 py-3.5 align-top sm:px-5">
                       {provider.coverage}
                     </td>
                   </tr>
