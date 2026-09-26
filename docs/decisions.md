@@ -190,6 +190,17 @@ Sidebar snapshots carry their repository identity. Drop mismatched answers in
 the renderer, and recheck identity between host awaits, to prevent rows from a
 new repository entering the previous repository's tab state.
 
+A later launch opens its start directory in the running app. The new process
+resolves that directory as a first launch would and sends it as the
+single-instance lock's `additionalData`. `argv` is not used: Chromium may
+reorder and extend it, and it carries neither the launcher's environment nor
+whether a terminal started the process. The running app passes over a
+directory that is not a repository, as startup does, and holds a launch that
+arrives before the window's first load. The renderer receives the directory as
+`open-repo` with a path. The repository gate handles that command above both
+screens, so the start screen and the workspace open it as the picker does; a
+launch naming the repository on screen changes nothing.
+
 Use native menus and dialogs where the OS supports the interaction. The review
 workspace has a navigation rail and one content pane; keep the terminal mounted
 when switching to the diff so scrollback survives. The diff owns its toolbar.

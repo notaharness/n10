@@ -51,6 +51,8 @@ import { useHostEvents } from './use-host-events.js';
 
 const SIDEBAR_KEY = 'n10.sidebar.hidden';
 
+type WorkspaceCommand = Exclude<MenuCommand, 'open-repo'>;
+
 /**
  * The main window once a repo is open: title bar, resizable sidebar +
  * tabbed editor area, status bar. Owns global shortcuts, native menu
@@ -60,12 +62,10 @@ export function Workspace({
   repo,
   onSwitchRepo,
   onOpenRepo,
-  onPickRepoFolder,
 }: {
   repo: RepoInfo;
   onSwitchRepo: () => void;
   onOpenRepo: (cwd: string) => void;
-  onPickRepoFolder: () => void;
 }) {
   const ctx = useMemo(
     () => ({ repo, switchRepo: onSwitchRepo, openRepo: onOpenRepo }),
@@ -73,11 +73,7 @@ export function Workspace({
   );
   return (
     <RepoProvider value={ctx}>
-      <WorkspaceInner
-        onSwitchRepo={onSwitchRepo}
-        onOpenRepo={onOpenRepo}
-        onPickRepoFolder={onPickRepoFolder}
-      />
+      <WorkspaceInner onSwitchRepo={onSwitchRepo} onOpenRepo={onOpenRepo} />
     </RepoProvider>
   );
 }
@@ -85,11 +81,9 @@ export function Workspace({
 function WorkspaceInner({
   onSwitchRepo,
   onOpenRepo,
-  onPickRepoFolder,
 }: {
   onSwitchRepo: () => void;
   onOpenRepo: (cwd: string) => void;
-  onPickRepoFolder: () => void;
 }) {
   const { repo } = useRepo();
   const tabs = useRepoTabs();
@@ -204,8 +198,9 @@ function WorkspaceInner({
     // A full Record rather than a switch: adding a MenuCommand is then
     // a type error here until it has a handler, which is the same
     // guarantee the exhaustive switch gave, minus the branching.
-    const handlers: Record<MenuCommand, (arg?: string) => void> = {
-      'open-repo': onPickRepoFolder,
+    // `open-repo` is the Gate's (App.tsx): it applies with no
+    // repository open too.
+    const handlers: Record<WorkspaceCommand, (arg?: string) => void> = {
       'switch-repo': onSwitchRepo,
       'new-worktree': () => setPaletteOpen(true),
       'new-terminal': terminalTabs.openDialog,
@@ -228,18 +223,13 @@ function WorkspaceInner({
       'show-shortcuts': () => setShortcutsOpen(true),
       about: () => void window.n10.showAbout(),
     };
-    const off = window.n10.onMenuCommand(({ command, arg }: MenuCommandEvent) =>
-      handlers[command](arg)
+    const off = window.n10.onMenuCommand(
+      ({ command, arg }: MenuCommandEvent) => {
+        if (command !== 'open-repo') handlers[command](arg);
+      }
     );
     return off;
-  }, [
-    tabs,
-    closer,
-    refresh,
-    onPickRepoFolder,
-    onSwitchRepo,
-    terminalTabs.openDialog,
-  ]);
+  }, [tabs, closer, refresh, onSwitchRepo, terminalTabs.openDialog]);
 
   // In-page shortcuts for the web-rendered UI. Anything that is also a
   // native menu accelerator reaches us through onMenuCommand instead;
