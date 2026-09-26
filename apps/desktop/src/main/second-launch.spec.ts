@@ -14,8 +14,11 @@ vi.mock('electron', () => ({
 const { installSecondLaunch, requestedRepo, secondLaunchData } = await import(
   './second-launch.js'
 );
+const { claimLaunchRepo, releaseLaunchRepo } = await import(
+  '../host/services/launch-repo.js'
+);
 
-class FakeWindow {
+class FakeWindow extends EventEmitter {
   webContents = new EventEmitter();
   minimized = false;
   isMinimized = () => this.minimized;
@@ -78,10 +81,18 @@ describe('installSecondLaunch', () => {
 
   const launch = (data: unknown) =>
     app.emit('second-instance', {}, ['n10'], '/', data);
+  const navigate = (isMainFrame: boolean, isSameDocument: boolean) =>
+    win.webContents.emit('did-start-navigation', {
+      isMainFrame,
+      isSameDocument,
+    });
 
   beforeEach(() => {
     app.removeAllListeners();
     open.mockReset();
+    // No page has claimed, and nothing waits.
+    claimLaunchRepo();
+    releaseLaunchRepo();
     windows.length = 0;
     installSecondLaunch(open);
     win = new FakeWindow();
@@ -97,17 +108,38 @@ describe('installSecondLaunch', () => {
     expect(open).not.toHaveBeenCalled();
   });
 
-  it('opens the repository a launch names once the page has loaded', () => {
-    win.webContents.emit('did-finish-load');
+  it('keeps a launch until a page claims, handing it the last one', () => {
+    launch({ startDir: other });
+    launch({ startDir: repo });
+    expect(open).not.toHaveBeenCalled();
+    expect(claimLaunchRepo()).toBe(repo);
+    expect(claimLaunchRepo()).toBeNull();
+  });
+
+  it('opens a launch at once in a page that has claimed', () => {
+    claimLaunchRepo();
     launch({ startDir: repo });
     expect(open).toHaveBeenCalledExactlyOnceWith(repo);
   });
 
-  it('holds a launch during startup until the page has loaded, the last one winning', () => {
+  it('keeps launches for the next page once the page navigates away', () => {
+    claimLaunchRepo();
+    navigate(false, false);
+    navigate(true, true);
     launch({ startDir: other });
+    expect(open).toHaveBeenCalledExactlyOnceWith(other);
+
+    navigate(true, false);
+    launch({ startDir: repo });
+    expect(open).toHaveBeenCalledOnce();
+    expect(claimLaunchRepo()).toBe(repo);
+  });
+
+  it('keeps launches for the next window once the window closes', () => {
+    claimLaunchRepo();
+    win.emit('closed');
     launch({ startDir: repo });
     expect(open).not.toHaveBeenCalled();
-    win.webContents.emit('did-finish-load');
-    expect(open).toHaveBeenCalledExactlyOnceWith(repo);
+    expect(claimLaunchRepo()).toBe(repo);
   });
 });

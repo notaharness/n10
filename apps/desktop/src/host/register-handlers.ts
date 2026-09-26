@@ -7,6 +7,7 @@ import type {
 } from './contract.js';
 import { IPC } from './contract.js';
 import * as repo from './services/repo.js';
+import * as launchRepo from './services/launch-repo.js';
 import * as prefs from './services/desktop-prefs.js';
 import * as settings from './services/settings.js';
 import * as sidebar from './services/sidebar.js';
@@ -40,6 +41,7 @@ export function createHostApi(): N10HostApi {
 
     openRepo: (cwd) => Promise.resolve(repo.openRepo(cwd)),
     getRepo: () => Promise.resolve(repo.getRepo()),
+    takeLaunchRepo: () => Promise.resolve(launchRepo.claimLaunchRepo()),
     listRecentRepos: () => Promise.resolve(repo.listRecentRepos()),
     selectRepoDirectory: () => pickFolder('Open repository'),
     selectFolder: () => pickFolder('Open folder'),
@@ -217,6 +219,7 @@ export function registerHostHandlers(
     [IPC.getVersion]: api.getVersion as HostMethod,
     [IPC.openRepo]: api.openRepo as HostMethod,
     [IPC.getRepo]: api.getRepo as HostMethod,
+    [IPC.takeLaunchRepo]: api.takeLaunchRepo as HostMethod,
     [IPC.listRecentRepos]: api.listRecentRepos as HostMethod,
     [IPC.selectRepoDirectory]: api.selectRepoDirectory as HostMethod,
     [IPC.selectFolder]: api.selectFolder as HostMethod,

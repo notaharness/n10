@@ -12,6 +12,10 @@
  */
 import { resolve } from 'node:path';
 import { app, BrowserWindow } from 'electron';
+import {
+  offerLaunchRepo,
+  releaseLaunchRepo,
+} from '../host/services/launch-repo.js';
 import { canonicalRepoPath, isGitRepo } from '../host/services/repo.js';
 
 /** What a second launch sends the running instance. */
@@ -54,26 +58,20 @@ function bringForward(): void {
 
 /**
  * Answer every later launch: bring the window forward and, when the
- * launch named a repository, `open` it. Install before the window is
- * created. A launch during startup waits for the window's first page
- * load, since there is no renderer to tell before then; of several
- * such launches, the last one wins.
+ * launch named a repository, `open` it if a page has claimed launches
+ * (`services/launch-repo.ts`), or keep it for the next page that does.
+ * Install before the first window is created.
  */
 export function installSecondLaunch(open: (cwd: string) => void): void {
-  let loaded = false;
-  let waiting: string | null = null;
-  app.once('browser-window-created', (_event, win) => {
-    win.webContents.once('did-finish-load', () => {
-      loaded = true;
-      if (waiting) open(waiting);
-      waiting = null;
+  app.on('browser-window-created', (_event, win) => {
+    win.webContents.on('did-start-navigation', (details) => {
+      if (details.isMainFrame && !details.isSameDocument) releaseLaunchRepo();
     });
+    win.on('closed', releaseLaunchRepo);
   });
   app.on('second-instance', (_event, _argv, _cwd, data) => {
     bringForward();
     const repo = requestedRepo(data);
-    if (!repo) return;
-    if (loaded) open(repo);
-    else waiting = repo;
+    if (repo && offerLaunchRepo(repo)) open(repo);
   });
 }

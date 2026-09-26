@@ -73,6 +73,7 @@ type ShellHost = Pick<
   | 'getVersion'
   | 'openRepo'
   | 'getRepo'
+  | 'takeLaunchRepo'
   | 'listRecentRepos'
   | 'selectRepoDirectory'
   | 'selectFolder'
@@ -101,6 +102,8 @@ export function createShellHost(state: DemoState): ShellHost {
       return info(state.open(cwd).cwd);
     },
     getRepo: () => later(info(state.current)),
+    // A page in a browser is never launched a second time.
+    takeLaunchRepo: () => later(null),
     listRecentRepos: () =>
       later(
         state.recent.map((cwd, i) => ({

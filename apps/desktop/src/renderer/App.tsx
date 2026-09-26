@@ -97,17 +97,28 @@ function Gate() {
 
   // File › Open Repository, and a later launch naming a repository
   // (main/second-launch.ts), which applies with no repository open
-  // too. Naming the one on screen changes nothing.
+  // too. Naming the one on screen changes nothing. Launches are claimed
+  // only once the gate has its first answer, which would otherwise
+  // land over a repository opened from one; until then they wait.
   const repoCwd = repo?.cwd ?? null;
-  useEffect(
-    () =>
-      window.n10.onMenuCommand(({ command, arg }) => {
-        if (command !== 'open-repo') return;
-        if (!arg) pickRepoFolder();
-        else if (arg !== repoCwd) openRepo(arg);
-      }),
-    [repoCwd, openRepo, pickRepoFolder]
-  );
+  useEffect(() => {
+    if (isPending) return;
+    const openLaunched = (cwd: string) => {
+      if (cwd !== repoCwd) openRepo(cwd);
+    };
+    const off = window.n10.onMenuCommand(({ command, arg }) => {
+      if (command !== 'open-repo') return;
+      if (arg) openLaunched(arg);
+      else pickRepoFolder();
+    });
+    window.n10
+      .takeLaunchRepo()
+      .then((cwd) => {
+        if (cwd) openLaunched(cwd);
+      })
+      .catch((err: unknown) => toast.error(errorMessage(err)));
+    return off;
+  }, [isPending, repoCwd, openRepo, pickRepoFolder]);
 
   if (isPending) {
     return (
