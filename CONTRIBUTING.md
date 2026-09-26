@@ -37,9 +37,23 @@ npx nx e2e desktop-e2e                # offline Electron tests
 
 `AGENTS.md` lists the rest, including visual and live integration tests.
 
-CI runs lint, tests, typecheck, builds and end-to-end tests on every pull
-request. A pre-commit hook runs lint on staged files. See
-[`docs/testing.md`](docs/testing.md) for test fixtures and visual QA.
+Run the checks that cover your change before you push. CI runs lint, tests,
+typecheck, builds and end-to-end tests on every pull request, and a pre-commit
+hook runs lint on staged files. See [`docs/testing.md`](docs/testing.md) for
+test fixtures and visual QA, and [`docs/linting.md`](docs/linting.md) for lint
+budgets and when an exception is acceptable.
+
+### tmux safety
+
+n10 hosts agent sessions in tmux, so a careless test can reach your real
+sessions.
+
+- Tests and scripts use a scratch socket directory inside a fixture-created
+  `HOME`, and unset `TMUX`, which overrides `TMUX_TMPDIR`.
+- Never run `tmux kill-server`. Clean up by killing individual fixture sessions.
+- Closing n10 detaches sessions. It must not kill them.
+
+[`libs/terminal-tmux/AGENTS.md`](libs/terminal-tmux/AGENTS.md) has the full rules.
 
 ## Work with an AI agent
 
@@ -68,6 +82,13 @@ Review its changes before you open a pull request.
 - Add or update tests for the behavior you change.
 - Fill in the pull request template.
 - Keep it small. Split unrelated changes into separate pull requests.
+
+## Discuss
+
+Use [issues](https://github.com/notaharness/n10/issues) for bugs, proposals
+and questions. For a question about an existing issue or pull request, comment
+there. Report vulnerabilities privately, as [`SECURITY.md`](SECURITY.md)
+describes.
 
 By contributing, you agree that your contributions are licensed under the
 [MIT License](LICENSE).
