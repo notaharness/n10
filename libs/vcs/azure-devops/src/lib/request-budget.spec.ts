@@ -20,8 +20,7 @@ import { resetAdoTransport } from './request.js';
  *   N  comment threads, one per pull request (no batch endpoint)
  *   N  status list, one per pull request (no batch endpoint)
  *
- * plus, once per half hour: `/connectiondata`, the caller's teams, and
- * the repository's id.
+ * plus, once per half hour: the caller's teams and the repository's id.
  *
  * A *warm* cycle over pull requests that have not moved costs the list
  * and nothing else — not even the pipeline runs, which are only asked
@@ -158,10 +157,10 @@ describe('one sync cycle', () => {
   it('costs 2 per pull request plus a fixed handful', async () => {
     await syncCycle();
 
-    // 3 identity/repository reads + the list + the batched builds +
+    // 2 teams/repository reads + the list + the batched builds +
     // (threads, statuses) per pull request.
-    expect(counts().network).toBe(3 + 1 + 1 + 2 * PR_COUNT);
-    expect(mockFetch).toHaveBeenCalledTimes(3 + 1 + 1 + 2 * PR_COUNT);
+    expect(counts().network).toBe(2 + 1 + 1 + 2 * PR_COUNT);
+    expect(mockFetch).toHaveBeenCalledTimes(2 + 1 + 1 + 2 * PR_COUNT);
   });
 
   it('asks for every pipeline run once, not once per row', async () => {
@@ -178,14 +177,13 @@ describe('one sync cycle', () => {
 
   it('never re-reads who we are for half an hour', async () => {
     await syncCycle();
-    // Identity, teams and the repository id are three of the fixed
-    // handful, and none of them moves between cycles.
+    // Teams and the repository id are two of the fixed handful, and
+    // neither moves between cycles.
     afterMinutes(1);
     const urls = [] as string[];
     mockFetch.mock.calls.length = 0;
     await syncCycle();
     urls.push(...mockFetch.mock.calls.map((c) => String(c[0])));
-    expect(urls.filter((u) => u.includes('/connectiondata'))).toEqual([]);
     expect(urls.filter((u) => u.includes('/teams?'))).toEqual([]);
   });
 });
@@ -696,7 +694,7 @@ describe('the same data asked for twice', () => {
     // A forced refresh landing on top of a poll: without dedupe this
     // is two of everything, and they arrive together by definition.
     await Promise.all([syncCycle(), syncCycle()]);
-    expect(counts().network).toBe(3 + 1 + 1 + 2 * PR_COUNT);
+    expect(counts().network).toBe(2 + 1 + 1 + 2 * PR_COUNT);
     expect(counts().deduped).toBeGreaterThan(0);
   });
 });
@@ -712,16 +710,15 @@ describe('while Azure is refusing', () => {
     } as unknown as Response);
 
     await expect(syncCycle()).rejects.toThrow('throttling requests');
-    // Two, not one: a cycle opens with the identity reads in parallel,
-    // and the gate cannot recall a request issued before the refusal
-    // arrived. What it does stop is everything after — the burst of
-    // 2N+2 that used to follow, each member of it failing separately.
-    expect(counts().network).toBe(2);
+    // The teams read that opens a cycle takes the refusal; the gate
+    // stops everything after it — the burst of 2N+2 that would
+    // otherwise follow, each member of it failing separately.
+    expect(counts().network).toBe(1);
     expect(counts().throttled).toBeGreaterThan(0);
 
     // And the next cycle spends nothing at all until the wait Azure
     // named has elapsed.
     await expect(syncCycle()).rejects.toThrow('throttling requests');
-    expect(counts().network).toBe(2);
+    expect(counts().network).toBe(1);
   });
 });
