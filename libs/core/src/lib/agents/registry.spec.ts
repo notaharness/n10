@@ -181,6 +181,16 @@ describe('agent registry', () => {
       });
     });
 
+    it.each(['--help', '-p do not run headlessly', 'quotes " \nnext line'])(
+      'attaches Gemini prompt %j as one literal argument',
+      (prompt) => {
+        expect(gemini.seed!(prompt)).toEqual({
+          cmd: 'gemini',
+          args: [`--prompt-interactive=${prompt}`],
+        });
+      }
+    );
+
     it('runs the continue path through /bin/sh', () => {
       const script = 'claude --continue || claude';
       expect(claude.continueOrBlank!()).toEqual({

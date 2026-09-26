@@ -1,14 +1,16 @@
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
-import { geminiCalls, installGemini } from './setup/gemini.js';
+import { fakeCli } from './setup/fake-cli.js';
 import { sessionMenu, sidebarRow } from './setup/app.js';
+
+const gemini = fakeCli('gemini');
 
 const branch = 'gemini-review';
 const instruction =
   '--help is literal; preserve "quotes", $HOME and `code`.\nSecond line.';
 test.use({
   env: async ({ fixtureHome }, provide) => {
-    await provide(installGemini(fixtureHome));
+    await provide(gemini.install(fixtureHome));
   },
   fakeGitHub: {
     username: 'tester',
@@ -33,7 +35,7 @@ test('Desktop selects Gemini for a review and preserves its interactive prompt',
   await menu.getByRole('button', { name: 'Start review', exact: true }).click();
   await expect(page.getByText('fake-gemini-ready').first()).toBeVisible();
   const cwd = join(repoPath, '.claude/worktrees', branch);
-  const calls = geminiCalls(cwd);
+  const calls = gemini.calls(cwd);
   expect(calls).toHaveLength(1);
   expect(calls[0].cwd).toBe(cwd);
   expect(calls[0].args).toHaveLength(1);

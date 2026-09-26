@@ -1,12 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
-import {
-  geminiCalls,
-  geminiWorked,
-  controlGemini,
-  installGemini,
-} from './setup/gemini.js';
+import { fakeCli } from './setup/fake-cli.js';
 import { agentSpinner, createWorktree, sessionMenu } from './setup/app.js';
 import { findN10SessionFor, socketEnv, tagTmuxSession } from './setup/tmux.js';
 import {
@@ -15,11 +10,13 @@ import {
   terminalTabs,
 } from './setup/terminals.js';
 
+const gemini = fakeCli('gemini');
+
 test.use({
   fakeGitHub: { prs: [] },
   n10Config: { agentId: 'gemini' },
   env: async ({ fixtureHome }, provide) => {
-    await provide(installGemini(fixtureHome));
+    await provide(gemini.install(fixtureHome));
   },
 });
 
@@ -37,11 +34,11 @@ test('Gemini worktree launch, activity and explicit fresh restart in Desktop', a
     .getByRole('button', { name: 'Start new session', exact: true })
     .click();
   await expect(page.getByText('fake-gemini-ready').first()).toBeVisible();
-  expect(geminiCalls(cwd)).toMatchObject([{ args: [], cwd }]);
-  controlGemini(cwd, 'busy');
+  expect(gemini.calls(cwd)).toMatchObject([{ args: [], cwd }]);
+  gemini.control(cwd, 'busy');
   await expect(agentSpinner(page).first()).toBeVisible({ timeout: 10_000 });
-  await expect.poll(() => geminiWorked(cwd)).toBe(true);
-  controlGemini(cwd, 'idle');
+  await expect.poll(() => gemini.worked(cwd)).toBe(true);
+  gemini.control(cwd, 'idle');
   await expect(agentSpinner(page)).toHaveCount(0, { timeout: 10_000 });
   const name = findN10SessionFor('gemini-life', homeDir)!;
   tagTmuxSession(
@@ -52,7 +49,7 @@ test('Gemini worktree launch, activity and explicit fresh restart in Desktop', a
     },
     homeDir
   );
-  controlGemini(cwd, 'exit');
+  gemini.control(cwd, 'exit');
   await expect
     .poll(() =>
       page.evaluate(async () =>
@@ -67,12 +64,12 @@ test('Gemini worktree launch, activity and explicit fresh restart in Desktop', a
   await expect(
     menu.getByRole('radio', { name: 'Continue', exact: true })
   ).toHaveCount(0);
-  expect(geminiCalls(cwd)).toHaveLength(1);
+  expect(gemini.calls(cwd)).toHaveLength(1);
   await menu
     .getByRole('button', { name: 'Start new session', exact: true })
     .click();
   await expect
-    .poll(() => geminiCalls(cwd))
+    .poll(() => gemini.calls(cwd))
     .toMatchObject([{ args: [] }, { args: [], cwd }]);
   expect(findN10SessionFor('gemini-life', homeDir)).toBe(name);
   expect(
@@ -97,8 +94,8 @@ test('Gemini standalone terminal refuses resume and permits an explicit fresh st
   await openNewTerminalDialog(app, page);
   await confirmNewTerminal(page, 'Agent');
   await expect(page.getByText('fake-gemini-ready').first()).toBeVisible();
-  expect(geminiCalls(repoPath)).toMatchObject([{ args: [], cwd: repoPath }]);
-  controlGemini(repoPath, 'exit');
+  expect(gemini.calls(repoPath)).toMatchObject([{ args: [], cwd: repoPath }]);
+  gemini.control(repoPath, 'exit');
   const resume = page.getByRole('button', {
     name: 'Resume agent',
     exact: true,
@@ -108,12 +105,12 @@ test('Gemini standalone terminal refuses resume and permits an explicit fresh st
   await expect(page.getByRole('alert')).toContainText(
     'Gemini does not support automatic resume'
   );
-  expect(geminiCalls(repoPath)).toHaveLength(1);
+  expect(gemini.calls(repoPath)).toHaveLength(1);
   await page
     .getByRole('button', { name: 'Start new (directory default)', exact: true })
     .click();
   await expect
-    .poll(() => geminiCalls(repoPath))
+    .poll(() => gemini.calls(repoPath))
     .toMatchObject([{ args: [] }, { args: [] }]);
   await expect(terminalTabs(page)).toHaveCount(1);
 });

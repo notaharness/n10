@@ -171,15 +171,21 @@ describe('fresh launches of retained agents', () => {
       });
     }
   );
-  it('still refuses automatic resume without a supported adapter', () => {
-    expect(() =>
-      buildAgentLaunch(
-        { config, request: { intent: 'continue-or-blank' } },
-        'gemini',
-        true
-      )
-    ).toThrow('does not support automatic resume');
-  });
+  it.each(['gemini', 'claude'])(
+    'refuses unsupported recorded Gemini resume with default %s',
+    (agentId) => {
+      expect(() =>
+        buildAgentLaunch(
+          {
+            config: { ...config, agentId } as AppConfig,
+            request: { intent: 'continue-or-blank' },
+          },
+          'gemini',
+          true
+        )
+      ).toThrow('does not support automatic resume');
+    }
+  );
 });
 
 describe('continuing a recorded "test" agent', () => {

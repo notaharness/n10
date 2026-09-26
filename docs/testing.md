@@ -16,9 +16,6 @@ restore it. Preserve property-test counterexamples as regression cases. Tab and
 diff properties should check invariants such as valid active ids and comments
 appearing exactly once.
 
-Gemini CLI has [documented offline verification](gemini-cli.md), including
-which upstream sources were checked and which real-binary checks were unavailable.
-
 ## Desktop
 
 The `desktop-e2e` targets build Electron before testing. Directly invoking
@@ -271,4 +268,37 @@ the TUI browser bridge):
 npx nx test core
 PORT=5198 npx nx e2e cli-e2e -- codex.test.ts
 npx nx e2e desktop-e2e -- codex.test.ts launch-dialog.test.ts
+```
+
+## Gemini CLI
+
+Verified offline against the official [CLI reference](https://geminicli.com/docs/cli/cli-reference/)
+and v0.61.0 [argument parser](https://github.com/google-gemini/gemini-cli/blob/v0.61.0/packages/cli/src/config/config.ts)
+and [session entry point](https://github.com/google-gemini/gemini-cli/blob/v0.61.0/packages/cli/src/gemini.tsx).
+No real Gemini binary, authentication or model session is exercised by the tests.
+
+The registry resolves `agentId: "gemini"` and legacy `aiCommand: "gemini"`.
+Blank launches use `gemini`; seeds use one `--prompt-interactive=PROMPT` argument
+so yargs does not treat option-like text as flags. Review guidance is folded into
+the prompt. Headless `-p` is not used.
+
+Automatic resume is refused: native `--resume latest` can create a fresh
+conversation when project history is missing, and n10 does not record Gemini
+conversation IDs. Both shells offer an explicit fresh start in the retained pane;
+a surviving process can still be attached without launching another one.
+
+Both e2e shells use `libs/core/tests/fixtures/fake-vendor-cli.mjs` through their
+`setup/fake-cli.ts` helpers. The fake accepts blank/attached-prompt launches and
+rejects resume. Tests cover launch, refusal, fresh starts, report-tag clearing,
+selected-agent review prompts and busy/idle transitions in isolated fixture HOME
+and tmux sockets. Activity measures changing terminal output, not internal model
+turns. Local managed panes use `tmux:` message targets; no Gemini-specific inbox
+or queue adapter is used.
+
+Choose an unused `PORT` when another worktree runs the TUI browser bridge:
+
+```sh
+npx nx test core
+PORT=5198 npx nx e2e cli-e2e -- gemini.test.ts
+npx nx e2e desktop-e2e -- gemini.test.ts gemini-review.test.ts
 ```
