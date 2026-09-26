@@ -1,5 +1,6 @@
 import type { DiffLine } from '@n10/diff';
 import { useDiff, useParsedDiff, useWorktreeDiff } from '../data/queries.js';
+import { keys } from '../data/query-keys.js';
 import { diffReadState } from '../data/read-state.js';
 import { useHeldFailure, useRetry } from '../data/use-read-state.js';
 
@@ -45,7 +46,10 @@ export function useReviewDiff({
   const parsed = useParsedDiff(diff.data);
   const read = useHeldFailure(
     diffReadState(diff, parsed),
-    diff.isFetching || parsed.isFetching
+    diff.isFetching || parsed.isFetching,
+    isPr
+      ? keys.diff(cwd, branch, baseBranch)
+      : keys.worktreeDiff(cwd, branch, baseBranch)
   );
   // A fetch that failed asks git again. A parse that failed also
   // re-reads the answer: the same text keys the same parse, which would

@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { sessionBranch } from './setup/session-keys.js';
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
@@ -391,6 +392,12 @@ test.describe('Pull request reads that fail', () => {
     await expect(failure).toBeVisible();
     await expect(retry).toBeFocused();
     await expect(retry).not.toHaveAttribute('aria-disabled', 'true');
+
+    // Once the branch exists, Retry reads it: an empty diff, now a fact.
+    execFileSync('git', ['branch', 'vanished'], { cwd: desktop.repoPath });
+    await retry.click();
+    await expect(failure).toHaveCount(0);
+    await expect(page.getByText(/No changes between/)).toBeVisible();
   });
 
   test('a diff that cannot be read says so, not "No changes"', async ({

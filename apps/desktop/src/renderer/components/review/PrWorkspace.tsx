@@ -11,6 +11,7 @@ import { useDiffOptions } from '../../lib/diff/diff-options.js';
 import { useDraftComments, useThreads } from '../../lib/data/queries.js';
 import { usePostDrafts } from '../../lib/data/mutations.js';
 import type { ReadState } from '../../lib/data/read-state.js';
+import { keys } from '../../lib/data/query-keys.js';
 import { useReadState } from '../../lib/data/use-read-state.js';
 import { useRepo } from '../../lib/repo-context.js';
 import { useCommentNavigator } from '../../lib/review/use-comment-navigator.js';
@@ -132,7 +133,7 @@ export function PrWorkspace({
   });
   const files = diff.files;
   const comments = useThreads(repo.cwd, prId);
-  const threads = useReadState(comments);
+  const threads = useReadState(comments, keys.threads(repo.cwd, prId));
   const threadsRead = pr ? threads.state : NO_THREADS;
   const draftsQuery = useDraftComments(repo.cwd, prId);
   const postAll = usePostDrafts(repo.cwd);

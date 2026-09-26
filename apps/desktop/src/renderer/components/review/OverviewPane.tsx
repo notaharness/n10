@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import type { PullRequestInfo, ReviewVerdict } from '@n10/vcs-core';
 import { usePrDescription } from '../../lib/data/queries.js';
 import type { ReadState } from '../../lib/data/read-state.js';
+import { keys } from '../../lib/data/query-keys.js';
 import { useReadState } from '../../lib/data/use-read-state.js';
 import { useSubmitVerdict } from '../../lib/data/mutations.js';
 import { useRepo } from '../../lib/repo-context.js';
@@ -210,7 +211,10 @@ function Description({
 
 export function OverviewPane({ pr }: { pr: PullRequestInfo }) {
   const { repo } = useRepo();
-  const description = useReadState(usePrDescription(repo.cwd, pr.id));
+  const description = useReadState(
+    usePrDescription(repo.cwd, pr.id),
+    keys.prDescription(repo.cwd, pr.id)
+  );
   const verdict = useSubmitVerdict(repo.cwd, repo.providerId ?? undefined);
   // Speak the provider's language: ADO has four votes; GitHub only
   // knows approve and request-changes, so the negative side collapses

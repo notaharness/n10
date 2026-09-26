@@ -34,7 +34,7 @@ function RetryButton({
       onClick={onRetry}
       aria-disabled={retrying}
       aria-label={label}
-      className="aria-disabled:opacity-50"
+      className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
     >
       {retrying ? <Loader2Icon className="animate-spin" /> : <RotateCcwIcon />}
       Retry
