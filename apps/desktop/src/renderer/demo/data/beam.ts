@@ -1,5 +1,12 @@
 import type { PullRequestInfo } from '@n10/vcs-core';
-import { HOME, VIEWER, prUrl, sessionKey, type RepoData } from './identity.js';
+import {
+  HOME,
+  VIEWER,
+  prUrl,
+  sessionKey,
+  worktreeSession,
+  type RepoData,
+} from './identity.js';
 import { DESKTOP } from './machines.js';
 
 /**
@@ -58,13 +65,13 @@ export const BEAM_REPO: RepoData = {
   sidebar: () => [
     {
       kind: 'session',
-      session: { name: sessionKey(BEAM, 'docs/relay-regions'), running: false },
+      session: worktreeSession(BEAM, 'docs/relay-regions', false),
       branch: 'docs/relay-regions',
       isMerged: false,
     },
     {
       kind: 'session',
-      session: { name: HOMEPAGE_SESSION, running: true },
+      session: worktreeSession(BEAM, PR_HOMEPAGE.sourceBranch, true, DESKTOP),
       branch: PR_HOMEPAGE.sourceBranch,
       pr: PR_HOMEPAGE,
       isMerged: false,

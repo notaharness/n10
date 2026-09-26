@@ -5,7 +5,7 @@ import type {
   TerminalLaunchRequest,
   TerminalSummary,
 } from '../../../host/contract.js';
-import { HOME, sessionKey } from '../data/identity.js';
+import { HOME, sessionKey, worktreeDir } from '../data/identity.js';
 import { PROGRAMS } from '../programs/index.js';
 import { Channel, later } from './hub.js';
 import type { DemoSession, Program, SessionHub } from './sessions.js';
@@ -188,6 +188,7 @@ export function createSessionHost(
           .map((s) => ({
             repo: s.meta.repo ?? '',
             branch: s.meta.branch ?? '',
+            worktree: worktreeDir(s.meta.repo ?? '', s.meta.branch ?? ''),
             sessionName: s.name,
           }))
       ),

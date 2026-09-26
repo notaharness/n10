@@ -5,7 +5,7 @@ import {
   VIEWER,
   babysitting,
   prUrl,
-  sessionKey,
+  worktreeSession,
   type RepoData,
 } from './identity.js';
 import { n10Threads } from './threads.js';
@@ -101,20 +101,20 @@ export const N10_REPO: RepoData = {
   sidebar: () => [
     {
       kind: 'session',
-      session: { name: sessionKey(N10, 'docs/roadmap'), running: false },
+      session: worktreeSession(N10, 'docs/roadmap', false),
       branch: 'docs/roadmap',
       isMerged: false,
     },
     {
       kind: 'session',
-      session: { name: sessionKey(N10, PR_FLEET.sourceBranch), running: true },
+      session: worktreeSession(N10, PR_FLEET.sourceBranch, true),
       branch: PR_FLEET.sourceBranch,
       pr: PR_FLEET,
       isMerged: false,
     },
     {
       kind: 'session',
-      session: { name: sessionKey(N10, PR_TABS.sourceBranch), running: false },
+      session: worktreeSession(N10, PR_TABS.sourceBranch, false),
       branch: PR_TABS.sourceBranch,
       pr: PR_TABS,
       isMerged: false,

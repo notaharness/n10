@@ -1,5 +1,5 @@
 import { BEAM_REPO } from './beam.js';
-import { HOME, sessionKey, type RepoData } from './identity.js';
+import { HOME, worktreeSession, type RepoData } from './identity.js';
 import { N10_REPO } from './n10.js';
 
 /**
@@ -18,10 +18,7 @@ const PLUGINS_REPO: RepoData = {
   sidebar: () => [
     {
       kind: 'session',
-      session: {
-        name: sessionKey(PLUGINS, 'docs/orchestra-terminal-style'),
-        running: false,
-      },
+      session: worktreeSession(PLUGINS, 'docs/orchestra-terminal-style', false),
       branch: 'docs/orchestra-terminal-style',
       isMerged: false,
     },
