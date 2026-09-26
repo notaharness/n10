@@ -234,6 +234,7 @@ describe('retained review guidance', () => {
       args: [
         'resume',
         '--last',
+        '--',
         `${request.systemGuidance}\n\n${request.prompt}`,
       ],
     });

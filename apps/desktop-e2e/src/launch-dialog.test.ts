@@ -1,11 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
 import { sessionMenu, sidebarRow, startSessionFromMenu } from './setup/app.js';
 import { armContextMenuChoice } from './setup/menu.js';
 import type { ElectronApplication } from '@playwright/test';
 import { findN10SessionFor, socketEnv, tagTmuxSession } from './setup/tmux.js';
+import { codexCalls, installCodex } from './setup/codex.js';
 
 const BRANCH = 'launch-dialog';
 const TITLE = `Launch ${'a-very-long-unbroken-title-'.repeat(18)}`;
@@ -163,21 +163,11 @@ test('a stopped unknown agent has no Continue action; a recorded resumable agent
 test('Review sends its selected agent and instructions to the same guarded worktree session', async ({
   desktop,
 }) => {
-  const { app, page, homeDir } = desktop;
-  const bin = join(homeDir, 'agent-bin');
-  const capture = join(homeDir, 'codex-argv.json');
-  mkdirSync(bin);
-  const fake = join(bin, 'codex');
-  writeFileSync(
-    fake,
-    `#!/usr/bin/env node\nrequire('node:fs').writeFileSync(${JSON.stringify(
-      capture
-    )},JSON.stringify(process.argv.slice(2)));\nconsole.log('selected-codex-ready');\nsetInterval(()=>{},60000);\n`
-  );
-  chmodSync(fake, 0o755);
-  await app.evaluate((_electron, path) => {
-    process.env.PATH = `${path}:${process.env.PATH}`;
-  }, bin);
+  const { app, page, homeDir, repoPath } = desktop;
+  const env = installCodex(homeDir);
+  await app.evaluate((_electron, env) => {
+    Object.assign(process.env, env);
+  }, env);
   await openMenu(page, app);
   await startSessionFromMenu(page);
   await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible();
@@ -207,16 +197,22 @@ test('Review sends its selected agent and instructions to the same guarded workt
   await page.getByRole('option', { name: 'Codex', exact: true }).click();
   await menu
     .getByLabel('Additional instructions')
-    .fill('Check module boundaries.');
+    .fill(
+      'Check module boundaries. Preserve "quotes", $HOME and `code`.\nSecond line.'
+    );
   await expect(menu.getByRole('note')).toContainText(
     'stops the running Custom session'
   );
   await menu
     .getByRole('button', { name: 'Stop and start review', exact: true })
     .click();
-  await expect(page.getByText('selected-codex-ready').first()).toBeVisible();
-  const args: string[] = JSON.parse(readFileSync(capture, 'utf8'));
-  expect(args.join('\n')).toContain('Check module boundaries.');
+  await expect(page.getByText('fake-codex-ready').first()).toBeVisible();
+  const [{ args }] = codexCalls(join(repoPath, '.claude/worktrees', BRANCH));
+  expect(args).toHaveLength(2);
+  expect(args[0]).toBe('--');
+  expect(args.join('\n')).toContain(
+    'Check module boundaries. Preserve "quotes", $HOME and `code`.\nSecond line.'
+  );
   expect(args.join('\n')).toContain('n10 util add-comment');
   expect(args.join('\n')).toContain('42');
   expect(args).not.toContain('resume');

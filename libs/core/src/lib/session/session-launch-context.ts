@@ -59,7 +59,8 @@ export function getSessionLaunchContext(
 }
 
 function parseReport(value?: string): SessionLaunchContext['lastReport'] {
-  const report = value?.match(/^(\S+)\s+(\S+)$/);
+  // Orchestra appends a delivery method (queue/inbox/stored/...) to receipts.
+  const report = value?.match(/^(\S+)\s+(\S+)(?:\s+\S+)?$/);
   return report && !Number.isNaN(Date.parse(report[2]))
     ? { kind: report[1], timestamp: report[2] }
     : undefined;

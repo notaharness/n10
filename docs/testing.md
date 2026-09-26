@@ -218,3 +218,51 @@ The archive, provenance, checksum and update instructions live in
 tmux is installed in CI, and the live suites skip locally when it is absent.
 `terminal-allocation.integration.spec.ts` exercises names becoming occupied or
 free between a tab's preliminary name probe and the backend's allocation.
+
+## Codex CLI
+
+Codex support is verified offline against the interactive command contract from
+`codex-cli 0.154.0` (`codex --help`, `codex resume --help`, `codex exec --help`
+and `codex queue --help`). The agent registry launches `codex`, seeds with
+`codex -- PROMPT`, and continues with `codex resume --last [-- PROMPT]` in the
+worktree directory. It does not use `exec`, `--all`, global continuation or
+approval/sandbox bypass flags. The separator keeps option-like prompts and
+subcommand names such as `review` literal. Codex receives review guidance in
+its user prompt because it has no Claude-style `--append-system-prompt` flag.
+
+The CLI's [resume parser](https://github.com/openai/codex/blob/main/codex-rs/cli/src/main.rs)
+accepts a single positional prompt with `--last`; selection is cwd-filtered.
+Continuation uses the retained session's recorded agent. With several Codex
+conversations in one checkout, `--last` selects the most recent eligible one;
+n10 does not store a Codex thread ID.
+
+`apps/cli-e2e/src/codex.test.ts` and
+`apps/desktop-e2e/src/codex.test.ts` install a fake `codex` on the fixture PATH,
+record argv/cwd, resume only in a cwd with a prior launch, and produce changing
+ANSI output before becoming quiet. They exercise both shells' launch/resume
+flows and busy/idle indicators, plus Desktop standalone agent terminals.
+`launch-dialog.test.ts` verifies the selected Codex review agent receives its
+instructions and review guidance intact. Every fake runs in an isolated HOME
+and tmux socket; no real Codex session or account is used.
+
+Activity is inferred from terminal output, not Codex model/tool events. Quiet
+network or tool work can appear idle. These tests verify n10's integration,
+not model responses, authentication, or exact Codex screen rendering.
+
+Reporting uses Orchestra's `codex queue --thread ID --message TEXT` adapter;
+`orchestra.integration.spec.ts` runs the pinned report scripts with a fake
+queue and checks success, failure and retained reporting metadata. The launch
+dialog accepts both legacy two-field reports and reports with a delivery method
+(`queue`, `inbox`, `stored`, etc.). Claude's
+inbox is a separate transport. Desktop's inbound relay deliberately refuses
+`codex:` targets (covered by `relay-target.spec.ts`); it does not silently
+route them to a guessed session. Local n10-managed agent panes can receive
+messages through their `tmux:` target.
+
+Run the offline checks:
+
+```sh
+npx nx test core
+PORT=5198 npx nx e2e cli-e2e -- codex.test.ts
+npx nx e2e desktop-e2e -- codex.test.ts launch-dialog.test.ts
+```
