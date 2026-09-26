@@ -23,8 +23,14 @@ export function useRemoteComments(
   const [comments, setComments] = useState<PullRequestComments>(EMPTY_COMMENTS);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const activePrIdRef = useRef<number | null>(null);
-  const cacheRef = useRef<Map<number, PullRequestComments>>(new Map());
+  // What the cache and the liveness token are keyed by: the PR number
+  // *in* a repository, reached through a provider with a set of
+  // credentials. The number alone names another pull request once the
+  // project settings change. Compared by content, so a settings save
+  // that leaves these alone keeps the cache.
+  const requestKey = JSON.stringify([provider?.id, auth, project, prId]);
+  const activeKeyRef = useRef<string | null>(null);
+  const cacheRef = useRef<Map<string, PullRequestComments>>(new Map());
   // Stabilize onFetchError across renders so it doesn't cycle
   // fetchComments' deps (which would re-fire the effect on every render).
   const onFetchErrorRef = useRef(onFetchError);
@@ -39,7 +45,7 @@ export function useRemoteComments(
 
       // Use cache unless force-refreshing
       if (!forceRefresh) {
-        const cached = cacheRef.current.get(prId);
+        const cached = cacheRef.current.get(requestKey);
         if (cached) {
           setComments(cached);
           return;
@@ -47,11 +53,11 @@ export function useRemoteComments(
       }
 
       // Logged always, shown only if this response still belongs to
-      // the PR on screen — see the note on activePrIdRef below.
+      // the PR on screen — see the note on activeKeyRef below.
       const reportFailure = (err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
         logError(`fetchCommentThreads [${provider.id}]`, err as Error);
-        if (activePrIdRef.current === prId) {
+        if (activeKeyRef.current === requestKey) {
           setError(msg);
           onFetchErrorRef.current?.(msg);
         }
@@ -61,38 +67,39 @@ export function useRemoteComments(
       setError(null);
       try {
         const result = await provider.fetchCommentThreads(auth, project, prId);
-        // Cache unconditionally — it's keyed by the closured prId so it's
-        // correct even if the user has moved on. Only commit to visible
-        // state if this response still matches the active PR.
-        cacheRef.current.set(prId, result);
-        if (activePrIdRef.current === prId) {
+        // Cache unconditionally — it's keyed by the closured request so
+        // it's correct even if the user has moved on. Only commit to
+        // visible state if this response still matches the active one.
+        cacheRef.current.set(requestKey, result);
+        if (activeKeyRef.current === requestKey) {
           setComments(result);
         }
       } catch (err: unknown) {
         reportFailure(err);
       } finally {
-        if (activePrIdRef.current === prId) {
+        if (activeKeyRef.current === requestKey) {
           setLoading(false);
         }
       }
     },
-    [prId, provider, auth, project]
+    [prId, provider, auth, project, requestKey]
   );
 
-  // Fetch when PR changes. `activePrIdRef` is the single liveness token an
-  // in-flight fetch checks before it commits: while mounted it holds the
-  // selected PR (so a response for a PR the user has moved off is dropped),
+  // Fetch when the request changes. `activeKeyRef` is the single liveness
+  // token an in-flight fetch checks before it commits: while mounted it
+  // holds the selected request (so a response for a PR or repository the
+  // user has moved off is dropped),
   // and clearing it on teardown means a response arriving after this hook is
   // gone is dropped too — it can never flash a fetch error at the user for a
   // view that no longer exists. A dep change runs the cleanup and the body in
   // the same synchronous commit, so nothing in flight can observe the gap.
   useEffect(() => {
-    activePrIdRef.current = prId;
+    activeKeyRef.current = requestKey;
     void fetchComments();
     return () => {
-      activePrIdRef.current = null;
+      activeKeyRef.current = null;
     };
-  }, [fetchComments, prId]);
+  }, [fetchComments, requestKey]);
 
   const refresh = useCallback(() => {
     void fetchComments(true);
@@ -130,9 +137,9 @@ export function useRemoteComments(
           generalComments: updateThreads(prev.generalComments),
         }));
         // Also update cache
-        const cached = cacheRef.current.get(prId);
+        const cached = cacheRef.current.get(requestKey);
         if (cached) {
-          cacheRef.current.set(prId, {
+          cacheRef.current.set(requestKey, {
             threads: updateThreads(cached.threads),
             generalComments: updateThreads(cached.generalComments),
           });
@@ -143,7 +150,7 @@ export function useRemoteComments(
         throw err;
       }
     },
-    [prId, provider, auth, project, comments]
+    [prId, provider, auth, project, comments, requestKey]
   );
 
   const toggleResolved = useCallback(
@@ -166,9 +173,9 @@ export function useRemoteComments(
           threads: updateThreads(prev.threads),
           generalComments: updateThreads(prev.generalComments),
         }));
-        const cached = cacheRef.current.get(prId);
+        const cached = cacheRef.current.get(requestKey);
         if (cached) {
-          cacheRef.current.set(prId, {
+          cacheRef.current.set(requestKey, {
             threads: updateThreads(cached.threads),
             generalComments: updateThreads(cached.generalComments),
           });
@@ -183,7 +190,7 @@ export function useRemoteComments(
         throw err;
       }
     },
-    [prId, provider, auth, project, onResolvedChange, comments]
+    [prId, provider, auth, project, onResolvedChange, comments, requestKey]
   );
 
   return {

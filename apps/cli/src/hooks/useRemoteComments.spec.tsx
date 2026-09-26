@@ -53,15 +53,23 @@ function mountProbe(
   outRef: { current: HookValue | null };
   unmount: () => void;
   setPrId: (next: number | null) => void;
+  setProject: (next: Record<string, string>) => void;
 } {
   const outRef: { current: HookValue | null } = { current: null };
+  let props = { prId, project: EMPTY_PROJECT };
 
-  function Probe({ prId: currentPrId }: { prId: number | null }) {
+  function Probe({
+    prId: currentPrId,
+    project,
+  }: {
+    prId: number | null;
+    project: Record<string, string>;
+  }) {
     const value = useRemoteComments(
       currentPrId,
       provider,
       EMPTY_AUTH,
-      EMPTY_PROJECT,
+      project,
       onResolvedChange,
       onFetchError
     );
@@ -73,11 +81,16 @@ function mountProbe(
     return <Box />;
   }
 
-  const { unmount, rerender } = render(<Probe prId={prId} />);
+  const { unmount, rerender } = render(<Probe {...props} />);
+  const update = (next: Partial<typeof props>) => {
+    props = { ...props, ...next };
+    rerender(<Probe {...props} />);
+  };
   return {
     outRef,
     unmount,
-    setPrId: (next) => rerender(<Probe prId={next} />),
+    setPrId: (next) => update({ prId: next }),
+    setProject: (next) => update({ project: next }),
   };
 }
 
@@ -319,6 +332,79 @@ describe('useRemoteComments', () => {
 
     expect(outRef.current?.threads.map((t) => t.id)).toEqual(['pr2-thread']);
     unmount();
+  });
+
+  it('fetches again when the same PR number now names another repository', async () => {
+    const fetchMock = vi.fn((_auth: unknown, project: Record<string, string>) =>
+      Promise.resolve({
+        threads: [makeThread({ id: `from-${project.repo}` })],
+        generalComments: [],
+      })
+    );
+    const provider = {
+      id: 'github',
+      fetchCommentThreads: fetchMock,
+    } as unknown as VcsProvider;
+
+    const probe = mountProbe(7, provider);
+    probe.setProject({ owner: 'org', repo: 'a' });
+    await waitForState(probe.outRef, (v) => v.threads[0]?.id === 'from-a');
+
+    probe.setProject({ owner: 'org', repo: 'b' });
+    await waitForState(probe.outRef, (v) => v.threads[0]?.id === 'from-b');
+    expect(probe.outRef.current?.threads[0]?.id).toBe('from-b');
+    probe.unmount();
+  });
+
+  it('drops a late response for the same PR number in a repository the user has moved off', async () => {
+    const fromA = deferred<PullRequestComments>();
+    const fetchMock = vi.fn((_auth: unknown, project: Record<string, string>) =>
+      project.repo === 'a'
+        ? fromA.promise
+        : Promise.resolve({
+            threads: [makeThread({ id: 'from-b' })],
+            generalComments: [],
+          })
+    );
+    const provider = {
+      id: 'github',
+      fetchCommentThreads: fetchMock,
+    } as unknown as VcsProvider;
+
+    const probe = mountProbe(7, provider);
+    probe.setProject({ owner: 'org', repo: 'a' });
+    await flush();
+    probe.setProject({ owner: 'org', repo: 'b' });
+    await waitForState(probe.outRef, (v) => v.threads[0]?.id === 'from-b');
+
+    fromA.resolve({
+      threads: [makeThread({ id: 'from-a' })],
+      generalComments: [],
+    });
+    await flush();
+    expect(probe.outRef.current?.threads[0]?.id).toBe('from-b');
+    probe.unmount();
+  });
+
+  it('keeps its cache across a settings change that leaves the repository alone', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      threads: [makeThread({ id: 't1' })],
+      generalComments: [],
+    });
+    const provider = {
+      id: 'github',
+      fetchCommentThreads: fetchMock,
+    } as unknown as VcsProvider;
+
+    const probe = mountProbe(7, provider);
+    probe.setProject({ owner: 'org', repo: 'a' });
+    await waitForState(probe.outRef, (v) => v.threads.length === 1);
+    const calls = fetchMock.mock.calls.length;
+    // A new object with the same contents, as a config reload makes.
+    probe.setProject({ owner: 'org', repo: 'a' });
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(calls);
+    probe.unmount();
   });
 
   it('toggleResolved returns false when provider lacks setThreadResolved', async () => {
