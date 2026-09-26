@@ -5,7 +5,6 @@ name: Package
 # gate and publishes the `package` artifact uploaded here.
 on:
   pull_request:
-    branches: [master]
     paths:
       - 'apps/cli/**'
       - 'apps/desktop/**'
