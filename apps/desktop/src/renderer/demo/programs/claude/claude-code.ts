@@ -1,5 +1,5 @@
 import type { Program, Tty } from '../../host/sessions.js';
-import { ESC, LiveScreen, fit, type Span } from '../ansi.js';
+import { ESC, LiveScreen, fit, onThemeChange, type Span } from '../ansi.js';
 import { scheduler } from '../scheduler.js';
 import { renderBlock, type Block } from './blocks.js';
 
@@ -54,12 +54,15 @@ export class ClaudeCode implements Program {
   private frame = 0;
   /** Every block drawn so far, to lay out again at a new width. */
   private transcript: { block: Block; gap: boolean }[] = [];
+  private offTheme: (() => void) | null = null;
 
   constructor(private readonly script: ClaudeScript) {}
 
   start(tty: Tty): void {
     this.tty = tty;
     this.screen = new LiveScreen(tty);
+    // Tones differ by theme, so a theme switch lays everything out again.
+    this.offTheme = onThemeChange(() => this.resize());
     tty.write(ESC.hideCursor);
     this.commit([{ kind: 'banner', cwd: this.script.cwd }], false);
     this.commit(this.script.history ?? []);
@@ -93,6 +96,7 @@ export class ClaudeCode implements Program {
   }
 
   stop(): void {
+    this.offTheme?.();
     this.stopSpin?.();
     this.queue = [];
   }

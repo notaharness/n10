@@ -3,7 +3,7 @@ import type { Tty } from '../host/sessions.js';
 /**
  * Terminal output for the scripted programs, in the 16-colour SGR that
  * Claude Code itself emits under tmux (captured from v2.1), so the
- * desktop terminal's own palette decides how it looks in either theme.
+ * desktop terminal's own palette does the rest.
  * Text is written as spans and wrapped here, with hanging indents, the
  * way Ink lays Claude Code out; only then is it turned into escapes.
  */
@@ -48,6 +48,41 @@ const SGR: Record<Tone, string> = {
   reverse: '7',
 };
 
+/**
+ * On a light background Claude Code's light theme stays off the tones
+ * that would vanish there: white used as gray, bright white, and the
+ * bright colours, which it swaps for their darker counterparts.
+ */
+const LIGHT: Record<Tone, string> = {
+  ...SGR,
+  gray: '90',
+  white: '30',
+  bred: '31',
+  bgreen: '32',
+  byellow: '33',
+  bblue: '34',
+  bmagenta: '35',
+  bcyan: '36',
+  userbg: '47',
+};
+
+const isDark = () => document.documentElement.classList.contains('dark');
+
+/** Calls `cb` when the app switches between light and dark. */
+export function onThemeChange(cb: () => void): () => void {
+  let dark = isDark();
+  const observer = new MutationObserver(() => {
+    if (isDark() === dark) return;
+    dark = isDark();
+    cb();
+  });
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+  return () => observer.disconnect();
+}
+
 export type Span = readonly [text: string, tones?: readonly Tone[]];
 
 export const ESC = {
@@ -58,10 +93,11 @@ export const ESC = {
 };
 
 export function paint(spans: readonly Span[]): string {
+  const sgr = isDark() ? SGR : LIGHT;
   return spans
     .map(([text, tones]) =>
       tones?.length
-        ? `\x1b[${tones.map((t) => SGR[t]).join(';')}m${text}\x1b[0m`
+        ? `\x1b[${tones.map((t) => sgr[t]).join(';')}m${text}\x1b[0m`
         : text
     )
     .join('');
