@@ -99,4 +99,25 @@ describe('usePolling', () => {
     expect(probe.outRef.current?.loading).toBe(false);
     probe.unmount();
   });
+
+  it('joins the queued request when asked again as the one ahead of it settles', async () => {
+    const requests: ((value: number) => void)[] = [];
+    const fetch = vi.fn(
+      () => new Promise<number>((resolve) => requests.push(resolve))
+    );
+    const probe = mountProbe(fetch, 60_000);
+    await settle();
+    requests[0]!(0);
+    await settle();
+
+    // A caller that refreshes again once its refresh settles, while
+    // someone else's refresh is queued behind it.
+    const first = probe.outRef.current!.refresh();
+    void first.then(() => probe.outRef.current!.refresh());
+    void probe.outRef.current!.refresh();
+    requests[1]!(1);
+    await settle();
+    expect(fetch).toHaveBeenCalledTimes(3);
+    probe.unmount();
+  });
 });

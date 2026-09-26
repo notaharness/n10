@@ -24,7 +24,11 @@ export function usePolling<T>(
   const [loading, setLoading] = useState(false);
   const mountedRef = useRef(true);
   const fnRef = useRef(fn);
-  fnRef.current = fn;
+  // Declared before the polling effect, so the fetch it starts on
+  // mount or re-enable already sees the latest `fn`.
+  useEffect(() => {
+    fnRef.current = fn;
+  });
   // One request at a time, so results commit in the order they were
   // asked for: a slow older request cannot overwrite a newer one, and a
   // pass with side effects (remote sync) never overlaps itself. Neither
@@ -33,8 +37,11 @@ export function usePolling<T>(
   const queuedRef = useRef<Promise<void> | null>(null);
 
   const start = useCallback((): Promise<void> => {
-    setLoading(true);
     const run = (async () => {
+      // Inside the async body, as in useMergedBranches: a synchronous
+      // setState in the effect that starts the first request makes
+      // React re-render before the effect has done anything.
+      setLoading(true);
       try {
         const v = await fnRef.current();
         if (mountedRef.current) {
@@ -53,11 +60,14 @@ export function usePolling<T>(
   }, []);
 
   const refresh = useCallback((): Promise<void> => {
+    // Checked first: between a request settling and the queued one
+    // starting, nothing is in flight but a request is already next.
+    if (queuedRef.current) return queuedRef.current;
     const inFlight = inFlightRef.current;
     if (!inFlight) return start();
     // The request already out may predate whatever prompted this ask,
     // so one fresh request follows it; asks meanwhile share that one.
-    queuedRef.current ??= inFlight.then(() => {
+    queuedRef.current = inFlight.then(() => {
       queuedRef.current = null;
       return mountedRef.current ? start() : undefined;
     });
