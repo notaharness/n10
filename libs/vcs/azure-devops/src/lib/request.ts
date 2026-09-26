@@ -207,6 +207,14 @@ const MAX_PAGES = 50;
  * gone. The pages are cached together, so a listing is kept — and
  * handed out — only once every page has arrived: a failed page fails
  * the read rather than passing off the rows before it as the whole list.
+ *
+ * Only for endpoints that fill every page but the last, as
+ * `/pullrequests` does. One that pages by `x-ms-continuationtoken`
+ * (`/build/builds`) can answer a short page with more to come; read
+ * those through `adoGetPage`.
+ *
+ * `truncateAfterPages` is for a caller a partial list cannot mislead:
+ * past that many pages it gets the rows read so far instead of a throw.
  */
 export function adoGetAll<T>(
   context: string,
@@ -214,11 +222,13 @@ export function adoGetAll<T>(
   ttlMs: number,
   url: string,
   headers: Record<string, string>,
-  what?: string
+  what?: string,
+  { truncateAfterPages }: { truncateAfterPages?: number } = {}
 ): Promise<T[]> {
   return cache.get(key, ttlMs, async () => {
     const rows: T[] = [];
-    for (let page = 0; page < MAX_PAGES; page++) {
+    const pages = truncateAfterPages ?? MAX_PAGES;
+    for (let page = 0; page < pages; page++) {
       const res = await send(
         context,
         `${url}&$top=${PAGE_SIZE}&$skip=${page * PAGE_SIZE}`,
@@ -228,6 +238,7 @@ export function adoGetAll<T>(
       rows.push(...value);
       if (value.length < PAGE_SIZE) return rows;
     }
+    if (truncateAfterPages !== undefined) return rows;
     throw new VcsError(
       'unexpected-response',
       `${PROVIDER_NAME} listed more than ${MAX_PAGES * PAGE_SIZE} rows for ${

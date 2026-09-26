@@ -802,20 +802,42 @@ describe('azureDevOpsProvider.fetchMergedBranches', () => {
 
   it('asks only for pull requests closed in the last thirty days', async () => {
     servePullRequestPages(completed);
-    const before = Date.now();
-    await azureDevOpsProvider.fetchMergedBranches!(
-      { pat: 'test-pat' },
-      testProject,
-      ['done-0']
-    );
+    vi.useFakeTimers({
+      now: Date.parse('2026-09-26T12:00:00.000Z'),
+      toFake: ['Date'],
+    });
+    try {
+      await azureDevOpsProvider.fetchMergedBranches!(
+        { pat: 'test-pat' },
+        testProject,
+        ['done-0']
+      );
+    } finally {
+      vi.useRealTimers();
+    }
     const url = new URL(mockFetch.mock.calls[0]![0] as string);
     expect(url.searchParams.get('searchCriteria.status')).toBe('completed');
     expect(url.searchParams.get('searchCriteria.queryTimeRangeType')).toBe(
       'closed'
     );
-    const since = Date.parse(url.searchParams.get('searchCriteria.minTime')!);
-    expect(before - since).toBeGreaterThanOrEqual(30 * 24 * 60 * 60 * 1000);
-    expect(before - since).toBeLessThan(31 * 24 * 60 * 60 * 1000);
+    expect(url.searchParams.get('searchCriteria.minTime')).toBe(
+      '2026-08-27T12:00:00.000Z'
+    );
+  });
+
+  it('uses the first thousand completed pull requests rather than none when there are more', async () => {
+    servePullRequestPages(
+      Array.from({ length: 1500 }, (_, i) => ({
+        sourceRefName: `refs/heads/done-${i}`,
+      }))
+    );
+    const merged = await azureDevOpsProvider.fetchMergedBranches!(
+      { pat: 'test-pat' },
+      testProject,
+      ['done-900', 'done-1200']
+    );
+    expect(merged).toEqual(new Set(['done-900']));
+    expect(mockFetch).toHaveBeenCalledTimes(10);
   });
 });
 

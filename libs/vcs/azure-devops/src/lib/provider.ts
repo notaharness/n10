@@ -1046,7 +1046,9 @@ export const azureDevOpsProvider: VcsProvider = {
     // Closed in the last thirty days, the window the GitHub provider
     // searches: completed pull requests accumulate for the life of a
     // repository, and reading every page of them each sweep would cost
-    // more the older it gets.
+    // more the older it gets. A partial listing only under-reports
+    // merges, the direction a failure already errs in, so past a
+    // thousand in the window the sweep uses the first thousand.
     const since = new Date(Date.now() - MERGED_WINDOW_MS).toISOString();
     const rows = await adoGetAll<{ sourceRefName?: string }>(
       'fetchMergedBranches',
@@ -1056,7 +1058,8 @@ export const azureDevOpsProvider: VcsProvider = {
         `&searchCriteria.queryTimeRangeType=closed` +
         `&searchCriteria.minTime=${encodeURIComponent(since)}&api-version=7.1`,
       authHeaders(config.pat),
-      `repository ${config.repo}`
+      `repository ${config.repo}`,
+      { truncateAfterPages: 10 }
     ).catch(() => [] as { sourceRefName?: string }[]);
     const branchSet = new Set(branches);
     const matched = new Set<string>();
