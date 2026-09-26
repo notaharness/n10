@@ -4,7 +4,6 @@ on:
   push:
     branches: [master]
   pull_request:
-    branches: [master, 'claude/**']
     paths:
       - 'apps/cli/**'
       - 'libs/**'
@@ -38,6 +37,10 @@ jobs:
           cache: 'npm'
 
       - run: npm ci
+
+      # Electron otherwise downloads its binary on the first e2e launch,
+      # inside Playwright's launch timeout.
+      - run: npx --no install-electron
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
