@@ -109,3 +109,27 @@ export function reloadAfterRendererGone(
   ];
   return { history: recent, reload: recent.length <= RENDERER_RELOAD_LIMIT };
 }
+
+/** The part of a BrowserWindow that showing it needs. */
+export interface ShowableWindow {
+  once(event: 'ready-to-show', listener: () => void): unknown;
+  webContents: { on(event: 'did-finish-load', listener: () => void): unknown };
+  isDestroyed(): boolean;
+  isVisible(): boolean;
+  show(): void;
+}
+
+/**
+ * Show a window created hidden once it has something to show. The
+ * first frame being ready is the moment that avoids a blank window,
+ * but on a display stack whose first frame never comes (GPU
+ * initialisation that fails quietly under Wayland) that moment never
+ * arrives, so the page having loaded shows the window as well.
+ */
+export function showWhenReadyOrLoaded(win: ShowableWindow): void {
+  const show = () => {
+    if (!win.isDestroyed() && !win.isVisible()) win.show();
+  };
+  win.once('ready-to-show', show);
+  win.webContents.on('did-finish-load', show);
+}
