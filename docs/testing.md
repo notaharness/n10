@@ -21,7 +21,7 @@ appearing exactly once.
 The `desktop-e2e` targets build Electron before testing. Directly invoking
 `run-e2e.mjs` or `run-visual.mjs` does not; run `npx nx build desktop` first.
 
-`src/fixtures/desktop.ts` creates a repo and isolated HOME, seeds optional git
+`src/fixtures/desktop.ts` creates a repo and isolated HOME, seeds optional Git
 states, supplies a scriptable fake agent and fails on renderer exceptions.
 Every test uses a private tmux socket inside its fixture HOME and kills only
 that fixture's sessions at teardown. It drops `N10_VITE_URL` to ensure tests
@@ -131,10 +131,11 @@ starting another. Browser launch may require the agent environment's approval.
 ## README media
 
 `apps/desktop-e2e/demo/capture.mjs` drives the built app under Xvfb with fake gh
-and a paced demo agent, then records GIFs and stills into `docs/media/`.
-The TUI capture uses the wterm bridge. `theme-slider.py` makes the light/dark
-hero wipe. Raw captures are ignored under `docs/media/raw/`.
-Read the demo directory's README before recording.
+and a paced demo agent, then records GIFs into `docs/media/`. The TUI capture
+uses the wterm bridge. Raw captures are ignored under `docs/media/raw/`.
+Read the demo directory's README before recording. The hero stills are
+screenshots of the website's desktop demo: `record-media/record.mjs hero` in
+`apps/website/scripts`.
 
 ## Integration Tests
 
