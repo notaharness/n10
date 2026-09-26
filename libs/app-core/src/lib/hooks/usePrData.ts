@@ -13,8 +13,15 @@ export function usePrData(refreshInterval = 60000) {
   const enabled =
     provider != null && provider.isConfigured(vendorAuth, vendorProject);
 
+  // Set by `refresh` below, consumed by the fetch that answers it.
+  const forgetCacheRef = useRef(false);
+
   const fetchPrs = useCallback(async (): Promise<BranchPrMap> => {
     if (!enabled || !provider) return {};
+    if (forgetCacheRef.current) {
+      forgetCacheRef.current = false;
+      provider.forgetPullRequestCache?.(vendorProject);
+    }
     try {
       return await provider.fetchPullRequests(vendorAuth, vendorProject);
     } catch (err: unknown) {
@@ -53,11 +60,15 @@ export function usePrData(refreshInterval = 60000) {
    * spend a request per row on it — and answering a keypress from
    * memory is what makes the key look broken. The desktop's refresh
    * does the same thing through its host (`services/sidebar.ts`).
+   *
+   * The provider forgets when the answering fetch starts, not now: a
+   * poll already in flight finishes first and would write its answers
+   * straight back.
    */
   const refresh = useCallback(() => {
-    provider?.forgetPullRequestCache?.(vendorProject);
+    forgetCacheRef.current = true;
     return polling.refresh();
-  }, [provider, vendorProject, polling]);
+  }, [polling]);
 
   return {
     prMap: polling.value ?? {},

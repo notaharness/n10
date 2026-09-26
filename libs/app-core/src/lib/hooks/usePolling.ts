@@ -25,21 +25,44 @@ export function usePolling<T>(
   const mountedRef = useRef(true);
   const fnRef = useRef(fn);
   fnRef.current = fn;
+  // One request at a time, so results commit in the order they were
+  // asked for: a slow older request cannot overwrite a newer one, and a
+  // pass with side effects (remote sync) never overlaps itself. Neither
+  // promise rejects.
+  const inFlightRef = useRef<Promise<void> | null>(null);
+  const queuedRef = useRef<Promise<void> | null>(null);
 
-  const refresh = useCallback(async (): Promise<void> => {
+  const start = useCallback((): Promise<void> => {
     setLoading(true);
-    try {
-      const v = await fnRef.current();
-      if (mountedRef.current) {
-        setValue(v);
-        setError(null);
+    const run = (async () => {
+      try {
+        const v = await fnRef.current();
+        if (mountedRef.current) {
+          setValue(v);
+          setError(null);
+        }
+      } catch (err: unknown) {
+        if (mountedRef.current) setError(err as Error);
       }
-    } catch (err: unknown) {
-      if (mountedRef.current) setError(err as Error);
-    } finally {
-      if (mountedRef.current) setLoading(false);
-    }
+    })().finally(() => {
+      inFlightRef.current = null;
+      if (!queuedRef.current && mountedRef.current) setLoading(false);
+    });
+    inFlightRef.current = run;
+    return run;
   }, []);
+
+  const refresh = useCallback((): Promise<void> => {
+    const inFlight = inFlightRef.current;
+    if (!inFlight) return start();
+    // The request already out may predate whatever prompted this ask,
+    // so one fresh request follows it; asks meanwhile share that one.
+    queuedRef.current ??= inFlight.then(() => {
+      queuedRef.current = null;
+      return mountedRef.current ? start() : undefined;
+    });
+    return queuedRef.current;
+  }, [start]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -49,12 +72,16 @@ export function usePolling<T>(
       };
     }
     void refresh();
-    const timer = setInterval(() => void refresh(), intervalMs);
+    // A tick while a request is out is skipped, not queued: the next
+    // tick comes round soon enough.
+    const timer = setInterval(() => {
+      if (!inFlightRef.current) void start();
+    }, intervalMs);
     return () => {
       mountedRef.current = false;
       clearInterval(timer);
     };
-  }, [enabled, intervalMs, refresh]);
+  }, [enabled, intervalMs, refresh, start]);
 
   return { value, error, loading, refresh };
 }
