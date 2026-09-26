@@ -69,6 +69,19 @@ function findThread(id) {
 const prs = scenario.prs ?? [];
 const argv = process.argv.slice(2);
 
+/**
+ * Answer the way `gh` does when GitHub has an outage: its own error on
+ * stderr and a nonzero exit. The provider classifies the text, so this
+ * is the path a real 5xx takes through the app.
+ */
+function failLikeGitHub() {
+  process.stderr.write('HTTP 502: Bad Gateway (https://api.github.com/)\n');
+  process.exit(1);
+}
+
+/** Whether the scenario says this PR's `read` should fail right now. */
+const failing = (pr, read) => Boolean(pr?.failing?.[read]);
+
 const out = (value) => {
   process.stdout.write(
     typeof value === 'string' ? value : JSON.stringify(value)
@@ -180,6 +193,7 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
 
   if (query.includes('reviewThreads(first: 100, after: $threadCursor)')) {
     const pr = prs.find((p) => String(p.number) === String(vars.prNumber));
+    if (failing(pr, 'threads')) failLikeGitHub();
     out({
       data: {
         repository: {
@@ -296,6 +310,7 @@ if (
   const pullPath = argv[1]?.match(/^repos\/[^/]+\/[^/]+\/pulls\/(\d+)$/);
   if (argv[0] === 'api' && pullPath) {
     const pr = prs.find((p) => String(p.number) === pullPath[1]);
+    if (failing(pr, 'body')) failLikeGitHub();
     out(pr?.body ?? '');
   }
 

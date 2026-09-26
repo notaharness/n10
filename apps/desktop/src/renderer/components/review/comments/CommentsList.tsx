@@ -5,10 +5,17 @@ import {
   ChevronRightIcon,
   MessageSquareIcon,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import type { CommentSeverity } from '../../../../host/contract.js';
+import type { ReadState } from '../../../lib/data/read-state.js';
 import { cn } from '../../../lib/utils.js';
 import { Avatar } from '../../ui/avatar.js';
 import { SEVERITY_DOT } from '../../../lib/review/severity.js';
+
+const OPEN_COUNT_LABEL: Partial<Record<ReadState<unknown>['kind'], string>> = {
+  loading: 'loading…',
+  failed: 'not loaded',
+};
 
 export interface CommentListItem {
   id: string;
@@ -34,6 +41,8 @@ export function CommentsList({
   onOpenChange,
   onJump,
   onContextMenu,
+  notice,
+  threads = 'ready',
 }: {
   items: CommentListItem[];
   activeId: string | null;
@@ -44,8 +53,14 @@ export function CommentsList({
   onJump: (item: CommentListItem) => void;
   /** Right-click a row: queue it for the agent (see PrWorkspace). */
   onContextMenu?: (item: CommentListItem) => void;
+  /** Why the remote threads are missing or out of date, shown above
+   *  the rows. */
+  notice?: ReactNode;
+  /** How far the remote threads got. Until they are `ready` the open
+   *  count is unknown, not zero. */
+  threads?: ReadState<unknown>['kind'];
 }) {
-  if (items.length === 0) return null;
+  if (items.length === 0 && !notice) return null;
   const openCount = items.filter((i) => !i.resolved).length;
   const draftCount = items.filter((i) => i.kind === 'draft').length;
 
@@ -65,9 +80,10 @@ export function CommentsList({
         Comments
         <span className="ml-auto rounded-full bg-muted px-1.5 text-[10px] font-medium tabular-nums">
           {draftCount > 0 && `${draftCount} draft · `}
-          {openCount} open
+          {OPEN_COUNT_LABEL[threads] ?? `${openCount} open`}
         </span>
       </button>
+      {open && notice}
       {open && (
         <div className="min-h-0 flex-1 overflow-y-auto pb-2">
           {items.map((item) => (

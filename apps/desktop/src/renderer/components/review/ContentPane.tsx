@@ -6,6 +6,7 @@ import type {
   ReviewComment,
 } from '../../../host/contract.js';
 import type { PlanItem } from '@n10/core/plan';
+import type { DiffReadState } from '../../lib/data/read-state.js';
 import { type Mode } from '../../lib/review/review-model.js';
 import { cn } from '../../lib/utils.js';
 import { SessionTerminal } from '../terminal/SessionTerminal.js';
@@ -101,8 +102,9 @@ export function ContentPane({
   drafts,
   hasDrafts,
   commentsLoading,
-  diffPending,
-  diffError,
+  diffRead,
+  diffRetrying,
+  onRetryDiff,
   focusThreadId,
   scrollRef,
   jumpRef,
@@ -138,8 +140,9 @@ export function ContentPane({
   drafts: ReviewComment[];
   hasDrafts: boolean;
   commentsLoading: boolean;
-  diffPending: boolean;
-  diffError: Error | null;
+  diffRead: DiffReadState;
+  diffRetrying: boolean;
+  onRetryDiff: () => void;
   focusThreadId: string | null;
   scrollRef: RefObject<HTMLDivElement | null>;
   jumpRef: Ref<DiffJumpHandle>;
@@ -227,8 +230,9 @@ export function ContentPane({
           draftsByFile={draftsByFile}
           generalThreads={generalThreads}
           commentsLoading={commentsLoading}
-          diffLoading={diffPending}
-          diffError={diffError ? String(diffError.message) : null}
+          read={diffRead}
+          retrying={diffRetrying}
+          onRetry={onRetryDiff}
           focusThreadId={focusThreadId}
           scrollRef={scrollRef}
           jumpRef={jumpRef}

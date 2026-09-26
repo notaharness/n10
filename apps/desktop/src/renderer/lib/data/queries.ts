@@ -233,10 +233,10 @@ export function useParsedDiff(text: string | undefined) {
   const content = useMemo(() => (text == null ? '' : contentKey(text)), [text]);
   return useQuery({
     queryKey: keys.parsedDiff(content),
-    // A patch that cannot be parsed is an empty one: the viewer says
-    // "no changes" instead of hanging on a spinner forever.
+    // A patch that cannot be parsed is a failed read, not an empty one:
+    // the viewer says it could not read the diff, never "no changes".
     queryFn: (): Promise<[string, DiffLine[]][]> =>
-      parseDiffInWorker(text ?? '').catch(() => []),
+      parseDiffInWorker(text ?? ''),
     enabled: text != null,
     staleTime: Infinity,
     gcTime: 0,

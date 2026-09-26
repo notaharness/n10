@@ -14,6 +14,7 @@ import {
   visibleText,
 } from './setup/app.js';
 import { armContextMenuChoice } from './setup/menu.js';
+import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
 
 /**
  * What the app does when something goes wrong.
@@ -207,5 +208,186 @@ test.describe('An agent command that does not exist', () => {
         { timeout: 20_000 }
       )
       .toBe(false);
+  });
+});
+
+/**
+ * A pull request's reads fail one at a time, and each section says so
+ * for itself. The lie these guard against is a failure rendered as a
+ * successful empty answer: "no description", "no changes" and an
+ * absent comment list all look like facts about the pull request, and
+ * a reviewer acts on them.
+ */
+test.describe('Pull request reads that fail', () => {
+  const FAILING_PR = {
+    number: 51,
+    title: 'Flaky reads',
+    headRefName: 'flaky-reads',
+    body: 'The real description.',
+    failing: { body: true, threads: true },
+    threads: [
+      {
+        id: 'T1',
+        path: 'a.txt',
+        line: 1,
+        comments: [{ author: 'alice', body: 'A remote question.' }],
+      },
+    ],
+  };
+  const GITHUB: FakeGitHub = {
+    username: 'n10-tester',
+    prs: [
+      FAILING_PR,
+      {
+        ...FAILING_PR,
+        number: 52,
+        title: 'Steady reads',
+        headRefName: 'steady-reads',
+        failing: {},
+      },
+      {
+        number: 53,
+        title: 'Silent author',
+        headRefName: 'silent-author',
+        body: '',
+      },
+      { number: 54, title: 'Vanished branch', headRefName: 'vanished' },
+      { number: 55, title: 'Accented path', headRefName: 'accented' },
+    ],
+  };
+
+  test.use({
+    fakeGitHub: GITHUB,
+    repo: {
+      worktrees: [
+        { branch: 'flaky-reads', files: { 'a.txt': 'one\n' } },
+        { branch: 'steady-reads', files: { 'a.txt': 'one\n' } },
+        { branch: 'silent-author', files: { 'b.txt': 'two\n' } },
+        // Git quotes a non-ASCII path in the diff header.
+        { branch: 'accented', files: { 'café.txt': 'x\n' } },
+      ],
+    },
+  });
+
+  async function openPr(page: Page, title: string) {
+    await sidebarRow(page, new RegExp(title)).first().click();
+    await expect(
+      page.getByRole('button', { name: 'Overview', exact: true })
+    ).toBeVisible({ timeout: 30_000 });
+  }
+
+  async function openOverview(page: Page, title: string) {
+    await openPr(page, title);
+    await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  }
+
+  const setFailing = (
+    homeDir: string,
+    number: number,
+    failing: { body?: boolean; threads?: boolean }
+  ) =>
+    updateFakeGh(homeDir, (scenario) => {
+      const pr = scenario.prs.find((p) => p.number === number);
+      if (pr) pr.failing = failing;
+    });
+
+  test('a description that fails to load offers Retry, not "no description"', async ({
+    desktop,
+  }) => {
+    const { page, homeDir } = desktop;
+    await openOverview(page, 'Flaky reads');
+
+    const failure = page
+      .getByRole('alert')
+      .filter({ hasText: "Couldn't load the description" });
+    await expect(failure).toBeVisible({ timeout: 30_000 });
+    await expect(failure).toContainText('GitHub returned an error');
+    await expect(
+      page.getByText('This pull request has no description.')
+    ).toHaveCount(0);
+
+    setFailing(homeDir, 51, {});
+    await failure.getByRole('button', { name: /^Retry/ }).click();
+    await expect(page.getByText('The real description.')).toBeVisible();
+    await expect(failure).toHaveCount(0);
+  });
+
+  test('a description that is actually empty says so', async ({ desktop }) => {
+    const { page } = desktop;
+    await openOverview(page, 'Silent author');
+    await expect(
+      page.getByText('This pull request has no description.')
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
+
+  test('comments that fail to load are not counted as none', async ({
+    desktop,
+  }) => {
+    const { page, homeDir } = desktop;
+    await openPr(page, 'Flaky reads');
+
+    const failure = page
+      .getByRole('alert')
+      .filter({ hasText: "Couldn't load comments" });
+    await expect(failure).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: /^Comments/ })).toContainText(
+      'not loaded'
+    );
+    await expect(page.locator('[data-comment-row="T1"]')).toHaveCount(0);
+
+    setFailing(homeDir, 51, {});
+    await failure.getByRole('button', { name: /^Retry/ }).click();
+    await expect(page.locator('[data-comment-row="T1"]')).toBeVisible();
+    await expect(failure).toHaveCount(0);
+  });
+
+  test('comments whose refresh fails stay on screen, marked as old', async ({
+    desktop,
+  }) => {
+    const { page, homeDir } = desktop;
+    await openPr(page, 'Steady reads');
+    const row = page.locator('[data-comment-row="T1"]');
+    await expect(row).toBeVisible({ timeout: 30_000 });
+
+    // Opening a reply box re-reads the threads; this time GitHub fails.
+    setFailing(homeDir, 52, { threads: true });
+    await page.getByRole('button', { name: 'Reply…', exact: true }).click();
+
+    const stale = page
+      .getByRole('status')
+      .filter({ hasText: 'Showing the comments from' });
+    await expect(stale).toBeVisible({ timeout: 30_000 });
+    await expect(stale).toContainText('GitHub returned an error');
+    await expect(row).toBeVisible();
+
+    setFailing(homeDir, 52, {});
+    await stale.getByRole('button', { name: /^Retry/ }).click();
+    await expect(stale).toHaveCount(0);
+    await expect(row).toBeVisible();
+  });
+
+  test('a diff that cannot be fetched says why, not "No changes"', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openPr(page, 'Vanished branch');
+    const failure = page
+      .getByRole('alert')
+      .filter({ hasText: "Couldn't load the diff" });
+    await expect(failure).toBeVisible({ timeout: 30_000 });
+    await expect(failure).toContainText('vanished');
+    await expect(page.getByText(/No changes between/)).toHaveCount(0);
+  });
+
+  test('a diff that cannot be read says so, not "No changes"', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openPr(page, 'Accented path');
+    await expect(
+      page.getByRole('alert').filter({ hasText: "Couldn't read the diff" })
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/No changes between/)).toHaveCount(0);
   });
 });

@@ -3,7 +3,9 @@ import {
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import type { ReviewComment } from '../../../host/contract.js';
+import type { ReadState } from '../../lib/data/read-state.js';
 import { cn } from '../../lib/utils.js';
 import { Button } from '../ui/button.js';
 import { ScrollArea } from '../ui/scroll-area.js';
@@ -65,6 +67,8 @@ export function ReviewRail({
   onCommentsOpenChange,
   onJumpComment,
   onCommentContextMenu,
+  commentsNotice,
+  threads,
 }: {
   hasPr: boolean;
   overviewActive: boolean;
@@ -97,6 +101,8 @@ export function ReviewRail({
   onCommentsOpenChange: (open: boolean) => void;
   onJumpComment: (item: CommentListItem) => void;
   onCommentContextMenu: (item: CommentListItem) => void;
+  commentsNotice?: ReactNode;
+  threads: ReadState<unknown>['kind'];
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col bg-sidebar/60">
@@ -179,6 +185,8 @@ export function ReviewRail({
           onOpenChange={onCommentsOpenChange}
           onJump={onJumpComment}
           onContextMenu={onCommentContextMenu}
+          notice={commentsNotice}
+          threads={threads}
         />
       </ScrollArea>
     </div>
