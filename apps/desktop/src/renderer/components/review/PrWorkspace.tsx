@@ -10,7 +10,8 @@ import type { PullRequestInfo } from '@n10/vcs-core';
 import { useDiffOptions } from '../../lib/diff/diff-options.js';
 import { useDraftComments, useThreads } from '../../lib/data/queries.js';
 import { usePostDrafts } from '../../lib/data/mutations.js';
-import { readState, type ReadState } from '../../lib/data/read-state.js';
+import type { ReadState } from '../../lib/data/read-state.js';
+import { useReadState } from '../../lib/data/use-read-state.js';
 import { useRepo } from '../../lib/repo-context.js';
 import { useCommentNavigator } from '../../lib/review/use-comment-navigator.js';
 import { useReviewDiff } from '../../lib/review/use-review-diff.js';
@@ -131,7 +132,8 @@ export function PrWorkspace({
   });
   const files = diff.files;
   const comments = useThreads(repo.cwd, prId);
-  const threadsRead = pr ? readState(comments) : NO_THREADS;
+  const threads = useReadState(comments);
+  const threadsRead = pr ? threads.state : NO_THREADS;
   const draftsQuery = useDraftComments(repo.cwd, prId);
   const postAll = usePostDrafts(repo.cwd);
   const options = useDiffOptions();
@@ -294,8 +296,8 @@ export function PrWorkspace({
                   commentsNotice={railReadNotice(
                     'comments',
                     threadsRead,
-                    comments.isFetching,
-                    () => void comments.refetch()
+                    threads.retrying,
+                    threads.retry
                   )}
                   threads={threadsRead.kind}
                 />

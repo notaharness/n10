@@ -25,12 +25,16 @@ function RetryButton({
   label: string;
 }) {
   return (
+    // aria-disabled rather than disabled: a disabled button drops
+    // keyboard focus to the page mid-retry. A press while retrying is
+    // ignored by `useRetry`.
     <Button
       variant="outline"
       size="sm"
       onClick={onRetry}
-      disabled={retrying}
+      aria-disabled={retrying}
       aria-label={label}
+      className="aria-disabled:opacity-50"
     >
       {retrying ? <Loader2Icon className="animate-spin" /> : <RotateCcwIcon />}
       Retry

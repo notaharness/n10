@@ -1,7 +1,7 @@
 import type { DiffLine } from '@n10/diff';
 import { useDiff, useParsedDiff, useWorktreeDiff } from '../data/queries.js';
 import { diffReadState } from '../data/read-state.js';
-import { diffIsPending } from './review-model.js';
+import { useHeldFailure, useRetry } from '../data/use-read-state.js';
 
 /** Shared empty parse, so "no files yet" keeps a stable identity and
  *  the lists derived from it are not rebuilt on every render. */
@@ -43,17 +43,27 @@ export function useReviewDiff({
   });
   const diff = isPr ? commitDiff : workingDiff;
   const parsed = useParsedDiff(diff.data);
+  const read = useHeldFailure(
+    diffReadState(diff, parsed),
+    diff.isFetching || parsed.isFetching
+  );
+  // A fetch that failed asks git again. A parse that failed also
+  // re-reads the answer: the same text keys the same parse, which would
+  // otherwise stay failed. Neither refetch rejects; a failure lands in
+  // the query's own error.
+  const parseFailed = read.kind === 'failed' && read.stage === 'parse';
+  const { retrying, retry } = useRetry(() =>
+    parseFailed
+      ? Promise.all([diff.refetch(), parsed.refetch()])
+      : diff.refetch()
+  );
   return {
     files: parsed.data ?? NO_FILES,
-    pending: diffIsPending(diff.isLoading, diff.data, parsed.data),
-    read: diffReadState(diff, parsed),
-    retrying: diff.isFetching || parsed.isFetching,
-    // A retry asks git again and re-reads the answer: the same text
-    // keys the same parse, which would otherwise stay failed. Neither
-    // refetch rejects; a failure lands in the query's own error.
-    retry: () => {
-      void diff.refetch();
-      void parsed.refetch();
-    },
+    // Only a read still under way is loading: a failed parse has no
+    // files and never will, and must not keep the file tree waiting.
+    pending: read.kind === 'loading',
+    read,
+    retrying,
+    retry,
   };
 }

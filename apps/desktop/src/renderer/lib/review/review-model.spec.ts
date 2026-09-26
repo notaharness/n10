@@ -7,7 +7,6 @@ import type {
 import {
   buildCommentRows,
   buildFileEntries,
-  diffIsPending,
   firstUnresolvedThread,
   focusesAgent,
   groupDraftsByFile,
@@ -216,30 +215,6 @@ describe('resolveMode', () => {
         hasPlan: false,
       })
     ).toBe('diff');
-  });
-});
-
-// ── diffIsPending ────────────────────────────────────────────────
-
-describe('diffIsPending', () => {
-  it('is pending while the patch itself is in flight', () => {
-    expect(diffIsPending(true, undefined, undefined)).toBe(true);
-  });
-
-  /** The case the second clause exists for: the patch has landed and
-   *  the worker has not produced a parse for *this* patch yet. */
-  it('is pending when a patch has arrived but its parse has not', () => {
-    expect(diffIsPending(false, 'diff --git a/x b/x', undefined)).toBe(true);
-  });
-
-  /** And the case that stops it being "pending forever": a query that
-   *  is disabled/idle has no patch and no parse, and is not loading. */
-  it('is not pending when there is no patch and nothing is loading', () => {
-    expect(diffIsPending(false, undefined, undefined)).toBe(false);
-  });
-
-  it('is not pending once the parse matches the patch', () => {
-    expect(diffIsPending(false, 'patch', [])).toBe(false);
   });
 });
 

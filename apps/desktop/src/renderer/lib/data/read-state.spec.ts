@@ -74,6 +74,15 @@ describe('diffReadState', () => {
     });
   });
 
+  it('is loading while the patch itself is in flight', () => {
+    expect(
+      diffReadState(
+        { data: undefined, error: null, dataUpdatedAt: 0 },
+        { data: undefined, error: null }
+      )
+    ).toEqual({ kind: 'loading' });
+  });
+
   it('is loading while the patch it has is still being parsed', () => {
     expect(diffReadState(ok('diff'), { data: undefined, error: null })).toEqual(
       {

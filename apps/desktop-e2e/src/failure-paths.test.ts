@@ -335,6 +335,10 @@ test.describe('Pull request reads that fail', () => {
       'not loaded'
     );
     await expect(page.locator('[data-comment-row="T1"]')).toHaveCount(0);
+    // The rest of the pull request is still readable.
+    await expect(
+      page.locator('[data-diff-scroll]').getByText('one', { exact: true })
+    ).toBeVisible();
 
     setFailing(homeDir, 51, {});
     await failure.getByRole('button', { name: /^Retry/ }).click();
@@ -378,6 +382,15 @@ test.describe('Pull request reads that fail', () => {
     await expect(failure).toBeVisible({ timeout: 30_000 });
     await expect(failure).toContainText('vanished');
     await expect(page.getByText(/No changes between/)).toHaveCount(0);
+
+    // A retry that fails again keeps the notice, and the focus on its
+    // button, rather than flashing a skeleton in their place.
+    const retry = failure.getByRole('button', { name: /^Retry/ });
+    await retry.focus();
+    await page.keyboard.press('Enter');
+    await expect(failure).toBeVisible();
+    await expect(retry).toBeFocused();
+    await expect(retry).not.toHaveAttribute('aria-disabled', 'true');
   });
 
   test('a diff that cannot be read says so, not "No changes"', async ({
@@ -389,5 +402,8 @@ test.describe('Pull request reads that fail', () => {
       page.getByRole('alert').filter({ hasText: "Couldn't read the diff" })
     ).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(/No changes between/)).toHaveCount(0);
+    // A failed read is finished: nothing, the file tree included, is
+    // left waiting on it.
+    await expect(page.locator('[data-slot="skeleton"]')).toHaveCount(0);
   });
 });
