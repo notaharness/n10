@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/n10.js';
-import { sidebarLocator } from './setup/sidebar.js';
+import { escapeRegExp, sidebarLocator } from './setup/sidebar.js';
 import {
   createSession,
   pressUntil,
@@ -82,19 +82,18 @@ test.describe('Active-session tab bar', () => {
     // Middle-truncated form: head=8 ('this-is-'), tail=7 ('ch-name').
     const longTruncated = 'this-is-…ch-name';
 
-    // Helper: assert the tab bar / sidebar shows `<digit> <label>` for
-    // each entry. Both surfaces are rendered as terminal text and end
-    // up in the page DOM as plain characters in `.term-row`s — getByText
-    // with `.first()` is enough since a row appears in only one pane.
-    const expectTab = async (digit: string, label: string) => {
-      await expect(n10.term.getByText(`${digit} ${label}`).first()).toBeVisible(
+    // Helper: assert the tab bar lists exactly `labels`, in order, as
+    // `<digit> <label>`. The tab bar is the right-hand part of the first
+    // terminal row; matching that row as one string makes a failure
+    // print the order n10 actually rendered.
+    const expectTabs = async (...labels: string[]) => {
+      const tabs = labels.map((l, i) => `${i + 1}\\s${escapeRegExp(l)}`);
+      await expect(n10.term.page.locator('.term-row').first()).toHaveText(
+        // Only padding may follow the last tab; another tab would sit
+        // one space away.
+        new RegExp(`(?:^|\\s)${tabs.join('\\s')}(?:\\s{2,}|\\s*$)`),
         { timeout: 5_000 }
       );
-    };
-    const expectNoTab = async (digit: string, label: string) => {
-      await expect(n10.term.getByText(`${digit} ${label}`)).not.toBeVisible({
-        timeout: 5_000,
-      });
     };
 
     // 1. Spawn order: alpha → long → bravo. Tab into each so the PTY
@@ -122,9 +121,7 @@ test.describe('Active-session tab bar', () => {
 
     // 2. Tab bar follows spawn order (NOT alphabetical, which would put
     //    `bravo` at tab 2). Long branch is middle-truncated.
-    await expectTab('1', 'alpha');
-    await expectTab('2', longTruncated);
-    await expectTab('3', 'bravo');
+    await expectTabs('alpha', longTruncated, 'bravo');
 
     // 3. Sidebar prefixes match the tab bar digits. The sidebar shows
     //    `<digit> <icon> <full-branch-name>` where icon is `●` (running,
@@ -151,10 +148,7 @@ test.describe('Active-session tab bar', () => {
     await n10.term.type('K'); // Shift+K kills the selected agent
 
     // Tab bar compacts: alpha stays at 1, bravo shifts up from 3 to 2.
-    await expectTab('1', 'alpha');
-    await expectTab('2', 'bravo');
-    await expectNoTab('2', longTruncated);
-    await expectNoTab('3', 'bravo');
+    await expectTabs('alpha', 'bravo');
 
     // 5. Restart the long-branch agent (Tab on its still-selected row).
     //    It must land at the END (tab 3), not back in its original
@@ -166,10 +160,6 @@ test.describe('Active-session tab bar', () => {
     await n10.term.write('\x00');
     await waitForSidebarFocused(n10.term);
 
-    await expectTab('1', 'alpha');
-    await expectTab('2', 'bravo');
-    await expectTab('3', longTruncated);
-    // bravo is no longer at tab 3 (compacted up earlier, now back to 2).
-    await expectNoTab('3', 'bravo');
+    await expectTabs('alpha', 'bravo', longTruncated);
   });
 });
