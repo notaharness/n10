@@ -67,6 +67,27 @@ test.describe('With a repository open', () => {
     expect(await lastOpenedAt(page, repoPath)).toBe(opened);
   });
 
+  test('a launch while no page is listening opens once one is', async ({
+    desktop,
+  }) => {
+    const { app, page } = desktop;
+    // What a reload or a recovering renderer looks like from main: the
+    // window's page is gone, so there is nobody to send the launch to.
+    const url = page.url();
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0]?.loadURL('about:blank')
+    );
+
+    await desktop.launchAgain(otherRepo);
+    await app.evaluate(
+      ({ BrowserWindow }, back) =>
+        BrowserWindow.getAllWindows()[0]?.loadURL(back),
+      url
+    );
+
+    expect(await openedRepo(page, otherRepo)).toBe(otherRepo);
+  });
+
   test('File › Open Repository opens the picked folder', async ({
     desktop,
   }) => {
