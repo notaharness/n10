@@ -311,6 +311,26 @@ describe('posting to Azure DevOps', () => {
       /422.*provider said no/
     );
   });
+
+  /** Azure has no review for a verdict to ride on. Posting the comments
+   *  without it would leave a pull request the caller meant to block
+   *  unblocked, and a comment marked posted cannot be retried with it. */
+  it.each(['APPROVE', 'REQUEST_CHANGES'] as const)(
+    'refuses %s before posting anything, rather than dropping it',
+    async (event) => {
+      await expect(
+        postReviewComments([comment()], azure, event)
+      ).rejects.toThrow(`Cannot post comments with ${event} on Azure DevOps`);
+      expect(env.fetches).toEqual([]);
+      expect(env.marked).toEqual([]);
+    }
+  );
+
+  it('posts comments filed as plain comments', async () => {
+    await postReviewComments([comment()], azure, 'COMMENT');
+    expect(env.fetches).toHaveLength(1);
+    expect(env.marked).toEqual([{ id: 'c1', patch: { status: 'posted' } }]);
+  });
 });
 
 describe('marking comments posted', () => {
