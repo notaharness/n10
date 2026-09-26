@@ -49,6 +49,8 @@ const env = vi.hoisted(() => ({
   lastBabysat: null as ReadonlyMap<number, unknown> | null,
   /** cwd → babysit statuses the babysit service answers with. */
   babysat: new Map<string, Map<number, unknown>>(),
+  /** What each listing told discovery it showed. */
+  noted: [] as [string, readonly string[]][],
 }));
 
 vi.mock('./repo.js', () => ({
@@ -72,6 +74,11 @@ vi.mock('./repo.js', () => ({
       },
     },
   ],
+}));
+
+vi.mock('./discovery.js', () => ({
+  noteListedWorktrees: (cwd: string, paths: readonly string[]) =>
+    env.noted.push([cwd, paths]),
 }));
 
 vi.mock('./babysit.js', () => ({
@@ -149,6 +156,7 @@ beforeEach(async () => {
   env.now = 1_000_000;
   env.lastBabysat = null;
   env.babysat = new Map();
+  env.noted = [];
 
   vi.spyOn(Date, 'now').mockImplementation(() => env.now);
   vi.resetModules();
@@ -316,6 +324,22 @@ describe('sidebar model', () => {
     settle(0);
     await model;
     expect([...(env.lastBabysat?.keys() ?? [])]).toEqual([7]);
+  });
+
+  // Discovery can only report the removal of a worktree it has seen,
+  // and the renderer may open a tab for anything listed here.
+  it('tells discovery which checkouts it showed', async () => {
+    env.worktrees = [checkout('one'), checkout('two')];
+    const model = sidebar.listSidebarItems();
+    await flush();
+    settle(0);
+    await model;
+    expect(env.noted).toEqual([
+      [
+        '/repo-a',
+        ['/repo-a/.claude/worktrees/one', '/repo-a/.claude/worktrees/two'],
+      ],
+    ]);
   });
 
   it('omits the state key entirely for a normal worktree', async () => {

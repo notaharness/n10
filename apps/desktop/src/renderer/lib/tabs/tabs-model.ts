@@ -27,7 +27,7 @@ import {
 export type { ItemTab, Tab, TerminalTab } from './tab-identity.js';
 export type { TerminalEntry } from './tab-terminals.js';
 export type { ForeignSessionEntry } from './tab-foreign.js';
-import { closeTab } from './tab-close.js';
+import { closeRemovedWorktrees, closeTab } from './tab-close.js';
 import { openForeign, type ForeignSessionEntry } from './tab-foreign.js';
 import { pinLive, rekey } from './tab-sync.js';
 import {
@@ -134,6 +134,10 @@ export type TabsAction =
    *  session that is already gone. Focus follows the close rules for
    *  `repo`, the one in view. A name with no terminal tab is nothing. */
   | { type: 'terminal-ended'; name: string; repo?: string }
+  /** Discovery says these checkouts of `repo` are gone — removed by
+   *  n10, with `git worktree remove`, or deleted from disk. Their tabs
+   *  close: nothing is left to show in them. */
+  | { type: 'worktrees-removed'; repo: string; worktrees: string[] }
   /** A repository was opened. Dispatched for every open, tab-driven or
    *  not; it only does something when the tab in front of the user
    *  belongs to somewhere else. */
@@ -229,12 +233,25 @@ function focusRepo(state: TabsState, repo: string): TabsState {
 /** The actions that take tabs off the strip. */
 type CloseAction = Extract<
   TabsAction,
-  { type: 'close' | 'close-others' | 'close-all' | 'terminal-ended' }
+  {
+    type:
+      | 'close'
+      | 'close-others'
+      | 'close-all'
+      | 'terminal-ended'
+      | 'worktrees-removed';
+  }
 >;
 
 const CLOSE_ACTIONS: ReadonlySet<TabsAction['type']> = new Set<
   CloseAction['type']
->(['close', 'close-others', 'close-all', 'terminal-ended']);
+>([
+  'close',
+  'close-others',
+  'close-all',
+  'terminal-ended',
+  'worktrees-removed',
+]);
 
 function isCloseAction(action: TabsAction): action is CloseAction {
   return CLOSE_ACTIONS.has(action.type);
@@ -246,6 +263,8 @@ function applyClose(state: TabsState, action: CloseAction): TabsState {
       return closeTab(state, action.id, action.repo);
     case 'terminal-ended':
       return closeTab(state, terminalTabId(action.name), action.repo);
+    case 'worktrees-removed':
+      return closeRemovedWorktrees(state, action.repo, action.worktrees);
     case 'close-others':
       return closeOtherTabs(state, action.id);
     case 'close-all':

@@ -19,6 +19,7 @@ import {
   type SessionExitEvent,
   type SyncNoticeEvent,
   type BabysitChangedEvent,
+  type DiscoveryChangedEvent,
 } from '../host/contract.js';
 
 /**
@@ -131,7 +132,8 @@ const api: N10HostApi = {
     return () => ipcRenderer.removeListener(SYNC_EVENTS.notice, listener);
   },
   onDiscoveryChanged: (cb) => {
-    const listener = () => cb();
+    const listener = (_e: unknown, payload: DiscoveryChangedEvent) =>
+      cb(payload);
     ipcRenderer.on(DISCOVERY_EVENTS.changed, listener);
     return () => ipcRenderer.removeListener(DISCOVERY_EVENTS.changed, listener);
   },

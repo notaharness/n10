@@ -11,6 +11,7 @@ import {
 } from '@n10/core';
 import { activeRepoIs, requireRepo } from './repo.js';
 import { babysatStatuses } from './babysit.js';
+import { noteListedWorktrees } from './discovery.js';
 import { isOwnSessionAlive } from './sessions.js';
 import { getSyncDecorations } from './remote-sync.js';
 import {
@@ -60,6 +61,10 @@ export async function listSidebarItems(): Promise<SidebarItem[]> {
   // call that may be a network round trip away.
   pullRequests.refreshInBackground(cwd);
   const worktrees = await listWorktrees();
+  noteListedWorktrees(
+    cwd,
+    worktrees.map((wt) => wt.path)
+  );
   const prMap = pullRequests.cached(cwd);
   // Rows are keyed by checkout, so the agent in a worktree stays that
   // worktree's whichever branch it is on now (`worktreeSessionRow`).

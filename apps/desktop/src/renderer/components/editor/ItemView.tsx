@@ -162,9 +162,10 @@ function useLaunchMenu(branch: string, active: boolean, state?: ItemState) {
 }
 
 function Preparing({ itemKey }: { itemKey: string }) {
-  // Either the worktree is still being created (optimistic tab) or the
-  // item left the sidebar; show a quiet loading state — the pane
-  // resolves itself on the next sidebar poll.
+  // The worktree is still being created (optimistic tab), or its item
+  // re-keyed and the next sync has not caught up; show a quiet loading
+  // state — the pane resolves itself on the next sidebar poll. A
+  // removed worktree's tab does not land here: discovery closes it.
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
       <Loader2Icon className="size-6 animate-spin" />

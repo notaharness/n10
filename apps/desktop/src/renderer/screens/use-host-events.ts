@@ -56,10 +56,11 @@ export function useHostEvents(
     return off;
   }, [qc, terminalEnded]);
 
-  // Worktrees and agent sessions can also appear without this process
-  // being involved — a second n10, a script, an operator with tmux.
-  // The host notices and says so; the sidebar is a query cache, so it
-  // has to be told to look again.
+  // Worktrees and agent sessions can also appear or go without this
+  // process being involved — a second n10, a script, an operator with
+  // tmux or `rm -rf` — and n10's own removals are reported the same way.
+  // The sidebar is a query cache, so it has to be told to look again.
+  // (A removed worktree's tabs close in `TabsProvider`.)
   useEffect(() => {
     const off = window.n10.onDiscoveryChanged(() => {
       void qc.invalidateQueries({ queryKey: keys.sidebar(cwd) });

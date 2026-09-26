@@ -1,7 +1,7 @@
 import type * as CoreModule from '@n10/core';
 import { worktreeSessionKey } from '@n10/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SessionDiscoveryOptions } from '@n10/core';
+import type { DiscoveryScan, SessionDiscoveryOptions } from '@n10/core';
 import type * as DiscoveryModule from './discovery.js';
 import type * as SessionsModule from './sessions.js';
 
@@ -31,6 +31,9 @@ const state = vi.hoisted(() => ({
   opts: null as SessionDiscoveryOptions | null,
   stops: 0,
   detached: [] as string[],
+  /** What the next scanner started will say it last saw. */
+  lastScan: null as DiscoveryScan | null,
+  scans: 0,
 }));
 
 vi.mock('./repo.js', () => ({
@@ -70,8 +73,13 @@ vi.mock('@n10/core', async (importOriginal) => {
     sessionKeyForBranch: () => Promise.resolve(null),
     startSessionDiscovery: (opts: SessionDiscoveryOptions) => {
       state.opts = opts;
+      const seen = state.lastScan;
       return {
-        scanNow: () => Promise.resolve(),
+        scanNow: () => {
+          state.scans += 1;
+          return Promise.resolve();
+        },
+        lastScan: () => seen,
         stop: () => {
           state.stops += 1;
         },
@@ -158,6 +166,8 @@ beforeEach(async () => {
   state.opts = null;
   state.stops = 0;
   state.detached = [];
+  state.lastScan = null;
+  state.scans = 0;
 
   vi.resetModules();
   sessions = await import('./sessions.js');
@@ -273,6 +283,65 @@ describe('startDiscoveryForRepo', () => {
     discovery.startDiscoveryForRepo('/repo-b');
     expect(state.stops).toBe(1);
   });
+
+  // A worktree the sidebar showed and the scanner never saw could be
+  // removed before the next tick, and its removal would go unreported.
+  describe('a checkout the sidebar listed', () => {
+    const seenA: DiscoveryScan = {
+      worktrees: [
+        {
+          name: worktreeSessionKey('/repo-a/.claude/worktrees/one', '/repo-a'),
+          branch: 'one',
+          path: '/repo-a/.claude/worktrees/one',
+        },
+      ],
+      persisted: new Set(),
+      terminals: [],
+    };
+
+    it('is scanned for now when the scanner has not seen it', () => {
+      state.lastScan = seenA;
+      discovery.startDiscoveryForRepo('/repo-a');
+      discovery.noteListedWorktrees('/repo-a', [
+        '/repo-a/.claude/worktrees/one',
+        '/repo-a/.claude/worktrees/new',
+      ]);
+      expect(state.scans).toBe(1);
+    });
+
+    it('costs nothing when the scanner has seen them all', () => {
+      state.lastScan = seenA;
+      discovery.startDiscoveryForRepo('/repo-a');
+      discovery.noteListedWorktrees('/repo-a', [
+        '/repo-a/.claude/worktrees/one',
+      ]);
+      expect(state.scans).toBe(0);
+    });
+
+    it("is not this scanner's business when listed for another repository", () => {
+      discovery.startDiscoveryForRepo('/repo-a');
+      discovery.noteListedWorktrees('/repo-b', ['/repo-b/.claude/worktrees/x']);
+      expect(state.scans).toBe(0);
+    });
+  });
+
+  // Reopening a repository reports what was removed while it was
+  // closed, so that removal's tabs close too.
+  it("starts a repository's scanner from what its last one saw", () => {
+    const seenInA: DiscoveryScan = {
+      worktrees: [],
+      persisted: new Set(),
+      terminals: [],
+    };
+    state.lastScan = seenInA;
+    discovery.startDiscoveryForRepo('/repo-a');
+    expect(opts().baseline).toBeUndefined();
+    state.lastScan = null;
+    discovery.startDiscoveryForRepo('/repo-b');
+    expect(opts().baseline).toBeUndefined();
+    discovery.startDiscoveryForRepo('/repo-a');
+    expect(opts().baseline).toBe(seenInA);
+  });
 });
 
 describe('the change notification', () => {
@@ -292,7 +361,31 @@ describe('the change notification', () => {
     discovery.setDiscoveryNotifier(notify);
     discovery.startDiscoveryForRepo('/repo-a');
     opts().onChanged(delta);
-    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledExactlyOnceWith({
+      repo: '/repo-a',
+      removedWorktrees: [],
+    });
+  });
+
+  // A tab remembers its worktree by checkout, not by branch or key.
+  it('names removed worktrees by checkout, for the repository scanned', () => {
+    const notify = vi.fn();
+    discovery.setDiscoveryNotifier(notify);
+    discovery.startDiscoveryForRepo('/repo-a');
+    opts().onChanged({
+      ...delta,
+      disappeared: [
+        {
+          name: worktreeSessionKey('/repo-a/.claude/worktrees/gone', '/repo-a'),
+          branch: 'renamed-since',
+          path: '/repo-a/.claude/worktrees/gone',
+        },
+      ],
+    });
+    expect(notify).toHaveBeenCalledExactlyOnceWith({
+      repo: '/repo-a',
+      removedWorktrees: ['/repo-a/.claude/worktrees/gone'],
+    });
   });
 
   it('forgets a retained agent tab when its tmux session is deleted externally', async () => {

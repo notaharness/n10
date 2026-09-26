@@ -127,9 +127,9 @@ export const SYNC_EVENTS = {
 
 export const DISCOVERY_EVENTS = {
   /**
-   * A worktree or agent session that this process did not create has
-   * appeared or gone away, and the sidebar model would now answer
-   * differently.
+   * A worktree or agent session appeared or went away — outside this
+   * process, or removed by core here — and the sidebar model would now
+   * answer differently.
    *
    * Separate from `SYNC_EVENTS.remote` because the two say different
    * things: that one means the pull request list arrived from the
@@ -159,6 +159,15 @@ export interface BabysitChangedEvent {
   /** The watch stopped on its own. Named, because the row it was on is
    *  usually gone with it. */
   ended?: { prId: number; sourceBranch: string };
+}
+
+/** What discovery saw change in the repository it scans. */
+export interface DiscoveryChangedEvent {
+  /** The repository the scan was for, as `RepoInfo.cwd` names it. */
+  repo: string;
+  /** Checkouts that are gone — removed by n10, with `git worktree
+   *  remove`, or deleted from disk. */
+  removedWorktrees: string[];
 }
 
 /** A user-facing event from the host's remote sync loop (auto-deleted

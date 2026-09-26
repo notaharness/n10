@@ -11,19 +11,29 @@
 import {
   startSessionDiscovery,
   type DiscoveredWorktree,
+  type DiscoveryScan,
   type SessionDiscovery,
 } from '@n10/core';
+import type { DiscoveryChangedEvent } from '../contract.js';
 import { activeRepoIs } from './repo.js';
 import { launchAgent } from './sessions.js';
 import { adoptTerminal, forgetTerminal } from './terminals.js';
 
 let discovery: SessionDiscovery | null = null;
+/** The repository `discovery` scans. */
+let discoveryCwd: string | null = null;
+/** What each repository's scanner last saw before another repository
+ *  was opened. Its next scanner starts from there, so reopening it
+ *  reports the worktrees removed meanwhile, and their tabs close. */
+const lastScans = new Map<string, DiscoveryScan>();
 
 // Installed by main.ts. Fires when discovery changed what
 // getSidebarModel() would answer.
-let changed: (() => void) | null = null;
+let changed: ((event: DiscoveryChangedEvent) => void) | null = null;
 
-export function setDiscoveryNotifier(fn: (() => void) | null): void {
+export function setDiscoveryNotifier(
+  fn: ((event: DiscoveryChangedEvent) => void) | null
+): void {
   changed = fn;
 }
 
@@ -58,7 +68,9 @@ async function attach(worktree: DiscoveredWorktree): Promise<void> {
  */
 export function startDiscoveryForRepo(cwd: string): void {
   stopDiscovery();
+  discoveryCwd = cwd;
   discovery = startSessionDiscovery({
+    baseline: lastScans.get(cwd),
     isCurrent: () => activeRepoIs(cwd),
     adopt: attach,
     // Terminal tabs come back the same way — the first scan is what
@@ -67,13 +79,40 @@ export function startDiscoveryForRepo(cwd: string): void {
     adoptTerminal: (terminal) => adoptTerminal(terminal),
     onChanged: (delta) => {
       for (const name of delta.endedTerminals) forgetTerminal(name);
-      changed?.();
+      // Named by checkout, which is what a worktree's tab remembers:
+      // its branch may have changed since, and its row is gone.
+      changed?.({
+        repo: cwd,
+        removedWorktrees: delta.disappeared.map((wt) => wt.path),
+      });
     },
   });
 }
 
+/**
+ * The sidebar just showed these checkouts of `cwd`.
+ *
+ * Discovery reports only the removal of a worktree it has seen, and the
+ * renderer may hold a tab for any worktree the sidebar showed. So one
+ * the scanner has not seen yet — made a moment ago, by n10 or not — is
+ * scanned for now rather than at the next tick, or a worktree removed
+ * before that tick would leave its tab behind.
+ */
+export function noteListedWorktrees(
+  cwd: string,
+  paths: readonly string[]
+): void {
+  if (!discovery || discoveryCwd !== cwd) return;
+  const seen = new Set(discovery.lastScan()?.worktrees.map((wt) => wt.path));
+  // `scanNow` settles every scan itself and never rejects.
+  if (paths.some((path) => !seen.has(path))) void discovery.scanNow();
+}
+
 /** Stop discovery. Idempotent; safe to call with none running. */
 export function stopDiscovery(): void {
+  const scan = discovery?.lastScan();
+  if (scan && discoveryCwd) lastScans.set(discoveryCwd, scan);
   discovery?.stop();
   discovery = null;
+  discoveryCwd = null;
 }

@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useReducer,
   type ReactNode,
@@ -99,6 +100,23 @@ const TabsContext = createContext<TabsApi | null>(null);
 
 export function TabsProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reduce, EMPTY_TABS);
+
+  // A removed worktree takes its tabs with it, whoever removed it: n10,
+  // `git worktree remove` or `rm -rf`. Heard here, above the repo gate,
+  // because the strip spans repositories and the workspace remounts per
+  // repository — a scan landing mid-switch would find no listener there.
+  useEffect(
+    () =>
+      window.n10.onDiscoveryChanged(({ repo, removedWorktrees }) => {
+        if (removedWorktrees.length === 0) return;
+        dispatch({
+          type: 'worktrees-removed',
+          repo,
+          worktrees: removedWorktrees,
+        });
+      }),
+    []
+  );
 
   const openItem = useCallback(
     (repo: string, itemKey: string, opts?: { preview?: boolean }) =>

@@ -86,6 +86,7 @@ import type {
 } from './contract-reviews.js';
 import type {
   BabysitChangedEvent,
+  DiscoveryChangedEvent,
   LaunchStepEvent,
   MachinesChangedEvent,
   MenuCommandEvent,
@@ -451,10 +452,10 @@ export interface N10HostApi {
   /** Fires when a background remote fetch has changed the sidebar
    *  model. Carries no payload — the renderer refetches. */
   onRemoteUpdated(cb: () => void): () => void;
-  /** Fires when a worktree or agent session created outside this
-   *  process appeared or went away. Carries no payload — the renderer
-   *  refetches. */
-  onDiscoveryChanged(cb: () => void): () => void;
+  /** Fires when a worktree or agent session appeared or went away,
+   *  whoever made the change. The renderer refetches, and closes the
+   *  tabs of the worktrees the event names as removed. */
+  onDiscoveryChanged(cb: (event: DiscoveryChangedEvent) => void): () => void;
 
   // ── Machines (beam fleet) ────────────────────────────────────
   /** Every machine: this one first, then fleet members. Empty until

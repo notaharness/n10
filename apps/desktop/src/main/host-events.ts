@@ -69,9 +69,9 @@ export function installHostEventBridge(): void {
   setRemoteUpdatedNotifier(() => broadcast(SYNC_EVENTS.remote));
 
   // Same idea for the local half: a worktree or session that appeared
-  // outside this process changes what the sidebar should show, and the
+  // or went away changes what the sidebar should show, and the
   // renderer is serving it from a query cache.
-  setDiscoveryNotifier(() => broadcast(DISCOVERY_EVENTS.changed));
+  setDiscoveryNotifier((event) => broadcast(DISCOVERY_EVENTS.changed, event));
 
   // A babysitter started an agent (a row and a session) or ended; its
   // status otherwise rides on the sidebar item.
