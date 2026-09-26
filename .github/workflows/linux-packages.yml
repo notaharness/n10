@@ -8,9 +8,11 @@ on:
   pull_request:
     paths:
       - 'apps/desktop/electron-builder.yml'
+      - 'apps/desktop/package.json'
       - 'apps/desktop/release-assets.json'
       - 'apps/desktop/scripts/package-linux.mjs'
       - 'apps/desktop/build/**'
+      - 'package-lock.json'
       - '.github/workflows/linux-packages.yml'
   workflow_call:
 
@@ -42,7 +44,8 @@ jobs:
 
       - run: |
           mkdir release
-          for name in $(jq -r --arg arch "$ARCH" '.linux[$arch][]' apps/desktop/release-assets.json); do
+          names=$(jq -er --arg arch "$ARCH" '.linux[$arch][]' apps/desktop/release-assets.json)
+          for name in $names; do
             cp "apps/desktop/dist/installers/$name" release/
           done
         env:

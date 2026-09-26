@@ -78,9 +78,8 @@ jobs:
           path: package
       - run: npm publish --dry-run --tag latest package/*.tgz
 
-  # Release assets are the artifacts named release-*. A beta is not marked a
-  # prerelease: until the updater brings a beta channel, releases/latest,
-  # npm's latest and the updater follow one channel.
+  # Release assets are the artifacts named release-*. Never a prerelease:
+  # one channel during the beta (docs/decisions.md).
   github-release:
     if: github.event_name == 'push'
     needs: publish

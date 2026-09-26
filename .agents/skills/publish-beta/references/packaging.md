@@ -60,12 +60,9 @@ Trusted publishing authenticates `npm publish` only, not `npm dist-tag`, so a
 release sets one tag: `latest`. Every release, prerelease or not, is what a
 plain `npm install -g @notaharness/n10` installs.
 
-`.github/workflows/linux-packages.yml` builds the desktop's .deb and AppImage
-on an x64 and an arm64 runner and uploads the files named in
-`apps/desktop/release-assets.json` as `release-linux-<arch>`. It runs on pull
-requests that touch the installer configuration, and in every release run,
-including a rehearsal; `publish` waits for it, so nothing is published unless
-every package built.
+Every release run, a rehearsal included, builds the Linux packages
+(`.github/workflows/linux-packages.yml`); `publish` waits for them, so nothing
+is published unless every package built.
 
 The `github-release` job creates the GitHub release with generated notes,
 marked latest and never a prerelease (one channel during the beta; see
