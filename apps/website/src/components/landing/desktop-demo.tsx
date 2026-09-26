@@ -14,23 +14,29 @@ import {
  * n10 Desktop itself, running in the page on sample data: the desktop
  * renderer built with an in-page mock host (apps/desktop/src/renderer/
  * demo, copied here by `website:sync-demo`). It is laid out at a
- * desktop window's size and scaled to fit, so the page shows the app's
- * real layout at any width. Below the width where the scaled app is
- * still usable, it is shown as a live picture and takes no input.
+ * desktop window's size and scaled to fit. The frame is only created
+ * from `WIDE` up, where the scaled app is still readable; below it the
+ * hero shows a screenshot and the demo costs nothing.
  *
  * The page tells it two things by message: whether to play (paused off
  * screen and by the button) and the theme, when the site's changes.
  */
 const SRC = '/desktop-demo/demo/index.html';
 const WINDOW = { width: 1280, height: 800 };
-/** Below this scale the app's text is too small to use. */
-const INTERACTIVE_SCALE = 0.55;
+/** Tailwind's `lg`, which the hero uses to swap the screenshot out. */
+const WIDE = '(min-width: 64rem)';
 const REDUCED = '(prefers-reduced-motion: reduce)';
 
-function subscribeReduced(onChange: () => void) {
-  const query = window.matchMedia(REDUCED);
-  query.addEventListener('change', onChange);
-  return () => query.removeEventListener('change', onChange);
+function useMedia(query: string): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const list = window.matchMedia(query);
+      list.addEventListener('change', onChange);
+      return () => list.removeEventListener('change', onChange);
+    },
+    () => window.matchMedia(query).matches,
+    () => false
+  );
 }
 
 function send(frame: HTMLIFrameElement | null, message: object): void {
@@ -74,14 +80,10 @@ export function DesktopDemo({ className }: { className?: string }) {
   const scale = useScale(box);
   const inView = useInView(box);
   const { resolvedTheme } = useTheme();
-  const reduced = useSyncExternalStore(
-    subscribeReduced,
-    () => window.matchMedia(REDUCED).matches,
-    () => false
-  );
+  const wide = useMedia(WIDE);
+  const reduced = useMedia(REDUCED);
   const [paused, setPaused] = useState(false);
   const playing = inView && !paused;
-  const interactive = scale >= INTERACTIVE_SCALE;
 
   useEffect(() => send(frame.current, { playing }), [playing]);
 
@@ -100,27 +102,26 @@ export function DesktopDemo({ className }: { className?: string }) {
         className="n10-frame bg-fd-card relative w-full overflow-hidden rounded-xl"
         style={{ aspectRatio: `${WINDOW.width} / ${WINDOW.height}` }}
       >
-        <iframe
-          ref={frame}
-          src={SRC}
-          title="n10 Desktop, running on sample data"
-          tabIndex={interactive ? 0 : -1}
-          inert={!interactive}
-          onLoad={(event) => send(event.currentTarget, { playing })}
-          className="absolute top-0 left-0 origin-top-left border-0"
-          style={{
-            width: WINDOW.width,
-            height: WINDOW.height,
-            transform: `scale(${scale})`,
-            visibility: scale ? 'visible' : 'hidden',
-          }}
-        />
+        {wide && (
+          <iframe
+            ref={frame}
+            src={SRC}
+            title="n10 Desktop, running on sample data"
+            onLoad={(event) => send(event.currentTarget, { playing })}
+            className="absolute top-0 left-0 origin-top-left border-0"
+            style={{
+              width: WINDOW.width,
+              height: WINDOW.height,
+              transform: `scale(${scale})`,
+              visibility: scale ? 'visible' : 'hidden',
+            }}
+          />
+        )}
       </div>
       <figcaption className="text-fd-muted-foreground mt-3 flex items-center justify-center gap-2 text-sm text-pretty">
         <span>
-          {interactive
-            ? 'The real n10 Desktop on sample data from n10’s own pull requests. Click around: the agents are scripted and nothing leaves the page.'
-            : 'The real n10 Desktop on sample data. Open this page on a wider screen to click around.'}
+          The real n10 Desktop on sample data from n10’s own pull requests.
+          Click around: the agents are scripted and nothing leaves the page.
         </span>
         {!reduced && (
           <button
