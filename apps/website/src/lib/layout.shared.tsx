@@ -16,6 +16,10 @@ export function baseOptions(): BaseLayoutProps {
         url: '/docs',
       },
       {
+        text: 'Download',
+        url: '/download',
+      },
+      {
         text: 'Beam',
         url: '/beam',
       },
