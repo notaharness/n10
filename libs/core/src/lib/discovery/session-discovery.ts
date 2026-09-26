@@ -35,7 +35,7 @@ import { keyForWorktree, sessionIdentity } from '../session-key.js';
  */
 import { watch, type FSWatcher } from 'node:fs';
 import { log, logError } from '@n10/logger';
-import { listWorktrees, worktreesBasePath } from '@n10/worktree-manager';
+import { listWorktreesStrict, worktreesBasePath } from '@n10/worktree-manager';
 import {
   hasSessionConnection,
   isSessionAlive,
@@ -119,6 +119,12 @@ export interface SessionDiscoveryOptions {
    *  open another repository mid-scan, and finishing against the new
    *  one would attach this repo's branch names over there. */
   isCurrent?: () => boolean;
+  /** What an earlier scanner of this repository last saw
+   *  (`lastScan()`). The first scan diffs against it instead of
+   *  announcing nothing, so a worktree removed while no scanner watched
+   *  the repository — another one was open — is reported like any other
+   *  removal. */
+  baseline?: DiscoveryScan | null;
 }
 
 export interface SessionDiscovery {
@@ -127,6 +133,8 @@ export interface SessionDiscovery {
   scanNow(): Promise<void>;
   /** Stop scanning and release the watch. Idempotent. */
   stop(): void;
+  /** What the last finished scan saw, or the baseline before one has. */
+  lastScan(): DiscoveryScan | null;
 }
 
 /** Every scanner running in this process. */
@@ -158,7 +166,7 @@ export function startSessionDiscovery(
   const { adopt, adoptTerminal, onChanged, isCurrent = () => true } = opts;
   const intervalMs = opts.intervalMs ?? DISCOVERY_INTERVAL_MS;
 
-  let previous: DiscoveryScan | null = null;
+  let previous: DiscoveryScan | null = opts.baseline ?? null;
   /** Consecutive failed attaches per session name. An entry is dropped
    *  when the tmux session behind it goes away, so a later session
    *  under the same name starts with a clean slate. */
@@ -176,8 +184,11 @@ export function startSessionDiscovery(
   let watcher: FSWatcher | null = null;
   let watchTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Rejects when git cannot list the worktrees, which abandons the
+   *  scan: diffed as an empty listing, it would report every worktree
+   *  removed. */
   async function observe(): Promise<DiscoveryScan> {
-    const worktrees: DiscoveredWorktree[] = (await listWorktrees()).map(
+    const worktrees: DiscoveredWorktree[] = (await listWorktreesStrict()).map(
       (wt) => ({
         name: keyForWorktree(wt),
         branch: wt.branch,
@@ -353,6 +364,7 @@ export function startSessionDiscovery(
 
   const handle: SessionDiscovery = {
     scanNow,
+    lastScan: () => previous,
     stop() {
       stopped = true;
       running.delete(handle);

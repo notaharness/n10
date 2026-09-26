@@ -32,7 +32,7 @@ vi.mock('@n10/logger', () => ({
   logError: () => undefined,
 }));
 vi.mock('@n10/worktree-manager', () => ({
-  listWorktrees: () => listWorktreesMock(),
+  listWorktreesStrict: () => listWorktreesMock(),
   // The real rule, not `wt.branch`: a detached-HEAD worktree has no
   // branch and is named after its directory. Stubbing it as the branch
   // would let the scanner collapse every orphan onto the empty string
@@ -464,6 +464,29 @@ describe('startSessionDiscovery', () => {
     });
   });
 
+  // The desktop stops one repository's scanner when it opens another,
+  // and starts a fresh one on the way back.
+  describe('a baseline from an earlier scanner', () => {
+    it('reports on the first scan what went while nothing watched', async () => {
+      listWorktreesMock.mockResolvedValue(worktrees('feature-a', 'feature-b'));
+      const first = start();
+      await first.discovery.scanNow();
+      const baseline = first.discovery.lastScan();
+      first.discovery.stop();
+
+      listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+      const { discovery, onChanged } = start({ baseline });
+      await discovery.scanNow();
+      expect(onChanged).toHaveBeenCalledTimes(1);
+      expect(onChanged.mock.calls[0]![0]).toMatchObject({
+        disappeared: [expect.objectContaining({ name: wtKey('feature-b') })],
+      });
+      expect(discovery.lastScan()?.worktrees).toEqual([
+        expect.objectContaining({ name: wtKey('feature-a') }),
+      ]);
+    });
+  });
+
   describe('rescanSessionDiscovery', () => {
     it('reports a change to every running scanner before it resolves', async () => {
       listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
@@ -493,6 +516,19 @@ describe('startSessionDiscovery', () => {
     listWorktreesMock.mockRejectedValue(new Error('git exploded'));
     const { discovery, onChanged } = start();
     await expect(discovery.scanNow()).resolves.toBeUndefined();
+    expect(onChanged).not.toHaveBeenCalled();
+  });
+
+  // A worktree missing from a scan reads as removed, and a removed
+  // worktree's tabs close: a listing that failed must not count.
+  it('reports nothing removed when git fails to list the worktrees', async () => {
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    const { discovery, onChanged } = start();
+    await discovery.scanNow();
+
+    listWorktreesMock.mockRejectedValueOnce(new Error('git exploded'));
+    await discovery.scanNow();
+    await discovery.scanNow();
     expect(onChanged).not.toHaveBeenCalled();
   });
 
