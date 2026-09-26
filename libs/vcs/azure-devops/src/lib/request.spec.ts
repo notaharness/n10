@@ -304,6 +304,63 @@ describe('throttling', () => {
       vi.useRealTimers();
     }
   });
+
+  it('stands down when a successful response asks for a pause with quota to spare', async () => {
+    vi.useFakeTimers();
+    try {
+      mockFetch.mockResolvedValue(
+        response('{"value":[]}', {
+          extraHeaders: { 'x-ratelimit-remaining': '10', 'retry-after': '60' },
+        })
+      );
+      await get();
+      expect((await failure(get())).kind).toBe('throttled');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(61_000);
+      await get();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not stand down on a reset time alone while quota remains', async () => {
+    // `X-RateLimit-Reset` says when the usage window drains, not that
+    // the client has to wait for it.
+    mockFetch.mockResolvedValue(
+      response('{"value":[]}', {
+        extraHeaders: {
+          'x-ratelimit-remaining': '10',
+          'x-ratelimit-reset': String(Math.ceil(Date.now() / 1000) + 300),
+        },
+      })
+    );
+    await get();
+    await get();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits as long as the server asks, past its own backoff ceiling', async () => {
+    vi.useFakeTimers();
+    try {
+      mockFetch.mockResolvedValue(
+        response('', { status: 429, extraHeaders: { 'retry-after': '600' } })
+      );
+      await failure(get());
+
+      vi.advanceTimersByTime(300_001);
+      expect((await failure(get())).kind).toBe('throttled');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(300_000);
+      mockFetch.mockResolvedValue(response('{"ok":true}'));
+      await get();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('caching and dedupe', () => {

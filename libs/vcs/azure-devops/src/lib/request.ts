@@ -8,6 +8,7 @@ import {
   quotaExhausted,
   readJsonResponse,
   RequestCache,
+  retryAfterHeaderMs,
   retryAfterMs,
   throttledError,
   ThrottleGate,
@@ -121,12 +122,12 @@ async function send(
   }
 
   gate.noteSuccess();
-  if (quotaExhausted(res.headers)) {
-    // Azure warns before it refuses. Standing down now costs one poll
-    // interval; ignoring it costs the backoff on the refusal that
-    // follows.
+  // Azure warns before it refuses: a `Retry-After` on a response it
+  // served, or a spent quota. Standing down now costs one poll
+  // interval; ignoring it costs the backoff on the refusal that follows.
+  if (retryAfterHeaderMs(res.headers) !== null || quotaExhausted(res.headers)) {
     const wait = gate.noteQuotaExhausted(retryAfterMs(res.headers));
-    log('warn', 'ado.throttle', `quota spent — pausing for ${wait}ms`);
+    log('warn', 'ado.throttle', `asked to slow down — pausing for ${wait}ms`);
   }
   return res;
 }
