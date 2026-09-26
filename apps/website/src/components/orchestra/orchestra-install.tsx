@@ -1,3 +1,4 @@
+import { withCode, wrapAtSpaces } from '@/components/inline-code';
 import Link from 'next/link';
 import { CopyButton } from '@/components/copy-button';
 import { buttonVariants } from '@/components/ui/button';
@@ -9,14 +10,14 @@ const routes = [
       '/plugin marketplace add notaharness/plugins',
       '/plugin install orchestra@notaharness',
     ],
-    then: 'Run /orchestra:orchestrator with a task. Without socat or nc, run Claude Code inside tmux.',
+    then: 'Run `/orchestra:orchestrator` with a task. Without `socat` or `nc`, run Claude Code inside tmux.',
   },
   {
     title: 'Codex and other agents',
     lines: [
       'npx skills@latest add notaharness/plugins --global --skill orchestrator player',
     ],
-    then: 'Start a new session and invoke $orchestrator. Install both skills in the same scope.',
+    then: 'Start a new session and invoke `$orchestrator`. Install both skills in the same scope.',
   },
 ];
 
@@ -42,23 +43,24 @@ export function OrchestraInstall() {
                       key={line}
                       className="flex items-center gap-2 py-1.5 pr-1.5 pl-4"
                     >
-                      <code className="min-w-0 flex-1 font-mono text-[13px] break-all sm:whitespace-nowrap">
-                        {line}
+                      <code className="min-w-0 flex-1 font-mono text-[13px]">
+                        {wrapAtSpaces(line)}
                       </code>
                       <CopyButton text={line} label={`Copy: ${line}`} />
                     </div>
                   ))}
                 </div>
                 <p className="text-fd-muted-foreground mt-3 text-sm">
-                  {route.then}
+                  {withCode(route.then)}
                 </p>
               </div>
             ))}
           </div>
           <p className="text-fd-muted-foreground mx-auto mt-10 max-w-xl text-center text-sm text-pretty">
-            Requires tmux 3.x, Git, python3 and an authenticated claude or codex
-            CLI for each player type. Delivering reports into a Claude Code
-            orchestrator&apos;s inbox needs OpenBSD nc or socat. Beam is only
+            Requires tmux 3.x, Git, <code>python3</code> and an authenticated{' '}
+            <code>claude</code> or <code>codex</code> CLI for each player type.
+            Delivering reports into a Claude Code orchestrator&apos;s inbox
+            needs OpenBSD <code>nc</code> or <code>socat</code>. Beam is only
             needed for players on other machines.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
