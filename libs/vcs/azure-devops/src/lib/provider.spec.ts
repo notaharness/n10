@@ -1051,6 +1051,23 @@ describe('azureDevOpsProvider', () => {
     ).toBe('https://dev.azure.com/myorg/myproject/_git/myrepo/pullrequest/42');
   });
 
+  it('names the repository a pull request ref belongs to', () => {
+    expect(
+      azureDevOpsProvider.repositoryRef?.({
+        org: 'myorg',
+        project: 'myproject',
+        repo: 'myrepo',
+      })
+    ).toEqual({
+      provider: 'azure-devops',
+      host: 'dev.azure.com/myorg',
+      repository: 'myproject/myrepo',
+    });
+    expect(
+      azureDevOpsProvider.repositoryRef?.({ org: 'myorg', repo: 'myrepo' })
+    ).toBeNull();
+  });
+
   describe('fetchPullRequests', () => {
     beforeEach(() => {
       // Block body on purpose: an arrow returning the mock hands vitest

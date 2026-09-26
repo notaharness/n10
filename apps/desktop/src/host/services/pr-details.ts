@@ -1,0 +1,35 @@
+import {
+  parseSnapshotRequest,
+  readPullRequestSnapshot,
+  type PullRequestSnapshot,
+} from '@n10/core';
+import { lookupPullRequest, resolveProvider } from './pull-requests.js';
+import { requireRepo } from './repo.js';
+import { getReviewViewer } from './reviews.js';
+
+/**
+ * One pull request, read by identity for the renderer.
+ *
+ * The request arrives from a renderer that displays remote content, so
+ * it is parsed as untrusted before anything is looked up. Core owns the
+ * sequence — the identity checks, the list row and the provider's
+ * detail — and this supplies the open repository's facts:
+ * its provider, the account it reads as, and the shared list cache, so
+ * the snapshot never costs the list a fetch of its own.
+ */
+export async function getPullRequestSnapshot(
+  request: unknown
+): Promise<PullRequestSnapshot> {
+  const req = parseSnapshotRequest(request);
+  const cwd = requireRepo();
+  const { config, provider, configured } = resolveProvider(cwd);
+  const active = configured ? provider : null;
+  const { vendorAuth: auth, vendorProject: project } = config;
+  const readDetail = active?.fetchPullRequestDetail?.bind(active);
+  return readPullRequestSnapshot(req, {
+    repository: active?.repositoryRef?.(project) ?? null,
+    viewer: getReviewViewer()?.identifier ?? null,
+    lookup: (prId) => lookupPullRequest(cwd, prId),
+    detail: readDetail && ((prId) => readDetail(auth, project, prId)),
+  });
+}

@@ -8,9 +8,11 @@ import type {
 import { keys, resetRepoScopedCache } from './query-keys.js';
 import {
   loadBranchRemovalSafety,
+  loadPullRequestSnapshot,
   loadRepoGate,
   loadSidebarModel,
   machinesQuery,
+  pullRequestRefFor,
 } from './queries.js';
 
 /**
@@ -30,6 +32,7 @@ const REPO: RepoInfo = {
   cwd: '/repo',
   providerId: null,
   vcsConfigured: false,
+  repository: null,
 };
 
 /** The value of `p`, or 'pending' if it has not settled by the time
@@ -85,6 +88,42 @@ describe('loadRepoGate', () => {
     });
 
     await expect(loadRepoGate()).resolves.toEqual(REPO);
+  });
+});
+
+describe('pull request snapshots', () => {
+  const GITHUB = {
+    provider: 'github',
+    host: 'github.com',
+    repository: 'acme/app',
+  };
+  const REF = { ...GITHUB, number: 42 };
+
+  it('qualifies a number with the open repository, or not at all', () => {
+    expect(pullRequestRefFor({ ...REPO, repository: GITHUB }, 42)).toEqual(REF);
+    expect(pullRequestRefFor(REPO, 42)).toBeNull();
+    // 0 is a worktree without a pull request.
+    expect(pullRequestRefFor({ ...REPO, repository: GITHUB }, 0)).toBeNull();
+  });
+
+  it('keeps an answer that echoes the pull request it was asked about', async () => {
+    const answer = { ref: REF, viewer: 'bob' };
+    stubHost({
+      getPullRequestSnapshot: ({ ref }) =>
+        Promise.resolve({ ...answer, ref } as never),
+    });
+    await expect(loadPullRequestSnapshot(REF)).resolves.toMatchObject(answer);
+  });
+
+  it("refuses repo B's #42 as an answer about repo A's", async () => {
+    // A delayed answer from before a repository switch.
+    stubHost({
+      getPullRequestSnapshot: () =>
+        Promise.resolve({ ref: { ...REF, repository: 'acme/lib' } } as never),
+    });
+    await expect(loadPullRequestSnapshot(REF)).rejects.toThrow(
+      'Expected an answer about github.com/acme/app#42, got one about github.com/acme/lib#42'
+    );
   });
 });
 

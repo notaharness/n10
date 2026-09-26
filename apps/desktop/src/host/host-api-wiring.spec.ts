@@ -101,6 +101,9 @@ vi.mock('./services/comment-images.js', () =>
 vi.mock('./services/clipboard-image.js', () =>
   recorder('clipboardImage', ['saveClipboardImage'])
 );
+vi.mock('./services/pr-details.js', () =>
+  recorder('prDetails', ['getPullRequestSnapshot'])
+);
 vi.mock('./services/drafts.js', () =>
   recorder('drafts', [
     'listDraftComments',
@@ -168,6 +171,11 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
   ['fetchPullRequests', [], 'reviews.fetchPullRequests'],
   ['fetchCommentThreads', [7], 'reviews.fetchCommentThreads'],
   ['fetchPrDescription', [7], 'reviews.fetchPrDescription'],
+  [
+    'getPullRequestSnapshot',
+    [{ ref: { number: 7 } }],
+    'prDetails.getPullRequestSnapshot',
+  ],
   [
     'replyToThread',
     [{ prId: 7, thread: { id: 't' }, body: 'hi' }],

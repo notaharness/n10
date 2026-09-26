@@ -12,6 +12,7 @@ import type {
   ReviewDecision,
   ReviewVerdict,
   BuildStatusState,
+  RepositoryRef,
 } from '@n10/vcs-core';
 import { isVcsError, sanitizeBody } from '@n10/vcs-core';
 import { logNetwork } from '@n10/logger';
@@ -761,6 +762,16 @@ export const githubProvider: VcsProvider = {
 
   getPullRequestUrl(project: Record<string, string>, prId: number): string {
     return `https://github.com/${project.owner}/${project.repo}/pull/${prId}`;
+  },
+
+  repositoryRef(project: Record<string, string>): RepositoryRef | null {
+    const { owner, repo } = project;
+    if (!owner || !repo) return null;
+    return {
+      provider: 'github',
+      host: 'github.com',
+      repository: `${owner}/${repo}`,
+    };
   },
 
   async fetchMergedBranches(

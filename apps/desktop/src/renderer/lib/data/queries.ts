@@ -7,8 +7,15 @@ import { parseDiffInWorker } from '../diff/diff-worker-client.js';
 import { measured } from '../perf.js';
 import { keys } from './query-keys.js';
 import { errorMessage } from '../utils.js';
+import {
+  describePullRequest,
+  pullRequestKey,
+  samePullRequest,
+} from '@n10/vcs-core/pr-details';
 import type {
   MachineView,
+  PullRequestRef,
+  PullRequestSnapshot,
   RepoInfo,
   SidebarItem,
 } from '../../../host/contract.js';
@@ -363,6 +370,53 @@ export function usePrDescription(cwd: string, prId: number) {
     queryFn: () => window.n10.fetchPrDescription(prId),
     staleTime: 5 * 60_000,
     enabled: prId > 0,
+  });
+}
+
+/**
+ * The ref naming pull request `prId` in the open repository, or null
+ * while the repository has no provider to qualify it with.
+ */
+export function pullRequestRefFor(
+  repo: RepoInfo,
+  prId: number
+): PullRequestRef | null {
+  return repo.repository && prId > 0
+    ? { ...repo.repository, number: prId }
+    : null;
+}
+
+/**
+ * One pull request by identity, refusing an answer about any other.
+ *
+ * The host checks the ref against the repository it has open, but the
+ * answer can still land after the renderer has moved on, and a key is
+ * only as good as what is stored under it. An answer that does not echo
+ * the ref it was asked for is an error here, never data in this entry.
+ */
+export async function loadPullRequestSnapshot(
+  ref: PullRequestRef
+): Promise<PullRequestSnapshot> {
+  const answer = await window.n10.getPullRequestSnapshot({ ref });
+  if (!samePullRequest(answer.ref, ref)) {
+    throw new Error(
+      `Expected an answer about ${describePullRequest(
+        ref
+      )}, got one about ${describePullRequest(answer.ref)}`
+    );
+  }
+  return answer;
+}
+
+export function usePullRequestSnapshot(
+  cwd: string,
+  ref: PullRequestRef | null
+) {
+  return useQuery({
+    queryKey: keys.prSnapshot(cwd, ref ? pullRequestKey(ref) : ''),
+    queryFn: () => loadPullRequestSnapshot(ref!),
+    enabled: ref != null,
+    staleTime: 60_000,
   });
 }
 

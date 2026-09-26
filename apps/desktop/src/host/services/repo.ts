@@ -135,22 +135,24 @@ export function openRepo(path: string): RepoInfo {
     resetWorktreeResolver();
   }
   repoOpenedListener?.(cwd);
-  const provider = PROVIDERS.find((p) => p.id === config.vendor) ?? null;
-  return {
-    cwd,
-    providerId: provider?.id ?? null,
-    vcsConfigured: provider ? isVcsConfigured(config, provider) : false,
-  };
+  return repoInfo(cwd, config);
 }
 
 export function getRepo(): RepoInfo | null {
   if (activeCwd === null) return null;
-  const config: AppConfig = readConfig(activeCwd);
+  return repoInfo(activeCwd, readConfig(activeCwd));
+}
+
+function repoInfo(cwd: string, config: AppConfig): RepoInfo {
   const provider = PROVIDERS.find((p) => p.id === config.vendor) ?? null;
+  const configured = provider ? isVcsConfigured(config, provider) : false;
   return {
-    cwd: activeCwd,
+    cwd,
     providerId: provider?.id ?? null,
-    vcsConfigured: provider ? isVcsConfigured(config, provider) : false,
+    vcsConfigured: configured,
+    repository: configured
+      ? provider?.repositoryRef?.(config.vendorProject) ?? null
+      : null,
   };
 }
 

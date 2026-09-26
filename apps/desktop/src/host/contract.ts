@@ -76,6 +76,13 @@ import type {
   ResolveRequest,
   ReviewLaunchRequest,
 } from './contract-reviews.js';
+// Pull request reads addressed by identity and exact commits.
+export type * from './contract-pull-requests.js';
+import type {
+  PullRequestSnapshot,
+  RepositoryRef,
+  SnapshotRequest,
+} from './contract-pull-requests.js';
 import type {
   BabysitChangedEvent,
   LaunchStepEvent,
@@ -100,6 +107,10 @@ export interface RepoInfo {
   cwd: string;
   providerId: string | null;
   vcsConfigured: boolean;
+  /** The repository as its provider names it; the repository half of
+   *  every pull request ref the renderer asks about. Null while no
+   *  provider is configured. */
+  repository: RepositoryRef | null;
 }
 
 // ── Sessions (agent terminals) ───────────────────────────────────
@@ -333,6 +344,10 @@ export interface N10HostApi {
   setThreadResolved(req: ResolveRequest): Promise<void>;
   /** Full PR description (list payloads truncate or omit it). */
   fetchPrDescription(prId: number): Promise<string>;
+  /** One pull request by identity: the list row, the provider's detail
+   *  and the exact commits its review compares. Rejects a ref from
+   *  another repository or a caller that last saw another account. */
+  getPullRequestSnapshot(req: SnapshotRequest): Promise<PullRequestSnapshot>;
   /** Cast the current user's review verdict on a PR. */
   submitReviewVerdict(prId: number, verdict: ReviewVerdict): Promise<void>;
   /** The reviewer-list identifier of the authenticated user (GitHub
@@ -526,6 +541,7 @@ export const IPC = {
   replyToThread: 'n10/reviews/reply',
   setThreadResolved: 'n10/reviews/resolve',
   fetchPrDescription: 'n10/reviews/pr-description',
+  getPullRequestSnapshot: 'n10/pull-requests/snapshot',
   submitReviewVerdict: 'n10/reviews/submit-verdict',
   getReviewViewer: 'n10/reviews/viewer',
   fetchCommentImage: 'n10/reviews/comment-image',

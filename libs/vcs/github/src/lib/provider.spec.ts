@@ -378,6 +378,17 @@ describe('githubProvider', () => {
     ).toBe('https://github.com/octocat/hello-world/pull/42');
   });
 
+  it('names the repository a pull request ref belongs to', () => {
+    expect(
+      githubProvider.repositoryRef?.({ owner: 'octocat', repo: 'hello-world' })
+    ).toEqual({
+      provider: 'github',
+      host: 'github.com',
+      repository: 'octocat/hello-world',
+    });
+    expect(githubProvider.repositoryRef?.({ owner: 'octocat' })).toBeNull();
+  });
+
   describe('fetchPullRequests', () => {
     beforeEach(() => mockExecFile.mockReset());
 
