@@ -66,7 +66,11 @@ export class RemoteSessionPoller {
     this.ensureTimer();
     return () => {
       entries!.delete(subscriber);
-      if (entries!.size === 0) this.subscribers.delete(name);
+      // A backend unsubscribes again from dispose() after its exit. By
+      // then a respawned session may have subscribed under the same
+      // name, into a new map this call must leave alone.
+      if (entries!.size === 0 && this.subscribers.get(name) === entries)
+        this.subscribers.delete(name);
       if (this.subscribers.size === 0) this.stopTimer();
     };
   }
@@ -83,16 +87,26 @@ export class RemoteSessionPoller {
     this.timer = undefined;
   }
 
+  /** Never rejects, so neither the interval nor the follow-up below
+   *  can raise an unhandled rejection over a subscriber that threw. */
   private poll(): Promise<void> {
     if (this.polling) return this.polling;
     const requestedAt = this.subscriptionSeq;
-    const promise = this.runOnePoll(requestedAt).finally(() => {
-      this.polling = null;
-      // A subscription made while that listing was in flight got
-      // nothing from it: list again now rather than a full interval later.
-      if (this.subscriptionSeq > requestedAt && !this.disposed)
-        void this.poll();
-    });
+    const promise = this.runOnePoll(requestedAt)
+      .catch(() => undefined)
+      .finally(() => {
+        this.polling = null;
+        // A subscription made while a successful listing was in flight
+        // got nothing from it: list again now rather than a full
+        // interval later. A failed listing gave nobody anything, and
+        // retrying it at once would get around UNREACHABLE_AFTER_MISSES.
+        if (
+          this.subscriptionSeq > requestedAt &&
+          this.consecutiveFailures === 0 &&
+          !this.disposed
+        )
+          void this.poll();
+      });
     this.polling = promise;
     return promise;
   }
