@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import type { Page } from '@playwright/test';
+import type { ElectronApplication, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
 import { newWorktreeButton } from './setup/app.js';
 import { armFolderPick } from './setup/dialogs.js';
@@ -31,6 +31,62 @@ async function lastOpenedAt(page: Page, cwd: string): Promise<number> {
   const entry = recents.find((r) => r.cwd === cwd);
   if (!entry) throw new Error(`${cwd} is not among the recents`);
   return entry.lastOpenedAt;
+}
+
+/** The repository the host has open, asked through the window's page
+ *  from main, so it works while Playwright's own handle on the page is
+ *  stuck or dead. Null while the renderer is gone. */
+function hostRepo(app: ElectronApplication): Promise<string | null> {
+  return app.evaluate(({ BrowserWindow }) => {
+    const contents = BrowserWindow.getAllWindows()[0]?.webContents;
+    if (!contents || contents.isCrashed()) return null;
+    return contents.executeJavaScript(
+      'window.n10.getRepo().then((r) => r && r.cwd)'
+    ) as Promise<string | null>;
+  });
+}
+
+/**
+ * Wait until the window's page shows the workspace, and so has claimed
+ * launches. The gate claims in the commit that first renders it (a
+ * store update, whose effects React flushes with the commit), and a
+ * round trip made after that is answered after the claim.
+ */
+async function pageClaimed(
+  app: ElectronApplication,
+  cwd: string
+): Promise<void> {
+  const shown = () =>
+    app.evaluate(({ BrowserWindow }) => {
+      const contents = BrowserWindow.getAllWindows()[0]?.webContents;
+      if (!contents || contents.isCrashed()) return '';
+      return contents.executeJavaScript(
+        'document.body.innerText'
+      ) as Promise<string>;
+    });
+  await expect.poll(shown, { timeout: 30_000 }).toContain('New worktree');
+  expect(await hostRepo(app)).toBe(cwd);
+}
+
+/** Kill the window's renderer the way the OS does, and wait for main
+ *  to register the death. */
+async function crashRenderer(app: ElectronApplication): Promise<void> {
+  const deaths = () =>
+    app.evaluate(() => (globalThis as { deaths?: number }).deaths ?? 0);
+  const before = await deaths();
+  await app.evaluate(({ BrowserWindow }) => {
+    const contents = BrowserWindow.getAllWindows()[0]?.webContents;
+    const g = globalThis as { deaths?: number; counting?: boolean };
+    if (contents && !g.counting) {
+      g.counting = true;
+      contents.on('render-process-gone', () => {
+        g.deaths = (g.deaths ?? 0) + 1;
+      });
+    }
+    const pid = contents?.getOSProcessId();
+    if (pid) process.kill(pid, 'SIGKILL');
+  });
+  await expect.poll(deaths, { timeout: 15_000 }).toBeGreaterThan(before);
 }
 
 let otherRepo: string;
@@ -86,6 +142,69 @@ test.describe('With a repository open', () => {
     );
 
     expect(await openedRepo(page, otherRepo)).toBe(otherRepo);
+  });
+
+  test('a navigation the window refuses leaves the page listening', async ({
+    desktop,
+  }) => {
+    const { app, page, repoPath } = desktop;
+    await pageClaimed(app, repoPath);
+    // An off-site link outside ExternalAnchor: main refuses it in
+    // will-navigate and hands it to the browser, which is stubbed here.
+    await app.evaluate(({ shell }) => {
+      const g = globalThis as { refused?: string[] };
+      g.refused = [];
+      (shell as { openExternal: unknown }).openExternal = (url: string) => {
+        g.refused?.push(url);
+        return Promise.resolve();
+      };
+    });
+    await page.evaluate(() => {
+      window.location.href = 'https://example.invalid/';
+    });
+    await expect
+      .poll(() =>
+        app.evaluate(() => (globalThis as { refused?: string[] }).refused)
+      )
+      .toEqual(['https://example.invalid/']);
+
+    await desktop.launchAgain(otherRepo);
+
+    // Playwright counts the refused navigation as still pending and
+    // holds page-side waits for it.
+    await expect.poll(() => hostRepo(app), { timeout: 30_000 }).toBe(otherRepo);
+  });
+
+  test('a launch while a crashed window waits on its question opens after the reload', async ({
+    desktop,
+  }) => {
+    const { app, repoPath } = desktop;
+    // renderer-recovery.ts reloads three deaths inside a minute and asks
+    // about the fourth, leaving the dead page up; this test answers.
+    await app.evaluate(({ dialog }) => {
+      const g = globalThis as { answer?: (response: number) => void };
+      (dialog as { showMessageBox: unknown }).showMessageBox = () =>
+        new Promise((resolve) => {
+          g.answer = (response) =>
+            resolve({ response, checkboxChecked: false });
+        });
+    });
+    for (let i = 0; i < 3; i += 1) {
+      await pageClaimed(app, repoPath);
+      await crashRenderer(app);
+    }
+    await pageClaimed(app, repoPath);
+    await crashRenderer(app);
+    await expect
+      .poll(() => app.evaluate(() => 'answer' in globalThis))
+      .toBe(true);
+
+    await desktop.launchAgain(otherRepo);
+    await app.evaluate(() =>
+      (globalThis as { answer?: (response: number) => void }).answer?.(0)
+    );
+
+    await expect.poll(() => hostRepo(app), { timeout: 30_000 }).toBe(otherRepo);
   });
 
   test('File › Open Repository opens the picked folder', async ({
