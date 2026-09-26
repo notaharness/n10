@@ -18,7 +18,7 @@ export function createDemoHost(): N10HostApi {
   PROGRAMS.boot(hub);
   return {
     ...createShellHost(state),
-    ...createWorktreeHost(state),
+    ...createWorktreeHost(state, hub),
     ...createReviewHost(state),
     ...createSessionHost(state, hub),
   };

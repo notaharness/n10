@@ -75,6 +75,11 @@ export class ClaudeCode implements Program {
     if (!this.busy && !this.gate) this.next();
   }
 
+  /** Nothing playing, queued or waiting on a permission answer. */
+  get idle(): boolean {
+    return !this.busy && !this.gate;
+  }
+
   /** A turn typed into the conversation from outside (n10's plan). */
   say(text: string, beats: readonly Beat[]): void {
     this.commit([{ kind: 'prompt', text }]);

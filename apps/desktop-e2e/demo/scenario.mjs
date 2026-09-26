@@ -259,7 +259,11 @@ export function buildScenario() {
     JSON.stringify(
       {
         vendor: 'github',
-        vendorProject: { owner: 'acme', repo: 'atlas', username: 'hermannb' },
+        vendorProject: {
+          owner: 'acme',
+          repo: 'atlas',
+          username: 'HermannBjorgvin',
+        },
       },
       null,
       2
@@ -339,20 +343,20 @@ function github() {
   return {
     owner: 'acme',
     repo: 'atlas',
-    username: 'hermannb',
+    username: 'HermannBjorgvin',
     prs: [
       {
         number: 128,
         title: 'Add a command palette',
         headRefName: 'command-palette',
         baseRefName: 'main',
-        author: 'hermannb',
+        author: 'HermannBjorgvin',
         rollup: 'SUCCESS',
         body:
           'A ⌘K palette over the command registry.\n\n' +
           '- fuzzy-ish substring filter over command titles\n' +
           '- `Escape` closes\n\nCloses #97.',
-        reviews: [{ author: 'sofia-codes', state: 'COMMENTED' }],
+        reviews: [{ author: 'demo-teammate', state: 'COMMENTED' }],
         threads: [
           {
             id: 'T-filter',
@@ -360,12 +364,12 @@ function github() {
             line: 15,
             comments: [
               {
-                author: 'sofia-codes',
+                author: 'demo-teammate',
                 body: 'This filter runs the whole command list on every keystroke. Fine today, but the registry grows per plugin — can we memoize per query prefix so backspace is free?',
                 createdAt: hoursAgo(5),
               },
               {
-                author: 'marcusv',
+                author: 'demo-reviewer',
                 body: 'Agreed — a prefix cache keeps this simple. fuzzysort is overkill at this size.',
                 createdAt: hoursAgo(4),
               },
@@ -377,7 +381,7 @@ function github() {
             line: 27,
             comments: [
               {
-                author: 'marcusv',
+                author: 'demo-reviewer',
                 body: 'Escape closes but keeps the old query, so reopening shows stale results for a beat. Clearing on close feels much better.',
                 createdAt: hoursAgo(3),
               },
@@ -386,7 +390,7 @@ function github() {
         ],
         generalComments: [
           {
-            author: 'sofia-codes',
+            author: 'demo-teammate',
             body: 'Tried it on the big workspace — feels instant. Two small things inline.',
             createdAt: hoursAgo(5),
           },
@@ -397,12 +401,12 @@ function github() {
         title: 'Retry transient network failures with backoff',
         headRefName: 'retry-backoff',
         baseRefName: 'main',
-        author: 'hermannb',
+        author: 'HermannBjorgvin',
         // Red in the sidebar: a failing build escalates a row whatever
         // the reviewers think of it.
         rollup: 'FAILURE',
         body: 'Exponential backoff around the transient failures.',
-        reviews: [{ author: 'marcusv', state: 'APPROVED' }],
+        reviews: [{ author: 'demo-reviewer', state: 'APPROVED' }],
         threads: [
           {
             id: 'T-cap',
@@ -410,7 +414,7 @@ function github() {
             line: 7,
             comments: [
               {
-                author: 'marcusv',
+                author: 'demo-reviewer',
                 body: 'Unbounded: at times=10 this sleeps for 100s. Cap the delay somewhere sane.',
                 createdAt: hoursAgo(1),
               },
@@ -423,12 +427,12 @@ function github() {
         title: 'Roving tabindex for the toolbar',
         headRefName: 'keyboard-nav',
         baseRefName: 'main',
-        author: 'hermannb',
+        author: 'HermannBjorgvin',
         // Green and filled: CI passed and every reviewer approved, which
         // is the only combination that reads as ready to merge.
         rollup: 'SUCCESS',
         body: 'Arrow keys move focus within the toolbar; Tab leaves it.',
-        reviews: [{ author: 'sofia-codes', state: 'APPROVED' }],
+        reviews: [{ author: 'demo-teammate', state: 'APPROVED' }],
         threads: [],
       },
       {
@@ -436,12 +440,12 @@ function github() {
         title: 'Fix flaky session restore on resume',
         headRefName: 'session-restore',
         baseRefName: 'main',
-        author: 'sofia-codes',
+        author: 'demo-teammate',
         rollup: 'SUCCESS',
         body:
           'Resuming from sleep could restore a stale session. Saves now ' +
           'carry a sequence number and restore prefers the live copy.',
-        reviewRequests: ['hermannb'],
+        reviewRequests: ['HermannBjorgvin'],
         threads: [],
       },
     ],

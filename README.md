@@ -5,7 +5,7 @@ n10 runs coding agents in Git worktrees and lets you review their pull requests,
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/hero.png">
   <source media="(prefers-color-scheme: light)" srcset="docs/media/hero-light.png">
-  <img alt="n10 Desktop showing worktrees and pull request status beside a code diff with inline review comments" src="docs/media/hero.png">
+  <img alt="n10 Desktop with worktrees and pull requests in the sidebar, beside a Claude Code agent asking permission to run the end-to-end tests" src="docs/media/hero.png">
 </picture>
 
 Every branch gets its own worktree and agent session, so you can have several features and reviews going at once without stashing changes or touching your main checkout. n10 shows each worktree's pull request, CI checks, reviews and conflicts. An agent can draft review comments for you to post, and you can hand review comments on your own pull requests to an agent as one task, without opening GitHub.com or Azure DevOps.
@@ -77,8 +77,6 @@ Read a pull request's description, browse its diff, reply to and resolve threads
 ### Light and dark themes
 
 The most important feature of any software.
-
-![The review workspace in dark and light themes](docs/media/theme.gif)
 
 ### The terminal UI
 
