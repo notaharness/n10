@@ -16,6 +16,7 @@ import {
 } from './setup/terminals.js';
 
 test.use({
+  fakeGitHub: { prs: [] },
   n10Config: { agentId: 'gemini' },
   env: async ({ fixtureHome }, provide) => {
     await provide(installGemini(fixtureHome));

@@ -53,6 +53,8 @@ The per-suite fake `gemini` validates argv, logs cwd and launches, models native
 latest-resume fallback, and produces controlled ANSI output before idle or exit.
 Tests use fixture HOME directories and isolated tmux sockets with TMUX unset. No fake delegates to an installed agent or contacts a model/account.
 
+Choose an unused `PORT` when another worktree runs the TUI browser bridge.
+
 ```sh
 npx nx test core
 PORT=5198 npx nx e2e cli-e2e -- gemini.test.ts

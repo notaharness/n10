@@ -1,3 +1,4 @@
+// Keep the Gemini contract aligned with apps/desktop-e2e/src/setup/gemini.ts.
 import {
   chmodSync,
   copyFileSync,

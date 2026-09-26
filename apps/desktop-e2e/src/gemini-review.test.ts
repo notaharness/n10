@@ -7,6 +7,9 @@ const branch = 'gemini-review';
 const instruction =
   '--help is literal; preserve "quotes", $HOME and `code`.\nSecond line.';
 test.use({
+  env: async ({ fixtureHome }, provide) => {
+    await provide(installGemini(fixtureHome));
+  },
   fakeGitHub: {
     username: 'tester',
     prs: [
@@ -19,10 +22,7 @@ test.use({
 test('Desktop selects Gemini for a review and preserves its interactive prompt', async ({
   desktop,
 }) => {
-  const { app, page, homeDir, repoPath } = desktop;
-  await app.evaluate((_electron, env) => {
-    Object.assign(process.env, env);
-  }, installGemini(homeDir));
+  const { page, repoPath } = desktop;
   await sidebarRow(page, /#42/).first().click();
   await page.getByRole('button', { name: 'Launch agent', exact: true }).click();
   const menu = sessionMenu(page);

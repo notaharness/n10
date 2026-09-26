@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Keep the Gemini contract aligned with apps/desktop-e2e/src/fixtures/fake-gemini.mjs.
 // Offline Gemini CLI contract, including native latest-resume fallback.
 // Never delegates to an installed CLI. Control files live in the fixture cwd.
 import {
