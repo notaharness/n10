@@ -1,4 +1,4 @@
-import { ChevronRightIcon } from 'lucide-react';
+import { ChevronRightIcon, NetworkIcon } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useBeamStatus, useMachines } from '../../lib/data/queries.js';
 import { useFleet } from '../../lib/fleet/fleet-context.js';
@@ -70,6 +70,7 @@ export function FleetSection({ className }: { className?: string }) {
               expanded && 'rotate-90'
             )}
           />
+          <NetworkIcon aria-hidden className="size-3.5" />
           <span>Fleet</span>
           {summary && (
             <span
@@ -86,7 +87,7 @@ export function FleetSection({ className }: { className?: string }) {
       <CollapsibleContent asChild>
         <section
           aria-label="Fleet"
-          className="min-h-0 overflow-y-auto px-3 pt-1 pb-3"
+          className="min-h-0 overflow-y-auto px-3 pt-1 pb-3 text-base"
         >
           <FleetPanel />
         </section>

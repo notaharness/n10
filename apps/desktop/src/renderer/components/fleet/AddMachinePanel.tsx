@@ -21,7 +21,7 @@ export function AddMachinePanel({
 }) {
   const heading = useFocusOnMount<HTMLHeadingElement>();
   return (
-    <div className="space-y-3 text-sm">
+    <div className="space-y-3 text-base">
       <div>
         <h3 ref={heading} tabIndex={-1} className="font-medium outline-none">
           Add a machine
@@ -42,7 +42,7 @@ export function AddMachinePanel({
         <h4 className="font-medium">Headless machine</h4>
         <p>On the machine you want to add, run:</p>
         <div className="flex items-center gap-1">
-          <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-xs select-all">
+          <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-sm select-all">
             {JOIN_COMMAND}
           </code>
           <Button

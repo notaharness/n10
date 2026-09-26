@@ -20,7 +20,7 @@ export function FleetHeader({
   return (
     <div className="space-y-2">
       {fingerprint && (
-        <div className="flex items-center gap-1 text-xs">
+        <div className="flex items-center gap-1 text-sm">
           <span className="text-muted-foreground">Fleet</span>
           <span
             className="font-mono select-all"

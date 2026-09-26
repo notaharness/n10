@@ -9,8 +9,8 @@ function Choices({ disabled }: { disabled: boolean }) {
   const { choose } = useFleet().enrolment;
   return (
     <div className="space-y-3">
-      <h2 className="text-sm font-semibold">Connect your first machine</h2>
-      <p className="text-sm text-muted-foreground">
+      <h2 className="text-base font-semibold">Connect your first machine</h2>
+      <p className="text-base text-muted-foreground">
         Create a fleet once. On your other machines, join it with the same
         passkey. Members can run commands as your user unless you restrict their
         access.
@@ -67,13 +67,13 @@ function NameField({
         <p
           id={`${id}-error`}
           aria-live="polite"
-          className="text-sm text-destructive"
+          className="text-base text-destructive"
         >
           {error}
         </p>
       ) : (
         helper && (
-          <p id={`${id}-helper`} className="text-sm text-muted-foreground">
+          <p id={`${id}-helper`} className="text-base text-muted-foreground">
             {helper}
           </p>
         )
@@ -84,7 +84,7 @@ function NameField({
 
 function CreateSteps() {
   return (
-    <div className="space-y-2 text-sm">
+    <div className="space-y-2 text-base">
       <ol className="list-decimal space-y-1 pl-5">
         <li>Create your fleet passkey — save a new passkey for beam.n10.is.</li>
         <li>
@@ -116,11 +116,11 @@ function EnrolmentForm({ disabled }: { disabled: boolean }) {
         e.submit();
       }}
     >
-      <h2 className="text-sm font-semibold">
+      <h2 className="text-base font-semibold">
         {creating ? 'Create a fleet' : 'Join an existing fleet'}
       </h2>
       {!creating && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-base text-muted-foreground">
           Use the passkey you created for this fleet. One passkey prompt
           authorizes this machine.
         </p>

@@ -21,7 +21,7 @@ import { ResetFleetPanel } from './ResetFleetPanel.js';
 function Loading({ starting }: { starting: boolean }) {
   return (
     <div className="space-y-2" role="status">
-      <p className="text-sm text-muted-foreground">
+      <p className="text-base text-muted-foreground">
         {starting ? 'Preparing network…' : 'Connecting to beam…'}
       </p>
       <Skeleton className="h-8 w-full" />
@@ -45,9 +45,9 @@ function Failure({
 }) {
   return (
     <div className="space-y-2" role="alert">
-      <p className="text-sm font-medium text-destructive">{title}</p>
+      <p className="text-base font-medium text-destructive">{title}</p>
       {detail && (
-        <p className="font-mono text-xs break-words text-muted-foreground select-text">
+        <p className="font-mono text-sm break-words text-muted-foreground select-text">
           {detail}
         </p>
       )}
@@ -70,7 +70,7 @@ function Notice({
     <p
       role="status"
       className={cn(
-        'rounded-md border px-2 py-1.5 text-xs',
+        'rounded-md border px-2 py-1.5 text-sm',
         warning
           ? 'border-warning/30 bg-warning/10'
           : 'border-border bg-muted/40'
@@ -98,7 +98,7 @@ function FleetRows({
         <MachineRow key={m.peerId} machine={m} disabled={disabled} />
       ))}
       {others.length === 0 && (
-        <p className="px-3 py-2 text-sm text-muted-foreground">
+        <p className="px-3 py-2 text-base text-muted-foreground">
           No other machines yet. Add a desktop or a headless machine.
         </p>
       )}

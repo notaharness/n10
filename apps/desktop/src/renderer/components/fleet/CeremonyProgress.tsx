@@ -37,7 +37,7 @@ export function InitSteps({
 }) {
   const statuses = initStepStatuses(view, failed);
   return (
-    <ol className="space-y-1 text-sm">
+    <ol className="space-y-1 text-base">
       {INIT_STEPS.map((step, i) => {
         const status = statuses[i];
         const Icon = STEP_ICON[status];
@@ -92,7 +92,7 @@ export function CeremonyProgress({
           {heading}
         </h3>
         {explanation && (
-          <p className="text-sm text-muted-foreground">{explanation}</p>
+          <p className="text-base text-muted-foreground">{explanation}</p>
         )}
       </div>
       {view.passkeyUrl && !view.cancelling && (

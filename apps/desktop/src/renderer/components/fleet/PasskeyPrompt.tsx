@@ -14,7 +14,7 @@ export function PasskeyPrompt({ url }: { url: string }) {
   return (
     <div className="flex flex-wrap justify-center gap-4">
       <QrCode value={url} />
-      <div className="min-w-0 flex-1 basis-64 space-y-3 text-sm">
+      <div className="min-w-0 flex-1 basis-64 space-y-3 text-base">
         {summary && (
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
             <dt className="text-muted-foreground">Action</dt>
@@ -30,7 +30,7 @@ export function PasskeyPrompt({ url }: { url: string }) {
           browser page. Continue only if you started this request.
         </p>
         <p
-          className="truncate font-mono text-xs text-muted-foreground select-all"
+          className="truncate font-mono text-sm text-muted-foreground select-all"
           title={url}
           data-testid="ceremony-url"
         >

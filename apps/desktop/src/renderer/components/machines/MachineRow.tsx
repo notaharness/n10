@@ -125,7 +125,7 @@ export function MachineRow({
             )}
             <RowBadges machine={machine} />
           </div>
-          <div className="flex flex-wrap items-center gap-x-2 text-xs">
+          <div className="flex flex-wrap items-center gap-x-2 text-sm">
             <span className={TEXT_CLASS[presentation.tone]}>
               {presentation.label}
             </span>
@@ -136,14 +136,14 @@ export function MachineRow({
             )}
           </div>
           {machine.queued > 0 && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Waiting to deliver when this machine connects.
             </p>
           )}
           <button
             type="button"
             onClick={() => copyFingerprint(machine.peerId)}
-            className="-ml-1 select-all rounded px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="-ml-1 select-all rounded px-1 font-mono text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
             title="Copy fingerprint"
           >
             {fingerprintGroups(machine.peerId)}

@@ -15,7 +15,7 @@ export function ResetFleetPanel() {
   const { typed, busy, outcome, close, setTyped, run } = useFleet().reset;
   const heading = useFocusOnMount<HTMLHeadingElement>();
   return (
-    <div className="space-y-3 text-sm">
+    <div className="space-y-3 text-base">
       <h3 ref={heading} tabIndex={-1} className="font-medium outline-none">
         Reset fleet on this machine?
       </h3>
