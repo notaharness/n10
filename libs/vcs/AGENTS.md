@@ -18,7 +18,7 @@ ceiling: it is a REST surface. Reasoning: `docs/decisions.md`.
   read (`pr-checks.ts`), never the cycle.
 - **Request budget** (`pr-cycle.ts`, `pr-details.ts`; asserted by
   `request-budget.spec.ts`, which fails on any reinstated per-row call): a
-  quiet cycle costs one request per hundred open PRs. Settled CI verdicts are
+  quiet cycle costs one request, plus one per full hundred open PRs. Settled CI verdicts are
   memoised against `lastMergeSourceCommit` + `lastMergeTargetCommit`;
   `pending` always re-reads and jumps the queue; comment counts are not pinned
   to that identity. 25 reads of each kind per cycle, longest-unread first,
