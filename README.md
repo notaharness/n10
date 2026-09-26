@@ -88,11 +88,11 @@ The most important feature of any software.
 
 ### Run agents on your other machines
 
-n10 Desktop includes [Beam](https://github.com/notaharness/beam), which pools the machines you own. Join them into a fleet from n10's **Fleet** view, then launch worktrees and agents on any of them. See [Fleet](https://n10.is/docs/guides/fleet).
+n10 Desktop includes [Beam](https://github.com/notaharness/beam), which pools the machines you own. Join them into a fleet from the **Fleet** section of n10's sidebar, then launch worktrees and agents on any of them. See [Fleet](https://n10.is/docs/guides/fleet).
 
 ### Let one agent coordinate others
 
-[Orchestra](https://github.com/notaharness/plugins/tree/main/orchestra) lets one coding agent hand work to other agents, each in its own worktree. n10 lists its players next to your own worktrees.
+[Orchestra](https://github.com/notaharness/plugins/tree/main/orchestra) lets one coding agent hand work to other agents, each in its own tmux session and usually its own worktree. n10 lists its worktree players next to your own worktrees.
 
 ## Contributing
 

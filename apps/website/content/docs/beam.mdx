@@ -21,9 +21,11 @@ are at [github.com/notaharness/beam](https://github.com/notaharness/beam).
 
 ## Install
 
-n10 Desktop includes Beam, so you only install it yourself on machines
-without n10 Desktop, such as a headless build box. It runs on macOS and
-Linux, arm64 and x64.
+n10 Desktop includes Beam for its [Fleet section](/docs/guides/fleet), so you
+don't need Beam to use Fleet. The `beam` command is on the `PATH` only in
+terminals and sessions n10 Desktop starts. Install it yourself to use `beam`
+from any shell, or on machines without n10 Desktop, such as a headless build
+box. It runs on macOS and Linux, arm64 and x64.
 
 You need a passkey provider that supports the WebAuthn PRF extension, in a
 browser or on your phone.
@@ -65,6 +67,7 @@ machines.
 
 ## With n10 and Orchestra
 
-n10 Desktop's [Fleet view](/docs/guides/fleet) manages the fleet and launches
-agents on its machines, and [Orchestra](/docs/orchestra)'s scripts take
-`--machine NAME` to run a player on one.
+n10 Desktop's [Fleet section](/docs/guides/fleet) manages the fleet and
+launches agents on its machines, and [Orchestra](/docs/orchestra)'s scripts
+take `--machine NAME` to run a player on one; that machine needs Orchestra
+installed too.
