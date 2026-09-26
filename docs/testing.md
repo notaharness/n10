@@ -85,6 +85,9 @@ Pass GH_TOKEN explicitly because the isolated HOME hides stored gh credentials:
 GH_TOKEN=$(gh auth token) npx nx e2e:integration desktop-e2e
 ```
 
+Copilot CLI has [documented offline verification](copilot-cli.md), including
+local binary checks, upstream documentation and remaining coverage limits.
+
 ## TUI and browser bridge
 
 `apps/cli-e2e/src/fixtures/n10.ts` creates a repo and HOME, sends `/spawn` to
