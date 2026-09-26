@@ -11,6 +11,9 @@ const BRANCH = 'launch-dialog';
 const TITLE = `Launch ${'a-very-long-unbroken-title-'.repeat(18)}`;
 const REPORT_TIME = '2026-09-09T14:32:00Z';
 test.use({
+  env: async ({ fixtureHome }, provide) => {
+    await provide(installCodex(fixtureHome));
+  },
   fakeGitHub: {
     username: 'tester',
     prs: [{ number: 42, title: TITLE, headRefName: BRANCH }],
@@ -164,10 +167,6 @@ test('Review sends its selected agent and instructions to the same guarded workt
   desktop,
 }) => {
   const { app, page, homeDir, repoPath } = desktop;
-  const env = installCodex(homeDir);
-  await app.evaluate((_electron, env) => {
-    Object.assign(process.env, env);
-  }, env);
   await openMenu(page, app);
   await startSessionFromMenu(page);
   await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible();

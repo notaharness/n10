@@ -1,3 +1,4 @@
+// Keep the Codex contract aligned with apps/desktop-e2e/src/setup/codex.ts.
 import {
   chmodSync,
   copyFileSync,

@@ -17,6 +17,7 @@ import {
 } from './setup/terminals.js';
 
 test.use({
+  fakeGitHub: { prs: [] },
   n10Config: { agentId: 'codex' },
   env: async ({ fixtureHome }, provide) => {
     await provide(installCodex(fixtureHome));
@@ -48,7 +49,7 @@ test('Codex worktree launch, activity and recorded-agent continuation in Desktop
     name,
     {
       '@orchestra-orchestrator': 'codex:11111111-2222-4333-8444-555555555555',
-      '@orchestra-last-report': 'PROGRESS 2026-09-09T14:32:00Z queue',
+      '@orchestra-last-report': 'PROGRESS 2026-09-09T14:32:00Z delivered',
     },
     homeDir
   );
@@ -97,7 +98,7 @@ test('Codex worktree launch, activity and recorded-agent continuation in Desktop
       { env: socketEnv(homeDir), encoding: 'utf8' }
     ).trim()
   ).toBe(
-    'codex\tcodex:11111111-2222-4333-8444-555555555555\tPROGRESS 2026-09-09T14:32:00Z queue'
+    'codex\tcodex:11111111-2222-4333-8444-555555555555\tPROGRESS 2026-09-09T14:32:00Z delivered'
   );
 });
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Keep the Codex contract aligned with apps/cli-e2e/src/fixtures/fake-codex.mjs.
 // Offline Codex CLI contract: interactive blank/seed and cwd-scoped resume.
 // Never delegates to an installed CLI. Control files live in the fixture cwd.
 import {
