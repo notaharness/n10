@@ -143,5 +143,9 @@ export {
 } from './lib/machine-registry.js';
 
 export { stopSession } from './lib/session/stop-session.js';
-export { removeWorktreeSession } from './lib/session/remove-worktree.js';
+export {
+  checkWorktreeRemoval,
+  removeWorktreeSession,
+  type WorktreeRemovalCheck,
+} from './lib/session/remove-worktree.js';
 export { setLocalSessionEnv } from './lib/session/local-session-env.js';
