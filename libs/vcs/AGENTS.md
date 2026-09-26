@@ -16,13 +16,13 @@ ceiling: it is a REST surface. Reasoning: `docs/decisions.md`.
   is `notSet` (queued). Branch-policy build validation reports under
   `_apis/policy/evaluations`, which is not read.
 - **Request budget** (`pr-cycle.ts`, `pr-details.ts`; asserted by
-  `request-budget.spec.ts`, which fails on any reinstated per-row call): a
-  quiet cycle costs one request per hundred open PRs. Settled CI verdicts are
-  memoised against `lastMergeSourceCommit` + `lastMergeTargetCommit`;
-  `pending` always re-reads and jumps the queue; comment counts are not pinned
-  to that identity. 25 reads of each kind per cycle, longest-unread first,
-  ties on id. Memos age out and are never deleted (`forgetRepoDetails`). On a
-  truncated runs page an unresolved row is omitted from the map ("not looked
-  up"); only a complete page records `none`.
+  `request-budget.spec.ts`, which fails on any reinstated per-row call): a quiet
+  cycle costs one request, plus one per full hundred open PRs. Settled CI
+  verdicts are memoised against `lastMergeSourceCommit` +
+  `lastMergeTargetCommit`; `pending` always re-reads and jumps the queue;
+  comment counts are not pinned to that identity. 25 reads of each kind per
+  cycle, longest-unread first, ties on id. Memos age out and are never deleted
+  (`forgetRepoDetails`). On a truncated runs page an unresolved row is omitted
+  from the map ("not looked up"); only a complete page records `none`.
 - GitHub's search returns the rollup and counts with the list, so it
   implements neither `forgetPullRequestCache` nor `resetCaches`.
