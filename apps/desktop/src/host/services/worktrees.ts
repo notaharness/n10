@@ -1,10 +1,12 @@
-import { removeWorktreeSession } from '@n10/core';
+import {
+  checkWorktreeRemoval as checkRemoval,
+  removeWorktreeSession,
+} from '@n10/core';
 import {
   listWorktrees as listWts,
   listBranches as listBr,
   listAllBranches as listAllBr,
   createWorktree as createWt,
-  canRemoveBranch as canRemoveBr,
 } from '@n10/worktree-manager';
 import { spawn } from 'node:child_process';
 import { fetchWorktreeDiffText } from '@n10/core';
@@ -54,9 +56,8 @@ export async function removeWorktree(
   return removeWorktreeSession(branch, force, repo);
 }
 
-export function canRemoveBranch(branch: string) {
-  requireRepo();
-  return canRemoveBr(branch);
+export function checkWorktreeRemoval(branch: string) {
+  return checkRemoval(branch, requireRepo());
 }
 
 /**
