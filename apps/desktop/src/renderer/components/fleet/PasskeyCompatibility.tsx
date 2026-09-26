@@ -81,7 +81,7 @@ export function PasskeyCompatibility({
   defaultOpen?: boolean;
 }) {
   return (
-    <Collapsible defaultOpen={defaultOpen} className="group/compat text-sm">
+    <Collapsible defaultOpen={defaultOpen} className="group/compat text-base">
       <CollapsibleTrigger className="flex items-center gap-1 font-medium hover:underline">
         <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]/compat:rotate-90" />
         Passkey compatibility

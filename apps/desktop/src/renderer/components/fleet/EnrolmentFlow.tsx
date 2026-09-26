@@ -25,7 +25,7 @@ function Success({
             <h3 ref={focus} tabIndex={-1} className="font-medium outline-none">
               Fleet created
             </h3>
-            <p className="text-sm">
+            <p className="text-base">
               This machine is enrolled. Use this fleet’s passkey to add your
               other machines.
             </p>
@@ -36,7 +36,7 @@ function Success({
             other machines known; connecting…
           </h3>
         )}
-        <p className="text-sm text-muted-foreground">
+        <p className="text-base text-muted-foreground">
           {publicationText(published)}
         </p>
       </div>
