@@ -75,6 +75,8 @@ interface RawReviewer {
   vote?: number;
   hasDeclined?: boolean;
   isContainer?: boolean;
+  /** Set on a member who voted on behalf of a group reviewer. */
+  votedFor?: { uniqueName?: string }[];
 }
 
 function toAdoConfig(
@@ -112,6 +114,14 @@ function invalidatePr(config: AdoConfig, prId: number): void {
   invalidateAdoCache(`${repo}/thread/${prId}/`);
 }
 
+/** The groups a reviewer's vote answered for, when there are any. */
+function votedFor(raw: RawReviewer): { votedFor?: string[] } {
+  const groups = (raw.votedFor ?? [])
+    .map((g) => g.uniqueName ?? '')
+    .filter(Boolean);
+  return groups.length > 0 ? { votedFor: groups } : {};
+}
+
 /**
  * A reviewer as Azure lists it. A group — a team, in Azure's terms a
  * container — is its own row carrying its own vote, which is whichever
@@ -134,6 +144,7 @@ export function parseReviewer(
     identifier: raw.uniqueName ?? '',
     decision: voteToDecision(normalizedVote, raw.hasDeclined ?? false),
     ...(mine ? { includesViewer: true } : {}),
+    ...votedFor(raw),
   };
 }
 
