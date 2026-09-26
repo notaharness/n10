@@ -4,7 +4,8 @@ import { cn } from '@/lib/cn';
  * A screenshot in the site's current theme. Both images render and CSS
  * hides one by the `.dark` class next-themes sets, so the image follows
  * the theme toggle rather than the OS setting. Both carry the alt text:
- * `display: none` keeps the hidden one out of the accessibility tree.
+ * `display: none` keeps the hidden one out of the accessibility tree,
+ * and `loading="lazy"` keeps the browser from fetching it.
  */
 export function ThemeImage({
   name,
@@ -20,11 +21,13 @@ export function ThemeImage({
       <img
         src={`/media/${name}-light.webp`}
         alt={alt}
+        loading="lazy"
         className={cn(className, 'n10-only-light')}
       />
       <img
         src={`/media/${name}.webp`}
         alt={alt}
+        loading="lazy"
         className={cn(className, 'n10-only-dark')}
       />
     </>
