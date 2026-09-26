@@ -225,6 +225,21 @@ when switching to the diff so scrollback survives. The diff owns its toolbar.
 Each tab has an ErrorBoundary. Markdown paragraphs render as `div` when they may
 contain block images; the host fetches protected images with provider auth.
 
+A worktree's tabs close when discovery reports its checkout gone
+(`worktrees-removed`), whoever removed it, and not when its row leaves the
+sidebar: a sidebar answer can belong to another repository mid-switch, and a
+failed `git worktree list` looks empty. Discovery abandons a scan whose listing
+failed, scans for any checkout the sidebar shows that it has not seen, and a
+reopened repository's scanner starts from its previous scanner's last scan. A
+worktree whose directory was deleted counts as removed; checking its branch out
+again clears the stale git registration. Git cannot tell a deleted directory
+from one on a volume that is not mounted: both are `prunable`. A worktree base
+on such a volume reads as removed while it is away, and checking its branch out
+meanwhile unregisters it. `git worktree lock` keeps git from calling a worktree
+prunable. An agent still running in a worktree
+removed outside n10 keeps running with no tab: its PTY stays held, so it is not
+offered as an orphan terminal.
+
 Optimistic removal drops a session row but retains a PR row with its session
 fields cleared: the PR outlives its checkout. Status indicators combine CI and
 review status; CI can worsen the result, but passing CI does not imply approval.
