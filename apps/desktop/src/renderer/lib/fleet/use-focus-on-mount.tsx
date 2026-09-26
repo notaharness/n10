@@ -42,8 +42,12 @@ export function useFocusOnMount<T extends HTMLElement>() {
   const container = useContext(ContainerMounted);
   useEffect(() => {
     if (container && !container.current) return;
+    // Focus on an ancestor is focus lost too: a dialog takes it back
+    // to itself when the focused node goes, before this effect runs.
     const active = document.activeElement;
-    if (active && active !== document.body) return;
+    const lost =
+      !active || active === document.body || active.contains(ref.current);
+    if (!lost) return;
     ref.current?.focus();
   }, [container]);
   return ref;
