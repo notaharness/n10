@@ -91,8 +91,13 @@ function serveEverything(): void {
         })
       );
     if (url.includes('/teams?')) return Promise.resolve(json({ value: [] }));
-    if (url.includes('/pullrequests?'))
-      return Promise.resolve(json({ value: prs }));
+    if (url.includes('/pullrequests?')) {
+      // Paged as Azure pages it: 101 rows when `$top` is not given.
+      const params = new URL(url).searchParams;
+      const skip = Number(params.get('$skip') ?? 0);
+      const top = Number(params.get('$top') ?? 101);
+      return Promise.resolve(json({ value: prs.slice(skip, skip + top) }));
+    }
     if (url.includes('/build/builds'))
       return Promise.resolve(
         json({
@@ -249,9 +254,9 @@ describe('a cycle over pull requests that have not moved', () => {
     // all at once — which is the shape a sliding-window rate limit
     // actually cares about.
     prs = makePrs(200);
-    // The list, the runs listing, and a budget of each kind. Not four
-    // hundred.
-    const ceiling = 1 + 1 + 25 + 25;
+    // The list's pages, the runs listing, and a budget of each kind.
+    // Not four hundred.
+    const ceiling = 3 + 1 + 25 + 25;
     expect(await cycleCost()).toBeLessThanOrEqual(3 + ceiling);
 
     for (let i = 0; i < 4; i++) {

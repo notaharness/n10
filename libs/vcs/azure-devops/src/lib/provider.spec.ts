@@ -58,6 +58,21 @@ function jsonResponse(data: unknown, status = 200): Response {
   return response(JSON.stringify(data), { status });
 }
 
+/** A pull request listing paged the way Azure pages it: `$top` and
+ *  `$skip`, and 101 rows when `$top` is not given. `failAtSkip` makes
+ *  the page starting there fail. */
+function servePullRequestPages(rows: unknown[], failAtSkip?: number): void {
+  mockFetch.mockImplementation((raw: string) => {
+    const url = new URL(raw);
+    const skip = Number(url.searchParams.get('$skip') ?? 0);
+    const top = Number(url.searchParams.get('$top') ?? 101);
+    if (skip === failAtSkip) return Promise.resolve(jsonResponse({}, 500));
+    return Promise.resolve(
+      jsonResponse({ value: rows.slice(skip, skip + top) })
+    );
+  });
+}
+
 // The transport caches and dedupes across calls by design, which
 // would let one test answer another's request. Every test starts from
 // an empty cache and an open throttle gate.
@@ -735,6 +750,72 @@ describe('fetchActivePullRequests', () => {
       'base64'
     ).toString();
     expect(decoded).toBe(':test-pat');
+  });
+
+  it('reads every page of a listing longer than one page', async () => {
+    servePullRequestPages(
+      Array.from({ length: 250 }, (_, i) => ({
+        pullRequestId: i + 1,
+        sourceRefName: `refs/heads/feature-${i + 1}`,
+        reviewers: [],
+      }))
+    );
+    const result = await fetchActivePullRequests(testAdoConfig, testProject);
+    expect(result.map((pr) => pr.id)).toEqual(
+      Array.from({ length: 250 }, (_, i) => i + 1)
+    );
+  });
+
+  it('fails the listing when a later page fails, rather than returning the pages before it', async () => {
+    servePullRequestPages(
+      Array.from({ length: 250 }, (_, i) => ({
+        pullRequestId: i + 1,
+        sourceRefName: `refs/heads/feature-${i + 1}`,
+        reviewers: [],
+      })),
+      100
+    );
+    await expect(
+      fetchActivePullRequests(testAdoConfig, testProject)
+    ).rejects.toThrow();
+  });
+});
+
+describe('azureDevOpsProvider.fetchMergedBranches', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  const completed = Array.from({ length: 250 }, (_, i) => ({
+    sourceRefName: `refs/heads/done-${i}`,
+  }));
+
+  it('finds a merged branch past the first page', async () => {
+    servePullRequestPages(completed);
+    const merged = await azureDevOpsProvider.fetchMergedBranches!(
+      { pat: 'test-pat' },
+      testProject,
+      ['done-240', 'still-open']
+    );
+    expect(merged).toEqual(new Set(['done-240']));
+  });
+
+  it('asks only for pull requests closed in the last thirty days', async () => {
+    servePullRequestPages(completed);
+    const before = Date.now();
+    await azureDevOpsProvider.fetchMergedBranches!(
+      { pat: 'test-pat' },
+      testProject,
+      ['done-0']
+    );
+    const url = new URL(mockFetch.mock.calls[0]![0] as string);
+    expect(url.searchParams.get('searchCriteria.status')).toBe('completed');
+    expect(url.searchParams.get('searchCriteria.queryTimeRangeType')).toBe(
+      'closed'
+    );
+    const since = Date.parse(url.searchParams.get('searchCriteria.minTime')!);
+    expect(before - since).toBeGreaterThanOrEqual(30 * 24 * 60 * 60 * 1000);
+    expect(before - since).toBeLessThan(31 * 24 * 60 * 60 * 1000);
   });
 });
 

@@ -5,6 +5,7 @@ import { isVcsError, type VcsError } from '@n10/vcs-core';
 import {
   _adoThrottleGateForTests,
   adoGet,
+  adoGetAll,
   looksLikeAdoSignIn,
   resetAdoTransport,
   TTL,
@@ -360,6 +361,27 @@ describe('throttling', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('paging', () => {
+  it('abandons a listing that never ends rather than reading forever', async () => {
+    // A server that ignores `$skip` answers every page in full.
+    const page = JSON.stringify({
+      value: Array.from({ length: 100 }, () => ({})),
+    });
+    mockFetch.mockImplementation(() => Promise.resolve(response(page)));
+    const err = await failure(
+      adoGetAll(
+        'spec',
+        'endless',
+        0,
+        'https://dev.azure.com/o/p/_apis/things?a=1',
+        headers
+      )
+    );
+    expect(err.kind).toBe('unexpected-response');
+    expect(mockFetch).toHaveBeenCalledTimes(50);
   });
 });
 
