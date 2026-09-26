@@ -12,6 +12,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '../ui/collapsible.js';
+import { FocusScope } from '../../lib/fleet/use-focus-on-mount.js';
 import { FleetPanel } from './FleetPanel.js';
 
 const TONE_CLASS: Record<SummaryTone, string> = {
@@ -24,7 +25,7 @@ const TONE_CLASS: Record<SummaryTone, string> = {
 function useAwaitingPasskey(): boolean {
   const { enrolment, revocation } = useFleet();
   return [enrolment.ceremony, revocation.ceremony].some(
-    (c) => c.running && !!c.view?.passkeyUrl
+    (c) => c.running && !!c.view?.passkeyUrl && !c.view.cancelling
   );
 }
 
@@ -35,7 +36,7 @@ function useAwaitingPasskey(): boolean {
  * actions. Its state lives in `FleetProvider`, so the Workspace's
  * sidebar and the repository picker's show the same section.
  */
-export function FleetSection({ className }: { className?: string }) {
+export function FleetSection() {
   const { section } = useFleet();
   const { expanded, setExpanded, revealSeq, takeRevealFocus } = section;
   const beam = useBeamStatus().data;
@@ -56,7 +57,7 @@ export function FleetSection({ className }: { className?: string }) {
     <Collapsible
       open={expanded}
       onOpenChange={setExpanded}
-      className={cn('flex min-h-0 flex-col', className)}
+      className="flex min-h-0 flex-col"
     >
       <CollapsibleTrigger asChild>
         <button
@@ -89,7 +90,9 @@ export function FleetSection({ className }: { className?: string }) {
           aria-label="Fleet"
           className="min-h-0 overflow-y-auto px-3 pt-1 pb-3 text-base"
         >
-          <FleetPanel />
+          <FocusScope>
+            <FleetPanel />
+          </FocusScope>
         </section>
       </CollapsibleContent>
     </Collapsible>

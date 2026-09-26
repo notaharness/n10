@@ -94,6 +94,42 @@ test.describe('Fleet in the sidebar', () => {
     expect(beam!.ops('ceremony.cancel')).toHaveLength(0);
   });
 
+  test('a remounted step leaves focus where the user put it', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openFleet(desktop);
+    const fleet = fleetView(page);
+    await fleet.getByRole('button', { name: 'Create a fleet' }).click();
+    await fleet.getByRole('button', { name: 'Create fleet' }).click();
+    const step = fleet.getByRole('heading', {
+      name: 'Step 1 of 2 · Create your fleet passkey',
+    });
+    // A real step transition takes focus: the clicked button is gone.
+    await expect(step).toBeFocused();
+
+    // Showing the sidebar again remounts the step under other focus.
+    const search = page
+      .getByRole('banner')
+      .getByRole('button', { name: /Search branches/ });
+    await search.focus();
+    await clickAppMenuItem(desktop.app, 'Toggle Sidebar');
+    await clickAppMenuItem(desktop.app, 'Toggle Sidebar');
+    await expect(step).toBeVisible();
+    await expect(search).toBeFocused();
+
+    // So does expanding the section, whose header keeps focus.
+    await collapseFleet(page);
+    await fleetToggle(page).click();
+    await expect(step).toBeVisible();
+    await expect(fleetToggle(page)).toBeFocused();
+
+    // And a repository switch, where focus has nowhere left to be.
+    await clickAppMenuItem(desktop.app, 'Switch Repository…');
+    await expect(step).toBeVisible();
+    await expect(step).not.toBeFocused();
+  });
+
   test('Settings links to the section instead of enrolling there', async ({
     desktop,
   }) => {
