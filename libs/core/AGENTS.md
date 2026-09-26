@@ -60,6 +60,8 @@ The reasoning behind each rule is in `docs/decisions.md`.
   shared launcher, rechecking connection state between awaits. Retired names
   are suppressed. Observe worktree processes, orphaned sessions and standalone
   terminals in one listing. Retained agent panes are not running processes.
+  `removeWorktreeSession` rescans before it resolves, so shells learn of
+  every removal, n10's or not, through `onChanged`.
 - **Terminal sessions** (`terminal/launch-terminal.ts`): explicit shell/agent
   requests use the same launcher as worktrees. Allocate the final tmux name
   before creating the registry key. Agent panes retain final output; shell
