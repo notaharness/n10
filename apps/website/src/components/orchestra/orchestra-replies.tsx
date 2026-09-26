@@ -2,7 +2,7 @@ import { withCode } from '@/components/inline-code';
 
 /**
  * One pair of real orchestrator replies from the benchmark in
- * notaharness/plugins#9, from two drafts of the unreleased guidance
+ * notaharness/plugins#9, from two drafts of the guidance before it shipped
  * (9da6d10 and 242d759): the same scripted message at the same point in
  * the run, quoted exactly as the PR records them, backticks included
  * (backticked spans render as code). Each side is a list because the
@@ -49,8 +49,8 @@ export function OrchestraReplies() {
       <p className="text-fd-muted-foreground mt-3 text-xs text-pretty">
         Replies to the same message at the same point in the benchmark in
         plugins#9, one scripted run of each in a toy repository, quoted as
-        written. Both are drafts of the unreleased guidance: the earlier one
-        already contains plugins#8, and the guidance changed again after the
+        written. Both are drafts from before the guidance shipped: the earlier
+        one already contains plugins#8, and the guidance changed again after the
         later one. The earlier draft already gave useful context here. Neither
         benchmark showed a clear overall improvement. In{' '}
         <a

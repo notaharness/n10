@@ -57,11 +57,11 @@ export function OrchestraInstall() {
             ))}
           </div>
           <p className="text-fd-muted-foreground mx-auto mt-10 max-w-xl text-center text-sm text-pretty">
-            Requires tmux 3.x, Git, <code>python3</code> and an authenticated{' '}
-            <code>claude</code> or <code>codex</code> CLI for each player type.
-            Delivering reports into a Claude Code orchestrator&apos;s inbox
-            needs OpenBSD <code>nc</code> or <code>socat</code>. Beam is only
-            needed for players on other machines.
+            Requires tmux 3.x, Git, <code>python3</code> and the authenticated
+            CLI of each agent you run as a player. Delivering reports into a
+            Claude Code orchestrator&apos;s inbox needs OpenBSD <code>nc</code>{' '}
+            or <code>socat</code>. Beam is only needed for players on other
+            machines.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Link

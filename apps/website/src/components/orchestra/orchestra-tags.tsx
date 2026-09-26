@@ -14,9 +14,14 @@ const tags = [
   },
   { name: '@orchestra-repo', value: '/code/shop', note: 'the main checkout' },
   {
+    name: '@orchestra-worktree-path',
+    value: '/code/shop/.claude/worktrees/feature-search',
+    note: 'the worktree’s directory, the session’s identity; required',
+  },
+  {
     name: '@orchestra-branch',
     value: 'feature/search',
-    note: 'the branch, unsanitised',
+    note: 'the branch when the player started',
   },
   {
     name: '@orchestra-session-type',
@@ -45,13 +50,13 @@ const tools = [
     name: 'n10',
     href: '/',
     blurb:
-      'n10 reads the same tags and lists worktree players beside its own worktrees. n10 Desktop is the relay that delivers a remote player’s reports into the orchestrator’s pane or Claude session.',
+      'n10 reads the same tags and lists worktree players beside its own worktrees. n10 Desktop delivers a remote player’s reports into the orchestrator’s pane or Claude session; for a Codex orchestrator, run Orchestra’s `relay.sh`.',
   },
   {
     name: 'Beam',
     href: '/beam',
     blurb:
-      'Every orchestrator script except `relay.sh` takes `--machine` with the name of a machine in your Beam fleet. The Git and tmux commands run on that machine, and reports come back through the fleet or wait on disk while your laptop is closed.',
+      'Every orchestrator script except `relay.sh` takes `--machine` with the name of a machine in your Beam fleet. That machine needs Orchestra installed at the same path under `$HOME`, the repository, and the player’s agent CLI. The Git and tmux commands run there, and reports come back through the fleet or wait on disk while your laptop is closed.',
   },
 ];
 

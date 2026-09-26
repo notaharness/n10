@@ -33,10 +33,14 @@ export function OrchestraAttention() {
   return (
     <section className="mx-auto w-full max-w-3xl px-4 py-16 sm:py-20">
       <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-        Coming next: how the orchestrator talks to you
+        How the orchestrator talks to you
       </h2>
       <p className="text-fd-muted-foreground mt-4 leading-relaxed text-pretty">
-        The next Orchestra release, in notaharness/plugins{' '}
+        The orchestrator keeps track of what you have acknowledged, asks for at
+        most one decision per message with a suggested default, and restates the
+        state that decision needs, so you don&apos;t have to reread the thread.
+        The design draws on research on attention and working memory. Small
+        benchmarks in notaharness/plugins{' '}
         <a
           href="https://github.com/notaharness/plugins/pull/8"
           className="text-fd-foreground hover:text-fd-primary underline decoration-fd-border underline-offset-4 transition-colors"
@@ -49,13 +53,8 @@ export function OrchestraAttention() {
           className="text-fd-foreground hover:text-fd-primary underline decoration-fd-border underline-offset-4 transition-colors"
         >
           #9
-        </a>
-        , changes how the orchestrator writes to you. It keeps track of what you
-        have acknowledged, asks for at most one decision per message with a
-        suggested default, and restates the state that decision needs, so you
-        don&apos;t have to reread the thread. The design draws on research on
-        attention and working memory. Small benchmarks in those PRs haven&apos;t
-        shown a clear improvement.
+        </a>{' '}
+        haven&apos;t shown a clear improvement.
       </p>
       <OrchestraReplies />
       <ul className="text-fd-muted-foreground mt-5 space-y-1.5 text-sm">
@@ -71,6 +70,16 @@ export function OrchestraAttention() {
           </li>
         ))}
       </ul>
+      <p className="text-fd-muted-foreground mt-5 text-sm">
+        The{' '}
+        <a
+          href="https://github.com/notaharness/plugins/tree/main/orchestra#communication-and-attention"
+          className="text-fd-foreground hover:text-fd-primary underline decoration-fd-border underline-offset-4 transition-colors"
+        >
+          Orchestra README
+        </a>{' '}
+        explains the approach and its sources.
+      </p>
     </section>
   );
 }
