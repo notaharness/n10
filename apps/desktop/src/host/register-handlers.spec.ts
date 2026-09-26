@@ -61,6 +61,7 @@ describe('registerHostHandlers', () => {
           providerId: null,
           vcsConfigured: false,
           repository: null,
+          viewer: null,
         });
       },
     };

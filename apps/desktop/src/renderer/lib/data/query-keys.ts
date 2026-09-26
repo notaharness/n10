@@ -44,9 +44,10 @@ export const keys = {
   prDescription: (cwd: string, prId: number) =>
     ['pr-description', cwd, prId] as const,
   /** Keyed by the provider-qualified pull request (`pullRequestKey`),
-   *  not the number: repo A's #42 and repo B's are different entries. */
-  prSnapshot: (cwd: string, prKey: string) =>
-    ['pr-snapshot', cwd, prKey] as const,
+   *  not the number — repo A's #42 and repo B's are different entries —
+   *  and by the account it was read as. */
+  prSnapshot: (cwd: string, prKey: string, viewer: string | null) =>
+    ['pr-snapshot', cwd, prKey, viewer] as const,
   activity: (cwd: string) => ['session-activity', cwd] as const,
   commentImage: (url: string) => ['comment-image', url] as const,
   drafts: (cwd: string, prId: number) => ['drafts', cwd, prId] as const,

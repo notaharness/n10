@@ -29,8 +29,12 @@ import type { PullRequestLookup } from './pull-request-cache.js';
  * local branch in for them is `resolvePrComparison`'s job.
  */
 export interface PullRequestSnapshot {
+  /** The ref asked about, with the repository's `id` once the detail
+   *  read has named it — the id to store beside anything persisted. */
   ref: PullRequestRef;
-  /** The account the provider was read as (login or email). */
+  /** The account n10 is configured to act as: the GitHub username, or
+   *  the Azure DevOps email. Configured, not proven: a credential
+   *  swapped outside n10 is not detected here. */
   viewer: string | null;
   fetchedAt: number;
   /** The row from the cached list, which the sidebar shows. */
@@ -53,11 +57,16 @@ export interface SnapshotRequest {
   viewer?: string;
 }
 
-/** Where a snapshot's facts come from; the shell supplies these. */
+/**
+ * Where a snapshot's facts come from; the shell supplies these. The
+ * repository and the account are asked for before the reads and again
+ * after them: either can change while a read is in flight, and an
+ * answer is only returned for the context it was asked in.
+ */
 export interface SnapshotSources {
-  /** The repository open in this shell, as its provider names it. */
-  repository: RepositoryRef | null;
-  viewer: string | null;
+  /** The repository open in this shell now, as its provider names it. */
+  repository: () => RepositoryRef | null;
+  viewer: () => string | null;
   lookup: (prId: number) => Promise<PullRequestLookup>;
   /** Absent when the provider has no detail read. */
   detail?: (prId: number) => Promise<PullRequestDetail>;
@@ -86,23 +95,49 @@ export function parseSnapshotRequest(value: unknown): SnapshotRequest {
   return req;
 }
 
-function assertSameContext(req: SnapshotRequest, src: SnapshotSources): void {
-  if (!src.repository) {
+/** The account the context reads as; throws unless the repository and
+ *  the account are the ones the caller asked about. */
+function assertSameContext(
+  req: SnapshotRequest,
+  src: SnapshotSources
+): string | null {
+  const repository = src.repository();
+  if (!repository) {
     throw new PullRequestIdentityError(
       'No pull request provider is configured for this repository'
     );
   }
-  if (!sameRepository(req.ref, src.repository)) {
+  if (!sameRepository(req.ref, repository)) {
     throw new PullRequestIdentityError(
-      `${describePullRequest(req.ref)} is not in ${src.repository.host}/${
-        src.repository.repository
+      `${describePullRequest(req.ref)} is not in ${repository.host}/${
+        repository.repository
       }, the repository open now`
     );
   }
+  const viewer = src.viewer();
   const asked = req.viewer?.toLowerCase();
-  if (asked !== undefined && asked !== src.viewer?.toLowerCase()) {
+  if (asked !== undefined && asked !== viewer?.toLowerCase()) {
     throw new PullRequestIdentityError(
-      `Signed in as ${src.viewer ?? 'nobody'} now, not ${req.viewer}`
+      `n10 acts as ${viewer ?? 'nobody'} now, not ${req.viewer}`
+    );
+  }
+  return viewer;
+}
+
+/**
+ * The repository at this path is not the one the caller knew: renamed
+ * away and replaced, or transferred. Its #N is some other pull request,
+ * so nothing read about it may answer for the one asked.
+ */
+function assertSameRepositoryId(
+  req: SnapshotRequest,
+  detail: ReadOutcome<PullRequestDetail>
+): void {
+  const known = req.ref.id;
+  const now = detail.state === 'read' ? detail.value.ref.id : undefined;
+  if (known != null && now != null && known !== now) {
+    throw new PullRequestIdentityError(
+      `${req.ref.host}/${req.ref.repository} is now a different repository than the one this pull request was read from`
     );
   }
 }
@@ -120,8 +155,9 @@ async function readDetail(
   try {
     const value = await read(ref.number);
     // A detail about some other pull request is not this one's, however
-    // it came back — never let it lend this one its commits.
-    return samePullRequest(value.ref, ref)
+    // it came back — never let it lend this one its commits. The id is
+    // left out: a replaced repository is refused as a whole, below.
+    return samePullRequest({ ...value.ref, id: undefined }, ref)
       ? { state: 'read', value }
       : readFailure(
           new Error(
@@ -153,10 +189,16 @@ export async function readPullRequestSnapshot(
     src.lookup(req.ref.number),
     readDetail(req.ref, src.detail),
   ]);
+  // Asked again after the reads: the list is cached per checkout, not
+  // per repository, so a config change while they ran would hand back
+  // another repository's row under this ref.
+  const viewer = assertSameContext(req, src);
+  assertSameRepositoryId(req, detail);
   const target = detail.state === 'read' ? detail.value.target.head : null;
+  const id = detail.state === 'read' ? detail.value.ref.id : req.ref.id;
   return {
-    ref: req.ref,
-    viewer: src.viewer,
+    ref: id === undefined ? req.ref : { ...req.ref, id },
+    viewer,
     fetchedAt: (src.now ?? Date.now)(),
     summary,
     detail,

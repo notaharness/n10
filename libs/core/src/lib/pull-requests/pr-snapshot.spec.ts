@@ -32,8 +32,8 @@ const ROW: PullRequestInfo = {
 
 function sources(overrides: Partial<SnapshotSources> = {}): SnapshotSources {
   return {
-    repository: REPO,
-    viewer: 'bob',
+    repository: () => REPO,
+    viewer: () => 'bob',
     lookup: () => Promise.resolve({ kind: 'found', pr: ROW }),
     now: () => 1000,
     ...overrides,
@@ -42,13 +42,12 @@ function sources(overrides: Partial<SnapshotSources> = {}): SnapshotSources {
 
 function detail(over: Partial<PullRequestDetail> = {}): PullRequestDetail {
   return {
-    ref: REF,
-    repositoryId: 'R_1',
+    ref: { ...REF, id: 'R_1' },
     title: 'Add undo',
     url: ROW.url,
     author: { identifier: 'alice', displayName: 'Alice' },
     lifecycle: { state: 'open', isDraft: false, native: 'OPEN' },
-    source: { branch: 'undo', repository: 'acme/app', head: H2 },
+    source: { branch: 'undo', repository: REPO, head: H2 },
     target: { branch: 'main', head: TARGET_NOW },
     createdAt: null,
     updatedAt: null,
@@ -81,15 +80,65 @@ describe('readPullRequestSnapshot: whose answer this is', () => {
   it('refuses a caller that last saw another account', async () => {
     await expect(
       readPullRequestSnapshot({ ref: REF, viewer: 'alice' }, sources())
-    ).rejects.toThrow('Signed in as bob now, not alice');
+    ).rejects.toThrow('n10 acts as bob now, not alice');
     await expect(
       readPullRequestSnapshot({ ref: REF, viewer: 'BOB' }, sources())
     ).resolves.toMatchObject({ viewer: 'bob' });
   });
 
+  it('refuses an answer when the repository changed during the reads', async () => {
+    // The list is cached per checkout: after a config change the row
+    // that comes back is the other repository's.
+    let open = REPO;
+    const snap = readPullRequestSnapshot(
+      { ref: REF },
+      sources({
+        repository: () => open,
+        lookup: () => {
+          open = { ...REPO, repository: 'acme/other' };
+          return Promise.resolve({ kind: 'found', pr: ROW });
+        },
+      })
+    );
+    await expect(snap).rejects.toThrow('the repository open now');
+  });
+
+  it('refuses an answer when the account changed during the reads', async () => {
+    let viewer = 'bob';
+    const snap = readPullRequestSnapshot(
+      { ref: REF, viewer: 'bob' },
+      sources({
+        viewer: () => viewer,
+        lookup: () => {
+          viewer = 'carol';
+          return Promise.resolve({ kind: 'found', pr: ROW });
+        },
+      })
+    );
+    await expect(snap).rejects.toThrow('n10 acts as carol now, not bob');
+  });
+
+  it('refuses a repository that is not the one the caller read before', async () => {
+    // Renamed away and replaced by a new repository at the same path.
+    await expect(
+      readPullRequestSnapshot(
+        { ref: { ...REF, id: 'R_OLD' } },
+        sources({ detail: () => Promise.resolve(detail()) })
+      )
+    ).rejects.toThrow('is now a different repository');
+  });
+
+  it("returns the repository's id once the detail names it", async () => {
+    const snap = await readPullRequestSnapshot(
+      { ref: REF },
+      sources({ detail: () => Promise.resolve(detail()) })
+    );
+    expect(snap.ref).toEqual({ ...REF, id: 'R_1' });
+  });
+
   it('refuses when no provider is configured', async () => {
     await expect(
-      readPullRequestSnapshot({ ref: REF }, sources({ repository: null }))
+      readPullRequestSnapshot({ ref: REF }, sources({ repository: () => null }))
     ).rejects.toThrow('No pull request provider is configured');
   });
 });

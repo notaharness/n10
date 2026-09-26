@@ -17,20 +17,33 @@ const REF = {
 
 const env = vi.hoisted(() => ({
   configured: true,
+  /** Whether /repo is still the open repository. */
+  open: true,
   viewer: 'bob' as string | null,
   detail: undefined as
     | ((auth: unknown, project: unknown, prId: number) => Promise<unknown>)
     | undefined,
   lookups: [] as [string, number][],
+  onLookup: (() => undefined) as () => void,
 }));
 
-vi.mock('./repo.js', () => ({ requireRepo: () => '/repo' }));
-vi.mock('./reviews.js', () => ({
-  getReviewViewer: () => (env.viewer ? { identifier: env.viewer } : null),
+vi.mock('@n10/vcs-core', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  readConfig: () => ({ vendorProject: { owner: 'acme', repo: 'app' } }),
+}));
+vi.mock('./repo.js', () => ({
+  requireRepo: () => '/repo',
+  activeRepoIs: (cwd: string) => env.open && cwd === '/repo',
+  configuredRepository: () =>
+    env.configured
+      ? { provider: 'github', host: 'github.com', repository: 'acme/app' }
+      : null,
+  configuredViewer: () => env.viewer,
 }));
 vi.mock('./pull-requests.js', () => ({
   lookupPullRequest: (cwd: string, prId: number) => {
     env.lookups.push([cwd, prId]);
+    env.onLookup();
     return Promise.resolve({ kind: 'gone' });
   },
   resolveProvider: () => ({
@@ -40,15 +53,7 @@ vi.mock('./pull-requests.js', () => ({
       vendorProject: { owner: 'acme', repo: 'app' },
     },
     configured: env.configured,
-    provider: {
-      id: 'github',
-      repositoryRef: (p: Record<string, string>) => ({
-        provider: 'github',
-        host: 'github.com',
-        repository: `${p.owner}/${p.repo}`,
-      }),
-      fetchPullRequestDetail: env.detail,
-    },
+    provider: { id: 'github', fetchPullRequestDetail: env.detail },
   }),
 }));
 
@@ -56,6 +61,8 @@ const { getPullRequestSnapshot } = await import('./pr-details.js');
 
 beforeEach(() => {
   env.configured = true;
+  env.open = true;
+  env.onLookup = () => undefined;
   env.viewer = 'bob';
   env.detail = undefined;
   env.lookups = [];
@@ -82,7 +89,16 @@ describe('getPullRequestSnapshot', () => {
   it('refuses a caller that last saw another account', async () => {
     await expect(
       getPullRequestSnapshot({ ref: REF, viewer: 'alice' })
-    ).rejects.toThrow('Signed in as bob now, not alice');
+    ).rejects.toThrow('n10 acts as bob now, not alice');
+  });
+
+  it('refuses to answer once another repository was opened during the read', async () => {
+    env.onLookup = () => {
+      env.open = false;
+    };
+    await expect(getPullRequestSnapshot({ ref: REF })).rejects.toThrow(
+      'No pull request provider is configured'
+    );
   });
 
   it('refuses when the provider is not configured', async () => {
@@ -109,11 +125,7 @@ describe('getPullRequestSnapshot', () => {
       seen.push([auth, project, prId]);
       return Promise.resolve({
         ref: REF,
-        source: {
-          branch: 'undo',
-          repository: 'acme/app',
-          head: 'a'.repeat(40),
-        },
+        source: { branch: 'undo', repository: null, head: 'a'.repeat(40) },
         target: { branch: 'main', head: 'b'.repeat(40) },
       } as PullRequestDetail);
     };

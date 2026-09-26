@@ -5,6 +5,7 @@ import type {
   RepoInfo,
   SidebarItem,
 } from '../../../host/contract.js';
+import { pullRequestKey } from '@n10/vcs-core/pr-details';
 import { keys, resetRepoScopedCache } from './query-keys.js';
 import {
   loadBranchRemovalSafety,
@@ -33,6 +34,7 @@ const REPO: RepoInfo = {
   providerId: null,
   vcsConfigured: false,
   repository: null,
+  viewer: null,
 };
 
 /** The value of `p`, or 'pending' if it has not settled by the time
@@ -106,22 +108,48 @@ describe('pull request snapshots', () => {
     expect(pullRequestRefFor({ ...REPO, repository: GITHUB }, 0)).toBeNull();
   });
 
-  it('keeps an answer that echoes the pull request it was asked about', async () => {
-    const answer = { ref: REF, viewer: 'bob' };
+  it('asks as the account it knows, and keeps an answer about that pull request', async () => {
+    const asked: unknown[] = [];
     stubHost({
-      getPullRequestSnapshot: ({ ref }) =>
-        Promise.resolve({ ...answer, ref } as never),
+      getPullRequestSnapshot: (req) => {
+        asked.push(req);
+        return Promise.resolve({ ref: req.ref, viewer: 'bob' } as never);
+      },
     });
-    await expect(loadPullRequestSnapshot(REF)).resolves.toMatchObject(answer);
+    await expect(loadPullRequestSnapshot(REF, 'bob')).resolves.toMatchObject({
+      ref: REF,
+    });
+    expect(asked).toEqual([{ ref: REF, viewer: 'bob' }]);
   });
 
-  it("refuses repo B's #42 as an answer about repo A's", async () => {
-    // A delayed answer from before a repository switch.
+  it('files repo A #42 and repo B #42 under different keys, per account (Q8)', () => {
+    const a = pullRequestKey(REF);
+    const b = pullRequestKey({ ...REF, repository: 'acme/lib' });
+    expect(keys.prSnapshot('/repo', a, 'bob')).not.toEqual(
+      keys.prSnapshot('/repo', b, 'bob')
+    );
+    expect(keys.prSnapshot('/repo', a, 'bob')).not.toEqual(
+      keys.prSnapshot('/repo', a, 'carol')
+    );
+  });
+
+  it('drops every snapshot with the repository it belonged to', () => {
+    const qc = new QueryClient();
+    qc.setQueryData(keys.prSnapshot('/repo', pullRequestKey(REF), 'bob'), {
+      ref: REF,
+    });
+    resetRepoScopedCache(qc);
+    expect(
+      qc.getQueryData(keys.prSnapshot('/repo', pullRequestKey(REF), 'bob'))
+    ).toBeUndefined();
+  });
+
+  it('refuses an answer that names another pull request', async () => {
     stubHost({
       getPullRequestSnapshot: () =>
         Promise.resolve({ ref: { ...REF, repository: 'acme/lib' } } as never),
     });
-    await expect(loadPullRequestSnapshot(REF)).rejects.toThrow(
+    await expect(loadPullRequestSnapshot(REF, null)).rejects.toThrow(
       'Expected an answer about github.com/acme/app#42, got one about github.com/acme/lib#42'
     );
   });

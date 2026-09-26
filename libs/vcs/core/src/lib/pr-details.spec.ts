@@ -17,7 +17,7 @@ const REF = {
 
 describe('pull request identity', () => {
   it('keys a pull request by provider, host, repository and number', () => {
-    expect(pullRequestKey(REF)).toBe('github:github.com/acme/app#42');
+    expect(pullRequestKey(REF)).toBe('["github","github.com","acme/app",42]');
   });
 
   it('tells repo A #42 from repo B #42', () => {
@@ -70,5 +70,22 @@ describe('readFailure', () => {
       kind: 'unknown',
       reason: 'boom',
     });
+  });
+});
+
+describe('keys that cannot collide', () => {
+  it('keeps a host and a path apart when both contain a slash', () => {
+    const a = { ...REF, host: 'dev.azure.com/org', repository: 'p/r' };
+    const b = { ...REF, host: 'dev.azure.com', repository: 'org/p/r' };
+    expect(pullRequestKey(a)).not.toBe(pullRequestKey(b));
+    expect(sameRepository(a, b)).toBe(false);
+  });
+
+  it('refuses a different repository id at the same path', () => {
+    expect(sameRepository({ ...REF, id: 'R_1' }, { ...REF, id: 'R_2' })).toBe(
+      false
+    );
+    // An id known on one side only still matches: it may not be read yet.
+    expect(sameRepository({ ...REF, id: 'R_1' }, REF)).toBe(true);
   });
 });

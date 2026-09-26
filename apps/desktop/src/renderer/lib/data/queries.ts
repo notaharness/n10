@@ -387,17 +387,22 @@ export function pullRequestRefFor(
 }
 
 /**
- * One pull request by identity, refusing an answer about any other.
+ * One pull request by identity, read as the account the renderer knows.
  *
- * The host checks the ref against the repository it has open, but the
- * answer can still land after the renderer has moved on, and a key is
- * only as good as what is stored under it. An answer that does not echo
- * the ref it was asked for is an error here, never data in this entry.
+ * What keeps repo A's #42 apart from repo B's is the key: it names the
+ * provider, host, repository and number, and the repository-scoped
+ * cache is dropped on a switch. The host refuses a request for a
+ * repository or an account that is no longer the open one, before and
+ * after its reads. The echo check here is the last line: an answer that
+ * names a different pull request is an error, never data in this entry.
  */
 export async function loadPullRequestSnapshot(
-  ref: PullRequestRef
+  ref: PullRequestRef,
+  viewer: string | null
 ): Promise<PullRequestSnapshot> {
-  const answer = await window.n10.getPullRequestSnapshot({ ref });
+  const answer = await window.n10.getPullRequestSnapshot(
+    viewer ? { ref, viewer } : { ref }
+  );
   if (!samePullRequest(answer.ref, ref)) {
     throw new Error(
       `Expected an answer about ${describePullRequest(
@@ -410,11 +415,12 @@ export async function loadPullRequestSnapshot(
 
 export function usePullRequestSnapshot(
   cwd: string,
-  ref: PullRequestRef | null
+  ref: PullRequestRef | null,
+  viewer: string | null
 ) {
   return useQuery({
-    queryKey: keys.prSnapshot(cwd, ref ? pullRequestKey(ref) : ''),
-    queryFn: () => loadPullRequestSnapshot(ref!),
+    queryKey: keys.prSnapshot(cwd, ref ? pullRequestKey(ref) : '', viewer),
+    queryFn: () => loadPullRequestSnapshot(ref!, viewer),
     enabled: ref != null,
     staleTime: 60_000,
   });

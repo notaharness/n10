@@ -3,9 +3,14 @@ import {
   readPullRequestSnapshot,
   type PullRequestSnapshot,
 } from '@n10/core';
+import { readConfig } from '@n10/vcs-core';
 import { lookupPullRequest, resolveProvider } from './pull-requests.js';
-import { requireRepo } from './repo.js';
-import { getReviewViewer } from './reviews.js';
+import {
+  activeRepoIs,
+  configuredRepository,
+  configuredViewer,
+  requireRepo,
+} from './repo.js';
 
 /**
  * One pull request, read by identity for the renderer.
@@ -23,12 +28,16 @@ export async function getPullRequestSnapshot(
   const req = parseSnapshotRequest(request);
   const cwd = requireRepo();
   const { config, provider, configured } = resolveProvider(cwd);
-  const active = configured ? provider : null;
   const { vendorAuth: auth, vendorProject: project } = config;
-  const readDetail = active?.fetchPullRequestDetail?.bind(active);
+  const readDetail = configured
+    ? provider?.fetchPullRequestDetail?.bind(provider)
+    : undefined;
   return readPullRequestSnapshot(req, {
-    repository: active?.repositoryRef?.(project) ?? null,
-    viewer: getReviewViewer()?.identifier ?? null,
+    // Read afresh on every check: the open repository, its config and
+    // the account can all change while the reads are in flight.
+    repository: () =>
+      activeRepoIs(cwd) ? configuredRepository(readConfig(cwd)) : null,
+    viewer: () => configuredViewer(readConfig(cwd)),
     lookup: (prId) => lookupPullRequest(cwd, prId),
     detail: readDetail && ((prId) => readDetail(auth, project, prId)),
   });

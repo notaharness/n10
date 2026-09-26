@@ -111,6 +111,9 @@ export interface RepoInfo {
    *  every pull request ref the renderer asks about. Null while no
    *  provider is configured. */
   repository: RepositoryRef | null;
+  /** The account n10 acts as (GitHub login, Azure DevOps email): what
+   *  per-account reads are keyed by and checked against. */
+  viewer: string | null;
 }
 
 // ── Sessions (agent terminals) ───────────────────────────────────

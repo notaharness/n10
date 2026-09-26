@@ -3,7 +3,7 @@ import { VcsError, type VcsErrorKind } from './errors.js';
 /**
  * The identity vocabulary every pull request surface shares: which
  * pull request an answer is about, whether an action is possible, and
- * how a read or a write turned out.
+ * how a read turned out.
  *
  * A branch name or a bare number is not an identity. Two repositories
  * each have a #42, a fork can share a branch name with its upstream,
@@ -20,6 +20,14 @@ export interface RepositoryRef {
   host: string;
   /** The provider's path to it: `owner/repo`, `<project>/<repo>`. */
   repository: string;
+  /**
+   * The provider's own id for the repository, once a detail read has
+   * named it. A path can be reused — rename or transfer a repository
+   * and a new one can be created at the old path — so anything kept
+   * across sessions (drafts, review progress) records the id and is
+   * compared with {@link sameRepository}, which refuses a different id.
+   */
+  id?: string;
 }
 
 /** One pull request, qualified by the repository it belongs to. */
@@ -28,29 +36,43 @@ export interface PullRequestRef extends RepositoryRef {
 }
 
 /**
- * A key that names one pull request across repositories and providers.
- * Host and path compare case-insensitively, as both providers treat
- * them; the provider and the number are exact.
+ * A key that names a repository across providers. Host and path compare
+ * case-insensitively, as both providers treat them. A tuple rather than
+ * a joined string, because hosts and paths both contain `/`: joined,
+ * `dev.azure.com/org` + `p/r` and `dev.azure.com` + `org/p/r` collide.
+ *
+ * The id is not part of the key: a caller that learns it later must
+ * still find what it stored before. {@link sameRepository} checks it.
  */
-export function pullRequestKey(ref: PullRequestRef): string {
-  return `${repositoryKey(ref)}#${ref.number}`;
-}
-
 export function repositoryKey(ref: RepositoryRef): string {
-  return `${
-    ref.provider
-  }:${ref.host.toLowerCase()}/${ref.repository.toLowerCase()}`;
+  return JSON.stringify([
+    ref.provider,
+    ref.host.toLowerCase(),
+    ref.repository.toLowerCase(),
+  ]);
 }
 
+/** A key that names one pull request across repositories and providers. */
+export function pullRequestKey(ref: PullRequestRef): string {
+  return JSON.stringify([
+    ref.provider,
+    ref.host.toLowerCase(),
+    ref.repository.toLowerCase(),
+    ref.number,
+  ]);
+}
+
+/** Same provider, host and path — and the same id when both know it. */
 export function sameRepository(a: RepositoryRef, b: RepositoryRef): boolean {
-  return repositoryKey(a) === repositoryKey(b);
+  if (repositoryKey(a) !== repositoryKey(b)) return false;
+  return a.id == null || b.id == null || a.id === b.id;
 }
 
 export function samePullRequest(a: PullRequestRef, b: PullRequestRef): boolean {
-  return pullRequestKey(a) === pullRequestKey(b);
+  return a.number === b.number && sameRepository(a, b);
 }
 
-/** `owner/repo#42` — for a sentence, not for a key. */
+/** `github.com/owner/repo#42` — for a sentence, not for a key. */
 export function describePullRequest(ref: PullRequestRef): string {
   return `${ref.host}/${ref.repository}#${ref.number}`;
 }
@@ -64,7 +86,7 @@ export function parsePullRequestRef(value: unknown): PullRequestRef {
   if (typeof value !== 'object' || value === null) {
     throw new TypeError('Invalid pull request ref');
   }
-  const { provider, host, repository, number } = value as Record<
+  const { provider, host, repository, number, id } = value as Record<
     string,
     unknown
   >;
@@ -75,11 +97,15 @@ export function parsePullRequestRef(value: unknown): PullRequestRef {
   if (typeof number !== 'number' || !Number.isInteger(number) || number <= 0) {
     throw new TypeError('Invalid pull request number');
   }
+  if (id !== undefined && (typeof id !== 'string' || id.length === 0)) {
+    throw new TypeError('Invalid repository id');
+  }
   return {
     provider: provider as string,
     host: host as string,
     repository: repository as string,
     number,
+    ...(id !== undefined ? { id: id as string } : {}),
   };
 }
 
@@ -137,17 +163,6 @@ export function readFailure(err: unknown): ReadOutcome<never> {
 }
 
 /**
- * How one write went. A timeout after the request left is `unknown`,
- * not `failed`: the provider may have applied it, so a retry has to
- * find out first rather than write again.
- */
-export type MutationOutcome<T = void> =
-  | { state: 'pending' }
-  | { state: 'succeeded'; value: T }
-  | { state: 'failed'; kind: VcsErrorKind; reason: string }
-  | { state: 'unknown'; reason: string };
-
-/**
  * A pull request's lifecycle in its provider's own words, plus the
  * shared reading of it. Azure's `abandoned` is closed and `completed`
  * is merged, but the native word is what the reader is shown.
@@ -165,18 +180,17 @@ export interface PullRequestLifecycle {
  * `VcsProvider.fetchPullRequestDetail`.
  */
 export interface PullRequestDetail {
+  /** Carries the repository's own `id`, which the detail read names. */
   ref: PullRequestRef;
-  /** The provider's own id for the repository, which survives a rename. */
-  repositoryId: string | null;
   title: string;
   url: string;
   author: { identifier: string; displayName: string };
   lifecycle: PullRequestLifecycle;
   source: {
     branch: string;
-    /** The repository the branch lives in — a fork's own path, or the
-     *  pull request's repository. Null when the fork is gone. */
-    repository: string | null;
+    /** The repository the branch lives in: a fork, or the pull
+     *  request's own repository. Null when the fork is gone. */
+    repository: RepositoryRef | null;
     head: Oid;
   };
   target: { branch: string; head: Oid | null };

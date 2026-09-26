@@ -11,7 +11,6 @@
 export type { PullRequestSnapshot, SnapshotRequest } from '@n10/core';
 export type {
   Capability,
-  MutationOutcome,
   Oid,
   PullRequestDetail,
   PullRequestLifecycle,
