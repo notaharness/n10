@@ -14,7 +14,7 @@ export function Hero() {
             rows down and 7 cells wide about the centre, so every stroke
             of the mark is a cell of the backdrop's grid in both poses. */}
         <Logo intro hover className="n10-logo--grid" />
-        <p className="text-fd-muted-foreground mt-4 text-sm">
+        <p className="text-fd-muted-foreground mt-4 text-base">
           a{' '}
           <Link
             href="https://github.com/notaharness"
@@ -28,8 +28,7 @@ export function Hero() {
           Like an IDE for agents
         </h1>
         <p className="text-fd-muted-foreground mt-6 max-w-2xl text-lg text-pretty">
-          Run multiple agents on multiple machines and connect from anywhere, no
-          SSH or VPN required
+          Run multiple agents on multiple machines and connect from anywhere
         </p>
         <InstallStrip className="mt-10" />
         <div className="relative mt-10 w-full sm:mt-12">
