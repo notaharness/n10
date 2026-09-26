@@ -143,7 +143,7 @@ const COPILOT: AgentDefinition = {
   name: 'Copilot',
   supportsAppendSystemPrompt: false,
   blank: () => ({ cmd: 'copilot', args: [] }),
-  // Attach the interactive prompt so option-like text remains literal.
+  // Use the documented attached form; the short `-i PROMPT` is valid too.
   // `-p` is programmatic mode and exits after completion.
   seed: (prompt) => ({ cmd: 'copilot', args: [`--interactive=${prompt}`] }),
   // `--continue` prefers this cwd but falls back to global history.

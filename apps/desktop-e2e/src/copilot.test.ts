@@ -1,12 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
-import {
-  copilotCalls,
-  copilotWorked,
-  controlCopilot,
-  installCopilot,
-} from './setup/copilot.js';
+import { fakeCli } from './setup/fake-cli.js';
 import { agentSpinner, createWorktree, sessionMenu } from './setup/app.js';
 import { findN10SessionFor, socketEnv, tagTmuxSession } from './setup/tmux.js';
 import {
@@ -15,11 +10,13 @@ import {
   terminalTabs,
 } from './setup/terminals.js';
 
+const copilot = fakeCli('copilot');
+
 test.use({
   fakeGitHub: { prs: [] },
   n10Config: { agentId: 'copilot' },
   env: async ({ fixtureHome }, provide) => {
-    await provide(installCopilot(fixtureHome));
+    await provide(copilot.install(fixtureHome));
   },
 });
 
@@ -37,11 +34,11 @@ test('Copilot worktree launch, activity and explicit fresh restart in Desktop', 
     .getByRole('button', { name: 'Start new session', exact: true })
     .click();
   await expect(page.getByText('fake-copilot-ready').first()).toBeVisible();
-  expect(copilotCalls(cwd)).toMatchObject([{ args: [], cwd }]);
-  controlCopilot(cwd, 'busy');
+  expect(copilot.calls(cwd)).toMatchObject([{ args: [], cwd }]);
+  copilot.control(cwd, 'busy');
   await expect(agentSpinner(page).first()).toBeVisible({ timeout: 10_000 });
-  await expect.poll(() => copilotWorked(cwd)).toBe(true);
-  controlCopilot(cwd, 'idle');
+  await expect.poll(() => copilot.worked(cwd)).toBe(true);
+  copilot.control(cwd, 'idle');
   await expect(agentSpinner(page)).toHaveCount(0, { timeout: 10_000 });
   const name = findN10SessionFor('copilot-life', homeDir)!;
   tagTmuxSession(
@@ -52,7 +49,7 @@ test('Copilot worktree launch, activity and explicit fresh restart in Desktop', 
     },
     homeDir
   );
-  controlCopilot(cwd, 'exit');
+  copilot.control(cwd, 'exit');
   await expect
     .poll(() =>
       page.evaluate(async () =>
@@ -67,12 +64,12 @@ test('Copilot worktree launch, activity and explicit fresh restart in Desktop', 
   await expect(
     menu.getByRole('radio', { name: 'Continue', exact: true })
   ).toHaveCount(0);
-  expect(copilotCalls(cwd)).toHaveLength(1);
+  expect(copilot.calls(cwd)).toHaveLength(1);
   await menu
     .getByRole('button', { name: 'Start new session', exact: true })
     .click();
   await expect
-    .poll(() => copilotCalls(cwd))
+    .poll(() => copilot.calls(cwd))
     .toMatchObject([{ args: [] }, { args: [], cwd }]);
   expect(findN10SessionFor('copilot-life', homeDir)).toBe(name);
   expect(
@@ -97,8 +94,8 @@ test('Copilot standalone terminal refuses resume and permits an explicit fresh s
   await openNewTerminalDialog(app, page);
   await confirmNewTerminal(page, 'Agent');
   await expect(page.getByText('fake-copilot-ready').first()).toBeVisible();
-  expect(copilotCalls(repoPath)).toMatchObject([{ args: [], cwd: repoPath }]);
-  controlCopilot(repoPath, 'exit');
+  expect(copilot.calls(repoPath)).toMatchObject([{ args: [], cwd: repoPath }]);
+  copilot.control(repoPath, 'exit');
   const resume = page.getByRole('button', {
     name: 'Resume agent',
     exact: true,
@@ -108,12 +105,12 @@ test('Copilot standalone terminal refuses resume and permits an explicit fresh s
   await expect(page.getByRole('alert')).toContainText(
     'Copilot does not support automatic resume'
   );
-  expect(copilotCalls(repoPath)).toHaveLength(1);
+  expect(copilot.calls(repoPath)).toHaveLength(1);
   await page
     .getByRole('button', { name: 'Start new (directory default)', exact: true })
     .click();
   await expect
-    .poll(() => copilotCalls(repoPath))
+    .poll(() => copilot.calls(repoPath))
     .toMatchObject([{ args: [] }, { args: [] }]);
   await expect(terminalTabs(page)).toHaveCount(1);
 });

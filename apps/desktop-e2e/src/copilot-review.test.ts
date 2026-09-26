@@ -1,14 +1,16 @@
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
-import { copilotCalls, installCopilot } from './setup/copilot.js';
+import { fakeCli } from './setup/fake-cli.js';
 import { sessionMenu, sidebarRow } from './setup/app.js';
+
+const copilot = fakeCli('copilot');
 
 const branch = 'copilot-review';
 const instruction =
   '--help is literal; preserve "quotes", $HOME and `code`.\nSecond line.';
 test.use({
   env: async ({ fixtureHome }, provide) => {
-    await provide(installCopilot(fixtureHome));
+    await provide(copilot.install(fixtureHome));
   },
   fakeGitHub: {
     username: 'tester',
@@ -33,7 +35,7 @@ test('Desktop selects Copilot for a review and preserves its interactive prompt'
   await menu.getByRole('button', { name: 'Start review', exact: true }).click();
   await expect(page.getByText('fake-copilot-ready').first()).toBeVisible();
   const cwd = join(repoPath, '.claude/worktrees', branch);
-  const calls = copilotCalls(cwd);
+  const calls = copilot.calls(cwd);
   expect(calls).toHaveLength(1);
   expect(calls[0].cwd).toBe(cwd);
   expect(calls[0].args).toHaveLength(1);
