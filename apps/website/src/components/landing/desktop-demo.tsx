@@ -96,7 +96,7 @@ export function DesktopDemo({ className }: { className?: string }) {
   const Icon = paused ? Play : Pause;
 
   return (
-    <figure className={className}>
+    <div className={className}>
       <div
         ref={box}
         className="n10-frame bg-fd-card relative w-full overflow-hidden rounded-xl"
@@ -118,11 +118,8 @@ export function DesktopDemo({ className }: { className?: string }) {
           />
         )}
       </div>
-      <figcaption className="text-fd-muted-foreground mt-3 flex items-center justify-center gap-2 text-sm text-pretty">
-        <span>
-          The real n10 Desktop on sample data from n10’s own pull requests.
-          Click around: the agents are scripted and nothing leaves the page.
-        </span>
+      {/* Moving content needs a way to stop it (WCAG 2.2.2). */}
+      <div className="text-fd-muted-foreground mt-2 flex justify-end">
         {!reduced && (
           <button
             type="button"
@@ -133,7 +130,7 @@ export function DesktopDemo({ className }: { className?: string }) {
             <Icon className="size-4" aria-hidden />
           </button>
         )}
-      </figcaption>
-    </figure>
+      </div>
+    </div>
   );
 }

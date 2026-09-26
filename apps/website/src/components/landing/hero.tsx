@@ -3,7 +3,6 @@ import { DesktopDemo } from '@/components/landing/desktop-demo';
 import { HeroBackdrop } from '@/components/hero-backdrop';
 import { Logo } from '@/components/logo';
 import { ThemeImage } from '@/components/theme-image';
-import { buttonVariants } from '@/components/ui/button';
 
 export function Hero() {
   return (
@@ -14,37 +13,23 @@ export function Hero() {
             rows down and 7 cells wide about the centre, so every stroke
             of the mark is a cell of the backdrop's grid in both poses. */}
         <Logo intro hover className="n10-logo--grid" />
-        <h1 className="mt-8 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
-          Keep up with your agents&apos; pull requests
+        <p className="text-fd-muted-foreground mt-4 text-sm">
+          a{' '}
+          <Link
+            href="https://github.com/notaharness"
+            className="hover:text-fd-foreground underline decoration-fd-border underline-offset-4 transition-colors"
+          >
+            @notaharness
+          </Link>{' '}
+          project
+        </p>
+        <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
+          n10, Like an IDE for agents
         </h1>
         <p className="text-fd-muted-foreground mt-6 max-w-2xl text-lg text-pretty">
           Agents in worktrees, sessions in plain tmux, review in one place.
           Close n10 and your agents keep running; <code>tmux attach</code> still
           works.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href="/docs/getting-started"
-            className={buttonVariants({ size: 'lg' })}
-          >
-            Read the docs
-          </Link>
-          <Link
-            href="https://github.com/notaharness/n10"
-            className={buttonVariants({ variant: 'outline', size: 'lg' })}
-          >
-            GitHub
-          </Link>
-        </div>
-        <p className="text-fd-muted-foreground mt-6 text-sm">
-          n10, a{' '}
-          <Link
-            href="https://github.com/notaharness"
-            className="hover:text-fd-foreground underline decoration-fd-border underline-offset-4 transition-colors"
-          >
-            notaharness
-          </Link>{' '}
-          project
         </p>
         <div className="relative mt-10 w-full sm:mt-12">
           <div

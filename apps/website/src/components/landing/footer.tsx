@@ -15,19 +15,8 @@ export function Footer() {
       <div className="text-fd-muted-foreground mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-8 gap-y-4 px-4 py-10 text-sm">
         <div className="flex items-center gap-4">
           <Logo className="h-5 w-auto shrink-0" />
-          {/* One run of text, so a narrow screen wraps it like a
-              sentence instead of stacking the separator on its own. */}
           <p className="text-pretty">
             Keep up with your agents&apos; pull requests
-            <span aria-hidden className="mx-2">
-              ·
-            </span>
-            <Link
-              href="https://github.com/notaharness"
-              className="hover:text-fd-foreground transition-colors"
-            >
-              a notaharness project
-            </Link>
           </p>
         </div>
         <nav className="flex flex-wrap gap-x-6 gap-y-2">
