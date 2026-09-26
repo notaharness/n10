@@ -66,13 +66,17 @@ export async function checkWorktreeRemoval(
  *  another worktree may have checked out since.
  *
  *  Resolves once session discovery has seen the result, so the shells
- *  learn of this removal the way they learn of one made outside n10. */
+ *  learn of this removal the way they learn of one made outside n10.
+ *  Discovery reports only the removal of a worktree it has seen, and a
+ *  worktree made moments ago may not have had a scan yet — so it looks
+ *  once before the removal as well as after. */
 export async function removeWorktreeSession(
   branch: string,
   force: boolean,
   repo?: string
 ): Promise<boolean> {
   const cwd = cwdFor(repo);
+  await rescanSessionDiscovery();
   const key = await sessionKeyFor(branch, cwd);
   if (key) stopSession(key);
   const removed = await removeWorktree(branch, { force, cwd });

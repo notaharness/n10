@@ -51,6 +51,7 @@ describe('removeWorktreeSession', () => {
   it('stops only the qualified agent before removing its checkout and branch in the captured repo', async () => {
     await removeWorktreeSession('feature/login', true, '/repo-a');
     expect(state.calls).toEqual([
+      ['rescan'],
       ['kill', LOGIN_KEY],
       ['remove', 'feature/login', { force: true, cwd: '/repo-a' }],
       ['delete', 'feature/login', true, '/repo-a'],
