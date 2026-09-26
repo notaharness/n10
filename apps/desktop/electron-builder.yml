@@ -24,7 +24,8 @@ linux:
   icon: build/icons
   category: Development
   synopsis: Coding agents in git worktrees, and reviews of their pull requests
-  maintainer: Hermann Björgvin <hermann@hermann.is>
+  maintainer: notaharness <notaharness@users.noreply.github.com>
+  vendor: notaharness
   artifactName: ${productName}-${version}-${arch}.${ext}
   syncDesktopName: true
 deb:
