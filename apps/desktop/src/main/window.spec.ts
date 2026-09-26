@@ -120,17 +120,9 @@ describe('showWhenReadyOrLoaded', () => {
   function fakeWindow() {
     const win = new EventEmitter();
     const webContents = new EventEmitter();
-    let visible = false;
-    const show = vi.fn(() => {
-      visible = true;
-    });
+    const show = vi.fn();
     return {
-      win: Object.assign(win, {
-        webContents,
-        isDestroyed: () => false,
-        isVisible: () => visible,
-        show,
-      }),
+      win: Object.assign(win, { webContents, isDestroyed: () => false, show }),
       webContents,
       show,
     };
@@ -150,12 +142,14 @@ describe('showWhenReadyOrLoaded', () => {
     expect(show).toHaveBeenCalledTimes(1);
   });
 
-  it('shows once, whichever comes first', () => {
+  it('shows once, and not again on a later reload', () => {
     const { win, webContents, show } = fakeWindow();
     showWhenReadyOrLoaded(win);
     webContents.emit('did-finish-load');
     win.emit('ready-to-show');
     webContents.emit('did-finish-load');
     expect(show).toHaveBeenCalledTimes(1);
+    expect(win.listenerCount('ready-to-show')).toBe(0);
+    expect(webContents.listenerCount('did-finish-load')).toBe(0);
   });
 });

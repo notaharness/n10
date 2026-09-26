@@ -113,23 +113,30 @@ export function reloadAfterRendererGone(
 /** The part of a BrowserWindow that showing it needs. */
 export interface ShowableWindow {
   once(event: 'ready-to-show', listener: () => void): unknown;
-  webContents: { on(event: 'did-finish-load', listener: () => void): unknown };
+  off(event: 'ready-to-show', listener: () => void): unknown;
+  webContents: {
+    once(event: 'did-finish-load', listener: () => void): unknown;
+    off(event: 'did-finish-load', listener: () => void): unknown;
+  };
   isDestroyed(): boolean;
-  isVisible(): boolean;
   show(): void;
 }
 
 /**
- * Show a window created hidden once it has something to show. The
- * first frame being ready is the moment that avoids a blank window,
- * but on a display stack whose first frame never comes (GPU
- * initialisation that fails quietly under Wayland) that moment never
- * arrives, so the page having loaded shows the window as well.
+ * Show a window created hidden on the first of two events, once:
+ * `did-finish-load`, the page having loaded, which for this local page
+ * usually comes first and costs a frame of the window's background
+ * colour; or `ready-to-show`, the first frame, which on a display
+ * stack whose first frame never comes (GPU initialisation failing
+ * quietly under Wayland) never fires at all. Both listeners go when
+ * either fires: a reload later must not show a window the user hid.
  */
 export function showWhenReadyOrLoaded(win: ShowableWindow): void {
   const show = () => {
-    if (!win.isDestroyed() && !win.isVisible()) win.show();
+    win.off('ready-to-show', show);
+    win.webContents.off('did-finish-load', show);
+    if (!win.isDestroyed()) win.show();
   };
   win.once('ready-to-show', show);
-  win.webContents.on('did-finish-load', show);
+  win.webContents.once('did-finish-load', show);
 }
