@@ -2,13 +2,15 @@ import type { MachineView } from '../../../host/contract.js';
 
 /**
  * A small beam fleet: this laptop, a desktop at home, and a Mac mini
- * that has been offline for a few days with mail queued for it.
+ * that has been offline for a few days with mail queued for it. The
+ * headless buildbox is the machine Add a machine's command joins.
  * peerIds are beam's 32 hex digits and the fleet id its 16, randomly
  * generated for the demo.
  */
 export const LAPTOP = '206ca2e21d30e3eee40c25347c18574b';
 export const DESKTOP = 'a5720899386a6c943b59370a57dbe1ec';
-export const MAC_MINI = '722d4e44117ea8f7de50ad71889f31e8';
+const MAC_MINI = '722d4e44117ea8f7de50ad71889f31e8';
+const BUILDBOX = '1bd38e7e011ee2bb4cf1298ad2e78ad1';
 export const FLEET_ID = 'b2226326713a038f';
 
 const DAY = 86_400_000;
@@ -44,3 +46,7 @@ export const macMini = () =>
     grant: 'msg',
     queued: 2,
   });
+
+/** Named after Add a machine's `beam join --label buildbox`. */
+export const buildbox = () =>
+  member(BUILDBOX, 'buildbox', { path: 'relay fra' });

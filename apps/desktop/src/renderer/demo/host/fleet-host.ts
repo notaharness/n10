@@ -8,9 +8,9 @@ import type {
   N10HostApi,
 } from '../../../host/contract.js';
 import {
-  DESKTOP,
   FLEET_ID,
   LAPTOP,
+  buildbox,
   desktop,
   macMini,
   member,
@@ -20,8 +20,10 @@ import { Channel, later } from './hub.js';
 /**
  * beam, simulated end to end for trying the Fleet section: creating a
  * fleet, joining one, adding a machine, revoking one and resetting. A
- * passkey step's link is the real beam.n10.is shape; opening it counts
- * as answering the passkey in the browser (a moment later), and an
+ * passkey step's link carries beam's fragment fields but points at the
+ * Fleet guide, so a scanned QR or a copied link never reaches a live
+ * beam.n10.is page. Opening it counts as answering the passkey in the
+ * browser (a moment later), and an
  * unanswered step answers itself after `AUTO_MS`. The page starts in a
  * fleet of three; resetting leaves it to create or join one.
  */
@@ -50,8 +52,12 @@ const hex = (n: number) =>
     b.toString(16).padStart(2, '0')
   ).join('');
 
+/** The fragment beam writes (`o`, `l`, `f`, `n`), which the prompt reads
+ *  for its Action and Machine rows, on a page that ignores it. */
 function passkeyUrl(fields: Record<string, string>): string {
-  return `https://beam.n10.is/#${new URLSearchParams(fields).toString()}`;
+  return `https://n10.is/docs/guides/fleet#${new URLSearchParams(
+    fields
+  ).toString()}`;
 }
 
 class Fleet {
@@ -67,6 +73,8 @@ class Fleet {
   private step: { url: string; answer: () => void } | null = null;
   private cancel: (() => void) | null = null;
   private joinTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Aliases set here, over each machine's own label. */
+  private readonly aliases = new Map<string, string>();
 
   constructor() {
     this.watchAddMachine();
@@ -79,7 +87,11 @@ class Fleet {
       path: null,
       lastSeenAt: Date.now(),
     });
-    return [local, ...this.others];
+    const aliased = this.others.map((m) => {
+      const alias = this.aliases.get(m.peerId);
+      return alias ? { ...m, label: alias } : m;
+    });
+    return [local, ...aliased];
   }
 
   beamStatus(): BeamStatus {
@@ -98,7 +110,16 @@ class Fleet {
 
   /** Opening the live link stands in for the browser's passkey page. */
   open(url: string): void {
-    if (this.step?.url === url) setTimeout(this.step.answer, ANSWER_MS);
+    const step = this.step;
+    if (step?.url !== url) return;
+    this.step = null;
+    setTimeout(step.answer, ANSWER_MS);
+  }
+
+  setAlias(peerId: string, alias: string | null): void {
+    if (alias) this.aliases.set(peerId, alias);
+    else this.aliases.delete(peerId);
+    this.changed();
   }
 
   stopCeremony(): void {
@@ -192,6 +213,8 @@ class Fleet {
 
   async reset(): Promise<{ ok: true }> {
     await later(null, 900);
+    this.stopJoin();
+    this.aliases.clear();
     this.fleetId = null;
     this.others = [];
     this.changed();
@@ -209,7 +232,7 @@ class Fleet {
     return new Promise((resolve, reject) => {
       const done = () => {
         clearTimeout(auto);
-        this.step = null;
+        if (this.step?.answer === done) this.step = null;
         resolve();
       };
       const auto = setTimeout(done, AUTO_MS);
@@ -233,23 +256,32 @@ class Fleet {
 
   /**
    * The machine the owner joins from elsewhere: while the Add a machine
-   * panel is open on an enrolled fleet without it, Desktop joins a few
-   * seconds later, as it would after `beam join` over there.
+   * panel shows its `beam join` command, the first of Desktop and the
+   * buildbox not yet in the fleet joins a few seconds later, as it would
+   * after running that command. Closing the panel or resetting calls
+   * it off.
    */
   private watchAddMachine(): void {
     new MutationObserver(() => {
-      const open = [...document.querySelectorAll('h3')].some(
-        (h) => h.textContent === 'Add a machine'
+      const open = [...document.querySelectorAll('code')].some((c) =>
+        c.textContent?.startsWith('beam join')
       );
-      if (!open || this.joinTimer || !this.fleetId) return;
-      if (this.others.some((m) => m.peerId === DESKTOP)) return;
+      if (!open) return this.stopJoin();
+      if (this.joinTimer || !this.fleetId) return;
+      const known = new Set(this.others.map((m) => m.peerId));
+      const next = [desktop(), buildbox()].find((m) => !known.has(m.peerId));
+      if (!next) return;
       this.joinTimer = setTimeout(() => {
         this.joinTimer = null;
-        if (!this.fleetId) return;
-        this.others = [...this.others, desktop()];
+        this.others = [...this.others, next];
         this.changed();
       }, JOIN_AFTER_MS);
     }).observe(document.body, { childList: true, subtree: true });
+  }
+
+  private stopJoin(): void {
+    if (this.joinTimer) clearTimeout(this.joinTimer);
+    this.joinTimer = null;
   }
 }
 
@@ -264,10 +296,7 @@ export function createFleetHost(): FleetHost {
     getBeamStatus: () => later(fleet.beamStatus()),
     onBeamStatusChanged: fleet.status.subscribe,
     setMachineAlias: (peerId, alias) => {
-      fleet.others = fleet.others.map((m) =>
-        m.peerId === peerId ? { ...m, label: alias ?? m.label } : m
-      );
-      fleet.changed();
+      fleet.setAlias(peerId, alias);
       return later(undefined);
     },
     setMachineGrant: (peerId, grant) => {

@@ -33,8 +33,6 @@ export interface RepoData {
   defaultBranch: string;
 }
 
-/** A worktree session's key, as core builds it (`worktreeSessionKey`):
- *  the machine is appended only when it is not this one. */
 /** Core's key for the agent session in a branch's worktree: keyed by
  *  the checkout (`worktreeSessionKey`), qualified by a remote machine. */
 export function sessionKey(repo: string, branch: string, machine = 'local') {
