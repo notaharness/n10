@@ -386,6 +386,79 @@ describe('useRemoteComments', () => {
     probe.unmount();
   });
 
+  it('does not apply a reply that lands after the user moved to another repository', async () => {
+    // Azure thread ids are only unique within a pull request, so the
+    // thread on screen can share the id of the one replied to.
+    const reply = deferred<RemoteCommentReply>();
+    const provider = {
+      id: 'azure-devops',
+      fetchCommentThreads: vi.fn().mockImplementation(() =>
+        Promise.resolve({
+          threads: [makeThread({ id: 't1' })],
+          generalComments: [],
+        })
+      ),
+      replyToThread: vi.fn().mockReturnValue(reply.promise),
+    } as unknown as VcsProvider;
+
+    const probe = mountProbe(7, provider);
+    probe.setProject({ org: 'o', project: 'p', repo: 'a' });
+    await waitForState(probe.outRef, (v) => v.threads.length === 1);
+    const replied = probe.outRef.current!.replyToThread('t1', 'late');
+
+    probe.setProject({ org: 'o', project: 'p', repo: 'b' });
+    await waitForState(
+      probe.outRef,
+      () =>
+        (provider.fetchCommentThreads as ReturnType<typeof vi.fn>).mock.calls
+          .length >= 3
+    );
+    await flush();
+    reply.resolve({
+      id: 'r1',
+      author: 'bob',
+      body: 'late',
+      createdAt: '2024-01-02T00:00:00Z',
+    });
+    await replied;
+    await flush();
+    expect(probe.outRef.current?.threads[0]?.comments).toHaveLength(1);
+    probe.unmount();
+  });
+
+  it('does not apply a resolve that lands after the user moved to another repository', async () => {
+    const resolved = deferred<undefined>();
+    const provider = {
+      id: 'azure-devops',
+      fetchCommentThreads: vi.fn().mockImplementation(() =>
+        Promise.resolve({
+          threads: [makeThread({ id: 't1' })],
+          generalComments: [],
+        })
+      ),
+      setThreadResolved: vi.fn().mockReturnValue(resolved.promise),
+    } as unknown as VcsProvider;
+
+    const probe = mountProbe(7, provider);
+    probe.setProject({ org: 'o', project: 'p', repo: 'a' });
+    await waitForState(probe.outRef, (v) => v.threads.length === 1);
+    const toggled = probe.outRef.current!.toggleResolved('t1', true);
+
+    probe.setProject({ org: 'o', project: 'p', repo: 'b' });
+    await waitForState(
+      probe.outRef,
+      () =>
+        (provider.fetchCommentThreads as ReturnType<typeof vi.fn>).mock.calls
+          .length >= 3
+    );
+    await flush();
+    resolved.resolve(undefined);
+    await toggled;
+    await flush();
+    expect(probe.outRef.current?.threads[0]?.isResolved).toBe(false);
+    probe.unmount();
+  });
+
   it('keeps its cache across a settings change that leaves the repository alone', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       threads: [makeThread({ id: 't1' })],

@@ -132,10 +132,14 @@ export function useRemoteComments(
           threads.map((t) =>
             t.id === threadId ? { ...t, comments: [...t.comments, reply] } : t
           );
-        setComments((prev) => ({
-          threads: updateThreads(prev.threads),
-          generalComments: updateThreads(prev.generalComments),
-        }));
+        // Only onto the threads it was made against: after a switch,
+        // the thread on screen can share this one's id.
+        if (activeKeyRef.current === requestKey) {
+          setComments((prev) => ({
+            threads: updateThreads(prev.threads),
+            generalComments: updateThreads(prev.generalComments),
+          }));
+        }
         // Also update cache
         const cached = cacheRef.current.get(requestKey);
         if (cached) {
@@ -169,10 +173,12 @@ export function useRemoteComments(
           threads.map((t) =>
             t.id === threadId ? { ...t, isResolved: resolved } : t
           );
-        setComments((prev) => ({
-          threads: updateThreads(prev.threads),
-          generalComments: updateThreads(prev.generalComments),
-        }));
+        if (activeKeyRef.current === requestKey) {
+          setComments((prev) => ({
+            threads: updateThreads(prev.threads),
+            generalComments: updateThreads(prev.generalComments),
+          }));
+        }
         const cached = cacheRef.current.get(requestKey);
         if (cached) {
           cacheRef.current.set(requestKey, {
