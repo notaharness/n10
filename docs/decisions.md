@@ -1223,6 +1223,15 @@ the deb has fixed paths. Where AppArmor blocks user namespaces (Ubuntu 24.04
 and later) the deb installs a profile, and the AppImage's launcher adds
 `--no-sandbox`.
 
+Release assets have versionless names, listed in
+`apps/desktop/release-assets.json`, so
+`https://github.com/notaharness/n10/releases/latest/download/<name>` always
+serves the current release; the website's download links read that file.
+During the beta there is one channel: a `-beta` GitHub release is not marked a
+prerelease, so `releases/latest`, npm's `latest` and a future updater agree.
+A separate beta channel comes with 1.0, alongside the updater's channel
+support.
+
 The app tells builds apart by manifest name, not `app.isPackaged`, which is
 false under the npm package too: `n10-dev` is the dev build, and anything else
 reports its manifest version. An installed app opens its last path argument,
