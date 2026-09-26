@@ -5,7 +5,6 @@ import type {
   RepoInfo,
   SettingsFieldView,
 } from '../../../host/contract.js';
-import { BEAM_STATUS, machines } from '../data/machines.js';
 import { requestedTheme } from '../embed.js';
 import { showAppMenu } from '../native/app-menu.js';
 import { showContextMenu } from '../native/context-menu.js';
@@ -80,25 +79,12 @@ type ShellHost = Pick<
   | 'forgetRecent'
   | 'getSettingsView'
   | 'updateSettingsField'
-  | 'openExternal'
   | 'showContextMenu'
   | 'showAppMenu'
   | 'onMenuCommand'
   | 'getDesktopPrefs'
   | 'setDesktopPrefs'
   | 'showAbout'
-  | 'listMachines'
-  | 'getBeamStatus'
-  | 'onBeamStatusChanged'
-  | 'setMachineAlias'
-  | 'setMachineGrant'
-  | 'runCeremony'
-  | 'cancelCeremony'
-  | 'resetFleet'
-  | 'onCeremonyProgress'
-  | 'onDirectoryPublished'
-  | 'onMachinesChanged'
-  | 'dismissInboundMail'
 >;
 
 export function createShellHost(state: DemoState): ShellHost {
@@ -106,13 +92,7 @@ export function createShellHost(state: DemoState): ShellHost {
     theme: requestedTheme() ?? 'system',
     nativeFrame: false,
   };
-  const never = new Channel<never>();
   const menuCommands = new Channel<MenuCommandEvent>();
-  const unavailable = {
-    ok: false as const,
-    code: 'demo',
-    detail: 'Machines need a real install.',
-  };
   return {
     getVersion: () =>
       later({ app: '1.0.0', electron: '44.0.0', node: '24.4.0', chrome: '' }),
@@ -138,7 +118,6 @@ export function createShellHost(state: DemoState): ShellHost {
     },
     getSettingsView: () => later(SETTINGS),
     updateSettingsField: () => later(undefined),
-    openExternal: () => later(undefined),
     showContextMenu,
     showAppMenu: () =>
       showAppMenu(prefs.theme, (command, arg) =>
@@ -151,17 +130,5 @@ export function createShellHost(state: DemoState): ShellHost {
       return later(prefs);
     },
     showAbout: () => later(undefined),
-    listMachines: () => later(machines()),
-    getBeamStatus: () => later(BEAM_STATUS),
-    onBeamStatusChanged: never.subscribe,
-    setMachineAlias: () => later(undefined),
-    setMachineGrant: () => later(undefined),
-    runCeremony: () => later(unavailable),
-    cancelCeremony: () => later(undefined),
-    resetFleet: () => later(unavailable),
-    onCeremonyProgress: never.subscribe,
-    onDirectoryPublished: never.subscribe,
-    onMachinesChanged: never.subscribe,
-    dismissInboundMail: () => later(undefined),
   };
 }
