@@ -171,7 +171,13 @@ const GEMINI: AgentDefinition = {
   blank: () => ({ cmd: 'gemini', args: [] }),
   // `-i`/`--prompt-interactive` seeds an interactive session; `-p` is
   // the headless mode that exits.
-  seed: (prompt) => ({ cmd: 'gemini', args: ['-i', prompt] }),
+  // Attach the value so option-like prompts remain literal under yargs.
+  seed: (prompt) => ({
+    cmd: 'gemini',
+    args: [`--prompt-interactive=${prompt}`],
+  }),
+  // `--resume latest` starts fresh if project history is missing (v0.61.0).
+  // No automatic resume until n10 can target a recorded conversation ID.
 };
 
 const OPENCODE: AgentDefinition = {

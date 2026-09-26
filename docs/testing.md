@@ -16,6 +16,9 @@ restore it. Preserve property-test counterexamples as regression cases. Tab and
 diff properties should check invariants such as valid active ids and comments
 appearing exactly once.
 
+Gemini CLI has [documented offline verification](gemini-cli.md), including
+which upstream sources were checked and which real-binary checks were unavailable.
+
 ## Desktop
 
 The `desktop-e2e` targets build Electron before testing. Directly invoking
