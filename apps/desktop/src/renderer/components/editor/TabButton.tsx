@@ -20,6 +20,8 @@ import {
 import { useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import type { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { cn } from '../../lib/utils.js';
+import { pressWithoutFocus } from './tab-keyboard.js';
+import { useSortableTab } from './TabStrip.js';
 
 type Closer = ReturnType<typeof useCloseTabs>;
 
@@ -94,7 +96,19 @@ function PlanCountBadge({ count }: { count: number }) {
   );
 }
 
-/** Always rendered; revealed on hover, or while the tab is active. */
+/** A tab that opened in the background and has not been looked at. */
+function UnseenDot() {
+  return (
+    <span
+      aria-label="Not yet opened"
+      className="size-1.5 shrink-0 rounded-full bg-primary"
+    />
+  );
+}
+
+/** Always rendered; revealed on hover, or while the tab is active.
+ *  Out of the Tab order: the row is one Tab stop, and Delete closes
+ *  the focused tab. */
 function TabCloseButton({
   active,
   onClose,
@@ -105,6 +119,7 @@ function TabCloseButton({
   return (
     <button
       type="button"
+      tabIndex={-1}
       onClick={onClose}
       aria-label="Close tab"
       className={cn(
@@ -152,6 +167,31 @@ async function runTabMenu(
   else if (chosen === 'pin') tabs.pin(tab.id);
 }
 
+function tabClassName({
+  active,
+  unseen,
+  dragging,
+  flashing,
+}: {
+  active: boolean;
+  unseen: boolean;
+  dragging: boolean;
+  flashing: boolean;
+}): string {
+  return cn(
+    'group relative flex h-full max-w-56 min-w-28 cursor-default items-center gap-2 border-r border-border pr-1.5 pl-3 text-base transition-colors select-none',
+    // Lifted above the tabs it slides over, and opaque across them;
+    // the active tab's own background wins below.
+    dragging && 'z-10 bg-tab',
+    active
+      ? 'bg-tab-active text-foreground'
+      : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+    unseen && 'text-foreground',
+    // The agent finished a work streak and nobody has looked yet.
+    flashing && !active && 'tab-attention'
+  );
+}
+
 export function TabButton({
   tab,
   item,
@@ -159,8 +199,9 @@ export function TabButton({
   closer,
   snapshot,
   foreignRepo,
-  startsGroup,
+  tabStop,
   running = false,
+  unseen = false,
   machineLabel,
 }: {
   tab: Tab;
@@ -170,11 +211,14 @@ export function TabButton({
   snapshot: SessionActivitySnapshot | undefined;
   /** Live state for a tab that has no item to read it from. */
   running?: boolean;
+  /** Opened in the background and not activated since. */
+  unseen?: boolean;
   /** The other repository this tab belongs to, or null when it is at
    *  home in the open one. */
   foreignRepo: string | null;
-  /** First tab of its repository's run — draw the group separator. */
-  startsGroup: boolean;
+  /** The row's one Tab stop: the active tab, or the first one while
+   *  none on the row is active. */
+  tabStop: boolean;
   /** The tab's machine, resolved by the caller — null for a local tab,
    *  or with only the local machine registered (ux-machines.md §6, D8). */
   machineLabel?: string | null;
@@ -185,32 +229,24 @@ export function TabButton({
   // A plan is built inside a tab and then navigated away from, so the
   // count has to be visible from wherever the user ends up.
   const planCount = usePlanCount(item?.pr?.id);
+  const { setNode, props, style, isDragging } = useSortableTab({
+    id: tab.id,
+    label,
+    tabStop,
+    actions: {
+      activate: () => tabs.activate(tab.id),
+      close: () => closer.close(tab.id),
+    },
+  });
 
   return (
     <div
-      role="tab"
+      ref={setNode}
+      {...props}
+      style={style}
       aria-selected={active}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/n10-tab', tab.id);
-        e.dataTransfer.effectAllowed = 'move';
-      }}
-      onDragOver={(e) => {
-        if (e.dataTransfer.types.includes('text/n10-tab')) {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-        }
-      }}
-      onDrop={(e) => {
-        const dragged = e.dataTransfer.getData('text/n10-tab');
-        if (!dragged || dragged === tab.id) return;
-        e.preventDefault();
-        const rect = e.currentTarget.getBoundingClientRect();
-        const side =
-          e.clientX < rect.left + rect.width / 2 ? 'before' : 'after';
-        tabs.moveTab(dragged, tab.id, side);
-      }}
       onMouseDown={(e) => {
+        pressWithoutFocus(e);
         if (e.button === 1) {
           e.preventDefault();
           closer.close(tab.id);
@@ -224,22 +260,13 @@ export function TabButton({
       }}
       title={tabTitle(tab, foreignRepo)}
       data-face={face}
-      // A repository boundary, named rather than left to the Tailwind
-      // classes below — those are a styling detail free to change, and
-      // a test asserting on `border-l` would break on a purely visual
-      // restyle that changes nothing about which tab starts a group.
-      data-starts-group={startsGroup || undefined}
-      className={cn(
-        'group relative flex h-full max-w-56 min-w-28 cursor-default items-center gap-2 border-r border-border pr-1.5 pl-3 text-base transition-colors select-none',
-        active
-          ? 'bg-tab-active text-foreground'
-          : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
-        // A repository boundary: the gap plus the extra rule reads as a
-        // group edge rather than as one more tab.
-        startsGroup && 'ml-1.5 border-l border-border',
-        // The agent finished a work streak and nobody has looked yet.
-        snapshot?.flashing && !active && 'tab-attention'
-      )}
+      data-unseen={unseen || undefined}
+      className={tabClassName({
+        active,
+        unseen,
+        dragging: isDragging,
+        flashing: snapshot?.flashing ?? false,
+      })}
     >
       {active && <span className="absolute inset-x-0 top-0 h-px bg-primary" />}
       <TabIcon
@@ -249,6 +276,7 @@ export function TabButton({
       />
       <TabLabel label={label} preview={tab.preview} foreignRepo={foreignRepo} />
       <PlanCountBadge count={planCount} />
+      {unseen && <UnseenDot />}
       <TabCloseButton
         active={active}
         onClose={(e) => {
