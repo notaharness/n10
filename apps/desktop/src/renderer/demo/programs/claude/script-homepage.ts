@@ -1,7 +1,7 @@
 import type { ClaudeScript } from './claude-code.js';
 
 /**
- * beam #39's agent, running on the rented server: it finishes the
+ * beam #39's agent, running on the desktop at home: it finishes the
  * homepage's reduced-motion handling and refreshes the page's CSP
  * hashes, the real change in that pull request.
  */

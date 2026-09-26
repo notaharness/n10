@@ -10,7 +10,8 @@ import type {
  * and the keys core would give their sessions.
  */
 export const VIEWER = 'HermannBjorgvin';
-export const TEAMMATE = 'sofia-codes';
+/** A made-up colleague, so nobody real reviews in the demo. */
+export const TEAMMATE = 'demo-teammate';
 export const HOME = '/home/you';
 
 type Loader = () => Promise<{ default: string }>;

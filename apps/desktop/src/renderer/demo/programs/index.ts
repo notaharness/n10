@@ -2,7 +2,7 @@ import type { PullRequestInfo } from '@n10/vcs-core';
 import type { SessionLaunchRequest } from '../../../host/contract.js';
 import { BEAM, HOMEPAGE_SESSION, PR_HOMEPAGE } from '../data/beam.js';
 import { HOME, displayDir, sessionKey } from '../data/identity.js';
-import { SERVER } from '../data/machines.js';
+import { DESKTOP } from '../data/machines.js';
 import { N10, PR_FLEET, PR_TABS } from '../data/n10.js';
 import type { DemoSession, SessionHub } from '../host/sessions.js';
 import type { RepoState } from '../host/state.js';
@@ -15,7 +15,7 @@ import { Zsh } from './zsh.js';
 
 /**
  * Which program runs in which session: what is alive when the page
- * loads (an agent in n10, one in beam on the rented server, and a zsh
+ * loads (an agent in n10, one in beam on the desktop at home, and a zsh
  * tab), and what launching, reviewing and checking out a plan start.
  */
 const DEMO_REPLY: Beat[] = [
@@ -71,7 +71,7 @@ export const PROGRAMS = {
     hub.spawn(HOMEPAGE_SESSION, new ClaudeCode(HOMEPAGE), {
       repo: BEAM,
       branch: PR_HOMEPAGE.sourceBranch,
-      machine: SERVER,
+      machine: DESKTOP,
     });
     hub.spawn(
       JSON.stringify(['terminal', 'n10-shell']),

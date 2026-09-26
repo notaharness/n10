@@ -1,10 +1,10 @@
 import type { PullRequestInfo } from '@n10/vcs-core';
 import { HOME, VIEWER, prUrl, sessionKey, type RepoData } from './identity.js';
-import { SERVER } from './machines.js';
+import { DESKTOP } from './machines.js';
 
 /**
  * beam, n10's machine fleet, with its two open pull requests as they
- * really are. #39's agent runs on the rented server rather than this
+ * really are. #39's agent runs on the desktop at home rather than this
  * laptop, which is how its tab shows a machine.
  */
 export const BEAM = `${HOME}/code/beam`;
@@ -41,7 +41,7 @@ const PR_PUBLISHING: PullRequestInfo = {
 export const HOMEPAGE_SESSION = sessionKey(
   BEAM,
   PR_HOMEPAGE.sourceBranch,
-  SERVER
+  DESKTOP
 );
 
 export const BEAM_REPO: RepoData = {
