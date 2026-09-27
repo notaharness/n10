@@ -8,54 +8,78 @@ import { ghGraphQL } from './gh-graphql.js';
 import { mapReviewState } from './gh-reviews.js';
 
 /**
- * A pull request's reviewers as GitHub names them: each account's
- * latest review, and every open review request — people and teams —
- * with both connections read page by page to the end.
+ * A pull request's reviewers as GitHub names them, each connection read
+ * page by page to the end:
+ *
+ * - `latestOpinionatedReviews`: each account's standing verdict. A reply
+ *   in a review thread is filed as a `COMMENTED` review, so the latest
+ *   review alone would hide an approval GitHub still counts.
+ * - `latestReviews`: everyone who reviewed, so someone who only
+ *   commented is listed too, with no verdict.
+ * - `reviewRequests`: every open request, people and teams.
  */
 
-export const REVIEWS = `
-        latestReviews(first: 100, after: $reviewsCursor) {
-          totalCount
-          pageInfo { hasNextPage endCursor }
-          nodes {
-            author { login ... on User { name } }
-            state
-            commit { oid }
-          }
-        }`;
+const ACTOR = 'login ... on Node { id } ... on User { name }';
 
-export const REQUESTS = `
-        reviewRequests(first: 100, after: $requestsCursor) {
-          totalCount
-          pageInfo { hasNextPage endCursor }
-          nodes {
+const CONNECTIONS = {
+  latestOpinionatedReviews: {
+    cursor: 'opinionsCursor',
+    query: 'PullRequestOpinionsPage',
+    nodes: `author { ${ACTOR} } state commit { oid }
+            onBehalfOf(first: 10) { nodes { combinedSlug } }`,
+  },
+  latestReviews: {
+    cursor: 'reviewsCursor',
+    query: 'PullRequestReviewsPage',
+    nodes: `author { ${ACTOR} } state`,
+  },
+  reviewRequests: {
+    cursor: 'requestsCursor',
+    query: 'PullRequestRequestsPage',
+    nodes: `asCodeOwner
             requestedReviewer {
-              __typename
+              ... on Node { id }
               ... on User { login name }
               ... on Bot { login }
               ... on Mannequin { login }
-              ... on Team { slug name organization { login } }
-            }
-          }
+              ... on Team { combinedSlug name }
+              ... on EnterpriseTeam { combinedSlug name }
+            }`,
+  },
+} as const;
+
+type Key = keyof typeof CONNECTIONS;
+const KEYS = Object.keys(CONNECTIONS) as Key[];
+
+function connection(key: Key): string {
+  const { cursor, nodes } = CONNECTIONS[key];
+  return `
+        ${key}(first: 100, after: $${cursor}) {
+          totalCount
+          pageInfo { hasNextPage endCursor }
+          nodes { ${nodes} }
         }`;
+}
 
-const REVIEWS_PAGE_QUERY = `
-  query PullRequestReviewsPage($owner: String!, $repo: String!, $number: Int!, $reviewsCursor: String) {
+/** The reviewer connections, for the detail query's pull request. */
+export const REVIEWER_FIELDS = KEYS.map(connection).join('');
+
+/** The cursor variables `REVIEWER_FIELDS` takes. */
+export const REVIEWER_CURSORS = KEYS.map(
+  (k) => `$${CONNECTIONS[k].cursor}: String`
+).join(', ');
+
+function pageQuery(key: Key): string {
+  const { cursor, query } = CONNECTIONS[key];
+  return `
+  query ${query}($owner: String!, $repo: String!, $number: Int!, $${cursor}: String) {
     repository(owner: $owner, name: $repo) {
-      pullRequest(number: $number) {${REVIEWS}
+      pullRequest(number: $number) {${connection(key)}
       }
     }
   }
 `;
-
-const REQUESTS_PAGE_QUERY = `
-  query PullRequestRequestsPage($owner: String!, $repo: String!, $number: Int!, $requestsCursor: String) {
-    repository(owner: $owner, name: $repo) {
-      pullRequest(number: $number) {${REQUESTS}
-      }
-    }
-  }
-`;
+}
 
 /** A connection is read at most this many pages deep — 1,000 reviewers
  *  — and reported incomplete past it rather than read forever. */
@@ -67,26 +91,40 @@ export interface Page<T> {
   nodes: T[];
 }
 
-export interface ReviewNode {
-  author: { login: string; name?: string | null } | null;
+interface Actor {
+  login: string;
+  id?: string;
+  name?: string | null;
+}
+
+export interface OpinionNode {
+  author: Actor | null;
   state: string;
   commit: { oid: string } | null;
+  onBehalfOf: { nodes: ({ combinedSlug: string } | null)[] };
+}
+
+export interface ReviewNode {
+  author: Actor | null;
+  state: string;
 }
 
 export interface RequestNode {
+  asCodeOwner: boolean;
+  /** Null, or empty, for a reviewer this account may not see — a
+   *  code-owner team in an organization it is not part of. */
   requestedReviewer: {
-    __typename: string;
+    id?: string;
     login?: string;
     name?: string | null;
-    slug?: string;
-    organization?: { login: string };
+    combinedSlug?: string;
   } | null;
 }
 
-interface PageResponse<K extends string, T> {
-  data: {
-    repository: { pullRequest: Record<K, Page<T>> | null } | null;
-  };
+export interface ReviewerConnections {
+  latestOpinionatedReviews: Page<OpinionNode>;
+  latestReviews: Page<ReviewNode>;
+  reviewRequests: Page<RequestNode>;
 }
 
 /**
@@ -108,41 +146,78 @@ async function restOf<T>(
   return { nodes, complete: true };
 }
 
-function reviewer(node: ReviewNode): DetailReviewer | null {
-  if (!node.author) return null;
+/** A reviewer before anything is known of them. */
+const NOBODY: Omit<DetailReviewer, 'kind' | 'identifier' | 'displayName'> = {
+  id: null,
+  decision: 'no-response',
+  native: null,
+  requested: false,
+  required: null,
+  reason: null,
+  onBehalfOf: [],
+  reviewedHead: null,
+};
+
+function person(actor: Actor | null) {
+  if (!actor?.login) return null;
   return {
-    kind: 'user',
-    identifier: node.author.login,
-    displayName: node.author.name || node.author.login,
-    decision: mapReviewState(node.state),
-    native: node.state,
-    requested: false,
-    required: null,
-    reviewedHead: isOid(node.commit?.oid) ? node.commit.oid : null,
+    kind: 'user' as const,
+    identifier: actor.login,
+    id: actor.id ?? null,
+    displayName: actor.name || actor.login,
   };
 }
 
-function requested(node: RequestNode): DetailReviewer | null {
-  const who = node.requestedReviewer;
+function verdict(node: OpinionNode): DetailReviewer | null {
+  const who = person(node.author);
   if (!who) return null;
-  const base = {
-    decision: 'no-response',
-    native: null,
+  const decision = mapReviewState(node.state);
+  const judged = decision !== 'no-response' && isOid(node.commit?.oid);
+  return {
+    ...NOBODY,
+    ...who,
+    decision,
+    native: node.state,
+    onBehalfOf: node.onBehalfOf.nodes.flatMap((t) =>
+      t ? [t.combinedSlug] : []
+    ),
+    reviewedHead: judged && node.commit ? node.commit.oid : null,
+  };
+}
+
+/** Someone who reviewed without a standing verdict: a comment names a
+ *  commit, but judges none. */
+function commenter(node: ReviewNode): DetailReviewer | null {
+  const who = person(node.author);
+  if (!who) return null;
+  return {
+    ...NOBODY,
+    ...who,
+    decision: mapReviewState(node.state),
+    native: node.state,
+  };
+}
+
+function request(node: RequestNode): DetailReviewer | null {
+  const who = node.requestedReviewer;
+  const asked = {
+    ...NOBODY,
+    id: who?.id ?? null,
     requested: true,
-    required: null,
-    reviewedHead: null,
-  } as const;
-  if (who.__typename === 'Team' && who.slug && who.organization) {
+    reason: node.asCodeOwner ? ('code-owner' as const) : null,
+  };
+  if (who?.combinedSlug) {
+    const name = who.combinedSlug;
     return {
-      ...base,
+      ...asked,
       kind: 'team',
-      identifier: `${who.organization.login}/${who.slug}`,
-      displayName: who.name || who.slug,
+      identifier: name,
+      displayName: who.name || name,
     };
   }
-  if (!who.login) return null;
+  if (!who?.login) return null;
   return {
-    ...base,
+    ...asked,
     kind: 'user',
     identifier: who.login,
     displayName: who.name || who.login,
@@ -150,72 +225,94 @@ function requested(node: RequestNode): DetailReviewer | null {
 }
 
 /**
- * Everyone who reviewed, then everyone asked who has not: someone asked
- * again after a verdict keeps the verdict and is marked requested.
+ * Everyone with a verdict, then everyone who only commented, then
+ * everyone asked who has done neither: someone asked again after a
+ * verdict keeps the verdict and is marked requested. Reviewers GitHub
+ * will not name to this account are counted, not listed; each is in
+ * `latestReviews` or `reviewRequests`, so those two are counted.
  */
 function mergeReviewers(
+  opinions: readonly OpinionNode[],
   reviews: readonly ReviewNode[],
   requests: readonly RequestNode[]
-): DetailReviewer[] {
+): { items: DetailReviewer[]; unnamed: number } {
   const byId = new Map<string, DetailReviewer>();
-  for (const r of reviews.map(reviewer)) {
-    if (r) byId.set(r.identifier.toLowerCase(), r);
+  const keep = (r: DetailReviewer | null) => {
+    if (r && !byId.has(r.identifier.toLowerCase())) {
+      byId.set(r.identifier.toLowerCase(), r);
+    }
+  };
+  opinions.map(verdict).forEach(keep);
+  const listed = reviews.map(commenter);
+  listed.forEach(keep);
+  const asked = requests.map(request);
+  for (const r of asked) {
+    const was = r && byId.get(r.identifier.toLowerCase());
+    if (r && was) {
+      byId.set(r.identifier.toLowerCase(), {
+        ...was,
+        requested: true,
+        reason: r.reason,
+        id: was.id ?? r.id,
+      });
+    } else keep(r);
   }
-  for (const r of requests.map(requested)) {
-    if (!r) continue;
-    const key = r.identifier.toLowerCase();
-    const reviewed = byId.get(key);
-    byId.set(key, reviewed ? { ...reviewed, requested: true } : r);
-  }
-  return [...byId.values()];
+  const unnamed = [...listed, ...asked].filter((r) => r === null).length;
+  return { items: [...byId.values()], unnamed };
 }
 
-export async function reviewersOf(
+interface PageResponse<K extends Key> {
+  data: {
+    repository: {
+      pullRequest: Pick<ReviewerConnections, K> | null;
+    } | null;
+  };
+}
+
+function pages<K extends Key>(
   vars: { owner: string; repo: string; number: number },
-  node: {
-    latestReviews: Page<ReviewNode>;
-    reviewRequests: Page<RequestNode>;
-  }
-): Promise<ListRead<DetailReviewer>> {
-  const pullRequest = async <K extends 'latestReviews' | 'reviewRequests', T>(
-    query: string,
-    key: K,
-    cursor: Record<string, string>
-  ): Promise<Page<T>> => {
-    const res = (await ghGraphQL(query, {
+  key: K
+) {
+  return async (cursor: string) => {
+    const res = (await ghGraphQL(pageQuery(key), {
       ...vars,
-      ...cursor,
-    })) as PageResponse<K, T>;
-    const page = res.data.repository?.pullRequest?.[key];
-    if (!page) {
+      [CONNECTIONS[key].cursor]: cursor,
+    })) as PageResponse<K>;
+    const pr = res.data.repository?.pullRequest;
+    if (!pr) {
       throw new VcsError(
         'not-found',
         `GitHub could not find ${vars.owner}/${vars.repo}#${vars.number} while reading its reviewers`
       );
     }
-    return page;
+    return pr[key];
   };
-  const [reviews, requests] = await Promise.all([
-    restOf(node.latestReviews, (c) =>
-      pullRequest<'latestReviews', ReviewNode>(
-        REVIEWS_PAGE_QUERY,
-        'latestReviews',
-        {
-          reviewsCursor: c,
-        }
-      )
+}
+
+export async function reviewersOf(
+  vars: { owner: string; repo: string; number: number },
+  first: ReviewerConnections
+): Promise<ListRead<DetailReviewer>> {
+  const [opinions, reviews, requests] = await Promise.all([
+    restOf(
+      first.latestOpinionatedReviews,
+      pages(vars, 'latestOpinionatedReviews')
     ),
-    restOf(node.reviewRequests, (c) =>
-      pullRequest<'reviewRequests', RequestNode>(
-        REQUESTS_PAGE_QUERY,
-        'reviewRequests',
-        { requestsCursor: c }
-      )
-    ),
+    restOf(first.latestReviews, pages(vars, 'latestReviews')),
+    restOf(first.reviewRequests, pages(vars, 'reviewRequests')),
   ]);
-  const items = mergeReviewers(reviews.nodes, requests.nodes);
-  const complete = reviews.complete && requests.complete;
-  // Someone can appear in both connections, so their counts do not add
-  // up to a head count until both are read to the end.
-  return { items, total: complete ? items.length : null, complete };
+  const { items, unnamed } = mergeReviewers(
+    opinions.nodes,
+    reviews.nodes,
+    requests.nodes
+  );
+  // Someone can appear in several connections, so their counts do not
+  // add up to a head count until all are read to the end.
+  if (!(opinions.complete && reviews.complete && requests.complete)) {
+    return { items, total: null, complete: false };
+  }
+  const total = items.length + unnamed;
+  return unnamed === 0
+    ? { items, total, complete: true }
+    : { items, total, complete: false };
 }

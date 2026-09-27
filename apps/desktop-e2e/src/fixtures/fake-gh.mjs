@@ -144,12 +144,32 @@ function searchNode(pr) {
   };
 }
 
-/** The repository the scenario stands for, with a stable node id. */
-function repositoryNode() {
-  const owner = scenario.owner ?? 'n10';
-  const repo = scenario.repo ?? 'fixture';
-  return { id: `R_${owner}_${repo}`, nameWithOwner: `${owner}/${repo}` };
+/** A repository's `databaseId`: a stable number derived from its name,
+ *  so the same repository always answers with the same id. */
+function repositoryNode(nameWithOwner) {
+  let databaseId = 7;
+  for (const c of nameWithOwner) {
+    databaseId = (databaseId * 31 + c.charCodeAt(0)) % 2_000_000_000;
+  }
+  return { databaseId, nameWithOwner };
 }
+
+/** The repository the scenario stands for. */
+function scenarioRepository() {
+  return repositoryNode(
+    `${scenario.owner ?? 'n10'}/${scenario.repo ?? 'fixture'}`
+  );
+}
+
+/** Each author's latest review among `reviews`, oldest first, whose
+ *  state passes `keep`. */
+function latestPerAuthor(reviews, keep) {
+  const byAuthor = new Map();
+  for (const r of reviews) if (keep(r.state)) byAuthor.set(r.author, r);
+  return [...byAuthor.values()];
+}
+
+const VERDICT_STATES = new Set(['APPROVED', 'CHANGES_REQUESTED']);
 
 /**
  * The selected-pull-request read (libs/vcs/github/src/lib/pr-details.ts),
@@ -158,13 +178,18 @@ function repositoryNode() {
  */
 function detailNode(pr) {
   const list = searchNode(pr);
-  const repository = repositoryNode();
-  const fork = pr.fork === undefined ? repository.nameWithOwner : pr.fork;
+  const repository = scenarioRepository();
+  const head =
+    pr.fork === undefined || pr.fork === repository.nameWithOwner
+      ? repository
+      : pr.fork && repositoryNode(pr.fork);
   const connection = (nodes) => ({
     totalCount: nodes.length,
     pageInfo: page,
     nodes,
   });
+  const author = (login) => ({ login, id: `U_${login}` });
+  const reviews = pr.reviews ?? [];
   return {
     ...repository,
     pullRequest: {
@@ -179,19 +204,27 @@ function detailNode(pr) {
       author: list.author,
       headRefName: pr.headRefName,
       headRefOid: list.headRefOid,
-      headRepository: fork && { id: `R_${fork}`, nameWithOwner: fork },
+      headRepository: head,
       baseRefName: list.baseRefName,
       baseRefOid: 'e'.repeat(40),
-      latestReviews: connection(
-        (pr.reviews ?? []).map((r) => ({
-          author: { login: r.author },
+      latestOpinionatedReviews: connection(
+        latestPerAuthor(reviews, (s) => VERDICT_STATES.has(s)).map((r) => ({
+          author: author(r.author),
           state: r.state,
           commit: { oid: list.headRefOid },
+          onBehalfOf: { nodes: [] },
+        }))
+      ),
+      latestReviews: connection(
+        latestPerAuthor(reviews, (s) => s !== 'PENDING').map((r) => ({
+          author: author(r.author),
+          state: r.state,
         }))
       ),
       reviewRequests: connection(
         (pr.reviewRequests ?? []).map((login) => ({
-          requestedReviewer: { __typename: 'User', login },
+          asCodeOwner: false,
+          requestedReviewer: { id: `U_${login}`, login },
         }))
       ),
     },

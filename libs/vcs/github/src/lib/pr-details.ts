@@ -1,21 +1,18 @@
 import {
   isOid,
+  readFailure,
   VcsError,
   type Capability,
-  type DetailReviewer,
-  type ListRead,
   type PullRequestDetail,
   type PullRequestLifecycle,
   type RepositoryRef,
 } from '@n10/vcs-core';
 import { ghGraphQL } from './gh-graphql.js';
 import {
-  REQUESTS,
-  REVIEWS,
+  REVIEWER_CURSORS,
+  REVIEWER_FIELDS,
   reviewersOf,
-  type Page,
-  type RequestNode,
-  type ReviewNode,
+  type ReviewerConnections,
 } from './pr-reviewers.js';
 
 /**
@@ -23,14 +20,18 @@ import {
  * pull request, then further pages of its reviews and review requests
  * until each connection is read to the end.
  *
+ * A repository is identified by its `databaseId`, the number REST
+ * calls `id`. Its node id is not stable: GitHub answers in a legacy or
+ * a newer format depending on a request header.
+ *
  * This is read for one pull request at a time, on demand — never per
  * sidebar row, which the list query serves.
  */
 
 const DETAIL_QUERY = `
-  query PullRequestDetail($owner: String!, $repo: String!, $number: Int!, $reviewsCursor: String, $requestsCursor: String) {
+  query PullRequestDetail($owner: String!, $repo: String!, $number: Int!, ${REVIEWER_CURSORS}) {
     repository(owner: $owner, name: $repo) {
-      id
+      databaseId
       nameWithOwner
       pullRequest(number: $number) {
         number
@@ -44,15 +45,20 @@ const DETAIL_QUERY = `
         author { login ... on User { name } }
         headRefName
         headRefOid
-        headRepository { id nameWithOwner }
+        headRepository { databaseId nameWithOwner }
         baseRefName
-        baseRefOid${REVIEWS}${REQUESTS}
+        baseRefOid${REVIEWER_FIELDS}
       }
     }
   }
 `;
 
-interface DetailNode {
+interface Repository {
+  databaseId: number;
+  nameWithOwner: string;
+}
+
+interface DetailNode extends ReviewerConnections {
   number: number;
   title: string;
   url: string;
@@ -64,29 +70,23 @@ interface DetailNode {
   author: { login: string; name?: string | null } | null;
   headRefName: string;
   headRefOid: string;
-  headRepository: { id: string; nameWithOwner: string } | null;
+  headRepository: Repository | null;
   baseRefName: string;
   baseRefOid: string | null;
-  latestReviews: Page<ReviewNode>;
-  reviewRequests: Page<RequestNode>;
 }
 
 interface DetailResponse {
   data: {
-    repository: {
-      id: string;
-      nameWithOwner: string;
-      pullRequest: DetailNode | null;
-    } | null;
+    repository: (Repository & { pullRequest: DetailNode | null }) | null;
   };
 }
 
-function githubRepository(id: string, nameWithOwner: string): RepositoryRef {
+function githubRepository(repository: Repository): RepositoryRef {
   return {
     provider: 'github',
     host: 'github.com',
-    repository: nameWithOwner,
-    id,
+    repository: repository.nameWithOwner,
+    id: String(repository.databaseId),
   };
 }
 
@@ -117,9 +117,9 @@ function updateCapability(canUpdate: boolean): Capability {
 }
 
 function detailOf(
-  repository: { id: string; nameWithOwner: string },
+  repository: Repository,
   node: DetailNode,
-  reviewers: ListRead<DetailReviewer>
+  reviewers: PullRequestDetail['reviewers']
 ): PullRequestDetail {
   if (!isOid(node.headRefOid)) {
     throw new VcsError(
@@ -128,10 +128,7 @@ function detailOf(
     );
   }
   return {
-    ref: {
-      ...githubRepository(repository.id, repository.nameWithOwner),
-      number: node.number,
-    },
+    ref: { ...githubRepository(repository), number: node.number },
     title: node.title,
     url: node.url,
     // A deleted account shows as GitHub's own "ghost".
@@ -145,10 +142,7 @@ function detailOf(
     source: {
       branch: node.headRefName,
       repository: node.headRepository
-        ? githubRepository(
-            node.headRepository.id,
-            node.headRepository.nameWithOwner
-          )
+        ? githubRepository(node.headRepository)
         : null,
       head: node.headRefOid,
     },
@@ -178,5 +172,11 @@ export async function fetchPullRequestDetailGitHub(
       `GitHub could not find ${owner}/${repo}#${number}, or this account cannot see it`
     );
   }
-  return detailOf(repository, node, await reviewersOf(vars, node));
+  // Every other field arrived with the first answer; a later reviewer
+  // page that fails takes only the reviewers with it.
+  const reviewers = await reviewersOf(vars, node).then(
+    (value) => ({ state: 'read' as const, value }),
+    readFailure
+  );
+  return detailOf(repository, node, reviewers);
 }

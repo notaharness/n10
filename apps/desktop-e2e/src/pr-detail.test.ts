@@ -18,8 +18,17 @@ const GITHUB: FakeGitHub = {
       headRefName: 'cancel-requests',
       author: 'alex',
       fork: 'alex/fixture',
-      reviews: [{ author: 'bea', state: 'APPROVED' }],
+      // A reply in a thread, after the approval, is a COMMENTED review.
+      reviews: [
+        { author: 'bea', state: 'APPROVED' },
+        { author: 'bea', state: 'COMMENTED' },
+      ],
       reviewRequests: ['n10-tester'],
+    },
+    {
+      number: 215,
+      title: 'Tidy the retry helper',
+      headRefName: 'tidy-retry',
     },
   ],
 };
@@ -37,11 +46,16 @@ interface Bridge {
   n10: { getPullRequestSnapshot(req: unknown): Promise<unknown> };
 }
 
-function snapshot(page: Page, viewer: string | null) {
+function snapshot(page: Page, viewer: string | null, number = REF.number) {
   return page.evaluate(
     (req) => (window as unknown as Bridge).n10.getPullRequestSnapshot(req),
-    { ref: REF, viewer }
+    { ref: { ...REF, number }, viewer }
   );
+}
+
+interface Read {
+  ref: { id: string };
+  detail: { value: { source: { repository: { id: string } } } };
 }
 
 test.describe('Selected pull request detail', () => {
@@ -49,7 +63,7 @@ test.describe('Selected pull request detail', () => {
     desktop,
   }) => {
     await expect(snapshot(desktop.page, 'n10-tester')).resolves.toMatchObject({
-      ref: { ...REF, id: 'R_n10_fixture' },
+      ref: { ...REF, id: expect.stringMatching(/^\d+$/) as unknown },
       viewer: 'n10-tester',
       head: { from: 'detail' },
       detail: {
@@ -58,24 +72,36 @@ test.describe('Selected pull request detail', () => {
           lifecycle: { state: 'open', native: 'OPEN' },
           source: {
             branch: 'cancel-requests',
-            repository: { repository: 'alex/fixture', id: 'R_alex/fixture' },
+            repository: { repository: 'alex/fixture' },
           },
           reviewers: {
-            complete: true,
-            total: 2,
-            items: [
-              { identifier: 'bea', decision: 'approved', requested: false },
-              {
-                identifier: 'n10-tester',
-                decision: 'no-response',
-                requested: true,
-              },
-            ],
+            state: 'read',
+            value: {
+              complete: true,
+              total: 2,
+              items: [
+                // The approval stands through the later comment.
+                { identifier: 'bea', decision: 'approved', requested: false },
+                {
+                  identifier: 'n10-tester',
+                  decision: 'no-response',
+                  requested: true,
+                },
+              ],
+            },
           },
           capabilities: { update: { state: 'supported' } },
         },
       },
     });
+  });
+
+  test('tells a fork from the repository by id', async ({ desktop }) => {
+    const fork = (await snapshot(desktop.page, 'n10-tester')) as Read;
+    const own = (await snapshot(desktop.page, 'n10-tester', 215)) as Read;
+    expect(fork.detail.value.source.repository.id).not.toBe(fork.ref.id);
+    expect(own.detail.value.source.repository.id).toBe(own.ref.id);
+    expect(own.ref.id).toBe(fork.ref.id);
   });
 
   test('keeps the list row when the detail read fails', async ({ desktop }) => {

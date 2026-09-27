@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { isVcsError } from '@n10/vcs-core';
+import {
+  isVcsError,
+  type DetailReviewer,
+  type ListRead,
+  type PullRequestDetail,
+} from '@n10/vcs-core';
 import { fetchPullRequestDetailGitHub } from './pr-details.js';
 import { githubProvider } from './provider.js';
 
@@ -25,12 +30,18 @@ function fixture(name: string): Json {
   ) as Json;
 }
 
-/** The first page with both connections ending there. */
+const CONNECTIONS = [
+  'latestOpinionatedReviews',
+  'latestReviews',
+  'reviewRequests',
+] as const;
+
+/** The first page with every connection ending there. */
 function onePage(edit: (pr: Json) => void = () => undefined): Json {
   const answer = fixture('pr-detail');
   const pr = (answer.data as Json).repository as Json;
   const node = pr.pullRequest as Json;
-  for (const key of ['latestReviews', 'reviewRequests']) {
+  for (const key of CONNECTIONS) {
     const conn = node[key] as Json;
     conn.pageInfo = { hasNextPage: false, endCursor: null };
   }
@@ -38,8 +49,13 @@ function onePage(edit: (pr: Json) => void = () => undefined): Json {
   return answer;
 }
 
+/** What `gh` prints when it fails, in place of an answer. */
+interface Failure {
+  stderr: string;
+}
+
 /** Answer each `gh` call with the next of `answers`, by query name. */
-function answerWith(answers: Record<string, Json[]>) {
+function answerWith(answers: Record<string, (Json | Failure)[]>) {
   mockExecFile.mockImplementation(
     (
       _cmd: string,
@@ -50,6 +66,7 @@ function answerWith(answers: Record<string, Json[]>) {
       const name = /query (\w+)/.exec(query)?.[1] ?? '';
       const next = answers[name]?.shift();
       if (!next) cb({ stderr: `unexpected query ${name}` });
+      else if ('stderr' in next) cb(next);
       else cb(null, { stdout: JSON.stringify(next) });
     }
   );
@@ -81,7 +98,7 @@ describe('fetchPullRequestDetailGitHub: identity', () => {
       provider: 'github',
       host: 'github.com',
       repository: 'acme/app',
-      id: 'R_kgDOAcme01',
+      id: '11223344',
       number: 214,
     });
     expect(detail.author).toEqual({
@@ -99,7 +116,7 @@ describe('fetchPullRequestDetailGitHub: identity', () => {
         provider: 'github',
         host: 'github.com',
         repository: 'acme/app',
-        id: 'R_kgDOAcme01',
+        id: '11223344',
       },
       head: '1'.repeat(40),
     });
@@ -116,7 +133,10 @@ describe('fetchPullRequestDetailGitHub: identity', () => {
     answerWith({
       PullRequestDetail: [
         onePage((pr) => {
-          pr.headRepository = { id: 'R_fork', nameWithOwner: 'alex/app' };
+          pr.headRepository = {
+            databaseId: 55667788,
+            nameWithOwner: 'alex/app',
+          };
         }),
         onePage((pr) => {
           pr.headRepository = null;
@@ -128,11 +148,11 @@ describe('fetchPullRequestDetailGitHub: identity', () => {
       provider: 'github',
       host: 'github.com',
       repository: 'alex/app',
-      id: 'R_fork',
+      id: '55667788',
     });
     // The fork's id, not the base repository's: the same branch name in
     // two repositories is two branches.
-    expect(fork.ref.id).toBe('R_kgDOAcme01');
+    expect(fork.ref.id).toBe('11223344');
 
     const deleted = await fetchPullRequestDetailGitHub('acme', 'app', 214);
     expect(deleted.source.repository).toBeNull();
@@ -193,97 +213,215 @@ describe('fetchPullRequestDetailGitHub: identity', () => {
   });
 });
 
+/** The reviewers, which a well-formed answer always reads. */
+function readReviewers(detail: PullRequestDetail): ListRead<DetailReviewer> {
+  if (detail.reviewers.state !== 'read') {
+    throw new Error(`reviewers were not read: ${detail.reviewers.reason}`);
+  }
+  return detail.reviewers.value;
+}
+
+/** A reviewer as the read names them, with nothing yet known. */
+function reviewer(fields: Partial<DetailReviewer>): DetailReviewer {
+  return {
+    kind: 'user',
+    identifier: '',
+    id: null,
+    displayName: '',
+    decision: 'no-response',
+    native: null,
+    requested: false,
+    required: null,
+    reason: null,
+    onBehalfOf: [],
+    reviewedHead: null,
+    ...fields,
+  };
+}
+
+/** The connection `key` of a pull request answer. */
+function connectionOf(answer: Json, key: string): Json {
+  const repo = (answer.data as Json).repository as Json;
+  return (repo.pullRequest as Json)[key] as Json;
+}
+
+const PAGE_QUERY: Record<(typeof CONNECTIONS)[number], string> = {
+  latestOpinionatedReviews: 'PullRequestOpinionsPage',
+  latestReviews: 'PullRequestReviewsPage',
+  reviewRequests: 'PullRequestRequestsPage',
+};
+
+const CURSOR: Record<(typeof CONNECTIONS)[number], string> = {
+  latestOpinionatedReviews: 'opinionsCursor',
+  latestReviews: 'reviewsCursor',
+  reviewRequests: 'requestsCursor',
+};
+
 describe('fetchPullRequestDetailGitHub: reviewers', () => {
-  it('reads every page of reviews and requests, people and teams', async () => {
+  it('reads every page of verdicts, reviews and requests, people and teams', async () => {
     answerWith({
       PullRequestDetail: [fixture('pr-detail')],
+      PullRequestOpinionsPage: [fixture('pr-detail-opinions-page-2')],
       PullRequestReviewsPage: [fixture('pr-detail-reviews-page-2')],
       PullRequestRequestsPage: [fixture('pr-detail-requests-page-2')],
     });
-    const { reviewers } = await fetchPullRequestDetailGitHub(
-      'acme',
-      'app',
-      214
+    const reviewers = readReviewers(
+      await fetchPullRequestDetailGitHub('acme', 'app', 214)
     );
 
-    expect(reviewers).toMatchObject({ total: 5, complete: true });
+    expect(reviewers).toMatchObject({ total: 7, complete: true });
     expect(reviewers.items).toEqual([
-      // Approved an older commit, and asked again since: the verdict and
-      // the request are both kept, and so is which commit it judged.
-      {
-        kind: 'user',
+      // Approved an older commit, replied in a thread since — which
+      // GitHub files as a COMMENTED review — and was asked again. The
+      // approval stands, and so does which commit it judged.
+      reviewer({
         identifier: 'Bea',
+        id: 'U_bea',
         displayName: 'Bea',
         decision: 'approved',
         native: 'APPROVED',
         requested: true,
-        required: null,
         reviewedHead: '0'.repeat(39) + '1',
-      },
-      {
-        kind: 'user',
+      }),
+      reviewer({
         identifier: 'cy',
+        id: 'U_cy',
         displayName: 'cy',
         decision: 'changes-requested',
         native: 'CHANGES_REQUESTED',
-        requested: false,
-        required: null,
+        onBehalfOf: ['acme/web'],
         reviewedHead: '1'.repeat(40),
-      },
-      // A comment is not a verdict, and names no reviewed commit.
-      {
-        kind: 'user',
+      }),
+      reviewer({
+        identifier: 'fay',
+        id: 'U_fay',
+        displayName: 'Fay',
+        decision: 'approved',
+        native: 'APPROVED',
+        reviewedHead: '1'.repeat(40),
+      }),
+      // Only commented: listed, with no verdict and no judged commit.
+      reviewer({
         identifier: 'dee',
+        id: 'U_dee',
         displayName: 'Dee',
-        decision: 'no-response',
         native: 'COMMENTED',
-        requested: false,
-        required: null,
-        reviewedHead: null,
-      },
-      {
+      }),
+      reviewer({
         kind: 'team',
         identifier: 'acme/core',
+        id: 'T_core',
         displayName: 'Core team',
-        decision: 'no-response',
-        native: null,
         requested: true,
-        required: null,
-        reviewedHead: null,
-      },
-      {
-        kind: 'user',
+        reason: 'code-owner',
+      }),
+      reviewer({
         identifier: 'eve',
+        id: 'U_eve',
         displayName: 'eve',
-        decision: 'no-response',
-        native: null,
         requested: true,
-        required: null,
-        reviewedHead: null,
-      },
+      }),
+      reviewer({
+        kind: 'team',
+        identifier: 'acme-enterprise/platform',
+        id: 'ET_plat',
+        displayName: 'Platform',
+        requested: true,
+      }),
     ]);
 
     // Each further page is asked for after the cursor it continues from.
     expect(
       calls()
         .filter((c) => c.name !== 'PullRequestDetail')
-        .map((c) => [c.name, c.vars.reviewsCursor ?? c.vars.requestsCursor])
+        .map((c) => [
+          c.name,
+          c.vars.opinionsCursor ??
+            c.vars.reviewsCursor ??
+            c.vars.requestsCursor,
+        ])
         .sort()
     ).toEqual([
+      ['PullRequestOpinionsPage', 'op-1'],
       ['PullRequestRequestsPage', 'req-1'],
       ['PullRequestReviewsPage', 'rev-1'],
     ]);
   });
 
-  it('stops after ten pages and says the list is incomplete', async () => {
-    const endless = (): Json => {
-      const page = fixture('pr-detail-reviews-page-2');
-      const conn = (
-        ((page.data as Json).repository as Json).pullRequest as Json
-      ).latestReviews as Json;
-      conn.pageInfo = { hasNextPage: true, endCursor: 'more' };
-      return page;
-    };
+  it('counts reviewers GitHub will not name, and says the list is incomplete', async () => {
+    answerWith({
+      PullRequestDetail: [
+        onePage((pr) => {
+          const requests = pr.reviewRequests as Json;
+          // A code-owner team in an organization this account is not in,
+          // and a reviewer type the read does not know.
+          requests.nodes = [
+            ...(requests.nodes as Json[]),
+            { asCodeOwner: true, requestedReviewer: null },
+            { asCodeOwner: false, requestedReviewer: {} },
+          ];
+          const reviews = pr.latestReviews as Json;
+          reviews.nodes = [
+            ...(reviews.nodes as Json[]),
+            { author: null, state: 'COMMENTED' },
+          ];
+        }),
+      ],
+    });
+    const reviewers = readReviewers(
+      await fetchPullRequestDetailGitHub('acme', 'app', 214)
+    );
+    expect(reviewers.items.map((r) => r.identifier)).toEqual([
+      'Bea',
+      'cy',
+      'acme/core',
+    ]);
+    expect(reviewers).toMatchObject({ complete: false, total: 6 });
+  });
+
+  it.each(CONNECTIONS)(
+    'follows each cursor of %s, stops after ten pages and claims no count',
+    async (key) => {
+      const endless = (n: number): Json => {
+        const answer = fixture(
+          {
+            latestOpinionatedReviews: 'pr-detail-opinions-page-2',
+            latestReviews: 'pr-detail-reviews-page-2',
+            reviewRequests: 'pr-detail-requests-page-2',
+          }[key]
+        );
+        connectionOf(answer, key).pageInfo = {
+          hasNextPage: true,
+          endCursor: `${key}-${n + 2}`,
+        };
+        return answer;
+      };
+      answerWith({
+        PullRequestDetail: [
+          onePage((pr) => {
+            (pr[key] as Json).pageInfo = {
+              hasNextPage: true,
+              endCursor: `${key}-1`,
+            };
+          }),
+        ],
+        [PAGE_QUERY[key]]: Array.from({ length: 20 }, (_, n) => endless(n)),
+      });
+      const reviewers = readReviewers(
+        await fetchPullRequestDetailGitHub('acme', 'app', 214)
+      );
+      expect(reviewers.complete).toBe(false);
+      // Someone can be in several connections, so no count is claimed.
+      expect(reviewers.total).toBeNull();
+      expect(
+        calls()
+          .filter((c) => c.name === PAGE_QUERY[key])
+          .map((c) => c.vars[CURSOR[key]])
+      ).toEqual(Array.from({ length: 9 }, (_, n) => `${key}-${n + 1}`));
+    }
+  );
+
+  it('keeps the rest of the detail when a reviewer page fails', async () => {
     answerWith({
       PullRequestDetail: [
         onePage((pr) => {
@@ -293,19 +431,17 @@ describe('fetchPullRequestDetailGitHub: reviewers', () => {
           };
         }),
       ],
-      PullRequestReviewsPage: Array.from({ length: 20 }, endless),
+      PullRequestReviewsPage: [
+        { stderr: 'gh: API rate limit exceeded for user ID 1. (HTTP 403)' },
+      ],
     });
-    const { reviewers } = await fetchPullRequestDetailGitHub(
-      'acme',
-      'app',
-      214
-    );
-    expect(reviewers.complete).toBe(false);
-    // Someone can be on both lists, so no count is claimed.
-    expect(reviewers.total).toBeNull();
-    expect(
-      calls().filter((c) => c.name === 'PullRequestReviewsPage')
-    ).toHaveLength(9);
+    const detail = await fetchPullRequestDetailGitHub('acme', 'app', 214);
+    expect(detail.reviewers).toMatchObject({
+      state: 'failed',
+      kind: 'throttled',
+    });
+    expect(detail.lifecycle.state).toBe('open');
+    expect(detail.source.head).toBe('1'.repeat(40));
   });
 });
 
@@ -317,7 +453,7 @@ describe('fetchPullRequestDetailGitHub: refusals', () => {
         {
           data: {
             repository: {
-              id: 'R',
+              databaseId: 1,
               nameWithOwner: 'acme/app',
               pullRequest: null,
             },

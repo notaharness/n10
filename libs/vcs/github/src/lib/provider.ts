@@ -46,12 +46,25 @@ export function parseGitHubRemoteUrl(
   return null;
 }
 
+/** Review states that leave the reviewer's earlier verdict standing.
+ *  A dismissal does not: it sets the verdict aside. */
+const REMARKS = new Set(['COMMENTED', 'PENDING']);
+
+/**
+ * Each reviewer's standing verdict, oldest reviews first. A reply in a
+ * review thread is filed as a `COMMENTED` review, so a comment after a
+ * verdict leaves the verdict standing, as GitHub counts it.
+ */
 export function latestReviewPerUser(
   reviews: { author: { login: string } | null; state: string }[]
 ): PullRequestReviewer[] {
   const byUser = new Map<string, { login: string; state: string }>();
   for (const r of reviews) {
     if (!r.author) continue;
+    const standing = byUser.get(r.author.login);
+    if (standing && !REMARKS.has(standing.state) && REMARKS.has(r.state)) {
+      continue;
+    }
     byUser.set(r.author.login, { login: r.author.login, state: r.state });
   }
   return [...byUser.values()].map((r) => ({

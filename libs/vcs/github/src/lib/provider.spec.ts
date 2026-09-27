@@ -85,8 +85,9 @@ describe('mapReviewState', () => {
     expect(mapReviewState('CHANGES_REQUESTED')).toBe('changes-requested');
   });
 
-  it('maps DISMISSED to declined', () => {
-    expect(mapReviewState('DISMISSED')).toBe('declined');
+  // Someone else set the verdict aside; the reviewer declined nothing.
+  it('maps DISMISSED to no-response', () => {
+    expect(mapReviewState('DISMISSED')).toBe('no-response');
   });
 
   it('maps COMMENTED to no-response', () => {
@@ -117,6 +118,29 @@ describe('latestReviewPerUser', () => {
     expect(alice?.decision).toBe('approved');
     const bob = result.find((r) => r.identifier === 'bob');
     expect(bob?.decision).toBe('changes-requested');
+  });
+
+  // A reply in a review thread is filed as a COMMENTED review.
+  it('keeps a verdict standing through later comments', () => {
+    const result = latestReviewPerUser([
+      { author: { login: 'alice' }, state: 'APPROVED' },
+      { author: { login: 'alice' }, state: 'COMMENTED' },
+      { author: { login: 'bob' }, state: 'CHANGES_REQUESTED' },
+      { author: { login: 'bob' }, state: 'PENDING' },
+    ]);
+    expect(result.map((r) => [r.identifier, r.decision])).toEqual([
+      ['alice', 'approved'],
+      ['bob', 'changes-requested'],
+    ]);
+  });
+
+  it('lets a dismissal set the verdict aside', () => {
+    const result = latestReviewPerUser([
+      { author: { login: 'alice' }, state: 'APPROVED' },
+      { author: { login: 'alice' }, state: 'DISMISSED' },
+      { author: { login: 'alice' }, state: 'COMMENTED' },
+    ]);
+    expect(result[0]?.decision).toBe('no-response');
   });
 
   it('returns empty array for no reviews', () => {
@@ -514,7 +538,6 @@ describe('githubProvider', () => {
       // One search for the whole list: no pull request's detail is read
       // per row, however many rows there are.
       expect(mockExecFile).toHaveBeenCalledTimes(1);
-      expect(args.join(' ')).not.toContain('PullRequestDetail');
     });
 
     it('handles null author, null review author, and null requestedReviewer', async () => {

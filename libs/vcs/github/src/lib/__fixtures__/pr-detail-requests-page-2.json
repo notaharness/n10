@@ -3,14 +3,26 @@
     "repository": {
       "pullRequest": {
         "reviewRequests": {
-          "totalCount": 3,
-          "pageInfo": { "hasNextPage": false, "endCursor": "req-2" },
+          "totalCount": 4,
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "req-2"
+          },
           "nodes": [
             {
+              "asCodeOwner": false,
               "requestedReviewer": {
-                "__typename": "User",
+                "id": "U_eve",
                 "login": "eve",
                 "name": null
+              }
+            },
+            {
+              "asCodeOwner": false,
+              "requestedReviewer": {
+                "id": "ET_plat",
+                "combinedSlug": "acme-enterprise/platform",
+                "name": "Platform"
               }
             }
           ]

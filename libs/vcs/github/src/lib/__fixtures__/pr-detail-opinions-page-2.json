@@ -2,28 +2,26 @@
   "data": {
     "repository": {
       "pullRequest": {
-        "latestReviews": {
-          "totalCount": 4,
+        "latestOpinionatedReviews": {
+          "totalCount": 3,
           "pageInfo": {
             "hasNextPage": false,
-            "endCursor": "rev-2"
+            "endCursor": "op-2"
           },
           "nodes": [
-            {
-              "author": {
-                "login": "dee",
-                "id": "U_dee",
-                "name": "Dee"
-              },
-              "state": "COMMENTED"
-            },
             {
               "author": {
                 "login": "fay",
                 "id": "U_fay",
                 "name": "Fay"
               },
-              "state": "APPROVED"
+              "state": "APPROVED",
+              "commit": {
+                "oid": "1111111111111111111111111111111111111111"
+              },
+              "onBehalfOf": {
+                "nodes": []
+              }
             }
           ]
         }

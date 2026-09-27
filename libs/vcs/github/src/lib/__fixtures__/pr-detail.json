@@ -1,7 +1,7 @@
 {
   "data": {
     "repository": {
-      "id": "R_kgDOAcme01",
+      "databaseId": 11223344,
       "nameWithOwner": "acme/app",
       "pullRequest": {
         "number": 214,
@@ -19,13 +19,54 @@
         "headRefName": "cancel-requests",
         "headRefOid": "1111111111111111111111111111111111111111",
         "headRepository": {
-          "id": "R_kgDOAcme01",
+          "databaseId": 11223344,
           "nameWithOwner": "acme/app"
         },
         "baseRefName": "main",
         "baseRefOid": "2222222222222222222222222222222222222222",
-        "latestReviews": {
+        "latestOpinionatedReviews": {
           "totalCount": 3,
+          "pageInfo": {
+            "hasNextPage": true,
+            "endCursor": "op-1"
+          },
+          "nodes": [
+            {
+              "author": {
+                "login": "Bea",
+                "id": "U_bea",
+                "name": "Bea"
+              },
+              "state": "APPROVED",
+              "commit": {
+                "oid": "0000000000000000000000000000000000000001"
+              },
+              "onBehalfOf": {
+                "nodes": []
+              }
+            },
+            {
+              "author": {
+                "login": "cy",
+                "id": "U_cy",
+                "name": null
+              },
+              "state": "CHANGES_REQUESTED",
+              "commit": {
+                "oid": "1111111111111111111111111111111111111111"
+              },
+              "onBehalfOf": {
+                "nodes": [
+                  {
+                    "combinedSlug": "acme/web"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "latestReviews": {
+          "totalCount": 4,
           "pageInfo": {
             "hasNextPage": true,
             "endCursor": "rev-1"
@@ -34,47 +75,42 @@
             {
               "author": {
                 "login": "Bea",
+                "id": "U_bea",
                 "name": "Bea"
               },
-              "state": "APPROVED",
-              "commit": {
-                "oid": "0000000000000000000000000000000000000001"
-              }
+              "state": "COMMENTED"
             },
             {
               "author": {
                 "login": "cy",
+                "id": "U_cy",
                 "name": null
               },
-              "state": "CHANGES_REQUESTED",
-              "commit": {
-                "oid": "1111111111111111111111111111111111111111"
-              }
+              "state": "CHANGES_REQUESTED"
             }
           ]
         },
         "reviewRequests": {
-          "totalCount": 3,
+          "totalCount": 4,
           "pageInfo": {
             "hasNextPage": true,
             "endCursor": "req-1"
           },
           "nodes": [
             {
+              "asCodeOwner": false,
               "requestedReviewer": {
-                "__typename": "User",
+                "id": "U_bea",
                 "login": "bea",
                 "name": "Bea"
               }
             },
             {
+              "asCodeOwner": true,
               "requestedReviewer": {
-                "__typename": "Team",
-                "slug": "core",
-                "name": "Core team",
-                "organization": {
-                  "login": "acme"
-                }
+                "id": "T_core",
+                "combinedSlug": "acme/core",
+                "name": "Core team"
               }
             }
           ]

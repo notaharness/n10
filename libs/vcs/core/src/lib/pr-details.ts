@@ -180,16 +180,15 @@ export interface PullRequestLifecycle {
 }
 
 /**
- * Some of a list, and whether it is the whole of it. `total` is the
- * provider's own count, or null when it gives none. A caller that
+ * Some of a list, and whether it is the whole of it. A caller that
  * shows an incomplete list says so ("12 of 30", "total unknown"); it
- * never presents a partial list as everyone.
+ * never presents a partial list as everyone. `total` counts everyone,
+ * named or not: an incomplete list may know it, because the provider
+ * counted people it would not name to this account, or may not.
  */
-export interface ListRead<T> {
-  items: T[];
-  total: number | null;
-  complete: boolean;
-}
+export type ListRead<T> =
+  | { items: T[]; complete: true; total: number }
+  | { items: T[]; complete: false; total: number | null };
 
 /**
  * Someone asked to review, or who has, as the detail read names them.
@@ -199,20 +198,38 @@ export interface ListRead<T> {
 export interface DetailReviewer {
   kind: 'user' | 'team';
   /** A login or email; for a team, the provider's name for it
-   *  (`org/slug` on GitHub). */
+   *  (`org/slug` on GitHub). Reviewers are compared by this,
+   *  ignoring case. */
   identifier: string;
+  /** The provider's handle for acting on this reviewer — a GitHub node
+   *  id, an Azure DevOps identity id — or null where it gives none.
+   *  Opaque: not for comparing or storing. */
+  id: string | null;
   displayName: string;
-  /** The shared reading of the verdict, as the list row gives it. */
+  /** The shared reading of their standing verdict. A later comment does
+   *  not withdraw a verdict. */
   decision: ReviewDecision;
-  /** The provider's own verdict — `APPROVED`, `CHANGES_REQUESTED`, an
-   *  Azure vote of `-5` or `10` — or null where none was given. */
+  /** The provider's own verdict — `APPROVED`, `COMMENTED`, an Azure
+   *  vote of `-5` or `10` — or null where none was given. The shared
+   *  reading merges some votes (Azure's `10` and `5` are both
+   *  approved), so a label in the provider's words reads this. */
   native: string | null;
-  /** A review is asked of them now. Someone can be asked again after
-   *  giving a verdict, so this and `decision` are separate facts. */
+  /** The provider holds an open request for their review. Someone can
+   *  be asked again after giving a verdict, so this and `decision` are
+   *  separate facts. Azure DevOps keeps no request apart from its list,
+   *  so there a listed reviewer who has not voted is asked; flagging a
+   *  reviewer for attention is not a request. */
   requested: boolean;
   /** Required by the provider's own rules, or null where the provider
    *  does not say. */
   required: boolean | null;
+  /** Why the provider asked for them, where it says: as a code owner of
+   *  the changed files, or by a branch policy. A code owner's review is
+   *  not required unless a rule makes it so. */
+  reason: 'code-owner' | 'policy' | null;
+  /** The teams their review answered for (`org/slug`): a team's request
+   *  is met, and leaves the list, once a member reviews for it. */
+  onBehalfOf: string[];
   /** The commit the verdict was given on; null for no verdict or where
    *  the provider does not say. A verdict on an older commit is not an
    *  approval of the head. */
@@ -242,9 +259,9 @@ export interface PullRequestDetail {
   createdAt: string | null;
   updatedAt: string | null;
   /** Everyone asked to review and everyone who has, all pages read, or
-   *  marked incomplete. */
-  reviewers: ListRead<DetailReviewer>;
-  /** What the viewer may change: the title, description and draft
-   *  state. */
+   *  marked incomplete. Read after the rest, and failed on its own. */
+  reviewers: ReadOutcome<ListRead<DetailReviewer>>;
+  /** Whether the viewer may edit the title and description. Draft and
+   *  ready depend on the lifecycle as well, and are not this. */
   capabilities: { update: Capability };
 }
