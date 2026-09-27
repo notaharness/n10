@@ -73,7 +73,7 @@ vi.mock('@n10/review-comments', async () => {
         const found = state.comments.find((x) => x.id === c.id);
         if (found) found.status = 'posted';
       }
-      return Promise.resolve(undefined);
+      return Promise.resolve(comments);
     },
   };
 });

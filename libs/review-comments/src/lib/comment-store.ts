@@ -8,7 +8,7 @@ import {
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { withFileLock } from './file-lock.js';
+import { isOwnerGone, ownerToken, withFileLock } from './file-lock.js';
 import type { ReviewComment, ReviewCommentsFile } from './types.js';
 
 const REVIEWS_DIR = join(homedir(), '.n10', 'reviews');
@@ -155,5 +155,68 @@ export function removeComment(scope: DraftScope, id: string): boolean {
     if (idx === -1) return false;
     comments.splice(idx, 1);
     return true;
+  });
+}
+
+/**
+ * How long a claim is honoured when its poster cannot be shown dead —
+ * its pid may have been reused. Far longer than any post takes.
+ */
+const CLAIM_ABANDONED_MS = 10 * 60_000;
+
+/** A draft, or a post that died holding its claim (or left none). */
+function isClaimable(comment: ReviewComment, now: number): boolean {
+  if (comment.status === 'draft') return true;
+  if (comment.status !== 'posting') return false;
+  const { claim } = comment;
+  return !claim || isOwnerGone(claim.token, now - claim.at, CLAIM_ABANDONED_MS);
+}
+
+/**
+ * Claim drafts for posting, as one transaction under the drafts' lock:
+ * each of `ids` still claimable becomes `posting` under this process's
+ * token. Another poster that gets there first holds the claim, so a
+ * draft is only ever posted by the one that claimed it. Returns the
+ * token and the ids it claimed.
+ */
+export function claimForPosting(
+  scope: DraftScope,
+  ids: readonly string[]
+): { token: string; claimed: Set<string> } {
+  const token = ownerToken();
+  const at = Date.now();
+  const claimed = new Set<string>();
+  modifyComments(scope, (comments) => {
+    for (const comment of comments) {
+      if (!ids.includes(comment.id) || !isClaimable(comment, at)) continue;
+      comment.status = 'posting';
+      comment.claim = { token, at };
+      claimed.add(comment.id);
+    }
+    return claimed.size > 0;
+  });
+  return { token, claimed };
+}
+
+/**
+ * End a claim: `posted` once the provider took the drafts, `draft` to
+ * offer them again. Only drafts still claimed under `token` change, so
+ * a poster whose claim was taken over cannot undo the new one.
+ */
+export function settleClaim(
+  scope: DraftScope,
+  ids: readonly string[],
+  token: string,
+  status: 'posted' | 'draft'
+): void {
+  modifyComments(scope, (comments) => {
+    let changed = false;
+    for (const comment of comments) {
+      if (!ids.includes(comment.id) || comment.claim?.token !== token) continue;
+      comment.status = status;
+      delete comment.claim;
+      changed = true;
+    }
+    return changed;
   });
 }

@@ -1,16 +1,34 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ReviewComment } from '@n10/review-comments';
-import type * as ReviewCommentsModule from '@n10/review-comments';
-import { postReviewComments } from '@n10/review-comments';
+import { rmSync } from 'node:fs';
+import { afterAll, describe, it, expect, vi, beforeEach } from 'vitest';
+import type { PostContext, ReviewComment } from '@n10/review-comments';
+import {
+  appendComment,
+  draftRepoKey,
+  postReviewComments,
+} from '@n10/review-comments';
 
-// Mock comment-store before importing the module under test
-vi.mock('@n10/review-comments', async (importOriginal) => {
-  const actual = await importOriginal<typeof ReviewCommentsModule>();
-  return {
-    ...actual,
-    updateComment: vi.fn(),
-  };
+// The poster claims each draft in the store before sending it, and the
+// store lives under $HOME, so the drafts go in a scratch one — set
+// before the store is imported, since it resolves the path then.
+await vi.hoisted(async () => {
+  const { mkdtempSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+  process.env.HOME = mkdtempSync(join(tmpdir(), 'n10-cli-poster-'));
 });
+
+afterAll(() => {
+  // Only ever the scratch HOME made above, never a real one.
+  const home = process.env.HOME ?? '';
+  if (home.includes('n10-cli-poster-')) rmSync(home, { recursive: true });
+});
+
+/** Post a draft that is in the store, as both shells do. */
+function post(comment: ReviewComment, ctx: PostContext) {
+  const repo = draftRepoKey(ctx.vendor, ctx.vendorProject);
+  if (repo) appendComment({ repo, prId: ctx.prId }, comment);
+  return postReviewComments([comment], ctx);
+}
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -43,7 +61,7 @@ describe('postAzureDevOps via fetch()', () => {
     });
 
     const comment = makeComment();
-    await postReviewComments([comment], {
+    await post(comment, {
       vendor: 'azure-devops',
       vendorAuth: { pat: 'my-pat' },
       vendorProject: { org: 'myorg', project: 'myproj', repo: 'myrepo' },
@@ -82,7 +100,7 @@ describe('postAzureDevOps via fetch()', () => {
     });
 
     await expect(
-      postReviewComments([makeComment()], {
+      post(makeComment(), {
         vendor: 'azure-devops',
         vendorAuth: { pat: 'bad' },
         vendorProject: { org: 'o', project: 'p', repo: 'r' },

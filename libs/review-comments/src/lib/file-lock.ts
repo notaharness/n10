@@ -59,7 +59,8 @@ function errorCode(err: unknown): string | undefined {
   return (err as NodeJS.ErrnoException).code;
 }
 
-function newToken(): string {
+/** A token naming this process: its machine, its pid and a nonce. */
+export function ownerToken(): string {
   return JSON.stringify({ host: HOST, pid: process.pid, id: randomUUID() });
 }
 
@@ -122,10 +123,23 @@ function isRunning(pid: number): boolean {
   }
 }
 
-function isAbandoned(holder: Holder, timing: LockTiming): boolean {
-  if (holder.ageMs > timing.abandonedMs) return true;
-  const owner = ownerOf(holder.token);
+/**
+ * Whether the process `token` names is gone: shown dead on this machine,
+ * or — when that cannot be checked, or its pid may since have been
+ * reused — older than `abandonedMs`.
+ */
+export function isOwnerGone(
+  token: string,
+  ageMs: number,
+  abandonedMs: number
+): boolean {
+  if (ageMs > abandonedMs) return true;
+  const owner = ownerOf(token);
   return owner?.host === HOST && !isRunning(owner.pid);
+}
+
+function isAbandoned(holder: Holder, timing: LockTiming): boolean {
+  return isOwnerGone(holder.token, holder.ageMs, timing.abandonedMs);
 }
 
 function removeIfHeldBy(path: string, token: string): void {
@@ -143,7 +157,7 @@ export function breakAbandonedLock(
   timing: LockTiming = DEFAULT_TIMING
 ): void {
   const breaker = `${lockPath}.break`;
-  const token = newToken();
+  const token = ownerToken();
   if (!tryCreate(breaker, token)) {
     const other = readHolder(breaker);
     if (other && isAbandoned(other, timing)) {
@@ -164,7 +178,7 @@ export function withFileLock<T>(
   fn: () => T,
   timing: LockTiming = DEFAULT_TIMING
 ): T {
-  const token = newToken();
+  const token = ownerToken();
   const deadline = Date.now() + timing.timeoutMs;
   while (!tryCreate(lockPath, token)) {
     if (Date.now() > deadline) {

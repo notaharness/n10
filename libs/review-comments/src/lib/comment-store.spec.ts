@@ -355,3 +355,59 @@ describe('the file on disk', () => {
     expect(parsed.comments).toHaveLength(2);
   });
 });
+
+describe('claiming drafts for posting', () => {
+  const token = (pid: number) =>
+    JSON.stringify({ host: hostname(), pid, id: 'x' });
+  const status = () =>
+    store.readComments(SCOPE).map((c) => [c.id, c.status, c.claim?.token]);
+
+  it('claims drafts, and only drafts', () => {
+    store.appendComment(SCOPE, comment('a'));
+    store.appendComment(SCOPE, { ...comment('b'), status: 'posted' });
+    const { token: mine, claimed } = store.claimForPosting(SCOPE, ['a', 'b']);
+    expect([...claimed]).toEqual(['a']);
+    expect(status()).toEqual([
+      ['a', 'posting', mine],
+      ['b', 'posted', undefined],
+    ]);
+  });
+
+  it('leaves a draft another live poster has claimed', () => {
+    const live = { token: token(process.pid), at: Date.now() };
+    store.appendComment(SCOPE, {
+      ...comment('a'),
+      status: 'posting',
+      claim: live,
+    });
+    expect(store.claimForPosting(SCOPE, ['a']).claimed.size).toBe(0);
+  });
+
+  it('takes over the claim of a poster that died mid-post', () => {
+    const { pid } = spawnSync(process.execPath, ['-e', '']);
+    store.appendComment(SCOPE, {
+      ...comment('a'),
+      status: 'posting',
+      claim: { token: token(pid!), at: Date.now() },
+    });
+    expect([...store.claimForPosting(SCOPE, ['a']).claimed]).toEqual(['a']);
+  });
+
+  it('takes over a claim too old to trust, whose pid may be reused', () => {
+    store.appendComment(SCOPE, {
+      ...comment('a'),
+      status: 'posting',
+      claim: { token: token(process.pid), at: Date.now() - 11 * 60_000 },
+    });
+    expect([...store.claimForPosting(SCOPE, ['a']).claimed]).toEqual(['a']);
+  });
+
+  it('settles only a claim it still holds', () => {
+    store.appendComment(SCOPE, comment('a'));
+    const first = store.claimForPosting(SCOPE, ['a']);
+    store.settleClaim(SCOPE, ['a'], 'someone else', 'draft');
+    expect(status()).toEqual([['a', 'posting', first.token]]);
+    store.settleClaim(SCOPE, ['a'], first.token, 'posted');
+    expect(status()).toEqual([['a', 'posted', undefined]]);
+  });
+});

@@ -6,8 +6,9 @@ import {
   withAgentFooter,
 } from './conventional.js';
 import {
+  claimForPosting,
   draftRepoKey,
-  updateComment,
+  settleClaim,
   type DraftScope,
 } from './comment-store.js';
 
@@ -95,25 +96,45 @@ function draftScopeOf(ctx: PostContext): DraftScope {
   return { repo, prId: ctx.prId };
 }
 
+/**
+ * Post drafts, each exactly once however many shells try at the same
+ * time.
+ *
+ * The drafts are claimed first (`claimForPosting`): only those this
+ * call claims are sent, and a draft another poster holds is skipped.
+ * They end `posted`, or back at `draft` when the provider refused, so a
+ * retry offers them again. Returns the drafts it posted — empty when
+ * someone else was already posting all of them.
+ */
 export async function postReviewComments(
   comments: ReviewComment[],
   ctx: PostContext,
   event: 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES' = 'COMMENT'
-): Promise<void> {
+): Promise<ReviewComment[]> {
   assertPostable(comments);
   const drafts = draftScopeOf(ctx);
-  if (ctx.vendor === 'github') {
-    await postGitHub(comments, ctx, event);
-  } else if (ctx.vendor === 'azure-devops') {
-    await postAzureDevOps(comments, ctx);
-  } else {
-    throw new Error(`Unsupported vendor: ${ctx.vendor}`);
+  if (ctx.vendor === 'github' && !ctx.headSha) {
+    throw new Error('headSha is required for GitHub reviews');
   }
-
-  // Mark all as posted
-  for (const comment of comments) {
-    updateComment(drafts, comment.id, { status: 'posted' });
+  const { token, claimed } = claimForPosting(
+    drafts,
+    comments.map((c) => c.id)
+  );
+  const mine = comments.filter((c) => claimed.has(c.id));
+  if (mine.length === 0) return [];
+  const ids = mine.map((c) => c.id);
+  try {
+    if (ctx.vendor === 'github') {
+      await postGitHub(mine, ctx, event);
+    } else {
+      await postAzureDevOps(mine, ctx);
+    }
+  } catch (err) {
+    settleClaim(drafts, ids, token, 'draft');
+    throw err;
   }
+  settleClaim(drafts, ids, token, 'posted');
+  return mine;
 }
 
 async function postGitHub(
@@ -121,9 +142,6 @@ async function postGitHub(
   ctx: PostContext,
   event: 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES'
 ): Promise<void> {
-  if (!ctx.headSha) {
-    throw new Error('headSha is required for GitHub reviews');
-  }
   const owner = ctx.vendorProject.owner;
   const repo = ctx.vendorProject.repo;
 

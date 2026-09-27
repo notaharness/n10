@@ -22,22 +22,25 @@ const env = vi.hoisted(() => ({
   fetches: [] as { url: string; init: RequestInit }[],
   fetchOk: true,
   fetchStatus: 200,
-  marked: [] as {
-    scope: DraftScope;
-    id: string;
-    patch: Record<string, unknown>;
-  }[],
+  /** How each claim ended: `settleClaim` calls, one per draft. */
+  marked: [] as { scope: DraftScope; id: string; status: string }[],
+  /** Another poster holds every draft. */
+  claimedElsewhere: false,
 }));
 
 vi.mock('./comment-store.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  updateComment: (
+  claimForPosting: (_scope: DraftScope, ids: string[]) => ({
+    token: 'token',
+    claimed: new Set(env.claimedElsewhere ? [] : ids),
+  }),
+  settleClaim: (
     scope: DraftScope,
-    id: string,
-    patch: Record<string, unknown>
+    ids: string[],
+    _token: string,
+    status: string
   ) => {
-    env.marked.push({ scope, id, patch });
-    return true;
+    for (const id of ids) env.marked.push({ scope, id, status });
   },
 }));
 
@@ -107,6 +110,7 @@ beforeEach(() => {
   env.fetchOk = true;
   env.fetchStatus = 200;
   env.marked = [];
+  env.claimedElsewhere = false;
 
   vi.stubGlobal(
     'fetch',
@@ -326,10 +330,17 @@ describe('marking comments posted', () => {
       [comment({ id: 'a' }), comment({ id: 'b' })],
       github
     );
-    expect(env.marked.map(({ id, patch }) => ({ id, patch }))).toEqual([
-      { id: 'a', patch: { status: 'posted' } },
-      { id: 'b', patch: { status: 'posted' } },
+    expect(env.marked.map(({ id, status }) => ({ id, status }))).toEqual([
+      { id: 'a', status: 'posted' },
+      { id: 'b', status: 'posted' },
     ]);
+  });
+
+  it('posts nothing another poster has claimed', async () => {
+    env.claimedElsewhere = true;
+    await expect(postReviewComments([comment()], github)).resolves.toEqual([]);
+    expect(env.ghInputs).toEqual([]);
+    expect(env.marked).toEqual([]);
   });
 
   /** A draft is stored under the repository it is for; marking another
@@ -348,12 +359,14 @@ describe('marking comments posted', () => {
     expect(env.fetches).toEqual([]);
   });
 
-  it('marks nothing when the post failed', async () => {
-    // Marking early would lose the comment: it is neither on the pull
-    // request nor still a draft to retry.
+  it('offers them again as drafts when the post failed', async () => {
+    // Marking them posted would lose them: they are not on the pull
+    // request, and a posted draft is never retried.
     env.ghExitCode = 1;
     await expect(postReviewComments([comment()], github)).rejects.toThrow();
-    expect(env.marked).toEqual([]);
+    expect(env.marked.map(({ id, status }) => ({ id, status }))).toEqual([
+      { id: 'c1', status: 'draft' },
+    ]);
   });
 });
 

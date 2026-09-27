@@ -172,14 +172,15 @@ function actionPostComment(a: DiffViewerActionCtx): void {
 
   const postedId = comment.id;
   const drafts = commentCtx.drafts;
-  updateComment(drafts, postedId, { status: 'posting' });
 
   // Loading state shown by the top-right spinner; no "Posting
   // comment…" flash. Result/failure toasts fire on completion.
   void ctx.asyncOps.run('post-comment', async () => {
     try {
-      await postReviewComments([comment], postCtx);
-      ctx.sessions.flashStatus('Comment posted');
+      const done = await postReviewComments([comment], postCtx);
+      ctx.sessions.flashStatus(
+        done.length > 0 ? 'Comment posted' : 'Already being posted elsewhere'
+      );
       // Refetch remote threads so the newly-created remote thread
       // for this comment shows up in the diff viewer — the local
       // copy is now `status: 'posted'` and filtered from render, so
@@ -203,7 +204,6 @@ function actionPostComment(a: DiffViewerActionCtx): void {
         ctx.pane.setSelectedCommentId(null);
       }
     } catch (err) {
-      updateComment(drafts, postedId, { status: 'draft' });
       ctx.sessions.flashStatus(`Post failed: ${(err as Error).message}`);
     }
   });
