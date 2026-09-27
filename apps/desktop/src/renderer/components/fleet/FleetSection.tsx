@@ -1,4 +1,4 @@
-import { ChevronRightIcon, NetworkIcon } from 'lucide-react';
+import { ChevronRightIcon, NetworkIcon, PlusIcon } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useBeamStatus, useMachines } from '../../lib/data/queries.js';
 import { useFleet } from '../../lib/fleet/fleet-context.js';
@@ -13,6 +13,8 @@ import {
   CollapsibleTrigger,
 } from '../ui/collapsible.js';
 import { FocusScope } from '../../lib/fleet/use-focus-on-mount.js';
+import { Button } from '../ui/button.js';
+import { Tip } from '../ui/tooltip.js';
 import { FleetPanel } from './FleetPanel.js';
 
 const TONE_CLASS: Record<SummaryTone, string> = {
@@ -37,7 +39,8 @@ function useAwaitingPasskey(): boolean {
  * sidebar and the repository picker's show the same section.
  */
 export function FleetSection() {
-  const { section } = useFleet();
+  const { section, adding, setAdding, reset, enrolment, revocation } =
+    useFleet();
   const { expanded, setExpanded, revealSeq, takeRevealFocus } = section;
   const beam = useBeamStatus().data;
   const machines = useMachines().data;
@@ -59,32 +62,57 @@ export function FleetSection() {
       onOpenChange={setExpanded}
       className="flex min-h-0 flex-col"
     >
-      <CollapsibleTrigger asChild>
-        <button
-          ref={trigger}
-          type="button"
-          className="flex h-[22px] w-full shrink-0 items-center gap-1 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
-        >
-          <ChevronRightIcon
-            className={cn(
-              'size-3.5 transition-transform',
-              expanded && 'rotate-90'
-            )}
-          />
-          <NetworkIcon aria-hidden className="size-3.5" />
-          <span>Fleet</span>
-          {summary && (
-            <span
+      <div className="flex shrink-0 items-center gap-1">
+        <CollapsibleTrigger asChild>
+          <button
+            ref={trigger}
+            type="button"
+            className="flex h-[22px] min-w-0 flex-1 shrink-0 items-center gap-1 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+          >
+            <ChevronRightIcon
               className={cn(
-                'ml-auto mr-1 truncate font-medium normal-case tracking-normal',
-                TONE_CLASS[summary.tone]
+                'size-3.5 transition-transform',
+                expanded && 'rotate-90'
               )}
+            />
+            <NetworkIcon aria-hidden className="size-3.5" />
+            <span>Fleet</span>
+            {summary && (
+              <span
+                className={cn(
+                  'ml-auto mr-1 truncate font-medium normal-case tracking-normal',
+                  TONE_CLASS[summary.tone]
+                )}
+              >
+                {summary.text}
+              </span>
+            )}
+          </button>
+        </CollapsibleTrigger>
+        {beam?.enrolled && beam.fleetId && (
+          <Tip label="Add a machine">
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              aria-label="Add a machine"
+              disabled={
+                !machines ||
+                beam.state !== 'ready' ||
+                reset.open ||
+                enrolment.ceremony.view !== null ||
+                revocation.ceremony.running
+              }
+              aria-expanded={adding && expanded}
+              onClick={() => {
+                setAdding(true);
+                setExpanded(true);
+              }}
             >
-              {summary.text}
-            </span>
-          )}
-        </button>
-      </CollapsibleTrigger>
+              <PlusIcon />
+            </Button>
+          </Tip>
+        )}
+      </div>
       <CollapsibleContent asChild>
         <section
           aria-label="Fleet"

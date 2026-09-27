@@ -1,3 +1,5 @@
+import { toast } from 'sonner';
+import { useAddMachine } from './use-add-machine.js';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   createContext,
@@ -75,11 +77,12 @@ const FleetContext = createContext<FleetContextValue | null>(null);
 
 /** The machines list and beam's status are pushed whole on every
  *  change; they go straight into the cache, whatever screen is up. */
-function useFleetPushes(): void {
+function useFleetPushes(onMachines: (machines: MachineView[]) => void): void {
   const qc = useQueryClient();
   useEffect(() => {
     const offMachines = window.n10.onMachinesChanged((machines) => {
       qc.setQueryData(keys.machines, machines);
+      onMachines(machines);
     });
     const offStatus = window.n10.onBeamStatusChanged((status) => {
       qc.setQueryData(keys.beamStatus, status);
@@ -88,7 +91,7 @@ function useFleetPushes(): void {
       offMachines();
       offStatus();
     };
-  }, [qc]);
+  }, [qc, onMachines]);
 }
 
 function useFleetSection(): FleetSectionState {
@@ -135,21 +138,44 @@ function useFleetSection(): FleetSectionState {
  */
 export function FleetProvider({ children }: { children: ReactNode }) {
   const section = useFleetSection();
-  const [adding, setAdding] = useState(false);
+  const { adding, setAdding, machinesChanged } = useAddMachine();
   const publication = usePublication();
   const { settle, clear } = publication;
   const hooks = useMemo(() => ({ onSettled: settle }), [settle]);
   const enrolment = useEnrolment(hooks);
   const [revokeTarget, setRevokeTarget] = useState<MachineView | null>(null);
-  const revokeCeremony = useCeremony(hooks);
+  const revokeHooks = useMemo(
+    () => ({
+      onSettled: (outcome: Parameters<typeof settle>[0]) => {
+        settle(outcome);
+        if (outcome.ok) {
+          setRevokeTarget(null);
+          toast.success('Access revoked', {
+            description: 'Offline machines update when they reconnect.',
+          });
+        }
+      },
+    }),
+    [settle]
+  );
+  const revokeCeremony = useCeremony(revokeHooks);
   const { leave } = enrolment;
   const afterReset = useCallback(() => {
     leave();
     clear();
-  }, [leave, clear]);
+    setAdding(false);
+  }, [leave, clear, setAdding]);
   const reset = useFleetReset(afterReset);
-  useFleetPushes();
+  useFleetPushes(machinesChanged);
 
+  const resetRevocation = revokeCeremony.reset;
+  const openRevocation = useCallback(
+    (machine: MachineView) => {
+      resetRevocation();
+      setRevokeTarget(machine);
+    },
+    [resetRevocation]
+  );
   const closeRevocation = useCallback(() => setRevokeTarget(null), []);
   const value = useMemo(
     () => ({
@@ -160,7 +186,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       revocation: {
         target: revokeTarget,
         ceremony: revokeCeremony,
-        open: setRevokeTarget,
+        open: openRevocation,
         close: closeRevocation,
       },
       reset,
@@ -169,10 +195,12 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     [
       section,
       adding,
+      setAdding,
       enrolment,
       revokeTarget,
       revokeCeremony,
       closeRevocation,
+      openRevocation,
       reset,
       publication,
     ]

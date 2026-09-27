@@ -1,4 +1,4 @@
-import { CopyIcon, PlusIcon } from 'lucide-react';
+import { CopyIcon } from 'lucide-react';
 import { copyText } from '../../lib/copy-text.js';
 import { fingerprintGroups } from '../../lib/machines/machine-model.js';
 import { Button } from '../ui/button.js';
@@ -9,13 +9,7 @@ import { Tip } from '../ui/tooltip.js';
  * `fleetId` that `beam status` prints, and what Copy copies — and the
  * way to add to it (beam-fleet-ux.md §1).
  */
-export function FleetHeader({
-  fleetId,
-  onAdd,
-}: {
-  fleetId: string | null;
-  onAdd: () => void;
-}) {
+export function FleetHeader({ fleetId }: { fleetId: string | null }) {
   const fingerprint = fleetId ? fingerprintGroups(fleetId) : null;
   return (
     <div className="space-y-2">
@@ -39,12 +33,6 @@ export function FleetHeader({
             </Button>
           </Tip>
         </div>
-      )}
-      {fingerprint && (
-        <Button size="sm" onClick={onAdd}>
-          <PlusIcon />
-          Add a machine
-        </Button>
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   CeremonyOutcome,
@@ -41,6 +42,10 @@ export function useCeremony({ onSettled }: CeremonyHooks) {
       const settle = (result: CeremonyOutcome) => {
         setOutcome(result);
         onSettled(result);
+        if (result.ok && result.op === 'init') {
+          setView(null);
+          toast.success('Fleet created');
+        }
       };
       window.n10
         .runCeremony(request)

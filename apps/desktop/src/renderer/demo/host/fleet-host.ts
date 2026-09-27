@@ -263,9 +263,7 @@ class Fleet {
    */
   private watchAddMachine(): void {
     new MutationObserver(() => {
-      const open = [...document.querySelectorAll('code')].some((c) =>
-        c.textContent?.startsWith('beam join')
-      );
+      const open = document.querySelector('[data-testid="add-machine-panel"]');
       if (!open) return this.stopJoin();
       if (this.joinTimer || !this.fleetId) return;
       const known = new Set(this.others.map((m) => m.peerId));
