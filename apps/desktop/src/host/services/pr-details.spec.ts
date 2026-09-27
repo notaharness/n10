@@ -17,9 +17,14 @@ const REF = {
 
 const env = vi.hoisted(() => ({
   configured: true,
+  /** The repository's config as it reads now. */
+  project: {
+    owner: 'acme',
+    repo: 'app',
+    username: 'bob' as string | undefined,
+  },
   /** Whether /repo is still the open repository. */
   open: true,
-  viewer: 'bob' as string | null,
   detail: undefined as
     | ((auth: unknown, project: unknown, prId: number) => Promise<unknown>)
     | undefined,
@@ -29,16 +34,23 @@ const env = vi.hoisted(() => ({
 
 vi.mock('@n10/vcs-core', async (original) => ({
   ...(await original<Record<string, unknown>>()),
-  readConfig: () => ({ vendorProject: { owner: 'acme', repo: 'app' } }),
+  readConfig: () => ({ vendor: 'github', vendorProject: { ...env.project } }),
 }));
+// Both answer from the config they are handed, so a closure that read
+// config once would miss every change below.
 vi.mock('./repo.js', () => ({
   requireRepo: () => '/repo',
   activeRepoIs: (cwd: string) => env.open && cwd === '/repo',
-  configuredRepository: () =>
+  configuredRepository: (config: {
+    vendorProject: { owner: string; repo: string };
+  }) =>
     env.configured
-      ? { provider: 'github', host: 'github.com', repository: 'acme/app' }
+      ? {
+          provider: 'github',
+          host: 'github.com',
+          repository: `${config.vendorProject.owner}/${config.vendorProject.repo}`,
+        }
       : null,
-  configuredViewer: () => env.viewer,
 }));
 vi.mock('./pull-requests.js', () => ({
   lookupPullRequest: (cwd: string, prId: number) => {
@@ -63,7 +75,7 @@ beforeEach(() => {
   env.configured = true;
   env.open = true;
   env.onLookup = () => undefined;
-  env.viewer = 'bob';
+  env.project = { owner: 'acme', repo: 'app', username: 'bob' };
   env.detail = undefined;
   env.lookups = [];
 });
@@ -97,7 +109,25 @@ describe('getPullRequestSnapshot', () => {
       env.open = false;
     };
     await expect(getPullRequestSnapshot({ ref: REF })).rejects.toThrow(
-      'No pull request provider is configured'
+      '/repo is no longer the repository open in n10'
+    );
+  });
+
+  it('refuses to answer once the config names another repository during the read', async () => {
+    env.onLookup = () => {
+      env.project = { ...env.project, repo: 'lib' };
+    };
+    await expect(getPullRequestSnapshot({ ref: REF })).rejects.toThrow(
+      'is not in github.com/acme/lib'
+    );
+  });
+
+  it('refuses to answer once the config names another account during the read', async () => {
+    env.onLookup = () => {
+      env.project = { ...env.project, username: 'carol' };
+    };
+    await expect(getPullRequestSnapshot({ ref: REF })).rejects.toThrow(
+      'n10 acts as carol now, not bob'
     );
   });
 

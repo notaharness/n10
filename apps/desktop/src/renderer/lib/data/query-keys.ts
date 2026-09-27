@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { pullRequestKey, type PullRequestRef } from '@n10/vcs-core/pr-details';
 
 /**
  * The renderer's data layer: every host call is a TanStack Query so
@@ -43,11 +44,12 @@ export const keys = {
   threads: (cwd: string, prId: number) => ['threads', cwd, prId] as const,
   prDescription: (cwd: string, prId: number) =>
     ['pr-description', cwd, prId] as const,
-  /** Keyed by the provider-qualified pull request (`pullRequestKey`),
-   *  not the number — repo A's #42 and repo B's are different entries —
-   *  and by the account it was read as. */
-  prSnapshot: (cwd: string, prKey: string, viewer: string | null) =>
-    ['pr-snapshot', cwd, prKey, viewer] as const,
+  /** Keyed by the provider-qualified pull request, not the number —
+   *  repo A's #42 and repo B's are different entries — by the
+   *  repository's id where it is known, so a repository replaced at the
+   *  same path never reads the old one's entry, and by the account. */
+  prSnapshot: (cwd: string, ref: PullRequestRef, viewer: string | null) =>
+    ['pr-snapshot', cwd, pullRequestKey(ref), ref.id ?? null, viewer] as const,
   activity: (cwd: string) => ['session-activity', cwd] as const,
   commentImage: (url: string) => ['comment-image', url] as const,
   drafts: (cwd: string, prId: number) => ['drafts', cwd, prId] as const,

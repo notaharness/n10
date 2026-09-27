@@ -16,6 +16,7 @@ import { githubProvider } from '@n10/vcs-github';
 import { azureDevOpsProvider } from '@n10/vcs-azure-devops';
 import type { RepositoryRef, VcsProvider } from '@n10/vcs-core';
 import { NoActiveRepoError, type RepoInfo } from '../contract.js';
+import { configuredViewer } from './viewer.js';
 import {
   loadRecents,
   forgetRecent,
@@ -141,19 +142,6 @@ export function openRepo(path: string): RepoInfo {
 export function getRepo(): RepoInfo | null {
   if (activeCwd === null) return null;
   return repoInfo(activeCwd, readConfig(activeCwd));
-}
-
-/**
- * The account n10 acts as, in the form the provider uses in reviewer
- * lists: GitHub's login, Azure DevOps's email (each provider's
- * `matchesUser` compares exactly this; `getReviewViewer` answers the
- * same for the verdict path). Configured, not verified against the
- * credential.
- */
-export function configuredViewer(config: AppConfig): string | null {
-  const identifier =
-    config.vendor === 'github' ? config.vendorProject?.username : config.email;
-  return identifier || null;
 }
 
 /** The open repository as its provider names it, or null while no

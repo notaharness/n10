@@ -169,3 +169,41 @@ test.describe('Settings form', () => {
     }
   });
 });
+
+test.describe('Settings form, with a pull request provider', () => {
+  test.use({ fakeGitHub: { prs: [] } });
+
+  test('keeps working after the account it reads as changes', async ({
+    desktop,
+  }) => {
+    const { app, page, homeDir, repoPath } = desktop;
+    await openSettings(app, page);
+
+    const user = page.getByLabel('GitHub Username', { exact: true });
+    await expect(user).toHaveValue('n10-tester');
+    await user.fill('carol');
+    await user.press('Enter');
+    await expect
+      .poll(
+        () =>
+          (
+            projectConfig(homeDir, repoPath).vendorProject as {
+              username?: string;
+            }
+          ).username,
+        { timeout: 15_000 }
+      )
+      .toBe('carol');
+
+    // A new account drops everything read as the old one, this form's
+    // own answer included. It has to come back rather than sit empty,
+    // and the next save has to land.
+    await expect(user).toHaveValue('carol');
+    const path = page.getByLabel('Worktree Path', { exact: true });
+    await path.fill('/tmp/after-account');
+    await path.press('Enter');
+    await expect
+      .poll(() => config(homeDir).worktreePath, { timeout: 15_000 })
+      .toBe('/tmp/after-account');
+  });
+});

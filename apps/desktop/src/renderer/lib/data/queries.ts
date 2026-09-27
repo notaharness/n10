@@ -1,21 +1,19 @@
 import { useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import type { DiffLine } from '@n10/diff';
 import { contentKey } from '../content-key.js';
 import { loadDesktopPrefs } from '../desktop-prefs.js';
 import { parseDiffInWorker } from '../diff/diff-worker-client.js';
 import { measured } from '../perf.js';
-import { keys } from './query-keys.js';
+import { keys, resetRepoScopedCache } from './query-keys.js';
 import { errorMessage } from '../utils.js';
-import {
-  describePullRequest,
-  pullRequestKey,
-  samePullRequest,
-} from '@n10/vcs-core/pr-details';
+import { repositoryKey } from '@n10/vcs-core/pr-details';
 import type {
   MachineView,
-  PullRequestRef,
-  PullRequestSnapshot,
   RepoInfo,
   SidebarItem,
 } from '../../../host/contract.js';
@@ -48,6 +46,37 @@ export async function loadRepoGate(): Promise<RepoInfo | null> {
     loadDesktopPrefs(),
   ]);
   return repo;
+}
+
+/** Whether two answers about the open repository name the same
+ *  provider, repository and account — what every pull request entry in
+ *  the cache was read for. */
+function sameRepoIdentity(a: RepoInfo, b: RepoInfo): boolean {
+  const repo = (r: RepoInfo) => r.repository && repositoryKey(r.repository);
+  return (
+    a.providerId === b.providerId &&
+    repo(a) === repo(b) &&
+    a.viewer?.toLowerCase() === b.viewer?.toLowerCase()
+  );
+}
+
+/**
+ * Re-read the open repository's info after its settings change.
+ *
+ * The provider, the repository it names and the account n10 acts as
+ * all come from config, and the gate's entry is otherwise only written
+ * when a repository is opened. When any of the three differs, whatever
+ * is cached was read somewhere else or as someone else, so it goes, as
+ * on a repository switch.
+ */
+export async function refreshRepoInfo(qc: QueryClient): Promise<void> {
+  const next = await window.n10.getRepo();
+  const prev = qc.getQueryData<RepoInfo | null>(keys.repo);
+  // The host moved to another repository meanwhile: that is the
+  // gate's switch to adopt, not this.
+  if (!prev || !next || prev.cwd !== next.cwd) return;
+  if (!sameRepoIdentity(prev, next)) resetRepoScopedCache(qc);
+  qc.setQueryData(keys.repo, next);
 }
 
 export function useRepoGate() {
@@ -370,59 +399,6 @@ export function usePrDescription(cwd: string, prId: number) {
     queryFn: () => window.n10.fetchPrDescription(prId),
     staleTime: 5 * 60_000,
     enabled: prId > 0,
-  });
-}
-
-/**
- * The ref naming pull request `prId` in the open repository, or null
- * while the repository has no provider to qualify it with.
- */
-export function pullRequestRefFor(
-  repo: RepoInfo,
-  prId: number
-): PullRequestRef | null {
-  return repo.repository && prId > 0
-    ? { ...repo.repository, number: prId }
-    : null;
-}
-
-/**
- * One pull request by identity, read as the account the renderer knows.
- *
- * What keeps repo A's #42 apart from repo B's is the key: it names the
- * provider, host, repository and number, and the repository-scoped
- * cache is dropped on a switch. The host refuses a request for a
- * repository or an account that is no longer the open one, before and
- * after its reads. The echo check here is the last line: an answer that
- * names a different pull request is an error, never data in this entry.
- */
-export async function loadPullRequestSnapshot(
-  ref: PullRequestRef,
-  viewer: string | null
-): Promise<PullRequestSnapshot> {
-  const answer = await window.n10.getPullRequestSnapshot(
-    viewer ? { ref, viewer } : { ref }
-  );
-  if (!samePullRequest(answer.ref, ref)) {
-    throw new Error(
-      `Expected an answer about ${describePullRequest(
-        ref
-      )}, got one about ${describePullRequest(answer.ref)}`
-    );
-  }
-  return answer;
-}
-
-export function usePullRequestSnapshot(
-  cwd: string,
-  ref: PullRequestRef | null,
-  viewer: string | null
-) {
-  return useQuery({
-    queryKey: keys.prSnapshot(cwd, ref ? pullRequestKey(ref) : '', viewer),
-    queryFn: () => loadPullRequestSnapshot(ref!, viewer),
-    enabled: ref != null,
-    staleTime: 60_000,
   });
 }
 

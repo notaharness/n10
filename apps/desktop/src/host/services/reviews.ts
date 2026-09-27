@@ -6,6 +6,7 @@ import type {
 } from '@n10/vcs-core';
 import { fetchDiffText, fetchFileDiffText } from '@n10/core';
 import { PROVIDERS, requireRepo } from './repo.js';
+import { configuredViewer } from './viewer.js';
 import { refreshPrList } from './sidebar.js';
 import type { ReplyRequest, ResolveRequest } from '../contract.js';
 
@@ -88,10 +89,7 @@ export async function fetchPullRequests(): Promise<BranchPrMap> {
  *  `matchesUser` compares exactly this). Lets the renderer patch the
  *  viewer's reviewer entry optimistically after a verdict. */
 export function getReviewViewer(): { identifier: string } | null {
-  const cwd = requireRepo();
-  const config = readConfig(cwd);
-  const identifier =
-    config.vendor === 'github' ? config.vendorProject?.username : config.email;
+  const identifier = configuredViewer(readConfig(requireRepo()));
   return identifier ? { identifier } : null;
 }
 

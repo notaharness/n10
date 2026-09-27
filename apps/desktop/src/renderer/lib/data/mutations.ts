@@ -35,12 +35,6 @@ function useInvalidator(cwd: string) {
     sync: () => qc.invalidateQueries({ queryKey: keys.sync(cwd) }),
     branches: () => qc.invalidateQueries({ queryKey: keys.branches(cwd) }),
     sessions: () => qc.invalidateQueries({ queryKey: keys.sessions(cwd) }),
-    settings: () =>
-      Promise.all([
-        qc.invalidateQueries({ queryKey: keys.settings(cwd) }),
-        // The picker's default row follows the configured agent.
-        qc.invalidateQueries({ queryKey: keys.agentOptions(cwd) }),
-      ]),
     threads: (prId: number) =>
       qc.invalidateQueries({ queryKey: keys.threads(cwd, prId) }),
     drafts: (prId: number) =>
@@ -336,19 +330,5 @@ export function useSetResolved(cwd: string) {
       if (ctx?.prev) qc.setQueryData(keys.threads(cwd, req.prId), ctx.prev);
     },
     onSettled: (_r, _e, req) => void inv.threads(req.prId),
-  });
-}
-
-export function useUpdateSetting(cwd: string) {
-  const inv = useInvalidator(cwd);
-  return useMutation({
-    mutationFn: ({
-      ref,
-      value,
-    }: {
-      ref: { label: string; key: string };
-      value: string;
-    }) => window.n10.updateSettingsField(ref, value),
-    onSettled: () => void inv.settings(),
   });
 }
