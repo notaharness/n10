@@ -307,7 +307,7 @@ export async function canRemoveBranch(
   // Use the worktree's real path from git so the status check runs
   // against the actual checkout, not a resolver-derived guess that may
   // not exist (which would silently skip the uncommitted-changes guard).
-  const dir = wt?.path ?? worktreeDir(branch);
+  const dir = wt?.path ?? resolverDir(branch, cwd);
 
   if (await hasUncommittedChanges(dir, branch)) {
     return { safe: false, reason: 'uncommitted changes' };
@@ -319,6 +319,13 @@ export async function canRemoveBranch(
   }
 
   return { safe: true };
+}
+
+/** Where the resolver would put `branch`'s checkout in the repository
+ *  at `cwd`: a relative resolver path is that repository's, not the
+ *  process's. */
+function resolverDir(branch: string, cwd?: string): string {
+  return resolve(cwd ?? process.cwd(), worktreeDir(branch));
 }
 
 /**
