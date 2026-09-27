@@ -56,7 +56,7 @@ test.describe('Pull request activity', () => {
 
     const items = activity.locator(':scope > ol > li');
     // Two commits in a row read as one push; the bot's comment folds.
-    await expect(items.nth(0)).toContainText('alex pushed 2 commits');
+    await expect(items.nth(0)).toContainText('alex added 2 commits');
     await expect(items.nth(1)).toContainText(
       'requested review from Core (team)'
     );
@@ -78,11 +78,16 @@ test.describe('Pull request activity', () => {
       'send(token, { retry: true });'
     );
 
-    // Resolved starts folded, and says who resolved it.
+    // Resolved starts folded to its author and first line, and says who
+    // resolved it.
     const resolved = activity.locator('[data-thread-id="T-resolved"]');
     await expect(resolved).toContainText('Resolved');
     await expect(resolved).toContainText('alex');
-    await expect(resolved.getByText('Nit: name this')).toHaveCount(0);
+    await expect(
+      resolved.getByRole('button', { expanded: false })
+    ).toContainText('bea');
+    await expect(resolved).toContainText('— Nit: name this');
+    await expect(resolved.locator('[data-comment-id]')).toHaveCount(0);
 
     // The file-level thread names the file, not a line.
     await expect(activity.locator('[data-thread-id="T-file"]')).toContainText(
@@ -134,6 +139,10 @@ test.describe('Pull request activity', () => {
     await activity.getByRole('searchbox').fill('nothing like this');
     await activity.getByRole('button', { name: 'Clear filters' }).click();
     await expect(activity.locator('[data-thread-id]')).toHaveCount(5);
+
+    // Unfolding moves focus to the first reply it shows.
+    await long.getByRole('button', { name: 'Show 6 more replies' }).click();
+    await expect(long.locator(':focus')).toContainText('Discussion 2.');
   });
 
   test('opens a thread in the diff at its place', async ({ desktop }) => {
@@ -183,14 +192,19 @@ test.describe('Pull request activity', () => {
     const update = activity.getByRole('button', { name: '1 new update' });
     await expect(update).toBeVisible({ timeout: 15_000 });
     await expect(activity.getByText('Late to the party')).toHaveCount(0);
-    // The thread the reader already had in view shows its new status.
-    await expect(activity.locator('[data-thread-id="T-open"]')).toContainText(
-      'Resolved'
-    );
+    // The thread the reader already had in view shows its new status,
+    // and stays open rather than folding under them.
+    const open = activity.locator('[data-thread-id="T-open"]');
+    await expect(open).toContainText('Resolved');
+    await expect(open.locator('[data-comment-id]')).toHaveCount(2);
 
     await update.click();
     await expect(activity.getByText('Late to the party')).toBeVisible();
     await expect(update).toHaveCount(0);
+    // Focus moves to what arrived, not back to the page.
+    await expect(activity.locator('li:focus')).toContainText(
+      'Late to the party'
+    );
   });
 
   test('says the conversation failed to load, and keeps the description', async ({

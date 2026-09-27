@@ -95,14 +95,16 @@ function EventLine({ event }: { event: ConversationEvent }) {
     <div className="flex items-start gap-2 px-3 text-xs text-muted-foreground">
       <Icon className="mt-px size-3.5 shrink-0" />
       <span className="min-w-0 flex-1">
-        {!own && (event.actor || event.kind === 'commit') && (
+        {!own && (
           <>
-            {event.kind === 'commit' && !event.actor ? (
-              <span className="font-medium text-foreground">
-                {event.authorName ?? 'Someone'}
-              </span>
-            ) : (
+            {event.actor ? (
               <ActorName actor={event.actor} />
+            ) : (
+              // The provider named nobody: a commit may still carry its
+              // author's name; anything else reads as "Someone".
+              <span className="font-medium text-foreground">
+                {(event.kind === 'commit' && event.authorName) || 'Someone'}
+              </span>
             )}{' '}
           </>
         )}

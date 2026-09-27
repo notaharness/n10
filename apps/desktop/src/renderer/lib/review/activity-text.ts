@@ -5,7 +5,7 @@ import type {
 
 /**
  * What an activity entry says, in words. The actor is shown beside the
- * sentence, so each sentence starts at the verb: "approved", "pushed 3
+ * sentence, so each sentence starts at the verb: "approved", "added 3
  * commits", "requested review from Core (team)".
  */
 
@@ -90,7 +90,7 @@ export function reviewSentence(r: ReviewSummary): string {
   return `${REVIEW_VERB[r.state]}${comments}`;
 }
 
-/** "Alex pushed 3 commits", for a run of them. */
+/** "Alex added 3 commits", for one author's run of them. */
 export function commitsSentence(count: number): string {
-  return `pushed ${count} commits`;
+  return `added ${count} commits`;
 }

@@ -1,5 +1,5 @@
 import { ArrowDownIcon, SearchIcon, XIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   PullRequestConversation,
   PullRequestRef,
@@ -11,6 +11,7 @@ import {
   buildActivity,
   filterCounts,
   groupActivity,
+  rowContaining,
   selectActivity,
   splitNew,
   type ActivityFilter,
@@ -32,15 +33,12 @@ import { CoverageNotice } from './CoverageNotice.js';
  * refresh waits behind "N new updates".
  */
 
-const FILTERS: { value: ActivityFilter; label: string; github?: true }[] = [
+const FILTERS: { value: ActivityFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'open', label: 'Open' },
   { value: 'resolved', label: 'Resolved' },
   { value: 'outdated', label: 'Outdated' },
   { value: 'mine', label: 'Mine' },
-  // Azure encodes a mention as the person's id, which the renderer
-  // does not know for the viewer; GitHub's is their login.
-  { value: 'mentions', label: 'Mentions', github: true },
 ];
 
 export function PrActivity({
@@ -58,7 +56,7 @@ export function PrActivity({
   );
   const { state } = read;
   return (
-    <section aria-labelledby="pr-activity" className="mt-8">
+    <section aria-label="Activity" className="mt-8">
       {state.kind === 'loading' && <ActivitySkeleton />}
       {state.kind === 'failed' && (
         <>
@@ -86,7 +84,6 @@ export function PrActivity({
             <Activity
               conversation={state.data.conversation.value}
               viewer={repo.viewer}
-              isGitHub={repo.providerId === 'github'}
               onOpenThread={onOpenThread}
             />
           ) : (
@@ -105,7 +102,7 @@ export function PrActivity({
 
 function ActivityHeading({ count }: { count?: number }) {
   return (
-    <h2 id="pr-activity" className="mb-3 text-[15px] font-semibold">
+    <h2 className="mb-3 text-[15px] font-semibold">
       Activity
       {count != null && (
         <>
@@ -130,29 +127,41 @@ function ActivitySkeleton() {
 function Activity({
   conversation,
   viewer,
-  isGitHub,
   onOpenThread,
 }: {
   conversation: PullRequestConversation;
   viewer: string | null;
-  isGitHub: boolean;
   onOpenThread: (id: string, path: string | null) => void;
 }) {
   const [filter, setFilter] = useState<ActivityFilter>('all');
   const [query, setQuery] = useState('');
   const entries = useMemo(() => buildActivity(conversation), [conversation]);
-  // What the reader has been shown. Set once, from the first answer;
-  // later answers add to it only when the reader asks to see them.
-  const [seen, setSeen] = useState<ReadonlySet<string> | null>(null);
-  if (seen === null) setSeen(new Set(entries.map((e) => e.id)));
-  const { shown, held } = splitNew(entries, seen);
+  // What the reader has been shown: the first answer, and later ones
+  // only when the reader asks to see them.
+  const [seen, setSeen] = useState<ReadonlySet<string>>(
+    () => new Set(entries.map((e) => e.id))
+  );
+  const { shown, held } = splitNew(entries, seen, viewer);
+  const list = useRef<HTMLOListElement>(null);
+  // Showing new updates moves the reader to the first of them, so focus
+  // does not fall back to the page when the button goes.
+  const reveal = useRef<string | null>(null);
 
   const counts = filterCounts(shown, viewer);
   const selected = selectActivity(shown, filter, query, viewer);
   const narrowed = filter !== 'all' || query.trim() !== '';
   // Grouping folds noise; a filtered or searched list shows each match.
   const rows = narrowed ? selected : groupActivity(selected);
-  const filters = FILTERS.filter((f) => isGitHub || !f.github);
+  useEffect(() => {
+    const id = reveal.current;
+    if (!id) return;
+    reveal.current = null;
+    const row = rowContaining(rows, id);
+    if (!row) return;
+    list.current
+      ?.querySelector<HTMLElement>(`[data-entry="${CSS.escape(row)}"]`)
+      ?.focus();
+  });
 
   return (
     <>
@@ -165,7 +174,7 @@ function Activity({
           aria-label="Show"
           className="mb-3 items-center rounded-md border border-border p-0.5"
         >
-          {filters.map((f) => (
+          {FILTERS.map((f) => (
             <ToggleGroupItem
               key={f.value}
               value={f.value}
@@ -188,9 +197,14 @@ function Activity({
           }}
         />
       ) : (
-        <ol className="space-y-3">
+        <ol ref={list} className="space-y-3">
           {rows.map((row) => (
-            <li key={row.id}>
+            <li
+              key={row.id}
+              data-entry={row.id}
+              tabIndex={-1}
+              className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               <ActivityRowView
                 row={row}
                 query={query}
@@ -202,7 +216,10 @@ function Activity({
       )}
       <NewUpdates
         count={held.length}
-        onShow={() => setSeen(new Set(entries.map((e) => e.id)))}
+        onShow={() => {
+          setSeen(new Set(entries.map((e) => e.id)));
+          reveal.current = held[0]?.id ?? null;
+        }}
       />
     </>
   );
@@ -274,10 +291,18 @@ function NewUpdates({ count, onShow }: { count: number; onShow: () => void }) {
   return (
     <div
       aria-live="polite"
-      className={cn(count > 0 && 'mt-4 flex justify-center')}
+      className={cn(
+        count > 0 &&
+          'pointer-events-none sticky bottom-4 mt-4 flex justify-center'
+      )}
     >
       {count > 0 && (
-        <Button variant="outline" size="sm" onClick={onShow}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onShow}
+          className="pointer-events-auto bg-background shadow-md"
+        >
           <ArrowDownIcon />
           {count} new update{count === 1 ? '' : 's'}
         </Button>
