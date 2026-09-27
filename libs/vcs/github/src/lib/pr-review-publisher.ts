@@ -1,5 +1,6 @@
 import {
   freshLedger,
+  type FiledReview,
   isVcsError,
   ReviewPublishError,
   type LedgerStore,
@@ -9,7 +10,13 @@ import {
   type ReviewLedger,
   type ReviewSubmission,
 } from '@n10/vcs-core';
-import { findSent, pendingComments, type GraphQL } from './pr-review-match.js';
+import { findSent, reviewComments, type GraphQL } from './pr-review-match.js';
+import {
+  readState,
+  reviewById,
+  type PendingReview,
+  type PullRequestState,
+} from './pr-review-state.js';
 import {
   ADD_REPLY,
   addThreadMutation,
@@ -17,8 +24,6 @@ import {
   threadVariables,
   DELETE_COMMENT,
   DELETE_REVIEW,
-  REVIEW_BY_ID,
-  REVIEW_STATE,
   START_REVIEW,
   SUBMIT_REVIEW,
   UPDATE_COMMENT,
@@ -38,19 +43,6 @@ import {
  * sent, so nothing goes out twice on the strength of a guess.
  */
 
-interface PendingReview {
-  id: string;
-  viewerDidAuthor: boolean;
-  commit: { oid: string } | null;
-  comments: { totalCount: number };
-}
-
-interface PullRequestState {
-  id: string;
-  headRefOid: string;
-  pending: PendingReview | null;
-}
-
 export async function publishGitHubReview(
   gql: GraphQL,
   repository: RepositoryRef,
@@ -63,7 +55,8 @@ export async function publishGitHubReview(
   const pr = await readState(gql, owner, repo, submission.prId);
   const run = new Run(gql, store, submission, now);
   // An earlier attempt may have got as far as the submit.
-  if (await run.alreadySubmitted(pr.pending)) return run.result(true);
+  const filed = await run.alreadyFiled(pr.pending);
+  if (filed) return run.result(filed);
   if (pr.headRefOid !== submission.head) {
     throw new ReviewPublishError(
       'moved',
@@ -78,38 +71,7 @@ export async function publishGitHubReview(
   await run.dropUnchosen();
   for (const item of submission.items) await run.add(item);
   await run.submit();
-  return run.result(false);
-}
-
-async function readState(
-  gql: GraphQL,
-  owner: string,
-  repo: string,
-  number: number
-): Promise<PullRequestState> {
-  const answer = (await gql(REVIEW_STATE, { owner, repo, number })) as {
-    data?: {
-      repository?: {
-        pullRequest?: {
-          id: string;
-          headRefOid: string;
-          reviews: { nodes: PendingReview[] };
-        } | null;
-      } | null;
-    };
-  };
-  const pr = answer.data?.repository?.pullRequest;
-  if (!pr) {
-    throw new ReviewPublishError(
-      'refused',
-      `Pull request #${number} was not found`
-    );
-  }
-  return {
-    id: pr.id,
-    headRefOid: pr.headRefOid,
-    pending: pr.reviews.nodes.find((r) => r.viewerDidAuthor) ?? null,
-  };
+  return run.result(null);
 }
 
 /** One attempt at a publication, over the ledger it resumes. */
@@ -128,7 +90,7 @@ class Run {
 
   private readonly fresh: () => ReviewLedger;
 
-  result(resumed: boolean): PublishedReview {
+  result(resumed: FiledReview | null): PublishedReview {
     const items: Record<string, string> = {};
     for (const [key, { id }] of Object.entries(this.ledger.added)) {
       items[key] = id;
@@ -137,35 +99,39 @@ class Run {
   }
 
   /**
-   * Whether an earlier attempt already submitted the review: its submit
-   * was answered, or was lost and the review is no longer pending.
+   * The review an earlier attempt's review became, if it was filed: by
+   * that attempt's submit (answered, or lost and no longer pending), or
+   * by the reviewer on GitHub. A step still in flight is accounted for
+   * against what the filed review holds first.
    */
-  async alreadySubmitted(pending: PendingReview | null): Promise<boolean> {
-    const { reviewId } = this.ledger;
-    if (this.ledger.submitted) return true;
-    if (!reviewId) return false;
-    if (pending?.id === reviewId) {
+  async alreadyFiled(
+    pending: PendingReview | null
+  ): Promise<FiledReview | null> {
+    const { reviewId, submitted } = this.ledger;
+    if (!reviewId) return null;
+    if (!submitted && pending?.id === reviewId) {
       // Still pending: a submit whose answer was lost did not land.
       if (this.ledger.inFlight === 'submit') this.save({ inFlight: null });
-      return false;
+      return null;
     }
-    const state = await this.reviewState(reviewId);
-    if (state && state !== 'PENDING') {
+    const review = await reviewById(this.gql, reviewId);
+    if (review && review.state !== 'PENDING') {
+      await this.reconcile();
       this.save({ submitted: true, inFlight: null });
-      return true;
+      return review;
     }
     // Gone without being submitted (discarded on GitHub): start over.
     this.reset();
-    return false;
+    return null;
   }
 
   /**
    * The pending review to fill: this publication's own, or a new one.
    * One it started on a head the reviewer has since moved past is
    * discarded first; a start whose answer was lost is taken up only
-   * when the review found is on the head it asked for and was made
-   * after it began. Any other pending review is the reviewer's own
-   * work elsewhere, and is left alone.
+   * when the review found is on the head it asked for and still empty.
+   * Any other pending review is the reviewer's own work on GitHub, and
+   * is left alone.
    */
   async openReview(pr: PullRequestState): Promise<void> {
     const { head } = this.submission;
@@ -212,7 +178,7 @@ class Run {
   async reconcile(): Promise<void> {
     const { inFlight, sending, reviewId } = this.ledger;
     if (!inFlight || !reviewId || STEPS.has(inFlight)) return;
-    const comments = await pendingComments(this.gql, reviewId);
+    const comments = await reviewComments(this.gql, reviewId);
     if (inFlight.startsWith('drop:')) {
       const key = inFlight.slice('drop:'.length);
       const kept = comments.some((c) => c.id === this.ledger.added[key]?.id);
@@ -306,20 +272,6 @@ class Run {
       pending.commit?.oid === this.ledger.head &&
       pending.comments.totalCount === 0
     );
-  }
-
-  /** The review's state; null once it is gone, which GitHub answers
-   *  with NOT_FOUND. */
-  private async reviewState(id: string): Promise<string | null> {
-    try {
-      const answer = (await this.gql(REVIEW_BY_ID, { id })) as {
-        data?: { node?: { state?: string } | null };
-      };
-      return answer.data?.node?.state ?? null;
-    } catch (err) {
-      if (isVcsError(err) && err.kind === 'not-found') return null;
-      throw err;
-    }
   }
 
   private reset(): void {

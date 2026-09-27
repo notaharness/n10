@@ -17,7 +17,6 @@ import {
   pullRequestKey,
   sameRepository,
   type PullRequestRef,
-  type ReviewEvent,
   type ReviewLedger,
 } from '@n10/vcs-core';
 import { parseTarget, type ReviewDraft } from './review-draft-types.js';
@@ -45,7 +44,6 @@ export interface DraftFile {
 export interface StoredSubmission {
   attempt: string;
   draftIds: string[];
-  event: ReviewEvent;
   ledger: ReviewLedger | null;
 }
 
@@ -188,10 +186,9 @@ function parseDraft(value: unknown): ReviewDraft {
 /** Enough to resume a review: the attempt, its drafts, its ledger. */
 function parseSubmission(value: unknown): StoredSubmission {
   const s = (value ?? {}) as Record<string, unknown>;
-  const { attempt, draftIds, event, ledger } = s;
+  const { attempt, draftIds, ledger } = s;
   if (
     typeof attempt !== 'string' ||
-    typeof event !== 'string' ||
     !Array.isArray(draftIds) ||
     !draftIds.every((id) => typeof id === 'string') ||
     (ledger !== null && typeof ledger !== 'object')

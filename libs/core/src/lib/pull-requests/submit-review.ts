@@ -45,10 +45,11 @@ export interface SubmitReviewRequest extends DraftsRequest {
 }
 
 export interface SubmittedReview extends ReviewDrafts {
-  /** An earlier submit that may have landed was finished instead of
-   *  this request: its drafts and verdict were filed, not the ones
-   *  asked for now, which are as they were. */
-  resumed: boolean;
+  /** The review had already been filed — by an earlier submit whose
+   *  answer was lost, or by the reviewer on the provider — and nothing
+   *  of this request was sent: the provider's state for it. The drafts
+   *  say which of them it holds. */
+  resumed: { state: string } | null;
 }
 
 export type SubmitSources = DraftSources & {
@@ -107,10 +108,8 @@ async function submitClaimed(
   const now = src.now ?? Date.now;
   const drafts = new DraftsFile(dir, req.ref, viewer);
   const file = drafts.read();
-  const pinned = pinnedFiling(file);
-  const asked = pinned ? { ...req, ...pinned } : req;
-  const chosen = choose(file, asked.draftIds);
-  const submission = toSubmission(asked, chosen);
+  const chosen = choose(file, req.draftIds);
+  const submission = toSubmission(req, chosen);
   const attempt = file.submission?.attempt ?? randomUUID();
   const before = file.submission?.draftIds ?? [];
 
@@ -122,12 +121,11 @@ async function submitClaimed(
     submission: {
       attempt,
       draftIds: chosen.map((d) => d.id),
-      event: asked.event,
       ledger: f.submission?.ledger ?? null,
     },
   }));
 
-  let resumed = false;
+  let resumed: SubmittedReview['resumed'] = null;
   const ledger: LedgerStore = {
     read: () => drafts.read().submission?.ledger ?? null,
     write: (l) =>
@@ -139,19 +137,14 @@ async function submitClaimed(
 
   try {
     const published = await src.publish(submission, ledger);
-    // The summary went with this submit, or with the pinned one; not
-    // when the review was found filed some other way (on GitHub).
-    const summary =
-      (pinned != null || !published.resumed) &&
-      chosen.some((d) => d.target.kind === 'summary');
     drafts.update((f) => ({
       ...f,
       drafts: f.drafts.map((d) =>
-        settled(d, published, summary, attempt, now())
+        settled(d, published, summarySent(chosen, published), attempt, now())
       ),
       submission: undefined,
     }));
-    resumed = pinned != null || published.resumed;
+    resumed = published.resumed && { state: published.resumed.state };
   } catch (err) {
     const unanswered = ledger.read()?.inFlight != null;
     drafts.update((f) => ({
@@ -165,21 +158,6 @@ async function submitClaimed(
     throw err;
   }
   return { ref: req.ref, viewer, drafts: drafts.read().drafts, resumed };
-}
-
-/**
- * The filing a submit may already have made: its submit was sent and
- * not answered, or answered and not yet settled. It is finished as it
- * was sent — the same drafts, verdict and head — before anything else,
- * so what is settled is what was filed.
- */
-function pinnedFiling(
-  file: DraftFile
-): Pick<SubmitReviewRequest, 'draftIds' | 'event' | 'head'> | null {
-  const s = file.submission;
-  const l = s?.ledger;
-  if (!s || !l || !(l.submitted || l.inFlight === 'submit')) return null;
-  return { draftIds: s.draftIds, event: s.event, head: l.head };
 }
 
 /** The file for one account and pull request, read afresh each time. */
@@ -310,16 +288,33 @@ function ownedBy(d: ReviewDraft, attempt: string): boolean {
  * own text when it went with the submit), or back to unpublished when
  * this attempt chose it and the review filed does not hold it.
  */
+/**
+ * The summary text the filed review carries, as n10's: what this
+ * submit sent, or — for a review already filed — the review's own text
+ * when it is the summary draft's, whoever filed it.
+ */
+function summarySent(
+  chosen: ReviewDraft[],
+  published: PublishedReview
+): (d: ReviewDraft) => boolean {
+  if (!published.resumed) {
+    const sent = chosen.some((d) => d.target.kind === 'summary');
+    return () => sent;
+  }
+  const { body } = published.resumed;
+  return (d) => body.trim() !== '' && d.body === body;
+}
+
 function settled(
   d: ReviewDraft,
   published: PublishedReview,
-  summary: boolean,
+  summary: (d: ReviewDraft) => boolean,
   attempt: string,
   at: number
 ): ReviewDraft {
   const remoteId =
     published.items[d.id] ??
-    (summary && d.target.kind === 'summary' ? published.reviewId : null);
+    (d.target.kind === 'summary' && summary(d) ? published.reviewId : null);
   if (remoteId) {
     return { ...d, publication: { state: 'published', attempt, remoteId, at } };
   }

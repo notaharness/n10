@@ -89,6 +89,21 @@ describe('telling a refused write from one that may have landed', () => {
     expect(resolved).toMatchObject({ refused: false });
   });
 
+  it('leaves a REST error body to gh’s own words', () => {
+    const err = classifyGhError(
+      failed('api repos/o/r/pulls/1/reviews', {
+        stderr: 'gh: Unprocessable Entity (HTTP 422)',
+        stdout: JSON.stringify({
+          message: 'Unprocessable Entity',
+          errors: ['Can not approve your own pull request'],
+          status: '422',
+        }),
+      })
+    );
+    expect(err.kind).toBe('unknown');
+    expect(err.message).toContain('HTTP 422');
+  });
+
   it('names what GitHub could not find', () => {
     const err = classifyGhError(
       failed('api graphql', {

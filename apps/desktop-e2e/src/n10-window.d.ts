@@ -87,7 +87,7 @@ interface N10Bridge {
     head: string;
     event: 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES';
     draftIds: string[];
-  }): Promise<{ drafts: FakeReviewDraft[]; resumed: boolean }>;
+  }): Promise<{ drafts: FakeReviewDraft[]; resumed: { state: string } | null }>;
   /** Asserted on for completeness: the conversation has no UI yet. */
   getPullRequestConversation(req: {
     ref: Record<string, unknown>;

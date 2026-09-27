@@ -162,17 +162,27 @@ function failureOf(
 ): { message: string; refused: boolean } | null {
   if (payload == null || typeof payload !== 'object') return null;
   const { data, errors } = payload as { data?: unknown; errors?: unknown };
-  if (answered(data) || !Array.isArray(errors) || errors.length === 0) {
-    return null;
-  }
-  const messages = errors.map((e) => {
-    const m = (e as { message?: unknown } | null)?.message;
-    return typeof m === 'string' ? m : '';
-  });
+  if (answered(data) || !isGraphQlErrors(errors)) return null;
+  const messages = errors.map((e) => e.message);
   const timedOut = messages.some((m) =>
     /timeout|something went wrong/i.test(m)
   );
   return { message: messages[0] || 'no data returned', refused: !timedOut };
+}
+
+/** GraphQL's shape: objects with a message. A REST error body's
+ *  `errors` is a list of strings or codes, and is not this. */
+function isGraphQlErrors(errors: unknown): errors is { message: string }[] {
+  return (
+    Array.isArray(errors) &&
+    errors.length > 0 &&
+    errors.every(
+      (e) =>
+        e != null &&
+        typeof e === 'object' &&
+        typeof (e as { message?: unknown }).message === 'string'
+    )
+  );
 }
 
 /** Some top-level field resolved. A refused mutation answers with its

@@ -41,7 +41,7 @@ export const THREAD_ROOT = `query ReviewPublicationThreadRoot($id: ID!) {
 }`;
 
 export const REVIEW_BY_ID = `query ReviewPublicationById($id: ID!) {
-  node(id: $id) { ... on PullRequestReview { id state } }
+  node(id: $id) { ... on PullRequestReview { id state body } }
 }`;
 
 export const START_REVIEW = `mutation StartReview($pr: ID!, $commit: GitObjectID!) {

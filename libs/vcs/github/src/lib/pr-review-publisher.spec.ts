@@ -48,6 +48,8 @@ class FakeGitHub {
   pending: Pending | null = null;
   pageSize = 100;
   states = new Map<string, string>();
+  /** Each filed review's text and comments, as GitHub keeps them. */
+  filed = new Map<string, { body: string; comments: Comment[] }>();
   sent: string[] = [];
   submitted: Record<string, unknown>[] = [];
   threadWrites: Record<string, unknown>[] = [];
@@ -82,6 +84,14 @@ class FakeGitHub {
     return Promise.resolve({ data });
   };
 
+  /** The reviewer submits the pending review on GitHub themselves. */
+  submitOnGitHub(body: string) {
+    const p = this.pending!;
+    this.states.set(p.id, 'COMMENTED');
+    this.filed.set(p.id, { body, comments: p.comments });
+    this.pending = null;
+  }
+
   private id(prefix: string) {
     return `${prefix}_${++this.next}`;
   }
@@ -90,6 +100,26 @@ class FakeGitHub {
     return op.startsWith('ReviewPublication')
       ? this.read(op, v)
       : this.write(op, query, v);
+  }
+
+  private commentsPage(v: Record<string, unknown>) {
+    const id = String(v['id']);
+    const pending = this.pending?.id === id ? this.pending : this.filed.get(id);
+    if (!pending) return { node: null };
+    const from = v['after'] ? Number(v['after']) : 0;
+    const to = from + this.pageSize;
+    const all = pending!.comments;
+    return {
+      node: {
+        comments: {
+          pageInfo: {
+            hasNextPage: to < all.length,
+            endCursor: String(to),
+          },
+          nodes: all.slice(from, to),
+        },
+      },
+    };
   }
 
   private read(op: string, v: Record<string, unknown>) {
@@ -113,24 +143,8 @@ class FakeGitHub {
             },
           },
         };
-      case 'ReviewPublicationComments': {
-        const pending = this.pending;
-        if (pending?.id !== v['id']) return { node: null };
-        const from = v['after'] ? Number(v['after']) : 0;
-        const to = from + this.pageSize;
-        const all = pending!.comments;
-        return {
-          node: {
-            comments: {
-              pageInfo: {
-                hasNextPage: to < all.length,
-                endCursor: String(to),
-              },
-              nodes: all.slice(from, to),
-            },
-          },
-        };
-      }
+      case 'ReviewPublicationComments':
+        return this.commentsPage(v);
       case 'ReviewPublicationThreadRoot': {
         const root = ROOTS[String(v['id'])];
         return { node: root ? { comments: { nodes: [{ id: root }] } } : null };
@@ -139,7 +153,8 @@ class FakeGitHub {
         // GitHub answers a node that is gone with NOT_FOUND, not null.
         const state = this.states.get(String(v['id']));
         if (!state) throw gone();
-        return { node: { id: v['id'], state } };
+        const body = this.filed.get(String(v['id']))?.body ?? '';
+        return { node: { id: v['id'], state, body } };
       }
       default:
         throw new Error(`unexpected ${op}`);
@@ -225,6 +240,10 @@ class FakeGitHub {
       if (this.pending?.id !== id) throw refused('review is not pending');
       this.states.set(id, v['event'] === 'APPROVE' ? 'APPROVED' : 'COMMENTED');
       this.submitted.push({ ...v, comments: this.pending!.comments.length });
+      this.filed.set(id, {
+        body: String(v['body']),
+        comments: this.pending!.comments,
+      });
       this.pending = null;
       return { submitPullRequestReview: { pullRequestReview: { id } } };
     },
@@ -316,7 +335,7 @@ describe('publishing a GitHub review', () => {
       { review: 'PRR_1', event: 'APPROVE', body: 'Looks right.', comments: 3 },
     ]);
     expect(Object.keys(published.items)).toEqual(['range', 'file', 'reply']);
-    expect(published.resumed).toBe(false);
+    expect(published.resumed).toBeNull();
     expect(store.get()).toMatchObject({ submitted: true, inFlight: null });
     expect(gh.threadWrites[0]).toMatchObject({
       path: 'src/cancel.ts',
@@ -342,7 +361,10 @@ describe('publishing a GitHub review', () => {
     expect(store.get()?.inFlight).toBe('submit');
     const published = await publish(gh, store);
     expect(gh.submitted).toHaveLength(1);
-    expect(published.resumed).toBe(true);
+    expect(published.resumed).toEqual({
+      state: 'APPROVED',
+      body: 'Looks right.',
+    });
   });
 
   it('finds a comment whose answer was lost instead of adding it again', async () => {
@@ -579,5 +601,22 @@ describe('publishing a GitHub review', () => {
     const err = await publish(gh).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ReviewPublishError);
     expect((err as ReviewPublishError).item).toBe('reply');
+  });
+
+  it('accounts for a lost comment in a review the reviewer then filed on GitHub', async () => {
+    const gh = new FakeGitHub();
+    const store = memory();
+    gh.lose.add('AddReviewThread');
+    expect(await failure(publish(gh, store))).toBe('unknown');
+    gh.submitOnGitHub('Filed from the web.');
+    const published = await publish(gh, store);
+    expect(published.resumed).toEqual({
+      state: 'COMMENTED',
+      body: 'Filed from the web.',
+    });
+    // The lost comment is in the filed review: recorded, never re-sent.
+    expect(Object.keys(published.items)).toEqual(['range']);
+    expect(count(gh, 'AddReviewThread')).toBe(1);
+    expect(gh.submitted).toHaveLength(0);
   });
 });

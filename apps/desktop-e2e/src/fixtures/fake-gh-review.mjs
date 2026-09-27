@@ -103,10 +103,12 @@ const reads = {
   ReviewPublicationById(prs, vars) {
     for (const pr of prs) {
       if (pr.pendingReview?.id === vars.id) {
-        return { node: { id: vars.id, state: 'PENDING' } };
+        return { node: { id: vars.id, state: 'PENDING', body: '' } };
       }
       const done = (pr.reviews ?? []).find((r) => r.id === vars.id);
-      if (done) return { node: { id: vars.id, state: done.state } };
+      if (done) {
+        return { node: { id: vars.id, state: done.state, body: done.body } };
+      }
     }
     throw new Refused(
       `Could not resolve to a node with the global id of '${vars.id}'`,

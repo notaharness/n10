@@ -33,8 +33,8 @@ interface CommentsPage {
   };
 }
 
-/** Every comment in the pending review, page by page. */
-export async function pendingComments(
+/** Every comment in the review, pending or filed, page by page. */
+export async function reviewComments(
   gql: GraphQL,
   review: string
 ): Promise<PendingComment[]> {

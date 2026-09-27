@@ -69,9 +69,17 @@ export interface PublishedReview {
   reviewId: string;
   /** Each item in the filed review, by key, with its remote comment id. */
   items: Record<string, string>;
-  /** The review had already been filed by an earlier attempt whose
-   *  answer was lost: what it holds is that attempt's, not this one's. */
-  resumed: boolean;
+  /** The review had already been filed, by an earlier attempt whose
+   *  answer was lost or by the reviewer on the provider, as the
+   *  provider holds it: its state and text. Nothing of this request
+   *  was sent; `items` is what that review holds. */
+  resumed: FiledReview | null;
+}
+
+export interface FiledReview {
+  /** The provider's state for the review, e.g. GitHub's `APPROVED`. */
+  state: string;
+  body: string;
 }
 
 /**

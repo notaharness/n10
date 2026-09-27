@@ -110,7 +110,7 @@ describe('submitting a review', () => {
         return Promise.resolve({
           reviewId: 'R',
           items: { 'inline:k1': 'C1', 'inline:k2': 'C2', 'reply:PRRT_1': 'C3' },
-          resumed: false,
+          resumed: null,
         });
       })
     );
@@ -176,7 +176,7 @@ describe('submitting a review', () => {
       return Promise.resolve({
         reviewId: 'R',
         items: { 'inline:k1': 'C1' },
-        resumed: true,
+        resumed: { state: 'APPROVED', body: 'Looks right.' },
       });
     };
     await submitReview(request(['summary', 'inline:k1']), src(resumed));
@@ -226,7 +226,7 @@ describe('submitting a review', () => {
         Promise.resolve({
           reviewId: 'R',
           items: { 'inline:k1': 'C1' },
-          resumed: false,
+          resumed: null,
         })
       )
     );
@@ -236,9 +236,7 @@ describe('submitting a review', () => {
     });
   });
 
-  it('settles a resumed review by what it filed, not by the new choice', async () => {
-    const lost: Publish = () =>
-      Promise.reject(new ReviewPublishError('unknown', 'no answer'));
+  it('sends the request as asked, and settles a review found filed by what it holds', async () => {
     const unanswered = src((_s, ledger) => {
       ledger.write({
         startedAt: 1,
@@ -249,35 +247,35 @@ describe('submitting a review', () => {
         added: { 'inline:k1': { id: 'C1', body: 'x' } },
         submitted: false,
       });
-      return lost(_s, ledger);
+      return Promise.reject(new ReviewPublishError('unknown', 'no answer'));
     });
     await submitReview(request(['summary', 'inline:k1']), unanswered).catch(
       () => undefined
     );
     let sent: ReviewSubmission | null = null;
     const answer = await submitReview(
-      request(['inline:k1', 'inline:k2'], 'REQUEST_CHANGES'),
+      request(['inline:k1', 'inline:k2'], 'COMMENT'),
       src((submission) => {
         sent = submission;
         return Promise.resolve({
           reviewId: 'R',
           items: { 'inline:k1': 'C1' },
-          resumed: true,
+          resumed: { state: 'APPROVED', body: 'Looks right.' },
         });
       })
     );
-    // The submit that may have landed is finished as it was sent.
-    expect(sent).toMatchObject({ event: 'APPROVE', body: 'Looks right.' });
-    expect(sent!.items.map((i) => i.key)).toEqual(['inline:k1']);
-    expect(answer.resumed).toBe(true);
+    // What the provider is asked for is this request, never an old one.
+    expect(sent).toMatchObject({ event: 'COMMENT', body: '' });
+    expect(answer.resumed).toEqual({ state: 'APPROVED' });
     expect(states()).toMatchObject({
+      // The filed review carries the summary's text.
       summary: 'published',
       'inline:k1': 'published',
       'inline:k2': 'unpublished',
     });
   });
 
-  it('keeps a maybe-filed submit’s choice through an attempt that fails before it is checked', async () => {
+  it('settles every item a filed review holds, even one a later attempt deselected', async () => {
     const lostSubmit = src((_s, ledger) => {
       ledger.write({
         startedAt: 1,
@@ -306,7 +304,7 @@ describe('submitting a review', () => {
         Promise.resolve({
           reviewId: 'R',
           items: { 'inline:k1': 'C1', 'inline:k2': 'C2' },
-          resumed: true,
+          resumed: { state: 'COMMENTED', body: '' },
         })
       )
     );
@@ -316,7 +314,7 @@ describe('submitting a review', () => {
     });
   });
 
-  it('settles a review filed on GitHub by what it holds, without the summary', async () => {
+  it('settles a review filed on GitHub by what it holds, and not the summary it does not carry', async () => {
     await submitReview(
       request(['summary', 'inline:k1', 'inline:k2']),
       src(() => Promise.reject(new ReviewPublishError('refused', 'no')))
@@ -326,13 +324,14 @@ describe('submitting a review', () => {
       src(() =>
         Promise.resolve({
           reviewId: 'R',
-          // k2 was in the pending review when it was filed on GitHub.
+          // k2 was in the pending review when it was filed on GitHub,
+          // with the reviewer's own text.
           items: { 'inline:k1': 'C1', 'inline:k2': 'C2' },
-          resumed: true,
+          resumed: { state: 'COMMENTED', body: 'Filed from the web.' },
         })
       )
     );
-    expect(answer.resumed).toBe(true);
+    expect(answer.resumed).toEqual({ state: 'COMMENTED' });
     expect(states()).toMatchObject({
       summary: 'unpublished',
       'inline:k1': 'published',
@@ -413,7 +412,7 @@ describe('two submits at once', () => {
           resolve({
             reviewId: 'R',
             items: { 'inline:k1': 'C1' },
-            resumed: false,
+            resumed: null,
           });
       });
     };

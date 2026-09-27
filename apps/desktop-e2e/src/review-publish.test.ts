@@ -124,7 +124,7 @@ test.describe('Publishing a review', () => {
 
     expect(await submit(page)).toEqual({
       ok: ['published', 'published'],
-      resumed: false,
+      resumed: null,
     });
     const after = scenario(homeDir);
     expect(after.reviewWrites).toEqual({
@@ -178,7 +178,10 @@ test.describe('Publishing a review', () => {
       .screenshot({ path: testInfo.outputPath('unknown.png') });
 
     // The review that landed is the one reported, not a new one.
-    expect(await submit(page)).toEqual({ ok: ['published'], resumed: true });
+    expect(await submit(page)).toEqual({
+      ok: ['published'],
+      resumed: { state: 'COMMENTED' },
+    });
     const after = scenario(homeDir);
     expect(after.reviewWrites?.['SubmitReview']).toBe(1);
     expect(after.prs[0]!.reviews).toHaveLength(1);
@@ -197,7 +200,7 @@ test.describe('Publishing a review', () => {
     expect(await submit(page)).toEqual({
       error: expect.stringContaining('GitHub did not answer'),
     });
-    expect(await submit(page)).toEqual({ ok: ['published'], resumed: false });
+    expect(await submit(page)).toEqual({ ok: ['published'], resumed: null });
     const after = scenario(homeDir);
     expect(after.reviewWrites).toEqual({
       StartReview: 1,
