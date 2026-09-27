@@ -42,7 +42,12 @@ export function useReviewDiff({
     enabled: !isPr,
     live: running,
   });
-  const diff = isPr ? commitDiff : workingDiff;
+  // A pull request's diff names the commit it was read at; a working
+  // tree is no commit, and nothing written on it is filed.
+  const diff = isPr
+    ? { ...commitDiff, data: commitDiff.data?.text }
+    : workingDiff;
+  const head = isPr ? commitDiff.data?.head ?? null : null;
   const parsed = useParsedDiff(diff.data);
   const read = useHeldFailure(
     diffReadState(diff, parsed),
@@ -63,6 +68,7 @@ export function useReviewDiff({
   );
   return {
     files: parsed.data ?? NO_FILES,
+    head,
     // Only a read still under way is loading: a failed parse has no
     // files and never will, and must not keep the file tree waiting.
     pending: read.kind === 'loading',

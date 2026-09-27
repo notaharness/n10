@@ -80,6 +80,10 @@ interface N10Bridge {
     ref: Record<string, unknown>;
     viewer?: string | null;
   }): Promise<{ drafts: FakeReviewDraft[] }>;
+  fetchDiffText(
+    sourceBranch: string,
+    targetBranch: string
+  ): Promise<{ text: string; head: string }>;
   /** What the Finish review form calls (its UI is a later slice). */
   submitReview(req: {
     ref: Record<string, unknown>;

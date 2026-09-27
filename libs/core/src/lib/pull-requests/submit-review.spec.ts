@@ -13,6 +13,7 @@ import { PullRequestIdentityError } from './pr-snapshot.js';
 import { readDraftFile, writeDraftFile } from './review-draft-store.js';
 import { listReviewDrafts, saveReviewDraft } from './review-drafts.js';
 import {
+  DraftsOnOtherCommitError,
   parseSubmitReviewRequest,
   submitReview,
   type SubmitSources,
@@ -35,7 +36,7 @@ const inline = (key: string, range = true) => ({
           end: 5,
         }
       : null,
-    head: null,
+    head: HEAD,
     lines: range ? ['a', 'b', 'c'] : [],
   },
 });
@@ -419,6 +420,54 @@ describe('submitting a review', () => {
       ),
     });
     expect(states()['inline:k1']).toBe('unknown');
+  });
+
+  it('refuses a comment written on another commit, before anything changes', async () => {
+    const other = 'b'.repeat(40);
+    saveReviewDraft(
+      {
+        ref: REF,
+        viewer: 'bea',
+        target: {
+          ...inline('k3'),
+          anchor: { ...inline('k3').anchor, head: other },
+        },
+        body: 'Is 250 ms enough?',
+      },
+      src()
+    );
+    saveReviewDraft(
+      {
+        ref: REF,
+        viewer: 'bea',
+        target: {
+          ...inline('k4'),
+          anchor: { ...inline('k4').anchor, head: null },
+        },
+        body: 'Written before n10 knew the commit.',
+      },
+      src()
+    );
+    let calls = 0;
+    const count: Publish = () => {
+      calls++;
+      return Promise.reject(new Error('should not publish'));
+    };
+    const err = await submitReview(
+      request(['inline:k1', 'inline:k3', 'inline:k4']),
+      src(count)
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DraftsOnOtherCommitError);
+    expect((err as DraftsOnOtherCommitError).draftIds).toEqual([
+      'inline:k3',
+      'inline:k4',
+    ]);
+    expect(calls).toBe(0);
+    expect(states()).toMatchObject({
+      'inline:k1': 'unpublished',
+      'inline:k3': 'unpublished',
+    });
+    expect(readDraftFile(dir, REF, 'bea').submission).toBeUndefined();
   });
 
   it('refuses what is no review: a conversation comment, or nothing to say', async () => {

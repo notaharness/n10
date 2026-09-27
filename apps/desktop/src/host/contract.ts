@@ -89,6 +89,7 @@ import type {
   PullRequestSnapshot,
   RepositoryRef,
   ReviewDraft,
+  ReviewDiffText,
   ReviewDrafts,
   SaveDraftRequest,
   SnapshotRequest,
@@ -458,7 +459,12 @@ export interface N10HostApi {
   onLaunchStep(cb: (payload: LaunchStepEvent) => void): () => void;
 
   // ── Diff ─────────────────────────────────────────────────────
-  fetchDiffText(sourceBranch: string, targetBranch: string): Promise<string>;
+  /** A pull request's diff, with the commit its new side was read at:
+   *  what a comment's line numbers belong to. */
+  fetchDiffText(
+    sourceBranch: string,
+    targetBranch: string
+  ): Promise<ReviewDiffText>;
   /** Diff of a branch's worktree against its base including uncommitted
    *  and untracked work — what an agent has done so far, as opposed to
    *  what it has committed. Empty string when the branch has no

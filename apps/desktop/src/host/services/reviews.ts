@@ -4,7 +4,7 @@ import type {
   PullRequestComments,
   ReviewVerdict,
 } from '@n10/vcs-core';
-import { fetchDiffText, fetchFileDiffText } from '@n10/core';
+import { fetchFileDiffText, fetchReviewDiff } from '@n10/core';
 import { PROVIDERS, requireRepo } from './repo.js';
 import { configuredViewer } from './viewer.js';
 import { refreshPrList } from './sidebar.js';
@@ -161,7 +161,7 @@ export async function submitReviewVerdict(
 
 export function getDiffText(sourceBranch: string, targetBranch: string) {
   requireRepo();
-  return fetchDiffText(sourceBranch, targetBranch);
+  return fetchReviewDiff(sourceBranch, targetBranch);
 }
 
 export function getFileDiffText(

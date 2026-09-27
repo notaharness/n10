@@ -24,6 +24,7 @@ import {
   type DraftsRequest,
   type ReviewDrafts,
 } from './review-drafts.js';
+import { assertAnchoredAt } from './submit-anchors.js';
 import { withSubmitClaim } from './submit-claims.js';
 
 /**
@@ -84,6 +85,8 @@ export function parseSubmitReviewRequest(value: unknown): SubmitReviewRequest {
   };
 }
 
+export { DraftsOnOtherCommitError } from './submit-anchors.js';
+
 export async function submitReview(
   req: SubmitReviewRequest,
   src: SubmitSources
@@ -109,6 +112,7 @@ async function submitClaimed(
   const drafts = new DraftsFile(dir, req.ref, viewer);
   const file = drafts.read();
   const chosen = choose(file, req.draftIds);
+  assertAnchoredAt(chosen, req.head);
   const submission = toSubmission(req, chosen);
   const attempt = file.submission?.attempt ?? randomUUID();
   const before = file.submission?.draftIds ?? [];

@@ -17,7 +17,6 @@ import {
 
 const BRANCH = 'retry-budget';
 const FILE = 'src/retry.ts';
-const HEAD = 'f'.repeat(40);
 
 const GITHUB: FakeGitHub = {
   username: 'bea',
@@ -73,15 +72,27 @@ async function draftOn(
   ).toBeVisible();
 }
 
-async function openDiff(page: Page) {
+/**
+ * Open the pull request's diff, with GitHub reporting the fixture
+ * branch's real commit as its head: the commit the diff is read at.
+ */
+async function openDiff(page: Page, homeDir: string): Promise<string> {
+  const head = await page.evaluate(
+    async (branch) => (await window.n10.fetchDiffText(branch, 'main')).head,
+    BRANCH
+  );
+  updateFakeGh(homeDir, (s) => {
+    s.prs[0]!.headRefOid = head;
+  });
   await sidebarRow(page, /Cap retries per request|#321/)
     .first()
     .click();
   await expect(gutterOf(page, 'RIGHT', 1)).toBeVisible({ timeout: 30_000 });
+  return head;
 }
 
 /** The bridge call the Finish review form makes, with every draft. */
-function submit(page: Page, head = HEAD) {
+function submit(page: Page, head: string) {
   return page.evaluate(async (head) => {
     const repo = (await window.n10.getRepo())!;
     const ref = { ...repo.repository!, number: 321 };
@@ -118,11 +129,11 @@ test.describe('Publishing a review', () => {
     desktop,
   }) => {
     const { page, homeDir } = desktop;
-    await openDiff(page);
+    const head = await openDiff(page, homeDir);
     await draftOn(page, 'RIGHT', 1, 'Why three?', 2);
     await draftOn(page, 'LEFT', 2, 'The old wait was fine.');
 
-    expect(await submit(page)).toEqual({
+    expect(await submit(page, head)).toEqual({
       ok: ['published', 'published'],
       resumed: null,
     });
@@ -133,7 +144,7 @@ test.describe('Publishing a review', () => {
       SubmitReview: 1,
     });
     const pr = after.prs[0]!;
-    expect(pr.reviews).toMatchObject([{ commit: HEAD, state: 'COMMENTED' }]);
+    expect(pr.reviews).toMatchObject([{ commit: head, state: 'COMMENTED' }]);
     expect(
       pr.threads?.map((t) => [
         t.startSide,
@@ -155,14 +166,14 @@ test.describe('Publishing a review', () => {
     updateFakeGh(homeDir, (s) => {
       s.loseAnswers = ['SubmitReview'];
     });
-    await openDiff(page);
+    const head = await openDiff(page, homeDir);
     await draftOn(page, 'RIGHT', 1, 'Why three?');
 
-    expect(await submit(page)).toEqual({
+    expect(await submit(page, head)).toEqual({
       error: expect.stringContaining('GitHub did not answer'),
     });
     await page.reload();
-    await openDiff(page);
+    await openDiff(page, homeDir);
     await expect(
       page.getByText(
         'This may already have been posted. n10 will check before sending it again.'
@@ -178,7 +189,7 @@ test.describe('Publishing a review', () => {
       .screenshot({ path: testInfo.outputPath('unknown.png') });
 
     // The review that landed is the one reported, not a new one.
-    expect(await submit(page)).toEqual({
+    expect(await submit(page, head)).toEqual({
       ok: ['published'],
       resumed: { state: 'COMMENTED' },
     });
@@ -194,13 +205,16 @@ test.describe('Publishing a review', () => {
     updateFakeGh(homeDir, (s) => {
       s.loseAnswers = ['AddReviewThread'];
     });
-    await openDiff(page);
+    const head = await openDiff(page, homeDir);
     await draftOn(page, 'RIGHT', 1, 'Why three?');
 
-    expect(await submit(page)).toEqual({
+    expect(await submit(page, head)).toEqual({
       error: expect.stringContaining('GitHub did not answer'),
     });
-    expect(await submit(page)).toEqual({ ok: ['published'], resumed: null });
+    expect(await submit(page, head)).toEqual({
+      ok: ['published'],
+      resumed: null,
+    });
     const after = scenario(homeDir);
     expect(after.reviewWrites).toEqual({
       StartReview: 1,
@@ -214,21 +228,39 @@ test.describe('Publishing a review', () => {
     desktop,
   }) => {
     const { page, homeDir } = desktop;
-    await openDiff(page);
+    const head = await openDiff(page, homeDir);
     await draftOn(page, 'RIGHT', 1, 'Why three?');
     updateFakeGh(homeDir, (s) => {
       s.prs[0]!.headRefOid = 'e'.repeat(40);
     });
-    expect(await submit(page)).toEqual({
+    expect(await submit(page, head)).toEqual({
       error: expect.stringContaining('new commits'),
     });
     expect(scenario(homeDir).reviewWrites).toBeUndefined();
     await page.reload();
-    await openDiff(page);
+    await openDiff(page, homeDir);
     await expect(
       page
         .locator('[data-my-draft]')
         .getByRole('button', { name: 'Edit draft' })
     ).toBeVisible();
+  });
+
+  test('a comment is not filed on a head its diff never showed', async ({
+    desktop,
+  }) => {
+    const { page, homeDir } = desktop;
+    await openDiff(page, homeDir);
+    await draftOn(page, 'RIGHT', 2, 'Is 250 ms enough?');
+    // Someone pushed; GitHub reports a commit n10 has not read, and the
+    // caller asks to file on it.
+    const pushed = 'e'.repeat(40);
+    updateFakeGh(homeDir, (s) => {
+      s.prs[0]!.headRefOid = pushed;
+    });
+    expect(await submit(page, pushed)).toEqual({
+      error: expect.stringContaining('written on another commit'),
+    });
+    expect(scenario(homeDir).reviewWrites).toBeUndefined();
   });
 });
