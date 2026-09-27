@@ -295,6 +295,13 @@ Ink passes `TerminalEmulator` ANSI through `<Text>`; raw stdin forwards to the
 PTY. Strip CI-related variables when spawning the interactive TUI. The serve
 target sets `TSX_TSCONFIG_PATH` for automatic JSX transformation.
 
+Selecting a sidebar row remounts `MainTabBody`, which is keyed by the selected
+item, and Ink subscribes `useInput` in a passive effect. Until that effect runs,
+a key still reaches the previous body's handler and acts on the old selection.
+Ink 7's `useEffectEvent`-based `useInput` closes that window for re-renders but
+not for a remount. Tests that act on a new selection wait for the remounted
+pane's `(loading...)` placeholder to clear first (`active-tabs.test.ts`).
+
 The wterm host keeps the PTY alive across WebSocket reconnects and replays a ring
 buffer. Use one build script for server and client to avoid output-directory
 cleaning conflicts. Playwright and Nx must agree on artifact output paths.
