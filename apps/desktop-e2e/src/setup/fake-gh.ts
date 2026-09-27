@@ -66,8 +66,8 @@ export interface FakePr {
 export interface FakeCheck {
   name: string;
   state: string;
-  /** GitHub's `isRequired`; false unless said, null for unknown. */
-  required?: boolean | null;
+  /** GitHub's `isRequired`, which is never null; false unless said. */
+  required?: boolean;
   status?: boolean;
   workflow?: string;
   /** The Actions event; `pull_request` unless said. */

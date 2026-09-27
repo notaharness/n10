@@ -267,6 +267,9 @@ function contextNode(c) {
     detailsUrl: `https://github.com/n10/fixture/actions/runs/${c.name.length}`,
     isRequired,
     checkSuite: {
+      // One suite per workflow and event, as a run per trigger has.
+      databaseId: repositoryNode(`${c.workflow ?? 'CI'}:${c.event ?? ''}`)
+        .databaseId,
       app: { slug: c.app ?? 'github-actions', databaseId: c.appId ?? 15368 },
       workflowRun: {
         runAttempt: 1,
@@ -281,6 +284,7 @@ function contextNode(c) {
 function checksNode(pr) {
   const nodes = (pr.checks ?? []).map(contextNode);
   return {
+    databaseId: scenarioRepository().databaseId,
     pullRequest: {
       number: pr.number,
       state: pr.state ?? 'OPEN',
@@ -289,6 +293,8 @@ function checksNode(pr) {
       mergeable: pr.mergeable ?? 'MERGEABLE',
       mergeStateStatus: pr.mergeStateStatus ?? 'CLEAN',
       reviewDecision: pr.reviewDecision ?? null,
+      // No classic protection: the scenario's rules are rule sets.
+      baseRef: { refUpdateRule: null },
       commits: {
         nodes: [
           {

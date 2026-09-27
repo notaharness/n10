@@ -1,19 +1,17 @@
 import {
   parseSnapshotRequest,
-  PullRequestIdentityError,
   readPullRequestChecks,
   type PullRequestChecksAnswer,
 } from '@n10/core';
-import { readConfig } from '@n10/vcs-core';
-import { lookupPullRequest, resolveProvider } from './pull-requests.js';
-import { activeRepoIs, configuredRepository, requireRepo } from './repo.js';
-import { configuredViewer } from './viewer.js';
+import { resolveProvider } from './pull-requests.js';
+import { identitySources } from './pr-identity.js';
+import { requireRepo } from './repo.js';
 
 /**
  * What stands between one pull request and completion, read by identity
  * for the renderer, the same way as its snapshot: the request is parsed
  * as untrusted, and core checks the repository and account around the
- * provider's read. The list cache supplies the unresolved conversations.
+ * provider's read.
  */
 export async function getPullRequestChecks(
   request: unknown
@@ -26,16 +24,7 @@ export async function getPullRequestChecks(
     ? provider?.fetchPullRequestChecks?.bind(provider)
     : undefined;
   return readPullRequestChecks(req, {
-    repository: () => {
-      if (!activeRepoIs(cwd)) {
-        throw new PullRequestIdentityError(
-          `${cwd} is no longer the repository open in n10`
-        );
-      }
-      return configuredRepository(readConfig(cwd));
-    },
-    viewer: () => configuredViewer(readConfig(cwd)),
-    lookup: (prId) => lookupPullRequest(cwd, prId),
+    ...identitySources(cwd),
     checks: readChecks && ((prId) => readChecks(auth, project, prId)),
   });
 }
