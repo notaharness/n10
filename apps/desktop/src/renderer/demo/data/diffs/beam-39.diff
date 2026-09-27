@@ -75,7 +75,7 @@ index 9ffcf4f..12472ea 100644
    "peerId": "…32 hex…",
    "nodePublic": "…base64url 32…",
    "address": "tc…",
-   "label": "buildbox",
+   "label": "my-server",
    "issuedAt": 1758570000000,
    "assertion": {
      "credentialId": "…", "clientDataJSON": "…", "authenticatorData": "…", "signature": "…"
@@ -902,7 +902,7 @@ index f8b50ab..cbec6d6 100644
  function request(o, extra = {}) {
    const { publicKey, privateKey } = generateKeyPairSync("x25519");
    const k = publicKey.export({ format: "jwk" }).x;
-   const f = { o, s: b64(randomBytes(16)), k, c: b64(randomBytes(32)), l: "buildbox", f: "b7f39a210c4e55d1", ...(o === "c" ? { n: "beam" } : {}), ...extra };
+   const f = { o, s: b64(randomBytes(16)), k, c: b64(randomBytes(32)), l: "my-server", f: "b7f39a210c4e55d1", ...(o === "c" ? { n: "beam" } : {}), ...extra };
    const frag = new URLSearchParams(Object.entries(f).filter(([, v]) => v !== undefined).sort(([a], [b]) => (a < b ? -1 : 1))).toString();
    return { url: "https://beam.n10.is/#" + frag, slot: f.s, key: { privateKey, k } };
  }
@@ -1140,7 +1140,7 @@ index f8b50ab..cbec6d6 100644
  
    it("ignores a parameter it does not know", async () => {
      const t = await load(request("a").url + "&z=1");
-     assert.equal(await text(t.page, "h1"), "Authorize buildbox");
+     assert.equal(await text(t.page, "h1"), "Authorize my-server");
 +    assert.equal(await t.page.locator("#home").isVisible(), false);
 +    assert.ok(await t.page.locator("details#compat").isVisible());
      await t.close();
@@ -1156,14 +1156,14 @@ index f8b50ab..cbec6d6 100644
  describe("the ceremony page, given a request", () => {
    const ready = [
      ["c", "Step 1 of 2 · Create your fleet passkey",
-       "Save a passkey for homelab at beam.n10.is. This creates the fleet’s credential. A second prompt will authorize buildbox and unlock its encrypted directory.",
+       "Save a passkey for homelab at beam.n10.is. This creates the fleet’s credential. A second prompt will authorize my-server and unlock its encrypted directory.",
        "Create fleet passkey for “homelab”", "Create passkey", { n: "homelab" }],
-     ["a", "Authorize buildbox",
+     ["a", "Authorize my-server",
        "Use your fleet’s passkey to sign this machine’s membership and unlock the encrypted directory. If you just created a fleet passkey, this is step 2 of 2.",
-       "Add “buildbox” to fleet", "Authorize machine", {}],
-     ["r", "Remove buildbox from your fleet",
+       "Add “my-server” to fleet", "Authorize machine", {}],
+     ["r", "Remove my-server from your fleet",
        "Use your fleet’s passkey to permanently revoke this machine identity. Offline machines learn when they reconnect.",
-       "Remove “buildbox” from fleet", "Authorize removal", {}],
+       "Remove “my-server” from fleet", "Authorize removal", {}],
    ];
    for (const [o, heading, explain, action, button, extra] of ready) {
      it(`shows what o=${o} approves and waits for a click`, async () => {
@@ -1171,7 +1171,7 @@ index f8b50ab..cbec6d6 100644
        assert.equal(await text(t.page, "h1"), heading);
        assert.equal(await text(t.page, "#explain"), explain);
        assert.deepEqual(await t.page.locator("#summary dt").allTextContents(), ["Action", "Machine", "Machine fingerprint"]);
-       assert.deepEqual(await t.page.locator("#summary dd").allTextContents(), [action, "buildbox", "b7f3 9a21 0c4e 55d1"]);
+       assert.deepEqual(await t.page.locator("#summary dd").allTextContents(), [action, "my-server", "b7f3 9a21 0c4e 55d1"]);
        assert.equal(await text(t.page, "#safety"),
          "Continue only if you started this request just now. Compare the action, machine name and machine fingerprint with n10 Desktop or your terminal.");
        assert.equal(await text(t.page, "#expiry"), "Requests expire after five minutes. The originating machine shows whether this request is still active.");
@@ -1274,7 +1274,7 @@ index f8b50ab..cbec6d6 100644
      assert.equal(await t.calls(), 0);
      assert.equal(t.posts.length, 0, "a false preflight writes nothing by itself");
      await t.page.getByRole("button", { name: "Try anyway" }).click();
-     assert.deepEqual(await settle(t.page), ["Approval sent.", "Return to buildbox to check whether it joined. beam still needs to verify the answer and finish directory work. After joining, compare the fleet fingerprint with a machine already in your fleet."]);
+     assert.deepEqual(await settle(t.page), ["Approval sent.", "Return to my-server to check whether it joined. beam still needs to verify the answer and finish directory work. After joining, compare the fleet fingerprint with a machine already in your fleet."]);
      assert.equal(sent(req, t.posts).get("result"), "ok");
      assert.equal(await t.page.getByRole("alert").count(), 0, "the preflight's alert is gone once overridden");
      await t.close();
@@ -1296,7 +1296,7 @@ index f8b50ab..cbec6d6 100644
      const t = await load(req.url);
      await t.page.getByRole("button", { name: "Create passkey" }).click();
      assert.deepEqual(await settle(t.page), ["Passkey created. One more step.",
-       "Return to n10 Desktop or your terminal. Open the new link or scan the new QR code, then use this same passkey to authorize buildbox. This page cannot open the second step."]);
+       "Return to n10 Desktop or your terminal. Open the new link or scan the new QR code, then use this same passkey to authorize my-server. This page cannot open the second step."]);
      const f = sent(req, t.posts);
      assert.equal(f.get("result"), "ok");
      for (const k of ["credentialId", "clientDataJSON", "attestationObject"]) assert.ok(f.get(k), k);
@@ -1311,7 +1311,7 @@ index f8b50ab..cbec6d6 100644
    });
  
    for (const [o, heading, body] of [
-     ["a", "Approval sent.", "Return to buildbox to check whether it joined. beam still needs to verify the answer and finish directory work. After joining, compare the fleet fingerprint with a machine already in your fleet."],
+     ["a", "Approval sent.", "Return to my-server to check whether it joined. beam still needs to verify the answer and finish directory work. After joining, compare the fleet fingerprint with a machine already in your fleet."],
      ["r", "Revocation approval sent.", "Return to your originating machine to check that the revocation completed and see its publication and acknowledgement status."],
    ]) {
      it(`signs o=${o} with the passkey and sends its 32-byte PRF output`, async () => {
