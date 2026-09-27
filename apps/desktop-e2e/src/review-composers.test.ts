@@ -64,7 +64,8 @@ function gutterOf(page: Page, side: 'LEFT' | 'RIGHT', line: number): Locator {
   return page.locator(`[data-file="${FILE}"][data-point="${side}:${line}"]`);
 }
 
-const composer = (page: Page) => page.getByRole('textbox', { name: 'Comment' });
+const composer = (page: Page) =>
+  page.getByRole('combobox', { name: 'Comment' });
 
 test.describe('Comment composers', () => {
   test('a range on the new side becomes a private draft that survives a reload', async ({
