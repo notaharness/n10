@@ -16,6 +16,7 @@ interface Comment {
   body: string;
   path: string;
   line: number | null;
+  startLine: number | null;
   subjectType: 'LINE' | 'FILE';
   replyTo: { id: string } | null;
 }
@@ -27,6 +28,12 @@ interface Pending {
   commit: { oid: string };
   comments: Comment[];
 }
+
+/** Each existing thread's first comment, which its replies answer. */
+const ROOTS: Record<string, string> = {
+  PRRT_old: 'PRRC_old',
+  PRRT_other: 'PRRC_other',
+};
 
 /**
  * GitHub's side of a review, as its GraphQL schema describes it: one
@@ -115,6 +122,10 @@ class FakeGitHub {
           },
         };
       }
+      case 'ReviewPublicationThreadRoot': {
+        const root = ROOTS[String(v['id'])];
+        return { node: root ? { comments: { nodes: [{ id: root }] } } : null };
+      }
       case 'ReviewPublicationById':
         return {
           node: this.states.has(String(v['id']))
@@ -157,6 +168,7 @@ class FakeGitHub {
         body: String(v['body']),
         path: String(v['path']),
         line: file ? null : Number(v['line']),
+        startLine: v['startLine'] ? Number(v['startLine']) : null,
         subjectType: file ? 'FILE' : 'LINE',
         replyTo: null,
       });
@@ -175,8 +187,9 @@ class FakeGitHub {
         body: String(v['body']),
         path: 'x',
         line: 1,
+        startLine: null,
         subjectType: 'LINE',
-        replyTo: { id: 'PRRC_earlier' },
+        replyTo: { id: ROOTS[String(v['thread'])] ?? 'PRRC_unknown' },
       });
       return { addPullRequestReviewThreadReply: { comment: { id } } };
     },

@@ -9,7 +9,7 @@ import {
   type ReviewLedger,
   type ReviewSubmission,
 } from '@n10/vcs-core';
-import { pendingComments, sameItem, type GraphQL } from './pr-review-match.js';
+import { findSent, pendingComments, type GraphQL } from './pr-review-match.js';
 import {
   ADD_REPLY,
   addThreadMutation,
@@ -219,7 +219,7 @@ class Run {
     }
     const known = new Set(Object.values(this.ledger.added).map((a) => a.id));
     const found = sending
-      ? comments.find((c) => !known.has(c.id) && sameItem(c, sending))
+      ? await findSent(this.gql, comments, sending, known)
       : undefined;
     const added = found
       ? { ...this.ledger.added, [inFlight]: { id: found.id, body: found.body } }
@@ -298,7 +298,7 @@ class Run {
     return (
       this.ledger.inFlight === 'review' &&
       pending.commit?.oid === this.ledger.head &&
-      Date.parse(pending.createdAt) >= this.ledger.startedAt - 1_000
+      Date.parse(pending.createdAt) >= this.ledger.startedAt - CLOCK_SLACK
     );
   }
 
@@ -343,6 +343,14 @@ class Run {
     this.store.write(this.ledger);
   }
 }
+
+/**
+ * How far this machine's clock may run ahead of GitHub's. A pending
+ * review older than the publication by more than this was not its own:
+ * had it existed when the start reached GitHub, the start would have
+ * been refused (one pending review per reviewer).
+ */
+const CLOCK_SLACK = 10 * 60_000;
 
 /** Steps that are not an item's; each is accounted for where it is sent. */
 const STEPS = new Set(['review', 'discard', 'submit']);

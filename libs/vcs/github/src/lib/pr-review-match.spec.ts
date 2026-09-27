@@ -6,6 +6,7 @@ const comment = (over: Partial<PendingComment> = {}): PendingComment => ({
   body: 'Why?',
   path: 'a.ts',
   line: 5,
+  startLine: 3,
   subjectType: 'LINE',
   replyTo: null,
   ...over,
@@ -27,15 +28,29 @@ describe('sameItem', () => {
       })
     ).toBe(true);
     expect(
-      sameItem(comment({ replyTo: { id: 'P' } }), {
-        body: 'Why?',
-        place: { kind: 'reply', threadId: 'T' },
-      })
+      sameItem(
+        comment({ replyTo: { id: 'P' } }),
+        { body: 'Why?', place: { kind: 'reply', threadId: 'T' } },
+        'P'
+      )
     ).toBe(true);
+  });
+
+  it('tells a reply in one thread from the same reply in another', () => {
+    const reply = {
+      body: 'Why?',
+      place: { kind: 'reply' as const, threadId: 'T' },
+    };
+    expect(sameItem(comment({ replyTo: { id: 'Q' } }), reply, 'P')).toBe(false);
+    expect(sameItem(comment({ replyTo: { id: 'P' } }), reply, null)).toBe(
+      false
+    );
   });
 
   it('tells apart the same text on another line, as a file comment or a reply', () => {
     expect(sameItem(comment({ line: 4 }), line)).toBe(false);
+    expect(sameItem(comment({ startLine: 4 }), line)).toBe(false);
+    expect(sameItem(comment({ startLine: null }), line)).toBe(false);
     expect(sameItem(comment({ subjectType: 'FILE', line: null }), line)).toBe(
       false
     );

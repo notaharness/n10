@@ -31,6 +31,11 @@ function prOf(prs, vars) {
   );
 }
 
+/** The id of thread `i`'s first comment, which its replies answer. */
+function rootOf(pr, i) {
+  return pr.threads?.[i]?.comments[0]?.id ?? `thread-${i + 1}-comment-1`;
+}
+
 const reads = {
   ReviewPublicationState(prs, vars) {
     const pr = prOf(prs, vars);
@@ -68,12 +73,24 @@ const reads = {
             body: c.body,
             path: c.path,
             line: c.line ?? null,
+            startLine: c.startLine ?? null,
             subjectType: c.file ? 'FILE' : 'LINE',
             replyTo: c.replyTo,
           })),
         },
       },
     };
+  },
+  ReviewPublicationThreadRoot(prs, vars) {
+    for (const pr of prs) {
+      const i = (pr.threads ?? []).findIndex(
+        (x, n) => (x.id ?? `thread-${n + 1}`) === vars.id
+      );
+      if (i >= 0) {
+        return { node: { comments: { nodes: [{ id: rootOf(pr, i) }] } } };
+      }
+    }
+    return { node: null };
   },
   ReviewPublicationById(prs, vars) {
     for (const pr of prs) {
@@ -132,13 +149,12 @@ const writes = {
     const i = (pr.threads ?? []).findIndex(
       (x, n) => (x.id ?? `thread-${n + 1}`) === vars.thread
     );
-    const parent = pr.threads?.[i]?.comments[0];
     pr.pendingReview.comments.push({
       id,
       body: vars.body,
       path: '',
       // The comment replied to, as GitHub's `replyTo` is.
-      replyTo: { id: parent?.id ?? `thread-${i + 1}-comment-1` },
+      replyTo: { id: rootOf(pr, i) },
       thread: vars.thread,
     });
     count(scenario, 'AddReviewReply');

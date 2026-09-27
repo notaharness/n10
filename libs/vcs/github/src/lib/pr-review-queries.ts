@@ -27,9 +27,16 @@ export const REVIEW_COMMENTS = `query ReviewPublicationComments($id: ID!, $after
     ... on PullRequestReview {
       comments(first: 100, after: $after) {
         pageInfo { hasNextPage endCursor }
-        nodes { id body path line subjectType replyTo { id } }
+        nodes { id body path line startLine subjectType replyTo { id } }
       }
     }
+  }
+}`;
+
+/** A thread's first comment, which every reply in it answers. */
+export const THREAD_ROOT = `query ReviewPublicationThreadRoot($id: ID!) {
+  node(id: $id) {
+    ... on PullRequestReviewThread { comments(first: 1) { nodes { id } } }
   }
 }`;
 
