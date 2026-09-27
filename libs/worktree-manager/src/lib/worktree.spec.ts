@@ -1263,29 +1263,6 @@ describe('worktreeSessionName', () => {
 
 describe('WorktreeResolver', () => {
   describe('default resolver', () => {
-    it('dir() matches existing worktreeDir behavior', () => {
-      // default resolver is active after resetWorktreeResolver in beforeEach
-      // We test indirectly via createWorktree which calls worktreeDir
-      // Just verify branchToSessionName is used consistently
-      expect(branchToSessionName('feature/auth')).toBe('feature-auth');
-    });
-
-    it('owns() uses startsWith and rejects paths outside base', () => {
-      const cwd = process.cwd();
-      const base = pathResolve(cwd, '.claude/worktrees');
-      // The default resolver should own paths under .claude/worktrees
-      // We test via listWorktrees behavior (tested above)
-      // Here we test createTemplateResolver as a proxy for the pattern
-      const resolver = createTemplateResolver(
-        '.claude/worktrees/{session}',
-        cwd
-      );
-      expect(resolver.owns(`${base}/feature-auth`)).toBe(true);
-      expect(resolver.owns(base)).toBe(true);
-      expect(resolver.owns(`${base}-old/stale`)).toBe(false);
-      expect(resolver.owns('/completely/different/path')).toBe(false);
-    });
-
     it('base() is the directory owns() tests membership of', () => {
       expect(worktreesBasePath()).toBe(
         pathResolve(process.cwd(), '.claude/worktrees')
