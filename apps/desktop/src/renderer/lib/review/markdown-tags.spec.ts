@@ -52,6 +52,17 @@ describe('escapeUnknownTags', () => {
     }
   });
 
+  it('keeps a raw-text tag as text by its name alone, as GFM does', () => {
+    expect(escapeUnknownTags(`<script a=b"c>`)).toBe(`&lt;script a=b"c>`);
+    expect(escapeUnknownTags(`<textarea a='x>\nlater`)).toBe(
+      `&lt;textarea a='x>\nlater`
+    );
+    expect(escapeUnknownTags('</STYLE')).toBe('&lt;/STYLE');
+    // A name that only starts like one is another tag.
+    expect(escapeUnknownTags('<scripts>')).toBe('&lt;scripts&gt;');
+    expect(escapeUnknownTags('<titled x="1')).toBe('<titled x="1');
+  });
+
   it('reads a quoted attribute as part of its tag', () => {
     expect(
       escapeUnknownTags(`<iframe srcdoc="<script>x</script>"></iframe>`)

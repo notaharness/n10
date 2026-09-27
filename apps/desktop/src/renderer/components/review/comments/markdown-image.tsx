@@ -6,9 +6,9 @@ import {
   type ComponentProps,
   type Ref,
 } from 'react';
-import { toast } from 'sonner';
 import { useCommentImage } from '../../../lib/data/queries.js';
 import { refocusAfter } from '../../../lib/focus.js';
+import { openLink } from '../../../lib/open-link.js';
 import { cn } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../../ui/dialog.js';
@@ -24,13 +24,6 @@ import { RetryButton } from '../ReadNotice.js';
  */
 
 type ImageData = NonNullable<ReturnType<typeof useCommentImage>['data']>;
-
-/** The image's own address, in the system browser. */
-function openImage(url: string): void {
-  window.n10.openExternal(url).catch(() => {
-    toast.error(`Couldn't open ${url}`);
-  });
-}
 
 const CHIP =
   'my-2 inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 text-sm text-muted-foreground';
@@ -85,7 +78,7 @@ function ImageFailure({
           if (!retrying) onRetry();
         }}
       />
-      <Button variant="ghost" size="sm" onClick={() => openImage(url)}>
+      <Button variant="ghost" size="sm" onClick={() => openLink(url)}>
         Open <ExternalLinkIcon />
       </Button>
     </span>
@@ -136,7 +129,7 @@ function ImageView({
               {alt || 'image'} · {data.contentType} ·{' '}
               {(data.bytes / 1024).toFixed(0)} KB
             </span>
-            <Button variant="outline" size="sm" onClick={() => openImage(url)}>
+            <Button variant="outline" size="sm" onClick={() => openLink(url)}>
               <ExternalLinkIcon /> Open original
             </Button>
           </div>

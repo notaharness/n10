@@ -1,6 +1,7 @@
 import { createContext, useContext, type ComponentProps } from 'react';
 import type { ExtraProps } from 'react-markdown';
 import { toast } from 'sonner';
+import { openLink } from '../../../lib/open-link.js';
 import {
   inPageAnchor,
   resolveLink,
@@ -23,17 +24,17 @@ function spellings(fragment: string): string[] {
 }
 
 /**
- * The element an in-page anchor names, in the anchor's own body. The
- * sanitizer prefixes every id with `user-content-`, the way GitHub
- * does, so a link to `#fn-1` means `user-content-fn-1`.
+ * The element an in-page anchor names, by id or as a named anchor
+ * (`<a name>`), in the anchor's own body. The sanitizer prefixes both
+ * with `user-content-`, the way GitHub does, so a link to `#fn-1`
+ * means `user-content-fn-1`.
  */
 function anchorTarget(from: Element, fragment: string): HTMLElement | null {
   // Each rendered body is marked, so two bodies' `fn-1` stay apart.
   const root = from.closest('[data-markdown]');
   for (const name of spellings(fragment)) {
-    const found = root?.querySelector(
-      `[id="${CSS.escape(`user-content-${name}`)}"]`
-    );
+    const value = CSS.escape(`user-content-${name}`);
+    const found = root?.querySelector(`[id="${value}"], a[name="${value}"]`);
     if (found instanceof HTMLElement) return found;
   }
   return null;
@@ -45,12 +46,6 @@ function follow(target: HTMLElement): void {
   target.scrollIntoView({ block: 'nearest' });
   if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
   target.focus({ preventScroll: true });
-}
-
-function open(url: string): void {
-  window.n10.openExternal(url).catch(() => {
-    toast.error(`Couldn't open ${url}`);
-  });
 }
 
 /**
@@ -100,7 +95,7 @@ export function MarkdownAnchor(props: ComponentProps<'a'> & ExtraProps) {
       href={href}
       onClick={(e) => {
         e.preventDefault();
-        open(target);
+        openLink(target);
       }}
       // Where it goes, before it goes there.
       title={target}

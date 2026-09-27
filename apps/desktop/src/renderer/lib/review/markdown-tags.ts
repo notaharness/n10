@@ -43,6 +43,13 @@ function parsed(name: string): boolean {
  *  hold `<` and `>`: `<iframe srcdoc="<script>…">` is one tag. */
 const TAG = /<\/?([a-z][a-z\d-]*)(?:\s(?:[^<>"']|"[^"]*"|'[^']*')*)?\/?>/gi;
 
+/** GFM's tag filter matches the name alone, before any attribute: a
+ *  raw-text tag whose quotes do not close is still one. */
+const RAW_TEXT_OPENING = new RegExp(
+  `<(?=/?(?:${[...RAW_TEXT].join('|')})(?:[\\s/>]|$))`,
+  'gi'
+);
+
 function escaped(tag: string): string {
   return tag
     .replaceAll('&', '&amp;')
@@ -53,9 +60,9 @@ function escaped(tag: string): string {
 /** Raw HTML with every tag that names no element, or a raw-text
  *  one, escaped to text. */
 export function escapeUnknownTags(html: string): string {
-  return html.replace(TAG, (tag, name: string) =>
-    parsed(name) ? tag : escaped(tag)
-  );
+  return html
+    .replace(TAG, (tag, name: string) => (parsed(name) ? tag : escaped(tag)))
+    .replace(RAW_TEXT_OPENING, '&lt;');
 }
 
 function visit(node: MarkdownNode): void {

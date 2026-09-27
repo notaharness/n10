@@ -34,7 +34,7 @@ const BODY = [
   '',
   'Mounts a <Script> tag, then continues. Use <Style> to theme it.',
   '',
-  'See [the rollout notes](#rollout-notes), not [a missing part](#nowhere).',
+  'See [the rollout notes](#rollout-notes) and [the window](#deploy-window), not [a missing part](#nowhere).',
   '',
   '- [x] Flag wired',
   '- [ ] Flag removed',
@@ -58,6 +58,8 @@ const BODY = [
   '![Inline sketch](data:image/png;base64,iVBORw0KGgo=)',
   '',
   '<a name="rollout-notes"></a>Rollout notes: ship it on a Tuesday.',
+  '',
+  '<a name="deploy-window" href="https://example.com/window">Deploy window</a>: mornings only.',
   '',
   'The rest of the description still reads.[^café]',
   '',
@@ -215,6 +217,11 @@ test.describe('Pull request description', () => {
     await description.getByRole('link', { name: 'the rollout notes' }).click();
     await expect(
       description.locator('[id="user-content-rollout-notes"]')
+    ).toBeFocused();
+    // A named anchor that is also a link is still a place to go.
+    await description.getByRole('link', { name: 'the window' }).click();
+    await expect(
+      description.getByRole('link', { name: 'Deploy window' })
     ).toBeFocused();
 
     // One that names nothing says so, rather than doing nothing.
