@@ -11,6 +11,7 @@
           "nodes": [
             {
               "author": {
+                "__typename": "User",
                 "login": "fay",
                 "id": "U_fay",
                 "name": "Fay"

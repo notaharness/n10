@@ -188,7 +188,7 @@ function detailNode(pr) {
     pageInfo: page,
     nodes,
   });
-  const author = (login) => ({ login, id: `U_${login}` });
+  const author = (login) => ({ __typename: 'User', login, id: `U_${login}` });
   const reviews = pr.reviews ?? [];
   return {
     ...repository,
@@ -224,7 +224,7 @@ function detailNode(pr) {
       reviewRequests: connection(
         (pr.reviewRequests ?? []).map((login) => ({
           asCodeOwner: false,
-          requestedReviewer: { id: `U_${login}`, login },
+          requestedReviewer: { __typename: 'User', id: `U_${login}`, login },
         }))
       ),
     },

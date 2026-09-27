@@ -381,6 +381,60 @@ describe('fetchPullRequestDetailGitHub: reviewers', () => {
     expect(reviewers).toMatchObject({ complete: false, total: 6 });
   });
 
+  it('keeps a bot a bot, whether it reviewed or was asked', async () => {
+    answerWith({
+      PullRequestDetail: [
+        onePage((pr) => {
+          const reviews = pr.latestReviews as Json;
+          reviews.nodes = [
+            ...(reviews.nodes as Json[]),
+            {
+              author: {
+                __typename: 'Bot',
+                login: 'copilot-pull-request-reviewer',
+                id: 'BOT_kgDOCnlnWA',
+              },
+              state: 'COMMENTED',
+            },
+          ];
+          const requests = pr.reviewRequests as Json;
+          requests.nodes = [
+            ...(requests.nodes as Json[]),
+            {
+              asCodeOwner: false,
+              requestedReviewer: {
+                __typename: 'Bot',
+                id: 'BOT_renovate',
+                login: 'renovate',
+              },
+            },
+            {
+              asCodeOwner: false,
+              requestedReviewer: {
+                __typename: 'Mannequin',
+                id: 'MQ_old',
+                login: 'old-account',
+              },
+            },
+          ];
+        }),
+      ],
+    });
+    const reviewers = readReviewers(
+      await fetchPullRequestDetailGitHub('acme', 'app', 214)
+    );
+    expect(
+      Object.fromEntries(reviewers.items.map((r) => [r.identifier, r.kind]))
+    ).toMatchObject({
+      Bea: 'user',
+      'copilot-pull-request-reviewer': 'bot',
+      renovate: 'bot',
+      // An imported account's placeholder stands for a person.
+      'old-account': 'user',
+      'acme/core': 'team',
+    });
+  });
+
   it.each(CONNECTIONS)(
     'follows each cursor of %s, stops after ten pages and claims no count',
     async (key) => {

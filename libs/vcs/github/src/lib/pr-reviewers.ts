@@ -19,7 +19,7 @@ import { mapReviewState } from './gh-reviews.js';
  * - `reviewRequests`: every open request, people and teams.
  */
 
-const ACTOR = 'login ... on Node { id } ... on User { name }';
+const ACTOR = '__typename login ... on Node { id } ... on User { name }';
 
 const CONNECTIONS = {
   latestOpinionatedReviews: {
@@ -38,6 +38,7 @@ const CONNECTIONS = {
     query: 'PullRequestRequestsPage',
     nodes: `asCodeOwner
             requestedReviewer {
+              __typename
               ... on Node { id }
               ... on User { login name }
               ... on Bot { login }
@@ -92,6 +93,8 @@ export interface Page<T> {
 }
 
 interface Actor {
+  /** `User`, `Bot`, `Mannequin`, …; a bot is not a person. */
+  __typename?: string;
   login: string;
   id?: string;
   name?: string | null;
@@ -114,6 +117,7 @@ export interface RequestNode {
   /** Null, or empty, for a reviewer this account may not see — a
    *  code-owner team in an organization it is not part of. */
   requestedReviewer: {
+    __typename?: string;
     id?: string;
     login?: string;
     name?: string | null;
@@ -158,10 +162,15 @@ const NOBODY: Omit<DetailReviewer, 'kind' | 'identifier' | 'displayName'> = {
   reviewedHead: null,
 };
 
+/** GitHub says what an account is; only its `Bot` is not a person. */
+function kindOf(typename: string | undefined): 'user' | 'bot' {
+  return typename === 'Bot' ? 'bot' : 'user';
+}
+
 function person(actor: Actor | null) {
   if (!actor?.login) return null;
   return {
-    kind: 'user' as const,
+    kind: kindOf(actor.__typename),
     identifier: actor.login,
     id: actor.id ?? null,
     displayName: actor.name || actor.login,
@@ -218,7 +227,7 @@ function request(node: RequestNode): DetailReviewer | null {
   if (!who?.login) return null;
   return {
     ...asked,
-    kind: 'user',
+    kind: kindOf(who.__typename),
     identifier: who.login,
     displayName: who.name || who.login,
   };

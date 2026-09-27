@@ -196,7 +196,10 @@ export type ListRead<T> =
  * groups, and neither is a person.
  */
 export interface DetailReviewer {
-  kind: 'user' | 'team';
+  /** A person, an app acting as a reviewer (GitHub's `Bot`, such as
+   *  Copilot), or a team or group. A GitHub mannequin, an imported
+   *  account's placeholder, stands for a person. */
+  kind: 'user' | 'bot' | 'team';
   /** A login or email; for a team, the provider's name for it
    *  (`org/slug` on GitHub). Reviewers are compared by this,
    *  ignoring case. */
