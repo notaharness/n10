@@ -17,6 +17,7 @@ import {
   pullRequestKey,
   sameRepository,
   type PullRequestRef,
+  type ReviewLedger,
 } from '@n10/vcs-core';
 import { parseTarget, type ReviewDraft } from './review-draft-types.js';
 
@@ -35,6 +36,15 @@ export interface DraftFile {
   ref: PullRequestRef;
   viewer: string | null;
   drafts: ReviewDraft[];
+  /** A review being filed from these drafts that has not finished:
+   *  which attempt, which drafts, and the provider's ledger of it. */
+  submission?: StoredSubmission;
+}
+
+export interface StoredSubmission {
+  attempt: string;
+  draftIds: string[];
+  ledger: ReviewLedger | null;
 }
 
 export function defaultDraftDir(): string {
@@ -140,7 +150,7 @@ function unreadable(path: string, why: string): Error {
 function parseFile(path: string, text: string): DraftFile {
   try {
     const value = JSON.parse(text) as Record<string, unknown> | null;
-    const { ref, viewer, drafts } = value ?? {};
+    const { ref, viewer, drafts, submission } = value ?? {};
     if (viewer !== null && typeof viewer !== 'string') {
       throw new TypeError('no account');
     }
@@ -149,6 +159,9 @@ function parseFile(path: string, text: string): DraftFile {
       ref: parsePullRequestRef(ref),
       viewer,
       drafts: drafts.map(parseDraft),
+      ...(submission === undefined
+        ? {}
+        : { submission: parseSubmission(submission) }),
     };
   } catch (err) {
     throw unreadable(path, message(err));
@@ -168,6 +181,21 @@ function parseDraft(value: unknown): ReviewDraft {
   }
   parseTarget(d['target']);
   return d as unknown as ReviewDraft;
+}
+
+/** Enough to resume a review: the attempt, its drafts, its ledger. */
+function parseSubmission(value: unknown): StoredSubmission {
+  const s = (value ?? {}) as Record<string, unknown>;
+  const { attempt, draftIds, ledger } = s;
+  if (
+    typeof attempt !== 'string' ||
+    !Array.isArray(draftIds) ||
+    !draftIds.every((id) => typeof id === 'string') ||
+    (ledger !== null && typeof ledger !== 'object')
+  ) {
+    throw new TypeError('the review being submitted is malformed');
+  }
+  return s as unknown as StoredSubmission;
 }
 
 function message(err: unknown): string {
