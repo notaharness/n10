@@ -88,6 +88,7 @@ export interface PrConnectionBanner {
 export function PrWorkspace({
   pr,
   branch,
+  worktree,
   baseBranch,
   sessionName,
   sessionEpoch,
@@ -103,6 +104,9 @@ export function PrWorkspace({
    *  (no comments, drafts or review walkthrough — just Agent + Files). */
   pr?: PullRequestInfo;
   branch: string;
+  /** The row's checkout key, for a worktree without a PR: its working
+   *  tree is diffed, whatever its HEAD is. */
+  worktree?: string;
   baseBranch: string;
   /** PTY session for this branch, if one exists (running or its final frame). */
   sessionName?: string;
@@ -136,6 +140,7 @@ export function PrWorkspace({
   const workingDiff = useWorktreeDiff(repo.cwd, branch, baseBranch, {
     enabled: isWorktreeOnly,
     live: running,
+    worktree,
   });
   const diff = isWorktreeOnly ? workingDiff : commitDiff;
   const comments = useThreads(repo.cwd, prId);
@@ -244,6 +249,7 @@ export function PrWorkspace({
       ) : (
         <BranchHeader
           branch={branch}
+          worktree={worktree}
           baseBranch={baseBranch}
           fileCount={files.length}
         />

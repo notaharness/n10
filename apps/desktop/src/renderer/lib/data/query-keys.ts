@@ -37,8 +37,12 @@ export const keys = {
   agentOptions: (cwd: string) => ['agent-options', cwd] as const,
   diff: (cwd: string, source: string, target: string) =>
     ['diff', cwd, source, target] as const,
-  worktreeDiff: (cwd: string, branch: string, target: string) =>
-    ['worktree-diff', cwd, branch, target] as const,
+  worktreeDiff: (
+    cwd: string,
+    branch: string,
+    target: string,
+    worktree: string | undefined
+  ) => ['worktree-diff', cwd, branch, target, worktree] as const,
   parsedDiff: (content: string) => ['parsed-diff', content] as const,
   threads: (cwd: string, prId: number) => ['threads', cwd, prId] as const,
   prDescription: (cwd: string, prId: number) =>

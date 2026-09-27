@@ -199,12 +199,15 @@ export function useWorktreeDiff(
   cwd: string,
   branch: string,
   target: string,
-  opts: { enabled: boolean; live: boolean }
+  opts: { enabled: boolean; live: boolean; worktree?: string }
 ) {
+  const { worktree } = opts;
   return useQuery({
-    queryKey: keys.worktreeDiff(cwd, branch, target),
+    queryKey: keys.worktreeDiff(cwd, branch, target, worktree),
     queryFn: () =>
-      measured('fetch', () => window.n10.fetchWorktreeDiffText(branch, target)),
+      measured('fetch', () =>
+        window.n10.fetchWorktreeDiffText(branch, target, worktree)
+      ),
     enabled: opts.enabled,
     refetchInterval: opts.live ? 2_000 : false,
     // Keep the previous patch on screen while the next one is in

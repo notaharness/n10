@@ -163,7 +163,7 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
   ['createWorktree', ['feature'], 'worktrees.createWorktree'],
   ['removeWorktree', ['feature', true], 'worktrees.removeWorktree'],
   ['canRemoveBranch', ['feature'], 'worktrees.canRemoveBranch'],
-  ['openInEditor', ['feature'], 'worktrees.openInEditor'],
+  ['openInEditor', ['feature', 'checkout-key'], 'worktrees.openInEditor'],
 
   ['fetchPullRequests', [], 'reviews.fetchPullRequests'],
   ['fetchCommentThreads', [7], 'reviews.fetchCommentThreads'],
@@ -184,7 +184,7 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
   ['fetchFileDiffText', ['feature', 'main', 'a.ts'], 'reviews.getFileDiffText'],
   [
     'fetchWorktreeDiffText',
-    ['feature', 'main'],
+    ['feature', 'main', 'checkout-key'],
     'worktrees.getWorktreeDiffText',
   ],
 
@@ -203,7 +203,11 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
   ['launchAgent', [{ branch: 'b' }], 'sessions.launchAgent'],
   ['launchReviewAgent', [{ pr: {} }], 'sessions.launchReviewAgent'],
   ['listAgentOptions', [], 'sessions.listAgentOptions'],
-  ['getSessionLaunchContext', ['feature'], 'sessions.getSessionLaunchContext'],
+  [
+    'getSessionLaunchContext',
+    ['feature', 'checkout-key'],
+    'sessions.getSessionLaunchContext',
+  ],
   [
     'checkoutPlan',
     [{ pr: {}, prompt: 'p', mode: 'inject' }],

@@ -1,12 +1,13 @@
 import {
   buildAgentOptions,
   getSessionLaunchContext as readSessionLaunchContext,
+  keyForWorktree,
   resolveAgent,
-  sessionKeyForBranch,
 } from '@n10/core';
 import { readConfig } from '@n10/vcs-core';
 import type { AgentOptionView, SessionLaunchView } from '../contract.js';
 import { requireRepo } from './repo.js';
+import { findWorktreeTarget } from './worktree-target.js';
 
 /**
  * The session menu's agent picker: the configured agent first (the
@@ -22,14 +23,17 @@ export function listAgentOptions(): AgentOptionView[] {
 }
 
 /** Read native state when the menu opens; no registry-only resume
- *  guesses. The session is the one in the checkout that has `branch`;
- *  with no such checkout there is none. */
+ *  guesses. The session is the one in the row's checkout (`worktree`),
+ *  or else in the checkout that has `branch`; with no such checkout
+ *  there is none. */
 export async function getSessionLaunchContext(
-  branch: string
+  branch: string,
+  worktree?: string
 ): Promise<SessionLaunchView> {
   const cwd = requireRepo();
   const config = readConfig(cwd);
-  const name = await sessionKeyForBranch(branch, cwd);
+  const wt = await findWorktreeTarget(cwd, branch, worktree);
+  const name = wt ? keyForWorktree(wt, cwd) : null;
   return {
     ...(name
       ? readSessionLaunchContext(name, config)

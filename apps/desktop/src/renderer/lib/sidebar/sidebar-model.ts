@@ -86,6 +86,29 @@ export function itemWorktree(item: SidebarItem): string | undefined {
   return item.kind === 'session' ? item.session.path : undefined;
 }
 
+/**
+ * The row holding the session for a tab's `branch`: a row whose actual
+ * branch is `branch` and that has a session. A detached worktree row
+ * has no branch; its label is its directory name, which may equal some
+ * pull request's branch, so it pairs with no other tab.
+ */
+export function pairedSessionRow(
+  items: readonly SidebarItem[],
+  branch: string
+): SidebarItem | undefined {
+  return items.find(
+    (i) =>
+      (i.kind === 'session' ? i.branch : i.pr.sourceBranch) === branch &&
+      itemSessionName(i)
+  );
+}
+
+/** The session key of an item's checkout — only a worktree row has
+ *  one. What the host acts on for the row, whatever its HEAD is. */
+export function itemCheckoutKey(item: SidebarItem): string | undefined {
+  return item.kind === 'session' ? item.session.name : undefined;
+}
+
 /** PTY session name for an item — the worktree session, or (for PR
  *  items) the alive review session the host attached to it. */
 export function itemSessionName(item: SidebarItem): string | undefined {

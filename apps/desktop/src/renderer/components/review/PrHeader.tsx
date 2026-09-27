@@ -19,8 +19,15 @@ import { Badge } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
 import { Tip } from '../ui/tooltip.js';
 
-/** Launch the configured external editor on the branch's worktree. */
-export function OpenInEditorButton({ branch }: { branch: string }) {
+/** Launch the configured external editor on the branch's worktree, or
+ *  on the row's own checkout (`worktree`) when it has one. */
+export function OpenInEditorButton({
+  branch,
+  worktree,
+}: {
+  branch: string;
+  worktree?: string;
+}) {
   const open = useOpenInEditor();
   return (
     <Tip label="Open worktree in editor">
@@ -29,10 +36,13 @@ export function OpenInEditorButton({ branch }: { branch: string }) {
         size="sm"
         disabled={open.isPending}
         onClick={() =>
-          open.mutate(branch, {
-            onSuccess: ({ editor }) => toast.success(`Opened in ${editor}`),
-            onError: (e) => toast.error(errorMessage(e)),
-          })
+          open.mutate(
+            { branch, worktree },
+            {
+              onSuccess: ({ editor }) => toast.success(`Opened in ${editor}`),
+              onError: (e) => toast.error(errorMessage(e)),
+            }
+          )
         }
       >
         <CodeIcon /> Editor
@@ -201,10 +211,12 @@ export function PrHeader({
 /** Header for a worktree tab without a PR: branch → base + files count. */
 export function BranchHeader({
   branch,
+  worktree,
   baseBranch,
   fileCount,
 }: {
   branch: string;
+  worktree?: string;
   baseBranch: string;
   fileCount: number;
 }) {
@@ -221,7 +233,7 @@ export function BranchHeader({
       <span className="hidden shrink-0 text-xs text-muted-foreground lg:inline">
         {fileCount} file{fileCount === 1 ? '' : 's'} changed
       </span>
-      <OpenInEditorButton branch={branch} />
+      <OpenInEditorButton branch={branch} worktree={worktree} />
     </header>
   );
 }

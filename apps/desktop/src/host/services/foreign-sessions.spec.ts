@@ -110,13 +110,15 @@ describe('listForeignSessions', () => {
     expect(state.recents).toEqual(['/repos/beta', '/repos/gamma']);
   });
 
-  // The desktop attaches by branch all the way down, and refuses a
-  // detached-HEAD worktree (`discovery.ts`); a tab for one would open
-  // its repository and then attach nothing.
-  it('leaves out an agent on a detached HEAD, which the desktop cannot attach', () => {
+  // Discovery attaches by checkout, so a detached HEAD's agent comes
+  // back in its repository like any other, under its directory name.
+  it('lists an agent on a detached HEAD under its directory name', () => {
     state.live = [BETA_AGENT, BETA_DETACHED];
-    expect(foreign.listForeignSessions().map((s) => s.sessionName)).toEqual([
-      'feat-b',
+    expect(
+      foreign.listForeignSessions().map((s) => [s.branch, s.sessionName])
+    ).toEqual([
+      ['feat/b', 'feat-b'],
+      ['hotfix', 'hotfix'],
     ]);
   });
 

@@ -113,6 +113,11 @@ export interface SessionLaunchRequest {
   fresh?: boolean;
   expected?: SessionIncarnation;
   branch: string;
+  /** The session key of the row's checkout, when it has one: the
+   *  launch then runs in that checkout whatever its HEAD is, detached
+   *  included, rather than in the one `branch` names. Ignored with
+   *  `machine`, which launches in that machine's checkout of `branch`. */
+  worktree?: string;
   intent: LaunchIntent;
   /**
    * Explicit agent for this launch. With a blank intent, an unset agent
@@ -323,8 +328,10 @@ export interface N10HostApi {
   /** Open the branch's worktree in the configured external editor
    *  (config.editor, falling back to $VISUAL / $EDITOR — same as the
    *  TUI). Creates the worktree if needed. Resolves to the editor
-   *  command used. */
-  openInEditor(branch: string): Promise<{ editor: string }>;
+   *  command used. `worktree` is the row's checkout key when it has
+   *  one, which is opened in place of the branch's (see
+   *  `SessionLaunchRequest.worktree`). */
+  openInEditor(branch: string, worktree?: string): Promise<{ editor: string }>;
 
   // ── Reviews ──────────────────────────────────────────────────
   fetchPullRequests(): Promise<BranchPrMap>;
@@ -360,7 +367,11 @@ export interface N10HostApi {
   launchReviewAgent(req: ReviewLaunchRequest): Promise<{ name: string }>;
   /** The agents the session menu offers, configured default first. */
   listAgentOptions(): Promise<AgentOptionView[]>;
-  getSessionLaunchContext(branch: string): Promise<SessionLaunchView>;
+  /** `worktree`: the row's checkout key, as for `openInEditor`. */
+  getSessionLaunchContext(
+    branch: string,
+    worktree?: string
+  ): Promise<SessionLaunchView>;
   /** Send a composed plan to the PR's agent, creating the worktree and
    *  starting one when there is none. Rejects with the reason on
    *  failure, leaving the plan intact for a retry. */
@@ -414,8 +425,13 @@ export interface N10HostApi {
   /** Diff of a branch's worktree against its base including uncommitted
    *  and untracked work — what an agent has done so far, as opposed to
    *  what it has committed. Empty string when the branch has no
-   *  worktree. */
-  fetchWorktreeDiffText(branch: string, targetBranch: string): Promise<string>;
+   *  worktree. `worktree`: the row's checkout key, as for
+   *  `openInEditor`. */
+  fetchWorktreeDiffText(
+    branch: string,
+    targetBranch: string,
+    worktree?: string
+  ): Promise<string>;
   fetchFileDiffText(
     sourceBranch: string,
     targetBranch: string,

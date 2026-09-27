@@ -100,6 +100,13 @@ vi.mock('@n10/worktree-manager', () => ({
     }
     return Promise.resolve(addCheckout(branch, cwd));
   },
+  listWorktrees: (repo: string) =>
+    Promise.resolve(
+      [...state.worktrees].flatMap(([key, path]) => {
+        const [owner, branch] = key.split('\0');
+        return owner === repo ? [{ path, branch }] : [];
+      })
+    ),
 }));
 
 vi.mock('./remote-machines.js', () => ({
@@ -118,6 +125,7 @@ vi.mock('@n10/core', async (importOriginal) => {
   const actual = await importOriginal<typeof CoreModule>();
   return {
     worktreeSessionKey: actual.worktreeSessionKey,
+    keyForWorktree: actual.keyForWorktree,
     sessionLabel: actual.sessionLabel,
     sessionIdentity: actual.sessionIdentity,
     LOCAL_MACHINE: actual.LOCAL_MACHINE,
@@ -359,6 +367,37 @@ describe('launchAgent', () => {
     expect(state.spawns[0].config).toEqual({ marker: 'root-config' });
   });
 
+  // A detached HEAD has no branch to resolve a checkout from; the row
+  // names its checkout by key, and only a checkout git lists answers.
+  it('launches in the checkout a row key names, whatever its HEAD is', async () => {
+    const path = addCheckout('');
+    const worktree = worktreeSessionKey(path, '/repo-a');
+    await launchAgent({
+      branch: 'detached-dir',
+      worktree,
+      intent: 'continue-or-blank',
+    });
+    expect(state.spawns.map((s) => [s.name, s.cwd])).toEqual([
+      [worktree, path],
+    ]);
+    expect(state.createWorktreeCalls).toEqual([]);
+  });
+
+  it('refuses a row key git does not list', async () => {
+    await expect(
+      launchAgent({
+        branch: 'gone',
+        worktree: worktreeSessionKey(
+          checkoutPath('gone', '/repo-a'),
+          '/repo-a'
+        ),
+        intent: 'continue-or-blank',
+      })
+    ).rejects.toThrow('The worktree for gone is gone');
+    expect(state.spawns).toEqual([]);
+    expect(state.createWorktreeCalls).toEqual([]);
+  });
+
   it('creates the worktree on the named machine and keys the session with it (D2, D5)', async () => {
     state.knownMachines.add('dddddddddddddddd');
     await launchAgent({
@@ -529,6 +568,36 @@ describe('launchAgent', () => {
     ).rejects.toThrow(/workbox/);
     expect(state.createWorktreeCalls).toEqual([]);
     expect(state.spawns).toEqual([]);
+  });
+
+  // A row names its checkout; peers are asked about the branch Git
+  // lists for it, never the label the row happened to send.
+  it('asks peers about a row checkout by the branch it is on', async () => {
+    state.knownMachines.add('bbbbbbbbbbbbbbbb');
+    state.machines = [connectedMachine('bbbbbbbbbbbbbbbb', 'workbox')];
+    state.remoteSessions.set('bbbbbbbbbbbbbbbb', [
+      remoteWorktreeSession('/repo-a', 'feature/x', 'bbbbbbbbbbbbbbbb'),
+    ]);
+    const worktree = worktreeSessionKey(addCheckout('feature/x'), '/repo-a');
+    await expect(
+      launchAgent({ branch: 'label', worktree, intent: 'continue-or-blank' })
+    ).rejects.toThrow(/workbox/);
+  });
+
+  it('asks peers nothing for a row checkout on a detached HEAD', async () => {
+    state.knownMachines.add('bbbbbbbbbbbbbbbb');
+    state.machines = [connectedMachine('bbbbbbbbbbbbbbbb', 'workbox')];
+    state.remoteSessions.set('bbbbbbbbbbbbbbbb', [
+      remoteWorktreeSession('/repo-a', 'detached-dir', 'bbbbbbbbbbbbbbbb'),
+    ]);
+    const worktree = worktreeSessionKey(addCheckout(''), '/repo-a');
+    await expect(
+      launchAgent({
+        branch: 'detached-dir',
+        worktree,
+        intent: 'continue-or-blank',
+      })
+    ).resolves.toBeDefined();
   });
 
   it('does not refuse an explicit remote launch on a different machine than the owner', async () => {

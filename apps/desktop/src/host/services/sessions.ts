@@ -20,9 +20,11 @@ import { tmuxSessionSnapshot, sameTmuxIncarnation } from '@n10/terminal-tmux';
 import { requireRepo } from './repo.js';
 import { refuseIfRemoteOwns } from './plan-remote-owner.js';
 import {
+  knownCheckout,
   noteLaunchStep,
   refuseRemoteOwned,
   resolveLaunchWorktree,
+  rowWorktree,
 } from './launch-worktree.js';
 import {
   adoptSession,
@@ -85,6 +87,8 @@ const inflightLaunches = new Map<
  * reported. It is deliberately a parameter rather than a field on
  * `SessionLaunchRequest`: that type crosses the IPC bridge, and the
  * renderer has no business naming a directory to spawn an agent in.
+ * A row names its checkout by session key instead (`req.worktree`),
+ * which only matches a checkout git lists (`findWorktreeTarget`).
  */
 export function launchAgent(
   req: SessionLaunchRequest,
@@ -96,7 +100,7 @@ export function launchAgent(
   const requestKey = JSON.stringify([
     repo,
     req.machine ?? LOCAL_MACHINE,
-    knownWorktreePath ?? req.branch,
+    knownWorktreePath ?? rowWorktree(req) ?? req.branch,
   ]);
   const signature = JSON.stringify([
     req.intent,
@@ -106,6 +110,7 @@ export function launchAgent(
     req.fresh,
     req.expected,
     knownWorktreePath,
+    req.worktree,
     req.machine,
   ]);
   const existing = inflightLaunches.get(requestKey);
@@ -140,10 +145,11 @@ function reuseConnection(
 async function doLaunchAgent(
   req: SessionLaunchRequest,
   repoCwd: string,
-  knownWorktreePath?: string
+  discoveredPath?: string
 ): Promise<{ name: string }> {
-  await refuseRemoteOwned(req, repoCwd, knownWorktreePath);
-  const wtPath = await resolveLaunchWorktree(req, repoCwd, knownWorktreePath);
+  const known = await knownCheckout(req, repoCwd, discoveredPath);
+  await refuseRemoteOwned(req, repoCwd, known);
+  const wtPath = await resolveLaunchWorktree(req, repoCwd, known?.path);
   const name = worktreeSessionKey(wtPath, repoCwd, req.machine);
   const reused = reuseConnection(req, name);
   if (reused) return reused;
@@ -159,14 +165,14 @@ async function doLaunchAgent(
   const entry = await launchSession({
     name,
     cwd: wtPath,
-    // Discovery attaches to whatever the checkout is on now; a launch
-    // from the UI names the branch it expects to find there.
-    ...(knownWorktreePath ? {} : { branch: req.branch }),
+    // Discovery and a row's checkout run whatever the checkout is on
+    // now; a launch by branch names the branch it expects to find there.
+    ...(known ? {} : { branch: req.branch }),
     cols: clampDim(req.cols, DEFAULT_COLS),
     rows: clampDim(req.rows, DEFAULT_ROWS),
     config,
     agent: needsSelectedAgent(req) ? resolveAgent(config) : undefined,
-    mode: knownWorktreePath ? 'attach' : 'open',
+    mode: discoveredPath ? 'attach' : 'open',
     fresh: req.fresh,
     expected: req.expected,
     request: {

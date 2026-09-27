@@ -8,6 +8,7 @@ import type { SessionLaunchRequest } from '../contract.js';
 import { refuseIfRemoteOwns } from './plan-remote-owner.js';
 import { machineFor } from './remote-machines.js';
 import { broadcastLaunchStep } from './session-relay.js';
+import { findWorktreeTarget } from './worktree-target.js';
 
 /**
  * The steps of a worktree agent launch before anything starts: the
@@ -27,21 +28,53 @@ export function noteLaunchStep(
   }
 }
 
+/** The row checkout a launch names, unless it launches on another
+ *  machine, where the checkout is that machine's for the branch. */
+export function rowWorktree(req: SessionLaunchRequest): string | undefined {
+  return req.machine ? undefined : req.worktree;
+}
+
+/** A checkout the launch was told about, and the branch it is on
+ *  (`''` on a detached HEAD). */
+export interface KnownCheckout {
+  path: string;
+  branch: string;
+}
+
+/** The checkout the launch was told about: discovery's, or the row's.
+ *  Either is used as is, whatever branch its HEAD is on. */
+export async function knownCheckout(
+  req: SessionLaunchRequest,
+  repoCwd: string,
+  discovered?: string
+): Promise<KnownCheckout | undefined> {
+  if (discovered) return { path: discovered, branch: req.branch };
+  const worktree = rowWorktree(req);
+  if (!worktree) return undefined;
+  const wt = await findWorktreeTarget(repoCwd, req.branch, worktree);
+  if (!wt) throw new Error(`The worktree for ${req.branch} is gone`);
+  return { path: wt.path, branch: wt.branch };
+}
+
 /** Refuse a local launch a fleet member already owns — before any
  *  local worktree is created for it. An explicit machine is the user's
  *  own choice of where to launch — `findSession` already resolves or
  *  creates on exactly that machine; only a local launch risks a second,
- *  local agent (finding 4). */
+ *  local agent (finding 4). Peers are asked by branch, so a known
+ *  checkout on a detached HEAD has nothing to ask them about. */
 export async function refuseRemoteOwned(
   req: SessionLaunchRequest,
   repoCwd: string,
-  knownWorktreePath?: string
+  known?: KnownCheckout
 ): Promise<void> {
   if (req.machine) return;
-  const local = knownWorktreePath
-    ? worktreeSessionKey(knownWorktreePath, repoCwd)
-    : await sessionKeyForBranch(req.branch, repoCwd);
-  await refuseIfRemoteOwns(repoCwd, req.branch, local);
+  if (!known) {
+    const local = await sessionKeyForBranch(req.branch, repoCwd);
+    await refuseIfRemoteOwns(repoCwd, req.branch, local);
+  } else if (known.branch) {
+    const local = worktreeSessionKey(known.path, repoCwd);
+    await refuseIfRemoteOwns(repoCwd, known.branch, local);
+  }
 }
 
 /** The checkout a launch runs in: the one discovery reported, or this

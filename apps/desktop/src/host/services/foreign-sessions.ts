@@ -21,10 +21,9 @@ let lastAnswered = '';
  * attaches the agent through the normal path.
  *
  * The open repository's own agents are left out: the sidebar describes
- * those, and listing them here as well would open each twice. So is an
- * agent in a worktree on a detached HEAD: the desktop attaches by
- * branch (`discovery.ts` refuses one with none), so its tab would open
- * the repository and then attach nothing.
+ * those, and listing them here as well would open each twice. An agent
+ * on a detached HEAD is listed under its directory name, which is its
+ * row's label once that repository is open.
  */
 export function listForeignSessions(): ForeignSessionSummary[] {
   const open = requireRepo();
@@ -40,7 +39,7 @@ export function listForeignSessions(): ForeignSessionSummary[] {
   }
   const out: ForeignSessionSummary[] = [];
   for (const live of listLiveWorktreeSessions()) {
-    if (live.repoRoot === openRoot || live.detached) continue;
+    if (live.repoRoot === openRoot) continue;
     out.push({
       repo: live.repoRoot,
       branch: live.branch,

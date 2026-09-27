@@ -11,6 +11,7 @@ import { fetchWorktreeDiffText } from '@n10/core';
 import { readConfig } from '@n10/vcs-core';
 import { requireRepo } from './repo.js';
 import { stopBabysitForBranch } from './babysit.js';
+import { findWorktreeTarget } from './worktree-target.js';
 
 // All worktree-manager functions resolve paths against process.cwd();
 // openRepo() chdir'd into the active repo, so these are repo-scoped.
@@ -60,25 +61,28 @@ export function canRemoveBranch(branch: string) {
 }
 
 /**
- * Live diff of a branch's worktree against its base, including work the
- * agent has not committed. Empty when the branch has no worktree —
+ * Live diff of a row's worktree against its base, including work the
+ * agent has not committed. Empty when the row has no worktree —
  * there is no working tree to look at, and the caller falls back to the
  * commit-range diff.
  */
 export async function getWorktreeDiffText(
   branch: string,
-  targetBranch: string
+  targetBranch: string,
+  worktree?: string
 ): Promise<string> {
-  requireRepo();
-  const wt = (await listWts()).find((w) => w.branch === branch);
+  const wt = await findWorktreeTarget(requireRepo(), branch, worktree);
   if (!wt) return '';
   return fetchWorktreeDiffText(wt.path, targetBranch);
 }
 
-/** Open the branch's worktree in the configured editor — the TUI's
+/** Open the row's worktree in the configured editor — the TUI's
  *  Shift+E: `config.editor || $VISUAL || $EDITOR`, spawned detached.
  *  createWorktree is idempotent, so PR rows without a checkout work. */
-export async function openInEditor(branch: string): Promise<{
+export async function openInEditor(
+  branch: string,
+  worktree?: string
+): Promise<{
   editor: string;
 }> {
   const cwd = requireRepo();
@@ -87,7 +91,9 @@ export async function openInEditor(branch: string): Promise<{
   if (!editor) {
     throw new Error('No editor configured — set one in Settings');
   }
-  const path = await createWt(branch);
+  const path = worktree
+    ? (await findWorktreeTarget(cwd, branch, worktree))?.path
+    : await createWt(branch);
   if (!path) {
     throw new Error(`Failed to resolve a worktree for "${branch}"`);
   }

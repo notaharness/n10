@@ -47,6 +47,7 @@ export type Mode = 'continue' | 'new' | 'review';
 export function LaunchDialog({
   pr,
   branch,
+  worktree,
   cwd,
   hasWorktree,
   busy,
@@ -57,6 +58,8 @@ export function LaunchDialog({
 }: {
   pr?: PullRequestInfo;
   branch: string;
+  /** The row's checkout key, when it has one (see `useItemLaunch`). */
+  worktree?: string;
   cwd: string;
   hasWorktree: boolean;
   /** True while a launch (local or remote) is in flight. */
@@ -68,8 +71,8 @@ export function LaunchDialog({
   onClose: () => void;
 }) {
   const context = useQuery({
-    queryKey: ['session-launch-context', cwd, branch],
-    queryFn: () => window.n10.getSessionLaunchContext(branch),
+    queryKey: ['session-launch-context', cwd, branch, worktree],
+    queryFn: () => window.n10.getSessionLaunchContext(branch, worktree),
     staleTime: 0,
     refetchOnWindowFocus: false,
   });

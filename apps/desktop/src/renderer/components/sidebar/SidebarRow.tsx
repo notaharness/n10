@@ -15,6 +15,7 @@ import {
 import { babysitBadge } from '../../lib/sidebar/babysit-badge.js';
 import {
   itemBranch,
+  itemCheckoutKey,
   itemHasWorktree,
   itemKey,
   itemRunning,
@@ -198,10 +199,13 @@ export function SidebarRow({
         onCheckout();
         break;
       case 'open-editor':
-        openEditor.mutate(branch, {
-          onSuccess: ({ editor }) => toast.success(`Opened in ${editor}`),
-          onError: (e) => toast.error(errorMessage(e)),
-        });
+        openEditor.mutate(
+          { branch, worktree: itemCheckoutKey(item) },
+          {
+            onSuccess: ({ editor }) => toast.success(`Opened in ${editor}`),
+            onError: (e) => toast.error(errorMessage(e)),
+          }
+        );
         break;
       case 'copy':
         void navigator.clipboard.writeText(branch);

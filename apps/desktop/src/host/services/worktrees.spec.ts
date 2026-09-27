@@ -29,6 +29,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('@n10/core', () => ({
+  keyForWorktree: (wt: { path: string }, repo: string) => `${repo}:${wt.path}`,
   removeWorktreeSession: (branch: string, force: boolean, repo: string) => {
     calls.log.push(`remove-session:${repo}:${branch}:${force}`);
     return Promise.resolve(calls.removed);
@@ -117,6 +118,25 @@ describe('openInEditor', () => {
     await openInEditor('b');
     expect(calls.log).toContain('create:b');
     expect(calls.spawned[0].args).toEqual(['/repo/.claude/worktrees/b']);
+  });
+
+  // A detached checkout has no branch: the row's key opens its own
+  // checkout, and nothing is created under the row's label.
+  it('opens the checkout a row key names without creating a worktree', async () => {
+    calls.config = { editor: 'code' };
+    calls.worktrees = [{ branch: '', path: '/repo/.claude/worktrees/dir' }];
+    await openInEditor('dir', '/repo:/repo/.claude/worktrees/dir');
+    expect(calls.log).toEqual([]);
+    expect(calls.spawned[0].args).toEqual(['/repo/.claude/worktrees/dir']);
+  });
+
+  it('refuses a row key git does not list', async () => {
+    calls.config = { editor: 'code' };
+    await expect(
+      openInEditor('dir', '/repo:/repo/.claude/worktrees/dir')
+    ).rejects.toThrow('Failed to resolve a worktree for "dir"');
+    expect(calls.log).toEqual([]);
+    expect(calls.spawned).toEqual([]);
   });
 
   it('spawns detached so closing n10 does not close the editor', async () => {

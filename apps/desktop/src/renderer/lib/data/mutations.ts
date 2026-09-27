@@ -260,9 +260,11 @@ export function useKillSession(cwd: string) {
   });
 }
 
+/** `worktree`: the row's checkout key, when it has one. */
 export function useOpenInEditor() {
   return useMutation({
-    mutationFn: (branch: string) => window.n10.openInEditor(branch),
+    mutationFn: ({ branch, worktree }: { branch: string; worktree?: string }) =>
+      window.n10.openInEditor(branch, worktree),
   });
 }
 
