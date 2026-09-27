@@ -9,8 +9,15 @@
  */
 
 export type {
+  DiscardDraftRequest,
+  DraftsRequest,
+  DraftTarget,
+  Publication,
   PullRequestConversationRead,
   PullRequestSnapshot,
+  ReviewDraft,
+  ReviewDrafts,
+  SaveDraftRequest,
   SnapshotRequest,
 } from '@n10/core';
 export type {

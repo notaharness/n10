@@ -79,9 +79,14 @@ import type {
 // Pull request reads addressed by identity and exact commits.
 export type * from './contract-pull-requests.js';
 import type {
+  DiscardDraftRequest,
+  DraftsRequest,
   PullRequestConversationRead,
   PullRequestSnapshot,
   RepositoryRef,
+  ReviewDraft,
+  ReviewDrafts,
+  SaveDraftRequest,
   SnapshotRequest,
 } from './contract-pull-requests.js';
 import type {
@@ -358,6 +363,13 @@ export interface N10HostApi {
   getPullRequestConversation(
     req: SnapshotRequest
   ): Promise<PullRequestConversationRead>;
+  /** The reviewer's own unpublished drafts on one pull request, kept on
+   *  this machine for the configured account. Refused like the snapshot. */
+  listReviewDrafts(req: DraftsRequest): Promise<ReviewDrafts>;
+  /** Store the draft for a target; an empty body removes it. Resolves
+   *  to the stored draft, or null when it was removed. */
+  saveReviewDraft(req: SaveDraftRequest): Promise<ReviewDraft | null>;
+  discardReviewDraft(req: DiscardDraftRequest): Promise<void>;
   /** Cast the current user's review verdict on a PR. */
   submitReviewVerdict(prId: number, verdict: ReviewVerdict): Promise<void>;
   /** The reviewer-list identifier of the authenticated user (GitHub
@@ -553,6 +565,9 @@ export const IPC = {
   fetchPrDescription: 'n10/reviews/pr-description',
   getPullRequestSnapshot: 'n10/pull-requests/snapshot',
   getPullRequestConversation: 'n10/pull-requests/conversation',
+  listReviewDrafts: 'n10/review-drafts/list',
+  saveReviewDraft: 'n10/review-drafts/save',
+  discardReviewDraft: 'n10/review-drafts/discard',
   submitReviewVerdict: 'n10/reviews/submit-verdict',
   getReviewViewer: 'n10/reviews/viewer',
   fetchCommentImage: 'n10/reviews/comment-image',
