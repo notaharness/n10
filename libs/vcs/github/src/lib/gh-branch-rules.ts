@@ -5,13 +5,12 @@ import type { Required } from './gh-check-nodes.js';
 /**
  * The base branch's rules: classic protection's required checks, which
  * GitHub shows anyone who can read the repository, and the rule sets
- * that apply to it. Conversation resolution is only visible from rule
- * sets, so under classic protection it is not known.
+ * that apply to it. Classic protection's conversation rule comes from
+ * the checks query (`refUpdateRule`); a rule set can add it.
  */
 
 interface ProtectionAnswer {
   protection?: {
-    enabled?: boolean;
     required_status_checks?: {
       enforcement_level?: string;
       checks?: { context: string; app_id: number | null }[];
@@ -33,30 +32,35 @@ interface RuleAnswer {
 /** Rule sets asked for in one page; a full page may not be all. */
 const RULES_PAGE = 100;
 
-/** Classic protection's required checks, and whether it is on. */
-function classic(answer: ProtectionAnswer): {
-  required: Required[];
-  enabled: boolean;
-} {
-  const protection = answer.protection;
-  const checks = protection?.required_status_checks;
-  const enforced = checks?.enforcement_level !== 'off';
-  return {
-    required: enforced
-      ? (checks?.checks ?? []).map((c) => ({
-          name: c.context,
-          appId: c.app_id ?? null,
-        }))
-      : [],
-    enabled: protection?.enabled ?? false,
-  };
+/** Classic protection's required checks. */
+function classic(answer: ProtectionAnswer): Required[] {
+  const checks = answer.protection?.required_status_checks;
+  if (checks?.enforcement_level === 'off') return [];
+  return (checks?.checks ?? []).map((c) => ({
+    name: c.context,
+    appId: c.app_id ?? null,
+  }));
+}
+
+/** One requirement once, however many rules state it. A requirement
+ *  with no app and one naming an app are two. */
+function distinct(required: readonly Required[]): Required[] {
+  const seen = new Set<string>();
+  return required.filter((r) => {
+    const key = `${r.appId ?? '-'}:${r.name}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export async function branchRules(
   owner: string,
   repo: string,
-  branch: string
-): Promise<{ required: Required[]; resolution: boolean | null }> {
+  branch: string,
+  /** What classic protection enforces on this account. */
+  enforced: { resolution: boolean }
+): Promise<{ required: Required[]; resolution: boolean }> {
   const name = encodeURIComponent(branch);
   const [branchAnswer, rules] = await Promise.all([
     ghRest(`repos/${owner}/${repo}/branches/${name}`),
@@ -70,8 +74,8 @@ export async function branchRules(
       `${branch} has more rules than n10 reads in one page`
     );
   }
-  const { required, enabled } = classic(branchAnswer as ProtectionAnswer);
-  let resolution: boolean | null = enabled ? null : false;
+  const required = classic(branchAnswer as ProtectionAnswer);
+  let resolution = enforced.resolution;
   for (const rule of rules as RuleAnswer[]) {
     const params = rule.parameters;
     for (const c of params?.required_status_checks ?? []) {
@@ -79,5 +83,5 @@ export async function branchRules(
     }
     if (params?.required_review_thread_resolution) resolution = true;
   }
-  return { required, resolution };
+  return { required: distinct(required), resolution };
 }

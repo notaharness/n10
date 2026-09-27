@@ -37,8 +37,9 @@ export type CheckOutcome =
   | 'unknown';
 
 export interface PullRequestCheck {
-  /** Provider-native identity: two apps, or two workflows, reporting
-   *  one name are two checks. Stable across reads of one revision. */
+  /** Provider-native identity: two apps, two workflows, or one workflow
+   *  run for two events, reporting one name are two checks. Stable
+   *  across reads of one revision. */
   key: string;
   name: string;
   /** The workflow or pipeline it belongs to, where there is one. */
@@ -52,9 +53,10 @@ export interface PullRequestCheck {
   /** The commit it reported on; null for one only expected. */
   revision: Oid | null;
   /**
-   * What it tested: the revision itself, or the revision merged into
-   * the target (a GitHub Actions `pull_request` run, Azure's build
-   * validation). Null where the provider does not say.
+   * The commit the provider handed the run: the revision itself, or a
+   * test merge of it into the target (a GitHub Actions `pull_request`
+   * run, Azure's build validation). What a job then checked out is its
+   * own business. Null where the provider does not say.
    */
   ranOn: 'revision' | 'merge' | null;
   startedAt: string | null;
@@ -66,11 +68,20 @@ export interface PullRequestCheck {
   url: string | null;
 }
 
+export interface RequiredCheck {
+  name: string;
+  /**
+   * The app that must report it, where the rule names one: the
+   * provider's id, and its name (`github-actions`) where a check on the
+   * head shows it. Null where any reporter counts.
+   */
+  app: { id: string; slug: string | null } | null;
+}
+
 /** What the target branch's rules ask of every pull request into it. */
 export interface BranchRules {
-  /** Checks that must pass, by name, with the app that must report
-   *  each where the rule names one. */
-  requiredChecks: { name: string; source: string | null }[];
+  /** Checks that must pass, by name. */
+  requiredChecks: RequiredCheck[];
   /** Review threads must be resolved; null where the rules that would
    *  say so could not be read. */
   conversationResolution: boolean | null;

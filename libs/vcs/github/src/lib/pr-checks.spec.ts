@@ -30,6 +30,8 @@ function run(
     app: { slug: string; databaseId: number };
     workflow: string;
     event: string;
+    /** The check suite: one run of one workflow or app on the head. */
+    suite: number;
     /** A third-party app's suite, which has no workflow run. */
     external: boolean;
   }> = {}
@@ -44,6 +46,7 @@ function run(
     detailsUrl: `https://github.com/acme/app/actions/runs/1/job/${name}`,
     isRequired: over.isRequired === undefined ? true : over.isRequired,
     checkSuite: {
+      databaseId: over.suite ?? 1,
       app: over.app ?? ACTIONS,
       workflowRun: over.external
         ? null
@@ -76,6 +79,8 @@ interface PageOf {
   nodes: Json[];
   next?: string;
   oid?: string;
+  /** GitHub's count of every check on the head. */
+  total?: number;
 }
 
 /** One answer of the checks query, or of its contexts page. */
@@ -83,6 +88,7 @@ function answer(page: PageOf, pr: Json = {}): Json {
   return {
     data: {
       repository: {
+        databaseId: 11223344,
         pullRequest: {
           number: 42,
           state: 'OPEN',
@@ -91,6 +97,7 @@ function answer(page: PageOf, pr: Json = {}): Json {
           mergeable: 'MERGEABLE',
           mergeStateStatus: 'BLOCKED',
           reviewDecision: 'REVIEW_REQUIRED',
+          baseRef: { refUpdateRule: null },
           ...pr,
           commits: {
             nodes: [
@@ -99,7 +106,7 @@ function answer(page: PageOf, pr: Json = {}): Json {
                   oid: page.oid ?? HEAD,
                   statusCheckRollup: {
                     contexts: {
-                      totalCount: page.nodes.length,
+                      totalCount: page.total ?? page.nodes.length,
                       pageInfo: {
                         hasNextPage: page.next != null,
                         endCursor: page.next ?? null,
@@ -221,10 +228,12 @@ describe('fetchPullRequestChecksGitHub: checks', () => {
       ],
     });
     const res = await read();
+    // Named by the repository's id as GitHub answered it.
     expect(res.ref).toEqual({
       provider: 'github',
       host: 'github.com',
       repository: 'acme/app',
+      id: '11223344',
       number: 42,
     });
     expect(res.head).toBe(HEAD);
@@ -252,6 +261,56 @@ describe('fetchPullRequestChecksGitHub: checks', () => {
       ranOn: null,
       completedAt: '2026-09-26T10:02:00Z',
     });
+  });
+
+  it('maps every conclusion and status GitHub gives', async () => {
+    const conclusions = [
+      'SUCCESS',
+      'FAILURE',
+      'TIMED_OUT',
+      'STARTUP_FAILURE',
+      'ACTION_REQUIRED',
+      'CANCELLED',
+      'STALE',
+      'NEUTRAL',
+      'SKIPPED',
+    ];
+    const states = ['SUCCESS', 'FAILURE', 'ERROR', 'PENDING', 'EXPECTED'];
+    answerWith({
+      PullRequestChecks: [
+        answer({
+          nodes: [
+            ...conclusions.map((c) => run(c, { conclusion: c })),
+            ...states.map((st) => status(st, st, true)),
+          ],
+        }),
+      ],
+    });
+    const checks = items(await read());
+    expect(checks.map((c) => c.outcome)).toEqual([
+      'succeeded',
+      'failed',
+      'failed',
+      'failed',
+      'failed',
+      'cancelled',
+      'cancelled',
+      'neutral',
+      'skipped',
+      'succeeded',
+      'failed',
+      'failed',
+      'running',
+      'expected',
+    ]);
+    // Only a settled status says when it settled.
+    expect(checks.slice(conclusions.length).map((c) => c.completedAt)).toEqual([
+      '2026-09-26T10:02:00Z',
+      '2026-09-26T10:02:00Z',
+      '2026-09-26T10:02:00Z',
+      null,
+      null,
+    ]);
   });
 
   it('takes no outcome it does not know for a pass or a failure', async () => {
@@ -312,20 +371,22 @@ describe('fetchPullRequestChecksGitHub: checks', () => {
     ]);
   });
 
-  it('tells two apps’, or two workflows’, checks of one name apart', async () => {
+  it('tells two apps’, two workflows’, or one workflow’s two runs’ checks of one name apart', async () => {
     answerWith({
       PullRequestChecks: [
         answer({
           nodes: [
             run('build'),
-            run('build', { app: CIRCLE }),
-            run('build', { workflow: 'Nightly' }),
+            run('build', { app: CIRCLE, suite: 2 }),
+            run('build', { workflow: 'Nightly', suite: 3 }),
+            // The same workflow, run for a push and for the pull request.
+            run('build', { event: 'push', suite: 4 }),
           ],
         }),
       ],
     });
     const keys = items(await read()).map((c) => c.key);
-    expect(new Set(keys).size).toBe(3);
+    expect(new Set(keys).size).toBe(4);
   });
 });
 
@@ -350,9 +411,10 @@ describe('fetchPullRequestChecksGitHub: required checks nothing reported', () =>
       state: 'read',
       value: {
         requiredChecks: [
-          // The app is named where a check on the head shows which.
-          { name: 'build', source: null },
-          { name: 'e2e', source: null },
+          // Its id is GitHub's; the app is named where a check on the
+          // head shows which.
+          { name: 'build', app: { id: '15368', slug: null } },
+          { name: 'e2e', app: null },
         ],
         conversationResolution: false,
       },
@@ -367,7 +429,11 @@ describe('fetchPullRequestChecksGitHub: required checks nothing reported', () =>
     const res = await read();
     expect(items(res)).toHaveLength(1);
     expect(res.rules).toMatchObject({
-      value: { requiredChecks: [{ name: 'build', source: 'github-actions' }] },
+      value: {
+        requiredChecks: [
+          { name: 'build', app: { id: '15368', slug: 'github-actions' } },
+        ],
+      },
     });
   });
 
@@ -425,14 +491,17 @@ describe('fetchPullRequestChecksGitHub: pages', () => {
       answer({ nodes: [run(`job-${i + 1}`)], next: `c${i + 2}` })
     );
     answerWith({
-      PullRequestChecks: [answer({ nodes: [run('job-0')], next: 'c1' })],
+      PullRequestChecks: [
+        answer({ nodes: [run('job-0')], next: 'c1', total: 1200 }),
+      ],
       PullRequestCheckContexts: pages,
       rules: [requiredRule(['e2e', null])],
     });
     const res = await read();
+    // Not all read, but GitHub says how many there are.
     expect(res.checks).toMatchObject({
       state: 'read',
-      value: { complete: false, total: null },
+      value: { complete: false, total: 1200 },
     });
     expect(items(res)).toHaveLength(10);
     expect(items(res).some((c) => c.outcome === 'expected')).toBe(false);
@@ -440,26 +509,72 @@ describe('fetchPullRequestChecksGitHub: pages', () => {
 });
 
 describe('fetchPullRequestChecksGitHub: rules', () => {
-  it('reads classic protection’s checks, and does not know about conversations under it', async () => {
+  it('reads classic protection’s checks, and its conversation rule as enforced on this account', async () => {
+    const protection = branch({
+      enabled: true,
+      required_status_checks: {
+        enforcement_level: 'non_admins',
+        contexts: ['build', 'lint'],
+        checks: [
+          { context: 'build', app_id: null },
+          { context: 'lint', app_id: ACTIONS.databaseId },
+        ],
+      },
+    });
+    const resolving = {
+      baseRef: { refUpdateRule: { requiresConversationResolution: true } },
+    };
     answerWith({
-      PullRequestChecks: [answer({ nodes: [] })],
-      branch: branch({
-        enabled: true,
-        required_status_checks: {
-          enforcement_level: 'non_admins',
-          contexts: ['build'],
-          checks: [{ context: 'build', app_id: null }],
-        },
-      }),
+      PullRequestChecks: [
+        answer({ nodes: [run('lint', { app: CIRCLE })] }, resolving),
+      ],
+      branch: protection,
     });
     const res = await read();
     expect(res.rules).toEqual({
       state: 'read',
       value: {
-        requiredChecks: [{ name: 'build', source: null }],
-        conversationResolution: null,
+        requiredChecks: [
+          { name: 'build', app: null },
+          { name: 'lint', app: { id: '15368', slug: null } },
+        ],
+        conversationResolution: true,
       },
     });
+    // `lint` must come from GitHub Actions: CircleCI's does not count.
+    expect(
+      items(res)
+        .filter((c) => c.outcome === 'expected')
+        .map((c) => c.name)
+    ).toEqual(['build', 'lint']);
+
+    // No rule enforced on this account: none about conversations.
+    answerWith({
+      PullRequestChecks: [answer({ nodes: [] })],
+      branch: protection,
+    });
+    expect((await read()).rules).toMatchObject({
+      value: { conversationResolution: false },
+    });
+  });
+
+  it('lists a check required by two rules once', async () => {
+    answerWith({
+      PullRequestChecks: [answer({ nodes: [] })],
+      branch: branch({
+        enabled: true,
+        required_status_checks: {
+          enforcement_level: 'everyone',
+          checks: [{ context: 'build', app_id: null }],
+        },
+      }),
+      rules: [requiredRule(['build', null], ['build', ACTIONS.databaseId])],
+    });
+    const res = await read();
+    expect(items(res).map((c) => c.key)).toEqual([
+      'expected:-:build',
+      `expected:${ACTIONS.databaseId}:build`,
+    ]);
   });
 
   it('takes a rule set’s conversation rule over classic protection’s silence', async () => {
@@ -544,6 +659,11 @@ describe('fetchPullRequestChecksGitHub: merge state', () => {
           }
         ),
         answer({ nodes: [] }, { mergeable: 'UNKNOWN', reviewDecision: null }),
+        // GitHub no longer sends `DRAFT`: a draft reads as clean.
+        answer(
+          { nodes: [] },
+          { isDraft: true, mergeStateStatus: 'CLEAN', reviewDecision: null }
+        ),
       ],
     });
     expect((await read()).merge).toMatchObject({
@@ -551,10 +671,14 @@ describe('fetchPullRequestChecksGitHub: merge state', () => {
       conflicts: 'conflicting',
       reviews: 'changes-requested',
     });
-    // No decision where no review is required.
+    // GitHub leaves the decision out whether or not review is required.
     expect((await read()).merge).toMatchObject({
       conflicts: 'unknown',
-      reviews: 'not-required',
+      reviews: 'unknown',
+    });
+    expect((await read()).merge).toMatchObject({
+      blocked: true,
+      native: 'CLEAN',
     });
   });
 

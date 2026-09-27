@@ -12,6 +12,8 @@ import {
 } from './pr-readiness.js';
 import {
   assertSameContext,
+  assertSameRepositoryId,
+  withId,
   type SnapshotRequest,
   type SnapshotSources,
 } from './pr-snapshot.js';
@@ -23,7 +25,8 @@ import {
  * request is refused.
  */
 export interface PullRequestChecksAnswer {
-  /** The ref asked about. */
+  /** The ref asked about, with the repository id the provider gave:
+   *  never the caller's own id returned as though confirmed. */
   ref: PullRequestRef;
   viewer: string | null;
   fetchedAt: number;
@@ -72,12 +75,15 @@ export async function readPullRequestChecks(
     readChecks(req.ref, src.checks),
   ]);
   assertSameContext({ ...req, viewer }, src);
+  const readId = checks.state === 'read' ? checks.value.ref.id : undefined;
+  assertSameRepositoryId(req, readId);
   // The list row's count of unresolved threads, which the checks read
-  // does not carry.
+  // does not carry: a lower bound, from its first page of threads, as
+  // of the list's own read. Readiness uses it to explain, not to decide.
   const unresolved =
     summary.kind === 'found' ? summary.pr.activeCommentCount ?? null : null;
   return {
-    ref: req.ref,
+    ref: withId(req.ref, readId),
     viewer,
     fetchedAt: (src.now ?? Date.now)(),
     checks,

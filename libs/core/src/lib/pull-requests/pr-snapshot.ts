@@ -149,12 +149,13 @@ function sameViewer(a: string | null, b: string | null): boolean {
  * away and replaced, or transferred. Its #N is some other pull request,
  * so nothing read about it may answer for the one asked.
  */
-function assertSameRepositoryId(
+/** The repository the caller named is the one a read answered from:
+ *  one renamed away and replaced at the same path is another. */
+export function assertSameRepositoryId(
   req: SnapshotRequest,
-  detail: ReadOutcome<PullRequestDetail>
+  now: string | undefined
 ): void {
   const known = req.ref.id;
-  const now = detail.state === 'read' ? detail.value.ref.id : undefined;
   if (known != null && now != null && known !== now) {
     throw new PullRequestIdentityError(
       `${req.ref.host}/${req.ref.repository} is now a different repository than the one this pull request was read from`
@@ -201,7 +202,10 @@ function reportedHead(
 }
 
 /** `ref` carrying exactly `id`: the caller's own is dropped, not kept. */
-function withId(ref: PullRequestRef, id: string | undefined): PullRequestRef {
+export function withId(
+  ref: PullRequestRef,
+  id: string | undefined
+): PullRequestRef {
   const out = { ...ref };
   delete out.id;
   return id === undefined ? out : { ...out, id };
@@ -221,7 +225,10 @@ export async function readPullRequestSnapshot(
   // while they ran would hand back another repository's row, or one
   // read as someone else, under this ref.
   assertSameContext({ ...req, viewer }, src);
-  assertSameRepositoryId(req, detail);
+  assertSameRepositoryId(
+    req,
+    detail.state === 'read' ? detail.value.ref.id : undefined
+  );
   const target = detail.state === 'read' ? detail.value.target.head : null;
   return {
     ref: withId(

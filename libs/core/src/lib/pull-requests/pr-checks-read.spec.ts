@@ -100,6 +100,25 @@ describe('readPullRequestChecks', () => {
     await expect(read).rejects.toBeInstanceOf(PullRequestIdentityError);
   });
 
+  it('refuses a repository replaced at the same path, and returns only the id the provider gave', async () => {
+    const answering = (id?: string) =>
+      sources({
+        checks: () =>
+          Promise.resolve(answer({ ref: { ...REF, ...(id ? { id } : {}) } })),
+      });
+    await expect(
+      readPullRequestChecks({ ref: { ...REF, id: '1' } }, answering('2'))
+    ).rejects.toThrow('is now a different repository');
+
+    const confirmed = await readPullRequestChecks({ ref: REF }, answering('9'));
+    expect(confirmed.ref.id).toBe('9');
+    const unconfirmed = await readPullRequestChecks(
+      { ref: { ...REF, id: '9' } },
+      answering()
+    );
+    expect(unconfirmed.ref).not.toHaveProperty('id');
+  });
+
   it('does not take checks about another pull request for this one', async () => {
     const res = await readPullRequestChecks(
       { ref: REF },

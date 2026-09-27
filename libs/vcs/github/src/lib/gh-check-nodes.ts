@@ -2,8 +2,9 @@ import type { CheckOutcome, PullRequestCheck } from '@n10/vcs-core';
 
 /**
  * GitHub's check runs and commit statuses, in the shared vocabulary.
- * A check's identity is its app, workflow and name: two apps, or two
- * workflows, reporting one name are two checks.
+ * A check run's identity is its app, its check suite and its name: two
+ * apps, two workflows, or one workflow run twice on the head (a push
+ * and a pull request) report one name as separate checks.
  */
 
 export interface CheckRunNode {
@@ -16,6 +17,8 @@ export interface CheckRunNode {
   detailsUrl: string | null;
   isRequired: boolean | null;
   checkSuite: {
+    /** One run of one workflow or app on this head. */
+    databaseId: number | null;
     app: { slug: string; databaseId: number } | null;
     workflowRun: {
       runAttempt: number | null;
@@ -117,7 +120,9 @@ function runOf(
 export function checkRun(node: CheckRunNode, head: string): PullRequestCheck {
   const { appId, slug, group, attempt, ranOn } = suiteOf(node);
   return {
-    key: `check:${appId ?? '-'}:${group ?? ''}:${node.name}`,
+    key: `check:${appId ?? '-'}:${node.checkSuite?.databaseId ?? '-'}:${
+      node.name
+    }`,
     name: node.name,
     group,
     source: slug,

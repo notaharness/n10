@@ -42,6 +42,7 @@ const CONTEXTS = `
                 name status conclusion startedAt completedAt detailsUrl
                 isRequired(pullRequestNumber: $number)
                 checkSuite {
+                  databaseId
                   app { slug databaseId }
                   workflowRun { runAttempt event workflow { name } }
                 }
@@ -54,28 +55,34 @@ const CONTEXTS = `
             }
           }`;
 
-function rollupOf(body: string): string {
-  return `
+const ROLLUP = `
+        commits(last: 1) {
+          nodes { commit { oid statusCheckRollup {${CONTEXTS}
+          } } }
+        }`;
+
+/** The merge state and classic protection's conversation rule — which
+ *  `refUpdateRule` shows the rules enforced on this account — with the
+ *  first page of checks. */
+const CHECKS_QUERY = `
+  query PullRequestChecks($owner: String!, $repo: String!, $number: Int!, $contextsCursor: String) {
+    repository(owner: $owner, name: $repo) {
+      databaseId
       pullRequest(number: $number) {
         number state isDraft baseRefName
         mergeable mergeStateStatus reviewDecision
-        commits(last: 1) {
-          nodes { commit { oid statusCheckRollup {${body}
-          } } }
-        }
-      }`;
-}
-
-const CHECKS_QUERY = `
-  query PullRequestChecks($owner: String!, $repo: String!, $number: Int!, $contextsCursor: String) {
-    repository(owner: $owner, name: $repo) {${rollupOf(CONTEXTS)}
+        baseRef { refUpdateRule { requiresConversationResolution } }${ROLLUP}
+      }
     }
   }
 `;
 
+/** A later page of checks, with the head it belongs to. */
 const CONTEXTS_PAGE_QUERY = `
   query PullRequestCheckContexts($owner: String!, $repo: String!, $number: Int!, $contextsCursor: String) {
-    repository(owner: $owner, name: $repo) {${rollupOf(CONTEXTS)}
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $number) {${ROLLUP}
+      }
     }
   }
 `;
@@ -88,6 +95,9 @@ interface ChecksNode {
   mergeable: string;
   mergeStateStatus: string | null;
   reviewDecision: string | null;
+  baseRef: {
+    refUpdateRule: { requiresConversationResolution: boolean } | null;
+  } | null;
   commits: {
     nodes: {
       commit: {
@@ -99,7 +109,17 @@ interface ChecksNode {
 }
 
 interface ChecksResponse {
-  data: { repository: { pullRequest: ChecksNode | null } | null };
+  data: {
+    repository: { databaseId?: number; pullRequest: ChecksNode | null } | null;
+  };
+}
+
+interface PageResponse {
+  data: {
+    repository: {
+      pullRequest: { commits: ChecksNode['commits'] } | null;
+    } | null;
+  };
 }
 
 const LIFECYCLE: Record<string, PullRequestLifecycle['state']> = {
@@ -122,9 +142,9 @@ const CONFLICTS: Record<string, MergeState['conflicts']> = {
 /**
  * What `mergeStateStatus` says about being behind and being blocked:
  * GitHub's own verdict. `UNSTABLE` merges with a failing check that is
- * not required; `DIRTY` has conflicts; `DRAFT` must be marked ready. A
- * state that hides the other question answers it with null, and
- * `UNKNOWN` answers neither.
+ * not required; `DIRTY` has conflicts. A state that hides the other
+ * question answers it with null, and `UNKNOWN` answers neither. GitHub
+ * has deprecated `DRAFT` for `isDraft`, which `mergeState` reads.
  */
 const MERGE_STATE: Record<string, [boolean | null, boolean | null]> = {
   CLEAN: [false, false],
@@ -152,14 +172,38 @@ function mergeState(node: ChecksNode): MergeState {
     lifecycle: { state, isDraft: node.isDraft, native: node.state },
     conflicts: CONFLICTS[node.mergeable] ?? 'unknown',
     behind,
-    blocked,
-    // GitHub gives no decision where no review is required.
-    reviews: node.reviewDecision
-      ? REVIEWS[node.reviewDecision] ?? 'unknown'
-      : 'not-required',
+    // A draft cannot merge, whatever state GitHub reports beside it: it
+    // says to read `isDraft` for that, and its merge refuses drafts.
+    blocked: node.isDraft ? true : blocked,
+    // GitHub leaves the decision out where a rule set requires review
+    // as well as where nothing does, so its absence says neither.
+    reviews: REVIEWS[node.reviewDecision ?? ''] ?? 'unknown',
     native: node.mergeStateStatus,
   };
 }
+
+/** The pull request's own repository, with the id GitHub answered. */
+function refOf(
+  res: ChecksResponse,
+  owner: string,
+  repo: string,
+  number: number
+): PullRequestChecks['ref'] {
+  const id = res.data.repository?.databaseId;
+  return {
+    provider: 'github',
+    host: 'github.com',
+    repository: `${owner}/${repo}`,
+    ...(id != null ? { id: String(id) } : {}),
+    number,
+  };
+}
+
+const NO_CHECKS: Page<ContextNode> = {
+  totalCount: 0,
+  pageInfo: { hasNextPage: false, endCursor: null },
+  nodes: [],
+};
 
 export async function fetchPullRequestChecksGitHub(
   owner: string,
@@ -177,17 +221,13 @@ export async function fetchPullRequestChecksGitHub(
     );
   }
   const head = commit.oid;
-  const first: Page<ContextNode> = commit.statusCheckRollup?.contexts ?? {
-    totalCount: 0,
-    pageInfo: { hasNextPage: false, endCursor: null },
-    nodes: [],
-  };
+  const first = commit.statusCheckRollup?.contexts ?? NO_CHECKS;
   const [contexts, rules] = await Promise.all([
     restOf(first, async (cursor) => {
       const page = (await ghGraphQL(CONTEXTS_PAGE_QUERY, {
         ...vars,
         contextsCursor: cursor,
-      })) as ChecksResponse;
+      })) as PageResponse;
       const rollup =
         page.data.repository?.pullRequest?.commits.nodes[0]?.commit;
       // A push between pages: the rest would be another revision's.
@@ -199,32 +239,30 @@ export async function fetchPullRequestChecksGitHub(
       }
       return rollup.statusCheckRollup.contexts;
     }).then((value) => ({ state: 'read' as const, value }), readFailure),
-    branchRules(owner, repo, node.baseRefName).then(
-      (value) => ({ state: 'read' as const, value }),
-      readFailure
-    ),
+    branchRules(owner, repo, node.baseRefName, {
+      // No rule enforced on this account is no classic rule for it.
+      resolution:
+        node.baseRef?.refUpdateRule?.requiresConversationResolution ?? false,
+    }).then((value) => ({ state: 'read' as const, value }), readFailure),
   ]);
   return {
-    ref: {
-      provider: 'github',
-      host: 'github.com',
-      repository: `${owner}/${repo}`,
-      number,
-    },
+    ref: refOf(res, owner, repo, number),
     head,
-    checks: checksOf(contexts, rules, head),
+    checks: checksOf(contexts, rules, head, first.totalCount),
     rules: rulesOf(rules, contexts),
     merge: mergeState(node),
   };
 }
 
 type Contexts = ReadOutcome<{ nodes: ContextNode[]; complete: boolean }>;
-type Rules = ReadOutcome<{ required: Required[]; resolution: boolean | null }>;
+type Rules = ReadOutcome<{ required: Required[]; resolution: boolean }>;
 
 function checksOf(
   contexts: Contexts,
   rules: Rules,
-  head: string
+  head: string,
+  /** GitHub's own count of the head's checks. */
+  reportedTotal: number
 ): ReadOutcome<ListRead<PullRequestCheck>> {
   if (contexts.state !== 'read') return contexts;
   const { nodes, complete } = contexts.value;
@@ -241,7 +279,7 @@ function checksOf(
     state: 'read',
     value: complete
       ? { items, total: items.length, complete: true }
-      : { items, total: null, complete: false },
+      : { items, total: reportedTotal, complete: false },
   };
 }
 
@@ -260,7 +298,8 @@ function rulesOf(rules: Rules, contexts: Contexts): ReadOutcome<BranchRules> {
     value: {
       requiredChecks: rules.value.required.map((r) => ({
         name: r.name,
-        source: r.appId == null ? null : slug(r.appId),
+        app:
+          r.appId == null ? null : { id: String(r.appId), slug: slug(r.appId) },
       })),
       conversationResolution: rules.value.resolution,
     },

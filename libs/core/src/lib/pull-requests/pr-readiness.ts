@@ -135,10 +135,14 @@ const REVIEW_BLOCKERS: Partial<Record<MergeState['reviews'], ReadinessItem>> = {
   },
 };
 
+/** An unstated requirement is moot where the provider says nothing it
+ *  enforces is in the way: GitHub states none when none applies. */
 function reviewsTally({ merge }: ReadinessInputs, t: Tally): void {
   const blocker = REVIEW_BLOCKERS[merge.reviews];
   if (blocker) t.blockers.push(blocker);
-  if (merge.reviews === 'unknown') t.unknowns.push('The review requirement');
+  if (merge.reviews === 'unknown' && merge.blocked !== false) {
+    t.unknowns.push('The review requirement');
+  }
 }
 
 /** Unresolved threads block where a rule says so; otherwise they are

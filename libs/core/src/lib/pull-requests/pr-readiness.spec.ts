@@ -43,7 +43,7 @@ function check(
 const RULES: ReadOutcome<BranchRules> = {
   state: 'read',
   value: {
-    requiredChecks: [{ name: 'test', source: null }],
+    requiredChecks: [{ name: 'test', app: null }],
     conversationResolution: false,
   },
 };
@@ -202,7 +202,8 @@ describe('evaluateReadiness', () => {
             check('test', 'failed'),
             check('lint', 'expected'),
             check('build', 'running'),
-            check('deploy', 'waiting')
+            check('deploy', 'waiting'),
+            check('e2e', 'cancelled')
           ),
         })
       )
@@ -210,6 +211,42 @@ describe('evaluateReadiness', () => {
       ['checks', 'author'],
       ['checks', 'checks'],
     ]);
+    expect(
+      evaluateReadiness(
+        inputs({
+          merge: { ...CLEAN, blocked: true, native: 'BLOCKED' },
+          checks: checks(
+            check('test', 'failed'),
+            check('lint', 'expected'),
+            check('build', 'running'),
+            check('deploy', 'waiting'),
+            check('e2e', 'cancelled'),
+            check('docs', 'queued')
+          ),
+        })
+      ).blockers.map((b) => b.text)
+    ).toEqual([
+      '2 required checks failing: test, e2e',
+      'Waiting for 4 required checks: lint, build, deploy, docs',
+    ]);
+  });
+
+  it('says what it cannot tell about requirements, where the provider blocks', () => {
+    const unsure = inputs({
+      checks: checks(check('test', 'succeeded', 'unknown')),
+      merge: { ...CLEAN, reviews: 'unknown' },
+    });
+    // Clear by the provider's word: whether either was required is moot.
+    expect(evaluateReadiness(unsure)).toMatchObject({
+      state: 'ready',
+      unknowns: [],
+    });
+    expect(
+      evaluateReadiness({
+        ...unsure,
+        merge: { ...unsure.merge, blocked: true, native: 'BLOCKED' },
+      }).unknowns
+    ).toEqual(['Whether every check is required', 'The review requirement']);
   });
 
   it('names a rule it cannot see when the provider blocks and nothing read says why', () => {
@@ -253,6 +290,8 @@ describe('evaluateReadiness', () => {
   });
 
   it('lists every blocker together', () => {
+    // GitHub reports a conflicting draft as DIRTY and says draft only
+    // through isDraft; the provider's read counts that as blocked.
     const r = evaluateReadiness(
       inputs({
         merge: {
@@ -262,7 +301,7 @@ describe('evaluateReadiness', () => {
           behind: true,
           blocked: true,
           reviews: 'changes-requested',
-          native: 'DRAFT',
+          native: 'DIRTY',
         },
         checks: checks(check('test', 'failed')),
         unresolvedThreads: 3,
