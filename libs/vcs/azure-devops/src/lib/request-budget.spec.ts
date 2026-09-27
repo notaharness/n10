@@ -575,7 +575,7 @@ describe('a cycle over pull requests that have not moved', () => {
   it('forgets a pull request a draft was just posted to', async () => {
     await syncCycle();
     afterMinutes(1);
-    mockFetch.mockImplementation(() => Promise.resolve(json({})));
+    mockFetch.mockImplementation(() => Promise.resolve(json({ id: 1 })));
     await azureDevOpsProvider.createThread!(AUTH, PROJECT, 100, {
       file: 'a.ts',
       lineStart: 1,

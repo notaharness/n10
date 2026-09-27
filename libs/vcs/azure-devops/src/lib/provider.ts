@@ -12,7 +12,7 @@ import type {
   BuildStatusState,
   NewCommentThread,
 } from '@n10/vcs-core';
-import { sanitizeBody } from '@n10/vcs-core';
+import { sanitizeBody, unexpectedResponseError } from '@n10/vcs-core';
 import { log } from '@n10/logger';
 import type { AdoConfig } from './client.js';
 import { adoOrigin, authHeaders, baseUrl } from './client.js';
@@ -22,6 +22,7 @@ import {
   counted,
   invalidateAdoCache,
   invalidateAdoKey,
+  PROVIDER_NAME,
   resetAdoTransport,
   TTL,
 } from './request.js';
@@ -917,7 +918,7 @@ async function createAdoThread(
     },
     status: 1, // active
   };
-  await adoSend<unknown>('createAdoThread', url, {
+  const created = await adoSend<{ id?: unknown }>('createAdoThread', url, {
     method: 'POST',
     headers: authHeaders(config.pat),
     body: JSON.stringify(thread),
@@ -927,6 +928,10 @@ async function createAdoThread(
   // Without this the new thread stays out of the review workspace and
   // the sidebar's count until the cached list lapses.
   invalidatePr(config, prId);
+  // JSON that is not a thread (a proxy's own answer, say) created
+  // nothing, and resolving would mark the draft posted.
+  if (typeof created?.id !== 'number')
+    throw unexpectedResponseError(PROVIDER_NAME);
 }
 
 async function setAdoThreadResolved(
