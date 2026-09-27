@@ -92,7 +92,7 @@ Every rule below has its reasoning in `docs/decisions.md`.
   closing control drops goes through `lib/focus.ts`.
 - New comments on code: the line number is the selection control
   (`diff/LineGutter.tsx`, one tab stop per file, one file and one side
-  per range). Composers and the reviewer's inline drafts hang in the
+  per range, consecutive lines on screen only). Composers and the reviewer's inline drafts hang in the
   flat diff through `mineByFile` (`diff/use-diff-comments.ts`). The review agent's findings stay in
   `@n10/review-comments`, keyed by PR number.
 - Diffs are whole-file (`-U99999`), folded client-side

@@ -6,11 +6,11 @@ import {
   type KeyboardEvent,
 } from 'react';
 import type { DiffLine } from '@n10/diff';
-import { isOid } from '@n10/vcs-core/pr-details';
 import type { LineRange } from '../../../../host/contract.js';
 import { pullRequestRefFor } from '../../../lib/data/pr-snapshot-query.js';
 import {
-  extend,
+  across,
+  extendOnScreen,
   headPoint,
   isSelected,
   neighbour,
@@ -26,17 +26,24 @@ import type { MyDraftsScope } from '../../../lib/review/my-drafts-context.js';
 import {
   byFile,
   inlineTargets,
+  unstored,
   type InlineTarget,
 } from '../../../lib/review/my-drafts.js';
-import { useReviewDrafts } from '../../../lib/review/review-drafts.js';
+import { useInlineDraftTargets } from '../../../lib/review/review-drafts.js';
 import { useRepo } from '../../../lib/repo-context.js';
 import type { GutterProps } from './LineGutter.js';
 
-/** How the list moves focus between lines it may not have mounted. */
+/** How the list moves focus to rows it may not have mounted. */
 export interface LineNav {
   pointsOf: (file: string) => readonly LinePoint[];
+  rowOf: (point: LinePoint) => number | undefined;
   focus: (point: LinePoint) => void;
+  focusFileComment: (file: string) => void;
+  focusDraft: (key: string) => void;
 }
+
+const VERTICAL = new Set(['ArrowDown', 'ArrowUp']);
+const SIDEWAYS = new Set(['ArrowLeft', 'ArrowRight']);
 
 /**
  * The reviewer's own comments in the diff: which lines are selected,
@@ -46,30 +53,41 @@ export interface LineNav {
  */
 export function useDiffComments({
   prId,
-  headSha,
   linesByFile,
   split,
 }: {
   prId: number;
-  headSha: string | undefined;
   linesByFile: ReadonlyMap<string, DiffLine[]>;
   split: boolean;
 }) {
   const { repo } = useRepo();
   const ref = pullRequestRefFor(repo, prId);
-  const drafts = useReviewDrafts(ref);
-  const [selection, setSelection] = useState<LineSelection | null>(null);
-  const [fresh, setFresh] = useState<InlineTarget[]>([]);
+  const stored = useInlineDraftTargets(ref);
+  // A selection belongs to the view it was made in: an old-side range
+  // over unchanged lines, picked in Split, has nothing to show in Unified.
+  const [picked, setPicked] = useState<{
+    sel: LineSelection;
+    split: boolean;
+  } | null>(null);
+  const selection = picked?.split === split ? picked.sel : null;
+  const [fresh, setFresh] = useState<readonly InlineTarget[]>([]);
   const [editing, setEditingKeys] = useState<ReadonlySet<string>>(new Set());
+  const opening = useRef(new Set<string>());
   const nav = useRef<LineNav | null>(null);
 
-  const stored = drafts.data?.drafts;
+  // Once a composer's draft is stored, the stored one stands for it.
+  const [storedSeen, setStoredSeen] = useState(stored);
+  if (storedSeen !== stored) {
+    setStoredSeen(stored);
+    setFresh((f) => unstored(f, stored));
+  }
   const mineByFile = useMemo(
-    () => byFile(inlineTargets(stored ?? [], fresh)),
+    () => byFile(inlineTargets(stored, fresh)),
     [stored, fresh]
   );
 
   const setEditing = useCallback((key: string, on: boolean) => {
+    if (on) opening.current.add(key);
     setEditingKeys((prev) => {
       const next = new Set(prev);
       if (on) next.add(key);
@@ -77,6 +95,13 @@ export function useDiffComments({
       return next;
     });
   }, []);
+
+  const setSelection = (
+    next: (sel: LineSelection | null) => LineSelection | null
+  ) => {
+    const sel = next(selection);
+    setPicked(sel ? { sel, split } : null);
+  };
 
   const commentOn = (file: string, range: LineRange | null) => {
     const lines = linesByFile.get(file) ?? [];
@@ -87,13 +112,16 @@ export function useDiffComments({
         path: file,
         previousPath: null,
         range,
-        head: isOid(headSha) ? headSha : null,
+        // The diff is read by branch name, so which commit its line
+        // numbers belong to is not known here; the draft keeps the
+        // lines themselves to tell when the code under it changes.
+        head: null,
         lines: range ? rangeSource(lines, range) : [],
       },
     };
     setFresh((f) => [...f, target]);
     setEditing(target.key, true);
-    setSelection(null);
+    setPicked(null);
   };
 
   const commentOnSelection = (at: LinePoint) => {
@@ -101,19 +129,36 @@ export function useDiffComments({
     commentOn(sel.file, selectionRange(sel));
   };
 
-  const move = (e: KeyboardEvent, point: LinePoint) => {
+  const pointsOf = (file: string) => nav.current?.pointsOf(file) ?? [];
+
+  const step = (e: KeyboardEvent, point: LinePoint): LinePoint | null => {
+    const points = pointsOf(point.file);
+    if (SIDEWAYS.has(e.key)) {
+      if (!split) return null;
+      const dir = e.key === 'ArrowRight' ? 1 : -1;
+      return across(points, point, dir, (p) => nav.current?.rowOf(p));
+    }
     const dir = e.key === 'ArrowDown' ? 1 : -1;
-    const points = nav.current?.pointsOf(point.file) ?? [];
-    const next = neighbour(points, point, dir, e.shiftKey || split);
+    return neighbour(points, point, dir, e.shiftKey || split);
+  };
+
+  const move = (e: KeyboardEvent, point: LinePoint) => {
+    const next = step(e, point);
     if (!next) return;
-    setSelection((sel) =>
-      e.shiftKey ? extend(sel ?? select(point), next) : select(next)
-    );
+    const extending = e.shiftKey && VERTICAL.has(e.key);
+    const sel = extending
+      ? extendOnScreen(pointsOf(point.file), selection ?? select(point), next)
+      : select(next);
+    // A range stops where the lines on screen stop being consecutive.
+    if (!sel) return;
+    setPicked({ sel, split });
     nav.current?.focus(next);
   };
 
   const onKey = (e: KeyboardEvent, point: LinePoint) => {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    // Alt and Mod chords belong to the diff's own navigation.
+    if (e.altKey || e.metaKey || e.ctrlKey) return;
+    if (VERTICAL.has(e.key) || SIDEWAYS.has(e.key)) {
       e.preventDefault();
       move(e, point);
     } else if (e.key === 'Enter') {
@@ -121,9 +166,18 @@ export function useDiffComments({
       commentOnSelection(point);
     } else if (e.key === 'Escape' && selection) {
       e.stopPropagation();
-      setSelection(null);
+      setPicked(null);
     }
   };
+
+  const onPoint = (p: LinePoint, extending: boolean) =>
+    setSelection((sel) => {
+      if (extending)
+        return extendOnScreen(pointsOf(p.file), sel, p) ?? select(p);
+      // Clicking the one selected line again lets it go.
+      const only = sel && sel.anchor === sel.head;
+      return only && isSelected(sel, p) ? null : select(p);
+    });
 
   const range = selection ? selectionRange(selection) : null;
   const end: LinePoint | null =
@@ -131,8 +185,8 @@ export function useDiffComments({
       ? { file: selection.file, side: selection.side, line: range.end }
       : null;
 
-  /** The gutter for `point`; `first` is its file's first line, the tab
-   *  stop while nothing in the file is selected. */
+  /** The gutter for `point`; `first` is its file's tab stop while
+   *  nothing in the file is selected. */
   const gutterFor = (
     point: LinePoint,
     first: LinePoint | null
@@ -145,8 +199,7 @@ export function useDiffComments({
         : samePoint(first, point),
     commentHere: samePoint(end, point),
     rangeLabel: range ? rangeWords(range) : null,
-    onPoint: (p, extending) =>
-      setSelection((sel) => (extending ? extend(sel, p) : select(p))),
+    onPoint,
     onKey,
     onComment: () => commentOnSelection(point),
   });
@@ -155,9 +208,25 @@ export function useDiffComments({
     ref,
     editing,
     setEditing,
+    takeFocus: (key) => opening.current.delete(key),
     dropFresh: (key) => setFresh((f) => f.filter((t) => t.key !== key)),
+    restore: (target) =>
+      setFresh((f) =>
+        f.some((t) => t.key === target.key) ? f : [...f, target]
+      ),
     linesOf: (path) => linesByFile.get(path),
+    focusAnchor: ({ anchor }) => {
+      const r = anchor.range;
+      if (!r) return nav.current?.focusFileComment(anchor.path);
+      nav.current?.focus({ file: anchor.path, side: r.side, line: r.end });
+    },
+    focusDraft: (key) => nav.current?.focusDraft(key),
   };
 
-  return { mineByFile, scope, gutterFor, commentOn, nav };
+  const announcement =
+    selection && range
+      ? `${rangeWords(range)} selected in ${selection.file}`
+      : '';
+
+  return { mineByFile, scope, gutterFor, commentOn, nav, announcement };
 }

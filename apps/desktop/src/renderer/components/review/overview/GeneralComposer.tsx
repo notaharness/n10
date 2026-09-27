@@ -1,12 +1,10 @@
-import { MessageSquarePlusIcon, PencilIcon, Trash2Icon } from 'lucide-react';
+import { MessageSquarePlusIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { PullRequestRef } from '../../../../host/contract.js';
 import { refocusAfter } from '../../../lib/focus.js';
 import { useReviewDraft } from '../../../lib/review/review-drafts.js';
-import { Badge } from '../../ui/badge.js';
-import { Button } from '../../ui/button.js';
-import { CommentBody } from '../comments/CommentBody.js';
 import { CommentComposer } from '../comments/CommentComposer.js';
+import { OwnDraftCard, OwnDraftPlace } from '../comments/OwnDraftCard.js';
 
 const GENERAL = { kind: 'general' } as const;
 
@@ -20,16 +18,9 @@ export function GeneralComposer({ prRef }: { prRef: PullRequestRef }) {
   const [open, setOpen] = useState(false);
   const prompt = useRef<HTMLButtonElement>(null);
   const card = useRef<HTMLElement>(null);
-  const place = (
-    <span className="flex items-center gap-1.5">
-      <Badge variant="outline" className="border-primary/40 text-primary">
-        Your draft
-      </Badge>
-      Comment on the conversation
-      <span className="text-muted-foreground">· Private to you</span>
-    </span>
-  );
-  const hasText = draft.body.trim() !== '';
+  const place = <OwnDraftPlace>Comment on the conversation</OwnDraftPlace>;
+  // The text is back, so the card is what renders.
+  const toCard = () => refocusAfter(() => card.current);
 
   if (open) {
     return (
@@ -37,52 +28,30 @@ export function GeneralComposer({ prRef }: { prRef: PullRequestRef }) {
         draft={draft}
         place={place}
         primary="Keep as draft"
-        placeholder="Write a comment… Markdown supported."
-        onUndo={() => refocusAfter(() => prompt.current)}
-        onClose={() => {
+        placeholder="Write a comment… Markdown supported. ⌘/Ctrl+Enter keeps it as a draft."
+        onUndo={toCard}
+        onClose={(kept) => {
           setOpen(false);
-          refocusAfter(() => card.current ?? prompt.current);
+          refocusAfter(() => (kept ? card.current : prompt.current));
         }}
       />
     );
   }
-  if (hasText) {
+  if (draft.body.trim()) {
     return (
-      <article
-        ref={card}
-        tabIndex={-1}
-        data-my-draft="general"
-        className="overflow-hidden rounded-lg border border-primary/30 bg-card outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <header className="flex items-center gap-2 border-b border-border bg-primary/5 px-3 py-1.5 text-xs">
-          <span className="min-w-0 flex-1">{place}</span>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Edit draft"
-            onClick={() => setOpen(true)}
-          >
-            <PencilIcon />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Discard draft"
-            className="hover:text-destructive"
-            onClick={() => {
-              // `discard` never rejects.
-              void draft
-                .discard(() => refocusAfter(() => card.current))
-                .then(() => refocusAfter(() => prompt.current));
-            }}
-          >
-            <Trash2Icon />
-          </Button>
-        </header>
-        <div className="px-3 py-2">
-          <CommentBody markdown={draft.body} />
-        </div>
-      </article>
+      <OwnDraftCard
+        id="general"
+        cardRef={card}
+        place={place}
+        body={draft.body}
+        onEdit={() => setOpen(true)}
+        // `discard` never rejects.
+        onDiscard={() =>
+          void draft
+            .discard(toCard)
+            .then(() => refocusAfter(() => prompt.current))
+        }
+      />
     );
   }
   return (

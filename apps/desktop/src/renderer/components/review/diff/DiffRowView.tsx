@@ -79,6 +79,7 @@ function FileHeaderRow({
         }
         collapseReason={s.collapseReason}
         draftCount={s.draftCount}
+        mineCount={s.mineCount}
         openThreads={s.openThreads}
         adds={s.adds}
         dels={s.dels}

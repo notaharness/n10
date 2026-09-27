@@ -1,5 +1,5 @@
 import { Trash2Icon } from 'lucide-react';
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { DurableDraft } from '../../../lib/review/review-drafts.js';
 import { Button } from '../../ui/button.js';
 import { Textarea } from '../../ui/textarea.js';
@@ -12,7 +12,8 @@ import { DraftStatus, UnsavedChoice } from './DraftStatus.js';
  * typed; the primary action says what it does ("Add to review") and
  * Mod+Enter does exactly that, nothing else. Escape closes and keeps
  * the text; only Discard lets it go. Preview renders what the provider
- * will be sent, and going back to Write keeps text and cursor.
+ * will be sent; the box stays mounted behind it, so going back to Write
+ * keeps text, cursor and selection.
  */
 export function CommentComposer({
   draft,
@@ -21,32 +22,47 @@ export function CommentComposer({
   placeholder,
   onClose,
   onUndo,
+  takeFocus,
 }: {
   draft: DurableDraft;
   /** Where the comment goes, in words, above the box. */
   place: ReactNode;
   primary: string;
   placeholder: string;
-  /** The composer is done with: closed, added, or discarded. */
-  onClose: () => void;
+  /** The composer is done with, and whether its text was kept: closed
+   *  or added with text (true), cancelled empty or discarded (false). */
+  onClose: (kept: boolean) => void;
   /** A discarded comment came back: where focus goes then. */
   onUndo?: () => void;
+  /** Whether to take the keyboard on mounting; asked once. A composer
+   *  in a virtual list mounts again as it scrolls back into view, and
+   *  must not pull focus and the viewport to itself each time. */
+  takeFocus?: () => boolean;
 }) {
   const [mode, setMode] = useState<'write' | 'preview'>('write');
   const [confirming, setConfirming] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
+  const asked = useRef(false);
+  useEffect(() => {
+    if (asked.current) return;
+    asked.current = true;
+    if (takeFocus?.() ?? true) box.current?.focus();
+  });
   const empty = !draft.body.trim();
+  const letGo = () => {
+    // Whitespace is not a draft; leave nothing stored behind the Cancel.
+    if (draft.body) void draft.clear();
+    onClose(false);
+  };
   const close = () => {
-    if (draft.save.kind === 'failed' && !empty) {
-      setConfirming(true);
-      return;
-    }
+    if (empty) return letGo();
+    if (draft.save.kind === 'failed') return setConfirming(true);
     draft.flush();
-    onClose();
+    onClose(true);
   };
   const write = () => {
     setMode('write');
-    // The textarea mounts again; put the reader back where they were.
+    // Shown again once the mode renders; its caret never moved.
     requestAnimationFrame(() => box.current?.focus());
   };
   return (
@@ -85,18 +101,17 @@ export function CommentComposer({
         </ToggleGroup>
       </div>
       <div className="flex flex-col gap-2 p-3">
-        {mode === 'write' ? (
-          <Textarea
-            ref={box}
-            autoFocus
-            aria-label="Comment"
-            value={draft.body}
-            onChange={(e) => draft.setBody(e.target.value)}
-            onBlur={draft.flush}
-            placeholder={placeholder}
-            className="min-h-24 bg-background"
-          />
-        ) : (
+        <Textarea
+          ref={box}
+          hidden={mode === 'preview'}
+          aria-label="Comment"
+          value={draft.body}
+          onChange={(e) => draft.setBody(e.target.value)}
+          onBlur={draft.flush}
+          placeholder={placeholder}
+          className="min-h-24 bg-background"
+        />
+        {mode === 'preview' && (
           <div className="min-h-24 rounded-md border border-border bg-background px-3 py-2">
             {empty ? (
               <p className="text-sm text-muted-foreground">
@@ -122,7 +137,7 @@ export function CommentComposer({
             <DraftStatus draft={draft} />
             <div className="ml-auto flex gap-2">
               {empty ? (
-                <Button variant="ghost" size="sm" onClick={onClose}>
+                <Button variant="ghost" size="sm" onClick={letGo}>
                   Cancel
                 </Button>
               ) : (
@@ -131,7 +146,8 @@ export function CommentComposer({
                   size="sm"
                   className="text-muted-foreground hover:text-destructive"
                   onClick={() => {
-                    draft.discard(onUndo).then(onClose, onClose);
+                    const gone = () => onClose(false);
+                    draft.discard(onUndo).then(gone, gone);
                   }}
                 >
                   <Trash2Icon /> Discard

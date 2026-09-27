@@ -22,6 +22,7 @@ import {
   type FileDisplayState,
 } from '../../../lib/diff/diff-virtual.js';
 import { useFileAnalyses } from '../../../lib/diff/highlight.js';
+import { focusIsLost } from '../../../lib/focus.js';
 import { MyDraftsContext } from '../../../lib/review/my-drafts-context.js';
 import { useTheme } from '../../../lib/theme.js';
 import { DiffRowView, type RowContext } from './DiffRowView.js';
@@ -75,7 +76,6 @@ export function VirtualDiffList({
   const linesByFile = useMemo(() => new Map(files), [files]);
   const comments = useDiffComments({
     prId,
-    headSha,
     linesByFile,
     split: options.view === 'split',
   });
@@ -184,34 +184,71 @@ export function VirtualDiffList({
     [flat, virtualizer]
   );
 
-  // Moving through lines may land on one the list has not mounted:
-  // scroll it into view, then focus its gutter once it renders.
+  // Moving through lines, or back from a closed composer, may land on
+  // a row the list has not mounted: scroll it into view, then focus it
+  // once it renders, which can take the virtualizer a few frames.
   const { nav } = comments;
   useEffect(() => {
+    const focusIn = (
+      selector: string,
+      index: number | undefined,
+      // A card takes the keyboard only from a control that went away,
+      // never from where the reader is (a toast's Undo hands it back).
+      onlyIfLost = false
+    ) => {
+      const find = () =>
+        onlyIfLost && !focusIsLost()
+          ? null
+          : scrollRef.current?.querySelector<HTMLElement>(selector);
+      const here = find();
+      // A neighbour is almost always mounted: focus it now, so the
+      // next key press already starts from it.
+      if (here) {
+        here.focus();
+        here.scrollIntoView({ block: 'nearest' });
+        return;
+      }
+      // Not in the list yet either (a card coming back on Undo): wait
+      // for the render that adds it.
+      if (index != null) virtualizer.scrollToIndex(index, { align: 'auto' });
+      const retry = (left: number) => {
+        const el = find();
+        if (el) el.focus();
+        else if (left > 0) requestAnimationFrame(() => retry(left - 1));
+      };
+      requestAnimationFrame(() => retry(10));
+    };
+    const file = (f: string) => `[data-file="${CSS.escape(f)}"]`;
     nav.current = {
-      pointsOf: (file) => points.byFile.get(file) ?? [],
-      focus: (point) => {
-        const find = () =>
-          scrollRef.current?.querySelector<HTMLElement>(
-            `[data-file="${CSS.escape(point.file)}"][data-point="${pointId(
-              point
-            )}"]`
-          );
-        const here = find();
-        // A neighbour is almost always mounted: focus it now, so the
-        // next key press already starts from it.
-        if (here) {
-          here.focus();
-          here.scrollIntoView({ block: 'nearest' });
-          return;
-        }
-        const index = points.rowOf.get(pointKey(point));
-        if (index == null) return;
-        virtualizer.scrollToIndex(index, { align: 'auto' });
-        requestAnimationFrame(() => find()?.focus());
-      },
+      pointsOf: (f) => points.byFile.get(f) ?? [],
+      rowOf: (p) => points.rowOf.get(pointKey(p)),
+      focus: (p) =>
+        focusIn(
+          `${file(p.file)}[data-point="${pointId(p)}"]`,
+          points.rowOf.get(pointKey(p))
+        ),
+      focusFileComment: (f) =>
+        focusIn(
+          `[data-file-comment="${CSS.escape(f)}"]`,
+          flat.fileIndex.get(f),
+          true
+        ),
+      focusDraft: (key) =>
+        focusIn(
+          `[data-my-draft="${CSS.escape(key)}"]`,
+          flat.indexById.get(key),
+          true
+        ),
     };
   });
+
+  // In Split the new side is where most comments go, so a file's tab
+  // stop is its first new-side line; Left and Right cross columns.
+  const split = options.view === 'split';
+  const firstPoint = (f: string) => {
+    const all = points.byFile.get(f);
+    return (split && all?.find((p) => p.side === 'RIGHT')) || all?.[0] || null;
+  };
 
   const ctx: RowContext = {
     linesByFile,
@@ -226,7 +263,7 @@ export function VirtualDiffList({
     patchFile,
     expand,
     gutterFor: comments.scope.ref ? comments.gutterFor : null,
-    firstPoint: (file) => points.byFile.get(file)?.[0] ?? null,
+    firstPoint,
     commentOnFile: comments.scope.ref
       ? (file) => comments.commentOn(file, null)
       : null,
@@ -253,6 +290,9 @@ export function VirtualDiffList({
             <DiffRowView row={rows[vi.index]} ctx={ctx} />
           </div>
         ))}
+      </div>
+      <div role="status" aria-live="polite" className="sr-only">
+        {comments.announcement}
       </div>
     </MyDraftsContext.Provider>
   );

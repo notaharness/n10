@@ -78,6 +78,9 @@ test.describe('Comment composers', () => {
       'aria-pressed',
       'true'
     );
+    await expect(
+      page.getByRole('status').filter({ hasText: 'selected in' })
+    ).toHaveText(`new lines 3–5 selected in ${FILE}`);
     await page
       .getByRole('button', { name: 'Comment on new lines 3–5' })
       .click();
@@ -126,9 +129,70 @@ test.describe('Comment composers', () => {
     await expect(page.locator('[data-my-draft]')).toContainText(
       `${FILE} · old lines 3–4`
     );
+    // In Split an unchanged line has an old-side cell to comment on.
     await gutterOf(page, 'LEFT', 1).click();
     await gutterOf(page, 'LEFT', 2).click({ modifiers: ['Shift'] });
+    await expect(gutterOf(page, 'LEFT', 2)).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await expect(
+      page.getByRole('button', { name: 'Comment on old lines 1–2' })
+    ).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('split.png') });
+
+    // Picked in Split, over unchanged lines: nothing of it in Unified.
+    await page.getByRole('button', { name: /Unified/ }).click();
+    await expect(
+      page.getByRole('button', { name: 'Comment on old lines 1–2' })
+    ).toHaveCount(0);
+    await expect(gutterOf(page, 'RIGHT', 1)).toHaveAttribute('tabindex', '0');
+  });
+
+  test('in Split the keyboard starts on the new side and crosses columns', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openDiff(page);
+    await page.getByRole('button', { name: /Split/ }).click();
+    await expect(gutterOf(page, 'RIGHT', 1)).toHaveAttribute('tabindex', '0');
+    await gutterOf(page, 'RIGHT', 1).focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(gutterOf(page, 'LEFT', 1)).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(gutterOf(page, 'RIGHT', 1)).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await expect(gutterOf(page, 'RIGHT', 3)).toBeFocused();
+    // Alt+arrows belong to the diff's own navigation.
+    await page.keyboard.press('Alt+ArrowDown');
+    await expect(gutterOf(page, 'RIGHT', 3)).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByText(`${FILE} · new line 3`)).toBeVisible();
+  });
+
+  test('Escape keeps the text; Discard returns to the line, and Undo brings it back', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openDiff(page);
+    await gutterOf(page, 'RIGHT', 3).click();
+    await page.getByRole('button', { name: 'Comment on new line 3' }).click();
+    await composer(page).fill('Is the timer cleared twice now?');
+    await page.keyboard.press('Escape');
+    const card = page.locator('[data-my-draft]');
+    await expect(card).toContainText('Is the timer cleared twice now?');
+    await expect(card).toBeFocused();
+
+    await card.getByRole('button', { name: 'Discard draft' }).click();
+    await expect(card).toHaveCount(0);
+    await expect(gutterOf(page, 'RIGHT', 3)).toBeFocused();
+
+    // The card is back at once, and the keyboard returns to where the
+    // reader was before the toast.
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(card).toContainText('Is the timer cleared twice now?');
+    await expect(gutterOf(page, 'RIGHT', 3)).toBeFocused();
   });
 
   test('the keyboard selects, extends and opens a comment', async ({
@@ -162,15 +226,40 @@ test.describe('Comment composers', () => {
     await page.getByRole('button', { name: `Comment on ${FILE}` }).click();
     await expect(page.getByText(`${FILE} · whole file`)).toBeVisible();
     await composer(page).fill('Worth a **test** for this.');
+    await composer(page).evaluate((el: HTMLTextAreaElement) =>
+      el.setSelectionRange(8, 16)
+    );
 
     await page.getByRole('radio', { name: 'Preview' }).click();
     await expect(page.locator('strong', { hasText: 'test' })).toBeVisible();
     await page.getByRole('radio', { name: 'Write' }).click();
     await expect(composer(page)).toHaveValue('Worth a **test** for this.');
     await expect(composer(page)).toBeFocused();
+    // Back where the reader left it: the selection is the same.
+    expect(
+      await composer(page).evaluate((el: HTMLTextAreaElement) => [
+        el.selectionStart,
+        el.selectionEnd,
+      ])
+    ).toEqual([8, 16]);
 
     await page.getByRole('button', { name: 'Add to review' }).click();
     await expect(page.locator('[data-my-draft]')).toContainText('whole file');
+  });
+
+  test('a file marked Viewed still takes a comment on the whole file', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openDiff(page);
+    await page.getByRole('button', { name: 'Viewed', exact: true }).click();
+    await expect(gutterOf(page, 'RIGHT', 1)).toHaveCount(0);
+    await page.getByRole('button', { name: `Comment on ${FILE}` }).click();
+    await expect(composer(page)).toBeFocused();
+    await composer(page).fill('Generated? Then say so in the header.');
+    await page.getByRole('button', { name: 'Add to review' }).click();
+    await expect(page.locator('[data-my-draft]')).toBeFocused();
+    await expect(page.getByText('1 yours')).toBeVisible();
   });
 
   test('a first comment on the conversation, even with none there yet', async ({

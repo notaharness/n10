@@ -26,6 +26,7 @@ export function DiffFileHeader({
   onCommentFile,
   collapseReason,
   draftCount,
+  mineCount,
   openThreads,
   adds,
   dels,
@@ -39,6 +40,7 @@ export function DiffFileHeader({
   onCommentFile?: () => void;
   collapseReason: CollapseReason;
   draftCount: number;
+  mineCount: number;
   openThreads: number;
   adds: number;
   dels: number;
@@ -72,21 +74,12 @@ export function DiffFileHeader({
           </span>
         </span>
       </button>
-      {collapseReason && !open && (
-        <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground">
-          {COLLAPSE_LABEL[collapseReason]}
-        </span>
-      )}
-      {draftCount > 0 && (
-        <span className="rounded-full border border-dashed border-border px-1.5 text-xs font-medium text-muted-foreground">
-          {draftCount} draft{draftCount === 1 ? '' : 's'}
-        </span>
-      )}
-      {openThreads > 0 && (
-        <span className="rounded-full bg-warning/15 px-1.5 text-xs font-medium text-warning">
-          {openThreads} open
-        </span>
-      )}
+      <FileChips
+        collapsed={!open ? collapseReason : null}
+        draftCount={draftCount}
+        mineCount={mineCount}
+        openThreads={openThreads}
+      />
       <span className="shrink-0 font-mono text-xs tabular-nums">
         <span className="text-success">+{adds}</span>{' '}
         <span className="text-destructive">−{dels}</span>
@@ -117,6 +110,44 @@ export function DiffFileHeader({
 
 /** A comment on the whole file: for a binary, a rename, or a point
  *  that is about no one line. */
+/** Why the file is collapsed, and what waits in it. */
+function FileChips({
+  collapsed,
+  draftCount,
+  mineCount,
+  openThreads,
+}: {
+  collapsed: CollapseReason;
+  draftCount: number;
+  mineCount: number;
+  openThreads: number;
+}) {
+  return (
+    <>
+      {collapsed && (
+        <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground">
+          {COLLAPSE_LABEL[collapsed]}
+        </span>
+      )}
+      {draftCount > 0 && (
+        <span className="rounded-full border border-dashed border-border px-1.5 text-xs font-medium text-muted-foreground">
+          {draftCount} draft{draftCount === 1 ? '' : 's'}
+        </span>
+      )}
+      {mineCount > 0 && (
+        <span className="rounded-full border border-primary/40 px-1.5 text-xs font-medium text-primary">
+          {mineCount} yours
+        </span>
+      )}
+      {openThreads > 0 && (
+        <span className="rounded-full bg-warning/15 px-1.5 text-xs font-medium text-warning">
+          {openThreads} open
+        </span>
+      )}
+    </>
+  );
+}
+
 function FileCommentButton({
   filename,
   onClick,
@@ -131,6 +162,7 @@ function FileCommentButton({
         variant="ghost"
         size="icon-xs"
         aria-label={`Comment on ${filename}`}
+        data-file-comment={filename}
         onClick={onClick}
       >
         <MessageSquarePlusIcon />

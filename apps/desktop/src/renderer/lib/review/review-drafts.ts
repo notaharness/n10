@@ -111,6 +111,35 @@ export function useReviewDrafts(ref: PullRequestRef | null) {
   });
 }
 
+type InlineDraftTarget = Extract<DraftTarget, { kind: 'inline' }>;
+const NO_TARGETS: InlineDraftTarget[] = [];
+const inlineTargetsOf = (d: ReviewDrafts): InlineDraftTarget[] =>
+  d.drafts.flatMap((x) =>
+    x.target.kind === 'inline' && isEditable(x) && x.body.trim()
+      ? [x.target]
+      : []
+  );
+
+/**
+ * Where the reviewer's comments on code are: the targets of the stored
+ * drafts a card can show. The answer is structurally shared, so a save
+ * that changes only a body leaves it the same array and the diff that
+ * places them is not rebuilt while someone types.
+ */
+export function useInlineDraftTargets(
+  ref: PullRequestRef | null
+): InlineDraftTarget[] {
+  const { repo } = useRepo();
+  const { data } = useQuery({
+    queryKey: keys.reviewDrafts(repo.cwd, ref, repo.viewer),
+    queryFn: () => loadDrafts(ref!, repo.viewer),
+    enabled: ref != null,
+    staleTime: Infinity,
+    select: inlineTargetsOf,
+  });
+  return data ?? NO_TARGETS;
+}
+
 /** Placeholder while there is no ref: the text is kept in memory only. */
 const LOCAL: PullRequestRef = {
   provider: 'local',
