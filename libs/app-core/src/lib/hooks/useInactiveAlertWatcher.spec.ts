@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { SessionBackend } from '@n10/terminal';
 import {
   attach,
-  noteSeen,
+  showTerminal,
   ACTIVITY_IDLE_MS,
   __resetActivityForTests as resetActivity,
 } from '@n10/core';
@@ -36,20 +36,26 @@ class MockPty {
 
 const bravo = { name: 'bravo' };
 
-/** Start `bravo`, let it print, and return the poll that saw it active. */
-function startActive(): { pty: MockPty; prev: Map<string, boolean> } {
+/** Start `bravo` and return the poll that saw it active. With `shown`,
+ * its terminal is on screen while it prints; release it to leave. */
+function startActive(opts: { shown?: boolean } = {}): {
+  pty: MockPty;
+  prev: Map<string, boolean>;
+  release: () => void;
+} {
   const pty = new MockPty();
   attach(bravo.name, pty.asPty());
+  const release = opts.shown ? showTerminal(bravo.name) : () => undefined;
   vi.advanceTimersByTime(100);
   pty.emit('n10-session-active');
-  const { active } = pollIdleTransitions([bravo], new Map(), bravo.name);
+  const { active } = pollIdleTransitions([bravo], new Map());
   expect(active.get(bravo.name)).toBe(true);
-  return { pty, prev: active };
+  return { pty, prev: active, release };
 }
 
-function pollAfterIdle(prev: Map<string, boolean>, viewed: string | null) {
+function pollAfterIdle(prev: Map<string, boolean>) {
   vi.advanceTimersByTime(ACTIVITY_IDLE_MS + 1);
-  return pollIdleTransitions([bravo], prev, viewed);
+  return pollIdleTransitions([bravo], prev);
 }
 
 describe('pollIdleTransitions', () => {
@@ -64,34 +70,43 @@ describe('pollIdleTransitions', () => {
     vi.useRealTimers();
   });
 
-  it('reports a session that goes idle with output the user has not seen', () => {
+  it('reports a session that goes idle after printing off screen', () => {
     const { prev } = startActive();
 
-    const { active, idle } = pollAfterIdle(prev, 'alpha');
+    const { active, idle } = pollAfterIdle(prev);
 
     expect(active.get(bravo.name)).toBe(false);
     expect(idle).toEqual([bravo]);
   });
 
-  it('skips a session the user saw, then left before it read as idle', () => {
-    const { prev } = startActive();
-    // The sidebar acknowledges the selected row when the user moves off it.
+  it('skips a session the user watched, then left before it read as idle', () => {
+    const { prev, release } = startActive({ shown: true });
     vi.advanceTimersByTime(100);
-    noteSeen(bravo.name);
+    release();
 
-    expect(pollAfterIdle(prev, 'alpha').idle).toEqual([]);
+    expect(pollAfterIdle(prev).idle).toEqual([]);
   });
 
-  it('skips the session being viewed', () => {
-    const { prev } = startActive();
+  it('reports a session that printed more after the user left it', () => {
+    const { pty, prev, release } = startActive({ shown: true });
+    vi.advanceTimersByTime(100);
+    release();
+    vi.advanceTimersByTime(100);
+    pty.emit('more output');
 
-    expect(pollAfterIdle(prev, bravo.name).idle).toEqual([]);
+    expect(pollAfterIdle(prev).idle).toEqual([bravo]);
+  });
+
+  it('skips a session whose terminal is still on screen', () => {
+    const { prev } = startActive({ shown: true });
+
+    expect(pollAfterIdle(prev).idle).toEqual([]);
   });
 
   it('skips an agent that exited', () => {
     const { pty, prev } = startActive();
     pty.exit(0);
 
-    expect(pollAfterIdle(prev, 'alpha').idle).toEqual([]);
+    expect(pollAfterIdle(prev).idle).toEqual([]);
   });
 });

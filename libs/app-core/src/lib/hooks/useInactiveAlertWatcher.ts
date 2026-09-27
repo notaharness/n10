@@ -9,12 +9,14 @@ const POLL_MS = 250;
 
 /**
  * One watcher poll: every session's `active` flag now, and the sessions
- * that went active → idle with output the user has not seen.
+ * that went active → idle with output the user has not seen
+ * (`hasUnseenOutput`: printed while its terminal was off screen).
  *
- * The idle edge trails the last output by ACTIVITY_IDLE_MS, so who is
- * viewed at the edge is not who watched the output: a user who leaves a
- * session inside that window has already seen everything it printed.
- * The currently-viewed session is skipped as well.
+ * The idle edge trails the last output by ACTIVITY_IDLE_MS, so which
+ * session is on screen at the edge says nothing about who watched the
+ * output: a user who leaves a session inside that window has already
+ * seen everything it printed, and a session whose terminal is still on
+ * screen has no unseen output at all.
  *
  * An exited agent's active→idle transition is "the agent finished",
  * not "the agent is waiting on you", so it is skipped too (the
@@ -22,8 +24,7 @@ const POLL_MS = 250;
  */
 export function pollIdleTransitions<S extends { name: string }>(
   sessions: readonly S[],
-  prevActive: ReadonlyMap<string, boolean>,
-  viewed: string | null
+  prevActive: ReadonlyMap<string, boolean>
 ): { active: Map<string, boolean>; idle: S[] } {
   const active = new Map<string, boolean>();
   const idle: S[] = [];
@@ -31,14 +32,7 @@ export function pollIdleTransitions<S extends { name: string }>(
     const snap = snapshot(s.name);
     active.set(s.name, snap.active);
     const wentIdle = prevActive.get(s.name) === true && !snap.active;
-    if (
-      wentIdle &&
-      !snap.exited &&
-      s.name !== viewed &&
-      hasUnseenOutput(s.name)
-    ) {
-      idle.push(s);
-    }
+    if (wentIdle && !snap.exited && hasUnseenOutput(s.name)) idle.push(s);
   }
   return { active, idle };
 }
@@ -54,19 +48,17 @@ export function pollIdleTransitions<S extends { name: string }>(
  * iterates the SessionContext's full list, so every running session is
  * tracked regardless of sidebar visibility.
  */
-export function useInactiveAlertWatcher(currentlyViewed: string | null): void {
+export function useInactiveAlertWatcher(): void {
   const { sessions } = useSessionData();
   const { flash } = useToastActions();
   const { config } = useConfig();
 
   const sessionsRef = useRef(sessions);
-  const viewedRef = useRef(currentlyViewed);
   const jumpEnabledRef = useRef(config.jumpToInactiveOnEscape !== false);
   const prevActive = useRef<Map<string, boolean>>(new Map());
 
   useLayoutEffect(() => {
     sessionsRef.current = sessions;
-    viewedRef.current = currentlyViewed;
     jumpEnabledRef.current = config.jumpToInactiveOnEscape !== false;
   });
 
@@ -74,8 +66,7 @@ export function useInactiveAlertWatcher(currentlyViewed: string | null): void {
     const id = setInterval(() => {
       const { active, idle } = pollIdleTransitions(
         sessionsRef.current,
-        prevActive.current,
-        viewedRef.current
+        prevActive.current
       );
       prevActive.current = active;
       for (const s of idle) {
