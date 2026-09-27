@@ -1,7 +1,10 @@
+import { commentBodyParts } from '@n10/review-comments/conventional';
 import type {
+  ConversationComment,
   ConversationEvent,
   ReviewSummary,
 } from '../../../host/contract.js';
+import { firstNonEmptyLine } from '../diff/thread-model.js';
 
 /**
  * What an activity entry says, in words. The actor is shown beside the
@@ -88,6 +91,22 @@ export function reviewSentence(r: ReviewSummary): string {
       ? ` with ${r.commentCount} comment${r.commentCount === 1 ? '' : 's'}`
       : '';
   return `${REVIEW_VERB[r.state]}${comments}`;
+}
+
+/**
+ * One line for a folded thread, by the rules its body follows: hidden
+ * text stays hidden until the reader opens it, and a deleted comment
+ * says so rather than showing nothing.
+ */
+export function commentPreview(c: ConversationComment): string {
+  if (c.deleted) return 'This comment was deleted.';
+  if (c.minimized) {
+    const why = c.minimized.reason?.replace(/_/g, ' ');
+    return why ? `Hidden as ${why}.` : 'Hidden.';
+  }
+  return c.kind === 'system'
+    ? firstNonEmptyLine(c.body)
+    : firstNonEmptyLine(commentBodyParts(c.body).body);
 }
 
 /** "Alex added 3 commits", for one author's run of them. */

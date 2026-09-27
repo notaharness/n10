@@ -390,8 +390,8 @@ describe('an Azure DevOps conversation', () => {
     expect(ids('resolved')).toEqual(['fixed', 'wontfix']);
   });
 
-  it('counts only what the viewer wrote as theirs, not their vote', () => {
-    expect(ids('mine')).toEqual([]);
+  it('counts the viewer’s vote as theirs, as a GitHub review is', () => {
+    expect(ids('mine')).toEqual(['vote']);
   });
 });
 
