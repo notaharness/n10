@@ -25,6 +25,9 @@ export interface FakeBeamScenario {
   /** False while beam's transport is still starting: `events.subscribe`
    *  then waits, as every op but `status` does in beam. */
   started?: boolean;
+  /** Ops answered with beam's `internal` error from the first request,
+   *  before a test body could call `refuse`. */
+  refused?: string[];
 }
 
 /** A member for scenarios that need one. */
@@ -76,6 +79,7 @@ export class FakeBeam {
         { alias: null, state: 'connected', grant: 'all', ...p },
       ])
     );
+    for (const op of scenario.refused ?? []) this.refuse(op, 'internal');
   }
 
   static async start(

@@ -178,3 +178,73 @@ test.describe('after creating a fleet', () => {
     ).toHaveCount(0);
   });
 });
+
+test.describe('Reset fleet while the machines cannot load', () => {
+  // A refused listing also drops the connection (the client then
+  // reconnects), so this covers the shared guard, not one clause of it.
+  test.use({
+    beamScenario: {
+      enrolled: true,
+      peers: [{ peerId: WORKBOX, label: 'workbox' }],
+      refused: ['peers'],
+    },
+  });
+
+  test('is disabled while the machines cannot be listed; copying still works', async ({
+    desktop,
+  }) => {
+    const { page, app } = desktop;
+    await openFleet(desktop);
+    await expect(
+      fleetView(page).getByText('Could not load machines.')
+    ).toBeVisible();
+    const side = page.getByRole('complementary');
+    await expect(
+      side.getByRole('button', { name: 'Add a machine' })
+    ).toBeDisabled();
+
+    await side.getByRole('button', { name: 'Fleet actions' }).click();
+    await expect(
+      page.getByRole('menu', { name: /3f9a 0c4e 7d12 e805/ })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('menuitem', { name: 'Reset fleet…' })
+    ).toBeDisabled();
+    await page
+      .getByRole('menuitem', { name: 'Copy fleet fingerprint' })
+      .click();
+    await expect
+      .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+      .toBe('3f9a 0c4e 7d12 e805');
+
+    await page.keyboard.press('Escape');
+    await armContextMenuChoice(app, 'Copy fleet fingerprint');
+    await app.evaluate(({ clipboard }) => clipboard.writeText(''));
+    await fleetToggle(page).click({ button: 'right' });
+    await expect
+      .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+      .toBe('3f9a 0c4e 7d12 e805');
+    // The native menu's reset is disabled too: picking it throws.
+    await armContextMenuChoice(app, 'Reset fleet…');
+    const refused = app.evaluate(
+      ({ Menu }) =>
+        new Promise<string>((resolve) => {
+          const proto = Menu.prototype as unknown as {
+            popup: (opts?: { callback?: () => void }) => void;
+          };
+          const armed = proto.popup;
+          proto.popup = function (this: Electron.Menu, opts) {
+            try {
+              armed.call(this, opts);
+              resolve('picked');
+            } catch (err) {
+              resolve(String(err));
+              opts?.callback?.();
+            }
+          };
+        })
+    );
+    await fleetToggle(page).click({ button: 'right' });
+    expect(await refused).toContain('"Reset fleet…" is disabled');
+  });
+});

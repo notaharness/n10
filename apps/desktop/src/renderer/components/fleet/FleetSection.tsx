@@ -41,7 +41,7 @@ function useAwaitingPasskey(): boolean {
  * sidebar and the repository picker's show the same section.
  */
 export function FleetSection() {
-  const { section, setAdding, reset, enrolment, revocation } = useFleet();
+  const { section } = useFleet();
   const { expanded, setExpanded, revealSeq, takeRevealFocus } = section;
   const beam = useBeamStatus().data;
   const machines = useMachines().data;
@@ -100,17 +100,8 @@ export function FleetSection() {
               size="icon-xs"
               variant="ghost"
               aria-label="Add a machine"
-              disabled={
-                !machines ||
-                beam?.state !== 'ready' ||
-                reset.open ||
-                enrolment.ceremony.view !== null ||
-                revocation.ceremony.running
-              }
-              onClick={() => {
-                setAdding(true);
-                setExpanded(true);
-              }}
+              disabled={actions.addDisabled}
+              onClick={actions.showAdd}
             >
               <PlusIcon />
             </Button>

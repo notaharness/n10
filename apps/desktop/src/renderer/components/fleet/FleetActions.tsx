@@ -1,5 +1,5 @@
 import { MoreHorizontalIcon } from 'lucide-react';
-import { useRef, type MouseEvent } from 'react';
+import { useId, useRef, type MouseEvent } from 'react';
 import { toast } from 'sonner';
 import { copyText } from '../../lib/copy-text.js';
 import { useBeamStatus, useMachines } from '../../lib/data/queries.js';
@@ -27,30 +27,33 @@ function releaseFocus(header: HTMLElement): void {
 }
 
 /**
- * The enrolled fleet's actions that are not needed day to day
- * (beam-fleet-ux.md §1): its fingerprint, for the post-join check on
- * another machine, and Reset fleet…, which opens its typed
- * confirmation in the section. `fingerprint` is null until this
- * machine is in a fleet; `resetDisabled` while the section cannot show
- * the confirmation, while a passkey flow runs, or while the
+ * The enrolled fleet's header actions (beam-fleet-ux.md §1): Add a
+ * machine, its fingerprint, for the post-join check on another
+ * machine, and Reset fleet…, which opens its typed confirmation in the
+ * section. `fingerprint` is null until this machine is in a fleet. Add
+ * and reset are disabled while the section cannot show their panels,
+ * while the other flow or a passkey flow runs, or while the reset
  * confirmation is already open.
  */
 export function useFleetActions() {
-  const { section, reset, enrolment, revocation } = useFleet();
+  const { section, setAdding, reset, enrolment, revocation } = useFleet();
   const status = useBeamStatus();
   const beam = status.data;
   const machines = useMachines().data;
   const fingerprint =
     beam?.enrolled && beam.fleetId ? fingerprintGroups(beam.fleetId) : null;
-  const resetDisabled =
-    status.isError ||
-    !machines ||
-    beam?.state !== 'ready' ||
-    reset.open ||
-    enrolment.ceremony.running ||
-    revocation.ceremony.running;
+  // What FleetPanel needs before it renders FleetBody, which holds both
+  // the add instructions and the reset confirmation.
+  const bodyShown = !status.isError && !!machines && beam?.state === 'ready';
+  const busy = !bodyShown || reset.open || revocation.ceremony.running;
+  const addDisabled = busy || enrolment.ceremony.view !== null;
+  const resetDisabled = busy || enrolment.ceremony.running;
   const copyFingerprint = () => {
     if (fingerprint) copyText(fingerprint, 'Fleet fingerprint copied');
+  };
+  const showAdd = () => {
+    setAdding(true);
+    section.setExpanded(true);
   };
   const showReset = () => {
     reset.show();
@@ -84,8 +87,10 @@ export function useFleetActions() {
   };
   return {
     fingerprint,
+    addDisabled,
     resetDisabled,
     copyFingerprint,
+    showAdd,
     showReset,
     openContextMenu,
   };
@@ -107,6 +112,7 @@ export function FleetActionsMenu({
   // Reset opens once the menu has closed, instead of focus returning to
   // the trigger, so the confirmation's heading takes focus.
   const resetChosen = useRef(false);
+  const labelId = useId();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -116,6 +122,7 @@ export function FleetActionsMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
+        aria-labelledby={labelId}
         onCloseAutoFocus={(e) => {
           if (!resetChosen.current) return;
           resetChosen.current = false;
@@ -123,7 +130,7 @@ export function FleetActionsMenu({
           onReset();
         }}
       >
-        <DropdownMenuLabel>
+        <DropdownMenuLabel id={labelId}>
           Fleet{' '}
           <span
             className="font-mono font-normal normal-case tracking-normal text-popover-foreground"
