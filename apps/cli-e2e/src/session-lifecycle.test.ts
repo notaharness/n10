@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/n10.js';
-import { dismissSessionMenu } from './setup/sessions.js';
+import { createSession, dismissSessionMenu } from './setup/sessions.js';
 import { settleFor } from './setup/waits.js';
 
 test.use({
@@ -162,5 +162,39 @@ test.describe('Session Lifecycle – dirty worktree', () => {
 
     // 7. Worktree removed despite dirty state
     expect(existsSync(worktreePath)).toBe(false);
+  });
+
+  // An agent can commit while the prompt is open. Nothing it did then
+  // was judged, so confirming keeps everything and says why.
+  test('a worktree that changed after the prompt opened is kept', async ({
+    n10,
+  }) => {
+    const branchName = 'e2e-changed';
+    await createSession(n10.term, branchName);
+    const worktreePath = join(n10.repoPath, '.claude', 'worktrees', branchName);
+    writeFileSync(join(worktreePath, 'draft.txt'), 'seen in the prompt');
+
+    await n10.term.type('x');
+    await expect(n10.term.getByText('to confirm').first()).toBeVisible({
+      timeout: 10_000,
+    });
+    execSync(
+      'git add . && git -c user.email=e2e@n10.dev -c user.name="n10 E2E" commit -q -m "after the check"',
+      { cwd: worktreePath }
+    );
+    await n10.term.type(branchName);
+    await settleFor(
+      n10.term.page,
+      2_000,
+      'the typed branch name to reach the confirm field before Enter'
+    );
+    await n10.term.press('Enter');
+
+    // The toast wraps at its 40 columns: match its first line.
+    await expect(n10.term.getByText(`Kept ${branchName}:`)).toBeVisible({
+      timeout: 15_000,
+    });
+    expect(existsSync(join(worktreePath, 'draft.txt'))).toBe(true);
+    await expect(n10.term.getByText(branchName).first()).toBeVisible();
   });
 });

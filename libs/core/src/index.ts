@@ -147,5 +147,6 @@ export {
   checkWorktreeRemoval,
   removeWorktreeSession,
   type WorktreeRemovalCheck,
+  type WorktreeRemovalOutcome,
 } from './lib/session/remove-worktree.js';
 export { setLocalSessionEnv } from './lib/session/local-session-env.js';

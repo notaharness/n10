@@ -76,11 +76,6 @@ type SweepConfig = Pick<
   'vendorAuth' | 'vendorProject' | 'autoDeleteOnMerge'
 >;
 
-/**
- * Delete the worktrees of merged branches that are safe to delete, and
- * return the ones a rebase is holding up. Null means the caller
- * cancelled partway, which is not the same as "nothing was blocked".
- */
 /** Called with a merged branch's checkout session, the branch, and the
  *  verdict to remove it with: `clear`, at the commit it was judged. */
 type AutoDelete = (
@@ -89,6 +84,11 @@ type AutoDelete = (
   approved: WorktreeRemovalCheck
 ) => void | Promise<void>;
 
+/**
+ * Delete the worktrees of merged branches that are safe to delete, and
+ * return the ones a rebase is holding up. Null means the caller
+ * cancelled partway, which is not the same as "nothing was blocked".
+ */
 async function autoDeleteMerged(args: {
   merged: Set<string>;
   onAutoDelete: AutoDelete;

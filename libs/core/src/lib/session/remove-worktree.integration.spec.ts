@@ -85,7 +85,7 @@ describe('removing a worktree as confirmed', () => {
     const check = await checkWorktreeRemoval('feature', repo);
     expect(check.verdict).toBe('clear');
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe(true);
+    expect(await removeWorktreeSession('feature', check, repo)).toBe('removed');
 
     expect(existsSync(worktree)).toBe(false);
     expect(branchExists()).toBe(false);
@@ -95,7 +95,7 @@ describe('removing a worktree as confirmed', () => {
     const check = await checkWorktreeRemoval('feature', repo);
     const later = commit(worktree, 'unpushed.txt');
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe(false);
+    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
 
     expect(existsSync(worktree)).toBe(true);
     expect(git(repo, 'rev-parse', 'feature')).toBe(later);
@@ -108,7 +108,9 @@ describe('removing a worktree as confirmed', () => {
       'written while the prompt was open'
     );
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe(false);
+    expect(await removeWorktreeSession('feature', check, repo)).toBe(
+      'git-refused'
+    );
 
     expect(existsSync(join(worktree, 'draft.txt'))).toBe(true);
     expect(branchExists()).toBe(true);
@@ -122,9 +124,90 @@ describe('removing a worktree as confirmed', () => {
       reason: 'uncommitted changes',
     });
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe(true);
+    expect(await removeWorktreeSession('feature', check, repo)).toBe('removed');
 
     expect(existsSync(worktree)).toBe(false);
     expect(branchExists()).toBe(false);
+  });
+
+  // The prompt is the user's whole picture of what they agree to lose.
+  it('names unpushed commits alongside uncommitted changes', async () => {
+    commit(worktree, 'unpushed.txt');
+    writeFileSync(join(worktree, 'draft.txt'), 'scratch');
+
+    expect(await checkWorktreeRemoval('feature', repo)).toMatchObject({
+      verdict: 'force',
+      risks: ['uncommitted changes', 'not pushed to upstream'],
+    });
+  });
+
+  // Unpushed commits go with the branch; `--force` would only add the
+  // files written since the check.
+  it('keeps a file written after confirming unpushed commits', async () => {
+    commit(worktree, 'unpushed.txt');
+    const check = await checkWorktreeRemoval('feature', repo);
+    expect(check).toMatchObject({
+      verdict: 'force',
+      risks: ['not pushed to upstream'],
+    });
+    writeFileSync(join(worktree, 'draft.txt'), 'written after the check');
+
+    expect(await removeWorktreeSession('feature', check, repo)).toBe(
+      'git-refused'
+    );
+
+    expect(existsSync(join(worktree, 'draft.txt'))).toBe(true);
+    expect(branchExists()).toBe(true);
+  });
+
+  // A rebase leaves the branch ref alone until it finishes: an amended
+  // commit at an `edit` stop lives only in the checkout's HEAD.
+  it('keeps a checkout that started a rebase after the check', async () => {
+    const check = await checkWorktreeRemoval('feature', repo);
+    execFileSync('git', ['rebase', '-i', 'HEAD~1'], {
+      cwd: worktree,
+      env: {
+        ...process.env,
+        GIT_SEQUENCE_EDITOR: "perl -i -pe 's/^pick/edit/'",
+      },
+      stdio: 'ignore',
+    });
+    writeFileSync(join(worktree, 'amended.txt'), 'amended');
+    git(worktree, 'add', '.');
+    git(worktree, 'commit', '-q', '--amend', '-m', 'amended during rebase');
+
+    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
+
+    expect(existsSync(join(worktree, 'amended.txt'))).toBe(true);
+  });
+
+  // Git will not remove a checkout with a submodule without `--force`.
+  it('asks to force past a checked-out submodule, then removes it', async () => {
+    const sub = join(root, 'sub');
+    execFileSync('git', ['init', '-q', '-b', 'main', sub]);
+    git(sub, 'config', 'user.email', 'test@example.invalid');
+    git(sub, 'config', 'user.name', 'Test');
+    git(sub, 'commit', '-q', '--allow-empty', '-m', 'sub');
+    git(
+      worktree,
+      '-c',
+      'protocol.file.allow=always',
+      'submodule',
+      'add',
+      '-q',
+      sub,
+      'sub'
+    );
+    git(worktree, 'commit', '-q', '-m', 'add sub');
+    git(worktree, 'push', '-q', 'origin', 'feature');
+
+    const check = await checkWorktreeRemoval('feature', repo);
+    expect(check).toMatchObject({
+      verdict: 'force',
+      risks: ['populated submodules'],
+    });
+
+    expect(await removeWorktreeSession('feature', check, repo)).toBe('removed');
+    expect(existsSync(worktree)).toBe(false);
   });
 });

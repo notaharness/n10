@@ -1,20 +1,17 @@
 import {
+  assessBranchRemoval,
   branchTip,
-  canRemoveBranch,
   listWorktrees,
   removeWorktree,
   deleteBranch,
+  type RemovalRisk,
+  type WorktreeInfo,
 } from '@n10/worktree-manager';
 import { rescanSessionDiscovery } from '../discovery/session-discovery.js';
 import { isSessionAlive } from '../pty-registry.js';
 import { stopSession } from './stop-session.js';
 import { getRepoRoot } from '../repo-root.js';
 import { keyForWorktree } from '../session-key.js';
-
-/** The unsafe reasons a user may override: the work they lose is on
- *  disk and they can see it. Anything else — a protected branch, a
- *  rebase in progress — is refused outright. */
-const OVERRIDABLE = new Set(['uncommitted changes', 'not pushed to upstream']);
 
 /**
  * What removing the worktree that has a branch checked out would cost,
@@ -28,8 +25,9 @@ export type WorktreeRemovalCheck =
     | { verdict: 'clear' }
     /** Git has nothing to lose, but a live agent would be killed. */
     | { verdict: 'agent-running' }
-    /** Work on disk would be lost; removal needs `force`. */
-    | { verdict: 'force'; reason: string }
+    /** Work would be lost: every risk that applies, and `reason`, the
+     *  same list for display. */
+    | { verdict: 'force'; reason: string; risks: readonly RemovalRisk[] }
     /** n10 does not remove this worktree at all. */
     | { verdict: 'refused'; reason: string }
   ) & {
@@ -37,17 +35,41 @@ export type WorktreeRemovalCheck =
     tip: string | null;
   };
 
+/**
+ * What {@link removeWorktreeSession} did. Anything but `removed` kept
+ * something the user asked to lose, and the shells say why.
+ */
+export type WorktreeRemovalOutcome =
+  /** The worktree and the branch are gone. */
+  | 'removed'
+  /** The worktree is gone; the branch stays, with commits made before
+   *  its agent stopped. */
+  | 'kept-branch'
+  /** Nothing was removed: the branch moved, or a rebase started, after
+   *  the check. */
+  | 'changed'
+  /** Nothing was removed: git would not remove the worktree. */
+  | 'git-refused'
+  /** Nothing was removed: the verdict refused it. */
+  | 'refused';
+
+/** The risks `git worktree remove` itself refuses without `--force`.
+ *  Unpushed commits go with the branch, so they never need it. */
+const FORCED_RISKS: ReadonlySet<RemovalRisk> = new Set([
+  'uncommitted changes',
+  'populated submodules',
+]);
+
 function cwdFor(repo: string | undefined): string {
   return repo ?? getRepoRoot() ?? process.cwd();
 }
 
-/** The session key of the checkout that has `branch`, if any. */
-async function sessionKeyFor(
+/** The checkout that has `branch`, if any. */
+async function checkoutFor(
   branch: string,
   cwd: string
-): Promise<string | null> {
-  const worktree = (await listWorktrees(cwd)).find((w) => w.branch === branch);
-  return worktree ? keyForWorktree(worktree, cwd) : null;
+): Promise<WorktreeInfo | null> {
+  return (await listWorktrees(cwd)).find((w) => w.branch === branch) ?? null;
 }
 
 /** Decide what removing `branch`'s worktree needs from the user. */
@@ -59,23 +81,23 @@ export async function checkWorktreeRemoval(
   // Read first: a commit that lands during the checks below then reads
   // as a moved branch, never as one the verdict covered.
   const tip = await branchTip(branch, cwd);
-  const check = await canRemoveBranch(branch, { cwd });
-  if (!check.safe) {
-    return OVERRIDABLE.has(check.reason)
-      ? { verdict: 'force', reason: check.reason, tip }
-      : { verdict: 'refused', reason: check.reason, tip };
+  const { refusal, risks } = await assessBranchRemoval(branch, { cwd });
+  if (refusal) return { verdict: 'refused', reason: refusal, tip };
+  if (risks.length > 0) {
+    return { verdict: 'force', reason: risks.join(', '), risks, tip };
   }
-  const key = await sessionKeyFor(branch, cwd);
-  return key && isSessionAlive(key)
+  const checkout = await checkoutFor(branch, cwd);
+  return checkout && isSessionAlive(keyForWorktree(checkout, cwd))
     ? { verdict: 'agent-running', tip }
     : { verdict: 'clear', tip };
 }
 
 /** Remove `branch`'s worktree and the branch, as `approved` allows:
  *  the verdict the user confirmed, at the commit it was judged at. Only
- *  a `force` verdict forces, so files written since the check keep the
- *  worktree. A branch that has moved since keeps everything, since its
- *  new commits were never judged; resolves false then.
+ *  the risks git itself guards with `--force` are forced past, so files
+ *  written since the check keep the worktree. A branch that has moved
+ *  since, or started a rebase, keeps everything: nothing it did then
+ *  was judged.
  *
  *  Stops the agent in the checkout first. The session belongs to the
  *  checkout, so it is found by the worktree's path — never by the
@@ -91,19 +113,28 @@ export async function removeWorktreeSession(
   branch: string,
   approved: WorktreeRemovalCheck,
   repo?: string
-): Promise<boolean> {
-  if (approved.verdict === 'refused') return false;
+): Promise<WorktreeRemovalOutcome> {
+  if (approved.verdict === 'refused') return 'refused';
   const cwd = cwdFor(repo);
   const unmoved = async () => (await branchTip(branch, cwd)) === approved.tip;
   await rescanSessionDiscovery();
-  if (!(await unmoved())) return false;
-  const key = await sessionKeyFor(branch, cwd);
-  if (key) stopSession(key);
-  const force = approved.verdict === 'force';
+  const checkout = await checkoutFor(branch, cwd);
+  // A rebase leaves the branch where it was until it finishes, so the
+  // tip alone would not show one that started after the check.
+  if (!(await unmoved()) || checkout?.state === 'rebasing') return 'changed';
+  if (checkout) stopSession(keyForWorktree(checkout, cwd));
+  const force =
+    approved.verdict === 'force' &&
+    approved.risks.some((risk) => FORCED_RISKS.has(risk));
   const removed = await removeWorktree(branch, { force, cwd });
   // The agent could commit until it stopped. The checkout is gone
   // either way, but commits nobody judged keep the branch.
-  if (removed && (await unmoved())) await deleteBranch(branch, true, cwd);
+  const outcome = !removed
+    ? 'git-refused'
+    : (await unmoved())
+    ? 'removed'
+    : 'kept-branch';
+  if (outcome === 'removed') await deleteBranch(branch, true, cwd);
   await rescanSessionDiscovery();
-  return removed;
+  return outcome;
 }

@@ -40,7 +40,12 @@ const FORCED: DeleteConfirmState = {
   sessionName: 'wt:alpha',
   reason: 'uncommitted changes',
   mode: 'type-branch',
-  approved: { verdict: 'force', reason: 'uncommitted changes', tip: 'abc123' },
+  approved: {
+    verdict: 'force',
+    reason: 'uncommitted changes',
+    risks: ['uncommitted changes'],
+    tip: 'abc123',
+  },
 };
 
 const RUNNING: DeleteConfirmState = {
@@ -61,7 +66,7 @@ function makeCtx(confirmDelete: DeleteConfirmState, confirmInput = '') {
       setConfirmInput: vi.fn(),
     },
     sessions: {
-      performDelete: vi.fn().mockResolvedValue(true),
+      performDelete: vi.fn().mockResolvedValue('removed'),
       flashStatus: vi.fn(),
     },
     asyncOps: {
@@ -123,15 +128,23 @@ describe('confirming a running agent’s removal', () => {
     );
   });
 
-  it('says the branch was kept when core kept it', async () => {
+  // Each reason core kept something is its own message: "changed" for
+  // a git refusal would send the user looking for a change that never
+  // happened.
+  it.each([
+    ['changed', 'Kept alpha: it changed after the check'],
+    ['git-refused', 'Kept alpha: git would not remove its worktree'],
+    [
+      'kept-branch',
+      'Deleted the worktree; kept alpha: it has commits made after the check',
+    ],
+  ])('says what core kept when it answers %s', async (outcome, message) => {
     const t = makeCtx(RUNNING);
-    t.ctx.sessions.performDelete.mockResolvedValue(false);
+    t.ctx.sessions.performDelete.mockResolvedValue(outcome);
 
     runConfirmedDelete(RUNNING, t.handlerCtx);
     await t.settle();
 
-    expect(t.ctx.sessions.flashStatus).toHaveBeenCalledExactlyOnceWith(
-      'Kept alpha: it changed after the check'
-    );
+    expect(t.ctx.sessions.flashStatus).toHaveBeenCalledExactlyOnceWith(message);
   });
 });

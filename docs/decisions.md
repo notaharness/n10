@@ -172,11 +172,16 @@ user must confirm (clear, a live agent, work only `force` removes, or a refusal)
 and each shell renders its own prompt from that verdict. The shell hands the
 confirmed verdict back to `removeWorktreeSession`, which enforces it at
 execution time: the prompt can stay open while an agent writes or commits, and
-nothing it did after the check was judged. Only a `force` verdict removes with
-`--force`, so files written since keep the worktree. The verdict carries the
-branch's tip when it was judged. A branch that has moved since keeps its
-worktree, and a branch that moved before its agent stopped keeps the branch
-itself. The merged-branch sweep uses the same guard. `removeWorktreeSession`
+nothing it did after the check was judged. A `force` verdict names every risk
+that applies, not the first, because the prompt is the user's whole picture of
+what they agree to lose. Removal forces past only what git itself guards with
+`--force` (uncommitted changes, a checked-out submodule), so files written since
+keep the worktree; unpushed commits go with the branch and never need it. The
+verdict carries the branch's tip when it was judged. A branch that has moved
+since, or whose checkout has started a rebase (which leaves the branch where it
+was until it finishes), keeps its worktree. A branch that moved before its agent
+stopped keeps the branch itself. `removeWorktreeSession` returns what it did,
+and each shell says what was kept and why. The merged-branch sweep uses the same guard. `removeWorktreeSession`
 scans discovery before and after removing, so the shells learn of n10's
 removals through `onChanged`, as they learn of `git worktree remove`: discovery
 can only report the removal of a worktree it has seen.

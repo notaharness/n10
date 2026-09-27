@@ -213,7 +213,7 @@ function makeCtx(opts: CtxOpts = {}) {
   const sessions = {
     flashStatus: vi.fn(),
     refreshSessions: vi.fn().mockResolvedValue([]),
-    performDelete: vi.fn().mockResolvedValue(true),
+    performDelete: vi.fn().mockResolvedValue('removed'),
     refreshPr: vi.fn().mockResolvedValue(undefined),
     triggerSync: vi.fn().mockResolvedValue(undefined),
   };
@@ -554,7 +554,7 @@ describe('sidebar handler — delete-branch', () => {
     vi.mocked(listWorktrees).mockResolvedValue([
       worktree('/wt/alpha', 'alpha'),
     ]);
-    t.sessions.performDelete.mockResolvedValue(false);
+    t.sessions.performDelete.mockResolvedValue('changed');
 
     press(KEYS.deleteBranch(), t.ctx);
     await t.settle();

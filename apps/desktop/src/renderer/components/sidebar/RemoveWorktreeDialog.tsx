@@ -49,11 +49,12 @@ export function RemoveWorktreeDialog({
   const { data: check } = useWorktreeRemovalCheck(repo.cwd, branch);
   const warning = blockerOf(check);
 
-  // Optimistic: the tab and this dialog close on confirm, and the
-  // sidebar row hides itself for as long as the mutation is pending
-  // (useRemovingBranches). Removal virtually always succeeds; if it
-  // doesn't, the row reappears by itself and the error is toasted from
-  // the mutation, which outlives this component.
+  // The dialog closes on confirm, and the sidebar row hides itself for
+  // as long as the mutation is pending (useRemovingBranches). The tab
+  // waits for the host: core keeps a worktree that changed after the
+  // check, and its agent may still be running. If it is kept, the row
+  // reappears by itself and the mutation, which outlives this component,
+  // says why.
   const doRemove = (approved: WorktreeRemovalCheck) => {
     // Look the tab up by item key rather than rebuilding its id: a tab
     // keeps the id it was opened with even after `sync-items` re-keys
@@ -63,9 +64,8 @@ export function RemoveWorktreeDialog({
     const tab = tabs.tabs.find(
       (t) => t.kind === 'item' && t.repo === repo.cwd && t.itemKey === itemKey
     );
-    if (tab) tabs.close(tab.id);
     onClose();
-    remove.mutate({ branch, approved });
+    remove.mutate({ branch, approved, tabId: tab?.id });
   };
 
   return (
@@ -79,7 +79,8 @@ export function RemoveWorktreeDialog({
             {running || check?.verdict === 'agent-running'
               ? ' and stops its running agent'
               : ''}
-            . The branch is deleted too unless git refuses.
+            . The branch is deleted too, unless it gains commits before the
+            removal runs.
           </DialogDescription>
         </DialogHeader>
 

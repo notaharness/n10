@@ -21,6 +21,7 @@ import type {
   LaunchIntent,
   SidebarItem,
   WorktreeRemovalCheck,
+  WorktreeRemovalOutcome,
 } from '@n10/core';
 import type { CommentSeverity, ReviewComment } from '@n10/review-comments';
 export type { CommentSeverity, ReviewComment };
@@ -42,6 +43,7 @@ export type {
   PullRequestLookup,
   SidebarItem,
   WorktreeRemovalCheck,
+  WorktreeRemovalOutcome,
 } from '@n10/core';
 
 // The push half of the contract — channel names and their payloads.
@@ -322,12 +324,12 @@ export interface N10HostApi {
   /** All local + remote branch names (checkout candidates). */
   listAllBranches(): Promise<string[]>;
   createWorktree(branch: string): Promise<string | null>;
-  /** Remove with the verdict the user confirmed. False when the
-   *  worktree was kept: git refused, or the branch moved since. */
+  /** Remove with the verdict the user confirmed; core's outcome says
+   *  what was kept, if anything. */
   removeWorktree(
     branch: string,
     approved: WorktreeRemovalCheck
-  ): Promise<boolean>;
+  ): Promise<WorktreeRemovalOutcome>;
   /** What removing the branch's worktree would cost — core's verdict,
    *  shared with the TUI. */
   checkWorktreeRemoval(branch: string): Promise<WorktreeRemovalCheck>;

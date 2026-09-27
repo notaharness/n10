@@ -26,7 +26,11 @@ import { useConfig } from './ConfigContext.js';
 import { useBranchPickerActions } from './ModalContext.js';
 import { useToastActions } from './ToastContext.js';
 import type { ToastVariant } from './ToastContext.js';
-import type { AgentSession, WorktreeRemovalCheck } from '@n10/core';
+import type {
+  AgentSession,
+  WorktreeRemovalCheck,
+  WorktreeRemovalOutcome,
+} from '@n10/core';
 import { sortSessionsByPrId } from '@n10/core';
 
 // ── Data context (consumed by SidebarProvider, changes on data refresh) ──
@@ -56,13 +60,13 @@ export interface SessionActionsContextValue {
    */
   flashStatus: (msg: string, variant?: ToastVariant) => void;
   refreshSessions: () => Promise<AgentSession[]>;
-  /** Resolves false when the worktree was kept: git refused, or the
-   *  branch moved after `approved` was judged. */
+  /** Resolves with what was removed: anything but `removed` kept
+   *  something, and the caller says why. */
   performDelete: (
     sessionName: string,
     branch: string,
     approved: WorktreeRemovalCheck
-  ) => Promise<boolean>;
+  ) => Promise<WorktreeRemovalOutcome>;
   refreshPr: () => Promise<void>;
   triggerSync: () => Promise<void>;
 }
@@ -105,9 +109,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     (sessionName: string, branch: string, approved: WorktreeRemovalCheck) => {
       void sessionMgr
         .performDelete(sessionName, branch, approved)
-        .then((removed) => {
-          if (removed) {
+        .then((outcome) => {
+          if (outcome === 'removed') {
             flash(`Auto-deleted merged branch: ${branch}`, 'success');
+          } else if (outcome === 'kept-branch') {
+            flash(
+              `Auto-deleted the worktree of merged branch ${branch}; kept the branch: it has commits made after the check`,
+              'warning'
+            );
           }
         })
         .catch((err: unknown) =>

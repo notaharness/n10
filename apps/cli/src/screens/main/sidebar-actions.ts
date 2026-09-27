@@ -20,6 +20,7 @@ import {
 } from '@n10/worktree-manager';
 import type { SidebarInputCtx } from './input-types.js';
 import { resolveEditorTarget } from './editor-target.js';
+import { keptNotice } from './confirm-delete-input.js';
 
 /** One sidebar action. Everything it needs comes from the context. */
 export type SidebarAction = (ctx: SidebarInputCtx) => void;
@@ -195,10 +196,15 @@ async function confirmOrDelete(
       });
       ctx.deleteConfirm.setConfirmInput('');
       return;
-    case 'clear':
-      if (!(await ctx.sessions.performDelete(sessionName, branch, check))) {
-        ctx.sessions.flashStatus(`Kept ${branch}: it changed after the check`);
-      }
+    case 'clear': {
+      const outcome = await ctx.sessions.performDelete(
+        sessionName,
+        branch,
+        check
+      );
+      const notice = keptNotice(branch, outcome);
+      if (notice) ctx.sessions.flashStatus(notice);
+    }
   }
 }
 

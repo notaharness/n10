@@ -27,8 +27,8 @@ const env = vi.hoisted(() => ({
   synced: [] as unknown[],
   sweeps: 0,
   removed: [] as { branch: string; approved: unknown }[],
-  /** What core's removal answers: false when it kept the worktree. */
-  removes: true,
+  /** What core's removal answers. */
+  removes: 'removed' as string,
   notices: [] as { message: string; kind: string }[],
   /** Resolvers for each syncRemote() call, in order. */
   pending: [] as ((ts: number) => void)[],
@@ -114,7 +114,7 @@ beforeEach(async () => {
   env.synced = [];
   env.sweeps = 0;
   env.removed = [];
-  env.removes = true;
+  env.removes = 'removed';
   env.notices = [];
   env.pending = [];
   env.rejects = [];
@@ -240,15 +240,32 @@ describe('gating and effects', () => {
     ]);
   });
 
-  it('says nothing when core kept the branch', async () => {
+  it('says nothing when core kept the worktree', async () => {
     env.autoDelete = 'feature/a';
-    env.removes = false;
+    env.removes = 'changed';
     sync.startRemoteSyncLoop('/repo-a');
     await flush();
     env.pending[0](1000);
     await flush();
 
     expect(env.notices).toEqual([]);
+  });
+
+  it('warns when core removed the worktree but kept the branch', async () => {
+    env.autoDelete = 'feature/a';
+    env.removes = 'kept-branch';
+    sync.startRemoteSyncLoop('/repo-a');
+    await flush();
+    env.pending[0](1000);
+    await flush();
+
+    expect(env.notices).toEqual([
+      {
+        message:
+          'Auto-deleted the worktree of merged branch feature/a; kept the branch: it has commits made after the check',
+        kind: 'warning',
+      },
+    ]);
   });
 
   it('does not auto-delete after the loop was stopped', async () => {

@@ -125,11 +125,18 @@ async function runSyncPass(cwd: string, gen: number): Promise<void> {
         if (cancelled()) return;
         // Core's removal, as in the TUI: kept if the branch moved after
         // the sweep judged it.
-        if (!(await removeWorktree(branch, approved))) return;
-        notifier?.({
-          message: `Auto-deleted merged branch: ${branch}`,
-          kind: 'success',
-        });
+        const outcome = await removeWorktree(branch, approved);
+        if (outcome === 'removed') {
+          notifier?.({
+            message: `Auto-deleted merged branch: ${branch}`,
+            kind: 'success',
+          });
+        } else if (outcome === 'kept-branch') {
+          notifier?.({
+            message: `Auto-deleted the worktree of merged branch ${branch}; kept the branch: it has commits made after the check`,
+            kind: 'warning',
+          });
+        }
       },
       onRebaseInProgress: (branch) =>
         notifier?.({

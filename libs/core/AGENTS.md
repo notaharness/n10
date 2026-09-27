@@ -70,9 +70,10 @@ The reasoning behind each rule is in `docs/decisions.md`.
 - **Session launch** (`session/`) resolves the worktree via `createWorktree`
   (exact branch match, rejecting a derived path occupied by another branch), reads config from the
   repo root, and only replaces a live session with explicit incarnation approval. Force-remove is offered only
-  for 'uncommitted changes' and 'not pushed to upstream'. `removeWorktreeSession`
-  takes the confirmed verdict, never a bare `force`, and refuses a branch whose
-  tip moved after the check.
+  for uncommitted changes, unpushed commits and populated submodules. `removeWorktreeSession`
+  takes the confirmed verdict, never a bare `force`, forces only past the risks
+  git guards with `--force`, refuses a branch whose tip moved or whose checkout
+  started a rebase after the check, and returns what it did.
 - **Plan** (`plan/`): items are value snapshots taken at add time.
   `composePlanPrompt` numbers items in `planRows` order. Checkout is
   three-state: inject into a live agent, respawn, or create the worktree and

@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const calls = vi.hoisted(() => ({
   log: [] as string[],
-  removed: true,
+  removed: 'removed' as string,
   worktrees: [] as { branch: string; path: string }[],
   config: { editor: undefined } as Record<string, unknown>,
   spawned: [] as { cmd: string; args: string[]; detached: boolean }[],
@@ -70,7 +70,7 @@ const { openInEditor, removeWorktree } = await import('./worktrees.js');
 
 beforeEach(() => {
   calls.log = [];
-  calls.removed = true;
+  calls.removed = 'removed';
   calls.worktrees = [
     { branch: 'feature/x', path: '/repo/.claude/worktrees/feature/x' },
   ];
@@ -87,19 +87,20 @@ describe('removeWorktree', () => {
       await removeWorktree('feature/x', {
         verdict: 'force',
         reason: 'uncommitted changes',
+        risks: ['uncommitted changes'],
         tip: 'abc123',
       })
-    ).toBe(true);
+    ).toBe('removed');
     expect(calls.log).toEqual([
       'stop-babysit:feature/x',
       'remove-session:/repo:feature/x:force',
     ]);
   });
-  it('returns a failed removal to the caller', async () => {
-    calls.removed = false;
+  it("returns core's outcome to the caller", async () => {
+    calls.removed = 'git-refused';
     expect(
       await removeWorktree('feature/x', { verdict: 'clear', tip: 'abc123' })
-    ).toBe(false);
+    ).toBe('git-refused');
   });
 });
 

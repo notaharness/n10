@@ -74,10 +74,11 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         const forced = {
           verdict: 'force',
           reason: 'uncommitted changes',
+          risks: ['uncommitted changes'],
           tip: await branchTip(branch, fixture.repo),
         } as const;
         expect(await removeWorktreeSession(branch, forced, fixture.repo)).toBe(
-          true
+          'removed'
         );
         expect(isSessionAlive(key)).toBe(false);
         expect(isSessionAlive(tab.name)).toBe(true);
