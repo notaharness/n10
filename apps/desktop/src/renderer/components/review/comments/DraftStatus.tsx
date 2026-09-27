@@ -6,8 +6,8 @@ import { Button } from '../../ui/button.js';
 
 /**
  * Whether what is in the box is kept. Saving and saved are quiet chrome,
- * not announced at every pause in typing; a failed save is an alert,
- * with its reason readable rather than hidden in a tooltip.
+ * not announced at every pause in typing; a failed save is an alert
+ * that says why, in words, on screen.
  */
 export function DraftStatus({ draft }: { draft: DurableDraft }) {
   const { save } = draft;
@@ -16,21 +16,20 @@ export function DraftStatus({ draft }: { draft: DurableDraft }) {
     return (
       <span
         role="alert"
-        className="flex min-w-0 items-center gap-1.5 text-xs text-destructive"
+        className="flex min-w-0 items-start gap-1.5 text-xs text-destructive"
       >
-        <AlertCircleIcon className="size-3.5 shrink-0" />
-        <span className="truncate" title={save.error}>
-          Couldn't save draft
-          <span className="sr-only">: {save.error}</span>
+        <AlertCircleIcon className="mt-px size-3.5 shrink-0" />
+        <span className="min-w-0 break-words">
+          Couldn't save draft: {save.error}.{' '}
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-xs"
+            onClick={draft.retry}
+          >
+            Retry
+          </Button>
         </span>
-        <Button
-          variant="link"
-          size="sm"
-          className="h-auto p-0 text-xs"
-          onClick={draft.retry}
-        >
-          Retry
-        </Button>
       </span>
     );
   }
@@ -60,10 +59,12 @@ export function UnsavedChoice({
   draft,
   onClose,
   onKeepEditing,
+  onUndo,
 }: {
   draft: DurableDraft;
   onClose: () => void;
   onKeepEditing: () => void;
+  onUndo?: () => void;
 }) {
   // Once a retry lands there is nothing left to decide.
   const kept = draft.save.kind === 'saved';
@@ -111,7 +112,7 @@ export function UnsavedChoice({
         variant="ghost"
         size="sm"
         onClick={() => {
-          draft.discard().then(onClose, onClose);
+          draft.discard(onUndo).then(onClose, onClose);
         }}
       >
         Discard

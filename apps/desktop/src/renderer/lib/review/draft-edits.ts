@@ -120,6 +120,14 @@ export class DraftEdits {
     this.write(key, { ...slot, timer: null });
   }
 
+  /** Whether any text failed to save, and so exists only here. */
+  hasFailed(): boolean {
+    for (const slot of this.slots.values()) {
+      if (slot.edit.save.kind === 'failed') return true;
+    }
+    return false;
+  }
+
   /** Save now everything waiting: the page is going away. */
   flushAll(): void {
     for (const key of this.slots.keys()) this.flush(key);

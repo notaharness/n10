@@ -161,7 +161,7 @@ describe('review drafts', () => {
           { ...as('bea'), target: REPLY, body: 'x' },
           src({ dir: locked })
         )
-      ).toThrow(/EACCES/);
+      ).toThrow(`n10 can't write to ${locked}: permission denied`);
     } finally {
       chmodSync(locked, 0o700);
     }

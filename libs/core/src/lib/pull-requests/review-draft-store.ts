@@ -88,10 +88,10 @@ export function readDraftFile(
 /** Written whole to a sibling and renamed over, so a crash mid-write
  *  leaves the previous file rather than half of one. */
 export function writeDraftFile(dir: string, file: DraftFile): void {
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
   const path = draftFilePath(dir, file.ref, file.viewer);
   const tmp = `${path}.${randomUUID()}.tmp`;
   try {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
     const fd = openSync(tmp, 'w', 0o600);
     try {
       // writeFileSync on a descriptor loops until every byte is out;
@@ -106,13 +106,35 @@ export function writeDraftFile(dir: string, file: DraftFile): void {
     renameSync(tmp, path);
   } catch (err) {
     rmSync(tmp, { force: true });
-    throw err;
+    throw unwritable(dir, err);
   }
+}
+
+/** The failure in the reader's terms: which folder, and why. */
+function unwritable(dir: string, err: unknown): Error {
+  const code = (err as NodeJS.ErrnoException).code;
+  const why =
+    code === 'EACCES' || code === 'EPERM'
+      ? 'permission denied'
+      : code === 'ENOSPC'
+      ? 'the disk is full'
+      : code === 'EROFS'
+      ? 'the disk is read-only'
+      : message(err);
+  return new Error(`n10 can't write to ${shortPath(dir)}: ${why}`);
+}
+
+/** `~/.n10/…` rather than the whole home directory. */
+function shortPath(path: string): string {
+  const home = homedir();
+  return path.startsWith(home + '/') ? `~${path.slice(home.length)}` : path;
 }
 
 /** Names the file, so a reviewer can keep its contents by hand. */
 function unreadable(path: string, why: string): Error {
-  return new Error(`Your saved drafts in ${path} could not be read: ${why}`);
+  return new Error(
+    `Your saved drafts in ${shortPath(path)} could not be read: ${why}`
+  );
 }
 
 function parseFile(path: string, text: string): DraftFile {

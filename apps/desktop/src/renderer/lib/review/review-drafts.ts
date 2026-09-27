@@ -8,9 +8,9 @@ import type {
   ReviewDrafts,
 } from '../../../host/contract.js';
 import { assertAnswerFor } from '../data/pr-snapshot-query.js';
+import { readError } from '../data/read-state.js';
 import { keys, queryClient } from '../data/query-keys.js';
 import { useRepo } from '../repo-context.js';
-import { errorMessage } from '../utils.js';
 import {
   DraftEdits,
   editKey,
@@ -40,9 +40,9 @@ export interface DurableDraft {
   flush: () => void;
   /** Save the text again after a failed save. */
   retry: () => void;
-  /** Remove the stored draft and clear the text, with an Undo. Never
-   *  rejects: a failure is reported as a toast. */
-  discard: () => Promise<void>;
+  /** Remove the stored draft and clear the text, with an Undo; told
+   *  when the text comes back. Never rejects: a failure is a toast. */
+  discard: (onUndo?: () => void) => Promise<void>;
   /** The same, silently, for text that was sent. */
   clear: () => Promise<void>;
   /** The stored drafts have not been read yet; editing waits, so the
@@ -70,7 +70,12 @@ function patchCache(req: SaveRequest, draft: ReviewDraft | null): void {
 
 const edits = new DraftEdits({
   save: ({ ref, viewer, target, body }) =>
-    window.n10.saveReviewDraft({ ref, viewer, target, body }),
+    window.n10
+      .saveReviewDraft({ ref, viewer, target, body })
+      .catch((err: unknown) => {
+        // The host's sentence, without Electron's transport wrapper.
+        throw new Error(readError(err));
+      }),
   saved: patchCache,
   now: () => Date.now(),
   setTimer: (fn, ms) => window.setTimeout(fn, ms),
@@ -80,6 +85,11 @@ const edits = new DraftEdits({
 // A reload or quit does not wait out the pause; the saves it starts
 // here still reach the host, which does not unload with the page.
 window.addEventListener('pagehide', () => edits.flushAll());
+// Text whose save failed exists only in this page: leaving asks first
+// (the host shows the question; see main/unsaved-guard.ts).
+window.addEventListener('beforeunload', (e) => {
+  if (edits.hasFailed()) e.preventDefault();
+});
 
 async function loadDrafts(
   ref: PullRequestRef,
@@ -135,12 +145,18 @@ export function useReviewDraft(
     else edits.local(key, { ...scope, body: text });
   };
 
-  const offerUndo = (text: string) =>
+  const offerUndo = (text: string, onUndo?: () => void) =>
     toast('Draft discarded', {
-      action: { label: 'Undo', onClick: () => setBody(text) },
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          setBody(text);
+          onUndo?.();
+        },
+      },
     });
 
-  const remove = (undoable: boolean): Promise<void> => {
+  const remove = (undoable: boolean, onUndo?: () => void): Promise<void> => {
     const text = body;
     edits.forget(key);
     if (!ref) return Promise.resolve();
@@ -151,10 +167,10 @@ export function useReviewDraft(
       .then(
         () => {
           patchCache({ ...scope, body: '' }, null);
-          if (undoable && text.trim()) offerUndo(text);
+          if (undoable && text.trim()) offerUndo(text, onUndo);
         },
         (err: unknown) => {
-          toast.error(`Couldn't discard your draft: ${errorMessage(err)}`);
+          toast.error(`Couldn't discard your draft: ${readError(err)}`);
         }
       );
   };
@@ -165,10 +181,10 @@ export function useReviewDraft(
     save: edit?.save ?? { kind: 'idle' },
     flush: () => edits.flush(key),
     retry: () => edits.retry(key),
-    discard: () => remove(true),
+    discard: (onUndo) => remove(true, onUndo),
     clear: () => remove(false),
     loading: ref != null && drafts.isPending,
-    readError: drafts.error ? errorMessage(drafts.error) : null,
+    readError: drafts.error ? readError(drafts.error) : null,
     durable: ref != null,
   };
 }

@@ -95,6 +95,19 @@ describe('DraftEdits', () => {
     expect(h.edits.get(key)?.save.kind).toBe('saved');
   });
 
+  it('knows when some text exists only in memory', async () => {
+    const h = harness();
+    const key = keyOf('bea');
+    h.edits.type(key, as('bea', 'x'));
+    expect(h.edits.hasFailed()).toBe(false);
+    h.elapse();
+    h.saves[0]!.reject(new Error('EACCES'));
+    await h.settle();
+    expect(h.edits.hasFailed()).toBe(true);
+    h.edits.forget(key);
+    expect(h.edits.hasFailed()).toBe(false);
+  });
+
   it('saves everything waiting when the page goes', () => {
     const h = harness();
     h.edits.type(keyOf('bea'), as('bea', 'a'));

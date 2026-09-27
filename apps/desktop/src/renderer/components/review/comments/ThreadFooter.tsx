@@ -5,9 +5,10 @@ import {
   RotateCcwIcon,
   Trash2Icon,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, type Ref } from 'react';
 import type { ComposerNotice as Notice } from '../../../lib/diff/thread-model.js';
 import type { DurableDraft } from '../../../lib/review/review-drafts.js';
+import { refocusAfter } from '../../../lib/focus.js';
 import { cn } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { Textarea } from '../../ui/textarea.js';
@@ -43,6 +44,15 @@ export function ThreadFooter({
   /** Freshness line from `useComposerRefresh`, shown above the input. */
   notice?: Notice | null;
 }) {
+  // However the box closes — Close, Escape, Discard, a sent reply — the
+  // keyboard lands on what it leaves behind, not on the page.
+  const prompt = useRef<HTMLButtonElement>(null);
+  const toPrompt = () => refocusAfter(() => prompt.current);
+  const wasComposing = useRef(composing);
+  useEffect(() => {
+    if (wasComposing.current && !composing) refocusAfter(() => prompt.current);
+    wasComposing.current = composing;
+  }, [composing]);
   return (
     <div className="border-t border-border bg-muted/20 px-3 py-2">
       <div className="flex items-start gap-2">
@@ -54,9 +64,14 @@ export function ThreadFooter({
             notice={notice}
             onSend={onSend}
             onClose={() => setComposing(false)}
+            onUndo={toPrompt}
           />
         ) : (
-          <ReplyPrompt draft={draft} onOpen={() => setComposing(true)} />
+          <ReplyPrompt
+            ref={prompt}
+            draft={draft}
+            onOpen={() => setComposing(true)}
+          />
         )}
         {canResolve && !composing && (
           <Button
@@ -90,9 +105,11 @@ export function ThreadFooter({
 
 /** The closed box: an invitation, or the reader's own unsent reply. */
 function ReplyPrompt({
+  ref,
   draft,
   onOpen,
 }: {
+  ref: Ref<HTMLButtonElement>;
   draft: DurableDraft;
   onOpen: () => void;
 }) {
@@ -100,6 +117,7 @@ function ReplyPrompt({
   const unsaved = draft.save.kind === 'failed' && !!firstLine;
   return (
     <button
+      ref={ref}
       type="button"
       onClick={onOpen}
       // Until the stored drafts are read, a box that looks empty may not
@@ -146,6 +164,7 @@ function ReplyComposer({
   notice,
   onSend,
   onClose,
+  onUndo,
 }: {
   canResolve: boolean;
   draft: DurableDraft;
@@ -153,6 +172,8 @@ function ReplyComposer({
   notice: Notice | null;
   onSend: (alsoResolve?: boolean) => void;
   onClose: () => void;
+  /** A discarded reply came back: where focus goes then. */
+  onUndo: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
@@ -190,6 +211,7 @@ function ReplyComposer({
         <UnsavedChoice
           draft={draft}
           onClose={onClose}
+          onUndo={onUndo}
           onKeepEditing={() => {
             setConfirming(false);
             box.current?.focus();
@@ -205,7 +227,7 @@ function ReplyComposer({
                 size="sm"
                 className="text-muted-foreground hover:text-destructive"
                 onClick={() => {
-                  draft.discard().then(onClose, onClose);
+                  draft.discard(onUndo).then(onClose, onClose);
                 }}
               >
                 <Trash2Icon /> Discard

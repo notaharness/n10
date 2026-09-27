@@ -74,11 +74,19 @@ test.describe('Review drafts', () => {
     await thread.getByRole('button', { name: 'Reply…' }).click();
     await thread.getByRole('textbox', { name: 'Reply' }).fill(TEXT);
     await expect(saved(thread)).toBeVisible();
-    await thread.getByRole('button', { name: 'Close' }).click();
+    await thread.getByRole('textbox', { name: 'Reply' }).press('Escape');
 
-    // Closed, the box says there is a draft and opens on it.
+    // Closed, the box says there is a draft, holds the keyboard, and
+    // opens on it.
     const prompt = thread.getByRole('button', { name: /Your draft reply/ });
     await expect(prompt).toContainText('First, the early return.');
+    await expect(prompt).toBeFocused();
+
+    // The Overview says so too.
+    await page.getByRole('button', { name: 'Overview' }).click();
+    await expect(
+      page.locator('[data-thread-id="T-open"]').getByText('Draft reply')
+    ).toBeVisible();
 
     await page.reload();
     thread = await openThread(page);
@@ -151,8 +159,9 @@ test.describe('Review drafts', () => {
         .click();
       box = thread.getByRole('textbox', { name: 'Reply' });
       await expect(box).toHaveValue('Nowhere to keep this');
+      // The reason, in words, on screen.
       await expect(thread.getByRole('alert')).toContainText(
-        "Couldn't save draft"
+        "Couldn't save draft: n10 can't write to ~/.n10/review-drafts: permission denied."
       );
 
       // Closing it now asks first.
@@ -188,11 +197,11 @@ test.describe('Review drafts', () => {
       .fill('Second thoughts');
     await expect(saved(thread)).toBeVisible();
     await thread.getByRole('button', { name: 'Discard' }).click();
-    await expect(thread.getByRole('button', { name: 'Reply…' })).toBeVisible();
+    await expect(thread.getByRole('button', { name: 'Reply…' })).toBeFocused();
     await page.getByRole('button', { name: 'Undo' }).click();
-    await expect(
-      thread.getByRole('button', { name: /Your draft reply/ })
-    ).toContainText('Second thoughts');
+    const back = thread.getByRole('button', { name: /Your draft reply/ });
+    await expect(back).toContainText('Second thoughts');
+    await expect(back).toBeFocused();
   });
 
   test('sending the reply clears its draft', async ({ desktop }) => {

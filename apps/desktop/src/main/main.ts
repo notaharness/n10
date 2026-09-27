@@ -37,6 +37,7 @@ import { installDesktopTmuxPreparer } from './tmux-session-preparer.js';
 import { MAIN_MARKS, mark } from './boot-marks.js';
 import { pickFolderWithDialog } from './folder-picker.js';
 import { buildMenuTemplate } from './menu.js';
+import { installUnsavedGuard } from './unsaved-guard.js';
 import {
   installProcessDiagnostics,
   installRendererRecovery,
@@ -191,6 +192,7 @@ function createMainWindow(): BrowserWindow {
   });
 
   installRendererRecovery(win);
+  installUnsavedGuard(win);
   return win;
 }
 
