@@ -145,6 +145,14 @@ test.describe('Active-session tab bar', () => {
     await expect(
       sidebarLocator(n10.term.page, longBranch).selected()
     ).toBeVisible({ timeout: 5_000 });
+    // A selection change remounts the main tab body (keyed by the
+    // selected row), and Ink subscribes its key handler in an effect:
+    // until that effect runs, a key still reaches the previous body and
+    // Shift+K would kill bravo. The remounted pane's "(loading...)"
+    // placeholder is replaced only after that effect pass.
+    await expect(n10.term.getByText('(loading...)')).toBeHidden({
+      timeout: 5_000,
+    });
     await n10.term.type('K'); // Shift+K kills the selected agent
 
     // Tab bar compacts: alpha stays at 1, bravo shifts up from 3 to 2.
