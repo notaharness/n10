@@ -1,0 +1,480 @@
+{
+  "value": [
+    {
+      "pullRequestThreadContext": null,
+      "id": 1,
+      "publishedDate": "2026-09-21T09:00:00.000Z",
+      "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+      "comments": [
+        {
+          "id": 1,
+          "parentCommentId": 0,
+          "author": {
+            "id": "8f5c1a2e-0000-4000-8000-00000000000a",
+            "displayName": "Alex Author",
+            "uniqueName": "alex@example.com"
+          },
+          "content": "Why is the timeout 30s?",
+          "publishedDate": "2026-09-21T09:00:00.000Z",
+          "lastUpdatedDate": "2026-09-21T10:00:00.000Z",
+          "lastContentUpdatedDate": "2026-09-21T10:00:00.000Z",
+          "commentType": "text",
+          "usersLiked": []
+        },
+        {
+          "id": 2,
+          "parentCommentId": 1,
+          "author": {
+            "id": "8f5c1a2e-0000-4000-8000-00000000000b",
+            "displayName": "Bea Reviewer",
+            "uniqueName": "bea@example.com"
+          },
+          "content": "@<8f5c1a2e-0000-4000-8000-00000000000a> it matches the gateway.",
+          "publishedDate": "2026-09-21T11:00:00.000Z",
+          "lastUpdatedDate": "2026-09-21T11:00:00.000Z",
+          "lastContentUpdatedDate": "2026-09-21T11:00:00.000Z",
+          "commentType": "text",
+          "usersLiked": []
+        }
+      ],
+      "threadContext": null,
+      "properties": {},
+      "identities": null,
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "https://dev.azure.com/example/_apis/git/repositories/00000000-0000-0000-0000-000000000001/pullRequests/7/threads/1"
+        }
+      },
+      "status": "active"
+    },
+    {
+      "pullRequestThreadContext": {
+        "iterationContext": {
+          "firstComparingIteration": 1,
+          "secondComparingIteration": 2
+        },
+        "changeTrackingId": 1
+      },
+      "id": 2,
+      "publishedDate": "2026-09-21T09:00:00.000Z",
+      "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+      "comments": [
+        {
+          "id": 1,
+          "parentCommentId": 0,
+          "author": {
+            "id": "8f5c1a2e-0000-4000-8000-00000000000b",
+            "displayName": "Bea Reviewer",
+            "uniqueName": "bea@example.com"
+          },
+          "content": "Does this keep the cleanup callback?",
+          "publishedDate": "2026-09-21T09:00:00.000Z",
+          "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "lastContentUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "commentType": "text",
+          "usersLiked": []
+        },
+        {
+          "id": 2,
+          "parentCommentId": 1,
+          "author": {
+            "id": "8f5c1a2e-0000-4000-8000-00000000000a",
+            "displayName": "Alex Author",
+            "uniqueName": "alex@example.com"
+          },
+          "content": "Yes, see line 50.",
+          "publishedDate": "2026-09-21T09:00:00.000Z",
+          "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "lastContentUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "commentType": "text",
+          "usersLiked": []
+        },
+        {
+          "id": 3,
+          "parentCommentId": 0,
+          "author": {
+            "id": "8f5c1a2e-0000-4000-8000-00000000000a",
+            "displayName": "Alex Author",
+            "uniqueName": "alex@example.com"
+          },
+          "content": "Alex Author resolved this thread.",
+          "publishedDate": "2026-09-21T09:00:00.000Z",
+          "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "lastContentUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "commentType": "system",
+          "usersLiked": []
+        }
+      ],
+      "threadContext": {
+        "filePath": "/src/request.ts",
+        "rightFileStart": {
+          "line": 41,
+          "offset": 1
+        },
+        "rightFileEnd": {
+          "line": 43,
+          "offset": 12
+        }
+      },
+      "properties": {},
+      "identities": null,
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "https://dev.azure.com/example/_apis/git/repositories/00000000-0000-0000-0000-000000000001/pullRequests/7/threads/2"
+        }
+      },
+      "status": "fixed"
+    },
+    {
+      "pullRequestThreadContext": {
+        "iterationContext": {
+          "firstComparingIteration": 1,
+          "secondComparingIteration": 1
+        },
+        "changeTrackingId": 2,
+        "trackingCriteria": {
+          "firstComparingIteration": 1,
+          "secondComparingIteration": 1,
+          "origLeftFileStart": {
+            "line": 18,
+            "offset": 1
+          },
+          "origLeftFileEnd": {
+            "line": 20,
+            "offset": 4
+          }
+        }
+      },
+      "id": 3,
+      "publishedDate": "2026-09-21T09:00:00.000Z",
+      "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+      "comments": [
+        {
+          "id": 1,
+          "parentCommentId": 0,
+          "author": {
+            "id": "8f5c1a2e-0000-4000-8000-00000000000b",
+            "displayName": "Bea Reviewer",
+            "uniqueName": "bea@example.com"
+          },
+          "content": "This branch looked unreachable.",
+          "publishedDate": "2026-09-21T09:00:00.000Z",
+          "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "lastContentUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "commentType": "text",
+          "usersLiked": []
+        }
+      ],
+      "threadContext": {
+        "filePath": "/src/legacy.ts"
+      },
+      "properties": {},
+      "identities": null,
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "https://dev.azure.com/example/_apis/git/repositories/00000000-0000-0000-0000-000000000001/pullRequests/7/threads/3"
+        }
+      },
+      "status": "wontFix"
+    },
+    {
+      "pullRequestThreadContext": {
+        "iterationContext": {
+          "firstComparingIteration": 1,
+          "secondComparingIteration": 2
+        },
+        "changeTrackingId": 1
+      },
+      "id": 4,
+      "publishedDate": "2026-09-21T09:00:00.000Z",
+      "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+      "comments": [
+        {
+          "id": 1,
+          "parentCommentId": 0,
+          "author": {
+            "id": "8f5c1a2e-0000-4000-8000-00000000000b",
+            "displayName": "Bea Reviewer",
+            "uniqueName": "bea@example.com"
+          },
+          "content": "Can this binary be generated instead?",
+          "publishedDate": "2026-09-21T09:00:00.000Z",
+          "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "lastContentUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "commentType": "text",
+          "usersLiked": []
+        }
+      ],
+      "threadContext": {
+        "filePath": "/assets/logo.png"
+      },
+      "properties": {},
+      "identities": null,
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "https://dev.azure.com/example/_apis/git/repositories/00000000-0000-0000-0000-000000000001/pullRequests/7/threads/4"
+        }
+      },
+      "status": "pending"
+    },
+    {
+      "pullRequestThreadContext": null,
+      "id": 5,
+      "publishedDate": "2026-09-21T09:00:00.000Z",
+      "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+      "comments": [
+        {
+          "id": 1,
+          "parentCommentId": 0,
+          "author": {
+            "id": "8f5c1a2e-0000-4000-8000-00000000000b",
+            "displayName": "Bea Reviewer",
+            "uniqueName": "bea@example.com"
+          },
+          "content": "Bea Reviewer voted 10",
+          "publishedDate": "2026-09-21T09:00:00.000Z",
+          "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "lastContentUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "commentType": "system",
+          "usersLiked": []
+        }
+      ],
+      "threadContext": null,
+      "properties": {
+        "CodeReviewThreadType": {
+          "$type": "System.String",
+          "$value": "VoteUpdate"
+        },
+        "CodeReviewVoteResult": {
+          "$type": "System.String",
+          "$value": "10"
+        },
+        "CodeReviewVotedByIdentity": {
+          "$type": "System.String",
+          "$value": "1"
+        }
+      },
+      "identities": {
+        "1": {
+          "id": "8f5c1a2e-0000-4000-8000-00000000000b",
+          "displayName": "Bea Reviewer",
+          "uniqueName": "bea@example.com"
+        }
+      },
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "https://dev.azure.com/example/_apis/git/repositories/00000000-0000-0000-0000-000000000001/pullRequests/7/threads/5"
+        }
+      }
+    },
+    {
+      "pullRequestThreadContext": null,
+      "id": 6,
+      "publishedDate": "2026-09-21T09:00:00.000Z",
+      "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+      "comments": [
+        {
+          "id": 1,
+          "parentCommentId": 0,
+          "author": {
+            "id": "00000002-0000-8888-8000-000000000000",
+            "displayName": "Microsoft.VisualStudio.Services.TFS",
+            "uniqueName": "00000002-0000-8888-8000-000000000000@2c895908-04e0-4952-89fd-54b0046d6288"
+          },
+          "content": "Alex Author updated the pull request",
+          "publishedDate": "2026-09-21T08:00:00.000Z",
+          "lastUpdatedDate": "2026-09-21T08:00:00.000Z",
+          "lastContentUpdatedDate": "2026-09-21T08:00:00.000Z",
+          "commentType": "system",
+          "usersLiked": []
+        }
+      ],
+      "threadContext": null,
+      "properties": {
+        "CodeReviewThreadType": {
+          "$type": "System.String",
+          "$value": "RefUpdate"
+        },
+        "CodeReviewRefUpdatedByIdentity": {
+          "$type": "System.String",
+          "$value": "1"
+        }
+      },
+      "identities": {
+        "1": {
+          "id": "8f5c1a2e-0000-4000-8000-00000000000a",
+          "displayName": "Alex Author",
+          "uniqueName": "alex@example.com"
+        }
+      },
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "https://dev.azure.com/example/_apis/git/repositories/00000000-0000-0000-0000-000000000001/pullRequests/7/threads/6"
+        }
+      }
+    },
+    {
+      "pullRequestThreadContext": null,
+      "id": 7,
+      "publishedDate": "2026-09-21T09:00:00.000Z",
+      "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+      "comments": [
+        {
+          "id": 1,
+          "parentCommentId": 0,
+          "author": {
+            "id": "00000002-0000-8888-8000-000000000000",
+            "displayName": "Microsoft.VisualStudio.Services.TFS",
+            "uniqueName": "00000002-0000-8888-8000-000000000000@2c895908-04e0-4952-89fd-54b0046d6288"
+          },
+          "content": "Alex Author set the pull request to completed",
+          "publishedDate": "2026-09-21T09:00:00.000Z",
+          "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "lastContentUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "commentType": "system",
+          "usersLiked": []
+        }
+      ],
+      "threadContext": null,
+      "properties": {
+        "CodeReviewThreadType": {
+          "$type": "System.String",
+          "$value": "StatusUpdate"
+        }
+      },
+      "identities": null,
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "https://dev.azure.com/example/_apis/git/repositories/00000000-0000-0000-0000-000000000001/pullRequests/7/threads/7"
+        }
+      }
+    },
+    {
+      "pullRequestThreadContext": null,
+      "id": 8,
+      "publishedDate": "2026-09-21T09:00:00.000Z",
+      "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+      "comments": [
+        {
+          "id": 1,
+          "parentCommentId": 0,
+          "author": {
+            "id": "00000002-0000-8888-8000-000000000000",
+            "displayName": "Microsoft.VisualStudio.Services.TFS",
+            "uniqueName": "00000002-0000-8888-8000-000000000000@2c895908-04e0-4952-89fd-54b0046d6288"
+          },
+          "content": "Alex Author added Bea Reviewer as a reviewer",
+          "publishedDate": "2026-09-21T09:00:00.000Z",
+          "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "lastContentUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "commentType": "system",
+          "usersLiked": []
+        }
+      ],
+      "threadContext": null,
+      "properties": {
+        "CodeReviewThreadType": {
+          "$type": "System.String",
+          "$value": "ReviewersUpdate"
+        }
+      },
+      "identities": null,
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "https://dev.azure.com/example/_apis/git/repositories/00000000-0000-0000-0000-000000000001/pullRequests/7/threads/8"
+        }
+      }
+    },
+    {
+      "pullRequestThreadContext": null,
+      "id": 9,
+      "publishedDate": "2026-09-21T09:00:00.000Z",
+      "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+      "comments": [
+        {
+          "id": 1,
+          "parentCommentId": 0,
+          "author": {
+            "id": "8f5c1a2e-0000-4000-8000-00000000000b",
+            "displayName": "Bea Reviewer",
+            "uniqueName": "bea@example.com"
+          },
+          "content": "never mind",
+          "publishedDate": "2026-09-21T09:00:00.000Z",
+          "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "lastContentUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "commentType": "text",
+          "usersLiked": []
+        }
+      ],
+      "threadContext": null,
+      "properties": {},
+      "identities": null,
+      "isDeleted": true,
+      "_links": {
+        "self": {
+          "href": "https://dev.azure.com/example/_apis/git/repositories/00000000-0000-0000-0000-000000000001/pullRequests/7/threads/9"
+        }
+      },
+      "status": "closed"
+    },
+    {
+      "pullRequestThreadContext": null,
+      "id": 10,
+      "publishedDate": "2026-09-21T09:00:00.000Z",
+      "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+      "comments": [
+        {
+          "id": 1,
+          "parentCommentId": 0,
+          "author": {
+            "id": "8f5c1a2e-0000-4000-8000-00000000000a",
+            "displayName": "Alex Author",
+            "uniqueName": "alex@example.com"
+          },
+          "content": "",
+          "publishedDate": "2026-09-21T09:00:00.000Z",
+          "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "lastContentUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "commentType": "text",
+          "usersLiked": [],
+          "isDeleted": true
+        },
+        {
+          "id": 2,
+          "parentCommentId": 1,
+          "author": {
+            "id": "8f5c1a2e-0000-4000-8000-00000000000b",
+            "displayName": "Bea Reviewer",
+            "uniqueName": "bea@example.com"
+          },
+          "content": "Still worth answering.",
+          "publishedDate": "2026-09-21T09:00:00.000Z",
+          "lastUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "lastContentUpdatedDate": "2026-09-21T09:00:00.000Z",
+          "commentType": "text",
+          "usersLiked": []
+        }
+      ],
+      "threadContext": null,
+      "properties": {},
+      "identities": null,
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "https://dev.azure.com/example/_apis/git/repositories/00000000-0000-0000-0000-000000000001/pullRequests/7/threads/10"
+        }
+      },
+      "status": "active"
+    }
+  ],
+  "count": 10
+}

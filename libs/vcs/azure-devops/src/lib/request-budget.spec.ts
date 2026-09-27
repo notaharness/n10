@@ -586,6 +586,13 @@ describe('the same data asked for twice', () => {
     expect(counts().cached).toBeGreaterThanOrEqual(2);
   });
 
+  it('reads the conversation from the threads the sidebar already counted', async () => {
+    await syncCycle();
+    const afterCycle = counts().network;
+    await azureDevOpsProvider.fetchPullRequestConversation!(AUTH, PROJECT, 100);
+    expect(counts().network).toBe(afterCycle);
+  });
+
   it('collapses two cycles that overlap into one', async () => {
     // A forced refresh landing on top of a poll: without dedupe this
     // is two of everything, and they arrive together by definition.

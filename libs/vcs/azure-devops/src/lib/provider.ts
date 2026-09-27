@@ -5,6 +5,8 @@ import type {
   PullRequestInfo,
   PullRequestReviewer,
   PullRequestComments,
+  PullRequestConversation,
+  PullRequestRef,
   RemoteCommentThread,
   RemoteCommentReply,
   ReviewDecision,
@@ -26,6 +28,11 @@ import {
   TTL,
 } from './request.js';
 import { fetchPrBuildStatus } from './build-status.js';
+import {
+  commentSources,
+  toAdoConversation,
+  type RawAdoThread,
+} from './pr-conversation.js';
 import { fetchPrBuildRunsBatch } from './builds.js';
 import {
   forgetPrDetails,
@@ -834,6 +841,21 @@ async function fetchAdoCommentThreads(
   return { threads, generalComments };
 }
 
+/** A pull request's whole conversation, from the same cached threads
+ *  read the sidebar's comment count uses — no request of its own. */
+async function fetchAdoConversation(
+  config: AdoConfig,
+  ref: PullRequestRef
+): Promise<PullRequestConversation> {
+  const data = await fetchRawThreads(config, ref.number);
+  const raw = (data.value ?? []) as RawAdoThread[];
+  const guids = new Set(commentSources(raw).flatMap(extractMentionGuids));
+  await resolveMentionNames(config, [...guids]);
+  return toAdoConversation(ref, raw, (source) =>
+    rewriteMentions(sanitizeBody(source), mentionCache)
+  );
+}
+
 /**
  * The comment id a reply should hang under. ADO renders threading from
  * `parentCommentId`, where `0` means "this IS the thread root" — so
@@ -1076,6 +1098,17 @@ export const azureDevOpsProvider: VcsProvider = {
   ): Promise<PullRequestComments> {
     const config = toAdoConfig(auth, project);
     return fetchAdoCommentThreads(config, prId);
+  },
+
+  async fetchPullRequestConversation(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestConversation> {
+    const repository = this.repositoryRef?.(project);
+    if (!repository) throw new Error('Azure DevOps project not configured');
+    const config = toAdoConfig(auth, project);
+    return fetchAdoConversation(config, { ...repository, number: prId });
   },
 
   async replyToThread(
