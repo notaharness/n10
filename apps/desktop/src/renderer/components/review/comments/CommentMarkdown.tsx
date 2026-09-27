@@ -1,42 +1,56 @@
-import { ExternalLinkIcon, ImageOffIcon } from 'lucide-react';
-import { useMemo, useState, type ComponentProps } from 'react';
+import { ExternalLinkIcon, ImageOffIcon, RotateCwIcon } from 'lucide-react';
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  type ComponentProps,
+} from 'react';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import {
   useHighlightedCodeBlock,
   type LineTokens,
 } from '../../../lib/diff/highlight.js';
 import { useCommentImage } from '../../../lib/data/queries.js';
+import {
+  resolveLink,
+  type RepoLinkBase,
+} from '../../../lib/review/markdown-links.js';
 import { useTheme } from '../../../lib/theme.js';
 import { cn } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../../ui/dialog.js';
 import { Skeleton } from '../../ui/skeleton.js';
+import {
+  DESCRIPTION_HEADINGS,
+  MarkdownDetails,
+  MarkdownParagraph,
+  MarkdownSummary,
+  MarkdownTable,
+} from './markdown-elements.js';
 
 /**
- * Markdown body for PR comments.
+ * Markdown body for PR descriptions and comments.
+ *  • Raw HTML is parsed and then sanitized to GitHub's own allow-list,
+ *    so a disclosure block renders and a script or event handler never
+ *    reaches the page.
  *  • Images are fetched by the host with the provider's credentials
  *    (Azure DevOps attachments need the PAT, private GitHub assets the
  *    gh token) and shown from a data URL; click opens a lightbox.
- *  • Links open in the system browser, never inside the app.
+ *  • Links open in the system browser, never inside the app; a
+ *    repository path opens at the pull request's commit, through
+ *    `MarkdownLinkBase`.
  *  • Headings are capped so a reply can't shout over the page.
  */
-// Comment images render as block elements (and show a block skeleton
-// while loading); a real <p> can't legally contain a <div>, so
-// paragraphs render as <div> to keep the nesting valid.
-function MarkdownParagraph(props: ComponentProps<'div'>) {
-  return <div className="my-1.5" {...props} />;
-}
 
-// A table keeps its columns and scrolls inside the text column, rather
-// than spilling over whatever sits beside it.
-function MarkdownTable(props: ComponentProps<'table'>) {
-  return (
-    <div className="max-w-full overflow-x-auto">
-      <table {...props} />
-    </div>
-  );
-}
+/** Where a repository path in the markdown below opens; null opens
+ *  none. */
+export const MarkdownLinkBase = createContext<RepoLinkBase | null>(null);
+
+const REHYPE_PLUGINS = [rehypeRaw, rehypeSanitize];
 
 const MARKDOWN_COMPONENTS = {
   img: CommentImage,
@@ -44,14 +58,38 @@ const MARKDOWN_COMPONENTS = {
   p: MarkdownParagraph,
   code: MarkdownCode,
   table: MarkdownTable,
+  details: MarkdownDetails,
+  summary: MarkdownSummary,
 };
 
-export function CommentMarkdown({ markdown }: { markdown: string }) {
+const DESCRIPTION_COMPONENTS = {
+  ...MARKDOWN_COMPONENTS,
+  ...DESCRIPTION_HEADINGS,
+};
+
+const PROSE =
+  'prose prose-sm dark:prose-invert max-w-none break-words text-base leading-relaxed prose-p:my-1.5 prose-pre:my-2 prose-pre:text-sm prose-code:before:content-none prose-code:after:content-none prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-a:text-primary prose-headings:my-2 prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-h4:text-base prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-table:my-2 prose-th:py-1 prose-th:px-2 prose-td:py-1 prose-td:px-2 prose-blockquote:my-2 prose-blockquote:border-l-border prose-hr:my-3';
+
+/** A description's `#` to `###`, shifted to `h3`–`h5`, keep a scale
+ *  above the body text. */
+const DESCRIPTION_PROSE =
+  'prose-headings:mt-4 prose-h3:text-xl prose-h4:text-lg prose-h5:text-base prose-h6:text-base';
+
+export function CommentMarkdown({
+  markdown,
+  description = false,
+}: {
+  markdown: string;
+  /** The pull request's description, whose headings sit under the
+   *  Overview's own. */
+  description?: boolean;
+}) {
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none break-words text-base leading-relaxed prose-p:my-1.5 prose-pre:my-2 prose-pre:text-sm prose-code:before:content-none prose-code:after:content-none prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-a:text-primary prose-headings:my-2 prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-h4:text-base prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-table:my-2 prose-th:py-1 prose-th:px-2 prose-td:py-1 prose-td:px-2 prose-blockquote:my-2 prose-blockquote:border-l-border prose-hr:my-3">
+    <div className={cn(PROSE, description && DESCRIPTION_PROSE)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        components={MARKDOWN_COMPONENTS}
+        rehypePlugins={REHYPE_PLUGINS}
+        components={description ? DESCRIPTION_COMPONENTS : MARKDOWN_COMPONENTS}
       >
         {markdown}
       </ReactMarkdown>
@@ -60,15 +98,17 @@ export function CommentMarkdown({ markdown }: { markdown: string }) {
 }
 
 function ExternalAnchor({ href, children, ...rest }: ComponentProps<'a'>) {
+  const target = resolveLink(href, useContext(MarkdownLinkBase));
   return (
     <a
       {...rest}
       href={href}
       onClick={(e) => {
         e.preventDefault();
-        if (href && /^https?:/i.test(href)) void window.n10.openExternal(href);
+        if (target) void window.n10.openExternal(target);
       }}
-      title={href}
+      // Where it goes, before it goes there; or why it goes nowhere.
+      title={target ?? (href && `${href} — n10 cannot open this link`)}
     >
       {children}
     </a>
@@ -93,7 +133,14 @@ function CommentImage({ src, alt }: ComponentProps<'img'>) {
     return (
       <span className="my-2 inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 text-sm text-muted-foreground">
         <ImageOffIcon className="size-3.5" />
-        <span>{alt || 'image'}</span>
+        <span>Couldn't load {alt ? `“${alt}”` : 'image'}</span>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 text-primary hover:underline"
+          onClick={() => void img.refetch()}
+        >
+          <RotateCwIcon className="size-3" /> Retry
+        </button>
         <button
           type="button"
           className="inline-flex items-center gap-1 text-primary hover:underline"
