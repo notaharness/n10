@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import {
   Group,
   Panel,
@@ -14,19 +14,18 @@ import type { ReadState } from '../../lib/data/read-state.js';
 import { keys } from '../../lib/data/query-keys.js';
 import { useReadState } from '../../lib/data/use-read-state.js';
 import { useRepo } from '../../lib/repo-context.js';
+import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { useCommentNavigator } from '../../lib/review/use-comment-navigator.js';
 import { useReviewDiff } from '../../lib/review/use-review-diff.js';
+import { useReviewMode } from '../../lib/review/use-review-mode.js';
 import { useReviewRail } from '../../lib/review/use-review-rail.js';
 import { usePlanCheckout } from '../../lib/plan/use-plan-checkout.js';
 import {
   buildFileEntries,
   groupDraftsByFile,
   groupThreadsByFile,
-  focusesAgent,
   resolveMode,
-  type AgentPresence,
   unpostedDrafts,
-  type Mode,
 } from '../../lib/review/review-model.js';
 import { errorMessage } from '../../lib/utils.js';
 import { ContentPane } from './ContentPane.js';
@@ -53,28 +52,6 @@ const NO_THREADS: ReadState<unknown> = {
  * What to show is decided in `lib/review-model.ts`; this component
  * wires that to the queries, the refs and the markup.
  */
-/**
- * The terminal takes over the pane whenever an agent starts, and
- * whenever the user comes back to a tab that already has one running —
- * the agent is what they returned for, not the diff. {@link focusesAgent}
- * owns which changes count as either.
- *
- * Written as state adjusted during render (React's own pattern for
- * "derive from a prop change") rather than an effect, so the pane never
- * paints the diff for one frame before switching.
- */
-function useAgentFocus(next: AgentPresence, onFocusAgent: () => void): void {
-  const [prev, setPrev] = useState(next);
-  if (
-    prev.hasSession !== next.hasSession ||
-    prev.running !== next.running ||
-    prev.active !== next.active
-  ) {
-    setPrev(next);
-    if (focusesAgent(prev, next)) onFocusAgent();
-  }
-}
-
 /** What the agent pane's connection banner needs (ux-machines.md §6),
  *  resolved by the caller (ItemView) so PrWorkspace stays free of the
  *  machines query and the reconnect mutation. */
@@ -140,11 +117,11 @@ export function PrWorkspace({
   const options = useDiffOptions();
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const [mode, setMode] = useState<Mode>(running ? 'agent' : 'diff');
-
-  useAgentFocus({ hasSession: Boolean(sessionName), running, active }, () =>
-    setMode('agent')
-  );
+  const [mode, setMode] = useReviewMode({
+    pr,
+    viewer: repo.viewer,
+    agent: { hasSession: Boolean(sessionName), running, active },
+  });
   const inlineThreads = useMemo(
     () => comments.data?.threads ?? [],
     [comments.data]
@@ -176,7 +153,7 @@ export function PrWorkspace({
     [files, threadsByFile, draftsByFile]
   );
 
-  const showDiff = useCallback(() => setMode('diff'), []);
+  const showDiff = useCallback(() => setMode('diff'), [setMode]);
   const nav = useCommentNavigator({
     files,
     general,
@@ -187,14 +164,20 @@ export function PrWorkspace({
   });
 
   const rail = useReviewRail(nav, comments, rootRef);
+  const { showUnresolved } = rail;
+  const onOverviewAction = useCallback(
+    (action: AttentionAction) =>
+      action === 'show-unresolved' ? showUnresolved() : setMode('diff'),
+    [showUnresolved, setMode]
+  );
 
   // ── The plan ───────────────────────────────────────────────────
   const showPlanItemInDiff = useCallback(
     (item: PlanItem) => nav.jumpToId(item.id, item.file),
     [nav]
   );
-  const backToAgent = useCallback(() => setMode('agent'), []);
-  const openPlanPane = useCallback(() => setMode('plan'), []);
+  const backToAgent = useCallback(() => setMode('agent'), [setMode]);
+  const openPlanPane = useCallback(() => setMode('plan'), [setMode]);
   // Both comment sources the rail can offer, as one list to resolve an
   // id against.
   const allThreads = useMemo(
@@ -341,6 +324,7 @@ export function PrWorkspace({
               onNext={() => nav.step(1)}
               onExitReview={showDiff}
               onOpenInDiff={nav.jumpToFile}
+              onOverviewAction={onOverviewAction}
               plan={plan.wiring}
             />
           </Panel>

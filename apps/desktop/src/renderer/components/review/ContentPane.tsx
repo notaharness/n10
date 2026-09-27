@@ -1,12 +1,13 @@
 import type { DiffLine } from '@n10/diff';
 import type { PullRequestInfo } from '@n10/vcs-core';
-import type { ReactNode, Ref, RefObject } from 'react';
+import { useState, type ReactNode, type Ref, type RefObject } from 'react';
 import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
 import type { PlanItem } from '@n10/core/plan';
 import type { DiffReadState } from '../../lib/data/read-state.js';
+import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { type Mode } from '../../lib/review/review-model.js';
 import { cn } from '../../lib/utils.js';
 import { SessionTerminal } from '../terminal/SessionTerminal.js';
@@ -35,6 +36,15 @@ function StackedPane({
       {children}
     </div>
   );
+}
+
+/** True from the first render where `on` is, onwards: a pane mounted
+ *  on first visit and kept, so a pull request nobody opens the Overview
+ *  of never fetches its description. */
+function useMountedOnce(on: boolean): boolean {
+  const [seen, setSeen] = useState(on);
+  if (on && !seen) setSeen(true);
+  return seen || on;
 }
 
 /** The agent's terminal, plus its connection banner (ux-machines.md
@@ -114,6 +124,7 @@ export function ContentPane({
   onNext,
   onExitReview,
   onOpenInDiff,
+  onOverviewAction,
   plan,
 }: {
   effMode: Mode;
@@ -152,6 +163,8 @@ export function ContentPane({
   onNext: () => void;
   onExitReview: () => void;
   onOpenInDiff: (file: string) => void;
+  /** The Overview's next-step button. */
+  onOverviewAction: (action: AttentionAction) => void;
   /** Everything the plan pane needs; absent on a bare worktree tab. */
   plan?: {
     items: PlanItem[];
@@ -166,6 +179,7 @@ export function ContentPane({
   };
 }) {
   const headSha = pr?.headSha;
+  const overviewMounted = useMountedOnce(effMode === 'overview');
   const generalThreads = hideResolved
     ? general.filter((t) => !t.isResolved)
     : general;
@@ -214,10 +228,10 @@ export function ContentPane({
           />
         </div>
       )}
-      {pr && effMode === 'overview' && (
-        <div className="absolute inset-0">
-          <OverviewPane pr={pr} />
-        </div>
+      {pr && overviewMounted && (
+        <StackedPane visible={effMode === 'overview'}>
+          <OverviewPane pr={pr} onAction={onOverviewAction} />
+        </StackedPane>
       )}
       <StackedPane visible={effMode === 'diff'}>
         <DiffPane

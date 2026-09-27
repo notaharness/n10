@@ -196,6 +196,14 @@ when switching to the diff so scrollback survives. The diff owns its toolbar.
 Each tab has an ErrorBoundary. Markdown paragraphs render as `div` when they may
 contain block images; the host fetches protected images with provider auth.
 
+A pull request tab opens on its Overview when someone else wrote it, and on the
+diff when you did (`initialMode`). An unknown account counts as a reviewer, so
+the safe start is the change's purpose before its code. A running agent still
+takes the pane. The Overview never calls a pull request ready: the list row has
+no policies, required reviewers, conflicts or merge permission, so readiness
+stays "not fully known" until those are read. Verdicts sit below the reviewers,
+as outline buttons; the next step is the only primary action.
+
 Optimistic removal drops a session row but retains a PR row with its session
 fields cleared: the PR outlives its checkout. Status indicators combine CI and
 review status; CI can worsen the result, but passing CI does not imply approval.

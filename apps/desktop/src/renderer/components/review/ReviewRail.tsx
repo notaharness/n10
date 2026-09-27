@@ -122,7 +122,7 @@ export function ReviewRail({
         </Tip>
       </div>
 
-      {/* Overview — the PR's title, description and verdict actions. */}
+      {/* Overview — what the PR is, the next step, readiness and reviews. */}
       {hasPr && (
         <div className="shrink-0 px-2 pb-1">
           <button
