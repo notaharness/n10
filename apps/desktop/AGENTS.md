@@ -98,6 +98,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - A mention is the provider's token (`@login`, Azure's `@<id>`) from its
   own search (core `pull-requests/mention-search.ts`,
   `comments/MentionPicker.tsx`); a display name is only ever shown.
+- Drafts are filed as one native review through core's
+  `pull-requests/submit-review.ts`; the provider's ledger lives in the
+  drafts file, so an unanswered step is looked for, never re-sent. A
+  draft being posted or maybe posted is shown, locked, never hidden.
 - Diffs are whole-file (`-U99999`), folded client-side
   (`lib/diff/diff-model.ts`). A PR diffs commits; a bare worktree diffs its
   working tree, polled at 2 s only while the agent runs. `FileTree` collapse

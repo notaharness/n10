@@ -22,6 +22,9 @@ import {
 
 const isEditable = (d: ReviewDraft) =>
   d.publication.state === 'unpublished' || d.publication.state === 'failed';
+/** Being posted, or maybe posted: shown, and not to be changed. */
+const isInFlight = (d: ReviewDraft) =>
+  d.publication.state === 'publishing' || d.publication.state === 'unknown';
 
 /**
  * The reviewer's own writing, kept as they type it: saved on this
@@ -36,6 +39,11 @@ export type { SaveState } from './draft-edits.js';
 export interface DurableDraft {
   /** The pull request it is written on; null when there is none. */
   ref: PullRequestRef | null;
+  /** The draft as it is being posted, or may have been: its text is
+   *  not to change until the outcome is known. */
+  sending: ReviewDraft | null;
+  /** Why the last attempt to post it was refused, if it was. */
+  refused: string | null;
   body: string;
   setBody: (body: string) => void;
   save: SaveState;
@@ -116,7 +124,8 @@ type InlineDraftTarget = Extract<DraftTarget, { kind: 'inline' }>;
 const NO_TARGETS: InlineDraftTarget[] = [];
 const inlineTargetsOf = (d: ReviewDrafts): InlineDraftTarget[] =>
   d.drafts.flatMap((x) =>
-    x.target.kind === 'inline' && isEditable(x) && x.body.trim()
+    x.target.kind === 'inline' &&
+    ((isEditable(x) && x.body.trim()) || isInFlight(x))
       ? [x.target]
       : []
   );
@@ -141,6 +150,23 @@ export function useInlineDraftTargets(
   return data ?? NO_TARGETS;
 }
 
+/**
+ * The stored draft for `target` that can be edited, or else the one
+ * being posted. A draft already posted is spent: neither.
+ */
+function storedFor(data: ReviewDrafts | undefined, target: DraftTarget) {
+  const mine = (data?.drafts ?? []).filter((d) => sameTarget(d.target, target));
+  const stored = mine.find(isEditable) ?? null;
+  const sending = stored ? null : mine.find(isInFlight) ?? null;
+  return { stored, sending };
+}
+
+function refusalOf(draft: ReviewDraft | null): string | null {
+  return draft?.publication.state === 'failed'
+    ? draft.publication.reason
+    : null;
+}
+
 /** Placeholder while there is no ref: the text is kept in memory only. */
 const LOCAL: PullRequestRef = {
   provider: 'local',
@@ -163,11 +189,7 @@ export function useReviewDraft(
   };
   const key = editKey(scope);
   const edit = useSyncExternalStore(edits.subscribe, () => edits.get(key));
-  // A draft being posted, or already posted, is not text to edit.
-  const stored =
-    drafts.data?.drafts.find(
-      (d) => sameTarget(d.target, target) && isEditable(d)
-    ) ?? null;
+  const { stored, sending } = storedFor(drafts.data, target);
   const body = edit?.text ?? stored?.body ?? '';
 
   const setBody = (text: string) => {
@@ -218,6 +240,8 @@ export function useReviewDraft(
 
   return {
     ref,
+    sending,
+    refused: refusalOf(stored),
     body,
     setBody,
     save: edit?.save ?? { kind: 'idle' },

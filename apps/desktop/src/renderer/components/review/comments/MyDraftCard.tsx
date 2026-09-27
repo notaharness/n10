@@ -4,7 +4,7 @@ import { useMyDrafts } from '../../../lib/review/my-drafts-context.js';
 import type { InlineTarget } from '../../../lib/review/my-drafts.js';
 import { useReviewDraft } from '../../../lib/review/review-drafts.js';
 import { CommentComposer } from './CommentComposer.js';
-import { OwnDraftCard, OwnDraftPlace } from './OwnDraftCard.js';
+import { OwnDraftCard, OwnDraftPlace, PostingNotice } from './OwnDraftCard.js';
 
 /**
  * The reviewer's own comment on code, before it is published: its card,
@@ -51,13 +51,31 @@ export function MyDraftCard({ target }: { target: InlineTarget }) {
       />
     );
   }
+  const posting = (
+    <PostingNotice sending={draft.sending} refused={draft.refused} />
+  );
+  if (draft.sending) {
+    return (
+      <OwnDraftCard
+        id={key}
+        place={place}
+        body={draft.sending.body}
+        notice={posting}
+      />
+    );
+  }
   if (!draft.body.trim()) return null;
   return (
     <OwnDraftCard
       id={key}
       place={place}
       body={draft.body}
-      notice={<CodeMoved target={target} />}
+      notice={
+        <>
+          {posting}
+          <CodeMoved target={target} />
+        </>
+      }
       onEdit={() => scope.openComposer(target)}
       // `discard` never rejects.
       onDiscard={() => void draft.discard(undone).then(gone)}

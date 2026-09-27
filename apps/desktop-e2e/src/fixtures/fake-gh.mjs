@@ -19,6 +19,7 @@
  * cares about.
  */
 import { readFileSync, writeFileSync, writeSync } from 'node:fs';
+import { reviewGraphql } from './fake-gh-review.mjs';
 
 const scenarioPath = process.env.N10_FAKE_GH;
 const scenario = JSON.parse(readFileSync(scenarioPath, 'utf8'));
@@ -364,6 +365,15 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
       },
     });
   }
+
+  // ── Filing a review: fake-gh-review.mjs ──
+  const review = reviewGraphql(query, vars, prs, scenario);
+  if (review?.wrote) save();
+  if (review?.lost) {
+    process.stderr.write('connection reset by peer\n');
+    process.exit(1);
+  }
+  if (review) out({ data: review.data });
 
   // ── Mutations ──
   if (query.includes('addPullRequestReviewThreadReply')) {

@@ -1,5 +1,11 @@
-import { PencilIcon, Trash2Icon } from 'lucide-react';
+import {
+  AlertCircleIcon,
+  Loader2Icon,
+  PencilIcon,
+  Trash2Icon,
+} from 'lucide-react';
 import type { ReactNode, Ref } from 'react';
+import type { ReviewDraft } from '../../../../host/contract.js';
 import { Badge } from '../../ui/badge.js';
 import { Button } from '../../ui/button.js';
 import { displayMentions } from '../../../lib/review/mention-query.js';
@@ -40,8 +46,9 @@ export function OwnDraftCard({
   body: string;
   /** Said above the body, such as the code having changed under it. */
   notice?: ReactNode;
-  onEdit: () => void;
-  onDiscard: () => void;
+  /** Absent while the draft is being posted: its text cannot change. */
+  onEdit?: () => void;
+  onDiscard?: () => void;
 }) {
   return (
     <article
@@ -52,28 +59,71 @@ export function OwnDraftCard({
     >
       <header className="flex items-center gap-2 border-b border-border bg-primary/5 px-3 py-1.5 text-xs">
         <span className="min-w-0 flex-1">{place}</span>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Edit draft"
-          onClick={onEdit}
-        >
-          <PencilIcon />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Discard draft"
-          className="hover:text-destructive"
-          onClick={onDiscard}
-        >
-          <Trash2Icon />
-        </Button>
+        {onEdit && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Edit draft"
+            onClick={onEdit}
+          >
+            <PencilIcon />
+          </Button>
+        )}
+        {onDiscard && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Discard draft"
+            className="hover:text-destructive"
+            onClick={onDiscard}
+          >
+            <Trash2Icon />
+          </Button>
+        )}
       </header>
       {notice}
       <div className="px-3 py-2">
         <CommentBody markdown={displayMentions(body, mentionNames)} />
       </div>
     </article>
+  );
+}
+
+/**
+ * Where posting a draft has got to, when it is anywhere: going out with
+ * the review, maybe already posted (looked for before it is sent
+ * again), or refused with the provider's reason.
+ */
+export function PostingNotice({
+  sending,
+  refused,
+}: {
+  sending: ReviewDraft | null;
+  refused: string | null;
+}) {
+  const state = sending?.publication.state;
+  if (!state && !refused) return null;
+  const text =
+    state === 'publishing'
+      ? 'Posting with your review…'
+      : state === 'unknown'
+      ? 'This may already have been posted. n10 will check before sending it again.'
+      : `Couldn't post: ${refused}`;
+  return (
+    <p
+      role="status"
+      className={
+        refused && !state
+          ? 'flex items-center gap-1.5 border-b border-border bg-destructive/5 px-3 py-1.5 text-xs text-destructive'
+          : 'flex items-center gap-1.5 border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground'
+      }
+    >
+      {state === 'publishing' ? (
+        <Loader2Icon className="size-3.5 animate-spin" />
+      ) : (
+        <AlertCircleIcon className="size-3.5" />
+      )}
+      {text}
+    </p>
   );
 }
