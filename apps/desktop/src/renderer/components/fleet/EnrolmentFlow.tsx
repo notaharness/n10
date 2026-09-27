@@ -1,16 +1,7 @@
-import type { CeremonyOutcome } from '../../../host/contract-machines.js';
 import { useFleet } from '../../lib/fleet/fleet-context.js';
 import { CeremonyFailure } from './CeremonyFailure.js';
 import { CeremonyProgress, InitSteps } from './CeremonyProgress.js';
 import { FingerprintCheck } from './FingerprintCheck.js';
-
-function Success({
-  outcome,
-}: {
-  outcome: Extract<CeremonyOutcome, { op: 'init' | 'join' }>;
-}) {
-  return <FingerprintCheck fleetId={outcome.fleetId} />;
-}
 
 /**
  * A create or join under way or just ended: its progress, its outcome
@@ -33,7 +24,9 @@ export function EnrolmentFlow() {
   // The host re-reads beam's status after every ceremony, failed ones
   // too, so what shows behind the result is already current.
   if (outcome.ok) {
-    return outcome.op === 'revoke' ? null : <Success outcome={outcome} />;
+    return outcome.op === 'join' ? (
+      <FingerprintCheck fleetId={outcome.fleetId} />
+    ) : null;
   }
   return (
     <div className="space-y-4">

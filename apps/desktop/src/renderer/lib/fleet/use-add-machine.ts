@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { MachineView } from '../../../host/contract.js';
@@ -28,5 +28,14 @@ export function useAddMachine() {
     setOpen(false);
     toast.success(`${joined.label} joined`);
   }, []);
-  return { adding, setAdding, machinesChanged };
+  useEffect(() => {
+    const cache = qc.getQueryCache();
+    return cache.subscribe((event) => {
+      if (event.type !== 'updated' || event.action.type !== 'success') return;
+      if (event.query !== cache.find({ queryKey: keys.machines, exact: true }))
+        return;
+      machinesChanged(qc.getQueryData<MachineView[]>(keys.machines) ?? []);
+    });
+  }, [qc, machinesChanged]);
+  return { adding, setAdding };
 }

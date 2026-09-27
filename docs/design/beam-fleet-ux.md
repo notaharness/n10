@@ -56,7 +56,7 @@ membership is already established by the daemon.
 - **Terminal:** `beam join --label buildbox`, a copy icon, and “Run there, then open the link or scan the QR.”
 
 A fingerprint block says “Check that its fleet fingerprint matches:” above the grouped
-value. “Waiting for a new machine…” reflects the waiting state. A new member identity
+value. “Waiting for a new machine…” reflects the waiting state. A new member identity from a push or fallback poll
 closes the panel, including while collapsed. Renames and reconnects cannot complete
 adding. **Close instructions** lets the owner leave early; there is no Done button.
 

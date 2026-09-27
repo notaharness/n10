@@ -77,12 +77,11 @@ const FleetContext = createContext<FleetContextValue | null>(null);
 
 /** The machines list and beam's status are pushed whole on every
  *  change; they go straight into the cache, whatever screen is up. */
-function useFleetPushes(onMachines: (machines: MachineView[]) => void): void {
+function useFleetPushes(): void {
   const qc = useQueryClient();
   useEffect(() => {
     const offMachines = window.n10.onMachinesChanged((machines) => {
       qc.setQueryData(keys.machines, machines);
-      onMachines(machines);
     });
     const offStatus = window.n10.onBeamStatusChanged((status) => {
       qc.setQueryData(keys.beamStatus, status);
@@ -91,7 +90,7 @@ function useFleetPushes(onMachines: (machines: MachineView[]) => void): void {
       offMachines();
       offStatus();
     };
-  }, [qc, onMachines]);
+  }, [qc]);
 }
 
 function useFleetSection(): FleetSectionState {
@@ -138,7 +137,7 @@ function useFleetSection(): FleetSectionState {
  */
 export function FleetProvider({ children }: { children: ReactNode }) {
   const section = useFleetSection();
-  const { adding, setAdding, machinesChanged } = useAddMachine();
+  const { adding, setAdding } = useAddMachine();
   const publication = usePublication();
   const { settle, clear } = publication;
   const hooks = useMemo(() => ({ onSettled: settle }), [settle]);
@@ -166,7 +165,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     setAdding(false);
   }, [leave, clear, setAdding]);
   const reset = useFleetReset(afterReset);
-  useFleetPushes(machinesChanged);
+  useFleetPushes();
 
   const resetRevocation = revokeCeremony.reset;
   const openRevocation = useCallback(

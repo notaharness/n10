@@ -108,7 +108,7 @@ export class FakeBeam {
   /** The URL the latest `*.start` answered, or step 2's once sent. */
   currentUrl = '';
 
-  peerChanged(peer: FakePeer): void {
+  peerChanged(peer: FakePeer, push = true): void {
     const next = {
       alias: null,
       state: 'connected' as const,
@@ -116,7 +116,7 @@ export class FakeBeam {
       ...peer,
     };
     this.peers.set(peer.peerId, next);
-    this.emit('peer', this.view(next));
+    if (push) this.emit('peer', this.view(next));
   }
 
   /** beam's transport comes up, and the held subscribes are answered. */

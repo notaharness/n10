@@ -1,7 +1,12 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/fake-beam.js';
 import { SELF_PEER_ID, WORKBOX, type FakeBeam } from './setup/fake-beam.js';
-import { fleetView, collapseFleet, openFleet } from './setup/machines.js';
+import {
+  fleetView,
+  fleetToggle,
+  collapseFleet,
+  openFleet,
+} from './setup/machines.js';
 
 /**
  * This machine's fleet identity and what hangs off it
@@ -97,8 +102,10 @@ test.describe('An enrolled machine', () => {
       fleetView(page).getByTestId('add-machine-panel')
     ).toBeVisible();
     beam!.peerChanged({ peerId: WORKBOX, label: 'renamed', state: 'offline' });
-    await collapseFleet(page);
-    await add.click();
+    await expect(fleetToggle(page)).toContainText('1 offline');
+    await expect(page.getByText('renamed joined', { exact: true })).toHaveCount(
+      0
+    );
     await expect(
       fleetView(page).getByTestId('add-machine-panel')
     ).toBeVisible();
@@ -114,6 +121,28 @@ test.describe('An enrolled machine', () => {
     await expect(
       fleetView(page).getByRole('button', { name: 'Done' })
     ).toHaveCount(0);
+  });
+  test('adding completes from the fallback poll without a push', async ({
+    desktop,
+    beam,
+  }) => {
+    const { page } = desktop;
+    await page.clock.install();
+    await page.reload();
+    await page
+      .getByRole('button', { name: 'Add a machine', exact: true })
+      .click();
+    await expect(
+      fleetView(page).getByTestId('add-machine-panel')
+    ).toBeVisible();
+    beam!.peerChanged({ peerId: 'b'.repeat(32), label: 'polledbox' }, false);
+    await page.clock.fastForward('05:01');
+    await expect(fleetView(page).getByTestId('add-machine-panel')).toHaveCount(
+      0
+    );
+    await expect(
+      page.getByTestId('machine-row').filter({ hasText: 'polledbox' })
+    ).toBeVisible();
   });
 });
 

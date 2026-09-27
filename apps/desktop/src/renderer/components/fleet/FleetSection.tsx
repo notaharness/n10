@@ -39,8 +39,7 @@ function useAwaitingPasskey(): boolean {
  * sidebar and the repository picker's show the same section.
  */
 export function FleetSection() {
-  const { section, adding, setAdding, reset, enrolment, revocation } =
-    useFleet();
+  const { section, setAdding, reset, enrolment, revocation } = useFleet();
   const { expanded, setExpanded, revealSeq, takeRevealFocus } = section;
   const beam = useBeamStatus().data;
   const machines = useMachines().data;
@@ -102,7 +101,6 @@ export function FleetSection() {
                 enrolment.ceremony.view !== null ||
                 revocation.ceremony.running
               }
-              aria-expanded={adding && expanded}
               onClick={() => {
                 setAdding(true);
                 setExpanded(true);

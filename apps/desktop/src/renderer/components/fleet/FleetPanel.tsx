@@ -205,12 +205,8 @@ export function FleetPanel() {
   const status = useBeamStatus();
   const machines = useMachines();
   const retry = () => {
-    void qc
-      .invalidateQueries({ queryKey: keys.beamStatus })
-      .catch(() => undefined);
-    void qc
-      .invalidateQueries({ queryKey: keys.machines })
-      .catch(() => undefined);
+    void qc.invalidateQueries({ queryKey: keys.beamStatus });
+    void qc.invalidateQueries({ queryKey: keys.machines });
   };
 
   const beam = status.data;
