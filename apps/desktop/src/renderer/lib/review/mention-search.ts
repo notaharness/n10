@@ -68,6 +68,19 @@ export function useMentionSearch(
  * box, and nothing while it is still being asked — not the pause before
  * the question, and not an earlier answer shown in its place.
  */
+/**
+ * The mention is already one of the people offered, typed out in full
+ * (`@alex` when `alex` is offered): there is nothing left to choose, so
+ * the list gets out of the way. Typing on reopens it.
+ */
+export function typedInFull(
+  query: string,
+  people: readonly MentionCandidate[]
+): boolean {
+  const q = query.toLowerCase();
+  return people.some((p) => p.handle.toLowerCase() === q);
+}
+
 export function offered(
   asked: string | null,
   query: string | null,

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { DurableDraft } from '../../../lib/review/review-drafts.js';
 import { Button } from '../../ui/button.js';
 import { Textarea } from '../../ui/textarea.js';
+import { Popover, PopoverAnchor } from '../../ui/popover.js';
 import { ToggleGroup, ToggleGroupItem } from '../../ui/toggle-group.js';
 import { CommentMarkdown } from './CommentMarkdown.js';
 import { displayMentions } from '../../../lib/review/mention-query.js';
@@ -110,18 +111,22 @@ export function CommentComposer({
         </ToggleGroup>
       </div>
       <div className="flex flex-col gap-2 p-3">
-        <Textarea
-          ref={box}
-          hidden={mode === 'preview'}
-          {...mentions.inputProps}
-          aria-label="Comment"
-          value={draft.body}
-          onChange={(e) => draft.setBody(e.target.value)}
-          onBlur={draft.flush}
-          placeholder={placeholder}
-          className="min-h-24 bg-background"
-        />
-        {mode === 'write' && mentions.list}
+        <Popover open={mode === 'write' && mentions.open}>
+          <PopoverAnchor asChild>
+            <Textarea
+              ref={box}
+              hidden={mode === 'preview'}
+              {...mentions.inputProps}
+              aria-label="Comment"
+              value={draft.body}
+              onChange={(e) => draft.setBody(e.target.value)}
+              onBlur={draft.flush}
+              placeholder={placeholder}
+              className="min-h-24 bg-background"
+            />
+          </PopoverAnchor>
+          {mode === 'write' && mentions.list}
+        </Popover>
         {mode === 'preview' && (
           <div className="min-h-24 rounded-md border border-border bg-background px-3 py-2">
             {empty ? (

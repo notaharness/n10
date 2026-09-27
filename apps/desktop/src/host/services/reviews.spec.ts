@@ -35,9 +35,9 @@ vi.mock('@n10/core', () => ({
   createPullRequestCache: () => ({
     readPullRequests: () => Promise.resolve({}),
   }),
-  fetchDiffText: (...args: unknown[]) => {
-    env.calls.push({ method: 'fetchDiffText', args });
-    return Promise.resolve('diff');
+  fetchReviewDiff: (...args: unknown[]) => {
+    env.calls.push({ method: 'fetchReviewDiff', args });
+    return Promise.resolve({ text: 'diff', head: 'a'.repeat(40) });
   },
   fetchFileDiffText: (...args: unknown[]) => {
     env.calls.push({ method: 'fetchFileDiffText', args });
@@ -264,9 +264,12 @@ describe('getReviewViewer', () => {
 describe('diffs', () => {
   it('reads from git without needing a provider at all', async () => {
     env.config = {};
-    expect(await getDiffText('feature', 'main')).toBe('diff');
+    expect(await getDiffText('feature', 'main')).toEqual({
+      text: 'diff',
+      head: 'a'.repeat(40),
+    });
     expect(await getFileDiffText('feature', 'main', 'a.ts')).toBe('file diff');
-    expect(called('fetchDiffText')[0].args).toEqual(['feature', 'main']);
+    expect(called('fetchReviewDiff')[0].args).toEqual(['feature', 'main']);
     expect(called('fetchFileDiffText')[0].args).toEqual([
       'feature',
       'main',

@@ -46,6 +46,7 @@ export interface DiffJumpHandle {
  */
 export function VirtualDiffList({
   files,
+  diffHead,
   threadsByFile,
   draftsByFile,
   generalThreads,
@@ -57,6 +58,8 @@ export function VirtualDiffList({
   jumpRef,
 }: {
   files: [string, DiffLine[]][];
+  /** The commit the diff was read at; what new comments anchor to. */
+  diffHead: string | null;
   threadsByFile: Map<string, RemoteCommentThread[]>;
   draftsByFile: Map<string, ReviewComment[]>;
   generalThreads: RemoteCommentThread[];
@@ -76,6 +79,7 @@ export function VirtualDiffList({
   const linesByFile = useMemo(() => new Map(files), [files]);
   const comments = useDiffComments({
     prId,
+    head: diffHead,
     linesByFile,
     split: options.view === 'split',
   });

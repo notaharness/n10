@@ -25,6 +25,7 @@ import {
   type DraftsRequest,
   type ReviewDrafts,
 } from './review-drafts.js';
+import { assertAnchoredAt } from './submit-anchors.js';
 import { withSubmitClaim } from './submit-claims.js';
 import {
   afterFailure,
@@ -93,6 +94,8 @@ export function parseSubmitReviewRequest(value: unknown): SubmitReviewRequest {
   };
 }
 
+export { DraftsOnOtherCommitError } from './submit-anchors.js';
+
 export async function submitReview(
   req: SubmitReviewRequest,
   src: SubmitSources
@@ -118,6 +121,7 @@ async function submitClaimed(
   const drafts = new DraftsFile(dir, req.ref, viewer);
   const file = drafts.read();
   const chosen = choose(file, req.draftIds);
+  assertAnchoredAt(chosen, req.head);
   // Comments an earlier attempt of this review already posted (Azure
   // DevOps shows each as it goes) say something too.
   const said = file.drafts.some(

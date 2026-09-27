@@ -20,6 +20,7 @@ export type {
   PullRequestConversationRead,
   PullRequestSnapshot,
   ReviewDraft,
+  ReviewDiffText,
   ReviewDrafts,
   SaveDraftRequest,
   SnapshotRequest,
