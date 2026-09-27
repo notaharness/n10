@@ -590,6 +590,7 @@ function rows(...specs: [string, boolean][]): CommentRow[] {
     where: 'w',
     preview: 'p',
     resolved,
+    resolvable: true,
     file: 'src/a.ts',
     line: i,
     fileRank: 0,

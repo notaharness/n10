@@ -10,6 +10,7 @@ import { Avatar } from '../../ui/avatar.js';
 import { Badge } from '../../ui/badge.js';
 import { Button } from '../../ui/button.js';
 import { CommentBody } from '../comments/CommentBody.js';
+import { useIsNew } from './new-since.js';
 
 /** "3h ago", with the exact time on hover and for assistive tech. */
 export function When({ at }: { at: string | null }) {
@@ -114,6 +115,7 @@ export function ActivityComment({
   /** Matches the reader's search. */
   highlighted?: boolean;
 }) {
+  const isNew = useIsNew();
   return (
     <div
       data-comment-id={comment.id}
@@ -134,6 +136,11 @@ export function ActivityComment({
           >
             · edited
           </span>
+        )}
+        {isNew(comment.id) && (
+          <Badge variant="outline" className="border-primary/40 text-primary">
+            New
+          </Badge>
         )}
         {comment.pending && (
           <Badge

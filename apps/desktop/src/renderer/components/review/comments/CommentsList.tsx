@@ -26,6 +26,9 @@ export interface CommentListItem {
   where: string;
   preview: string;
   resolved: boolean;
+  /** Whether it can be resolved at all: a general comment on GitHub
+   *  cannot, and is never counted as open. */
+  resolvable: boolean;
   severity?: CommentSeverity;
 }
 
@@ -61,7 +64,11 @@ export function CommentsList({
   threads?: ReadState<unknown>['kind'];
 }) {
   if (items.length === 0 && !notice) return null;
-  const openCount = items.filter((i) => !i.resolved).length;
+  // The same count as the header's and the Overview's: threads that can
+  // be resolved and are not. Drafts are counted apart.
+  const openCount = items.filter(
+    (i) => i.kind === 'thread' && i.resolvable && !i.resolved
+  ).length;
   const draftCount = items.filter((i) => i.kind === 'draft').length;
 
   return (

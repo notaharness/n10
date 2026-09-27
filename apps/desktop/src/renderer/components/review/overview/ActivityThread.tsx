@@ -8,6 +8,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import type { ConversationThread } from '../../../../host/contract.js';
 import { commentPreview } from '../../../lib/review/activity-text.js';
+import { foldReplies } from '../../../lib/review/reply-fold.js';
 import { matchingComments } from '../../../lib/review/activity-model.js';
 import {
   nativeStatus,
@@ -19,10 +20,7 @@ import { Button } from '../../ui/button.js';
 import { Tip } from '../../ui/tooltip.js';
 import { ThreadContext } from '../comments/ThreadContext.js';
 import { ActivityComment, ActorName } from './ActivityComment.js';
-
-/** Replies shown either side of a folded run in a long thread. */
-const KEEP_LAST = 2;
-const FOLD_AFTER = 4;
+import { useIsNew } from './new-since.js';
 
 function StatusBadges({ thread }: { thread: ConversationThread }) {
   const native = nativeStatus(thread);
@@ -105,6 +103,8 @@ function ThreadHeader({
   const Chevron = open ? ChevronDownIcon : ChevronRightIcon;
   const count = thread.comments.length;
   const root = thread.comments[0];
+  const isNew = useIsNew();
+  const arrived = thread.comments.filter((c) => isNew(c.id)).length;
   return (
     <header
       className={cn(
@@ -136,6 +136,9 @@ function ThreadHeader({
         )}
         <span className="ml-auto shrink-0 text-xs text-muted-foreground">
           {count} comment{count === 1 ? '' : 's'}
+          {arrived > 0 && (
+            <span className="font-medium text-primary"> · {arrived} new</span>
+          )}
         </span>
       </button>
       <span className="flex shrink-0 items-center gap-1">
@@ -189,7 +192,7 @@ function ThreadBody({
 }
 
 /** A long thread shows its first and last replies and folds the run
- *  between, unless a search is looking inside it. */
+ *  between; a reply a search matches shows wherever it is, marked. */
 function Replies({
   replies,
   matches,
@@ -198,57 +201,55 @@ function Replies({
   matches: Set<string>;
 }) {
   const [all, setAll] = useState(false);
-  const fold = !all && matches.size === 0 && replies.length > FOLD_AFTER;
-  const head = fold ? replies.slice(0, 1) : replies;
-  const tail = fold ? replies.slice(-KEEP_LAST) : [];
-  const hidden = replies.length - head.length - tail.length;
-  // Unfolding moves the reader to the first reply it shows, so focus
+  const keep = new Set(
+    replies.flatMap((c, i) => (matches.has(c.id) ? [i] : []))
+  );
+  const slots = all
+    ? replies.map((_, index) => ({ kind: 'reply' as const, index }))
+    : foldReplies(replies.length, keep);
+  // Unfolding moves the reader to the first reply it reveals, so focus
   // does not fall back to the page when the button goes.
+  const [revealed, setRevealed] = useState<number | null>(null);
   const first = useRef<HTMLDivElement>(null);
-  const revealed = useRef(false);
+  const pending = useRef(false);
   useEffect(() => {
-    if (!revealed.current) return;
-    revealed.current = false;
+    if (!pending.current) return;
+    pending.current = false;
     first.current?.focus();
   });
   return (
     <>
-      {head.map((c, i) =>
-        i === 1 && all ? (
+      {slots.map((slot) => {
+        if (slot.kind === 'gap') {
+          return (
+            <div key={`gap:${slot.from}`} className="px-3 py-1">
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0"
+                onClick={() => {
+                  pending.current = true;
+                  setRevealed(slot.from);
+                  setAll(true);
+                }}
+              >
+                Show {slot.count} more repl{slot.count === 1 ? 'y' : 'ies'}
+              </Button>
+            </div>
+          );
+        }
+        const c = replies[slot.index]!;
+        return (
           <div
             key={c.id}
-            ref={first}
-            tabIndex={-1}
+            ref={slot.index === revealed ? first : undefined}
+            tabIndex={slot.index === revealed ? -1 : undefined}
             className="outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           >
             <ActivityComment comment={c} highlighted={matches.has(c.id)} />
           </div>
-        ) : (
-          <ActivityComment
-            key={c.id}
-            comment={c}
-            highlighted={matches.has(c.id)}
-          />
-        )
-      )}
-      {fold && (
-        <div className="px-3 py-1">
-          <Button
-            variant="link"
-            size="sm"
-            className="h-auto p-0"
-            onClick={() => {
-              revealed.current = true;
-              setAll(true);
-            }}
-          >
-            Show {hidden} more repl{hidden === 1 ? 'y' : 'ies'}
-          </Button>
-        </div>
-      )}
-      {tail.map((c) => (
-        <ActivityComment key={c.id} comment={c} />
-      ))}
+        );
+      })}
     </>
   );
 }

@@ -55,23 +55,46 @@ function time(at: string | null): number {
 }
 
 /**
- * A review with no verdict and no summary says nothing its comments do
- * not. GitHub files one for every reply made from a thread; the replies
- * are read in their threads.
+ * A review whose comments are all replies, with no verdict and no
+ * summary, only carries those replies, which are read in their threads.
+ * That is what the provider says about it — each comment names its
+ * review and what it answers — not a guess about why it was filed. A
+ * review that started threads keeps its row, summary or not.
  */
-function saysSomething(review: ReviewSummary): boolean {
-  return review.state !== 'commented' || review.body.trim() !== '';
+function onlyCarriesReplies(
+  review: ReviewSummary,
+  byReview: ReadonlyMap<string, ConversationComment[]>
+): boolean {
+  if (review.state !== 'commented' || review.body.trim() !== '') return false;
+  const comments = byReview.get(review.id) ?? [];
+  return comments.length > 0 && comments.every((c) => c.replyTo != null);
+}
+
+function commentsByReview(
+  threads: readonly ConversationThread[]
+): Map<string, ConversationComment[]> {
+  const out = new Map<string, ConversationComment[]>();
+  for (const t of threads) {
+    for (const c of t.comments) {
+      if (!c.reviewId) continue;
+      out.set(c.reviewId, [...(out.get(c.reviewId) ?? []), c]);
+    }
+  }
+  return out;
 }
 
 /** Every record of the conversation, oldest first. */
 export function buildActivity(c: PullRequestConversation): ActivityEntry[] {
+  const byReview = commentsByReview(c.threads);
   const entries: ActivityEntry[] = [
-    ...c.reviews.filter(saysSomething).map((review) => ({
-      kind: 'review' as const,
-      id: review.id,
-      at: review.submittedAt,
-      review,
-    })),
+    ...c.reviews
+      .filter((r) => !onlyCarriesReplies(r, byReview))
+      .map((review) => ({
+        kind: 'review' as const,
+        id: review.id,
+        at: review.submittedAt,
+        review,
+      })),
     ...c.comments.map((comment) => ({
       kind: 'comment' as const,
       id: comment.id,
