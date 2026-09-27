@@ -100,7 +100,8 @@
           }
         ],
         "outputs": [
-          "{projectRoot}/.next/types"
+          "{projectRoot}/.next/types",
+          "{projectRoot}/next-env.d.ts"
         ],
         "options": {
           "command": "next typegen",
