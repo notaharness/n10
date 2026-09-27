@@ -12,6 +12,7 @@ import {
   filterCounts,
   groupActivity,
   matchingComments,
+  rowContaining,
   selectActivity,
   splitNew,
 } from './activity-model.js';
@@ -93,11 +94,11 @@ function review(id: string, author: string, at: string | null): ReviewSummary {
   };
 }
 
-function commit(id: string, at: string): ConversationEvent {
+function commit(id: string, at: string, author = 'alex'): ConversationEvent {
   return {
     id,
     kind: 'commit',
-    actor: person('alex'),
+    actor: person(author),
     at,
     native: 'PullRequestCommit',
     commit: id.padEnd(40, '0'),
@@ -106,9 +107,21 @@ function commit(id: string, at: string): ConversationEvent {
   };
 }
 
-function system(id: string, at: string): ConversationEvent {
-  return { id, kind: 'system', actor: null, at, native: 'x', text: 'noise' };
+function system(
+  id: string,
+  at: string,
+  actor: ConversationActor | null = null
+): ConversationEvent {
+  return { id, kind: 'system', actor, at, native: 'x', text: 'noise' };
 }
+
+/** An Azure DevOps pull request's conversation shape. */
+const ADO_REF = {
+  provider: 'azure-devops',
+  host: 'dev.azure.com/acme',
+  repository: 'Shop/web',
+  number: 7,
+};
 
 function conversation(
   over: Partial<PullRequestConversation>
@@ -150,6 +163,20 @@ describe('buildActivity', () => {
     expect(entries.map((e) => e.id)).toEqual(['g1', 'c1', 't1', 'r1']);
   });
 
+  it('leaves out a review that says nothing its comments do not', () => {
+    // GitHub files an empty COMMENTED review for each reply from a thread.
+    const entries = buildActivity(
+      conversation({
+        reviews: [
+          { ...review('empty', 'bea', T(1)), state: 'commented', body: ' ' },
+          { ...review('said', 'bea', T(2)), state: 'commented' },
+          { ...review('verdict', 'bea', T(3)), body: '' },
+        ],
+      })
+    );
+    expect(entries.map((e) => e.id)).toEqual(['said', 'verdict']);
+  });
+
   it('puts an undated review (the viewer’s pending one) last', () => {
     const entries = buildActivity(
       conversation({
@@ -162,7 +189,7 @@ describe('buildActivity', () => {
 });
 
 describe('groupActivity', () => {
-  it('reads commits in a row as one push, and a lone commit as itself', () => {
+  it('reads one author’s commits in a row as one entry, and a lone commit as itself', () => {
     const rows = groupActivity(
       buildActivity(
         conversation({
@@ -173,6 +200,21 @@ describe('groupActivity', () => {
     );
     expect(rows.map((r) => r.kind)).toEqual(['commits', 'comment', 'event']);
     expect(rows[0]).toMatchObject({ events: [{ id: 'a' }, { id: 'b' }] });
+  });
+
+  it('never credits one author’s commits to another', () => {
+    const rows = groupActivity(
+      buildActivity(
+        conversation({
+          events: [
+            commit('a', T(1)),
+            commit('b', T(2), 'bea'),
+            commit('c', T(3), 'bea'),
+          ],
+        })
+      )
+    );
+    expect(rows.map((r) => r.id)).toEqual(['a', 'commits:b']);
   });
 
   it('folds bot comments and provider noise, and keeps people’s entries apart', () => {
@@ -192,6 +234,44 @@ describe('groupActivity', () => {
     expect(rows[0]).toMatchObject({
       entries: [{ id: 'bot1' }, { id: 's1' }, { id: 'bot2' }],
     });
+  });
+
+  it('keeps history a person made in view, whatever the provider calls it', () => {
+    // Azure's ReviewersUpdate is a system entry with a human actor.
+    const rows = groupActivity(
+      buildActivity(
+        conversation({
+          ref: ADO_REF,
+          events: [
+            system('reviewers', T(1), person('bea@acme.com')),
+            system(
+              'merge-check',
+              T(2),
+              person('Project Build Service', 'system')
+            ),
+          ],
+        })
+      )
+    );
+    expect(rows.map((r) => r.kind)).toEqual(['event', 'automation']);
+  });
+
+  it('finds the row that shows an entry, folded or not', () => {
+    const rows = groupActivity(
+      buildActivity(
+        conversation({
+          events: [commit('a', T(1)), commit('b', T(2))],
+          comments: [
+            comment('bot', 'ci-bot', 'coverage', T(3), 'bot'),
+            comment('g1', 'bea', 'hi', T(4)),
+          ],
+        })
+      )
+    );
+    expect(rowContaining(rows, 'b')).toBe('commits:a');
+    expect(rowContaining(rows, 'bot')).toBe('auto:bot');
+    expect(rowContaining(rows, 'g1')).toBe('g1');
+    expect(rowContaining(rows, 'gone')).toBeNull();
   });
 });
 
@@ -224,9 +304,8 @@ describe('selectActivity', () => {
     expect(ids('outdated')).toEqual(['old']);
   });
 
-  it('finds what the viewer wrote, and where they are mentioned by login', () => {
+  it('finds what the viewer wrote', () => {
     expect(ids('mine')).toEqual(['done', 'r1']);
-    expect(ids('mentions')).toEqual(['ping']);
   });
 
   it('counts each filter', () => {
@@ -236,7 +315,6 @@ describe('selectActivity', () => {
       resolved: 1,
       outdated: 1,
       mine: 2,
-      mentions: 1,
     });
   });
 
@@ -248,6 +326,72 @@ describe('selectActivity', () => {
     expect(ids('all', 'STALE')).toEqual(['old']);
     expect(ids('all', 'request.ts')).toEqual(['open', 'done', 'old']);
     expect(ids('all', 'alex')).toEqual(['ping', 'email', 'code']);
+  });
+
+  it('searches the words an event line shows', () => {
+    const events = buildActivity(
+      conversation({
+        events: [
+          {
+            id: 'rr',
+            kind: 'review-requested',
+            actor: person('alex'),
+            at: T(1),
+            native: 'ReviewRequestedEvent',
+            reviewer: { kind: 'team', name: 'Core', handle: 'acme/core' },
+          },
+        ],
+      })
+    );
+    expect(
+      selectActivity(events, 'all', 'requested review', null)
+    ).toHaveLength(1);
+  });
+});
+
+describe('an Azure DevOps conversation', () => {
+  const entries = buildActivity(
+    conversation({
+      ref: ADO_REF,
+      threads: [
+        thread(
+          'general',
+          [comment('g', 'bea@acme.com', 'Overall fine', T(1))],
+          {
+            scope: 'general',
+            anchor: null,
+          }
+        ),
+        thread('fixed', [comment('f', 'bea@acme.com', 'typo', T(2))], {
+          status: { resolved: true, native: 'fixed', resolvedBy: null },
+        }),
+        thread('wontfix', [comment('w', 'bea@acme.com', 'rename?', T(3))], {
+          status: { resolved: true, native: 'wontFix', resolvedBy: null },
+        }),
+      ],
+      events: [
+        {
+          id: 'vote',
+          kind: 'vote',
+          actor: person('me@acme.com'),
+          at: T(4),
+          native: 'VoteUpdate',
+          vote: 10,
+          text: null,
+        },
+      ],
+    })
+  );
+  const ids = (f: Parameters<typeof selectActivity>[1]) =>
+    selectActivity(entries, f, '', 'ME@acme.com').map((e) => e.id);
+
+  it('files general threads by their status like any other', () => {
+    expect(ids('open')).toEqual(['general']);
+    expect(ids('resolved')).toEqual(['fixed', 'wontfix']);
+  });
+
+  it('counts only what the viewer wrote as theirs, not their vote', () => {
+    expect(ids('mine')).toEqual([]);
   });
 });
 
@@ -279,13 +423,15 @@ describe('splitNew', () => {
     })
   );
 
-  it('shows everything before anything has been seen', () => {
-    expect(splitNew(entries, null).held).toEqual([]);
-  });
-
   it('holds back what arrived after the reader started reading', () => {
-    const { shown, held } = splitNew(entries, new Set(['a']));
+    const { shown, held } = splitNew(entries, new Set(['a']), 'me');
     expect(shown.map((e) => e.id)).toEqual(['a']);
     expect(held.map((e) => e.id)).toEqual(['b']);
+  });
+
+  it('shows what the reader wrote themselves at once', () => {
+    const { shown, held } = splitNew(entries, new Set(['a']), 'BEA');
+    expect(shown.map((e) => e.id)).toEqual(['a', 'b']);
+    expect(held).toEqual([]);
   });
 });

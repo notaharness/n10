@@ -6,15 +6,16 @@ import type {
   PullRequestConversation,
   ReviewSummary,
 } from '../../../host/contract.js';
+import { eventSentence } from './activity-text.js';
 
 /**
  * A pull request's conversation as one chronological activity list.
  *
  * Order is the provider's time for each record, oldest first, so a
- * reply is read after what it answers. Automation — bot comments and
- * provider history with no specific reading — collapses into one
- * disclosure between the human entries, and a run of commits into one
- * push. Filters and search select entries; they never reorder them.
+ * reply is read after what it answers. Automation — what a bot or the
+ * provider itself wrote — collapses into one disclosure between the
+ * human entries, and one author's commits in a row into one entry.
+ * Filters and search select entries; they never reorder them.
  */
 
 export type ActivityEntry =
@@ -45,13 +46,7 @@ export type ActivityRow =
       entries: ActivityEntry[];
     };
 
-export type ActivityFilter =
-  | 'all'
-  | 'open'
-  | 'resolved'
-  | 'outdated'
-  | 'mine'
-  | 'mentions';
+export type ActivityFilter = 'all' | 'open' | 'resolved' | 'outdated' | 'mine';
 
 function time(at: string | null): number {
   const t = at == null ? NaN : Date.parse(at);
@@ -59,10 +54,19 @@ function time(at: string | null): number {
   return Number.isNaN(t) ? Infinity : t;
 }
 
+/**
+ * A review with no verdict and no summary says nothing its comments do
+ * not. GitHub files one for every reply made from a thread; the replies
+ * are read in their threads.
+ */
+function saysSomething(review: ReviewSummary): boolean {
+  return review.state !== 'commented' || review.body.trim() !== '';
+}
+
 /** Every record of the conversation, oldest first. */
 export function buildActivity(c: PullRequestConversation): ActivityEntry[] {
   const entries: ActivityEntry[] = [
-    ...c.reviews.map((review) => ({
+    ...c.reviews.filter(saysSomething).map((review) => ({
       kind: 'review' as const,
       id: review.id,
       at: review.submittedAt,
@@ -106,16 +110,31 @@ function actorOf(entry: ActivityEntry): ConversationActor | null {
   }
 }
 
-/** Written by a bot or by the provider itself, or history the reader
- *  has no specific reading for. */
+/** Written by a bot or by the provider itself. History a person made
+ *  is theirs, whatever the provider calls it. */
 export function isAutomation(entry: ActivityEntry): boolean {
-  if (entry.kind === 'event' && entry.event.kind === 'system') return true;
-  const kind = actorOf(entry)?.kind;
-  return kind === 'bot' || kind === 'system';
+  const actor = actorOf(entry);
+  if (!actor) return entry.kind === 'event' && entry.event.kind === 'system';
+  return actor.kind === 'bot' || actor.kind === 'system';
 }
 
-/** Commits in a row read as one push; bot and provider noise in a row
- *  reads as one disclosure. */
+/** Who wrote a commit, as far as the provider says. */
+function commitAuthor(e: CommitEvent): string | null {
+  const actor: ConversationActor | null = e.actor;
+  return actor ? actor.identifier.toLowerCase() : e.authorName ?? null;
+}
+
+function sameAuthor(
+  row: ActivityRow | undefined,
+  e: CommitEvent
+): row is Extract<ActivityRow, { kind: 'commits' }> {
+  if (row?.kind !== 'commits') return false;
+  const author = commitAuthor(e);
+  return author != null && commitAuthor(row.events[0]!) === author;
+}
+
+/** One author's commits in a row read as one entry; bot and provider
+ *  noise in a row reads as one disclosure. */
 export function groupActivity(
   entries: readonly ActivityEntry[]
 ): ActivityRow[] {
@@ -123,7 +142,7 @@ export function groupActivity(
   for (const entry of entries) {
     const last = rows.at(-1);
     if (entry.kind === 'event' && entry.event.kind === 'commit') {
-      if (last?.kind === 'commits') last.events.push(entry.event);
+      if (sameAuthor(last, entry.event)) last.events.push(entry.event);
       else rows.push(commitsRow(entry.event));
     } else if (isAutomation(entry)) {
       if (last?.kind === 'automation') last.entries.push(entry);
@@ -158,6 +177,19 @@ function unwrapSingle(row: ActivityRow): ActivityRow {
   return { kind: 'event', id: event.id, at: event.at, event };
 }
 
+/** The id of the row that shows entry `id`, folded or not. */
+export function rowContaining(
+  rows: readonly ActivityRow[],
+  id: string
+): string | null {
+  const row = rows.find((r) => {
+    if (r.kind === 'commits') return r.events.some((e) => e.id === id);
+    if (r.kind === 'automation') return r.entries.some((e) => e.id === id);
+    return r.id === id;
+  });
+  return row?.id ?? null;
+}
+
 // ── Filters and search ────────────────────────────────────────────
 
 function sameAccount(a: ConversationActor | null, viewer: string): boolean {
@@ -170,31 +202,9 @@ function textsOf(entry: ActivityEntry): ConversationComment[] {
   return [];
 }
 
-/** Markdown with its code taken out: GitHub does not mention anyone
- *  from inside a code block or span. */
-function prose(source: string): string {
-  return source.replace(/```[\s\S]*?(```|$)/g, '').replace(/`[^`\n]*`/g, '');
-}
-
-/** Whether the markdown mentions `@login`, as GitHub reads one. */
-function mentions(source: string, viewer: string): boolean {
-  const escaped = viewer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(^|[^\\w@])@${escaped}(?![\\w-])`, 'i').test(
-    prose(source)
-  );
-}
-
 function isMine(entry: ActivityEntry, viewer: string): boolean {
   if (entry.kind === 'review') return sameAccount(entry.review.author, viewer);
   return textsOf(entry).some((c) => sameAccount(c.author, viewer));
-}
-
-function mentionsViewer(entry: ActivityEntry, viewer: string): boolean {
-  const sources =
-    entry.kind === 'review'
-      ? [entry.review.source]
-      : textsOf(entry).map((c) => c.source);
-  return sources.some((s) => mentions(s, viewer));
 }
 
 const THREAD_FILTERS: Partial<
@@ -213,10 +223,7 @@ export function matchesFilter(
   if (filter === 'all') return true;
   const byThread = THREAD_FILTERS[filter];
   if (byThread) return entry.kind === 'thread' && byThread(entry.thread);
-  if (!viewer) return false;
-  return filter === 'mine'
-    ? isMine(entry, viewer)
-    : mentionsViewer(entry, viewer);
+  return viewer != null && isMine(entry, viewer);
 }
 
 /** The comments of an entry that contain `query`, for a thread to open
@@ -236,18 +243,10 @@ export function matchingComments(
   );
 }
 
+/** The words an event line shows, and the full commit id behind it. */
 function eventText(event: ConversationEvent): string {
-  switch (event.kind) {
-    case 'commit':
-      return `${event.headline ?? ''} ${event.commit}`;
-    case 'vote':
-    case 'push':
-    case 'status-changed':
-    case 'system':
-      return event.text ?? '';
-    default:
-      return '';
-  }
+  const commit = event.kind === 'commit' ? event.commit : '';
+  return `${eventSentence(event)} ${commit}`;
 }
 
 export function matchesQuery(entry: ActivityEntry, query: string): boolean {
@@ -286,7 +285,6 @@ export function filterCounts(
     resolved: count('resolved'),
     outdated: count('outdated'),
     mine: count('mine'),
-    mentions: count('mentions'),
   };
 }
 
@@ -296,15 +294,20 @@ export function filterCounts(
  * What the reader has been shown, and what arrived since. Entries that
  * appear on a refresh are held back behind "N new updates" instead of
  * sliding into the list under the reader; replies inside a thread they
- * already see are part of that thread and show at once.
+ * already see are part of that thread and show at once. What the
+ * reader wrote themselves is expected, and shows at once too.
  */
 export function splitNew(
   entries: readonly ActivityEntry[],
-  seen: ReadonlySet<string> | null
+  seen: ReadonlySet<string>,
+  viewer: string | null
 ): { shown: ActivityEntry[]; held: ActivityEntry[] } {
-  if (!seen) return { shown: [...entries], held: [] };
   const shown: ActivityEntry[] = [];
   const held: ActivityEntry[] = [];
-  for (const e of entries) (seen.has(e.id) ? shown : held).push(e);
+  for (const e of entries) {
+    const known =
+      seen.has(e.id) || (viewer != null && sameAccount(actorOf(e), viewer));
+    (known ? shown : held).push(e);
+  }
   return { shown, held };
 }

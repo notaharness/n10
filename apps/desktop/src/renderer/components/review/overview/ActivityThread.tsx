@@ -5,8 +5,10 @@ import {
   CodeXmlIcon,
   MessageSquareIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { commentBodyParts } from '@n10/review-comments/conventional';
 import type { ConversationThread } from '../../../../host/contract.js';
+import { firstNonEmptyLine } from '../../../lib/diff/thread-model.js';
 import { matchingComments } from '../../../lib/review/activity-model.js';
 import {
   nativeStatus,
@@ -61,8 +63,18 @@ export function ActivityThread({
     { kind: 'thread', id: thread.id, at: null, thread },
     query
   );
-  const [expanded, setExpanded] = useState<boolean | null>(null);
-  const open = matches.size > 0 || (expanded ?? !thread.status.resolved);
+  // Folded as it was when first shown: a thread someone resolves while
+  // it is being read stays open rather than moving the list.
+  const [expanded, setExpanded] = useState(() => !thread.status.resolved);
+  // A search opens the threads it matches; folding one again holds for
+  // that search only.
+  const [foldedFor, setFoldedFor] = useState<string | null>(null);
+  const searching = matches.size > 0;
+  const open = searching ? foldedFor !== query : expanded;
+  const toggle = () => {
+    if (searching) setFoldedFor(open ? query : null);
+    else setExpanded(!open);
+  };
   return (
     <article
       data-thread-id={thread.id}
@@ -71,7 +83,7 @@ export function ActivityThread({
       <ThreadHeader
         thread={thread}
         open={open}
-        onToggle={() => setExpanded(!open)}
+        onToggle={toggle}
         onOpen={onOpen}
       />
       {open && <ThreadBody thread={thread} matches={matches} />}
@@ -93,6 +105,7 @@ function ThreadHeader({
   const place = threadPlace(thread) ?? 'Conversation';
   const Chevron = open ? ChevronDownIcon : ChevronRightIcon;
   const count = thread.comments.length;
+  const root = thread.comments[0];
   return (
     <header
       className={cn(
@@ -109,7 +122,19 @@ function ThreadHeader({
       >
         <Chevron className="size-3.5 shrink-0 text-muted-foreground" />
         <MessageSquareIcon className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="truncate font-mono text-xs">{place}</span>
+        {root?.author && (
+          <span className="shrink-0 font-medium">
+            {root.author.displayName}
+          </span>
+        )}
+        <span className="truncate font-mono text-xs text-muted-foreground">
+          {place}
+        </span>
+        {!open && root && (
+          <span className="min-w-0 truncate text-muted-foreground">
+            — {firstNonEmptyLine(commentBodyParts(root.body).body)}
+          </span>
+        )}
         <span className="ml-auto shrink-0 text-xs text-muted-foreground">
           {count} comment{count === 1 ? '' : 's'}
         </span>
@@ -155,8 +180,9 @@ function ThreadBody({
       </div>
       {!coverage.complete && (
         <p className="border-t border-border px-3 py-1.5 text-xs text-warning">
-          Showing {coverage.loaded} of {coverage.total ?? 'more'} comments; the
-          rest did not load.
+          {coverage.total == null
+            ? `Showing the first ${coverage.loaded} comments; the rest did not load.`
+            : `Showing ${coverage.loaded} of ${coverage.total} comments; the rest did not load.`}
         </p>
       )}
     </div>
@@ -177,22 +203,45 @@ function Replies({
   const head = fold ? replies.slice(0, 1) : replies;
   const tail = fold ? replies.slice(-KEEP_LAST) : [];
   const hidden = replies.length - head.length - tail.length;
+  // Unfolding moves the reader to the first reply it shows, so focus
+  // does not fall back to the page when the button goes.
+  const first = useRef<HTMLDivElement>(null);
+  const revealed = useRef(false);
+  useEffect(() => {
+    if (!revealed.current) return;
+    revealed.current = false;
+    first.current?.focus();
+  });
   return (
     <>
-      {head.map((c) => (
-        <ActivityComment
-          key={c.id}
-          comment={c}
-          highlighted={matches.has(c.id)}
-        />
-      ))}
+      {head.map((c, i) =>
+        i === 1 && all ? (
+          <div
+            key={c.id}
+            ref={first}
+            tabIndex={-1}
+            className="outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          >
+            <ActivityComment comment={c} highlighted={matches.has(c.id)} />
+          </div>
+        ) : (
+          <ActivityComment
+            key={c.id}
+            comment={c}
+            highlighted={matches.has(c.id)}
+          />
+        )
+      )}
       {fold && (
         <div className="px-3 py-1">
           <Button
             variant="link"
             size="sm"
             className="h-auto p-0"
-            onClick={() => setAll(true)}
+            onClick={() => {
+              revealed.current = true;
+              setAll(true);
+            }}
           >
             Show {hidden} more repl{hidden === 1 ? 'y' : 'ies'}
           </Button>
