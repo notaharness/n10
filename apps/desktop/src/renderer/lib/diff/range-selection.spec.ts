@@ -4,6 +4,7 @@ import {
   across,
   extend,
   extendOnScreen,
+  shownIn,
   isSelected,
   neighbour,
   rangeSource,
@@ -110,6 +111,20 @@ describe('a range covers only what is highlighted', () => {
     expect(extendOnScreen(unified, select(L(18)), R(19))).toEqual(
       select(R(19))
     );
+  });
+});
+
+describe('a selection across a change of view', () => {
+  const lines = [ctx(17, 17), del(18), del(19), add(18), ctx(20, 19)];
+
+  it('keeps new-side ranges and runs of removed lines in Unified', () => {
+    expect(shownIn(extend(select(R(17)), R(19)), false, lines)).toBe(true);
+    expect(shownIn(extend(select(L(18)), L(19)), false, lines)).toBe(true);
+  });
+
+  it('drops an old-side range over unchanged lines in Unified', () => {
+    expect(shownIn(extend(select(L(17)), L(18)), false, lines)).toBe(false);
+    expect(shownIn(extend(select(L(17)), L(18)), true, lines)).toBe(true);
   });
 });
 

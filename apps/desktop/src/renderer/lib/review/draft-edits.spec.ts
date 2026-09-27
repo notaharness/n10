@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ReviewDraft } from '../../../host/contract.js';
-import { DraftEdits, editKey, type SaveRequest } from './draft-edits.js';
+import {
+  DraftEdits,
+  editKey,
+  withDraft,
+  type SaveRequest,
+} from './draft-edits.js';
 
 const REF = {
   provider: 'github',
@@ -175,5 +180,34 @@ describe('DraftEdits', () => {
     h.elapse();
     expect(h.saves).toHaveLength(0);
     expect(h.edits.get(key)).toEqual({ text: 'local', save: { kind: 'idle' } });
+  });
+});
+
+describe('the drafts list after a save', () => {
+  const inline = (key: string) => ({
+    kind: 'inline' as const,
+    key,
+    anchor: {
+      path: 'a.ts',
+      previousPath: null,
+      range: null,
+      head: null,
+      lines: [],
+    },
+  });
+  const stored = (key: string, body: string) =>
+    ({ target: inline(key), body } as unknown as ReviewDraft);
+
+  it('replaces a draft where it was, so drafts in one row keep their order', () => {
+    const list = [stored('a', 'one'), stored('b', 'two')];
+    expect(
+      withDraft(list, inline('a'), stored('a', 'one!')).map((d) => d.body)
+    ).toEqual(['one!', 'two']);
+  });
+
+  it('adds a new draft at the end and removes a deleted one', () => {
+    const list = [stored('a', 'one')];
+    expect(withDraft(list, inline('b'), stored('b', 'two'))).toHaveLength(2);
+    expect(withDraft(list, inline('a'), null)).toEqual([]);
   });
 });

@@ -79,7 +79,7 @@ export function VirtualDiffList({
     linesByFile,
     split: options.view === 'split',
   });
-  const { mineByFile } = comments;
+  const { mineByFile, mineCount } = comments;
 
   const flat = useMemo(
     () =>
@@ -91,6 +91,7 @@ export function VirtualDiffList({
         threadsByFile,
         draftsByFile,
         mineByFile,
+        mineCount,
         fileState,
       }),
     [
@@ -102,6 +103,7 @@ export function VirtualDiffList({
       threadsByFile,
       draftsByFile,
       mineByFile,
+      mineCount,
       fileState,
     ]
   );
@@ -192,28 +194,30 @@ export function VirtualDiffList({
     const focusIn = (
       selector: string,
       index: number | undefined,
-      // A card takes the keyboard only from a control that went away,
-      // never from where the reader is (a toast's Undo hands it back).
+      // A closing control hands the keyboard on only once it has gone;
+      // never take it from where the reader is (a toast's Undo gives it
+      // back itself).
       onlyIfLost = false
     ) => {
       const find = () =>
-        onlyIfLost && !focusIsLost()
-          ? null
-          : scrollRef.current?.querySelector<HTMLElement>(selector);
+        scrollRef.current?.querySelector<HTMLElement>(selector);
+      const free = () => !onlyIfLost || focusIsLost();
       const here = find();
       // A neighbour is almost always mounted: focus it now, so the
       // next key press already starts from it.
-      if (here) {
+      if (here && free()) {
         here.focus();
         here.scrollIntoView({ block: 'nearest' });
         return;
       }
       // Not in the list yet either (a card coming back on Undo): wait
       // for the render that adds it.
-      if (index != null) virtualizer.scrollToIndex(index, { align: 'auto' });
+      if (!here && index != null) {
+        virtualizer.scrollToIndex(index, { align: 'auto' });
+      }
       const retry = (left: number) => {
         const el = find();
-        if (el) el.focus();
+        if (el && free()) el.focus({ preventScroll: true });
         else if (left > 0) requestAnimationFrame(() => retry(left - 1));
       };
       requestAnimationFrame(() => retry(10));
@@ -222,10 +226,11 @@ export function VirtualDiffList({
     nav.current = {
       pointsOf: (f) => points.byFile.get(f) ?? [],
       rowOf: (p) => points.rowOf.get(pointKey(p)),
-      focus: (p) =>
+      focus: (p, onlyIfLost) =>
         focusIn(
           `${file(p.file)}[data-point="${pointId(p)}"]`,
-          points.rowOf.get(pointKey(p))
+          points.rowOf.get(pointKey(p)),
+          onlyIfLost
         ),
       focusFileComment: (f) =>
         focusIn(

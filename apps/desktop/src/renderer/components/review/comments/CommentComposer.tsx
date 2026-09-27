@@ -53,9 +53,14 @@ export function CommentComposer({
     if (takeFocus?.() ?? true) box.current?.focus();
   });
   const empty = !draft.body.trim();
+  // What the box held when it opened: emptying a saved draft and
+  // closing is a discard, and gets the same Undo.
+  const [opened] = useState(draft.body);
   const letGo = () => {
+    // `discard` and `clear` never reject.
+    if (opened.trim()) void draft.discard(onUndo, opened);
     // Whitespace is not a draft; leave nothing stored behind the Cancel.
-    if (draft.body) void draft.clear();
+    else if (draft.body) void draft.clear();
     onClose(false);
   };
   const close = () => {

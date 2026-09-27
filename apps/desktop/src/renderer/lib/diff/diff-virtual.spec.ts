@@ -247,7 +247,11 @@ describe("the reviewer's own drafts", () => {
   it('keeps a whole-file draft, and counts them all, while the file is collapsed', () => {
     const { rows, stats } = buildFlatDiff(
       [['a.ts', smallFile]],
-      options({ mineByFile, fileState: new Map([['a.ts', { open: false }]]) })
+      options({
+        mineByFile,
+        mineCount: new Map([['a.ts', 2]]),
+        fileState: new Map([['a.ts', { open: false }]]),
+      })
     );
     expect(rows.map((r) => r.kind)).toEqual(['file-header', 'file-drafts']);
     expect(stats.get('a.ts')?.mineCount).toBe(2);

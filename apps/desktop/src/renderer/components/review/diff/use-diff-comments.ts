@@ -19,12 +19,14 @@ import {
   samePoint,
   select,
   selectionRange,
+  shownIn,
   type LinePoint,
   type LineSelection,
 } from '../../../lib/diff/range-selection.js';
 import type { MyDraftsScope } from '../../../lib/review/my-drafts-context.js';
 import {
   byFile,
+  countByFile,
   inlineTargets,
   unstored,
   type InlineTarget,
@@ -37,13 +39,15 @@ import type { GutterProps } from './LineGutter.js';
 export interface LineNav {
   pointsOf: (file: string) => readonly LinePoint[];
   rowOf: (point: LinePoint) => number | undefined;
-  focus: (point: LinePoint) => void;
+  /** With `onlyIfLost`, only when the keyboard has nowhere to be. */
+  focus: (point: LinePoint, onlyIfLost?: boolean) => void;
   focusFileComment: (file: string) => void;
   focusDraft: (key: string) => void;
 }
 
 const VERTICAL = new Set(['ArrowDown', 'ArrowUp']);
 const SIDEWAYS = new Set(['ArrowLeft', 'ArrowRight']);
+const STOPPED = 'The range can’t grow further on this side';
 
 /**
  * The reviewer's own comments in the diff: which lines are selected,
@@ -63,28 +67,35 @@ export function useDiffComments({
   const { repo } = useRepo();
   const ref = pullRequestRefFor(repo, prId);
   const stored = useInlineDraftTargets(ref);
-  // A selection belongs to the view it was made in: an old-side range
-  // over unchanged lines, picked in Split, has nothing to show in Unified.
+  // `note` says why the last move did not extend the range.
   const [picked, setPicked] = useState<{
     sel: LineSelection;
-    split: boolean;
+    note?: string;
   } | null>(null);
-  const selection = picked?.split === split ? picked.sel : null;
+  // An old-side range over unchanged lines, picked in Split, has
+  // nothing to show in Unified; every other range shows in both.
+  const selection =
+    picked && shownIn(picked.sel, split, linesByFile.get(picked.sel.file) ?? [])
+      ? picked.sel
+      : null;
   const [fresh, setFresh] = useState<readonly InlineTarget[]>([]);
   const [editing, setEditingKeys] = useState<ReadonlySet<string>>(new Set());
   const opening = useRef(new Set<string>());
   const nav = useRef<LineNav | null>(null);
 
-  // Once a composer's draft is stored, the stored one stands for it.
-  const [storedSeen, setStoredSeen] = useState(stored);
-  if (storedSeen !== stored) {
-    setStoredSeen(stored);
-    setFresh((f) => unstored(f, stored));
+  // Once a closed composer's draft is stored, the stored one stands
+  // for it; an open composer keeps its own entry whatever is stored.
+  const [seen, setSeen] = useState({ stored, editing });
+  if (seen.stored !== stored || seen.editing !== editing) {
+    setSeen({ stored, editing });
+    setFresh((f) => unstored(f, stored, editing));
   }
   const mineByFile = useMemo(
     () => byFile(inlineTargets(stored, fresh)),
     [stored, fresh]
   );
+  // What is kept, not composers opened and still empty.
+  const mineCount = useMemo(() => countByFile(stored), [stored]);
 
   const setEditing = useCallback((key: string, on: boolean) => {
     if (on) opening.current.add(key);
@@ -95,12 +106,19 @@ export function useDiffComments({
       return next;
     });
   }, []);
+  const restore = useCallback(
+    (target: InlineTarget) =>
+      setFresh((f) =>
+        f.some((t) => t.key === target.key) ? f : [...f, target]
+      ),
+    []
+  );
 
   const setSelection = (
     next: (sel: LineSelection | null) => LineSelection | null
   ) => {
     const sel = next(selection);
-    setPicked(sel ? { sel, split } : null);
+    setPicked(sel ? { sel } : null);
   };
 
   const commentOn = (file: string, range: LineRange | null) => {
@@ -119,7 +137,7 @@ export function useDiffComments({
         lines: range ? rangeSource(lines, range) : [],
       },
     };
-    setFresh((f) => [...f, target]);
+    restore(target);
     setEditing(target.key, true);
     setPicked(null);
   };
@@ -134,7 +152,6 @@ export function useDiffComments({
   const step = (e: KeyboardEvent, point: LinePoint): LinePoint | null => {
     const points = pointsOf(point.file);
     if (SIDEWAYS.has(e.key)) {
-      if (!split) return null;
       const dir = e.key === 'ArrowRight' ? 1 : -1;
       return across(points, point, dir, (p) => nav.current?.rowOf(p));
     }
@@ -144,21 +161,31 @@ export function useDiffComments({
 
   const move = (e: KeyboardEvent, point: LinePoint) => {
     const next = step(e, point);
-    if (!next) return;
     const extending = e.shiftKey && VERTICAL.has(e.key);
-    const sel = extending
-      ? extendOnScreen(pointsOf(point.file), selection ?? select(point), next)
-      : select(next);
-    // A range stops where the lines on screen stop being consecutive.
-    if (!sel) return;
-    setPicked({ sel, split });
+    // Shift+Arrow grows the selection the focused line is in, or starts
+    // one there.
+    const from = isSelected(selection, point) ? selection! : select(point);
+    const sel =
+      next &&
+      (extending
+        ? extendOnScreen(pointsOf(point.file), from, next)
+        : select(next));
+    if (!next || !sel) {
+      if (!extending) return;
+      // A range stops where the lines on screen stop being consecutive;
+      // say so, or a screen reader hears nothing happen.
+      setPicked({ sel: from, note: STOPPED });
+      return;
+    }
+    setPicked({ sel });
     nav.current?.focus(next);
   };
 
   const onKey = (e: KeyboardEvent, point: LinePoint) => {
     // Alt and Mod chords belong to the diff's own navigation.
     if (e.altKey || e.metaKey || e.ctrlKey) return;
-    if (VERTICAL.has(e.key) || SIDEWAYS.has(e.key)) {
+    // Unified has no columns: Left/Right stay the list's to scroll.
+    if (VERTICAL.has(e.key) || (split && SIDEWAYS.has(e.key))) {
       e.preventDefault();
       move(e, point);
     } else if (e.key === 'Enter') {
@@ -207,26 +234,40 @@ export function useDiffComments({
   const scope: MyDraftsScope = {
     ref,
     editing,
-    setEditing,
+    openComposer: (target) => {
+      restore(target);
+      setEditing(target.key, true);
+    },
+    closeComposer: (key) => setEditing(key, false),
     takeFocus: (key) => opening.current.delete(key),
     dropFresh: (key) => setFresh((f) => f.filter((t) => t.key !== key)),
-    restore: (target) =>
-      setFresh((f) =>
-        f.some((t) => t.key === target.key) ? f : [...f, target]
-      ),
+    restore,
     linesOf: (path) => linesByFile.get(path),
     focusAnchor: ({ anchor }) => {
       const r = anchor.range;
       if (!r) return nav.current?.focusFileComment(anchor.path);
-      nav.current?.focus({ file: anchor.path, side: r.side, line: r.end });
+      const point = { file: anchor.path, side: r.side, line: r.end };
+      nav.current?.focus(point, true);
     },
     focusDraft: (key) => nav.current?.focusDraft(key),
   };
 
-  const announcement =
-    selection && range
-      ? `${rangeWords(range)} selected in ${selection.file}`
-      : '';
+  const announcement = announce(selection, picked?.note);
 
-  return { mineByFile, scope, gutterFor, commentOn, nav, announcement };
+  return {
+    mineByFile,
+    mineCount,
+    scope,
+    gutterFor,
+    commentOn,
+    nav,
+    announcement,
+  };
+}
+
+/** What the list's live region says about the selection. */
+function announce(sel: LineSelection | null, note: string | undefined) {
+  if (!sel) return '';
+  const said = `${rangeWords(selectionRange(sel))} selected in ${sel.file}`;
+  return note ? `${said}. ${note}` : said;
 }
