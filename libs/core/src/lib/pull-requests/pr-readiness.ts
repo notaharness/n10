@@ -10,7 +10,8 @@ import type {
  * Whether a pull request can complete, as its provider says, with the
  * provider's own facts that explain it: mergeability, the review
  * requirement, the head's checks and the target's rules. The verdict is
- * the provider's (`MergeState.blocked`); n10 adds none. It is unknown
+ * the provider's (`MergeState.blocked`), and a draft's own lifecycle;
+ * n10 adds none. It is unknown
  * where the provider has not worked it out, and where its own details
  * contradict it: conflicting information never reads as ready. Each
  * blocker names who can clear it, and what could not be read is listed
@@ -155,7 +156,10 @@ function conversationsTally(inputs: ReadinessInputs, t: Tally): void {
       ? inputs.rules.value.conversationResolution
       : null;
   if (open == null) {
-    if (enforced !== false) t.unknowns.push('Unresolved conversations');
+    // Moot where no rule asks, or the provider says it is clear.
+    if (enforced !== false && inputs.merge.blocked !== false) {
+      t.unknowns.push('Unresolved conversations');
+    }
     return;
   }
   if (open === 0) return;

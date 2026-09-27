@@ -243,7 +243,7 @@ const CONCLUSIONS = new Set([
 ]);
 
 /** A check as the checks read selects it (pr-checks.ts). */
-function contextNode(c) {
+function contextNode(c, index) {
   const isRequired = c.required ?? false;
   if (c.status) {
     return {
@@ -259,10 +259,9 @@ function contextNode(c) {
   const done = CONCLUSIONS.has(c.state);
   return {
     __typename: 'CheckRun',
-    // This check run's own id, stable for the scenario.
-    databaseId: repositoryNode(
-      `${c.workflow ?? 'CI'}:${c.event ?? ''}:${c.app ?? ''}:${c.name}`
-    ).databaseId,
+    // This check run's own id: its place in the scenario, so two runs
+    // of one name in one workflow stay two, as on GitHub.
+    databaseId: 9000 + index,
     name: c.name,
     status: done ? 'COMPLETED' : c.state,
     conclusion: done ? c.state : null,

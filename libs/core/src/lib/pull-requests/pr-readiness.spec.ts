@@ -156,6 +156,23 @@ describe('evaluateReadiness', () => {
     expect(
       evaluateReadiness(inputs({ unresolvedThreads: null })).unknowns
     ).toEqual([]);
+    // A rule does, but GitHub says it is clear: the count is moot.
+    const ruled: ReadOutcome<BranchRules> = {
+      state: 'read',
+      value: { requiredChecks: [], conversationResolution: true },
+    };
+    expect(
+      evaluateReadiness(inputs({ unresolvedThreads: null, rules: ruled }))
+    ).toMatchObject({ state: 'ready', unknowns: [] });
+    expect(
+      evaluateReadiness(
+        inputs({
+          unresolvedThreads: null,
+          rules: ruled,
+          merge: { ...CLEAN, blocked: true, native: 'BLOCKED' },
+        })
+      ).unknowns
+    ).toEqual(['Unresolved conversations']);
     // Unread rules, but GitHub says it is clear: whether they must be
     // resolved is moot.
     const rules = { state: 'failed', kind: 'auth', reason: 'denied' } as const;
