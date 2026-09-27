@@ -57,6 +57,12 @@ class FakeGitHub {
   }
 
   private answer(op: string, query: string, v: Record<string, unknown>) {
+    return op.startsWith('ReviewPublication')
+      ? this.read(op, v)
+      : this.write(op, query, v);
+  }
+
+  private read(op: string, v: Record<string, unknown>) {
     switch (op) {
       case 'ReviewPublicationState':
         return {
@@ -83,6 +89,13 @@ class FakeGitHub {
             ? { id: v['id'], state: this.states.get(String(v['id'])) }
             : null,
         };
+      default:
+        throw new Error(`unexpected ${op}`);
+    }
+  }
+
+  private write(op: string, query: string, v: Record<string, unknown>) {
+    switch (op) {
       case 'StartReview': {
         const id = this.id('PRR');
         this.pending = {
@@ -125,6 +138,15 @@ class FakeGitHub {
         return {
           updatePullRequestReviewComment: {
             pullRequestReviewComment: { id: c.id },
+          },
+        };
+      }
+      case 'DeleteReviewComment': {
+        const at = this.pending!.comments.findIndex((c) => c.id === v['id']);
+        this.pending!.comments.splice(at, 1);
+        return {
+          deletePullRequestReviewComment: {
+            pullRequestReview: { id: this.pending!.id },
           },
         };
       }
@@ -298,5 +320,20 @@ describe('publishing a GitHub review', () => {
     expect(gh.sent).toContain('DeletePendingReview');
     expect(gh.sent.filter((op) => op === 'StartReview')).toHaveLength(2);
     expect(gh.submitted).toHaveLength(1);
+  });
+
+  it('takes out a comment an earlier attempt added for a draft no longer chosen', async () => {
+    const gh = new FakeGitHub();
+    const store = memory();
+    gh.refuse.set('SubmitReview', 'try again');
+    await failure(publish(gh, store));
+    const fewer = {
+      ...SUBMISSION,
+      items: SUBMISSION.items.filter((i) => i.key !== 'reply'),
+    };
+    const published = await publish(gh, store, fewer);
+    expect(gh.sent).toContain('DeleteReviewComment');
+    expect(gh.submitted[0]).toMatchObject({ comments: 2 });
+    expect(Object.keys(published.items)).toEqual(['range', 'file']);
   });
 });

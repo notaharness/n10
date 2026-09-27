@@ -74,6 +74,12 @@ export const UPDATE_COMMENT = `mutation UpdateReviewComment($id: ID!, $body: Str
   }
 }`;
 
+export const DELETE_COMMENT = `mutation DeleteReviewComment($id: ID!) {
+  deletePullRequestReviewComment(input: { id: $id }) {
+    pullRequestReview { id }
+  }
+}`;
+
 export const SUBMIT_REVIEW = `mutation SubmitReview($review: ID!, $event: PullRequestReviewEvent!, $body: String!) {
   submitPullRequestReview(input: { pullRequestReviewId: $review, event: $event, body: $body }) {
     pullRequestReview { id state }

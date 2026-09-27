@@ -12,6 +12,7 @@ import {
 import {
   ADD_REPLY,
   addThreadMutation,
+  DELETE_COMMENT,
   DELETE_REVIEW,
   REVIEW_BY_ID,
   REVIEW_STATE,
@@ -80,6 +81,7 @@ export async function publishGitHubReview(
     );
   }
   await run.openReview(pr);
+  await run.dropUnchosen();
   for (const item of submission.items) await run.add(item, pr.pending);
   await run.submit();
   return run.result();
@@ -221,6 +223,25 @@ class Run {
     this.record(item, commentIdOf(answer));
   }
 
+  /** Comments an earlier attempt added for drafts no longer chosen:
+   *  taken out of the pending review, so only what was chosen is filed. */
+  async dropUnchosen(): Promise<void> {
+    const chosen = new Set(this.submission.items.map((i) => i.key));
+    for (const [key, { id }] of Object.entries(this.ledger.added)) {
+      if (chosen.has(key)) continue;
+      await this.step(`drop:${key}`, () =>
+        this.gql(DELETE_COMMENT, { id })
+      ).catch((err: unknown) => {
+        // Already gone is what was wanted.
+        if (!isGone(err)) throw err;
+      });
+      const added = Object.fromEntries(
+        Object.entries(this.ledger.added).filter(([k]) => k !== key)
+      );
+      this.save({ added, inFlight: null });
+    }
+  }
+
   async submit(): Promise<void> {
     // A lost submit that took effect was found by `alreadySubmitted`.
     const review = this.ledger.reviewId!;
@@ -281,6 +302,11 @@ class Run {
     this.ledger = { ...this.ledger, ...patch };
     this.store.write(this.ledger);
   }
+}
+
+function isGone(err: unknown): boolean {
+  const cause = err instanceof Error ? err.cause : undefined;
+  return isVcsError(cause) && cause.kind === 'not-found';
 }
 
 function sameItem(c: PendingComment, item: ReviewItem): boolean {
