@@ -1073,6 +1073,14 @@ describe('azureDevOpsProvider', () => {
       );
       await expect(post()).rejects.toThrow('rejected the access token');
     });
+
+    it('refuses a success that did not create a thread', async () => {
+      mockFetch.mockResolvedValue(jsonResponse({}));
+      await expect(post()).rejects.toMatchObject({
+        kind: 'unexpected-response',
+        message: 'Azure DevOps answered without the new thread',
+      });
+    });
   });
 
   it('has correct id and displayName', () => {

@@ -11,6 +11,7 @@ import {
   retryAfterMs,
   throttledError,
   ThrottleGate,
+  VcsError,
   type RequestCounters,
 } from '@n10/vcs-core';
 import { log } from '@n10/logger';
@@ -254,4 +255,18 @@ export async function counted<T>(
     const delta = diffRequestCounters(before, getRequestCounters(PROVIDER_ID));
     log('debug', 'ado.requests', `${label}: ${formatRequestCounters(delta)}`);
   }
+}
+
+/**
+ * The id a write answered with for what it created. JSON that names
+ * nothing (a proxy's own answer, an empty object) created nothing, and
+ * treating it as success would, for a draft, mark it posted.
+ */
+export function createdId(answer: unknown, what: string): number {
+  const id = (answer as { id?: unknown } | null)?.id;
+  if (typeof id === 'number') return id;
+  throw new VcsError(
+    'unexpected-response',
+    `${PROVIDER_NAME} answered without the new ${what}`
+  );
 }

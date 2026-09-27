@@ -20,6 +20,7 @@ import {
   adoGet,
   adoSend,
   counted,
+  createdId,
   invalidateAdoCache,
   invalidateAdoKey,
   resetAdoTransport,
@@ -917,7 +918,7 @@ async function createAdoThread(
     },
     status: 1, // active
   };
-  await adoSend<unknown>('createAdoThread', url, {
+  const created = await adoSend<unknown>('createAdoThread', url, {
     method: 'POST',
     headers: authHeaders(config.pat),
     body: JSON.stringify(thread),
@@ -927,6 +928,7 @@ async function createAdoThread(
   // Without this the new thread stays out of the review workspace and
   // the sidebar's count until the cached list lapses.
   invalidatePr(config, prId);
+  createdId(created, 'thread');
 }
 
 async function setAdoThreadResolved(
