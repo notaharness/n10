@@ -15,16 +15,22 @@ import {
   mentionAt,
   type MentionQuery,
 } from '../../../lib/review/mention-query.js';
-import { useMentionSearch } from '../../../lib/review/mention-search.js';
+import {
+  typedInFull,
+  useMentionSearch,
+} from '../../../lib/review/mention-search.js';
 import type { DurableDraft } from '../../../lib/review/review-drafts.js';
 import { cn } from '../../../lib/utils.js';
+import { PopoverContent } from '../../ui/popover.js';
 
 /**
  * Mentioning someone while writing: type `@` and part of a name, and
  * the provider's own search offers people. The box controls a listbox
- * below it: Up/Down move, Enter or Tab inserts, Escape closes the
- * list and leaves the text. What goes in is the provider's token for
- * the person (`@login`, or Azure's `@<id>`), never a display name.
+ * floating above it (a popover anchored to the box, so opening and
+ * closing it moves nothing and covers none of its actions): Up/Down move, Enter or
+ * Tab inserts, Escape closes the list and leaves the text. What goes
+ * in is the provider's token for the person (`@login`, or Azure's
+ * `@<id>`), never a display name.
  */
 export function useMentionPicker(
   draft: DurableDraft,
@@ -44,8 +50,10 @@ export function useMentionPicker(
     place.current = null;
   });
 
-  const typing = focused ? typed(draft.body, caret, dismissed) : null;
-  const search = useMentionSearch(draft.ref, typing?.query ?? null);
+  const asked = focused ? typed(draft.body, caret, dismissed) : null;
+  const search = useMentionSearch(draft.ref, asked?.query ?? null);
+  const typing =
+    asked && !typedInFull(asked.query, search.people) ? asked : null;
   const people = typing ? search.people : [];
   const active = activeIndex(pick, typing, people.length);
 
@@ -102,7 +110,7 @@ export function useMentionPicker(
     />
   );
 
-  return { inputProps, list };
+  return { inputProps, list, open: typing != null };
 }
 
 /** The mention being typed at the caret, unless Escape closed its list. */
@@ -185,7 +193,17 @@ function MentionList({
   onChoose: (person: MentionCandidate) => void;
 }) {
   return (
-    <div className="rounded-md border border-border bg-popover text-sm text-popover-foreground shadow-md">
+    <PopoverContent
+      // A listbox the box controls, not a dialog: the keyboard stays in
+      // the box.
+      role="presentation"
+      // Above the box, clear of the actions below it; below when there
+      // is no room above.
+      side="top"
+      onOpenAutoFocus={(e) => e.preventDefault()}
+      onCloseAutoFocus={(e) => e.preventDefault()}
+      className="w-(--radix-popover-trigger-width) text-sm"
+    >
       <ul
         id={id}
         role="listbox"
@@ -221,7 +239,7 @@ function MentionList({
         waiting={waiting}
         error={error}
       />
-    </div>
+    </PopoverContent>
   );
 }
 
