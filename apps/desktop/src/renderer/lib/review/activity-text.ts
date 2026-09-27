@@ -93,6 +93,11 @@ export function reviewSentence(r: ReviewSummary): string {
   return `${REVIEW_VERB[r.state]}${comments}`;
 }
 
+/** "Hidden as off topic.", in the provider's own reason where it gave one. */
+export function hiddenLabel(reason: string | null): string {
+  return reason ? `Hidden as ${reason.replace(/_/g, ' ')}.` : 'Hidden.';
+}
+
 /**
  * One line for a folded thread, by the rules its body follows: hidden
  * text stays hidden until the reader opens it, and a deleted comment
@@ -100,10 +105,7 @@ export function reviewSentence(r: ReviewSummary): string {
  */
 export function commentPreview(c: ConversationComment): string {
   if (c.deleted) return 'This comment was deleted.';
-  if (c.minimized) {
-    const why = c.minimized.reason?.replace(/_/g, ' ');
-    return why ? `Hidden as ${why}.` : 'Hidden.';
-  }
+  if (c.minimized) return hiddenLabel(c.minimized.reason);
   return c.kind === 'system'
     ? firstNonEmptyLine(c.body)
     : firstNonEmptyLine(commentBodyParts(c.body).body);

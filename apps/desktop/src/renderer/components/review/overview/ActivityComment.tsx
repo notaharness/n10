@@ -4,6 +4,7 @@ import type {
   ConversationActor,
   ConversationComment,
 } from '../../../../host/contract.js';
+import { hiddenLabel } from '../../../lib/review/activity-text.js';
 import { cn, relativeTime } from '../../../lib/utils.js';
 import { Avatar } from '../../ui/avatar.js';
 import { Badge } from '../../ui/badge.js';
@@ -69,7 +70,7 @@ function Minimized({
     <div>
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <EyeOffIcon className="size-3.5" />
-        Hidden{reason ? ` as ${reason.replace(/_/g, ' ')}` : ''}.
+        {hiddenLabel(reason)}
         <Button
           variant="link"
           size="sm"
