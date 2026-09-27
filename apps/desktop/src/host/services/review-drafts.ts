@@ -4,15 +4,13 @@ import {
   parseDiscardDraftRequest,
   parseDraftsRequest,
   parseSaveDraftRequest,
-  PullRequestIdentityError,
   saveReviewDraft,
   type DraftSources,
   type ReviewDraft,
   type ReviewDrafts,
 } from '@n10/core';
-import { readConfig } from '@n10/vcs-core';
-import { activeRepoIs, configuredRepository, requireRepo } from './repo.js';
-import { configuredViewer } from './viewer.js';
+import { openContext } from './open-context.js';
+import { requireRepo } from './repo.js';
 
 /**
  * The reviewer's own drafts on the pull request on screen: replies,
@@ -25,18 +23,7 @@ import { configuredViewer } from './viewer.js';
  */
 
 function sources(): DraftSources {
-  const cwd = requireRepo();
-  return {
-    repository: () => {
-      if (!activeRepoIs(cwd)) {
-        throw new PullRequestIdentityError(
-          `${cwd} is no longer the repository open in n10`
-        );
-      }
-      return configuredRepository(readConfig(cwd));
-    },
-    viewer: () => configuredViewer(readConfig(cwd)),
-  };
+  return openContext(requireRepo());
 }
 
 export async function listDrafts(request: unknown): Promise<ReviewDrafts> {

@@ -18,6 +18,7 @@ import * as terminals from './services/terminals.js';
 import * as commentImages from './services/comment-images.js';
 import * as clipboardImage from './services/clipboard-image.js';
 import * as drafts from './services/drafts.js';
+import * as mentions from './services/mentions.js';
 import * as prConversation from './services/pr-conversation.js';
 import * as prDetails from './services/pr-details.js';
 import * as reviewDrafts from './services/review-drafts.js';
@@ -74,6 +75,7 @@ export function createHostApi(): N10HostApi {
     listReviewDrafts: (req) => reviewDrafts.listDrafts(req),
     saveReviewDraft: (req) => reviewDrafts.saveDraft(req),
     discardReviewDraft: (req) => reviewDrafts.discardDraft(req),
+    searchMentionCandidates: (req) => mentions.searchMentionCandidates(req),
     submitReviewVerdict: (prId, verdict) =>
       reviews.submitReviewVerdict(prId, verdict),
     getReviewViewer: () => Promise.resolve(reviews.getReviewViewer()),
@@ -267,6 +269,7 @@ export function registerHostHandlers(
     [IPC.listReviewDrafts]: api.listReviewDrafts as HostMethod,
     [IPC.saveReviewDraft]: api.saveReviewDraft as HostMethod,
     [IPC.discardReviewDraft]: api.discardReviewDraft as HostMethod,
+    [IPC.searchMentionCandidates]: api.searchMentionCandidates as HostMethod,
     [IPC.submitReviewVerdict]: api.submitReviewVerdict as HostMethod,
     [IPC.getReviewViewer]: api.getReviewViewer as HostMethod,
     [IPC.fetchCommentImage]: api.fetchCommentImage as HostMethod,

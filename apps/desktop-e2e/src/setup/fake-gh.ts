@@ -75,6 +75,9 @@ export interface FakeGitHub {
   /** The signed-in user. PRs they authored are "yours". */
   username?: string;
   prs: FakePr[];
+  /** Who `mentionableUsers` finds: a login or name containing the
+   *  query, ignoring case, first eight. */
+  mentionable?: { login: string; name?: string }[];
   /**
    * Make every `gh` call take this long, standing in for the round trip
    * to GitHub. Left off for the e2e suite (which wants speed); the perf

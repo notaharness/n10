@@ -12,6 +12,8 @@ export type {
   DiscardDraftRequest,
   DraftsRequest,
   DraftTarget,
+  MentionSearch,
+  MentionSearchRequest,
   Publication,
   PullRequestConversationRead,
   PullRequestSnapshot,
@@ -22,6 +24,7 @@ export type {
 } from '@n10/core';
 export type {
   Capability,
+  MentionCandidate,
   ConversationActor,
   ConversationComment,
   ConversationEvent,

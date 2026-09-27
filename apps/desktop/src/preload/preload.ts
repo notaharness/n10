@@ -96,6 +96,8 @@ const api: N10HostApi = {
   listReviewDrafts: (req) => ipcRenderer.invoke(IPC.listReviewDrafts, req),
   saveReviewDraft: (req) => ipcRenderer.invoke(IPC.saveReviewDraft, req),
   discardReviewDraft: (req) => ipcRenderer.invoke(IPC.discardReviewDraft, req),
+  searchMentionCandidates: (req) =>
+    ipcRenderer.invoke(IPC.searchMentionCandidates, req),
   submitReviewVerdict: (prId, verdict) =>
     ipcRenderer.invoke(IPC.submitReviewVerdict, prId, verdict),
   getReviewViewer: () => ipcRenderer.invoke(IPC.getReviewViewer),

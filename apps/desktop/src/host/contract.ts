@@ -81,6 +81,8 @@ export type * from './contract-pull-requests.js';
 import type {
   DiscardDraftRequest,
   DraftsRequest,
+  MentionSearch,
+  MentionSearchRequest,
   PullRequestConversationRead,
   PullRequestSnapshot,
   RepositoryRef,
@@ -370,6 +372,9 @@ export interface N10HostApi {
    *  to the stored draft, or null when it was removed. */
   saveReviewDraft(req: SaveDraftRequest): Promise<ReviewDraft | null>;
   discardReviewDraft(req: DiscardDraftRequest): Promise<void>;
+  /** People a comment on one pull request can mention, found by the
+   *  provider's own search. Refused like the snapshot. */
+  searchMentionCandidates(req: MentionSearchRequest): Promise<MentionSearch>;
   /** Cast the current user's review verdict on a PR. */
   submitReviewVerdict(prId: number, verdict: ReviewVerdict): Promise<void>;
   /** The reviewer-list identifier of the authenticated user (GitHub
@@ -568,6 +573,7 @@ export const IPC = {
   listReviewDrafts: 'n10/review-drafts/list',
   saveReviewDraft: 'n10/review-drafts/save',
   discardReviewDraft: 'n10/review-drafts/discard',
+  searchMentionCandidates: 'n10/pull-requests/mentions',
   submitReviewVerdict: 'n10/reviews/submit-verdict',
   getReviewViewer: 'n10/reviews/viewer',
   fetchCommentImage: 'n10/reviews/comment-image',
