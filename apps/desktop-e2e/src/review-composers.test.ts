@@ -195,6 +195,61 @@ test.describe('Comment composers', () => {
     await expect(gutterOf(page, 'RIGHT', 3)).toBeFocused();
   });
 
+  test('emptying an open composer keeps it open, and emptying a saved one offers Undo', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openDiff(page);
+    await gutterOf(page, 'RIGHT', 3).click();
+    await page.getByRole('button', { name: 'Comment on new line 3' }).click();
+    await composer(page).fill('first thought');
+    await expect(page.getByText('Draft saved')).toBeVisible();
+    // Blank text is no draft a card could show, so the stored one drops
+    // out of the list once this save lands; the open box stays.
+    await composer(page).press('ControlOrMeta+a');
+    await page.keyboard.type(' ');
+    await expect(page.getByText('Draft saved')).toBeVisible();
+    await expect(composer(page)).toBeFocused();
+    await page.keyboard.type('second thought');
+    await expect(composer(page)).toHaveValue(' second thought');
+    await composer(page).press('ControlOrMeta+Enter');
+
+    const card = page.locator('[data-my-draft]');
+    await card.getByRole('button', { name: 'Edit draft' }).click();
+    await composer(page).press('ControlOrMeta+a');
+    await composer(page).press('Backspace');
+    await page.keyboard.press('Escape');
+    await expect(card).toHaveCount(0);
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(card).toContainText('second thought');
+  });
+
+  test('a new-side range carries across views; a refused extension is announced', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openDiff(page);
+    await gutterOf(page, 'RIGHT', 3).click();
+    await gutterOf(page, 'RIGHT', 5).click({ modifiers: ['Shift'] });
+    await page.getByRole('button', { name: /Split/ }).click();
+    await expect(
+      page.getByRole('button', { name: 'Comment on new lines 3–5' })
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: /Unified/ }).click();
+    await gutterOf(page, 'LEFT', 3).focus();
+    await page.keyboard.press('Shift+ArrowDown');
+    await expect(gutterOf(page, 'LEFT', 4)).toBeFocused();
+    // Past the removed run there is no old line on screen to add.
+    await page.keyboard.press('Shift+ArrowDown');
+    await expect(gutterOf(page, 'LEFT', 4)).toBeFocused();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'selected in' })
+    ).toHaveText(
+      `old lines 3–4 selected in ${FILE}. The range can’t grow further on this side`
+    );
+  });
+
   test('the keyboard selects, extends and opens a comment', async ({
     desktop,
   }) => {

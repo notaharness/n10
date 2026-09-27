@@ -97,6 +97,25 @@ export function extendOnScreen(
   return next;
 }
 
+/**
+ * Whether a selection shows in the view: every new-side line and every
+ * removed line is a point in both views, but an unchanged line stands
+ * for its old side only in Split.
+ */
+export function shownIn(
+  sel: LineSelection,
+  split: boolean,
+  lines: readonly DiffLine[]
+): boolean {
+  if (split || sel.side === 'RIGHT') return true;
+  const removed = new Set(
+    lines.flatMap((l) => (l.type === 'remove' && l.oldLine ? [l.oldLine] : []))
+  );
+  const { start, end } = selectionRange(sel);
+  for (let n = start; n <= end; n++) if (!removed.has(n)) return false;
+  return true;
+}
+
 export function selectionRange(sel: LineSelection): LineRange {
   return {
     startSide: sel.side,

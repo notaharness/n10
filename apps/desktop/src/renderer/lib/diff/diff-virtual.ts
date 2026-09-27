@@ -125,6 +125,8 @@ export interface FlatDiffOptions {
   draftsByFile: ReadonlyMap<string, ReviewComment[]>;
   /** The reviewer's own inline drafts, open composers included. */
   mineByFile?: ReadonlyMap<string, InlineTarget[]>;
+  /** How many of those each file holds, kept ones only, for its header. */
+  mineCount?: ReadonlyMap<string, number>;
   fileState: ReadonlyMap<string, FileDisplayState>;
 }
 
@@ -164,7 +166,7 @@ function fileSlice(
       dels,
       openThreads: allThreads.filter((t) => !t.isResolved).length,
       draftCount: activeDrafts.length,
-      mineCount: opts.mineByFile?.get(file)?.length ?? 0,
+      mineCount: opts.mineCount?.get(file) ?? 0,
       collapseReason,
       open: state.open ?? collapseReason === null,
       viewed: state.viewed ?? false,

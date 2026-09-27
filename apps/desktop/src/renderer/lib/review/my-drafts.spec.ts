@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { inlineTargets, unstored, type InlineTarget } from './my-drafts.js';
+import {
+  countByFile,
+  inlineTargets,
+  unstored,
+  type InlineTarget,
+} from './my-drafts.js';
 
 const target = (key: string, path = 'a.ts'): InlineTarget => ({
   kind: 'inline',
@@ -19,9 +24,26 @@ describe('the reviewer’s comments on code', () => {
     ]);
   });
 
-  it('forgets a composer once its draft is stored, and only then', () => {
+  it('forgets a closed composer once its draft is stored, and only then', () => {
     const fresh = [target('k'), target('n')];
-    expect(unstored(fresh, [target('k')])).toEqual([target('n')]);
-    expect(unstored(fresh, [target('x')])).toBe(fresh);
+    const none = new Set<string>();
+    expect(unstored(fresh, [target('k')], none)).toEqual([target('n')]);
+    expect(unstored(fresh, [target('x')], none)).toBe(fresh);
+  });
+
+  it('keeps an open composer, so emptying its stored draft cannot close it', () => {
+    const fresh = [target('k')];
+    expect(unstored(fresh, [target('k')], new Set(['k']))).toBe(fresh);
+  });
+
+  it('counts drafts per file', () => {
+    expect(
+      countByFile([target('a'), target('b'), target('c', 'b.ts')])
+    ).toEqual(
+      new Map([
+        ['a.ts', 2],
+        ['b.ts', 1],
+      ])
+    );
   });
 });

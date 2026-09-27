@@ -12,7 +12,9 @@ import type { InlineTarget } from './my-drafts.js';
 export interface MyDraftsScope {
   ref: PullRequestRef | null;
   editing: ReadonlySet<string>;
-  setEditing: (key: string, on: boolean) => void;
+  /** Open the composer on a draft, new or stored. */
+  openComposer: (target: InlineTarget) => void;
+  closeComposer: (key: string) => void;
   /** True once for a composer just opened: it takes the keyboard when
    *  it first mounts, not every time scrolling mounts it again. */
   takeFocus: (key: string) => boolean;

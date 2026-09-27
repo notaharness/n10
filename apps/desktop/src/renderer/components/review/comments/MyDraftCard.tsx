@@ -44,7 +44,7 @@ export function MyDraftCard({ target }: { target: InlineTarget }) {
         takeFocus={() => scope.takeFocus(key)}
         onUndo={undone}
         onClose={(kept) => {
-          scope.setEditing(key, false);
+          scope.closeComposer(key);
           if (kept) scope.focusDraft(key);
           else gone();
         }}
@@ -58,7 +58,7 @@ export function MyDraftCard({ target }: { target: InlineTarget }) {
       place={place}
       body={draft.body}
       notice={<CodeMoved target={target} />}
-      onEdit={() => scope.setEditing(key, true)}
+      onEdit={() => scope.openComposer(target)}
       // `discard` never rejects.
       onDiscard={() => void draft.discard(undone).then(gone)}
     />

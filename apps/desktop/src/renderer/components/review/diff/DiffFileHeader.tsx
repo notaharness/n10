@@ -108,8 +108,6 @@ export function DiffFileHeader({
   );
 }
 
-/** A comment on the whole file: for a binary, a rename, or a point
- *  that is about no one line. */
 /** Why the file is collapsed, and what waits in it. */
 function FileChips({
   collapsed,
@@ -148,6 +146,8 @@ function FileChips({
   );
 }
 
+/** A comment on the whole file: for a binary, a rename, or a point
+ *  that is about no one line. */
 function FileCommentButton({
   filename,
   onClick,
