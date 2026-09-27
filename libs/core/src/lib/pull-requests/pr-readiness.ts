@@ -28,6 +28,7 @@ export interface ReadinessItem {
     | 'conflicts'
     | 'behind'
     | 'checks'
+    | 'policies'
     | 'reviews'
     | 'conversations'
     | 'rules';
@@ -59,30 +60,65 @@ interface Tally {
   unknowns: string[];
 }
 
+function count(n: number, [one, many]: Noun): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
 function plural(n: number, word: string): string {
-  return `${n} ${word}${n === 1 ? '' : 's'}`;
+  return count(n, [word, `${word}s`]);
 }
 
 function names(checks: readonly PullRequestCheck[]): string {
   return checks.map((c) => c.name).join(', ');
 }
 
+type Noun = readonly [one: string, many: string];
+
+/** How each kind of item is spoken of, and what not passing is. */
+const WORDS = {
+  check: {
+    kind: 'checks',
+    required: ['required check', 'required checks'],
+    other: ['check', 'checks'],
+    fails: 'failing',
+  },
+  policy: {
+    kind: 'policies',
+    required: ['required policy', 'required policies'],
+    other: ['policy', 'policies'],
+    fails: 'not met',
+  },
+} as const satisfies Record<
+  PullRequestCheck['kind'],
+  {
+    kind: ReadinessItem['kind'];
+    required: Noun;
+    other: Noun;
+    fails: string;
+  }
+>;
+
 const FAILED = new Set(['failed', 'cancelled']);
 const WAITING = new Set(['queued', 'running', 'waiting', 'expected']);
 
-function checksTally(inputs: ReadinessInputs, t: Tally): void {
-  if (inputs.checks.state !== 'read') {
-    t.unknowns.push('Checks');
-    return;
-  }
-  const { items, complete } = inputs.checks.value;
+/** One kind's failing and waiting requirements, and its failures
+ *  nothing enforces. */
+function kindTally(
+  items: readonly PullRequestCheck[],
+  words: (typeof WORDS)[keyof typeof WORDS],
+  t: Tally
+): void {
+  const { kind, fails } = words;
   const required = items.filter((c) => c.requirement === 'required');
   const failing = required.filter((c) => FAILED.has(c.outcome));
   const waiting = required.filter((c) => WAITING.has(c.outcome));
+  const other = items.filter(
+    (c) => c.requirement !== 'required' && FAILED.has(c.outcome)
+  );
   if (failing.length > 0) {
     t.blockers.push({
-      kind: 'checks',
-      text: `${plural(failing.length, 'required check')} failing: ${names(
+      kind,
+      text: `${count(failing.length, words.required)} ${fails}: ${names(
         failing
       )}`,
       resolvedBy: 'author',
@@ -90,24 +126,37 @@ function checksTally(inputs: ReadinessInputs, t: Tally): void {
   }
   if (waiting.length > 0) {
     t.blockers.push({
-      kind: 'checks',
-      text: `Waiting for ${plural(waiting.length, 'required check')}: ${names(
+      kind,
+      text: `Waiting for ${count(waiting.length, words.required)}: ${names(
         waiting
       )}`,
       resolvedBy: 'checks',
     });
   }
-  const other = items.filter(
-    (c) => c.requirement !== 'required' && FAILED.has(c.outcome)
-  );
   if (other.length > 0) {
     t.advisories.push({
-      kind: 'checks',
-      text: `${plural(other.length, 'check')} failing, not required: ${names(
-        other
-      )}`,
+      kind,
+      text: `${count(
+        other.length,
+        words.other
+      )} ${fails}, not required: ${names(other)}`,
       resolvedBy: 'author',
     });
+  }
+}
+
+function checksTally(inputs: ReadinessInputs, t: Tally): void {
+  if (inputs.checks.state !== 'read') {
+    t.unknowns.push('Checks');
+    return;
+  }
+  const { items, complete } = inputs.checks.value;
+  for (const kind of ['check', 'policy'] as const) {
+    kindTally(
+      items.filter((c) => c.kind === kind),
+      WORDS[kind],
+      t
+    );
   }
   // Moot where the provider says nothing enforced is in the way.
   if (
@@ -116,7 +165,9 @@ function checksTally(inputs: ReadinessInputs, t: Tally): void {
   ) {
     t.unknowns.push('Whether every check is required');
   }
-  const unread = required.filter((c) => c.outcome === 'unknown');
+  const unread = items.filter(
+    (c) => c.requirement === 'required' && c.outcome === 'unknown'
+  );
   if (unread.length > 0) {
     t.unknowns.push(`The outcome of ${names(unread)}`);
   }
@@ -148,11 +199,27 @@ function reviewsTally({ merge }: ReadinessInputs, t: Tally): void {
 
 /** Unresolved threads block where a rule says so and the provider does
  *  not say it is clear; otherwise they are there to read, not in the
- *  way. The count is the list's, older than the provider's verdict. */
+ *  way. The count is the list's, older than the provider's verdict.
+ *  Where the provider judges the rule itself (Azure's comment policy),
+ *  its verdict stands. */
 function conversationsTally(inputs: ReadinessInputs, t: Tally): void {
   const open = inputs.unresolvedThreads;
+  const judged = inputs.merge.conversations;
+  const item: ReadinessItem = {
+    kind: 'conversations',
+    text: open
+      ? plural(open, 'unresolved conversation')
+      : 'Unresolved conversations',
+    resolvedBy: 'author',
+  };
+  if (judged === 'unresolved') {
+    t.blockers.push(item);
+    return;
+  }
   const enforced =
-    inputs.rules.state === 'read'
+    judged === 'resolved'
+      ? false
+      : inputs.rules.state === 'read'
       ? inputs.rules.value.conversationResolution
       : null;
   if (open == null) {
@@ -163,11 +230,6 @@ function conversationsTally(inputs: ReadinessInputs, t: Tally): void {
     return;
   }
   if (open === 0) return;
-  const item: ReadinessItem = {
-    kind: 'conversations',
-    text: `${plural(open, 'unresolved conversation')}`,
-    resolvedBy: 'author',
-  };
   if (enforced && inputs.merge.blocked !== false) t.blockers.push(item);
   else t.advisories.push(item);
   if (enforced == null && inputs.merge.blocked !== false) {

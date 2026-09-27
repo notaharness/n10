@@ -15,6 +15,7 @@ const CLEAN: MergeState = {
   behind: false,
   blocked: false,
   reviews: 'approved',
+  conversations: null,
   native: 'CLEAN',
 };
 
@@ -25,6 +26,7 @@ function check(
 ): PullRequestCheck {
   return {
     key: `check:1::${name}`,
+    kind: 'check',
     requires: null,
     name,
     group: null,
@@ -317,6 +319,76 @@ describe('evaluateReadiness', () => {
         merge: { ...unsure.merge, blocked: true, native: 'BLOCKED' },
       }).unknowns
     ).toEqual(['Whether every check is required', 'The review requirement']);
+  });
+
+  it('speaks of a policy as one, not as a check', () => {
+    const policy = (
+      name: string,
+      outcome: PullRequestCheck['outcome'],
+      requirement: PullRequestCheck['requirement'] = 'required'
+    ): PullRequestCheck => ({
+      ...check(name, outcome, requirement),
+      kind: 'policy',
+    });
+    const r = evaluateReadiness(
+      inputs({
+        merge: { ...CLEAN, blocked: true, native: 'succeeded' },
+        checks: checks(
+          check('test', 'succeeded'),
+          policy('Work item linking', 'failed'),
+          policy('Merge strategy', 'queued'),
+          policy('Changelog entry', 'failed', 'optional')
+        ),
+      })
+    );
+    expect(r.blockers).toEqual([
+      {
+        kind: 'policies',
+        text: '1 required policy not met: Work item linking',
+        resolvedBy: 'author',
+      },
+      {
+        kind: 'policies',
+        text: 'Waiting for 1 required policy: Merge strategy',
+        resolvedBy: 'checks',
+      },
+    ]);
+    expect(r.advisories.map((a) => a.text)).toEqual([
+      '1 policy not met, not required: Changelog entry',
+    ]);
+  });
+
+  it('takes the provider’s own verdict on conversations over the count', () => {
+    const unresolved = evaluateReadiness(
+      inputs({
+        merge: { ...CLEAN, blocked: true, conversations: 'unresolved' },
+        unresolvedThreads: null,
+      })
+    );
+    expect(unresolved.blockers).toEqual([
+      {
+        kind: 'conversations',
+        text: 'Unresolved conversations',
+        resolvedBy: 'author',
+      },
+    ]);
+    expect(unresolved.unknowns).toEqual([]);
+    // The provider counts them resolved: the count is to read, not in
+    // the way, whatever the rule says.
+    const resolved = evaluateReadiness(
+      inputs({
+        merge: { ...CLEAN, conversations: 'resolved' },
+        unresolvedThreads: 2,
+        rules: {
+          state: 'read',
+          value: { requiredChecks: [], conversationResolution: true },
+        },
+      })
+    );
+    expect(resolved).toMatchObject({ state: 'ready', blockers: [] });
+    expect(resolved.advisories.map((a) => a.text)).toEqual([
+      '2 unresolved conversations',
+    ]);
   });
 
   it('names a rule it cannot see when the provider blocks and nothing read says why', () => {

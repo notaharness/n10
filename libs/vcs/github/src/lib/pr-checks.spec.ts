@@ -251,6 +251,7 @@ describe('fetchPullRequestChecksGitHub: checks', () => {
       ['deploy/preview', 'failed', 'ERROR', 'unknown'],
     ]);
     expect(items(res)[0]).toMatchObject({
+      kind: 'check',
       group: 'CI',
       source: 'github-actions',
       revision: HEAD,
@@ -260,6 +261,7 @@ describe('fetchPullRequestChecksGitHub: checks', () => {
       url: 'https://github.com/acme/app/actions/runs/1/job/build',
     });
     expect(items(res)[4]).toMatchObject({
+      kind: 'check',
       group: null,
       source: 'preview-bot',
       ranOn: null,
@@ -695,6 +697,8 @@ describe('fetchPullRequestChecksGitHub: merge state', () => {
       lifecycle: { state: 'open', isDraft: true, native: 'OPEN' },
       conflicts: 'conflicting',
       reviews: 'changes-requested',
+      // GitHub states the rule, never a verdict on the threads.
+      conversations: null,
     });
     // GitHub leaves the decision out whether or not review is required.
     expect((await read()).merge).toMatchObject({

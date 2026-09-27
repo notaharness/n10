@@ -38,6 +38,7 @@ function answer(over: Partial<PullRequestChecks> = {}): PullRequestChecks {
       behind: false,
       blocked: true,
       reviews: 'approved',
+      conversations: null,
       native: 'BLOCKED',
     },
     ...over,
