@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import type {
   MentionCandidate,
@@ -44,8 +44,9 @@ async function search(
 
 /**
  * Who the provider says matches what was typed after `@`, asked once
- * typing pauses. The last answer stays up while the next is asked, so
- * the list does not flicker empty between letters.
+ * typing pauses. `people` is only ever the answer for the query in the
+ * box now: an earlier answer is never offered, so Enter cannot insert
+ * someone found for other letters.
  */
 export function useMentionSearch(
   ref: PullRequestRef | null,
@@ -53,13 +54,16 @@ export function useMentionSearch(
 ) {
   const { repo } = useRepo();
   const asked = useSettled(query, PAUSE_MS);
-  const settled = asked === query;
   const result = useQuery({
-    queryKey: keys.mentions(repo.cwd, ref!, repo.viewer, asked ?? ''),
+    queryKey: keys.mentions(repo.cwd, ref, repo.viewer, asked ?? ''),
     queryFn: () => search(ref!, repo.viewer, asked!),
     enabled: ref != null && !!asked,
     staleTime: 60_000,
-    placeholderData: keepPreviousData,
   });
-  return { ...result, settled };
+  const current = asked === query && result.isSuccess;
+  return {
+    people: current ? result.data : [],
+    waiting: asked !== query || result.isFetching,
+    error: asked === query ? result.error : null,
+  };
 }

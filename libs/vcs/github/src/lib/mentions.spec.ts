@@ -34,4 +34,14 @@ describe('searchGitHubMentions', () => {
       { token: '@bea-bot', displayName: 'bea-bot', handle: 'bea-bot' },
     ]);
   });
+
+  it('says the repository was not found rather than offer nobody', async () => {
+    await expect(
+      searchGitHubMentions(
+        () => Promise.resolve({ data: { repository: null } }),
+        REPO,
+        'bea'
+      )
+    ).rejects.toThrow('GitHub could not find acme/app');
+  });
 });

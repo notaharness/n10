@@ -8,6 +8,11 @@ describe('the mention being typed', () => {
     expect(mentionAt('(@bo', 4)).toEqual({ start: 1, query: 'bo' });
   });
 
+  it('is not a mention already made', () => {
+    const token = '@<8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d>';
+    expect(mentionAt(token, token.length)).toBeNull();
+  });
+
   it('is not an email address, a finished word or a path', () => {
     expect(mentionAt('mail bob@example.com', 20)).toBeNull();
     expect(mentionAt('@al is here', 11)).toBeNull();
@@ -32,7 +37,7 @@ describe('choosing someone', () => {
     const at = mentionAt('hi @al and more', 6)!;
     expect(insertMention('hi @al and more', at, '@<8c8c>')).toEqual({
       text: 'hi @<8c8c> and more',
-      caret: 10,
+      caret: 11,
     });
   });
 });

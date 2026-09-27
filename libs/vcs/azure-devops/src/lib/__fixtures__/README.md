@@ -36,9 +36,10 @@ the REST reference. Real field names and shapes as the API owner
 publishes them; the organization and people are Microsoft's fictional
 ones, so nothing needs scrubbing.
 
-| File                         | What it is                                                                                                                                                                                                                                                                                         |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pr-threads-documented.json` | the `GET …/pullRequests/{id}/threads` sample from the [7.1 reference](https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-request-threads/list?view=azure-devops-rest-7.1): merge attempts, reviewer changes, a vote, a push, a general thread and a line thread with a deleted reply |
+| File                                                                  | What it is                                                                                                                                                                                                                                                                                         |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pr-threads-documented.json`                                          | the `GET …/pullRequests/{id}/threads` sample from the [7.1 reference](https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-request-threads/list?view=azure-devops-rest-7.1): merge attempts, reviewer changes, a vote, a push, a general thread and a line thread with a deleted reply |
+| `identities-documented-email.json`, `identities-documented-name.json` | the "By Email" and "By Name" samples of `GET vssps…/_apis/identities?searchFilter=General` from the [7.1 reference](https://learn.microsoft.com/en-us/rest/api/azure/devops/ims/identities/read-identities?view=azure-devops-rest-7.1): a person, and a group                                      |
 
 To record a new one, hit the API with the PAT from `~/.n10/config.json`,
 scrub the identifiers above, and add a row here saying what the response

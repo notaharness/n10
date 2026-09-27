@@ -70,3 +70,28 @@ describe('searchAdoMentions', () => {
     expect(await searchAdoMentions(CONFIG, 'zz')).toEqual([]);
   });
 });
+
+describe('the documented Identities samples', () => {
+  const sample = (name: string) =>
+    readFileSync(join(__dirname, '__fixtures__', name), 'utf8');
+
+  it('offers the person in the “By Email” sample', async () => {
+    mockFetch.mockResolvedValue(
+      answer(sample('identities-documented-email.json'))
+    );
+    expect(await searchAdoMentions(CONFIG, 'jtseng@vscsi.us')).toEqual([
+      {
+        token: '@<81fa6389-0872-6fdd-a451-7ba7880f566a>',
+        displayName: 'Jia-hao Tseng',
+        handle: 'jtseng@vscsi.us',
+      },
+    ]);
+  });
+
+  it('offers no group, like the one in the “By Name” sample', async () => {
+    mockFetch.mockResolvedValue(
+      answer(sample('identities-documented-name.json'))
+    );
+    expect(await searchAdoMentions(CONFIG, 'Project Collection')).toEqual([]);
+  });
+});
