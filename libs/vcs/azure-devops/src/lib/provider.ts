@@ -1155,14 +1155,15 @@ export const azureDevOpsProvider: VcsProvider = {
       body: JSON.stringify({ id: userId, vote }),
       bodyForLog: { vote },
     });
-    // The selected pull request's detail is the one cached answer that
-    // carries votes; the list is fetched with a zero TTL, so it is
-    // deduped and never stored. Wiping the repository prefix would drop
-    // threads, statuses and descriptions to fix something they do not
-    // hold. The vote a user might still see is in the shell's own model
-    // — the desktop refreshes it from services/reviews.ts.
-    invalidateAdoKey(
-      `${config.org}/${config.project}/${config.repo}/detail/${prId}`
-    );
+    // The selected pull request's detail carries votes, and its policy
+    // evaluations the reviewer policies' verdict on them; the list is
+    // fetched with a zero TTL, so it is deduped and never stored.
+    // Wiping the repository prefix would drop threads, statuses and
+    // descriptions to fix something they do not hold. The vote a user
+    // might still see is in the shell's own model — the desktop
+    // refreshes it from services/reviews.ts.
+    const repo = `${config.org}/${config.project}/${config.repo}`;
+    invalidateAdoKey(`${repo}/detail/${prId}`);
+    invalidateAdoKey(`${repo}/policies/${prId}`);
   },
 };

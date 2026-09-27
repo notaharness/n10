@@ -170,9 +170,10 @@ describe('fetchPullRequestChecksAzure', () => {
     expect(
       items(res).map((c) => [c.key, c.kind, c.name, c.outcome, c.requirement])
     ).toEqual([
-      ['policy:21', 'check', 'fabrikam-ci', 'succeeded', 'required'],
-      ['policy:22', 'check', 'End-to-end', 'failed', 'optional'],
-      ['policy:23', 'check', 'sonar/quality-gate', 'queued', 'required'],
+      ['policy:21:5120', 'check', 'fabrikam-ci', 'succeeded', 'required'],
+      ['policy:22:5102', 'check', 'End-to-end', 'failed', 'optional'],
+      // Named as Azure's page names it.
+      ['policy:23', 'check', 'SonarCloud quality gate', 'queued', 'required'],
       ['policy:26', 'policy', 'Work item linking', 'succeeded', 'required'],
       // Its newest word: the failure on push 2 was superseded.
       ['status:example/lint', 'check', 'example/lint', 'succeeded', 'optional'],
@@ -194,7 +195,7 @@ describe('fetchPullRequestChecksAzure', () => {
     });
     const res = await read();
     expect(items(res)[0]).toMatchObject({
-      key: 'policy:21',
+      key: 'policy:21:5120',
       outcome: 'failed',
       requirement: 'required',
     });
@@ -238,7 +239,7 @@ describe('fetchPullRequestChecksAzure', () => {
       value: {
         requiredChecks: [
           { name: 'fabrikam-ci', app: null },
-          { name: 'sonar/quality-gate', app: null },
+          { name: 'SonarCloud quality gate', app: null },
         ],
         conversationResolution: true,
       },
@@ -355,8 +356,8 @@ describe('fetchPullRequestChecksAzure', () => {
     serve({ statuses: 500 });
     const res = await read();
     expect(items(res).map((c) => c.key)).toEqual([
-      'policy:21',
-      'policy:22',
+      'policy:21:5120',
+      'policy:22:5102',
       'policy:23',
       'policy:26',
     ]);

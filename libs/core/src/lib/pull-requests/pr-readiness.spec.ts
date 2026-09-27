@@ -358,6 +358,30 @@ describe('evaluateReadiness', () => {
     ]);
   });
 
+  it('names a required check nobody has started, and who must start it', () => {
+    const r = evaluateReadiness(
+      inputs({
+        merge: { ...CLEAN, blocked: true, native: 'succeeded' },
+        checks: checks(
+          { ...check('nightly', 'queued'), manual: true },
+          check('ci', 'queued')
+        ),
+      })
+    );
+    expect(r.blockers).toEqual([
+      {
+        kind: 'checks',
+        text: 'Waiting for 1 required check: ci',
+        resolvedBy: 'checks',
+      },
+      {
+        kind: 'checks',
+        text: 'Someone must start 1 required check: nightly',
+        resolvedBy: 'author',
+      },
+    ]);
+  });
+
   it('takes the provider’s own verdict on conversations over the count', () => {
     const unresolved = evaluateReadiness(
       inputs({
@@ -389,6 +413,19 @@ describe('evaluateReadiness', () => {
     expect(resolved.advisories.map((a) => a.text)).toEqual([
       '2 unresolved conversations',
     ]);
+    // Even under a block, a resolved verdict leaves the count to read.
+    const blocked = evaluateReadiness(
+      inputs({
+        merge: { ...CLEAN, blocked: true, conversations: 'resolved' },
+        unresolvedThreads: 2,
+        rules: {
+          state: 'read',
+          value: { requiredChecks: [], conversationResolution: true },
+        },
+      })
+    );
+    expect(blocked.blockers.map((b) => b.kind)).toEqual(['rules']);
+    expect(blocked.advisories.map((a) => a.kind)).toEqual(['conversations']);
   });
 
   it('names a rule it cannot see when the provider blocks and nothing read says why', () => {

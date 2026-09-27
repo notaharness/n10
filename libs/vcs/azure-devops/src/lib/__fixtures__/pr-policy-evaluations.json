@@ -125,7 +125,8 @@
               "matchKind": "Exact",
               "repositoryId": "5b0c8e8a-1f3e-4c4e-9d3a-2f6b7c8d9e01"
             }
-          ]
+          ],
+          "defaultDisplayName": "SonarCloud quality gate"
         },
         "isEnterpriseManaged": false,
         "revision": 3,
@@ -285,7 +286,7 @@
       "artifactId": "vstfs:///CodeReview/CodeReviewId/a9e2b3c4-5d6e-4f70-8a91-b2c3d4e5f601/4211",
       "evaluationId": "0f1e2d3c-4b5a-4968-8776-000000000027",
       "startedDate": "2026-09-22T10:00:00.000Z",
-      "status": "notApplicable",
+      "status": "approved",
       "completedDate": "2026-09-22T10:06:00.000Z"
     },
     {

@@ -43,8 +43,15 @@ export interface RawEvaluation {
     type?: { id?: string; displayName?: string };
     settings?: {
       displayName?: string | null;
+      /** A Status policy's name, as Azure's page shows it. */
+      defaultDisplayName?: string | null;
       statusGenre?: string;
       statusName?: string;
+      /** Minimum reviewers: completion is allowed despite a reviewer
+       *  waiting for the author or rejecting. Off unless set. */
+      allowDownvotes?: boolean;
+      /** Build: someone must queue it; it never starts by itself. */
+      manualQueueOnly?: boolean;
     };
   };
   /** What a build policy ran: its build, and the source commit it
@@ -119,14 +126,17 @@ export function statusNameOf(e: RawEvaluation): string | null {
   return s.statusGenre ? `${s.statusGenre}/${s.statusName}` : s.statusName;
 }
 
+/** The name Azure's own page shows, the most specific first. */
 function nameOf(e: RawEvaluation): string {
-  return (
-    e.configuration?.settings?.displayName ||
-    e.context?.buildDefinitionName ||
-    statusNameOf(e) ||
-    e.configuration?.type?.displayName ||
-    'Policy'
-  );
+  const settings = e.configuration?.settings;
+  const names = [
+    settings?.displayName,
+    settings?.defaultDisplayName,
+    e.context?.buildDefinitionName,
+    statusNameOf(e),
+    e.configuration?.type?.displayName,
+  ];
+  return names.find((n): n is string => Boolean(n)) ?? 'Policy';
 }
 
 function requirementOf(e: RawEvaluation): PullRequestCheck['requirement'] {
@@ -158,12 +168,27 @@ function ranFacts(
 
 function outcomeFacts(
   e: RawEvaluation
-): Pick<PullRequestCheck, 'outcome' | 'native'> {
+): Pick<PullRequestCheck, 'outcome' | 'native' | 'manual'> {
   if (expired(e)) return { outcome: 'queued', native: 'expired' };
-  return {
+  const facts = {
     outcome: OUTCOME[e.status ?? ''] ?? 'unknown',
     native: e.status ?? null,
   };
+  // "If you set the policy trigger to Manual, users must queue the
+  // build themselves": queued, it waits for a person, not a runner.
+  const manual =
+    e.status === 'queued' &&
+    typeOf(e) === POLICY.build &&
+    e.configuration?.settings?.manualQueueOnly === true;
+  return manual ? { ...facts, manual } : facts;
+}
+
+/** A build policy is one check per build it ran: a new build is a new
+ *  check, as a re-run is on GitHub. */
+function keyOf(e: RawEvaluation): string {
+  const policy = e.configuration?.id ?? e.evaluationId ?? nameOf(e);
+  const build = typeOf(e) === POLICY.build ? e.context?.buildId : undefined;
+  return build != null ? `policy:${policy}:${build}` : `policy:${policy}`;
 }
 
 /** One policy as a check. */
@@ -172,7 +197,7 @@ export function policyCheck(
   where: { org: string; project: string }
 ): PullRequestCheck {
   return {
-    key: `policy:${e.configuration?.id ?? e.evaluationId ?? nameOf(e)}`,
+    key: keyOf(e),
     kind: CHECK_POLICIES.includes(typeOf(e)) ? 'check' : 'policy',
     // Each policy is itself the requirement, not a stand-in for one.
     requires: null,
@@ -220,11 +245,30 @@ export function reviewersBlock(reviewers: readonly ReviewerVote[]): boolean {
 }
 
 /**
+ * A reviewer waiting for the author (-5) or rejecting (-10) holds it
+ * where Azure counts that vote: a required reviewer's, or anyone's
+ * under a minimum-reviewers policy that does not allow downvotes.
+ */
+function downvoted(
+  policies: readonly RawEvaluation[],
+  reviewers: readonly ReviewerVote[]
+): boolean {
+  const counted = policies.some(
+    (e) =>
+      typeOf(e) === POLICY.minimumReviewers &&
+      e.configuration?.settings?.allowDownvotes !== true
+  );
+  return reviewers.some(
+    (r) => (r.vote ?? 0) < 0 && (r.isRequired === true || counted)
+  );
+}
+
+/**
  * The review requirement, as Azure states it: every required reviewer
  * approves and every blocking reviewer policy is met. Where it is not,
- * a reviewer who rejected (-10) or waits for the author (-5) has asked
- * for changes. Null evaluations were not read: the policies' part is
- * then unknown.
+ * a downvote Azure counts is changes requested; otherwise it waits for
+ * review. Null evaluations were not read: the policies' part is then
+ * unknown.
  */
 export function reviewsOf(
   evaluations: readonly RawEvaluation[] | null,
@@ -234,9 +278,7 @@ export function reviewsOf(
     (e) => isActive(e) && blocking(e) && REVIEW_POLICIES.includes(typeOf(e))
   );
   if (reviewersBlock(reviewers) || !policies.every(satisfied)) {
-    return reviewers.some((r) => (r.vote ?? 0) < 0)
-      ? 'changes-requested'
-      : 'required';
+    return downvoted(policies, reviewers) ? 'changes-requested' : 'required';
   }
   if (!evaluations) return 'unknown';
   const any = policies.length > 0 || reviewers.some((r) => r.isRequired);

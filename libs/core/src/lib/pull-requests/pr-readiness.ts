@@ -111,7 +111,9 @@ function kindTally(
   const { kind, fails } = words;
   const required = items.filter((c) => c.requirement === 'required');
   const failing = required.filter((c) => FAILED.has(c.outcome));
-  const waiting = required.filter((c) => WAITING.has(c.outcome));
+  const going = required.filter((c) => WAITING.has(c.outcome));
+  const waiting = going.filter((c) => !c.manual);
+  const unstarted = going.filter((c) => c.manual);
   const other = items.filter(
     (c) => c.requirement !== 'required' && FAILED.has(c.outcome)
   );
@@ -131,6 +133,16 @@ function kindTally(
         waiting
       )}`,
       resolvedBy: 'checks',
+    });
+  }
+  if (unstarted.length > 0) {
+    t.blockers.push({
+      kind,
+      text: `Someone must start ${count(
+        unstarted.length,
+        words.required
+      )}: ${names(unstarted)}`,
+      resolvedBy: 'author',
     });
   }
   if (other.length > 0) {

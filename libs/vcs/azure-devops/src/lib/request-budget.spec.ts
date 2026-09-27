@@ -295,6 +295,15 @@ describe('a cycle over pull requests that have not moved', () => {
     );
     await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 100);
     expect(policies()).toBe(2);
+    // A vote is a write too: the reviewer policies' verdict moves with it.
+    await azureDevOpsProvider.submitReviewVerdict!(
+      AUTH,
+      PROJECT,
+      100,
+      'approve'
+    );
+    await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 100);
+    expect(policies()).toBe(3);
   });
 
   it('pays again only for the pull request whose head commit moved', async () => {

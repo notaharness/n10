@@ -26,7 +26,7 @@ ceiling: it is a REST surface. Reasoning: `docs/decisions.md`.
   truncated runs page an unresolved row is omitted from the map ("not looked
   up"); only a complete page records `none`. The selected pull request's
   detail (`pr-overview-details.ts`) is two reads on demand and touches no
-  cycle memo; its checks add one read, the policy evaluations, and share the
-  rest with the detail and the cycle.
+  cycle memo; its checks add the policy evaluations and share the rest: one
+  read while the cycle's statuses are fresh (30 s), two after.
 - GitHub's search returns the rollup and counts with the list, so it
   implements neither `forgetPullRequestCache` nor `resetCaches`.

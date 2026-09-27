@@ -69,7 +69,7 @@ describe('policyCheck', () => {
     expect(
       policyCheck(BUILD('rejected', { lastMergeSourceCommitId: OLD }), WHERE)
     ).toEqual({
-      key: 'policy:7',
+      key: 'policy:7:812',
       kind: 'check',
       requires: null,
       name: 'PR build',
@@ -114,6 +114,21 @@ describe('policyCheck', () => {
     ]);
   });
 
+  it('says a build with a manual trigger waits for someone to queue it', () => {
+    const manual = (status: string) =>
+      policyCheck(
+        evaluation(POLICY.build, status, {
+          settings: { manualQueueOnly: true },
+          context: { buildDefinitionName: 'nightly' },
+        }),
+        WHERE
+      );
+    expect(manual('queued')).toMatchObject({ outcome: 'queued', manual: true });
+    // Once queued by someone, it is under way like any other.
+    expect(manual('running')).not.toHaveProperty('manual');
+    expect(policyCheck(BUILD('queued'), WHERE)).not.toHaveProperty('manual');
+  });
+
   it('names other policies by what they wait for, and runs nothing', () => {
     const status = policyCheck(
       evaluation(POLICY.status, 'queued', {
@@ -143,6 +158,8 @@ describe('the completion gate', () => {
     // A build policy that failed, with no failed status anywhere.
     expect(policiesBlock([BUILD('rejected')])).toBe(true);
     expect(policiesBlock([BUILD('approved', { isExpired: true })])).toBe(true);
+    // A policy that does not apply to this pull request is met.
+    expect(policiesBlock([BUILD('notApplicable')])).toBe(false);
     expect(
       policiesBlock([
         evaluation('work-items', 'rejected', { blocking: false }),
@@ -199,6 +216,27 @@ describe('the completion gate', () => {
     ).toBe('not-required');
   });
 
+  it('counts only the downvotes Azure counts', () => {
+    const minimum = (allowDownvotes?: boolean) =>
+      evaluation(POLICY.minimumReviewers, 'rejected', {
+        settings: allowDownvotes == null ? {} : { allowDownvotes },
+      });
+    const required = { vote: 0, isRequired: true };
+    const rejects = { vote: -10 };
+    // A required reviewer has not voted; an optional one's reject is
+    // not what Azure waits on.
+    expect(reviewsOf([], [required, rejects])).toBe('required');
+    expect(reviewsOf([minimum(true)], [rejects])).toBe('required');
+    // A required reviewer's downvote, or anyone's under a policy that
+    // does not allow them, is changes requested.
+    expect(reviewsOf([], [{ vote: -5, isRequired: true }])).toBe(
+      'changes-requested'
+    );
+    expect(reviewsOf([minimum(false)], [rejects])).toBe('changes-requested');
+    // Azure's default is to count them.
+    expect(reviewsOf([minimum()], [rejects])).toBe('changes-requested');
+  });
+
   it('holds completion for a required reviewer who has not approved', () => {
     const required = (vote: number) => ({ vote, isRequired: true });
     // Approve with suggestions (5) approves; no vote, or waiting, does not.
@@ -236,7 +274,7 @@ describe('the completion gate', () => {
       .filter(isListed)
       .map((e) => [policyCheck(e, WHERE).key, policyCheck(e, WHERE).kind]);
     expect(listed).toEqual([
-      ['policy:7', 'check'],
+      ['policy:7:812', 'check'],
       ['policy:8', 'check'],
       ['policy:11', 'policy'],
     ]);
