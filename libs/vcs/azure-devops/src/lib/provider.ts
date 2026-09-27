@@ -25,6 +25,7 @@ import {
   TTL,
 } from './request.js';
 import { fetchPrBuildStatus } from './build-status.js';
+import { fetchPullRequestChecksAzure } from './pr-checks.js';
 import { fetchPullRequestDetailAzure } from './pr-overview-details.js';
 import { voteToDecision } from './votes.js';
 import { fetchPrBuildRunsBatch } from './builds.js';
@@ -85,6 +86,7 @@ function invalidatePr(config: AdoConfig, prId: number): void {
   invalidateAdoKey(`${repo}/description/${prId}`);
   invalidateAdoKey(`${repo}/detail/${prId}`);
   invalidateAdoKey(`${repo}/iterations/${prId}`);
+  invalidateAdoKey(`${repo}/policies/${prId}`);
   invalidateAdoCache(`${repo}/thread/${prId}/`);
 }
 
@@ -1119,6 +1121,14 @@ export const azureDevOpsProvider: VcsProvider = {
     prId: number
   ) {
     return fetchPullRequestDetailAzure(toAdoConfig(auth, project), prId);
+  },
+
+  fetchPullRequestChecks(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ) {
+    return fetchPullRequestChecksAzure(toAdoConfig(auth, project), prId);
   },
 
   async submitReviewVerdict(

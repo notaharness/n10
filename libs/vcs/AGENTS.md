@@ -14,7 +14,8 @@ ceiling: it is a REST surface. Reasoning: `docs/decisions.md`.
   `context` and counts only the newest entry per check (`iterationId`, date,
   id). `notApplicable` retracts its check and casts no vote; a missing `state`
   is `notSet` (queued). Branch-policy build validation reports under
-  `_apis/policy/evaluations`, which is not read.
+  `_apis/policy/evaluations`, which only the selected pull request's checks
+  read (`pr-checks.ts`), never the cycle.
 - **Request budget** (`pr-cycle.ts`, `pr-details.ts`; asserted by
   `request-budget.spec.ts`, which fails on any reinstated per-row call): a
   quiet cycle over a hundred PRs costs one request. Settled CI verdicts are
@@ -25,6 +26,7 @@ ceiling: it is a REST surface. Reasoning: `docs/decisions.md`.
   truncated runs page an unresolved row is omitted from the map ("not looked
   up"); only a complete page records `none`. The selected pull request's
   detail (`pr-overview-details.ts`) is two reads on demand and touches no
-  cycle memo.
+  cycle memo; its checks add one read, the policy evaluations, and share the
+  rest with the detail and the cycle.
 - GitHub's search returns the rollup and counts with the list, so it
   implements neither `forgetPullRequestCache` nor `resetCaches`.

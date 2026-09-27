@@ -218,6 +218,17 @@ rule n10 cannot see". The unresolved-thread count comes from the list, older
 than the verdict, so it explains a block but never overturns a clear one. Anything that could not be
 read is listed beside the verdict and does not override it.
 
+Azure DevOps has no single verdict field. Its completion gate, in its own
+words, is that "all required reviewers approved it and all required branch
+policies are met", so the adapter (`pr-checks.ts`, `pr-policies.ts`) reads
+exactly that: the required reviewers' votes, each blocking policy's evaluation
+(an expired build's approval is not met) and `mergeStatus`. Blocked where any
+of them stops it; clear only where every blocking policy is met on a merge that
+succeeded; undecided otherwise. A draft is blocked by its lifecycle, as on
+GitHub. Reviewer and comment policies are not listed as items, since the review
+requirement and `MergeState.conversations` carry their verdicts; other
+policies, such as work item linking, are listed with `kind: 'policy'`.
+
 Optimistic removal drops a session row but retains a PR row with its session
 fields cleared: the PR outlives its checkout. Status indicators combine CI and
 review status; CI can worsen the result, but passing CI does not imply approval.
