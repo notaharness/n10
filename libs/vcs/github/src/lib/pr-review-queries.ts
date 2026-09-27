@@ -7,19 +7,27 @@ import type { ReviewPlace } from '@n10/vcs-core';
  * add to it, `submitPullRequestReview` files it with its verdict.
  */
 
-/** The pull request, its head, and the reviewer's own pending review
- *  (GitHub shows nobody else's) with what is in it. */
+/** The pull request, its head, and the reviewer's pending review:
+ *  whose it is and on which commit. */
 export const REVIEW_STATE = `query ReviewPublicationState($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
       id
       headRefOid
-      reviews(states: [PENDING], first: 1) {
-        nodes {
-          id
-          createdAt
-          comments(first: 100) { nodes { id body path replyTo { id } } }
-        }
+      reviews(states: [PENDING], first: 10) {
+        nodes { id createdAt viewerDidAuthor commit { oid } }
+      }
+    }
+  }
+}`;
+
+/** One page of what a pending review holds, to find a lost comment. */
+export const REVIEW_COMMENTS = `query ReviewPublicationComments($id: ID!, $after: String) {
+  node(id: $id) {
+    ... on PullRequestReview {
+      comments(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes { id body path line subjectType replyTo { id } }
       }
     }
   }
@@ -91,3 +99,31 @@ export const DELETE_REVIEW = `mutation DeletePendingReview($review: ID!) {
     pullRequestReview { id }
   }
 }`;
+
+/** The variables `addThreadMutation(place)` declares. */
+export function threadVariables(
+  place: Exclude<ReviewPlace, { kind: 'reply' }>
+): Record<string, string | number> {
+  if (place.kind === 'file') return { path: place.path };
+  const { range } = place;
+  const one = range.start === range.end;
+  return {
+    path: place.path,
+    line: range.end,
+    side: range.side,
+    ...(one ? {} : { startLine: range.start, startSide: range.startSide }),
+  };
+}
+
+/** The comment an add answered with: a reply's, or a thread's first. */
+export function commentIdOf(answer: unknown): string {
+  const data = (answer as { data?: Record<string, unknown> }).data ?? {};
+  const reply = data['addPullRequestReviewThreadReply'] as
+    | { comment: { id: string } }
+    | undefined;
+  if (reply) return reply.comment.id;
+  const thread = data['addPullRequestReviewThread'] as {
+    thread: { comments: { nodes: { id: string }[] } };
+  };
+  return thread.thread.comments.nodes[0]!.id;
+}

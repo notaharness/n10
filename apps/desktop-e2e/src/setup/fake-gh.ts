@@ -34,8 +34,11 @@ export interface FakePr {
   /** Submitted reviews: the list reads the verdicts, the conversation
    *  reads the summaries too. */
   reviews?: {
+    id?: string;
     author: string;
     state: string;
+    /** The commit a review filed through n10 was made on. */
+    commit?: string;
     body?: string;
     commentCount?: number;
     submittedAt?: string;
@@ -58,6 +61,7 @@ export interface FakeThread {
   /** Left off, with no `originalLine` either, for a file-level thread. */
   line?: number;
   startLine?: number;
+  startSide?: 'LEFT' | 'RIGHT';
   /** Set with `line: null` semantics by leaving `line` off — see the
    *  outdated-thread case in the TUI suite. */
   originalLine?: number;

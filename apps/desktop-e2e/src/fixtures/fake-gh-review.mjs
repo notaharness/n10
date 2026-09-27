@@ -8,7 +8,11 @@
  * whose answer never arrives, once each: the publisher must find what
  * it did rather than do it again. `scenario.reviewWrites` counts what
  * reached "GitHub", for a test to assert nothing was sent twice.
+ * What GitHub itself refuses (a second pending review, a submit of one
+ * not pending) is answered with GraphQL errors and no write.
  */
+
+class Refused extends Error {}
 
 let next = 0;
 const newId = (prefix) => `${prefix}_${Date.now()}_${++next}`;
@@ -38,9 +42,35 @@ const reads = {
           headRefOid: pr.headRefOid ?? 'f'.repeat(40),
           reviews: {
             nodes: pending
-              ? [{ ...pending, comments: { nodes: pending.comments } }]
+              ? [
+                  {
+                    id: pending.id,
+                    createdAt: pending.createdAt,
+                    viewerDidAuthor: true,
+                    commit: { oid: pending.commit },
+                  },
+                ]
               : [],
           },
+        },
+      },
+    };
+  },
+  ReviewPublicationComments(prs, vars) {
+    const pr = prs.find((p) => p.pendingReview?.id === vars.id);
+    if (!pr) return { node: null };
+    return {
+      node: {
+        comments: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: pr.pendingReview.comments.map((c) => ({
+            id: c.id,
+            body: c.body,
+            path: c.path,
+            line: c.line ?? null,
+            subjectType: c.file ? 'FILE' : 'LINE',
+            replyTo: c.replyTo,
+          })),
         },
       },
     };
@@ -60,6 +90,11 @@ const reads = {
 const writes = {
   StartReview(prs, vars, scenario) {
     const pr = prOf(prs, vars);
+    if (pr.pendingReview) {
+      throw new Refused(
+        'User can only have one pending review per pull request'
+      );
+    }
     const id = newId('PRR');
     pr.pendingReview = {
       id,
@@ -80,6 +115,7 @@ const writes = {
       replyTo: null,
       line: vars.line ? Number(vars.line) : undefined,
       startLine: vars.startLine ? Number(vars.startLine) : undefined,
+      startSide: vars.startSide,
       side: vars.side,
       file: query.includes('subjectType: FILE'),
     });
@@ -93,11 +129,16 @@ const writes = {
   AddReviewReply(prs, vars, scenario) {
     const pr = prOf(prs, vars);
     const id = newId('PRRC');
+    const i = (pr.threads ?? []).findIndex(
+      (x, n) => (x.id ?? `thread-${n + 1}`) === vars.thread
+    );
+    const parent = pr.threads?.[i]?.comments[0];
     pr.pendingReview.comments.push({
       id,
       body: vars.body,
       path: '',
-      replyTo: { id: vars.thread },
+      // The comment replied to, as GitHub's `replyTo` is.
+      replyTo: { id: parent?.id ?? `thread-${i + 1}-comment-1` },
       thread: vars.thread,
     });
     count(scenario, 'AddReviewReply');
@@ -106,7 +147,8 @@ const writes = {
   SubmitReview(prs, vars, scenario) {
     const pr = prOf(prs, vars);
     const author = scenario.username ?? 'n10-tester';
-    const pending = pr.pendingReview;
+    const pending = pr?.pendingReview;
+    if (!pending) throw new Refused('Review is not pending');
     for (const c of pending.comments) {
       if (c.thread) {
         const t = (pr.threads ?? []).find(
@@ -120,7 +162,12 @@ const writes = {
             path: c.path,
             ...(c.file
               ? {}
-              : { line: c.line, startLine: c.startLine, side: c.side }),
+              : {
+                  line: c.line,
+                  startLine: c.startLine,
+                  startSide: c.startSide,
+                  side: c.side,
+                }),
             comments: [{ author, body: c.body }],
           },
         ];
@@ -138,6 +185,7 @@ const writes = {
         state,
         body: vars.body,
         commentCount: pending.comments.length,
+        commit: pending.commit,
         submittedAt: new Date().toISOString(),
       },
     ];
@@ -152,13 +200,19 @@ const writes = {
 /**
  * The answer to a review publication query or mutation, or null when
  * `query` is none of them. `lost` is set when the write was kept but
- * its answer must be dropped.
+ * its answer must be dropped; `errors` when GitHub would refuse it.
  */
 export function reviewGraphql(query, vars, prs, scenario) {
   const op = /(?:query|mutation) (\w+)\(/.exec(query)?.[1];
   if (reads[op]) return { data: reads[op](prs, vars) };
   if (!writes[op]) return null;
-  const data = writes[op](prs, vars, scenario, query);
+  let data;
+  try {
+    data = writes[op](prs, vars, scenario, query);
+  } catch (err) {
+    if (err instanceof Refused) return { errors: [{ message: err.message }] };
+    throw err;
+  }
   const lose = scenario.loseAnswers ?? [];
   const lost = lose.includes(op);
   if (lost) scenario.loseAnswers = lose.filter((x) => x !== op);

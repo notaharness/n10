@@ -111,7 +111,6 @@ export function PostingNotice({
       : `Couldn't post: ${refused}`;
   return (
     <p
-      role="status"
       className={
         refused && !state
           ? 'flex items-center gap-1.5 border-b border-border bg-destructive/5 px-3 py-1.5 text-xs text-destructive'
@@ -119,7 +118,7 @@ export function PostingNotice({
       }
     >
       {state === 'publishing' ? (
-        <Loader2Icon className="size-3.5 animate-spin" />
+        <Loader2Icon className="size-3.5 motion-safe:animate-spin" />
       ) : (
         <AlertCircleIcon className="size-3.5" />
       )}

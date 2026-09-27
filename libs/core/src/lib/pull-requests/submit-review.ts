@@ -24,6 +24,7 @@ import {
   type DraftsRequest,
   type ReviewDrafts,
 } from './review-drafts.js';
+import { withSubmitClaim } from './submit-claims.js';
 
 /**
  * The reviewer's chosen drafts filed as one native review, by identity.
@@ -52,14 +53,6 @@ export type SubmitSources = DraftSources & {
 };
 
 const EVENTS: readonly string[] = ['COMMENT', 'APPROVE', 'REQUEST_CHANGES'];
-
-/**
- * Drafts files with a submit running in this process. A second submit
- * would take the first one's attempt for its own and resume it while it
- * is still going: it is refused instead. The host is one process per
- * machine (the single-instance lock), so this is the whole claim.
- */
-const running = new Set<string>();
 
 export function parseSubmitReviewRequest(value: unknown): SubmitReviewRequest {
   const base = parseDraftsRequest(value);
@@ -92,21 +85,10 @@ export async function submitReview(
     throw new Error("This provider can't file a review from n10");
   }
   const dir = src.dir ?? defaultDraftDir();
-  const claim = draftFilePath(dir, req.ref, viewer);
-  if (running.has(claim)) {
-    throw new Error('This review is already being submitted');
-  }
-  running.add(claim);
-  try {
-    return await submitClaimed(
-      req,
-      { ...src, publish: src.publish },
-      dir,
-      viewer
-    );
-  } finally {
-    running.delete(claim);
-  }
+  const publish = src.publish;
+  return withSubmitClaim(draftFilePath(dir, req.ref, viewer), () =>
+    submitClaimed(req, { ...src, publish }, dir, viewer)
+  );
 }
 
 async function submitClaimed(
@@ -121,11 +103,12 @@ async function submitClaimed(
   const chosen = choose(file, req.draftIds);
   const submission = toSubmission(req, chosen);
   const attempt = file.submission?.attempt ?? randomUUID();
+  const before = file.submission?.draftIds ?? [];
 
   drafts.update((f) => ({
     ...f,
     drafts: f.drafts.map((d) =>
-      publicationFor(d, chosen, file.submission?.draftIds ?? [], attempt, now())
+      publicationFor(d, chosen, before, attempt, now())
     ),
     submission: {
       attempt,
@@ -145,21 +128,24 @@ async function submitClaimed(
 
   try {
     const published = await src.publish(submission, ledger);
-    settle(drafts, chosen, attempt, (d) => ({
-      state: 'published',
-      attempt,
-      remoteId: published.items[d.id] ?? published.reviewId,
-      at: now(),
+    // A resumed review is the earlier attempt's: what it filed is what
+    // that attempt chose, whatever this request asked for.
+    const filed = new Set(published.resumed ? before : chosen.map((d) => d.id));
+    drafts.update((f) => ({
+      ...f,
+      drafts: f.drafts.map((d) => settled(d, published, filed, attempt, now())),
+      submission: undefined,
     }));
-    drafts.update((f) => ({ ...f, submission: undefined }));
   } catch (err) {
     const unanswered = ledger.read()?.inFlight != null;
-    settle(
-      drafts,
-      chosen,
-      attempt,
-      afterFailure(err, unanswered, attempt, now())
-    );
+    drafts.update((f) => ({
+      ...f,
+      drafts: f.drafts.map((d) =>
+        ownedBy(d, attempt)
+          ? { ...d, publication: afterFailure(d, err, unanswered, now()) }
+          : d
+      ),
+    }));
     throw err;
   }
   return { ref: req.ref, viewer, drafts: drafts.read().drafts };
@@ -280,46 +266,62 @@ function publicationFor(
   return d;
 }
 
-function settle(
-  drafts: DraftsFile,
-  chosen: ReviewDraft[],
+/** Marked `publishing` by this attempt, and not settled since. */
+function ownedBy(d: ReviewDraft, attempt: string): boolean {
+  return (
+    d.publication.state === 'publishing' && d.publication.attempt === attempt
+  );
+}
+
+/**
+ * Where a draft stands once the review is filed: posted when the
+ * review holds it (an item by its comment, the summary as the review's
+ * own text), or back to unpublished when this attempt chose it and the
+ * filed review, an earlier attempt's, did not.
+ */
+function settled(
+  d: ReviewDraft,
+  published: PublishedReview,
+  filed: Set<string>,
   attempt: string,
-  outcome: (d: ReviewDraft) => Publication
-): void {
-  const ids = new Set(chosen.map((d) => d.id));
-  drafts.update((f) => ({
-    ...f,
-    drafts: f.drafts.map((d) =>
-      ids.has(d.id) &&
-      d.publication.state === 'publishing' &&
-      d.publication.attempt === attempt
-        ? { ...d, publication: outcome(d) }
-        : d
-    ),
-  }));
+  at: number
+): ReviewDraft {
+  const remoteId =
+    published.items[d.id] ??
+    (d.target.kind === 'summary' && filed.has(d.id)
+      ? published.reviewId
+      : null);
+  if (remoteId && filed.has(d.id)) {
+    return { ...d, publication: { state: 'published', attempt, remoteId, at } };
+  }
+  return ownedBy(d, attempt)
+    ? { ...d, publication: { state: 'unpublished' } }
+    : d;
 }
 
 /**
  * Where a draft stands after a failed attempt. Unanswered: it may be in
- * the review, so it is looked for next time. Refused: the provider's
- * reason, and it can be edited. Stopped before any write (the pull
+ * the review, so it is looked for next time. Refused at an item: that
+ * draft carries the provider's reason and can be edited; the others
+ * were not refused and are as they were. Refused at the review itself:
+ * every draft carries the reason. Stopped before any write (the pull
  * request moved on, a pending review of the reviewer's own): as it was.
  */
 function afterFailure(
+  d: ReviewDraft,
   err: unknown,
   unanswered: boolean,
-  attempt: string,
   at: number
-): (d: ReviewDraft) => Publication {
+): Publication {
+  const { attempt } = d.publication as { attempt: string };
   const reason = err instanceof Error ? err.message : String(err);
   // A step of this or an earlier attempt is still unaccounted for.
-  if (unanswered) return () => ({ state: 'unknown', attempt, since: at });
-  if (isReviewPublishError(err)) {
-    if (err.failure === 'refused') {
-      return () => ({ state: 'failed', attempt, reason, at });
-    }
-    return () => ({ state: 'unpublished' });
+  if (unanswered) return { state: 'unknown', attempt, since: at };
+  if (!isReviewPublishError(err)) {
+    // The read before any write failed: nothing was sent.
+    return { state: 'failed', attempt, reason, at };
   }
-  // The read before any write failed: nothing was sent.
-  return () => ({ state: 'failed', attempt, reason, at });
+  if (err.failure !== 'refused') return { state: 'unpublished' };
+  if (err.item && err.item !== d.id) return { state: 'unpublished' };
+  return { state: 'failed', attempt, reason, at };
 }

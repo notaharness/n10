@@ -6,6 +6,7 @@ import {
 } from './pr-snapshot.js';
 import {
   defaultDraftDir,
+  draftFilePath,
   readDraftFile,
   writeDraftFile,
   type DraftFile,
@@ -17,6 +18,7 @@ import {
   type DraftTarget,
   type ReviewDraft,
 } from './review-draft-types.js';
+import { asRead } from './submit-claims.js';
 
 /**
  * A reviewer's private drafts, read and written by identity: which pull
@@ -82,7 +84,12 @@ export function listReviewDrafts(
   src: DraftSources
 ): ReviewDrafts {
   const viewer = assertSameContext(req, src);
-  const { drafts } = readDraftFile(dirOf(src), req.ref, viewer);
+  const dir = dirOf(src);
+  const file = draftFilePath(dir, req.ref, viewer);
+  const drafts = readDraftFile(dir, req.ref, viewer).drafts.map((d) => ({
+    ...d,
+    publication: asRead(file, d.publication),
+  }));
   return { ref: req.ref, viewer, drafts };
 }
 

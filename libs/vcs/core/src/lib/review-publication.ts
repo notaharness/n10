@@ -48,9 +48,12 @@ export interface ReviewLedger {
   head: Oid;
   /** The provider's pending review, once created. */
   reviewId: string | null;
-  /** The step sent whose answer never came: `review`, `submit`, or an
-   *  item's key. */
+  /** The step sent whose answer never came: `review`, `discard`,
+   *  `submit`, `drop:<key>`, or an item's key. */
   inFlight: string | null;
+  /** What that item step was adding, to find it in the pending review
+   *  even when its draft has since been deselected. */
+  sending: { body: string; place: ReviewPlace } | null;
   /** Each item already in the pending review: its remote id, and the
    *  text it was added with. */
   added: Record<string, { id: string; body: string }>;
@@ -64,8 +67,11 @@ export interface LedgerStore {
 
 export interface PublishedReview {
   reviewId: string;
-  /** Each item's remote comment id. */
+  /** Each item in the filed review, by key, with its remote comment id. */
   items: Record<string, string>;
+  /** The review had already been filed by an earlier attempt whose
+   *  answer was lost: what it holds is that attempt's, not this one's. */
+  resumed: boolean;
 }
 
 /**
@@ -79,10 +85,20 @@ export type PublishFailure = 'refused' | 'unknown' | 'moved' | 'blocked';
 
 export class ReviewPublishError extends Error {
   readonly failure: PublishFailure;
-  constructor(failure: PublishFailure, message: string, cause?: unknown) {
-    super(message, cause === undefined ? undefined : { cause });
+  /** The item whose step stopped it, when it was an item's. */
+  readonly item: string | null;
+  constructor(
+    failure: PublishFailure,
+    message: string,
+    details: { cause?: unknown; item?: string | null } = {}
+  ) {
+    super(
+      message,
+      details.cause === undefined ? undefined : { cause: details.cause }
+    );
     this.name = 'ReviewPublishError';
     this.failure = failure;
+    this.item = details.item ?? null;
   }
 }
 
@@ -96,6 +112,7 @@ export function freshLedger(head: Oid, now: number): ReviewLedger {
     head,
     reviewId: null,
     inFlight: null,
+    sending: null,
     added: {},
     submitted: false,
   };

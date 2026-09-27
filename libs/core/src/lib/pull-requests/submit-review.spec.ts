@@ -9,7 +9,7 @@ import {
   type ReviewSubmission,
 } from '@n10/vcs-core';
 import { PullRequestIdentityError } from './pr-snapshot.js';
-import { readDraftFile } from './review-draft-store.js';
+import { readDraftFile, writeDraftFile } from './review-draft-store.js';
 import { listReviewDrafts, saveReviewDraft } from './review-drafts.js';
 import {
   parseSubmitReviewRequest,
@@ -102,12 +102,14 @@ describe('submitting a review', () => {
           head: HEAD,
           reviewId: 'R',
           inFlight: null,
+          sending: null,
           added: {},
           submitted: true,
         });
         return Promise.resolve({
           reviewId: 'R',
           items: { 'inline:k1': 'C1', 'inline:k2': 'C2', 'reply:PRRT_1': 'C3' },
+          resumed: false,
         });
       })
     );
@@ -156,6 +158,7 @@ describe('submitting a review', () => {
         head: HEAD,
         reviewId: 'R',
         inFlight: 'submit',
+        sending: null,
         added: {},
         submitted: false,
       });
@@ -169,7 +172,11 @@ describe('submitting a review', () => {
 
     const resumed: Publish = (_s, ledger: LedgerStore) => {
       attempts.push(ledger.read()?.inFlight ?? null);
-      return Promise.resolve({ reviewId: 'R', items: { 'inline:k1': 'C1' } });
+      return Promise.resolve({
+        reviewId: 'R',
+        items: { 'inline:k1': 'C1' },
+        resumed: true,
+      });
     };
     await submitReview(request(['summary', 'inline:k1']), src(resumed));
     expect(attempts).toEqual(['submit']);
@@ -215,13 +222,96 @@ describe('submitting a review', () => {
     await submitReview(
       request(['inline:k1']),
       src(() =>
-        Promise.resolve({ reviewId: 'R', items: { 'inline:k1': 'C1' } })
+        Promise.resolve({
+          reviewId: 'R',
+          items: { 'inline:k1': 'C1' },
+          resumed: false,
+        })
       )
     );
     expect(states()).toMatchObject({
       'inline:k1': 'published',
       'inline:k2': 'unpublished',
     });
+  });
+
+  it('settles a resumed review by what it filed, not by the new choice', async () => {
+    const lost: Publish = () =>
+      Promise.reject(new ReviewPublishError('unknown', 'no answer'));
+    const unanswered = src((_s, ledger) => {
+      ledger.write({
+        startedAt: 1,
+        head: HEAD,
+        reviewId: 'R',
+        inFlight: 'submit',
+        sending: null,
+        added: { 'inline:k1': { id: 'C1', body: 'x' } },
+        submitted: false,
+      });
+      return lost(_s, ledger);
+    });
+    await submitReview(request(['summary', 'inline:k1']), unanswered).catch(
+      () => undefined
+    );
+    await submitReview(
+      request(['inline:k1', 'inline:k2']),
+      src(() =>
+        Promise.resolve({
+          reviewId: 'R',
+          items: { 'inline:k1': 'C1' },
+          resumed: true,
+        })
+      )
+    );
+    expect(states()).toMatchObject({
+      summary: 'published',
+      'inline:k1': 'published',
+      'inline:k2': 'unpublished',
+    });
+  });
+
+  it('gives a refusal’s reason to the draft it stopped at, and leaves the others as they were', async () => {
+    await expect(
+      submitReview(
+        request(['inline:k1', 'reply:PRRT_1']),
+        src(() =>
+          Promise.reject(
+            new ReviewPublishError('refused', 'thread is locked', {
+              item: 'reply:PRRT_1',
+            })
+          )
+        )
+      )
+    ).rejects.toThrow('locked');
+    expect(states()).toMatchObject({
+      'inline:k1': 'unpublished',
+      'reply:PRRT_1': 'failed',
+    });
+  });
+
+  it('reads a draft left being posted by a submit that stopped with n10 as maybe posted', async () => {
+    let seen: string | undefined;
+    await submitReview(
+      request(['inline:k1']),
+      src(() => {
+        seen = states()['inline:k1'];
+        return Promise.reject(new Error('killed'));
+      })
+    ).catch(() => undefined);
+    expect(seen).toBe('publishing');
+    const file = readDraftFile(dir, REF, 'bea');
+    writeDraftFile(dir, {
+      ...file,
+      drafts: file.drafts.map((d) =>
+        d.id === 'inline:k1'
+          ? {
+              ...d,
+              publication: { state: 'publishing', attempt: 'A', since: 1 },
+            }
+          : d
+      ),
+    });
+    expect(states()['inline:k1']).toBe('unknown');
   });
 
   it('refuses what is no review: a conversation comment, or nothing to say', async () => {
@@ -249,7 +339,12 @@ describe('two submits at once', () => {
     const slow: Publish = () => {
       calls++;
       return new Promise((resolve) => {
-        finish = () => resolve({ reviewId: 'R', items: { 'inline:k1': 'C1' } });
+        finish = () =>
+          resolve({
+            reviewId: 'R',
+            items: { 'inline:k1': 'C1' },
+            resumed: false,
+          });
       });
     };
     const first = submitReview(request(['inline:k1']), src(slow));

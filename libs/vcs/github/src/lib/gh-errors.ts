@@ -34,6 +34,20 @@ export function ghOutput(err: unknown): string {
   return parts.length > 0 ? parts.join('\n') : String(err);
 }
 
+/**
+ * What `gh` itself said: stderr and stdout, never Node's `message`,
+ * which begins with the whole command line — a comment's body among it.
+ * A body that says "HTTP 404" must not read as GitHub saying it.
+ */
+function ghDiagnostics(err: unknown): string {
+  if (err == null || typeof err !== 'object') return String(err);
+  const e = err as Record<string, unknown>;
+  return [e.stderr, e.stdout]
+    .filter((p): p is string => typeof p === 'string' && p.trim() !== '')
+    .map((p) => p.trim())
+    .join('\n');
+}
+
 function code(err: unknown): string {
   if (err == null || typeof err !== 'object') return '';
   const value = (err as { code?: unknown }).code;
@@ -84,7 +98,7 @@ export function classifyGhError(err: unknown): VcsError {
     );
   }
 
-  const output = ghOutput(err);
+  const output = ghDiagnostics(err);
   for (const { kind, match } of PATTERNS) {
     if (!match.test(output)) continue;
     // Turned away before anything was done; a 5xx may have been after.
@@ -100,16 +114,18 @@ export function classifyGhError(err: unknown): VcsError {
       refused,
     });
   }
-  const refusal = graphQlRefusal(err);
-  if (refusal) {
-    return new VcsError('server', `GitHub refused: ${refusal}`, {
+  const failure = graphQlFailure(err);
+  if (failure) {
+    return new VcsError('server', `GitHub: ${failure.message}`, {
       cause: err,
-      refused: true,
+      refused: failure.refused,
     });
   }
   // Nothing recognised: the CLI's own words are still the best
   // description available, and hiding them would lose the only clue.
-  return new VcsError('unknown', `gh: ${output}`, { cause: err });
+  return new VcsError('unknown', `gh: ${output || 'failed without a word'}`, {
+    cause: err,
+  });
 }
 
 /**
@@ -133,6 +149,42 @@ export function parseGhJson<T>(stdout: string, what: string): T {
 }
 
 /**
+ * GraphQL errors from a response with no data: refused (nothing was
+ * done) unless GitHub says the query ran out of time, when it may have
+ * got partway. A response with data beside its errors is not a failure.
+ */
+function failureOf(
+  payload: unknown
+): { message: string; refused: boolean } | null {
+  if (payload == null || typeof payload !== 'object') return null;
+  const { data, errors } = payload as { data?: unknown; errors?: unknown };
+  if (data != null || !Array.isArray(errors) || errors.length === 0) {
+    return null;
+  }
+  const messages = errors.map((e) => {
+    const m = (e as { message?: unknown } | null)?.message;
+    return typeof m === 'string' ? m : '';
+  });
+  const timedOut = messages.some((m) =>
+    /timeout|something went wrong/i.test(m)
+  );
+  return { message: messages[0] || 'no data returned', refused: !timedOut };
+}
+
+/** The GraphQL failure `gh` printed on stdout before exiting non-zero. */
+function graphQlFailure(err: unknown) {
+  const stdout = (err as { stdout?: unknown } | null)?.stdout;
+  if (typeof stdout !== 'string' || !stdout.trim().startsWith('{')) {
+    return null;
+  }
+  try {
+    return failureOf(JSON.parse(stdout));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * A GraphQL response that carries errors and no data.
  *
  * Partial failures — one field resolving to null with an error beside
@@ -140,35 +192,12 @@ export function parseGhJson<T>(stdout: string, what: string): T {
  * handle a missing field. It is the total failure that used to surface
  * as a `TypeError` several frames away from the cause.
  */
-/** The first GraphQL error `gh` printed before exiting non-zero: the
- *  API answered and declined, so nothing was written. */
-function graphQlRefusal(err: unknown): string | null {
-  const stdout = (err as { stdout?: unknown } | null)?.stdout;
-  if (typeof stdout !== 'string' || !stdout.trim().startsWith('{')) {
-    return null;
-  }
-  try {
-    const { errors } = JSON.parse(stdout) as { errors?: unknown };
-    const first = Array.isArray(errors) ? errors[0] : undefined;
-    const message = (first as { message?: unknown } | undefined)?.message;
-    return typeof message === 'string' ? message : null;
-  } catch {
-    return null;
-  }
-}
-
 export function assertGraphQlData(payload: unknown, what: string): void {
-  if (payload == null || typeof payload !== 'object') return;
-  const { data, errors } = payload as { data?: unknown; errors?: unknown[] };
-  if (data != null || !Array.isArray(errors) || errors.length === 0) return;
-  const first = errors[0];
-  const detail =
-    first &&
-    typeof first === 'object' &&
-    typeof (first as { message?: unknown }).message === 'string'
-      ? (first as { message: string }).message
-      : 'no data returned';
-  throw new VcsError('server', `GitHub could not answer ${what}: ${detail}`, {
-    refused: true,
-  });
+  const failure = failureOf(payload);
+  if (!failure) return;
+  throw new VcsError(
+    'server',
+    `GitHub could not answer ${what}: ${failure.message}`,
+    { refused: failure.refused }
+  );
 }

@@ -56,10 +56,15 @@ async function draftOn(
   page: Page,
   side: 'LEFT' | 'RIGHT',
   line: number,
-  text: string
+  text: string,
+  end = line
 ) {
   await gutterOf(page, side, line).click();
-  const where = `${side === 'LEFT' ? 'old' : 'new'} line ${line}`;
+  if (end !== line) {
+    await gutterOf(page, side, end).click({ modifiers: ['Shift'] });
+  }
+  const lines = end === line ? `line ${line}` : `lines ${line}–${end}`;
+  const where = `${side === 'LEFT' ? 'old' : 'new'} ${lines}`;
   await page.getByRole('button', { name: `Comment on ${where}` }).click();
   await page.getByRole('textbox', { name: 'Comment' }).fill(text);
   await page.getByRole('button', { name: 'Add to review' }).click();
@@ -111,7 +116,7 @@ test.describe('Publishing a review', () => {
   }) => {
     const { page, homeDir } = desktop;
     await openDiff(page);
-    await draftOn(page, 'RIGHT', 1, 'Why three?');
+    await draftOn(page, 'RIGHT', 1, 'Why three?', 2);
     await draftOn(page, 'LEFT', 2, 'The old wait was fine.');
 
     expect(await submit(page)).toEqual({ ok: ['published', 'published'] });
@@ -122,12 +127,18 @@ test.describe('Publishing a review', () => {
       SubmitReview: 1,
     });
     const pr = after.prs[0]!;
-    expect(pr.reviews).toHaveLength(1);
+    expect(pr.reviews).toMatchObject([{ commit: HEAD, state: 'COMMENTED' }]);
     expect(
-      pr.threads?.map((t) => [t.side, t.line, t.comments[0]!.body])
+      pr.threads?.map((t) => [
+        t.startSide,
+        t.startLine,
+        t.side,
+        t.line,
+        t.comments[0]!.body,
+      ])
     ).toEqual([
-      ['RIGHT', 1, 'Why three?'],
-      ['LEFT', 2, 'The old wait was fine.'],
+      ['RIGHT', 1, 'RIGHT', 2, 'Why three?'],
+      [undefined, undefined, 'LEFT', 2, 'The old wait was fine.'],
     ]);
   });
 
@@ -164,6 +175,29 @@ test.describe('Publishing a review', () => {
     const after = scenario(homeDir);
     expect(after.reviewWrites?.['SubmitReview']).toBe(1);
     expect(after.prs[0]!.reviews).toHaveLength(1);
+  });
+
+  test('a comment whose answer was lost is found in the pending review, not added again', async ({
+    desktop,
+  }) => {
+    const { page, homeDir } = desktop;
+    updateFakeGh(homeDir, (s) => {
+      s.loseAnswers = ['AddReviewThread'];
+    });
+    await openDiff(page);
+    await draftOn(page, 'RIGHT', 1, 'Why three?');
+
+    expect(await submit(page)).toEqual({
+      error: expect.stringContaining('GitHub did not answer'),
+    });
+    expect(await submit(page)).toEqual({ ok: ['published'] });
+    const after = scenario(homeDir);
+    expect(after.reviewWrites).toEqual({
+      StartReview: 1,
+      AddReviewThread: 1,
+      SubmitReview: 1,
+    });
+    expect(after.prs[0]!.threads).toHaveLength(1);
   });
 
   test('a pull request that moved on is not reviewed, and the drafts stay', async ({
