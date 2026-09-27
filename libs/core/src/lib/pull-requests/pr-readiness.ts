@@ -209,6 +209,11 @@ function reviewsTally({ merge }: ReadinessInputs, t: Tally): void {
   }
 }
 
+/** Whether the rules ask for threads to be resolved; null unread. */
+function ruleOf(rules: ReadinessInputs['rules']): boolean | null {
+  return rules.state === 'read' ? rules.value.conversationResolution : null;
+}
+
 /** Unresolved threads block where a rule says so and the provider does
  *  not say it is clear; otherwise they are there to read, not in the
  *  way. The count is the list's, older than the provider's verdict.
@@ -228,12 +233,7 @@ function conversationsTally(inputs: ReadinessInputs, t: Tally): void {
     t.blockers.push(item);
     return;
   }
-  const enforced =
-    judged === 'resolved'
-      ? false
-      : inputs.rules.state === 'read'
-      ? inputs.rules.value.conversationResolution
-      : null;
+  const enforced = judged === 'resolved' ? false : ruleOf(inputs.rules);
   if (open == null) {
     // Moot where no rule asks, or the provider says it is clear.
     if (enforced !== false && inputs.merge.blocked !== false) {
