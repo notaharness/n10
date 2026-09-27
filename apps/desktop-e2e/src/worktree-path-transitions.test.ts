@@ -1,25 +1,35 @@
 import { execFileSync } from 'node:child_process';
-import { renameSync, symlinkSync, rmSync } from 'node:fs';
+import { realpathSync, renameSync, symlinkSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { visibleWithin } from './setup/lifecycle.js';
 import { test, expect } from './fixtures/desktop.js';
 import { sidebarRow, tab, tabs, visibleText } from './setup/app.js';
 import {
   addExternalWorktree,
   startExternalTmuxSession,
 } from './setup/external.js';
-import { listTaggedSessions } from './setup/tmux.js';
+import { listTaggedSessions, type TaggedTmuxSession } from './setup/tmux.js';
 
 const paths = [
   {
     name: 'symlink',
     prepare: (repo: string, next: string) => symlinkSync(repo, next, 'dir'),
     restore: (_repo: string, next: string) => rmSync(next, { force: true }),
+    // The same physical checkout: its tags already name it.
+    tags: (before: TaggedTmuxSession[]) => before,
   },
   {
     name: 'moved',
     prepare: moveRepo,
     restore: (repo: string, next: string) => moveRepo(next, repo),
+    // Rebound to the checkout the agent moved with.
+    tags: (before: TaggedTmuxSession[], next: string) =>
+      before.map((s) => ({
+        ...s,
+        repo: realpathSync(next),
+        worktreePath: realpathSync(
+          join(next, '.claude', 'worktrees', 'path-agent')
+        ),
+      })),
   },
 ];
 
@@ -50,31 +60,27 @@ for (const pathKind of paths) {
       timeout: 30_000,
     });
     const before = listTaggedSessions(homeDir);
+    const names = () => listTaggedSessions(homeDir).map((s) => s.name);
     const nextPath = join(homeDir, 'repo');
-    let observed = false;
     try {
       pathKind.prepare(repoPath, nextPath);
       await desktop.restart(nextPath);
       await expect(sidebarRow(desktop.page, /path-agent/)).toBeVisible();
       await sidebarRow(desktop.page, /path-agent/).click();
-      expect(listTaggedSessions(homeDir)).toEqual(before);
-      observed = await visibleWithin(
-        visibleText(desktop.page, 'path-agent-ready')
-      );
+      expect(names()).toEqual(before.map((s) => s.name));
+      await expect(visibleText(desktop.page, 'path-agent-ready')).toBeVisible({
+        timeout: 15_000,
+      });
       await expect(tabs(desktop.page)).toHaveCount(1);
-      expect(listTaggedSessions(homeDir)).toEqual(before);
+      expect(listTaggedSessions(homeDir)).toEqual(
+        pathKind.tags(before, nextPath)
+      );
     } finally {
-      // Stop and restore before the expected-failure annotation: cleanup errors must fail CI.
       try {
         await desktop.stop();
       } finally {
         pathKind.restore(repoPath, nextPath);
       }
     }
-    test.fail(
-      pathKind.name === 'moved',
-      'https://github.com/notaharness/n10/issues/208'
-    );
-    expect(observed).toBe(true);
   });
 }

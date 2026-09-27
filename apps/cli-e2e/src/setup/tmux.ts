@@ -93,6 +93,7 @@ export interface TaggedTmuxSession {
   branch: string;
   paneDead: boolean;
   panePid: number;
+  worktreePath: string;
 }
 
 const LISTING = [
@@ -103,6 +104,8 @@ const LISTING = [
   '#{@orchestra-branch}',
   '#{pane_dead}',
   '#{pane_pid}',
+  // Last: a path may contain anything, tabs included.
+  '#{@orchestra-worktree-path}',
 ].join('\t');
 
 /** Every session on the test's tmux server, tags included. Empty when
@@ -132,6 +135,7 @@ export function listTaggedSessions(tmuxTmpdir: string): TaggedTmuxSession[] {
           branch = '',
           dead,
           pid,
+          ...path
         ] = line.split('\t');
         return {
           name,
@@ -141,6 +145,7 @@ export function listTaggedSessions(tmuxTmpdir: string): TaggedTmuxSession[] {
           branch,
           paneDead: dead === '1',
           panePid: Number(pid),
+          worktreePath: path.join('\t'),
         };
       });
   } catch {

@@ -15,6 +15,7 @@ import type {
   DiscoveredWorktree,
 } from './discovery/discovery-model.js';
 import { liveSessionNames } from './pty-registry.js';
+import { rebindMovedSessions } from './discovery/moved-sessions.js';
 import {
   isTerminalSession,
   registryNameOf,
@@ -103,6 +104,11 @@ const NOTHING: TmuxObservation = { persisted: new Set(), terminals: [] };
  * that worktree this session's agent. Only when nothing here already
  * holds it, though, since attaching a second client to a session this
  * process is driving is exactly what the orphan path must not do.
+ *
+ * Before any of that, a session whose checkout moved with its agent in
+ * it is rebound to the listed checkout it is in now
+ * (`discovery/moved-sessions.ts`), so this scan already finds it
+ * persisted.
  * Never throws; an absent tmux server yields nothing, same as no
  * sessions.
  */
@@ -120,7 +126,10 @@ export function observeTmuxSessions(
   };
   const persisted = new Set<string>();
   const terminals: DiscoveredTerminal[] = [];
-  for (const session of listOurSessions()) {
+  const sessions = rebindMovedSessions(listOurSessions(), root, worktrees, {
+    held: () => ctx.owned,
+  });
+  for (const session of sessions) {
     const found = classifySession(session, ctx);
     if (!found) continue;
     if (found.kind === 'terminal') terminals.push(found.terminal);

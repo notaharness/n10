@@ -1,13 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { renameSync, symlinkSync, rmSync } from 'node:fs';
+import { realpathSync, renameSync, symlinkSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { visibleWithin } from './setup/lifecycle.js';
 import { test, expect } from './fixtures/n10.js';
 import { sidebarLocator } from './setup/sidebar.js';
 import {
   addExternalWorktree,
   listTaggedSessions,
   startExternalTmuxSession,
+  type TaggedTmuxSession,
 } from './setup/tmux.js';
 
 test.use({ n10Config: { keybindPreset: 'vim' } });
@@ -17,11 +17,22 @@ const paths = [
     name: 'symlink',
     prepare: (repo: string, next: string) => symlinkSync(repo, next, 'dir'),
     restore: (_repo: string, next: string) => rmSync(next, { force: true }),
+    // The same physical checkout: its tags already name it.
+    tags: (before: TaggedTmuxSession[]) => before,
   },
   {
     name: 'moved',
     prepare: moveRepo,
     restore: (repo: string, next: string) => moveRepo(next, repo),
+    // Rebound to the checkout the agent moved with.
+    tags: (before: TaggedTmuxSession[], next: string) =>
+      before.map((s) => ({
+        ...s,
+        repo: realpathSync(next),
+        worktreePath: realpathSync(
+          join(next, '.claude', 'worktrees', 'path-agent')
+        ),
+      })),
   },
 ];
 
@@ -51,30 +62,25 @@ for (const pathKind of paths) {
     const row = sidebarLocator(term.page, branch);
     await expect(row.running()).toBeVisible({ timeout: 30_000 });
     const before = listTaggedSessions(homeDir);
+    const names = () => listTaggedSessions(homeDir).map((s) => s.name);
     const nextPath = join(homeDir, 'repo');
-    let observed = false;
     try {
       pathKind.prepare(repoPath, nextPath);
       await n10.restart(nextPath);
       await expect(row.any()).toBeVisible();
-      expect(listTaggedSessions(homeDir)).toEqual(before);
+      expect(names()).toEqual(before.map((s) => s.name));
+      await expect(row.running()).toBeVisible({ timeout: 15_000 });
       await term.press('Tab');
-      observed = await visibleWithin(
-        term.getByText('path-agent-ready').first()
+      await expect(term.getByText('path-agent-ready').first()).toBeVisible();
+      expect(listTaggedSessions(homeDir)).toEqual(
+        pathKind.tags(before, nextPath)
       );
-      expect(listTaggedSessions(homeDir)).toEqual(before);
     } finally {
-      // Stop and restore before the expected-failure annotation: cleanup errors must fail CI.
       try {
         await n10.stop();
       } finally {
         pathKind.restore(repoPath, nextPath);
       }
     }
-    test.fail(
-      pathKind.name === 'moved',
-      'https://github.com/notaharness/n10/issues/208'
-    );
-    expect(observed).toBe(true);
   });
 }
