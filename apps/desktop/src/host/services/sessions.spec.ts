@@ -240,7 +240,7 @@ vi.mock('@n10/core', async (importOriginal) => {
     hasLiveTmuxSession: (name: string) => state.persisted.has(name),
     getSpawnedAt: () => 1000,
     noteInput: () => undefined,
-    noteResize: () => undefined,
+    resizeSession: () => undefined,
     noteSeen: () => undefined,
     snapshot: (name: string) => ({
       active: state.alive.has(name),

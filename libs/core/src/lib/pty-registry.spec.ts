@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { SessionBackend } from '@n10/terminal';
-import { MIN_ACTIVE_MS } from './activity-config.js';
+import { MIN_ACTIVE_MS, RESIZE_ECHO_MS } from './activity-config.js';
 
 // Capture every session backend / TerminalEmulator the registry constructs
 // so a test can drive the exit callback and inspect disposal.
@@ -71,6 +71,7 @@ import {
   killSession,
   releaseExitedSession,
   detachSession,
+  resizeSession,
 } from './pty-registry.js';
 
 const NAMES = ['s1', 's2'];
@@ -157,6 +158,79 @@ describe('pty-registry — self-exit', () => {
       flashing: true,
       exited: true,
     });
+  });
+});
+
+describe('pty-registry — resize', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    for (const n of NAMES) killSession(n);
+    ptys.length = 0;
+    emus.length = 0;
+    activity.__resetForTests();
+  });
+
+  afterEach(() => {
+    for (const n of NAMES) killSession(n);
+    activity.__resetForTests();
+    vi.useRealTimers();
+  });
+
+  it('leaves a PTY at its current size alone, so output right after counts', async () => {
+    spawnSession('s1');
+
+    resizeSession('s1', 80, 24);
+    ptys[0].emit('xxxx');
+    await Promise.resolve();
+
+    expect(ptys[0].resize).not.toHaveBeenCalled();
+    expect(emus[0].resize).not.toHaveBeenCalled();
+    expect(activity.snapshot('s1').active).toBe(true);
+  });
+
+  it('resizes PTY and emulator on a real change and discounts the redraw', async () => {
+    spawnSession('s1');
+
+    resizeSession('s1', 100, 30);
+    ptys[0].emit('xxxx');
+    await Promise.resolve();
+    expect(ptys[0].resize).toHaveBeenCalledWith(100, 30);
+    expect(emus[0].resize).toHaveBeenCalledWith(100, 30);
+    expect(activity.snapshot('s1').active).toBe(false);
+
+    // The new size is now the current one.
+    resizeSession('s1', 100, 30);
+    expect(ptys[0].resize).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(RESIZE_ECHO_MS);
+    ptys[0].emit('yyyy');
+    await Promise.resolve();
+    expect(activity.snapshot('s1').active).toBe(true);
+  });
+
+  it('starts a respawned entry from its spawn size', () => {
+    spawnSession('s1');
+    resizeSession('s1', 100, 30);
+
+    spawnSession('s1');
+    resizeSession('s1', 100, 30);
+
+    expect(ptys[1].resize).toHaveBeenCalledWith(100, 30);
+  });
+
+  it('retries a size whose PTY resize threw', () => {
+    spawnSession('s1');
+    // A client that just exited throws from the ioctl (EBADF).
+    ptys[0].resize.mockImplementationOnce(() => {
+      throw new Error('ioctl(2) failed, EBADF');
+    });
+
+    expect(() => resizeSession('s1', 100, 30)).toThrow('EBADF');
+    resizeSession('s1', 100, 30);
+
+    expect(ptys[0].resize).toHaveBeenCalledTimes(2);
+    expect(emus[0].resize).toHaveBeenLastCalledWith(100, 30);
   });
 });
 

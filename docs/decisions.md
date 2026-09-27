@@ -168,9 +168,12 @@ including when no local connection exists. `removeWorktreeSession` owns shared
 stop/remove/delete operations with the captured repository.
 
 Carry output sequence numbers across reattachment and restart so mounted
-terminals accept subsequent chunks. Resize on fit and when `spawnedAt` changes,
-even if the session name and dimensions are unchanged. `paneTerminalGrid`
-measures the actual font and padding; the first fit corrects startup estimates.
+terminals accept subsequent chunks. Request a resize on fit and when `spawnedAt`
+changes, even if the session name and dimensions are unchanged. Core's
+`resizeSession` applies only a size the PTY does not already have: an unchanged
+size sends no SIGWINCH, and noting a resize anyway would hide the next second of
+output from activity tracking. `paneTerminalGrid` measures the actual font and
+padding; the first fit corrects startup estimates.
 
 ## Desktop repositories and tabs
 

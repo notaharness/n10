@@ -11,7 +11,7 @@ import {
   resolveAgent,
   getSpawnedAt,
   noteInput,
-  noteResize,
+  resizeSession as resizeRegisteredSession,
   noteSeen,
   snapshot as activitySnapshot,
 } from '@n10/core';
@@ -324,11 +324,7 @@ export function writeSession(name: string, data: string): void {
 }
 
 export function resizeSession(name: string, cols: number, rows: number): void {
-  const entry = getSession(name);
-  if (!entry) return;
-  // SIGWINCH redraws aren't agent activity either.
-  noteResize(name);
-  entry.pty.resize(cols, rows);
+  resizeRegisteredSession(name, cols, rows);
 }
 
 /** Debounced agent-activity snapshots for every session this host has

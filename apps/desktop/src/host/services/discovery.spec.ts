@@ -118,7 +118,6 @@ vi.mock('@n10/core', async (importOriginal) => {
     buildReviewLaunchRequest: () => ({ intent: 'blank' }),
     getSpawnedAt: () => 1000,
     noteInput: () => undefined,
-    noteResize: () => undefined,
     noteSeen: () => undefined,
     snapshot: () => ({ active: false, flashing: false }),
   };

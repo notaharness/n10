@@ -49,7 +49,6 @@ export {
   attach,
   detach,
   noteInput,
-  noteResize,
   noteSeen,
   snapshot,
   idleFor,

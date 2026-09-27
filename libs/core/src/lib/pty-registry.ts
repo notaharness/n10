@@ -26,6 +26,9 @@ export interface NamedPtyEntry extends PtyEntry {
 
 const registry = new Map<string, PtyEntry>();
 
+/** The size each entry's PTY was last given, spawn size first. */
+const sizes = new WeakMap<PtyEntry, { cols: number; rows: number }>();
+
 // Subscribers notified when an agent PTY exits on its own (Ctrl-D twice
 // in claude, the agent crashing, etc.). React-side state derives the
 // sidebar's "running" indicator from `isSessionAlive`, so we push a
@@ -100,8 +103,28 @@ export function spawnSession(
   });
 
   activity.attach(name, pty, emu);
+  sizes.set(entry, { cols, rows });
   registry.set(name, entry);
   return entry;
+}
+
+/**
+ * Size a session's PTY and emulator to the pane showing it. The kernel
+ * sends no SIGWINCH for a size the PTY already has, so an unchanged
+ * size is a no-op: there is no redraw to discount, and noting a resize
+ * anyway would hide the next second of real output from activity.
+ */
+export function resizeSession(name: string, cols: number, rows: number): void {
+  const entry = registry.get(name);
+  const size = entry && sizes.get(entry);
+  if (!entry || !size || (size.cols === cols && size.rows === rows)) return;
+  // The redraw SIGWINCH triggers is not agent activity.
+  activity.noteResize(name);
+  entry.emu.resize(cols, rows);
+  // A client that just exited can throw here; the size is recorded only
+  // once the PTY has it, so the next identical request tries again.
+  entry.pty.resize(cols, rows);
+  sizes.set(entry, { cols, rows });
 }
 
 export function getSession(name: string): PtyEntry | undefined {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import type { MouseTrackingMode } from '@n10/terminal';
 import { getSession } from '@n10/core';
 import type { PtyEntry } from '@n10/core';
-import { noteInput, noteResize } from '@n10/core';
+import { noteInput, resizeSession } from '@n10/core';
 
 export function usePtySession(
   sessionName: string | null,
@@ -73,13 +73,12 @@ export function usePtySession(
     };
   }, [sessionName, reconnectKey, scheduleRender]);
 
-  // Handle resize
+  // Handle resize. This also runs whenever the pane mounts on a session;
+  // `resizeSession` leaves a PTY that already has the pane's size alone.
   useEffect(() => {
     const entry = entryRef.current;
-    if (entry && !entry.exited) {
-      if (sessionName) noteResize(sessionName);
-      entry.pty.resize(paneCols, paneRows);
-      entry.emu.resize(paneCols, paneRows);
+    if (entry && !entry.exited && sessionName) {
+      resizeSession(sessionName, paneCols, paneRows);
       scheduleRender();
     }
   }, [paneCols, paneRows, scheduleRender, sessionName]);
