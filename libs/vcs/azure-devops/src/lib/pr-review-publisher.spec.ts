@@ -45,7 +45,7 @@ class FakeAzure implements AdoReviewApi {
   /** Lost before it reaches Azure: nothing written. */
   drop = new Set<string>();
   refuse = new Set<string>();
-  /** GETs answered 503, by path suffix, once each. */
+  /** GETs answered 429, by path suffix, once each. */
   unavailable = new Set<string>();
   private next = 100;
 
@@ -369,7 +369,7 @@ describe('publishing an Azure DevOps review', () => {
     const ado = new FakeAzure();
     ado.unavailable.add('/threads/40');
     const err = await failed(publish(ado));
-    expect(err?.failure).toBe('refused');
+    expect(err).toMatchObject({ failure: 'refused', item: 'reply' });
     expect(Object.keys(err!.posted)).toEqual(['range', 'file']);
     expect(ado.votes.has(ME)).toBe(false);
   });

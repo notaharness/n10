@@ -123,13 +123,15 @@ class Run {
     return new ReviewPublishError(
       'refused',
       err instanceof Error ? err.message : String(err),
-      { cause: err, posted: this.posted() }
+      { cause: err, item: this.current, posted: this.posted() }
     );
   }
 
   /** The threads as they stand when this attempt begins: where a lost
    *  write is looked for, and what each write must not be taken for. */
   private threads: AdoReviewThread[] = [];
+  /** The item being posted, named when a read for it fails. */
+  private current: string | null = null;
 
   /** A write whose answer was lost: found among the threads, or known
    *  not to have landed. */
@@ -159,6 +161,7 @@ class Run {
 
   async thread(key: string, body: string, place: ThreadPlace): Promise<void> {
     if (this.ledger.added[key]) return;
+    this.current = key;
     const context =
       place.kind === 'conversation' ? null : await this.iterationContext();
     const posted = await this.step(key, this.sending(body, place), () =>
@@ -173,6 +176,7 @@ class Run {
 
   async reply(key: string, body: string, threadId: string): Promise<void> {
     if (this.ledger.added[key]) return;
+    this.current = key;
     const path = `pullrequests/${this.submission.prId}/threads/${threadId}`;
     const thread = await this.api.get<AdoReviewThread>(`${path}?${V}`);
     const root = (thread.comments ?? []).find(
@@ -259,7 +263,11 @@ class Run {
     return {
       body,
       place,
-      before: lookAlikes(this.threads, { body, place }, this.me),
+      // Those there when the attempt began, and those it posted since.
+      before: [
+        ...lookAlikes(this.threads, { body, place }, this.me),
+        ...Object.values(this.ledger.added).map((a) => a.id),
+      ],
     };
   }
 

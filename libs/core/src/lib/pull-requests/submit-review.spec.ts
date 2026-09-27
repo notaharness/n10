@@ -463,6 +463,43 @@ describe('submitting a review', () => {
     expect(states()['inline:k1']).toBe('published');
   });
 
+  it('settles a summary posted as its own item, where there is no review', async () => {
+    await submitReview(
+      request(['summary', 'reply:PRRT_1'], 'REJECT'),
+      src(() =>
+        Promise.reject(
+          new ReviewPublishError('refused', 'thread is closed', {
+            item: 'reply:PRRT_1',
+            posted: { summary: '103' },
+          })
+        )
+      )
+    ).catch(() => undefined);
+    expect(states()).toMatchObject({
+      summary: 'published',
+      'reply:PRRT_1': 'failed',
+    });
+    write({ kind: 'summary' }, 'Second round.');
+    await submitReview(
+      request(['summary']),
+      src(() =>
+        Promise.resolve({
+          reviewId: null,
+          items: { summary: '104' },
+          resumed: null,
+        })
+      )
+    );
+    const summary = listReviewDrafts(
+      { ref: REF, viewer: 'bea' },
+      src()
+    ).drafts.find((d) => d.id === 'summary')!;
+    expect(summary.publication).toMatchObject({
+      state: 'published',
+      remoteId: '104',
+    });
+  });
+
   it('refuses what is no review: a conversation comment, or nothing to say', async () => {
     const never = src(() => Promise.reject(new Error('should not publish')));
     await expect(submitReview(request(['general']), never)).rejects.toThrow(
