@@ -41,6 +41,18 @@ export async function loadPullRequestSnapshot(
   viewer: string | null
 ): Promise<PullRequestSnapshot> {
   const answer = await window.n10.getPullRequestSnapshot({ ref, viewer });
+  assertAnswerFor(ref, viewer, answer);
+  return answer;
+}
+
+/** An answer about a different pull request, or read as a different
+ *  account, is an error — never data in the entry that asked. Every
+ *  read by identity checks its answer with this. */
+export function assertAnswerFor(
+  ref: PullRequestRef,
+  viewer: string | null,
+  answer: { ref: PullRequestRef; viewer: string | null }
+): void {
   if (!samePullRequest(answer.ref, ref)) {
     throw new Error(
       `Expected an answer about ${describePullRequest(
@@ -55,7 +67,6 @@ export async function loadPullRequestSnapshot(
       }`
     );
   }
-  return answer;
 }
 
 /** Placeholder while there is no ref; the query is disabled then. */

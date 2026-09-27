@@ -167,6 +167,100 @@ function threadNode(t, i) {
   };
 }
 
+// ── The whole conversation, a hundred nodes a page ──
+//
+// The conversation reader follows every connection past its first page,
+// so this pages the way GitHub does: at most a hundred nodes, an offset
+// cursor, and a total count. A reader that stops early shows up in the
+// counts a test asserts.
+
+function pageOf(all, after) {
+  const start = after ? Number(after) : 0;
+  const nodes = all.slice(start, start + 100);
+  const end = start + nodes.length;
+  return {
+    totalCount: all.length,
+    pageInfo: { hasNextPage: end < all.length, endCursor: String(end) },
+    nodes,
+  };
+}
+
+const actor = (login) => (login ? { __typename: 'User', login } : null);
+
+function conversationComment(c, id) {
+  return {
+    id,
+    author: actor(c.author),
+    body: c.body,
+    createdAt: c.createdAt ?? '2026-01-01T00:00:00Z',
+    lastEditedAt: null,
+    isMinimized: false,
+    minimizedReason: null,
+    url: `https://github.com/n10/fixture/pull/1#${id}`,
+    viewerCanUpdate: c.author === (scenario.username ?? 'n10-tester'),
+    viewerCanDelete: c.author === (scenario.username ?? 'n10-tester'),
+  };
+}
+
+function threadComments(t, i) {
+  const id = t.id ?? `thread-${i + 1}`;
+  return (t.comments ?? []).map((c, j) => ({
+    ...conversationComment(c, `${id}-c${j + 1}`),
+    replyTo: j === 0 ? null : { id: `${id}-c1` },
+    pullRequestReview: null,
+    originalCommit: null,
+  }));
+}
+
+function conversationThread(t, i) {
+  const node = threadNode(t, i);
+  return {
+    ...node,
+    subjectType: t.line == null && t.originalLine == null ? 'FILE' : 'LINE',
+    startDiffSide: null,
+    resolvedBy: t.isResolved ? actor(t.resolvedBy) : null,
+    viewerCanReply: true,
+    viewerCanResolve: !node.isResolved,
+    viewerCanUnresolve: node.isResolved,
+    comments: pageOf(threadComments(t, i), undefined),
+  };
+}
+
+function conversationConnections(pr, after) {
+  const threads = pageOf(pr?.threads ?? [], after);
+  return {
+    reviewThreads: {
+      ...threads,
+      nodes: threads.nodes.map((t, k) =>
+        conversationThread(t, (after ? Number(after) : 0) + k)
+      ),
+    },
+    comments: pageOf(
+      (pr?.generalComments ?? []).map((c, i) =>
+        conversationComment(c, `general-${i + 1}`)
+      ),
+      after
+    ),
+    reviews: pageOf(
+      (pr?.reviews ?? []).map((r, i) => ({
+        id: `review-${i + 1}`,
+        author: actor(r.author),
+        state: r.state,
+        body: r.body ?? '',
+        submittedAt: r.submittedAt ?? '2026-01-01T00:00:00Z',
+        url: `https://github.com/n10/fixture/pull/1#review-${i + 1}`,
+        commit: null,
+        comments: { totalCount: r.commentCount ?? 0 },
+      })),
+      after
+    ),
+    timelineItems: {
+      ...pageOf(pr?.events ?? [], after),
+      totalCount: undefined,
+    },
+  };
+}
+
 // ── gh auth status ──
 if (argv[0] === 'auth' && argv[1] === 'status') {
   out(
@@ -189,6 +283,32 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
   }
   if (query.includes('search(')) {
     out({ data: { search: { pageInfo: page, nodes: [] } } });
+  }
+
+  if (query.includes('query PullRequestConversation(')) {
+    const pr = prs.find((p) => String(p.number) === String(vars.number));
+    if (failing(pr, 'conversation')) failLikeGitHub();
+    out({
+      data: { repository: { pullRequest: conversationConnections(pr) } },
+    });
+  }
+  if (query.includes('query PullRequestConversationPage(')) {
+    const pr = prs.find((p) => String(p.number) === String(vars.number));
+    if (failing(pr, 'conversation')) failLikeGitHub();
+    const all = conversationConnections(pr, vars.after);
+    const name = Object.keys(all).find((n) => query.includes(`${n}(first:`));
+    out({ data: { repository: { pullRequest: { [name]: all[name] } } } });
+  }
+  if (query.includes('query PullRequestThreadReplies(')) {
+    for (const pr of prs) {
+      const i = (pr.threads ?? []).findIndex(
+        (t, k) => (t.id ?? `thread-${k + 1}`) === vars.thread
+      );
+      if (i < 0) continue;
+      const comments = pageOf(threadComments(pr.threads[i], i), vars.after);
+      out({ data: { node: { comments } } });
+    }
+    out({ data: { node: null } });
   }
 
   if (query.includes('reviewThreads(first: 100, after: $threadCursor)')) {

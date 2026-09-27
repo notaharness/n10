@@ -50,6 +50,15 @@ export const keys = {
    *  same path never reads the old one's entry, and by the account. */
   prSnapshot: (cwd: string, ref: PullRequestRef, viewer: string | null) =>
     ['pr-snapshot', cwd, pullRequestKey(ref), ref.id ?? null, viewer] as const,
+  /** Keyed like `prSnapshot`. */
+  prConversation: (cwd: string, ref: PullRequestRef, viewer: string | null) =>
+    [
+      'pr-conversation',
+      cwd,
+      pullRequestKey(ref),
+      ref.id ?? null,
+      viewer,
+    ] as const,
   activity: (cwd: string) => ['session-activity', cwd] as const,
   commentImage: (url: string) => ['comment-image', url] as const,
   drafts: (cwd: string, prId: number) => ['drafts', cwd, prId] as const,

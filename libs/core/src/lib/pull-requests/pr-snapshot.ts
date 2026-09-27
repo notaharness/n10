@@ -103,10 +103,11 @@ export function parseSnapshotRequest(value: unknown): SnapshotRequest {
 }
 
 /** The account the context reads as; throws unless the repository and
- *  the account are the ones the caller asked about. */
-function assertSameContext(
+ *  the account are the ones the caller asked about. Every read by
+ *  identity asks this before its reads and again after them. */
+export function assertSameContext(
   req: SnapshotRequest,
-  src: SnapshotSources
+  src: Pick<SnapshotSources, 'repository' | 'viewer'>
 ): string | null {
   const repository = src.repository();
   if (!repository) {

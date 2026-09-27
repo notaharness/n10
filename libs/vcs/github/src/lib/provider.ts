@@ -7,6 +7,7 @@ import type {
   PullRequestInfo,
   PullRequestReviewer,
   PullRequestComments,
+  PullRequestConversation,
   RemoteCommentThread,
   RemoteCommentReply,
   ReviewDecision,
@@ -22,6 +23,7 @@ import {
   ghOutput,
   parseGhJson,
 } from './gh-errors.js';
+import { fetchGitHubConversation } from './pr-conversation.js';
 
 // ── gh CLI transport ──────────────────────────────────────────────
 
@@ -805,6 +807,16 @@ export const githubProvider: VcsProvider = {
     const { owner, repo } = project;
     if (!owner || !repo) return { threads: [], generalComments: [] };
     return fetchCommentThreadsGitHub(owner, repo, prId);
+  },
+
+  async fetchPullRequestConversation(
+    _auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestConversation> {
+    const repository = this.repositoryRef?.(project);
+    if (!repository) throw new Error('GitHub project not configured');
+    return fetchGitHubConversation(ghGraphQL, { ...repository, number: prId });
   },
 
   async replyToThread(
