@@ -58,6 +58,22 @@ a real diff. Seeded worktree branches must be slash-free because the fixture and
 app construct paths differently. Provider project fields belong in `vendorProject`
 or auto-detection replaces them.
 
+`src/setup/fake-ado.ts` is the Azure DevOps counterpart. The provider uses
+`fetch`, so the seam is `N10_ADO_ORIGIN`: the `fakeAzureDevOps` option starts
+`src/fixtures/fake-ado.ts`, a loopback HTTP server in the Playwright worker,
+writes the PAT and project config, and launches the app with the variable
+pointing at it. `adoOrigin()` in `libs/vcs/azure-devops/src/lib/client.ts`
+sends both `dev.azure.com` and `vssps.dev.azure.com` there and refuses any
+origin that is not loopback `http`. The scenario declares PRs, reviewers
+(teams with `isContainer`, members' `votedFor`), threads, iterations and policy
+evaluations; response shapes follow the 7.1 API and the recorded fixtures in
+`libs/vcs/azure-devops/src/lib/__fixtures__/`. The server applies the app's
+writes (new threads, replies, resolutions, votes) to its copy of the scenario,
+so the next read sees them. A test takes the `fakeAdo` fixture to read
+`scenario` and `requests`. A request the fake does not model is answered 404
+and fails the test at teardown, so extend the fake when the provider starts
+calling a new endpoint. `src/azure-devops.test.ts` is the suite.
+
 Tests run under Xvfb on Linux, even with DISPLAY set. The fixture drops
 `WAYLAND_DISPLAY` and selects X11. Use `N10_E2E_HEADED=1` to watch a run.
 `@visual` tests run in the pinned Playwright container with zero pixel tolerance.

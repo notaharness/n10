@@ -14,8 +14,9 @@ export function appEnv(opts: {
   repoPath: string;
   startWithoutRepo: boolean | undefined;
   githubToken: string | undefined;
-  /** PATH additions that install the fake `gh`. */
-  ghEnv: Record<string, string>;
+  /** What installs the fake providers: PATH additions for the fake
+   *  `gh`, `N10_ADO_ORIGIN` for the fake Azure DevOps. */
+  fakeEnv: Record<string, string>;
   /** Extra knobs a test asked for. Applied before the isolation below. */
   extra: Record<string, string> | undefined;
 }): Record<string, string> {
@@ -49,6 +50,10 @@ export function appEnv(opts: {
   // one of those terminals silently tests a different bundle, or, once
   // the dev server is gone, a blank window and 30s timeouts.
   delete env.N10_VITE_URL;
+  // Points the Azure DevOps provider at a loopback server. Inherited,
+  // it would send an ADO test's requests to whatever last listened
+  // there; a test that wants the fake gets it from `fakeEnv`.
+  delete env.N10_ADO_ORIGIN;
 
   return {
     ...env,
@@ -61,7 +66,7 @@ export function appEnv(opts: {
     N10_DESKTOP_VERSION: 'e2e',
     ...(opts.githubToken ? { GH_TOKEN: opts.githubToken } : {}),
     // The fake `gh` has to win the PATH lookup.
-    ...opts.ghEnv,
+    ...opts.fakeEnv,
     // Last, and not negotiable. A tmux server is identified by its
     // socket directory, and the default one is the developer's own —
     // holding their real work and every persisted agent session. A
