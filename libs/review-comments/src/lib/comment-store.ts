@@ -5,9 +5,10 @@ import {
   renameSync,
   rmSync,
   watch,
+  type FSWatcher,
 } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { withFileLock } from './file-lock.js';
 import type { ReviewComment, ReviewCommentsFile } from './types.js';
@@ -164,22 +165,39 @@ export function removeComment(scope: DraftScope, id: string): boolean {
  * the returned function is called.
  *
  * A review usually starts with no drafts at all: the agent writes the
- * first one some time after the PR is opened. A watch on a directory
- * that does not exist yet cannot be installed, and nothing would ever
- * install it later, so the directory is created here first. The watch
- * is on the directory rather than the file because writes replace the
- * file by rename.
- *
- * A watcher that fails (its directory removed, say) stops reporting;
- * its 'error' event is handled, since an unheard one would be thrown.
+ * first one some time after the PR is opened, and a watch cannot be
+ * installed on a directory that does not exist yet. So until the PR's
+ * own directory appears, the repository's drafts directory (created
+ * here: one per repository, not one per PR looked at) is watched for
+ * it, and the PR's is watched from then on. The watches are on
+ * directories rather than the file because writes replace the file by
+ * rename. An unheard 'error' event would be thrown, so each watcher
+ * handles its own.
  */
 export function watchComments(
   scope: DraftScope,
   onChange: () => void
 ): () => void {
   const dir = commentDirPath(scope);
-  mkdirSync(dir, { recursive: true });
-  const watcher = watch(dir, onChange);
-  watcher.on('error', () => watcher.close());
-  return () => watcher.close();
+  const repoDir = dirname(dir);
+  mkdirSync(repoDir, { recursive: true });
+  let prWatcher: FSWatcher | undefined;
+  const watchPr = () => {
+    if (prWatcher) return;
+    try {
+      prWatcher = watch(dir, onChange).on('error', () => prWatcher?.close());
+    } catch {
+      return; // Not there yet.
+    }
+    // The first draft may already be in it.
+    onChange();
+  };
+  const repoWatcher = watch(repoDir, (_event, name) => {
+    if (name === null || name === basename(dir)) watchPr();
+  }).on('error', () => repoWatcher.close());
+  watchPr();
+  return () => {
+    repoWatcher.close();
+    prWatcher?.close();
+  };
 }

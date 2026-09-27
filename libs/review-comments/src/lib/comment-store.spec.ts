@@ -387,8 +387,12 @@ describe('watchComments', () => {
   });
 
   it('reports a draft written by another process', async () => {
+    // A review with drafts already: the PR's directory exists.
+    mkdirSync(store.commentDirPath(SCOPE), { recursive: true });
     const { seen, onChange } = changes();
     const unwatch = store.watchComments(SCOPE, onChange);
+    await new Promise((r) => setTimeout(r, 50));
+    seen.count = 0;
     try {
       // The agent's `add-comment` replaces the file by rename.
       writeFileSync(`${store.commentFilePath(SCOPE)}.tmp`, '{}');
@@ -401,6 +405,14 @@ describe('watchComments', () => {
     } finally {
       unwatch();
     }
+  });
+
+  /** The TUI watches the PR under the sidebar cursor, reviewed or
+   *  not; that must not leave a directory behind for each one. */
+  it('creates no directory for a PR it only looked at', () => {
+    const unwatch = store.watchComments(SCOPE, () => undefined);
+    unwatch();
+    expect(existsSync(store.commentDirPath(SCOPE))).toBe(false);
   });
 
   it('stops reporting once unwatched', async () => {
