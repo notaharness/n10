@@ -4,9 +4,9 @@ import {
   checkoutWorktree,
   createWorktree,
   removeWorktree,
-  canRemoveBranch,
   rebaseOntoMaster,
 } from './worktree.js';
+import { assessBranchRemoval, canRemoveBranch } from './removal-check.js';
 import { assertShellSafeRef, branchToSessionName } from './refs.js';
 import {
   parseWorktrees,
@@ -504,6 +504,49 @@ describe('deleteBranch', () => {
   });
 });
 
+// Every risk, not the first: a prompt that names one is the user's
+// whole picture of what they agree to lose.
+describe('assessBranchRemoval', () => {
+  function answers(outputs: Record<string, string>) {
+    mockExec.mockImplementation(((command: string) => {
+      if (command.includes('git worktree list')) {
+        return Promise.resolve(
+          worktreeListPorcelain([{ branch: 'feature/busy' }])
+        );
+      }
+      const hit = Object.keys(outputs).find((k) => command.includes(k));
+      return Promise.resolve(resolve(hit ? outputs[hit] : ''));
+    }) as unknown as typeof exec);
+  }
+
+  it('reports uncommitted changes and unpushed commits together', async () => {
+    answers({
+      'status --porcelain': ' M src/file.ts\n',
+      'git log': 'abc1234 unpushed\n',
+    });
+    expect(await assessBranchRemoval('feature/busy')).toEqual({
+      refusal: null,
+      risks: ['uncommitted changes', 'not pushed to upstream'],
+    });
+  });
+
+  it('reports a checked-out submodule, which git only removes by force', async () => {
+    answers({ 'submodule foreach': '/wt/feature-busy/vendor/lib\n' });
+    expect(await assessBranchRemoval('feature/busy')).toEqual({
+      refusal: null,
+      risks: ['populated submodules'],
+    });
+  });
+
+  it('has no risks for a clean, pushed checkout', async () => {
+    answers({});
+    expect(await assessBranchRemoval('feature/busy')).toEqual({
+      refusal: null,
+      risks: [],
+    });
+  });
+});
+
 describe('canRemoveBranch', () => {
   it('should reject main as protected', async () => {
     expect(await canRemoveBranch('main')).toEqual({
@@ -661,17 +704,17 @@ describe('canRemoveBranch', () => {
   });
 
   it('should skip unpushed check when confirmedMerged is true', async () => {
-    // Only the worktree lookup + status check run (status clean), no git log call
     mockExec.mockResolvedValueOnce(
       worktreeListPorcelain([{ branch: 'feature/squash-merged' }])
     );
-    mockExec.mockResolvedValueOnce(resolve(''));
+    mockExec.mockResolvedValue(resolve(''));
     expect(
       await canRemoveBranch('feature/squash-merged', { confirmedMerged: true })
     ).toEqual({
       safe: true,
     });
-    expect(mockExec).toHaveBeenCalledTimes(2);
+    const commands = mockExec.mock.calls.map(([command]) => command);
+    expect(commands.some((c) => c.includes('git log'))).toBe(false);
   });
 
   it('should still reject uncommitted changes when confirmedMerged is true', async () => {

@@ -11,9 +11,9 @@ import { tmpdir } from 'node:os';
 import {
   createWorktree,
   removeWorktree,
-  canRemoveBranch,
   rebaseOntoMaster,
 } from './worktree.js';
+import { canRemoveBranch } from './removal-check.js';
 import { listWorktrees } from './worktree-list.js';
 import {
   resetWorktreeResolver,
