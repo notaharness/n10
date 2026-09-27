@@ -108,9 +108,7 @@ describe('removing a worktree as confirmed', () => {
       'written while the prompt was open'
     );
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe(
-      'git-refused'
-    );
+    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
 
     expect(existsSync(join(worktree, 'draft.txt'))).toBe(true);
     expect(branchExists()).toBe(true);
@@ -152,9 +150,7 @@ describe('removing a worktree as confirmed', () => {
     });
     writeFileSync(join(worktree, 'draft.txt'), 'written after the check');
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe(
-      'git-refused'
-    );
+    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
 
     expect(existsSync(join(worktree, 'draft.txt'))).toBe(true);
     expect(branchExists()).toBe(true);
@@ -183,31 +179,86 @@ describe('removing a worktree as confirmed', () => {
 
   // Git will not remove a checkout with a submodule without `--force`.
   it('asks to force past a checked-out submodule, then removes it', async () => {
-    const sub = join(root, 'sub');
-    execFileSync('git', ['init', '-q', '-b', 'main', sub]);
-    git(sub, 'config', 'user.email', 'test@example.invalid');
-    git(sub, 'config', 'user.name', 'Test');
-    git(sub, 'commit', '-q', '--allow-empty', '-m', 'sub');
-    git(
-      worktree,
-      '-c',
-      'protocol.file.allow=always',
-      'submodule',
-      'add',
-      '-q',
-      sub,
-      'sub'
-    );
-    git(worktree, 'commit', '-q', '-m', 'add sub');
-    git(worktree, 'push', '-q', 'origin', 'feature');
+    addSubmodule();
 
     const check = await checkWorktreeRemoval('feature', repo);
     expect(check).toMatchObject({
       verdict: 'force',
-      risks: ['populated submodules'],
+      risks: ['submodules'],
     });
 
     expect(await removeWorktreeSession('feature', check, repo)).toBe('removed');
     expect(existsSync(worktree)).toBe(false);
   });
+
+  // `--force` past a submodule would also take the file.
+  it('keeps a file written after confirming a submodule', async () => {
+    addSubmodule();
+    const check = await checkWorktreeRemoval('feature', repo);
+    writeFileSync(join(worktree, 'draft.txt'), 'written after the check');
+
+    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
+
+    expect(existsSync(join(worktree, 'draft.txt'))).toBe(true);
+  });
+
+  // Git still refuses once the submodule is gone from the branch: its
+  // repository stays in the worktree's own `modules` directory.
+  it('asks to force past a submodule the branch removed', async () => {
+    addSubmodule();
+    git(worktree, 'rm', '-q', 'sub');
+    git(worktree, 'commit', '-q', '-m', 'drop sub');
+    git(worktree, 'push', '-q', 'origin', 'feature');
+
+    const check = await checkWorktreeRemoval('feature', repo);
+    expect(check).toMatchObject({ verdict: 'force', risks: ['submodules'] });
+    expect(await removeWorktreeSession('feature', check, repo)).toBe('removed');
+  });
+
+  // An agent that clones something into its checkout and commits it
+  // leaves a gitlink with no `.gitmodules` entry.
+  it('asks to force past a committed repository with no .gitmodules', async () => {
+    const nested = join(worktree, 'vendored');
+    execFileSync('git', ['init', '-q', '-b', 'main', nested]);
+    git(nested, 'config', 'user.email', 'test@example.invalid');
+    git(nested, 'config', 'user.name', 'Test');
+    git(nested, 'commit', '-q', '--allow-empty', '-m', 'vendored');
+    git(worktree, 'add', 'vendored');
+    git(worktree, 'commit', '-q', '-m', 'vendor it');
+    git(worktree, 'push', '-q', 'origin', 'feature');
+
+    const check = await checkWorktreeRemoval('feature', repo);
+    expect(check).toMatchObject({ verdict: 'force', risks: ['submodules'] });
+    expect(await removeWorktreeSession('feature', check, repo)).toBe('removed');
+  });
+
+  it('keeps a checkout that switched to another branch', async () => {
+    const check = await checkWorktreeRemoval('feature', repo);
+    git(worktree, 'switch', '-q', '-c', 'other');
+
+    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
+    expect(existsSync(worktree)).toBe(true);
+    expect(branchExists()).toBe(true);
+  });
 });
+
+/** Add, commit and push a submodule to `feature`, checked out. */
+function addSubmodule(): void {
+  const sub = join(root, 'sub');
+  execFileSync('git', ['init', '-q', '-b', 'main', sub]);
+  git(sub, 'config', 'user.email', 'test@example.invalid');
+  git(sub, 'config', 'user.name', 'Test');
+  git(sub, 'commit', '-q', '--allow-empty', '-m', 'sub');
+  git(
+    worktree,
+    '-c',
+    'protocol.file.allow=always',
+    'submodule',
+    'add',
+    '-q',
+    sub,
+    'sub'
+  );
+  git(worktree, 'commit', '-q', '-m', 'add sub');
+  git(worktree, 'push', '-q', 'origin', 'feature');
+}

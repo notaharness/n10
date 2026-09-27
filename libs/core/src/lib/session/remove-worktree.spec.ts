@@ -6,7 +6,6 @@ const state = vi.hoisted(() => ({
   removed: true,
   /** The branch's tip at each read, in order; the last one repeats. */
   tips: ['judged'] as (string | null)[],
-  rebasing: false,
   alive: new Set<string>(),
   assessment: { refusal: null, risks: [] } as BranchRemovalAssessment,
 }));
@@ -33,11 +32,7 @@ vi.mock('@n10/worktree-manager', () => ({
   },
   listWorktrees: async () => [
     { branch: 'main', path: '/repo-a' },
-    {
-      branch: 'feature/login',
-      path: '/repo-a/.worktrees/login',
-      ...(state.rebasing ? { state: 'rebasing' } : {}),
-    },
+    { branch: 'feature/login', path: '/repo-a/.worktrees/login' },
   ],
   removeWorktree: async (branch: string, opts: unknown) => {
     state.calls.push(['remove', branch, opts]);
@@ -70,19 +65,19 @@ const UNPUSHED = {
 } as const;
 const SUBMODULES = {
   verdict: 'force',
-  reason: 'populated submodules',
-  risks: ['populated submodules'],
+  reason: 'submodules',
+  risks: ['submodules'],
   tip: 'judged',
 } as const;
-/** Each call's kind, without the tip reads. */
-const kinds = () =>
-  state.calls.map((c) => (c as string[])[0]).filter((kind) => kind !== 'tip');
+/** Each call, without the reads that judge the checkout. */
+const effects = () =>
+  state.calls.filter((c) => !['tip', 'assess'].includes((c as string[])[0]));
+const kinds = () => effects().map((c) => (c as string[])[0]);
 
 beforeEach(() => {
   state.calls = [];
   state.removed = true;
   state.tips = ['judged'];
-  state.rebasing = false;
   state.alive = new Set();
   state.assessment = { refusal: null, risks: [] };
 });
@@ -92,7 +87,7 @@ describe('removeWorktreeSession', () => {
     expect(await removeWorktreeSession('feature/login', DIRTY, '/repo-a')).toBe(
       'removed'
     );
-    expect(state.calls.filter((c) => (c as string[])[0] !== 'tip')).toEqual([
+    expect(effects()).toEqual([
       ['rescan'],
       ['kill', LOGIN_KEY],
       ['remove', 'feature/login', { force: true, cwd: '/repo-a' }],
@@ -124,7 +119,7 @@ describe('removeWorktreeSession', () => {
     ['clear', CLEAR, false],
     ['agent-running', { verdict: 'agent-running', tip: 'judged' }, false],
     ['uncommitted changes', DIRTY, true],
-    ['populated submodules', SUBMODULES, true],
+    ['submodules', SUBMODULES, true],
     ['not pushed to upstream', UNPUSHED, false],
   ] as const)(
     'forces only past what the verdict confirmed: %s',
@@ -161,20 +156,62 @@ describe('removeWorktreeSession', () => {
 
   // A rebase leaves the branch ref alone until it finishes.
   it('leaves everything once a rebase has started in the checkout', async () => {
-    state.rebasing = true;
+    state.assessment = { refusal: 'rebase in progress', risks: [] };
     expect(await removeWorktreeSession('feature/login', DIRTY, '/repo-a')).toBe(
       'changed'
     );
     expect(kinds()).toEqual(['rescan']);
   });
 
-  it('keeps the branch when it moved before its agent stopped', async () => {
+  // `--force` is all or nothing: past a submodule it also takes a file
+  // written since the check, which nobody agreed to lose.
+  it.each([
+    ['clear', CLEAR, 'uncommitted changes'],
+    ['submodules', SUBMODULES, 'uncommitted changes'],
+    ['unpushed commits', UNPUSHED, 'submodules'],
+  ] as const)(
+    'leaves everything, agent included, for a %s verdict once git finds %s',
+    async (_, approved, risk) => {
+      state.assessment = { refusal: null, risks: [risk] };
+      expect(
+        await removeWorktreeSession('feature/login', approved, '/repo-a')
+      ).toBe('changed');
+      expect(kinds()).toEqual(['rescan']);
+    }
+  );
+
+  it('forces past what the verdict named', async () => {
+    state.assessment = { refusal: null, risks: ['uncommitted changes'] };
+    expect(await removeWorktreeSession('feature/login', DIRTY, '/repo-a')).toBe(
+      'removed'
+    );
+  });
+
+  // The agent can commit until it stops.
+  it('keeps everything when the branch moved while its agent stopped', async () => {
     state.tips = ['judged', 'later'];
+    expect(await removeWorktreeSession('feature/login', CLEAR, '/repo-a')).toBe(
+      'changed'
+    );
+    expect(kinds()).toEqual(['rescan', 'kill', 'rescan']);
+  });
+
+  it('keeps the branch when it moved during the removal', async () => {
+    state.tips = ['judged', 'judged', 'later'];
     expect(await removeWorktreeSession('feature/login', CLEAR, '/repo-a')).toBe(
       'kept-branch'
     );
     expect(kinds()).toContain('remove');
     expect(kinds()).not.toContain('delete');
+  });
+
+  // A checkout that switched away, or went detached, no longer holds
+  // the branch the prompt was about.
+  it('leaves everything once no checkout has the branch', async () => {
+    expect(await removeWorktreeSession('feature/gone', CLEAR, '/repo-a')).toBe(
+      'changed'
+    );
+    expect(kinds()).toEqual(['rescan']);
   });
 });
 

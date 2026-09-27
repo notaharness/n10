@@ -174,14 +174,18 @@ confirmed verdict back to `removeWorktreeSession`, which enforces it at
 execution time: the prompt can stay open while an agent writes or commits, and
 nothing it did after the check was judged. A `force` verdict names every risk
 that applies, not the first, because the prompt is the user's whole picture of
-what they agree to lose. Removal forces past only what git itself guards with
-`--force` (uncommitted changes, a checked-out submodule), so files written since
-keep the worktree; unpushed commits go with the branch and never need it. The
-verdict carries the branch's tip when it was judged. A branch that has moved
-since, or whose checkout has started a rebase (which leaves the branch where it
-was until it finishes), keeps its worktree. A branch that moved before its agent
-stopped keeps the branch itself. `removeWorktreeSession` returns what it did,
-and each shell says what was kept and why. The merged-branch sweep uses the same guard. `removeWorktreeSession`
+what they agree to lose. `--force` is all or nothing, so removal forces only when
+the verdict named a risk git guards with it (uncommitted changes, submodules),
+and git's own test for submodules is the one n10 applies. Unpushed commits go
+with the branch and never need it. The verdict carries the branch's tip when it
+was judged. Before the agent is stopped and again once it has, removal looks for
+anything the verdict did not cover: a moved branch, a rebase (which leaves the
+branch where it was until it finishes), a checkout that left the branch, or a
+risk git guards with `--force` that the verdict did not name, such as a file
+written into a checkout judged clean. Any of them keeps everything. A branch
+that moves during the removal itself keeps the branch. `removeWorktreeSession`
+returns what it did, and each shell says what was kept and why. The
+merged-branch sweep uses the same guard. `removeWorktreeSession`
 scans discovery before and after removing, so the shells learn of n10's
 removals through `onChanged`, as they learn of `git worktree remove`: discovery
 can only report the removal of a worktree it has seen.

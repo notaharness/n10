@@ -13,8 +13,8 @@ import {
 import { spawn } from 'node:child_process';
 import { fetchWorktreeDiffText } from '@n10/core';
 import { readConfig } from '@n10/vcs-core';
-import { requireRepo } from './repo.js';
-import { stopBabysitForBranch } from './babysit.js';
+import { activeRepoIs, requireRepo } from './repo.js';
+import { startBabysit, stopBabysitForBranch } from './babysit.js';
 
 // All worktree-manager functions resolve paths against process.cwd();
 // openRepo() chdir'd into the active repo, so these are repo-scoped.
@@ -54,8 +54,19 @@ export async function removeWorktree(
   approved: WorktreeRemovalCheck
 ): Promise<WorktreeRemovalOutcome> {
   const repo = requireRepo();
-  stopBabysitForBranch(branch);
-  return removeWorktreeSession(branch, approved, repo);
+  const babysat = stopBabysitForBranch(branch);
+  const outcome = await removeWorktreeSession(branch, approved, repo);
+  const gone = outcome === 'removed' || outcome === 'kept-branch';
+  // Nothing was removed, so its agent is still there to watch. A
+  // restarted babysitter starts from nothing, as after a restart.
+  if (!gone && activeRepoIs(repo)) {
+    for (const prId of babysat) {
+      await startBabysit(prId).catch((err: unknown) =>
+        console.error('[desktop] babysit restart failed:', err)
+      );
+    }
+  }
+  return outcome;
 }
 
 export function checkWorktreeRemoval(branch: string) {

@@ -57,7 +57,7 @@ export type WorktreeRemovalOutcome =
  *  Unpushed commits go with the branch, so they never need it. */
 const FORCED_RISKS: ReadonlySet<RemovalRisk> = new Set([
   'uncommitted changes',
-  'populated submodules',
+  'submodules',
 ]);
 
 function cwdFor(repo: string | undefined): string {
@@ -92,12 +92,36 @@ export async function checkWorktreeRemoval(
     : { verdict: 'clear', tip };
 }
 
+/** The checkout that has `branch`, while it is still as `approved`
+ *  judged it: the branch at the same tip, and nothing git guards with
+ *  `--force` that the verdict did not name. A rebase leaves the branch
+ *  where it was until it finishes, so the tip alone would miss one that
+ *  started since; the assessment refuses it. Null when anything changed. */
+async function judgedCheckout(
+  branch: string,
+  approved: WorktreeRemovalCheck,
+  cwd: string
+): Promise<WorktreeInfo | null> {
+  const checkout = await checkoutFor(branch, cwd);
+  if (!checkout || (await branchTip(branch, cwd)) !== approved.tip) {
+    return null;
+  }
+  const { refusal, risks } = await assessBranchRemoval(branch, {
+    cwd,
+    confirmedMerged: true,
+  });
+  const named = approved.verdict === 'force' ? approved.risks : [];
+  const unnamed = risks.some((r) => FORCED_RISKS.has(r) && !named.includes(r));
+  return refusal || unnamed ? null : checkout;
+}
+
 /** Remove `branch`'s worktree and the branch, as `approved` allows:
- *  the verdict the user confirmed, at the commit it was judged at. Only
- *  the risks git itself guards with `--force` are forced past, so files
- *  written since the check keep the worktree. A branch that has moved
- *  since, or started a rebase, keeps everything: nothing it did then
- *  was judged.
+ *  the verdict the user confirmed, at the commit it was judged at.
+ *  `--force` takes only the risks the verdict named that git guards
+ *  with it. Anything else found since the check keeps everything,
+ *  since nothing done then was judged: a moved branch, a rebase, a
+ *  file written into a checkout judged clean. It is looked for before
+ *  the agent is stopped and again once it has.
  *
  *  Stops the agent in the checkout first. The session belongs to the
  *  checkout, so it is found by the worktree's path — never by the
@@ -116,25 +140,30 @@ export async function removeWorktreeSession(
 ): Promise<WorktreeRemovalOutcome> {
   if (approved.verdict === 'refused') return 'refused';
   const cwd = cwdFor(repo);
-  const unmoved = async () => (await branchTip(branch, cwd)) === approved.tip;
   await rescanSessionDiscovery();
-  const checkout = await checkoutFor(branch, cwd);
-  // A rebase leaves the branch where it was until it finishes, so the
-  // tip alone would not show one that started after the check.
-  if (!(await unmoved()) || checkout?.state === 'rebasing') return 'changed';
-  if (checkout) stopSession(keyForWorktree(checkout, cwd));
+  const checkout = await judgedCheckout(branch, approved, cwd);
+  if (!checkout) return 'changed';
+  stopSession(keyForWorktree(checkout, cwd));
+  const outcome = (await judgedCheckout(branch, approved, cwd))
+    ? await removeJudged(branch, approved, cwd)
+    : 'changed';
+  await rescanSessionDiscovery();
+  return outcome;
+}
+
+/** Remove the worktree and, while the branch is still at the judged
+ *  tip, the branch. The agent is stopped by now, but a commit could
+ *  still land from outside n10; the checkout goes either way. */
+async function removeJudged(
+  branch: string,
+  approved: WorktreeRemovalCheck,
+  cwd: string
+): Promise<WorktreeRemovalOutcome> {
   const force =
     approved.verdict === 'force' &&
     approved.risks.some((risk) => FORCED_RISKS.has(risk));
-  const removed = await removeWorktree(branch, { force, cwd });
-  // The agent could commit until it stopped. The checkout is gone
-  // either way, but commits nobody judged keep the branch.
-  const outcome = !removed
-    ? 'git-refused'
-    : (await unmoved())
-    ? 'removed'
-    : 'kept-branch';
-  if (outcome === 'removed') await deleteBranch(branch, true, cwd);
-  await rescanSessionDiscovery();
-  return outcome;
+  if (!(await removeWorktree(branch, { force, cwd }))) return 'git-refused';
+  if ((await branchTip(branch, cwd)) !== approved.tip) return 'kept-branch';
+  await deleteBranch(branch, true, cwd);
+  return 'removed';
 }

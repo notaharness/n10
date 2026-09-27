@@ -17,7 +17,10 @@ const calls = vi.hoisted(() => ({
   createReturns: '/repo/.claude/worktrees/b' as string | null,
 }));
 
-vi.mock('./repo.js', () => ({ requireRepo: () => '/repo' }));
+vi.mock('./repo.js', () => ({
+  requireRepo: () => '/repo',
+  activeRepoIs: (cwd: string) => cwd === '/repo',
+}));
 
 vi.mock('@n10/vcs-core', () => ({ readConfig: () => calls.config }));
 
@@ -40,8 +43,14 @@ vi.mock('@n10/core', () => ({
 }));
 
 vi.mock('./babysit.js', () => ({
-  stopBabysitForBranch: (branch: string) =>
-    calls.log.push(`stop-babysit:${branch}`),
+  stopBabysitForBranch: (branch: string) => {
+    calls.log.push(`stop-babysit:${branch}`);
+    return [42];
+  },
+  startBabysit: (prId: number) => {
+    calls.log.push(`start-babysit:${prId}`);
+    return Promise.resolve({ phase: 'watching' });
+  },
 }));
 
 vi.mock('@n10/worktree-manager', () => ({
@@ -102,6 +111,25 @@ describe('removeWorktree', () => {
       await removeWorktree('feature/x', { verdict: 'clear', tip: 'abc123' })
     ).toBe('git-refused');
   });
+
+  // The agent a kept worktree still holds is still worth watching.
+  it.each(['changed', 'git-refused'])(
+    'babysits the pull request again when core answers %s',
+    async (outcome) => {
+      calls.removed = outcome;
+      await removeWorktree('feature/x', { verdict: 'clear', tip: 'abc123' });
+      expect(calls.log.at(-1)).toBe('start-babysit:42');
+    }
+  );
+
+  it.each(['removed', 'kept-branch'])(
+    'leaves babysitting stopped when core answers %s',
+    async (outcome) => {
+      calls.removed = outcome;
+      await removeWorktree('feature/x', { verdict: 'clear', tip: 'abc123' });
+      expect(calls.log).not.toContain('start-babysit:42');
+    }
+  );
 });
 
 describe('openInEditor', () => {

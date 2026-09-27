@@ -155,7 +155,7 @@ export function useRemoveWorktree(cwd: string) {
     onSuccess: (outcome, { branch, tabId }) => {
       // A kept worktree keeps its tab: its agent may still be running.
       const gone = outcome === 'removed' || outcome === 'kept-branch';
-      if (gone && tabId) tabs.close(tabId);
+      if (gone && tabId) tabs.close(tabId, cwd);
       const notice = keptNotice(branch, outcome);
       if (notice) toast.warning(notice);
       else toast.success(`Removed worktree ${branch}`);
