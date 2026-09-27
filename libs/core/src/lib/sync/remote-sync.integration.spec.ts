@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resetMainBranchCache } from '@n10/worktree-manager';
@@ -10,11 +10,16 @@ vi.mock('@n10/logger', () => ({
   logError: () => undefined,
 }));
 
-import { syncRemote } from './remote-sync.js';
+// The sweep skips a checkout with a live agent; none runs here.
+vi.mock('../pty-registry.js', () => ({ isSessionAlive: () => false }));
+vi.mock('../session-backend.js', () => ({ hasLiveTmuxSession: () => false }));
+
+import { keyForWorktree } from '../session-key.js';
+import { sweepMergedBranches, syncRemote } from './remote-sync.js';
 
 /**
- * `syncRemote(repo)` against real repositories sharing a local bare
- * remote. The desktop switches repositories by changing the process's
+ * `syncRemote(repo)` and `sweepMergedBranches({ cwd })` against real
+ * repositories sharing a local bare remote. The desktop switches repositories by changing the process's
  * directory, so a sync that started for one repository may finish with
  * the process in another: every step must act on the repository it was
  * given.
@@ -135,5 +140,57 @@ describe('syncRemote', () => {
     await syncRemote(b.clone);
 
     expect(git(b.clone, 'branch', '--list', 'main')).toBe('');
+  });
+});
+
+describe('sweepMergedBranches', () => {
+  /** A repository with a `feature` checkout under the default worktree
+   *  directory; `dirty` leaves an uncommitted file in it. */
+  function repoWithFeature(name: string, dirty: boolean) {
+    const repo = join(root, name);
+    init(repo, 'main');
+    const checkout = join(repo, '.claude', 'worktrees', 'feature');
+    git(repo, 'worktree', 'add', '-q', '-b', 'feature', checkout);
+    if (dirty) writeFileSync(join(checkout, 'uncommitted.txt'), 'work');
+    return { repo: realpathSync(repo), checkout: realpathSync(checkout) };
+  }
+
+  /** Sweep `repo` with `feature` reported merged and auto-delete on,
+   *  and return what it asked to delete. */
+  async function sweep(repo: string): Promise<[string, string][]> {
+    const deleted: [string, string][] = [];
+    await sweepMergedBranches({
+      provider: {
+        fetchMergedBranches: () => Promise.resolve(new Set(['feature'])),
+      } as never,
+      vcsConfigured: true,
+      config: { vendorAuth: {}, vendorProject: {}, autoDeleteOnMerge: true },
+      branches: ['feature'],
+      warnedRebase: new Set(),
+      onAutoDelete: (sessionName, branch) => {
+        deleted.push([sessionName, branch]);
+      },
+      onRebaseInProgress: () => undefined,
+      cwd: repo,
+    });
+    return deleted;
+  }
+
+  it('refuses to delete a branch whose checkout in the given repository has work', async () => {
+    const a = repoWithFeature('a', false);
+    const b = repoWithFeature('b', true);
+    process.chdir(a.repo);
+
+    expect(await sweep(b.repo)).toEqual([]);
+  });
+
+  it('names the given repository’s checkout when it deletes', async () => {
+    const a = repoWithFeature('a', true);
+    const b = repoWithFeature('b', false);
+    process.chdir(a.repo);
+
+    expect(await sweep(b.repo)).toEqual([
+      [keyForWorktree({ path: b.checkout }, b.repo), 'feature'],
+    ]);
   });
 });
