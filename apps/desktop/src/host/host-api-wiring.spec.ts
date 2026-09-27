@@ -108,7 +108,12 @@ vi.mock('./services/pr-conversation.js', () =>
   recorder('prConversation', ['getPullRequestConversation'])
 );
 vi.mock('./services/review-drafts.js', () =>
-  recorder('reviewDrafts', ['listDrafts', 'saveDraft', 'discardDraft'])
+  recorder('reviewDrafts', [
+    'listDrafts',
+    'saveDraft',
+    'discardDraft',
+    'submitReview',
+  ])
 );
 vi.mock('./services/mentions.js', () =>
   recorder('mentions', ['searchMentionCandidates'])
@@ -193,6 +198,7 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
   ['listReviewDrafts', [{ ref: { number: 7 } }], 'reviewDrafts.listDrafts'],
   ['saveReviewDraft', [{ ref: { number: 7 } }], 'reviewDrafts.saveDraft'],
   ['discardReviewDraft', [{ ref: { number: 7 } }], 'reviewDrafts.discardDraft'],
+  ['submitReview', [{ ref: { number: 7 } }], 'reviewDrafts.submitReview'],
   [
     'searchMentionCandidates',
     [{ ref: { number: 7 }, query: 'al' }],

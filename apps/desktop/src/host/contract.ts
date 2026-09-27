@@ -83,6 +83,7 @@ import type {
   DraftsRequest,
   MentionSearch,
   MentionSearchRequest,
+  SubmitReviewRequest,
   PullRequestConversationRead,
   PullRequestSnapshot,
   RepositoryRef,
@@ -375,6 +376,10 @@ export interface N10HostApi {
   /** People a comment on one pull request can mention, found by the
    *  provider's own search. Refused like the snapshot. */
   searchMentionCandidates(req: MentionSearchRequest): Promise<MentionSearch>;
+  /** File the chosen drafts as one native review on the head the
+   *  reviewer read. Resolves to the drafts as they now stand; a failure
+   *  leaves each draft saying where it got to. Refused like the snapshot. */
+  submitReview(req: SubmitReviewRequest): Promise<ReviewDrafts>;
   /** Cast the current user's review verdict on a PR. */
   submitReviewVerdict(prId: number, verdict: ReviewVerdict): Promise<void>;
   /** The reviewer-list identifier of the authenticated user (GitHub
@@ -574,6 +579,7 @@ export const IPC = {
   saveReviewDraft: 'n10/review-drafts/save',
   discardReviewDraft: 'n10/review-drafts/discard',
   searchMentionCandidates: 'n10/pull-requests/mentions',
+  submitReview: 'n10/review-drafts/submit',
   submitReviewVerdict: 'n10/reviews/submit-verdict',
   getReviewViewer: 'n10/reviews/viewer',
   fetchCommentImage: 'n10/reviews/comment-image',

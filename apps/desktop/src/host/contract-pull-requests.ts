@@ -14,6 +14,7 @@ export type {
   DraftTarget,
   MentionSearch,
   MentionSearchRequest,
+  SubmitReviewRequest,
   Publication,
   PullRequestConversationRead,
   PullRequestSnapshot,
