@@ -43,7 +43,8 @@ export function insertMention(
 ): { text: string; caret: number } {
   const end = at.start + 1 + at.query.length;
   const rest = text.slice(end);
-  const spaced = /^\s/.test(rest);
+  // A space or tab ends the mention; a line break stays after it.
+  const spaced = /^[ \t]/.test(rest);
   const head = text.slice(0, at.start) + token + (spaced ? '' : ' ');
   return { text: head + rest, caret: head.length + (spaced ? 1 : 0) };
 }

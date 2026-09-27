@@ -137,17 +137,17 @@ test.describe('Mentions', () => {
     await expect(box).toHaveValue('@alex ');
     await expect(box).toBeFocused();
 
-    // Straight on to other letters: what was found for "al" is gone
-    // before the next answer, so Enter is just a new line.
-    await box.pressSequentially('@s');
+    // Letters nobody matches, straight away: nothing found for "al"
+    // is offered, so Enter is just a new line.
+    await box.pressSequentially('@z');
     await page.keyboard.press('Enter');
-    await expect(box).toHaveValue('@alex @s\n');
+    await expect(box).toHaveValue('@alex @z\n');
 
     await box.pressSequentially('@sam');
     await expect(list.getByRole('option')).toHaveCount(2);
     await page.keyboard.press('ControlOrMeta+Enter');
     await expect(page.locator('[data-my-draft="general"]')).toContainText(
-      '@alex @s'
+      '@alex @z\n@sam'
     );
   });
 });

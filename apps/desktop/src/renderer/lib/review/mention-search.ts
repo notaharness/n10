@@ -60,9 +60,29 @@ export function useMentionSearch(
     enabled: ref != null && !!asked,
     staleTime: 60_000,
   });
-  const current = asked === query && result.isSuccess;
+  return offered(asked, query, result);
+}
+
+/**
+ * What the picker may offer: the answer for exactly the query in the
+ * box, and nothing while it is still being asked — not the pause before
+ * the question, and not an earlier answer shown in its place.
+ */
+export function offered(
+  asked: string | null,
+  query: string | null,
+  result: {
+    data?: MentionCandidate[];
+    error: Error | null;
+    isSuccess: boolean;
+    isPlaceholderData: boolean;
+    isFetching: boolean;
+  }
+) {
+  const current =
+    asked === query && result.isSuccess && !result.isPlaceholderData;
   return {
-    people: current ? result.data : [],
+    people: current ? result.data ?? [] : [],
     waiting: asked !== query || result.isFetching,
     error: asked === query ? result.error : null,
   };
