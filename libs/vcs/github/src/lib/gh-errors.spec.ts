@@ -56,6 +56,63 @@ describe('telling a refused write from one that may have landed', () => {
     );
     expect(timedOut).toMatchObject({ refused: false });
   });
+
+  it('takes a mutation answered with its field null as refused, with GitHub’s reason', () => {
+    const outside = classifyGhError(
+      failed('api graphql', {
+        stderr: 'gh: pull_request_review_thread.line must be part of the diff',
+        stdout: JSON.stringify({
+          data: { addPullRequestReviewThread: null },
+          errors: [
+            {
+              type: 'UNPROCESSABLE',
+              message:
+                'pull_request_review_thread.line must be part of the diff',
+            },
+          ],
+        }),
+      })
+    );
+    expect(outside).toMatchObject({
+      refused: true,
+      message:
+        'GitHub: pull_request_review_thread.line must be part of the diff',
+    });
+    const resolved = classifyGhError(
+      failed('api graphql', {
+        stdout: JSON.stringify({
+          data: { addPullRequestReviewThread: { thread: { id: 'T' } } },
+          errors: [{ message: 'partial' }],
+        }),
+      })
+    );
+    expect(resolved).toMatchObject({ refused: false });
+  });
+
+  it('names what GitHub could not find', () => {
+    const err = classifyGhError(
+      failed('api graphql', {
+        stderr:
+          "gh: Could not resolve to a node with the global id of 'PRRT_x'",
+        stdout: JSON.stringify({
+          data: { node: null },
+          errors: [
+            {
+              type: 'NOT_FOUND',
+              message:
+                "Could not resolve to a node with the global id of 'PRRT_x'",
+            },
+          ],
+        }),
+      })
+    );
+    expect(err).toMatchObject({
+      kind: 'not-found',
+      refused: true,
+      message:
+        "GitHub: Could not resolve to a node with the global id of 'PRRT_x'",
+    });
+  });
 });
 
 describe('assertGraphQlData', () => {

@@ -12,7 +12,15 @@
  * not pending) is answered with GraphQL errors and no write.
  */
 
-class Refused extends Error {}
+class Refused extends Error {
+  /** `field` is named null beside the error, as in GitHub's own
+   *  refusals. */
+  constructor(message, field, type = 'UNPROCESSABLE') {
+    super(message);
+    this.field = field;
+    this.type = type;
+  }
+}
 
 let next = 0;
 const newId = (prefix) => `${prefix}_${Date.now()}_${++next}`;
@@ -50,7 +58,7 @@ const reads = {
               ? [
                   {
                     id: pending.id,
-                    createdAt: pending.createdAt,
+                    comments: { totalCount: pending.comments.length },
                     viewerDidAuthor: true,
                     commit: { oid: pending.commit },
                   },
@@ -100,7 +108,11 @@ const reads = {
       const done = (pr.reviews ?? []).find((r) => r.id === vars.id);
       if (done) return { node: { id: vars.id, state: done.state } };
     }
-    return { node: null };
+    throw new Refused(
+      `Could not resolve to a node with the global id of '${vars.id}'`,
+      'node',
+      'NOT_FOUND'
+    );
   },
 };
 
@@ -109,7 +121,8 @@ const writes = {
     const pr = prOf(prs, vars);
     if (pr.pendingReview) {
       throw new Refused(
-        'User can only have one pending review per pull request'
+        'User can only have one pending review per pull request',
+        'addPullRequestReview'
       );
     }
     const id = newId('PRR');
@@ -164,7 +177,9 @@ const writes = {
     const pr = prOf(prs, vars);
     const author = scenario.username ?? 'n10-tester';
     const pending = pr?.pendingReview;
-    if (!pending) throw new Refused('Review is not pending');
+    if (!pending) {
+      throw new Refused('Review is not pending', 'submitPullRequestReview');
+    }
     for (const c of pending.comments) {
       if (c.thread) {
         const t = (pr.threads ?? []).find(
@@ -220,15 +235,19 @@ const writes = {
  */
 export function reviewGraphql(query, vars, prs, scenario) {
   const op = /(?:query|mutation) (\w+)\(/.exec(query)?.[1];
-  if (reads[op]) return { data: reads[op](prs, vars) };
-  if (!writes[op]) return null;
+  const run = reads[op] ?? writes[op];
+  if (!run) return null;
   let data;
   try {
-    data = writes[op](prs, vars, scenario, query);
+    data = run(prs, vars, scenario, query);
   } catch (err) {
-    if (err instanceof Refused) return { errors: [{ message: err.message }] };
-    throw err;
+    if (!(err instanceof Refused)) throw err;
+    return {
+      data: { [err.field]: null },
+      errors: [{ type: err.type, message: err.message }],
+    };
   }
+  if (reads[op]) return { data };
   const lose = scenario.loseAnswers ?? [];
   const lost = lose.includes(op);
   if (lost) scenario.loseAnswers = lose.filter((x) => x !== op);

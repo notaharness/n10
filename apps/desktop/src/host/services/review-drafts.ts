@@ -10,6 +10,7 @@ import {
   type DraftSources,
   type ReviewDraft,
   type ReviewDrafts,
+  type SubmittedReview,
 } from '@n10/core';
 import { openContext } from './open-context.js';
 import { resolveProvider } from './pull-requests.js';
@@ -46,7 +47,7 @@ export async function discardDraft(request: unknown): Promise<void> {
  * Nothing is sent unless the reviewer asked for exactly this; a review
  * that stops part-way is resumed by the next call, never repeated.
  */
-export async function submitReview(request: unknown): Promise<ReviewDrafts> {
+export async function submitReview(request: unknown): Promise<SubmittedReview> {
   const req = parseSubmitReviewRequest(request);
   const cwd = requireRepo();
   const { config, provider, configured } = resolveProvider(cwd);

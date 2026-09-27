@@ -23,7 +23,6 @@ interface Comment {
 
 interface Pending {
   id: string;
-  createdAt: string;
   viewerDidAuthor: boolean;
   commit: { oid: string };
   comments: Comment[];
@@ -39,7 +38,8 @@ const ROOTS: Record<string, string> = {
  * GitHub's side of a review, as its GraphQL schema describes it: one
  * pending review per reviewer, visible only to them, filled by thread
  * and reply mutations and filed by a submit. `lose` performs a write
- * and then drops its answer; `refuse` answers no and writes nothing.
+ * and then drops its answer; `drop` loses the request before it
+ * reaches GitHub; `refuse` answers no and writes nothing.
  * What GitHub itself refuses (a second pending review, a submit of one
  * already filed, a comment that is not there) is refused here too.
  */
@@ -52,6 +52,7 @@ class FakeGitHub {
   submitted: Record<string, unknown>[] = [];
   threadWrites: Record<string, unknown>[] = [];
   lose = new Set<string>();
+  drop = new Set<string>();
   refuse = new Map<string, string>();
   clock = Date.parse('2026-09-01T00:00:00Z');
   private next = 0;
@@ -65,6 +66,9 @@ class FakeGitHub {
       return Promise.reject(
         new VcsError('server', `GitHub refused: ${refusal}`, { refused: true })
       );
+    }
+    if (this.drop.delete(op)) {
+      return Promise.reject(new VcsError('network', 'connection refused'));
     }
     let data: unknown;
     try {
@@ -98,7 +102,12 @@ class FakeGitHub {
               headRefOid: this.head,
               reviews: {
                 nodes: this.pending
-                  ? [{ ...this.pending, comments: undefined }]
+                  ? [
+                      {
+                        ...this.pending,
+                        comments: { totalCount: this.pending.comments.length },
+                      },
+                    ]
                   : [],
               },
             },
@@ -126,12 +135,12 @@ class FakeGitHub {
         const root = ROOTS[String(v['id'])];
         return { node: root ? { comments: { nodes: [{ id: root }] } } : null };
       }
-      case 'ReviewPublicationById':
-        return {
-          node: this.states.has(String(v['id']))
-            ? { id: v['id'], state: this.states.get(String(v['id'])) }
-            : null,
-        };
+      case 'ReviewPublicationById': {
+        // GitHub answers a node that is gone with NOT_FOUND, not null.
+        const state = this.states.get(String(v['id']));
+        if (!state) throw gone();
+        return { node: { id: v['id'], state } };
+      }
       default:
         throw new Error(`unexpected ${op}`);
     }
@@ -152,7 +161,6 @@ class FakeGitHub {
       const id = this.id('PRR');
       this.pending = {
         id,
-        createdAt: new Date(this.clock).toISOString(),
         viewerDidAuthor: true,
         commit: { oid: String(v['commit']) },
         comments: [],
@@ -285,7 +293,6 @@ function publish(gh: FakeGitHub, store = memory(), sub = SUBMISSION) {
 
 const web = (): Pending => ({
   id: 'PRR_web',
-  createdAt: '2020-01-01T00:00:00Z',
   viewerDidAuthor: true,
   commit: { oid: HEAD },
   comments: [],
@@ -509,14 +516,49 @@ describe('publishing a GitHub review', () => {
     expect(store.get()?.head).toBe(NEWER);
   });
 
-  it('does not take up a pending review older than its own lost start', async () => {
+  it('does not take up a pending review filled on GitHub after its own start was lost', async () => {
     const gh = new FakeGitHub();
     const store = memory();
-    gh.lose.add('StartReview');
+    gh.drop.add('StartReview');
     await failure(publish(gh, store));
-    gh.pending = web();
+    gh.pending = {
+      ...web(),
+      comments: [
+        {
+          id: 'PRRC_web',
+          body: 'Mine, from the web.',
+          path: 'a.ts',
+          line: 1,
+          startLine: null,
+          subjectType: 'LINE',
+          replyTo: null,
+        },
+      ],
+    };
     expect(await failure(publish(gh, store))).toBe('blocked');
-    expect(gh.pending.comments).toHaveLength(0);
+    expect(gh.pending.comments).toHaveLength(1);
+  });
+
+  it('starts over when its pending review was discarded on GitHub', async () => {
+    const gh = new FakeGitHub();
+    const store = memory();
+    gh.refuse.set('SubmitReview', 'try again');
+    await failure(publish(gh, store));
+    gh.states.delete(gh.pending!.id);
+    gh.pending = null;
+    await publish(gh, store);
+    expect(count(gh, 'StartReview')).toBe(2);
+    expect(gh.submitted[0]).toMatchObject({ comments: 3 });
+  });
+
+  it('knows a lost submit did not land when the review is still pending', async () => {
+    const gh = new FakeGitHub();
+    const store = memory();
+    gh.drop.add('SubmitReview');
+    expect(await failure(publish(gh, store))).toBe('unknown');
+    gh.head = NEWER;
+    expect(await failure(publish(gh, store))).toBe('moved');
+    expect(store.get()?.inFlight).toBeNull();
   });
 
   it('does not take up a pending review on another commit after its own lost start', async () => {
@@ -526,7 +568,6 @@ describe('publishing a GitHub review', () => {
     await failure(publish(gh, store));
     gh.pending = {
       ...web(),
-      createdAt: new Date(gh.clock).toISOString(),
       commit: { oid: NEWER },
     };
     expect(await failure(publish(gh, store))).toBe('blocked');

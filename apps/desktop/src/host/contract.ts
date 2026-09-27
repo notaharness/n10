@@ -84,6 +84,7 @@ import type {
   MentionSearch,
   MentionSearchRequest,
   SubmitReviewRequest,
+  SubmittedReview,
   PullRequestConversationRead,
   PullRequestSnapshot,
   RepositoryRef,
@@ -379,7 +380,7 @@ export interface N10HostApi {
   /** File the chosen drafts as one native review on the head the
    *  reviewer read. Resolves to the drafts as they now stand; a failure
    *  leaves each draft saying where it got to. Refused like the snapshot. */
-  submitReview(req: SubmitReviewRequest): Promise<ReviewDrafts>;
+  submitReview(req: SubmitReviewRequest): Promise<SubmittedReview>;
   /** Cast the current user's review verdict on a PR. */
   submitReviewVerdict(prId: number, verdict: ReviewVerdict): Promise<void>;
   /** The reviewer-list identifier of the authenticated user (GitHub

@@ -40,9 +40,9 @@ import {
 
 interface PendingReview {
   id: string;
-  createdAt: string;
   viewerDidAuthor: boolean;
   commit: { oid: string } | null;
+  comments: { totalCount: number };
 }
 
 interface PullRequestState {
@@ -143,7 +143,12 @@ class Run {
   async alreadySubmitted(pending: PendingReview | null): Promise<boolean> {
     const { reviewId } = this.ledger;
     if (this.ledger.submitted) return true;
-    if (!reviewId || pending?.id === reviewId) return false;
+    if (!reviewId) return false;
+    if (pending?.id === reviewId) {
+      // Still pending: a submit whose answer was lost did not land.
+      if (this.ledger.inFlight === 'submit') this.save({ inFlight: null });
+      return false;
+    }
     const state = await this.reviewState(reviewId);
     if (state && state !== 'PENDING') {
       this.save({ submitted: true, inFlight: null });
@@ -292,21 +297,29 @@ class Run {
     });
   }
 
-  /** Its own start whose answer was lost: on the head it asked for,
-   *  and made since this publication began. */
+  /** Its own start whose answer was lost: the reviewer's, on the head
+   *  it asked for, and still empty. One with comments in it was filled
+   *  on GitHub, so it is the reviewer's work there, not this start. */
   private startedHere(pending: PendingReview): boolean {
     return (
       this.ledger.inFlight === 'review' &&
       pending.commit?.oid === this.ledger.head &&
-      Date.parse(pending.createdAt) >= this.ledger.startedAt - CLOCK_SLACK
+      pending.comments.totalCount === 0
     );
   }
 
+  /** The review's state; null once it is gone, which GitHub answers
+   *  with NOT_FOUND. */
   private async reviewState(id: string): Promise<string | null> {
-    const answer = (await this.gql(REVIEW_BY_ID, { id })) as {
-      data?: { node?: { state?: string } | null };
-    };
-    return answer.data?.node?.state ?? null;
+    try {
+      const answer = (await this.gql(REVIEW_BY_ID, { id })) as {
+        data?: { node?: { state?: string } | null };
+      };
+      return answer.data?.node?.state ?? null;
+    } catch (err) {
+      if (isVcsError(err) && err.kind === 'not-found') return null;
+      throw err;
+    }
   }
 
   private reset(): void {
@@ -343,14 +356,6 @@ class Run {
     this.store.write(this.ledger);
   }
 }
-
-/**
- * How far this machine's clock may run ahead of GitHub's. A pending
- * review older than the publication by more than this was not its own:
- * had it existed when the start reached GitHub, the start would have
- * been refused (one pending review per reviewer).
- */
-const CLOCK_SLACK = 10 * 60_000;
 
 /** Steps that are not an item's; each is accounted for where it is sent. */
 const STEPS = new Set(['review', 'discard', 'submit']);

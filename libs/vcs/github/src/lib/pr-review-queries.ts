@@ -8,14 +8,14 @@ import type { ReviewPlace } from '@n10/vcs-core';
  */
 
 /** The pull request, its head, and the reviewer's pending review:
- *  whose it is and on which commit. */
+ *  whose it is, on which commit, and whether anything is in it. */
 export const REVIEW_STATE = `query ReviewPublicationState($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
       id
       headRefOid
       reviews(states: [PENDING], first: 10) {
-        nodes { id createdAt viewerDidAuthor commit { oid } }
+        nodes { id viewerDidAuthor commit { oid } comments { totalCount } }
       }
     }
   }

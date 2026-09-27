@@ -98,7 +98,10 @@ function submit(page: Page, head = HEAD) {
         draftIds: drafts.map((d) => d.id),
       })
       .then(
-        (r) => ({ ok: r.drafts.map((d) => d.publication.state) }),
+        (r) => ({
+          ok: r.drafts.map((d) => d.publication.state),
+          resumed: r.resumed,
+        }),
         (e: Error) => ({ error: e.message })
       );
   }, head);
@@ -119,7 +122,10 @@ test.describe('Publishing a review', () => {
     await draftOn(page, 'RIGHT', 1, 'Why three?', 2);
     await draftOn(page, 'LEFT', 2, 'The old wait was fine.');
 
-    expect(await submit(page)).toEqual({ ok: ['published', 'published'] });
+    expect(await submit(page)).toEqual({
+      ok: ['published', 'published'],
+      resumed: false,
+    });
     const after = scenario(homeDir);
     expect(after.reviewWrites).toEqual({
       StartReview: 1,
@@ -171,7 +177,8 @@ test.describe('Publishing a review', () => {
       .locator('[data-my-draft]')
       .screenshot({ path: testInfo.outputPath('unknown.png') });
 
-    expect(await submit(page)).toEqual({ ok: ['published'] });
+    // The review that landed is the one reported, not a new one.
+    expect(await submit(page)).toEqual({ ok: ['published'], resumed: true });
     const after = scenario(homeDir);
     expect(after.reviewWrites?.['SubmitReview']).toBe(1);
     expect(after.prs[0]!.reviews).toHaveLength(1);
@@ -190,7 +197,7 @@ test.describe('Publishing a review', () => {
     expect(await submit(page)).toEqual({
       error: expect.stringContaining('GitHub did not answer'),
     });
-    expect(await submit(page)).toEqual({ ok: ['published'] });
+    expect(await submit(page)).toEqual({ ok: ['published'], resumed: false });
     const after = scenario(homeDir);
     expect(after.reviewWrites).toEqual({
       StartReview: 1,

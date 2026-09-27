@@ -15,6 +15,7 @@ export type {
   MentionSearch,
   MentionSearchRequest,
   SubmitReviewRequest,
+  SubmittedReview,
   Publication,
   PullRequestConversationRead,
   PullRequestSnapshot,

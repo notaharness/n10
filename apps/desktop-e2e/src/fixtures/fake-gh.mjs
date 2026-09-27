@@ -371,7 +371,9 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
   if (review?.errors) {
     // What `gh api graphql` does with a GraphQL error: the payload on
     // stdout, its message on stderr, a failed exit.
-    process.stdout.write(JSON.stringify({ errors: review.errors }));
+    process.stdout.write(
+      JSON.stringify({ data: review.data, errors: review.errors })
+    );
     process.stderr.write(`gh: ${review.errors[0].message}\n`);
     process.exit(1);
   }

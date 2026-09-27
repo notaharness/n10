@@ -6,6 +6,7 @@ import {
   ReviewPublishError,
   type LedgerStore,
   type PullRequestRef,
+  type ReviewEvent,
   type ReviewSubmission,
 } from '@n10/vcs-core';
 import { PullRequestIdentityError } from './pr-snapshot.js';
@@ -64,7 +65,7 @@ function write(
   saveReviewDraft({ ref: REF, viewer: 'bea', target, body }, src());
 }
 
-const request = (draftIds: string[], event = 'APPROVE' as const) => ({
+const request = (draftIds: string[], event: ReviewEvent = 'APPROVE') => ({
   ref: REF,
   viewer: 'bea',
   head: HEAD,
@@ -253,20 +254,89 @@ describe('submitting a review', () => {
     await submitReview(request(['summary', 'inline:k1']), unanswered).catch(
       () => undefined
     );
+    let sent: ReviewSubmission | null = null;
+    const answer = await submitReview(
+      request(['inline:k1', 'inline:k2'], 'REQUEST_CHANGES'),
+      src((submission) => {
+        sent = submission;
+        return Promise.resolve({
+          reviewId: 'R',
+          items: { 'inline:k1': 'C1' },
+          resumed: true,
+        });
+      })
+    );
+    // The submit that may have landed is finished as it was sent.
+    expect(sent).toMatchObject({ event: 'APPROVE', body: 'Looks right.' });
+    expect(sent!.items.map((i) => i.key)).toEqual(['inline:k1']);
+    expect(answer.resumed).toBe(true);
+    expect(states()).toMatchObject({
+      summary: 'published',
+      'inline:k1': 'published',
+      'inline:k2': 'unpublished',
+    });
+  });
+
+  it('keeps a maybe-filed submit’s choice through an attempt that fails before it is checked', async () => {
+    const lostSubmit = src((_s, ledger) => {
+      ledger.write({
+        startedAt: 1,
+        head: HEAD,
+        reviewId: 'R',
+        inFlight: 'submit',
+        sending: null,
+        added: {
+          'inline:k1': { id: 'C1', body: 'x' },
+          'inline:k2': { id: 'C2', body: 'y' },
+        },
+        submitted: false,
+      });
+      return Promise.reject(new ReviewPublishError('unknown', 'no answer'));
+    });
+    await submitReview(request(['inline:k1', 'inline:k2']), lostSubmit).catch(
+      () => undefined
+    );
     await submitReview(
-      request(['inline:k1', 'inline:k2']),
+      request(['inline:k1']),
+      src(() => Promise.reject(new Error('offline')))
+    ).catch(() => undefined);
+    await submitReview(
+      request(['inline:k1']),
       src(() =>
         Promise.resolve({
           reviewId: 'R',
-          items: { 'inline:k1': 'C1' },
+          items: { 'inline:k1': 'C1', 'inline:k2': 'C2' },
           resumed: true,
         })
       )
     );
     expect(states()).toMatchObject({
-      summary: 'published',
       'inline:k1': 'published',
-      'inline:k2': 'unpublished',
+      'inline:k2': 'published',
+    });
+  });
+
+  it('settles a review filed on GitHub by what it holds, without the summary', async () => {
+    await submitReview(
+      request(['summary', 'inline:k1', 'inline:k2']),
+      src(() => Promise.reject(new ReviewPublishError('refused', 'no')))
+    ).catch(() => undefined);
+    const answer = await submitReview(
+      request(['summary', 'inline:k1']),
+      src(() =>
+        Promise.resolve({
+          reviewId: 'R',
+          // k2 was in the pending review when it was filed on GitHub.
+          items: { 'inline:k1': 'C1', 'inline:k2': 'C2' },
+          resumed: true,
+        })
+      )
+    );
+    expect(answer.resumed).toBe(true);
+    expect(states()).toMatchObject({
+      summary: 'unpublished',
+      'inline:k1': 'published',
+      'inline:k2': 'published',
     });
   });
 
