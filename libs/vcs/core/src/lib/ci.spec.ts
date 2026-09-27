@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { parseCiLogRef, stripTerminalControls, tailLines } from './ci.js';
+import {
+  parseCiLogRef,
+  readableCiLog,
+  stripTerminalControls,
+  tailLines,
+} from './ci.js';
 
 describe('parseCiLogRef', () => {
   it('accepts exactly the two shapes', () => {
@@ -60,5 +65,16 @@ describe('stripTerminalControls', () => {
         '\x1b[1;31merror\x1b[0m:\tbad\x07\r\x1b]0;title\x07'
       )
     ).toBe('error:\tbad');
+  });
+});
+
+describe('readableCiLog', () => {
+  it('drops the byte-order mark, timestamps and escapes', () => {
+    expect(
+      readableCiLog(
+        '\ufeff2026-09-26T20:37:45.6919290Z first\n' +
+          '2026-09-26T20:37:46.0000000Z \x1b[1;31merror\x1b[0m: bad\r\n'
+      )
+    ).toBe('first\nerror: bad\n');
   });
 });

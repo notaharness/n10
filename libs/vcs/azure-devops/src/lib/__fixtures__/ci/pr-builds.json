@@ -1,0 +1,26 @@
+{
+  "count": 1,
+  "value": [
+    {
+      "id": 1613631,
+      "buildNumber": "20260926.26",
+      "status": "completed",
+      "result": "failed",
+      "reason": "pullRequest",
+      "sourceBranch": "refs/pull/38922/merge",
+      "sourceVersion": "924c709ae68f3e564baea4fa343be8ab12886c86",
+      "queueTime": "2026-09-27T02:03:21.579701Z",
+      "startTime": "2026-09-27T02:03:47.1550557Z",
+      "finishTime": "2026-09-27T02:15:58.2326143Z",
+      "definition": {
+        "id": 302,
+        "name": "maui-pr"
+      },
+      "_links": {
+        "web": {
+          "href": "https://dev.azure.com/dnceng-public/cbb18261-c48f-4abb-8651-8cdcb5474649/_build/results?buildId=1613631"
+        }
+      }
+    }
+  ]
+}

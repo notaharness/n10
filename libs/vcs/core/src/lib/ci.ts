@@ -141,6 +141,21 @@ export function stripTerminalControls(text: string): string {
   return sanitizeBody(text).replace(CONTROL_CHARS, '');
 }
 
+const TIMESTAMP = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z ?/;
+
+/**
+ * A CI log as text to read. GitHub and Azure agents write the same
+ * format: a byte-order mark, an ISO timestamp on every line, and the
+ * colour codes of whatever ran. All three go.
+ */
+export function readableCiLog(raw: string): string {
+  const body = raw.startsWith('\ufeff') ? raw.slice(1) : raw;
+  return body
+    .split(/\r?\n/)
+    .map((line) => stripTerminalControls(line.replace(TIMESTAMP, '')))
+    .join('\n');
+}
+
 /** The last `count` lines of `text`, numbered within the whole. */
 export function tailLines(text: string, count: number): CiLog {
   const lines = text.split('\n');

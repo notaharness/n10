@@ -7,6 +7,7 @@ import {
   networkError,
   quotaExhausted,
   readJsonResponse,
+  readTextResponse,
   RequestCache,
   retryAfterMs,
   throttledError,
@@ -54,6 +55,8 @@ export const TTL = {
   description: 5 * 60_000,
   /** Who we are, which teams we are in, and the repository's id. */
   identity: 30 * 60_000,
+  /** A build's timeline and log list, read while the CI page is open. */
+  ci: 10_000,
 } as const;
 
 const cache = new RequestCache({ providerId: PROVIDER_ID });
@@ -185,6 +188,21 @@ export function adoGetPage<T>(
     const res = await send(context, url, { headers });
     const continuation = res.headers.get('x-ms-continuationtoken');
     return { data: await toJson<T>(res, what), continuation };
+  });
+}
+
+/** A GET of plain text, such as a log. Not cached: logs are read on
+ *  demand, one range at a time. */
+export async function adoGetText(
+  context: string,
+  url: string,
+  headers: Record<string, string>,
+  what?: string
+): Promise<string> {
+  return readTextResponse(await send(context, url, { headers }), {
+    providerName: PROVIDER_NAME,
+    what,
+    isSignInBody: looksLikeAdoSignIn,
   });
 }
 

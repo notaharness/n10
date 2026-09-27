@@ -8,7 +8,6 @@ import {
   fetchGitHubCiOverview,
   githubCiStatus,
   mapJob,
-  readableJobLog,
 } from './ci.js';
 
 /**
@@ -254,16 +253,5 @@ describe('fetchGitHubCiLog', () => {
       .then(() => null)
       .catch((e: unknown) => e);
     expect(String(err)).toContain('larger than 32 MiB');
-  });
-});
-
-describe('readableJobLog', () => {
-  it('drops the byte-order mark, timestamps and escapes', () => {
-    expect(
-      readableJobLog(
-        '﻿2026-09-26T20:37:45.6919290Z first\n' +
-          '2026-09-26T20:37:46.0000000Z \x1b[1;31merror\x1b[0m: bad\r\n'
-      )
-    ).toBe('first\nerror: bad\n');
   });
 });

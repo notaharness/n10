@@ -1,0 +1,4764 @@
+{
+  "id": "4fbec5ab-c606-4dd6-8a7f-1d30fba67ada",
+  "changeId": 375,
+  "records": [
+    {
+      "id": "39cee261-d094-472c-a767-012afbb65b69",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Post-job: Checkout dotnet/maui@refs/pull/38922/merge to s",
+      "identifier": null,
+      "order": 31,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:00.3133333Z",
+      "finishTime": "2026-09-27T02:15:00.5833333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 206
+      }
+    },
+    {
+      "id": "d460c757-c01d-4847-a5db-02d94845b93f",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Post-job: Checkout dotnet/maui@refs/pull/38922/merge to s",
+      "identifier": null,
+      "order": 29,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:26.09Z",
+      "finishTime": "2026-09-27T02:15:26.3766667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 226
+      }
+    },
+    {
+      "id": "7dc26345-1f7a-5000-238a-0444f4cc74a5",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Use .NET SDK 10.0.100",
+      "identifier": null,
+      "order": 10,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:37.2866667Z",
+      "finishTime": "2026-09-27T02:07:42.6966667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 45
+      }
+    },
+    {
+      "id": "9dd13560-4824-59ab-43ec-05a43e0950a4",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "install Gradle init script (Windows)",
+      "identifier": null,
+      "order": 22,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:08:42.2933333Z",
+      "finishTime": "2026-09-27T02:08:42.2966667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 73
+      }
+    },
+    {
+      "id": "9f9de0b9-424f-585d-7ff3-077012b6b48c",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "prepare Gradle cache variables (Windows)",
+      "identifier": null,
+      "order": 19,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:08:20.9966667Z",
+      "finishTime": "2026-09-27T02:08:21Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 56
+      }
+    },
+    {
+      "id": "0dbdbb3b-148b-5cfa-e030-07ca544bf631",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Publish XUnit Test Results",
+      "identifier": null,
+      "order": 25,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:14:57.1066667Z",
+      "finishTime": "2026-09-27T02:14:57.77Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 1,
+      "log": {
+        "id": 200
+      }
+    },
+    {
+      "id": "04ca6bab-6239-4cd5-96e3-08ce64906c64",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Post-job: Checkout dotnet/maui@refs/pull/38922/merge to s",
+      "identifier": null,
+      "order": 31,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:26.69Z",
+      "finishTime": "2026-09-27T02:09:26.8Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 115
+      }
+    },
+    {
+      "id": "224fd070-a2a0-4e9e-b31b-0945a6bf5222",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Finalize Job",
+      "identifier": null,
+      "order": 30,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:26.3766667Z",
+      "finishTime": "2026-09-27T02:15:26.4Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 227
+      }
+    },
+    {
+      "id": "cedf2542-baba-5758-e577-094ca7d48328",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "RunOniOS_MauiNativeAOT x64",
+      "identifier": "IntegrationTests.mac_runios_nativeaot",
+      "order": 19,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "e2dd1b9a-7f67-5ee0-ae15-0971e06b749b",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Show pre simulator info",
+      "identifier": null,
+      "order": 5,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:30.7466667Z",
+      "finishTime": "2026-09-27T02:09:30.75Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 124
+      }
+    },
+    {
+      "id": "55d1fa0a-f6b3-5dc8-0547-09dbe336aca8",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "install Gradle init script (Linux/macOS)",
+      "identifier": null,
+      "order": 21,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:00.4933333Z",
+      "finishTime": "2026-09-27T02:09:00.6166667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 79
+      }
+    },
+    {
+      "id": "464edbb0-63b3-53dc-eb0b-0b599e5e3d22",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Install iOS 18.5 Simulator (for integration tests)",
+      "identifier": null,
+      "order": 7,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:24.36Z",
+      "finishTime": "2026-09-27T02:09:24.3666667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 110
+      }
+    },
+    {
+      "id": "218356d0-7496-5735-9c67-0d6ae5755970",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Use .NET SDK 10.0.100",
+      "identifier": null,
+      "order": 10,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:33.9166667Z",
+      "finishTime": "2026-09-27T02:09:51.2333333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 149
+      }
+    },
+    {
+      "id": "89aca719-aa70-5d1a-d15b-0de7b5f020a4",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Publish TRX Test Results",
+      "identifier": null,
+      "order": 26,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:14:57.77Z",
+      "finishTime": "2026-09-27T02:14:58.37Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 1,
+      "log": {
+        "id": 201
+      }
+    },
+    {
+      "id": "acb75b45-4e3b-444f-82a9-0e715097031f",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Post-job: cache Gradle downloads",
+      "identifier": null,
+      "order": 30,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:18.1366667Z",
+      "finishTime": "2026-09-27T02:09:18.2433333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 95
+      }
+    },
+    {
+      "id": "1562dd0d-5e88-54a8-fa09-0f80dd4a1225",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Publish Logs",
+      "identifier": null,
+      "order": 28,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:25.1966667Z",
+      "finishTime": "2026-09-27T02:09:26.58Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 112
+      }
+    },
+    {
+      "id": "fe394abe-bcfe-569b-ea9c-0fb02f01b3d5",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Select Xcode Version",
+      "identifier": null,
+      "order": 4,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:10.8133333Z",
+      "finishTime": "2026-09-27T02:09:10.82Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 83
+      }
+    },
+    {
+      "id": "9fa98f12-31bb-5f3b-9fce-1112d60671f8",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Restore .NET Tools",
+      "identifier": null,
+      "order": 13,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:43.9366667Z",
+      "finishTime": "2026-09-27T02:10:07.2366667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 158
+      }
+    },
+    {
+      "id": "6b7979be-3a84-5b68-8a0f-133d06d0c613",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "\ud83d\udee0\ufe0f Provision SDK & Build BuildTasks",
+      "identifier": null,
+      "order": 23,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:08:42.2966667Z",
+      "finishTime": "2026-09-27T02:09:14.0566667Z",
+      "attempt": 1,
+      "errorCount": 4,
+      "warningCount": 3,
+      "log": {
+        "id": 88
+      }
+    },
+    {
+      "id": "33d1dfaa-1b2a-543b-e07b-14a32b7517bf",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Clean /opt/hostedtoolcache/dotnet directory",
+      "identifier": null,
+      "order": 3,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:04:41.0433333Z",
+      "finishTime": "2026-09-27T02:04:42.5433333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 18
+      }
+    },
+    {
+      "id": "5106bc33-952e-5398-a70e-151512f59343",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Install iOS 18.5 Simulator (for integration tests)",
+      "identifier": null,
+      "order": 7,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:30.2933333Z",
+      "finishTime": "2026-09-27T02:09:30.2966667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 128
+      }
+    },
+    {
+      "id": "4d610ee4-9c7b-5f9d-b36a-16afb6ba8879",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Set dump file location",
+      "identifier": null,
+      "order": 9,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:30.7633333Z",
+      "finishTime": "2026-09-27T02:09:41.4533333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 145
+      }
+    },
+    {
+      "id": "83a7d7a5-02b9-5638-4bb6-173089e3058f",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "Build macOS",
+      "identifier": "IntegrationTests.mac_buildtemplate_tests",
+      "order": 5,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "05153f67-ade2-5e26-b2c3-1761998a0301",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "List all .NET SDKs",
+      "identifier": null,
+      "order": 11,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:58.5233333Z",
+      "finishTime": "2026-09-27T02:10:01.3833333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 155
+      }
+    },
+    {
+      "id": "0e96fc9d-9292-5f44-534a-18a8186e125d",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "install Gradle init script (Windows)",
+      "identifier": null,
+      "order": 22,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:08:50.8933333Z",
+      "finishTime": "2026-09-27T02:08:50.8966667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 77
+      }
+    },
+    {
+      "id": "9f38bf7f-b7b8-5206-2e0d-197c76a7529f",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Provision Android SDK - Environment variables",
+      "identifier": null,
+      "order": 16,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:32.89Z",
+      "finishTime": "2026-09-27T02:08:34.1366667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 65
+      }
+    },
+    {
+      "id": "dc53b65b-482e-50b1-d446-1d8451d09d0d",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Gather logs for publish to artifacts",
+      "identifier": null,
+      "order": 27,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:25.0833333Z",
+      "finishTime": "2026-09-27T02:09:25.1966667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 108
+      }
+    },
+    {
+      "id": "48c38491-f0a2-5505-1224-2091af8c7038",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Install Simulator Runtimes",
+      "identifier": null,
+      "order": 6,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:24.3566667Z",
+      "finishTime": "2026-09-27T02:09:24.36Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 109
+      }
+    },
+    {
+      "id": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "parentId": "0daec9bd-91a9-567b-a56a-99d4cd137a05",
+      "type": "Job",
+      "name": "Build macOS (Release)",
+      "identifier": "Build.build_net_macOS_Release.__default",
+      "order": 1,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:03:48.21Z",
+      "finishTime": "2026-09-27T02:09:20.9466667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 101
+      }
+    },
+    {
+      "id": "5d6007c9-d4ee-51bb-2f1a-25ee5eb8f0f4",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "AOT macOS",
+      "identifier": "IntegrationTests.mac_aot_tests",
+      "order": 11,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "45822f11-4d21-5040-87e1-26a828eb9e55",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Restore .NET Tools",
+      "identifier": null,
+      "order": 13,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:45.3733333Z",
+      "finishTime": "2026-09-27T02:08:01.3366667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 49
+      }
+    },
+    {
+      "id": "a65ad6c3-10be-54b7-f938-26e5b1ca29a7",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "cache Gradle downloads",
+      "identifier": null,
+      "order": 20,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:12:14.4233333Z",
+      "finishTime": "2026-09-27T02:14:10.2033333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 186
+      }
+    },
+    {
+      "id": "9808f556-57b7-5553-28d4-2743d231e81c",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Gather logs for publish to artifacts",
+      "identifier": null,
+      "order": 27,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:14:58.37Z",
+      "finishTime": "2026-09-27T02:14:58.5233333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 202
+      }
+    },
+    {
+      "id": "406b5ad6-26e0-59f2-5adc-2831bca270d8",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Show pre simulator info",
+      "identifier": null,
+      "order": 5,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:30.2833333Z",
+      "finishTime": "2026-09-27T02:09:30.29Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 123
+      }
+    },
+    {
+      "id": "b2e101a1-b4b6-50c4-1eeb-28f22aa09325",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Gather logs for publish to artifacts",
+      "identifier": null,
+      "order": 25,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:38.61Z",
+      "finishTime": "2026-09-27T02:15:38.78Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 231
+      }
+    },
+    {
+      "id": "b5cb90f8-1d03-53ed-6440-290a2e7dad59",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "cache Gradle downloads",
+      "identifier": null,
+      "order": 20,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:12:42.7133333Z",
+      "finishTime": "2026-09-27T02:14:51.2333333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 195
+      }
+    },
+    {
+      "id": "3cad04f3-bc04-4092-a4d2-2998bd21a4e9",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Post-job: Checkout dotnet/maui@refs/pull/38922/merge to s",
+      "identifier": null,
+      "order": 31,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:18.2433333Z",
+      "finishTime": "2026-09-27T02:09:18.35Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 96
+      }
+    },
+    {
+      "id": "713ac93d-cd3b-56fe-6c12-29b95550f6be",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Install iOS 18.5 Simulator (for integration tests)",
+      "identifier": null,
+      "order": 7,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:10.8266667Z",
+      "finishTime": "2026-09-27T02:09:10.83Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 86
+      }
+    },
+    {
+      "id": "41b91751-b409-542e-44e5-2b1101c9a338",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "MultiProject windows",
+      "identifier": "IntegrationTests.win_multitemplate_tests",
+      "order": 8,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "1c609fb8-a564-5b03-aa43-2b4502639981",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Publish Logs",
+      "identifier": null,
+      "order": 28,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:16.6266667Z",
+      "finishTime": "2026-09-27T02:09:18.1333333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 93
+      }
+    },
+    {
+      "id": "5b3cebe2-1838-50d0-b3c0-2df59f5a8082",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "cache Gradle downloads",
+      "identifier": null,
+      "order": 20,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:38.3666667Z",
+      "finishTime": "2026-09-27T02:09:00.4933333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 78
+      }
+    },
+    {
+      "id": "ca4b89ca-5223-5ed6-2b84-2fd3dfaff38b",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Set dump file location",
+      "identifier": null,
+      "order": 9,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:07:38.83Z",
+      "finishTime": "2026-09-27T02:07:38.8333333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 33
+      }
+    },
+    {
+      "id": "554a7cde-2c10-5520-7303-3097bd40e241",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Provision Android SDK - Platform APIs",
+      "identifier": null,
+      "order": 17,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:17.28Z",
+      "finishTime": "2026-09-27T02:08:20.8233333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 54
+      }
+    },
+    {
+      "id": "dcca5645-f02e-51b4-eac5-30ef7d933563",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "Blazor macOS",
+      "identifier": "IntegrationTests.mac_blazortemplate_tests",
+      "order": 7,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "9d069d78-1f14-4da1-b5f7-320d38c07277",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Finalize Job",
+      "identifier": null,
+      "order": 32,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:26.8033333Z",
+      "finishTime": "2026-09-27T02:09:29.63Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 140
+      }
+    },
+    {
+      "id": "57231484-147f-5bab-2bf5-33053fcc6a95",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Pack",
+      "identifier": null,
+      "order": 24,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:31.2233333Z",
+      "finishTime": "2026-09-27T02:09:31.2266667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 126
+      }
+    },
+    {
+      "id": "3f6a9117-1d40-496a-8d80-3325c35f17ef",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Initialize job",
+      "identifier": null,
+      "order": 1,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:34.94Z",
+      "finishTime": "2026-09-27T02:08:41.8666667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 69
+      }
+    },
+    {
+      "id": "f0a8d6e3-22ce-50d2-29d8-34c5ffa05d80",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Install Simulator Runtimes",
+      "identifier": null,
+      "order": 6,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:05:21.5Z",
+      "finishTime": "2026-09-27T02:05:25.3533333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 27
+      }
+    },
+    {
+      "id": "333c19e6-9449-55d3-3113-35985c4fa12b",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "prepare Gradle cache variables (Linux/macOS)",
+      "identifier": null,
+      "order": 18,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:12:41.1433333Z",
+      "finishTime": "2026-09-27T02:12:41.15Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 184
+      }
+    },
+    {
+      "id": "606e83b4-8289-525a-3c6d-3957c339ac36",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Show pre simulator info",
+      "identifier": null,
+      "order": 5,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:24.3533333Z",
+      "finishTime": "2026-09-27T02:09:24.3566667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 107
+      }
+    },
+    {
+      "id": "77e766ed-6677-551a-459e-3afeae4fed2c",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "\ud83d\udee0\ufe0f Build Microsoft.Maui.sln",
+      "identifier": null,
+      "order": 24,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:22.43Z",
+      "finishTime": "2026-09-27T02:09:22.4333333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 99
+      }
+    },
+    {
+      "id": "53887f69-049f-5e35-267a-3b8c9886e1b5",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Select Xcode Version",
+      "identifier": null,
+      "order": 4,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:30.2766667Z",
+      "finishTime": "2026-09-27T02:09:30.2833333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 120
+      }
+    },
+    {
+      "id": "7775a5d4-86fb-550d-a85e-3cb7febf9df5",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "RunOniOS_MauiReleaseTrimFull_CoreCLR ARM64",
+      "identifier": "IntegrationTests.mac_runios_maui_trim_coreclr_arm64",
+      "order": 16,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "7418d8d6-c627-4d64-9b25-3cbddc77afd8",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Post-job: Checkout dotnet/maui@refs/pull/38922/merge to s",
+      "identifier": null,
+      "order": 31,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:33.0666667Z",
+      "finishTime": "2026-09-27T02:09:33.17Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 139
+      }
+    },
+    {
+      "id": "d6027cd7-0ad9-53b3-5470-3df45f622f84",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Checkout dotnet/maui@refs/pull/38922/merge to s",
+      "identifier": null,
+      "order": 2,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:42.53Z",
+      "finishTime": "2026-09-27T02:09:24.3366667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 103
+      }
+    },
+    {
+      "id": "c09c7d83-e7c5-5af8-67ff-3e027a0003af",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Set dump file location",
+      "identifier": null,
+      "order": 9,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:07:37.2833333Z",
+      "finishTime": "2026-09-27T02:07:37.2866667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 44
+      }
+    },
+    {
+      "id": "0a9bd062-85fa-55c6-fad5-3eb50dd6705e",
+      "parentId": "b6f66369-b8a4-5497-bbb2-6f6e92ac02c8",
+      "type": "Checkpoint",
+      "name": "Checkpoint",
+      "identifier": "Checkpoint",
+      "order": null,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:03:30.9866667Z",
+      "finishTime": "2026-09-27T02:03:30.9866667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "1f4956a3-cf3c-5cce-cbb3-3f914783838a",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Publish TRX Test Results",
+      "identifier": null,
+      "order": 26,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:19.4466667Z",
+      "finishTime": "2026-09-27T02:15:20.05Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 1,
+      "log": {
+        "id": 212
+      }
+    },
+    {
+      "id": "0aa216fc-bfb3-467c-9744-40308010e238",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Finalize Job",
+      "identifier": null,
+      "order": 30,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:41.2266667Z",
+      "finishTime": "2026-09-27T02:15:41.2566667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 236
+      }
+    },
+    {
+      "id": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "parentId": "25e2c4e3-a72c-5289-a8db-c488dd8b5df7",
+      "type": "Job",
+      "name": "Pack macOS",
+      "identifier": "Pack.pack_net_macOS.__default",
+      "order": 1,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:03:57.4733333Z",
+      "finishTime": "2026-09-27T02:09:35.8866667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 146
+      }
+    },
+    {
+      "id": "c56b64a1-df5a-5e77-4059-43e24b85fc91",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Provision Android SDK - Common Packages",
+      "identifier": null,
+      "order": 15,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:10:48.6533333Z",
+      "finishTime": "2026-09-27T02:11:33.6466667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 166
+      }
+    },
+    {
+      "id": "734bf394-7966-5fda-2129-43ee539c8809",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Show post simulator info",
+      "identifier": null,
+      "order": 8,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:10.83Z",
+      "finishTime": "2026-09-27T02:09:10.8333333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 87
+      }
+    },
+    {
+      "id": "dcd154e9-492b-5feb-eb08-466cd975c56a",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "\ud83d\udee0\ufe0f Provision SDK & Build BuildTasks",
+      "identifier": null,
+      "order": 23,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:14:52.7333333Z",
+      "finishTime": "2026-09-27T02:15:38.6033333Z",
+      "attempt": 1,
+      "errorCount": 4,
+      "warningCount": 3,
+      "log": {
+        "id": 229
+      }
+    },
+    {
+      "id": "8a2cb29f-8e34-569f-a0c0-46ae88325326",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Provision Android SDK - Environment variables",
+      "identifier": null,
+      "order": 16,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:26.1566667Z",
+      "finishTime": "2026-09-27T02:08:27.2733333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 59
+      }
+    },
+    {
+      "id": "a5eee27f-aa59-513c-5970-47e0cd6e4c7e",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Component Detection (auto-injected by policy)",
+      "identifier": null,
+      "order": 29,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:15:00.0433333Z",
+      "finishTime": "2026-09-27T02:15:00.0466667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 204
+      }
+    },
+    {
+      "id": "4400f56c-46f7-5bf1-278a-48619c2b0c9b",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Clean C:\\hostedtoolcache\\windows/dotnet directory",
+      "identifier": null,
+      "order": 3,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:10.8066667Z",
+      "finishTime": "2026-09-27T02:09:10.8133333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 82
+      }
+    },
+    {
+      "id": "a43580a2-e4b9-55e2-481d-48708e86d6c3",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Restore .NET Tools",
+      "identifier": null,
+      "order": 13,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:38.5233333Z",
+      "finishTime": "2026-09-27T02:07:43.3466667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 41
+      }
+    },
+    {
+      "id": "4af93a59-094b-52e4-a944-49450fe79991",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Clear all NuGet caches",
+      "identifier": null,
+      "order": 12,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:10:01.59Z",
+      "finishTime": "2026-09-27T02:10:03.0566667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 157
+      }
+    },
+    {
+      "id": "da7a6c69-8785-575f-ba88-4a1ab34c6fe2",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Component Detection (auto-injected by policy)",
+      "identifier": null,
+      "order": 29,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:26.5833333Z",
+      "finishTime": "2026-09-27T02:09:26.5833333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 113
+      }
+    },
+    {
+      "id": "0b7e8a94-90fa-548f-8be4-4a846201a7c8",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Provision Android SDK - Platform APIs",
+      "identifier": null,
+      "order": 17,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:11:51.49Z",
+      "finishTime": "2026-09-27T02:12:21.7466667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 180
+      }
+    },
+    {
+      "id": "6128bad5-a40d-58c6-ed77-4c6bf7e9e01e",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Publish XUnit Test Results",
+      "identifier": null,
+      "order": 25,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:14.0633333Z",
+      "finishTime": "2026-09-27T02:09:16.0633333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 1,
+      "log": {
+        "id": 90
+      }
+    },
+    {
+      "id": "f07ef6c4-0ad8-5b8b-2dd7-4d029fc0dad9",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Provision JDK",
+      "identifier": null,
+      "order": 14,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:10:19.4933333Z",
+      "finishTime": "2026-09-27T02:10:51.5533333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 163
+      }
+    },
+    {
+      "id": "c10e1d53-0732-4651-a543-4db57c92f1ec",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Initialize job",
+      "identifier": null,
+      "order": 1,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:03:57.59Z",
+      "finishTime": "2026-09-27T02:04:04.91Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 13
+      }
+    },
+    {
+      "id": "5bc72bba-1e08-57fa-ef52-4e1241434dc6",
+      "parentId": "292e256f-86f0-5122-4a91-e4f7a3cea51f",
+      "type": "Job",
+      "name": "Monitor Helix Jobs",
+      "identifier": "HelixTests.HelixJobMonitor.__default",
+      "order": 1,
+      "state": "completed",
+      "result": "abandoned",
+      "startTime": "2026-09-27T02:15:58.3266667Z",
+      "finishTime": "2026-09-27T02:15:58.3266667Z",
+      "attempt": 1,
+      "errorCount": 1,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "656e3e3d-e10b-590c-d2ef-4f133423f29b",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "List all .NET SDKs",
+      "identifier": null,
+      "order": 11,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:39.6366667Z",
+      "finishTime": "2026-09-27T02:09:42.48Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 147
+      }
+    },
+    {
+      "id": "6efaf5b6-a9b6-51f1-ecd9-525d901e57c9",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "cache Gradle downloads",
+      "identifier": null,
+      "order": 20,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:12:23.2933333Z",
+      "finishTime": "2026-09-27T02:14:33.9066667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 192
+      }
+    },
+    {
+      "id": "75ddcd96-c5cb-5914-08d4-55350ebc95bc",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Provision Android SDK - Environment variables",
+      "identifier": null,
+      "order": 16,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:16.0833333Z",
+      "finishTime": "2026-09-27T02:08:17.28Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 53
+      }
+    },
+    {
+      "id": "d11719d5-131c-5582-3067-56c0f5d0ec4f",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Component Detection (auto-injected by policy)",
+      "identifier": null,
+      "order": 27,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:15:40.6766667Z",
+      "finishTime": "2026-09-27T02:15:40.6833333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 233
+      }
+    },
+    {
+      "id": "87d4680e-9b78-545c-762c-5792cd50feb8",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Provision JDK",
+      "identifier": null,
+      "order": 14,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:10:22.8Z",
+      "finishTime": "2026-09-27T02:10:57.2733333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 164
+      }
+    },
+    {
+      "id": "4d99796f-4f9b-5074-e913-57df0e5f630f",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Show post simulator info",
+      "identifier": null,
+      "order": 8,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:30.2966667Z",
+      "finishTime": "2026-09-27T02:09:30.3033333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 131
+      }
+    },
+    {
+      "id": "6893e5cb-825e-52a8-80dd-58ae2a516e27",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "Samples windows",
+      "identifier": "IntegrationTests.win_sample_tests",
+      "order": 1,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "2f6ac0eb-0a16-58e9-6ad2-59e0cb6b8597",
+      "parentId": "7f6b8130-2616-53cd-267e-fe401c7f74e4",
+      "type": "Checkpoint",
+      "name": "Checkpoint",
+      "identifier": "Checkpoint",
+      "order": null,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:03:30.99Z",
+      "finishTime": "2026-09-27T02:03:30.99Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "d64aa565-0004-5d7b-f323-5a7a8938d3a5",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Install iOS 18.5 Simulator (for integration tests)",
+      "identifier": null,
+      "order": 7,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:05:23.6033333Z",
+      "finishTime": "2026-09-27T02:07:36.0166667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 30
+      }
+    },
+    {
+      "id": "1f3fab8a-db10-5f75-b426-5c94fc8be785",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Run Helix Tests",
+      "identifier": null,
+      "order": 24,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:15:23.5066667Z",
+      "finishTime": "2026-09-27T02:15:23.5133333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 215
+      }
+    },
+    {
+      "id": "ebd0f77f-9476-5677-8b69-5ca4da857175",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "install Gradle init script (Linux/macOS)",
+      "identifier": null,
+      "order": 21,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:50.7633333Z",
+      "finishTime": "2026-09-27T02:08:50.8933333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 76
+      }
+    },
+    {
+      "id": "f2792888-ccc5-5998-dac0-5ea6153af9b6",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "List all .NET SDKs",
+      "identifier": null,
+      "order": 11,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:37.21Z",
+      "finishTime": "2026-09-27T02:07:37.73Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 37
+      }
+    },
+    {
+      "id": "caad6efe-e1ce-5b98-7af2-5f53983f06cc",
+      "parentId": "b6f66369-b8a4-5497-bbb2-6f6e92ac02c8",
+      "type": "Phase",
+      "name": "Windows Helix Unit Tests (Debug)",
+      "identifier": "HelixTests.test_helix_unit_tests_windows_Debug",
+      "order": 1,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:08:34.79Z",
+      "finishTime": "2026-09-27T02:15:57.6266667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 9
+      }
+    },
+    {
+      "id": "a647d9e9-8fa8-4c4e-a08f-5fbf62c03495",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Post-job: cache Gradle downloads",
+      "identifier": null,
+      "order": 30,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:32.9433333Z",
+      "finishTime": "2026-09-27T02:09:33.0666667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 138
+      }
+    },
+    {
+      "id": "d42bfe32-9477-5e2e-2cf2-6016d69daf22",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Provision JDK",
+      "identifier": null,
+      "order": 14,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:10:27.3666667Z",
+      "finishTime": "2026-09-27T02:11:11.4766667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 165
+      }
+    },
+    {
+      "id": "660abb4c-1afa-516b-71d2-6077c83ea0b3",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Install Simulator Runtimes",
+      "identifier": null,
+      "order": 6,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:30.29Z",
+      "finishTime": "2026-09-27T02:09:30.2933333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 125
+      }
+    },
+    {
+      "id": "bf7b8ca2-41ab-5396-bb9a-616e4751a2e2",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "RunOniOS_BlazorDebug_CoreCLR ARM64",
+      "identifier": "IntegrationTests.mac_runios_blazor_debug_coreclr_arm64",
+      "order": 17,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "c9d12a7e-dd8b-5aa6-d793-64750a346d35",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Clear all NuGet caches",
+      "identifier": null,
+      "order": 12,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:52.8666667Z",
+      "finishTime": "2026-09-27T02:09:54.2733333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 151
+      }
+    },
+    {
+      "id": "f4cd31e8-b000-5ab1-b087-65a03f030349",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Show post simulator info",
+      "identifier": null,
+      "order": 8,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:30.76Z",
+      "finishTime": "2026-09-27T02:09:30.7633333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 133
+      }
+    },
+    {
+      "id": "ae638c1f-17da-5e42-d4d4-6626e695ad4a",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Provision JDK",
+      "identifier": null,
+      "order": 14,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:49.6733333Z",
+      "finishTime": "2026-09-27T02:08:14.22Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 51
+      }
+    },
+    {
+      "id": "6501489d-d881-5a8e-b664-677b65ed6aae",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "install Gradle init script (Windows)",
+      "identifier": null,
+      "order": 22,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:14:29.6166667Z",
+      "finishTime": "2026-09-27T02:14:31.15Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 191
+      }
+    },
+    {
+      "id": "0d987832-2aa4-5321-6fce-67caa7025e89",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Install Simulator Runtimes",
+      "identifier": null,
+      "order": 6,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:30.75Z",
+      "finishTime": "2026-09-27T02:09:30.7566667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 127
+      }
+    },
+    {
+      "id": "6f32659b-bf70-5279-8835-67d5c35365a4",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "install Gradle init script (Linux/macOS)",
+      "identifier": null,
+      "order": 21,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:14:29.6066667Z",
+      "finishTime": "2026-09-27T02:14:29.6166667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 190
+      }
+    },
+    {
+      "id": "fe824fdf-3ec1-5551-e1a2-6993cdca29e2",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "\ud83d\udee0\ufe0f Build Microsoft.Maui.sln",
+      "identifier": null,
+      "order": 24,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:15:18.7833333Z",
+      "finishTime": "2026-09-27T02:15:18.7933333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 210
+      }
+    },
+    {
+      "id": "aa01b73f-be8e-5f87-3a0a-6b04553a0182",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Checkout dotnet/maui@refs/pull/38922/merge to s",
+      "identifier": null,
+      "order": 2,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:46.3633333Z",
+      "finishTime": "2026-09-27T02:09:30.2666667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 116
+      }
+    },
+    {
+      "id": "e26ca63d-80b1-5e5a-4076-6b43ebba4e51",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Gather logs for publish to artifacts",
+      "identifier": null,
+      "order": 27,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:31.3533333Z",
+      "finishTime": "2026-09-27T02:09:31.4533333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 134
+      }
+    },
+    {
+      "id": "291d5ea3-9a2e-57df-f8e4-6bb6def34621",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Publish Logs",
+      "identifier": null,
+      "order": 28,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:20.2466667Z",
+      "finishTime": "2026-09-27T02:15:22.2366667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 220
+      }
+    },
+    {
+      "id": "0bc34576-3692-5d07-b1b6-6cea5f4113a3",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Provision Android SDK - Platform APIs",
+      "identifier": null,
+      "order": 17,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:27.2733333Z",
+      "finishTime": "2026-09-27T02:08:31.0633333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 60
+      }
+    },
+    {
+      "id": "89cec5c6-477d-510a-2d37-6ced43a2d11a",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Set dump file location",
+      "identifier": null,
+      "order": 9,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:10.8333333Z",
+      "finishTime": "2026-09-27T02:09:20.9266667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 97
+      }
+    },
+    {
+      "id": "733c3980-91b2-5ed4-1f0a-6e47326b83ed",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "AOT windows",
+      "identifier": "IntegrationTests.win_aot_tests",
+      "order": 10,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "1fb5179b-b771-5878-923f-6e5b0d6b66f4",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Clear all NuGet caches",
+      "identifier": null,
+      "order": 12,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:10:00.4033333Z",
+      "finishTime": "2026-09-27T02:10:02.5666667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 156
+      }
+    },
+    {
+      "id": "d8e2cb85-e7b1-5f80-d6d2-6f2a3e75f860",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Run Helix Tests",
+      "identifier": null,
+      "order": 24,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:15:38.6033333Z",
+      "finishTime": "2026-09-27T02:15:38.61Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 230
+      }
+    },
+    {
+      "id": "b6f66369-b8a4-5497-bbb2-6f6e92ac02c8",
+      "parentId": null,
+      "type": "Stage",
+      "name": "Run Helix Unit Tests",
+      "identifier": "HelixTests",
+      "order": 1,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:08:34.79Z",
+      "finishTime": "2026-09-27T02:15:57.7866667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "bf0efc54-5ec6-5665-0343-70fe090aefc9",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Publish Logs",
+      "identifier": null,
+      "order": 28,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:14:58.5233333Z",
+      "finishTime": "2026-09-27T02:15:00.0433333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 203
+      }
+    },
+    {
+      "id": "407138ab-e13a-5b2a-51d0-711c1a62189a",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Provision Android SDK - Environment variables",
+      "identifier": null,
+      "order": 16,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:11:33.6466667Z",
+      "finishTime": "2026-09-27T02:11:37.07Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 167
+      }
+    },
+    {
+      "id": "845bd37a-22e9-402f-8253-71a754166743",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Post-job: Checkout dotnet/maui@refs/pull/38922/merge to s",
+      "identifier": null,
+      "order": 29,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:40.9466667Z",
+      "finishTime": "2026-09-27T02:15:41.2233333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 235
+      }
+    },
+    {
+      "id": "a9dd6fbb-7e3b-593e-d07e-71c127e865d8",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Clean /opt/hostedtoolcache/dotnet directory",
+      "identifier": null,
+      "order": 3,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:04:43.3766667Z",
+      "finishTime": "2026-09-27T02:04:44.82Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 21
+      }
+    },
+    {
+      "id": "60976ce5-ea28-519e-ecc2-725dcc54112c",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Clear all NuGet caches",
+      "identifier": null,
+      "order": 12,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:42.48Z",
+      "finishTime": "2026-09-27T02:09:43.9366667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 148
+      }
+    },
+    {
+      "id": "118848e2-9627-5d2b-2aae-72a600472990",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "install Gradle init script (Windows)",
+      "identifier": null,
+      "order": 22,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:14:51.24Z",
+      "finishTime": "2026-09-27T02:14:52.7333333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 197
+      }
+    },
+    {
+      "id": "5bf4e877-f43e-51c6-64c7-72cf5816a985",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Clean C:\\hostedtoolcache\\windows/dotnet directory",
+      "identifier": null,
+      "order": 3,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:24.34Z",
+      "finishTime": "2026-09-27T02:09:24.3466667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 104
+      }
+    },
+    {
+      "id": "47b91ee4-5e4d-43ce-8842-72d3f5d5d9d9",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Post-job: cache Gradle downloads",
+      "identifier": null,
+      "order": 30,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:22.2433333Z",
+      "finishTime": "2026-09-27T02:15:22.5Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 222
+      }
+    },
+    {
+      "id": "9a1e7a3a-9e48-56cb-8649-744de01dc8b5",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Select Xcode Version",
+      "identifier": null,
+      "order": 4,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:04:44.82Z",
+      "finishTime": "2026-09-27T02:04:47.5666667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 22
+      }
+    },
+    {
+      "id": "573b8904-819d-5c84-5751-76c1deabbc80",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Set dump file location",
+      "identifier": null,
+      "order": 9,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:24.37Z",
+      "finishTime": "2026-09-27T02:09:33.9166667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 135
+      }
+    },
+    {
+      "id": "1b989a59-4d7a-5f06-2b59-77b213990bab",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "RunOniOS_MauiRelease_CoreCLR x64",
+      "identifier": "IntegrationTests.mac_runios_maui_release_coreclr",
+      "order": 21,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "f5962592-36f2-51d5-e7eb-7915a2a887b7",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Publish Logs",
+      "identifier": null,
+      "order": 26,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:38.78Z",
+      "finishTime": "2026-09-27T02:15:40.6766667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 232
+      }
+    },
+    {
+      "id": "ad810b76-920d-5929-6579-7aadd29ca728",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Provision SDK & Workloads",
+      "identifier": null,
+      "order": 23,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:09:00.62Z",
+      "finishTime": "2026-09-27T02:09:31.2233333Z",
+      "attempt": 1,
+      "errorCount": 4,
+      "warningCount": 3,
+      "log": {
+        "id": 121
+      }
+    },
+    {
+      "id": "95a1cc28-7403-5974-2b4b-7bf189684763",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "install Gradle init script (Linux/macOS)",
+      "identifier": null,
+      "order": 21,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:14:51.2333333Z",
+      "finishTime": "2026-09-27T02:14:51.24Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 196
+      }
+    },
+    {
+      "id": "8639efc4-a262-5cac-4452-7bfcc243735c",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Provision Android SDK - Environment variables",
+      "identifier": null,
+      "order": 16,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:12:00.9633333Z",
+      "finishTime": "2026-09-27T02:12:04.5633333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 173
+      }
+    },
+    {
+      "id": "1ebacd26-a511-5a23-b1b3-7ca2c14d3b36",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Restore .NET Tools",
+      "identifier": null,
+      "order": 13,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:10:03.0566667Z",
+      "finishTime": "2026-09-27T02:10:27.3633333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 161
+      }
+    },
+    {
+      "id": "bb504554-83f6-5af5-ff23-7d15658176b6",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Provision Android SDK - Platform APIs",
+      "identifier": null,
+      "order": 17,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:11:37.07Z",
+      "finishTime": "2026-09-27T02:12:12.9866667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 174
+      }
+    },
+    {
+      "id": "1597a9f2-c63e-5f0b-3c53-7e9e08bd0140",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Provision Android SDK - Environment variables",
+      "identifier": null,
+      "order": 16,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:11:40.8366667Z",
+      "finishTime": "2026-09-27T02:11:44.4333333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 169
+      }
+    },
+    {
+      "id": "1c3a421b-70ea-5336-a0f6-7f1050a54be4",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Show pre simulator info",
+      "identifier": null,
+      "order": 5,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:04:47.5666667Z",
+      "finishTime": "2026-09-27T02:05:21.4966667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 25
+      }
+    },
+    {
+      "id": "b5468ff6-d097-596a-1052-7f38a9025cea",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Provision Android SDK - Platform APIs",
+      "identifier": null,
+      "order": 17,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:11:44.4333333Z",
+      "finishTime": "2026-09-27T02:12:16.7833333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 177
+      }
+    },
+    {
+      "id": "52bc70c1-4c04-56cd-5d8a-82e8db50a752",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "prepare Gradle cache variables (Windows)",
+      "identifier": null,
+      "order": 19,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:12:41.1533333Z",
+      "finishTime": "2026-09-27T02:12:42.7133333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 185
+      }
+    },
+    {
+      "id": "1b190185-d822-5bcb-c565-84711fe05fa4",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Install iOS 18.5 Simulator (for integration tests)",
+      "identifier": null,
+      "order": 7,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:30.7566667Z",
+      "finishTime": "2026-09-27T02:09:30.76Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 130
+      }
+    },
+    {
+      "id": "fa3adfd0-7fdb-5259-b88f-848d63237e66",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Provision Android SDK - Platform APIs",
+      "identifier": null,
+      "order": 17,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:34.1366667Z",
+      "finishTime": "2026-09-27T02:08:38.21Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 66
+      }
+    },
+    {
+      "id": "353e6f4b-63da-5934-035e-866bf1a88bac",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "MultiProject macOS",
+      "identifier": "IntegrationTests.mac_multitemplate_tests",
+      "order": 9,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "b91ed073-6793-50c0-68cd-868e545b01cf",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "List all .NET SDKs",
+      "identifier": null,
+      "order": 11,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:57.2Z",
+      "finishTime": "2026-09-27T02:10:00.4033333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 154
+      }
+    },
+    {
+      "id": "dc762039-e2e6-5f02-a790-885aa34933c1",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Publish Mac Native Artifacts",
+      "identifier": null,
+      "order": 26,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:09:31.23Z",
+      "finishTime": "2026-09-27T02:09:31.3533333Z",
+      "attempt": 1,
+      "errorCount": 1,
+      "warningCount": 0,
+      "log": {
+        "id": 132
+      }
+    },
+    {
+      "id": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "parentId": "8b2e1297-c48f-5cca-4be0-f528e8484588",
+      "type": "Job",
+      "name": "Build Windows (Debug)",
+      "identifier": "Build.build_net_Windows_Debug.__default",
+      "order": 1,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:08:34.7566667Z",
+      "finishTime": "2026-09-27T02:15:22.7966667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 225
+      }
+    },
+    {
+      "id": "4c35f5ea-2d8d-5b4e-3dc9-8921b1944c51",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Provision Android SDK - Common Packages",
+      "identifier": null,
+      "order": 15,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:11:11.4766667Z",
+      "finishTime": "2026-09-27T02:12:00.96Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 172
+      }
+    },
+    {
+      "id": "d4b0e683-00fe-596a-4383-8a441408f7d6",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "prepare Gradle cache variables (Windows)",
+      "identifier": null,
+      "order": 19,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:12:21.7533333Z",
+      "finishTime": "2026-09-27T02:12:23.2933333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 182
+      }
+    },
+    {
+      "id": "ca4da304-16ac-509e-0c65-8a4f58024edb",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Show pre simulator info",
+      "identifier": null,
+      "order": 5,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:04:45.34Z",
+      "finishTime": "2026-09-27T02:05:19.81Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 24
+      }
+    },
+    {
+      "id": "e69da3f1-e5f8-53c1-b09a-8a59095873a0",
+      "parentId": "6884a131-87da-5381-61f3-d7acc3b91d76",
+      "type": "Checkpoint",
+      "name": "Checkpoint",
+      "identifier": "Checkpoint",
+      "order": null,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:03:30.9866667Z",
+      "finishTime": "2026-09-27T02:03:30.9866667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "56479f98-8dff-5ba5-cca9-8c6394d4e7e5",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "prepare Gradle cache variables (Linux/macOS)",
+      "identifier": null,
+      "order": 18,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:31.0633333Z",
+      "finishTime": "2026-09-27T02:08:31.1866667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 61
+      }
+    },
+    {
+      "id": "ecc748bd-ddd3-52a8-7c3e-9033e4873278",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "RunOniOS_MauiNativeAOT ARM64",
+      "identifier": "IntegrationTests.mac_runios_nativeaot_arm64",
+      "order": 13,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "69ca6312-c08d-5ec8-66b7-90f59ea1813a",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Checkout dotnet/maui@refs/pull/38922/merge to s",
+      "identifier": null,
+      "order": 2,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:04:02.8766667Z",
+      "finishTime": "2026-09-27T02:04:41.0433333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 16
+      }
+    },
+    {
+      "id": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "parentId": "2a173f72-6a3f-51f7-f803-a4cae325a932",
+      "type": "Job",
+      "name": "Build macOS (Debug)",
+      "identifier": "Build.build_net_macOS_Debug.__default",
+      "order": 1,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:03:50.77Z",
+      "finishTime": "2026-09-27T02:09:29.6333333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 141
+      }
+    },
+    {
+      "id": "bf650b9a-4bde-4927-b13e-9398489d4aae",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Finalize Job",
+      "identifier": null,
+      "order": 32,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:33.1733333Z",
+      "finishTime": "2026-09-27T02:09:35.8833333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 144
+      }
+    },
+    {
+      "id": "5247549d-74ca-5918-6852-93d96c9eca70",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "install Gradle init script (Windows)",
+      "identifier": null,
+      "order": 22,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:00.6166667Z",
+      "finishTime": "2026-09-27T02:09:00.6166667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 80
+      }
+    },
+    {
+      "id": "8e0a445a-0fe6-52b3-dc60-95839066cede",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "install Gradle init script (Windows)",
+      "identifier": null,
+      "order": 22,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:14:33.9133333Z",
+      "finishTime": "2026-09-27T02:14:35.63Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 194
+      }
+    },
+    {
+      "id": "29172c3f-4d35-5c8b-dd4d-95fdbdae67cd",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Publish XUnit Test Results",
+      "identifier": null,
+      "order": 25,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:18.7933333Z",
+      "finishTime": "2026-09-27T02:15:19.4466667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 1,
+      "log": {
+        "id": 211
+      }
+    },
+    {
+      "id": "35bd6be9-7db3-49e3-9da4-96df2b95ff9a",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Initialize job",
+      "identifier": null,
+      "order": 1,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:34.9166667Z",
+      "finishTime": "2026-09-27T02:08:42.52Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 71
+      }
+    },
+    {
+      "id": "5234f1bb-453f-5956-2cba-97b9b9e867b4",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Gather logs for publish to artifacts",
+      "identifier": null,
+      "order": 27,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:20.05Z",
+      "finishTime": "2026-09-27T02:15:20.2466667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 213
+      }
+    },
+    {
+      "id": "0daec9bd-91a9-567b-a56a-99d4cd137a05",
+      "parentId": "6884a131-87da-5381-61f3-d7acc3b91d76",
+      "type": "Phase",
+      "name": "Build macOS (Release)",
+      "identifier": "Build.build_net_macOS_Release",
+      "order": 4,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:03:48.21Z",
+      "finishTime": "2026-09-27T02:09:25.5133333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 3
+      }
+    },
+    {
+      "id": "e3317a4d-4e34-558b-0b21-9a3ad9b2e05c",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Checkout dotnet/maui@refs/pull/38922/merge to s",
+      "identifier": null,
+      "order": 2,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:31.85Z",
+      "finishTime": "2026-09-27T02:09:10.8066667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 81
+      }
+    },
+    {
+      "id": "bac9d5f8-a887-59d8-d4dc-9a3ddecef6f3",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Install Simulator Runtimes",
+      "identifier": null,
+      "order": 6,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:05:19.81Z",
+      "finishTime": "2026-09-27T02:05:23.6033333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 26
+      }
+    },
+    {
+      "id": "0a91f5dd-a849-55e6-1733-9ad5c031ec38",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "prepare Gradle cache variables (Linux/macOS)",
+      "identifier": null,
+      "order": 18,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:12:16.7833333Z",
+      "finishTime": "2026-09-27T02:12:16.7866667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 178
+      }
+    },
+    {
+      "id": "abcbe976-8a82-5f7c-036e-9b68e19646a9",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "install Gradle init script (Linux/macOS)",
+      "identifier": null,
+      "order": 21,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:14:10.2033333Z",
+      "finishTime": "2026-09-27T02:14:10.2066667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 187
+      }
+    },
+    {
+      "id": "d8c98993-d3ab-5e29-b624-9b81889bc3bf",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Clear all NuGet caches",
+      "identifier": null,
+      "order": 12,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:43.2933333Z",
+      "finishTime": "2026-09-27T02:07:43.9133333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 47
+      }
+    },
+    {
+      "id": "805d3094-0bc6-5f60-4b88-9b8443f96782",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Publish TRX Test Results",
+      "identifier": null,
+      "order": 26,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:16.0666667Z",
+      "finishTime": "2026-09-27T02:09:16.5166667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 1,
+      "log": {
+        "id": 91
+      }
+    },
+    {
+      "id": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "parentId": "caad6efe-e1ce-5b98-7af2-5f53983f06cc",
+      "type": "Job",
+      "name": "Windows Helix Unit Tests (Debug)",
+      "identifier": "HelixTests.test_helix_unit_tests_windows_Debug.__default",
+      "order": 1,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:08:34.79Z",
+      "finishTime": "2026-09-27T02:15:41.26Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 237
+      }
+    },
+    {
+      "id": "4dca1f66-41be-5a41-ed2c-9eff405a7cbb",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Publish Logs",
+      "identifier": null,
+      "order": 28,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:31.4533333Z",
+      "finishTime": "2026-09-27T02:09:32.9366667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 136
+      }
+    },
+    {
+      "id": "e8caa30c-9d52-4956-86c6-9f0a8b3cfb72",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Initialize job",
+      "identifier": null,
+      "order": 1,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:03:48.3266667Z",
+      "finishTime": "2026-09-27T02:03:59.64Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 11
+      }
+    },
+    {
+      "id": "67b6bc76-59b5-58de-4aa0-a05287f5b827",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Install Simulator Runtimes",
+      "identifier": null,
+      "order": 6,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:05:15.4633333Z",
+      "finishTime": "2026-09-27T02:05:19.18Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 28
+      }
+    },
+    {
+      "id": "b3ebf97d-c30f-5dce-42ea-a0f3975c15fb",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Install iOS 18.5 Simulator (for integration tests)",
+      "identifier": null,
+      "order": 7,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:05:25.3533333Z",
+      "finishTime": "2026-09-27T02:07:37.3133333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 31
+      }
+    },
+    {
+      "id": "47128b08-28bf-5063-95f4-a20213c64271",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "\ud83d\udee0\ufe0f Provision SDK & Build BuildTasks",
+      "identifier": null,
+      "order": 23,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:08:50.8966667Z",
+      "finishTime": "2026-09-27T02:09:22.43Z",
+      "attempt": 1,
+      "errorCount": 4,
+      "warningCount": 3,
+      "log": {
+        "id": 98
+      }
+    },
+    {
+      "id": "2a173f72-6a3f-51f7-f803-a4cae325a932",
+      "parentId": "6884a131-87da-5381-61f3-d7acc3b91d76",
+      "type": "Phase",
+      "name": "Build macOS (Debug)",
+      "identifier": "Build.build_net_macOS_Debug",
+      "order": 3,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:03:50.77Z",
+      "finishTime": "2026-09-27T02:09:39.0066667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 4
+      }
+    },
+    {
+      "id": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "parentId": "05c3dd71-a3d0-5574-67ad-c2d48bb04204",
+      "type": "Job",
+      "name": "Build Windows (Release)",
+      "identifier": "Build.build_net_Windows_Release.__default",
+      "order": 1,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:08:23.48Z",
+      "finishTime": "2026-09-27T02:15:00.6133333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 208
+      }
+    },
+    {
+      "id": "635940ce-5b04-52c7-a737-a69023162f69",
+      "parentId": "7f6b8130-2616-53cd-267e-fe401c7f74e4",
+      "type": "Phase",
+      "name": "Pack Windows",
+      "identifier": "Pack.pack_net_Windows",
+      "order": 2,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "9759b619-3497-5556-beec-a6ac72405a0b",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "Samples macOS",
+      "identifier": "IntegrationTests.mac_sample_tests",
+      "order": 2,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "9bd7ca2d-c464-53be-79b9-a73f4a663964",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Select Xcode Version",
+      "identifier": null,
+      "order": 4,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:30.7366667Z",
+      "finishTime": "2026-09-27T02:09:30.7466667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 122
+      }
+    },
+    {
+      "id": "593388b4-4f72-5bc2-75e7-a827c607c932",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "\ud83d\udee0\ufe0f Provision SDK & Build BuildTasks",
+      "identifier": null,
+      "order": 23,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:14:35.63Z",
+      "finishTime": "2026-09-27T02:15:23.5066667Z",
+      "attempt": 1,
+      "errorCount": 4,
+      "warningCount": 3,
+      "log": {
+        "id": 214
+      }
+    },
+    {
+      "id": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "parentId": "2b6f89ca-577d-5856-acb8-e94e903a3878",
+      "type": "Job",
+      "name": "Windows Helix Unit Tests (Release)",
+      "identifier": "HelixTests.test_helix_unit_tests_windows_Release.__default",
+      "order": 1,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:08:39.4466667Z",
+      "finishTime": "2026-09-27T02:15:26.4033333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 228
+      }
+    },
+    {
+      "id": "9e70086a-6e93-5428-f70f-ab5fe03d7335",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "\ud83d\udee0\ufe0f Provision SDK & Build BuildTasks",
+      "identifier": null,
+      "order": 23,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:14:31.15Z",
+      "finishTime": "2026-09-27T02:15:18.7833333Z",
+      "attempt": 1,
+      "errorCount": 4,
+      "warningCount": 3,
+      "log": {
+        "id": 209
+      }
+    },
+    {
+      "id": "2566d51c-096c-5de4-5691-acd52910aa84",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "List all .NET SDKs",
+      "identifier": null,
+      "order": 11,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:44.0666667Z",
+      "finishTime": "2026-09-27T02:07:44.6566667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 40
+      }
+    },
+    {
+      "id": "1a1e62d7-6854-5beb-9b41-ad38f6ae0970",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Clean C:\\hostedtoolcache\\windows/dotnet directory",
+      "identifier": null,
+      "order": 3,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:30.27Z",
+      "finishTime": "2026-09-27T02:09:30.2766667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 118
+      }
+    },
+    {
+      "id": "cb940f53-9053-5fa5-7750-afd77c536464",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Provision JDK",
+      "identifier": null,
+      "order": 14,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:01.3366667Z",
+      "finishTime": "2026-09-27T02:08:22.6266667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 57
+      }
+    },
+    {
+      "id": "569b6ebe-a232-58fc-2e1d-b2270d440c3f",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Component Detection (auto-injected by policy)",
+      "identifier": null,
+      "order": 29,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:18.1333333Z",
+      "finishTime": "2026-09-27T02:09:18.1366667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 94
+      }
+    },
+    {
+      "id": "04dea89a-647f-56fe-e338-b443df1548ba",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "\ud83d\udee0\ufe0f Build Microsoft.Maui.sln",
+      "identifier": null,
+      "order": 24,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:14:57.1033333Z",
+      "finishTime": "2026-09-27T02:14:57.1066667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 199
+      }
+    },
+    {
+      "id": "0d9ba054-f2e1-5c5c-2248-b4db71711dce",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Gather logs for publish to artifacts",
+      "identifier": null,
+      "order": 25,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:23.5133333Z",
+      "finishTime": "2026-09-27T02:15:23.7Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 216
+      }
+    },
+    {
+      "id": "667a2a73-5158-4deb-be6b-b79b6806addf",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Post-job: cache Gradle downloads",
+      "identifier": null,
+      "order": 30,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:26.5833333Z",
+      "finishTime": "2026-09-27T02:09:26.69Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 114
+      }
+    },
+    {
+      "id": "1aa09c23-979b-530c-fccf-b7af2a0920fd",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "RunOniOS_MauiRelease_CoreCLR ARM64",
+      "identifier": "IntegrationTests.mac_runios_maui_release_coreclr_arm64",
+      "order": 15,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "d0b13695-0dca-52db-11f8-b88b0e0b5974",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Show post simulator info",
+      "identifier": null,
+      "order": 8,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:37.3133333Z",
+      "finishTime": "2026-09-27T02:07:38.83Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 32
+      }
+    },
+    {
+      "id": "8aeee588-85f0-539f-391b-b9c6dd994c47",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "RunOnAndroid ",
+      "identifier": "IntegrationTests.linux_runandroid_tests",
+      "order": 12,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "5e5c2a9a-7f6c-51b3-b637-ba42e06db7ff",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Select Xcode Version",
+      "identifier": null,
+      "order": 4,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:04:39.0133333Z",
+      "finishTime": "2026-09-27T02:04:41.8Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 17
+      }
+    },
+    {
+      "id": "adbfa47b-bfc1-507d-a5f9-bb934852c426",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Provision Android SDK - Common Packages",
+      "identifier": null,
+      "order": 15,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:10:57.2766667Z",
+      "finishTime": "2026-09-27T02:11:47.8466667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 170
+      }
+    },
+    {
+      "id": "cbf826ea-cffb-5476-f8e2-bc77fc44b13b",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Show pre simulator info",
+      "identifier": null,
+      "order": 5,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:10.82Z",
+      "finishTime": "2026-09-27T02:09:10.8233333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 84
+      }
+    },
+    {
+      "id": "6d20e021-b6d9-5401-973a-bd0f567bf8f9",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Use .NET SDK 10.0.100",
+      "identifier": null,
+      "order": 10,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:40.9566667Z",
+      "finishTime": "2026-09-27T02:09:57.2Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 152
+      }
+    },
+    {
+      "id": "14a4b6f9-f87d-4631-8f3d-bd6bf8887dc0",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Finalize Job",
+      "identifier": null,
+      "order": 32,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:22.77Z",
+      "finishTime": "2026-09-27T02:15:22.7933333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 224
+      }
+    },
+    {
+      "id": "03792021-150f-557d-869d-bf3fd22fa562",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "Blazor windows",
+      "identifier": "IntegrationTests.win_blazortemplate_tests",
+      "order": 6,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "689fd49e-dd68-57e1-edae-bffadd5f3129",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "prepare Gradle cache variables (Linux/macOS)",
+      "identifier": null,
+      "order": 18,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:20.8233333Z",
+      "finishTime": "2026-09-27T02:08:20.9966667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 55
+      }
+    },
+    {
+      "id": "19d8eee7-ecae-5773-fda8-c185c2c5e63e",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Show pre simulator info",
+      "identifier": null,
+      "order": 5,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:04:41.8Z",
+      "finishTime": "2026-09-27T02:05:15.4633333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 23
+      }
+    },
+    {
+      "id": "f97423d2-7255-426e-97fa-c1cc38fc8371",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Post-job: cache Gradle downloads",
+      "identifier": null,
+      "order": 30,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:00.0466667Z",
+      "finishTime": "2026-09-27T02:15:00.3133333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 205
+      }
+    },
+    {
+      "id": "0d4f8f47-9460-5da4-9096-c26ffc374bcd",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "\ud83d\udee0\ufe0f Build Microsoft.Maui.sln",
+      "identifier": null,
+      "order": 24,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:14.0566667Z",
+      "finishTime": "2026-09-27T02:09:14.0633333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 89
+      }
+    },
+    {
+      "id": "05c3dd71-a3d0-5574-67ad-c2d48bb04204",
+      "parentId": "6884a131-87da-5381-61f3-d7acc3b91d76",
+      "type": "Phase",
+      "name": "Build Windows (Release)",
+      "identifier": "Build.build_net_Windows_Release",
+      "order": 2,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:08:23.48Z",
+      "finishTime": "2026-09-27T02:15:23.6966667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 6
+      }
+    },
+    {
+      "id": "6b14b922-5e62-42f5-a709-c460d2c37df9",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Post-job: Checkout dotnet/maui@refs/pull/38922/merge to s",
+      "identifier": null,
+      "order": 31,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:22.5Z",
+      "finishTime": "2026-09-27T02:15:22.7666667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 223
+      }
+    },
+    {
+      "id": "25e2c4e3-a72c-5289-a8db-c488dd8b5df7",
+      "parentId": "7f6b8130-2616-53cd-267e-fe401c7f74e4",
+      "type": "Phase",
+      "name": "Pack macOS",
+      "identifier": "Pack.pack_net_macOS",
+      "order": 1,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:03:57.4733333Z",
+      "finishTime": "2026-09-27T02:09:43.4066667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 10
+      }
+    },
+    {
+      "id": "9a30d2a9-2e68-5cf5-d9ad-c74c3e20e2bb",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Restore .NET Tools",
+      "identifier": null,
+      "order": 13,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:43.9133333Z",
+      "finishTime": "2026-09-27T02:07:49.6733333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 48
+      }
+    },
+    {
+      "id": "66eb3468-6617-5c6f-8444-c7585835de8d",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "RunOniOS_MauiDebug_CoreCLR ARM64",
+      "identifier": "IntegrationTests.mac_runios_maui_debug_coreclr_arm64",
+      "order": 14,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "a2cb547f-e54d-5650-3252-c77d8b5d1213",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Select Xcode Version",
+      "identifier": null,
+      "order": 4,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:24.3466667Z",
+      "finishTime": "2026-09-27T02:09:24.3533333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 105
+      }
+    },
+    {
+      "id": "1b451764-f976-5c15-2391-c9607486eaca",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "Build windows",
+      "identifier": "IntegrationTests.win_buildtemplate_tests",
+      "order": 4,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "e9a6158a-4f6b-560b-1938-cb1551f30059",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Install iOS 18.5 Simulator (for integration tests)",
+      "identifier": null,
+      "order": 7,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:05:19.18Z",
+      "finishTime": "2026-09-27T02:07:30.6233333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 29
+      }
+    },
+    {
+      "id": "891a0588-d6ae-5380-1123-cccbf3afb1ae",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Select Xcode Version",
+      "identifier": null,
+      "order": 4,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:04:42.5433333Z",
+      "finishTime": "2026-09-27T02:04:45.34Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 20
+      }
+    },
+    {
+      "id": "f49f8944-190a-51a0-9eea-cd508799546e",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "prepare Gradle cache variables (Windows)",
+      "identifier": null,
+      "order": 19,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:12:16.7866667Z",
+      "finishTime": "2026-09-27T02:12:18.29Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 179
+      }
+    },
+    {
+      "id": "3f08748d-c43e-5007-8b27-cf089bb71072",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Restore .NET Tools",
+      "identifier": null,
+      "order": 13,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:10:02.5666667Z",
+      "finishTime": "2026-09-27T02:10:22.8Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 160
+      }
+    },
+    {
+      "id": "ae38b4ba-b8df-50ba-40ed-cf0ba9f5ba44",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Use .NET SDK 10.0.100",
+      "identifier": null,
+      "order": 10,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:41.4533333Z",
+      "finishTime": "2026-09-27T02:09:58.5233333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 153
+      }
+    },
+    {
+      "id": "8a8845ac-867e-4a5c-8f0c-d01fc5207ac4",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Initialize job",
+      "identifier": null,
+      "order": 1,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:23.5966667Z",
+      "finishTime": "2026-09-27T02:08:31.8433333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 63
+      }
+    },
+    {
+      "id": "9afbaff6-7b8a-5941-ed0d-d0f007a1d47c",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Provision Android SDK - Common Packages",
+      "identifier": null,
+      "order": 15,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:04.4633333Z",
+      "finishTime": "2026-09-27T02:08:16.0833333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 52
+      }
+    },
+    {
+      "id": "f7ae8851-9466-503a-ae45-d1125c032fed",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "prepare Gradle cache variables (Windows)",
+      "identifier": null,
+      "order": 19,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:08:31.1866667Z",
+      "finishTime": "2026-09-27T02:08:31.1866667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 62
+      }
+    },
+    {
+      "id": "d0a88328-62d6-5def-06e8-d2b8fc0abe10",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Clear all NuGet caches",
+      "identifier": null,
+      "order": 12,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:44.6566667Z",
+      "finishTime": "2026-09-27T02:07:45.3733333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 42
+      }
+    },
+    {
+      "id": "377e1a38-076f-595e-6372-d3ec6ed0b11a",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Component Detection (auto-injected by policy)",
+      "identifier": null,
+      "order": 29,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:15:22.2366667Z",
+      "finishTime": "2026-09-27T02:15:22.2433333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 221
+      }
+    },
+    {
+      "id": "579a5313-daaa-5e86-47be-d4c5ec2b876d",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "cache Gradle downloads",
+      "identifier": null,
+      "order": 20,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:21Z",
+      "finishTime": "2026-09-27T02:08:42.16Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 70
+      }
+    },
+    {
+      "id": "ec1bce35-134b-5cc8-e717-d51c9486992a",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "cache Gradle downloads",
+      "identifier": null,
+      "order": 20,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:31.1866667Z",
+      "finishTime": "2026-09-27T02:08:50.7633333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 75
+      }
+    },
+    {
+      "id": "724f9502-2886-5541-0560-d57629149564",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "cache Gradle downloads",
+      "identifier": null,
+      "order": 20,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:12:18.29Z",
+      "finishTime": "2026-09-27T02:14:29.6066667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 189
+      }
+    },
+    {
+      "id": "39150fde-e7d2-50c7-cb28-d61e2c628f02",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Provision JDK",
+      "identifier": null,
+      "order": 14,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:10:07.2366667Z",
+      "finishTime": "2026-09-27T02:10:48.6533333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 162
+      }
+    },
+    {
+      "id": "e0455509-afe8-561c-a4db-d72443cc1614",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "\ud83d\udee0\ufe0f Provision SDK & Build BuildTasks",
+      "identifier": null,
+      "order": 23,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:14:11.6066667Z",
+      "finishTime": "2026-09-27T02:14:57.1033333Z",
+      "attempt": 1,
+      "errorCount": 4,
+      "warningCount": 3,
+      "log": {
+        "id": 198
+      }
+    },
+    {
+      "id": "6884a131-87da-5381-61f3-d7acc3b91d76",
+      "parentId": null,
+      "type": "Stage",
+      "name": "Build .NET MAUI",
+      "identifier": "Build",
+      "order": 3,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:03:48.21Z",
+      "finishTime": "2026-09-27T02:15:35.9266667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "818ae610-a17c-575c-5cd1-d9d26521f4ae",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Provision Android SDK - Common Packages",
+      "identifier": null,
+      "order": 15,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:14.22Z",
+      "finishTime": "2026-09-27T02:08:26.1566667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 58
+      }
+    },
+    {
+      "id": "6ba77579-6845-420d-8437-d9fac5363615",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Finalize Job",
+      "identifier": null,
+      "order": 32,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:18.35Z",
+      "finishTime": "2026-09-27T02:09:20.9466667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 100
+      }
+    },
+    {
+      "id": "df377d01-baac-51d2-0384-da133e14dd3f",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "install Gradle init script (Linux/macOS)",
+      "identifier": null,
+      "order": 21,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:14:33.9066667Z",
+      "finishTime": "2026-09-27T02:14:33.9133333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 193
+      }
+    },
+    {
+      "id": "8fab40df-cd87-537b-711a-dd2588fe1cb0",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Gather logs for publish to artifacts",
+      "identifier": null,
+      "order": 27,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:16.5166667Z",
+      "finishTime": "2026-09-27T02:09:16.6266667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 92
+      }
+    },
+    {
+      "id": "e54963a8-deba-4c36-9a96-dec849d9ac02",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Post-job: cache Gradle downloads",
+      "identifier": null,
+      "order": 28,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:25.82Z",
+      "finishTime": "2026-09-27T02:15:26.09Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 219
+      }
+    },
+    {
+      "id": "63427181-bf84-5705-79f3-df1a19501c27",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Copy Native Binaries",
+      "identifier": null,
+      "order": 25,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:31.2266667Z",
+      "finishTime": "2026-09-27T02:09:31.23Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 129
+      }
+    },
+    {
+      "id": "d7ee61ba-d0d2-5abd-59a6-df6ec1c9d3e3",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Clear all NuGet caches",
+      "identifier": null,
+      "order": 12,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:37.73Z",
+      "finishTime": "2026-09-27T02:07:38.5233333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 39
+      }
+    },
+    {
+      "id": "a81a339b-51cc-41c3-8ccd-df9055b2a940",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Initialize job",
+      "identifier": null,
+      "order": 1,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:03:50.89Z",
+      "finishTime": "2026-09-27T02:04:02.87Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 12
+      }
+    },
+    {
+      "id": "107743e3-e6f8-52fc-0d22-dfd34550206d",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "install Gradle init script (Windows)",
+      "identifier": null,
+      "order": 22,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:14:10.2066667Z",
+      "finishTime": "2026-09-27T02:14:11.6066667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 188
+      }
+    },
+    {
+      "id": "88a38c6c-c390-515f-9a18-e01c62589c39",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Component Detection (auto-injected by policy)",
+      "identifier": null,
+      "order": 27,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:15:25.8133333Z",
+      "finishTime": "2026-09-27T02:15:25.82Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 218
+      }
+    },
+    {
+      "id": "a954b149-ed67-5599-79be-e0b5d39029b8",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "prepare Gradle cache variables (Linux/macOS)",
+      "identifier": null,
+      "order": 18,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:12:21.7466667Z",
+      "finishTime": "2026-09-27T02:12:21.7533333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 181
+      }
+    },
+    {
+      "id": "02688852-5b5b-58a5-09b9-e0d6fe36e1c4",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "WindowsTemplates windows",
+      "identifier": "IntegrationTests.win_wintemplate_tests",
+      "order": 3,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "48dc04d9-15b4-55da-f1ba-e0fa0b389f9d",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "List all .NET SDKs",
+      "identifier": null,
+      "order": 11,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:42.6966667Z",
+      "finishTime": "2026-09-27T02:07:43.2933333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 46
+      }
+    },
+    {
+      "id": "9d0996d6-4c62-5aec-4af7-e11a43b315b4",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "install Gradle init script (Linux/macOS)",
+      "identifier": null,
+      "order": 21,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:42.16Z",
+      "finishTime": "2026-09-27T02:08:42.2933333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 72
+      }
+    },
+    {
+      "id": "538cf3cc-a9b3-4721-b58f-e12664beaf9b",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Initialize job",
+      "identifier": null,
+      "order": 1,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:39.5933333Z",
+      "finishTime": "2026-09-27T02:08:46.3533333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 74
+      }
+    },
+    {
+      "id": "47398399-f2a3-5809-76bb-e1a399f3e8b8",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Restore .NET Tools",
+      "identifier": null,
+      "order": 13,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:54.2733333Z",
+      "finishTime": "2026-09-27T02:10:19.4933333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 159
+      }
+    },
+    {
+      "id": "01de896c-fb2e-52ab-3f00-e1bf36596320",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "prepare Gradle cache variables (Windows)",
+      "identifier": null,
+      "order": 19,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:08:38.3633333Z",
+      "finishTime": "2026-09-27T02:08:38.3666667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 68
+      }
+    },
+    {
+      "id": "2678421b-c56a-55a9-7280-e25069e3f8b9",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Provision Android SDK - Environment variables",
+      "identifier": null,
+      "order": 16,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:11:47.8466667Z",
+      "finishTime": "2026-09-27T02:11:51.49Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 171
+      }
+    },
+    {
+      "id": "e4fd2656-e35f-5741-7f72-e2df772fabb0",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Show post simulator info",
+      "identifier": null,
+      "order": 8,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:36.0166667Z",
+      "finishTime": "2026-09-27T02:07:37.2833333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 43
+      }
+    },
+    {
+      "id": "7bf8fbb7-bba4-5e44-d294-e361b6e5de98",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "List all .NET SDKs",
+      "identifier": null,
+      "order": 11,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:51.2333333Z",
+      "finishTime": "2026-09-27T02:09:52.8666667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 150
+      }
+    },
+    {
+      "id": "c0d8ef64-ac06-50ec-9744-e3f05befaaf7",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Checkout dotnet/maui@refs/pull/38922/merge to s",
+      "identifier": null,
+      "order": 2,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:41.8733333Z",
+      "finishTime": "2026-09-27T02:09:30.7233333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 117
+      }
+    },
+    {
+      "id": "292e256f-86f0-5122-4a91-e4f7a3cea51f",
+      "parentId": "b6f66369-b8a4-5497-bbb2-6f6e92ac02c8",
+      "type": "Phase",
+      "name": "Monitor Helix Jobs",
+      "identifier": "HelixTests.HelixJobMonitor",
+      "order": 3,
+      "state": "completed",
+      "result": "failed",
+      "startTime": null,
+      "finishTime": "2026-09-27T02:03:36.7466667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 8
+      }
+    },
+    {
+      "id": "c5a36156-e939-5a40-b715-e6373683a726",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Set dump file location",
+      "identifier": null,
+      "order": 9,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:07:31.82Z",
+      "finishTime": "2026-09-27T02:07:31.82Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 35
+      }
+    },
+    {
+      "id": "a0637f68-1e82-5554-14d3-e6c8d6a06403",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "RunOniOS_MauiReleaseTrimFull_CoreCLR x64",
+      "identifier": "IntegrationTests.mac_runios_maui_trim_coreclr",
+      "order": 22,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "4735f9a0-71fe-599d-a391-e7bdd8146df4",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "RunOniOS_BlazorRelease_CoreCLR ARM64",
+      "identifier": "IntegrationTests.mac_runios_blazor_release_coreclr_arm64",
+      "order": 18,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "f788348d-5204-5abc-9ac3-e87de15101cd",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Show post simulator info",
+      "identifier": null,
+      "order": 8,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:30.6233333Z",
+      "finishTime": "2026-09-27T02:07:31.8166667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 34
+      }
+    },
+    {
+      "id": "2b6f89ca-577d-5856-acb8-e94e903a3878",
+      "parentId": "b6f66369-b8a4-5497-bbb2-6f6e92ac02c8",
+      "type": "Phase",
+      "name": "Windows Helix Unit Tests (Release)",
+      "identifier": "HelixTests.test_helix_unit_tests_windows_Release",
+      "order": 2,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:08:39.4466667Z",
+      "finishTime": "2026-09-27T02:15:39.4066667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 7
+      }
+    },
+    {
+      "id": "66a67664-5e97-5056-1c53-eb23f1e46f5e",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Checkout dotnet/maui@refs/pull/38922/merge to s",
+      "identifier": null,
+      "order": 2,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:04:04.9133333Z",
+      "finishTime": "2026-09-27T02:04:43.3733333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 19
+      }
+    },
+    {
+      "id": "fdb0cb45-e8c6-5944-af7f-eb59aafbcd2e",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "RunOniOS_BlazorRelease_CoreCLR x64",
+      "identifier": "IntegrationTests.mac_runios_blazor_release_coreclr",
+      "order": 24,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "b47c4ce5-9aa6-54c4-04f1-eb864d5aadc6",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Publish Logs",
+      "identifier": null,
+      "order": 26,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:23.7Z",
+      "finishTime": "2026-09-27T02:15:25.8133333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 217
+      }
+    },
+    {
+      "id": "11b03eb8-3090-5abd-b325-ebbdda8ec2bd",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "prepare Gradle cache variables (Linux/macOS)",
+      "identifier": null,
+      "order": 18,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:12:12.9866667Z",
+      "finishTime": "2026-09-27T02:12:12.99Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 175
+      }
+    },
+    {
+      "id": "5109a047-d101-5ef5-5ffc-ece168f0d615",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Use .NET SDK 10.0.100",
+      "identifier": null,
+      "order": 10,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:20.9266667Z",
+      "finishTime": "2026-09-27T02:09:39.6366667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 142
+      }
+    },
+    {
+      "id": "4f190cb7-28e1-5d6c-4bdc-ed8ddf5ec6b3",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Provision Android SDK - Common Packages",
+      "identifier": null,
+      "order": 15,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:10:51.5533333Z",
+      "finishTime": "2026-09-27T02:11:40.8366667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 168
+      }
+    },
+    {
+      "id": "4196c708-937c-5edb-f3fe-efbf1913c974",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Provision Android SDK - Common Packages",
+      "identifier": null,
+      "order": 15,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:22.6266667Z",
+      "finishTime": "2026-09-27T02:08:32.89Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 64
+      }
+    },
+    {
+      "id": "c9bc8595-fd2b-536e-a229-f111f4dd8614",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "prepare Gradle cache variables (Windows)",
+      "identifier": null,
+      "order": 19,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:12:12.99Z",
+      "finishTime": "2026-09-27T02:12:14.4233333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 176
+      }
+    },
+    {
+      "id": "843cf892-394e-5a95-58a2-f157705529be",
+      "parentId": null,
+      "type": "Stage",
+      "name": "Run Integration Tests",
+      "identifier": "IntegrationTests",
+      "order": 4,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "74cf0061-0ca6-5287-bc29-f1e3ae869cce",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Use .NET SDK 10.0.100",
+      "identifier": null,
+      "order": 10,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:31.82Z",
+      "finishTime": "2026-09-27T02:07:37.21Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 36
+      }
+    },
+    {
+      "id": "85296e1d-62c2-5db0-8e22-f25c5956bc38",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Provision JDK",
+      "identifier": null,
+      "order": 14,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:43.3466667Z",
+      "finishTime": "2026-09-27T02:08:04.4633333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 50
+      }
+    },
+    {
+      "id": "00cb057a-79c9-5c4d-bf0c-f317340d1141",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Use .NET SDK 10.0.100",
+      "identifier": null,
+      "order": 10,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:07:38.8333333Z",
+      "finishTime": "2026-09-27T02:07:44.0666667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 38
+      }
+    },
+    {
+      "id": "28745b72-1497-52d8-2a26-f36b001f294b",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "RunOniOS_BlazorDebug_CoreCLR x64",
+      "identifier": "IntegrationTests.mac_runios_blazor_debug_coreclr",
+      "order": 23,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "cf62ed7e-b87f-4d9c-9d0a-f3f199a90fc6",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Post-job: cache Gradle downloads",
+      "identifier": null,
+      "order": 28,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:40.6833333Z",
+      "finishTime": "2026-09-27T02:15:40.9466667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 234
+      }
+    },
+    {
+      "id": "b3452867-47cf-5f24-b1ac-f4a2db00abb8",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Publish TRX Test Results",
+      "identifier": null,
+      "order": 26,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:24.6233333Z",
+      "finishTime": "2026-09-27T02:09:25.0833333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 1,
+      "log": {
+        "id": 106
+      }
+    },
+    {
+      "id": "8b2e1297-c48f-5cca-4be0-f528e8484588",
+      "parentId": "6884a131-87da-5381-61f3-d7acc3b91d76",
+      "type": "Phase",
+      "name": "Build Windows (Debug)",
+      "identifier": "Build.build_net_Windows_Debug",
+      "order": 1,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:08:34.7566667Z",
+      "finishTime": "2026-09-27T02:15:35.7633333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 5
+      }
+    },
+    {
+      "id": "1b0d0ce3-1069-5faa-3cca-f6b61c06cfa8",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Clean C:\\hostedtoolcache\\windows/dotnet directory",
+      "identifier": null,
+      "order": 3,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:30.7233333Z",
+      "finishTime": "2026-09-27T02:09:30.7366667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 119
+      }
+    },
+    {
+      "id": "0890f6b1-b669-5c8a-eb5f-f6ff7665ec73",
+      "parentId": "93b0cbef-3582-5f50-77b2-919796faf044",
+      "type": "Task",
+      "name": "Publish XUnit Test Results",
+      "identifier": null,
+      "order": 25,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:22.4333333Z",
+      "finishTime": "2026-09-27T02:09:24.6233333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 1,
+      "log": {
+        "id": 102
+      }
+    },
+    {
+      "id": "8df42b96-a9ac-5138-f611-f88613d0ed45",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Clean /opt/hostedtoolcache/dotnet directory",
+      "identifier": null,
+      "order": 3,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:04:37.54Z",
+      "finishTime": "2026-09-27T02:04:39.0133333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 15
+      }
+    },
+    {
+      "id": "24e1ec10-a0d3-590f-5768-face83076d16",
+      "parentId": "59319c02-6534-5eaf-6f2e-9ef8c7a053e9",
+      "type": "Task",
+      "name": "Provision Android SDK - Platform APIs",
+      "identifier": null,
+      "order": 17,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:12:04.5633333Z",
+      "finishTime": "2026-09-27T02:12:41.1433333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 183
+      }
+    },
+    {
+      "id": "ffd3f689-55ad-4a3c-b204-fcaee0056c87",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Finalize Job",
+      "identifier": null,
+      "order": 32,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:15:00.5866667Z",
+      "finishTime": "2026-09-27T02:15:00.61Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 207
+      }
+    },
+    {
+      "id": "aef5ab34-567e-52ef-b323-fcbcea8d64e3",
+      "parentId": "ecb4441a-0274-5ffd-7e4b-8906c5c789bf",
+      "type": "Task",
+      "name": "Show post simulator info",
+      "identifier": null,
+      "order": 8,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:24.3666667Z",
+      "finishTime": "2026-09-27T02:09:24.37Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 111
+      }
+    },
+    {
+      "id": "5509336d-b598-5a58-5bca-fd0d69eb6be1",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "prepare Gradle cache variables (Linux/macOS)",
+      "identifier": null,
+      "order": 18,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:08:38.21Z",
+      "finishTime": "2026-09-27T02:08:38.3633333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 67
+      }
+    },
+    {
+      "id": "cb5cfe6e-d43b-51ff-b03d-fd0defbf6f62",
+      "parentId": "843cf892-394e-5a95-58a2-f157705529be",
+      "type": "Phase",
+      "name": "RunOniOS_MauiDebug_CoreCLR x64",
+      "identifier": "IntegrationTests.mac_runios_maui_debug_coreclr",
+      "order": 20,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": null,
+      "finishTime": null,
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "7d33f647-6142-5dca-9c27-fe22a08484b9",
+      "parentId": "e9d48dcb-eb13-5b04-6871-aa7cd031b82d",
+      "type": "Task",
+      "name": "Set dump file location",
+      "identifier": null,
+      "order": 9,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:09:30.3033333Z",
+      "finishTime": "2026-09-27T02:09:40.9566667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 143
+      }
+    },
+    {
+      "id": "7f6b8130-2616-53cd-267e-fe401c7f74e4",
+      "parentId": null,
+      "type": "Stage",
+      "name": "Pack .NET MAUI",
+      "identifier": "Pack",
+      "order": 2,
+      "state": "completed",
+      "result": "failed",
+      "startTime": "2026-09-27T02:03:57.4733333Z",
+      "finishTime": "2026-09-27T02:09:43.9166667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": null
+    },
+    {
+      "id": "9db798a7-e698-5bc1-5b41-fe591fb8f535",
+      "parentId": "6c7e153f-5e0a-5163-9345-41ec5b092b65",
+      "type": "Task",
+      "name": "Component Detection (auto-injected by policy)",
+      "identifier": null,
+      "order": 29,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:32.9366667Z",
+      "finishTime": "2026-09-27T02:09:32.9433333Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 137
+      }
+    },
+    {
+      "id": "8e9c98ca-cf8f-584d-1b82-ff93a7b0fc04",
+      "parentId": "d87f0dbb-e794-58c6-55ff-a5ac644bd5bb",
+      "type": "Task",
+      "name": "Install Simulator Runtimes",
+      "identifier": null,
+      "order": 6,
+      "state": "completed",
+      "result": "skipped",
+      "startTime": "2026-09-27T02:09:10.8233333Z",
+      "finishTime": "2026-09-27T02:09:10.8266667Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 85
+      }
+    },
+    {
+      "id": "e888d325-62d0-5a16-2235-ffde4ae983a4",
+      "parentId": "ebccebfa-7282-5dd5-5e5b-21288f7711bd",
+      "type": "Task",
+      "name": "Checkout dotnet/maui@refs/pull/38922/merge to s",
+      "identifier": null,
+      "order": 2,
+      "state": "completed",
+      "result": "succeeded",
+      "startTime": "2026-09-27T02:03:59.6466667Z",
+      "finishTime": "2026-09-27T02:04:37.54Z",
+      "attempt": 1,
+      "errorCount": 0,
+      "warningCount": 0,
+      "log": {
+        "id": 14
+      }
+    }
+  ]
+}

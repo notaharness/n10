@@ -33,3 +33,16 @@ To record a new one, hit the API with the PAT from `~/.n10/config.json`,
 scrub the identifiers above, and add a row here saying what the response
 was of. Prefer recording over constructing: the bugs in this provider
 have consistently been in fields nobody thought to invent.
+
+**Recorded from a public project.** `ci/` holds one pull request build from
+the public `dnceng-public/public` project (`dotnet/maui` PR 38922, `maui-pr`
+build 1613631), read anonymously on 27 September 2026. No organization of
+ours was involved. The JSON is trimmed to the fields `ci.ts` reads; values
+are verbatim. The log is verbatim.
+
+| File                       | Request                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------------ |
+| `ci/pr-builds.json`        | `GET _apis/build/builds?branchName=refs/pull/38922/merge&…&maxBuildsPerDefinition=1`       |
+| `ci/timeline-1613631.json` | `GET _apis/build/builds/1613631/timeline`: 4 stages, 33 phases, 8 jobs, failed and skipped |
+| `ci/logs-1613631.json`     | `GET _apis/build/builds/1613631/logs`: every log's `lineCount`                             |
+| `ci/log-88-259-758.txt`    | `GET _apis/build/builds/1613631/logs/88?startLine=259&endLine=758`: a failed task's tail   |

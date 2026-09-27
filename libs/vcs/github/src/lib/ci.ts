@@ -1,7 +1,7 @@
 import { execFile as execFileCb } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
-  stripTerminalControls,
+  readableCiLog,
   tailLines,
   VcsError,
   type CiJob,
@@ -250,18 +250,6 @@ export function clearGitHubLogCache(): void {
   logCache.clear();
 }
 
-const TIMESTAMP = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z ?/;
-
-/** The log as text to read: byte-order mark, per-line timestamps and
- *  terminal escapes removed. */
-export function readableJobLog(raw: string): string {
-  const body = raw.startsWith('\ufeff') ? raw.slice(1) : raw;
-  return body
-    .split(/\r?\n/)
-    .map((line) => stripTerminalControls(line.replace(TIMESTAMP, '')))
-    .join('\n');
-}
-
 function logError(err: unknown): VcsError {
   if (err instanceof VcsError) return err;
   if (
@@ -310,7 +298,7 @@ export async function fetchGitHubCiLog(
         ],
         { maxBuffer: MAX_JOB_LOG_BYTES }
       );
-      text = readableJobLog(raw);
+      text = readableCiLog(raw);
     } catch (err: unknown) {
       throw logError(err);
     }
