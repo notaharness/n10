@@ -6,7 +6,7 @@ import { updateFakeGh } from './setup/fake-gh.js';
 
 test.use({
   repo: { name: 'sync-demo', worktrees: [{ branch: 'sync-design' }] },
-  n10Config: { prPollInterval: 3_600_000 },
+  n10Config: { prPollInterval: 3_600_000, mergePollInterval: 600_000 },
   desktopPrefs: { theme: 'dark' },
   fakeGitHub: {
     username: 'tester',
@@ -39,7 +39,9 @@ test('automatic PR sync explains its scope and offers an immediate recheck', asy
   await expect(dialog).toContainText(
     'Merged badges and automatic worktree cleanup'
   );
-  await expect(dialog).toContainText('hourly by default');
+  await expect(dialog).toContainText(
+    'separate schedule, about every 10 minutes'
+  );
   await expect(dialog).toContainText('Refresh now does not run those checks');
   await expect(dialog).toContainText('their errors are not shown here');
   await expect(sidebarRow(page, /Clarify sync status/)).toBeVisible();
@@ -143,6 +145,7 @@ test.describe('Azure DevOps status presentation', () => {
         lastGitSyncAt: null,
         remoteSyncing: false,
         remoteIntervalMs: 60_000,
+        maintenanceIntervalMs: 300_000,
         remoteFetches: 1,
         remoteError:
           'Azure DevOps rejected the access token. Update it in Settings.',
@@ -162,6 +165,9 @@ test.describe('Azure DevOps status presentation', () => {
       name: 'Azure DevOps pull request sync',
     });
     await expect(dialog).toContainText('about every minute');
+    await expect(dialog).toContainText(
+      'separate schedule, about every 5 minutes'
+    );
     await expect(dialog).toContainText('Not synced yet');
     await expect(dialog.getByRole('alert')).toContainText(
       'Update it in Settings'
@@ -197,6 +203,7 @@ test('missing credentials keep their warning and Settings tooltip on hover', asy
       lastGitSyncAt: null,
       remoteSyncing: false,
       remoteIntervalMs: 60_000,
+      maintenanceIntervalMs: 300_000,
       remoteFetches: 0,
       remoteError: null,
     }));

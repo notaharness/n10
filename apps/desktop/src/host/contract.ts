@@ -228,6 +228,8 @@ export interface SyncState {
   remoteSyncing: boolean;
   /** Remote cache TTL in ms (from config, clamped). */
   remoteIntervalMs: number;
+  /** Repository maintenance cadence in ms (from config, clamped). */
+  maintenanceIntervalMs: number;
   /**
    * Provider fetches this process has started, successful or not.
    *

@@ -51,7 +51,8 @@ and the existing cache shares them among readers. The status bar names
   data and the configured automatic cadence while the window is visible, and
   shows the exact **Last successful PR refresh** time.
 - Explicitly explain that Merged badges and automatic worktree cleanup are checked
-  on a separate schedule (hourly by default); **Refresh now** does not run those checks and their errors
+  on a separate schedule, showing the configured `mergePollInterval` with its
+  five-minute minimum; **Refresh now** does not run those checks and their errors
   are not shown here. Do not imply that a successful PR refresh certifies maintenance.
 - A failure remains visible in the bar, including on hover. The popover shows the
   error as text, explains whether data may be stale or unavailable, and offers

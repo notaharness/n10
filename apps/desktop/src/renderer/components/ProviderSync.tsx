@@ -168,9 +168,9 @@ function SyncDetails({
         </p>
         <p className="text-sm text-muted-foreground">
           Merged badges and automatic worktree cleanup run on a separate
-          schedule (hourly by default). Refresh now does not run those checks,
-          and their errors are not shown here. Git fetch and local branch
-          updates also run separately.
+          schedule, about every {cadence(sync.maintenanceIntervalMs)}. Refresh
+          now does not run those checks, and their errors are not shown here.
+          Git fetch and local branch updates also run separately.
         </p>
       </div>
       <div className="flex flex-wrap justify-end gap-2">
