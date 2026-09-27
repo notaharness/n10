@@ -63,7 +63,7 @@ describe('ceremonyStep', () => {
       { kind: 'stage', stage: 'notifying peers' },
     ]);
     expect(view).toMatchObject({ phase: 'notifying-peers', passkeyUrl: null });
-    expect(ceremonyHeading(view).heading).toBe('Notifying peers…');
+    expect(ceremonyHeading(view).heading).toBe('Updating machines…');
   });
 
   it('counts a join or revoke signature as its one step', () => {
@@ -117,30 +117,27 @@ describe('ceremonyHeading', () => {
   it('names each signal of a fleet’s creation', () => {
     const heading = (events: CeremonyProgress[]) =>
       ceremonyHeading(walk('init', events)).heading;
-    expect(heading([preparing])).toBe('Preparing network…');
-    expect(heading([create])).toBe('Step 1 of 2 · Create your fleet passkey');
-    expect(heading([create, sign])).toBe(
-      'Step 2 of 2 · Authorize this machine'
-    );
-    expect(heading([create, sign, publishing])).toBe('Publishing membership…');
+    expect(heading([preparing])).toBe('Getting ready…');
+    expect(heading([create])).toBe('1 of 2 · Save a passkey');
+    expect(heading([create, sign])).toBe('2 of 2 · Add this machine');
+    expect(heading([create, sign, publishing])).toBe('Finishing setup…');
   });
 
   it('tells a joining machine not to create another passkey', () => {
     expect(ceremonyHeading(walk('join', [sign]))).toEqual({
-      heading: 'Authorize this machine',
-      explanation:
-        'Choose this fleet’s existing passkey. Do not create another passkey.',
+      heading: 'Add this machine',
+      explanation: 'Use your fleet’s existing passkey.',
     });
     expect(
       ceremonyHeading(
         walk('join', [sign, { kind: 'stage', stage: 'reading directory' }])
       ).heading
-    ).toBe('Reading fleet directory…');
+    ).toBe('Finding machines…');
   });
 
   it('asks for the revocation’s authorization', () => {
     expect(ceremonyHeading(walk('revoke', [sign])).heading).toBe(
-      'Authorize revocation'
+      'Confirm with your passkey'
     );
   });
 

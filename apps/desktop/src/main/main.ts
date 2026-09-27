@@ -36,7 +36,7 @@ import { installHostEventBridge } from './host-events.js';
 import { installDesktopTmuxPreparer } from './tmux-session-preparer.js';
 import { MAIN_MARKS, mark } from './boot-marks.js';
 import { pickFolderWithDialog } from './folder-picker.js';
-import { buildMenuTemplate } from './menu.js';
+import { buildMenuTemplate } from '../host/menu-template.js';
 import {
   installProcessDiagnostics,
   installRendererRecovery,

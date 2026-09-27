@@ -37,7 +37,7 @@ export function InitSteps({
 }) {
   const statuses = initStepStatuses(view, failed);
   return (
-    <ol className="space-y-1 text-sm">
+    <ol className="space-y-1 text-base">
       {INIT_STEPS.map((step, i) => {
         const status = statuses[i];
         const Icon = STEP_ICON[status];
@@ -92,7 +92,7 @@ export function CeremonyProgress({
           {heading}
         </h3>
         {explanation && (
-          <p className="text-sm text-muted-foreground">{explanation}</p>
+          <p className="text-base text-muted-foreground">{explanation}</p>
         )}
       </div>
       {view.passkeyUrl && !view.cancelling && (
@@ -103,7 +103,9 @@ export function CeremonyProgress({
           size="sm"
           variant="ghost"
           disabled={view.cancelling}
-          onClick={onCancel}
+          // The second click of a double click on the button that
+          // started this can land here once the progress replaces it.
+          onClick={(e) => e.detail < 2 && onCancel()}
         >
           {cancelLabel}
         </Button>

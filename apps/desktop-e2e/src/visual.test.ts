@@ -9,6 +9,7 @@ import {
 } from './setup/app.js';
 import { armContextMenuChoice, clickAppMenuItem } from './setup/menu.js';
 import type { FakeGitHub } from './setup/fake-gh.js';
+import { fleetView } from './setup/machines.js';
 
 /**
  * Screenshot comparisons, kept to the surfaces where they earn their
@@ -41,6 +42,17 @@ const shot = {
   caret: 'hide',
   maxDiffPixels: 0,
 } as const;
+
+/** The sidebar's Fleet section shows beam's answer, not its loading
+ *  skeleton: the app's own daemon starts unenrolled in the fixture
+ *  HOME, and how long it takes is no part of any shot. */
+test.beforeEach(async ({ desktop }) => {
+  await expect(
+    fleetView(desktop.page).getByRole('heading', {
+      name: 'Your machines, together',
+    })
+  ).toBeVisible({ timeout: 30_000 });
+});
 
 test.describe('Visual @visual', () => {
   test.use({ repo: { name: 'n10-visual' } });

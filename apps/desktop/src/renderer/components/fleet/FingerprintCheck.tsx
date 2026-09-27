@@ -13,15 +13,14 @@ function Mismatch({ onReset }: { onReset: () => void }) {
         tabIndex={-1}
         className="font-medium text-destructive outline-none"
       >
-        Fleet fingerprints do not match
+        Different fleet
       </h3>
-      <p className="text-sm">
-        This machine joined a different fleet. Stop using its remote
-        connections. Reset the fleet on this machine, then join again using your
-        known fleet passkey and a fresh link.
+      <p className="text-base">
+        Stop using remote connections. Reset here, then join with your fleet’s
+        passkey.
       </p>
       <Button size="sm" variant="destructive" onClick={onReset}>
-        Reset fleet on this machine…
+        Reset fleet…
       </Button>
     </div>
   );
@@ -38,20 +37,20 @@ export function FingerprintCheck({ fleetId }: { fleetId: string }) {
   if (enrolment.mismatch) return <Mismatch onReset={reset.show} />;
   return (
     <div className="space-y-2 border-t border-border pt-3">
-      <h4 className="font-medium">Check the fleet fingerprint</h4>
-      <p className="font-mono text-base select-all">
+      <h4 className="font-medium">Check fleet fingerprint</h4>
+      <p className="font-mono text-lg select-all">
         {fingerprintGroups(fleetId)}
       </p>
-      <p className="text-sm text-muted-foreground">
-        Compare this with Fleet on a machine already in your fleet, or run beam
-        status there. Matching names are not enough.
+      <p className="text-base text-muted-foreground">
+        Compare with a machine already in your fleet: its Fleet … menu shows the
+        fingerprint.
       </p>
       <div className="flex gap-2">
         <Button size="sm" onClick={enrolment.leave}>
-          Fingerprints match
+          Matches
         </Button>
         <Button size="sm" variant="outline" onClick={enrolment.reportMismatch}>
-          They don’t match
+          Doesn’t match
         </Button>
       </div>
     </div>

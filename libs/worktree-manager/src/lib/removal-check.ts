@@ -4,7 +4,7 @@
  * else that would be lost is a risk the user may choose to take.
  */
 import { existsSync, realpathSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { log } from '@n10/logger';
 import { exec, gitOptions } from './exec.js';
 import { refuseRemote, type Machine } from './machine.js';
@@ -69,7 +69,7 @@ export async function assessBranchRemoval(
   // Use the worktree's real path from git so the status check runs
   // against the actual checkout, not a resolver-derived guess that may
   // not exist (which would silently skip the uncommitted-changes guard).
-  const dir = wt?.path ?? worktreeDir(branch);
+  const dir = wt?.path ?? resolverDir(branch, cwd);
   const risks: RemovalRisk[] = [];
   const changes = await uncommittedChanges(dir, branch, wt !== undefined);
   if (changes) risks.push(changes);
@@ -78,6 +78,13 @@ export async function assessBranchRemoval(
   }
   if (await hasSubmodules(dir, branch)) risks.push('submodules');
   return { refusal: null, risks };
+}
+
+/** Where the resolver would put `branch`'s checkout in the repository
+ *  at `cwd`: a relative resolver path is that repository's, not the
+ *  process's. */
+function resolverDir(branch: string, cwd?: string): string {
+  return resolve(cwd ?? process.cwd(), worktreeDir(branch));
 }
 
 /**

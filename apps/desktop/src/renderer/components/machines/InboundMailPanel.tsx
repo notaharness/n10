@@ -25,7 +25,7 @@ export function InboundMailPanel({
   if (waiting.length === 0 && refused.length === 0) return null;
 
   return (
-    <div className="space-y-1 bg-muted/30 px-4 pb-3 pl-[calc(0.75rem+0.5rem+1rem)] text-xs">
+    <div className="space-y-1 bg-muted/30 px-3 pb-2 pl-7 text-sm">
       {waiting.map((row) => (
         <div
           key={row.id}
@@ -47,7 +47,7 @@ export function InboundMailPanel({
             <Button
               variant="ghost"
               size="sm"
-              className="h-5 shrink-0 px-1.5 text-xs"
+              className="h-5 shrink-0 px-1.5 text-sm"
               disabled={disabled}
               onClick={() =>
                 dismissMail.mutate(row.id, {
