@@ -29,6 +29,7 @@ evidence about what a real server sends.
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `builds-batch.json`            | one `GET /_apis/build/builds?repositoryId=…` page covering several pull requests at once                                                                                       |
 | `pr-threads-conversation.json` | one `GET …/pullRequests/{id}/threads` answer: general, line, outdated left-side, file-level and deleted threads, and system entries in the documented sample's property shapes |
+| `identities-search.json`       | one `GET vssps…/_apis/identities?searchFilter=General` answer: two active people, one with only an account name, and one inactive                                              |
 
 **Documented.** Microsoft's own sample response, copied verbatim from
 the REST reference. Real field names and shapes as the API owner

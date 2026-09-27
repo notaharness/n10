@@ -14,9 +14,11 @@ import type {
   ReviewVerdict,
   BuildStatusState,
   RepositoryRef,
+  MentionCandidate,
 } from '@n10/vcs-core';
 import { isVcsError, sanitizeBody } from '@n10/vcs-core';
 import { logNetwork } from '@n10/logger';
+import { searchGitHubMentions } from './mentions.js';
 import {
   assertGraphQlData,
   classifyGhError,
@@ -817,6 +819,16 @@ export const githubProvider: VcsProvider = {
     const repository = this.repositoryRef?.(project);
     if (!repository) throw new Error('GitHub project not configured');
     return fetchGitHubConversation(ghGraphQL, { ...repository, number: prId });
+  },
+
+  async searchMentionCandidates(
+    _auth: Record<string, string>,
+    project: Record<string, string>,
+    query: string
+  ): Promise<MentionCandidate[]> {
+    const repository = this.repositoryRef?.(project);
+    if (!repository) throw new Error('GitHub project not configured');
+    return searchGitHubMentions(ghGraphQL, repository, query);
   },
 
   async replyToThread(

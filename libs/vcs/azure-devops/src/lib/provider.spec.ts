@@ -19,10 +19,12 @@ import {
   fetchAuthenticatedUserEmail,
   fetchMyTeamIds,
   enrichReviewersWithTeamMembership,
+} from './provider.js';
+import {
   extractMentionGuids,
   rewriteMentions,
   _clearMentionCacheForTests,
-} from './provider.js';
+} from './mentions.js';
 
 // Mock global fetch
 const mockFetch = vi.fn();
