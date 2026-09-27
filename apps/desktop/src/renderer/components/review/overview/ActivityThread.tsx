@@ -6,9 +6,8 @@ import {
   MessageSquareIcon,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { commentBodyParts } from '@n10/review-comments/conventional';
 import type { ConversationThread } from '../../../../host/contract.js';
-import { firstNonEmptyLine } from '../../../lib/diff/thread-model.js';
+import { commentPreview } from '../../../lib/review/activity-text.js';
 import { matchingComments } from '../../../lib/review/activity-model.js';
 import {
   nativeStatus,
@@ -19,7 +18,7 @@ import { Badge } from '../../ui/badge.js';
 import { Button } from '../../ui/button.js';
 import { Tip } from '../../ui/tooltip.js';
 import { ThreadContext } from '../comments/ThreadContext.js';
-import { ActivityComment } from './ActivityComment.js';
+import { ActivityComment, ActorName } from './ActivityComment.js';
 
 /** Replies shown either side of a folded run in a long thread. */
 const KEEP_LAST = 2;
@@ -122,9 +121,9 @@ function ThreadHeader({
       >
         <Chevron className="size-3.5 shrink-0 text-muted-foreground" />
         <MessageSquareIcon className="size-3.5 shrink-0 text-muted-foreground" />
-        {root?.author && (
-          <span className="shrink-0 font-medium">
-            {root.author.displayName}
+        {root && (
+          <span className="shrink-0">
+            <ActorName actor={root.author} />
           </span>
         )}
         <span className="truncate font-mono text-xs text-muted-foreground">
@@ -132,7 +131,7 @@ function ThreadHeader({
         </span>
         {!open && root && (
           <span className="min-w-0 truncate text-muted-foreground">
-            — {firstNonEmptyLine(commentBodyParts(root.body).body)}
+            — {commentPreview(root)}
           </span>
         )}
         <span className="ml-auto shrink-0 text-xs text-muted-foreground">

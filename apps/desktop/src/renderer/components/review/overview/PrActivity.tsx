@@ -149,6 +149,9 @@ function Activity({
 
   const counts = filterCounts(shown, viewer);
   const selected = selectActivity(shown, filter, query, viewer);
+  // New updates are counted against what the reader is looking at; the
+  // rest wait until the filter or search would show them.
+  const arrived = selectActivity(held, filter, query, viewer);
   const narrowed = filter !== 'all' || query.trim() !== '';
   // Grouping folds noise; a filtered or searched list shows each match.
   const rows = narrowed ? selected : groupActivity(selected);
@@ -215,10 +218,10 @@ function Activity({
         </ol>
       )}
       <NewUpdates
-        count={held.length}
+        count={arrived.length}
         onShow={() => {
-          setSeen(new Set(entries.map((e) => e.id)));
-          reveal.current = held[0]?.id ?? null;
+          setSeen(new Set([...seen, ...arrived.map((e) => e.id)]));
+          reveal.current = arrived[0]?.id ?? null;
         }}
       />
     </>

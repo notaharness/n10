@@ -202,8 +202,15 @@ function textsOf(entry: ActivityEntry): ConversationComment[] {
   return [];
 }
 
+/** What the viewer wrote, and their verdicts: a GitHub review or an
+ *  Azure vote. */
 function isMine(entry: ActivityEntry, viewer: string): boolean {
   if (entry.kind === 'review') return sameAccount(entry.review.author, viewer);
+  if (entry.kind === 'event') {
+    return (
+      entry.event.kind === 'vote' && sameAccount(entry.event.actor, viewer)
+    );
+  }
   return textsOf(entry).some((c) => sameAccount(c.author, viewer));
 }
 

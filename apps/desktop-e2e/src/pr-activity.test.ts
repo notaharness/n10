@@ -189,7 +189,15 @@ test.describe('Pull request activity', () => {
       .click();
     await page.getByRole('button', { name: 'Overview' }).click();
 
+    // Under a filter the arrival would not show in, nothing is announced.
+    const filters = activity.getByRole('radiogroup', { name: 'Show' });
+    await filters.getByRole('radio', { name: /Resolved/ }).click();
     const update = activity.getByRole('button', { name: '1 new update' });
+    await expect(activity.locator('[data-thread-id="T-open"]')).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(update).toHaveCount(0);
+    await filters.getByRole('radio', { name: /^All/ }).click();
     await expect(update).toBeVisible({ timeout: 15_000 });
     await expect(activity.getByText('Late to the party')).toHaveCount(0);
     // The thread the reader already had in view shows its new status,
