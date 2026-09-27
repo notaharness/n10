@@ -44,36 +44,45 @@ export function ThreadFooter({
   notice?: Notice | null;
 }) {
   return (
-    <div className="flex items-start gap-2 border-t border-border bg-muted/20 px-3 py-2">
-      {composing ? (
-        <ReplyComposer
-          canResolve={canResolve && !isResolved}
-          draft={draft}
-          sending={sending}
-          notice={notice}
-          onSend={onSend}
-          onClose={() => setComposing(false)}
-        />
-      ) : (
-        <ReplyPrompt draft={draft} onOpen={() => setComposing(true)} />
-      )}
-      {canResolve && !composing && (
-        <Button
-          variant={isResolved ? 'ghost' : 'outline'}
-          size="sm"
-          onClick={onToggleResolved}
-          disabled={resolving}
-        >
-          {isResolved ? (
-            <>
-              <RotateCcwIcon /> Reopen
-            </>
-          ) : (
-            <>
-              <CheckIcon /> Resolve
-            </>
-          )}
-        </Button>
+    <div className="border-t border-border bg-muted/20 px-3 py-2">
+      <div className="flex items-start gap-2">
+        {composing ? (
+          <ReplyComposer
+            canResolve={canResolve && !isResolved}
+            draft={draft}
+            sending={sending}
+            notice={notice}
+            onSend={onSend}
+            onClose={() => setComposing(false)}
+          />
+        ) : (
+          <ReplyPrompt draft={draft} onOpen={() => setComposing(true)} />
+        )}
+        {canResolve && !composing && (
+          <Button
+            variant={isResolved ? 'ghost' : 'outline'}
+            size="sm"
+            onClick={onToggleResolved}
+            disabled={resolving}
+          >
+            {isResolved ? (
+              <>
+                <RotateCcwIcon /> Reopen
+              </>
+            ) : (
+              <>
+                <CheckIcon /> Resolve
+              </>
+            )}
+          </Button>
+        )}
+      </div>
+      {draft.readError && !composing && (
+        // The whole reason, file path included, as text a reader can
+        // select and copy: it is how they keep what the file holds.
+        <p className="mt-1.5 select-text break-all text-xs text-destructive">
+          {draft.readError}
+        </p>
       )}
     </div>
   );

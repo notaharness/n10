@@ -7,7 +7,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
-  writeSync,
+  writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -94,7 +94,9 @@ export function writeDraftFile(dir: string, file: DraftFile): void {
   try {
     const fd = openSync(tmp, 'w', 0o600);
     try {
-      writeSync(fd, JSON.stringify(file, null, 2));
+      // writeFileSync on a descriptor loops until every byte is out;
+      // a single writeSync may stop short on a filling disk.
+      writeFileSync(fd, JSON.stringify(file, null, 2));
       // On disk before it replaces the old file, or a crash can leave
       // an empty one where the drafts were.
       fsyncSync(fd);

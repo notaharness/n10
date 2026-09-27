@@ -80,6 +80,30 @@ describe('DraftEdits', () => {
     expect(h.saves[1]!.req.body).toBe('Nowhere to keep this');
   });
 
+  it('keeps a failure standing while the reader types on', async () => {
+    const h = harness();
+    const key = keyOf('bea');
+    h.edits.type(key, as('bea', 'one'));
+    h.elapse();
+    h.saves[0]!.reject(new Error('EACCES'));
+    await h.settle();
+    h.edits.type(key, as('bea', 'one two'));
+    expect(h.edits.get(key)?.save.kind).toBe('failed');
+    h.elapse();
+    h.saves[1]!.resolve(null);
+    await h.settle();
+    expect(h.edits.get(key)?.save.kind).toBe('saved');
+  });
+
+  it('saves everything waiting when the page goes', () => {
+    const h = harness();
+    h.edits.type(keyOf('bea'), as('bea', 'a'));
+    h.edits.type(keyOf('carol'), as('carol', 'b'));
+    h.edits.flushAll();
+    expect(h.saves.map((s) => s.req.body).sort()).toEqual(['a', 'b']);
+    expect(h.timers.size).toBe(0);
+  });
+
   it('lets only the latest save speak for the text', async () => {
     const h = harness();
     const key = keyOf('bea');

@@ -19,6 +19,9 @@ import {
   type SaveState,
 } from './draft-edits.js';
 
+const isEditable = (d: ReviewDraft) =>
+  d.publication.state === 'unpublished' || d.publication.state === 'failed';
+
 /**
  * The reviewer's own writing, kept as they type it: saved on this
  * machine a moment after each change, so a reply survives a scroll, a
@@ -74,6 +77,10 @@ const edits = new DraftEdits({
   clearTimer: (id) => window.clearTimeout(id),
 });
 
+// A reload or quit does not wait out the pause; the saves it starts
+// here still reach the host, which does not unload with the page.
+window.addEventListener('pagehide', () => edits.flushAll());
+
 async function loadDrafts(
   ref: PullRequestRef,
   viewer: string | null
@@ -116,8 +123,11 @@ export function useReviewDraft(
   };
   const key = editKey(scope);
   const edit = useSyncExternalStore(edits.subscribe, () => edits.get(key));
+  // A draft being posted, or already posted, is not text to edit.
   const stored =
-    drafts.data?.drafts.find((d) => sameTarget(d.target, target)) ?? null;
+    drafts.data?.drafts.find(
+      (d) => sameTarget(d.target, target) && isEditable(d)
+    ) ?? null;
   const body = edit?.text ?? stored?.body ?? '';
 
   const setBody = (text: string) => {

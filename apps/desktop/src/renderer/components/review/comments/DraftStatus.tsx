@@ -1,4 +1,5 @@
 import { AlertCircleIcon, CheckIcon, Loader2Icon } from 'lucide-react';
+import { useEffect } from 'react';
 import type { DurableDraft } from '../../../lib/review/review-drafts.js';
 import { copyText } from '../../../lib/copy-text.js';
 import { Button } from '../../ui/button.js';
@@ -64,6 +65,12 @@ export function UnsavedChoice({
   onClose: () => void;
   onKeepEditing: () => void;
 }) {
+  // Once a retry lands there is nothing left to decide.
+  const kept = draft.save.kind === 'saved';
+  useEffect(() => {
+    if (kept) onClose();
+  }, [kept, onClose]);
+  const retrying = draft.save.kind === 'saving';
   return (
     <div
       role="group"
@@ -79,8 +86,19 @@ export function UnsavedChoice({
       <span className="mr-auto text-destructive">
         This draft isn't saved. Copy it, or discard it.
       </span>
-      <Button variant="outline" size="sm" onClick={draft.retry}>
-        Retry
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={draft.retry}
+        disabled={retrying}
+      >
+        {retrying ? (
+          <>
+            <Loader2Icon className="animate-spin" /> Retrying…
+          </>
+        ) : (
+          'Retry'
+        )}
       </Button>
       <Button
         variant="outline"

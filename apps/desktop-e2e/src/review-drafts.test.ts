@@ -165,10 +165,15 @@ test.describe('Review drafts', () => {
       await expect(box).toBeFocused();
       await expect(box).toHaveValue('Nowhere to keep this');
 
-      // Once the disk takes it again, Retry saves it.
+      // Once the disk takes it again, Retry from the prompt saves it,
+      // and with nothing left to decide the box closes.
       chmodSync(dir, 0o700);
-      await thread.getByRole('button', { name: 'Retry' }).click();
-      await expect(saved(thread)).toBeVisible();
+      await box.press('Escape');
+      await choice.getByRole('button', { name: 'Retry' }).click();
+      await expect(box).toHaveCount(0);
+      await expect(
+        thread.getByRole('button', { name: /Your draft reply/ })
+      ).toContainText('Nowhere to keep this');
     } finally {
       chmodSync(dir, 0o700);
     }

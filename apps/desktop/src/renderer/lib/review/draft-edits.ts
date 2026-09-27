@@ -88,8 +88,14 @@ export class DraftEdits {
     const slot = this.slots.get(key);
     if (slot?.timer != null) this.io.clearTimer(slot.timer);
     const timer = this.io.setTimer(() => this.flush(key), SAVE_DELAY_MS);
+    // A failure stands until a save succeeds: typing does not make the
+    // text any safer, and the alert should not blink with each key.
+    const failed = slot?.edit.save.kind === 'failed';
     this.put(key, {
-      edit: { text: req.body, save: { kind: 'saving' } },
+      edit: {
+        text: req.body,
+        save: failed ? slot.edit.save : { kind: 'saving' },
+      },
       req,
       timer,
       seq: slot?.seq ?? 0,
@@ -112,6 +118,11 @@ export class DraftEdits {
     if (slot?.timer == null) return;
     this.io.clearTimer(slot.timer);
     this.write(key, { ...slot, timer: null });
+  }
+
+  /** Save now everything waiting: the page is going away. */
+  flushAll(): void {
+    for (const key of this.slots.keys()) this.flush(key);
   }
 
   /** Save again what failed to save. */
