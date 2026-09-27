@@ -370,7 +370,7 @@ export async function rebaseOntoMaster(
 ): Promise<'success' | 'conflict' | 'error'> {
   refuseRemote('rebaseOntoMaster', machine);
   assertShellSafeRef(worktreePath, 'worktree path');
-  const main = await getMainBranch();
+  const main = await getMainBranch(worktreePath);
   try {
     await exec(`git -C "${worktreePath}" fetch origin ${main}`, {
       encoding: 'utf8',
