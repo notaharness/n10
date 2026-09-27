@@ -97,7 +97,7 @@ function draftScopeOf(ctx: PostContext): DraftScope {
 }
 
 /**
- * Post drafts, each exactly once however many shells try at the same
+ * Post drafts, each by one poster however many shells try at the same
  * time.
  *
  * The drafts are claimed first (`claimForPosting`): only those this
@@ -120,21 +120,46 @@ export async function postReviewComments(
     drafts,
     comments.map((c) => c.id)
   );
-  const mine = comments.filter((c) => claimed.has(c.id));
-  if (mine.length === 0) return [];
-  const ids = mine.map((c) => c.id);
+  if (claimed.length === 0) return [];
+  const ids = claimed.map((c) => c.id);
   try {
+    // What is sent is what was claimed: the drafts as stored now, with
+    // any edit made since the caller read them.
+    assertPostable(claimed);
     if (ctx.vendor === 'github') {
-      await postGitHub(mine, ctx, event);
+      await postGitHub(claimed, ctx, event);
     } else {
-      await postAzureDevOps(mine, ctx);
+      await postAzureDevOps(claimed, ctx);
     }
   } catch (err) {
-    settleClaim(drafts, ids, token, 'draft');
+    releaseClaim(drafts, ids, token);
     throw err;
   }
-  settleClaim(drafts, ids, token, 'posted');
-  return mine;
+  try {
+    settleClaim(drafts, ids, token, 'posted');
+  } catch (err) {
+    // The provider has them. Reporting a failure would invite a retry
+    // that posts them twice; the claim stays until this process exits.
+    throw new Error(
+      `Posted, but could not mark the drafts posted (${errorText(err)}). ` +
+        'Check the pull request before posting them again.'
+    );
+  }
+  return claimed;
+}
+
+/** Offer the drafts again. A failure here must not hide the post's own
+ *  error: the claim then ends with this process instead. */
+function releaseClaim(drafts: DraftScope, ids: string[], token: string): void {
+  try {
+    settleClaim(drafts, ids, token, 'draft');
+  } catch {
+    // Readers offer a dead poster's drafts again (`readComments`).
+  }
+}
+
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 async function postGitHub(

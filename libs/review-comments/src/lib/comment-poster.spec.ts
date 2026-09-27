@@ -26,13 +26,17 @@ const env = vi.hoisted(() => ({
   marked: [] as { scope: DraftScope; id: string; status: string }[],
   /** Another poster holds every draft. */
   claimedElsewhere: false,
+  /** A settle to this status throws, as a lock timeout would. */
+  settleFails: null as string | null,
+  /** Every draft `comment()` made, by id: what the store holds. */
+  drafts: new Map<string, ReviewComment>(),
 }));
 
 vi.mock('./comment-store.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   claimForPosting: (_scope: DraftScope, ids: string[]) => ({
     token: 'token',
-    claimed: new Set(env.claimedElsewhere ? [] : ids),
+    claimed: env.claimedElsewhere ? [] : ids.map((id) => env.drafts.get(id)!),
   }),
   settleClaim: (
     scope: DraftScope,
@@ -40,6 +44,7 @@ vi.mock('./comment-store.js', async (importOriginal) => ({
     _token: string,
     status: string
   ) => {
+    if (env.settleFails === status) throw new Error('lock timed out');
     for (const id of ids) env.marked.push({ scope, id, status });
   },
 }));
@@ -74,7 +79,7 @@ const { postReviewComments } = await import('./comment-poster.js');
 const { draftRepoKey } = await import('./comment-store.js');
 
 function comment(over: Partial<ReviewComment> = {}): ReviewComment {
-  return {
+  const made: ReviewComment = {
     id: 'c1',
     file: 'src/a.ts',
     lineStart: 10,
@@ -86,6 +91,8 @@ function comment(over: Partial<ReviewComment> = {}): ReviewComment {
     createdAt: '2026-01-01T00:00:00.000Z',
     ...over,
   };
+  env.drafts.set(made.id, made);
+  return made;
 }
 
 const github: PostContext = {
@@ -111,6 +118,8 @@ beforeEach(() => {
   env.fetchStatus = 200;
   env.marked = [];
   env.claimedElsewhere = false;
+  env.drafts.clear();
+  env.settleFails = null;
 
   vi.stubGlobal(
     'fetch',
@@ -357,6 +366,30 @@ describe('marking comments posted', () => {
       postReviewComments([comment()], { ...azure, vendorProject: {} })
     ).rejects.toThrow('No repository is configured');
     expect(env.fetches).toEqual([]);
+  });
+
+  it('sends the draft as stored, with an edit made after it was read', async () => {
+    const read = comment();
+    env.drafts.set(read.id, { ...read, body: 'Edited since.' });
+    await postReviewComments([read], github);
+    const body = env.ghInputs[0].body as { comments: { body: string }[] };
+    expect(body.comments[0].body).toContain('Edited since.');
+  });
+
+  it('says the post landed when only marking it posted failed', async () => {
+    env.settleFails = 'posted';
+    await expect(postReviewComments([comment()], github)).rejects.toThrow(
+      /^Posted, but could not mark the drafts posted/
+    );
+    expect(env.ghInputs).toHaveLength(1);
+  });
+
+  it("keeps the provider's error when putting the drafts back fails", async () => {
+    env.ghExitCode = 1;
+    env.settleFails = 'draft';
+    await expect(postReviewComments([comment()], github)).rejects.toThrow(
+      'gh failed'
+    );
   });
 
   it('offers them again as drafts when the post failed', async () => {

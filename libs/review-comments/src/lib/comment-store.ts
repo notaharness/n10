@@ -8,7 +8,7 @@ import {
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { isOwnerGone, ownerToken, withFileLock } from './file-lock.js';
+import { ownerAlive, ownerToken, withFileLock } from './file-lock.js';
 import type { ReviewComment, ReviewCommentsFile } from './types.js';
 
 const REVIEWS_DIR = join(homedir(), '.n10', 'reviews');
@@ -81,14 +81,25 @@ export function commentFilePath(scope: DraftScope): string {
   return join(commentDirPath(scope), 'comments.json');
 }
 
+/**
+ * A PR's drafts. A draft whose poster died mid-post reads as a draft
+ * again (`isClaimGone`), so either shell can offer it to be posted.
+ */
 export function readComments(scope: DraftScope): ReviewComment[] {
+  let comments: ReviewComment[];
   try {
     const data = readFileSync(commentFilePath(scope), 'utf8');
     const parsed: ReviewCommentsFile = JSON.parse(data);
-    return parsed.comments ?? [];
+    comments = parsed.comments ?? [];
   } catch {
     return [];
   }
+  const now = Date.now();
+  return comments.map((c) =>
+    c.status === 'posting' && isClaimGone(c, now)
+      ? { ...c, status: 'draft', claim: undefined }
+      : c
+  );
 }
 
 /**
@@ -159,17 +170,26 @@ export function removeComment(scope: DraftScope, id: string): boolean {
 }
 
 /**
- * How long a claim is honoured when its poster cannot be shown dead —
- * its pid may have been reused. Far longer than any post takes.
+ * How long a claim is honoured when its poster cannot be checked: it
+ * was made on another machine sharing this home directory.
  */
 const CLAIM_ABANDONED_MS = 10 * 60_000;
 
-/** A draft, or a post that died holding its claim (or left none). */
-function isClaimable(comment: ReviewComment, now: number): boolean {
-  if (comment.status === 'draft') return true;
-  if (comment.status !== 'posting') return false;
+/**
+ * Whether a `posting` draft's poster is gone. One on this machine holds
+ * its claim for as long as it runs, however long its post takes, so a
+ * live poster is never overtaken; a claim with no poster, or one that
+ * cannot be checked and is older than `CLAIM_ABANDONED_MS`, is gone.
+ *
+ * A draft whose poster died is offered again, not marked posted: the
+ * post may or may not have landed, and a comment posted twice can be
+ * deleted where a lost one cannot be recovered.
+ */
+function isClaimGone(comment: ReviewComment, now: number): boolean {
   const { claim } = comment;
-  return !claim || isOwnerGone(claim.token, now - claim.at, CLAIM_ABANDONED_MS);
+  if (!claim) return true;
+  const alive = ownerAlive(claim.token);
+  return alive === undefined ? now - claim.at > CLAIM_ABANDONED_MS : !alive;
 }
 
 /**
@@ -177,25 +197,26 @@ function isClaimable(comment: ReviewComment, now: number): boolean {
  * each of `ids` still claimable becomes `posting` under this process's
  * token. Another poster that gets there first holds the claim, so a
  * draft is only ever posted by the one that claimed it. Returns the
- * token and the ids it claimed.
+ * token and the claimed drafts as stored, in `ids` order.
  */
 export function claimForPosting(
   scope: DraftScope,
   ids: readonly string[]
-): { token: string; claimed: Set<string> } {
+): { token: string; claimed: ReviewComment[] } {
   const token = ownerToken();
   const at = Date.now();
-  const claimed = new Set<string>();
+  const claimed = new Map<string, ReviewComment>();
   modifyComments(scope, (comments) => {
     for (const comment of comments) {
-      if (!ids.includes(comment.id) || !isClaimable(comment, at)) continue;
+      // A dead poster's claim already reads as `draft`.
+      if (!ids.includes(comment.id) || comment.status !== 'draft') continue;
       comment.status = 'posting';
       comment.claim = { token, at };
-      claimed.add(comment.id);
+      claimed.set(comment.id, { ...comment });
     }
     return claimed.size > 0;
   });
-  return { token, claimed };
+  return { token, claimed: ids.flatMap((id) => claimed.get(id) ?? []) };
 }
 
 /**

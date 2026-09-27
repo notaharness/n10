@@ -133,9 +133,16 @@ export function isOwnerGone(
   ageMs: number,
   abandonedMs: number
 ): boolean {
-  if (ageMs > abandonedMs) return true;
+  return ageMs > abandonedMs || ownerAlive(token) === false;
+}
+
+/**
+ * Whether the process `token` names is running, or undefined when that
+ * cannot be checked: it is on another machine, or the token names none.
+ */
+export function ownerAlive(token: string): boolean | undefined {
   const owner = ownerOf(token);
-  return owner?.host === HOST && !isRunning(owner.pid);
+  return owner?.host === HOST ? isRunning(owner.pid) : undefined;
 }
 
 function isAbandoned(holder: Holder, timing: LockTiming): boolean {

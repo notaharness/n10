@@ -96,7 +96,10 @@ export function ReviewStepper({
           {
             // The posted draft leaves the list, shifting the next one
             // into this index — keep index where it is.
-            onSuccess: () => toast.success('Comment posted'),
+            onSuccess: (n) =>
+              n > 0
+                ? toast.success('Comment posted')
+                : toast.info('Already being posted elsewhere'),
             onError: (e) => toast.error(`Post failed: ${errorMessage(e)}`),
           }
         )
