@@ -6,6 +6,7 @@ export default defineConfig(() => ({
   test: {
     name: '@n10/engine',
     watch: false,
+    passWithNoTests: true,
     globals: true,
     environment: 'node',
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],

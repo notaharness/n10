@@ -1,1 +1,6 @@
-export * from './lib/engine.js';
+// @n10/engine — the program both shells run.
+//
+// State, scheduling, caching and the events that announce them, over
+// @n10/core's operations. Node only; no React, Ink or Electron. A
+// shell creates the services it needs and renders what they report.
+export {};

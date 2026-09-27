@@ -14,6 +14,7 @@
     "./package.json": "./package.json"
   },
   "nx": {
+    "name": "@n10/engine",
     "tags": [
       "type:lib",
       "scope:engine"
