@@ -17,7 +17,10 @@ npx nx run website:deploy         # needs CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCO
 ```
 
 `sync-content` (Fumadocs' MDX codegen into `.source/`) runs automatically as
-a dependency of `dev`, `build` and `typecheck`.
+a dependency of `dev` and `build`. `typegen` (Next's route types, such as
+`PageProps`, into `.next/types/`) runs after it, and `lint` and `typecheck`
+depend on it: without those types the type-aware lint rules read the pages'
+props as unresolved.
 
 ## Conventions that differ from the rest of the repo
 

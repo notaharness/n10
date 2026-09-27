@@ -85,11 +85,33 @@
           "cwd": "apps/website"
         }
       },
-      "typecheck": {
+      "typegen": {
         "executor": "nx:run-commands",
         "cache": true,
         "dependsOn": [
           "sync-content"
+        ],
+        "inputs": [
+          "production",
+          {
+            "externalDependencies": [
+              "next"
+            ]
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/.next/types"
+        ],
+        "options": {
+          "command": "next typegen",
+          "cwd": "apps/website"
+        }
+      },
+      "typecheck": {
+        "executor": "nx:run-commands",
+        "cache": true,
+        "dependsOn": [
+          "typegen"
         ],
         "inputs": [
           "production",
@@ -101,7 +123,7 @@
           }
         ],
         "options": {
-          "command": "next typegen && tsc -p tsconfig.app.json --noEmit",
+          "command": "tsc -p tsconfig.app.json --noEmit",
           "cwd": "apps/website"
         }
       },
@@ -169,7 +191,7 @@
       },
       "lint": {
         "dependsOn": [
-          "sync-content"
+          "typegen"
         ]
       },
       "sync-demo": {
