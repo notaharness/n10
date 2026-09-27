@@ -1,3 +1,5 @@
+import { parseAnchor, type DraftAnchor } from './review-draft-anchor.js';
+
 /**
  * A reviewer's own unpublished writing on one pull request: a reply to
  * a thread, a new conversation comment, the review summary. Private to
@@ -9,11 +11,14 @@
  * where they keep their own attribution.
  */
 
-/** What a draft will become when it is published. */
+/** What a draft will become when it is published. An inline draft is
+ *  one of many on its pull request, told apart by a key its writer
+ *  chose; the others are one per target. */
 export type DraftTarget =
   | { kind: 'reply'; threadId: string }
   | { kind: 'general' }
-  | { kind: 'summary' };
+  | { kind: 'summary' }
+  | { kind: 'inline'; key: string; anchor: DraftAnchor };
 
 /**
  * Where publishing a draft has got to. A write whose answer never came
@@ -28,7 +33,8 @@ export type Publication =
   | { state: 'failed'; attempt: string; reason: string; at: number };
 
 export interface ReviewDraft {
-  /** One per target: a thread has one reply draft, a review one summary. */
+  /** One per target: a thread has one reply draft, a review one summary,
+   *  an inline comment one draft per key. */
   id: string;
   target: DraftTarget;
   /** Exactly as typed, whitespace and all. */
@@ -66,11 +72,30 @@ export function parseTarget(value: unknown): DraftTarget {
   ) {
     return { kind: 'reply', threadId };
   }
+  if (target['kind'] === 'inline' && isKey(target['key'])) {
+    return {
+      kind: 'inline',
+      key: target['key'],
+      anchor: parseAnchor(target['anchor']),
+    };
+  }
   throw new TypeError('Invalid draft target');
 }
 
+/** A key the writer chose: a UUID, or anything as plain. */
+function isKey(value: unknown): value is string {
+  return typeof value === 'string' && /^[\w-]{1,64}$/.test(value);
+}
+
 export function draftId(target: DraftTarget): string {
-  return target.kind === 'reply' ? `reply:${target.threadId}` : target.kind;
+  switch (target.kind) {
+    case 'reply':
+      return `reply:${target.threadId}`;
+    case 'inline':
+      return `inline:${target.key}`;
+    default:
+      return target.kind;
+  }
 }
 
 /** Text can change only while nothing may have been sent. */

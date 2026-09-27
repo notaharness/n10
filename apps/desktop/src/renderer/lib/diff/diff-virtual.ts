@@ -3,15 +3,21 @@ import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
+import type { InlineTarget } from '../review/my-drafts.js';
 import {
   anchorKey,
   buildSplitRows,
   buildUnifiedRows,
   defaultCollapseReason,
-  lineAnchors,
   type CollapseReason,
   type SplitRow,
 } from './diff-model.js';
+import {
+  anchorComments,
+  presentAnchors,
+  pushOrphans,
+  splitMine,
+} from './diff-anchors.js';
 
 // ── Flat rows for the virtualized all-files diff ─────────────────
 //
@@ -24,6 +30,8 @@ import {
 export type FlatRow =
   | { key: string; kind: 'conversation' }
   | { key: string; kind: 'file-header'; file: string }
+  /** The reviewer's own comments on a whole file, under its header. */
+  | { key: string; kind: 'file-drafts'; file: string; mine: InlineTarget[] }
   | { key: string; kind: 'hunk'; file: string; index: number }
   | { key: string; kind: 'unified'; file: string; index: number }
   | { key: string; kind: 'split-context'; file: string; index: number }
@@ -40,6 +48,8 @@ export type FlatRow =
       file: string;
       threads: RemoteCommentThread[];
       drafts: ReviewComment[];
+      /** The reviewer's own drafts ending on this line. */
+      mine: InlineTarget[];
       /** Indent under the gutter (unified view). */
       indent: boolean;
     }
@@ -49,6 +59,7 @@ export type FlatRow =
       file: string;
       threads: RemoteCommentThread[];
       drafts: ReviewComment[];
+      mine: InlineTarget[];
     };
 
 /** Rough pixel heights per row kind; the virtualizer refines them by
@@ -66,6 +77,7 @@ export function estimateRowHeight(row: FlatRow): number {
     case 'file-header':
       return 37;
     case 'comments':
+    case 'file-drafts':
       return 160;
     case 'orphans':
       return 220;
@@ -102,57 +114,6 @@ export interface FlatDiff {
   stats: Map<string, FileStats>;
 }
 
-/** Group agent drafts / remote threads by the anchor they sit under. */
-function anchorComments<T extends { side: 'LEFT' | 'RIGHT' }>(
-  present: ReadonlySet<string>,
-  items: readonly T[],
-  lineFor: (t: T) => number | null
-): { byAnchor: Map<string, T[]>; orphans: T[]; pinned: Set<string> } {
-  const byAnchor = new Map<string, T[]>();
-  const orphans: T[] = [];
-  const pinned = new Set<string>();
-  for (const t of items) {
-    const line = lineFor(t);
-    if (line == null) {
-      orphans.push(t);
-      continue;
-    }
-    const a = anchorKey(t.side === 'LEFT' ? 'L' : 'R', line);
-    if (present.has(a)) {
-      (byAnchor.get(a) ?? byAnchor.set(a, []).get(a)!).push(t);
-      pinned.add(a);
-    } else {
-      orphans.push(t);
-    }
-  }
-  return { byAnchor, orphans, pinned };
-}
-
-/** Every anchor key this file's lines can carry a comment on. */
-function presentAnchors(lines: readonly DiffLine[]): Set<string> {
-  const present = new Set<string>();
-  for (const l of lines) for (const a of lineAnchors(l)) present.add(a);
-  return present;
-}
-
-/**
- * The tail row under a file, holding comments whose anchor line the
- * diff doesn't contain. Emits nothing when there are none.
- */
-function pushOrphans(
-  rows: FlatRow[],
-  indexById: Map<string, number>,
-  file: string,
-  threads: RemoteCommentThread[],
-  drafts: ReviewComment[]
-): void {
-  if (threads.length === 0 && drafts.length === 0) return;
-  const index = rows.length;
-  rows.push({ key: `o:${file}`, kind: 'orphans', file, threads, drafts });
-  for (const x of threads) indexById.set(x.id, index);
-  for (const x of drafts) indexById.set(x.id, index);
-}
-
 export interface FlatDiffOptions {
   view: 'unified' | 'split';
   hideResolved: boolean;
@@ -160,6 +121,8 @@ export interface FlatDiffOptions {
   generalThreads: readonly RemoteCommentThread[];
   threadsByFile: ReadonlyMap<string, RemoteCommentThread[]>;
   draftsByFile: ReadonlyMap<string, ReviewComment[]>;
+  /** The reviewer's own inline drafts, open composers included. */
+  mineByFile?: ReadonlyMap<string, InlineTarget[]>;
   fileState: ReadonlyMap<string, FileDisplayState>;
 }
 
@@ -236,7 +199,18 @@ export function buildFlatDiff(
       x.lineStart == null ? null : x.lineEnd ?? x.lineStart
     );
     const d = anchorComments(present, activeDrafts, (x) => x.lineEnd);
-    const pinnedAll = new Set([...t.pinned, ...d.pinned]);
+    const own = splitMine(opts.mineByFile?.get(file) ?? []);
+    const m = anchorComments(present, own.onLines, (x) => x.anchor.range!.end);
+    const pinnedAll = new Set([...t.pinned, ...d.pinned, ...m.pinned]);
+    if (own.onFile.length > 0) {
+      for (const x of own.onFile) indexById.set(x.key, rows.length);
+      rows.push({
+        key: `fd:${file}`,
+        kind: 'file-drafts',
+        file,
+        mine: own.onFile,
+      });
+    }
 
     const unified = buildUnifiedRows(lines, {
       pinnedAnchors: pinnedAll,
@@ -252,9 +226,11 @@ export function buildFlatDiff(
     ) => {
       const threads: RemoteCommentThread[] = [];
       const drafts: ReviewComment[] = [];
+      const mine: InlineTarget[] = [];
       const take = (anchor: string) => {
         threads.push(...(t.byAnchor.get(anchor) ?? []));
         drafts.push(...(d.byAnchor.get(anchor) ?? []));
+        mine.push(...(m.byAnchor.get(anchor) ?? []));
       };
       if (!onlyLeft && line.newLine != null) take(anchorKey('R', line.newLine));
       // A context line carries both an old and a new number, and a
@@ -266,7 +242,7 @@ export function buildFlatDiff(
       if ((onlyLeft || line.type !== 'add') && line.oldLine != null) {
         take(anchorKey('L', line.oldLine));
       }
-      if (threads.length === 0 && drafts.length === 0) return;
+      if (threads.length + drafts.length + mine.length === 0) return;
       const index = rows.length;
       rows.push({
         key: `c:${file}:${keySuffix}`,
@@ -274,10 +250,12 @@ export function buildFlatDiff(
         file,
         threads,
         drafts,
+        mine,
         indent,
       });
       for (const x of threads) indexById.set(x.id, index);
       for (const x of drafts) indexById.set(x.id, index);
+      for (const x of mine) indexById.set(x.key, index);
     };
 
     /**
@@ -352,7 +330,7 @@ export function buildFlatDiff(
     if (opts.view === 'split') appendSplitRows();
     else appendUnifiedRows();
 
-    pushOrphans(rows, indexById, file, t.orphans, d.orphans);
+    pushOrphans(rows, indexById, file, t.orphans, d.orphans, m.orphans);
   }
 
   return { rows, indexById, fileIndex, stats };

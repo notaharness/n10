@@ -57,7 +57,21 @@ export const SAVE_DELAY_MS = 400;
 
 export function sameTarget(a: DraftTarget, b: DraftTarget): boolean {
   if (a.kind !== b.kind) return false;
-  return a.kind !== 'reply' || a.threadId === (b as typeof a).threadId;
+  if (a.kind === 'reply') return a.threadId === (b as typeof a).threadId;
+  if (a.kind === 'inline') return a.key === (b as typeof a).key;
+  return true;
+}
+
+/** An inline draft is known by its key: its anchor is data, not identity. */
+function targetKey(target: DraftTarget): string {
+  switch (target.kind) {
+    case 'reply':
+      return `reply:${target.threadId}`;
+    case 'inline':
+      return `inline:${target.key}`;
+    default:
+      return target.kind;
+  }
 }
 
 export function editKey(req: Omit<SaveRequest, 'body'>): string {
@@ -65,7 +79,7 @@ export function editKey(req: Omit<SaveRequest, 'body'>): string {
     req.cwd,
     pullRequestKey(req.ref),
     req.viewer?.toLowerCase() ?? null,
-    req.target,
+    targetKey(req.target),
   ]);
 }
 

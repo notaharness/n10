@@ -24,6 +24,7 @@ import { Button } from '../ui/button.js';
 import { Skeleton } from '../ui/skeleton.js';
 import { Tip } from '../ui/tooltip.js';
 import { CommentMarkdown } from './comments/CommentMarkdown.js';
+import { GeneralComposer } from './overview/GeneralComposer.js';
 import { PrActivity } from './overview/PrActivity.js';
 import { ReadFailure, StaleNotice } from './ReadNotice.js';
 
@@ -279,11 +280,16 @@ export function OverviewPane({
         </div>
 
         {prRef && (
-          <PrActivity
-            key={pullRequestKey(prRef)}
-            prRef={prRef}
-            onOpenThread={onOpenThread}
-          />
+          <>
+            <PrActivity
+              key={pullRequestKey(prRef)}
+              prRef={prRef}
+              onOpenThread={onOpenThread}
+            />
+            <div className="mt-6">
+              <GeneralComposer key={pullRequestKey(prRef)} prRef={prRef} />
+            </div>
+          </>
         )}
       </div>
     </div>

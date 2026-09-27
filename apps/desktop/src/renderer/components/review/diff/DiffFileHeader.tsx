@@ -3,9 +3,11 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   EyeOffIcon,
+  MessageSquarePlusIcon,
 } from 'lucide-react';
 import type { CollapseReason } from '../../../lib/diff/diff-model.js';
 import { cn } from '../../../lib/utils.js';
+import { Button } from '../../ui/button.js';
 import { Tip } from '../../ui/tooltip.js';
 
 const COLLAPSE_LABEL: Record<Exclude<CollapseReason, null>, string> = {
@@ -21,6 +23,7 @@ export function DiffFileHeader({
   onToggleOpen,
   viewed,
   onToggleViewed,
+  onCommentFile,
   collapseReason,
   draftCount,
   openThreads,
@@ -32,6 +35,8 @@ export function DiffFileHeader({
   onToggleOpen: () => void;
   viewed: boolean;
   onToggleViewed: () => void;
+  /** Absent when the diff cannot take comments. */
+  onCommentFile?: () => void;
   collapseReason: CollapseReason;
   draftCount: number;
   openThreads: number;
@@ -86,6 +91,7 @@ export function DiffFileHeader({
         <span className="text-success">+{adds}</span>{' '}
         <span className="text-destructive">−{dels}</span>
       </span>
+      <FileCommentButton filename={filename} onClick={onCommentFile} />
       <Tip label={viewed ? 'Mark as not viewed' : 'Mark as viewed'}>
         <button
           type="button"
@@ -106,5 +112,29 @@ export function DiffFileHeader({
         </button>
       </Tip>
     </div>
+  );
+}
+
+/** A comment on the whole file: for a binary, a rename, or a point
+ *  that is about no one line. */
+function FileCommentButton({
+  filename,
+  onClick,
+}: {
+  filename: string;
+  onClick: (() => void) | undefined;
+}) {
+  if (!onClick) return null;
+  return (
+    <Tip label="Comment on this file">
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        aria-label={`Comment on ${filename}`}
+        onClick={onClick}
+      >
+        <MessageSquarePlusIcon />
+      </Button>
+    </Tip>
   );
 }

@@ -80,6 +80,7 @@ export * from './lib/sync/fetch-queue.js';
 export * from './lib/pull-requests/pr-conversation.js';
 export * from './lib/pull-requests/pr-snapshot.js';
 export * from './lib/pull-requests/pull-request-cache.js';
+export * from './lib/pull-requests/review-draft-anchor.js';
 export * from './lib/pull-requests/review-draft-store.js';
 export * from './lib/pull-requests/review-draft-types.js';
 export * from './lib/pull-requests/review-drafts.js';
