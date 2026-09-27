@@ -144,6 +144,60 @@ function searchNode(pr) {
   };
 }
 
+/** The repository the scenario stands for, with a stable node id. */
+function repositoryNode() {
+  const owner = scenario.owner ?? 'n10';
+  const repo = scenario.repo ?? 'fixture';
+  return { id: `R_${owner}_${repo}`, nameWithOwner: `${owner}/${repo}` };
+}
+
+/**
+ * The selected-pull-request read (libs/vcs/github/src/lib/pr-details.ts),
+ * answered in one page. `fork` names the head repository when it is not
+ * the scenario's own; `null` is a deleted fork.
+ */
+function detailNode(pr) {
+  const list = searchNode(pr);
+  const repository = repositoryNode();
+  const fork = pr.fork === undefined ? repository.nameWithOwner : pr.fork;
+  const connection = (nodes) => ({
+    totalCount: nodes.length,
+    pageInfo: page,
+    nodes,
+  });
+  return {
+    ...repository,
+    pullRequest: {
+      number: pr.number,
+      title: pr.title,
+      url: list.url,
+      state: pr.state ?? 'OPEN',
+      isDraft: list.isDraft,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-02T00:00:00Z',
+      viewerCanUpdate: pr.canUpdate ?? true,
+      author: list.author,
+      headRefName: pr.headRefName,
+      headRefOid: list.headRefOid,
+      headRepository: fork && { id: `R_${fork}`, nameWithOwner: fork },
+      baseRefName: list.baseRefName,
+      baseRefOid: 'e'.repeat(40),
+      latestReviews: connection(
+        (pr.reviews ?? []).map((r) => ({
+          author: { login: r.author },
+          state: r.state,
+          commit: { oid: list.headRefOid },
+        }))
+      ),
+      reviewRequests: connection(
+        (pr.reviewRequests ?? []).map((login) => ({
+          requestedReviewer: { __typename: 'User', login },
+        }))
+      ),
+    },
+  };
+}
+
 function threadNode(t, i) {
   return {
     id: t.id ?? `thread-${i + 1}`,
@@ -189,6 +243,12 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
   }
   if (query.includes('search(')) {
     out({ data: { search: { pageInfo: page, nodes: [] } } });
+  }
+
+  if (query.includes('query PullRequestDetail(')) {
+    const pr = prs.find((p) => String(p.number) === String(vars.number));
+    if (failing(pr, 'detail')) failLikeGitHub();
+    out({ data: { repository: pr ? detailNode(pr) : null } });
   }
 
   if (query.includes('reviewThreads(first: 100, after: $threadCursor)')) {

@@ -1,0 +1,85 @@
+{
+  "data": {
+    "repository": {
+      "id": "R_kgDOAcme01",
+      "nameWithOwner": "acme/app",
+      "pullRequest": {
+        "number": 214,
+        "title": "Handle cancelled requests",
+        "url": "https://github.com/acme/app/pull/214",
+        "state": "OPEN",
+        "isDraft": false,
+        "createdAt": "2026-09-22T09:30:00Z",
+        "updatedAt": "2026-09-26T14:02:11Z",
+        "viewerCanUpdate": true,
+        "author": {
+          "login": "alex",
+          "name": "Alex Doe"
+        },
+        "headRefName": "cancel-requests",
+        "headRefOid": "1111111111111111111111111111111111111111",
+        "headRepository": {
+          "id": "R_kgDOAcme01",
+          "nameWithOwner": "acme/app"
+        },
+        "baseRefName": "main",
+        "baseRefOid": "2222222222222222222222222222222222222222",
+        "latestReviews": {
+          "totalCount": 3,
+          "pageInfo": {
+            "hasNextPage": true,
+            "endCursor": "rev-1"
+          },
+          "nodes": [
+            {
+              "author": {
+                "login": "Bea",
+                "name": "Bea"
+              },
+              "state": "APPROVED",
+              "commit": {
+                "oid": "0000000000000000000000000000000000000001"
+              }
+            },
+            {
+              "author": {
+                "login": "cy",
+                "name": null
+              },
+              "state": "CHANGES_REQUESTED",
+              "commit": {
+                "oid": "1111111111111111111111111111111111111111"
+              }
+            }
+          ]
+        },
+        "reviewRequests": {
+          "totalCount": 3,
+          "pageInfo": {
+            "hasNextPage": true,
+            "endCursor": "req-1"
+          },
+          "nodes": [
+            {
+              "requestedReviewer": {
+                "__typename": "User",
+                "login": "bea",
+                "name": "Bea"
+              }
+            },
+            {
+              "requestedReviewer": {
+                "__typename": "Team",
+                "slug": "core",
+                "name": "Core team",
+                "organization": {
+                  "login": "acme"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

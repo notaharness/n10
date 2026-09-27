@@ -9,84 +9,23 @@ import type {
   PullRequestComments,
   RemoteCommentThread,
   RemoteCommentReply,
-  ReviewDecision,
   ReviewVerdict,
   BuildStatusState,
   RepositoryRef,
+  PullRequestDetail,
 } from '@n10/vcs-core';
-import { isVcsError, sanitizeBody } from '@n10/vcs-core';
-import { logNetwork } from '@n10/logger';
-import {
-  assertGraphQlData,
-  classifyGhError,
-  ghOutput,
-  parseGhJson,
-} from './gh-errors.js';
+import { sanitizeBody, VcsError } from '@n10/vcs-core';
+import { classifyGhError, parseGhJson } from './gh-errors.js';
+import { ghGraphQL } from './gh-graphql.js';
+import { mapReviewState } from './gh-reviews.js';
+import { fetchPullRequestDetailGitHub } from './pr-details.js';
 
 // ── gh CLI transport ──────────────────────────────────────────────
 
 const execFile = promisify(execFileCb);
 
-/** What `gh` printed, for the network log. The user-facing wording is
- *  `classifyGhError`'s job. */
-function extractErrorMessage(err: unknown): string {
-  return ghOutput(err);
-}
-
-/**
- * Compact identifier for a GraphQL query — first non-blank line. Lets
- * the network log distinguish e.g. SEARCH_PRS_QUERY from
- * FETCH_PR_THREADS_QUERY without dumping the whole query body.
- */
-function summarizeQuery(query: string): string {
-  return query.trim().split('\n')[0]?.slice(0, 80) ?? 'query';
-}
-
-export async function ghGraphQL(
-  query: string,
-  variables: Record<string, string | number>
-): Promise<unknown> {
-  const startedAt = Date.now();
-  const querySummary = summarizeQuery(query);
-  logNetwork('github.network', `→ gh graphql ${querySummary}`, {
-    variables: Object.fromEntries(
-      Object.entries(variables).map(([k, v]) => [
-        k,
-        typeof v === 'string' && v.length > 60 ? `${v.slice(0, 60)}…` : v,
-      ])
-    ),
-  });
-  try {
-    const args = ['api', 'graphql', '-f', `query=${query}`];
-    for (const [key, val] of Object.entries(variables)) {
-      if (typeof val === 'number') {
-        args.push('-F', `${key}=${val}`);
-      } else {
-        args.push('-f', `${key}=${val}`);
-      }
-    }
-    const { stdout } = await execFile('gh', args);
-    const durationMs = Date.now() - startedAt;
-    logNetwork(
-      'github.network',
-      `← gh graphql ${querySummary} (${durationMs}ms, ${stdout.length} bytes)`
-    );
-    const payload = parseGhJson<unknown>(stdout, querySummary);
-    assertGraphQlData(payload, querySummary);
-    return payload;
-  } catch (err: unknown) {
-    const durationMs = Date.now() - startedAt;
-    logNetwork(
-      'github.network',
-      `× gh graphql ${querySummary} (${durationMs}ms) — ${extractErrorMessage(
-        err
-      )}`
-    );
-    // A classification made here is already the answer; only a raw
-    // subprocess failure still needs one.
-    throw isVcsError(err) ? err : classifyGhError(err);
-  }
-}
+/** These live beside the detail read, which shares them. */
+export { ghGraphQL, mapReviewState };
 
 // ── Internal helpers ───────────────────────────────────────────────
 
@@ -105,21 +44,6 @@ export function parseGitHubRemoteUrl(
   );
   if (ssh?.groups) return { owner: ssh.groups.owner, repo: ssh.groups.repo };
   return null;
-}
-
-export function mapReviewState(state: string): ReviewDecision {
-  switch (state) {
-    case 'APPROVED':
-      return 'approved';
-    case 'CHANGES_REQUESTED':
-      return 'changes-requested';
-    case 'DISMISSED':
-      return 'declined';
-    case 'COMMENTED':
-    case 'PENDING':
-    default:
-      return 'no-response';
-  }
 }
 
 export function latestReviewPerUser(
@@ -772,6 +696,20 @@ export const githubProvider: VcsProvider = {
       host: 'github.com',
       repository: `${owner}/${repo}`,
     };
+  },
+
+  fetchPullRequestDetail(
+    _auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestDetail> {
+    const { owner, repo } = project;
+    if (!owner || !repo) {
+      return Promise.reject(
+        new VcsError('not-found', 'No GitHub repository is configured')
+      );
+    }
+    return fetchPullRequestDetailGitHub(owner, repo, prId);
   },
 
   async fetchMergedBranches(

@@ -510,6 +510,11 @@ describe('githubProvider', () => {
       expect(searchQueryArg).toContain('repo:octocat/hello-world');
       expect(searchQueryArg).toContain('is:pr');
       expect(searchQueryArg).toContain('is:open');
+
+      // One search for the whole list: no pull request's detail is read
+      // per row, however many rows there are.
+      expect(mockExecFile).toHaveBeenCalledTimes(1);
+      expect(args.join(' ')).not.toContain('PullRequestDetail');
     });
 
     it('handles null author, null review author, and null requestedReviewer', async () => {

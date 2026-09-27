@@ -1,0 +1,21 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewRequests": {
+          "totalCount": 3,
+          "pageInfo": { "hasNextPage": false, "endCursor": "req-2" },
+          "nodes": [
+            {
+              "requestedReviewer": {
+                "__typename": "User",
+                "login": "eve",
+                "name": null
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

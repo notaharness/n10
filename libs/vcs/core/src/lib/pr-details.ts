@@ -1,4 +1,5 @@
 import { VcsError, type VcsErrorKind } from './errors.js';
+import type { ReviewDecision } from './types.js';
 
 /**
  * The identity vocabulary every pull request surface shares: which
@@ -179,6 +180,46 @@ export interface PullRequestLifecycle {
 }
 
 /**
+ * Some of a list, and whether it is the whole of it. `total` is the
+ * provider's own count, or null when it gives none. A caller that
+ * shows an incomplete list says so ("12 of 30", "total unknown"); it
+ * never presents a partial list as everyone.
+ */
+export interface ListRead<T> {
+  items: T[];
+  total: number | null;
+  complete: boolean;
+}
+
+/**
+ * Someone asked to review, or who has, as the detail read names them.
+ * A team is a reviewer too: GitHub requests teams, Azure DevOps adds
+ * groups, and neither is a person.
+ */
+export interface DetailReviewer {
+  kind: 'user' | 'team';
+  /** A login or email; for a team, the provider's name for it
+   *  (`org/slug` on GitHub). */
+  identifier: string;
+  displayName: string;
+  /** The shared reading of the verdict, as the list row gives it. */
+  decision: ReviewDecision;
+  /** The provider's own verdict — `APPROVED`, `CHANGES_REQUESTED`, an
+   *  Azure vote of `-5` or `10` — or null where none was given. */
+  native: string | null;
+  /** A review is asked of them now. Someone can be asked again after
+   *  giving a verdict, so this and `decision` are separate facts. */
+  requested: boolean;
+  /** Required by the provider's own rules, or null where the provider
+   *  does not say. */
+  required: boolean | null;
+  /** The commit the verdict was given on; null for no verdict or where
+   *  the provider does not say. A verdict on an older commit is not an
+   *  approval of the head. */
+  reviewedHead: Oid | null;
+}
+
+/**
  * The selected pull request as its provider describes it, read on
  * demand rather than with the list. Providers fill this through
  * `VcsProvider.fetchPullRequestDetail`.
@@ -200,4 +241,10 @@ export interface PullRequestDetail {
   target: { branch: string; head: Oid | null };
   createdAt: string | null;
   updatedAt: string | null;
+  /** Everyone asked to review and everyone who has, all pages read, or
+   *  marked incomplete. */
+  reviewers: ListRead<DetailReviewer>;
+  /** What the viewer may change: the title, description and draft
+   *  state. */
+  capabilities: { update: Capability };
 }
