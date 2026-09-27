@@ -98,7 +98,9 @@ The reasoning behind each rule is in `docs/decisions.md`.
   keeps every file. Untracked files are assembled by hand, never `git add -N`,
   and symlinks render as mode-120000 patches. Git-backed cases live in
   `worktree-diff.integration.spec.ts`.
-- **Sync** (`sync/`): `sweepMergedBranches`, conflict counts. `asyncOps.run`
+- **Sync** (`sync/`): `sweepMergedBranches`, conflict counts. The sweep
+  removes a branch only at a merged pull request's head commit or an ancestor
+  of one, never by name alone. `asyncOps.run`
   never rejects; errors go through `setOperationErrorHandler`.
 - `keybindings/registry.ts` is the action catalog and carries a 900-line
   ceiling on purpose. Presets: Normie, Vim.

@@ -1,0 +1,104 @@
+{
+  "count": 3,
+  "value": [
+    {
+      "repository": {
+        "id": "00000000-1111-2222-3333-444444444444",
+        "name": "widgets",
+        "project": {
+          "id": "55555555-6666-7777-8888-999999999999",
+          "name": "shop"
+        }
+      },
+      "pullRequestId": 214,
+      "codeReviewId": 214,
+      "status": "completed",
+      "creationDate": "2026-09-10T08:02:11.417Z",
+      "closedDate": "2026-09-11T14:30:05.223Z",
+      "title": "Retry the checkout call",
+      "sourceRefName": "refs/heads/feature/retry",
+      "targetRefName": "refs/heads/main",
+      "mergeStatus": "succeeded",
+      "isDraft": false,
+      "mergeId": "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+      "lastMergeSourceCommit": {
+        "commitId": "3c7d1e9a0b2f4c6e8a1d3f5b7c9e0a2b4d6f8a1c",
+        "url": "https://dev.azure.com/example/_apis/git/repositories/00000000-1111-2222-3333-444444444444/commits/3c7d1e9a0b2f4c6e8a1d3f5b7c9e0a2b4d6f8a1c"
+      },
+      "lastMergeTargetCommit": {
+        "commitId": "9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b",
+        "url": "https://dev.azure.com/example/_apis/git/repositories/00000000-1111-2222-3333-444444444444/commits/9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b"
+      },
+      "lastMergeCommit": {
+        "commitId": "5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f",
+        "url": "https://dev.azure.com/example/_apis/git/repositories/00000000-1111-2222-3333-444444444444/commits/5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f"
+      },
+      "completionOptions": {
+        "mergeStrategy": "squash",
+        "deleteSourceBranch": true
+      },
+      "supportsIterations": true
+    },
+    {
+      "repository": {
+        "id": "00000000-1111-2222-3333-444444444444",
+        "name": "widgets",
+        "project": {
+          "id": "55555555-6666-7777-8888-999999999999",
+          "name": "shop"
+        }
+      },
+      "pullRequestId": 198,
+      "codeReviewId": 198,
+      "status": "completed",
+      "creationDate": "2026-09-01T10:15:40.001Z",
+      "closedDate": "2026-09-02T09:12:18.650Z",
+      "title": "First pass at retries",
+      "sourceRefName": "refs/heads/feature/retry",
+      "targetRefName": "refs/heads/main",
+      "mergeStatus": "succeeded",
+      "isDraft": false,
+      "mergeId": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+      "lastMergeSourceCommit": {
+        "commitId": "b1a2c3d4e5f60718293a4b5c6d7e8f9012345678",
+        "url": "https://dev.azure.com/example/_apis/git/repositories/00000000-1111-2222-3333-444444444444/commits/b1a2c3d4e5f60718293a4b5c6d7e8f9012345678"
+      },
+      "lastMergeTargetCommit": {
+        "commitId": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00",
+        "url": "https://dev.azure.com/example/_apis/git/repositories/00000000-1111-2222-3333-444444444444/commits/c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00"
+      },
+      "lastMergeCommit": {
+        "commitId": "d00dfeedd00dfeedd00dfeedd00dfeedd00dfeed",
+        "url": "https://dev.azure.com/example/_apis/git/repositories/00000000-1111-2222-3333-444444444444/commits/d00dfeedd00dfeedd00dfeedd00dfeedd00dfeed"
+      },
+      "completionOptions": { "mergeStrategy": "noFastForward" },
+      "supportsIterations": true
+    },
+    {
+      "repository": {
+        "id": "00000000-1111-2222-3333-444444444444",
+        "name": "widgets",
+        "project": {
+          "id": "55555555-6666-7777-8888-999999999999",
+          "name": "shop"
+        }
+      },
+      "pullRequestId": 187,
+      "codeReviewId": 187,
+      "status": "completed",
+      "creationDate": "2026-08-27T13:44:09.992Z",
+      "closedDate": "2026-08-28T16:01:37.120Z",
+      "title": "Someone else's branch",
+      "sourceRefName": "refs/heads/feature/unrelated",
+      "targetRefName": "refs/heads/main",
+      "mergeStatus": "succeeded",
+      "isDraft": false,
+      "mergeId": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+      "lastMergeSourceCommit": {
+        "commitId": "e1e2e3e4e5e6e7e8e9e0e1e2e3e4e5e6e7e8e9e0",
+        "url": "https://dev.azure.com/example/_apis/git/repositories/00000000-1111-2222-3333-444444444444/commits/e1e2e3e4e5e6e7e8e9e0e1e2e3e4e5e6e7e8e9e0"
+      },
+      "supportsIterations": true
+    }
+  ]
+}

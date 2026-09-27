@@ -12,6 +12,7 @@ import type {
   ReviewDecision,
   ReviewVerdict,
   BuildStatusState,
+  MergedBranchHeads,
 } from '@n10/vcs-core';
 import { isVcsError, sanitizeBody } from '@n10/vcs-core';
 import { logNetwork } from '@n10/logger';
@@ -323,6 +324,7 @@ const SEARCH_MERGED_PRS_QUERY = `
       nodes {
         ... on PullRequest {
           headRefName
+          headRefOid
         }
       }
     }
@@ -331,6 +333,8 @@ const SEARCH_MERGED_PRS_QUERY = `
 
 interface MergedPrNode {
   headRefName: string;
+  /** The head commit the pull request merged. */
+  headRefOid?: string;
 }
 
 interface SearchMergedPrsResponse {
@@ -497,9 +501,10 @@ function transformGeneralComment(
   };
 }
 
-/** Every merged head branch the search matches, across all its pages. */
-async function fetchMergedHeads(searchQuery: string): Promise<Set<string>> {
-  const heads = new Set<string>();
+/** Every merged pull request the search matches, across all its pages:
+ *  its head branch and the commit it merged. */
+async function fetchMergedHeads(searchQuery: string): Promise<MergedPrNode[]> {
+  const heads: MergedPrNode[] = [];
   let cursor: string | undefined;
   do {
     const variables: Record<string, string> = { searchQuery };
@@ -511,9 +516,7 @@ async function fetchMergedHeads(searchQuery: string): Promise<Set<string>> {
     )) as SearchMergedPrsResponse;
 
     const { nodes, pageInfo } = result.data.search;
-    for (const node of nodes) {
-      if (node.headRefName) heads.add(node.headRefName);
-    }
+    heads.push(...nodes);
     cursor = nextCursor(pageInfo);
   } while (cursor);
   return heads;
@@ -767,21 +770,24 @@ export const githubProvider: VcsProvider = {
     _auth: Record<string, string>,
     project: Record<string, string>,
     branches: string[]
-  ): Promise<Set<string>> {
+  ): Promise<MergedBranchHeads> {
     const { owner, repo, username } = project;
-    if (!username || !owner || !repo || branches.length === 0) return new Set();
+    if (!username || !owner || !repo || branches.length === 0) return new Map();
 
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
       .toISOString()
       .slice(0, 10);
     const searchQuery = `repo:${owner}/${repo} is:pr is:merged author:${username} merged:>${since}`;
 
-    const mergedHeads = await fetchMergedHeads(searchQuery);
-
     const branchSet = new Set(branches);
-    const matched = new Set<string>();
-    for (const head of mergedHeads) {
-      if (branchSet.has(head)) matched.add(head);
+    const matched: MergedBranchHeads = new Map();
+    for (const pr of await fetchMergedHeads(searchQuery)) {
+      // A pull request without its head commit vouches for nothing.
+      if (!branchSet.has(pr.headRefName) || !pr.headRefOid) continue;
+      matched.set(pr.headRefName, [
+        ...(matched.get(pr.headRefName) ?? []),
+        pr.headRefOid,
+      ]);
     }
     return matched;
   },

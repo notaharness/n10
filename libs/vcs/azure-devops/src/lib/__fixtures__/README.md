@@ -25,9 +25,10 @@ because there was no organization to record from. Trustworthy about
 _structure_ — field names, nesting, which fields are optional — and not
 evidence about what a real server sends.
 
-| File                | What it stands in for                                                                    |
-| ------------------- | ---------------------------------------------------------------------------------------- |
-| `builds-batch.json` | one `GET /_apis/build/builds?repositoryId=…` page covering several pull requests at once |
+| File                 | What it stands in for                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------- |
+| `builds-batch.json`  | one `GET /_apis/build/builds?repositoryId=…` page covering several pull requests at once                 |
+| `completed-prs.json` | one `GET …/pullrequests?searchCriteria.status=completed` page: a branch merged twice, and another branch |
 
 To record a new one, hit the API with the PAT from `~/.n10/config.json`,
 scrub the identifiers above, and add a row here saying what the response

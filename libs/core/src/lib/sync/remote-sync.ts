@@ -3,10 +3,16 @@ import {
   branchTip,
   canRemoveBranch,
   fastForwardMainBranch,
+  isAncestorOf,
   listWorktrees,
 } from '@n10/worktree-manager';
 import { logError } from '@n10/logger';
-import type { AppConfig, BranchPrMap, VcsProvider } from '@n10/vcs-core';
+import type {
+  AppConfig,
+  BranchPrMap,
+  MergedBranchHeads,
+  VcsProvider,
+} from '@n10/vcs-core';
 import { isSessionAlive } from '../pty-registry.js';
 import { hasLiveTmuxSession } from '../session-backend.js';
 import {
@@ -80,7 +86,8 @@ type SweepConfig = Pick<
 >;
 
 /** Called with a merged branch's checkout session, the branch, and the
- *  verdict to remove it with: `clear`, at the commit it was judged. */
+ *  verdict to remove it with: `clear`, at the tip its merged pull
+ *  request carried. */
 type AutoDelete = (
   sessionName: string,
   branch: string,
@@ -88,12 +95,32 @@ type AutoDelete = (
 ) => void | Promise<void>;
 
 /**
+ * The branch's tip, when a merged pull request carried all of it: the
+ * merged head itself, or an ancestor of one (someone pushed to the pull
+ * request after this checkout last pulled). Null when the branch has
+ * work no merged pull request had, or git cannot tell.
+ */
+async function mergedTip(
+  branch: string,
+  heads: readonly string[],
+  cwd: string
+): Promise<string | null> {
+  const tip = await branchTip(branch, cwd);
+  if (!tip) return null;
+  if (heads.includes(tip)) return tip;
+  for (const head of heads) {
+    if (await isAncestorOf(tip, head, cwd)) return tip;
+  }
+  return null;
+}
+
+/**
  * Delete the worktrees of merged branches that are safe to delete, and
  * return the ones a rebase is holding up. Null means the caller
  * cancelled partway, which is not the same as "nothing was blocked".
  */
 async function autoDeleteMerged(args: {
-  merged: Set<string>;
+  merged: MergedBranchHeads;
   onAutoDelete: AutoDelete;
   isCancelled: () => boolean;
 }): Promise<string[] | null> {
@@ -102,7 +129,7 @@ async function autoDeleteMerged(args: {
   // One listing for the pass: each merged branch's session is the one in
   // the checkout that has it.
   const checkouts = await listWorktrees();
-  for (const branch of merged) {
+  for (const [branch, heads] of merged) {
     // A live agent prevents auto-deletion even when n10 is detached.
     // Deleting its working directory would disrupt the running process.
     const checkout = checkouts.find((w) => w.branch === branch);
@@ -115,7 +142,16 @@ async function autoDeleteMerged(args: {
       );
       continue;
     }
-    const tip = await branchTip(branch, checkout.path);
+    // A merge vouches for the commits its pull request carried, not for
+    // the branch name: work committed since exists nowhere else.
+    const tip = await mergedTip(branch, heads, checkout.path);
+    if (!tip) {
+      logError(
+        'sweepMergedBranches',
+        `Skipping auto-delete of ${branch}: it has commits its merged pull request did not`
+      );
+      continue;
+    }
     const check = await canRemoveBranch(branch, { confirmedMerged: true });
     if (isCancelled()) return null;
     if (check.safe) {
@@ -181,17 +217,18 @@ export async function sweepMergedBranches(opts: {
     return { merged: new Set(), nextWarned: keepWarned };
   }
 
-  let merged: Set<string>;
+  let heads: MergedBranchHeads;
   try {
-    merged = await fetchMerged(
+    heads = await fetchMerged(
       config.vendorAuth,
       config.vendorProject,
       branches
     );
   } catch (err: unknown) {
     logError('fetchMergedBranches', err);
-    merged = new Set<string>();
+    heads = new Map();
   }
+  const merged = new Set(heads.keys());
   if (isCancelled()) return { merged, nextWarned: keepWarned };
   onMerged?.(merged);
   if (!config.autoDeleteOnMerge) {
@@ -199,7 +236,7 @@ export async function sweepMergedBranches(opts: {
   }
 
   const rebasingNow = await autoDeleteMerged({
-    merged,
+    merged: heads,
     onAutoDelete,
     isCancelled,
   });
