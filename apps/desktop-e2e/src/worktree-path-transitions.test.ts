@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { renameSync, symlinkSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { visibleWithin } from './setup/lifecycle.js';
 import { test, expect } from './fixtures/desktop.js';
 import { sidebarRow, tab, tabs, visibleText } from './setup/app.js';
 import {
@@ -50,23 +51,30 @@ for (const pathKind of paths) {
     });
     const before = listTaggedSessions(homeDir);
     const nextPath = join(homeDir, 'repo');
+    let observed = false;
     try {
       pathKind.prepare(repoPath, nextPath);
       await desktop.restart(nextPath);
       await expect(sidebarRow(desktop.page, /path-agent/)).toBeVisible();
       await sidebarRow(desktop.page, /path-agent/).click();
       expect(listTaggedSessions(homeDir)).toEqual(before);
-      test.fail(
-        pathKind.name === 'moved',
-        'https://github.com/notaharness/n10/issues/208'
+      observed = await visibleWithin(
+        visibleText(desktop.page, 'path-agent-ready')
       );
-      await expect(visibleText(desktop.page, 'path-agent-ready')).toBeVisible({
-        timeout: 15_000,
-      });
       await expect(tabs(desktop.page)).toHaveCount(1);
       expect(listTaggedSessions(homeDir)).toEqual(before);
     } finally {
-      pathKind.restore(repoPath, nextPath);
+      // Stop and restore before the expected-failure annotation: cleanup errors must fail CI.
+      try {
+        await desktop.stop();
+      } finally {
+        pathKind.restore(repoPath, nextPath);
+      }
     }
+    test.fail(
+      pathKind.name === 'moved',
+      'https://github.com/notaharness/n10/issues/208'
+    );
+    expect(observed).toBe(true);
   });
 }

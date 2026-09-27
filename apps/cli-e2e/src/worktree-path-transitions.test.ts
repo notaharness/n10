@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { renameSync, symlinkSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { visibleWithin } from './setup/lifecycle.js';
 import { test, expect } from './fixtures/n10.js';
 import { sidebarLocator } from './setup/sidebar.js';
-import { restartN10 } from './setup/lifecycle.js';
 import {
   addExternalWorktree,
   listTaggedSessions,
@@ -52,21 +52,29 @@ for (const pathKind of paths) {
     await expect(row.running()).toBeVisible({ timeout: 30_000 });
     const before = listTaggedSessions(homeDir);
     const nextPath = join(homeDir, 'repo');
+    let observed = false;
     try {
       pathKind.prepare(repoPath, nextPath);
-      await restartN10(n10, nextPath);
+      await n10.restart(nextPath);
       await expect(row.any()).toBeVisible();
       expect(listTaggedSessions(homeDir)).toEqual(before);
-      test.fail(
-        pathKind.name === 'moved',
-        'https://github.com/notaharness/n10/issues/208'
-      );
-      await expect(row.running()).toBeVisible({ timeout: 15_000 });
-      expect(listTaggedSessions(homeDir)).toEqual(before);
       await term.press('Tab');
-      await expect(term.getByText('path-agent-ready').first()).toBeVisible();
+      observed = await visibleWithin(
+        term.getByText('path-agent-ready').first()
+      );
+      expect(listTaggedSessions(homeDir)).toEqual(before);
     } finally {
-      pathKind.restore(repoPath, nextPath);
+      // Stop and restore before the expected-failure annotation: cleanup errors must fail CI.
+      try {
+        await n10.stop();
+      } finally {
+        pathKind.restore(repoPath, nextPath);
+      }
     }
+    test.fail(
+      pathKind.name === 'moved',
+      'https://github.com/notaharness/n10/issues/208'
+    );
+    expect(observed).toBe(true);
   });
 }

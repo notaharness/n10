@@ -21,9 +21,12 @@ Desktop and TUI E2E cases, including executable known failures and the separate
 removal coverage in PRs #205/#206. Run the non-removal transition files with:
 
 ```sh
-npx nx e2e desktop-e2e --grep='checkout tab|external agent on a detached|keeps the worktree|n10 restart with|opening a.*repo preserves|external worktrees respect'
-PORT=5187 npx nx e2e cli-e2e --grep='checkout row|external agent on a detached|keeps the row|n10 restart with|opening a.*repo preserves|external worktrees respect'
+npx nx e2e desktop-e2e -- worktree-transitions worktree-session-transitions worktree-path-transitions
+PORT=5187 npx nx e2e cli-e2e -- worktree-transitions worktree-session-transitions worktree-path-transitions
 ```
+
+`PORT=5187` keeps the TUI host separate from a development host on the default
+5174; choose another unused port if another worktree is using 5187.
 
 ## Desktop
 

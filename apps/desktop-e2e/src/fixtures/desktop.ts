@@ -17,6 +17,7 @@ import {
 } from '../setup/git-repo.js';
 import { killFixtureSessions } from '../setup/tmux.js';
 import { appEnv } from './app-env.js';
+import { prepareWindow } from './prepare-window.js';
 import { closeDesktopApp } from '../setup/app-close.js';
 import type { TerminalSeed } from '../setup/terminals.js';
 import {
@@ -96,6 +97,8 @@ export interface DesktopApp {
   main: ElectronApplication['evaluate'];
   /** Relaunch the real host with the same HOME and optional new repo path. */
   restart(repoPath?: string): Promise<void>;
+  /** Stop and verify process exit before a test changes repository paths. */
+  stop(): Promise<void>;
 }
 
 export const test = base.extend<
@@ -181,41 +184,37 @@ export const test = base.extend<
         timeout: 60_000,
       });
 
-    let app = await launch(repoPath);
-    let page = await app.firstWindow();
-
-    // Chromium throttles requestAnimationFrame in a window it considers
-    // hidden or occluded, and under xvfb (or behind another window on a
-    // developer's desktop) that is the normal state. Playwright's
-    // actionability check waits for two consecutive stable animation
-    // frames before it will click, so a throttled window makes every
-    // click hang until the timeout even though the page is perfectly
-    // idle. Show, focus and un-throttle before any test touches it.
-    await app.evaluate(({ BrowserWindow }) => {
-      const win = BrowserWindow.getAllWindows()[0];
-      if (!win) return;
-      win.webContents.setBackgroundThrottling(false);
-      win.show();
-      win.focus();
-    });
-
     const pageErrors: string[] = [];
     const consoleErrors: string[] = [];
-    page.on('pageerror', (err) =>
-      pageErrors.push(err.stack || err.message || String(err))
+    let app = await launch(repoPath);
+    let page = await prepareWindow(
+      app,
+      startWithoutRepo,
+      pageErrors,
+      consoleErrors
     );
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') consoleErrors.push(msg.text());
-    });
+    let stopped = false;
 
-    await page.waitForLoadState('domcontentloaded');
-    if (!startWithoutRepo) {
-      // The workspace has rendered (not the repo picker, not a blank
-      // window) once the sidebar's actions exist.
-      await page
-        .getByRole('button', { name: 'New worktree', exact: true })
-        .first()
-        .waitFor({ state: 'visible', timeout: 30_000 });
+    async function close() {
+      if (stopped) return { exited: true, note: null };
+      const result = await closeDesktopApp(app);
+      stopped = true;
+      if (result.note) {
+        console.warn(`[desktop-e2e] ${result.note}`);
+        await testInfo.attach('desktop-close', {
+          body: result.note,
+          contentType: 'text/plain',
+        });
+      }
+      return result;
+    }
+
+    async function stop(): Promise<void> {
+      const result = await close();
+      if (!result.exited)
+        throw new Error(result.note ?? 'Electron did not exit');
+      if (pageErrors.length)
+        throw new Error(`Renderer threw:\n${pageErrors.join('\n')}`);
     }
 
     let used = false;
@@ -233,27 +232,17 @@ export const test = base.extend<
         get main() {
           return app.evaluate.bind(app);
         },
+        stop,
         async restart(startPath = repoPath) {
-          const note = await closeDesktopApp(app);
-          if (note) throw new Error(note);
+          await stop();
           app = await launch(startPath);
-          page = await app.firstWindow();
-          page.on('pageerror', (err) =>
-            pageErrors.push(err.stack || err.message)
+          stopped = false;
+          page = await prepareWindow(
+            app,
+            startWithoutRepo,
+            pageErrors,
+            consoleErrors
           );
-          page.on('console', (msg) => {
-            if (msg.type() === 'error') consoleErrors.push(msg.text());
-          });
-          await app.evaluate(({ BrowserWindow }) => {
-            const win = BrowserWindow.getAllWindows()[0];
-            win?.webContents.setBackgroundThrottling(false);
-            win?.show();
-            win?.focus();
-          });
-          await page
-            .getByRole('button', { name: 'New worktree', exact: true })
-            .first()
-            .waitFor({ state: 'visible', timeout: 30_000 });
         },
       });
       used = true;
@@ -265,14 +254,7 @@ export const test = base.extend<
         });
       }
       // Bounded, and never the reason a test fails: see setup/app-close.ts.
-      const closeNote = await closeDesktopApp(app);
-      if (closeNote) {
-        console.warn(`[desktop-e2e] ${closeNote}`);
-        await testInfo.attach('desktop-close', {
-          body: closeNote,
-          contentType: 'text/plain',
-        });
-      }
+      await close();
       if (ownsRepo) cleanupTestRepo(repoPath);
     }
 

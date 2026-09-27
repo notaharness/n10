@@ -1,8 +1,9 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/n10.js';
+import { settleFor } from './setup/waits.js';
 import { sidebarLocator } from './setup/sidebar.js';
-import { fixtureTmux, restartN10 } from './setup/lifecycle.js';
+import { fixtureTmux } from './setup/lifecycle.js';
 import {
   addExternalWorktree,
   killFixtureSessions,
@@ -125,7 +126,7 @@ test('n10 restart with sessions alive rediscovers the checkout', async ({
   await expect(row.running()).toBeVisible({ timeout: 30_000 });
   const before = listTaggedSessions(homeDir);
 
-  await restartN10(n10);
+  await n10.restart();
   await expect(row.any()).toBeVisible();
   await expect(row.running()).toBeVisible({ timeout: 30_000 });
   expect(listTaggedSessions(homeDir)).toEqual(before);
@@ -149,8 +150,13 @@ test('n10 restart with sessions gone rediscovers the checkout', async ({
   const row = sidebarLocator(term.page, branch);
   await expect(row.running()).toBeVisible({ timeout: 30_000 });
   killFixtureSessions(homeDir);
-  await restartN10(n10);
+  await n10.restart();
   await expect(row.any()).toBeVisible();
+  await settleFor(
+    term.page,
+    5_000,
+    'one four-second discovery interval after restart before asserting no automatic launch'
+  );
   await expect(row.running()).toHaveCount(0);
   expect(listTaggedSessions(homeDir)).toEqual([]);
 });

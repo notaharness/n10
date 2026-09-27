@@ -18,21 +18,24 @@ test.use({
 for (const transition of [
   {
     name: 'rename',
+    before: [],
     args: ['branch', '-m', 'renamed'],
     label: 'renamed',
     after: [],
   },
   {
     name: 'checkout',
+    before: [],
     args: ['checkout', '-b', 'checked-out'],
     label: 'checked-out',
     after: [],
   },
   {
     name: 'detach HEAD',
+    before: [{ args: ['checkout', '-b', 'pre-detach'], label: 'pre-detach' }],
     args: ['checkout', '--detach'],
     label: BRANCH,
-    after: [['branch', '-D', BRANCH]],
+    after: [['branch', '-D', BRANCH, 'pre-detach']],
   },
 ]) {
   test(`${transition.name} preserves the checkout row and live agent`, async ({
@@ -50,11 +53,21 @@ for (const transition of [
         stdio: 'pipe',
       })
     ).toThrow();
+    for (const step of transition.before) {
+      execFileSync('git', step.args, { cwd });
+      await expect(
+        sidebarLocator(n10.term.page, step.label)
+          .any()
+          .and(sidebarLocator(n10.term.page, step.label).running())
+      ).toBeVisible({ timeout: 15_000 });
+    }
     execFileSync('git', transition.args, { cwd });
     // Delete the now-unused branch in the detached case: the checkout survives.
     for (const args of transition.after) execFileSync('git', args, { cwd });
     await expect(
-      sidebarLocator(n10.term.page, transition.label).running()
+      sidebarLocator(n10.term.page, transition.label)
+        .any()
+        .and(sidebarLocator(n10.term.page, transition.label).running())
     ).toBeVisible({ timeout: 15_000 });
     expect(listTaggedSessions(n10.homeDir)).toEqual(before);
     await n10.term.press('Tab');

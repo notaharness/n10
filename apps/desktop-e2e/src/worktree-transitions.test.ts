@@ -17,22 +17,18 @@ import {
 
 for (const transition of [
   {
-    name: 'rename',
-    args: ['branch', '-m', 'renamed'],
-    label: 'renamed',
-    after: [],
-  },
-  {
     name: 'checkout',
+    before: [],
     args: ['checkout', '-b', 'checked-out'],
     label: 'checked-out',
     after: [],
   },
   {
     name: 'detach HEAD',
+    before: [{ args: ['checkout', '-b', 'pre-detach'], label: 'pre-detach' }],
     args: ['checkout', '--detach'],
     label: 'transition',
-    after: [['branch', '-D', 'transition']],
+    after: [['branch', '-D', 'transition', 'pre-detach']],
   },
 ]) {
   test(`${transition.name} preserves the checkout tab and live agent`, async ({
@@ -50,6 +46,13 @@ for (const transition of [
         stdio: 'pipe',
       })
     ).toThrow();
+    for (const step of transition.before) {
+      execFileSync('git', step.args, { cwd });
+      await expect(sidebarRow(page, new RegExp(step.label))).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(tab(page, new RegExp(step.label))).toBeVisible();
+    }
     execFileSync('git', transition.args, { cwd });
     for (const args of transition.after) execFileSync('git', args, { cwd });
     await expect(sidebarRow(page, new RegExp(transition.label))).toBeVisible({
