@@ -36,7 +36,7 @@ type WorktreeHost = Pick<
   | 'listAllBranches'
   | 'createWorktree'
   | 'removeWorktree'
-  | 'canRemoveBranch'
+  | 'checkWorktreeRemoval'
   | 'openInEditor'
   | 'onSyncNotice'
   | 'onRemoteUpdated'
@@ -77,9 +77,15 @@ export function createWorktreeHost(
       repo().worktrees.add(branch);
       return later(worktreeDir(repo().cwd, branch), 300);
     },
-    removeWorktree: () => later(false),
-    canRemoveBranch: () =>
-      later({ safe: false as const, reason: 'The demo keeps its worktrees.' }),
+    removeWorktree: () => later('refused' as const),
+    checkWorktreeRemoval: () =>
+      later({
+        verdict: 'refused' as const,
+        reason: 'The demo keeps its worktrees.',
+        tip: null,
+        repo: null,
+        checkout: null,
+      }),
     openInEditor: () => later({ editor: 'code' }),
     onSyncNotice: never.subscribe,
     onRemoteUpdated: state.remoteUpdated.subscribe,

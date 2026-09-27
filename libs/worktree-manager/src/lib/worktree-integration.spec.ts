@@ -11,9 +11,9 @@ import { tmpdir } from 'node:os';
 import {
   createWorktree,
   removeWorktree,
-  canRemoveBranch,
   rebaseOntoMaster,
 } from './worktree.js';
+import { canRemoveBranch } from './removal-check.js';
 import { listWorktrees } from './worktree-list.js';
 import {
   resetWorktreeResolver,
@@ -218,7 +218,9 @@ describe('integration: canRemoveBranch', () => {
     writeFileSync(join(path!, 'dirty.txt'), 'uncommitted content');
     execSync('git branch shared', { cwd: there, stdio: 'pipe' });
 
-    expect(await canRemoveBranch('shared', true, undefined, there)).toEqual({
+    expect(
+      await canRemoveBranch('shared', { confirmedMerged: true, cwd: there })
+    ).toEqual({
       safe: true,
     });
 

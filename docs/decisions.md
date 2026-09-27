@@ -167,6 +167,35 @@ Stop, terminal close and worktree removal terminate the matching session,
 including when no local connection exists. `removeWorktreeSession` owns shared
 stop/remove/delete operations with the captured repository.
 
+Worktree removal is one flow in core. `checkWorktreeRemoval` decides what the
+user must confirm (clear, a live agent, work only `force` removes, or a refusal)
+and each shell renders its own prompt from that verdict. The shell hands the
+confirmed verdict back to `removeWorktreeSession`, which enforces it at
+execution time: the prompt can stay open while an agent writes or commits, and
+nothing it did after the check was judged. A `force` verdict names every risk
+that applies, not the first, because the prompt is the user's whole picture of
+what they agree to lose. `--force` is all or nothing, so removal forces only when
+the verdict named a risk git guards with it (uncommitted changes, submodules),
+and git's own test for submodules is the one n10 applies. Unpushed commits go
+with the branch and never need it. A force prompt that runs `--force` says it
+discards whatever is uncommitted when it runs, which is what `--force` does. The
+checks fail closed: status is read whole, untracked files included whatever the
+repository's settings, and a checkout git cannot answer for has `unknown
+changes`, which only force takes. The verdict carries the repository (by its
+common git directory), the checkout's canonical path and the branch's tip when
+it was judged. Before the agent is stopped and again once it has, removal looks
+for anything the verdict did not cover: another repository or checkout, a moved
+branch, a rebase (which leaves the branch where it was until it finishes), a
+checkout that left the branch, or a risk git guards with `--force` that the
+verdict did not name, such as a file written into a checkout judged clean. Any
+of them keeps everything. A branch that moves during the removal itself, or
+that git will not delete, keeps the branch. `removeWorktreeSession`
+returns what it did, and each shell says what was kept and why. The
+merged-branch sweep uses the same guard. `removeWorktreeSession`
+scans discovery before and after removing, so the shells learn of n10's
+removals through `onChanged`, as they learn of `git worktree remove`: discovery
+can only report the removal of a worktree it has seen.
+
 Carry output sequence numbers across reattachment and restart so mounted
 terminals accept subsequent chunks. Resize on fit and when `spawnedAt` changes,
 even if the session name and dimensions are unchanged. `paneTerminalGrid`

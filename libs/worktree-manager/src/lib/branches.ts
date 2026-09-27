@@ -269,6 +269,23 @@ export async function refExists(ref: string, cwd?: string): Promise<boolean> {
   }
 }
 
+/** The commit local `branch` points at, or null when there is none. */
+export async function branchTip(
+  branch: string,
+  cwd?: string
+): Promise<string | null> {
+  assertShellSafeRef(branch);
+  try {
+    const { stdout } = await exec(
+      `git rev-parse --verify --quiet "refs/heads/${branch}^{commit}"`,
+      gitOptions(cwd)
+    );
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 /** Delete a local git branch. Returns true on success, false on failure. */
 export async function deleteBranch(
   branch: string,

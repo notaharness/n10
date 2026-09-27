@@ -9,23 +9,16 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { log } from '@n10/logger';
 import { exec, gitOptions } from './exec.js';
-import { isRemoteMachine, runGitOn, type Machine } from './machine.js';
+import {
+  isRemoteMachine,
+  refuseRemote,
+  runGitOn,
+  type Machine,
+} from './machine.js';
 import { assertShellSafeRef } from './refs.js';
 import { worktreeDir } from './worktree-resolver.js';
 import { listWorktrees, type WorktreeInfo } from './worktree-list.js';
 import { getMainBranch } from './branches.js';
-
-/** Throws for any function this phase left local-only: half-threading
- *  the machine seam (accepting one that is quietly ignored) is the
- *  data-loss bug this package's AGENTS.md warns about, so a caller
- *  that hands one of these a remote machine gets a loud failure
- *  instead of an operation silently run against the local repository. */
-function refuseRemote(fn: string, machine: Machine | undefined): void {
-  if (isRemoteMachine(machine))
-    throw new Error(
-      `${fn}() does not support a remote machine yet (${machine.id})`
-    );
-}
 
 /**
  * Resolve the actual on-disk path of the worktree that has `branch`
@@ -267,108 +260,6 @@ export async function removeWorktree(
       `git worktree remove failed for ${branch}`,
       e
     );
-    return false;
-  }
-}
-
-/**
- * Check whether a branch can be safely deleted from the repository at
- * `cwd` (the process's directory when not given).
- * Returns { safe: true } or { safe: false, reason: string }.
- */
-export async function canRemoveBranch(
-  branch: string,
-  confirmedMerged = false,
-  machine?: Machine,
-  cwd?: string
-): Promise<{ safe: true } | { safe: false; reason: string }> {
-  refuseRemote('canRemoveBranch', machine);
-  assertShellSafeRef(branch);
-  // Protected branch guard
-  if (
-    branch === 'main' ||
-    branch === 'master' ||
-    branch.startsWith('gitbutler')
-  ) {
-    return { safe: false, reason: 'protected branch' };
-  }
-
-  const wt = await worktreeForBranch(branch, cwd);
-
-  // A mid-rebase worktree carries in-progress rebase state (recovered
-  // from rebase-merge/rebase-apply) that force-removing the worktree
-  // would silently destroy. Refuse to delete it — auto-delete and manual
-  // delete both gate on this — so the user finishes or aborts the rebase
-  // first.
-  if (wt?.state === 'rebasing') {
-    return { safe: false, reason: 'rebase in progress' };
-  }
-
-  // Use the worktree's real path from git so the status check runs
-  // against the actual checkout, not a resolver-derived guess that may
-  // not exist (which would silently skip the uncommitted-changes guard).
-  const dir = wt?.path ?? resolverDir(branch, cwd);
-
-  if (await hasUncommittedChanges(dir, branch)) {
-    return { safe: false, reason: 'uncommitted changes' };
-  }
-
-  // Skip when the VCS provider already confirmed the branch merged.
-  if (!confirmedMerged && (await hasUnpushedCommits(branch, cwd))) {
-    return { safe: false, reason: 'not pushed to upstream' };
-  }
-
-  return { safe: true };
-}
-
-/** Where the resolver would put `branch`'s checkout in the repository
- *  at `cwd`: a relative resolver path is that repository's, not the
- *  process's. */
-function resolverDir(branch: string, cwd?: string): string {
-  return resolve(cwd ?? process.cwd(), worktreeDir(branch));
-}
-
-/**
- * Whether the checkout at `dir` has anything uncommitted. A git call
- * that fails answers "no": the worktree may simply not exist, and this
- * guard is not the place to report that.
- */
-async function hasUncommittedChanges(
-  dir: string,
-  branch: string
-): Promise<boolean> {
-  try {
-    // Deliberately not `-z`: this output is only ever tested for
-    // emptiness, so NUL termination would buy nothing. Add it before
-    // parsing the entries — the newline form renders a rename as
-    // `old -> new` in one field, which is the same trap `--numstat`
-    // set with its brace form (see parseNumstat in @n10/app-core).
-    const { stdout } = await exec(`git -C "${dir}" status --porcelain`, {
-      encoding: 'utf8',
-    });
-    return stdout.trim().length > 0;
-  } catch (e) {
-    log('warn', 'canRemoveBranch', `status check failed for ${branch}`, e);
-    return false;
-  }
-}
-
-/**
- * Whether `branch` holds commits no remote has. As above, a failure
- * answers "no" — the branch may just have no remote tracking.
- */
-async function hasUnpushedCommits(
-  branch: string,
-  cwd?: string
-): Promise<boolean> {
-  try {
-    const { stdout } = await exec(
-      `git log "${branch}" --not --remotes -1`,
-      gitOptions(cwd)
-    );
-    return stdout.trim().length > 0;
-  } catch (e) {
-    log('warn', 'canRemoveBranch', `unpushed check failed for ${branch}`, e);
     return false;
   }
 }
