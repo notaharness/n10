@@ -571,6 +571,22 @@ describe('a cycle over pull requests that have not moved', () => {
     // one would leave the sidebar badge behind for minutes.
     expect(await cycleCost()).toBe(2 + 2);
   });
+
+  it('forgets a pull request a draft was just posted to', async () => {
+    await syncCycle();
+    afterMinutes(1);
+    mockFetch.mockImplementation(() => Promise.resolve(json({})));
+    await azureDevOpsProvider.createThread!(AUTH, PROJECT, 100, {
+      file: 'a.ts',
+      lineStart: 1,
+      lineEnd: 1,
+      body: 'a draft',
+    });
+    serveEverything();
+
+    // The new thread belongs in the count straight away, as a reply's does.
+    expect(await cycleCost()).toBe(2 + 2);
+  });
 });
 
 describe('the same data asked for twice', () => {

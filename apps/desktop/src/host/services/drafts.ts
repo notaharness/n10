@@ -8,7 +8,7 @@ import {
   type PostContext,
   type ReviewComment,
 } from '@n10/review-comments';
-import { requireRepo } from './repo.js';
+import { PROVIDERS, requireRepo } from './repo.js';
 import type { PostDraftsRequest } from '../contract.js';
 
 /**
@@ -135,6 +135,7 @@ export async function postDraftComments(
     vendorProject: config.vendorProject,
     prId: req.prId,
     headSha: req.headSha,
+    provider: PROVIDERS.find((p) => p.id === vendor),
   };
   // One comment per post call, like the TUI's diff viewer. A batch
   // that dies mid-way would otherwise reset already-live comments back

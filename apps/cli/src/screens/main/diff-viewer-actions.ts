@@ -168,6 +168,7 @@ function actionPostComment(a: DiffViewerActionCtx): void {
     vendorProject: ctx.config.config.vendorProject,
     prId: commentCtx.prId,
     headSha: pr.headSha,
+    provider: ctx.config.provider,
   };
 
   const postedId = comment.id;

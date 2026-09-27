@@ -18,9 +18,9 @@ const env = vi.hoisted(() => ({
   /** JSON handed to `gh` on stdin, per invocation. */
   ghInputs: [] as { args: string[]; body: unknown }[],
   ghExitCode: 0,
-  fetches: [] as { url: string; init: RequestInit }[],
-  fetchOk: true,
-  fetchStatus: 200,
+  /** Arguments of each `createThread` call the Azure poster made. */
+  threads: [] as unknown[][],
+  azureRefuses: false,
   marked: [] as { id: string; patch: Record<string, unknown> }[],
 }));
 
@@ -91,27 +91,22 @@ const azure: PostContext = {
   vendorAuth: { pat: 'secret-pat' },
   vendorProject: { org: 'acme', project: 'proj', repo: 'widgets' },
   prId: 7,
+  provider: {
+    createThread: (...args) => {
+      env.threads.push(args);
+      return env.azureRefuses
+        ? Promise.reject(new Error('Azure DevOps refused: provider said no'))
+        : Promise.resolve();
+    },
+  },
 };
 
 beforeEach(() => {
   env.ghInputs = [];
   env.ghExitCode = 0;
-  env.fetches = [];
-  env.fetchOk = true;
-  env.fetchStatus = 200;
+  env.threads = [];
+  env.azureRefuses = false;
   env.marked = [];
-
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string, init: RequestInit) => {
-      env.fetches.push({ url, init });
-      return Promise.resolve({
-        ok: env.fetchOk,
-        status: env.fetchStatus,
-        text: () => Promise.resolve('provider said no'),
-      });
-    })
-  );
 });
 
 describe('posting to GitHub', () => {
@@ -272,44 +267,43 @@ describe('posting to GitHub', () => {
 });
 
 describe('posting to Azure DevOps', () => {
-  it('opens one thread per comment, anchored to the file and lines', async () => {
+  it('opens one thread per comment through the provider', async () => {
     await postReviewComments(
-      [comment({ id: 'a', lineStart: 3, lineEnd: 5 })],
+      [
+        comment({ id: 'a', lineStart: 3, lineEnd: 5 }),
+        comment({ id: 'b', file: 'src/b.ts' }),
+      ],
       azure
     );
 
-    expect(env.fetches).toHaveLength(1);
-    expect(env.fetches[0].url).toContain(
-      'dev.azure.com/acme/proj/_apis/git/repositories/widgets/pullrequests/7/threads'
-    );
-    const body = JSON.parse(String(env.fetches[0].init.body)) as {
-      threadContext: {
-        filePath: string;
-        rightFileStart: { line: number };
-        rightFileEnd: { line: number };
-      };
-      comments: { content: string }[];
-    };
-    // Azure wants a repo-absolute path.
-    expect(body.threadContext.filePath).toBe('/src/a.ts');
-    expect(body.threadContext.rightFileStart.line).toBe(3);
-    expect(body.threadContext.rightFileEnd.line).toBe(5);
-    expect(body.comments[0].content).toContain('issue (non-blocking):');
-    expect(body.comments[0].content).toContain('by an agent_');
+    expect(env.threads).toHaveLength(2);
+    const [auth, project, prId, first] = env.threads[0] as [
+      unknown,
+      unknown,
+      number,
+      { file: string; lineStart: number; lineEnd: number; body: string }
+    ];
+    expect(auth).toEqual({ pat: 'secret-pat' });
+    expect(project).toEqual({ org: 'acme', project: 'proj', repo: 'widgets' });
+    expect(prId).toBe(7);
+    expect(first).toMatchObject({ file: 'src/a.ts', lineStart: 3, lineEnd: 5 });
+    expect(first.body).toContain('issue (non-blocking):');
+    expect(first.body).toContain('by an agent_');
   });
 
-  it('sends the PAT as basic auth', async () => {
-    await postReviewComments([comment()], azure);
-    const headers = env.fetches[0].init.headers as Record<string, string>;
-    expect(headers.Authorization).toBe(`Basic ${btoa(':secret-pat')}`);
-  });
-
-  it('reports the provider status and body when it refuses', async () => {
-    env.fetchOk = false;
-    env.fetchStatus = 422;
+  it('reports the provider refusing', async () => {
+    env.azureRefuses = true;
     await expect(postReviewComments([comment()], azure)).rejects.toThrow(
-      /422.*provider said no/
+      /provider said no/
     );
+    expect(env.marked).toEqual([]);
+  });
+
+  it('is refused without a provider that can open threads', async () => {
+    await expect(
+      postReviewComments([comment()], { ...azure, provider: null })
+    ).rejects.toThrow('cannot open threads');
+    expect(env.marked).toEqual([]);
   });
 });
 

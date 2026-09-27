@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ReviewComment } from '@n10/review-comments';
 import type * as ReviewCommentsModule from '@n10/review-comments';
 import { postReviewComments } from '@n10/review-comments';
+import { azureDevOpsProvider, resetAdoTransport } from '@n10/vcs-azure-devops';
 
 // Mock comment-store before importing the module under test
 vi.mock('@n10/review-comments', async (importOriginal) => {
@@ -30,17 +31,18 @@ function makeComment(overrides?: Partial<ReviewComment>): ReviewComment {
   };
 }
 
-describe('postAzureDevOps via fetch()', () => {
+describe('posting to Azure DevOps through the provider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetAdoTransport();
   });
 
   it('sends correct URL, auth header, and thread body', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: () => Promise.resolve(''),
-    });
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ id: 1 }), {
+        headers: { 'content-type': 'application/json' },
+      })
+    );
 
     const comment = makeComment();
     await postReviewComments([comment], {
@@ -48,6 +50,7 @@ describe('postAzureDevOps via fetch()', () => {
       vendorAuth: { pat: 'my-pat' },
       vendorProject: { org: 'myorg', project: 'myproj', repo: 'myrepo' },
       prId: 42,
+      provider: azureDevOpsProvider,
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -75,11 +78,7 @@ describe('postAzureDevOps via fetch()', () => {
   });
 
   it('throws on non-ok response', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 401,
-      text: () => Promise.resolve('Unauthorized'),
-    });
+    mockFetch.mockResolvedValue(new Response('Unauthorized', { status: 401 }));
 
     await expect(
       postReviewComments([makeComment()], {
@@ -87,8 +86,9 @@ describe('postAzureDevOps via fetch()', () => {
         vendorAuth: { pat: 'bad' },
         vendorProject: { org: 'o', project: 'p', repo: 'r' },
         prId: 1,
+        provider: azureDevOpsProvider,
       })
-    ).rejects.toThrow('Azure DevOps API 401');
+    ).rejects.toThrow('rejected the access token');
   });
 });
 

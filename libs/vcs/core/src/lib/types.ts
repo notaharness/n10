@@ -139,6 +139,16 @@ export interface VcsProvider {
     prId: number
   ): Promise<PullRequestComments>;
 
+  /** Open a new thread anchored to lines of a file on the new side of
+   *  the diff. Azure DevOps only: GitHub's comments are filed as one
+   *  review through `gh`, which carries the verdict too. */
+  createThread?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number,
+    comment: { file: string; lineStart: number; lineEnd: number; body: string }
+  ): Promise<void>;
+
   /** Reply to an existing comment thread. The thread is passed (not just
    *  the id) so providers can dispatch on `replyKind` — GitHub review
    *  threads use one mutation, GitHub issue comments (general PR

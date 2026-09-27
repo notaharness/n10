@@ -985,6 +985,55 @@ describe('fetchMyTeamIds', () => {
 });
 
 describe('azureDevOpsProvider', () => {
+  describe('createThread', () => {
+    beforeEach(() => {
+      mockFetch.mockReset();
+    });
+
+    it('opens an active thread on the new side of the file', async () => {
+      mockFetch.mockResolvedValue(jsonResponse({ id: 9 }));
+      await azureDevOpsProvider.createThread!(
+        { pat: 'secret-pat' },
+        { org: 'acme', project: 'proj', repo: 'widgets' },
+        7,
+        { file: 'src/a.ts', lineStart: 3, lineEnd: 5, body: 'nit: rename' }
+      );
+
+      const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe(
+        'https://dev.azure.com/acme/proj/_apis/git/repositories/widgets/pullrequests/7/threads?api-version=7.1'
+      );
+      expect(init.method).toBe('POST');
+      expect((init.headers as Record<string, string>).Authorization).toBe(
+        `Basic ${Buffer.from(':secret-pat').toString('base64')}`
+      );
+      expect(JSON.parse(String(init.body))).toEqual({
+        comments: [
+          { parentCommentId: 0, content: 'nit: rename', commentType: 1 },
+        ],
+        // Azure wants a repo-absolute path.
+        threadContext: {
+          filePath: '/src/a.ts',
+          rightFileStart: { line: 3, offset: 1 },
+          rightFileEnd: { line: 5, offset: 1 },
+        },
+        status: 1,
+      });
+    });
+
+    it('reports Azure refusing', async () => {
+      mockFetch.mockResolvedValue(jsonResponse({ message: 'nope' }, 403));
+      await expect(
+        azureDevOpsProvider.createThread!(
+          { pat: 'p' },
+          { org: 'o', project: 'p', repo: 'r' },
+          1,
+          { file: 'a', lineStart: 1, lineEnd: 1, body: 'x' }
+        )
+      ).rejects.toThrow();
+    });
+  });
+
   it('has correct id and displayName', () => {
     expect(azureDevOpsProvider.id).toBe('azure-devops');
     expect(azureDevOpsProvider.displayName).toBe('Azure DevOps');

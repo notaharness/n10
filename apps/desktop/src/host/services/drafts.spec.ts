@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type * as VcsCore from '@n10/vcs-core';
 import type * as ReviewCommentsModule from '@n10/review-comments';
 import type { ReviewComment } from '@n10/review-comments';
 
@@ -21,12 +20,10 @@ const state = vi.hoisted(() => ({
 
 vi.mock('./repo.js', () => ({
   requireRepo: () => '/repo',
+  PROVIDERS: [],
 }));
 
-vi.mock('@n10/vcs-core', async (importOriginal) => ({
-  // Partial: the Azure DevOps transport, loaded through
-  // @n10/review-comments, builds its request cache from this module.
-  ...(await importOriginal<typeof VcsCore>()),
+vi.mock('@n10/vcs-core', () => ({
   readConfig: () => state.config,
 }));
 

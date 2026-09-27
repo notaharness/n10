@@ -1,10 +1,5 @@
 import { spawn } from 'node:child_process';
-import {
-  authHeaders,
-  baseUrl,
-  invalidatePr,
-  toAdoConfig,
-} from '@n10/vcs-azure-devops';
+import type { VcsProvider } from '@n10/vcs-core';
 import type { ReviewComment } from './types.js';
 import {
   formatConventionalComment,
@@ -79,6 +74,9 @@ export interface PostContext {
   vendorProject: Record<string, string>;
   prId: number;
   headSha?: string;
+  /** The configured provider. Azure DevOps posts through its
+   *  `createThread`, which also refreshes what the provider caches. */
+  provider?: Pick<VcsProvider, 'createThread'> | null;
 }
 
 export async function postReviewComments(
@@ -137,48 +135,16 @@ async function postAzureDevOps(
   comments: ReviewComment[],
   ctx: PostContext
 ): Promise<void> {
-  // The provider's own mapping: `invalidatePr` keys its cache by it.
-  const config = toAdoConfig(ctx.vendorAuth, ctx.vendorProject);
-  const threadsUrl = `${baseUrl(config)}/pullrequests/${
-    ctx.prId
-  }/threads?api-version=7.1`;
-
+  const { provider } = ctx;
+  if (!provider?.createThread) {
+    throw new Error('The Azure DevOps provider cannot open threads');
+  }
   for (const comment of comments) {
-    const thread = {
-      comments: [
-        {
-          parentCommentId: 0,
-          content: renderCommentBody(comment),
-          commentType: 1,
-        },
-      ],
-      threadContext: {
-        filePath: `/${comment.file}`,
-        rightFileStart: {
-          line: comment.lineStart,
-          offset: 1,
-        },
-        rightFileEnd: {
-          line: comment.lineEnd,
-          offset: 1,
-        },
-      },
-      status: 1, // active
-    };
-
-    const response = await fetch(threadsUrl, {
-      method: 'POST',
-      headers: authHeaders(config.pat),
-      body: JSON.stringify(thread),
+    await provider.createThread(ctx.vendorAuth, ctx.vendorProject, ctx.prId, {
+      file: comment.file,
+      lineStart: comment.lineStart,
+      lineEnd: comment.lineEnd,
+      body: renderCommentBody(comment),
     });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Azure DevOps API ${response.status}: ${text}`);
-    }
-    // The provider caches the thread list; without this the new thread
-    // stays out of the review workspace and the sidebar's count until
-    // the entry lapses and something happens to read it again.
-    invalidatePr(config, ctx.prId);
   }
 }
