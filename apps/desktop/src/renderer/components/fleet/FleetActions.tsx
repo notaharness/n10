@@ -37,11 +37,13 @@ function releaseFocus(header: HTMLElement): void {
  */
 export function useFleetActions() {
   const { section, reset, enrolment, revocation } = useFleet();
-  const beam = useBeamStatus().data;
+  const status = useBeamStatus();
+  const beam = status.data;
   const machines = useMachines().data;
   const fingerprint =
     beam?.enrolled && beam.fleetId ? fingerprintGroups(beam.fleetId) : null;
   const resetDisabled =
+    status.isError ||
     !machines ||
     beam?.state !== 'ready' ||
     reset.open ||
