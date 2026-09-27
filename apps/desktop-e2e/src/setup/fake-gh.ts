@@ -34,9 +34,20 @@ export interface FakePr {
   threads?: FakeThread[];
   generalComments?: { author: string; body: string }[];
   /** Reads that answer with GitHub's 502 until cleared with
-   *  `updateFakeGh`: the description, the threads query, and the
-   *  selected pull request's detail. */
-  failing?: { body?: boolean; threads?: boolean; detail?: boolean };
+   *  `updateFakeGh`: the description, the threads query, the selected
+   *  pull request's detail, and its checks. */
+  failing?: {
+    body?: boolean;
+    threads?: boolean;
+    detail?: boolean;
+    checks?: boolean;
+  };
+  /** Check runs and statuses on the head, for the checks read. */
+  checks?: FakeCheck[];
+  /** GitHub's reading of the pull request, for the checks read. */
+  mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
+  mergeStateStatus?: string;
+  reviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   /** The detail read's lifecycle; open unless said. */
   state?: 'OPEN' | 'CLOSED' | 'MERGED';
   /** The head repository as `owner/repo` when it is a fork, or null
@@ -44,6 +55,25 @@ export interface FakePr {
   fork?: string | null;
   /** Whether the signed-in account may edit it; defaults to true. */
   canUpdate?: boolean;
+}
+
+/**
+ * A check on the head. `state` is a check run's conclusion
+ * (`SUCCESS`, `FAILURE`, …) or, for one still going, its status
+ * (`QUEUED`, `IN_PROGRESS`); with `status: true` it is a commit status
+ * and `state` is the status's (`SUCCESS`, `PENDING`, …).
+ */
+export interface FakeCheck {
+  name: string;
+  state: string;
+  /** GitHub's `isRequired`; false unless said, null for unknown. */
+  required?: boolean | null;
+  status?: boolean;
+  workflow?: string;
+  /** The Actions event; `pull_request` unless said. */
+  event?: string;
+  app?: string;
+  appId?: number;
 }
 
 /** An inline review thread, anchored to a file and line in the diff. */
@@ -67,6 +97,14 @@ export interface FakeGitHub {
   /** The signed-in user. PRs they authored are "yours". */
   username?: string;
   prs: FakePr[];
+  /** Rule sets on every base branch: required checks (by name, from
+   *  GitHub Actions) and whether conversations must be resolved.
+   *  `failing` answers both rules reads with a 502. */
+  rules?: {
+    required?: string[];
+    conversationResolution?: boolean;
+    failing?: boolean;
+  };
   /**
    * Make every `gh` call take this long, standing in for the round trip
    * to GitHub. Left off for the e2e suite (which wants speed); the perf
