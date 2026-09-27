@@ -12,6 +12,7 @@ import {
 import { assertSameContext } from './pr-snapshot.js';
 import {
   defaultDraftDir,
+  draftFilePath,
   readDraftFile,
   writeDraftFile,
   type DraftFile,
@@ -52,6 +53,14 @@ export type SubmitSources = DraftSources & {
 
 const EVENTS: readonly string[] = ['COMMENT', 'APPROVE', 'REQUEST_CHANGES'];
 
+/**
+ * Drafts files with a submit running in this process. A second submit
+ * would take the first one's attempt for its own and resume it while it
+ * is still going: it is refused instead. The host is one process per
+ * machine (the single-instance lock), so this is the whole claim.
+ */
+const running = new Set<string>();
+
 export function parseSubmitReviewRequest(value: unknown): SubmitReviewRequest {
   const base = parseDraftsRequest(value);
   const { head, event, draftIds } = value as Record<string, unknown>;
@@ -83,6 +92,29 @@ export async function submitReview(
     throw new Error("This provider can't file a review from n10");
   }
   const dir = src.dir ?? defaultDraftDir();
+  const claim = draftFilePath(dir, req.ref, viewer);
+  if (running.has(claim)) {
+    throw new Error('This review is already being submitted');
+  }
+  running.add(claim);
+  try {
+    return await submitClaimed(
+      req,
+      { ...src, publish: src.publish },
+      dir,
+      viewer
+    );
+  } finally {
+    running.delete(claim);
+  }
+}
+
+async function submitClaimed(
+  req: SubmitReviewRequest,
+  src: SubmitSources & { publish: NonNullable<SubmitSources['publish']> },
+  dir: string,
+  viewer: string | null
+): Promise<ReviewDrafts> {
   const now = src.now ?? Date.now;
   const drafts = new DraftsFile(dir, req.ref, viewer);
   const file = drafts.read();

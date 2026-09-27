@@ -242,6 +242,27 @@ describe('submitting a review', () => {
   });
 });
 
+describe('two submits at once', () => {
+  it('refuses the second while the first is going, and files once', async () => {
+    let calls = 0;
+    let finish: () => void = () => undefined;
+    const slow: Publish = () => {
+      calls++;
+      return new Promise((resolve) => {
+        finish = () => resolve({ reviewId: 'R', items: { 'inline:k1': 'C1' } });
+      });
+    };
+    const first = submitReview(request(['inline:k1']), src(slow));
+    await expect(
+      submitReview(request(['inline:k1']), src(slow))
+    ).rejects.toThrow('already being submitted');
+    finish();
+    await first;
+    expect(calls).toBe(1);
+    expect(states()['inline:k1']).toBe('published');
+  });
+});
+
 describe('parseSubmitReviewRequest', () => {
   it('refuses a short head, an unknown event and non-string ids', () => {
     expect(() =>
