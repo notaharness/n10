@@ -136,7 +136,11 @@ export function saveReviewDraft(
         updatedAt: now,
         publication: { state: 'unpublished' },
       };
-  writeDraftFile(dir, withRef(file, req.ref, [...others, draft]));
+  // In place, so drafts keep the order they were started in.
+  const drafts = found
+    ? file.drafts.map((d) => (d.id === id ? draft : d))
+    : [...file.drafts, draft];
+  writeDraftFile(dir, withRef(file, req.ref, drafts));
   return draft;
 }
 

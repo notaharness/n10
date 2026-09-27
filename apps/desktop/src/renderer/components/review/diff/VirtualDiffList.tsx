@@ -210,15 +210,19 @@ export function VirtualDiffList({
         here.scrollIntoView({ block: 'nearest' });
         return;
       }
-      // Not in the list yet either (a card coming back on Undo): wait
-      // for the render that adds it.
-      if (!here && index != null) {
-        virtualizer.scrollToIndex(index, { align: 'auto' });
-      }
+      // Otherwise wait a frame: a card replacing its composer renders
+      // in place. Only a target still missing then is scrolled to.
       const retry = (left: number) => {
         const el = find();
-        if (el && free()) el.focus({ preventScroll: true });
-        else if (left > 0) requestAnimationFrame(() => retry(left - 1));
+        if (el && free()) {
+          el.focus({ preventScroll: true });
+          el.scrollIntoView({ block: 'nearest' });
+          return;
+        }
+        if (!el && left === 10 && index != null) {
+          virtualizer.scrollToIndex(index, { align: 'auto' });
+        }
+        if (left > 0) requestAnimationFrame(() => retry(left - 1));
       };
       requestAnimationFrame(() => retry(10));
     };

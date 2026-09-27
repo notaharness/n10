@@ -191,17 +191,25 @@ export function useReviewDraft(
   ): Promise<void> => {
     edits.forget(key);
     if (!ref) return Promise.resolve();
+    const gone = () => patchCache({ ...scope, body: '' }, null);
+    // Gone from the screen at once, so the stored text never shows again
+    // while the host answers.
+    gone();
     // By target, after any save still in flight for it: IPC answers in
     // order, so a first save that lands late is removed too.
     return window.n10
       .discardReviewDraft({ ref, viewer: repo.viewer, target })
       .then(
         () => {
-          patchCache({ ...scope, body: '' }, null);
+          gone();
           if (undoable && text.trim()) offerUndo(text, onUndo);
         },
         (err: unknown) => {
           toast.error(`Couldn't discard your draft: ${readError(err)}`);
+          // What is stored is still there: read it back.
+          void queryClient.invalidateQueries({
+            queryKey: keys.reviewDrafts(repo.cwd, ref, repo.viewer),
+          });
         }
       );
   };
