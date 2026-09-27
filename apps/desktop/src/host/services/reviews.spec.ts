@@ -30,11 +30,6 @@ const env = vi.hoisted(() => ({
 }));
 
 vi.mock('@n10/core', () => ({
-  // `./sidebar.js` (imported for refreshPrList) stands its cache up at
-  // load, and a verdict re-reads the list through it.
-  createPullRequestCache: () => ({
-    readPullRequests: () => Promise.resolve({}),
-  }),
   fetchReviewDiff: (...args: unknown[]) => {
     env.calls.push({ method: 'fetchReviewDiff', args });
     return Promise.resolve({ text: 'diff', head: 'a'.repeat(40) });

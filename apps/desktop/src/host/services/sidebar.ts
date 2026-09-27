@@ -4,20 +4,16 @@ import {
   buildSessionPrMap,
   categorizeReviews,
   findOrphanPrs,
-  pullRequestPollIntervalMs,
   sortSessionsByPrId,
   worktreeSessionRow,
   type SidebarItem,
 } from '@n10/core';
+import { pullRequestPollIntervalMs } from '@n10/engine';
 import { activeRepoIs, requireRepo } from './repo.js';
 import { babysatStatuses } from './babysit.js';
 import { isOwnSessionAlive } from './sessions.js';
 import { getSyncDecorations } from './remote-sync.js';
-import {
-  notifyRemoteUpdated,
-  pullRequests,
-  resolveProvider,
-} from './pull-requests.js';
+import { pullRequests, resolveProvider } from './pull-requests.js';
 import type { SidebarModel, SyncState } from '../contract.js';
 
 /**
@@ -29,9 +25,10 @@ import type { SidebarModel, SyncState } from '../contract.js';
  *
  * Local state (worktrees, alive PTYs) is cheap and re-read on every
  * call; remote pull request data comes from the host's one instance
- * of `@n10/core`'s per-repository cache (`services/pull-requests.ts`),
+ * of `@n10/engine`'s pull request list (`services/pull-requests.ts`),
  * so the renderer can poll the model frequently without hammering the
- * provider API.
+ * provider API. The renderer's poll is also the list's demand: each
+ * call starts a read when one is due.
  *
  * **The model never waits for the network.** A cold start has no
  * cached pull requests, and awaiting them here meant the sidebar — the
@@ -60,7 +57,7 @@ export async function listSidebarItems(): Promise<SidebarItem[]> {
   // call that may be a network round trip away.
   pullRequests.refreshInBackground(cwd);
   const worktrees = await listWorktrees();
-  const prMap = pullRequests.cached(cwd);
+  const prMap = pullRequests.getSnapshot(cwd).prMap;
   // Rows are keyed by checkout, so the agent in a worktree stays that
   // worktree's whichever branch it is on now (`worktreeSessionRow`).
   const sessions = worktrees.map((wt) =>
@@ -118,16 +115,16 @@ export async function getSidebarSnapshot(): Promise<SidebarModel> {
 export function getSyncState(): SyncState {
   const cwd = requireRepo();
   const { config, provider, configured } = resolveProvider(cwd);
-  const remote = pullRequests.getState(cwd);
+  const remote = pullRequests.getSnapshot(cwd);
   return {
     providerId: provider?.id ?? null,
     providerConfigured: configured,
     lastRemoteSyncAt: remote.fetchedAt,
     lastGitSyncAt: getSyncDecorations().lastGitSyncAt,
     remoteError: remote.error,
-    remoteSyncing: remote.inflight,
+    remoteSyncing: remote.refreshing,
     remoteIntervalMs: pullRequestPollIntervalMs(config.prPollInterval),
-    remoteFetches: remote.fetchCount,
+    remoteFetches: pullRequests.fetchCount(),
   };
 }
 
@@ -137,13 +134,11 @@ export function getSyncState(): SyncState {
  * Deeper than a poll on purpose: a provider may hold per-row answers
  * well beyond one response — Azure remembers a settled CI verdict for
  * ten minutes — and answering a button from memory is what makes the
- * button look broken. Pressing it says "I think something has changed".
+ * button look broken. The engine has the provider forget when this
+ * refresh's own request starts.
  */
 export async function refreshRemote(): Promise<void> {
-  const cwd = requireRepo();
-  const { config, provider } = resolveProvider(cwd);
-  provider?.forgetPullRequestCache?.(config.vendorProject);
-  await pullRequests.readPullRequests(cwd, { force: true });
+  await pullRequests.refresh(requireRepo());
 }
 
 /**
@@ -155,26 +150,5 @@ export async function refreshRemote(): Promise<void> {
  * from the list, and nothing a provider caches per row carries them.
  */
 export async function refreshPrList(): Promise<void> {
-  await pullRequests.readPullRequests(requireRepo(), { force: true });
-}
-
-/**
- * The credentials changed: drop what the old ones fetched and go and
- * find out whether the new ones work.
- *
- * The error is cleared before the attempt rather than after it,
- * because it describes a state that no longer exists — leaving
- * "Azure DevOps rejected the access token" on screen after the token
- * has been replaced is what made a correct fix look like it had not
- * taken. If the new credentials are wrong too, the fetch says so
- * within a round trip.
- */
-export function onCredentialsChanged(): void {
-  pullRequests.forgetCredentials(requireRepo());
-  notifyRemoteUpdated();
-}
-
-/** Test hook: forget cached remote data. */
-export function resetRemoteCache(): void {
-  pullRequests.reset();
+  await pullRequests.read(requireRepo(), { force: true });
 }

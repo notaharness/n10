@@ -8,7 +8,7 @@ import {
   type SettingsField,
 } from '@n10/core';
 import { PROVIDERS, requireRepo } from './repo.js';
-import { onCredentialsChanged } from './sidebar.js';
+import { pullRequests } from './pull-requests.js';
 import { startRemoteSyncLoop } from './remote-sync.js';
 import { SECRET_PLACEHOLDER } from '../contract.js';
 import type { SettingsFieldView, SettingsGroup } from '../contract.js';
@@ -131,14 +131,10 @@ function runSettingsEffects(effects: SettingsEffect[]): void {
   for (const effect of effects) {
     switch (effect) {
       case 'reset-provider-cache':
-        // Every provider, not just the selected one: on a `vendor`
-        // change the stale entries belong to the provider being left,
-        // and switching back within its TTL would serve answers
-        // fetched under the old configuration.
-        for (const provider of PROVIDERS) provider.resetCaches?.();
+        pullRequests.credentialsChanged();
         break;
       case 'refresh-remote':
-        onCredentialsChanged();
+        void pullRequests.refresh(requireRepo());
         break;
       case 'restart-sync-loop':
         startRemoteSyncLoop(requireRepo());

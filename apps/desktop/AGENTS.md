@@ -36,9 +36,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - Sidebar answers are stamped with the repo they describe
   (`getSidebarSnapshot`) and the renderer drops answers for a repo it is not
   showing (`loadSidebarModel`). A switch is in flight for several awaits.
-- The pull request list is fetched once per interval in core's cache
-  (`services/pull-requests.ts`); `services/sidebar.ts`, babysitters and the
-  sync loop all read it there. Do not call the provider from a second place.
+- The pull request list is `@n10/engine`'s, one instance in
+  `services/pull-requests.ts`; `services/sidebar.ts`, babysitters, the sync
+  loop and settings effects all go through it. The renderer is told only of
+  changes it would paint. Do not call the provider's list from a second place.
 - Babysitters (`services/babysit.ts`) live per repo in memory, sit out while
   another repo is open, stop when their worktree is removed, and push only
   `spawned` and `ended`; everything else rides on the sidebar poll.

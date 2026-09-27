@@ -17,8 +17,7 @@ const state = vi.hoisted(() => ({
   fields: [] as SettingsField[],
   persisted: [] as { key: string; value: string | undefined }[],
   syncRestarts: 0,
-  cacheResets: 0,
-  otherCacheResets: 0,
+  credentialChanges: 0,
   remoteRefreshes: 0,
   effects: [] as SettingsEffect[],
   effectsAskedFor: [] as string[],
@@ -27,29 +26,18 @@ const state = vi.hoisted(() => ({
 
 vi.mock('./repo.js', () => ({
   requireRepo: () => '/repo',
-  PROVIDERS: [
-    {
-      id: 'azure-devops',
-      resetCaches: () => {
-        state.cacheResets += 1;
-      },
-    },
-    // A second provider, and one with nothing to forget: switching
-    // vendors has to clear the one being *left*, and must not assume
-    // every provider implements the hook.
-    {
-      id: 'github',
-      resetCaches: () => {
-        state.otherCacheResets += 1;
-      },
-    },
-    { id: 'nothing-to-forget' },
-  ],
+  PROVIDERS: [{ id: 'azure-devops' }, { id: 'github' }],
 }));
 
-vi.mock('./sidebar.js', () => ({
-  onCredentialsChanged: () => {
-    state.remoteRefreshes += 1;
+vi.mock('./pull-requests.js', () => ({
+  pullRequests: {
+    credentialsChanged: () => {
+      state.credentialChanges += 1;
+    },
+    refresh: () => {
+      state.remoteRefreshes += 1;
+      return Promise.resolve({});
+    },
   },
 }));
 
@@ -107,8 +95,7 @@ beforeEach(() => {
   state.fields = [field()];
   state.persisted = [];
   state.syncRestarts = 0;
-  state.cacheResets = 0;
-  state.otherCacheResets = 0;
+  state.credentialChanges = 0;
   state.remoteRefreshes = 0;
   state.effects = [];
   state.effectsAskedFor = [];
@@ -188,16 +175,14 @@ describe('updateSettingsFromView', () => {
       expect(state.syncRestarts).toBe(1);
     });
 
-    it('clears every provider, not just the selected one', () => {
-      // On a `vendor` change the stale entries belong to the provider
-      // being left. Clearing only the incoming one leaves the outgoing
-      // provider's cache intact, and switching back inside its TTL
-      // serves answers fetched under the old configuration.
+    it('hands a provider change to the pull request list', () => {
+      // Which caches that clears — every provider's, and every
+      // repository's list — is the engine's, and asserted there.
       state.effects = ['reset-provider-cache'];
       state.fields = [field({ label: 'Vendor', key: 'vendor' })];
       updateSettingsFromView({ label: 'Vendor', key: 'vendor' }, 'github');
-      expect(state.cacheResets).toBe(1);
-      expect(state.otherCacheResets).toBe(1);
+      expect(state.credentialChanges).toBe(1);
+      expect(state.remoteRefreshes).toBe(0);
     });
 
     it('drops the provider cache and fetches now for a credential change', () => {
@@ -218,7 +203,7 @@ describe('updateSettingsFromView', () => {
         { label: 'Personal Access Token', key: 'pat' },
         'ado_rotated'
       );
-      expect(state.cacheResets).toBe(1);
+      expect(state.credentialChanges).toBe(1);
       expect(state.remoteRefreshes).toBe(1);
       expect(state.syncRestarts).toBe(1);
     });
@@ -240,7 +225,7 @@ describe('updateSettingsFromView', () => {
       // Nothing was written, so there is nothing to invalidate — and a
       // refetch here would fire on every visit to the settings page.
       expect(state.effectsAskedFor).toEqual([]);
-      expect(state.cacheResets).toBe(0);
+      expect(state.credentialChanges).toBe(0);
       expect(state.remoteRefreshes).toBe(0);
     });
   });
