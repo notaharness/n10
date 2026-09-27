@@ -278,9 +278,14 @@ from its own post context, so a draft is marked posted in the repository it was
 posted to.
 
 Agents, the TUI and the desktop all rewrite the file. Each read-modify-write
-runs under an O_EXCL lock file beside it; a lock older than five seconds belongs
-to a dead writer and is taken over. Readers take no lock: writes go to a unique
-temporary file and are renamed into place.
+runs under a lock file beside it (`file-lock.ts`) holding its owner's host, pid
+and a nonce. A holder releases the lock only while it still holds its token. A
+waiter takes over only from a holder shown to be gone: a process on this machine
+that no longer exists, or a lock older than a minute when the holder cannot be
+checked. It does so under a second lock, re-checking the token, so two waiters
+cannot both break it. A live holder is waited for, and a waiter gives up loudly
+after ten seconds. Readers take no lock: writes go to a unique temporary file
+and are renamed into place.
 
 ## Diff generation and rendering
 

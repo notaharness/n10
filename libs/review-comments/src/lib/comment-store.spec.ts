@@ -1,14 +1,13 @@
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdtempSync,
   readdirSync,
   rmSync,
-  utimesSync,
   writeFileSync,
   mkdirSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -205,9 +204,9 @@ describe('appendComment', () => {
   it('takes over a lock left by a writer that died holding it', () => {
     const lock = `${store.commentFilePath(SCOPE)}.lock`;
     mkdirSync(store.commentDirPath(SCOPE), { recursive: true });
-    writeFileSync(lock, '');
-    const aMinuteAgo = new Date(Date.now() - 60_000);
-    utimesSync(lock, aMinuteAgo, aMinuteAgo);
+    // A process that has exited, as a writer killed mid-write would be.
+    const { pid } = spawnSync(process.execPath, ['-e', '']);
+    writeFileSync(lock, JSON.stringify({ host: hostname(), pid, id: 'x' }));
 
     store.appendComment(SCOPE, comment('one'));
     expect(store.readComments(SCOPE).map((c) => c.id)).toEqual(['one']);

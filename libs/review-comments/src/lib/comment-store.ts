@@ -3,14 +3,12 @@ import {
   writeFileSync,
   mkdirSync,
   renameSync,
-  openSync,
-  closeSync,
   rmSync,
-  statSync,
 } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { withFileLock } from './file-lock.js';
 import type { ReviewComment, ReviewCommentsFile } from './types.js';
 
 const REVIEWS_DIR = join(homedir(), '.n10', 'reviews');
@@ -93,45 +91,6 @@ export function readComments(scope: DraftScope): ReviewComment[] {
   }
 }
 
-/** A lock older than this belongs to a writer that died holding it:
- *  the critical section is one small file's read and rewrite. */
-const LOCK_STALE_MS = 5_000;
-/** Longer than {@link LOCK_STALE_MS}, so a dead writer's lock is
- *  always broken before a live one gives up waiting. */
-const LOCK_TIMEOUT_MS = 10_000;
-const LOCK_RETRY_MS = 5;
-
-function sleepSync(ms: number): void {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
-
-function lockAgeMs(lockPath: string): number {
-  try {
-    return Date.now() - statSync(lockPath).mtimeMs;
-  } catch {
-    return 0; // Released between the two calls: just try again.
-  }
-}
-
-function acquireLock(lockPath: string): void {
-  const deadline = Date.now() + LOCK_TIMEOUT_MS;
-  for (;;) {
-    try {
-      closeSync(openSync(lockPath, 'wx'));
-      return;
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
-    }
-    if (lockAgeMs(lockPath) > LOCK_STALE_MS) {
-      rmSync(lockPath, { force: true });
-    } else if (Date.now() > deadline) {
-      throw new Error(`Timed out waiting for ${lockPath}`);
-    } else {
-      sleepSync(LOCK_RETRY_MS);
-    }
-  }
-}
-
 /**
  * Read, change and rewrite a PR's drafts as one transaction.
  *
@@ -139,8 +98,8 @@ function acquireLock(lockPath: string): void {
  * `n10 util add-comment`, the TUI and the desktop. Two of them
  * interleaved would each write back the snapshot it read, and the
  * second would silently drop the first's change — so the whole
- * read-modify-write runs under a lock file created with O_EXCL, which
- * only one process can hold. Readers take no lock: the new content is
+ * read-modify-write runs under a lock file only one process can hold
+ * (`file-lock.ts`). Readers take no lock: the new content is
  * written to a temporary file and renamed into place, so a read sees
  * the old file or the new one, never a partial write.
  *
@@ -154,9 +113,7 @@ function modifyComments(
   const dir = commentDirPath(scope);
   mkdirSync(dir, { recursive: true });
   const filePath = join(dir, 'comments.json');
-  const lockPath = `${filePath}.lock`;
-  acquireLock(lockPath);
-  try {
+  return withFileLock(`${filePath}.lock`, () => {
     const comments = readComments(scope);
     if (!change(comments)) return false;
     const data: ReviewCommentsFile = { prId: scope.prId, comments };
@@ -169,9 +126,7 @@ function modifyComments(
       throw err;
     }
     return true;
-  } finally {
-    rmSync(lockPath, { force: true });
-  }
+  });
 }
 
 export function appendComment(scope: DraftScope, comment: ReviewComment): void {
