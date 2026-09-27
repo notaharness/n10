@@ -100,7 +100,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `comments/MentionPicker.tsx`); a display name is only ever shown.
 - Drafts are filed as one native review through core's
   `pull-requests/submit-review.ts`; the provider's ledger lives in the
-  drafts file, so an unanswered step is looked for, never re-sent. An
+  drafts file, so an unanswered step is looked for, never re-sent. Azure
+  DevOps has no grouped review: each comment posts as it goes and the
+  vote is cast last, so a failure leaves what posted as posted. An
   inline draft being posted or maybe posted is shown, locked; a reply
   draft in that state is not yet shown in its thread.
 - Diffs are whole-file (`-U99999`), folded client-side

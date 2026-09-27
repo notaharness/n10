@@ -6,6 +6,7 @@ import {
   type LedgerStore,
   type PublishedReview,
   type RepositoryRef,
+  type ReviewEvent,
   type ReviewItem,
   type ReviewLedger,
   type ReviewSubmission,
@@ -56,6 +57,12 @@ export async function publishGitHubReview(
 ): Promise<PublishedReview> {
   const [owner, repo] = repository.repository.split('/');
   if (!owner || !repo) throw new Error('GitHub project not configured');
+  if (!GITHUB_EVENTS.includes(submission.event)) {
+    throw new ReviewPublishError(
+      'refused',
+      'GitHub reviews Comment, Approve or Request changes; it has no other verdict'
+    );
+  }
   const pr = await readState(gql, owner, repo, submission.prId);
   const run = new Run(gql, store, submission);
   // An earlier attempt may have got as far as the submit.
@@ -332,6 +339,13 @@ class Run {
     this.store.write(this.ledger);
   }
 }
+
+/** The verdicts `submitPullRequestReview` takes. */
+const GITHUB_EVENTS: readonly ReviewEvent[] = [
+  'COMMENT',
+  'APPROVE',
+  'REQUEST_CHANGES',
+];
 
 /** Steps that are not an item's; each is accounted for where it is sent. */
 const STEPS = new Set(['review', 'discard', 'submit']);

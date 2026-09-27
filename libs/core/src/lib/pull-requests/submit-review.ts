@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import {
   isOid,
-  isReviewPublishError,
+  CHANGES_EVENTS,
+  REVIEW_EVENTS,
   type LedgerStore,
   type Oid,
   type PublishedReview,
@@ -17,7 +18,7 @@ import {
   writeDraftFile,
   type DraftFile,
 } from './review-draft-store.js';
-import type { Publication, ReviewDraft } from './review-draft-types.js';
+import type { ReviewDraft } from './review-draft-types.js';
 import {
   parseDraftsRequest,
   type DraftSources,
@@ -25,6 +26,13 @@ import {
   type ReviewDrafts,
 } from './review-drafts.js';
 import { withSubmitClaim } from './submit-claims.js';
+import {
+  afterFailure,
+  forgetPosted,
+  ownedBy,
+  settled,
+  summarySent,
+} from './submit-outcome.js';
 
 /**
  * The reviewer's chosen drafts filed as one native review, by identity.
@@ -60,13 +68,14 @@ export type SubmitSources = DraftSources & {
   ) => Promise<PublishedReview>;
 };
 
-const EVENTS: readonly string[] = ['COMMENT', 'APPROVE', 'REQUEST_CHANGES'];
-
 export function parseSubmitReviewRequest(value: unknown): SubmitReviewRequest {
   const base = parseDraftsRequest(value);
   const { head, event, draftIds } = value as Record<string, unknown>;
   if (!isOid(head)) throw new TypeError('Invalid head commit');
-  if (typeof event !== 'string' || !EVENTS.includes(event)) {
+  if (
+    typeof event !== 'string' ||
+    !(REVIEW_EVENTS as readonly string[]).includes(event)
+  ) {
     throw new TypeError('Invalid review event');
   }
   if (
@@ -109,7 +118,14 @@ async function submitClaimed(
   const drafts = new DraftsFile(dir, req.ref, viewer);
   const file = drafts.read();
   const chosen = choose(file, req.draftIds);
-  const submission = toSubmission(req, chosen);
+  // Comments an earlier attempt of this review already posted (Azure
+  // DevOps shows each as it goes) say something too.
+  const said = file.drafts.some(
+    (d) =>
+      d.publication.state === 'published' &&
+      d.publication.attempt === file.submission?.attempt
+  );
+  const submission = toSubmission(req, chosen, said);
   const attempt = file.submission?.attempt ?? randomUUID();
   const before = file.submission?.draftIds ?? [];
   const held = heldBack(file, chosen);
@@ -148,6 +164,7 @@ async function submitClaimed(
     resumed = published.resumed && { state: published.resumed.state };
   } catch (err) {
     const unanswered = ledger.read()?.inFlight != null;
+    forgetPosted(ledger, err);
     drafts.update((f) => ({
       ...f,
       drafts: f.drafts.map((d) => {
@@ -214,7 +231,8 @@ function choose(file: DraftFile, ids: string[]): ReviewDraft[] {
 
 function toSubmission(
   req: SubmitReviewRequest,
-  chosen: ReviewDraft[]
+  chosen: ReviewDraft[],
+  said: boolean
 ): ReviewSubmission {
   const summary = chosen.find((d) => d.target.kind === 'summary');
   const items = chosen.flatMap((d): ReviewItem[] => {
@@ -238,16 +256,13 @@ function toSubmission(
       },
     ];
   });
-  if (
-    req.event === 'REQUEST_CHANGES' &&
-    !summary?.body.trim() &&
-    !items.length
-  ) {
+  const says = Boolean(summary?.body.trim()) || items.length > 0 || said;
+  if (CHANGES_EVENTS.includes(req.event) && !says) {
     throw new Error(
       'Say what needs to change: write a summary or choose a comment'
     );
   }
-  if (req.event === 'COMMENT' && !summary?.body.trim() && !items.length) {
+  if (req.event === 'COMMENT' && !says) {
     throw new Error(
       'There is nothing to post: write a summary or choose a comment'
     );
@@ -284,6 +299,8 @@ function publicationFor(
   attempt: string,
   at: number
 ): ReviewDraft {
+  // Posted is posted, whichever attempt did it.
+  if (d.publication.state === 'published') return d;
   if (chosen.some((c) => c.id === d.id)) {
     return { ...d, publication: { state: 'publishing', attempt, since: at } };
   }
@@ -294,81 +311,4 @@ function publicationFor(
     return { ...d, publication: { state: 'unpublished' } };
   }
   return d;
-}
-
-/** Marked by this attempt (being posted, or held back maybe posted),
- *  and not settled since. */
-function ownedBy(d: ReviewDraft, attempt: string): boolean {
-  const p = d.publication;
-  return (
-    (p.state === 'publishing' || p.state === 'unknown') && p.attempt === attempt
-  );
-}
-
-/**
- * The summary text the filed review carries, as n10's: what this
- * submit sent, or — for a review already filed — the review's own text
- * when it is the summary draft's, whoever filed it.
- */
-function summarySent(
-  chosen: ReviewDraft[],
-  published: PublishedReview
-): (d: ReviewDraft) => boolean {
-  if (!published.resumed) {
-    const sent = chosen.some((d) => d.target.kind === 'summary');
-    return () => sent;
-  }
-  const { body } = published.resumed;
-  return (d) => body.trim() !== '' && d.body === body;
-}
-
-/**
- * Where a draft stands once the review is filed: posted when the
- * review holds it (an item by its comment, the summary as the review's
- * own text when it went with the submit), or back to unpublished when
- * this attempt chose it and the review filed does not hold it.
- */
-function settled(
-  d: ReviewDraft,
-  published: PublishedReview,
-  summary: (d: ReviewDraft) => boolean,
-  attempt: string,
-  at: number
-): ReviewDraft {
-  const remoteId =
-    published.items[d.id] ??
-    (d.target.kind === 'summary' && summary(d) ? published.reviewId : null);
-  if (remoteId) {
-    return { ...d, publication: { state: 'published', attempt, remoteId, at } };
-  }
-  return ownedBy(d, attempt)
-    ? { ...d, publication: { state: 'unpublished' } }
-    : d;
-}
-
-/**
- * Where a draft stands after a failed attempt. Unanswered: it may be in
- * the review, so it is looked for next time. Refused at an item: that
- * draft carries the provider's reason and can be edited; the others
- * were not refused and are as they were. Refused at the review itself:
- * every draft carries the reason. Stopped before any write (the pull
- * request moved on, a pending review of the reviewer's own): as it was.
- */
-function afterFailure(
-  d: ReviewDraft,
-  err: unknown,
-  unanswered: boolean,
-  at: number
-): Publication {
-  const { attempt } = d.publication as { attempt: string };
-  const reason = err instanceof Error ? err.message : String(err);
-  // A step of this or an earlier attempt is still unaccounted for.
-  if (unanswered) return { state: 'unknown', attempt, since: at };
-  if (!isReviewPublishError(err)) {
-    // The read before any write failed: nothing was sent.
-    return { state: 'failed', attempt, reason, at };
-  }
-  if (err.failure !== 'refused') return { state: 'unpublished' };
-  if (err.item && err.item !== d.id) return { state: 'unpublished' };
-  return { state: 'failed', attempt, reason, at };
 }
