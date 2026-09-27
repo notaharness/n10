@@ -3,7 +3,7 @@
     "repository": {
       "pullRequest": {
         "latestReviews": {
-          "totalCount": 4,
+          "totalCount": 3,
           "pageInfo": {
             "hasNextPage": false,
             "endCursor": "rev-2"
@@ -23,7 +23,7 @@
                 "id": "U_fay",
                 "name": "Fay"
               },
-              "state": "APPROVED"
+              "state": "COMMENTED"
             }
           ]
         }

@@ -442,7 +442,14 @@ describe('githubProvider', () => {
                 reviews: {
                   nodes: [{ author: { login: 'bob' }, state: 'APPROVED' }],
                 },
-                reviewRequests: { nodes: [] },
+                // Bob is asked again after approving; carol for the
+                // first time.
+                reviewRequests: {
+                  nodes: [
+                    { requestedReviewer: { login: 'Bob' } },
+                    { requestedReviewer: { login: 'carol' } },
+                  ],
+                },
                 reviewThreads: {
                   nodes: [
                     { isResolved: false },
@@ -505,6 +512,13 @@ describe('githubProvider', () => {
             displayName: 'bob',
             identifier: 'bob',
             decision: 'approved',
+            requested: true,
+          },
+          {
+            displayName: 'carol',
+            identifier: 'carol',
+            decision: 'no-response',
+            requested: true,
           },
         ],
         buildStatus: 'succeeded',

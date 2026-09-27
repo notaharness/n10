@@ -211,17 +211,22 @@ export function mapRollupState(
 function transformSearchNode(node: SearchPrNode): PullRequestInfo {
   const reviewers = latestReviewPerUser(node.reviews.nodes);
 
-  // Merge requested reviewers who haven't submitted a review yet
-  const reviewedLogins = new Set(
-    reviewers.map((r) => r.identifier.toLowerCase())
+  // Everyone with an open request is asked, including someone asked
+  // again after their verdict, who keeps it.
+  const byLogin = new Map(
+    reviewers.map((r) => [r.identifier.toLowerCase(), r])
   );
   for (const req of node.reviewRequests.nodes) {
     const login = req.requestedReviewer?.login;
-    if (login && !reviewedLogins.has(login.toLowerCase())) {
+    if (!login) continue;
+    const reviewed = byLogin.get(login.toLowerCase());
+    if (reviewed) reviewed.requested = true;
+    else {
       reviewers.push({
         displayName: login,
         identifier: login,
         decision: 'no-response',
+        requested: true,
       });
     }
   }

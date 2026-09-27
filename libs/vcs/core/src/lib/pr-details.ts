@@ -217,18 +217,20 @@ export interface DetailReviewer {
   /** The provider holds an open request for their review. Someone can
    *  be asked again after giving a verdict, so this and `decision` are
    *  separate facts. Azure DevOps keeps no request apart from its list,
-   *  so there a listed reviewer who has not voted is asked; flagging a
-   *  reviewer for attention is not a request. */
+   *  so there a listed reviewer who has neither voted nor declined is
+   *  asked; flagging a reviewer for attention is not a request. */
   requested: boolean;
   /** Required by the provider's own rules, or null where the provider
    *  does not say. */
   required: boolean | null;
   /** Why the provider asked for them, where it says: as a code owner of
    *  the changed files, or by a branch policy. A code owner's review is
-   *  not required unless a rule makes it so. */
+   *  not required unless a rule makes it so, and a required reviewer
+   *  someone added by hand has no reason. */
   reason: 'code-owner' | 'policy' | null;
-  /** The teams their review answered for (`org/slug`): a team's request
-   *  is met, and leaves the list, once a member reviews for it. */
+  /** The teams or groups their review answered for. On GitHub a team's
+   *  request is met, and leaves the list, once a member reviews for it;
+   *  on Azure DevOps the group stays listed with its members' vote. */
   onBehalfOf: string[];
   /** The commit the verdict was given on; null for no verdict or where
    *  the provider does not say. A verdict on an older commit is not an

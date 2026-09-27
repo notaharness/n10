@@ -271,9 +271,9 @@ describe('fetchPullRequestDetailGitHub: reviewers', () => {
 
     expect(reviewers).toMatchObject({ total: 7, complete: true });
     expect(reviewers.items).toEqual([
-      // Approved an older commit, replied in a thread since — which
-      // GitHub files as a COMMENTED review — and was asked again. The
-      // approval stands, and so does which commit it judged.
+      // Approved an older commit and was asked again: the approval
+      // stands, and so does which commit it judged. GitHub leaves
+      // someone with an open request out of latestReviews.
       reviewer({
         identifier: 'Bea',
         id: 'U_bea',
@@ -292,6 +292,8 @@ describe('fetchPullRequestDetailGitHub: reviewers', () => {
         onBehalfOf: ['acme/web'],
         reviewedHead: '1'.repeat(40),
       }),
+      // Approved, then replied in a thread, which GitHub files as a
+      // COMMENTED review: the approval is what stands.
       reviewer({
         identifier: 'fay',
         id: 'U_fay',

@@ -66,20 +66,12 @@
           ]
         },
         "latestReviews": {
-          "totalCount": 4,
+          "totalCount": 3,
           "pageInfo": {
             "hasNextPage": true,
             "endCursor": "rev-1"
           },
           "nodes": [
-            {
-              "author": {
-                "login": "Bea",
-                "id": "U_bea",
-                "name": "Bea"
-              },
-              "state": "COMMENTED"
-            },
             {
               "author": {
                 "login": "cy",
