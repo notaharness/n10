@@ -30,6 +30,15 @@ interface RawIdentity {
   descriptor?: string;
 }
 
+/** Who opened it, by the name Azure DevOps gives, or its id where it
+ *  gives none; no one where it names no one. */
+function authorOf(who: RawIdentity | undefined) {
+  const identifier = who?.uniqueName || who?.id;
+  return identifier
+    ? { identifier, displayName: who?.displayName || identifier }
+    : null;
+}
+
 interface RawReviewer extends RawIdentity {
   vote?: number;
   hasDeclined?: boolean;
@@ -243,10 +252,7 @@ function detailOf(
     ref: { ...ownRepository(config, raw), number },
     title: raw.title ?? '',
     url: `https://dev.azure.com/${config.org}/${config.project}/_git/${config.repo}/pullrequest/${number}`,
-    author: {
-      identifier: raw.createdBy?.uniqueName ?? '',
-      displayName: raw.createdBy?.displayName || 'Unknown',
-    },
+    author: authorOf(raw.createdBy),
     lifecycle: lifecycle(raw),
     source: {
       branch: branch(raw.sourceRefName),

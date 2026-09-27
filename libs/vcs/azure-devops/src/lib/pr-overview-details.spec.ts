@@ -191,6 +191,24 @@ describe('fetchPullRequestDetail (Azure DevOps): identity', () => {
     expect((await read()).source.repository).toBeNull();
   });
 
+  it('names the author Azure names, by id where it gives no name, and invents none', async () => {
+    const ID = 'a0a0a0a0-0000-4000-8000-000000000009';
+    serve(
+      editedPr((pr) => {
+        pr.createdBy = { id: ID };
+      })
+    );
+    expect((await read()).author).toEqual({ identifier: ID, displayName: ID });
+
+    resetAdoTransport();
+    serve(
+      editedPr((pr) => {
+        delete pr.createdBy;
+      })
+    );
+    expect((await read()).author).toBeNull();
+  });
+
   it('refuses a status it does not know, or a pull request nothing names a head for', async () => {
     const noMerge = editedPr((pr) => {
       delete pr.lastMergeSourceCommit;

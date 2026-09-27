@@ -224,8 +224,9 @@ export interface DetailReviewer {
    *  asked; flagging a reviewer for attention is not a request. */
   requested: boolean;
   /** Flagged for attention without touching their vote — Azure DevOps'
-   *  "request attention". False where the provider has no such flag. */
-  attention: boolean;
+   *  "request attention". Null where the provider has no such flag, so
+   *  "not flagged" and "cannot be flagged" stay apart. */
+  attention: boolean | null;
   /** Required by the provider's own rules, or null where the provider
    *  does not say. */
   required: boolean | null;
@@ -270,7 +271,9 @@ export interface PullRequestDetail {
   ref: PullRequestRef;
   title: string;
   url: string;
-  author: { identifier: string; displayName: string };
+  /** Who opened it, or null where the provider names no one. GitHub
+   *  names a deleted account `ghost`, as it shows one. */
+  author: { identifier: string; displayName: string } | null;
   lifecycle: PullRequestLifecycle;
   source: {
     branch: string;
@@ -279,6 +282,13 @@ export interface PullRequestDetail {
     repository: RepositoryRef | null;
     head: Oid;
   };
+  /**
+   * The target branch, and the commit this head was compared with —
+   * not necessarily the branch's head now. On Azure DevOps it is the
+   * target recorded with the newest iteration, which stays put when
+   * the branch moves without a push to the pull request; on GitHub it
+   * is `baseRefOid`. Null where not given.
+   */
   target: { branch: string; head: Oid | null };
   createdAt: string | null;
   updatedAt: string | null;

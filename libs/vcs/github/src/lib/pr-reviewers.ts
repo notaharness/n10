@@ -156,7 +156,8 @@ const NOBODY: Omit<DetailReviewer, 'kind' | 'identifier' | 'displayName'> = {
   decision: 'no-response',
   native: null,
   requested: false,
-  attention: false,
+  // GitHub has no flag apart from a request.
+  attention: null,
   required: null,
   reason: null,
   onBehalfOf: [],
