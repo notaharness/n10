@@ -20,22 +20,14 @@ export function focusIsLost(): boolean {
 }
 
 /**
- * Focus `target` when focus is lost, from the next frame and for as
- * long as the control going away may still take it (`settleMs`): a
- * toast's button keeps focus until the toast unmounts, and then hands
- * it back to whatever it held before, which may be gone too; a prompt
- * that replaces a closed composer may not be mounted or enabled at the
- * first frame. Focus the reader moved somewhere visible themselves
- * stays where it is.
+ * Focus `target` once React has drawn the next frame, if focus was lost
+ * on the way. Focus the reader moved somewhere visible themselves stays
+ * where it is.
  */
 export function refocusAfter(
-  target: () => HTMLElement | null | undefined,
-  settleMs = 1000
+  target: () => HTMLElement | null | undefined
 ): void {
-  const until = performance.now() + settleMs;
-  const check = () => {
+  requestAnimationFrame(() => {
     if (focusIsLost()) target()?.focus({ preventScroll: true });
-    if (performance.now() < until) requestAnimationFrame(check);
-  };
-  requestAnimationFrame(check);
+  });
 }
