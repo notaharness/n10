@@ -111,7 +111,7 @@
       "reviewerUrl": "https://dev.azure.com/contoso/Fabrikam/_apis/git/repositories/5b0c8e8a-1f3e-4c4e-9d3a-2f6b7c8d9e01/pullRequests/4211/reviewers/00000000-0000-4000-8000-000000000003",
       "vote": -5,
       "hasDeclined": false,
-      "isFlagged": false,
+      "isFlagged": true,
       "displayName": "Cai Moss",
       "url": "https://spsprodeus27.vssps.visualstudio.com/_apis/Identities/00000000-0000-4000-8000-000000000003",
       "_links": {

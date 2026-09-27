@@ -7,6 +7,7 @@ import {
   type PullRequestDetail,
   type PullRequestIteration,
   type PullRequestLifecycle,
+  type ReadOutcome,
   type RepositoryRef,
 } from '@n10/vcs-core';
 import { authHeaders, baseUrl, type AdoConfig } from './client.js';
@@ -124,7 +125,7 @@ function sourceRepository(
 /** An Azure DevOps group or team: said by the deprecated flag, or by a
  *  group descriptor. */
 function isGroup(raw: RawIdentity): boolean {
-  return raw.isContainer ?? /^(vssgp|aadgp)\./.test(raw.descriptor ?? '');
+  return raw.isContainer ?? /^(vssgp|aadgp|ungrp)\./.test(raw.descriptor ?? '');
 }
 
 /** How a reviewer is named and compared. */
@@ -194,29 +195,41 @@ function newestIteration(
   return newest;
 }
 
+interface Revision {
+  head: string | null;
+  /** The target the head was compared with. */
+  target: string | null;
+  iteration: PullRequestIteration | null;
+}
+
 /**
- * The head, and the iteration that pushed it. `lastMergeSourceCommit`
- * is the source as Azure last merged it, and lags a push until the
- * merge runs again; the newest iteration does not. A merged commit no
- * iteration lists yet is a push the iterations read missed, and names
- * no iteration.
+ * The head, the target it was compared with, and the iteration that
+ * pushed it — one comparison, never the source of one paired with the
+ * target of another. `lastMerge*Commit` is the pair as Azure last
+ * merged it, and lags a push until the merge runs again; the newest
+ * iteration does not. A merged commit no iteration lists yet is a push
+ * the iterations read missed, and names no iteration.
  */
 function revision(
   raw: RawPullRequest,
   iterations: readonly RawIteration[] | null
-): { head: string | null; iteration: PullRequestIteration | null } {
-  const merged = oid(raw.lastMergeSourceCommit);
+): Revision {
+  const merged = {
+    head: oid(raw.lastMergeSourceCommit),
+    target: oid(raw.lastMergeTargetCommit),
+    iteration: null,
+  };
   const newest = iterations && newestIteration(iterations);
-  if (!newest) return { head: merged, iteration: null };
-  const listed = iterations.some((i) => oid(i.sourceRefCommit) === merged);
-  if (merged && !listed) return { head: merged, iteration: null };
-  return { head: newest.source, iteration: newest };
+  if (!newest) return merged;
+  const listed = iterations.some((i) => oid(i.sourceRefCommit) === merged.head);
+  if (merged.head && !listed) return merged;
+  return { head: newest.source, target: newest.target, iteration: newest };
 }
 
 function detailOf(
   config: AdoConfig,
   raw: RawPullRequest,
-  head: string | null,
+  { head, target }: Revision,
   iteration: PullRequestDetail['iteration']
 ): PullRequestDetail {
   const number = raw.pullRequestId ?? 0;
@@ -242,7 +255,7 @@ function detailOf(
     },
     target: {
       branch: branch(raw.targetRefName),
-      head: oid(raw.lastMergeTargetCommit),
+      head: target,
     },
     createdAt: raw.creationDate ?? null,
     // Azure keeps no time of the last change to a pull request.
@@ -256,6 +269,18 @@ function detailOf(
       },
     },
   };
+}
+
+/** A failed read's error again, with its kind and wait. */
+function failureOf(
+  outcome: Exclude<ReadOutcome<unknown>, { state: 'read' }>
+): VcsError {
+  if (outcome.state === 'unsupported') {
+    return new VcsError('unexpected-response', outcome.reason);
+  }
+  return new VcsError(outcome.kind, outcome.reason, {
+    retryAfterMs: outcome.retryAfterMs,
+  });
 }
 
 export async function fetchPullRequestDetailAzure(
@@ -287,14 +312,15 @@ export async function fetchPullRequestDetailAzure(
       readFailure
     ),
   ]);
-  const read = iterations.state === 'read' ? iterations.value : null;
-  const { head, iteration } = revision(raw, read);
-  return detailOf(
-    config,
-    raw,
-    head,
-    iterations.state === 'read'
-      ? { state: 'read', value: iteration }
-      : iterations
-  );
+  if (iterations.state !== 'read') {
+    const merged = revision(raw, null);
+    // Nothing else names the head: the failure is the iterations'.
+    if (!merged.head) throw failureOf(iterations);
+    return detailOf(config, raw, merged, iterations);
+  }
+  const current = revision(raw, iterations.value);
+  return detailOf(config, raw, current, {
+    state: 'read',
+    value: current.iteration,
+  });
 }

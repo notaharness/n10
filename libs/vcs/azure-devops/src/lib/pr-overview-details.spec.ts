@@ -208,10 +208,15 @@ describe('fetchPullRequestDetail (Azure DevOps): identity', () => {
       const err: unknown = await read().catch((e: unknown) => e);
       expect(isVcsError(err) && err.kind).toBe('unexpected-response');
     }
-    // With no merge yet, the newest iteration still names the head.
+    // With no merge yet, the newest iteration still names the head…
     resetAdoTransport();
     serve(noMerge);
     expect((await read()).source.head).toBe(HEAD);
+    // …and when that read fails, its failure is what the caller hears.
+    resetAdoTransport();
+    serve(noMerge, 500);
+    const err: unknown = await read().catch((e: unknown) => e);
+    expect(isVcsError(err) && err.kind).toBe('server');
   });
 
   it('reports a pull request Azure cannot find as not found', async () => {
@@ -246,7 +251,7 @@ describe('fetchPullRequestDetail (Azure DevOps): reviewers', () => {
     expect(reviewersOf(detail)).toMatchObject({ total: 10, complete: true });
   });
 
-  it('says who is asked, who is required by policy, and which group a vote counted for', async () => {
+  it('says who is asked, who is flagged, who is required, and which group a vote counted for', async () => {
     serve();
     const detail = await read();
     // Listed without a vote is asked; flagged for attention is still
@@ -263,12 +268,16 @@ describe('fetchPullRequestDetail (Azure DevOps): reviewers', () => {
       reason: null,
     });
 
+    // Flagged for attention, with or without a vote: the vote stands,
+    // and a flag is not a request.
     expect(
-      reviewersOf(detail).items.map((r) => [r.identifier, r.attention])
-    ).toContainEqual(['eli@contoso.example', true]);
-    expect(reviewersOf(detail).items.filter((r) => r.attention)).toHaveLength(
-      1
-    );
+      reviewersOf(detail)
+        .items.filter((r) => r.attention)
+        .map((r) => [r.identifier, r.native, r.requested])
+    ).toEqual([
+      ['cai@contoso.example', '-5', false],
+      ['eli@contoso.example', '0', true],
+    ]);
 
     // Groups by the flag or, where Azure leaves it out, by a group
     // descriptor. Required, but not said why: an author can mark a
@@ -295,6 +304,32 @@ describe('fetchPullRequestDetail (Azure DevOps): reviewers', () => {
     // Azure does not record which commit a vote was cast on.
     expect(sams.map((s) => s.reviewedHead)).toEqual([null, null]);
   });
+
+  it.each(['vssgp', 'aadgp', 'ungrp'])(
+    'knows a %s descriptor for a group without the flag',
+    async (prefix) => {
+      const group = { id: 'g1', descriptor: `${prefix}.Uy0x` };
+      serve(
+        editedPr((pr) => {
+          pr.reviewers = [
+            { ...group, vote: 0 },
+            {
+              id: 'u1',
+              uniqueName: 'u@example.com',
+              descriptor: 'aad.Uy0y',
+              vote: 10,
+              votedFor: [group],
+            },
+          ];
+        })
+      );
+      const items = reviewersOf(await read()).items;
+      expect(items.map((r) => r.kind)).toEqual(['team', 'user']);
+      // A group with no unique name is named by its id, both ways.
+      expect(items[0]?.identifier).toBe('g1');
+      expect(items[1]?.onBehalfOf).toEqual(['g1']);
+    }
+  );
 
   it('counts a reviewer it cannot name and does not call the list whole', async () => {
     serve(
@@ -326,10 +361,13 @@ describe('fetchPullRequestDetail (Azure DevOps): iteration', () => {
     serve(
       editedPr((pr) => {
         pr.lastMergeSourceCommit = { commitId: '2'.repeat(40) };
+        pr.lastMergeTargetCommit = { commitId: 'a'.repeat(40) };
       })
     );
     const detail = await read();
     expect(detail.source.head).toBe(HEAD);
+    // The target that head was compared with, not the lagging merge's.
+    expect(detail.target.head).toBe('b'.repeat(40));
     expect(detail.iteration).toMatchObject({ state: 'read', value: { id: 3 } });
   });
 
@@ -386,11 +424,14 @@ describe('fetchPullRequestDetail (Azure DevOps): cache', () => {
       true
     );
     await read();
-    expect(
-      mockFetch.mock.calls.filter(([url]) =>
-        /\/pullrequests\/4211\/iterations\?/.test(String(url))
-      )
-    ).toHaveLength(2);
+    for (const route of [
+      /\/pullrequests\/4211\?/,
+      /\/pullrequests\/4211\/iterations\?/,
+    ]) {
+      expect(
+        mockFetch.mock.calls.filter(([url]) => route.test(String(url)))
+      ).toHaveLength(2);
+    }
   });
 
   it('reads again after this account votes', async () => {
