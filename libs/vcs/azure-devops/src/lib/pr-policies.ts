@@ -60,6 +60,8 @@ export interface RawEvaluation {
     buildId?: number;
     buildDefinitionName?: string;
     isExpired?: boolean;
+    /** The build ran on an earlier push than the head. */
+    buildIsNotCurrent?: boolean;
     lastMergeSourceCommitId?: string;
   };
 }
@@ -166,21 +168,31 @@ function ranFacts(
   };
 }
 
+/**
+ * "If you set the policy trigger to Manual, users must queue the build
+ * themselves", and an expired approval is not re-queued either. Such a
+ * build waits for a person until one is queued for this revision: a
+ * queued evaluation with its current build is waiting for an agent.
+ */
+function waitsForSomeone(e: RawEvaluation): boolean {
+  if (typeOf(e) !== POLICY.build) return false;
+  if (e.configuration?.settings?.manualQueueOnly !== true) return false;
+  if (expired(e)) return true;
+  const build = e.context?.buildId;
+  const current = build != null && e.context?.buildIsNotCurrent !== true;
+  return e.status === 'queued' && !current;
+}
+
 function outcomeFacts(
   e: RawEvaluation
 ): Pick<PullRequestCheck, 'outcome' | 'native' | 'manual'> {
-  if (expired(e)) return { outcome: 'queued', native: 'expired' };
-  const facts = {
-    outcome: OUTCOME[e.status ?? ''] ?? 'unknown',
-    native: e.status ?? null,
-  };
-  // "If you set the policy trigger to Manual, users must queue the
-  // build themselves": queued, it waits for a person, not a runner.
-  const manual =
-    e.status === 'queued' &&
-    typeOf(e) === POLICY.build &&
-    e.configuration?.settings?.manualQueueOnly === true;
-  return manual ? { ...facts, manual } : facts;
+  const facts: Pick<PullRequestCheck, 'outcome' | 'native'> = expired(e)
+    ? { outcome: 'queued', native: 'expired' }
+    : {
+        outcome: OUTCOME[e.status ?? ''] ?? 'unknown',
+        native: e.status ?? null,
+      };
+  return waitsForSomeone(e) ? { ...facts, manual: true } : facts;
 }
 
 /** A build policy is one check per build it ran: a new build is a new

@@ -124,8 +124,31 @@ describe('policyCheck', () => {
         WHERE
       );
     expect(manual('queued')).toMatchObject({ outcome: 'queued', manual: true });
-    // Once queued by someone, it is under way like any other.
+    // Once queued by someone, it is under way like any other: running,
+    // or queued with a build for this revision, waiting for an agent.
     expect(manual('running')).not.toHaveProperty('manual');
+    const queued = (context: RawEvaluation['context']) =>
+      policyCheck(
+        evaluation(POLICY.build, 'queued', {
+          settings: { manualQueueOnly: true },
+          context,
+        }),
+        WHERE
+      );
+    expect(queued({ buildId: 9 })).not.toHaveProperty('manual');
+    expect(queued({ buildId: 9, buildIsNotCurrent: true })).toMatchObject({
+      manual: true,
+    });
+    // An expired approval is not queued again by itself either.
+    expect(
+      policyCheck(
+        evaluation(POLICY.build, 'approved', {
+          settings: { manualQueueOnly: true },
+          context: { buildId: 9, isExpired: true },
+        }),
+        WHERE
+      )
+    ).toMatchObject({ outcome: 'queued', native: 'expired', manual: true });
     expect(policyCheck(BUILD('queued'), WHERE)).not.toHaveProperty('manual');
   });
 
