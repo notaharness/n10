@@ -78,18 +78,24 @@ adding.
 
 ## Deploying
 
-The `Deploy website` workflow (`.github/workflows/deploy-website.yml`) runs
-on every push to master. It always runs `deploy:check`, a wrangler dry run
-that needs no credentials, and runs the real `deploy` once
-`CLOUDFLARE_API_TOKEN` exists. To go live:
+The site is the `n10-website` Worker, served at `n10.is` through the
+custom-domain route in `wrangler.jsonc` and at its `workers.dev` URL.
+The `Deploy website` workflow (`.github/workflows/deploy-website.yml`)
+runs on every push to master that affects the project, including changes
+to `desktop` (an implicit dependency, for the demo):
 
-1. Add `n10.is` as a zone in the Cloudflare account.
-2. Uncomment the `routes` entry in `wrangler.jsonc`. Until the zone exists,
-   `wrangler deploy` fails on the unresolvable route.
-3. Create an API token from Cloudflare's "Edit Cloudflare Workers" template,
-   scoped to this account and the `n10.is` zone, and add it as the
-   `CLOUDFLARE_API_TOKEN` repository secret.
-4. Add the account ID as the `CLOUDFLARE_ACCOUNT_ID` repository variable.
+- `deploy:check` builds and runs a wrangler dry run, which needs no
+  credentials.
+- `deploy` publishes with the `CLOUDFLARE_API_TOKEN` repository secret
+  (Cloudflare's "Edit Cloudflare Workers" template, scoped to this
+  account and the `n10.is` zone) and the `CLOUDFLARE_ACCOUNT_ID`
+  repository variable. The step is skipped when the secret is absent.
+
+Both first run `check-demo`, which fails the build when the hero's
+desktop demo is missing from `.open-next/assets/desktop-demo/demo/`.
+That is the path `src/components/landing/desktop-demo.tsx` loads in its
+iframe; the page sits under `demo/` because of how `desktop:build-demo`
+lays out its output.
 
 ## Media
 
