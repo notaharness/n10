@@ -25,11 +25,11 @@ because there was no organization to record from. Trustworthy about
 _structure_ — field names, nesting, which fields are optional — and not
 evidence about what a real server sends.
 
-| File                        | What it stands in for                                                                                                                                                               |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `builds-batch.json`         | one `GET /_apis/build/builds?repositoryId=…` page covering several pull requests at once                                                                                            |
-| `pr-detail.json`            | one `GET …/pullrequests/{id}`: every vote value, a flagged and a declined reviewer, two required groups, a vote cast for a group (`votedFor`), and two people with one display name |
-| `pr-detail-iterations.json` | its `GET …/pullrequests/{id}/iterations`, three pushes with the last one at the pull request's head                                                                                 |
+| File                        | What it stands in for                                                                                                                                                                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `builds-batch.json`         | one `GET /_apis/build/builds?repositoryId=…` page covering several pull requests at once                                                                                                                                     |
+| `pr-detail.json`            | one `GET …/pullrequests/{id}`: every vote value, a flagged and a declined reviewer, two required groups (one known only by its group descriptor), a vote cast for a group (`votedFor`), and two people with one display name |
+| `pr-detail-iterations.json` | its `GET …/pullrequests/{id}/iterations`: three pushes, listed out of order, the newest at the pull request's head                                                                                                           |
 
 To record a new one, hit the API with the PAT from `~/.n10/config.json`,
 scrub the identifiers above, and add a row here saying what the response

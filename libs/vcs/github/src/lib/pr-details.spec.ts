@@ -231,6 +231,7 @@ function reviewer(fields: Partial<DetailReviewer>): DetailReviewer {
     decision: 'no-response',
     native: null,
     requested: false,
+    attention: false,
     required: null,
     reason: null,
     onBehalfOf: [],

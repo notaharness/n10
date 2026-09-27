@@ -191,20 +191,27 @@ describe('fetchPullRequestDetail (Azure DevOps): identity', () => {
     expect((await read()).source.repository).toBeNull();
   });
 
-  it('refuses a status it does not know, or a pull request with no source commit', async () => {
-    for (const edit of [
-      (pr: Json) => {
-        pr.status = 'notSet';
-      },
-      (pr: Json) => {
-        delete pr.lastMergeSourceCommit;
-      },
-    ]) {
+  it('refuses a status it does not know, or a pull request nothing names a head for', async () => {
+    const noMerge = editedPr((pr) => {
+      delete pr.lastMergeSourceCommit;
+    });
+    const cases: [Json, Json][] = [
+      [
+        editedPr((pr) => (pr.status = 'notSet')),
+        fixture('pr-detail-iterations'),
+      ],
+      [noMerge, { value: [], count: 0 }],
+    ];
+    for (const [pr, iterations] of cases) {
       resetAdoTransport();
-      serve(editedPr(edit));
+      serve(pr, iterations);
       const err: unknown = await read().catch((e: unknown) => e);
       expect(isVcsError(err) && err.kind).toBe('unexpected-response');
     }
+    // With no merge yet, the newest iteration still names the head.
+    resetAdoTransport();
+    serve(noMerge);
+    expect((await read()).source.head).toBe(HEAD);
   });
 
   it('reports a pull request Azure cannot find as not found', async () => {
@@ -256,10 +263,20 @@ describe('fetchPullRequestDetail (Azure DevOps): reviewers', () => {
       reason: null,
     });
 
+    expect(
+      reviewersOf(detail).items.map((r) => [r.identifier, r.attention])
+    ).toContainEqual(['eli@contoso.example', true]);
+    expect(reviewersOf(detail).items.filter((r) => r.attention)).toHaveLength(
+      1
+    );
+
+    // Groups by the flag or, where Azure leaves it out, by a group
+    // descriptor. Required, but not said why: an author can mark a
+    // reviewer required by hand.
     const groups = reviewersOf(detail).items.filter((r) => r.kind === 'team');
     expect(groups.map((g) => [g.displayName, g.required, g.reason])).toEqual([
-      ['[Fabrikam]\\Web Reviewers', true, 'policy'],
-      ['[Fabrikam]\\Release Approvers', true, 'policy'],
+      ['[Fabrikam]\\Web Reviewers', true, null],
+      ['[Fabrikam]\\Release Approvers', true, null],
     ]);
     expect(byName(detail, 'ana@contoso.example')?.onBehalfOf).toEqual([
       groups[0]?.identifier,
@@ -305,13 +322,26 @@ describe('fetchPullRequestDetail (Azure DevOps): iteration', () => {
     });
   });
 
-  it('names none when the head moved between the two reads', async () => {
+  it('takes the head from the newest iteration when the merge lags a push', async () => {
+    serve(
+      editedPr((pr) => {
+        pr.lastMergeSourceCommit = { commitId: '2'.repeat(40) };
+      })
+    );
+    const detail = await read();
+    expect(detail.source.head).toBe(HEAD);
+    expect(detail.iteration).toMatchObject({ state: 'read', value: { id: 3 } });
+  });
+
+  it('names none when a push landed between the two reads', async () => {
     serve(
       editedPr((pr) => {
         pr.lastMergeSourceCommit = { commitId: '4'.repeat(40) };
       })
     );
-    expect((await read()).iteration).toEqual({ state: 'read', value: null });
+    const detail = await read();
+    expect(detail.source.head).toBe('4'.repeat(40));
+    expect(detail.iteration).toEqual({ state: 'read', value: null });
   });
 
   it('keeps the pull request when its iterations cannot be read', async () => {
@@ -323,7 +353,46 @@ describe('fetchPullRequestDetail (Azure DevOps): iteration', () => {
   });
 });
 
+describe('fetchPullRequestDetail (Azure DevOps): configuration', () => {
+  it('names the repository as configured, even by its id', async () => {
+    serve();
+    const byId = { ...PROJECT, repo: REPO_ID };
+    const detail = await azureDevOpsProvider.fetchPullRequestDetail?.(
+      AUTH,
+      byId,
+      4211
+    );
+    const asked = azureDevOpsProvider.repositoryRef?.(byId);
+    expect(detail?.ref.repository).toBe(`Fabrikam/${REPO_ID}`);
+    expect(
+      asked && detail && samePullRequest({ ...asked, number: 4211 }, detail.ref)
+    ).toBe(true);
+  });
+});
+
 describe('fetchPullRequestDetail (Azure DevOps): cache', () => {
+  it('reads again after a thread is resolved', async () => {
+    serve();
+    await read();
+    const answer = mockFetch.getMockImplementation();
+    mockFetch.mockImplementation((url: string, init?: RequestInit) =>
+      init?.method === 'PATCH' ? Promise.resolve(json({})) : answer?.(url, init)
+    );
+    await azureDevOpsProvider.setThreadResolved?.(
+      AUTH,
+      PROJECT,
+      4211,
+      { id: '7', canResolve: true } as never,
+      true
+    );
+    await read();
+    expect(
+      mockFetch.mock.calls.filter(([url]) =>
+        /\/pullrequests\/4211\/iterations\?/.test(String(url))
+      )
+    ).toHaveLength(2);
+  });
+
   it('reads again after this account votes', async () => {
     serve();
     await read();

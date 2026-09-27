@@ -85,7 +85,8 @@
           "id": "00000000-0000-4000-8000-000000000021",
           "uniqueName": "vstfs:///Classification/TeamProject/a9e2b3c4-5d6e-4f70-8a91-b2c3d4e5f601\\Web Reviewers",
           "imageUrl": "https://dev.azure.com/contoso/_api/_common/identityImage?id=00000000-0000-4000-8000-000000000021",
-          "isContainer": true
+          "isContainer": true,
+          "descriptor": "vssgp.0021"
         }
       ]
     },
@@ -219,7 +220,7 @@
       "id": "00000000-0000-4000-8000-000000000021",
       "uniqueName": "vstfs:///Classification/TeamProject/a9e2b3c4-5d6e-4f70-8a91-b2c3d4e5f601\\Web Reviewers",
       "imageUrl": "https://dev.azure.com/contoso/_api/_common/identityImage?id=00000000-0000-4000-8000-000000000021",
-      "descriptor": "aad.00000000-0000-4000-8000-000000000021",
+      "descriptor": "vssgp.0021",
       "isContainer": true,
       "reviewerUrl": "https://dev.azure.com/contoso/Fabrikam/_apis/git/repositories/5b0c8e8a-1f3e-4c4e-9d3a-2f6b7c8d9e01/pullRequests/4211/reviewers/00000000-0000-4000-8000-000000000021",
       "vote": 5,
@@ -238,8 +239,7 @@
       "id": "00000000-0000-4000-8000-000000000022",
       "uniqueName": "vstfs:///Classification/TeamProject/a9e2b3c4-5d6e-4f70-8a91-b2c3d4e5f601\\Release Approvers",
       "imageUrl": "https://dev.azure.com/contoso/_api/_common/identityImage?id=00000000-0000-4000-8000-000000000022",
-      "descriptor": "aad.00000000-0000-4000-8000-000000000022",
-      "isContainer": true,
+      "descriptor": "vssgp.0022",
       "reviewerUrl": "https://dev.azure.com/contoso/Fabrikam/_apis/git/repositories/5b0c8e8a-1f3e-4c4e-9d3a-2f6b7c8d9e01/pullRequests/4211/reviewers/00000000-0000-4000-8000-000000000022",
       "vote": 0,
       "hasDeclined": false,

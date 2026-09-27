@@ -24,13 +24,16 @@ interface RawIdentity {
   id?: string;
   displayName?: string;
   uniqueName?: string;
+  /** Deprecated by Azure in favour of the descriptor's subject type. */
   isContainer?: boolean;
+  descriptor?: string;
 }
 
 interface RawReviewer extends RawIdentity {
   vote?: number;
   hasDeclined?: boolean;
   isRequired?: boolean;
+  isFlagged?: boolean;
   /** The groups this reviewer's vote counted for. */
   votedFor?: RawIdentity[];
 }
@@ -118,31 +121,45 @@ function sourceRepository(
   };
 }
 
+/** An Azure DevOps group or team: said by the deprecated flag, or by a
+ *  group descriptor. */
+function isGroup(raw: RawIdentity): boolean {
+  return raw.isContainer ?? /^(vssgp|aadgp)\./.test(raw.descriptor ?? '');
+}
+
+/** How a reviewer is named and compared. */
+function identifierOf(raw: RawIdentity): string | undefined {
+  return raw.uniqueName || raw.id;
+}
+
 /**
  * One listed reviewer, their vote kept as Azure cast it. Azure has no
- * review request apart from the list, so someone listed who has not
- * voted is asked; a group's vote is its members'. Azure does not record
- * which commit a vote was cast on.
+ * review request apart from the list, so someone listed who has neither
+ * voted nor declined is asked; a group's vote is its members'. A
+ * required reviewer carries no reason: an author can mark one required
+ * by hand, and which a policy requires is the policy evaluation's to
+ * say. Azure does not record which commit a vote was cast on.
  */
 function reviewer(raw: RawReviewer): DetailReviewer | null {
-  const identifier = raw.uniqueName || raw.id;
+  const identifier = identifierOf(raw);
   if (!identifier) return null;
   const vote = raw.vote ?? 0;
   const declined = raw.hasDeclined ?? false;
-  const required = raw.isRequired ?? false;
   return {
-    kind: raw.isContainer ? 'team' : 'user',
+    kind: isGroup(raw) ? 'team' : 'user',
     identifier,
     id: raw.id ?? null,
     displayName: raw.displayName || identifier,
     decision: voteToDecision(vote, declined),
     native: String(vote),
     requested: vote === 0 && !declined,
-    required,
-    reason: required ? 'policy' : null,
-    onBehalfOf: (raw.votedFor ?? []).flatMap((g) =>
-      g.uniqueName ? [g.uniqueName] : []
-    ),
+    attention: raw.isFlagged ?? false,
+    required: raw.isRequired ?? false,
+    reason: null,
+    onBehalfOf: (raw.votedFor ?? []).flatMap((g) => {
+      const group = identifierOf(g);
+      return group ? [group] : [];
+    }),
     reviewedHead: null,
   };
 }
@@ -158,32 +175,51 @@ function reviewersOf(raw: RawPullRequest): ListRead<DetailReviewer> {
     : { items, total, complete: false };
 }
 
-/** The iteration that pushed `head`, or null when Azure has none for it
- *  yet — a push that landed between the two reads. */
-function iterationAt(
-  iterations: readonly RawIteration[],
-  head: string
+/** The newest iteration, by number rather than by where the list put
+ *  it. */
+function newestIteration(
+  iterations: readonly RawIteration[]
 ): PullRequestIteration | null {
-  const pushed = iterations.filter(
-    (i) => i.id != null && oid(i.sourceRefCommit) === head
-  );
-  const last = pushed.at(-1);
-  if (!last?.id) return null;
-  return {
-    id: last.id,
-    source: head,
-    target: oid(last.targetRefCommit),
-    base: oid(last.commonRefCommit),
-  };
+  let newest: PullRequestIteration | null = null;
+  for (const i of iterations) {
+    const source = oid(i.sourceRefCommit);
+    if (i.id == null || !source || (newest && newest.id >= i.id)) continue;
+    newest = {
+      id: i.id,
+      source,
+      target: oid(i.targetRefCommit),
+      base: oid(i.commonRefCommit),
+    };
+  }
+  return newest;
+}
+
+/**
+ * The head, and the iteration that pushed it. `lastMergeSourceCommit`
+ * is the source as Azure last merged it, and lags a push until the
+ * merge runs again; the newest iteration does not. A merged commit no
+ * iteration lists yet is a push the iterations read missed, and names
+ * no iteration.
+ */
+function revision(
+  raw: RawPullRequest,
+  iterations: readonly RawIteration[] | null
+): { head: string | null; iteration: PullRequestIteration | null } {
+  const merged = oid(raw.lastMergeSourceCommit);
+  const newest = iterations && newestIteration(iterations);
+  if (!newest) return { head: merged, iteration: null };
+  const listed = iterations.some((i) => oid(i.sourceRefCommit) === merged);
+  if (merged && !listed) return { head: merged, iteration: null };
+  return { head: newest.source, iteration: newest };
 }
 
 function detailOf(
   config: AdoConfig,
   raw: RawPullRequest,
+  head: string | null,
   iteration: PullRequestDetail['iteration']
 ): PullRequestDetail {
   const number = raw.pullRequestId ?? 0;
-  const head = oid(raw.lastMergeSourceCommit);
   if (!head) {
     throw new VcsError(
       'unexpected-response',
@@ -251,10 +287,14 @@ export async function fetchPullRequestDetailAzure(
       readFailure
     ),
   ]);
-  const head = oid(raw.lastMergeSourceCommit) ?? '';
-  const iteration: PullRequestDetail['iteration'] =
+  const read = iterations.state === 'read' ? iterations.value : null;
+  const { head, iteration } = revision(raw, read);
+  return detailOf(
+    config,
+    raw,
+    head,
     iterations.state === 'read'
-      ? { state: 'read', value: iterationAt(iterations.value, head) }
-      : iterations;
-  return detailOf(config, raw, iteration);
+      ? { state: 'read', value: iteration }
+      : iterations
+  );
 }

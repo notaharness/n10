@@ -223,6 +223,9 @@ export interface DetailReviewer {
    *  so there a listed reviewer who has neither voted nor declined is
    *  asked; flagging a reviewer for attention is not a request. */
   requested: boolean;
+  /** Flagged for attention without touching their vote — Azure DevOps'
+   *  "request attention". False where the provider has no such flag. */
+  attention: boolean;
   /** Required by the provider's own rules, or null where the provider
    *  does not say. */
   required: boolean | null;
@@ -242,9 +245,10 @@ export interface DetailReviewer {
 }
 
 /**
- * One push to an Azure DevOps pull request: the provider's own name for
- * a revision, numbered from 1, with the commits it compared. Comments
- * and review ranges are tracked against it.
+ * One iteration of an Azure DevOps pull request — a push, or a retarget
+ * onto another branch: the provider's own name for a revision, numbered
+ * from 1, with the commits it compared. Comments and review ranges are
+ * tracked against it.
  */
 export interface PullRequestIteration {
   id: number;
@@ -281,10 +285,10 @@ export interface PullRequestDetail {
   /** Everyone asked to review and everyone who has, all pages read, or
    *  marked incomplete. Read after the rest, and failed on its own. */
   reviewers: ReadOutcome<ListRead<DetailReviewer>>;
-  /** The iteration whose source is `source.head`, where the provider
-   *  numbers revisions; `null` when none does yet (a push landed between
-   *  the reads). Unsupported where the head commit is the only name a
-   *  revision has. */
+  /** The newest iteration, whose source is `source.head`, where the
+   *  provider numbers revisions; `null` when it lists none for that head
+   *  yet (a push landed between the reads). Unsupported where the head
+   *  commit is the only name a revision has. */
   iteration: ReadOutcome<PullRequestIteration | null>;
   /** Whether the viewer may edit the title and description. Draft and
    *  ready depend on the lifecycle as well, and are not this. */
