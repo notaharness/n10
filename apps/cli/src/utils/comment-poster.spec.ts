@@ -100,6 +100,7 @@ describe('postReviewComments vendor guard', () => {
         vendorAuth: {},
         vendorProject: {},
         prId: 1,
+        provider: null,
       })
     ).rejects.toThrow('Unsupported vendor: gitlab');
   });
@@ -111,6 +112,7 @@ describe('postReviewComments vendor guard', () => {
         vendorAuth: {},
         vendorProject: { owner: 'o', repo: 'r' },
         prId: 1,
+        provider: null,
       })
     ).rejects.toThrow('headSha is required');
   });

@@ -10,6 +10,7 @@ import type {
   ReviewDecision,
   ReviewVerdict,
   BuildStatusState,
+  NewCommentThread,
 } from '@n10/vcs-core';
 import { sanitizeBody } from '@n10/vcs-core';
 import { log } from '@n10/logger';
@@ -902,16 +903,17 @@ async function replyToAdoThread(
 async function createAdoThread(
   config: AdoConfig,
   prId: number,
-  comment: { file: string; lineStart: number; lineEnd: number; body: string }
+  comment: NewCommentThread
 ): Promise<void> {
   const url = `${baseUrl(config)}/pullrequests/${prId}/threads?api-version=7.1`;
+  const side = comment.side === 'LEFT' ? 'left' : 'right';
   const thread = {
     comments: [{ parentCommentId: 0, content: comment.body, commentType: 1 }],
     threadContext: {
-      // Azure wants a repo-absolute path.
+      // Azure wants a repo-absolute path, and anchors each side apart.
       filePath: `/${comment.file}`,
-      rightFileStart: { line: comment.lineStart, offset: 1 },
-      rightFileEnd: { line: comment.lineEnd, offset: 1 },
+      [`${side}FileStart`]: { line: comment.lineStart, offset: 1 },
+      [`${side}FileEnd`]: { line: comment.lineEnd, offset: 1 },
     },
     status: 1, // active
   };
@@ -919,12 +921,8 @@ async function createAdoThread(
     method: 'POST',
     headers: authHeaders(config.pat),
     body: JSON.stringify(thread),
-    bodyForLog: {
-      filePath: thread.threadContext.filePath,
-      lineStart: comment.lineStart,
-      lineEnd: comment.lineEnd,
-      contentLength: comment.body.length,
-    },
+    // The anchor, never the comment's text.
+    bodyForLog: { ...comment, body: undefined, length: comment.body.length },
   });
   // Without this the new thread stays out of the review workspace and
   // the sidebar's count until the cached list lapses.
@@ -1118,7 +1116,7 @@ export const azureDevOpsProvider: VcsProvider = {
     auth: Record<string, string>,
     project: Record<string, string>,
     prId: number,
-    comment: { file: string; lineStart: number; lineEnd: number; body: string }
+    comment: NewCommentThread
   ): Promise<void> {
     await createAdoThread(toAdoConfig(auth, project), prId, comment);
   },

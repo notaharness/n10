@@ -187,6 +187,7 @@ interface CtxOpts {
   prId?: number;
   headSha?: string;
   config?: Record<string, unknown>;
+  provider?: unknown;
   asyncOpsRun?: (key: string, fn: () => Promise<void>) => void;
   toggleResolved?: (id: string, resolved: boolean) => Promise<boolean>;
   refresh?: () => void;
@@ -223,7 +224,10 @@ function makeCtx(
     sectionAnchorRows: opts.sectionAnchorRows ?? [0],
     commentCtx: makeCommentCtx(opts),
     remoteCtx: makeRemoteCtx(opts),
-    config: { config: opts.config ?? {} } as never,
+    config: {
+      config: opts.config ?? {},
+      provider: opts.provider ?? null,
+    } as never,
     sessions: { flashStatus: vi.fn() } as unknown as SessionActionsContextValue,
     asyncOps: { run: opts.asyncOpsRun ?? vi.fn() } as never,
     keybinds,
@@ -713,6 +717,29 @@ describe('diff-viewer handler — post-comment', () => {
     expect(refresh).toHaveBeenCalled();
     expect(pane.selectedCommentId).toBe('d2');
     expect(ctx.sessions.flashStatus).toHaveBeenCalledWith('Comment posted');
+  });
+
+  it('posts to Azure DevOps through the configured provider', async () => {
+    const pane = makePane({ selectedCommentId: 'd1' });
+    const d1 = makeComment({ id: 'd1', status: 'draft' });
+    vi.mocked(readComments).mockReturnValue([d1]);
+    let captured: (() => Promise<void>) | undefined;
+    const provider = { id: 'azure-devops' };
+    const ctx = makeCtx(pane, {
+      comments: [d1],
+      config: { vendor: 'azure-devops' },
+      provider,
+      prId: 7,
+      asyncOpsRun: vi.fn((_key: string, fn: () => Promise<void>) => {
+        captured = fn;
+      }),
+    });
+    handleDiffViewerInput('p', makeKey(), ctx);
+    await captured!();
+    expect(postReviewComments).toHaveBeenCalledWith(
+      [d1],
+      expect.objectContaining({ vendor: 'azure-devops', provider })
+    );
   });
 
   it('on failure, reverts the comment to draft and flashes the error', async () => {

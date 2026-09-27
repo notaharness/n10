@@ -580,6 +580,7 @@ describe('a cycle over pull requests that have not moved', () => {
       file: 'a.ts',
       lineStart: 1,
       lineEnd: 1,
+      side: 'RIGHT',
       body: 'a draft',
     });
     serveEverything();

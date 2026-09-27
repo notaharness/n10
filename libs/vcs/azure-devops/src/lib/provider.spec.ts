@@ -996,7 +996,13 @@ describe('azureDevOpsProvider', () => {
         { pat: 'secret-pat' },
         { org: 'acme', project: 'proj', repo: 'widgets' },
         7,
-        { file: 'src/a.ts', lineStart: 3, lineEnd: 5, body: 'nit: rename' }
+        {
+          file: 'src/a.ts',
+          lineStart: 3,
+          lineEnd: 5,
+          side: 'RIGHT',
+          body: 'nit: rename',
+        }
       );
 
       const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
@@ -1021,16 +1027,51 @@ describe('azureDevOpsProvider', () => {
       });
     });
 
-    it('reports Azure refusing', async () => {
+    it('anchors a comment on the old file to the left side', async () => {
+      mockFetch.mockResolvedValue(jsonResponse({ id: 9 }));
+      await azureDevOpsProvider.createThread!(
+        { pat: 'p' },
+        { org: 'o', project: 'p', repo: 'r' },
+        1,
+        { file: 'a.ts', lineStart: 4, lineEnd: 4, side: 'LEFT', body: 'x' }
+      );
+      const init = mockFetch.mock.calls[0]![1] as RequestInit;
+      expect(
+        (JSON.parse(String(init.body)) as { threadContext: unknown })
+          .threadContext
+      ).toEqual({
+        filePath: '/a.ts',
+        leftFileStart: { line: 4, offset: 1 },
+        leftFileEnd: { line: 4, offset: 1 },
+      });
+    });
+
+    const post = () =>
+      azureDevOpsProvider.createThread!(
+        { pat: 'p' },
+        { org: 'o', project: 'p', repo: 'r' },
+        1,
+        { file: 'a', lineStart: 1, lineEnd: 1, side: 'RIGHT', body: 'x' }
+      );
+
+    it('reports a rejected token', async () => {
       mockFetch.mockResolvedValue(jsonResponse({ message: 'nope' }, 403));
-      await expect(
-        azureDevOpsProvider.createThread!(
-          { pat: 'p' },
-          { org: 'o', project: 'p', repo: 'r' },
-          1,
-          { file: 'a', lineStart: 1, lineEnd: 1, body: 'x' }
+      await expect(post()).rejects.toThrow('rejected the access token');
+    });
+
+    it('reports the sign-in page Azure serves for a dead token', async () => {
+      // A 203 is a success to fetch; posting through it used to mark the
+      // draft posted while nothing reached the pull request.
+      mockFetch.mockResolvedValue(
+        new Response(
+          readFileSync(
+            new URL('./__fixtures__/signin-page.html', import.meta.url),
+            'utf8'
+          ),
+          { status: 203, headers: { 'content-type': 'text/html' } }
         )
-      ).rejects.toThrow();
+      );
+      await expect(post()).rejects.toThrow('rejected the access token');
     });
   });
 

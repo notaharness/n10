@@ -84,6 +84,7 @@ const github: PostContext = {
   vendorProject: { owner: 'acme', repo: 'widgets' },
   prId: 7,
   headSha: 'abc123',
+  provider: null,
 };
 
 const azure: PostContext = {
@@ -286,7 +287,12 @@ describe('posting to Azure DevOps', () => {
     expect(auth).toEqual({ pat: 'secret-pat' });
     expect(project).toEqual({ org: 'acme', project: 'proj', repo: 'widgets' });
     expect(prId).toBe(7);
-    expect(first).toMatchObject({ file: 'src/a.ts', lineStart: 3, lineEnd: 5 });
+    expect(first).toMatchObject({
+      file: 'src/a.ts',
+      lineStart: 3,
+      lineEnd: 5,
+      side: 'RIGHT',
+    });
     expect(first.body).toContain('issue (non-blocking):');
     expect(first.body).toContain('by an agent_');
   });
@@ -302,7 +308,7 @@ describe('posting to Azure DevOps', () => {
   it('is refused without a provider that can open threads', async () => {
     await expect(
       postReviewComments([comment()], { ...azure, provider: null })
-    ).rejects.toThrow('cannot open threads');
+    ).rejects.toThrow('No Azure DevOps provider');
     expect(env.marked).toEqual([]);
   });
 });

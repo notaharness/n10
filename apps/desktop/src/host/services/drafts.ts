@@ -135,7 +135,7 @@ export async function postDraftComments(
     vendorProject: config.vendorProject,
     prId: req.prId,
     headSha: req.headSha,
-    provider: PROVIDERS.find((p) => p.id === vendor),
+    provider: PROVIDERS.find((p) => p.id === vendor) ?? null,
   };
   // One comment per post call, like the TUI's diff viewer. A batch
   // that dies mid-way would otherwise reset already-live comments back

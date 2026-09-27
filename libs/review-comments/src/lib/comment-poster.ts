@@ -74,9 +74,10 @@ export interface PostContext {
   vendorProject: Record<string, string>;
   prId: number;
   headSha?: string;
-  /** The configured provider. Azure DevOps posts through its
-   *  `createThread`, which also refreshes what the provider caches. */
-  provider?: Pick<VcsProvider, 'createThread'> | null;
+  /** The configured provider, or null when none is. Azure DevOps posts
+   *  through its `createThread`, which also refreshes what the provider
+   *  caches. */
+  provider: Pick<VcsProvider, 'createThread'> | null;
 }
 
 export async function postReviewComments(
@@ -137,13 +138,14 @@ async function postAzureDevOps(
 ): Promise<void> {
   const { provider } = ctx;
   if (!provider?.createThread) {
-    throw new Error('The Azure DevOps provider cannot open threads');
+    throw new Error('No Azure DevOps provider to open threads with');
   }
   for (const comment of comments) {
     await provider.createThread(ctx.vendorAuth, ctx.vendorProject, ctx.prId, {
       file: comment.file,
       lineStart: comment.lineStart,
       lineEnd: comment.lineEnd,
+      side: comment.side,
       body: renderCommentBody(comment),
     });
   }
