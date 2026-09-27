@@ -161,7 +161,11 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
   ['listBranches', [], 'worktrees.listBranches'],
   ['listAllBranches', [], 'worktrees.listAllBranches'],
   ['createWorktree', ['feature'], 'worktrees.createWorktree'],
-  ['removeWorktree', ['feature', true], 'worktrees.removeWorktree'],
+  [
+    'removeWorktree',
+    ['feature', { verdict: 'clear', tip: 'abc123' }],
+    'worktrees.removeWorktree',
+  ],
   ['checkWorktreeRemoval', ['feature'], 'worktrees.checkWorktreeRemoval'],
   ['openInEditor', ['feature'], 'worktrees.openInEditor'],
 

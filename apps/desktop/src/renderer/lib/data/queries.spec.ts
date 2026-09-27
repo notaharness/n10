@@ -92,12 +92,17 @@ describe('loadWorktreeRemovalCheck', () => {
   it('passes the host verdict through', async () => {
     stubHost({
       checkWorktreeRemoval: () =>
-        Promise.resolve({ verdict: 'refused', reason: 'rebase in progress' }),
+        Promise.resolve({
+          verdict: 'refused',
+          reason: 'rebase in progress',
+          tip: 'abc123',
+        }),
     });
 
     await expect(loadWorktreeRemovalCheck('wip')).resolves.toEqual({
       verdict: 'refused',
       reason: 'rebase in progress',
+      tip: 'abc123',
     });
   });
 
@@ -114,6 +119,7 @@ describe('loadWorktreeRemovalCheck', () => {
     await expect(loadWorktreeRemovalCheck('wip')).resolves.toEqual({
       verdict: 'refused',
       reason: 'not a git repository',
+      tip: null,
     });
   });
 });

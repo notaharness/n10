@@ -28,6 +28,7 @@ let liveSessions = new Set<string>();
 let exitedSessions = new Set<string>();
 const killSessionMock = vi.fn();
 const checkWorktreeRemovalMock = vi.fn();
+const CLEAR = { verdict: 'clear', tip: 'abc123' } as const;
 
 vi.mock('@n10/core', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -212,7 +213,7 @@ function makeCtx(opts: CtxOpts = {}) {
   const sessions = {
     flashStatus: vi.fn(),
     refreshSessions: vi.fn().mockResolvedValue([]),
-    performDelete: vi.fn().mockResolvedValue(undefined),
+    performDelete: vi.fn().mockResolvedValue(true),
     refreshPr: vi.fn().mockResolvedValue(undefined),
     triggerSync: vi.fn().mockResolvedValue(undefined),
   };
@@ -280,7 +281,7 @@ beforeEach(() => {
   exitedSessions = new Set();
   vi.mocked(listWorktrees).mockResolvedValue([]);
   vi.mocked(listAllBranches).mockResolvedValue([]);
-  checkWorktreeRemovalMock.mockResolvedValue({ verdict: 'clear' });
+  checkWorktreeRemovalMock.mockResolvedValue(CLEAR);
   vi.mocked(createWorktree).mockResolvedValue(null);
   vi.mocked(rebaseOntoMaster).mockResolvedValue('success');
   vi.mocked(spawn).mockReturnValue({
@@ -541,13 +542,31 @@ describe('sidebar handler — delete-branch', () => {
     expect(checkWorktreeRemovalMock).toHaveBeenCalledExactlyOnceWith('alpha');
     expect(t.sessions.performDelete).toHaveBeenCalledExactlyOnceWith(
       worktreeSessionKey('/wt/alpha'),
-      'alpha'
+      'alpha',
+      CLEAR
     );
     expect(t.deleteConfirm.setConfirmDelete).not.toHaveBeenCalled();
+    expect(t.sessions.flashStatus).not.toHaveBeenCalled();
+  });
+
+  it('says so when core kept a branch that changed after the check', async () => {
+    const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
+    vi.mocked(listWorktrees).mockResolvedValue([
+      worktree('/wt/alpha', 'alpha'),
+    ]);
+    t.sessions.performDelete.mockResolvedValue(false);
+
+    press(KEYS.deleteBranch(), t.ctx);
+    await t.settle();
+
+    expect(t.sessions.flashStatus).toHaveBeenCalledExactlyOnceWith(
+      'Kept alpha: it changed after the check'
+    );
   });
 
   it('asks yes/no before killing a still-running agent', async () => {
-    checkWorktreeRemovalMock.mockResolvedValue({ verdict: 'agent-running' });
+    const running = { verdict: 'agent-running', tip: 'abc123' } as const;
+    checkWorktreeRemovalMock.mockResolvedValue(running);
     const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
     vi.mocked(listWorktrees).mockResolvedValue([
       worktree('/wt/alpha', 'alpha'),
@@ -561,6 +580,8 @@ describe('sidebar handler — delete-branch', () => {
       sessionName: worktreeSessionKey('/wt/alpha'),
       reason: 'session is active — agent process will be killed',
       mode: 'yes-no',
+      // Confirming removes with this verdict, which does not force.
+      approved: running,
     });
     expect(t.deleteConfirm.setConfirmInput).toHaveBeenCalledExactlyOnceWith('');
     expect(t.sessions.performDelete).not.toHaveBeenCalled();
@@ -573,7 +594,8 @@ describe('sidebar handler — delete-branch', () => {
       vi.mocked(listWorktrees).mockResolvedValue([
         worktree('/wt/alpha', 'alpha'),
       ]);
-      checkWorktreeRemovalMock.mockResolvedValue({ verdict: 'force', reason });
+      const forced = { verdict: 'force', reason, tip: 'abc123' } as const;
+      checkWorktreeRemovalMock.mockResolvedValue(forced);
 
       press(KEYS.deleteBranch(), t.ctx);
       await t.settle();
@@ -583,6 +605,7 @@ describe('sidebar handler — delete-branch', () => {
         sessionName: worktreeSessionKey('/wt/alpha'),
         reason,
         mode: 'type-branch',
+        approved: forced,
       });
       expect(t.deleteConfirm.setConfirmInput).toHaveBeenCalledExactlyOnceWith(
         ''
@@ -640,7 +663,8 @@ describe('sidebar handler — delete-branch', () => {
 
     expect(t.sessions.performDelete).toHaveBeenCalledExactlyOnceWith(
       PR_SESSION,
-      'feat/thing'
+      'feat/thing',
+      CLEAR
     );
   });
 

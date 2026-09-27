@@ -136,6 +136,7 @@ export function loadWorktreeRemovalCheck(
   return window.n10.checkWorktreeRemoval(branch).catch((err: unknown) => ({
     verdict: 'refused' as const,
     reason: errorMessage(err),
+    tip: null,
   }));
 }
 

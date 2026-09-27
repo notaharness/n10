@@ -11,7 +11,10 @@ import {
   useAsyncOps,
   useKeybindResolve,
 } from '@n10/app-core';
-import { handleConfirmDeleteInput } from '../screens/main/confirm-delete-input.js';
+import {
+  handleConfirmDeleteInput,
+  runConfirmedDelete,
+} from '../screens/main/confirm-delete-input.js';
 
 interface DeleteConfirmModalProps {
   branch: string;
@@ -129,15 +132,8 @@ function YesNoModal({ branch, reason }: { branch: string; reason: string }) {
   const asyncOps = useAsyncOps();
 
   const performDelete = () => {
-    // Capture sessionName before clearing modal state — the async
-    // runs after setConfirmDelete(null) clears it.
-    const sessionName = deleteConfirmState.confirmDelete?.sessionName;
-    if (sessionName) {
-      void asyncOps.run('delete', async () => {
-        await sessions.performDelete(sessionName, branch);
-        sessions.flashStatus(`Deleted ${branch}`);
-      });
-    }
+    const confirmed = deleteConfirmState.confirmDelete;
+    if (confirmed) runConfirmedDelete(confirmed, { sessions, asyncOps });
     deleteConfirmActions.setConfirmDelete(null);
     deleteConfirmActions.setConfirmInput('');
   };

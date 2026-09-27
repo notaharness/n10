@@ -19,6 +19,7 @@ import type {
   ReviewVerdict,
   SessionLaunchRequest,
   SidebarItem,
+  WorktreeRemovalCheck,
 } from '../../../host/contract.js';
 
 /**
@@ -135,13 +136,21 @@ export function useRemoveWorktree(cwd: string) {
   const inv = useInvalidator(cwd);
   return useMutation({
     mutationKey: REMOVE_WORKTREE_KEY,
-    mutationFn: ({ branch, force }: { branch: string; force: boolean }) =>
-      window.n10.removeWorktree(branch, force),
+    mutationFn: ({
+      branch,
+      approved,
+    }: {
+      branch: string;
+      approved: WorktreeRemovalCheck;
+    }) => window.n10.removeWorktree(branch, approved),
     // Reported here rather than through `mutate`'s own callbacks: the
     // confirm dialog closes as soon as it fires, and per-call callbacks
     // are dropped when their component unmounts. Mutation-level ones run
     // either way, so the outcome is never swallowed.
-    onSuccess: (_r, { branch }) => toast.success(`Removed worktree ${branch}`),
+    onSuccess: (removed, { branch }) => {
+      if (removed) toast.success(`Removed worktree ${branch}`);
+      else toast.warning(`Kept ${branch}: it changed after the check`);
+    },
     onError: (err) => toast.error(errorMessage(err)),
     onSettled: () => {
       void inv.sidebar();

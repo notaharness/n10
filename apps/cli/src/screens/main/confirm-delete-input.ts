@@ -1,5 +1,22 @@
 import { handleTextInput, type KeyPress } from '@n10/core';
+import type { DeleteConfirmState } from '@n10/app-core';
 import type { DeleteConfirmHandlerCtx } from './input-types.js';
+
+/** Remove what the prompt showed, with the verdict it showed. Takes the
+ *  state, not the context: the modal clears it before this runs. */
+export function runConfirmedDelete(
+  { sessionName, branch, approved }: DeleteConfirmState,
+  { sessions, asyncOps }: Pick<DeleteConfirmHandlerCtx, 'sessions' | 'asyncOps'>
+): void {
+  void asyncOps.run('delete', async () => {
+    const removed = await sessions.performDelete(sessionName, branch, approved);
+    sessions.flashStatus(
+      removed
+        ? `Deleted ${branch}`
+        : `Kept ${branch}: it changed after the check`
+    );
+  });
+}
 
 export function handleConfirmDeleteInput(
   input: string,
@@ -14,17 +31,9 @@ export function handleConfirmDeleteInput(
     return;
   }
   if (action === 'confirm-delete.confirm') {
-    if (
-      ctx.deleteConfirm.confirmInput === ctx.deleteConfirm.confirmDelete!.branch
-    ) {
-      // Capture the names before clearing the modal state below — the
-      // async runs after setConfirmDelete(null), and we need these for
-      // the success toast too.
-      const { sessionName, branch } = ctx.deleteConfirm.confirmDelete!;
-      void ctx.asyncOps.run('delete', async () => {
-        await ctx.sessions.performDelete(sessionName, branch);
-        ctx.sessions.flashStatus(`Deleted ${branch}`);
-      });
+    const confirmed = ctx.deleteConfirm.confirmDelete!;
+    if (ctx.deleteConfirm.confirmInput === confirmed.branch) {
+      runConfirmedDelete(confirmed, ctx);
     } else {
       ctx.sessions.flashStatus('Branch name did not match — delete cancelled');
     }

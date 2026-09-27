@@ -6,7 +6,11 @@ import {
   setWorktreeResolver,
   createTemplateResolver,
 } from '@n10/worktree-manager';
-import type { AgentSession, DiscoveredWorktree } from '@n10/core';
+import type {
+  AgentSession,
+  DiscoveredWorktree,
+  WorktreeRemovalCheck,
+} from '@n10/core';
 import { readConfig, autoDetectProjectConfig } from '@n10/vcs-core';
 import type { VcsProvider } from '@n10/vcs-core';
 import {
@@ -44,9 +48,8 @@ export function useSessionManager(
   // `onDiscovered` below re-reads the rows, as it does for a worktree
   // removed outside n10.
   const performDelete = useCallback(
-    async (_sessionName: string, branch: string) => {
-      await removeWorktreeSession(branch, true);
-    },
+    (_sessionName: string, branch: string, approved: WorktreeRemovalCheck) =>
+      removeWorktreeSession(branch, approved),
     []
   );
 

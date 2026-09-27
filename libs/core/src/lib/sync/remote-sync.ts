@@ -1,5 +1,6 @@
 import { keyForWorktree } from '../session-key.js';
 import {
+  branchTip,
   canRemoveBranch,
   fastForwardMainBranch,
   listWorktrees,
@@ -8,6 +9,7 @@ import { logError } from '@n10/logger';
 import type { AppConfig, BranchPrMap, VcsProvider } from '@n10/vcs-core';
 import { isSessionAlive } from '../pty-registry.js';
 import { hasLiveTmuxSession } from '../session-backend.js';
+import type { WorktreeRemovalCheck } from '../session/remove-worktree.js';
 import { countBranchConflicts } from './conflicts.js';
 import { fetchRefs } from './fetch-queue.js';
 
@@ -79,9 +81,17 @@ type SweepConfig = Pick<
  * return the ones a rebase is holding up. Null means the caller
  * cancelled partway, which is not the same as "nothing was blocked".
  */
+/** Called with a merged branch's checkout session, the branch, and the
+ *  verdict to remove it with: `clear`, at the commit it was judged. */
+type AutoDelete = (
+  sessionName: string,
+  branch: string,
+  approved: WorktreeRemovalCheck
+) => void | Promise<void>;
+
 async function autoDeleteMerged(args: {
   merged: Set<string>;
-  onAutoDelete: (sessionName: string, branch: string) => void | Promise<void>;
+  onAutoDelete: AutoDelete;
   isCancelled: () => boolean;
 }): Promise<string[] | null> {
   const { merged, onAutoDelete, isCancelled } = args;
@@ -102,10 +112,11 @@ async function autoDeleteMerged(args: {
       );
       continue;
     }
+    const tip = await branchTip(branch, checkout.path);
     const check = await canRemoveBranch(branch, { confirmedMerged: true });
     if (isCancelled()) return null;
     if (check.safe) {
-      await onAutoDelete(sessionName, branch);
+      await onAutoDelete(sessionName, branch, { verdict: 'clear', tip });
     } else {
       if (check.reason === 'rebase in progress') rebasingNow.push(branch);
       logError(
@@ -141,7 +152,7 @@ export async function sweepMergedBranches(opts: {
    *  (potentially slow) auto-delete pass — lets UIs show merged
    *  badges without waiting for deletions. */
   onMerged?: (merged: Set<string>) => void;
-  onAutoDelete: (sessionName: string, branch: string) => void | Promise<void>;
+  onAutoDelete: AutoDelete;
   onRebaseInProgress: (branch: string) => void;
   /** Abort between async steps (the TUI passes its effect-cancel flag). */
   isCancelled?: () => boolean;

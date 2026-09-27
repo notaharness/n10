@@ -121,11 +121,11 @@ async function runSyncPass(cwd: string, gen: number): Promise<void> {
       branches,
       warnedRebase,
       isCancelled: cancelled,
-      onAutoDelete: async (_sessionName, branch) => {
+      onAutoDelete: async (_sessionName, branch, approved) => {
         if (cancelled()) return;
-        // Same triple as the TUI's performDelete (kill session, remove
-        // worktree, delete branch) — the worktrees service owns it.
-        await removeWorktree(branch, true);
+        // Core's removal, as in the TUI: kept if the branch moved after
+        // the sweep judged it.
+        if (!(await removeWorktree(branch, approved))) return;
         notifier?.({
           message: `Auto-deleted merged branch: ${branch}`,
           kind: 'success',

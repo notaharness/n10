@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTmuxBackend } from '@n10/terminal-tmux';
+import { branchTip } from '@n10/worktree-manager';
 import { orchestraFixture } from '../../tests/orchestra-fixture.js';
 import { diffScans } from './discovery/discovery-model.js';
 import { getSession, isSessionAlive, killSession } from './pty-registry.js';
@@ -70,7 +71,12 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         expect(getSession(key)).toBe(agent);
         expect(getSession(tab.name)).toBe(tab);
         expect(isSessionAlive(key)).toBe(true);
-        expect(await removeWorktreeSession(branch, true, fixture.repo)).toBe(
+        const forced = {
+          verdict: 'force',
+          reason: 'uncommitted changes',
+          tip: await branchTip(branch, fixture.repo),
+        } as const;
+        expect(await removeWorktreeSession(branch, forced, fixture.repo)).toBe(
           true
         );
         expect(isSessionAlive(key)).toBe(false);

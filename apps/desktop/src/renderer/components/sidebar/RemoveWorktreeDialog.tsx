@@ -54,7 +54,7 @@ export function RemoveWorktreeDialog({
   // (useRemovingBranches). Removal virtually always succeeds; if it
   // doesn't, the row reappears by itself and the error is toasted from
   // the mutation, which outlives this component.
-  const doRemove = (force: boolean) => {
+  const doRemove = (approved: WorktreeRemovalCheck) => {
     // Look the tab up by item key rather than rebuilding its id: a tab
     // keeps the id it was opened with even after `sync-items` re-keys
     // it (worktree `branch:x` → `pr:42` once a PR appears), so the
@@ -65,7 +65,7 @@ export function RemoveWorktreeDialog({
     );
     if (tab) tabs.close(tab.id);
     onClose();
-    remove.mutate({ branch, force });
+    remove.mutate({ branch, approved });
   };
 
   return (
@@ -76,8 +76,10 @@ export function RemoveWorktreeDialog({
           <DialogDescription>
             This deletes the worktree for{' '}
             <span className="font-mono text-foreground">{branch}</span>
-            {running ? ' and stops its running agent' : ''}. The branch is
-            deleted too unless git refuses.
+            {running || check?.verdict === 'agent-running'
+              ? ' and stops its running agent'
+              : ''}
+            . The branch is deleted too unless git refuses.
           </DialogDescription>
         </DialogHeader>
 
@@ -103,12 +105,12 @@ export function RemoveWorktreeDialog({
             <Button
               variant="destructive"
               disabled={!check}
-              onClick={() => doRemove(false)}
+              onClick={() => check && doRemove(check)}
             >
               Remove
             </Button>
           ) : warning.verdict === 'force' ? (
-            <Button variant="destructive" onClick={() => doRemove(true)}>
+            <Button variant="destructive" onClick={() => doRemove(warning)}>
               Force remove
             </Button>
           ) : null}

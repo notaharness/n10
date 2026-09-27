@@ -26,7 +26,7 @@ import { useConfig } from './ConfigContext.js';
 import { useBranchPickerActions } from './ModalContext.js';
 import { useToastActions } from './ToastContext.js';
 import type { ToastVariant } from './ToastContext.js';
-import type { AgentSession } from '@n10/core';
+import type { AgentSession, WorktreeRemovalCheck } from '@n10/core';
 import { sortSessionsByPrId } from '@n10/core';
 
 // ── Data context (consumed by SidebarProvider, changes on data refresh) ──
@@ -56,7 +56,13 @@ export interface SessionActionsContextValue {
    */
   flashStatus: (msg: string, variant?: ToastVariant) => void;
   refreshSessions: () => Promise<AgentSession[]>;
-  performDelete: (sessionName: string, branch: string) => Promise<void>;
+  /** Resolves false when the worktree was kept: git refused, or the
+   *  branch moved after `approved` was judged. */
+  performDelete: (
+    sessionName: string,
+    branch: string,
+    approved: WorktreeRemovalCheck
+  ) => Promise<boolean>;
   refreshPr: () => Promise<void>;
   triggerSync: () => Promise<void>;
 }
@@ -96,10 +102,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // to actually land — announcing it up front reported success for a
   // branch that is still on disk.
   const onMergedDelete = useCallback(
-    (sessionName: string, branch: string) => {
+    (sessionName: string, branch: string, approved: WorktreeRemovalCheck) => {
       void sessionMgr
-        .performDelete(sessionName, branch)
-        .then(() => flash(`Auto-deleted merged branch: ${branch}`, 'success'))
+        .performDelete(sessionName, branch, approved)
+        .then((removed) => {
+          if (removed) {
+            flash(`Auto-deleted merged branch: ${branch}`, 'success');
+          }
+        })
         .catch((err: unknown) =>
           flash(
             `Auto-delete of ${branch} failed: ${describeError(err)}`,

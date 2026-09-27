@@ -29,8 +29,12 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('@n10/core', () => ({
-  removeWorktreeSession: (branch: string, force: boolean, repo: string) => {
-    calls.log.push(`remove-session:${repo}:${branch}:${force}`);
+  removeWorktreeSession: (
+    branch: string,
+    approved: { verdict: string },
+    repo: string
+  ) => {
+    calls.log.push(`remove-session:${repo}:${branch}:${approved.verdict}`);
     return Promise.resolve(calls.removed);
   },
 }));
@@ -79,15 +83,23 @@ beforeEach(() => {
 
 describe('removeWorktree', () => {
   it('stops babysitting then delegates removal with the captured repository', async () => {
-    expect(await removeWorktree('feature/x', true)).toBe(true);
+    expect(
+      await removeWorktree('feature/x', {
+        verdict: 'force',
+        reason: 'uncommitted changes',
+        tip: 'abc123',
+      })
+    ).toBe(true);
     expect(calls.log).toEqual([
       'stop-babysit:feature/x',
-      'remove-session:/repo:feature/x:true',
+      'remove-session:/repo:feature/x:force',
     ]);
   });
   it('returns a failed removal to the caller', async () => {
     calls.removed = false;
-    expect(await removeWorktree('feature/x', false)).toBe(false);
+    expect(
+      await removeWorktree('feature/x', { verdict: 'clear', tip: 'abc123' })
+    ).toBe(false);
   });
 });
 

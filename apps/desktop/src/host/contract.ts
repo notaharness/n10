@@ -322,7 +322,12 @@ export interface N10HostApi {
   /** All local + remote branch names (checkout candidates). */
   listAllBranches(): Promise<string[]>;
   createWorktree(branch: string): Promise<string | null>;
-  removeWorktree(branch: string, force: boolean): Promise<boolean>;
+  /** Remove with the verdict the user confirmed. False when the
+   *  worktree was kept: git refused, or the branch moved since. */
+  removeWorktree(
+    branch: string,
+    approved: WorktreeRemovalCheck
+  ): Promise<boolean>;
   /** What removing the branch's worktree would cost — core's verdict,
    *  shared with the TUI. */
   checkWorktreeRemoval(branch: string): Promise<WorktreeRemovalCheck>;

@@ -56,7 +56,8 @@ export function createHostApi(): N10HostApi {
     listBranches: () => worktrees.listBranches(),
     listAllBranches: () => worktrees.listAllBranches(),
     createWorktree: (branch) => worktrees.createWorktree(branch),
-    removeWorktree: (branch, force) => worktrees.removeWorktree(branch, force),
+    removeWorktree: (branch, approved) =>
+      worktrees.removeWorktree(branch, approved),
     checkWorktreeRemoval: (branch) => worktrees.checkWorktreeRemoval(branch),
     openInEditor: (branch) => worktrees.openInEditor(branch),
 

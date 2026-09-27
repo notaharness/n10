@@ -1,6 +1,7 @@
 import {
   checkWorktreeRemoval as checkRemoval,
   removeWorktreeSession,
+  type WorktreeRemovalCheck,
 } from '@n10/core';
 import {
   listWorktrees as listWts,
@@ -49,11 +50,11 @@ export async function createWorktree(branch: string): Promise<string> {
 
 export async function removeWorktree(
   branch: string,
-  force: boolean
+  approved: WorktreeRemovalCheck
 ): Promise<boolean> {
   const repo = requireRepo();
   stopBabysitForBranch(branch);
-  return removeWorktreeSession(branch, force, repo);
+  return removeWorktreeSession(branch, approved, repo);
 }
 
 export function checkWorktreeRemoval(branch: string) {

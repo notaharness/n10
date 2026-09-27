@@ -47,8 +47,8 @@ const api: N10HostApi = {
   listBranches: () => ipcRenderer.invoke(IPC.listBranches),
   listAllBranches: () => ipcRenderer.invoke(IPC.listAllBranches),
   createWorktree: (branch) => ipcRenderer.invoke(IPC.createWorktree, branch),
-  removeWorktree: (branch, force) =>
-    ipcRenderer.invoke(IPC.removeWorktree, branch, force),
+  removeWorktree: (branch, approved) =>
+    ipcRenderer.invoke(IPC.removeWorktree, branch, approved),
   checkWorktreeRemoval: (branch) =>
     ipcRenderer.invoke(IPC.checkWorktreeRemoval, branch),
   openInEditor: (branch) => ipcRenderer.invoke(IPC.openInEditor, branch),

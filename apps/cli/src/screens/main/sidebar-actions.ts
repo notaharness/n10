@@ -178,6 +178,7 @@ async function confirmOrDelete(
         sessionName,
         reason: check.reason,
         mode: 'type-branch',
+        approved: check,
       });
       ctx.deleteConfirm.setConfirmInput('');
       return;
@@ -190,11 +191,14 @@ async function confirmOrDelete(
         sessionName,
         reason: 'session is active — agent process will be killed',
         mode: 'yes-no',
+        approved: check,
       });
       ctx.deleteConfirm.setConfirmInput('');
       return;
     case 'clear':
-      await ctx.sessions.performDelete(sessionName, branch);
+      if (!(await ctx.sessions.performDelete(sessionName, branch, check))) {
+        ctx.sessions.flashStatus(`Kept ${branch}: it changed after the check`);
+      }
   }
 }
 
