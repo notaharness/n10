@@ -14,10 +14,18 @@ export function ciPollInterval(
   return active ? CI_POLL_MS : false;
 }
 
-/** A pull request's pipelines, stages, jobs and steps. */
-export function useCiOverview(cwd: string, prId: number) {
+/**
+ * A pull request's pipelines, stages, jobs and steps. Keyed by the head
+ * commit too: a finished overview is not polled, and a push is what
+ * starts new pipelines.
+ */
+export function useCiOverview(
+  cwd: string,
+  prId: number,
+  headSha: string | undefined
+) {
   return useQuery({
-    queryKey: keys.ciOverview(cwd, prId),
+    queryKey: keys.ciOverview(cwd, prId, headSha),
     queryFn: () => window.n10.getCiOverview(prId),
     enabled: prId > 0,
     refetchInterval: (query) => ciPollInterval(query.state.data),

@@ -40,8 +40,11 @@ crosses IPC. The renderer only renders.
   `pull_requests`. `pull_requests` is empty for a fork's PR (seen on every
   `sharkdp/bat` fork run), so runs are found by head SHA, not by PR number.
 - The same workflow can run more than once on one SHA (`push` and
-  `pull_request`). The page lists every run the API returns, with its event and
-  run number.
+  `pull_request`). The page lists every run the API returns, with its run
+  number, attempt (when above 1) and event.
+- A run has a start (`run_started_at`) but no completion time: `updated_at` is
+  the last change to the record, not the end of the run. The page gives a run
+  no duration; its jobs have their own `started_at` and `completed_at`.
 - A run's `conclusion` has values a job does not: `action_required` (a
   first-time contributor's run waiting for approval), `startup_failure`,
   `stale`.
@@ -187,8 +190,8 @@ CiLogRef   { provider: 'github', jobId }
            | { provider: 'azure-devops', buildId, logId }
 
 CiOverview { provider, pipelines: CiPipeline[] }
-CiPipeline { id, name, status, url, event, commit, startedAt, completedAt,
-             stages: CiStage[] }
+CiPipeline { id, name, status, url, number, attempt, event, commit,
+             startedAt, completedAt, stages: CiStage[] }
 CiStage    { id, name | null, status, startedAt, completedAt, jobs: CiJob[] }
 CiJob      { id, name, status, startedAt, completedAt, url,
              log: CiLogRef | null, steps: CiStep[] }
@@ -199,6 +202,8 @@ CiLog      { text, firstLine, totalLines, truncated }
 | Model    | GitHub                                   | Azure DevOps                                           |
 | -------- | ---------------------------------------- | ------------------------------------------------------ |
 | Pipeline | workflow run for the head SHA            | newest build per definition (`maxBuildsPerDefinition`) |
+| Number   | `run_number`, and `run_attempt`          | `buildNumber`; attempts are per record                 |
+| Times    | `run_started_at` only                    | `startTime`, `finishTime`                              |
 | Stage    | none: one unnamed stage holds the jobs   | `Stage` record, by `order`                             |
 | Job      | job, in API order                        | `Job` record, or a `Phase` with no job, by `order`     |
 | Step     | step, by `number`                        | `Task` record, by `order`                              |
@@ -270,14 +275,20 @@ the next slices (§7), not deferrals.
 ## 6. Costs
 
 - **GitHub overview:** one request for the runs and one per run for its jobs
-  (100 jobs a page). bat's PR: 3 requests. The GraphQL query in §2.1 would
-  make it one query of about 10 points, without the attempt number.
-- **Azure overview:** one builds query, then one timeline per pipeline.
+  (100 jobs a page). bat's PR: 3 requests. A finished run's jobs change only
+  when it is re-run, which raises `run_attempt` and moves `updated_at`, so they
+  are kept (64 runs) under that key and a later read costs one request for the
+  runs plus one per run still going. The GraphQL query in §2.1 would make a
+  read one query of about 10 points, without the attempt number.
+- **Azure overview:** one builds query, then one timeline per pipeline. The
+  reads share a request when concurrent and keep nothing, so memory does not
+  grow with the builds opened.
 - **Polling:** only while the CI page is open and a pipeline is still going,
-  every 15 s; a finished overview is read again only on Refresh. At 15 s that
-  is 240 cycles an hour, about 720 requests for a PR with two workflows:
-  within GitHub's 5,000, which is why polling stops once everything finishes.
-  Conditional requests would make quiet cycles free.
+  every 15 s. A finished overview is read again on Refresh, or when the PR's
+  head commit changes, since the page's cache is keyed by it. At 15 s that is
+  240 cycles an hour; with finished runs cached, a PR with one run still going
+  costs about 480 requests an hour, within GitHub's 5,000. Conditional
+  requests would make quiet cycles free.
 - **Logs:** read only when the user opens one. GitHub job logs run from tens of
   KB to several MB (900 KB per bat build job), and the API offers only the
   whole file, so the host keeps the last few finished job logs in memory,
@@ -313,11 +324,13 @@ Deferred items (§5) join this list when their API exists.
   `@n10/vcs-core/ci`. `VcsProvider` gains the optional `fetchCiOverview` and
   `fetchCiLog`.
 - **GitHub:** `libs/vcs/github/src/lib/ci.ts`: runs for the head commit, every
-  page of each run's jobs, steps by number, and a finished job's log, kept in
-  memory (8 logs, 64 MiB) and refused over 32 MiB.
+  page of each run's jobs (a finished run's kept under its attempt and
+  `updated_at`), steps by number, and a finished job's log, kept in memory
+  (8 logs, 64 MiB) and refused over 32 MiB.
 - **Azure:** `libs/vcs/azure-devops/src/lib/ci.ts`: newest build per
   definition, the timeline by `parentId` and `order`, a phase without a job
-  shown as itself, and a task's log read by line range.
+  shown as itself, and a task's log read by line range. Reads are
+  dedupe-only.
 - **Core:** `libs/core/src/lib/pull-requests/ci-overview.ts` finds the PR's
   head in the cached list and asks the configured provider; a log reference
   from another provider is refused.

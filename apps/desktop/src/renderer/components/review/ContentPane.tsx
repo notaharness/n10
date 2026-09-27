@@ -80,7 +80,11 @@ function PrPage({ pr, mode }: { pr?: PullRequestInfo; mode: Mode }) {
   if (!pr || (mode !== 'overview' && mode !== 'ci')) return null;
   return (
     <div className="absolute inset-0">
-      {mode === 'overview' ? <OverviewPane pr={pr} /> : <CiPane prId={pr.id} />}
+      {mode === 'overview' ? (
+        <OverviewPane pr={pr} />
+      ) : (
+        <CiPane prId={pr.id} headSha={pr.headSha} />
+      )}
     </div>
   );
 }

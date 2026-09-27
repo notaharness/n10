@@ -1,6 +1,10 @@
 import { ExternalLinkIcon } from 'lucide-react';
 import type { CiJob, CiPipeline, CiStage } from '@n10/vcs-core/ci';
-import { ciDuration, CI_STATUS_LABEL } from '../../../lib/review/ci-model.js';
+import {
+  ciDuration,
+  ciPipelineMeta,
+  CI_STATUS_LABEL,
+} from '../../../lib/review/ci-model.js';
 import { cn } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { Tip } from '../../ui/tooltip.js';
@@ -103,10 +107,7 @@ export function CiPipelineCard({
   onSelectJob: (job: CiJob) => void;
   onOpen: (url: string) => void;
 }) {
-  const duration = ciDuration(pipeline.startedAt, pipeline.completedAt);
-  const meta = [pipeline.event, pipeline.commit?.slice(0, 7), duration].filter(
-    Boolean
-  );
+  const meta = ciPipelineMeta(pipeline);
   const { url } = pipeline;
   return (
     <article
@@ -118,7 +119,7 @@ export function CiPipelineCard({
         <CiStatusIcon status={pipeline.status} className="size-4" />
         <h3 className="truncate text-sm font-semibold">{pipeline.name}</h3>
         <span className="truncate font-mono text-xs text-muted-foreground">
-          {meta.join(' · ')}
+          {meta}
         </span>
         {url && (
           <Tip label="Open in the browser">

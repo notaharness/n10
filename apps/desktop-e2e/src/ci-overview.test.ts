@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
 import { sidebarRow } from './setup/app.js';
 import { RECORDED_HEAD, recordedCiApi } from './setup/ci-fixture.js';
-import type { FakeGitHub } from './setup/fake-gh.js';
+import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
 
 /**
  * The CI page (preview), offline: the fake `gh` answers with a recorded
@@ -57,9 +57,7 @@ test('lists every workflow run for the head commit with its jobs', async ({
 
   const cicd = ci.locator('[data-ci-pipeline="CICD"]');
   await expect(cicd.getByRole('heading', { name: 'CICD' })).toBeVisible();
-  await expect(
-    cicd.getByText('pull_request · beb1258 · 13m 11s')
-  ).toBeVisible();
+  await expect(cicd.getByText('#6010 · pull_request · beb1258')).toBeVisible();
   await expect(cicd.locator('[data-ci-job]')).toHaveCount(23);
   await expect(
     ci.locator('[data-ci-pipeline="Changelog"] [data-ci-job]')
@@ -107,4 +105,49 @@ test('says a skipped job has no log', async ({ desktop }) => {
 
   await page.getByRole('button', { name: 'Close job details' }).click();
   await expect(page.getByText('This job did not run.')).toHaveCount(0);
+});
+
+test("says why a job's log could not be read", async ({ desktop }) => {
+  const { page } = desktop;
+  updateFakeGh(desktop.homeDir, (scenario) => {
+    scenario.api = {
+      ...scenario.api,
+      'repos/n10/fixture/actions/jobs/108482497925/logs': {
+        ghError: 'Not Found (HTTP 404)',
+      },
+    };
+  });
+  await openCi(page);
+
+  await job(page, 'Ensure code quality').click();
+  const alert = page.getByRole('alert');
+  await expect(alert).toContainText(
+    "Couldn't load the log: GitHub has no log for this job."
+  );
+  await expect(alert).not.toContainText('Error invoking remote method');
+  await expect(alert.getByRole('button', { name: 'Retry' })).toBeVisible();
+});
+
+test('keeps the pipelines on screen when a refresh fails', async ({
+  desktop,
+}) => {
+  const { page } = desktop;
+  const ci = await openCi(page);
+  await expect(ci.locator('[data-ci-pipeline="CICD"]')).toBeVisible({
+    timeout: 30_000,
+  });
+
+  updateFakeGh(desktop.homeDir, (scenario) => {
+    scenario.api = {
+      ...scenario.api,
+      [`repos/n10/fixture/actions/runs?head_sha=${RECORDED_HEAD}&per_page=100&page=1`]:
+        { ghError: 'HTTP 502: Bad Gateway' },
+    };
+  });
+  await page.getByRole('button', { name: 'Refresh CI' }).click();
+
+  await expect(ci.getByRole('status')).toContainText(
+    "Couldn't refresh, so this may be out of date"
+  );
+  await expect(ci.locator('[data-ci-pipeline="CICD"]')).toBeVisible();
 });

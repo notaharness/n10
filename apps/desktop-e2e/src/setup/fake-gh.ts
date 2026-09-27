@@ -60,7 +60,8 @@ export interface FakeGitHub {
   prs: FakePr[];
   /**
    * Recorded `gh api <path>` answers, keyed by the exact path: JSON,
-   * or text such as a job log. See `setup/ci-fixture.ts`.
+   * or text such as a job log. `{ ghError: 'Not Found (HTTP 404)' }`
+   * fails the call the way `gh` does. See `setup/ci-fixture.ts`.
    */
   api?: Record<string, unknown>;
   /**

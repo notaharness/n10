@@ -305,9 +305,15 @@ if (
 
   // ── gh api <path>, answered verbatim from the scenario's `api` table ──
   // Recorded REST responses (JSON, or text such as a job log) keyed by
-  // the exact path the provider asks for.
+  // the exact path the provider asks for. `{ ghError }` fails the way
+  // gh does, with that text on stderr.
   if (argv[0] === 'api' && scenario.api && argv[1] in scenario.api) {
-    out(scenario.api[argv[1]]);
+    const answer = scenario.api[argv[1]];
+    if (answer && typeof answer === 'object' && 'ghError' in answer) {
+      process.stderr.write(`gh: ${answer.ghError}\n`);
+      process.exit(1);
+    }
+    out(answer);
   }
 
   process.stderr.write(`fake gh: unhandled invocation: ${argv.join(' ')}\n`);

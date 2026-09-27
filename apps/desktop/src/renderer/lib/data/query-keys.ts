@@ -44,8 +44,8 @@ export const keys = {
   threads: (cwd: string, prId: number) => ['threads', cwd, prId] as const,
   prDescription: (cwd: string, prId: number) =>
     ['pr-description', cwd, prId] as const,
-  ciOverview: (cwd: string, prId: number) =>
-    ['ci-overview', cwd, prId] as const,
+  ciOverview: (cwd: string, prId: number, headSha: string | undefined) =>
+    ['ci-overview', cwd, prId, headSha] as const,
   ciLog: (cwd: string, ref: CiLogRef | null) => ['ci-log', cwd, ref] as const,
   activity: (cwd: string) => ['session-activity', cwd] as const,
   commentImage: (url: string) => ['comment-image', url] as const,

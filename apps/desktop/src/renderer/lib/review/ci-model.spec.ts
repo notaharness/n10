@@ -4,6 +4,7 @@ import { ciPollInterval, CI_POLL_MS } from '../data/ci-queries.js';
 import {
   ciDuration,
   ciLogLineKind,
+  ciPipelineMeta,
   ciSummary,
   findCiJob,
   hostErrorMessage,
@@ -30,6 +31,8 @@ function pipeline(id: string, over: Partial<CiPipeline> = {}): CiPipeline {
     name: `pipeline ${id}`,
     status: 'succeeded',
     url: null,
+    number: null,
+    attempt: null,
     event: null,
     commit: null,
     startedAt: null,
@@ -134,5 +137,28 @@ describe('hostErrorMessage', () => {
         )
       )
     ).toBe('GitHub has no log for this job.');
+  });
+});
+
+describe('ciPipelineMeta', () => {
+  it("lists the run's own number, a re-run's attempt, event and commit", () => {
+    expect(
+      ciPipelineMeta(
+        pipeline('1', {
+          number: '6010',
+          attempt: 2,
+          event: 'pull_request',
+          commit: 'beb1258da78f003ab057914860e6907b1e2adf2b',
+          startedAt: '2026-09-26T20:37:42Z',
+          completedAt: '2026-09-26T20:50:53Z',
+        })
+      )
+    ).toBe('#6010 · attempt 2 · pull_request · beb1258 · 13m 11s');
+  });
+
+  it('leaves out a first attempt and anything missing', () => {
+    expect(
+      ciPipelineMeta(pipeline('1', { number: '7', attempt: 1, event: 'push' }))
+    ).toBe('#7 · push');
   });
 });

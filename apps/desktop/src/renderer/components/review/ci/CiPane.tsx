@@ -29,10 +29,13 @@ function openExternal(url: string): void {
 function CiHeader({
   overview,
   fetching,
+  staleError,
   onRefresh,
 }: {
   overview: CiOverview | undefined;
   fetching: boolean;
+  /** Set when a refresh failed and the page still shows older data. */
+  staleError: unknown;
   onRefresh: () => void;
 }) {
   const status = overview
@@ -72,6 +75,12 @@ function CiHeader({
         dependencies are not shown: the provider&apos;s API does not report
         them.
       </p>
+      {staleError != null && (
+        <p role="status" className="mt-1 text-xs text-warning">
+          Couldn&apos;t refresh, so this may be out of date:{' '}
+          {hostErrorMessage(staleError)}
+        </p>
+      )}
     </header>
   );
 }
@@ -138,9 +147,15 @@ function CiBody({
  * The CI page of a pull request (preview): every pipeline, its stages
  * and jobs; a chosen job's steps and log below.
  */
-export function CiPane({ prId }: { prId: number }) {
+export function CiPane({
+  prId,
+  headSha,
+}: {
+  prId: number;
+  headSha: string | undefined;
+}) {
   const { repo } = useRepo();
-  const query = useCiOverview(repo.cwd, prId);
+  const query = useCiOverview(repo.cwd, prId, headSha);
   const [selected, setSelected] = useState<{
     pipelineId: string;
     jobId: string;
@@ -154,6 +169,7 @@ export function CiPane({ prId }: { prId: number }) {
       <CiHeader
         overview={query.data}
         fetching={query.isFetching}
+        staleError={query.data ? query.error : null}
         onRefresh={() => void query.refetch()}
       />
       <div

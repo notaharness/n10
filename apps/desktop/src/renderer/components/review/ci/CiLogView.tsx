@@ -2,9 +2,10 @@ import { useLayoutEffect, useRef } from 'react';
 import type { CiLog } from '@n10/vcs-core/ci';
 import {
   ciLogLineKind,
+  hostErrorMessage,
   type CiLogLineKind,
 } from '../../../lib/review/ci-model.js';
-import { cn, errorMessage } from '../../../lib/utils.js';
+import { cn } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { Skeleton } from '../../ui/skeleton.js';
 
@@ -91,7 +92,7 @@ export function CiLogView({
       ) : error ? (
         <div role="alert" className="flex items-center gap-3 p-3 text-sm">
           <span className="text-destructive">
-            Couldn&apos;t load the log: {errorMessage(error)}
+            Couldn&apos;t load the log: {hostErrorMessage(error)}
           </span>
           <Button size="sm" variant="outline" onClick={onRetry}>
             Retry

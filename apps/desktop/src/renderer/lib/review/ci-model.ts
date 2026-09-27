@@ -98,3 +98,16 @@ export function hostErrorMessage(err: unknown): string {
     ''
   );
 }
+
+/** The native facts a pipeline card lists after its name. */
+export function ciPipelineMeta(p: CiPipeline): string {
+  return [
+    p.number ? `#${p.number}` : null,
+    p.attempt != null && p.attempt > 1 ? `attempt ${p.attempt}` : null,
+    p.event,
+    p.commit ? p.commit.slice(0, 7) : null,
+    ciDuration(p.startedAt, p.completedAt),
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(' · ');
+}
