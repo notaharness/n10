@@ -29,8 +29,9 @@ n10 was formerly named Kirby; the repository is `notaharness/n10`.
 n10 runs coding agents in Git worktrees and reviews their pull requests.
 Nx monorepo with npm workspaces and ESM: `apps/cli` is the Ink TUI,
 `apps/desktop` is Electron, `apps/website` is the Next.js/Fumadocs site at
-n10.is, `libs/core` owns shared operations, and `libs/app-core` supplies
-React hooks and controllers.
+n10.is, `libs/core` owns shared operations, `libs/engine` owns the state,
+scheduling and caching both shells run, and `libs/app-core` supplies React
+hooks and controllers. Layering: `docs/architecture.md`.
 
 ## Context and tools
 
@@ -74,10 +75,14 @@ Next.js requires otherwise).
 - Put shared sequences of Git, filesystem, PTY, config and provider operations
   in `@n10/core`; both shells call them. When changing worktree removal,
   consolidate the duplicated TUI and desktop flows there.
-- Core cannot import React, Ink, Electron or `@n10/app-core`. The desktop
+- Core cannot import React, Ink, Electron, `@n10/app-core` or `@n10/engine`;
+  the engine cannot import React, Ink, Electron or `@n10/app-core`. The desktop
   renderer uses the browser-safe `@n10/core/plan` and `@n10/core/readiness`,
-  never core's Node entry.
-  Keep the core and app-core barrels separate.
+  never core's or the engine's Node entry. Keep the core and app-core barrels
+  separate.
+- Behavior both shells need (what to read and when, caching, refresh rules)
+  belongs in `@n10/engine`, with each shell adapting it. Moving a resource there
+  deletes the shells' own implementations of it.
 - Terminal backends implement `SessionBackend` without n10-specific names.
   tmux session names are labels; `libs/core/src/lib/session-identity.ts`
   owns the `@orchestra-*` tags that identify a session and the label rules.

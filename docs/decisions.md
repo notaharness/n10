@@ -5,10 +5,21 @@ working rules; this document explains constraints that are easy to miss.
 
 ## Shared operations and entry points
 
-Core owns sequences of Git, filesystem, PTY, config and provider calls.
-App-core supplies React bindings; shells own presentation. The desktop renderer
-cannot use Node APIs and accesses core's plan through `@n10/core/plan`.
-Keep that entry browser-safe and the core/app-core barrels separate.
+Core owns sequences of Git, filesystem, PTY, config and provider calls. The
+engine owns what both shells do with them: what to read and when, what to keep,
+and who hears about it. App-core supplies React bindings; shells own rendering
+and input. The desktop renderer cannot use Node APIs and accesses core's plan
+through `@n10/core/plan`. Keep that entry browser-safe and the core/app-core
+barrels separate.
+
+The engine is a layer of its own because shared primitives did not keep the
+shells converged. Both called the same provider, yet the TUI polled it from a
+hook while the desktop read core's cache, with different refresh, overlap and
+error semantics. Coordination written twice drifts however much it shares, so
+it is written once, below React: `@n10/engine` depends on core, core may not
+import it, and neither imports a shell or the React layer (enforced in
+`eslint.config.mjs`). Each process creates its own engine services, so a TUI
+and a desktop open on one repository poll independently.
 
 When changing shared behavior, compare both shells. Worktree removal is
 implemented in the TUI's `performDelete` and desktop's `services/worktrees.ts`;
@@ -358,12 +369,31 @@ assert the actual prompt received by a fake agent.
 
 ## Pull request caching and providers
 
-The desktop sidebar, babysitters and sync loop share core's per-repo PR cache.
-Key cache entries, in-flight requests and sequence guards by cwd. Only the newest
-fetch for a repo commits. Failures retain the last good list and retry on the
-interval. Changing global credentials clears entries and invalidates in-flight
-results. `cached`/`refreshInBackground` support polling; explicit reads can await
-refresh. The TUI's `usePrData` is its process's single list reader.
+Both shells read pull requests through the engine's list
+(`createPullRequestList`): the TUI's `usePrData`, and the desktop host's
+sidebar, babysitters and sync loop. The TUI holds a `watch`; the desktop's
+demand is its renderer's sidebar poll.
+
+- An answer is keyed by scope: repo path, provider, project and a credentials
+  generation. Replacing any of them at the same path starts an empty scope, and
+  a request out under the old one commits only there. Secrets never enter a key;
+  `credentialsChanged` resets every provider's caches and bumps the generation.
+- One request per scope. Reads join the request out; a forced read queues
+  exactly one request behind it, which forced reads meanwhile share, so a slow
+  answer never overwrites a newer one. A watch tick that finds a request out is
+  skipped, not queued.
+- `refresh` has the provider forget its per-row memo when that refresh's own
+  request starts. Forgetting when the user asks lets a request already out
+  write its answers straight back.
+- A failure keeps the last good list with the error beside it and waits out the
+  interval before retrying.
+- A `gh` read is killed at `GH_READ_DEADLINE_MS` (30s; `execFile`'s
+  `timeout`), so a hung read cannot hold the queue: the engine sees an ordinary
+  failure. Mutations run without one; a killed mutation may or may not have
+  reached GitHub.
+- The engine resolves providers from the persisted config. The TUI persists a
+  settings edit in a microtask, so its settings effects are queued behind that
+  write.
 
 GitHub uses authenticated `gh`; offline tests replace that executable on PATH.
 Azure DevOps uses REST and a PAT, with recorded anonymized fixtures rather than

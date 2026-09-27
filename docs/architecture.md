@@ -1,5 +1,23 @@
 # Project structure
 
+## Layers
+
+n10 is one program with two frontends. Each layer depends only on the ones
+below it, and the ESLint module boundaries enforce the direction.
+
+| Layer                      | Role                                                                                                                                                                                                |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@n10/core`                | Primitive operations: Git, filesystem, tmux and PTY, config, providers, pure helpers. Node only.                                                                                                    |
+| `@n10/engine`              | The program: state, scheduling, caching and the events that announce them, over core. Node only; never React, Ink or Electron.                                                                      |
+| `@n10/app-core`            | React bindings. The TUI's contexts and hooks, and the plan binding the desktop renderer also uses. Its end state is thin, browser-safe hooks over an engine client.                                 |
+| `apps/cli`, `apps/desktop` | Rendering and input. The TUI runs the engine in its own process; the desktop runs it in the Electron main process, behind the host bridge. Two open shells share the implementation, not the state. |
+
+Behavior moves into the engine one resource at a time. The pull request list
+is there (`libs/engine/src/lib/pull-requests/`); remote sync, review threads,
+config effects and session orchestration are still coordinated by each shell.
+
+## Directory map
+
 ```
 apps/cli/                        — The published `n10` package: the command, the Ink TUI (ESM, React 19) — thin render layer over @n10/app-core
   src/main.ts                    — `n10` entry: routes to the desktop, `--tui` or `util`, loading only that path
@@ -12,7 +30,7 @@ apps/cli/                        — The published `n10` package: the command, t
   src/screens/reviews/           — Reviews tab (DiffFileList, DiffViewer, ReviewDetailPane)
   src/hooks/                     — Ink-coupled hooks (useTerminal, useScrollWheel, useRawStdinForward, useDiffListScrollSync)
   scripts/prepare-publish.mjs    — Assembles dist/ into the package: the CLI bundle, the desktop build under desktop/, the manifest
-apps/desktop/                    — Electron GUI shell over @n10/app-core, shipped inside `@notaharness/n10`
+apps/desktop/                    — Electron GUI shell, shipped inside `@notaharness/n10`: host services over @n10/engine and @n10/core, a renderer over its own query layer
   src/main/tmux-session-preparer.ts — Utility-process boundary for isolated tmux server creation
   src/main/                      — Electron main: window chrome + security posture (window.ts), N10_QA_STEPS hook
   src/main/beam/                 — Client of the beam daemon's control socket: machines, remote exec/pty, ceremonies, mail relay, and the daemon the app starts
@@ -57,7 +75,9 @@ apps/website/                    — Next.js 16 + Fumadocs site at n10.is, deplo
   src/app/llms.txt, llms-full.txt — Agent-facing page index and full content (see src/lib/llms.ts)
   src/components/landing/        — Marketing page sections, data-driven where repeated (Features)
   Own tsconfig/eslint/import conventions — see apps/website/README.md, not this file
-libs/core/                       — Shell-agnostic core. No React, Ink or Electron (lint-enforced)
+libs/engine/                     — The program both shells run: state, scheduling, caching. No React, Ink, Electron or app-core (lint-enforced)
+  src/lib/pull-requests/         — The pull request list: scoped reads, one request per scope, queued refreshes, snapshots and subscriptions, watch schedule
+libs/core/                       — Shell-agnostic operations. No React, Ink, Electron or engine (lint-enforced)
   src/lib/session/               — Session launch + plan checkout flows
   src/lib/plan/                  — Plan store (external store) + prompt composition
   src/plan.ts                    — Browser-safe entry (`@n10/core/plan`) for the renderer
@@ -77,8 +97,8 @@ libs/core/                       — Shell-agnostic core. No React, Ink or Elect
     hints.ts                     — Human-readable key display strings
     controls-data.ts             — Controls panel data logic (buildControlsRows, getBindingRows)
   src/lib/input/                 — KeyPress type (shell-agnostic ink-Key shape) + text-input handling
-libs/app-core/                   — The React layer over @n10/core, shared by both shells
-  src/lib/context/               — React state contexts (Config, Session, Sidebar, Nav, Modal, Toast, Layout…)
+libs/app-core/                   — React bindings: the TUI's contexts and hooks, and the plan binding the desktop renderer uses
+  src/lib/context/               — React state contexts (Config, Engine, Session, Sidebar, Nav, Modal, Toast, Layout…)
   src/lib/hooks/                 — Shell-agnostic hooks (useSessionManager, useDiffData, useRemoteComments…)
   src/lib/controllers/           — Headless screen controllers (diff file list / viewer view-models)
   src/lib/plan/use-plan-store.ts — useSyncExternalStore binding for core's plan store
