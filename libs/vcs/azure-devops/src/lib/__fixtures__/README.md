@@ -25,10 +25,19 @@ because there was no organization to record from. Trustworthy about
 _structure_ — field names, nesting, which fields are optional — and not
 evidence about what a real server sends.
 
-| File                           | What it stands in for                                                                                                                                   |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `builds-batch.json`            | one `GET /_apis/build/builds?repositoryId=…` page covering several pull requests at once                                                                |
-| `pr-threads-conversation.json` | one `GET …/pullRequests/{id}/threads` answer: general, line, outdated left-side, file-level, deleted and system (vote, push, status, reviewers) threads |
+| File                           | What it stands in for                                                                                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `builds-batch.json`            | one `GET /_apis/build/builds?repositoryId=…` page covering several pull requests at once                                                                                       |
+| `pr-threads-conversation.json` | one `GET …/pullRequests/{id}/threads` answer: general, line, outdated left-side, file-level and deleted threads, and system entries in the documented sample's property shapes |
+
+**Documented.** Microsoft's own sample response, copied verbatim from
+the REST reference. Real field names and shapes as the API owner
+publishes them; the organization and people are Microsoft's fictional
+ones, so nothing needs scrubbing.
+
+| File                         | What it is                                                                                                                                                                                                                                                                                         |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pr-threads-documented.json` | the `GET …/pullRequests/{id}/threads` sample from the [7.1 reference](https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-request-threads/list?view=azure-devops-rest-7.1): merge attempts, reviewer changes, a vote, a push, a general thread and a line thread with a deleted reply |
 
 To record a new one, hit the API with the PAT from `~/.n10/config.json`,
 scrub the identifiers above, and add a row here saying what the response

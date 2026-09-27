@@ -51,6 +51,12 @@ export interface ConversationComment {
   body: string;
   /** `system` is an entry the provider wrote into a thread itself. */
   kind: 'text' | 'system';
+  /**
+   * Deleted, with no text left. Kept only where something still hangs
+   * off it — a thread's root, or a comment others replied to — so the
+   * replies do not lose what they answer.
+   */
+  deleted: boolean;
   createdAt: string;
   /** When the text last changed, where the provider says. */
   editedAt: string | null;
@@ -96,7 +102,12 @@ export interface LineRange {
 export interface ThreadAnchor {
   path: string;
   current: LineRange | null;
+  /** Null when the provider recorded no separate original: Azure keeps
+   *  one only for a thread it has had to track across pushes. */
   original: LineRange | null;
+  /** The file's path when the thread was written, where the provider
+   *  says it differs: the file was renamed since (Azure). */
+  originalPath: string | null;
   /** The commit the original range was written against (GitHub). */
   originalCommit: Oid | null;
   /** The iteration pair the thread was written against (Azure). */
@@ -168,6 +179,8 @@ export interface ReviewSummary {
 export interface RequestedReviewer {
   kind: 'user' | 'team';
   name: string;
+  /** What a request is made with: a login, or a team's `org/slug`. */
+  handle: string;
 }
 
 interface EventBase {
@@ -216,6 +229,10 @@ export type ConversationEvent = EventBase &
   );
 
 export type ConversationEventKind = ConversationEvent['kind'];
+
+/** One kind of event's own fields, without the ones every event has. */
+export type ConversationEventDetail<E = ConversationEvent> =
+  E extends ConversationEvent ? Omit<E, keyof EventBase> : never;
 
 export interface PullRequestConversation {
   ref: PullRequestRef;

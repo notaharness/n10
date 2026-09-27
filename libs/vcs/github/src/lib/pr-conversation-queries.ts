@@ -22,7 +22,6 @@ fragment ConversationReviewComment on PullRequestReviewComment {
   viewerCannotUpdateReasons
   viewerCanDelete
   state
-  diffHunk
 }`;
 
 const THREAD = `
@@ -42,13 +41,11 @@ fragment ConversationThread on PullRequestReviewThread {
   viewerCanReply
   viewerCanResolve
   viewerCanUnresolve
+  root: comments(first: 1) { nodes { diffHunk originalCommit { oid } } }
   comments(first: 100) {
     totalCount
     pageInfo { hasNextPage endCursor }
-    nodes {
-      ...ConversationReviewComment
-      originalCommit { oid }
-    }
+    nodes { ...ConversationReviewComment }
   }
 }`;
 
@@ -103,7 +100,7 @@ const REVIEWER = `
     ... on User { login }
     ... on Bot { login }
     ... on Mannequin { login }
-    ... on Team { name }
+    ... on Team { name combinedSlug }
   }`;
 
 const EVENT = `
@@ -219,10 +216,7 @@ query PullRequestThreadReplies($thread: ID!, $after: String!) {
       comments(first: 100, after: $after) {
         totalCount
         ${PAGE}
-        nodes {
-          ...ConversationReviewComment
-          originalCommit { oid }
-        }
+        nodes { ...ConversationReviewComment }
       }
     }
   }

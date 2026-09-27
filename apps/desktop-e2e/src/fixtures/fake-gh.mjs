@@ -225,8 +225,6 @@ function threadComments(t, i) {
     replyTo: j === 0 ? null : { id: `${id}-c1` },
     pullRequestReview: null,
     state: 'SUBMITTED',
-    diffHunk: '',
-    originalCommit: null,
   }));
 }
 
@@ -240,6 +238,7 @@ function conversationThread(t, i) {
     viewerCanReply: true,
     viewerCanResolve: !node.isResolved,
     viewerCanUnresolve: node.isResolved,
+    root: { nodes: [{ diffHunk: t.diffHunk ?? '', originalCommit: null }] },
     comments: pageOf(threadComments(t, i), undefined),
   };
 }

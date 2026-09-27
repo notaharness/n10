@@ -52,8 +52,6 @@ export interface RawReviewComment {
   viewerCanDelete: boolean;
   /** `PENDING` while part of the viewer's unsubmitted review. */
   state: string;
-  diffHunk: string;
-  originalCommit: { oid: string } | null;
 }
 
 export interface RawThread {
@@ -72,12 +70,19 @@ export interface RawThread {
   viewerCanReply: boolean;
   viewerCanResolve: boolean;
   viewerCanUnresolve: boolean;
+  /** The root comment's context, read once rather than per reply. */
+  root: {
+    nodes: ({
+      diffHunk: string;
+      originalCommit: { oid: string } | null;
+    } | null)[];
+  };
   comments: Page<RawReviewComment>;
 }
 
 type RawIssueComment = Omit<
   RawReviewComment,
-  'replyTo' | 'pullRequestReview' | 'originalCommit' | 'state' | 'diffHunk'
+  'replyTo' | 'pullRequestReview' | 'state'
 >;
 
 interface RawReview {
@@ -178,6 +183,8 @@ export function toComment(
     source: raw.body,
     body: sanitizeBody(raw.body),
     kind: 'text',
+    // GitHub removes a deleted comment outright; nothing is left of it.
+    deleted: false,
     createdAt: raw.createdAt,
     editedAt: raw.lastEditedAt,
     minimized: minimizedOf(raw),
@@ -219,7 +226,7 @@ export function toThread(
 ): ConversationThread {
   const isFile = raw.subjectType === 'FILE';
   const { startDiffSide: startSide, diffSide: side } = raw;
-  const root = comments[0];
+  const root = raw.root.nodes[0];
   return {
     id: raw.id,
     scope: isFile ? 'file' : 'line',
@@ -231,6 +238,7 @@ export function toThread(
       original: isFile
         ? null
         : range(startSide, side, raw.originalStartLine, raw.originalLine),
+      originalPath: null,
       originalCommit: oidOf(root?.originalCommit),
       iterations: null,
       diffHunk: root?.diffHunk || null,

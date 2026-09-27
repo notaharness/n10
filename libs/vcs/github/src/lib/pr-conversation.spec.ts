@@ -158,8 +158,18 @@ function pageOf<T>(all: T[], after: string | undefined, total?: number) {
   };
 }
 
+/** GitHub reads the root's context once, beside the replies. */
 function threadNode(t: FakeThread) {
-  return { ...t.node, comments: pageOf(t.comments, undefined) };
+  const root = t.comments[0];
+  return {
+    ...t.node,
+    root: {
+      nodes: root
+        ? [{ diffHunk: root.diffHunk, originalCommit: root.originalCommit }]
+        : [],
+    },
+    comments: pageOf(t.comments, undefined),
+  };
 }
 
 function connections(s: Scenario, after?: string) {
@@ -347,6 +357,7 @@ describe('thread provenance', () => {
       path: 'src/request.ts',
       current: null,
       original: { startSide: 'LEFT', start: 18, side: 'LEFT', end: 20 },
+      originalPath: null,
       originalCommit: OID_A,
       iterations: null,
       diffHunk: '@@ -38,4 +38,6 @@ function run() {',
@@ -582,7 +593,11 @@ describe('reviews and events', () => {
           id: 'request-1',
           createdAt: '2026-09-02T09:30:00Z',
           actor: user('alex'),
-          requestedReviewer: { __typename: 'Team', name: 'Core team' },
+          requestedReviewer: {
+            __typename: 'Team',
+            name: 'Core team',
+            combinedSlug: 'n10/core',
+          },
         },
         {
           __typename: 'ReadyForReviewEvent',
@@ -610,7 +625,7 @@ describe('reviews and events', () => {
       }),
       expect.objectContaining({
         kind: 'review-requested',
-        reviewer: { kind: 'team', name: 'Core team' },
+        reviewer: { kind: 'team', name: 'Core team', handle: 'n10/core' },
       }),
       expect.objectContaining({ kind: 'ready-for-review' }),
     ]);

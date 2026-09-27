@@ -105,12 +105,10 @@ describe('toAdoConversation', () => {
     });
   });
 
-  it('keeps a system comment inside a person’s thread, labelled', () => {
-    expect(thread('2').comments.map((c) => c.kind)).toEqual([
-      'text',
-      'text',
-      'system',
-    ]);
+  it('keeps a system comment inside a person’s thread, labelled as Azure’s', () => {
+    const comments = thread('2').comments;
+    expect(comments.map((c) => c.kind)).toEqual(['text', 'text', 'system']);
+    expect(comments[2]!.author?.kind).toBe('system');
   });
 
   it('keeps an outdated left-side thread on its original range', () => {
@@ -135,10 +133,11 @@ describe('toAdoConversation', () => {
     });
   });
 
-  it('drops a deleted thread, and a deleted comment but not its replies', () => {
+  it('drops a deleted thread, and keeps a deleted root for its replies', () => {
     expect(conversation.threads.find((t) => t.id === '9')).toBeUndefined();
     expect(thread('10').comments).toEqual([
-      expect.objectContaining({ id: '2', replyTo: '1' }),
+      expect.objectContaining({ id: '1', deleted: true, body: '' }),
+      expect.objectContaining({ id: '2', deleted: false, replyTo: '1' }),
     ]);
   });
 
@@ -147,17 +146,21 @@ describe('toAdoConversation', () => {
     expect(thread('1').comments[0]!.capabilities.edit.state).toBe('unknown');
   });
 
-  it('reads a vote with its value and the voter it names', () => {
+  it('reads a vote with its value and the voter the entry names', () => {
     expect(event('5')).toMatchObject({
       kind: 'vote',
       native: 'VoteUpdate',
       vote: 10,
-      actor: { identifier: 'bea@example.com', displayName: 'Bea Reviewer' },
+      actor: {
+        displayName: 'Bea Reviewer',
+        id: '8f5c1a2e-0000-4000-8000-00000000000b',
+        kind: 'user',
+      },
       text: 'Bea Reviewer voted 10',
     });
   });
 
-  it('names who pushed, not the service that wrote the entry', () => {
+  it('names who pushed, by unique name, not the service that wrote it', () => {
     expect(event('6')).toMatchObject({
       kind: 'push',
       actor: ALEX,
@@ -165,12 +168,87 @@ describe('toAdoConversation', () => {
     });
   });
 
-  it('keeps a history entry it has no reading for, with its text', () => {
-    expect(event('7').kind).toBe('status-changed');
+  it('credits an entry that names nobody to nobody', () => {
+    expect(event('7')).toMatchObject({ kind: 'status-changed', actor: null });
+  });
+
+  it('keeps a history entry it has no reading for, with its text and actor', () => {
     expect(event('8')).toMatchObject({
       kind: 'system',
       native: 'ReviewersUpdate',
       text: 'Alex Author added Bea Reviewer as a reviewer',
+      actor: { displayName: 'Alex Author', kind: 'user' },
+    });
+  });
+
+  it('keeps a renamed file’s original path', () => {
+    expect(thread('3').anchor?.originalPath).toBe('src/old-legacy.ts');
+  });
+});
+
+describe('the documented 7.1 sample', () => {
+  const documented = toAdoConversation(
+    REF,
+    (
+      JSON.parse(
+        readFileSync(
+          join(__dirname, '__fixtures__', 'pr-threads-documented.json'),
+          'utf8'
+        )
+      ) as { value: RawAdoThread[] }
+    ).value
+  );
+  const byId = (id: string) => documented.events.find((e) => e.id === id)!;
+
+  it('reads people’s threads as threads and history as events', () => {
+    expect(documented.threads.map((t) => t.id)).toEqual(['147', '148']);
+    expect(documented.events.map((e) => e.id)).toEqual([
+      '141',
+      '142',
+      '143',
+      '144',
+      '145',
+      '146',
+    ]);
+  });
+
+  it('credits votes, pushes and reviewer changes to the person, never the service group', () => {
+    expect(byId('143')).toMatchObject({
+      kind: 'vote',
+      vote: 10,
+      actor: {
+        identifier: 'd6245f20-2af8-44f4-9451-8107cb2767db',
+        displayName: 'Normal Paulk',
+      },
+    });
+    expect(byId('145')).toMatchObject({
+      kind: 'push',
+      actor: {
+        identifier: 'fabrikamfiber16@hotmail.com',
+        displayName: 'Normal Paulk',
+      },
+    });
+    expect(byId('142').actor).toMatchObject({ displayName: 'Normal Paulk' });
+    for (const e of documented.events) {
+      expect(e.actor?.displayName ?? '').not.toMatch(/Service Accounts/);
+    }
+  });
+
+  it('reads a merge attempt as provider history with nobody behind it', () => {
+    expect(byId('141')).toMatchObject({
+      kind: 'system',
+      native: 'MergeAttempt',
+      actor: null,
+    });
+  });
+
+  it('keeps a deleted reply only while something answers it', () => {
+    const line = documented.threads.find((t) => t.id === '148')!;
+    expect(line.comments.map((c) => c.id)).toEqual(['1']);
+    expect(line.anchor).toMatchObject({
+      path: 'new_feature.cpp',
+      current: { side: 'RIGHT', start: 5, end: 5 },
+      iterations: { first: 1, second: 2 },
     });
   });
 });

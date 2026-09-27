@@ -94,9 +94,9 @@
           "id": 3,
           "parentCommentId": 0,
           "author": {
-            "id": "8f5c1a2e-0000-4000-8000-00000000000a",
-            "displayName": "Alex Author",
-            "uniqueName": "alex@example.com"
+            "id": "41113706-4320-4083-9150-925feb93fc22",
+            "displayName": "[DefaultCollection]\\Project Collection Service Accounts",
+            "isContainer": true
           },
           "content": "Alex Author resolved this thread.",
           "publishedDate": "2026-09-21T09:00:00.000Z",
@@ -144,7 +144,8 @@
           "origLeftFileEnd": {
             "line": 20,
             "offset": 4
-          }
+          },
+          "origFilePath": "/src/old-legacy.ts"
         }
       },
       "id": 3,
@@ -231,9 +232,9 @@
           "id": 1,
           "parentCommentId": 0,
           "author": {
-            "id": "8f5c1a2e-0000-4000-8000-00000000000b",
-            "displayName": "Bea Reviewer",
-            "uniqueName": "bea@example.com"
+            "id": "41113706-4320-4083-9150-925feb93fc22",
+            "displayName": "[DefaultCollection]\\Project Collection Service Accounts",
+            "isContainer": true
           },
           "content": "Bea Reviewer voted 10",
           "publishedDate": "2026-09-21T09:00:00.000Z",
@@ -249,20 +250,17 @@
           "$type": "System.String",
           "$value": "VoteUpdate"
         },
+        "CodeReviewVotedByDisplayName": {
+          "$type": "System.String",
+          "$value": "Bea Reviewer"
+        },
+        "CodeReviewVotedByTfId": {
+          "$type": "System.String",
+          "$value": "8f5c1a2e-0000-4000-8000-00000000000b"
+        },
         "CodeReviewVoteResult": {
           "$type": "System.String",
           "$value": "10"
-        },
-        "CodeReviewVotedByIdentity": {
-          "$type": "System.String",
-          "$value": "1"
-        }
-      },
-      "identities": {
-        "1": {
-          "id": "8f5c1a2e-0000-4000-8000-00000000000b",
-          "displayName": "Bea Reviewer",
-          "uniqueName": "bea@example.com"
         }
       },
       "isDeleted": false,
@@ -270,7 +268,8 @@
         "self": {
           "href": "https://dev.azure.com/example/_apis/git/repositories/00000000-0000-0000-0000-000000000001/pullRequests/7/threads/5"
         }
-      }
+      },
+      "identities": null
     },
     {
       "pullRequestThreadContext": null,
@@ -282,11 +281,11 @@
           "id": 1,
           "parentCommentId": 0,
           "author": {
-            "id": "00000002-0000-8888-8000-000000000000",
-            "displayName": "Microsoft.VisualStudio.Services.TFS",
-            "uniqueName": "00000002-0000-8888-8000-000000000000@2c895908-04e0-4952-89fd-54b0046d6288"
+            "id": "41113706-4320-4083-9150-925feb93fc22",
+            "displayName": "[DefaultCollection]\\Project Collection Service Accounts",
+            "isContainer": true
           },
-          "content": "Alex Author updated the pull request",
+          "content": "The reference refs/heads/feature was updated.",
           "publishedDate": "2026-09-21T08:00:00.000Z",
           "lastUpdatedDate": "2026-09-21T08:00:00.000Z",
           "lastContentUpdatedDate": "2026-09-21T08:00:00.000Z",
@@ -300,16 +299,25 @@
           "$type": "System.String",
           "$value": "RefUpdate"
         },
-        "CodeReviewRefUpdatedByIdentity": {
+        "CodeReviewRefName": {
           "$type": "System.String",
-          "$value": "1"
-        }
-      },
-      "identities": {
-        "1": {
-          "id": "8f5c1a2e-0000-4000-8000-00000000000a",
-          "displayName": "Alex Author",
-          "uniqueName": "alex@example.com"
+          "$value": "refs/heads/feature"
+        },
+        "CodeReviewRefNewHeadCommit": {
+          "$type": "System.String",
+          "$value": "8c9396b5cf22f929767c7172e9dbbe777ddc6357"
+        },
+        "CodeReviewRefUpdatedBy": {
+          "$type": "System.String",
+          "$value": "alex@example.com"
+        },
+        "CodeReviewRefUpdatedByDisplayName": {
+          "$type": "System.String",
+          "$value": "Alex Author"
+        },
+        "CodeReviewRefUpdatedByTfId": {
+          "$type": "System.String",
+          "$value": "8f5c1a2e-0000-4000-8000-00000000000a"
         }
       },
       "isDeleted": false,
@@ -317,7 +325,8 @@
         "self": {
           "href": "https://dev.azure.com/example/_apis/git/repositories/00000000-0000-0000-0000-000000000001/pullRequests/7/threads/6"
         }
-      }
+      },
+      "identities": null
     },
     {
       "pullRequestThreadContext": null,
@@ -329,9 +338,9 @@
           "id": 1,
           "parentCommentId": 0,
           "author": {
-            "id": "00000002-0000-8888-8000-000000000000",
-            "displayName": "Microsoft.VisualStudio.Services.TFS",
-            "uniqueName": "00000002-0000-8888-8000-000000000000@2c895908-04e0-4952-89fd-54b0046d6288"
+            "id": "41113706-4320-4083-9150-925feb93fc22",
+            "displayName": "[DefaultCollection]\\Project Collection Service Accounts",
+            "isContainer": true
           },
           "content": "Alex Author set the pull request to completed",
           "publishedDate": "2026-09-21T09:00:00.000Z",
@@ -348,13 +357,13 @@
           "$value": "StatusUpdate"
         }
       },
-      "identities": null,
       "isDeleted": false,
       "_links": {
         "self": {
           "href": "https://dev.azure.com/example/_apis/git/repositories/00000000-0000-0000-0000-000000000001/pullRequests/7/threads/7"
         }
-      }
+      },
+      "identities": null
     },
     {
       "pullRequestThreadContext": null,
@@ -366,9 +375,9 @@
           "id": 1,
           "parentCommentId": 0,
           "author": {
-            "id": "00000002-0000-8888-8000-000000000000",
-            "displayName": "Microsoft.VisualStudio.Services.TFS",
-            "uniqueName": "00000002-0000-8888-8000-000000000000@2c895908-04e0-4952-89fd-54b0046d6288"
+            "id": "41113706-4320-4083-9150-925feb93fc22",
+            "displayName": "[DefaultCollection]\\Project Collection Service Accounts",
+            "isContainer": true
           },
           "content": "Alex Author added Bea Reviewer as a reviewer",
           "publishedDate": "2026-09-21T09:00:00.000Z",
@@ -383,15 +392,27 @@
         "CodeReviewThreadType": {
           "$type": "System.String",
           "$value": "ReviewersUpdate"
+        },
+        "CodeReviewReviewersUpdatedByDisplayname": {
+          "$type": "System.String",
+          "$value": "Alex Author"
+        },
+        "CodeReviewReviewersUpdatedByTfId": {
+          "$type": "System.String",
+          "$value": "8f5c1a2e0000400080000000000000aa"
+        },
+        "CodeReviewReviewersUpdatedNumAdded": {
+          "$type": "System.Int32",
+          "$value": 1
         }
       },
-      "identities": null,
       "isDeleted": false,
       "_links": {
         "self": {
           "href": "https://dev.azure.com/example/_apis/git/repositories/00000000-0000-0000-0000-000000000001/pullRequests/7/threads/8"
         }
-      }
+      },
+      "identities": null
     },
     {
       "pullRequestThreadContext": null,

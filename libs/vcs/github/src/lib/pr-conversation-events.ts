@@ -1,6 +1,7 @@
 import type {
   ConversationActor,
   ConversationEvent,
+  ConversationEventDetail,
   RequestedReviewer,
 } from '@n10/vcs-core';
 import { oidOf, toActor, type RawActor } from './pr-conversation-map.js';
@@ -25,21 +26,19 @@ export interface RawEvent {
     __typename: string;
     login?: string;
     name?: string;
+    combinedSlug?: string;
   } | null;
   dismissalMessage?: string | null;
 }
 
-/** One event kind's own fields, without the ones every event has. */
-type Detail = ConversationEvent extends infer E
-  ? E extends ConversationEvent
-    ? Omit<E, 'id' | 'actor' | 'at' | 'native'>
-    : never
-  : never;
+type Detail = ConversationEventDetail;
 
 function reviewer(raw: RawEvent): RequestedReviewer | null {
   const r = raw.requestedReviewer;
-  if (r?.__typename === 'Team' && r.name) return { kind: 'team', name: r.name };
-  return r?.login ? { kind: 'user', name: r.login } : null;
+  if (r?.__typename === 'Team' && r.name) {
+    return { kind: 'team', name: r.name, handle: r.combinedSlug ?? r.name };
+  }
+  return r?.login ? { kind: 'user', name: r.login, handle: r.login } : null;
 }
 
 /** What each timeline type says beyond who and when. A type not listed

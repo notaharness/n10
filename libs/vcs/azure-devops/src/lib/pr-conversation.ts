@@ -5,6 +5,7 @@ import {
   type ConversationActor,
   type ConversationComment,
   type ConversationEvent,
+  type ConversationEventDetail,
   type ConversationThread,
   type LineRange,
   type PullRequestConversation,
@@ -30,6 +31,8 @@ interface RawIdentity {
   id?: string;
   displayName?: string;
   uniqueName?: string;
+  /** A group: Azure's own service accounts write its history. */
+  isContainer?: boolean;
 }
 
 interface RawComment {
@@ -61,6 +64,7 @@ export interface RawAdoThread {
       secondComparingIteration?: number;
     };
     trackingCriteria?: {
+      origFilePath?: string;
       origLeftFileStart?: RawLine;
       origLeftFileEnd?: RawLine;
       origRightFileStart?: RawLine;
@@ -70,9 +74,6 @@ export interface RawAdoThread {
   comments?: RawComment[];
   /** Values arrive wrapped with their .NET type: `{ $type, $value }`. */
   properties?: Record<string, { $value?: unknown } | undefined> | null;
-  /** The people a system thread's properties name, keyed by the
-   *  string the property holds. */
-  identities?: Record<string, RawIdentity> | null;
 }
 
 /** Turns a raw comment body into display text: escape sequences out,
@@ -84,14 +85,26 @@ const UNKNOWN_PERMISSION: Capability = {
   reason: 'Azure DevOps does not say what you may do with a thread',
 };
 
+/** Azure's own accounts: the service group that writes system
+ *  comments, and the service identity some organizations show. */
+function isService(raw: RawIdentity): boolean {
+  return (
+    raw.isContainer === true ||
+    raw.displayName === 'Microsoft.VisualStudio.Services.TFS'
+  );
+}
+
+/** A person as Azure names them. The unique name is what
+ *  `matchesUser` compares; an identity with only an id keeps the id,
+ *  which matches nobody. */
 function toActor(raw: RawIdentity | undefined): ConversationActor | null {
-  const identifier = raw?.uniqueName ?? raw?.displayName;
+  const identifier = raw?.uniqueName ?? raw?.id;
   if (!raw || !identifier) return null;
   return {
     identifier,
     displayName: raw.displayName ?? identifier,
     id: raw.id ?? null,
-    kind: 'user',
+    kind: isService(raw) ? 'system' : 'user',
   };
 }
 
@@ -105,6 +118,7 @@ function toComment(raw: RawComment, display: DisplayText): ConversationComment {
     source,
     body: display(source),
     kind: raw.commentType === 'system' ? 'system' : 'text',
+    deleted: raw.isDeleted === true,
     createdAt: published,
     editedAt: edited && edited !== published ? edited : null,
     minimized: null,
@@ -142,15 +156,27 @@ function rangeOf(
  *  decided. */
 const RESOLVED = new Set(['fixed', 'wontFix', 'closed', 'byDesign']);
 
+type PrContext = NonNullable<RawAdoThread['pullRequestThreadContext']>;
+
+function iterationsOf(
+  ctx: PrContext['iterationContext']
+): { first: number; second: number } | null {
+  const first = ctx?.firstComparingIteration;
+  const second = ctx?.secondComparingIteration;
+  return first != null && second != null ? { first, second } : null;
+}
+
+/** Azure's paths carry a leading slash; the diff's do not. */
+const repoPath = (path: string) => path.replace(/^\//, '');
+
 function anchorOf(raw: RawAdoThread): ConversationThread['anchor'] {
   const ctx = raw.threadContext;
   if (!ctx?.filePath) return null;
   const orig = raw.pullRequestThreadContext?.trackingCriteria ?? {};
-  const iteration = raw.pullRequestThreadContext?.iterationContext;
-  const first = iteration?.firstComparingIteration;
-  const second = iteration?.secondComparingIteration;
+  const path = repoPath(ctx.filePath);
+  const originalPath = orig.origFilePath && repoPath(orig.origFilePath);
   return {
-    path: ctx.filePath.replace(/^\//, ''),
+    path,
     current: rangeOf(
       ctx.leftFileStart,
       ctx.leftFileEnd,
@@ -163,8 +189,9 @@ function anchorOf(raw: RawAdoThread): ConversationThread['anchor'] {
       orig.origRightFileStart,
       orig.origRightFileEnd
     ),
+    originalPath: originalPath && originalPath !== path ? originalPath : null,
     originalCommit: null,
-    iterations: first != null && second != null ? { first, second } : null,
+    iterations: iterationsOf(raw.pullRequestThreadContext?.iterationContext),
     diffHunk: null,
   };
 }
@@ -198,15 +225,28 @@ function toThread(
 
 // ── History ───────────────────────────────────────────────────────
 
-/** Which property names the person behind each kind of entry. */
-const ACTOR_PROPERTY: Record<string, string> = {
-  VoteUpdate: 'CodeReviewVotedByIdentity',
-  RefUpdate: 'CodeReviewRefUpdatedByIdentity',
-  StatusUpdate: 'CodeReviewStatusUpdatedByIdentity',
+/**
+ * The property prefix naming who did each kind of entry. The comment
+ * on a history entry is written by Azure's service account, so the
+ * person is only ever in these; an entry that names nobody has no
+ * actor rather than the service's.
+ */
+const ACTOR_PREFIX: Record<string, string> = {
+  VoteUpdate: 'CodeReviewVotedBy',
+  RefUpdate: 'CodeReviewRefUpdatedBy',
+  ReviewersUpdate: 'CodeReviewReviewersUpdatedBy',
+  StatusUpdate: 'CodeReviewStatusUpdatedBy',
 };
 
+/** A property's value. Azure is not consistent about case —
+ *  `…UpdatedByDisplayname` sits beside `…VotedByDisplayName` — so the
+ *  name is matched without it. */
 function property(raw: RawAdoThread, name: string): string | undefined {
-  const value = raw.properties?.[name]?.$value;
+  const props = raw.properties ?? {};
+  const key = Object.keys(props).find(
+    (k) => k.toLowerCase() === name.toLowerCase()
+  );
+  const value = key ? props[key]?.$value : undefined;
   return value == null ? undefined : String(value);
 }
 
@@ -215,26 +255,25 @@ function integer(value: string | undefined): number | undefined {
   return Number.isInteger(n) ? n : undefined;
 }
 
-function eventActor(
-  raw: RawAdoThread,
-  type: string,
-  first: RawComment | undefined
-): ConversationActor | null {
-  const key = property(raw, ACTOR_PROPERTY[type] ?? '');
-  const named = key != null ? raw.identities?.[key] : undefined;
-  return toActor(named ?? first?.author);
+function eventActor(raw: RawAdoThread, type: string): ConversationActor | null {
+  const prefix = ACTOR_PREFIX[type];
+  if (!prefix) return null;
+  // `…RefUpdatedBy` itself holds the unique name, where Azure gives it.
+  const unique = property(raw, prefix);
+  return toActor({
+    id: property(raw, `${prefix}TfId`),
+    displayName: property(raw, `${prefix}DisplayName`),
+    uniqueName: unique?.includes('@') ? unique : undefined,
+  });
 }
 
 /** The events Azure's history entries can be. */
-type History = Extract<
-  ConversationEvent,
-  { kind: 'vote' | 'push' | 'status-changed' | 'system' }
+type HistoryDetail = ConversationEventDetail<
+  Extract<
+    ConversationEvent,
+    { kind: 'vote' | 'push' | 'status-changed' | 'system' }
+  >
 >;
-type HistoryDetail = History extends infer E
-  ? E extends History
-    ? Omit<E, 'id' | 'actor' | 'at' | 'native'>
-    : never
-  : never;
 
 /** The event reading of each kind of history entry Azure writes. */
 function detailOf(
@@ -262,7 +301,7 @@ function toEvent(raw: RawAdoThread, display: DisplayText): ConversationEvent {
   const text = first?.content != null ? display(first.content) : null;
   return {
     id: String(raw.id ?? ''),
-    actor: eventActor(raw, type, first),
+    actor: eventActor(raw, type),
     at: first?.publishedDate ?? raw.publishedDate ?? null,
     native: type,
     ...detailOf(raw, type, text),
@@ -270,6 +309,13 @@ function toEvent(raw: RawAdoThread, display: DisplayText): ConversationEvent {
 }
 
 // ── Conversation ──────────────────────────────────────────────────
+
+/** A thread's comments without the deleted ones nothing hangs off. A
+ *  deleted root, or one somebody replied to, stays as a tombstone. */
+function keptComments(all: RawComment[]): RawComment[] {
+  const answered = new Set(all.map((c) => c.parentCommentId));
+  return all.filter((c, i) => !c.isDeleted || i === 0 || answered.has(c.id));
+}
 
 /** Every `@<GUID>` a display pass will want a name for. */
 export function commentSources(threads: readonly RawAdoThread[]): string[] {
@@ -285,8 +331,7 @@ export function toAdoConversation(
   const events: ConversationEvent[] = [];
   for (const t of raw) {
     if (t.isDeleted) continue;
-    // A deleted comment keeps no text; its replies stay, answering it.
-    const comments = (t.comments ?? []).filter((c) => !c.isDeleted);
+    const comments = keptComments(t.comments ?? []);
     if (comments.some((c) => c.commentType !== 'system')) {
       threads.push(toThread(t, comments, display));
     } else if (comments.length > 0) {

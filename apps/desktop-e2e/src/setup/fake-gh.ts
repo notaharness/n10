@@ -63,6 +63,8 @@ export interface FakeThread {
   resolvedBy?: string;
   isOutdated?: boolean;
   side?: 'LEFT' | 'RIGHT';
+  /** The diff excerpt GitHub keeps with the thread's first comment. */
+  diffHunk?: string;
   comments: { author: string; body: string; createdAt?: string }[];
 }
 
