@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
+import { isAbsolute, join, relative } from 'node:path';
 import { log } from '@n10/logger';
 import { tmuxPaneCurrentPath, tmuxSetOptions } from '@n10/terminal-tmux';
-import { liveSessionNames } from '../pty-registry.js';
 import { canonicalWorktreePath, LOCAL_MACHINE } from '../session-key.js';
 import {
   ORCHESTRA_TAG,
@@ -10,112 +10,123 @@ import {
 } from '../session-identity.js';
 
 /**
- * Rebinding a worktree session to its checkout after the checkout moved.
+ * Rebinding a worktree session after its repository moved.
  *
- * A worktree session belongs to the checkout its tags name. Moving the
- * repository (and running `git worktree repair`), or `git worktree
- * move`, leaves them naming a directory that is gone: the session then
- * belongs to no worktree, and its running agent reads as stopped next to
- * a row that invites launching a second one.
+ * A worktree session belongs to the checkout its tags name. Renaming
+ * the repository (then `git worktree repair`) leaves them naming a
+ * directory that is gone: the session belongs to no worktree, and its
+ * running agent reads as stopped next to a row that invites launching
+ * a second one.
  *
- * The tags are rewritten only on the kernel's word. tmux reads the pane
- * process's working directory (`#{pane_current_path}`) from the kernel,
- * which follows a directory through a rename. A session is rebound to a
- * checkout when all of these hold:
+ * The tags are rewritten only when two independent facts agree:
  *
- * - the checkout its tags name no longer exists;
- * - its pane process is live and runs in exactly the root of a checkout
- *   Git lists for the open repository;
- * - no other session's tags claim that checkout;
- * - this process holds no connection to it under its old key.
+ * - Structure: the repository the tags name no longer exists, and the
+ *   open repository lists a checkout at the same path relative to its
+ *   root as the tagged checkout had relative to the old one.
+ * - Kernel: tmux reports that exact checkout root as the pane's current
+ *   path (`#{pane_current_path}`: the working directory of the pane's
+ *   foreground process, which follows a directory through a rename).
  *
- * The branch and the label are never consulted: another checkout can
- * have the session's branch. A checkout that was copied rather than
- * moved is a new directory no process runs in, so it stays a new
- * checkout, and so does one whose agent changed directory. A move while
- * n10 holds the session is recovered by reopening the repository.
+ * The session must also be live and local, the checkout unclaimed by
+ * any other session's tags, the match unambiguous (one stale session
+ * per checkout), and this process must hold no connection to it under
+ * its old key. The branch and the label are never consulted. A copied
+ * repository is new directories no process runs in; a deleted one
+ * leaves the pane in a `(deleted)` path; an agent whose foreground job
+ * is elsewhere gives no evidence. Each stays unbound.
  */
 export interface MovedSessionDeps {
   exists?: (path: string) => boolean;
   paneCwd?: (tmuxName: string) => string;
   /** Write the tags; `false` when tmux refused. */
   retag?: (tmuxName: string, tags: Record<string, string>) => boolean;
-  /** Registry keys this process holds a connection under. */
-  held?: () => Iterable<string>;
-}
-
-/** What {@link movedCheckout} decides against. */
-interface MoveContext {
-  /** Canonical path of each listed checkout. */
-  listed: Set<string>;
-  /** Canonical checkout path of every worktree session's tags. */
-  claimed: Set<string>;
-  held: Set<string>;
-  exists: (path: string) => boolean;
-  paneCwd: (tmuxName: string) => string;
 }
 
 /**
- * Rebind every session whose checkout moved to one of `worktrees` in
- * `repoRoot`, and return `sessions` as the tags now read. Only a stale
- * session costs a tmux fork. Never throws.
+ * Rebind every session whose repository moved to `repoRoot`, and
+ * return `sessions` as the tags now read. `held` is the registry keys
+ * this process holds a connection under. Only a session that passes
+ * the structural check costs a tmux fork. Never throws.
  */
 export function rebindMovedSessions(
   sessions: readonly TaggedSession[],
   repoRoot: string,
   worktrees: readonly { path: string }[],
+  held: Iterable<string>,
   deps: MovedSessionDeps = {}
 ): TaggedSession[] {
+  const paneCwd = deps.paneCwd ?? tmuxPaneCurrentPath;
   const retag = deps.retag ?? defaultRetag;
-  const ctx: MoveContext = {
-    listed: new Set(worktrees.map((wt) => canonicalWorktreePath(wt.path))),
-    claimed: new Set(
-      sessions
-        .filter((s) => s.type === 'worktree')
-        .map((s) => canonicalWorktreePath(s.worktreePath, s.machine))
-    ),
-    held: new Set((deps.held ?? liveSessionNames)()),
+  const candidates = relocationCandidates(sessions, repoRoot, worktrees, {
+    held: new Set(held),
     exists: deps.exists ?? existsSync,
-    paneCwd: deps.paneCwd ?? tmuxPaneCurrentPath,
-  };
-  return sessions.map((session) => {
-    const checkout = movedCheckout(session, ctx);
-    if (!checkout) return session;
+  });
+  const rebound = new Map<string, string>();
+  for (const [checkout, [session, ...others]] of candidates) {
+    if (others.length > 0 || paneCwd(session.name) !== checkout) continue;
     const tags = {
       [ORCHESTRA_TAG.worktreePath]: checkout,
       [ORCHESTRA_TAG.repo]: repoRoot,
     };
-    if (!retag(session.name, tags)) return session;
-    ctx.claimed.add(checkout);
+    if (!retag(session.name, tags)) continue;
+    rebound.set(session.name, checkout);
     log(
       'info',
       'discovery',
       `rebound ${session.name} from ${session.worktreePath} to ${checkout}`
     );
-    return { ...session, repo: repoRoot, worktreePath: checkout };
+  }
+  return sessions.map((session) => {
+    const checkout = rebound.get(session.name);
+    return checkout
+      ? { ...session, repo: repoRoot, worktreePath: checkout }
+      : session;
   });
 }
 
-/** The listed checkout `session`'s agent moved into with its
- *  directory, or `null`. */
-function movedCheckout(
+/** Stale sessions by the listed, unclaimed checkout their moved
+ *  repository puts them in — structure only, no tmux. */
+function relocationCandidates(
+  sessions: readonly TaggedSession[],
+  repoRoot: string,
+  worktrees: readonly { path: string }[],
+  ctx: { held: Set<string>; exists: (path: string) => boolean }
+): Map<string, TaggedSession[]> {
+  const listed = new Set(worktrees.map((wt) => canonicalWorktreePath(wt.path)));
+  const claimed = new Set(
+    sessions
+      .filter((s) => s.type === 'worktree')
+      .map((s) => canonicalWorktreePath(s.worktreePath, s.machine))
+  );
+  const candidates = new Map<string, TaggedSession[]>();
+  for (const session of sessions) {
+    const checkout = relocatedCheckout(session, repoRoot, ctx.exists);
+    if (!checkout || !listed.has(checkout) || claimed.has(checkout)) continue;
+    if (ctx.held.has(registryNameOf(session))) continue;
+    candidates.set(checkout, [...(candidates.get(checkout) ?? []), session]);
+  }
+  return candidates;
+}
+
+/** Where `session`'s checkout sits in `repoRoot` if its repository
+ *  moved there, or `null` when it is not a live local worktree session
+ *  whose repository and checkout are gone. */
+function relocatedCheckout(
   session: TaggedSession,
-  ctx: MoveContext
+  repoRoot: string,
+  exists: (path: string) => boolean
 ): string | null {
   if (
     session.type !== 'worktree' ||
     session.machine !== LOCAL_MACHINE ||
     session.paneDead ||
-    ctx.exists(session.worktreePath) ||
-    ctx.held.has(registryNameOf(session))
+    exists(session.repo) ||
+    exists(session.worktreePath)
   )
     return null;
-  const cwd = ctx.paneCwd(session.name);
-  if (!cwd) return null;
-  const checkout = canonicalWorktreePath(cwd);
-  return ctx.listed.has(checkout) && !ctx.claimed.has(checkout)
-    ? checkout
-    : null;
+  const inRepo = relative(session.repo, session.worktreePath);
+  if (!inRepo || inRepo.startsWith('..') || isAbsolute(inRepo)) return null;
+  return canonicalWorktreePath(join(repoRoot, inRepo));
 }
 
 function defaultRetag(tmuxName: string, tags: Record<string, string>): boolean {

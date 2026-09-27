@@ -8,13 +8,14 @@ import {
 
 vi.mock('@n10/logger', () => ({ log: () => undefined }));
 
+const OLD = '/old/repo';
 const ROOT = '/new/repo';
 const checkout = (dir: string) => `${ROOT}/.claude/worktrees/${dir}`;
-const oldCheckout = (dir: string) => `/old/repo/.claude/worktrees/${dir}`;
+const oldCheckout = (dir: string) => `${OLD}/.claude/worktrees/${dir}`;
 
 function session(
   name: string,
-  worktreePath: string,
+  worktreePath = oldCheckout(name),
   extra: Partial<TaggedSession> = {}
 ): TaggedSession {
   return {
@@ -23,7 +24,7 @@ function session(
     paneDead: false,
     path: worktreePath,
     spawner: 'n10',
-    repo: '/old/repo',
+    repo: OLD,
     type: 'worktree',
     branch: name,
     worktreePath,
@@ -32,8 +33,8 @@ function session(
   };
 }
 
-/** A world where only `existing` paths exist and each pane runs in
- *  `cwd[name]`. Records every rewrite. */
+/** A world where only `existing` paths exist and each pane's current
+ *  path is `cwd[name]`. Records every question and rewrite. */
 function world(
   cwd: Record<string, string>,
   existing: string[] = [],
@@ -51,7 +52,6 @@ function world(
       retagged.push([name, tags]);
       return true;
     },
-    held: () => [],
     ...extra,
   };
   return { deps, retagged, asked };
@@ -59,15 +59,18 @@ function world(
 
 const listed = [{ path: checkout('a') }, { path: checkout('b') }];
 
+function rebind(
+  sessions: TaggedSession[],
+  deps: MovedSessionDeps,
+  held: string[] = []
+) {
+  return rebindMovedSessions(sessions, ROOT, listed, held, deps);
+}
+
 describe('rebindMovedSessions', () => {
-  it('rebinds a session whose checkout is gone to the listed checkout its agent is in', () => {
+  it('rebinds a session whose repository moved, once its pane is in the checkout', () => {
     const { deps, retagged } = world({ a: checkout('a') });
-    const result = rebindMovedSessions(
-      [session('a', oldCheckout('a'))],
-      ROOT,
-      listed,
-      deps
-    );
+    const [result] = rebind([session('a')], deps);
     expect(retagged).toEqual([
       [
         'a',
@@ -77,114 +80,98 @@ describe('rebindMovedSessions', () => {
         },
       ],
     ]);
-    expect(result[0]).toMatchObject({
-      repo: ROOT,
-      worktreePath: checkout('a'),
-    });
+    expect(result).toMatchObject({ repo: ROOT, worktreePath: checkout('a') });
   });
 
-  it('leaves a session whose checkout still exists without asking tmux', () => {
-    const { deps, retagged, asked } = world({ a: checkout('b') }, [
-      checkout('a'),
-    ]);
-    const sessions = [session('a', checkout('a'), { repo: ROOT })];
-    expect(rebindMovedSessions(sessions, ROOT, listed, deps)).toEqual(sessions);
-    expect(asked).toEqual([]);
+  it('leaves a session whose repository or checkout still exists without asking tmux', () => {
+    const repoThere = world({ a: checkout('a') }, [OLD]);
+    rebind([session('a')], repoThere.deps);
+    const checkoutThere = world({ a: checkout('a') }, [oldCheckout('a')]);
+    rebind([session('a')], checkoutThere.deps);
+    expect([...repoThere.asked, ...checkoutThere.asked]).toEqual([]);
+    expect([...repoThere.retagged, ...checkoutThere.retagged]).toEqual([]);
+  });
+
+  // The pane path is the foreground job's directory: a job that moved
+  // into a sibling checkout is not evidence the session belongs there.
+  it('refuses when the pane is in another checkout than the relocated one', () => {
+    const { deps, retagged } = world({ a: checkout('b') });
+    rebind([session('a')], deps);
     expect(retagged).toEqual([]);
   });
 
-  // The branch is never evidence: checkout `a` has the session's
-  // branch, but the agent is not in it.
-  it('never rebinds by branch, only by where the agent runs', () => {
-    const { deps, retagged } = world({ a: '/somewhere/else' });
-    rebindMovedSessions(
-      [session('a', oldCheckout('a'), { branch: 'a' })],
-      ROOT,
-      listed,
-      deps
-    );
-    expect(retagged).toEqual([]);
-  });
-
-  it('requires the agent to run in the checkout root, not below it', () => {
+  it('requires the pane in the checkout root, not below it', () => {
     const { deps, retagged } = world({ a: `${checkout('a')}/src` });
-    rebindMovedSessions([session('a', oldCheckout('a'))], ROOT, listed, deps);
+    rebind([session('a')], deps);
     expect(retagged).toEqual([]);
   });
 
   // tmux reports a deleted working directory with this suffix.
-  it('ignores an agent whose directory was deleted', () => {
+  it('refuses a pane whose directory was deleted', () => {
     const { deps, retagged } = world({ a: `${oldCheckout('a')} (deleted)` });
-    rebindMovedSessions([session('a', oldCheckout('a'))], ROOT, listed, deps);
+    rebind([session('a')], deps);
     expect(retagged).toEqual([]);
+  });
+
+  it('asks nothing when the relocated checkout is not listed', () => {
+    const { deps, asked } = world({ gone: checkout('gone') });
+    rebind([session('gone')], deps);
+    expect(asked).toEqual([]);
+  });
+
+  it('asks nothing for a checkout that was outside its repository', () => {
+    const { deps, asked } = world({ a: checkout('a') });
+    rebind([session('a', '/elsewhere/.claude/worktrees/a')], deps);
+    expect(asked).toEqual([]);
   });
 
   it('refuses a checkout another session claims', () => {
-    const { deps, retagged } = world({ stale: checkout('a') }, [checkout('a')]);
-    rebindMovedSessions(
-      [
-        session('owner', checkout('a'), { repo: ROOT }),
-        session('stale', oldCheckout('x')),
-      ],
-      ROOT,
-      listed,
+    const { deps, asked } = world({ a: checkout('a') }, [checkout('a')]);
+    rebind(
+      [session('owner', checkout('a'), { repo: ROOT }), session('a')],
       deps
     );
-    expect(retagged).toEqual([]);
+    expect(asked).toEqual([]);
   });
 
-  it('binds only the first of two stale sessions in one checkout', () => {
-    const { deps, retagged } = world({
-      first: checkout('a'),
-      second: checkout('a'),
+  // tmux lists by name, while the resolver prefers the oldest: picking
+  // either would be a guess.
+  it('binds neither of two stale sessions for one checkout', () => {
+    const { deps, asked, retagged } = world({
+      a: checkout('a'),
+      twin: checkout('a'),
     });
-    rebindMovedSessions(
-      [
-        session('first', oldCheckout('a')),
-        session('second', oldCheckout('a2')),
-      ],
-      ROOT,
-      listed,
-      deps
-    );
-    expect(retagged.map(([name]) => name)).toEqual(['first']);
-  });
-
-  it('skips a dead pane, a remote session and one this process holds', () => {
-    const held = session('held', oldCheckout('b'));
-    const { deps, retagged, asked } = world(
-      { dead: checkout('a'), remote: checkout('a'), held: checkout('b') },
-      [],
-      { held: () => [worktreeSessionKey(held.worktreePath, held.repo)] }
-    );
-    rebindMovedSessions(
-      [
-        session('dead', oldCheckout('a'), { paneDead: true }),
-        session('remote', oldCheckout('a'), { machine: 'peer' }),
-        held,
-      ],
-      ROOT,
-      listed,
-      deps
-    );
+    rebind([session('a'), session('twin', oldCheckout('a'))], deps);
     expect(asked).toEqual([]);
     expect(retagged).toEqual([]);
   });
 
+  it('skips a dead pane, a remote session and one this process holds', () => {
+    const { deps, asked } = world({
+      a: checkout('a'),
+      b: checkout('b'),
+    });
+    rebind(
+      [
+        session('a', oldCheckout('a'), { paneDead: true }),
+        session('b', oldCheckout('b'), { machine: 'peer' }),
+      ],
+      deps
+    );
+    const held = session('b');
+    rebind([held], deps, [worktreeSessionKey(held.worktreePath, OLD)]);
+    expect(asked).toEqual([]);
+  });
+
   it('keeps the old tags when tmux refuses the rewrite', () => {
     const { deps } = world({ a: checkout('a') }, [], { retag: () => false });
-    const sessions = [session('a', oldCheckout('a'))];
-    expect(rebindMovedSessions(sessions, ROOT, listed, deps)).toEqual(sessions);
+    const sessions = [session('a')];
+    expect(rebind(sessions, deps)).toEqual(sessions);
   });
 
   it('ignores terminal sessions', () => {
     const { deps, asked } = world({ t: checkout('a') });
-    rebindMovedSessions(
-      [session('t', '', { type: 'shell' })],
-      ROOT,
-      listed,
-      deps
-    );
+    rebind([session('t', '', { type: 'shell' })], deps);
     expect(asked).toEqual([]);
   });
 });

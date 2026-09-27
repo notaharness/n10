@@ -77,8 +77,9 @@ export interface TmuxObservation {
 const NOTHING: TmuxObservation = { persisted: new Set(), terminals: [] };
 
 /**
- * One fork, two answers: which worktree sessions survived, and which
- * terminal sessions exist.
+ * One listing, two answers: which worktree sessions survived, and which
+ * terminal sessions exist. A session whose repository moved costs one
+ * more fork to confirm where its pane is.
  *
  * Every session is read through the resolver, so only tagged sessions
  * are seen at all: a session whose name n10 might have chosen but
@@ -105,10 +106,11 @@ const NOTHING: TmuxObservation = { persisted: new Set(), terminals: [] };
  * holds it, though, since attaching a second client to a session this
  * process is driving is exactly what the orphan path must not do.
  *
- * Before any of that, a session whose checkout moved with its agent in
- * it is rebound to the listed checkout it is in now
- * (`discovery/moved-sessions.ts`), so this scan already finds it
- * persisted.
+ * Before any of that, a session whose repository moved here is rebound
+ * to its checkout at the new location (`discovery/moved-sessions.ts`),
+ * so this scan already finds it persisted. The caller must not pass
+ * another repository's worktrees than the open one's: the rebind
+ * writes tags.
  * Never throws; an absent tmux server yields nothing, same as no
  * sessions.
  */
@@ -126,9 +128,12 @@ export function observeTmuxSessions(
   };
   const persisted = new Set<string>();
   const terminals: DiscoveredTerminal[] = [];
-  const sessions = rebindMovedSessions(listOurSessions(), root, worktrees, {
-    held: () => ctx.owned,
-  });
+  const sessions = rebindMovedSessions(
+    listOurSessions(),
+    root,
+    worktrees,
+    ctx.owned
+  );
   for (const session of sessions) {
     const found = classifySession(session, ctx);
     if (!found) continue;

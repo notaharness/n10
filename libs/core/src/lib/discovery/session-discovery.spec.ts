@@ -523,6 +523,20 @@ describe('startSessionDiscovery', () => {
       expect(adopt.mock.calls.map((c) => c[0].name)).toEqual([wtKey('first')]);
     });
 
+    // Observing tmux can rewrite a moved session's tags against the
+    // open root; a listing taken before a repo switch must not reach it.
+    it('does not observe tmux when another repository opened during the listing', async () => {
+      let current = true;
+      listWorktreesMock.mockImplementation(async () => {
+        current = false;
+        return worktrees('feature-a');
+      });
+      const { discovery } = start({ isCurrent: () => current });
+      listPersistedMock.mockClear();
+      await discovery.scanNow();
+      expect(listPersistedMock).not.toHaveBeenCalled();
+    });
+
     it('abandons a scan when the repo is no longer current', async () => {
       listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
       listPersistedMock.mockReturnValue(new Set([wtKey('feature-a')]));

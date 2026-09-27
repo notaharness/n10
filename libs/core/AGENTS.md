@@ -33,9 +33,9 @@ The reasoning behind each rule is in `docs/decisions.md`.
   `@orchestra-branch` (only the branch it was created for); one without the
   tag is foreign. No migration paths for session tags: users close sessions
   before upgrading.
-  A session whose tagged checkout is gone is rebound only when its live
-  pane process runs in the root of an unclaimed listed checkout
-  (`discovery/moved-sessions.ts`); the kernel's cwd follows a rename.
+  A session whose repository is gone is rebound only when the open repo
+  lists its checkout at the same relative path and tmux reports that exact
+  root as the pane's current path (`discovery/moved-sessions.ts`).
   Attach and continuation preserve creator/reporting tags. Fresh
   conversations preserve creator/repo/branch but clear supervisor and
   last-report tags; record the actual launched agent.
