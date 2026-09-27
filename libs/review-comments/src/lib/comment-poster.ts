@@ -17,14 +17,24 @@ function execWithStdin(
     const child = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
+    let stdinError: Error | undefined;
+    // A command that could not start (not installed, not executable) is
+    // an 'error' event, and an emitter throws one nobody listens for:
+    // that would end the whole process rather than this post.
+    child.on('error', reject);
+    // A command that exits without reading its input breaks the pipe
+    // under the write (EPIPE). Its exit status says why, so that is
+    // what 'close' reports; the write's own error only matters if the
+    // command claims to have succeeded without its input.
+    child.stdin.on('error', (err) => (stdinError = err));
     child.stdout.on('data', (d) => (stdout += d));
     child.stderr.on('data', (d) => (stderr += d));
     child.on('close', (code) => {
       if (code !== 0) reject(new Error(`${cmd} exited ${code}: ${stderr}`));
+      else if (stdinError) reject(stdinError);
       else resolve(stdout);
     });
-    child.stdin.write(input);
-    child.stdin.end();
+    child.stdin.end(input);
   });
 }
 

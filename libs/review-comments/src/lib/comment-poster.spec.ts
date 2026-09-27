@@ -1,5 +1,9 @@
+import type * as ChildProcess from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PostContext } from './comment-poster.js';
 import type { ReviewComment } from './types.js';
 
@@ -21,6 +25,8 @@ const env = vi.hoisted(() => ({
   /** Arguments of each `createThread` call the Azure poster made. */
   threads: [] as unknown[][],
   azureRefuses: false,
+  /** Spawn the real executable found on PATH, not the scripted one. */
+  realSpawn: false,
   marked: [] as { id: string; patch: Record<string, unknown> }[],
 }));
 
@@ -35,31 +41,36 @@ vi.mock('./comment-store.js', () => ({
   },
 }));
 
-vi.mock('node:child_process', () => ({
-  spawn: (_cmd: string, args: string[]) => {
-    const child = new EventEmitter() as EventEmitter & {
-      stdout: EventEmitter;
-      stderr: EventEmitter;
-      stdin: { write(s: string): void; end(): void };
-    };
-    child.stdout = new EventEmitter();
-    child.stderr = new EventEmitter();
-    let input = '';
-    child.stdin = {
-      write: (s: string) => {
-        input += s;
-      },
-      end: () => {
-        env.ghInputs.push({ args, body: JSON.parse(input) });
-        setImmediate(() => {
-          if (env.ghExitCode !== 0) child.stderr.emit('data', 'gh failed');
-          child.emit('close', env.ghExitCode);
-        });
-      },
-    };
-    return child;
-  },
-}));
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof ChildProcess>();
+  return {
+    spawn: (...a: Parameters<typeof actual.spawn>) =>
+      env.realSpawn ? actual.spawn(...a) : scriptedGh(a[1] as string[]),
+  };
+});
+
+/** A `gh` that records the JSON it was handed and exits with
+ *  `env.ghExitCode`. */
+function scriptedGh(args: string[]) {
+  type Stdin = EventEmitter & { end(s?: string): void };
+  const child = new EventEmitter() as EventEmitter & {
+    stdout: EventEmitter;
+    stderr: EventEmitter;
+    stdin: Stdin;
+  };
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.stdin = Object.assign(new EventEmitter(), {
+    end: (input = '') => {
+      env.ghInputs.push({ args, body: JSON.parse(input) });
+      setImmediate(() => {
+        if (env.ghExitCode !== 0) child.stderr.emit('data', 'gh failed');
+        child.emit('close', env.ghExitCode);
+      });
+    },
+  });
+  return child;
+}
 
 const { postReviewComments } = await import('./comment-poster.js');
 
@@ -107,6 +118,7 @@ beforeEach(() => {
   env.ghExitCode = 0;
   env.threads = [];
   env.azureRefuses = false;
+  env.realSpawn = false;
   env.marked = [];
 });
 
@@ -309,6 +321,48 @@ describe('posting to Azure DevOps', () => {
     await expect(
       postReviewComments([comment()], { ...azure, provider: null })
     ).rejects.toThrow('No Azure DevOps provider');
+    expect(env.marked).toEqual([]);
+  });
+});
+
+/**
+ * `gh` is a real executable found on PATH, and two of the ways it can
+ * fail are events rather than an exit status. Unheard, either is thrown
+ * by the emitter, which takes down the whole host process instead of
+ * failing this post.
+ */
+describe('the gh process', () => {
+  let bin: string;
+  let path: string | undefined;
+
+  beforeEach(() => {
+    bin = mkdtempSync(join(tmpdir(), 'n10-poster-bin-'));
+    path = process.env.PATH;
+    process.env.PATH = bin;
+    env.realSpawn = true;
+  });
+
+  afterEach(() => {
+    process.env.PATH = path;
+    rmSync(bin, { recursive: true, force: true });
+  });
+
+  it('fails the post when gh is not installed', async () => {
+    await expect(postReviewComments([comment()], github)).rejects.toThrow(
+      /ENOENT/
+    );
+    expect(env.marked).toEqual([]);
+  });
+
+  it('fails the post when gh exits without reading its input', async () => {
+    // Exiting unread closes the pipe under the pending write: EPIPE.
+    // The input has to outgrow the pipe's buffer for that to be certain.
+    const gh = join(bin, 'gh');
+    writeFileSync(gh, '#!/bin/sh\necho refused >&2\nexit 1\n');
+    chmodSync(gh, 0o755);
+    await expect(
+      postReviewComments([comment({ body: 'x'.repeat(1 << 20) })], github)
+    ).rejects.toThrow(/gh exited 1: refused/);
     expect(env.marked).toEqual([]);
   });
 });
