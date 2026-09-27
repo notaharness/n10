@@ -87,12 +87,25 @@ export function classifyGhError(err: unknown): VcsError {
   const output = ghOutput(err);
   for (const { kind, match } of PATTERNS) {
     if (!match.test(output)) continue;
+    // Turned away before anything was done; a 5xx may have been after.
+    const refused = kind !== 'server';
     if (kind === 'throttled') {
       return throttledError(PROVIDER_NAME, DEFAULT_RATE_LIMIT_WAIT_MS, {
         cause: err,
+        refused,
       });
     }
-    return new VcsError(kind, MESSAGES[kind] ?? output, { cause: err });
+    return new VcsError(kind, MESSAGES[kind] ?? output, {
+      cause: err,
+      refused,
+    });
+  }
+  const refusal = graphQlRefusal(err);
+  if (refusal) {
+    return new VcsError('server', `GitHub refused: ${refusal}`, {
+      cause: err,
+      refused: true,
+    });
   }
   // Nothing recognised: the CLI's own words are still the best
   // description available, and hiding them would lose the only clue.
@@ -127,6 +140,23 @@ export function parseGhJson<T>(stdout: string, what: string): T {
  * handle a missing field. It is the total failure that used to surface
  * as a `TypeError` several frames away from the cause.
  */
+/** The first GraphQL error `gh` printed before exiting non-zero: the
+ *  API answered and declined, so nothing was written. */
+function graphQlRefusal(err: unknown): string | null {
+  const stdout = (err as { stdout?: unknown } | null)?.stdout;
+  if (typeof stdout !== 'string' || !stdout.trim().startsWith('{')) {
+    return null;
+  }
+  try {
+    const { errors } = JSON.parse(stdout) as { errors?: unknown };
+    const first = Array.isArray(errors) ? errors[0] : undefined;
+    const message = (first as { message?: unknown } | undefined)?.message;
+    return typeof message === 'string' ? message : null;
+  } catch {
+    return null;
+  }
+}
+
 export function assertGraphQlData(payload: unknown, what: string): void {
   if (payload == null || typeof payload !== 'object') return;
   const { data, errors } = payload as { data?: unknown; errors?: unknown[] };
@@ -138,5 +168,7 @@ export function assertGraphQlData(payload: unknown, what: string): void {
     typeof (first as { message?: unknown }).message === 'string'
       ? (first as { message: string }).message
       : 'no data returned';
-  throw new VcsError('server', `GitHub could not answer ${what}: ${detail}`);
+  throw new VcsError('server', `GitHub could not answer ${what}: ${detail}`, {
+    refused: true,
+  });
 }

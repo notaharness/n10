@@ -1,4 +1,9 @@
 import type { MentionCandidate } from './mentions.js';
+import type {
+  LedgerStore,
+  PublishedReview,
+  ReviewSubmission,
+} from './review-publication.js';
 import type { PullRequestConversation } from './pr-conversation.js';
 import type { PullRequestDetail, RepositoryRef } from './pr-details.js';
 
@@ -214,6 +219,18 @@ export interface VcsProvider {
     project: Record<string, string>,
     prId: number
   ): Promise<PullRequestDetail>;
+
+  /**
+   * File the reviewer's drafts as one native review (see
+   * review-publication.ts). Progress goes to `ledger` step by step, so
+   * an attempt that stops part-way is resumed, never repeated.
+   */
+  publishReview?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    submission: ReviewSubmission,
+    ledger: LedgerStore
+  ): Promise<PublishedReview>;
 
   /** Cast the current user's review verdict on a PR. */
   submitReviewVerdict?(
