@@ -7,10 +7,8 @@ import { useReadState } from '../../../lib/data/use-read-state.js';
 import { useRepo } from '../../../lib/repo-context.js';
 import { repoLinkBase } from '../../../lib/review/markdown-links.js';
 import { Skeleton } from '../../ui/skeleton.js';
-import {
-  CommentMarkdown,
-  MarkdownLinkBase,
-} from '../comments/CommentMarkdown.js';
+import { CommentMarkdown } from '../comments/CommentMarkdown.js';
+import { MarkdownLinkBase } from '../comments/markdown-anchor.js';
 import { ReadFailure, StaleNotice } from '../ReadNotice.js';
 import { Section } from './parts.js';
 

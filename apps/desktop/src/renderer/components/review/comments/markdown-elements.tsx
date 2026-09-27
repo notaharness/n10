@@ -1,3 +1,4 @@
+import { ChevronRightIcon } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import type { ExtraProps } from 'react-markdown';
 
@@ -11,7 +12,7 @@ type Props<T extends 'div' | 'table' | 'details' | 'summary' | 'h3'> =
 
 /** The element's own props, without the syntax node react-markdown
  *  hands every component. */
-function withoutNode<P extends ExtraProps>(props: P): Omit<P, 'node'> {
+export function withoutNode<P extends ExtraProps>(props: P): Omit<P, 'node'> {
   const rest = { ...props };
   delete rest.node;
   return rest;
@@ -45,13 +46,21 @@ export function MarkdownDetails(props: Props<'details'>) {
 }
 
 /** The disclosure's native toggle: it takes focus, and Enter or Space
- *  opens it. */
+ *  opens it. Its marker is the app's chevron, turned while its own
+ *  block is open (not an outer one). */
 export function MarkdownSummary(props: Props<'summary'>) {
+  const { children, ...rest } = withoutNode(props);
   return (
     <summary
-      className="cursor-pointer rounded-sm font-medium outline-none select-none focus-visible:ring-2 focus-visible:ring-ring"
-      {...withoutNode(props)}
-    />
+      className="flex cursor-pointer list-none items-center gap-1 rounded-sm font-medium outline-none select-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
+      {...rest}
+    >
+      <ChevronRightIcon
+        aria-hidden
+        className="size-3.5 shrink-0 text-muted-foreground motion-safe:transition-transform [details[open]>summary>&]:rotate-90"
+      />
+      {children}
+    </summary>
   );
 }
 
@@ -62,7 +71,8 @@ function shifted(Tag: 'h3' | 'h4' | 'h5' | 'h6') {
 }
 
 /** A description's headings sit below the Overview's own section
- *  heading, so its `#` is an `h3` and nothing outranks the page. */
+ *  heading, so its `#` is an `h3` and nothing outranks the page. Their
+ *  sizes are `DESCRIPTION_PROSE`'s. */
 export const DESCRIPTION_HEADINGS = {
   h1: shifted('h3'),
   h2: shifted('h4'),

@@ -15,7 +15,7 @@ import { Button } from '../ui/button.js';
  * screen, it is a caveat above content that is still worth reading.
  */
 
-function RetryButton({
+export function RetryButton({
   retrying,
   onRetry,
   label,
