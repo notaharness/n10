@@ -245,6 +245,19 @@ describe('inline drafts', () => {
     ]);
     expect(drafts.find((d) => d.id === 'inline:k2')?.target).toEqual(left);
   });
+
+  it('keeps the order they were started in when one is saved again', () => {
+    const save = (key: string, body: string) =>
+      saveReviewDraft(
+        parseSaveDraftRequest({ ...as('bea'), target: inline(key), body }),
+        src()
+      );
+    save('k1', 'first');
+    save('k2', 'second');
+    save('k1', 'first, edited');
+    const { drafts } = listReviewDrafts(as('bea'), src());
+    expect(drafts.map((d) => d.body)).toEqual(['first, edited', 'second']);
+  });
 });
 
 describe('parseSaveDraftRequest', () => {
