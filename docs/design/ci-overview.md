@@ -5,230 +5,171 @@ Research baseline: 27 September 2026. GitHub facts were checked against
 DevOps facts against the public `dnceng-public/public` project with anonymous
 reads. Nothing here touched a private or work organisation.
 
-The page this describes shows a pull request's pipelines as a graph of stages
-and jobs, with each job's steps and each step's log, the way GitHub's run graph
-and Azure's stages view do. It is the diagnostic half of the PR overview spec:
+The page shows a pull request's pipelines, their stages and jobs, each job's
+steps, and the logs the provider serves, the way GitHub's run page and Azure's
+stages view do. It is the diagnostic half of the PR overview spec:
 requirements O8 (detailed checks), O10 (native CI details and logs) and O11
-(retry and cancel), and slices I27–I32. The proof of concept in this branch
-covers the read-only part of O10 for GitHub and Azure.
+(retry and cancel), slices I27–I32.
+
+**Scope rule.** The page shows only what the provider APIs return. Anything
+the APIs do not expose, such as dependencies between jobs, is deferred until
+an API supports it (§5). It is not reconstructed from workflow files, log
+timestamps or run order.
 
 ## 1. Where it sits
 
 The PR overview spec keeps one content pane per PR tab and nests checks and
 logs under Overview with a Back action. The POC adds a **CI** entry to the
-review rail, marked Preview, that opens a `ci` content mode. That is the
-smallest wiring that makes the page reachable. The intended home is the
-Overview's readiness column (I29): _View checks_ opens this page, and a failed
-check opens it with that job selected.
+review rail, marked Preview, that opens a `ci` content mode: the smallest
+wiring that makes the page reachable. The intended home is the Overview's
+readiness column (I29): _View checks_ opens this page, and a failed check opens
+it with that job selected.
 
-The renderer only renders. Providers fetch and map; `@n10/core` runs the
-sequence (find the PR's head in the cached list, ask the provider); the
-desktop host validates what crosses IPC.
+Providers fetch and map. `@n10/core` runs the sequence: find the PR's head in
+the cached list, then ask the provider. The desktop host validates what
+crosses IPC. The renderer only renders.
 
-## 2. GitHub Actions
+## 2. GitHub Actions: what the API supports
 
 ### 2.1 Runs for a PR's head commit
 
-- `GET /repos/{o}/{r}/actions/runs?head_sha={sha}` lists every workflow run
-  for the commit, whatever the trigger. One request covers all workflows.
-- A run carries `name`, `path` (the workflow file), `event`, `status`,
-  `conclusion`, `run_attempt`, `run_started_at`, `updated_at`, `html_url`,
-  `check_suite_id` and `pull_requests`. **`pull_requests` is empty for a fork's
-  PR** (seen on every `sharkdp/bat` fork run), so a PR's runs have to be found
-  by head SHA, not by PR number.
-- The same workflow can run twice on one SHA (`push` and `pull_request`, or a
-  re-sync). The POC keeps the newest run per workflow and event.
-- `conclusion` adds values a job does not have: `action_required` (a first-time
-  contributor's run waiting for approval, seen on bat #4016), `startup_failure`,
+- `GET /repos/{o}/{r}/actions/runs?head_sha={sha}` lists every workflow run for
+  the commit, whatever triggered it. One request covers all workflows.
+- A run carries `name`, `path`, `event`, `status`, `conclusion`,
+  `run_attempt`, `run_number`, `run_started_at`, `updated_at`, `html_url` and
+  `pull_requests`. `pull_requests` is empty for a fork's PR (seen on every
+  `sharkdp/bat` fork run), so runs are found by head SHA, not by PR number.
+- The same workflow can run more than once on one SHA (`push` and
+  `pull_request`). The page lists every run the API returns, with its event and
+  run number.
+- A run's `conclusion` has values a job does not: `action_required` (a
+  first-time contributor's run waiting for approval), `startup_failure`,
   `stale`.
-- GraphQL reaches the same data from the PR:
-  `pullRequest.commits(last:1).commit.checkSuites.workflowRun { file { path } workflow { name } }`.
-  It also gives `statusCheckRollup.contexts` with `isRequired(pullRequestNumber:)`,
-  which REST cannot, and non-Actions check runs in the same answer. The query
-  that returned suites, runs and five steps per run cost 10 points.
+- GraphQL reaches the same runs from the PR through
+  `commit.checkSuites.workflowRun`, and adds `statusCheckRollup.contexts` with
+  `isRequired(pullRequestNumber:)`. A query for suites, runs and steps cost 10
+  points.
 
 ### 2.2 Jobs and steps
 
 - `GET /actions/runs/{id}/jobs?filter=latest&per_page=100`: each job has `id`,
   `name`, `status`, `conclusion`, `started_at`, `completed_at`, `html_url`,
-  `labels`, `runner_name`, `run_attempt`, and `steps[]` with `number`, `name`,
-  `status`, `conclusion`, `started_at`, `completed_at` (second precision).
-  `filter=all` returns every attempt's jobs;
+  `run_attempt`, `labels`, `runner_name`, and `steps[]` with `number`, `name`,
+  `status`, `conclusion`, `started_at`, `completed_at` (to the second).
+  `filter=all` returns every attempt's jobs, and
   `/actions/runs/{id}/attempts/{n}/jobs` returns one attempt's.
-- A job's id **is** its check run id (`check_run_url` ends in the job id).
-- Step numbers are not contiguous: post steps jump ahead (`5` then `10`,
-  `11` in bat's lint job). A skipped step can still be listed.
-- A job skipped by `if:` or a failed dependency is listed with no steps.
-- GraphQL `CheckRun.steps` has the same fields plus `secondsToCompletion`.
+- A job's id is its check run id.
+- Step numbers skip: post steps are numbered after a gap (`5`, then `10`, `11`
+  in bat's lint job).
+- A job skipped by `if:` or by a failed dependency is listed with no steps.
+- The jobs are a flat list. The page shows them in the order the API returns
+  them.
 
-### 2.3 The `needs` graph
+### 2.3 Logs
 
-**Neither API exposes job dependencies.** GitHub's own graph comes from an
-internal endpoint. A client has to read the workflow file and match jobs to it:
+- `GET /actions/jobs/{id}/logs` answers with a redirect (302 documented, 303
+  observed) to a signed URL valid for one minute. `gh api` follows it. The
+  body is the whole job's log as plain text: a byte-order mark, then one
+  timestamp per line, with `##[group]`, `##[endgroup]` and `##[error]` markers
+  and ANSI colour codes. bat's lint job: 930 lines, 73 KB; its build jobs about
+  900 KB each; n10's `main` job 306 KB.
+- **The log is per job.** There is no per-step endpoint.
+- **The log exists once the job finishes.** While a job runs, the redirect
+  leads to a blob that answers 404; the run's zip is 404 until the run
+  finishes.
+- `gh` 2.97.0 and later neutralise terminal escape sequences in `gh api`
+  output and refuse to print a log containing them unless given
+  `--allow-escape-sequences` (a security fix, GHSA-3m3g-3wcr-px46). n10 passes
+  the flag, so reading logs needs `gh` 2.97 or newer, and strips the escapes
+  itself before the text reaches the page.
+- Retention is 90 days by default and configurable per repository. An expired
+  log is an error to show, not an empty log.
 
-1. Fetch `run.path` at the run's `head_sha`
-   (`GET /repos/{o}/{r}/contents/{path}?ref={sha}`, base64, 1 MB limit). The
-   file at a SHA never changes, so it is cached for good. A fork's head is
-   readable through the base repository.
-2. Parse `jobs.<key>.needs` (string or list), `name`, and whether `strategy.matrix`
-   or `uses:` is set.
-3. Map each API job back to a key by its display name: the literal `name`
-   (or the key); a `name` containing `${{ … }}` treated as a pattern with each
-   expression a wildcard (bat names its matrix legs
-   `${{ matrix.job.target }} (${{ matrix.job.os }})`); a matrix leg's default
-   `<name> (<values>)`; a reusable workflow's `<caller> / <callee>`.
-4. A job that needs key `k` depends on every job mapped to `k`.
-
-Where this is wrong or blind:
-
-- `pull_request` runs use the workflow from the merge commit, and
-  `pull_request_target` from the base branch, not the head. Reading the head's
-  file is right unless the base changed the workflow since the branch point.
-- Two keys whose names produce the same pattern are ambiguous; the POC leaves
-  them unmatched rather than guessing.
-- Jobs inside a called reusable workflow depend on each other through the
-  callee's own file (`referenced_workflows` gives its path and SHA). The POC
-  does not follow it.
-- A job whose name cannot be matched gets no edges, and the pipeline is
-  marked as having a partial graph, which the page says.
-
-### 2.4 Logs
-
-- `GET /actions/jobs/{id}/logs` answers 302 (303 observed) to a signed blob URL
-  that expires after one minute. The body is the **whole job's** log as plain
-  text: a BOM, then one `2026-09-26T20:37:45.6919290Z ` timestamp per line, with
-  `##[group]`, `##[endgroup]` and `##[error]` markers and ANSI colour codes.
-  bat's lint job: 930 lines, 73 KB; its build jobs about 900 KB each; n10's
-  `main` job 306 KB.
-- **No per-step endpoint.** `GET /actions/runs/{id}/logs` is a zip of the whole
-  run. n10's run 36288574162 had per-step files (`main/9_Run npx nx affected….txt`);
-  bat's run 36270173409 had only `<job>/system.txt` plus whole-job files at the
-  root. `gh run view --log` labels every line `UNKNOWN STEP` for that job. The
-  per-step files cannot be relied on.
-- The POC slices a job log into steps by time: a step owns the lines from its
-  start to the next step's start. Where two steps start in the same second, a
-  `##[group]Run …` line that matches an unnamed step's name (`Run cargo clippy …`)
-  marks the exact boundary. Composite actions print several `##[group]Run`
-  lines within one step, so markers alone cannot delimit steps.
-- **No live logs.** While a job runs, the redirect leads to a blob that answers
-  404 `The specified blob does not exist`; the run zip is 404 until the run
-  finishes. The web UI streams over a private channel.
-- The blob honours `Range: bytes=N-` (206 with `Content-Range`) but not a
-  suffix range (`bytes=-N` returns the whole body), and `gh api` does not carry
-  a `Range` header across the redirect. A bounded tail needs our own request to
-  the `Location` (with a `HEAD` for the length): undocumented behaviour, so the
-  POC downloads the whole job log (capped at 32 MiB) and caches it by job id.
-- `gh` 2.101 refuses to print a response containing escape sequences unless
-  given `--allow-escape-sequences`, which older `gh` versions reject as an
-  unknown flag. The POC passes the flag and retries without it on that error,
-  then strips ANSI and control characters in the provider.
-- Retention is 90 days by default (configurable per repository); an expired
-  or deleted log is a distinct error to show.
-
-### 2.5 Check runs, suites and statuses
+### 2.4 Check runs, suites and statuses
 
 - `GET /commits/{sha}/check-runs` and `/check-suites` cover every app,
-  including external CI. Non-Actions runs have no steps or logs: only
-  `output.title`, `output.summary`, `details_url` and annotations
+  including external CI. Non-Actions check runs have no jobs, steps or logs:
+  only `output.title`, `output.summary`, `details_url` and annotations
   (`GET /check-runs/{id}/annotations`).
 - Commit statuses (`GET /commits/{sha}/statuses`) are a separate, older
   mechanism with a `target_url` only.
-- Required-ness is not on the check run; GraphQL `isRequired` or the branch
-  rules API (`GET /repos/{o}/{r}/rules/branches/{branch}`) answer it.
+- Whether a check is required is not on the check run. GraphQL `isRequired`
+  or the branch rules API (`GET /repos/{o}/{r}/rules/branches/{branch}`)
+  answers it.
 
-### 2.6 Re-run and cancel
+### 2.5 Re-run and cancel
 
 `POST /actions/runs/{id}/rerun`, `/rerun-failed-jobs`, `/actions/jobs/{id}/rerun`
 (each takes `enable_debug_logging`), `/actions/runs/{id}/cancel` and
-`/force-cancel`. A re-run keeps the run id and bumps `run_attempt`; earlier
-attempts stay readable through `/attempts/{n}`. Approving a fork run is
-`POST /actions/runs/{id}/approve`. All need write access; none is in the POC.
+`/force-cancel`. A re-run keeps the run id and raises `run_attempt`; earlier
+attempts stay readable through `/attempts/{n}`. A fork's run is approved with
+`POST /actions/runs/{id}/approve`. All need write access. None is in the POC.
 
-### 2.7 Rate limits and `gh`
+### 2.6 Rate limits and `gh`
 
-- REST: 5,000 requests an hour per user; GraphQL: 5,000 points an hour.
+- REST: 5,000 requests an hour per user. GraphQL: 5,000 points an hour.
   Secondary limits: 100 concurrent requests, 900 REST points and 2,000 GraphQL
   points a minute. A conditional request answered 304 does not count against
   the primary limit, and `gh api` can send `If-None-Match`.
-- `gh` covers all of it through `gh api`. The porcelain is thinner:
+- `gh api` reaches all of the above. The porcelain is thinner:
   `gh pr checks --json` has name, state, bucket, link, workflow and times but no
-  ids, steps or graph; `gh run view --json jobs` has jobs and steps;
-  `gh run view --log/--log-failed` needs a finished run and loses step
-  attribution as above; `gh run rerun --failed` and `gh run cancel` wrap the
-  write endpoints.
+  ids or steps; `gh run view --json jobs` has jobs and steps;
+  `gh run view --log` needs a finished run; `gh run rerun --failed` and
+  `gh run cancel` wrap the write endpoints.
 
-## 3. Azure Pipelines
+## 3. Azure Pipelines: what the API supports
 
 ### 3.1 Builds for a PR
 
-- `GET {org}/{project}/_apis/build/builds?branchName=refs/pull/{id}/merge&repositoryId={repoId}&repositoryType=TfsGit&queryOrder=queueTimeDescending`
-  (`reasonFilter=pullRequest` narrows further). The provider already runs this
-  query for the list badge (`builds.ts`).
-- Several validation policies mean several definitions; each re-queue is a new
-  build id. The newest build per definition speaks for it, as
-  `deriveBuildRunStatus` already assumes.
-- `sourceVersion` is the merge commit; `triggerInfo` carries `pr.number` and
-  `pr.sourceSha` (seen on a GitHub-hosted repository's build; not verified for
-  Azure Repos).
-- Required-ness is policy, not build: `_apis/policy/evaluations` (not read
-  today; see `libs/vcs/AGENTS.md`).
+- `GET {org}/{project}/_apis/build/builds?branchName=refs/pull/{id}/merge&repositoryId={repoId}&repositoryType=TfsGit&queryOrder=queueTimeDescending&maxBuildsPerDefinition=1`
+  returns the newest build of each pipeline definition that ran for the PR.
+  `maxBuildsPerDefinition` is the API's own filter: on `dnceng-public` a PR
+  with 25 builds across 4 definitions came back as 4.
+- A build has `definition.name`, `status`, `result`, `reason`,
+  `sourceVersion` (the merge commit it built), `startTime`, `finishTime` and a
+  web link in `_links.web.href`.
+- The provider already queries this route for the sidebar's CI badge
+  (`builds.ts`).
 
 ### 3.2 The timeline
 
-`GET _apis/build/builds/{id}/timeline` returns flat `records[]`, each with
-`id`, `parentId`, `type`, `name`, `refName`, `identifier`, `order`, `state`
-(`pending`, `inProgress`, `completed`), `result` (`succeeded`,
-`succeededWithIssues`, `failed`, `canceled`, `skipped`, `abandoned`),
-`startTime`, `finishTime`, `attempt`, `previousAttempts[]`, `errorCount`,
-`warningCount`, `issues[]`, `workerName` and `log {id, url}`.
+`GET _apis/build/builds/{id}/timeline` returns flat `records[]`. Each has
+`id`, `parentId`, `type`, `name`, `identifier`, `order`, `state` (`pending`,
+`inProgress`, `completed`), `result` (`succeeded`, `succeededWithIssues`,
+`failed`, `canceled`, `skipped`, `abandoned`), `startTime`, `finishTime`,
+`attempt`, `previousAttempts[]`, `errorCount`, `warningCount`, `issues[]`,
+`workerName` and `log { id, url }`.
 
-- Types seen: `Stage` → `Phase` → `Job` → `Task`, plus `Checkpoint` (and
-  `Checkpoint.Approval` for manual approvals). A build of `dotnet/runtime`
-  had 2 stages, 9 phases, 5 jobs and 69 tasks.
-- A phase is the declared job; its `Job` records are the matrix or parallel
-  legs. **A skipped phase has no Job record at all**, so a view that walks
-  only jobs loses skipped work.
-- `identifier` is the stable dotted name (`Build.build_linux_x64_release.__default`).
-- Earlier attempts: `previousAttempts[].timelineId` read through
+- The hierarchy is `Stage` → `Phase` → `Job` → `Task`, linked by `parentId`,
+  plus `Checkpoint` records (`Checkpoint.Approval` for manual approvals). A
+  `dotnet/runtime` build had 2 stages, 9 phases, 5 jobs and 69 tasks.
+- A phase is the job as the pipeline declares it; its `Job` records are the
+  agents that ran it (one per matrix leg). A phase that was skipped has no `Job`
+  record, so the page shows the phase itself in that case.
+- Siblings are ordered by `order`.
+- Earlier attempts: `previousAttempts[].timelineId`, read through
   `GET _apis/build/builds/{id}/timeline/{timelineId}`.
 
-### 3.3 Dependencies
+### 3.3 Logs
 
-**The timeline has no `dependsOn` for stages or jobs.** Options:
+- Every record that ran has its own `log.id`, so each task has its own log.
+- `GET _apis/build/builds/{id}/logs` lists every log's `lineCount`, and
+  `GET …/logs/{logId}?startLine=&endLine=` returns that range as text. A tail
+  is two small requests and never downloads the whole log.
+- The whole build's logs are `GET …/logs` with `Accept: application/zip`.
+- A task's log is uploaded as the task runs and finishes. Whether a running
+  task's log is readable through REST was not verified.
 
-- Read the YAML. `definition.id` → `GET _apis/build/definitions/{id}` gives
-  `process.yamlFilename`, fetched from the repository at `sourceVersion`.
-  Templates and `extends` make this incomplete without expanding them.
-- `POST _apis/pipelines/{id}/preview` with `previewRun: true` returns the fully
-  expanded `finalYaml`. It expands the definition as it is now, for the ref and
-  parameters given, not necessarily as the build ran.
-- Fall back to YAML's default: without `dependsOn`, a stage depends on the
-  previous one, and jobs in a stage run in parallel. The timeline's `order`
-  gives the sequence.
-
-The POC uses the fallback and says so on the page ("run order").
-
-### 3.4 Logs
-
-- Each record has its own `log.id`: per-task logs exist natively, unlike GitHub.
-- `GET _apis/build/builds/{id}/logs` lists `id`, `lineCount`, `createdOn`,
-  `lastChangedOn`; `GET …/logs/{logId}?startLine=&endLine=` returns that range
-  as text. A tail is two small requests.
-- The whole build is `GET …/logs` with `Accept: application/zip`.
-- A task's log is uploaded as it finishes; the web UI's live console is a
-  separate feed. Whether a running task's log is readable through REST was not
-  verified.
-
-### 3.5 Retry and cancel
+### 3.4 Retry and cancel
 
 - `PATCH _apis/build/builds/{id}?retry=true` retries the failed jobs of a
-  completed build in place, raising `attempt` on retried records.
+  completed build in place, raising `attempt` on the records it reruns.
 - `PATCH _apis/build/builds/{id}/stages/{stageRefName}` with
   `{ state: 'retry' | 'cancel', forceRetryAllJobs }` acts on one stage.
-- Cancel the build with `PATCH` `{ status: 'cancelling' }`.
+- `PATCH` with `{ status: 'cancelling' }` cancels the build.
 - All need `vso.build_execute`. Approvals are `_apis/pipelines/approvals`.
 
-### 3.6 Limits
+### 3.5 Limits
 
 A global limit of 200 TSTUs per user in a sliding five-minute window, with
 `Retry-After` and `X-RateLimit-*` headers (`X-RateLimit-Cost` per request; a
@@ -237,196 +178,150 @@ them.
 
 ## 4. Provider-neutral model
 
-One model that both providers fill, in `libs/vcs/core/src/lib/ci.ts`:
+`libs/vcs/core/src/lib/ci.ts`, exported browser-safe as `@n10/vcs-core/ci`:
 
-```ts
-type CiStatus =
-  | 'queued'
-  | 'waiting'
-  | 'running'
-  | 'succeeded'
-  | 'failed'
-  | 'cancelled'
-  | 'skipped'
-  | 'neutral'
-  | 'unknown';
+```text
+CiStatus   queued | waiting | running | succeeded | warning | failed
+           | cancelled | skipped | neutral | unknown
+CiLogRef   { provider: 'github', jobId }
+           | { provider: 'azure-devops', buildId, logId }
 
-type CiLogRef =
-  | { provider: 'github'; jobId: number; stepNumber?: number }
-  | { provider: 'azure-devops'; buildId: number; logId: number };
-
-interface CiStep {
-  id;
-  name;
-  status;
-  startedAt;
-  completedAt;
-  log: CiLogRef | null;
-}
-interface CiJob {
-  id;
-  name;
-  status;
-  startedAt;
-  completedAt;
-  group;
-  groupName;
-  needs: string[];
-  steps: CiStep[];
-  log: CiLogRef | null;
-  url;
-}
-interface CiStage {
-  id;
-  name;
-  status;
-  startedAt;
-  completedAt;
-  needs: string[];
-  jobs: CiJob[];
-}
-interface CiPipeline {
-  id;
-  name;
-  status;
-  url;
-  attempt;
-  event;
-  startedAt;
-  completedAt;
-  implicitStage: boolean;
-  stages: CiStage[];
-  graph: { source: 'declared' | 'run-order' | 'none'; note? };
-}
-interface CiOverview {
-  provider;
-  headSha;
-  pipelines: CiPipeline[];
-  notes: string[];
-}
-interface CiLog {
-  text;
-  firstLine;
-  totalLines;
-  truncated;
-  scope: 'job' | 'step';
-  note?;
-}
+CiOverview { provider, pipelines: CiPipeline[] }
+CiPipeline { id, name, status, url, event, commit, startedAt, completedAt,
+             stages: CiStage[] }
+CiStage    { id, name | null, status, startedAt, completedAt, jobs: CiJob[] }
+CiJob      { id, name, status, startedAt, completedAt, url,
+             log: CiLogRef | null, steps: CiStep[] }
+CiStep     { id, name, status, startedAt, completedAt, log: CiLogRef | null }
+CiLog      { text, firstLine, totalLines, truncated }
 ```
 
-| Model         | GitHub                                       | Azure DevOps                                            |
-| ------------- | -------------------------------------------- | ------------------------------------------------------- |
-| Pipeline      | workflow run (newest per workflow and event) | build (newest per definition)                           |
-| Stage         | one implicit stage per run                   | `Stage` record                                          |
-| Stage `needs` | —                                            | previous stage by `order` (inferred)                    |
-| Job group     | workflow job key (a matrix's legs share one) | `Phase` record                                          |
-| Job           | job                                          | `Job` record; a phase with none becomes one skipped job |
-| Job `needs`   | workflow YAML `needs`, matched by name       | — (parallel within a stage)                             |
-| Step          | step (`number`)                              | `Task` record (`order`)                                 |
-| Log handle    | job id (+ step number, sliced by time)       | record's `log.id`                                       |
-| Status        | `status` + `conclusion`                      | `state` + `result`                                      |
+| Model    | GitHub                                   | Azure DevOps                                           |
+| -------- | ---------------------------------------- | ------------------------------------------------------ |
+| Pipeline | workflow run for the head SHA            | newest build per definition (`maxBuildsPerDefinition`) |
+| Stage    | none: one unnamed stage holds the jobs   | `Stage` record, by `order`                             |
+| Job      | job, in API order                        | `Job` record, or a `Phase` with no job, by `order`     |
+| Step     | step, by `number`                        | `Task` record, by `order`                              |
+| Log      | the job's log, once the job has finished | each record's own `log.id`                             |
+| Status   | `status` + `conclusion`                  | `state` + `result`                                     |
 
-Status mapping:
-
-| `CiStatus` | GitHub                                    | Azure                                                             |
-| ---------- | ----------------------------------------- | ----------------------------------------------------------------- |
-| queued     | `queued`, `requested`, `pending`          | `pending`                                                         |
-| waiting    | `waiting`, conclusion `action_required`   | pending `Checkpoint.Approval`                                     |
-| running    | `in_progress`                             | `inProgress`                                                      |
-| succeeded  | `success`                                 | `succeeded`                                                       |
-| failed     | `failure`, `timed_out`, `startup_failure` | `failed`; `succeededWithIssues` is succeeded with a warning count |
-| cancelled  | `cancelled`                               | `canceled`, `abandoned`                                           |
-| skipped    | `skipped`                                 | `skipped`                                                         |
-| neutral    | `neutral`, `stale`                        | —                                                                 |
+| `CiStatus` | GitHub                                    | Azure                                             |
+| ---------- | ----------------------------------------- | ------------------------------------------------- |
+| queued     | `queued`, `requested`, `pending`          | `pending`; build `notStarted`, `postponed`        |
+| waiting    | `waiting`; conclusion `action_required`   | —                                                 |
+| running    | `in_progress`                             | `inProgress`; build `cancelling`                  |
+| succeeded  | `success`                                 | `succeeded`                                       |
+| warning    | —                                         | `succeededWithIssues`; build `partiallySucceeded` |
+| failed     | `failure`, `timed_out`, `startup_failure` | `failed`                                          |
+| cancelled  | `cancelled`                               | `canceled`, `abandoned`                           |
+| skipped    | `skipped`                                 | `skipped`                                         |
+| neutral    | `neutral`, `stale`                        | —                                                 |
 
 The views never branch on the provider. `CiLogRef` is the one provider-shaped
-value, and it only travels back to the host, which validates it before use.
+value, and it travels only back to the host, which validates it.
 
-## 5. What the APIs cannot give
+## 5. Deferred
 
-- **GitHub dependency graph.** Needs the workflow YAML and name matching;
-  wrong when the base branch changed the workflow, partial for reusable
-  workflows and ambiguous names.
-- **GitHub per-step logs.** Only per job; slicing by timestamp is exact to the
-  second and refined by markers where they exist.
-- **Live logs on either provider** through the public REST APIs. A running job
-  shows its steps and their states; its log appears when it finishes.
-- **GitHub log ranges.** Documented only as a whole download; a tail needs the
-  undocumented ranged read of the blob.
-- **Azure dependencies.** Not in the timeline; YAML with templates, or the
-  preview API's expansion of the current definition, or run order.
-- **Required checks** are a separate read on both (GraphQL `isRequired`, Azure
-  policy evaluations). The POC does not show them.
-- **External CI** behind a GitHub check run or an Azure status has no jobs or
-  logs; only a summary and a link.
+Each item below is left out because the APIs do not provide it. Building it
+would mean reconstructing data the provider does not give, and a
+reconstruction can be wrong without anyone being able to tell.
+
+**GitHub job dependencies (`needs`).** Neither REST nor GraphQL returns them.
+They exist only in the workflow file, and jobs would have to be matched to it
+by display name, which fails for `pull_request_target` (the base branch's
+file runs), reusable workflows, and names built from expressions. Unblocked
+by a `needs` field, or dependency ids, on the jobs API or GraphQL `CheckRun`.
+Until then, jobs are listed in API order with no edges.
+
+**GitHub per-step logs.** Logs are served per job. The run zip had per-step
+files for n10's run 36288574162 and none for bat's run 36270173409, and
+`gh run view --log` labels bat's lines `UNKNOWN STEP`. Cutting a job log at
+step timestamps is guesswork at one-second precision. Unblocked by a per-step
+log endpoint or step offsets in the job log. Until then, steps show status and
+timings, and the log is the job's.
+
+**Azure stage and job dependencies (`dependsOn`).** The timeline has no
+`dependsOn`. The YAML needs its templates expanded, the preview API expands
+today's definition rather than the one that ran, and run order is not the
+declared graph. Unblocked by `dependsOn` on timeline records, or the expanded
+YAML of the run itself. Until then, stages are columns in `order`, with no
+edges.
+
+**GitHub matrix grouping.** Nothing in the jobs API says which jobs are legs of
+one matrix; only their display names hint at it. Unblocked by a matrix or job
+key field on the job.
+
+**Live logs.** GitHub serves a job's log only after the job finishes; its web
+UI streams over a private channel. Azure's live console is a separate feed.
+Unblocked by a public streaming or incremental log API. Until then, a running
+job shows its steps and says its log arrives when it finishes.
+
+**Tail-only reads of a GitHub log.** The API documents only the whole
+download. The signed blob answered a byte-range request, but that is the
+storage service's behaviour, not a documented contract. Unblocked by a
+documented range or tail parameter.
+
+**Supported, but outside this read-only POC:** required checks (GraphQL
+`isRequired`, Azure policy evaluations), external check runs and statuses,
+attempts (`/attempts/{n}`, `previousAttempts`), Azure checkpoints and
+approvals, and the writes: re-run, cancel and approve (§2.5, §3.4). These are
+the next slices (§7), not deferrals.
 
 ## 6. Costs
 
-- **GitHub overview:** one REST call for the runs, one per run for its jobs
-  (100 per page), one per distinct workflow file and SHA for the YAML, cached
-  for good. bat's PR: 5 requests the first time, 3 on refresh. The GraphQL
-  query in §2.1 replaces the runs and jobs calls with one query of about 10
-  points, but has no attempt number.
-- **Azure overview:** one builds query (already made for the badge), then one
-  timeline per pipeline.
-- **Polling:** only while the CI page is open and a pipeline is not finished,
-  every 15 s; a finished overview is not refetched until Refresh. At 15 s that
-  is 240 cycles an hour, about 720 requests for a three-workflow PR: within
-  GitHub's 5,000 but not free, which is why it stops at completion. Conditional
-  requests would make quiet cycles free of rate limit.
-- **Logs:** fetched only on a click. GitHub job logs run from tens of KB to
-  several MB (900 KB per bat build job; tens of MB for verbose test suites), so
-  the host caches finished job logs (8 jobs, 64 MiB), caps a download at
-  32 MiB, and sends the renderer only the last 500 lines of the step. Azure
-  reads only the lines it shows.
+- **GitHub overview:** one request for the runs and one per run for its jobs
+  (100 jobs a page). bat's PR: 3 requests. The GraphQL query in §2.1 would
+  make it one query of about 10 points, without the attempt number.
+- **Azure overview:** one builds query, then one timeline per pipeline.
+- **Polling:** only while the CI page is open and a pipeline is still going,
+  every 15 s; a finished overview is read again only on Refresh. At 15 s that
+  is 240 cycles an hour, about 720 requests for a PR with two workflows:
+  within GitHub's 5,000, which is why polling stops once everything finishes.
+  Conditional requests would make quiet cycles free.
+- **Logs:** read only when the user opens one. GitHub job logs run from tens of
+  KB to several MB (900 KB per bat build job), and the API offers only the
+  whole file, so the host keeps the last few finished job logs in memory,
+  refuses a log over 32 MiB, and sends the page the last 500 lines. Azure reads
+  only the lines the page shows.
 
 ## 7. Recommended slices
 
 These refine I27–I32 of the PR overview spec.
 
-1. **CI model and GitHub read** (I30 data): `vcs-core/ci`, GitHub runs, jobs,
-   YAML graph and log slicing, recorded fixtures. This branch.
-2. **Azure read** (I31 data): builds, timeline, per-task logs, run-order graph,
-   recorded public fixtures. This branch.
+1. **CI model and GitHub read** (I30 data): runs, jobs, steps and job logs.
+   This branch.
+2. **Azure read** (I31 data): builds, timeline hierarchy and per-task logs.
+   This branch.
 3. **Page in the Overview** (I29/I30 UI): move the page under Overview's
    readiness column, open a failed check straight to its job, Back restores
    the location.
 4. **Required and external checks** (I27/I28): GraphQL `isRequired`, check-run
-   summaries and annotations, Azure policy evaluations; external checks as
-   named links.
+   summaries and annotations, Azure policy evaluations; external checks shown
+   as named links.
 5. **Attempts** (O10): attempt picker from `run_attempt` and
    `previousAttempts`.
-6. **Log reader** (O10): find across the whole log, copy, line numbers,
-   `##[error]` jump, bounded rendering for 10 MiB, ranged GitHub tail if the
-   blob behaviour holds, add selection to the Plan.
-7. **Azure YAML graph**: definition YAML with templates, or the preview API,
-   behind a clear "declared vs inferred" label.
-8. **Retry and cancel** (I32/O11): permission-aware, reconciling the new
-   attempt; GitHub re-run failed, Azure `retry=true` and stage retry.
-9. **Reusable workflows** on GitHub: follow `referenced_workflows` for the
-   called jobs' edges.
+6. **Retry, cancel and approve** (I32/O11): permission-aware, reconciling the
+   new attempt.
+7. **Log reader** (O10): find, copy, line numbers, `##[error]` navigation,
+   bounded rendering for 10 MiB logs, add a selection to the Plan.
+
+Deferred items (§5) join this list when their API exists.
 
 ## 8. The proof of concept
 
-- **Model:** `libs/vcs/core/src/lib/ci.ts` (types, `parseCiLogRef`), exported
-  browser-safe as `@n10/vcs-core/ci`. `VcsProvider` gains the optional
+- **Model:** `libs/vcs/core/src/lib/ci.ts`. `VcsProvider` gains the optional
   `fetchCiOverview` and `fetchCiLog`.
-- **GitHub:** `libs/vcs/github/src/lib/ci.ts` (runs, jobs, mapping),
-  `ci-workflow.ts` (YAML `needs` and name matching), `ci-log.ts` (fetch, cache,
-  sanitise, slice by step). Fixtures recorded from `sharkdp/bat` run
-  36270173409 under `__fixtures__/`.
-- **Azure:** `libs/vcs/azure-devops/src/lib/ci.ts` (builds, timeline mapping,
-  ranged logs), with a trimmed public `dnceng-public` timeline as its fixture.
-- **Core:** `libs/core/src/lib/pull-requests/ci-overview.ts` looks up the PR's
+- **GitHub:** `libs/vcs/github/src/lib/ci.ts`: runs, jobs and steps, and the
+  job log once the job has finished.
+- **Azure:** `libs/vcs/azure-devops/src/lib/ci.ts`: builds, timeline hierarchy,
+  per-task logs read by line range.
+- **Core:** `libs/core/src/lib/pull-requests/ci-overview.ts` finds the PR's
   head in the cached list and asks the provider.
-- **Host:** `apps/desktop/src/host/contract-ci.ts`, `services/ci.ts`;
+- **Host:** `apps/desktop/src/host/contract-ci.ts` and `services/ci.ts`:
   `getCiOverview(prId)` and `getCiLog(ref)`.
-- **Renderer:** `components/review/ci/` (page, graph, job detail, log);
-  `lib/review/ci-graph-model.ts` lays the graph out in columns by dependency
-  depth and collapses a matrix into one node.
-- **Tests:** unit tests for mapping, YAML matching, log slicing and layout;
-  `apps/desktop-e2e/src/ci-overview.test.ts` drives the page through the fake
-  `gh` with the recorded fixture, plus a `@visual` baseline.
-
-Out of scope: writes (re-run, cancel), attempts, required checks, external
-checks, live logs, and anything outside the PR workspace.
+- **Renderer:** `components/review/ci/`: each pipeline's stages as columns in
+  the provider's order, jobs in each stage with their status, a job's steps,
+  and the log.
+- **Tests:** unit tests for both mappings against recorded public fixtures,
+  and `apps/desktop-e2e/src/ci-overview.test.ts` driving the page through the
+  fake `gh`, with a `@visual` baseline.
