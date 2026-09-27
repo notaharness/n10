@@ -62,6 +62,16 @@ export interface VcsConfigField {
   masked?: boolean;
 }
 
+/** A new inline thread: lines of `file` on the `side` of the diff they
+ *  were read from (LEFT the old file, RIGHT the new). */
+export interface NewCommentThread {
+  file: string;
+  lineStart: number;
+  lineEnd: number;
+  side: 'LEFT' | 'RIGHT';
+  body: string;
+}
+
 export interface VcsProvider {
   readonly id: string;
   readonly displayName: string;
@@ -138,6 +148,16 @@ export interface VcsProvider {
     project: Record<string, string>,
     prId: number
   ): Promise<PullRequestComments>;
+
+  /** Open a new thread anchored to lines of a file. Azure DevOps only:
+   *  GitHub's comments are filed as one review through `gh`, which
+   *  carries the verdict too. */
+  createThread?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number,
+    thread: NewCommentThread
+  ): Promise<void>;
 
   /** Reply to an existing comment thread. The thread is passed (not just
    *  the id) so providers can dispatch on `replyKind` — GitHub review

@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type * as VcsCore from '@n10/vcs-core';
 import type * as ReviewCommentsModule from '@n10/review-comments';
 import type { ReviewComment } from '@n10/review-comments';
 
@@ -15,18 +14,17 @@ import type { ReviewComment } from '@n10/review-comments';
 const state = vi.hoisted(() => ({
   comments: [] as ReviewComment[],
   config: {} as Record<string, unknown>,
-  posts: [] as { ids: string[]; event: string }[],
+  posts: [] as { ids: string[]; event: string; provider: unknown }[],
+  azure: { id: 'azure-devops' },
   failOn: null as string | null,
 }));
 
 vi.mock('./repo.js', () => ({
   requireRepo: () => '/repo',
+  PROVIDERS: [state.azure],
 }));
 
-vi.mock('@n10/vcs-core', async (importOriginal) => ({
-  // Partial: the Azure DevOps transport, loaded through
-  // @n10/review-comments, builds its request cache from this module.
-  ...(await importOriginal<typeof VcsCore>()),
+vi.mock('@n10/vcs-core', () => ({
   readConfig: () => state.config,
 }));
 
@@ -50,11 +48,11 @@ vi.mock('@n10/review-comments', async () => ({
   },
   postReviewComments: (
     comments: ReviewComment[],
-    _ctx: unknown,
+    ctx: { provider: unknown },
     event: string
   ) => {
     const ids = comments.map((c) => c.id);
-    state.posts.push({ ids, event });
+    state.posts.push({ ids, event, provider: ctx.provider });
     if (state.failOn && ids.includes(state.failOn)) {
       return Promise.reject(new Error('provider said no'));
     }
@@ -218,6 +216,16 @@ describe('postDraftComments', () => {
   it('does not require a head SHA on Azure DevOps', async () => {
     state.config = { vendor: 'azure-devops', vendorAuth: {} };
     await expect(postDraftComments({ prId: 1 })).resolves.toBe(3);
+  });
+
+  it('hands the poster the configured provider, which Azure posts through', async () => {
+    state.config = { vendor: 'azure-devops', vendorAuth: {} };
+    await postDraftComments({ prId: 1 });
+    expect(state.posts.map((p) => p.provider)).toEqual([
+      state.azure,
+      state.azure,
+      state.azure,
+    ]);
   });
 });
 

@@ -10,6 +10,7 @@ import type {
   ReviewDecision,
   ReviewVerdict,
   BuildStatusState,
+  NewCommentThread,
 } from '@n10/vcs-core';
 import { sanitizeBody } from '@n10/vcs-core';
 import { log } from '@n10/logger';
@@ -52,7 +53,7 @@ interface RawReviewer {
   isContainer?: boolean;
 }
 
-export function toAdoConfig(
+function toAdoConfig(
   auth: Record<string, string>,
   project: Record<string, string>
 ): AdoConfig {
@@ -64,17 +65,16 @@ export function toAdoConfig(
   };
 }
 
-/** Forget everything the transport has cached about one pull request.
- *  Called after a write so the change is visible immediately rather
- *  than at the end of the entry's TTL — by the draft poster in
- *  `@n10/review-comments` too, which creates threads outside this file.
+/** Everything the transport has cached about one pull request. Called
+ *  after a write so the change is visible immediately rather than at
+ *  the end of the entry's TTL.
  *
  *  Exact keys, not prefixes: `.../threads/1` is a prefix of
  *  `.../threads/10`, so replying on pull request 1 would otherwise
  *  drop the cached threads of 10 through 19 and 100 through 199 too.
  *  The individual-thread keys carry a further segment, so those are
  *  the one place a prefix is meant — and it ends at the separator. */
-export function invalidatePr(config: AdoConfig, prId: number): void {
+function invalidatePr(config: AdoConfig, prId: number): void {
   const repo = `${config.org}/${config.project}/${config.repo}`;
   // The memo too, or the sidebar's comment badge would keep the count
   // from before the write for the rest of its life.
@@ -900,6 +900,35 @@ async function replyToAdoThread(
   return toRemoteReply(posted);
 }
 
+async function createAdoThread(
+  config: AdoConfig,
+  prId: number,
+  comment: NewCommentThread
+): Promise<void> {
+  const url = `${baseUrl(config)}/pullrequests/${prId}/threads?api-version=7.1`;
+  const side = comment.side === 'LEFT' ? 'left' : 'right';
+  const thread = {
+    comments: [{ parentCommentId: 0, content: comment.body, commentType: 1 }],
+    threadContext: {
+      // Azure wants a repo-absolute path, and anchors each side apart.
+      filePath: `/${comment.file}`,
+      [`${side}FileStart`]: { line: comment.lineStart, offset: 1 },
+      [`${side}FileEnd`]: { line: comment.lineEnd, offset: 1 },
+    },
+    status: 1, // active
+  };
+  await adoSend<unknown>('createAdoThread', url, {
+    method: 'POST',
+    headers: authHeaders(config.pat),
+    body: JSON.stringify(thread),
+    // The anchor, never the comment's text.
+    bodyForLog: { ...comment, body: undefined, length: comment.body.length },
+  });
+  // Without this the new thread stays out of the review workspace and
+  // the sidebar's count until the cached list lapses.
+  invalidatePr(config, prId);
+}
+
 async function setAdoThreadResolved(
   config: AdoConfig,
   prId: number,
@@ -1081,6 +1110,15 @@ export const azureDevOpsProvider: VcsProvider = {
   ): Promise<RemoteCommentReply> {
     const config = toAdoConfig(auth, project);
     return replyToAdoThread(config, prId, thread.id, body);
+  },
+
+  async createThread(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number,
+    comment: NewCommentThread
+  ): Promise<void> {
+    await createAdoThread(toAdoConfig(auth, project), prId, comment);
   },
 
   async setThreadResolved(
