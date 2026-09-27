@@ -1,0 +1,95 @@
+{
+  "value": [
+    {
+      "id": 1,
+      "description": "Cancel before connect",
+      "author": {
+        "displayName": "Alex Doe",
+        "url": "https://spsprodeus27.vssps.visualstudio.com/_apis/Identities/00000000-0000-4000-8000-000000000009",
+        "_links": {
+          "avatar": {
+            "href": "https://dev.azure.com/contoso/_apis/GraphProfile/MemberAvatars/aad.00000000-0000-4000-8000-000000000009"
+          }
+        },
+        "id": "00000000-0000-4000-8000-000000000009",
+        "uniqueName": "alex@contoso.example",
+        "imageUrl": "https://dev.azure.com/contoso/_api/_common/identityImage?id=00000000-0000-4000-8000-000000000009",
+        "descriptor": "aad.00000000-0000-4000-8000-000000000009"
+      },
+      "createdDate": "2026-09-22T09:30:00.000Z",
+      "updatedDate": "2026-09-22T09:30:00.000Z",
+      "sourceRefCommit": {
+        "commitId": "1111111111111111111111111111111111111111"
+      },
+      "targetRefCommit": {
+        "commitId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "commonRefCommit": {
+        "commitId": "cccccccccccccccccccccccccccccccccccccccc"
+      },
+      "hasMoreCommits": false,
+      "reason": "create"
+    },
+    {
+      "id": 2,
+      "description": "Address review",
+      "author": {
+        "displayName": "Alex Doe",
+        "url": "https://spsprodeus27.vssps.visualstudio.com/_apis/Identities/00000000-0000-4000-8000-000000000009",
+        "_links": {
+          "avatar": {
+            "href": "https://dev.azure.com/contoso/_apis/GraphProfile/MemberAvatars/aad.00000000-0000-4000-8000-000000000009"
+          }
+        },
+        "id": "00000000-0000-4000-8000-000000000009",
+        "uniqueName": "alex@contoso.example",
+        "imageUrl": "https://dev.azure.com/contoso/_api/_common/identityImage?id=00000000-0000-4000-8000-000000000009",
+        "descriptor": "aad.00000000-0000-4000-8000-000000000009"
+      },
+      "createdDate": "2026-09-23T11:02:00.000Z",
+      "updatedDate": "2026-09-23T11:02:00.000Z",
+      "sourceRefCommit": {
+        "commitId": "2222222222222222222222222222222222222222"
+      },
+      "targetRefCommit": {
+        "commitId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "commonRefCommit": {
+        "commitId": "cccccccccccccccccccccccccccccccccccccccc"
+      },
+      "hasMoreCommits": false,
+      "reason": "push"
+    },
+    {
+      "id": 3,
+      "description": "Address review",
+      "author": {
+        "displayName": "Alex Doe",
+        "url": "https://spsprodeus27.vssps.visualstudio.com/_apis/Identities/00000000-0000-4000-8000-000000000009",
+        "_links": {
+          "avatar": {
+            "href": "https://dev.azure.com/contoso/_apis/GraphProfile/MemberAvatars/aad.00000000-0000-4000-8000-000000000009"
+          }
+        },
+        "id": "00000000-0000-4000-8000-000000000009",
+        "uniqueName": "alex@contoso.example",
+        "imageUrl": "https://dev.azure.com/contoso/_api/_common/identityImage?id=00000000-0000-4000-8000-000000000009",
+        "descriptor": "aad.00000000-0000-4000-8000-000000000009"
+      },
+      "createdDate": "2026-09-25T15:40:00.000Z",
+      "updatedDate": "2026-09-25T15:40:00.000Z",
+      "sourceRefCommit": {
+        "commitId": "3333333333333333333333333333333333333333"
+      },
+      "targetRefCommit": {
+        "commitId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "commonRefCommit": {
+        "commitId": "cccccccccccccccccccccccccccccccccccccccc"
+      },
+      "hasMoreCommits": false,
+      "reason": "push"
+    }
+  ],
+  "count": 3
+}

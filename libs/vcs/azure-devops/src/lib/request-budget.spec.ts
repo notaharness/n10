@@ -207,6 +207,34 @@ describe('a cycle over pull requests that have not moved', () => {
     expect(await cycleCost()).toBe(1);
   });
 
+  it('stays at the list after one pull request is opened', async () => {
+    await syncCycle();
+    afterMinutes(1);
+    // The selected pull request is two reads of its own — itself and
+    // its iterations — and touches none of the cycle's memos.
+    const answer = mockFetch.getMockImplementation();
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (/\/pullrequests\/105\/iterations\?/.test(url)) {
+        return Promise.resolve(json({ value: [] }));
+      }
+      if (/\/pullrequests\/105\?/.test(url)) {
+        return Promise.resolve(
+          json({
+            ...prs[5],
+            status: 'active',
+            lastMergeSourceCommit: { commitId: '5'.repeat(40) },
+          })
+        );
+      }
+      return answer?.(url, init);
+    });
+    resetRequestCounters('azure-devops');
+    await azureDevOpsProvider.fetchPullRequestDetail?.(AUTH, PROJECT, 105);
+    expect(counts().network).toBe(2);
+
+    expect(await cycleCost()).toBe(1);
+  });
+
   it('pays again only for the pull request whose head commit moved', async () => {
     await syncCycle();
     afterMinutes(1);

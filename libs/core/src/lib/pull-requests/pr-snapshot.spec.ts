@@ -55,6 +55,7 @@ function detail(over: Partial<PullRequestDetail> = {}): PullRequestDetail {
       state: 'read',
       value: { items: [], total: 0, complete: true },
     },
+    iteration: { state: 'unsupported', reason: 'no iterations' },
     capabilities: { update: { state: 'supported' } },
     ...over,
   };

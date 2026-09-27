@@ -242,6 +242,21 @@ export interface DetailReviewer {
 }
 
 /**
+ * One push to an Azure DevOps pull request: the provider's own name for
+ * a revision, numbered from 1, with the commits it compared. Comments
+ * and review ranges are tracked against it.
+ */
+export interface PullRequestIteration {
+  id: number;
+  /** The source branch's head when it was pushed. */
+  source: Oid;
+  /** The target branch's head it was compared with, where given. */
+  target: Oid | null;
+  /** The merge base of the two, where given. */
+  base: Oid | null;
+}
+
+/**
  * The selected pull request as its provider describes it, read on
  * demand rather than with the list. Providers fill this through
  * `VcsProvider.fetchPullRequestDetail`.
@@ -266,6 +281,11 @@ export interface PullRequestDetail {
   /** Everyone asked to review and everyone who has, all pages read, or
    *  marked incomplete. Read after the rest, and failed on its own. */
   reviewers: ReadOutcome<ListRead<DetailReviewer>>;
+  /** The iteration whose source is `source.head`, where the provider
+   *  numbers revisions; `null` when none does yet (a push landed between
+   *  the reads). Unsupported where the head commit is the only name a
+   *  revision has. */
+  iteration: ReadOutcome<PullRequestIteration | null>;
   /** Whether the viewer may edit the title and description. Draft and
    *  ready depend on the lifecycle as well, and are not this. */
   capabilities: { update: Capability };
