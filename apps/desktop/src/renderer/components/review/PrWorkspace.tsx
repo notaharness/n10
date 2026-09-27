@@ -165,10 +165,16 @@ export function PrWorkspace({
 
   const rail = useReviewRail(nav, comments, rootRef);
   const { showUnresolved } = rail;
+  const { scrollRef } = nav;
+  // The pressed button goes hidden with the Overview, so focus follows
+  // the reader: to the changes, or (in ThreadCard) to the thread.
   const onOverviewAction = useCallback(
-    (action: AttentionAction) =>
-      action === 'show-unresolved' ? showUnresolved() : setMode('diff'),
-    [showUnresolved, setMode]
+    (action: AttentionAction) => {
+      if (action === 'show-unresolved') return showUnresolved();
+      setMode('diff');
+      requestAnimationFrame(() => scrollRef.current?.focus());
+    },
+    [showUnresolved, setMode, scrollRef]
   );
 
   // ── The plan ───────────────────────────────────────────────────

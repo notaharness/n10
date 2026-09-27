@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import type { ElectronApplication, Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
 import { sidebarRow, visibleText } from './setup/app.js';
 import type { FakeGitHub } from './setup/fake-gh.js';
@@ -23,9 +23,14 @@ const BODY = [
   '- [x] Unit tests cover cancel before connect',
   '- [ ] Soak test on staging',
   '',
-  '| Case | Before | After |',
-  '| --- | --- | --- |',
-  '| cancel | leak | closed |',
+  '| Case | Before | After | Socket | Timer | Cache | Retries |',
+  '| --- | --- | --- | --- | --- | --- | --- |',
+  '| `cancelBeforeConnect` | `leakedUntilServerTimeout` | `closedImmediatelyOnCancel` | `requestSocketCancellationRegression` | cleared | untouched | none |',
+  '| cancel mid-response | leaked until the server gave up | closed after flush | closed | cleared | entry discarded | none |',
+  '',
+  'Trace: https://traces.example.com/sessions/cancelled-request-socket-leak/spans/0123456789abcdef',
+  '',
+  'Digest 9f2c1e7a4b8d3f60c5e1a2b7d9043e6f8a1c2b3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5061728394a5b6c7d8e9f',
 ].join('\n');
 
 const GITHUB: FakeGitHub = {
@@ -94,6 +99,34 @@ async function top(locator: Locator): Promise<number> {
   return box.y;
 }
 
+async function resize(
+  app: ElectronApplication,
+  width: number,
+  height: number
+): Promise<void> {
+  await app.evaluate(
+    ({ BrowserWindow }, [w, h]) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      window.setMinimumSize(0, 0);
+      window.setContentSize(w, h);
+    },
+    [width, height]
+  );
+}
+
+/** Where an element stops being visible on the right: its own edge,
+ *  cut by every scrolling or clipping box it sits in, up to the pane. */
+function visibleRight(el: Element): number {
+  let right = el.getBoundingClientRect().right;
+  for (let box = el.parentElement; box; box = box.parentElement) {
+    if (getComputedStyle(box).overflowX !== 'visible') {
+      right = Math.min(right, box.getBoundingClientRect().right);
+    }
+    if (box.classList.contains('@container')) break;
+  }
+  return right;
+}
+
 async function openPr(page: Page, row: RegExp): Promise<void> {
   await sidebarRow(page, row).first().click();
   await expect(prHeader(page)).toBeVisible({ timeout: 30_000 });
@@ -129,14 +162,19 @@ test.describe('Pull request Overview', () => {
     );
   });
 
-  test('Review changes shows the diff', async ({ desktop }) => {
+  test('Review changes shows the diff and takes the keyboard there', async ({
+    desktop,
+  }) => {
     const { page } = desktop;
     await openPr(page, /#214/);
 
-    await page.getByRole('button', { name: 'Review changes' }).click();
+    await page.getByRole('button', { name: 'Review changes' }).focus();
+    await page.keyboard.press('Enter');
 
     await expect(visibleText(page, 'socket.close();')).toBeVisible();
     await expect(overviewTitle(page, 'Handle cancelled requests')).toBeHidden();
+    // Not left on the hidden button: the next key acts on the changes.
+    await expect(page.getByRole('region', { name: 'Changes' })).toBeFocused();
   });
 
   test('opens your own pull request on its diff', async ({ desktop }) => {
@@ -154,12 +192,16 @@ test.describe('Pull request Overview', () => {
 
     const next = page.getByRole('region', { name: 'Next step' });
     await expect(next).toContainText('1 unresolved thread');
-    await next.getByRole('button', { name: 'Respond to feedback' }).click();
+    await next.getByRole('button', { name: 'Respond to feedback' }).focus();
+    await page.keyboard.press('Enter');
 
-    // The thread's card in the diff, not its row in the rail.
+    // The navigator went to the thread, and the keyboard with it.
+    await expect(
+      page.locator('[data-comment-row][aria-current="true"]')
+    ).toContainText('Why keep the old name?');
     await expect(
       page.locator('[data-thread]', { hasText: 'Why keep the old name?' })
-    ).toBeVisible();
+    ).toBeFocused();
   });
 
   test('copies the link from the native More menu', async ({ desktop }) => {
@@ -174,16 +216,72 @@ test.describe('Pull request Overview', () => {
       .toBe('https://github.com/n10/fixture/pull/214');
   });
 
+  test('says where reviews stand in words at 1024×768', async ({ desktop }) => {
+    const { app, page } = desktop;
+    await openPr(page, /#214/);
+    await resize(app, 1024, 768);
+    await page.getByRole('button', { name: 'Hide sidebar' }).click();
+
+    const header = prHeader(page);
+    await expect(header.locator('[data-reviewer-summary]')).toHaveText(
+      '1/2 approved'
+    );
+    await expect(
+      header.getByRole('button', { name: 'Open worktree in editor' })
+    ).toBeVisible();
+    await expect(
+      header.getByRole('button', { name: 'Open on GitHub' })
+    ).toBeVisible();
+    // An approval beside a pending request is counted, not called met.
+    await expect(page.locator('[data-readiness-row="reviews"]')).toContainText(
+      'Approved by bea · 1 pending'
+    );
+  });
+
+  test('keeps a wide table and a long link inside the reading column', async ({
+    desktop,
+  }) => {
+    const { app, page } = desktop;
+    await openPr(page, /#214/);
+    await resize(app, 1360, 860);
+    await page.getByRole('button', { name: 'Hide sidebar' }).click();
+    // The header has room for the branches here, read as one name.
+    await expect(
+      prHeader(page).getByRole('button', {
+        name: 'cancel-requests → main',
+        exact: true,
+      })
+    ).toBeVisible();
+
+    const completion = page.getByRole('region', { name: 'Completion' });
+    const table = page.getByRole('table');
+    await expect(table).toBeVisible();
+    const completionBox = await completion.boundingBox();
+    // The table scrolls in its own box, so what shows of it ends before
+    // the context column starts…
+    const shownRight = await table.evaluate(visibleRight);
+    expect(shownRight).toBeLessThanOrEqual(completionBox?.x ?? 0);
+    // …a long unbroken digest wraps within the column…
+    const digestRight = await page.getByText(/^Digest /).evaluate((el) => {
+      const text = document.createRange();
+      text.selectNodeContents(el);
+      return text.getBoundingClientRect().right;
+    });
+    expect(digestRight).toBeLessThanOrEqual(completionBox?.x ?? 0);
+    // …and nothing scrolls the Overview itself sideways.
+    const sideways = await completion.evaluate((el) => {
+      const pane = el.closest('.overflow-auto');
+      return pane ? pane.scrollWidth - pane.clientWidth : -1;
+    });
+    expect(sideways).toBe(0);
+  });
+
   test('keeps the number and state in view at a narrow width', async ({
     desktop,
   }) => {
     const { app, page } = desktop;
     await openPr(page, /#214/);
-    await app.evaluate(({ BrowserWindow }) => {
-      const window = BrowserWindow.getAllWindows()[0];
-      window.setMinimumSize(0, 0);
-      window.setContentSize(800, 600);
-    });
+    await resize(app, 800, 600);
 
     const header = prHeader(page);
     await expect(header.getByText('#214', { exact: true })).toBeVisible();

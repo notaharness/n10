@@ -46,7 +46,7 @@ function VerdictButton({
         size="sm"
         onClick={onClick}
         disabled={disabled}
-        className="w-full justify-start"
+        className="@min-[900px]:w-full @min-[900px]:justify-start"
       >
         {pending ? <Loader2Icon className="animate-spin" /> : icon}
         {children}
@@ -56,9 +56,9 @@ function VerdictButton({
 }
 
 /**
- * The reviewer's votes, in the provider's own terms: Azure DevOps has
- * four; GitHub knows only approve and request changes, so "wait for
- * author" is not offered there.
+ * The reviewer's votes, in the provider's own terms and nothing else:
+ * Azure DevOps has four; GitHub has approve and request changes. A vote
+ * posts at once, and says so.
  */
 export function VerdictActions({ prId }: { prId: number }) {
   const { repo } = useRepo();
@@ -82,7 +82,12 @@ export function VerdictActions({ prId }: { prId: number }) {
 
   return (
     <Section title="Your review">
-      <div className="flex flex-col gap-1.5">
+      <p className="mb-2 text-xs text-muted-foreground">
+        A vote posts to {isGitHub ? 'GitHub' : 'Azure DevOps'} at once.
+      </p>
+      {/* A column of full-width votes beside the description; a row that
+          wraps once the Overview is one column. */}
+      <div className="flex flex-wrap gap-1.5 @min-[900px]:flex-col">
         <VerdictButton
           tip="Approve this pull request"
           icon={<CheckCircle2Icon className="text-success" />}
@@ -90,17 +95,15 @@ export function VerdictActions({ prId }: { prId: number }) {
         >
           Approve
         </VerdictButton>
-        <VerdictButton
-          tip={
-            isGitHub
-              ? 'Approve with a non-blocking note (GitHub has no separate vote for this)'
-              : 'Approve, with non-blocking suggestions'
-          }
-          icon={<MessageSquarePlusIcon className="text-success" />}
-          {...vote('approve-with-suggestions')}
-        >
-          Approve with suggestions
-        </VerdictButton>
+        {!isGitHub && (
+          <VerdictButton
+            tip="Approve, with non-blocking suggestions"
+            icon={<MessageSquarePlusIcon className="text-success" />}
+            {...vote('approve-with-suggestions')}
+          >
+            Approve with suggestions
+          </VerdictButton>
+        )}
         {!isGitHub && (
           <VerdictButton
             tip="Block the pull request until the author responds"

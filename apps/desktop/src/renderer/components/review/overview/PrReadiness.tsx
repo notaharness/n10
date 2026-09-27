@@ -2,6 +2,8 @@ import {
   CheckCircle2Icon,
   CircleDashedIcon,
   CircleDotIcon,
+  CircleIcon,
+  TriangleAlertIcon,
   XCircleIcon,
 } from 'lucide-react';
 import type {
@@ -28,6 +30,16 @@ const STATE: Record<
     className: 'text-warning',
     label: 'Waiting',
   },
+  concern: {
+    icon: TriangleAlertIcon,
+    className: 'text-warning',
+    label: 'Not known if required',
+  },
+  observed: {
+    icon: CircleIcon,
+    className: 'text-muted-foreground',
+    label: 'Not known if required',
+  },
   unknown: {
     icon: CircleDashedIcon,
     className: 'text-muted-foreground',
@@ -53,21 +65,24 @@ function StateIcon({
 
 /**
  * What stands between the pull request and completion. The headline is
- * the strongest blocker in one sentence; the rows are each fact on its
- * own, so a failed check never reads as a review verdict and an unread
- * policy never reads as satisfied.
+ * a verdict only where the provider gives one, and otherwise says
+ * readiness is not fully known, with the visible problems beside it.
+ * Each row is one fact, so a failed check never reads as a review
+ * verdict, and an approval never reads as a satisfied requirement.
  */
 export function PrReadiness({ readiness }: { readiness: Readiness }) {
   const { headline, rows } = readiness;
   return (
     <Section title="Completion">
-      <p
-        data-readiness-headline={headline.state}
-        className="flex items-start gap-2 font-medium"
-      >
+      <div data-readiness-headline={headline.state} className="flex gap-2">
         <StateIcon state={headline.state} className="mt-0.5 size-4" />
-        {headline.text}
-      </p>
+        <div className="min-w-0">
+          <p className="font-medium">{headline.text}</p>
+          {headline.detail && (
+            <p className="text-sm text-muted-foreground">{headline.detail}</p>
+          )}
+        </div>
+      </div>
       <ul className="mt-2 space-y-1.5 text-sm">
         {rows.map((row) => (
           <li

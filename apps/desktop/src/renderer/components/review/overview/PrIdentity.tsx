@@ -17,7 +17,7 @@ export function PrIdentity({
   className?: string;
 }) {
   return (
-    <header className={cn('min-w-0', className)}>
+    <div className={cn('min-w-0', className)}>
       <h1 className="text-xl leading-snug font-semibold break-words">
         {pr.title}{' '}
         <span className="font-normal text-muted-foreground">#{pr.id}</span>
@@ -55,6 +55,6 @@ export function PrIdentity({
           </CopyChip>
         )}
       </div>
-    </header>
+    </div>
   );
 }

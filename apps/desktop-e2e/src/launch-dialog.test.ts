@@ -32,7 +32,7 @@ async function openMenu(
 ) {
   await sidebarRow(page, /#42/).first().click();
   await expect(
-    page.getByRole('button', { name: `${BRANCH} → main`, exact: true })
+    page.getByRole('button', { name: 'Open on GitHub', exact: true })
   ).toBeVisible();
   const sessions = await page.evaluate(() => window.n10.listSessions());
   if (!sessions.some((s) => s.running)) {

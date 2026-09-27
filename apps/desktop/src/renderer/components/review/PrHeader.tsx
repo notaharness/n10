@@ -94,6 +94,11 @@ function UnresolvedButton({
   );
 }
 
+const PROVIDER_NAME: Record<string, string> = {
+  github: 'GitHub',
+  'azure-devops': 'Azure DevOps',
+};
+
 /** Copy what names this pull request, through the native menu. */
 async function runMoreMenu(pr: PullRequestInfo): Promise<void> {
   const chosen = await window.n10.showContextMenu([
@@ -124,6 +129,7 @@ export function PrHeader({
 }) {
   const { repo } = useRepo();
   const refresh = useRefreshPullRequest(repo.cwd);
+  const provider = PROVIDER_NAME[repo.providerId ?? ''] ?? 'the provider';
   const reviewers = pr.reviewers ?? [];
   return (
     <header className="@container flex h-10 shrink-0 items-center gap-3 border-b border-border px-3">
@@ -138,11 +144,10 @@ export function PrHeader({
           <button
             type="button"
             onClick={() => copyText(pr.sourceBranch, 'Branch name copied')}
-            className="hidden min-w-0 items-center gap-1 truncate rounded px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground @min-[1000px]:flex"
+            className="hidden min-w-0 items-center gap-1 rounded px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground @min-[1200px]:flex"
           >
-            <span className="truncate">
-              {pr.sourceBranch} → {pr.targetBranch}
-            </span>
+            <span className="truncate">{pr.sourceBranch}</span>
+            <span className="shrink-0">→ {pr.targetBranch}</span>
             <CopyIcon className="size-3 shrink-0" />
           </button>
         </Tip>
@@ -170,7 +175,7 @@ export function PrHeader({
         />
         <ReviewerSummary
           reviewers={reviewers}
-          className="hidden @min-[720px]:flex @min-[1000px]:hidden"
+          className="hidden @min-[720px]:flex"
         />
         {(pr.activeCommentCount ?? 0) > 0 && (
           <UnresolvedButton
@@ -183,15 +188,15 @@ export function PrHeader({
       <div className="flex-1" />
 
       <OpenInEditorButton branch={pr.sourceBranch} />
-      <Tip label="Open on the provider">
+      <Tip label={`Open on ${provider}`}>
         <Button
           variant="ghost"
           size="sm"
-          aria-label="Open on the provider"
+          aria-label={`Open on ${provider}`}
           onClick={() => void window.n10.openExternal(pr.url)}
         >
           <ExternalLinkIcon />
-          <span className="hidden @min-[900px]:inline">Open</span>
+          <span className="hidden @min-[900px]:inline">{provider}</span>
         </Button>
       </Tip>
       <Tip label="Refresh this pull request">
@@ -199,14 +204,10 @@ export function PrHeader({
           variant="ghost"
           size="icon-sm"
           aria-label="Refresh this pull request"
-          disabled={refresh.isPending}
-          onClick={() =>
-            refresh.mutate(pr, {
-              onError: (e) => toast.error(`Refresh failed: ${errorMessage(e)}`),
-            })
-          }
+          disabled={refresh.pending}
+          onClick={() => refresh.run(pr)}
         >
-          <RefreshCwIcon className={cn(refresh.isPending && 'animate-spin')} />
+          <RefreshCwIcon className={cn(refresh.pending && 'animate-spin')} />
         </Button>
       </Tip>
       <Tip label="More actions">

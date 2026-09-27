@@ -1,12 +1,15 @@
 import { UsersIcon, XCircleIcon } from 'lucide-react';
+import type { PullRequestReviewer } from '@n10/vcs-core/types';
 import {
-  isBlockingDecision,
-  type PullRequestReviewer,
-} from '@n10/vcs-core/types';
-import { DECISION_LABEL } from '../../lib/review/overview-model.js';
+  DECISION_LABEL,
+  HOLDING_VERDICTS,
+} from '../../lib/review/overview-model.js';
 import { cn } from '../../lib/utils.js';
 import { Avatar } from '../ui/avatar.js';
 import { Tip } from '../ui/tooltip.js';
+
+/** Avatars the header has room for; the rest are counted. */
+const MAX_AVATARS = 6;
 
 /** Colour of the dot on a reviewer's avatar, by their verdict. */
 function decisionDotClass(decision: string): string {
@@ -20,8 +23,9 @@ function decisionDotClass(decision: string): string {
   return '';
 }
 
-/** Reviewer avatars, each dotted with where that reviewer landed. For a
- *  header with room to spare; {@link ReviewerSummary} says it in words. */
+/** Reviewer avatars, each dotted with where that reviewer landed, for a
+ *  header with room to spare. The dot is never the only signal:
+ *  {@link ReviewerSummary} says it in words beside them. */
 export function ReviewerDots({
   reviewers,
   className,
@@ -32,12 +36,15 @@ export function ReviewerDots({
   if (reviewers.length === 0) return null;
   return (
     <span className={cn('items-center gap-1.5', className)}>
-      {reviewers.slice(0, 6).map((r) => (
+      {reviewers.slice(0, MAX_AVATARS).map((r) => (
         <Tip
           key={r.identifier}
           label={`${r.displayName}: ${DECISION_LABEL[r.decision]}`}
         >
           <span className="relative">
+            <span className="sr-only">
+              {r.displayName}: {DECISION_LABEL[r.decision]}
+            </span>
             <Avatar name={r.displayName} size="xs" />
             <span
               className={cn(
@@ -48,12 +55,18 @@ export function ReviewerDots({
           </span>
         </Tip>
       ))}
+      {reviewers.length > MAX_AVATARS && (
+        <span className="text-xs text-muted-foreground">
+          +{reviewers.length - MAX_AVATARS}
+          <span className="sr-only"> more reviewers</span>
+        </span>
+      )}
     </span>
   );
 }
 
-/** Where the reviews stand, in words, for a header too narrow for the
- *  avatars. The Overview lists each reviewer. */
+/** Where the reviews stand, in words. The Overview lists each
+ *  reviewer. */
 export function ReviewerSummary({
   reviewers,
   className,
@@ -62,24 +75,31 @@ export function ReviewerSummary({
   className?: string;
 }) {
   if (reviewers.length === 0) return null;
-  const blocking = reviewers.some((r) => isBlockingDecision(r.decision));
+  // The most severe verdict holding it back, in the provider's words.
+  const holding = HOLDING_VERDICTS.find((d) =>
+    reviewers.some((r) => r.decision === d)
+  );
   const approved = reviewers.filter((r) => r.decision === 'approved').length;
   return (
     <span
       data-reviewer-summary
       className={cn(
         'items-center gap-1',
-        blocking ? 'text-warning' : 'text-muted-foreground',
+        holding === 'rejected'
+          ? 'text-destructive'
+          : holding
+          ? 'text-warning'
+          : 'text-muted-foreground',
         className
       )}
     >
-      {blocking ? (
+      {holding ? (
         <XCircleIcon aria-hidden className="size-3.5" />
       ) : (
         <UsersIcon aria-hidden className="size-3.5" />
       )}
-      {blocking
-        ? 'Changes requested'
+      {holding
+        ? DECISION_LABEL[holding]
         : `${approved}/${reviewers.length} approved`}
     </span>
   );

@@ -1,5 +1,4 @@
 import {
-  isBlockingDecision,
   type PullRequestInfo,
   type PullRequestReviewer,
   type ReviewDecision,
@@ -60,6 +59,28 @@ export const DECISION_LABEL: Record<ReviewDecision, string> = {
   declined: 'Declined',
 };
 
+/** The pane a workspace shows, and whether the reader picked it. */
+export interface PaneState {
+  mode: Mode;
+  /** The reader, or an agent taking over, chose this pane. */
+  chosen: boolean;
+  hasPr: boolean;
+}
+
+/**
+ * A pull request that arrives after its tab opened — the sidebar lists
+ * worktrees before pull requests — opens where it would have, unless
+ * the reader has already picked a pane.
+ */
+export function adoptPullRequest(
+  state: PaneState,
+  hasPr: boolean,
+  initial: Mode
+): PaneState {
+  if (state.hasPr === hasPr) return state;
+  return { ...state, hasPr, mode: state.chosen ? state.mode : initial };
+}
+
 /** The viewer's own entry among the reviewers, if they are one. */
 export function viewerReview(
   pr: PullRequestInfo,
@@ -88,27 +109,75 @@ function names(reviewers: readonly PullRequestReviewer[]): string {
   return `${first} and ${rest.length} other${rest.length === 1 ? '' : 's'}`;
 }
 
+/** The verdicts that hold a pull request back, most severe first, each
+ *  in its provider's own words: Azure's -10 and -5 are different votes,
+ *  and GitHub has only the third. */
+export const HOLDING_VERDICTS = [
+  'rejected',
+  'waiting-for-author',
+  'changes-requested',
+] as const;
+
+const HOLDING_PHRASE: Record<
+  (typeof HOLDING_VERDICTS)[number],
+  (who: string) => string
+> = {
+  rejected: (who) => `Rejected by ${who}`,
+  'waiting-for-author': (who) => `Waiting for author: ${who}`,
+  'changes-requested': (who) => `Changes requested by ${who}`,
+};
+
+/** The most severe verdict holding the pull request back, or null. */
+function holdingVerdict(
+  reviewers: readonly PullRequestReviewer[]
+): string | null {
+  for (const decision of HOLDING_VERDICTS) {
+    const who = reviewers.filter((r) => r.decision === decision);
+    if (who.length > 0) return HOLDING_PHRASE[decision](names(who));
+  }
+  return null;
+}
+
 function unresolvedDetail(pr: PullRequestInfo): string | null {
   const n = pr.activeCommentCount ?? 0;
   if (n === 0) return null;
   return `${n} unresolved thread${n === 1 ? '' : 's'}`;
 }
 
-function reviewerStep(
-  pr: PullRequestInfo,
-  mine: PullRequestReviewer | undefined
-): NextStep {
+/** What a reviewer's own verdict says back to them. */
+const OWN_VERDICT: Partial<Record<PullRequestReviewer['decision'], string>> = {
+  approved: 'You approved this pull request',
+  'changes-requested': 'You asked for changes',
+  'waiting-for-author': 'You are waiting for the author',
+  rejected: 'You rejected this pull request',
+  declined: 'You declined to review',
+};
+
+function reviewerStep(pr: PullRequestInfo, viewer: string | null): NextStep {
   const step = {
     detail: unresolvedDetail(pr),
     action: 'review-changes' as const,
     label: 'Review changes',
   };
-  if (mine?.decision === 'approved') {
-    return { ...step, summary: 'You approved this pull request' };
+  // A draft is not asking for review yet, which is also why the sidebar
+  // keeps it out of Needs your review.
+  if (pr.isDraft) {
+    return {
+      ...step,
+      summary: 'Draft: not ready for review yet',
+      label: 'View changes',
+    };
   }
-  if (mine && isBlockingDecision(mine.decision)) {
-    return { ...step, summary: 'You asked for changes' };
+  if (viewer == null) {
+    return {
+      ...step,
+      summary: 'n10 cannot see your review',
+      detail: 'No account is configured for this repository.',
+    };
   }
+  const mine = viewerReview(pr, viewer);
+  const own = mine && OWN_VERDICT[mine.decision];
+  if (own) return { ...step, summary: own };
   return {
     ...step,
     summary: mine ? 'Your review is requested' : 'Not reviewed by you yet',
@@ -119,29 +188,19 @@ function authorStep(pr: PullRequestInfo): NextStep {
   const reviewers = pr.reviewers ?? [];
   const unresolved = unresolvedDetail(pr);
   const view = { action: 'review-changes' as const, label: 'View changes' };
+  // The count is the fact; who owes the next move on each thread is not
+  // something it says.
   if (unresolved) {
     return {
       summary: unresolved,
-      detail: 'Reviewers are waiting on your replies or fixes.',
+      detail: null,
       action: 'show-unresolved',
       label: 'Respond to feedback',
     };
   }
-  const blocking = reviewers.filter((r) => isBlockingDecision(r.decision));
-  if (blocking.length > 0) {
-    return {
-      ...view,
-      summary: `Changes requested by ${names(blocking)}`,
-      detail: null,
-    };
-  }
-  if (pr.isDraft) {
-    return {
-      ...view,
-      summary: 'Draft',
-      detail: 'Reviewers are not asked to look until it is ready for review.',
-    };
-  }
+  const holding = holdingVerdict(reviewers);
+  if (holding) return { ...view, summary: holding, detail: null };
+  if (pr.isDraft) return { ...view, summary: 'Draft', detail: null };
   const approved = reviewers.filter((r) => r.decision === 'approved');
   if (approved.length > 0) {
     return { ...view, summary: `Approved by ${names(approved)}`, detail: null };
@@ -160,61 +219,76 @@ export function nextStep(
   role: ReviewRole,
   viewer: string | null
 ): NextStep {
-  return role === 'author'
-    ? authorStep(pr)
-    : reviewerStep(pr, viewerReview(pr, viewer));
+  return role === 'author' ? authorStep(pr) : reviewerStep(pr, viewer);
 }
 
 /**
- * One fact about completing the pull request. `unknown` is a first-class
- * state, drawn and worded as such: a fact n10 has not read is never shown
- * as met.
+ * One fact about completing the pull request, and what n10 can say about
+ * its effect.
+ *
+ * `met`, `blocked` and `waiting` are verdicts, and need the provider's
+ * own requirement signal: a draft cannot be merged, and says so itself.
+ * The list row carries no branch rules or policies, so what it shows —
+ * an approval, a failing check — is `observed` (or a `concern`, when it
+ * is a problem): a fact whose weight n10 cannot read, never shown as
+ * satisfying or blocking anything. `unknown` is what n10 has not read.
  */
-export type ReadinessState = 'met' | 'blocked' | 'waiting' | 'unknown';
+export type ReadinessState =
+  | 'met'
+  | 'blocked'
+  | 'waiting'
+  | 'concern'
+  | 'observed'
+  | 'unknown';
 
 export interface ReadinessRow {
-  id: 'lifecycle' | 'reviews' | 'checks' | 'conflicts' | 'merge';
+  id: 'lifecycle' | 'reviews' | 'checks' | 'unknown';
   label: string;
   state: ReadinessState;
   text: string;
 }
 
 export interface Readiness {
-  /** The strongest blocker, or why readiness cannot be stated. */
-  headline: { state: ReadinessState; text: string };
+  /** A verdict n10 can stand behind, or "not fully known" with the
+   *  visible problems beside it. */
+  headline: { state: ReadinessState; text: string; detail: string | null };
   rows: ReadinessRow[];
 }
 
+/** Where the reviews stand, in the provider's words. A declined
+ *  request asks nothing more. */
 function reviewsRow(pr: PullRequestInfo): ReadinessRow {
-  const reviewers = pr.reviewers ?? [];
+  const reviewers = (pr.reviewers ?? []).filter(
+    (r) => r.decision !== 'declined'
+  );
   const row = { id: 'reviews' as const, label: 'Reviews' };
-  const blocking = reviewers.filter((r) => isBlockingDecision(r.decision));
-  if (blocking.length > 0) {
-    return {
-      ...row,
-      state: 'blocked',
-      text: `Changes requested by ${names(blocking)}`,
-    };
+  const holding = holdingVerdict(reviewers);
+  if (holding) return { ...row, state: 'concern', text: holding };
+  if (reviewers.length === 0) {
+    return { ...row, state: 'observed', text: 'No reviewers requested' };
   }
   const approved = reviewers.filter((r) => r.decision === 'approved');
-  if (approved.length > 0) {
-    return { ...row, state: 'met', text: `Approved by ${names(approved)}` };
-  }
-  return {
-    ...row,
-    state: 'waiting',
-    text: reviewers.length > 0 ? 'No verdicts yet' : 'No reviewers requested',
-  };
+  const pending = reviewers.length - approved.length;
+  const text =
+    approved.length === 0
+      ? `${pending} pending`
+      : pending === 0
+      ? `Approved by ${names(approved)}`
+      : `Approved by ${names(approved)} · ${pending} pending`;
+  return { ...row, state: 'observed', text };
 }
 
+/** GitHub's rollup and Azure's statuses carry only what reported: a
+ *  required check that never ran is absent, and a failing one may be
+ *  optional. */
 const CHECKS: Record<
   NonNullable<PullRequestInfo['buildStatus']>,
   Pick<ReadinessRow, 'state' | 'text'>
 > = {
-  succeeded: { state: 'met', text: 'Checks passing' },
-  failed: { state: 'blocked', text: 'Checks failing' },
-  pending: { state: 'waiting', text: 'Checks running' },
-  none: { state: 'unknown', text: 'No checks reported' },
+  succeeded: { state: 'observed', text: 'Reported checks pass' },
+  failed: { state: 'concern', text: 'Failing' },
+  pending: { state: 'observed', text: 'Running' },
+  none: { state: 'unknown', text: 'None reported' },
 };
 
 export function readiness(pr: PullRequestInfo): Readiness {
@@ -225,16 +299,10 @@ export function readiness(pr: PullRequestInfo): Readiness {
     reviewsRow(pr),
     { id: 'checks', label: 'Checks', ...CHECKS[pr.buildStatus ?? 'none'] },
     {
-      id: 'conflicts',
-      label: 'Conflicts',
+      id: 'unknown',
+      label: 'Unknown',
       state: 'unknown',
-      text: 'Not checked yet',
-    },
-    {
-      id: 'merge',
-      label: 'Policies',
-      state: 'unknown',
-      text: 'Branch policies and merge permission are not read yet',
+      text: 'Conflicts, branch policies and merge permission are not visible to n10',
     },
   ];
   return { headline: headline(pr, rows), rows };
@@ -244,9 +312,12 @@ function headline(
   pr: PullRequestInfo,
   rows: readonly ReadinessRow[]
 ): Readiness['headline'] {
-  if (pr.isDraft)
-    return { state: 'waiting', text: 'Draft: not ready to merge' };
-  const blocked = rows.find((r) => r.state === 'blocked');
-  if (blocked) return { state: 'blocked', text: blocked.text };
-  return { state: 'unknown', text: 'Readiness not fully known' };
+  const concerns = rows
+    .filter((r) => r.state === 'concern')
+    .map((r) => (r.id === 'checks' ? 'Checks failing' : r.text));
+  const detail = concerns.length > 0 ? concerns.join(' · ') : null;
+  if (pr.isDraft) {
+    return { state: 'waiting', text: 'Draft: not ready to merge', detail };
+  }
+  return { state: 'unknown', text: 'Readiness not fully known', detail };
 }

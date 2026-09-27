@@ -29,6 +29,18 @@ import { useComposerRefresh } from './use-composer-refresh.js';
  * Resolved threads start collapsed to the header; `focused` (thread
  * navigator / comment list) expands and outlines the card.
  */
+/** Nothing has focus, or what has it can no longer be seen. Checked
+ *  as the pane that held it is hidden, before the browser moves focus
+ *  to the page itself. */
+function focusIsLost(): boolean {
+  const active = document.activeElement;
+  return (
+    !(active instanceof HTMLElement) ||
+    active === document.body ||
+    !active.checkVisibility({ visibilityProperty: true })
+  );
+}
+
 export function ThreadCard({
   thread,
   prId,
@@ -72,8 +84,13 @@ export function ThreadCard({
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (focused)
-      ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (!focused) return;
+    ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    // Keyboard focus that is lost on the way here — the Overview's
+    // button goes hidden as it opens the diff — lands on the thread it
+    // asked for. Focus that is somewhere visible, such as a rail row
+    // being arrowed through, stays there.
+    if (focusIsLost()) ref.current?.focus({ preventScroll: true });
   }, [focused]);
 
   // The notice belongs to a composer the reader can actually see. The
@@ -125,8 +142,9 @@ export function ThreadCard({
     <div
       ref={ref}
       data-thread={thread.id}
+      tabIndex={-1}
       className={cn(
-        'group/card max-w-[900px] overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs transition-shadow',
+        'group/card max-w-[900px] overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs transition-shadow outline-none',
         planControls.inPlan
           ? 'border-primary/40'
           : thread.isResolved

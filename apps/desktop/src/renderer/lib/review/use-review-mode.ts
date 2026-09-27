@@ -1,6 +1,16 @@
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  useCallback,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import type { PullRequestInfo } from '@n10/vcs-core/types';
-import { initialMode, reviewRole } from './overview-model.js';
+import {
+  adoptPullRequest,
+  initialMode,
+  reviewRole,
+  type PaneState,
+} from './overview-model.js';
 import { focusesAgent, type AgentPresence, type Mode } from './review-model.js';
 
 /**
@@ -29,7 +39,8 @@ function useAgentFocus(next: AgentPresence, onFocusAgent: () => void): void {
  * The pane a review workspace shows. It opens where {@link initialMode}
  * says — the Overview for someone else's pull request, the diff for
  * your own, the terminal while an agent runs — and after that changes
- * only when the reader picks a pane or an agent takes it over.
+ * only when the reader picks a pane, an agent takes it over, or the
+ * pull request itself arrives before either has happened.
  */
 export function useReviewMode({
   pr,
@@ -40,13 +51,26 @@ export function useReviewMode({
   viewer: string | null;
   agent: AgentPresence;
 }): [Mode, Dispatch<SetStateAction<Mode>>] {
-  const [mode, setMode] = useState<Mode>(() =>
+  const hasPr = pr != null;
+  const initial = () =>
     initialMode({
       running: agent.running,
-      hasPr: pr != null,
+      hasPr,
       role: pr ? reviewRole(pr, viewer) : 'author',
-    })
-  );
+    });
+  const [pane, setPane] = useState<PaneState>(() => ({
+    mode: initial(),
+    chosen: false,
+    hasPr,
+  }));
+  if (pane.hasPr !== hasPr) setPane(adoptPullRequest(pane, hasPr, initial()));
+  const setMode = useCallback((next: SetStateAction<Mode>) => {
+    setPane((p) => ({
+      ...p,
+      mode: typeof next === 'function' ? next(p.mode) : next,
+      chosen: true,
+    }));
+  }, []);
   useAgentFocus(agent, () => setMode('agent'));
-  return [mode, setMode];
+  return [pane.mode, setMode];
 }

@@ -28,16 +28,27 @@ function MarkdownParagraph(props: ComponentProps<'div'>) {
   return <div className="my-1.5" {...props} />;
 }
 
+// A table keeps its columns and scrolls inside the text column, rather
+// than spilling over whatever sits beside it.
+function MarkdownTable(props: ComponentProps<'table'>) {
+  return (
+    <div className="max-w-full overflow-x-auto">
+      <table {...props} />
+    </div>
+  );
+}
+
 const MARKDOWN_COMPONENTS = {
   img: CommentImage,
   a: ExternalAnchor,
   p: MarkdownParagraph,
   code: MarkdownCode,
+  table: MarkdownTable,
 };
 
 export function CommentMarkdown({ markdown }: { markdown: string }) {
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none text-base leading-relaxed prose-p:my-1.5 prose-pre:my-2 prose-pre:text-sm prose-code:before:content-none prose-code:after:content-none prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-a:text-primary prose-headings:my-2 prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-h4:text-base prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-table:my-2 prose-th:py-1 prose-th:px-2 prose-td:py-1 prose-td:px-2 prose-blockquote:my-2 prose-blockquote:border-l-border prose-hr:my-3">
+    <div className="prose prose-sm dark:prose-invert max-w-none break-words text-base leading-relaxed prose-p:my-1.5 prose-pre:my-2 prose-pre:text-sm prose-code:before:content-none prose-code:after:content-none prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-a:text-primary prose-headings:my-2 prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-h4:text-base prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-table:my-2 prose-th:py-1 prose-th:px-2 prose-td:py-1 prose-td:px-2 prose-blockquote:my-2 prose-blockquote:border-l-border prose-hr:my-3">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={MARKDOWN_COMPONENTS}
