@@ -12,12 +12,14 @@ import type {
   ReviewVerdict,
   BuildStatusState,
   RepositoryRef,
+  PullRequestChecks,
   PullRequestDetail,
 } from '@n10/vcs-core';
 import { sanitizeBody, VcsError } from '@n10/vcs-core';
 import { classifyGhError, parseGhJson } from './gh-errors.js';
 import { ghGraphQL } from './gh-graphql.js';
 import { mapReviewState } from './gh-reviews.js';
+import { fetchPullRequestChecksGitHub } from './pr-checks.js';
 import { fetchPullRequestDetailGitHub } from './pr-details.js';
 
 // ── gh CLI transport ──────────────────────────────────────────────
@@ -728,6 +730,20 @@ export const githubProvider: VcsProvider = {
       );
     }
     return fetchPullRequestDetailGitHub(owner, repo, prId);
+  },
+
+  fetchPullRequestChecks(
+    _auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestChecks> {
+    const { owner, repo } = project;
+    if (!owner || !repo) {
+      return Promise.reject(
+        new VcsError('not-found', 'No GitHub repository is configured')
+      );
+    }
+    return fetchPullRequestChecksGitHub(owner, repo, prId);
   },
 
   async fetchMergedBranches(

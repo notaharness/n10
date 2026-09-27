@@ -1,3 +1,4 @@
+import type { PullRequestChecks } from './pr-checks.js';
 import type { PullRequestDetail, RepositoryRef } from './pr-details.js';
 
 export type ReviewDecision =
@@ -192,6 +193,15 @@ export interface VcsProvider {
     project: Record<string, string>,
     prId: number
   ): Promise<PullRequestDetail>;
+
+  /** What stands between one pull request and completion, read on
+   *  demand: its head's checks, the target's rules, and the provider's
+   *  reading of mergeability and reviews. */
+  fetchPullRequestChecks?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestChecks>;
 
   /** Cast the current user's review verdict on a PR. */
   submitReviewVerdict?(
