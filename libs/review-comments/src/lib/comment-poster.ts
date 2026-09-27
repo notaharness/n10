@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { authHeaders, baseUrl } from '@n10/vcs-azure-devops';
+import { authHeaders, baseUrl, invalidatePr } from '@n10/vcs-azure-devops';
 import type { ReviewComment } from './types.js';
 import {
   formatConventionalComment,
@@ -175,5 +175,9 @@ async function postAzureDevOps(
       const text = await response.text();
       throw new Error(`Azure DevOps API ${response.status}: ${text}`);
     }
+    // The provider caches the thread list; without this the new thread
+    // stays out of the review workspace and the sidebar's count until
+    // the entry lapses and something happens to read it again.
+    invalidatePr(config, ctx.prId);
   }
 }

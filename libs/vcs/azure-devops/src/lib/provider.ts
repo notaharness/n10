@@ -64,16 +64,17 @@ function toAdoConfig(
   };
 }
 
-/** Everything the transport has cached about one pull request. Called
- *  after a write so the change is visible immediately rather than at
- *  the end of the entry's TTL.
+/** Forget everything the transport has cached about one pull request.
+ *  Called after a write so the change is visible immediately rather
+ *  than at the end of the entry's TTL — by the draft poster in
+ *  `@n10/review-comments` too, which creates threads outside this file.
  *
  *  Exact keys, not prefixes: `.../threads/1` is a prefix of
  *  `.../threads/10`, so replying on pull request 1 would otherwise
  *  drop the cached threads of 10 through 19 and 100 through 199 too.
  *  The individual-thread keys carry a further segment, so those are
  *  the one place a prefix is meant — and it ends at the separator. */
-function invalidatePr(config: AdoConfig, prId: number): void {
+export function invalidatePr(config: AdoConfig, prId: number): void {
   const repo = `${config.org}/${config.project}/${config.repo}`;
   // The memo too, or the sidebar's comment badge would keep the count
   // from before the write for the rest of its life.
