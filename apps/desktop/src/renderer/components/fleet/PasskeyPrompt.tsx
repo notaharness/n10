@@ -12,25 +12,22 @@ import { Button } from '../ui/button.js';
 export function PasskeyPrompt({ url }: { url: string }) {
   const summary = ceremonySummary(url);
   return (
-    <div className="flex flex-wrap gap-4">
+    <div className="flex flex-wrap justify-center gap-2">
       <QrCode value={url} />
-      <div className="min-w-0 flex-1 basis-64 space-y-3 text-sm">
+      <div className="min-w-0 flex-1 basis-48 space-y-2 text-base">
         {summary && (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
             <dt className="text-muted-foreground">Action</dt>
             <dd className="break-words">{summary.action}</dd>
             <dt className="text-muted-foreground">Machine</dt>
             <dd className="break-words">{summary.machine}</dd>
-            <dt className="text-muted-foreground">Machine fingerprint</dt>
+            <dt className="text-muted-foreground">Fingerprint</dt>
             <dd className="font-mono select-all">{summary.fingerprint}</dd>
           </dl>
         )}
-        <p>
-          Compare the action, machine name and machine fingerprint with the
-          browser page. Continue only if you started this request.
-        </p>
+        <p>Check the action, machine and fingerprint on the page.</p>
         <p
-          className="truncate font-mono text-xs text-muted-foreground select-all"
+          className="truncate font-mono text-sm text-muted-foreground select-all"
           title={url}
           data-testid="ceremony-url"
         >
@@ -51,8 +48,7 @@ export function PasskeyPrompt({ url }: { url: string }) {
           </Button>
         </div>
         <p className="text-muted-foreground">
-          Each passkey request expires after five minutes. Do not share this
-          link or QR code. Anyone who sees it can answer this request first.
+          Keep this link private. It expires in 5 minutes.
         </p>
       </div>
     </div>

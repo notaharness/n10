@@ -1,0 +1,47 @@
+---
+title: Work on several branches at once
+description: Each worktree gets its own checkout and agent session.
+---
+
+Each branch you work on in n10 gets its own Git worktree and agent session.
+Switch between them from the sidebar. There's nothing to stash, and agents
+never edit your main checkout.
+
+- **New branch**: press `⌘N` (`Ctrl+N` on Linux), type the branch name and
+  choose **Create branch … and open a worktree**.
+- **Existing branch or pull request**: find it in the command palette under
+  **Check out branch**, or right-click its row in the sidebar and choose
+  **Check out as worktree**.
+
+A session belongs to the worktree's directory, not to its branch name. If
+you switch or rename the branch inside a worktree, its agent session stays
+with that worktree.
+
+## What the sidebar shows
+
+Each worktree's row shows its pull request, CI checks, review status and
+conflicts. The status turns red when a check fails or a reviewer asks
+for changes, and solid green when checks pass and every reviewer approves.
+
+Open a worktree before it has a pull request to see its changes: the diff
+covers commits, uncommitted edits and untracked files against the base
+branch.
+
+## Keeping worktrees current
+
+On each sync, n10 fetches from origin and fast-forwards your default branch,
+using `git merge --ff-only` if that branch is checked out in your main
+checkout. It also checks each worktree for conflicts and looks for merged
+pull requests. **Sync Interval** and **Auto Delete on Merge** in
+[Settings](/docs/configuration) control this.
+
+n10 Desktop doesn't rebase worktrees. In the terminal UI, `u` rebases the
+selected worktree onto origin's default branch, not the pull request's
+target branch, and aborts the rebase if it conflicts.
+
+## Removing a worktree
+
+Right-click it and choose **Remove worktree…**. This stops its agent,
+removes the worktree directory and deletes its local branch. If removal
+isn't safe, for example because of uncommitted changes, the dialog says why
+and offers **Force remove** where n10 allows it.

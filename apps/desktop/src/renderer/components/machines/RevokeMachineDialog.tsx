@@ -1,9 +1,6 @@
-import type {
-  CeremonyOutcome,
-  MachineView,
-} from '../../../host/contract-machines.js';
+import type { MachineView } from '../../../host/contract-machines.js';
 import { useFleet } from '../../lib/fleet/fleet-context.js';
-import { publicationText } from '../../lib/fleet/publication.js';
+import { FocusScope } from '../../lib/fleet/use-focus-on-mount.js';
 import { fingerprintGroups } from '../../lib/machines/machine-model.js';
 import { CeremonyFailure } from '../fleet/CeremonyFailure.js';
 import { CeremonyProgress } from '../fleet/CeremonyProgress.js';
@@ -16,27 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog.js';
-
-function Revoked({
-  machine,
-  outcome,
-}: {
-  machine: MachineView;
-  outcome: Extract<CeremonyOutcome, { op: 'revoke' }>;
-}) {
-  const published = useFleet().publication.isPublished(outcome);
-  const label = machine.label;
-  const n = outcome.acknowledgedBy;
-  return (
-    <div role="status" className="space-y-1 text-sm">
-      <p className="font-medium">Revoked {label} on this machine.</p>
-      <p className="text-muted-foreground">{publicationText(published)}</p>
-      <p className="text-muted-foreground">
-        Acknowledged by {n} peers. Offline peers learn when they connect.
-      </p>
-    </div>
-  );
-}
 
 /** The dialog's body: the warning, the ceremony, or how it ended. */
 function RevokeBody({
@@ -65,31 +41,19 @@ function RevokeBody({
       />
     );
   }
-  if (outcome?.ok && outcome.op === 'revoke') {
-    return (
-      <>
-        <Revoked machine={machine} outcome={outcome} />
-        <DialogFooter>
-          <Button onClick={onClose}>Close</Button>
-        </DialogFooter>
-      </>
-    );
-  }
   return (
     <>
       <p className="text-sm">
-        Permanently remove {label} from this fleet. Your passkey signs the
-        revocation. Connections to this machine close; offline peers learn when
-        they reconnect. This does not erase files or guarantee that programs on
-        that machine stop. A revoked machine needs a new node identity to
-        return; fleet reset alone keeps its identity.
+        Permanently revoke {label}’s access. Offline machines update when they
+        reconnect. Files and running programs stay on that machine. Resetting
+        its fleet won’t let it rejoin.
       </p>
       <DialogFooter>
         <Button variant="ghost" onClick={onClose}>
           Cancel
         </Button>
         <Button variant="destructive" onClick={revoke}>
-          Continue to passkey
+          Revoke access
         </Button>
       </DialogFooter>
     </>
@@ -117,13 +81,15 @@ export function RevokeMachineDialog({ machine }: { machine: MachineView }) {
         <DialogHeader>
           <DialogTitle>Revoke {machine.label}</DialogTitle>
           <DialogDescription>
-            Machine fingerprint{' '}
+            Fingerprint{' '}
             <span className="font-mono text-foreground select-all">
               {fingerprintGroups(machine.peerId)}
             </span>
           </DialogDescription>
         </DialogHeader>
-        <RevokeBody machine={machine} revoke={revoke} onClose={onClose} />
+        <FocusScope>
+          <RevokeBody machine={machine} revoke={revoke} onClose={onClose} />
+        </FocusScope>
       </DialogContent>
     </Dialog>
   );

@@ -5,7 +5,7 @@ working rules; this document explains constraints that are easy to miss.
 
 ## Shared operations and entry points
 
-Core owns sequences of git, filesystem, PTY, config and provider calls.
+Core owns sequences of Git, filesystem, PTY, config and provider calls.
 App-core supplies React bindings; shells own presentation. The desktop renderer
 cannot use Node APIs and accesses core's plan through `@n10/core/plan`.
 Keep that entry browser-safe and the core/app-core barrels separate.
@@ -206,7 +206,7 @@ measures the actual font and padding; the first fit corrects startup estimates.
 The host serves one repository at a time; the tab strip can contain several.
 Activating a foreign tab opens its repository through `useRepoFollowsTabs`.
 Use canonical real paths for repository identity so symlinked paths cannot
-produce duplicate tabs or disagree with git and tmux names.
+produce duplicate tabs or disagree with Git and tmux names.
 
 `TabsProvider` lives above the repository gate because `Workspace` remounts on
 switch. Keep one reconciliation step: `Workspace` sends `sync-items` to the pure
@@ -264,7 +264,7 @@ only after the agent has been idle for thirty seconds. Start agents with `seed`,
 not `continue-or-seed`, which may discard the prompt. Use `checkoutWorktree` for
 an existing branch: inventing one from HEAD would send work to the wrong commit.
 
-Pass `cwd` to every git operation and check `live()` after awaits. Serialize
+Pass `cwd` to every Git operation and check `live()` after awaits. Serialize
 fetches through `sync/fetch-queue.ts`; invalidate reused refs when the head moves.
 Use `sync/conflicts.ts` for both the badge and briefing. The worktree resolver is
 process-global, so check liveness immediately before checkout as well.
@@ -318,12 +318,12 @@ include index, working tree and untracked files. Build untracked patches without
 worktrees; do not recursively watch a checkout and exhaust inotify on dependencies.
 
 Whole-file context (`-U99999`) supports comments on unchanged lines; fold it in
-the viewer. Stream git output with `runGit`, which preserves partial output and
+the viewer. Stream Git output with `runGit`, which preserves partial output and
 reports truncation rather than discarding the entire buffer on overflow.
 
 Bound worktree diffs before expensive reads. Use `lstat` for symlinks, churn to
 bound deleted files, and exclude both paths of an oversized rename. A content-free
-rename only needs headers. Size untracked files before reading, respect git ignores,
+rename only needs headers. Size untracked files before reading, respect Git ignores,
 and render symlinks as mode-120000 patches without following them. Trim total-output
 overruns at complete file boundaries. The PR path retains files because review
 comments depend on them. Git-backed regression cases live in
@@ -338,6 +338,13 @@ state. Open ancestors only for new or changed files.
 Ink passes `TerminalEmulator` ANSI through `<Text>`; raw stdin forwards to the
 PTY. Strip CI-related variables when spawning the interactive TUI. The serve
 target sets `TSX_TSCONFIG_PATH` for automatic JSX transformation.
+
+Selecting a sidebar row remounts `MainTabBody`, which is keyed by the selected
+item, and Ink subscribes `useInput` in a passive effect. Until that effect runs,
+a key still reaches the previous body's handler and acts on the old selection.
+Ink 7's `useEffectEvent`-based `useInput` closes that window for re-renders but
+not for a remount. Tests that act on a new selection wait for the remounted
+pane's `(loading...)` placeholder to clear first (`active-tabs.test.ts`).
 
 The wterm host keeps the PTY alive across WebSocket reconnects and replays a ring
 buffer. Use one build script for server and client to avoid output-directory

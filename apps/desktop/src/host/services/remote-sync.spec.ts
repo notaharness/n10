@@ -2,15 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as RemoteSyncModule from './remote-sync.js';
 
 /**
- * The sync loop runs git operations — including auto-deleting merged
- * branches — against `process.cwd()`, which the desktop changes when
- * the user opens another repository. A pass that keeps going after a
- * repo switch would therefore run the *old* repo's branch list against
- * the *new* checkout, and a pass that keeps going after quit can exit
- * between removing a worktree and deleting its branch.
+ * A pass names its repository in every git call, but the removal goes
+ * through the worktrees service, which acts on whichever repository is
+ * open. A pass that keeps going after a repo switch must therefore stop
+ * before removing anything, and a pass that keeps going after quit can
+ * exit between removing a worktree and deleting its branch.
  *
  * Both are prevented by a generation counter, and both are what these
- * tests are about.
+ * tests are about, along with each call naming the pass's repository.
  */
 
 /** The verdict core's sweep hands over with a branch to remove. */
@@ -33,6 +32,9 @@ const env = vi.hoisted(() => ({
   /** Arguments of every computeConflictCounts call. */
   conflictCalls: [] as unknown[][],
   synced: [] as unknown[],
+  /** The repository each worktree listing and sweep was asked about. */
+  listed: [] as unknown[],
+  swept: [] as unknown[],
   sweeps: 0,
   removed: [] as { branch: string; approved: unknown }[],
   /** What core's removal answers. */
@@ -73,8 +75,10 @@ vi.mock('@n10/vcs-core', () => ({
 }));
 
 vi.mock('@n10/worktree-manager', () => ({
-  listWorktrees: () =>
-    Promise.resolve(env.branches.map((branch) => ({ branch }))),
+  listWorktrees: (cwd: unknown) => {
+    env.listed.push(cwd);
+    return Promise.resolve(env.branches.map((branch) => ({ branch })));
+  },
 }));
 
 vi.mock('@n10/core', () => ({
@@ -90,8 +94,10 @@ vi.mock('@n10/core', () => ({
       branch: string,
       approved: unknown
     ) => Promise<void>;
+    cwd?: string;
   }) => {
     env.sweeps += 1;
+    env.swept.push(opts.cwd);
     if (env.sweepThrows) throw new Error('provider unreachable');
     if (env.autoDelete) {
       await opts.onAutoDelete(env.autoDelete, env.autoDelete, SWEPT);
@@ -120,6 +126,8 @@ beforeEach(async () => {
   env.prMap = {};
   env.conflictCalls = [];
   env.synced = [];
+  env.listed = [];
+  env.swept = [];
   env.sweeps = 0;
   env.removed = [];
   env.removes = 'removed';
@@ -191,6 +199,17 @@ describe('cancellation', () => {
     await flush();
     expect(env.synced).toEqual(['/repo-a']);
     expect(env.conflictCalls).toEqual([[['feature/a'], env.prMap, '/repo-a']]);
+  });
+
+  // The process's directory follows whichever repository is open; the
+  // listing and the sweep must not.
+  it('lists and sweeps the repository the pass is for', async () => {
+    sync.startRemoteSyncLoop('/repo-b');
+    await flush();
+    env.pending[0](1234);
+    await flush();
+    expect(env.listed).toEqual(['/repo-b']);
+    expect(env.swept).toEqual(['/repo-b']);
   });
 });
 

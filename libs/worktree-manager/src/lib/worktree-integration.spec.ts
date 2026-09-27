@@ -227,6 +227,25 @@ describe('integration: canRemoveBranch', () => {
 
     await removeWorktree('clean-branch');
   });
+  // Named, the repository is where every check looks, even for a
+  // branch with no checkout there: a dirty checkout of the same branch
+  // in the process's repository is not this repository's.
+  it('checks the repository it is given, not the process directory', async () => {
+    const { repoDir: here } = setupGitRepo();
+    const { repoDir: there } = setupGitRepo();
+    process.chdir(here);
+    const path = await createWorktree('shared');
+    writeFileSync(join(path!, 'dirty.txt'), 'uncommitted content');
+    execSync('git branch shared', { cwd: there, stdio: 'pipe' });
+
+    expect(
+      await canRemoveBranch('shared', { confirmedMerged: true, cwd: there })
+    ).toEqual({
+      safe: true,
+    });
+
+    await removeWorktree('shared', { force: true });
+  });
 });
 
 describe('integration: listAllBranches', () => {
@@ -278,7 +297,7 @@ describe('integration: fastForwardMainBranch', () => {
     });
     execSync('git push', { cwd: pushDir, stdio: 'pipe' });
 
-    // git branch -f master fails if HEAD is on master, so switch away
+    // Off master, the update is a local fetch rather than a merge.
     execSync('git checkout -b temp-branch', { cwd: cloneDir, stdio: 'pipe' });
 
     // Record local master before fast-forward
@@ -287,7 +306,9 @@ describe('integration: fastForwardMainBranch', () => {
       encoding: 'utf8',
     }).trim();
 
-    const result = await fastForwardMainBranch();
+    // The caller fetches; fast-forwarding only moves main to what was fetched.
+    execSync('git fetch origin', { cwd: cloneDir, stdio: 'pipe' });
+    const result = await fastForwardMainBranch(cloneDir);
     expect(result).toBe(true);
 
     // Local master should now be ahead of where it was
@@ -328,7 +349,9 @@ describe('integration: fastForwardMainBranch', () => {
       encoding: 'utf8',
     }).trim();
 
-    const result = await fastForwardMainBranch();
+    // The caller fetches; fast-forwarding only moves main to what was fetched.
+    execSync('git fetch origin', { cwd: cloneDir, stdio: 'pipe' });
+    const result = await fastForwardMainBranch(cloneDir);
     expect(result).toBe(true);
 
     // Local master should now be ahead of where it was

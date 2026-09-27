@@ -1,6 +1,13 @@
 import { test, expect } from './fixtures/fake-beam.js';
 import { WORKBOX } from './setup/fake-beam.js';
-import { fleetView, openFleet } from './setup/machines.js';
+import { armContextMenuChoice } from './setup/menu.js';
+import {
+  chooseFleetAction,
+  collapseFleet,
+  fleetToggle,
+  fleetView,
+  openFleet,
+} from './setup/machines.js';
 
 /**
  * Resetting this machine's fleet (beam-fleet-ux.md §3): an explicit,
@@ -21,57 +28,85 @@ test.describe('Reset fleet on this machine', () => {
   }) => {
     const { page } = desktop;
     await openFleet(desktop);
-    await fleetView(page)
-      .getByRole('button', { name: 'Reset fleet on this machine…' })
-      .click();
-    const dialog = page.getByRole('dialog');
+    await chooseFleetAction(page, 'Reset fleet…');
+    const panel = fleetView(page);
     await expect(
-      dialog.getByRole('heading', { name: 'Reset fleet on this machine?' })
-    ).toBeVisible();
+      panel.getByRole('heading', { name: 'Reset fleet here?' })
+    ).toBeFocused();
     await expect(
-      dialog.getByText(
-        /Its machine identity is kept\. Other machines and the fleet passkey are not reset or revoked\./
-      )
+      panel.getByText(/Other machines and your passkey stay unchanged\./)
     ).toBeVisible();
-    const confirm = dialog.getByLabel('Type reset to confirm');
-    const reset = dialog.getByRole('button', { name: 'Reset fleet' });
+    const confirm = panel.getByLabel('Type reset to confirm');
+    const reset = panel.getByRole('button', { name: 'Reset fleet' });
     await expect(reset).toBeDisabled();
     await confirm.fill('Reset');
     await expect(reset).toBeDisabled();
     await confirm.fill('reset ');
     await expect(reset).toBeDisabled();
 
-    await dialog.getByRole('button', { name: 'Cancel' }).click();
-    await expect(dialog).toBeHidden();
+    await panel.getByRole('button', { name: 'Cancel' }).click();
+    await expect(
+      panel.getByRole('heading', { name: 'Reset fleet here?' })
+    ).toHaveCount(0);
     expect(beam!.ops('fleet.reset')).toHaveLength(0);
     await expect(page.getByTestId('machine-row')).toHaveCount(2);
+  });
+
+  test('stays out of the overview, behind the header’s menus', async ({
+    desktop,
+  }) => {
+    const { page, app } = desktop;
+    await openFleet(desktop);
+    await expect(page.getByTestId('machine-row')).toHaveCount(2);
+    await expect(
+      fleetView(page).getByRole('button', { name: /Reset fleet/ })
+    ).toHaveCount(0);
+
+    await collapseFleet(page);
+    await armContextMenuChoice(app, 'Reset fleet…');
+    await fleetToggle(page).click({ button: 'right' });
+    await expect(
+      fleetView(page).getByRole('heading', { name: 'Reset fleet here?' })
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole('complementary')
+        .getByRole('button', { name: 'Fleet actions' })
+    ).toBeEnabled();
+    await page
+      .getByRole('complementary')
+      .getByRole('button', { name: 'Fleet actions' })
+      .click();
+    await expect(
+      page.getByRole('menuitem', { name: 'Reset fleet…' })
+    ).toBeDisabled();
   });
 
   test('resets through beam, then offers to create or join', async ({
     desktop,
     beam,
   }) => {
-    const { page } = desktop;
+    const { page, app } = desktop;
     await openFleet(desktop);
-    await fleetView(page)
-      .getByRole('button', { name: 'Reset fleet on this machine…' })
-      .click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('Type reset to confirm').fill('reset');
-    await dialog.getByLabel('Type reset to confirm').press('Enter');
+    await expect(page.getByTestId('machine-row')).toHaveCount(2);
+    await armContextMenuChoice(app, 'Reset fleet…');
+    await fleetToggle(page).click({ button: 'right' });
+    const panel = fleetView(page);
+    await expect(
+      panel.getByRole('heading', { name: 'Reset fleet here?' })
+    ).toBeFocused();
+    await panel.getByLabel('Type reset to confirm').fill('reset');
+    await panel.getByLabel('Type reset to confirm').press('Enter');
 
     await expect(
-      dialog.getByText(
-        'Fleet reset on this machine. Create a fleet or join one to continue.'
-      )
+      panel.getByRole('button', { name: 'Create a fleet' })
     ).toBeVisible();
     expect(beam!.ops('fleet.reset')).toEqual([
       expect.objectContaining({ confirm: 'reset' }),
     ]);
-    await dialog.getByRole('button', { name: 'Close' }).first().click();
     await expect(
       fleetView(page).getByRole('heading', {
-        name: 'Connect your first machine',
+        name: 'Your machines, together',
       })
     ).toBeVisible();
     await expect(page.getByTestId('machine-row')).toHaveCount(0);
@@ -84,18 +119,35 @@ test.describe('Reset fleet on this machine', () => {
     const { page } = desktop;
     beam!.refuse('fleet.reset', 'storage-failure', 'disk full');
     await openFleet(desktop);
-    await fleetView(page)
-      .getByRole('button', { name: 'Reset fleet on this machine…' })
-      .click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('Type reset to confirm').fill('reset');
-    await dialog.getByRole('button', { name: 'Reset fleet' }).click();
+    // Reset stays disabled until the machines have loaded.
+    await expect(page.getByTestId('machine-row')).toHaveCount(2);
+    await page
+      .getByRole('complementary')
+      .getByRole('button', { name: 'Fleet actions' })
+      .press('Enter');
     await expect(
-      dialog.getByText('Could not reset this machine’s fleet. disk full')
+      page.getByRole('menuitem', { name: 'Copy fleet fingerprint' })
+    ).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(
+      page.getByRole('menuitem', { name: 'Reset fleet…' })
+    ).toBeFocused();
+    await page.keyboard.press('Enter');
+    const panel = fleetView(page);
+    await expect(
+      panel.getByRole('heading', { name: 'Reset fleet here?' })
+    ).toBeFocused();
+    await panel.getByLabel('Type reset to confirm').fill('reset');
+    await panel.getByRole('button', { name: 'Reset fleet' }).click();
+    await expect(
+      panel.getByText(
+        'Couldn’t reset fleet. Couldn’t save. Check disk space and permissions.'
+      )
     ).toBeVisible();
-    await expect(dialog.getByLabel('Type reset to confirm')).toHaveValue(
+    await expect(panel.getByLabel('Type reset to confirm')).toHaveValue(
       'reset'
     );
+    await panel.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByTestId('machine-row')).toHaveCount(2);
   });
 });
@@ -112,22 +164,87 @@ test.describe('after creating a fleet', () => {
     await expect(view.getByTestId('ceremony-url')).toBeVisible();
     beam!.nextPasskeyStep();
     beam!.finishCeremony();
-    await expect(
-      view.getByRole('heading', { name: 'Fleet created' })
-    ).toBeVisible();
+    await expect(page.getByTestId('machine-row')).toHaveCount(1);
 
-    await view
-      .getByRole('button', { name: 'Reset fleet on this machine…' })
-      .click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('Type reset to confirm').fill('reset');
-    await dialog.getByRole('button', { name: 'Reset fleet' }).click();
-    await dialog.getByRole('button', { name: 'Close' }).first().click();
+    await chooseFleetAction(page, 'Reset fleet…');
+    const panel = fleetView(page);
+    await panel.getByLabel('Type reset to confirm').fill('reset');
+    await panel.getByRole('button', { name: 'Reset fleet' }).click();
     await expect(
-      view.getByRole('heading', { name: 'Connect your first machine' })
+      view.getByRole('heading', { name: 'Your machines, together' })
     ).toBeVisible();
     await expect(
       view.getByRole('heading', { name: 'Fleet created' })
     ).toHaveCount(0);
+  });
+});
+
+test.describe('Reset fleet while the machines cannot load', () => {
+  // A refused listing also drops the connection (the client then
+  // reconnects), so this covers the shared guard, not one clause of it.
+  test.use({
+    beamScenario: {
+      enrolled: true,
+      peers: [{ peerId: WORKBOX, label: 'workbox' }],
+      refused: ['peers'],
+    },
+  });
+
+  test('is disabled while the machines cannot be listed; copying still works', async ({
+    desktop,
+  }) => {
+    const { page, app } = desktop;
+    await openFleet(desktop);
+    await expect(
+      fleetView(page).getByText('Could not load machines.')
+    ).toBeVisible();
+    const side = page.getByRole('complementary');
+    await expect(
+      side.getByRole('button', { name: 'Add a machine' })
+    ).toBeDisabled();
+
+    await side.getByRole('button', { name: 'Fleet actions' }).click();
+    await expect(
+      page.getByRole('menu', { name: /3f9a 0c4e 7d12 e805/ })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('menuitem', { name: 'Reset fleet…' })
+    ).toBeDisabled();
+    await page
+      .getByRole('menuitem', { name: 'Copy fleet fingerprint' })
+      .click();
+    await expect
+      .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+      .toBe('3f9a 0c4e 7d12 e805');
+
+    await page.keyboard.press('Escape');
+    await armContextMenuChoice(app, 'Copy fleet fingerprint');
+    await app.evaluate(({ clipboard }) => clipboard.writeText(''));
+    await fleetToggle(page).click({ button: 'right' });
+    await expect
+      .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+      .toBe('3f9a 0c4e 7d12 e805');
+    // The native menu's reset is disabled too: picking it throws.
+    await armContextMenuChoice(app, 'Reset fleet…');
+    const refused = app.evaluate(
+      ({ Menu }) =>
+        new Promise<string>((resolve) => {
+          const proto = Menu.prototype as unknown as {
+            popup: (opts?: { callback?: () => void }) => void;
+          };
+          const armed = proto.popup;
+          proto.popup = function (this: Electron.Menu, opts) {
+            try {
+              armed.call(this, opts);
+              resolve('picked');
+            } catch (err) {
+              resolve(String(err));
+              opts?.callback?.();
+            }
+          };
+        })
+    );
+    await fleetToggle(page).click({ button: 'right' });
+    expect(await refused).toContain('"Reset fleet…" is disabled');
   });
 });
