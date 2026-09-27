@@ -1,5 +1,4 @@
-import { ArrowDownIcon, SearchIcon, XIcon } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   PullRequestConversation,
   PullRequestRef,
@@ -17,14 +16,13 @@ import {
   type ActivityFilter,
 } from '../../../lib/review/activity-model.js';
 import { useRepo } from '../../../lib/repo-context.js';
-import { cn } from '../../../lib/utils.js';
-import { Button } from '../../ui/button.js';
-import { Input } from '../../ui/input.js';
 import { Skeleton } from '../../ui/skeleton.js';
 import { ToggleGroup, ToggleGroupItem } from '../../ui/toggle-group.js';
 import { ReadFailure, StaleNotice } from '../ReadNotice.js';
 import { ActivityRowView } from './ActivityEntries.js';
+import { EmptyActivity, NewUpdates, SearchBox } from './ActivityControls.js';
 import { CoverageNotice } from './CoverageNotice.js';
+import { NewSince } from './new-since.js';
 
 /**
  * The Overview's activity: every review, comment, thread and event on
@@ -141,6 +139,11 @@ function Activity({
   const [seen, setSeen] = useState<ReadonlySet<string>>(
     () => new Set(entries.map((e) => e.id))
   );
+  // Every comment there was when the reader arrived; the rest are new.
+  const [known] = useState<ReadonlySet<string>>(
+    () => new Set(commentIds(conversation))
+  );
+  const isNew = useCallback((id: string) => !known.has(id), [known]);
   const { shown, held } = splitNew(entries, seen, viewer);
   const list = useRef<HTMLOListElement>(null);
   // Showing new updates moves the reader to the first of them, so focus
@@ -167,7 +170,7 @@ function Activity({
   });
 
   return (
-    <>
+    <NewSince.Provider value={isNew}>
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
         <ActivityHeading count={shown.length} />
         <ToggleGroup
@@ -224,92 +227,13 @@ function Activity({
           reveal.current = arrived[0]?.id ?? null;
         }}
       />
-    </>
+    </NewSince.Provider>
   );
 }
 
-function SearchBox({
-  query,
-  onChange,
-}: {
-  query: string;
-  onChange: (q: string) => void;
-}) {
-  return (
-    <div className="relative mb-3 ml-auto w-56 min-w-40">
-      <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        type="search"
-        value={query}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape' && query) {
-            e.stopPropagation();
-            onChange('');
-          }
-        }}
-        placeholder="Search activity"
-        aria-label="Search activity"
-        className="h-6 pl-7 pr-6 text-sm [&::-webkit-search-cancel-button]:hidden"
-      />
-      {query && (
-        <button
-          type="button"
-          aria-label="Clear search"
-          onClick={() => onChange('')}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded text-muted-foreground hover:text-foreground"
-        >
-          <XIcon className="size-3.5" />
-        </button>
-      )}
-    </div>
-  );
-}
-
-function EmptyActivity({
-  narrowed,
-  onClear,
-}: {
-  narrowed: boolean;
-  onClear: () => void;
-}) {
-  if (!narrowed) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        No comments, reviews or activity yet.
-      </p>
-    );
-  }
-  return (
-    <p className="flex items-center gap-2 text-sm text-muted-foreground">
-      Nothing matches.
-      <Button variant="link" size="sm" className="h-auto p-0" onClick={onClear}>
-        Clear filters
-      </Button>
-    </p>
-  );
-}
-
-function NewUpdates({ count, onShow }: { count: number; onShow: () => void }) {
-  return (
-    <div
-      aria-live="polite"
-      className={cn(
-        count > 0 &&
-          'pointer-events-none sticky bottom-4 mt-4 flex justify-center'
-      )}
-    >
-      {count > 0 && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onShow}
-          className="pointer-events-auto bg-background shadow-md"
-        >
-          <ArrowDownIcon />
-          {count} new update{count === 1 ? '' : 's'}
-        </Button>
-      )}
-    </div>
-  );
+function commentIds(c: PullRequestConversation): string[] {
+  return [
+    ...c.comments.map((x) => x.id),
+    ...c.threads.flatMap((t) => t.comments.map((x) => x.id)),
+  ];
 }

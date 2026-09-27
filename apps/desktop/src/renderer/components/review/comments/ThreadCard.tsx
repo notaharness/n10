@@ -15,6 +15,7 @@ import {
   threadExpanded,
   threadLocation,
 } from '../../../lib/diff/thread-model.js';
+import { focusIsLost } from '../../../lib/focus.js';
 import { cn, errorMessage, relativeTime } from '../../../lib/utils.js';
 import { Avatar } from '../../ui/avatar.js';
 import { Badge } from '../../ui/badge.js';
@@ -77,8 +78,12 @@ export function ThreadCard({
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (focused)
-      ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (!focused) return;
+    ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    // Keyboard focus lost on the way here — the Overview's link goes
+    // hidden as it opens the diff — lands on the thread it asked for.
+    // Focus somewhere visible, such as a rail row, stays there.
+    if (focusIsLost()) ref.current?.focus({ preventScroll: true });
   }, [focused]);
 
   // The notice belongs to a composer the reader can actually see. The
@@ -130,8 +135,9 @@ export function ThreadCard({
     <div
       ref={ref}
       data-thread={thread.id}
+      tabIndex={-1}
       className={cn(
-        'group/card max-w-[900px] overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs transition-shadow',
+        'group/card max-w-[900px] overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs transition-shadow outline-none focus-visible:ring-2 focus-visible:ring-ring',
         planControls.inPlan
           ? 'border-primary/40'
           : thread.isResolved

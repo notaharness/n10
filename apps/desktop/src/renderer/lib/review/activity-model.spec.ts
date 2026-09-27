@@ -163,18 +163,36 @@ describe('buildActivity', () => {
     expect(entries.map((e) => e.id)).toEqual(['g1', 'c1', 't1', 'r1']);
   });
 
-  it('leaves out a review that says nothing its comments do not', () => {
-    // GitHub files an empty COMMENTED review for each reply from a thread.
+  it('leaves out a review that only carries replies, and keeps one that started threads', () => {
+    const empty = (id: string, at: string): ReviewSummary => ({
+      ...review(id, 'bea', at),
+      state: 'commented',
+      body: ' ',
+    });
+    const of = (id: string, reviewId: string, replyTo: string | null) => ({
+      ...comment(id, 'bea', 'text', T(1)),
+      reviewId,
+      replyTo,
+    });
     const entries = buildActivity(
       conversation({
         reviews: [
-          { ...review('empty', 'bea', T(1)), state: 'commented', body: ' ' },
-          { ...review('said', 'bea', T(2)), state: 'commented' },
-          { ...review('verdict', 'bea', T(3)), body: '' },
+          empty('carrier', T(1)),
+          empty('started', T(2)),
+          { ...review('said', 'bea', T(3)), state: 'commented' },
+          { ...review('verdict', 'bea', T(4)), body: '' },
+        ],
+        threads: [
+          thread('t1', [
+            of('root1', 'started', null),
+            of('re1', 'carrier', 'root1'),
+          ]),
         ],
       })
     );
-    expect(entries.map((e) => e.id)).toEqual(['said', 'verdict']);
+    expect(entries.filter((e) => e.kind === 'review').map((e) => e.id)).toEqual(
+      ['started', 'said', 'verdict']
+    );
   });
 
   it('puts an undated review (the viewer’s pending one) last', () => {

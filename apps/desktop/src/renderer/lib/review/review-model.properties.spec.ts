@@ -226,6 +226,7 @@ const rowList = fc
         where: 'w',
         preview: 'p',
         resolved: x.resolved,
+        resolvable: true,
         file: 'src/a.ts',
         line: i,
         fileRank: 0,
