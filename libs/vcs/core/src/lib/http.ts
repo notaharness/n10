@@ -210,3 +210,33 @@ export async function readJsonResponse<T>(
     });
   }
 }
+
+/**
+ * Read a plain-text response, such as a log, or throw a classified
+ * {@link VcsError}. The status rules are the JSON reader's; an HTML body
+ * is never the text an API meant, so it is classified the same way too.
+ */
+export async function readTextResponse(
+  res: Response,
+  opts: JsonResponseOptions
+): Promise<string> {
+  const fromStatus = errorFromStatus(res, opts);
+  if (fromStatus) throw fromStatus;
+
+  const body = await res.text();
+  const contentType = res.headers.get('content-type') ?? '';
+  if (contentType.toLowerCase().includes('html')) {
+    throw errorFromNonJsonBody(res, body, opts);
+  }
+  if (!res.ok) {
+    const detail = apiMessage(body);
+    throw new VcsError(
+      'server',
+      detail
+        ? `${opts.providerName}: ${detail}`
+        : serverError(opts.providerName, { status: res.status }).message,
+      { status: res.status }
+    );
+  }
+  return body;
+}

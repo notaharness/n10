@@ -16,6 +16,11 @@
       "import": "./src/lib/types.ts",
       "default": "./src/lib/types.ts"
     },
+    "./ci": {
+      "types": "./src/lib/ci.ts",
+      "import": "./src/lib/ci.ts",
+      "default": "./src/lib/ci.ts"
+    },
     "./package.json": "./package.json"
   },
   "nx": {

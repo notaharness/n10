@@ -7,3 +7,4 @@ export * from './lib/http.js';
 export * from './lib/request-cache.js';
 export * from './lib/request-stats.js';
 export * from './lib/throttle-gate.js';
+export * from './lib/ci.js';

@@ -1,0 +1,72 @@
+{
+  "jobs": [
+    {
+      "completed_at": "2026-09-26T20:37:48Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173260/job/108482497205",
+      "id": 108482497205,
+      "name": "Check for changelog entry",
+      "started_at": "2026-09-26T20:37:44Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:45Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:44Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:46Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v6",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:45Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:46Z",
+          "conclusion": "success",
+          "name": "Fetch PR base",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:46Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:47Z",
+          "conclusion": "success",
+          "name": "Get PR submitter",
+          "number": 4,
+          "started_at": "2026-09-26T20:37:46Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:47Z",
+          "conclusion": "success",
+          "name": "Search for added line in changelog",
+          "number": 5,
+          "started_at": "2026-09-26T20:37:47Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:47Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v6",
+          "number": 10,
+          "started_at": "2026-09-26T20:37:47Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:47Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 11,
+          "started_at": "2026-09-26T20:37:47Z",
+          "status": "completed"
+        }
+      ]
+    }
+  ],
+  "total_count": 1
+}
