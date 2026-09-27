@@ -26,7 +26,9 @@ export function verdictDecision(
  *
  * Azure DevOps rolls a member's vote into every group of theirs on the
  * pull request and names those groups in `votedFor`, so the patched row
- * names them too and a tally counts one vote, as the re-read will.
+ * names them too and a tally counts one vote, as the re-read will. The
+ * groups a row already names stay: `includesViewer` marks only project
+ * teams, and an earlier vote may also have answered for another group.
  * GitHub marks no group as the viewer's, so it adds nothing there.
  */
 export function withViewerVerdict(
@@ -39,12 +41,17 @@ export function withViewerVerdict(
   const groups = reviewers
     .filter((r) => r.includesViewer)
     .map((r) => r.identifier);
-  const voted = groups.length > 0 ? { votedFor: groups } : {};
+  const voted = (already: readonly string[] = []) => {
+    const all = [...new Set([...already, ...groups])];
+    return all.length > 0 ? { votedFor: all } : {};
+  };
   if (reviewers.some(isMe)) {
-    return reviewers.map((r) => (isMe(r) ? { ...r, decision, ...voted } : r));
+    return reviewers.map((r) =>
+      isMe(r) ? { ...r, decision, ...voted(r.votedFor) } : r
+    );
   }
   return [
     ...reviewers,
-    { identifier: viewerIdentifier, displayName: 'You', decision, ...voted },
+    { identifier: viewerIdentifier, displayName: 'You', decision, ...voted() },
   ];
 }
