@@ -23,7 +23,7 @@ const STATE_LABEL: Record<MachineState, string> = {
   connected: 'Connected',
   offline: 'Offline',
   revoked: 'Revoked',
-  'revoked-by-fleet': 'Refuses this machine',
+  'revoked-by-fleet': 'Access revoked',
 };
 
 const STATE_TONE: Record<MachineState, MachineTone> = {
@@ -37,7 +37,7 @@ const STATE_TONE: Record<MachineState, MachineTone> = {
 function routeText(path: string | null): string {
   if (path === 'direct') return 'Direct';
   const region = path?.match(/^relay (.+)$/)?.[1];
-  return region ? `Relay ${region}` : 'Path unknown';
+  return region ? `Relay ${region}` : 'Connecting…';
 }
 
 function secondaryText(machine: MachineView): string {
@@ -46,12 +46,12 @@ function secondaryText(machine: MachineView): string {
       return routeText(machine.path);
     case 'offline':
       return machine.lastSeenAt == null
-        ? 'Not connected yet'
+        ? 'Never connected'
         : `Last seen ${relativeTime(machine.lastSeenAt)}`;
     case 'revoked':
       return '';
     case 'revoked-by-fleet':
-      return 'This machine was revoked from that peer’s fleet view.';
+      return 'This machine’s access was revoked.';
   }
 }
 
@@ -141,6 +141,28 @@ export function hasPeerMachines(machines: readonly MachineView[]): boolean {
 /** A peer still in the fleet: not this machine, not revoked here. */
 export function isFleetMember(machine: MachineView): boolean {
   return !machine.isLocal && machine.state !== 'revoked';
+}
+
+/**
+ * `3 machines`, or `3 machines · 1 offline` / `3 machines · 2 queued`
+ * when something needs attention (offline takes priority over mail
+ * waiting). Counts this machine; `null` with no other machine (D8).
+ */
+export function machinesSummary(
+  machines: readonly MachineView[]
+): { text: string; offline: boolean } | null {
+  if (!hasPeerMachines(machines)) return null;
+  const members = machines.filter(isFleetMember);
+  const offline = members.filter((m) => m.state === 'offline').length;
+  const queued = members.reduce((sum, m) => sum + m.queued, 0);
+  const count = members.length + 1; // + this machine
+  let suffix = '';
+  if (offline > 0) suffix = ` · ${offline} offline`;
+  else if (queued > 0) suffix = ` · ${queued} queued`;
+  return {
+    text: `${count} machine${count === 1 ? '' : 's'}${suffix}`,
+    offline: offline > 0,
+  };
 }
 
 /** Whether a machine can be launched on right now — this machine

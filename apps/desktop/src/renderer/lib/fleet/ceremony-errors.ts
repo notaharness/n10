@@ -12,117 +12,98 @@ interface FailureCopy {
 }
 
 const CAPACITY: FailureCopy = {
-  explanation:
-    'beam reached a capacity limit. Check the details before retrying.',
+  explanation: 'Limit reached. Check the details.',
   actions: ['close'],
 };
 
 const INTERNAL: FailureCopy = {
-  explanation:
-    'beam could not complete this request. Check the details and this machine’s fleet status before retrying.',
+  explanation: 'Couldn’t complete this request. Check Fleet and the details.',
   actions: ['close'],
 };
 
 const CATALOGUE: Record<string, FailureCopy> = {
   'prf-unsupported': {
-    explanation:
-      'The selected passkey did not provide WebAuthn PRF. beam needs this extension to derive the encrypted fleet directory key. Browser, operating system and passkey provider must all support it.',
+    explanation: 'This passkey isn’t supported. Try another browser or device.',
     actions: ['compatibility', 'retry', 'back'],
   },
   'ceremony-cancelled': {
-    explanation:
-      'Passkey request cancelled. No further approval is pending for this request.',
+    explanation: 'Passkey request cancelled.',
     actions: ['retry', 'back'],
   },
   'ceremony-timeout': {
-    explanation:
-      'This passkey request expired after five minutes. Start again to get a new link and QR code.',
+    explanation: 'Request expired. Try again.',
     actions: ['retry'],
   },
   'ceremony-state': {
-    explanation:
-      'beam could not use this ceremony result. The request may be stale, already consumed, or answered with data it cannot decrypt. Check this machine’s fleet status, then start again with a fresh link.',
+    explanation: 'Couldn’t confirm the result. Check Fleet before retrying.',
     actions: ['close', 'retry'],
   },
   'bad-assertion': {
-    explanation:
-      'The passkey request failed or its answer could not be verified. Check the browser’s message, then start again.',
+    explanation: 'Couldn’t verify the passkey. Try again.',
     actions: ['retry'],
   },
   'directory-unavailable': {
-    explanation:
-      'Cannot read the fleet directory. Check the connection to beam.n10.is and try joining again.',
+    explanation: 'Couldn’t reach your fleet. Check your connection and retry.',
     actions: ['retry'],
   },
   'wrong-passkey': {
-    explanation:
-      'This passkey does not unlock the expected fleet. Choose the original fleet passkey using a compatible browser and provider.',
+    explanation: 'Wrong passkey. Choose your fleet’s original passkey.',
     actions: ['retry'],
   },
   busy: {
-    explanation:
-      'Another passkey request is already running. Finish or cancel it where you started it, then try again.',
+    explanation: 'Another request is open. Finish or cancel it first.',
     actions: ['back'],
   },
   'already-enrolled': {
-    explanation:
-      'This machine already belongs to a fleet. Open Fleet to inspect it.',
+    explanation: 'This machine already belongs to a fleet.',
     actions: ['close'],
   },
   'not-enrolled': {
-    explanation:
-      'This machine is not in a fleet. Create or join a fleet first.',
+    explanation: 'Create or join a fleet first.',
     actions: ['close'],
   },
   'revoked-peer': {
-    explanation:
-      'This machine identity has been revoked. Resetting its fleet will not make that identity eligible to rejoin.',
+    explanation: 'Access revoked. Resetting won’t let this machine rejoin.',
     actions: ['close'],
   },
   'unknown-peer': {
-    explanation:
-      'This machine is no longer in the local peer list. Refresh Fleet before trying again.',
+    explanation: 'Machine no longer found. Check Fleet.',
     actions: ['close'],
   },
   'ambiguous-peer': {
-    explanation:
-      'More than one machine matches. Select a machine by its fingerprint.',
+    explanation: 'Names match. Choose by fingerprint.',
     actions: ['close'],
   },
   params: {
-    explanation:
-      'beam rejected these details. Check the machine and fleet names.',
+    explanation: 'Check the machine and fleet names.',
     actions: ['back'],
   },
   'bad-entry': {
-    explanation:
-      'beam rejected an invalid membership record. Check the details before trying again.',
+    explanation: 'Couldn’t verify membership. Check the details.',
     actions: ['back'],
   },
   'storage-failure': {
-    explanation:
-      'beam could not save fleet data. Check available disk space and permissions, then retry.',
+    explanation: 'Couldn’t save. Check disk space and permissions.',
     actions: ['retry'],
   },
   offline: {
-    explanation: 'The machine is offline. Try again after it reconnects.',
+    explanation: 'Machine offline. Retry when it reconnects.',
     actions: ['close'],
   },
   grant: {
-    explanation: 'This machine does not allow that operation.',
+    explanation: 'This machine hasn’t allowed access.',
     actions: ['close'],
   },
   limit: CAPACITY,
   'queue-full': CAPACITY,
   spawn: {
-    explanation:
-      'beam could not start the requested process. Check the details.',
+    explanation: 'Couldn’t start the process. Check the details.',
     actions: ['back'],
   },
   internal: INTERNAL,
   'connection-lost': {
     explanation:
-      'The connection to beam was interrupted. Check Fleet before retrying; the request may have completed.',
+      'Connection lost. Check Fleet before retrying; this may have completed.',
     actions: ['close'],
   },
 };
@@ -135,9 +116,9 @@ export function failureCopy(code: string): FailureCopy {
 /** A PRF failure while joining or revoking: the fix is a supported
  *  provider for the same passkey, not a new one. */
 export const SAME_PASSKEY_NOTE =
-  'Use the same fleet passkey; a new passkey creates a different fleet.';
+  'Use the same fleet passkey. A new one creates a different fleet.';
 
 /** Shown on top of any failure of a fleet's creation once its first
  *  passkey prompt was offered: a passkey may already exist. */
 export const CREATE_FAILURE_NOTE =
-  'If you saved a passkey before this stopped, it may still be in your passkey manager. It does not mean a fleet was created. Check this machine’s status before trying again.';
+  'A passkey may have been saved. Check Fleet before trying again.';

@@ -14,7 +14,7 @@ import {
   type BeamMachine,
   type Testkit,
 } from './setup/beam-testkit.js';
-import { leaveFleet, openFleet } from './setup/machines.js';
+import { collapseFleet, openFleet } from './setup/machines.js';
 import { findN10SessionFor } from './setup/tmux.js';
 
 /** `laptop` is the daemon in the fixture HOME, which the app finds;
@@ -50,12 +50,12 @@ const test = base.extend<{
 async function formFleet(page: Page, workbox: BeamMachine): Promise<void> {
   await openFleet({ page });
   await page.getByRole('button', { name: 'Create a fleet' }).click();
-  await page.getByLabel('This machine’s name').fill('laptop');
+  await page.getByLabel('Machine name').fill('laptop');
   await page.getByLabel('Fleet name').fill('home');
   await page.getByRole('button', { name: 'Create fleet' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Fleet created' })
-  ).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('machine-row')).toHaveCount(1, {
+    timeout: 60_000,
+  });
 
   const joined = await workbox.cli(['join', '--label', 'workbox']);
   expect(joined.code, joined.stderr).toBe(0);
@@ -64,7 +64,7 @@ async function formFleet(page: Page, workbox: BeamMachine): Promise<void> {
     rows.filter({ hasText: 'workbox' }).getByText('Connected')
   ).toBeVisible({ timeout: 60_000 });
   await expect(rows).toHaveCount(2);
-  await leaveFleet(page);
+  await collapseFleet(page);
 }
 
 const BRANCH = 'agent-work';
@@ -139,7 +139,7 @@ test.describe('A fleet of real beam daemons @beam', () => {
     await expect(
       page.getByText(/Refused for tmux:.*grants the sender "msg"/)
     ).toBeVisible({ timeout: 30_000 });
-    await leaveFleet(page);
+    await collapseFleet(page);
     await tab(page, new RegExp(BRANCH)).click();
     await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible();
     await expect(visibleText(page, /echo:DONE/)).toHaveCount(0);
