@@ -35,7 +35,7 @@ vi.mock('@n10/terminal-tmux', () => ({
   isTmuxAvailable: () => isTmuxAvailableMock(),
   tmuxKillSession: (name: string) => tmuxKillSessionMock(name),
   tmuxListSessionsDetailed: () => tmuxListSessionsMock(),
-  tmuxPaneCurrentPath: (name: string) => paneCwdMock(name),
+  tmuxPanePaths: (name: string) => [paneCwdMock(name)],
   tmuxSetOptions: (name: string, tags: Record<string, string>) => {
     setOptionsMock(name, tags);
     return { stdout: '', stderr: '', exitCode: 0 };

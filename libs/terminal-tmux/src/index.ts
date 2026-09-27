@@ -16,7 +16,7 @@ export {
   tmuxListSessions,
   tmuxListSessionsDetailed,
   tmuxNewSessionDetached,
-  tmuxPaneCurrentPath,
+  tmuxPanePaths,
   tmuxPaneState,
   tmuxSetOption,
   tmuxSetOptions,

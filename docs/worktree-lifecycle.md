@@ -99,12 +99,14 @@ label. A discovery scan rebinds a session only when two independent facts agree:
 - **Structure**: the repository its tags name no longer exists, and the open
   repository lists a checkout at the same path relative to its root as the
   tagged checkout had relative to the old one.
-- **Kernel**: tmux reports exactly that checkout root as the pane's current path
-  (`#{pane_current_path}`, the working directory of the pane's foreground
-  process, which follows a directory through a rename).
+- **Kernel**: tmux reports exactly that checkout root as the current path of
+  every pane in the session (`#{pane_current_path}`, the working directory of
+  each pane's foreground process, which follows a directory through a rename).
+  One pane elsewhere refuses the session.
 
 The session must also be live and local, the checkout unclaimed by another
-session's tags, the match unambiguous (one stale session per checkout), and the
+session's tags, the match unambiguous (one session with that evidence per
+checkout, so clones moved together are told apart by their panes), and the
 running process must hold no connection to it under its old key. The scan then
 rewrites `@orchestra-worktree-path` and `@orchestra-repo` in one tmux command and
 adopts the session as usual
@@ -113,9 +115,10 @@ by `observeTmuxSessions`). Only a session that passes the structural check costs
 a tmux fork.
 
 Anything else stays unbound: a copied repository (new directories no process
-runs in), a deleted one (the pane reports a `(deleted)` path), a foreground job
+runs in), a deleted one (its panes report a `(deleted)` path), a foreground job
 outside the checkout root, a retained dead pane, and `git worktree move` within
-a repository that still exists. Such a session remains an orphan.
+a repository that still exists. Such a session remains an orphan. tmux cannot
+show a job-control shell whose foreground job moved while the shell did not.
 
 n10 does not follow a repository that moves while it is open: the cached root,
 resolver and directory watch keep referring to the old path. Reopen the

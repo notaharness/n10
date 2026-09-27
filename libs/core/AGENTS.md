@@ -35,7 +35,7 @@ The reasoning behind each rule is in `docs/decisions.md`.
   before upgrading.
   A session whose repository is gone is rebound only when the open repo
   lists its checkout at the same relative path and tmux reports that exact
-  root as the pane's current path (`discovery/moved-sessions.ts`).
+  root for every pane (`discovery/moved-sessions.ts`).
   Attach and continuation preserve creator/reporting tags. Fresh
   conversations preserve creator/repo/branch but clear supervisor and
   last-report tags; record the actual launched agent.

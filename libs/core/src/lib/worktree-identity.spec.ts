@@ -30,7 +30,7 @@ vi.mock('@n10/terminal-tmux', () => ({
   tmuxKillSession: vi.fn(),
   tmuxListSessionsDetailed: () => listMock(),
   // No agent here has moved with its checkout.
-  tmuxPaneCurrentPath: () => '',
+  tmuxPanePaths: () => [],
   tmuxSetOptions: vi.fn(),
 }));
 vi.mock('@n10/worktree-manager', () => ({ listWorktrees: vi.fn() }));

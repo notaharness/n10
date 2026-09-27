@@ -33,10 +33,11 @@ function session(
   };
 }
 
-/** A world where only `existing` paths exist and each pane's current
- *  path is `cwd[name]`. Records every question and rewrite. */
+/** A world where only `existing` paths exist and a session's panes are
+ *  in `cwd[name]` (one pane for a string). Records every question and
+ *  rewrite. */
 function world(
-  cwd: Record<string, string>,
+  cwd: Record<string, string | string[]>,
   existing: string[] = [],
   extra: MovedSessionDeps = {}
 ) {
@@ -44,9 +45,9 @@ function world(
   const asked: string[] = [];
   const deps: MovedSessionDeps = {
     exists: (path) => existing.includes(path),
-    paneCwd: (name) => {
+    panePaths: (name) => {
       asked.push(name);
-      return cwd[name] ?? '';
+      return [cwd[name] ?? []].flat();
     },
     retag: (name, tags) => {
       retagged.push([name, tags]);
@@ -100,6 +101,22 @@ describe('rebindMovedSessions', () => {
     expect(retagged).toEqual([]);
   });
 
+  // Another pane, a split parked in a same-named checkout of another
+  // clone, must not vouch for an agent whose own pane is elsewhere.
+  it('refuses unless every pane is in the checkout', () => {
+    const { deps, retagged } = world({
+      a: [checkout('a'), `${oldCheckout('a')} (deleted)`],
+    });
+    rebind([session('a')], deps);
+    expect(retagged).toEqual([]);
+  });
+
+  it('refuses a session tmux reports no panes for', () => {
+    const { deps, retagged } = world({ a: [] });
+    rebind([session('a')], deps);
+    expect(retagged).toEqual([]);
+  });
+
   it('requires the pane in the checkout root, not below it', () => {
     const { deps, retagged } = world({ a: `${checkout('a')}/src` });
     rebind([session('a')], deps);
@@ -136,14 +153,26 @@ describe('rebindMovedSessions', () => {
 
   // tmux lists by name, while the resolver prefers the oldest: picking
   // either would be a guess.
-  it('binds neither of two stale sessions for one checkout', () => {
-    const { deps, asked, retagged } = world({
+  it('binds neither of two sessions evidenced into one checkout', () => {
+    const { deps, retagged } = world({
       a: checkout('a'),
       twin: checkout('a'),
     });
     rebind([session('a'), session('twin', oldCheckout('a'))], deps);
-    expect(asked).toEqual([]);
     expect(retagged).toEqual([]);
+  });
+
+  // Two clones moved together (`~/src` renamed), each with an agent in
+  // a same-named worktree: structure alone matches both, the panes
+  // tell them apart.
+  it('binds the one session whose panes are in the checkout when clones moved together', () => {
+    const other = '/old/other/.claude/worktrees/a';
+    const { deps, retagged } = world({
+      a: checkout('a'),
+      b: '/new/other/.claude/worktrees/a',
+    });
+    rebind([session('a'), session('b', other, { repo: '/old/other' })], deps);
+    expect(retagged.map(([name]) => name)).toEqual(['a']);
   });
 
   it('skips a dead pane, a remote session and one this process holds', () => {

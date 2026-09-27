@@ -53,21 +53,24 @@ export function tmuxPaneState(name: string): TmuxPaneState | null {
   return parsePaneStateResult(runTmux(paneStateArgs(name)));
 }
 
-/** The working directory of the process in the session's active pane —
- *  `#{pane_current_path}`, which tmux reads from the kernel, so it
- *  follows the directory through a rename. `''` when tmux reports
- *  nothing: no such session, no server, or a process it cannot read.
- *  A deleted directory reads as its last path with ` (deleted)` added. */
-export function tmuxPaneCurrentPath(name: string): string {
+/** `#{pane_current_path}` of every pane in the session, one fork: the
+ *  working directory of each pane's foreground process, which tmux
+ *  reads from the kernel, so it follows a directory through a rename.
+ *  A deleted directory reads as its last path with ` (deleted)` added;
+ *  a pane tmux cannot read reports `''`. Empty when there is no such
+ *  session or no server. A path containing a newline splits into
+ *  entries that name no directory. */
+export function tmuxPanePaths(name: string): string[] {
   const { stdout, exitCode } = runTmux([
     '-u',
-    'display-message',
-    '-p',
+    'list-panes',
+    '-s',
     '-t',
     `=${name}:`,
+    '-F',
     '#{pane_current_path}',
   ]);
-  return exitCode === 0 ? stdout.replace(/\r?\n$/, '') : '';
+  return exitCode === 0 ? stdout.replace(/\r?\n$/, '').split('\n') : [];
 }
 
 /** Outcome of an async pane-state read, for the backend's poller. A
