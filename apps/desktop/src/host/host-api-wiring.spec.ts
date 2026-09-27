@@ -163,7 +163,15 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
   ['createWorktree', ['feature'], 'worktrees.createWorktree'],
   [
     'removeWorktree',
-    ['feature', { verdict: 'clear', tip: 'abc123' }],
+    [
+      'feature',
+      {
+        verdict: 'clear',
+        tip: 'abc123',
+        repo: '/repo/.git',
+        checkout: '/repo/wt',
+      },
+    ],
     'worktrees.removeWorktree',
   ],
   ['checkWorktreeRemoval', ['feature'], 'worktrees.checkWorktreeRemoval'],

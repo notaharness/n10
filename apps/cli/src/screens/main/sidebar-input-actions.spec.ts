@@ -28,7 +28,12 @@ let liveSessions = new Set<string>();
 let exitedSessions = new Set<string>();
 const killSessionMock = vi.fn();
 const checkWorktreeRemovalMock = vi.fn();
-const CLEAR = { verdict: 'clear', tip: 'abc123' } as const;
+const CLEAR = {
+  verdict: 'clear',
+  tip: 'abc123',
+  repo: '/repo/.git',
+  checkout: '/repo/wt',
+} as const;
 
 vi.mock('@n10/core', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -565,7 +570,12 @@ describe('sidebar handler — delete-branch', () => {
   });
 
   it('asks yes/no before killing a still-running agent', async () => {
-    const running = { verdict: 'agent-running', tip: 'abc123' } as const;
+    const running = {
+      verdict: 'agent-running',
+      tip: 'abc123',
+      repo: '/repo/.git',
+      checkout: '/repo/wt',
+    } as const;
     checkWorktreeRemovalMock.mockResolvedValue(running);
     const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
     vi.mocked(listWorktrees).mockResolvedValue([
@@ -594,7 +604,13 @@ describe('sidebar handler — delete-branch', () => {
       vi.mocked(listWorktrees).mockResolvedValue([
         worktree('/wt/alpha', 'alpha'),
       ]);
-      const forced = { verdict: 'force', reason, tip: 'abc123' } as const;
+      const forced = {
+        verdict: 'force',
+        reason,
+        tip: 'abc123',
+        repo: '/repo/.git',
+        checkout: '/repo/wt',
+      } as const;
       checkWorktreeRemovalMock.mockResolvedValue(forced);
 
       press(KEYS.deleteBranch(), t.ctx);

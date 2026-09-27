@@ -94,6 +94,11 @@ export function RemoveWorktreeDialog({
                   : 'Cannot delete'}
               </p>
               <p className="text-muted-foreground">{warning.reason}</p>
+              {warning.verdict === 'force' && warning.discardsUncommitted && (
+                <p className="text-muted-foreground">
+                  Force remove discards whatever is uncommitted when it runs.
+                </p>
+              )}
             </div>
           </div>
         )}

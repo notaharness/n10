@@ -79,6 +79,27 @@ test.describe('Worktree removal', () => {
     expect(existsSync(worktreeDir)).toBe(true);
   });
 
+  // Forcing takes whatever is uncommitted when it runs, not only what
+  // the check saw; unpushed commits alone need no force.
+  test('Force remove says it discards whatever is uncommitted', async ({
+    desktop,
+  }) => {
+    const { page, app, repoPath } = desktop;
+    await createWorktree(page, BRANCH);
+    const note = /discards whatever is uncommitted when it runs/;
+
+    let dialog = await openRemoveDialog(page, app);
+    await expect(confirmButton(dialog)).toBeVisible();
+    await expect(dialog.getByText(note)).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+
+    execFileSync('touch', [
+      join(repoPath, '.claude', 'worktrees', BRANCH, 'draft.txt'),
+    ]);
+    dialog = await openRemoveDialog(page, app);
+    await expect(dialog.getByText(note)).toBeVisible();
+  });
+
   test('cancelling leaves the worktree alone', async ({ desktop }) => {
     const { page, app, repoPath } = desktop;
     await createWorktree(page, BRANCH);

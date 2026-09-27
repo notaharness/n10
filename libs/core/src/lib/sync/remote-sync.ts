@@ -9,7 +9,10 @@ import { logError } from '@n10/logger';
 import type { AppConfig, BranchPrMap, VcsProvider } from '@n10/vcs-core';
 import { isSessionAlive } from '../pty-registry.js';
 import { hasLiveTmuxSession } from '../session-backend.js';
-import type { WorktreeRemovalCheck } from '../session/remove-worktree.js';
+import {
+  clearVerdictAt,
+  type WorktreeRemovalCheck,
+} from '../session/remove-worktree.js';
 import { countBranchConflicts } from './conflicts.js';
 import { fetchRefs } from './fetch-queue.js';
 
@@ -116,7 +119,11 @@ async function autoDeleteMerged(args: {
     const check = await canRemoveBranch(branch, { confirmedMerged: true });
     if (isCancelled()) return null;
     if (check.safe) {
-      await onAutoDelete(sessionName, branch, { verdict: 'clear', tip });
+      await onAutoDelete(
+        sessionName,
+        branch,
+        await clearVerdictAt(checkout.path, tip)
+      );
     } else {
       if (check.reason === 'rebase in progress') rebasingNow.push(branch);
       logError(

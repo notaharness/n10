@@ -4,11 +4,11 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTmuxBackend } from '@n10/terminal-tmux';
-import { branchTip } from '@n10/worktree-manager';
+import { branchTip, repositoryOf } from '@n10/worktree-manager';
 import { orchestraFixture } from '../../tests/orchestra-fixture.js';
 import { diffScans } from './discovery/discovery-model.js';
 import { getSession, isSessionAlive, killSession } from './pty-registry.js';
-import { worktreeSessionKey } from './session-key.js';
+import { canonicalWorktreePath, worktreeSessionKey } from './session-key.js';
 import { resetRepoRoot } from './session-backend.js';
 import { sessionTags } from './session-identity.js';
 import { openSession } from './session/open-session.js';
@@ -75,7 +75,10 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
           verdict: 'force',
           reason: 'uncommitted changes',
           risks: ['uncommitted changes'],
+          discardsUncommitted: true,
           tip: await branchTip(branch, fixture.repo),
+          repo: await repositoryOf(fixture.repo),
+          checkout: canonicalWorktreePath(path),
         } as const;
         expect(await removeWorktreeSession(branch, forced, fixture.repo)).toBe(
           'removed'

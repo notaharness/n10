@@ -44,7 +44,10 @@ const FORCED: DeleteConfirmState = {
     verdict: 'force',
     reason: 'uncommitted changes',
     risks: ['uncommitted changes'],
+    discardsUncommitted: true,
     tip: 'abc123',
+    repo: '/repo/.git',
+    checkout: '/repo/wt',
   },
 };
 
@@ -53,7 +56,12 @@ const RUNNING: DeleteConfirmState = {
   sessionName: 'wt:alpha',
   reason: 'session is active — agent process will be killed',
   mode: 'yes-no',
-  approved: { verdict: 'agent-running', tip: 'abc123' },
+  approved: {
+    verdict: 'agent-running',
+    tip: 'abc123',
+    repo: '/repo/.git',
+    checkout: '/repo/wt',
+  },
 };
 
 function makeCtx(confirmDelete: DeleteConfirmState, confirmInput = '') {

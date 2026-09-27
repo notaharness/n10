@@ -14,7 +14,15 @@ import type * as RemoteSyncModule from './remote-sync.js';
  */
 
 /** The verdict core's sweep hands over with a branch to remove. */
-const SWEPT = vi.hoisted(() => ({ verdict: 'clear', tip: 'abc123' } as const));
+const SWEPT = vi.hoisted(
+  () =>
+    ({
+      verdict: 'clear',
+      tip: 'abc123',
+      repo: '/repo/.git',
+      checkout: '/repo/wt',
+    } as const)
+);
 
 const env = vi.hoisted(() => ({
   configured: true,

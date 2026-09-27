@@ -38,6 +38,7 @@ const env = vi.hoisted(() => ({
 
 vi.mock('@n10/worktree-manager', () => ({
   branchTip: (branch: string) => Promise.resolve(`tip:${branch}`),
+  repositoryOf: () => Promise.resolve('/repo/.git'),
   branchToSessionName: (b: string) => b.replace(/\//g, '-'),
   canRemoveBranch: (branch: string) => {
     env.checks += 1;

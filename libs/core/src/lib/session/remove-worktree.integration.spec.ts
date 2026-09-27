@@ -232,6 +232,72 @@ describe('removing a worktree as confirmed', () => {
     expect(await removeWorktreeSession('feature', check, repo)).toBe('removed');
   });
 
+  // A user's `status.showUntrackedFiles=no` must not hide a file the
+  // removal would take.
+  it('sees an untracked file whatever the repository shows by default', async () => {
+    git(repo, 'config', 'status.showUntrackedFiles', 'no');
+    writeFileSync(join(worktree, 'draft.txt'), 'untracked');
+
+    expect(await checkWorktreeRemoval('feature', repo)).toMatchObject({
+      verdict: 'force',
+      risks: ['uncommitted changes'],
+    });
+  });
+
+  // Another checkout at the same commit is not the one the user judged.
+  it('keeps a checkout that replaced the one judged', async () => {
+    writeFileSync(join(worktree, 'scratch.txt'), 'seen in the prompt');
+    const check = await checkWorktreeRemoval('feature', repo);
+    expect(check).toMatchObject({ verdict: 'force' });
+    git(repo, 'worktree', 'remove', '--force', worktree);
+    const other = join(repo, '.claude', 'worktrees', 'feature-again');
+    git(repo, 'worktree', 'add', '-q', other, 'feature');
+    writeFileSync(join(other, 'draft.txt'), 'never judged');
+
+    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
+    expect(existsSync(join(other, 'draft.txt'))).toBe(true);
+  });
+
+  // A verdict from another clone at the same commit says nothing here.
+  it('keeps a checkout when the verdict came from another repository', async () => {
+    const clone = join(root, 'clone');
+    execFileSync('git', ['clone', '-q', repo, clone]);
+    const cloned = join(clone, 'wt');
+    git(
+      clone,
+      'worktree',
+      'add',
+      '-q',
+      '-b',
+      'feature',
+      cloned,
+      'origin/feature'
+    );
+    const check = await checkWorktreeRemoval('feature', clone);
+    expect(check.tip).toBe(git(repo, 'rev-parse', 'feature'));
+
+    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
+    expect(existsSync(worktree)).toBe(true);
+  });
+
+  // `git branch -D` can fail too: a stale ref lock, say.
+  it('says the branch was kept when git would not delete it', async () => {
+    const check = await checkWorktreeRemoval('feature', repo);
+    const common = git(
+      repo,
+      'rev-parse',
+      '--path-format=absolute',
+      '--git-common-dir'
+    );
+    writeFileSync(join(common, 'refs', 'heads', 'feature.lock'), '');
+
+    expect(await removeWorktreeSession('feature', check, repo)).toBe(
+      'kept-branch'
+    );
+    expect(existsSync(worktree)).toBe(false);
+    expect(branchExists()).toBe(true);
+  });
+
   it('keeps a checkout that switched to another branch', async () => {
     const check = await checkWorktreeRemoval('feature', repo);
     git(worktree, 'switch', '-q', '-c', 'other');

@@ -4,6 +4,7 @@ import {
   listWorktrees,
   removeWorktree,
   deleteBranch,
+  repositoryOf,
   type RemovalRisk,
   type WorktreeInfo,
 } from '@n10/worktree-manager';
@@ -11,7 +12,7 @@ import { rescanSessionDiscovery } from '../discovery/session-discovery.js';
 import { isSessionAlive } from '../pty-registry.js';
 import { stopSession } from './stop-session.js';
 import { getRepoRoot } from '../repo-root.js';
-import { keyForWorktree } from '../session-key.js';
+import { canonicalWorktreePath, keyForWorktree } from '../session-key.js';
 
 /**
  * What removing the worktree that has a branch checked out would cost,
@@ -26,13 +27,25 @@ export type WorktreeRemovalCheck =
     /** Git has nothing to lose, but a live agent would be killed. */
     | { verdict: 'agent-running' }
     /** Work would be lost: every risk that applies, and `reason`, the
-     *  same list for display. */
-    | { verdict: 'force'; reason: string; risks: readonly RemovalRisk[] }
+     *  same list for display. `discardsUncommitted` when confirming
+     *  runs `--force`, which takes whatever is uncommitted when the
+     *  removal runs, not only what the check saw. */
+    | {
+        verdict: 'force';
+        reason: string;
+        risks: readonly RemovalRisk[];
+        discardsUncommitted: boolean;
+      }
     /** n10 does not remove this worktree at all. */
     | { verdict: 'refused'; reason: string }
   ) & {
     /** The branch's commit when it was judged; null if it has none. */
     tip: string | null;
+    /** The repository judged, by its common git directory. */
+    repo: string | null;
+    /** The checkout judged, by its canonical path; null if no checkout
+     *  had the branch. */
+    checkout: string | null;
   };
 
 /**
@@ -57,8 +70,14 @@ export type WorktreeRemovalOutcome =
  *  Unpushed commits go with the branch, so they never need it. */
 const FORCED_RISKS: ReadonlySet<RemovalRisk> = new Set([
   'uncommitted changes',
+  'unknown changes',
   'submodules',
 ]);
+
+/** Whether removing past `risks` needs `--force`. */
+function forcesPast(risks: readonly RemovalRisk[]): boolean {
+  return risks.some((risk) => FORCED_RISKS.has(risk));
+}
 
 function cwdFor(repo: string | undefined): string {
   return repo ?? getRepoRoot() ?? process.cwd();
@@ -72,6 +91,19 @@ async function checkoutFor(
   return (await listWorktrees(cwd)).find((w) => w.branch === branch) ?? null;
 }
 
+/** Which repository and checkout a verdict is about, and the tip. */
+async function judgedAt(branch: string, cwd: string) {
+  const checkout = await checkoutFor(branch, cwd);
+  return {
+    checkout,
+    at: {
+      tip: await branchTip(branch, cwd),
+      repo: await repositoryOf(cwd),
+      checkout: checkout ? canonicalWorktreePath(checkout.path) : null,
+    },
+  };
+}
+
 /** Decide what removing `branch`'s worktree needs from the user. */
 export async function checkWorktreeRemoval(
   branch: string,
@@ -80,21 +112,37 @@ export async function checkWorktreeRemoval(
   const cwd = cwdFor(repo);
   // Read first: a commit that lands during the checks below then reads
   // as a moved branch, never as one the verdict covered.
-  const tip = await branchTip(branch, cwd);
+  const { checkout, at } = await judgedAt(branch, cwd);
   const { refusal, risks } = await assessBranchRemoval(branch, { cwd });
-  if (refusal) return { verdict: 'refused', reason: refusal, tip };
+  if (refusal) return { verdict: 'refused', reason: refusal, ...at };
   if (risks.length > 0) {
-    return { verdict: 'force', reason: risks.join(', '), risks, tip };
+    const reason = risks.join(', ');
+    const discardsUncommitted = forcesPast(risks);
+    return { verdict: 'force', reason, risks, discardsUncommitted, ...at };
   }
-  const checkout = await checkoutFor(branch, cwd);
   return checkout && isSessionAlive(keyForWorktree(checkout, cwd))
-    ? { verdict: 'agent-running', tip }
-    : { verdict: 'clear', tip };
+    ? { verdict: 'agent-running', ...at }
+    : { verdict: 'clear', ...at };
+}
+
+/** The verdict the merged-branch sweep removes with: `clear`, at the
+ *  tip it judged, for the checkout at `checkoutPath`. */
+export async function clearVerdictAt(
+  checkoutPath: string,
+  tip: string | null
+): Promise<WorktreeRemovalCheck> {
+  return {
+    verdict: 'clear',
+    tip,
+    repo: await repositoryOf(checkoutPath),
+    checkout: canonicalWorktreePath(checkoutPath),
+  };
 }
 
 /** The checkout that has `branch`, while it is still as `approved`
- *  judged it: the branch at the same tip, and nothing git guards with
- *  `--force` that the verdict did not name. A rebase leaves the branch
+ *  judged it: the same repository and checkout, the branch at the same
+ *  tip, and nothing git guards with `--force` that the verdict did not
+ *  name. A rebase leaves the branch
  *  where it was until it finishes, so the tip alone would miss one that
  *  started since; the assessment refuses it. Null when anything changed. */
 async function judgedCheckout(
@@ -102,10 +150,14 @@ async function judgedCheckout(
   approved: WorktreeRemovalCheck,
   cwd: string
 ): Promise<WorktreeInfo | null> {
-  const checkout = await checkoutFor(branch, cwd);
-  if (!checkout || (await branchTip(branch, cwd)) !== approved.tip) {
-    return null;
-  }
+  const { checkout, at } = await judgedAt(branch, cwd);
+  const same =
+    checkout !== null &&
+    at.tip === approved.tip &&
+    at.repo !== null &&
+    at.repo === approved.repo &&
+    at.checkout === approved.checkout;
+  if (!same) return null;
   const { refusal, risks } = await assessBranchRemoval(branch, {
     cwd,
     confirmedMerged: true,
@@ -159,11 +211,8 @@ async function removeJudged(
   approved: WorktreeRemovalCheck,
   cwd: string
 ): Promise<WorktreeRemovalOutcome> {
-  const force =
-    approved.verdict === 'force' &&
-    approved.risks.some((risk) => FORCED_RISKS.has(risk));
+  const force = approved.verdict === 'force' && forcesPast(approved.risks);
   if (!(await removeWorktree(branch, { force, cwd }))) return 'git-refused';
   if ((await branchTip(branch, cwd)) !== approved.tip) return 'kept-branch';
-  await deleteBranch(branch, true, cwd);
-  return 'removed';
+  return (await deleteBranch(branch, true, cwd)) ? 'removed' : 'kept-branch';
 }

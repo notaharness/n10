@@ -97,7 +97,10 @@ describe('removeWorktree', () => {
         verdict: 'force',
         reason: 'uncommitted changes',
         risks: ['uncommitted changes'],
+        discardsUncommitted: true,
         tip: 'abc123',
+        repo: '/repo/.git',
+        checkout: '/repo/wt',
       })
     ).toBe('removed');
     expect(calls.log).toEqual([
@@ -108,7 +111,12 @@ describe('removeWorktree', () => {
   it("returns core's outcome to the caller", async () => {
     calls.removed = 'git-refused';
     expect(
-      await removeWorktree('feature/x', { verdict: 'clear', tip: 'abc123' })
+      await removeWorktree('feature/x', {
+        verdict: 'clear',
+        tip: 'abc123',
+        repo: '/repo/.git',
+        checkout: '/repo/wt',
+      })
     ).toBe('git-refused');
   });
 
@@ -117,7 +125,12 @@ describe('removeWorktree', () => {
     'babysits the pull request again when core answers %s',
     async (outcome) => {
       calls.removed = outcome;
-      await removeWorktree('feature/x', { verdict: 'clear', tip: 'abc123' });
+      await removeWorktree('feature/x', {
+        verdict: 'clear',
+        tip: 'abc123',
+        repo: '/repo/.git',
+        checkout: '/repo/wt',
+      });
       expect(calls.log.at(-1)).toBe('start-babysit:42');
     }
   );
@@ -126,7 +139,12 @@ describe('removeWorktree', () => {
     'leaves babysitting stopped when core answers %s',
     async (outcome) => {
       calls.removed = outcome;
-      await removeWorktree('feature/x', { verdict: 'clear', tip: 'abc123' });
+      await removeWorktree('feature/x', {
+        verdict: 'clear',
+        tip: 'abc123',
+        repo: '/repo/.git',
+        checkout: '/repo/wt',
+      });
       expect(calls.log).not.toContain('start-babysit:42');
     }
   );

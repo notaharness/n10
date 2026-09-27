@@ -84,6 +84,9 @@ function TypeBranchModal({
   const sessions = useSessionActions();
   const asyncOps = useAsyncOps();
   const keybinds = useKeybindResolve();
+  const approved = deleteConfirmState.confirmDelete?.approved;
+  const discards =
+    approved?.verdict === 'force' && approved.discardsUncommitted;
 
   useInput(
     (input, key) => {
@@ -107,6 +110,9 @@ function TypeBranchModal({
       >
         <Box flexDirection="column" padding={1} gap={1}>
           <Alert variant="warning">{reason}</Alert>
+          {discards && (
+            <Text>Deleting discards whatever is uncommitted when it runs.</Text>
+          )}
           <Text>
             Type{' '}
             <Text bold color="yellow">

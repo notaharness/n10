@@ -137,6 +137,8 @@ export function loadWorktreeRemovalCheck(
     verdict: 'refused' as const,
     reason: errorMessage(err),
     tip: null,
+    repo: null,
+    checkout: null,
   }));
 }
 

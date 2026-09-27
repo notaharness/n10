@@ -8,6 +8,8 @@ const state = vi.hoisted(() => ({
   tips: ['judged'] as (string | null)[],
   alive: new Set<string>(),
   assessment: { refusal: null, risks: [] } as BranchRemovalAssessment,
+  repository: '/repo-a/.git',
+  branchDeleted: true,
 }));
 vi.mock('../pty-registry.js', () => ({
   hasSession: () => true,
@@ -40,8 +42,9 @@ vi.mock('@n10/worktree-manager', () => ({
   },
   deleteBranch: async (...args: unknown[]) => {
     state.calls.push(['delete', ...args]);
-    return true;
+    return state.branchDeleted;
   },
+  repositoryOf: async () => state.repository,
 }));
 import {
   checkWorktreeRemoval,
@@ -50,24 +53,34 @@ import {
 
 const LOGIN_KEY = worktreeSessionKey('/repo-a/.worktrees/login', '/repo-a');
 
-const CLEAR = { verdict: 'clear', tip: 'judged' } as const;
+/** Where every verdict here was judged. */
+const AT = {
+  tip: 'judged',
+  repo: '/repo-a/.git',
+  checkout: '/repo-a/.worktrees/login',
+} as const;
+
+const CLEAR = { verdict: 'clear', ...AT } as const;
 const DIRTY = {
   verdict: 'force',
   reason: 'uncommitted changes',
   risks: ['uncommitted changes'],
-  tip: 'judged',
+  discardsUncommitted: true,
+  ...AT,
 } as const;
 const UNPUSHED = {
   verdict: 'force',
   reason: 'not pushed to upstream',
   risks: ['not pushed to upstream'],
-  tip: 'judged',
+  discardsUncommitted: false,
+  ...AT,
 } as const;
 const SUBMODULES = {
   verdict: 'force',
   reason: 'submodules',
   risks: ['submodules'],
-  tip: 'judged',
+  discardsUncommitted: true,
+  ...AT,
 } as const;
 /** Each call, without the reads that judge the checkout. */
 const effects = () =>
@@ -80,6 +93,8 @@ beforeEach(() => {
   state.tips = ['judged'];
   state.alive = new Set();
   state.assessment = { refusal: null, risks: [] };
+  state.repository = '/repo-a/.git';
+  state.branchDeleted = true;
 });
 
 describe('removeWorktreeSession', () => {
@@ -117,7 +132,7 @@ describe('removeWorktreeSession', () => {
   // also take files written after the check.
   it.each([
     ['clear', CLEAR, false],
-    ['agent-running', { verdict: 'agent-running', tip: 'judged' }, false],
+    ['agent-running', { verdict: 'agent-running', ...AT }, false],
     ['uncommitted changes', DIRTY, true],
     ['submodules', SUBMODULES, true],
     ['not pushed to upstream', UNPUSHED, false],
@@ -137,7 +152,7 @@ describe('removeWorktreeSession', () => {
     const refused = {
       verdict: 'refused',
       reason: 'protected branch',
-      tip: 'judged',
+      ...AT,
     } as const;
     expect(
       await removeWorktreeSession('feature/login', refused, '/repo-a')
@@ -205,6 +220,30 @@ describe('removeWorktreeSession', () => {
     expect(kinds()).not.toContain('delete');
   });
 
+  // Same branch, same commit, but not what the user judged.
+  it('leaves everything when the verdict was about another checkout', async () => {
+    const elsewhere = { ...CLEAR, checkout: '/repo-a/.worktrees/other' };
+    expect(
+      await removeWorktreeSession('feature/login', elsewhere, '/repo-a')
+    ).toBe('changed');
+    expect(kinds()).toEqual(['rescan']);
+  });
+
+  it('leaves everything when the verdict came from another repository', async () => {
+    state.repository = '/clone/.git';
+    expect(await removeWorktreeSession('feature/login', CLEAR, '/repo-a')).toBe(
+      'changed'
+    );
+    expect(kinds()).toEqual(['rescan']);
+  });
+
+  it('says the branch was kept when git would not delete it', async () => {
+    state.branchDeleted = false;
+    expect(await removeWorktreeSession('feature/login', CLEAR, '/repo-a')).toBe(
+      'kept-branch'
+    );
+  });
+
   // A checkout that switched away, or went detached, no longer holds
   // the branch the prompt was about.
   it('leaves everything once no checkout has the branch', async () => {
@@ -219,7 +258,7 @@ describe('checkWorktreeRemoval', () => {
   it('is clear when git has nothing to lose and no agent runs', async () => {
     expect(await checkWorktreeRemoval('feature/login', '/repo-a')).toEqual({
       verdict: 'clear',
-      tip: 'judged',
+      ...AT,
     });
   });
 
@@ -235,7 +274,7 @@ describe('checkWorktreeRemoval', () => {
     state.alive.add(LOGIN_KEY);
     expect(await checkWorktreeRemoval('feature/login', '/repo-a')).toEqual({
       verdict: 'agent-running',
-      tip: 'judged',
+      ...AT,
     });
   });
 
@@ -249,8 +288,18 @@ describe('checkWorktreeRemoval', () => {
       verdict: 'force',
       reason: 'uncommitted changes, not pushed to upstream',
       risks: ['uncommitted changes', 'not pushed to upstream'],
-      tip: 'judged',
+      discardsUncommitted: true,
+      ...AT,
     });
+  });
+
+  // Unpushed commits go with the branch; only what `--force` takes
+  // warrants the prompt saying so.
+  it('does not warn of discarded changes for unpushed commits alone', async () => {
+    state.assessment = { refusal: null, risks: ['not pushed to upstream'] };
+    expect(
+      await checkWorktreeRemoval('feature/login', '/repo-a')
+    ).toMatchObject({ verdict: 'force', discardsUncommitted: false });
   });
 
   it.each(['protected branch', 'rebase in progress'] as const)(
@@ -260,7 +309,7 @@ describe('checkWorktreeRemoval', () => {
       expect(await checkWorktreeRemoval('feature/login', '/repo-a')).toEqual({
         verdict: 'refused',
         reason: refusal,
-        tip: 'judged',
+        ...AT,
       });
     }
   );

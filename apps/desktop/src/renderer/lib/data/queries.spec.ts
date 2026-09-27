@@ -96,6 +96,8 @@ describe('loadWorktreeRemovalCheck', () => {
           verdict: 'refused',
           reason: 'rebase in progress',
           tip: 'abc123',
+          repo: '/repo/.git',
+          checkout: '/repo/wt',
         }),
     });
 
@@ -103,6 +105,8 @@ describe('loadWorktreeRemovalCheck', () => {
       verdict: 'refused',
       reason: 'rebase in progress',
       tip: 'abc123',
+      repo: '/repo/.git',
+      checkout: '/repo/wt',
     });
   });
 
@@ -120,6 +124,8 @@ describe('loadWorktreeRemovalCheck', () => {
       verdict: 'refused',
       reason: 'not a git repository',
       tip: null,
+      repo: null,
+      checkout: null,
     });
   });
 });

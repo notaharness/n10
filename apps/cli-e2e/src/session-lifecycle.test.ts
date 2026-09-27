@@ -145,6 +145,11 @@ test.describe('Session Lifecycle – dirty worktree', () => {
     await expect(n10.term.getByText('to confirm').first()).toBeVisible({
       timeout: 10_000,
     });
+    // Forcing takes whatever is uncommitted when it runs, not only what
+    // the check saw.
+    await expect(
+      n10.term.getByText('Deleting discards whatever').first()
+    ).toBeVisible();
 
     // 5. Confirm deletion by typing the branch name
     await n10.term.type(branchName);
