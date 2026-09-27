@@ -78,7 +78,7 @@ test.describe('An enrolled machine', () => {
         /Fleet section choose Join an existing fleet.*with 3f9a 0c4e 7d12 e805\./
       )
     ).toBeVisible();
-    await expect(panel.getByText('beam join --label buildbox')).toBeVisible();
+    await expect(panel.getByText('beam join --label my-server')).toBeVisible();
     await expect(
       panel.getByText(/Over SSH it does not open a browser\./)
     ).toBeVisible();

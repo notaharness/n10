@@ -3,7 +3,7 @@ import { copyText } from '../../lib/copy-text.js';
 import { useFocusOnMount } from '../../lib/fleet/use-focus-on-mount.js';
 import { Button } from '../ui/button.js';
 
-const JOIN_COMMAND = 'beam join --label buildbox';
+const JOIN_COMMAND = 'beam join --label my-server';
 
 /**
  * How another machine joins this fleet (beam-fleet-ux.md §2): from its

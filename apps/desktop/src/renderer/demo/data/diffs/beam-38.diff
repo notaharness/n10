@@ -325,7 +325,7 @@ index 2d29729..dd6ecfb 100644
 +On the new machine:
  
  ```sh
- beam join --label buildbox
+ beam join --label my-server
  ```
  
 -After joining, compare the `fleet xxxx xxxx xxxx xxxx` fingerprint in the output with
@@ -351,52 +351,52 @@ index 2d29729..dd6ecfb 100644
 +From any machine in the fleet:
 +
 +```sh
-+beam revoke buildbox
++beam revoke my-server
 +```
 +
-+This takes a passkey approval too. The machine you ran it on cuts buildbox off at once,
++This takes a passkey approval too. The machine you ran it on cuts my-server off at once,
 +connected machines within seconds, and offline ones when they next connect.
 +
 +### Limit a machine
 +
-+By default every machine can open a shell on every other. To limit what buildbox can do
++By default every machine can open a shell on every other. To limit what my-server can do
 +on this machine, run this here: `msg` allows only messages, `none` allows nothing, and
 +`all` is the default.
 +
 +```sh
-+beam peer grant buildbox msg
++beam peer grant my-server msg
 +```
 +
 +### Run commands and shells
  
  ```sh
 -beam peers
--beam connect buildbox
- beam exec buildbox -- uname -a
--beam msg send buildbox --topic jobs 'ready'
-+beam exec buildbox --cwd '~/src/app' -- make test
-+beam connect buildbox
-+beam connect buildbox -- tmux new-session -A -s work
+-beam connect my-server
+ beam exec my-server -- uname -a
+-beam msg send my-server --topic jobs 'ready'
++beam exec my-server --cwd '~/src/app' -- make test
++beam connect my-server
++beam connect my-server -- tmux new-session -A -s work
  ```
  
--On buildbox, `beam msg listen --topic jobs laptop` receives messages from the laptop.
+-On my-server, `beam msg listen --topic jobs laptop` receives messages from the laptop.
 -Messages are queued durably when they cannot be delivered immediately.
 +`exec` passes stdin through, streams stdout and stderr, and exits with the remote
 +command's status. `connect` opens your login shell, or the command after `--`, in a
 +terminal on the other machine. Run it again to reattach the tmux session after you
 +detach or lose the connection.
  
--With tmux installed on buildbox, start or reattach an agent's session there:
+-With tmux installed on my-server, start or reattach an agent's session there:
 +### Send messages
  
  ```sh
--beam connect buildbox -- tmux new-session -A -s agents
-+beam msg send buildbox --topic jobs 'build main'    # on laptop
-+beam msg listen --topic jobs laptop                 # on buildbox, from laptop only
+-beam connect my-server -- tmux new-session -A -s agents
++beam msg send my-server --topic jobs 'build main'    # on laptop
++beam msg listen --topic jobs laptop                 # on my-server, from laptop only
  ```
  
 -Run your agent inside that session. Detach from tmux and reconnect with the same
--command; the session stays on buildbox. See [the CLI](docs/07-cli.md) for grants,
+-command; the session stays on my-server. See [the CLI](docs/07-cli.md) for grants,
 -revocation, queue inspection and the other commands.
 -
 -## Technical gist
