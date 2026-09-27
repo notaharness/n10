@@ -36,10 +36,11 @@ export interface FakePr {
     state: string;
     body?: string;
     commentCount?: number;
+    submittedAt?: string;
   }[];
   reviewRequests?: string[];
   threads?: FakeThread[];
-  generalComments?: { author: string; body: string }[];
+  generalComments?: { author: string; body: string; createdAt?: string }[];
   /** Timeline entries, as GraphQL `PullRequestTimelineItems` nodes. */
   events?: Record<string, unknown>[];
   /** Reads that answer with GitHub's 502 until cleared with

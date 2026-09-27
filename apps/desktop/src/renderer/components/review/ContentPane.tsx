@@ -1,6 +1,6 @@
 import type { DiffLine } from '@n10/diff';
 import type { PullRequestInfo } from '@n10/vcs-core';
-import type { ReactNode, Ref, RefObject } from 'react';
+import { useState, type ReactNode, type Ref, type RefObject } from 'react';
 import type {
   RemoteCommentThread,
   ReviewComment,
@@ -35,6 +35,13 @@ function StackedPane({
       {children}
     </div>
   );
+}
+
+/** Whether `visible` has been true at any point in this pane's life. */
+function useShownOnce(visible: boolean): boolean {
+  const [shown, setShown] = useState(visible);
+  if (visible && !shown) setShown(true);
+  return shown || visible;
 }
 
 /** The agent's terminal, plus its connection banner (ux-machines.md
@@ -114,6 +121,7 @@ export function ContentPane({
   onNext,
   onExitReview,
   onOpenInDiff,
+  onOpenThread,
   plan,
 }: {
   effMode: Mode;
@@ -152,6 +160,8 @@ export function ContentPane({
   onNext: () => void;
   onExitReview: () => void;
   onOpenInDiff: (file: string) => void;
+  /** Show a remote thread in the diff, from the Overview's activity. */
+  onOpenThread: (id: string, path: string | null) => void;
   /** Everything the plan pane needs; absent on a bare worktree tab. */
   plan?: {
     items: PlanItem[];
@@ -165,6 +175,7 @@ export function ContentPane({
     openNoteFor: { key: string } | null;
   };
 }) {
+  const overviewShown = useShownOnce(effMode === 'overview');
   const headSha = pr?.headSha;
   const generalThreads = hideResolved
     ? general.filter((t) => !t.isResolved)
@@ -214,10 +225,14 @@ export function ContentPane({
           />
         </div>
       )}
-      {pr && effMode === 'overview' && (
-        <div className="absolute inset-0">
-          <OverviewPane pr={pr} />
-        </div>
+      {pr && overviewShown && (
+        // Kept mounted like the diff once it has been shown: the
+        // reader's place in the activity, its filter and search survive
+        // a trip to the diff. Not before, so a tab that never shows it
+        // never reads its conversation.
+        <StackedPane visible={effMode === 'overview'}>
+          <OverviewPane pr={pr} onOpenThread={onOpenThread} />
+        </StackedPane>
       )}
       <StackedPane visible={effMode === 'diff'}>
         <DiffPane

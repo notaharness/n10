@@ -50,6 +50,8 @@ export const keys = {
    *  same path never reads the old one's entry, and by the account. */
   prSnapshot: (cwd: string, ref: PullRequestRef, viewer: string | null) =>
     ['pr-snapshot', cwd, pullRequestKey(ref), ref.id ?? null, viewer] as const,
+  /** Every conversation read in this repository, to invalidate. */
+  prConversations: (cwd: string) => ['pr-conversation', cwd] as const,
   /** Keyed like `prSnapshot`. */
   prConversation: (cwd: string, ref: PullRequestRef, viewer: string | null) =>
     [

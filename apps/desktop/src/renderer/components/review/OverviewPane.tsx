@@ -9,6 +9,8 @@ import {
 import type { ComponentProps, ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { PullRequestInfo, ReviewVerdict } from '@n10/vcs-core';
+import { pullRequestKey } from '@n10/vcs-core/pr-details';
+import { pullRequestRefFor } from '../../lib/data/pr-snapshot-query.js';
 import { usePrDescription } from '../../lib/data/queries.js';
 import type { ReadState } from '../../lib/data/read-state.js';
 import { keys } from '../../lib/data/query-keys.js';
@@ -22,6 +24,7 @@ import { Button } from '../ui/button.js';
 import { Skeleton } from '../ui/skeleton.js';
 import { Tip } from '../ui/tooltip.js';
 import { CommentMarkdown } from './comments/CommentMarkdown.js';
+import { PrActivity } from './overview/PrActivity.js';
 import { ReadFailure, StaleNotice } from './ReadNotice.js';
 
 /**
@@ -209,8 +212,15 @@ function Description({
   );
 }
 
-export function OverviewPane({ pr }: { pr: PullRequestInfo }) {
+export function OverviewPane({
+  pr,
+  onOpenThread,
+}: {
+  pr: PullRequestInfo;
+  onOpenThread: (id: string, path: string | null) => void;
+}) {
   const { repo } = useRepo();
+  const prRef = pullRequestRefFor(repo, pr.id);
   const description = useReadState(
     usePrDescription(repo.cwd, pr.id),
     keys.prDescription(repo.cwd, pr.id)
@@ -267,6 +277,14 @@ export function OverviewPane({ pr }: { pr: PullRequestInfo }) {
             onRetry={description.retry}
           />
         </div>
+
+        {prRef && (
+          <PrActivity
+            key={pullRequestKey(prRef)}
+            prRef={prRef}
+            onOpenThread={onOpenThread}
+          />
+        )}
       </div>
     </div>
   );

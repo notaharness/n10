@@ -341,6 +341,7 @@ export function PrWorkspace({
               onNext={() => nav.step(1)}
               onExitReview={showDiff}
               onOpenInDiff={nav.jumpToFile}
+              onOpenThread={nav.jumpToId}
               plan={plan.wiring}
             />
           </Panel>
