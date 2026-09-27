@@ -94,6 +94,8 @@ export interface DesktopApp {
   pageErrors: string[];
   /** Evaluate in the main process (e.g. to inspect host services). */
   main: ElectronApplication['evaluate'];
+  /** Relaunch the real host with the same HOME and optional new repo path. */
+  restart(repoPath?: string): Promise<void>;
 }
 
 export const test = base.extend<
@@ -157,28 +159,30 @@ export const test = base.extend<
 
     seedTmux(repoPath, homeDir, liveSessions, liveTerminals);
 
-    const app = await electron.launch({
-      args: [
-        APP_DIR,
-        // CI runners have no user namespaces for the sandbox, and
-        // software rendering is both available and deterministic.
-        '--no-sandbox',
-        '--disable-gpu',
-        '--ozone-platform=x11',
-      ],
-      cwd: WORKSPACE_ROOT,
-      env: appEnv({
-        homeDir,
-        repoPath,
-        startWithoutRepo,
-        githubToken,
-        ghEnv,
-        extra: env,
-      }),
-      timeout: 60_000,
-    });
+    const launch = (startPath: string) =>
+      electron.launch({
+        args: [
+          APP_DIR,
+          // CI runners have no user namespaces for the sandbox, and
+          // software rendering is both available and deterministic.
+          '--no-sandbox',
+          '--disable-gpu',
+          '--ozone-platform=x11',
+        ],
+        cwd: WORKSPACE_ROOT,
+        env: appEnv({
+          homeDir,
+          repoPath: startPath,
+          startWithoutRepo,
+          githubToken,
+          ghEnv,
+          extra: env,
+        }),
+        timeout: 60_000,
+      });
 
-    const page = await app.firstWindow();
+    let app = await launch(repoPath);
+    let page = await app.firstWindow();
 
     // Chromium throttles requestAnimationFrame in a window it considers
     // hidden or occluded, and under xvfb (or behind another window on a
@@ -217,12 +221,40 @@ export const test = base.extend<
     let used = false;
     try {
       await provide({
-        app,
-        page,
+        get app() {
+          return app;
+        },
+        get page() {
+          return page;
+        },
         repoPath,
         homeDir,
         pageErrors,
-        main: app.evaluate.bind(app),
+        get main() {
+          return app.evaluate.bind(app);
+        },
+        async restart(startPath = repoPath) {
+          const note = await closeDesktopApp(app);
+          if (note) throw new Error(note);
+          app = await launch(startPath);
+          page = await app.firstWindow();
+          page.on('pageerror', (err) =>
+            pageErrors.push(err.stack || err.message)
+          );
+          page.on('console', (msg) => {
+            if (msg.type() === 'error') consoleErrors.push(msg.text());
+          });
+          await app.evaluate(({ BrowserWindow }) => {
+            const win = BrowserWindow.getAllWindows()[0];
+            win?.webContents.setBackgroundThrottling(false);
+            win?.show();
+            win?.focus();
+          });
+          await page
+            .getByRole('button', { name: 'New worktree', exact: true })
+            .first()
+            .waitFor({ state: 'visible', timeout: 30_000 });
+        },
       });
       used = true;
     } finally {
