@@ -18,13 +18,17 @@ and switching repositories. The status bar and Settings reveal and focus the sec
 The header shows a concise state. An enrolled fleet has a small **+** at its right
 edge, with **Add a machine** as its accessible label and tooltip. It opens and expands
 the instructions. It is disabled while reconnecting, resetting or completing a passkey
-flow. Beside it, **Fleet actions** (“…”) opens a menu holding **Reset fleet…**; a
-right-click on the header opens the same entry as a native context menu. Choosing it
-expands the section. The entry is disabled while reconnecting, completing a passkey
-flow or already confirming. Both buttons are siblings of the collapse trigger.
+flow. Beside it, **Fleet actions** (“…”) opens a menu headed by the grouped fleet
+fingerprint, with **Copy fleet fingerprint** and **Reset fleet…**; a right-click on the
+header opens the same two entries as a native context menu. Choosing reset expands the
+section and focuses its confirmation. Reset is disabled while the machines have not
+loaded, while reconnecting, completing a passkey flow or already confirming. Both
+buttons are siblings of the collapse trigger.
 
 The overview shows compact machine rows, local first. The fleet fingerprint is not
-part of it; it appears where it is compared: **Add a machine** and the post-join check.
+part of it. It appears where it is compared: **Add a machine**, the post-join check,
+and the Fleet actions menu, which is where a joining machine's owner finds it on a
+machine already in the fleet once the add instructions have closed.
 Rows show name, connection state and fingerprint; queue and access
 badges appear when relevant. Offline and revoked states use text and colour.
 An otherwise empty fleet says
@@ -49,7 +53,8 @@ setup…”, without protocol explanations.
 
 Successful creation returns directly to the overview and announces **Fleet created**.
 A successful join keeps **Check fleet fingerprint**, the grouped fingerprint and
-“Compare with a machine already in your fleet.” **Matches** and **Doesn’t match**
+“Compare with a machine already in your fleet: its Fleet … menu shows the
+fingerprint.” **Matches** and **Doesn’t match**
 record a human security decision. A mismatch says “Stop using remote connections.
 Reset here, then join with your fleet’s passkey.” This is advice, not a transport gate;
 membership is already established by the daemon.

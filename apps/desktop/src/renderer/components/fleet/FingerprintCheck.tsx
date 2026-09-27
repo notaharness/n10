@@ -42,7 +42,8 @@ export function FingerprintCheck({ fleetId }: { fleetId: string }) {
         {fingerprintGroups(fleetId)}
       </p>
       <p className="text-base text-muted-foreground">
-        Compare with a machine already in your fleet.
+        Compare with a machine already in your fleet: its Fleet … menu shows
+        the fingerprint.
       </p>
       <div className="flex gap-2">
         <Button size="sm" onClick={enrolment.leave}>

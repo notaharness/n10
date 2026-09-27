@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { armContextMenuChoice } from './setup/menu.js';
 import { test, expect } from './fixtures/fake-beam.js';
 import { SELF_PEER_ID, WORKBOX, type FakeBeam } from './setup/fake-beam.js';
 import {
@@ -61,6 +62,33 @@ test.describe('An enrolled machine', () => {
       .click();
     await expect
       .poll(() => desktop.app.evaluate(({ clipboard }) => clipboard.readText()))
+      .toBe('3f9a 0c4e 7d12 e805');
+  });
+
+  test('the header menu shows and copies the fleet fingerprint', async ({
+    desktop,
+  }) => {
+    const { page, app } = desktop;
+    await openFleet(desktop);
+    await page
+      .getByRole('complementary')
+      .getByRole('button', { name: 'Fleet actions' })
+      .click();
+    await expect(page.getByTestId('fleet-menu-fingerprint')).toHaveText(
+      '3f9a 0c4e 7d12 e805'
+    );
+    await page
+      .getByRole('menuitem', { name: 'Copy fleet fingerprint' })
+      .click();
+    await expect
+      .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+      .toBe('3f9a 0c4e 7d12 e805');
+
+    await app.evaluate(({ clipboard }) => clipboard.writeText(''));
+    await armContextMenuChoice(app, 'Copy fleet fingerprint');
+    await fleetToggle(page).click({ button: 'right' });
+    await expect
+      .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
       .toBe('3f9a 0c4e 7d12 e805');
   });
 

@@ -32,7 +32,7 @@ test.describe('Reset fleet on this machine', () => {
     const panel = fleetView(page);
     await expect(
       panel.getByRole('heading', { name: 'Reset fleet here?' })
-    ).toBeVisible();
+    ).toBeFocused();
     await expect(
       panel.getByText(/Other machines and your passkey stay unchanged\./)
     ).toBeVisible();
@@ -86,10 +86,15 @@ test.describe('Reset fleet on this machine', () => {
     desktop,
     beam,
   }) => {
-    const { page } = desktop;
+    const { page, app } = desktop;
     await openFleet(desktop);
-    await chooseFleetAction(page, 'Reset fleet…');
+    await expect(page.getByTestId('machine-row')).toHaveCount(2);
+    await armContextMenuChoice(app, 'Reset fleet…');
+    await fleetToggle(page).click({ button: 'right' });
     const panel = fleetView(page);
+    await expect(
+      panel.getByRole('heading', { name: 'Reset fleet here?' })
+    ).toBeFocused();
     await panel.getByLabel('Type reset to confirm').fill('reset');
     await panel.getByLabel('Type reset to confirm').press('Enter');
 
@@ -114,8 +119,24 @@ test.describe('Reset fleet on this machine', () => {
     const { page } = desktop;
     beam!.refuse('fleet.reset', 'storage-failure', 'disk full');
     await openFleet(desktop);
-    await chooseFleetAction(page, 'Reset fleet…');
+    // Reset stays disabled until the machines have loaded.
+    await expect(page.getByTestId('machine-row')).toHaveCount(2);
+    await page
+      .getByRole('complementary')
+      .getByRole('button', { name: 'Fleet actions' })
+      .press('Enter');
+    await expect(
+      page.getByRole('menuitem', { name: 'Copy fleet fingerprint' })
+    ).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(
+      page.getByRole('menuitem', { name: 'Reset fleet…' })
+    ).toBeFocused();
+    await page.keyboard.press('Enter');
     const panel = fleetView(page);
+    await expect(
+      panel.getByRole('heading', { name: 'Reset fleet here?' })
+    ).toBeFocused();
     await panel.getByLabel('Type reset to confirm').fill('reset');
     await panel.getByRole('button', { name: 'Reset fleet' }).click();
     await expect(

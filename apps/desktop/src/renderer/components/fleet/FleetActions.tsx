@@ -1,66 +1,110 @@
 import { MoreHorizontalIcon } from 'lucide-react';
-import type { MouseEvent } from 'react';
+import { useRef, type MouseEvent } from 'react';
 import { toast } from 'sonner';
-import { useBeamStatus } from '../../lib/data/queries.js';
+import { copyText } from '../../lib/copy-text.js';
+import { useBeamStatus, useMachines } from '../../lib/data/queries.js';
 import { useFleet } from '../../lib/fleet/fleet-context.js';
+import { fingerprintGroups } from '../../lib/machines/machine-model.js';
 import { errorMessage } from '../../lib/utils.js';
 import { Button } from '../ui/button.js';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu.js';
 
+const COPY_LABEL = 'Copy fleet fingerprint';
 const RESET_LABEL = 'Reset fleet…';
 
+/** Moves focus off the header, so the confirmation's heading takes it
+ *  (`useFocusOnMount` leaves focus that is somewhere else alone). */
+function releaseFocus(header: HTMLElement): void {
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && header.contains(active)) active.blur();
+}
+
 /**
- * The enrolled fleet's rare actions (beam-fleet-ux.md §1): today only
- * Reset fleet…, which opens its typed confirmation in the section.
- * `available` is false until this machine is in a fleet; `disabled`
- * while reconnecting, while a passkey flow runs or while the
+ * The enrolled fleet's actions that are not needed day to day
+ * (beam-fleet-ux.md §1): its fingerprint, for the post-join check on
+ * another machine, and Reset fleet…, which opens its typed
+ * confirmation in the section. `fingerprint` is null until this
+ * machine is in a fleet; `resetDisabled` while the section cannot show
+ * the confirmation, while a passkey flow runs, or while the
  * confirmation is already open.
  */
 export function useFleetActions() {
   const { section, reset, enrolment, revocation } = useFleet();
   const beam = useBeamStatus().data;
-  const available = !!beam?.enrolled && !!beam.fleetId;
-  const disabled =
+  const machines = useMachines().data;
+  const fingerprint =
+    beam?.enrolled && beam.fleetId ? fingerprintGroups(beam.fleetId) : null;
+  const resetDisabled =
+    !machines ||
     beam?.state !== 'ready' ||
     reset.open ||
     enrolment.ceremony.running ||
     revocation.ceremony.running;
+  const copyFingerprint = () => {
+    if (fingerprint) copyText(fingerprint, 'Fleet fingerprint copied');
+  };
   const showReset = () => {
     reset.show();
     section.setExpanded(true);
   };
-  /** The header's native context menu, the same entry as the "…" menu. */
-  const openContextMenu = (e: MouseEvent) => {
-    if (!available) return;
+  /** The header's native context menu: the "…" menu's actions. */
+  const openContextMenu = (e: MouseEvent<HTMLElement>) => {
+    if (!fingerprint) return;
     e.preventDefault();
+    const header = e.currentTarget;
     window.n10
       .showContextMenu([
-        { id: 'reset', label: RESET_LABEL, enabled: !disabled, danger: true },
+        { id: 'copy', label: COPY_LABEL },
+        { type: 'separator' },
+        {
+          id: 'reset',
+          label: RESET_LABEL,
+          enabled: !resetDisabled,
+          danger: true,
+        },
       ])
       .then(
         (chosen) => {
-          if (chosen === 'reset') showReset();
+          if (chosen === 'copy') copyFingerprint();
+          if (chosen !== 'reset') return;
+          releaseFocus(header);
+          showReset();
         },
         (err: unknown) => toast.error(errorMessage(err))
       );
   };
-  return { available, disabled, showReset, openContextMenu };
+  return {
+    fingerprint,
+    resetDisabled,
+    copyFingerprint,
+    showReset,
+    openContextMenu,
+  };
 }
 
-/** The header's "…" menu: the context menu's entries, reachable by
- *  pointer and keyboard. */
+/** The header's "…" menu: the fleet fingerprint and the context menu's
+ *  actions, reachable by pointer and keyboard. */
 export function FleetActionsMenu({
-  disabled,
+  fingerprint,
+  resetDisabled,
+  onCopy,
   onReset,
 }: {
-  disabled: boolean;
+  fingerprint: string;
+  resetDisabled: boolean;
+  onCopy: () => void;
   onReset: () => void;
 }) {
+  // Reset opens once the menu has closed, instead of focus returning to
+  // the trigger, so the confirmation's heading takes focus.
+  const resetChosen = useRef(false);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -68,11 +112,32 @@ export function FleetActionsMenu({
           <MoreHorizontalIcon />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        align="end"
+        onCloseAutoFocus={(e) => {
+          if (!resetChosen.current) return;
+          resetChosen.current = false;
+          e.preventDefault();
+          onReset();
+        }}
+      >
+        <DropdownMenuLabel>
+          Fleet{' '}
+          <span
+            className="font-mono font-normal normal-case tracking-normal text-popover-foreground"
+            data-testid="fleet-menu-fingerprint"
+          >
+            {fingerprint}
+          </span>
+        </DropdownMenuLabel>
+        <DropdownMenuItem onSelect={onCopy}>{COPY_LABEL}</DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"
-          disabled={disabled}
-          onSelect={onReset}
+          disabled={resetDisabled}
+          onSelect={() => {
+            resetChosen.current = true;
+          }}
         >
           {RESET_LABEL}
         </DropdownMenuItem>

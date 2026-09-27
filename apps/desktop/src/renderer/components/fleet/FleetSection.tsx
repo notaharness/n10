@@ -35,8 +35,9 @@ function useAwaitingPasskey(): boolean {
 /**
  * Fleet in the sidebar (beam-fleet-ux.md §1): a collapsible section
  * whose header keeps the fleet's state in view and holds its actions
- * (add, and behind "…" or a right-click, reset), and whose body holds
- * the machines, the first-run and pairing steps. Its state lives in `FleetProvider`, so the Workspace's
+ * (add, and behind "…" or a right-click, the fleet fingerprint and
+ * reset), and whose body holds the machines and the first-run and
+ * pairing steps. Its state lives in `FleetProvider`, so the Workspace's
  * sidebar and the repository picker's show the same section.
  */
 export function FleetSection() {
@@ -93,7 +94,7 @@ export function FleetSection() {
             )}
           </button>
         </CollapsibleTrigger>
-        {actions.available && (
+        {actions.fingerprint && (
           <Tip label="Add a machine">
             <Button
               size="icon-xs"
@@ -115,9 +116,11 @@ export function FleetSection() {
             </Button>
           </Tip>
         )}
-        {actions.available && (
+        {actions.fingerprint && (
           <FleetActionsMenu
-            disabled={actions.disabled}
+            fingerprint={actions.fingerprint}
+            resetDisabled={actions.resetDisabled}
+            onCopy={actions.copyFingerprint}
             onReset={actions.showReset}
           />
         )}
