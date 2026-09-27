@@ -79,8 +79,9 @@ function mergedAt(head: string): VcsProvider {
   } as unknown as VcsProvider;
 }
 
-async function sweep(provider: VcsProvider): Promise<void> {
+async function sweep(provider: VcsProvider, cwd?: string): Promise<void> {
   await sweepMergedBranches({
+    cwd,
     provider,
     vcsConfigured: true,
     config: { autoDeleteOnMerge: true, vendorAuth: {}, vendorProject: {} },
@@ -142,6 +143,25 @@ describe('merged-branch cleanup', () => {
     forget(merged);
 
     await sweep(mergedAt(merged));
+
+    expect(existsSync(worktree)).toBe(false);
+  });
+
+  // The desktop's process directory follows whichever repository is
+  // open; the fetch belongs to the one being swept.
+  it('fetches a merged head in the repository being swept', async () => {
+    const origin = join(root, 'origin.git');
+    execFileSync('git', ['init', '-q', '--bare', '-b', 'main', origin]);
+    git(repo, 'remote', 'add', 'origin', origin);
+    const merged = aheadThenBehind();
+    git(worktree, 'push', '-q', 'origin', `${merged}:refs/heads/feature`);
+    git(repo, 'update-ref', '-d', 'refs/remotes/origin/feature');
+    forget(merged);
+    const elsewhere = join(root, 'elsewhere');
+    execFileSync('git', ['init', '-q', '-b', 'main', elsewhere]);
+    process.chdir(elsewhere);
+
+    await sweep(mergedAt(merged), repo);
 
     expect(existsSync(worktree)).toBe(false);
   });
