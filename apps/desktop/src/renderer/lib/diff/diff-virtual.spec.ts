@@ -4,6 +4,7 @@ import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
+import type { InlineTarget } from '../review/my-drafts.js';
 import { buildFlatDiff } from './diff-virtual.js';
 
 function ctx(oldLine: number, newLine: number): DiffLine {
@@ -207,5 +208,48 @@ describe('LEFT-side comments on unchanged lines', () => {
       (r) => r.kind === 'comments' && r.threads.some((t) => t.id === 't-left')
     );
     expect(hits).toHaveLength(1);
+  });
+});
+
+describe("the reviewer's own drafts", () => {
+  const mine = (key: string, end: number | null): InlineTarget => ({
+    kind: 'inline',
+    key,
+    anchor: {
+      path: 'a.ts',
+      previousPath: null,
+      range: end
+        ? { startSide: 'RIGHT', start: end, side: 'RIGHT', end }
+        : null,
+      head: null,
+      lines: [],
+    },
+  });
+  const mineByFile = new Map([['a.ts', [mine('l', 2), mine('f', null)]]]);
+
+  it('hangs a line draft under its line and a file draft under the header', () => {
+    const { rows, indexById } = buildFlatDiff(
+      [['a.ts', smallFile]],
+      options({ mineByFile })
+    );
+    expect(rows.map((r) => r.kind)).toEqual([
+      'file-header',
+      'file-drafts',
+      'unified',
+      'unified',
+      'comments',
+      'unified',
+    ]);
+    expect(indexById.get('f')).toBe(1);
+    expect(indexById.get('l')).toBe(4);
+  });
+
+  it('keeps a whole-file draft, and counts them all, while the file is collapsed', () => {
+    const { rows, stats } = buildFlatDiff(
+      [['a.ts', smallFile]],
+      options({ mineByFile, fileState: new Map([['a.ts', { open: false }]]) })
+    );
+    expect(rows.map((r) => r.kind)).toEqual(['file-header', 'file-drafts']);
+    expect(stats.get('a.ts')?.mineCount).toBe(2);
   });
 });

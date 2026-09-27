@@ -98,6 +98,8 @@ export interface FileStats {
   dels: number;
   openThreads: number;
   draftCount: number;
+  /** The reviewer's own drafts on this file, lines and whole file. */
+  mineCount: number;
   collapseReason: CollapseReason;
   open: boolean;
   viewed: boolean;
@@ -162,6 +164,7 @@ function fileSlice(
       dels,
       openThreads: allThreads.filter((t) => !t.isResolved).length,
       draftCount: activeDrafts.length,
+      mineCount: opts.mineByFile?.get(file)?.length ?? 0,
       collapseReason,
       open: state.open ?? collapseReason === null,
       viewed: state.viewed ?? false,
@@ -192,16 +195,9 @@ export function buildFlatDiff(
     fileIndex.set(file, rows.length);
     rows.push({ key: `h:${file}`, kind: 'file-header', file });
     stats.set(file, slice.stats);
-    if (!slice.stats.open) continue;
-
-    const present = presentAnchors(lines);
-    const t = anchorComments(present, visibleThreads, (x) =>
-      x.lineStart == null ? null : x.lineEnd ?? x.lineStart
-    );
-    const d = anchorComments(present, activeDrafts, (x) => x.lineEnd);
     const own = splitMine(opts.mineByFile?.get(file) ?? []);
-    const m = anchorComments(present, own.onLines, (x) => x.anchor.range!.end);
-    const pinnedAll = new Set([...t.pinned, ...d.pinned, ...m.pinned]);
+    // Under the header, so a comment on the whole file shows even while
+    // the file is collapsed (generated, large, or marked Viewed).
     if (own.onFile.length > 0) {
       for (const x of own.onFile) indexById.set(x.key, rows.length);
       rows.push({
@@ -211,6 +207,15 @@ export function buildFlatDiff(
         mine: own.onFile,
       });
     }
+    if (!slice.stats.open) continue;
+
+    const present = presentAnchors(lines);
+    const t = anchorComments(present, visibleThreads, (x) =>
+      x.lineStart == null ? null : x.lineEnd ?? x.lineStart
+    );
+    const d = anchorComments(present, activeDrafts, (x) => x.lineEnd);
+    const m = anchorComments(present, own.onLines, (x) => x.anchor.range!.end);
+    const pinnedAll = new Set([...t.pinned, ...d.pinned, ...m.pinned]);
 
     const unified = buildUnifiedRows(lines, {
       pinnedAnchors: pinnedAll,

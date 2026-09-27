@@ -74,6 +74,29 @@ export function extend(
   return { ...sel, head: point.line };
 }
 
+/**
+ * Extend `sel` to `point` when every line between them on that side is
+ * on screen among `points`, else null. A range covers exactly what is
+ * highlighted: in the unified view an old-side range is a run of
+ * removed lines (unchanged lines between them stand for the new side),
+ * and no range reaches across lines a fold hides.
+ */
+export function extendOnScreen(
+  points: readonly LinePoint[],
+  sel: LineSelection | null,
+  point: LinePoint
+): LineSelection | null {
+  const next = extend(sel, point);
+  const { start, end } = selectionRange(next);
+  const shown = new Set(
+    points
+      .filter((p) => p.file === next.file && p.side === next.side)
+      .map((p) => p.line)
+  );
+  for (let n = start; n <= end; n++) if (!shown.has(n)) return null;
+  return next;
+}
+
 export function selectionRange(sel: LineSelection): LineRange {
   return {
     startSide: sel.side,
@@ -149,7 +172,24 @@ export function neighbour(
   return null;
 }
 
-/** "RIGHT 41–43", "LEFT 18", the words a composer names its place with. */
+/**
+ * The other column of the same split row, left or right of `from`:
+ * `points` holds a row's cells old side first, and `rowOf` says which
+ * row a point sits in. Null for a row with one side only.
+ */
+export function across(
+  points: readonly LinePoint[],
+  from: LinePoint,
+  dir: 1 | -1,
+  rowOf: (p: LinePoint) => number | undefined
+): LinePoint | null {
+  const at = points.findIndex((p) => samePoint(p, from));
+  const p = at < 0 ? undefined : points[at + dir];
+  return p && rowOf(p) === rowOf(from) ? p : null;
+}
+
+/** "new lines 41–43", "old line 18": the words a composer names its
+ *  place with. */
 export function rangeWords(range: LineRange): string {
   const side = range.side === 'LEFT' ? 'old' : 'new';
   return range.start === range.end

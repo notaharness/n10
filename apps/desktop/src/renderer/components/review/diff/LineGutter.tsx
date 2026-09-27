@@ -5,14 +5,18 @@ import {
   type LinePoint,
 } from '../../../lib/diff/range-selection.js';
 import { cn } from '../../../lib/utils.js';
+import { Button } from '../../ui/button.js';
+import { Tip } from '../../ui/tooltip.js';
 
 /**
  * How a line's gutter takes part in commenting. The line number is a
- * button: click to select it, Shift-click to extend the selection on
- * the same side. With it focused, Up/Down move and Shift+Up/Down
- * extend; Enter opens a comment on the selection. One gutter per file
- * is a tab stop, so reading the diff never means tabbing through
- * every line. The code itself stays plain text to select and copy.
+ * toggle: click to select it (again to let it go), Shift-click to
+ * extend the selection on the same side. With it focused, Up/Down move
+ * and Shift+Up/Down extend; in Split, Left/Right cross to the other
+ * column; Enter opens a comment on the selection. One gutter per file
+ * is a tab stop, so reading the diff never means tabbing through every
+ * line. The list announces the selected range and its file. The code
+ * itself stays plain text to select and copy.
  */
 export interface GutterProps {
   point: LinePoint;
@@ -66,15 +70,16 @@ export function LineGutter({
         {children}
       </button>
       {gutter.commentHere && (
-        <button
-          type="button"
-          aria-label={`Comment on ${gutter.rangeLabel ?? words}`}
-          title={`Comment on ${gutter.rangeLabel ?? words}`}
-          onClick={gutter.onComment}
-          className="absolute -right-5 top-0 z-[2] flex size-5 items-center justify-center rounded bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-        >
-          <MessageSquarePlusIcon className="size-3.5" />
-        </button>
+        <Tip label={`Comment on ${gutter.rangeLabel ?? words}`}>
+          <Button
+            size="icon-xs"
+            aria-label={`Comment on ${gutter.rangeLabel ?? words}`}
+            onClick={gutter.onComment}
+            className="absolute -right-5 top-0 z-[2] size-5 shadow-sm"
+          >
+            <MessageSquarePlusIcon />
+          </Button>
+        </Tip>
       )}
     </span>
   );

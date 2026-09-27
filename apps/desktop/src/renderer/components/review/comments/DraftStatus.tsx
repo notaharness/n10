@@ -62,14 +62,15 @@ export function UnsavedChoice({
   onUndo,
 }: {
   draft: DurableDraft;
-  onClose: () => void;
+  /** Told whether the text was kept (a retry landed) or let go. */
+  onClose: (kept: boolean) => void;
   onKeepEditing: () => void;
   onUndo?: () => void;
 }) {
   // Once a retry lands there is nothing left to decide.
   const kept = draft.save.kind === 'saved';
   useEffect(() => {
-    if (kept) onClose();
+    if (kept) onClose(true);
   }, [kept, onClose]);
   const retrying = draft.save.kind === 'saving';
   return (
@@ -112,7 +113,8 @@ export function UnsavedChoice({
         variant="ghost"
         size="sm"
         onClick={() => {
-          draft.discard(onUndo).then(onClose, onClose);
+          const gone = () => onClose(false);
+          draft.discard(onUndo).then(gone, gone);
         }}
       >
         Discard

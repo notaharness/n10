@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { DiffLine } from '@n10/diff';
 import {
+  across,
   extend,
+  extendOnScreen,
   isSelected,
   neighbour,
   rangeSource,
@@ -79,6 +81,56 @@ describe('moving through the lines on screen', () => {
   it('keeps to one side when extending', () => {
     expect(neighbour(points, R(40), 1, true)).toEqual(R(41));
     expect(neighbour(points, L(19), 1, true)).toBeNull();
+  });
+});
+
+describe('a range covers only what is highlighted', () => {
+  // Unified: L18 removed, then unchanged lines (new side), then L41.
+  const unified = [L(18), R(19), R(20), L(41), R(42)];
+
+  it('stops an old-side range at the unchanged lines after a removal', () => {
+    expect(extendOnScreen(unified, select(L(18)), L(41))).toBeNull();
+  });
+
+  it('grows over consecutive lines, across removals on the new side', () => {
+    const points = [R(40), L(18), L(19), R(41), R(42)];
+    expect(extendOnScreen(points, select(R(40)), R(42))).toEqual(
+      extend(select(R(40)), R(42))
+    );
+    expect(extendOnScreen(points, select(L(18)), L(19))).toEqual(
+      extend(select(L(18)), L(19))
+    );
+  });
+
+  it('does not reach across lines a fold hides', () => {
+    expect(extendOnScreen([R(3), R(4), R(30)], select(R(4)), R(30))).toBeNull();
+  });
+
+  it('starts afresh on the other side, as extend does', () => {
+    expect(extendOnScreen(unified, select(L(18)), R(19))).toEqual(
+      select(R(19))
+    );
+  });
+});
+
+describe('crossing columns in the split view', () => {
+  // Two rows: [L10, R12] and a one-sided [R13].
+  const points = [L(10), R(12), R(13)];
+  const rows = new Map([
+    ['LEFT:10', 0],
+    ['RIGHT:12', 0],
+    ['RIGHT:13', 1],
+  ]);
+  const rowOf = (p: LinePoint) => rows.get(`${p.side}:${p.line}`);
+
+  it('moves to the other cell of the same row', () => {
+    expect(across(points, L(10), 1, rowOf)).toEqual(R(12));
+    expect(across(points, R(12), -1, rowOf)).toEqual(L(10));
+  });
+
+  it('stays put where the row has one side', () => {
+    expect(across(points, R(12), 1, rowOf)).toBeNull();
+    expect(across(points, R(13), -1, rowOf)).toBeNull();
   });
 });
 

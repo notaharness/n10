@@ -1,107 +1,67 @@
-import { PencilIcon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
-import { useRef } from 'react';
-import { refocusAfter } from '../../../lib/focus.js';
+import { TriangleAlertIcon } from 'lucide-react';
 import { rangeSource, rangeWords } from '../../../lib/diff/range-selection.js';
 import { useMyDrafts } from '../../../lib/review/my-drafts-context.js';
 import type { InlineTarget } from '../../../lib/review/my-drafts.js';
 import { useReviewDraft } from '../../../lib/review/review-drafts.js';
-import { Badge } from '../../ui/badge.js';
-import { Button } from '../../ui/button.js';
-import { CommentBody } from './CommentBody.js';
 import { CommentComposer } from './CommentComposer.js';
+import { OwnDraftCard, OwnDraftPlace } from './OwnDraftCard.js';
 
 /**
- * The reviewer's own comment on code, before it is published: a card
- * saying whose it is, where it goes and that nobody else can see it,
- * or the composer while it is being written. Labelled so it is never
- * mistaken for a posted thread or an agent's finding.
+ * The reviewer's own comment on code, before it is published: its card,
+ * or the composer while it is being written. Closed, the keyboard stays
+ * with the comment: on its card, or — when nothing was kept — on the
+ * line (or file) it was about, in this diff.
  */
 export function MyDraftCard({ target }: { target: InlineTarget }) {
   const scope = useMyDrafts();
   const draft = useReviewDraft(scope.ref, target);
   const { key, anchor } = target;
-  const editing = scope.editing.has(key);
-  const card = useRef<HTMLElement>(null);
-  // Closed, the keyboard stays with the comment: on its card, or — when
-  // nothing was kept — on the line (or file) it was about.
-  const whereItWas = () =>
-    document.querySelector<HTMLElement>(
-      anchor.range
-        ? `[data-file="${CSS.escape(anchor.path)}"][data-point="${
-            anchor.range.side
-          }:${anchor.range.end}"]`
-        : `[aria-label="${CSS.escape(`Comment on ${anchor.path}`)}"]`
-    );
-  const toCard = () => refocusAfter(() => card.current);
   const where = anchor.range ? rangeWords(anchor.range) : 'whole file';
   const place = (
-    <span className="flex min-w-0 items-center gap-1.5">
-      <Badge variant="outline" className="border-primary/40 text-primary">
-        Your draft
-      </Badge>
+    <OwnDraftPlace>
       <span className="truncate font-mono">
         {anchor.path} · {where}
       </span>
-      <span className="shrink-0 text-muted-foreground">· Private to you</span>
-    </span>
+    </OwnDraftPlace>
   );
+  // Undo brings the text back before its save lands: show the card now.
+  const undone = () => {
+    scope.restore(target);
+    scope.focusDraft(key);
+  };
+  const gone = () => {
+    scope.dropFresh(key);
+    scope.focusAnchor(target);
+  };
 
-  if (editing) {
+  if (scope.editing.has(key)) {
     return (
       <CommentComposer
         draft={draft}
         place={place}
         primary="Add to review"
         placeholder="Leave a comment… Markdown supported. ⌘/Ctrl+Enter adds it to your review."
-        onUndo={toCard}
-        onClose={() => {
+        takeFocus={() => scope.takeFocus(key)}
+        onUndo={undone}
+        onClose={(kept) => {
           scope.setEditing(key, false);
-          if (draft.body.trim()) return toCard();
-          scope.dropFresh(key);
-          refocusAfter(whereItWas);
+          if (kept) scope.focusDraft(key);
+          else gone();
         }}
       />
     );
   }
   if (!draft.body.trim()) return null;
   return (
-    <article
-      ref={card}
-      tabIndex={-1}
-      data-my-draft={key}
-      className="overflow-hidden rounded-lg border border-primary/30 bg-card font-sans text-card-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <header className="flex items-center gap-2 border-b border-border bg-primary/5 px-3 py-1.5 text-xs">
-        <span className="min-w-0 flex-1">{place}</span>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Edit draft"
-          onClick={() => scope.setEditing(key, true)}
-        >
-          <PencilIcon />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Discard draft"
-          className="hover:text-destructive"
-          onClick={() => {
-            // `discard` never rejects.
-            void draft.discard(toCard).then(() => {
-              scope.dropFresh(key);
-              refocusAfter(whereItWas);
-            });
-          }}
-        >
-          <Trash2Icon />
-        </Button>
-      </header>
-      <CodeMoved target={target} />
-      <div className="px-3 py-2">
-        <CommentBody markdown={draft.body} />
-      </div>
-    </article>
+    <OwnDraftCard
+      id={key}
+      place={place}
+      body={draft.body}
+      notice={<CodeMoved target={target} />}
+      onEdit={() => scope.setEditing(key, true)}
+      // `discard` never rejects.
+      onDiscard={() => void draft.discard(undone).then(gone)}
+    />
   );
 }
 
