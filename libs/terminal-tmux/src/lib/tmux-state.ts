@@ -53,6 +53,26 @@ export function tmuxPaneState(name: string): TmuxPaneState | null {
   return parsePaneStateResult(runTmux(paneStateArgs(name)));
 }
 
+/** `#{pane_current_path}` of every pane in the session, one fork: the
+ *  working directory of each pane's foreground process, which tmux
+ *  reads from the kernel, so it follows a directory through a rename.
+ *  A deleted directory reads as its last path with ` (deleted)` added;
+ *  a pane tmux cannot read reports `''`. Empty when there is no such
+ *  session or no server. A path containing a newline splits into
+ *  entries that name no directory. */
+export function tmuxPanePaths(name: string): string[] {
+  const { stdout, exitCode } = runTmux([
+    '-u',
+    'list-panes',
+    '-s',
+    '-t',
+    `=${name}:`,
+    '-F',
+    '#{pane_current_path}',
+  ]);
+  return exitCode === 0 ? stdout.replace(/\r?\n$/, '').split('\n') : [];
+}
+
 /** Outcome of an async pane-state read, for the backend's poller. A
  *  non-zero exit or spawn error (`EAGAIN`/`EMFILE` on fork, `ENOENT`, the
  *  5s timeout kill — see `runTmuxAsync`) means n10 could not talk to

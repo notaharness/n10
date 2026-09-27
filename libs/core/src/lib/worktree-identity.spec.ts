@@ -29,6 +29,9 @@ vi.mock('@n10/terminal-tmux', () => ({
   isTmuxAvailable: vi.fn(),
   tmuxKillSession: vi.fn(),
   tmuxListSessionsDetailed: () => listMock(),
+  // No agent here has moved with its checkout.
+  tmuxPanePaths: () => [],
+  tmuxSetOptions: vi.fn(),
 }));
 vi.mock('@n10/worktree-manager', () => ({ listWorktrees: vi.fn() }));
 vi.mock('./pty-registry.js', () => ({

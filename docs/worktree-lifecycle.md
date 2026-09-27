@@ -12,7 +12,8 @@ removal PRs have landed.
 A worktree is a checkout directory, independently of its branch and its agent.
 The internal key is `(worktree, canonical repo root, canonical checkout path)`;
 branch names and tmux session names are labels. A symlink alias resolves to the
-same physical identity. A directory move changes that identity.
+same physical identity. A directory move changes that identity; see
+[Relocation](#relocation) for a moved repository.
 
 `listWorktrees` reads Git's porcelain list and keeps only paths owned by the
 configured resolver: `.claude/worktrees/` by default, or `worktreePath` from the
@@ -81,7 +82,7 @@ link; an unexpected pass fails CI and requires removing the annotation.
 | n10 exits/restarts, agents alive                                                       | Detach on exit; attach same process on restart                          | Initial scan adopts persisted sessions                                    | Restores live tab and output; same tmux session                                                                         | Filled row and same pane PID/output                        | Scan, Tabs, Exit                                                                   | D9, C9 (`sessions alive`)                                                       |
 | n10 restarts with no surviving sessions                                                | Rediscover checkout; do not silently start agent                        | Git list, no adoption                                                     | Row; selecting opens tab offering Launch agent                                                                          | Hollow row, no tmux process created                        | List, Scan, Rows                                                                   | D9, C9 (`sessions gone`)                                                        |
 | Machine reboot (sessions gone) / persistent sessions restored by another tool          | Same as restart with actual surviving session state                     | No disk session database; Git and tmux are authoritative                  | Idle row or live restored tab respectively                                                                              | Hollow or filled row respectively                          | List, Scan, Tabs                                                                   | D9/C9 model the post-reboot states; no actual OS reboot                         |
-| Repository moved, worktrees repaired, reopened at new path                             | Preserve or explicitly recover surviving agent association              | New root does not match stale `@orchestra-repo` / checkout tags           | **Mismatch:** row exists, offers Launch agent; surviving agent has no restored worktree tab                             | **Mismatch:** hollow row despite surviving agent           | Identity, Scan, Tabs                                                               | D10, C10 (`moved`, known failure #208)                                          |
+| Repository moved, worktrees repaired, reopened at new path                             | Preserve the surviving agent association                                | Scan rebinds tags; see Relocation                                         | Restores the live tab and output; no duplicate agent                                                                    | Filled row, same process                                   | Identity, Scan, Relocation                                                         | D10, C10 (`moved`)                                                              |
 | Same repository reached through symlink                                                | One physical checkout identity and same agent                           | Canonical root/path matches tags                                          | Same live checkout tab, no duplicate                                                                                    | Filled row, same process                                   | Identity, Scan, Rows, Tabs                                                         | D10, C10 (`symlink`)                                                            |
 | TUI with running agents → `q` (#56)                                                    | Exit promptly; agents survive                                           | Scanner unmounts; `killAll` disposes clients, not hosted sessions         | N/A; desktop restart test checks clean quit detaches                                                                    | C11 passes: TUI process exits; no need to terminate agents | Exit                                                                               | C11; D9 for Desktop                                                             |
 | Worktree → remove in n10                                                               | Stop associated session, remove checkout, close its tab/row             | Baseline has split shell removal paths                                    | Removal/tab reconciliation work belongs to #205/#206                                                                    | Removal flow consolidation belongs to #205                 | [`remove-worktree`](../libs/core/src/lib/session/remove-worktree.ts), Scan, Rows   | Removal index: baseline Desktop cases + #205/#206                               |
@@ -89,10 +90,40 @@ link; an unexpected pass fails CI and requires removing the annotation.
 | Worktree → `rm -rf` without prune                                                      | Treat missing checkout as removed even if registered                    | Baseline keeps Git's prunable registration                                | Ghost row/tab can linger                                                                                                | Ghost row can linger                                       | List, Scan                                                                         | Removal index; #206 for automatic reconciliation                                |
 | Whole repository deleted                                                               | No stale worktree tabs; unavailable-repo handling                       | Git listing fails to `[]`; cached root/tags cannot recover a missing repo | Baseline has no comprehensive removed-path reconciliation                                                               | Refresh can empty rows; cannot operate in deleted cwd      | List, Identity, Scan                                                               | Removal scope; #205/#206, with whole-repo error UX still requiring verification |
 
-Repository relocation while the app stays open additionally leaves cached roots,
-resolver paths and file watches referring to the former location. #208 includes
-that recovery policy; the executable reproduction deliberately repairs Git and
-reopens the repo to isolate n10's stale identity tags from broken Git metadata.
+## Relocation
+
+A moved repository ([#208](https://github.com/notaharness/n10/issues/208)) keeps
+its agents by rebinding each session's tags, never by matching a branch or a
+label. A discovery scan rebinds a session only when two independent facts agree:
+
+- **Structure**: the repository its tags name no longer exists, and the open
+  repository lists a checkout at the same path relative to its root as the
+  tagged checkout had relative to the old one.
+- **Kernel**: tmux reports exactly that checkout root as the current path of
+  every pane in the session (`#{pane_current_path}`, the working directory of
+  each pane's foreground process, which follows a directory through a rename).
+  One pane elsewhere refuses the session.
+
+The session must also be live and local, the checkout unclaimed by another
+session's tags, the match unambiguous (one session with that evidence per
+checkout, so clones moved together are told apart by their panes), and the
+running process must hold no connection to it under its old key. The scan then
+rewrites `@orchestra-worktree-path` and `@orchestra-repo` in one tmux command and
+adopts the session as usual
+([`rebindMovedSessions`](../libs/core/src/lib/discovery/moved-sessions.ts), run
+by `observeTmuxSessions`). Only a session that passes the structural check costs
+a tmux fork.
+
+Anything else stays unbound: a copied repository (new directories no process
+runs in), a deleted one (its panes report a `(deleted)` path), a foreground job
+outside the checkout root, a retained dead pane, and `git worktree move` within
+a repository that still exists. Such a session remains an orphan. tmux cannot
+show a job-control shell whose foreground job moved while the shell did not.
+
+n10 does not follow a repository that moves while it is open: the cached root,
+resolver and directory watch keep referring to the old path. Reopen the
+repository at its new location after `git worktree repair` (Desktop: open it;
+TUI: restart there). The first scan rebinds the surviving agents.
 
 ## Executable coverage index
 
@@ -117,8 +148,6 @@ Paths below are under `apps/desktop-e2e/src` (**D**) and `apps/cli-e2e/src` (**C
 
 ## Follow-ups and test boundaries
 
-- [#208](https://github.com/notaharness/n10/issues/208): repository relocation
-  requires a safe identity migration/recovery policy. Never match by branch alone.
 - [#209](https://github.com/notaharness/n10/issues/209): Desktop detached-HEAD
   adoption/launch needs checkout-path addressing across discovery, launch and editor
   actions. Its discovery/contract changes overlap #205/#206, so they stay separate.

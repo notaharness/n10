@@ -9,6 +9,8 @@ const {
   tmuxListSessionsMock,
   execFileSyncMock,
   liveSessionNamesMock,
+  paneCwdMock,
+  setOptionsMock,
 } = vi.hoisted(() => {
   return {
     isTmuxAvailableMock: vi.fn<() => Promise<TmuxStatus>>(),
@@ -19,6 +21,9 @@ const {
     // session names this process currently holds alive, independent of
     // whatever the worktree list or tmux happen to report this scan.
     liveSessionNamesMock: vi.fn<() => string[]>(),
+    paneCwdMock: vi.fn<(name: string) => string>(),
+    setOptionsMock:
+      vi.fn<(name: string, tags: Record<string, string>) => void>(),
   };
 });
 
@@ -30,6 +35,11 @@ vi.mock('@n10/terminal-tmux', () => ({
   isTmuxAvailable: () => isTmuxAvailableMock(),
   tmuxKillSession: (name: string) => tmuxKillSessionMock(name),
   tmuxListSessionsDetailed: () => tmuxListSessionsMock(),
+  tmuxPanePaths: (name: string) => [paneCwdMock(name)],
+  tmuxSetOptions: (name: string, tags: Record<string, string>) => {
+    setOptionsMock(name, tags);
+    return { stdout: '', stderr: '', exitCode: 0 };
+  },
 }));
 vi.mock('@n10/worktree-manager', () => ({
   branchToSessionName: (branch: string) => branch.replace(/\//g, '-'),
@@ -102,6 +112,9 @@ beforeEach(async () => {
   tmuxListSessionsMock.mockReturnValue([]);
   liveSessionNamesMock.mockReset();
   liveSessionNamesMock.mockReturnValue([]);
+  paneCwdMock.mockReset();
+  paneCwdMock.mockReturnValue('');
+  setOptionsMock.mockReset();
   // getRepoRoot memoizes for the process, so a test that let it resolve
   // to null would decide every later one. Reset and let it find /repo.
   resetRepoRoot();
@@ -397,6 +410,24 @@ describe('observeTmuxSessions', () => {
       persisted: new Set(),
       terminals: [],
     });
+  });
+
+  // The repository moved with its agent running: the tags still name
+  // the old checkout, and the pane process sits in the new one.
+  it('rebinds a session whose checkout moved with its agent, and reports it persisted', () => {
+    const old = '/old/.claude/worktrees/moved';
+    tmuxListSessionsMock.mockReturnValue([
+      ours('old-moved', 'worktree', '/old', 'moved', old),
+    ]);
+    paneCwdMock.mockReturnValue(dirOf('moved'));
+    const seen = observeTmuxSessions([wt('moved', 'moved')]);
+    expect(setOptionsMock).toHaveBeenCalledWith('old-moved', {
+      '@orchestra-worktree-path': dirOf('moved'),
+      '@orchestra-repo': '/repo',
+    });
+    expect(seen.persisted).toEqual(
+      new Set([worktreeSessionKey(dirOf('moved'))])
+    );
   });
 
   // A detached-HEAD worktree has no branch; its session is tagged with

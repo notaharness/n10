@@ -17,6 +17,7 @@ export interface MachineExecutor {
 }
 export {
   tmuxListSessionsDetailed,
+  tmuxPanePaths,
   tmuxPaneState,
   tmuxPaneStateAsync,
   type TmuxPaneState,
@@ -270,6 +271,19 @@ export function tmuxSetOption(
   value: string
 ): TmuxRunResult {
   return runTmux(setOptionArgv(name, option, value));
+}
+
+/** Set several session options in one tmux command list, which the
+ *  server applies together: no other client reads a mix of old and new
+ *  values. */
+export function tmuxSetOptions(
+  name: string,
+  options: Record<string, string>
+): TmuxRunResult {
+  const [first, ...rest] = Object.entries(options).map(([option, value]) =>
+    setOptionArgv(name, option, value)
+  );
+  return first ? runTmux(first, rest) : { stdout: '', stderr: '', exitCode: 0 };
 }
 
 /** tmux decides from `LANG`/`LC_CTYPE`/`LC_ALL` whether its client is

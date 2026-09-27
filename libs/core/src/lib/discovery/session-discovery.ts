@@ -160,7 +160,7 @@ export function startSessionDiscovery(
   let watcher: FSWatcher | null = null;
   let watchTimer: ReturnType<typeof setTimeout> | null = null;
 
-  async function observe(): Promise<DiscoveryScan> {
+  async function observe(): Promise<DiscoveryScan | null> {
     const worktrees: DiscoveredWorktree[] = (await listWorktrees()).map(
       (wt) => ({
         name: keyForWorktree(wt),
@@ -168,6 +168,10 @@ export function startSessionDiscovery(
         path: wt.path,
       })
     );
+    // A repository opened during the listing: its root must not meet
+    // this one's checkouts, least of all where the observation below
+    // rebinds a moved session's tags.
+    if (stopped || !isCurrent()) return null;
     const seen = observeTmuxSessions(worktrees);
     return {
       worktrees,
@@ -235,7 +239,7 @@ export function startSessionDiscovery(
   async function runScan(): Promise<void> {
     if (stopped || !isCurrent()) return;
     const next = await observe();
-    if (stopped || !isCurrent()) return;
+    if (!next || stopped || !isCurrent()) return;
     forgetFailuresFor(next);
     const delta = diffScans(
       previous,
