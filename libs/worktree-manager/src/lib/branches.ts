@@ -242,6 +242,29 @@ export async function branchTip(
   }
 }
 
+/**
+ * Whether `commit` is `other` or one of its ancestors. False when git
+ * cannot tell, `other` never having been fetched for one: a caller
+ * deciding whether work is safe to delete must treat not knowing as no.
+ */
+export async function isAncestorOf(
+  commit: string,
+  other: string,
+  cwd?: string
+): Promise<boolean> {
+  assertShellSafeRef(commit, 'commit');
+  assertShellSafeRef(other, 'commit');
+  try {
+    await exec(
+      `git merge-base --is-ancestor "${commit}" "${other}"`,
+      gitOptions(cwd)
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Delete a local git branch. Returns true on success, false on failure. */
 export async function deleteBranch(
   branch: string,
