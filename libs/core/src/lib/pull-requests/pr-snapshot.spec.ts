@@ -118,6 +118,54 @@ describe('readPullRequestSnapshot: whose answer this is', () => {
     await expect(snap).rejects.toThrow('n10 acts as carol now, not bob');
   });
 
+  it('refuses an account change during the reads when the caller named no account', async () => {
+    // Omitted or null, the caller still gets an answer read as a single
+    // account: the one configured when the read started.
+    for (const asked of [{}, { viewer: null }]) {
+      let viewer: string | null = null;
+      const snap = readPullRequestSnapshot(
+        { ref: REF, ...asked },
+        sources({
+          viewer: () => viewer,
+          lookup: () => {
+            viewer = 'carol';
+            return Promise.resolve({ kind: 'found', pr: ROW });
+          },
+        })
+      );
+      await expect(snap).rejects.toThrow(
+        'n10 acts as carol now; no account was configured when this was asked'
+      );
+    }
+  });
+
+  it('refuses a caller that saw no account once one is configured', async () => {
+    await expect(
+      readPullRequestSnapshot({ ref: REF, viewer: null }, sources())
+    ).rejects.toThrow('n10 acts as bob now; no account was configured');
+    await expect(
+      readPullRequestSnapshot(
+        { ref: REF, viewer: 'bob' },
+        sources({ viewer: () => null })
+      )
+    ).rejects.toThrow('No account is configured now; this was asked as bob');
+  });
+
+  it('echoes only an id the provider named, never the one it was sent', async () => {
+    // No detail read confirms anything: the caller's id goes unechoed,
+    // so an answer never passes it off as the provider's.
+    const unconfirmed = await readPullRequestSnapshot(
+      { ref: { ...REF, id: 'R_1' } },
+      sources()
+    );
+    expect(unconfirmed.ref).toEqual(REF);
+    const confirmed = await readPullRequestSnapshot(
+      { ref: { ...REF, id: 'R_1' } },
+      sources({ detail: () => Promise.resolve(detail()) })
+    );
+    expect(confirmed.ref).toEqual({ ...REF, id: 'R_1' });
+  });
+
   it('refuses a repository that is not the one the caller read before', async () => {
     // Renamed away and replaced by a new repository at the same path.
     await expect(
@@ -226,6 +274,13 @@ describe('parseSnapshotRequest', () => {
       ref: REF,
       viewer: 'bob',
     });
+    // Null is "the caller saw no account", which is a constraint;
+    // omitted is none.
+    expect(parseSnapshotRequest({ ref: REF, viewer: null })).toEqual({
+      ref: REF,
+      viewer: null,
+    });
+    expect(parseSnapshotRequest({ ref: REF })).toEqual({ ref: REF });
   });
 
   it.each([

@@ -29,8 +29,10 @@ import type { PullRequestLookup } from './pull-request-cache.js';
  * local branch in for them is `resolvePrComparison`'s job.
  */
 export interface PullRequestSnapshot {
-  /** The ref asked about, with the repository's `id` once the detail
-   *  read has named it — the id to store beside anything persisted. */
+  /** The ref asked about. Its `id` is the one this read's detail named
+   *  — the id to store beside anything persisted — and absent when the
+   *  detail named none: an id the caller sent is never echoed back as
+   *  though the provider had confirmed it. */
   ref: PullRequestRef;
   /** The account n10 is configured to act as: the GitHub username, or
    *  the Azure DevOps email. Configured, not proven: a credential
@@ -52,9 +54,12 @@ export interface PullRequestSnapshot {
 
 export interface SnapshotRequest {
   ref: PullRequestRef;
-  /** The account the caller last saw. A different one now means the
-   *  caller's state belongs to someone else, so the read is refused. */
-  viewer?: string;
+  /** The account the caller last saw, or null when it saw none. A
+   *  different one now means the caller's state belongs to someone
+   *  else, so the read is refused. Omitted, the read is answered as
+   *  whichever account is configured — but never as one that changed
+   *  while the read was in flight. */
+  viewer?: string | null;
 }
 
 /**
@@ -89,7 +94,9 @@ export function parseSnapshotRequest(value: unknown): SnapshotRequest {
   const { ref, viewer } = value as Record<string, unknown>;
   const req: SnapshotRequest = { ref: parsePullRequestRef(ref) };
   if (viewer !== undefined) {
-    if (typeof viewer !== 'string') throw new TypeError('Invalid viewer');
+    if (viewer !== null && typeof viewer !== 'string') {
+      throw new TypeError('Invalid viewer');
+    }
     req.viewer = viewer;
   }
   return req;
@@ -115,13 +122,25 @@ function assertSameContext(
     );
   }
   const viewer = src.viewer();
-  const asked = req.viewer?.toLowerCase();
-  if (asked !== undefined && asked !== viewer?.toLowerCase()) {
-    throw new PullRequestIdentityError(
-      `n10 acts as ${viewer ?? 'nobody'} now, not ${req.viewer}`
-    );
+  if (req.viewer !== undefined && !sameViewer(req.viewer, viewer)) {
+    throw new PullRequestIdentityError(accountChanged(req.viewer, viewer));
   }
   return viewer;
+}
+
+function accountChanged(asked: string | null, now: string | null): string {
+  if (asked === null) {
+    return `n10 acts as ${now} now; no account was configured when this was asked`;
+  }
+  if (now === null) {
+    return `No account is configured now; this was asked as ${asked}`;
+  }
+  return `n10 acts as ${now} now, not ${asked}`;
+}
+
+/** Accounts compare as the providers compare logins and emails. */
+function sameViewer(a: string | null, b: string | null): boolean {
+  return a?.toLowerCase() === b?.toLowerCase();
 }
 
 /**
@@ -180,24 +199,34 @@ function reportedHead(
   return isOid(listed) ? { oid: listed, from: 'list' } : null;
 }
 
+/** `ref` carrying exactly `id`: the caller's own is dropped, not kept. */
+function withId(ref: PullRequestRef, id: string | undefined): PullRequestRef {
+  const out = { ...ref };
+  delete out.id;
+  return id === undefined ? out : { ...out, id };
+}
+
 export async function readPullRequestSnapshot(
   req: SnapshotRequest,
   src: SnapshotSources
 ): Promise<PullRequestSnapshot> {
-  assertSameContext(req, src);
+  const viewer = assertSameContext(req, src);
   const [summary, detail] = await Promise.all([
     src.lookup(req.ref.number),
     readDetail(req.ref, src.detail),
   ]);
-  // Asked again after the reads: the list is cached per checkout, not
-  // per repository, so a config change while they ran would hand back
-  // another repository's row under this ref.
-  const viewer = assertSameContext(req, src);
+  // Asked again after the reads, as the account they started as: the
+  // list is cached per checkout, not per repository, so a config change
+  // while they ran would hand back another repository's row, or one
+  // read as someone else, under this ref.
+  assertSameContext({ ...req, viewer }, src);
   assertSameRepositoryId(req, detail);
   const target = detail.state === 'read' ? detail.value.target.head : null;
-  const id = detail.state === 'read' ? detail.value.ref.id : req.ref.id;
   return {
-    ref: id === undefined ? req.ref : { ...req.ref, id },
+    ref: withId(
+      req.ref,
+      detail.state === 'read' ? detail.value.ref.id : undefined
+    ),
     viewer,
     fetchedAt: (src.now ?? Date.now)(),
     summary,

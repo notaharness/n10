@@ -21,11 +21,15 @@ export interface RepositoryRef {
   /** The provider's path to it: `owner/repo`, `<project>/<repo>`. */
   repository: string;
   /**
-   * The provider's own id for the repository, once a detail read has
-   * named it. A path can be reused — rename or transfer a repository
-   * and a new one can be created at the old path — so anything kept
-   * across sessions (drafts, review progress) records the id and is
-   * compared with {@link sameRepository}, which refuses a different id.
+   * The provider's own id for the repository, where a read has named
+   * it. A path can be reused — rename or transfer a repository and a
+   * new one can be created at the old path — so anything kept across
+   * sessions (drafts, review progress) records the id beside the path
+   * and is compared with {@link sameRepository}, which refuses a
+   * different id. The configured repository carries no id, so compare
+   * a record with a ref a detail read returned, not with config alone.
+   * A rename keeps the id and changes the path: a record keyed by path
+   * alone is orphaned by it.
    */
   id?: string;
 }
