@@ -4,7 +4,7 @@ import { useFocusOnMount } from '../../lib/fleet/use-focus-on-mount.js';
 import { Button } from '../ui/button.js';
 import { Tip } from '../ui/tooltip.js';
 
-const JOIN_COMMAND = 'beam join --label buildbox';
+const JOIN_COMMAND = 'beam join --label my-server';
 
 /** Instructions stay open until a new member arrives, or the owner
  *  closes them. The fleet fingerprint shows here, where the owner

@@ -114,7 +114,7 @@ test.describe('An enrolled machine', () => {
     await expect(
       panel.getByText(/On the other machine, open Fleet → Join a fleet/)
     ).toBeVisible();
-    await expect(panel.getByText('beam join --label buildbox')).toBeVisible();
+    await expect(panel.getByText('beam join --label my-server')).toBeVisible();
     await expect(panel.getByText('3f9a 0c4e 7d12 e805')).toBeVisible();
     expect(beam!.ops('join.start')).toHaveLength(0);
   });

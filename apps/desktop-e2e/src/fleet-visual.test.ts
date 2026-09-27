@@ -84,7 +84,7 @@ for (const theme of ['dark', 'light'] as const) {
           .getByRole('button', { name: 'Add a machine', exact: true })
           .click();
         await expect(
-          fleetView(page).getByText('beam join --label buildbox')
+          fleetView(page).getByText('beam join --label my-server')
         ).toBeVisible();
         await expect(page.getByRole('complementary')).toHaveScreenshot(
           `fleet-add-${theme}.png`,

@@ -10,7 +10,6 @@ import type {
 import {
   FLEET_ID,
   LAPTOP,
-  buildbox,
   desktop,
   macMini,
   member,
@@ -46,7 +45,6 @@ type FleetHost = Pick<
 
 const AUTO_MS = 10_000;
 const ANSWER_MS = 1_200;
-const JOIN_AFTER_MS = 6_000;
 const hex = (n: number) =>
   Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) =>
     b.toString(16).padStart(2, '0')
@@ -72,13 +70,8 @@ class Fleet {
   /** The passkey step waiting on its answer, if any. */
   private step: { url: string; answer: () => void } | null = null;
   private cancel: (() => void) | null = null;
-  private joinTimer: ReturnType<typeof setTimeout> | null = null;
   /** Aliases set here, over each machine's own label. */
   private readonly aliases = new Map<string, string>();
-
-  constructor() {
-    this.watchAddMachine();
-  }
 
   machines(): MachineView[] {
     if (!this.fleetId) return [];
@@ -213,7 +206,6 @@ class Fleet {
 
   async reset(): Promise<{ ok: true }> {
     await later(null, 900);
-    this.stopJoin();
     this.aliases.clear();
     this.fleetId = null;
     this.others = [];
@@ -252,34 +244,6 @@ class Fleet {
         reject(new Error('cancelled'));
       };
     });
-  }
-
-  /**
-   * The machine the owner joins from elsewhere: while the Add a machine
-   * panel shows its `beam join` command, the first of Desktop and the
-   * buildbox not yet in the fleet joins a few seconds later, as it would
-   * after running that command. Closing the panel or resetting calls
-   * it off.
-   */
-  private watchAddMachine(): void {
-    new MutationObserver(() => {
-      const open = document.querySelector('[data-testid="add-machine-panel"]');
-      if (!open) return this.stopJoin();
-      if (this.joinTimer || !this.fleetId) return;
-      const known = new Set(this.others.map((m) => m.peerId));
-      const next = [desktop(), buildbox()].find((m) => !known.has(m.peerId));
-      if (!next) return;
-      this.joinTimer = setTimeout(() => {
-        this.joinTimer = null;
-        this.others = [...this.others, next];
-        this.changed();
-      }, JOIN_AFTER_MS);
-    }).observe(document.body, { childList: true, subtree: true });
-  }
-
-  private stopJoin(): void {
-    if (this.joinTimer) clearTimeout(this.joinTimer);
-    this.joinTimer = null;
   }
 }
 

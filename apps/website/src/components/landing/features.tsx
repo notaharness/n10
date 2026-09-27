@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { BeamFeature, OrchestraFeature } from './companion-sections';
 import { FeatureSection, type Feature } from './feature-section';
 
@@ -108,16 +107,6 @@ export function Features() {
           />
         ))}
       </div>
-      <p className="text-fd-muted-foreground mt-16 text-center text-sm">
-        Also:{' '}
-        <Link
-          href="/docs/guides/themes"
-          className="hover:text-fd-foreground underline decoration-fd-border underline-offset-4 transition-colors"
-        >
-          light and dark themes
-        </Link>
-        , the most important feature of any software.
-      </p>
     </section>
   );
 }

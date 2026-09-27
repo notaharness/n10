@@ -62,7 +62,7 @@ membership is already established by the daemon.
 **Add a machine** has two short paths:
 
 - **Desktop:** “On the other machine, open Fleet → Join a fleet. Use your fleet’s passkey.”
-- **Terminal:** `beam join --label buildbox`, a copy icon, and “Run there, then open the link or scan the QR.”
+- **Terminal:** `beam join --label my-server`, a copy icon, and “Run there, then open the link or scan the QR.”
 
 A fingerprint block says “Check that its fleet fingerprint matches:” above the grouped
 value and a copy icon. “Waiting for a new machine…” reflects the waiting state. A new member identity from a push or fallback poll
@@ -215,8 +215,8 @@ For the reported iPhone failure, do not infer the selected provider, iOS version
 Desktop e2e covers both passkey steps, automatic create/revoke/reset completion,
 persistent fingerprint comparison, new-member detection across collapse, retry and
 pending publication. Fleet screenshots cover both themes in the pinned Playwright
-container alongside full-workspace baselines. The website demo uses the same renderer;
-its mock watches the add panel and emits a joining member to complete the flow.
+container alongside full-workspace baselines. The website demo uses the same renderer
+with a mock host; no machine joins it on its own.
 
 Real browser/provider compatibility remains manual; mocked passkeys do not establish
 device support. Tests isolate HOME and tmux sockets and never touch user sessions.
