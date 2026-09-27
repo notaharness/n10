@@ -169,9 +169,9 @@ export interface VcsProvider {
   ): Promise<PullRequestConversation>;
 
   /**
-   * People a comment on this repository can mention whose name or login
-   * starts with, or matches, `query` — as the provider's own search
-   * answers it. Each carries the token the provider stores for the
+   * People a comment on this repository can mention for `query`, as the
+   * provider's own search answers it; how much of a name it matches is
+   * the provider's. Each carries the token the provider stores for the
    * mention, which is what a composer inserts.
    */
   searchMentionCandidates?(

@@ -25,13 +25,16 @@ export function mentionAt(text: string, caret: number): MentionQuery | null {
   if (at > 0 && !OPENS.test(before[at - 1]!)) return null;
   const query = before.slice(at + 1);
   if (/\s/.test(query) || query.length > MAX_QUERY) return null;
+  // `@<id>` is a mention already made (Azure's token), not a name.
+  if (query.startsWith('<')) return null;
   return { start: at, query };
 }
 
 /**
  * Replace the typed `@name` with the provider's token for the person
- * and a space, leaving the caret after them. Text after the caret is
- * kept, and no second space is added before one already there.
+ * and a space, leaving the caret after the space, where the mention is
+ * finished. Text after the caret is kept, and a space already there
+ * serves.
  */
 export function insertMention(
   text: string,
@@ -40,9 +43,9 @@ export function insertMention(
 ): { text: string; caret: number } {
   const end = at.start + 1 + at.query.length;
   const rest = text.slice(end);
-  const gap = /^\s/.test(rest) ? '' : ' ';
-  const head = text.slice(0, at.start) + token + gap;
-  return { text: head + rest, caret: head.length };
+  const spaced = /^\s/.test(rest);
+  const head = text.slice(0, at.start) + token + (spaced ? '' : ' ');
+  return { text: head + rest, caret: head.length + (spaced ? 1 : 0) };
 }
 
 /**

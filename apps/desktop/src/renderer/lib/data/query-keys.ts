@@ -78,15 +78,15 @@ export const keys = {
    *  typed after `@`. Keyed like `prSnapshot`. */
   mentions: (
     cwd: string,
-    ref: PullRequestRef,
+    ref: PullRequestRef | null,
     viewer: string | null,
     query: string
   ) =>
     [
       'mentions',
       cwd,
-      pullRequestKey(ref),
-      ref.id ?? null,
+      ref ? pullRequestKey(ref) : null,
+      ref?.id ?? null,
       viewer,
       query.toLowerCase(),
     ] as const,

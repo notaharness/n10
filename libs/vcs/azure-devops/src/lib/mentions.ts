@@ -14,6 +14,7 @@ interface AdoIdentity {
   providerDisplayName?: string;
   customDisplayName?: string;
   isActive?: boolean;
+  isContainer?: boolean;
   properties?: { Account?: { $value?: string }; Mail?: { $value?: string } };
 }
 
@@ -144,9 +145,12 @@ export async function searchAdoMentions(
     'people to mention'
   );
   return (data.value ?? []).flatMap((i) => {
+    // People only: a group comes back too (the documented "By Name"
+    // sample is one), and the picker offers people to mention.
     if (!i.id || !i.providerDisplayName || i.isActive === false) return [];
+    if (i.isContainer) return [];
     const handle =
-      i.properties?.Mail?.$value ?? i.properties?.Account?.$value ?? '';
+      i.properties?.Mail?.$value || i.properties?.Account?.$value || '';
     return [
       { token: `@<${i.id}>`, displayName: i.providerDisplayName, handle },
     ];

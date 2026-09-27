@@ -45,7 +45,7 @@ async function openComposer(page: Page) {
     .click();
   await page.getByRole('button', { name: 'Overview' }).click();
   await page.getByRole('button', { name: 'Write a comment…' }).click();
-  const box = page.getByRole('combobox', { name: 'Comment' });
+  const box = page.getByRole('textbox', { name: 'Comment' });
   await expect(box).toBeFocused();
   return box;
 }
@@ -64,7 +64,10 @@ test.describe('Mentions', () => {
     await expect(options.nth(0)).toContainText('Sam Lee');
     await expect(options.nth(0)).toContainText('samlee');
     await expect(options.nth(1)).toContainText('slee-ops');
-    await expect(box).toHaveAttribute('aria-expanded', 'true');
+    await expect(box).toHaveAttribute(
+      'aria-controls',
+      (await list.getAttribute('id'))!
+    );
     await page.screenshot({ path: testInfo.outputPath('mentions.png') });
 
     await page.keyboard.press('ArrowDown');
@@ -108,7 +111,43 @@ test.describe('Mentions', () => {
     // The composer is still open, with its text.
     await expect(box).toHaveValue('cc @alex and @nobody');
 
+    // A mention typed again where that one was opens a list again.
+    await box.evaluate((el: HTMLTextAreaElement) =>
+      el.setSelectionRange(el.value.length - '@nobody'.length, el.value.length)
+    );
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type('@sa');
+    await expect(list.getByRole('option')).toHaveCount(2);
+    await page.keyboard.press('Escape');
+
     await page.keyboard.type(' or mail bea@example.com');
-    await expect(box).toHaveAttribute('aria-expanded', 'false');
+    await expect(list).toHaveCount(0);
+    await expect(box).not.toHaveAttribute('aria-controls');
+  });
+
+  test('Tab inserts, Mod+Enter keeps the draft, and an answer for other letters is never offered', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    const box = await openComposer(page);
+    const list = page.getByRole('listbox', { name: 'People to mention' });
+    await box.pressSequentially('@al');
+    await expect(list.getByRole('option')).toHaveCount(1);
+    await page.keyboard.press('Tab');
+    await expect(box).toHaveValue('@alex ');
+    await expect(box).toBeFocused();
+
+    // Straight on to other letters: what was found for "al" is gone
+    // before the next answer, so Enter is just a new line.
+    await box.pressSequentially('@s');
+    await page.keyboard.press('Enter');
+    await expect(box).toHaveValue('@alex @s\n');
+
+    await box.pressSequentially('@sam');
+    await expect(list.getByRole('option')).toHaveCount(2);
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(page.locator('[data-my-draft="general"]')).toContainText(
+      '@alex @s'
+    );
   });
 });

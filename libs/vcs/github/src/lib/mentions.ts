@@ -38,7 +38,11 @@ export async function searchGitHubMentions(
     repo,
     q: query,
   })) as Answer;
-  const nodes = answer.data?.repository?.mentionableUsers?.nodes ?? [];
+  // No repository is not "no one": say so rather than offer nobody.
+  if (!answer.data?.repository) {
+    throw new Error(`GitHub could not find ${repository.repository}`);
+  }
+  const nodes = answer.data.repository.mentionableUsers?.nodes ?? [];
   return nodes.flatMap((n) =>
     n?.login
       ? [

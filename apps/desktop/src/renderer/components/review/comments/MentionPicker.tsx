@@ -21,8 +21,8 @@ import { cn } from '../../../lib/utils.js';
 
 /**
  * Mentioning someone while writing: type `@` and part of a name, and
- * the provider's own search offers people. The box is an ARIA combobox
- * over the list: Up/Down move, Enter or Tab inserts, Escape closes the
+ * the provider's own search offers people. The box controls a listbox
+ * below it: Up/Down move, Enter or Tab inserts, Escape closes the
  * list and leaves the text. What goes in is the provider's token for
  * the person (`@login`, or Azure's `@<id>`), never a display name.
  */
@@ -46,7 +46,7 @@ export function useMentionPicker(
 
   const typing = focused ? typed(draft.body, caret, dismissed) : null;
   const search = useMentionSearch(draft.ref, typing?.query ?? null);
-  const people = (typing && search.data) || [];
+  const people = typing ? search.people : [];
   const active = activeIndex(pick, typing, people.length);
 
   const choose = (person: MentionCandidate, from: MentionQuery) => {
@@ -69,9 +69,16 @@ export function useMentionPicker(
     });
   };
 
-  const readCaret = () => setCaret(box.current?.selectionStart ?? null);
+  // A list closed with Escape stays closed only for that mention.
+  const track = (text: string, at: number | null) => {
+    setCaret(at);
+    const now = at == null ? null : mentionAt(text, at);
+    if (dismissed != null && now?.start !== dismissed) setDismissed(null);
+  };
+  const readCaret = () =>
+    track(box.current?.value ?? '', box.current?.selectionStart ?? null);
   const inputProps = {
-    ...comboboxProps(
+    ...autocompleteProps(
       typing ? listId : null,
       people.length > 0 ? `${listId}-${active}` : null
     ),
@@ -80,7 +87,7 @@ export function useMentionPicker(
     onFocus: () => setFocused(true),
     onBlurCapture: () => setFocused(false),
     onChangeCapture: (e: ChangeEvent<HTMLTextAreaElement>) =>
-      setCaret(e.target.selectionStart),
+      track(e.target.value, e.target.selectionStart),
   };
 
   const list = typing && (
@@ -89,7 +96,7 @@ export function useMentionPicker(
       query={typing.query}
       people={people}
       active={active}
-      waiting={!search.settled || search.isFetching}
+      waiting={search.waiting}
       error={search.error && readError(search.error)}
       onChoose={(p) => choose(p, typing)}
     />
@@ -117,15 +124,24 @@ function activeIndex(
   return pick.query === typing?.query ? Math.min(pick.index, count - 1) : 0;
 }
 
-/** The box's side of the combobox: `listId` while the list shows. */
-function comboboxProps(listId: string | null, activeId: string | null) {
+/**
+ * The box's side of the list, while it shows. A textarea keeps its own
+ * textbox role (ARIA in HTML allows it no other) and says it controls
+ * the list and which option is highlighted.
+ */
+function autocompleteProps(listId: string | null, activeId: string | null) {
   return {
-    role: 'combobox',
-    'aria-autocomplete': 'list' as const,
-    'aria-expanded': listId != null,
+    'aria-autocomplete': listId ? ('list' as const) : undefined,
     'aria-controls': listId ?? undefined,
     'aria-activedescendant': (listId && activeId) || undefined,
   };
+}
+
+/** No chord, no composition (its Enter commits the text), and not
+ *  Shift+Tab, which leaves the box. */
+function plainKey(e: KeyboardEvent): boolean {
+  if (e.metaKey || e.ctrlKey || e.altKey) return false;
+  return !e.nativeEvent.isComposing && !(e.key === 'Tab' && e.shiftKey);
 }
 
 /** A key pressed in the box while the list shows. */
@@ -140,7 +156,7 @@ function listKey(
     on.dismiss();
     return;
   }
-  if (count === 0 || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (count === 0 || !plainKey(e)) return;
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
     e.preventDefault();
     on.move(e.key === 'ArrowDown' ? 1 : -1);
