@@ -33,13 +33,12 @@ jobs:
 
       - uses: nrwl/nx-set-shas@v4
 
-      # Builds and dry-runs wrangler with no credentials required, so this
-      # workflow stays green while n10.is is not yet a Cloudflare zone.
+      # Builds, checks the desktop demo made it into the assets, and
+      # dry-runs wrangler; needs no credentials.
       - run: npx nx affected -t deploy:check
 
-      # Runs only once CLOUDFLARE_API_TOKEN is set as a repository secret
-      # (and CLOUDFLARE_ACCOUNT_ID as a repository variable) — see
-      # apps/website/README.md for the Cloudflare-side setup.
+      # Needs the CLOUDFLARE_API_TOKEN repository secret and the
+      # CLOUDFLARE_ACCOUNT_ID repository variable — see apps/website/README.md.
       - name: Deploy
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: npx nx affected -t deploy

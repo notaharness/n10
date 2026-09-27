@@ -134,11 +134,22 @@
           "cwd": "apps/website"
         }
       },
-      "deploy": {
+      "check-demo": {
         "executor": "nx:run-commands",
         "cache": false,
         "dependsOn": [
           "build"
+        ],
+        "options": {
+          "command": "test -f .open-next/assets/desktop-demo/demo/index.html || { echo \"website build is missing the desktop demo: .open-next/assets/desktop-demo/demo/index.html\" >&2; exit 1; }",
+          "cwd": "apps/website"
+        }
+      },
+      "deploy": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "dependsOn": [
+          "check-demo"
         ],
         "options": {
           "command": "opennextjs-cloudflare deploy",
@@ -149,7 +160,7 @@
         "executor": "nx:run-commands",
         "cache": false,
         "dependsOn": [
-          "build"
+          "check-demo"
         ],
         "options": {
           "command": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
