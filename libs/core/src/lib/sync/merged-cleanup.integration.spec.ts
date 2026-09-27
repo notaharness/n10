@@ -13,12 +13,14 @@ vi.mock('../session-backend.js', () => ({
   hasLiveTmuxSession: () => false,
   killPersistedTmuxSession: () => undefined,
 }));
+const logged = vi.hoisted(() => [] as string[]);
 vi.mock('@n10/logger', () => ({
   log: () => undefined,
-  logError: () => undefined,
+  logError: (_where: string, message: unknown) => logged.push(String(message)),
 }));
 
 import { resetMainBranchCache } from '@n10/worktree-manager';
+import { __resetFetchQueueForTests } from './fetch-queue.js';
 import { resetRepoRoot } from '../repo-root.js';
 import { removeWorktreeSession } from '../session/remove-worktree.js';
 import { sweepMergedBranches } from './remote-sync.js';
@@ -58,6 +60,8 @@ beforeEach(() => {
   process.chdir(repo);
   resetRepoRoot();
   resetMainBranchCache();
+  __resetFetchQueueForTests();
+  logged.length = 0;
 });
 
 afterEach(() => {
@@ -123,4 +127,54 @@ describe('merged-branch cleanup', () => {
 
     expect(existsSync(worktree)).toBe(false);
   });
+
+  // The pull request's last commit was made on the server (Update
+  // branch, a committed suggestion) and the branch deleted on merge: no
+  // local ref reaches the head, but the remote still has it.
+  it('fetches a merged head the clone lacks, then removes a branch behind it', async () => {
+    const origin = join(root, 'origin.git');
+    execFileSync('git', ['init', '-q', '--bare', '-b', 'main', origin]);
+    git(repo, 'remote', 'add', 'origin', origin);
+    const merged = aheadThenBehind();
+    git(worktree, 'push', '-q', 'origin', `${merged}:refs/heads/feature`);
+    // Pruned after the merge deleted the branch.
+    git(repo, 'update-ref', '-d', 'refs/remotes/origin/feature');
+    forget(merged);
+
+    await sweep(mergedAt(merged));
+
+    expect(existsSync(worktree)).toBe(false);
+  });
+
+  // Not knowing is not the same as knowing the branch is covered.
+  it('keeps a branch whose merged head it cannot get, and says why', async () => {
+    const merged = aheadThenBehind();
+    forget(merged);
+
+    await sweep(mergedAt(merged));
+
+    expect(existsSync(worktree)).toBe(true);
+    expect(logged).toContain(
+      'Skipping auto-delete of feature: the head of its merged pull request is not in this clone'
+    );
+  });
 });
+
+/** Commit on `feature`, then reset it back one commit: the checkout is
+ *  behind the returned head, as after someone else pushed to it. */
+function aheadThenBehind(): string {
+  const behind = git(worktree, 'rev-parse', 'HEAD');
+  writeFileSync(join(worktree, 'server.txt'), 'made on the server');
+  git(worktree, 'add', '.');
+  git(worktree, 'commit', '-q', '-m', 'made on the server');
+  const head = git(worktree, 'rev-parse', 'HEAD');
+  git(worktree, 'reset', '-q', '--hard', behind);
+  return head;
+}
+
+/** Drop every trace of `commit` from the clone. */
+function forget(commit: string): void {
+  git(repo, 'reflog', 'expire', '--expire=now', '--all');
+  git(repo, 'gc', '-q', '--prune=now');
+  expect(() => git(repo, 'cat-file', '-e', commit)).toThrow();
+}

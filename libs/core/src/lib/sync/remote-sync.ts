@@ -1,9 +1,7 @@
 import { keyForWorktree } from '../session-key.js';
 import {
-  branchTip,
   canRemoveBranch,
   fastForwardMainBranch,
-  isAncestorOf,
   listWorktrees,
 } from '@n10/worktree-manager';
 import { logError } from '@n10/logger';
@@ -21,6 +19,7 @@ import {
 } from '../session/remove-worktree.js';
 import { countBranchConflicts } from './conflicts.js';
 import { fetchRefs } from './fetch-queue.js';
+import { mergedTip, type MergedTip } from './merged-tip.js';
 
 // ── Remote sync core ─────────────────────────────────────────────
 //
@@ -94,25 +93,12 @@ type AutoDelete = (
   approved: WorktreeRemovalCheck
 ) => void | Promise<void>;
 
-/**
- * The branch's tip, when a merged pull request carried all of it: the
- * merged head itself, or an ancestor of one (someone pushed to the pull
- * request after this checkout last pulled). Null when the branch has
- * work no merged pull request had, or git cannot tell.
- */
-async function mergedTip(
-  branch: string,
-  heads: readonly string[],
-  cwd: string
-): Promise<string | null> {
-  const tip = await branchTip(branch, cwd);
-  if (!tip) return null;
-  if (heads.includes(tip)) return tip;
-  for (const head of heads) {
-    if (await isAncestorOf(tip, head, cwd)) return tip;
-  }
-  return null;
-}
+/** Why the sweep leaves a merged branch, as the log says it. */
+const SKIPPED: Record<Exclude<MergedTip, { tip: string }>['skip'], string> = {
+  'no-tip': 'git cannot find its tip',
+  'new-work': 'it has commits its merged pull request did not',
+  'unknown-head': 'the head of its merged pull request is not in this clone',
+};
 
 /**
  * Delete the worktrees of merged branches that are safe to delete, and
@@ -143,15 +129,22 @@ async function autoDeleteMerged(args: {
       continue;
     }
     // A merge vouches for the commits its pull request carried, not for
-    // the branch name: work committed since exists nowhere else.
-    const tip = await mergedTip(branch, heads, checkout.path);
-    if (!tip) {
+    // the branch name: work committed since exists nowhere else. The
+    // main checkout, listed first, names the repository to fetch in.
+    const judged = await mergedTip(
+      branch,
+      heads,
+      checkout.path,
+      checkouts[0]?.path ?? checkout.path
+    );
+    if (!('tip' in judged)) {
       logError(
         'sweepMergedBranches',
-        `Skipping auto-delete of ${branch}: it has commits its merged pull request did not`
+        `Skipping auto-delete of ${branch}: ${SKIPPED[judged.skip]}`
       );
       continue;
     }
+    const { tip } = judged;
     const check = await canRemoveBranch(branch, { confirmedMerged: true });
     if (isCancelled()) return null;
     if (check.safe) {

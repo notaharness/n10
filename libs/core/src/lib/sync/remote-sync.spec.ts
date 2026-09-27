@@ -48,6 +48,7 @@ const env = vi.hoisted(() => ({
 vi.mock('@n10/worktree-manager', () => ({
   branchTip: (branch: string) =>
     Promise.resolve(branch in env.tips ? env.tips[branch] : mergedHead(branch)),
+  refExists: () => Promise.resolve(true),
   isAncestorOf: (commit: string, other: string) =>
     Promise.resolve(env.ancestry.has(`${commit}>${other}`)),
   repositoryOf: () => Promise.resolve('/repo/.git'),
