@@ -185,7 +185,9 @@ test.describe('Pull request Overview', () => {
     await expect(overviewTitle(page, 'Tidy the retry helper')).toBeHidden();
   });
 
-  test('sends an author to the thread waiting on them', async ({ desktop }) => {
+  test('sends an author to the first unresolved thread, and the keyboard with it', async ({
+    desktop,
+  }) => {
     const { page } = desktop;
     await openPr(page, /#215/);
     await page.getByRole('button', { name: 'Overview', exact: true }).click();
@@ -202,6 +204,22 @@ test.describe('Pull request Overview', () => {
     await expect(
       page.locator('[data-thread]', { hasText: 'Why keep the old name?' })
     ).toBeFocused();
+  });
+
+  test('leaves the keyboard on a rail row that opens a thread', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openPr(page, /#215/);
+    const row = page.locator('[data-comment-row]').first();
+    await row.focus();
+    await page.keyboard.press('Enter');
+    // The thread opens beside it, but the reader is still arrowing
+    // through the list.
+    await expect(
+      page.locator('[data-thread]', { hasText: 'Why keep the old name?' })
+    ).toBeVisible();
+    await expect(row).toBeFocused();
   });
 
   test('copies the link from the native More menu', async ({ desktop }) => {

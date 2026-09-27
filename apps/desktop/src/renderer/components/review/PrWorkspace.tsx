@@ -13,6 +13,7 @@ import { usePostDrafts } from '../../lib/data/mutations.js';
 import type { ReadState } from '../../lib/data/read-state.js';
 import { keys } from '../../lib/data/query-keys.js';
 import { useReadState } from '../../lib/data/use-read-state.js';
+import { refocusAfter } from '../../lib/focus.js';
 import { useRepo } from '../../lib/repo-context.js';
 import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { useCommentNavigator } from '../../lib/review/use-comment-navigator.js';
@@ -172,7 +173,8 @@ export function PrWorkspace({
     (action: AttentionAction) => {
       if (action === 'show-unresolved') return showUnresolved();
       setMode('diff');
-      requestAnimationFrame(() => scrollRef.current?.focus());
+      // The pressed button is hidden with the Overview.
+      refocusAfter(() => scrollRef.current);
     },
     [showUnresolved, setMode, scrollRef]
   );

@@ -180,9 +180,10 @@ describe('readiness', () => {
   const row = (pr: PullRequestInfo, id: string) =>
     readiness(pr).rows.find((r) => r.id === id);
 
-  it('never calls a pull request ready, or anything met, from the list', () => {
+  it('never calls a pull request ready, or a requirement met, from the list', () => {
     // Everything n10 can see is green; what it cannot see still decides,
     // so an approval and passing checks are observations, not verdicts.
+    // Only the state is met: the provider itself says it is open.
     const green = {
       ...PR,
       buildStatus: 'succeeded' as const,
@@ -218,6 +219,13 @@ describe('readiness', () => {
       row({ ...PR, reviewers: [bea('approved'), cy('declined')] }, 'reviews')
         ?.text
     ).toBe('Approved by Bea');
+    // Nobody left to ask is not the same as nobody asked.
+    expect(
+      row({ ...PR, reviewers: [cy('declined')] }, 'reviews')
+    ).toMatchObject({ state: 'observed', text: 'Declined by Cy' });
+    expect(row({ ...PR, reviewers: [] }, 'reviews')?.text).toBe(
+      'No reviewers requested'
+    );
   });
 
   it('shows problems as concerns beside "not fully known", never as blockers', () => {
@@ -240,15 +248,16 @@ describe('readiness', () => {
   });
 
   it("keeps Azure's votes apart, most severe first", () => {
+    // Rejected keeps the red it has in the reviewers list and header.
     expect(
       row(
         { ...PR, reviewers: [bea('waiting-for-author'), cy('rejected')] },
         'reviews'
-      )?.text
-    ).toBe('Rejected by Cy');
+      )
+    ).toMatchObject({ text: 'Rejected by Cy', severe: true });
     expect(
-      row({ ...PR, reviewers: [bea('waiting-for-author')] }, 'reviews')?.text
-    ).toBe('Waiting for author: Bea');
+      row({ ...PR, reviewers: [bea('waiting-for-author')] }, 'reviews')
+    ).toMatchObject({ text: 'Waiting for author: Bea', severe: false });
   });
 
   it('says a draft is not ready: the provider says so itself', () => {

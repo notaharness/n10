@@ -9,6 +9,7 @@ import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { ReviewVerdict } from '@n10/vcs-core/types';
 import { useSubmitVerdict } from '../../../lib/data/mutations.js';
+import { providerName } from '../../../lib/provider-name.js';
 import { useRepo } from '../../../lib/repo-context.js';
 import { errorMessage } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
@@ -83,7 +84,7 @@ export function VerdictActions({ prId }: { prId: number }) {
   return (
     <Section title="Your review">
       <p className="mb-2 text-xs text-muted-foreground">
-        A vote posts to {isGitHub ? 'GitHub' : 'Azure DevOps'} at once.
+        A vote posts to {providerName(repo.providerId)} at once.
       </p>
       {/* A column of full-width votes beside the description; a row that
           wraps once the Overview is one column. */}
@@ -106,7 +107,7 @@ export function VerdictActions({ prId }: { prId: number }) {
         )}
         {!isGitHub && (
           <VerdictButton
-            tip="Block the pull request until the author responds"
+            tip="Say you are waiting for the author to respond"
             icon={<ClockIcon className="text-warning" />}
             {...vote('wait-for-author')}
           >

@@ -33,7 +33,7 @@ const STATE: Record<
   concern: {
     icon: TriangleAlertIcon,
     className: 'text-warning',
-    label: 'Not known if required',
+    label: 'Needs attention, not known if required',
   },
   observed: {
     icon: CircleIcon,
@@ -49,15 +49,24 @@ const STATE: Record<
 
 function StateIcon({
   state,
+  severe = false,
   className,
 }: {
   state: ReadinessState;
+  severe?: boolean;
   className?: string;
 }) {
   const { icon: Icon, className: tone, label } = STATE[state];
   return (
     <>
-      <Icon aria-hidden className={cn('shrink-0', tone, className)} />
+      <Icon
+        aria-hidden
+        className={cn(
+          'shrink-0',
+          severe ? 'text-destructive' : tone,
+          className
+        )}
+      />
       <span className="sr-only">{label}: </span>
     </>
   );
@@ -90,7 +99,11 @@ export function PrReadiness({ readiness }: { readiness: Readiness }) {
             data-readiness-row={row.id}
             className="flex items-start gap-2"
           >
-            <StateIcon state={row.state} className="mt-0.5 size-3.5" />
+            <StateIcon
+              state={row.state}
+              severe={row.severe}
+              className="mt-0.5 size-3.5"
+            />
             <span className="w-16 shrink-0 text-muted-foreground">
               {row.label}
             </span>

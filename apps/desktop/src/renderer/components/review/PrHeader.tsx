@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import { copyText } from '../../lib/copy-text.js';
 import { useOpenInEditor } from '../../lib/data/mutations.js';
+import { providerName } from '../../lib/provider-name.js';
 import { useRepo } from '../../lib/repo-context.js';
 import { useRefreshPullRequest } from '../../lib/review/use-refresh-pull-request.js';
 import { unresolvedCommentsLabel } from '../../lib/sidebar/sidebar-model.js';
@@ -94,11 +95,6 @@ function UnresolvedButton({
   );
 }
 
-const PROVIDER_NAME: Record<string, string> = {
-  github: 'GitHub',
-  'azure-devops': 'Azure DevOps',
-};
-
 /** Copy what names this pull request, through the native menu. */
 async function runMoreMenu(pr: PullRequestInfo): Promise<void> {
   const chosen = await window.n10.showContextMenu([
@@ -129,7 +125,7 @@ export function PrHeader({
 }) {
   const { repo } = useRepo();
   const refresh = useRefreshPullRequest(repo.cwd);
-  const provider = PROVIDER_NAME[repo.providerId ?? ''] ?? 'the provider';
+  const provider = providerName(repo.providerId);
   const reviewers = pr.reviewers ?? [];
   return (
     <header className="@container flex h-10 shrink-0 items-center gap-3 border-b border-border px-3">

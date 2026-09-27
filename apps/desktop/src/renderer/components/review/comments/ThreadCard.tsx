@@ -13,6 +13,7 @@ import {
   threadExpanded,
   threadLocation,
 } from '../../../lib/diff/thread-model.js';
+import { focusIsLost } from '../../../lib/focus.js';
 import { cn, errorMessage, relativeTime } from '../../../lib/utils.js';
 import { Avatar } from '../../ui/avatar.js';
 import { Badge } from '../../ui/badge.js';
@@ -29,18 +30,6 @@ import { useComposerRefresh } from './use-composer-refresh.js';
  * Resolved threads start collapsed to the header; `focused` (thread
  * navigator / comment list) expands and outlines the card.
  */
-/** Nothing has focus, or what has it can no longer be seen. Checked
- *  as the pane that held it is hidden, before the browser moves focus
- *  to the page itself. */
-function focusIsLost(): boolean {
-  const active = document.activeElement;
-  return (
-    !(active instanceof HTMLElement) ||
-    active === document.body ||
-    !active.checkVisibility({ visibilityProperty: true })
-  );
-}
-
 export function ThreadCard({
   thread,
   prId,
@@ -143,6 +132,10 @@ export function ThreadCard({
       ref={ref}
       data-thread={thread.id}
       tabIndex={-1}
+      role="article"
+      aria-label={[`Thread by ${root.author}`, location]
+        .filter(Boolean)
+        .join(' on ')}
       className={cn(
         'group/card max-w-[900px] overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs transition-shadow outline-none',
         planControls.inPlan

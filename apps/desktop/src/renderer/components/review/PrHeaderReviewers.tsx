@@ -1,6 +1,7 @@
 import { UsersIcon, XCircleIcon } from 'lucide-react';
 import type { PullRequestReviewer } from '@n10/vcs-core/types';
 import {
+  activeReviewers,
   DECISION_LABEL,
   HOLDING_VERDICTS,
 } from '../../lib/review/overview-model.js';
@@ -74,12 +75,14 @@ export function ReviewerSummary({
   reviewers: readonly PullRequestReviewer[];
   className?: string;
 }) {
-  if (reviewers.length === 0) return null;
+  // Counted as Completion counts them: one who declined is not asked.
+  const asked = activeReviewers(reviewers);
+  if (asked.length === 0) return null;
   // The most severe verdict holding it back, in the provider's words.
   const holding = HOLDING_VERDICTS.find((d) =>
-    reviewers.some((r) => r.decision === d)
+    asked.some((r) => r.decision === d)
   );
-  const approved = reviewers.filter((r) => r.decision === 'approved').length;
+  const approved = asked.filter((r) => r.decision === 'approved').length;
   return (
     <span
       data-reviewer-summary
@@ -100,7 +103,7 @@ export function ReviewerSummary({
       )}
       {holding
         ? DECISION_LABEL[holding]
-        : `${approved}/${reviewers.length} approved`}
+        : `${approved}/${asked.length} approved`}
     </span>
   );
 }

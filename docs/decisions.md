@@ -201,8 +201,11 @@ diff when you did (`initialMode`). An unknown account counts as a reviewer, so
 the safe start is the change's purpose before its code. A running agent still
 takes the pane. The Overview never calls a pull request ready: the list row has
 no policies, required reviewers, conflicts or merge permission, so readiness
-stays "not fully known" until those are read. Verdicts sit below the reviewers,
-as outline buttons; the next step is the only primary action.
+stays "not fully known" until those are read. Until a native requirement signal
+is read, an approval or a passing check is an observation, and a failing check
+or a holding verdict is a concern, not a block; only the provider's own
+lifecycle (open, draft) is a verdict. Verdicts sit below the reviewers, as
+outline buttons; the next step is the only primary action.
 
 Optimistic removal drops a session row but retains a PR row with its session
 fields cleared: the PR outlives its checkout. Status indicators combine CI and

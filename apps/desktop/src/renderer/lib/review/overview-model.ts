@@ -246,6 +246,9 @@ export interface ReadinessRow {
   label: string;
   state: ReadinessState;
   text: string;
+  /** A concern in the colour the vote has everywhere else: Azure's
+   *  Rejected is the one verdict shown red. */
+  severe?: boolean;
 }
 
 export interface Readiness {
@@ -255,17 +258,27 @@ export interface Readiness {
   rows: ReadinessRow[];
 }
 
-/** Where the reviews stand, in the provider's words. A declined
- *  request asks nothing more. */
+/** The reviewers still asked for a verdict: one who declined is not. */
+export function activeReviewers(
+  reviewers: readonly PullRequestReviewer[]
+): PullRequestReviewer[] {
+  return reviewers.filter((r) => r.decision !== 'declined');
+}
+
+/** Where the reviews stand, in the provider's words. */
 function reviewsRow(pr: PullRequestInfo): ReadinessRow {
-  const reviewers = (pr.reviewers ?? []).filter(
-    (r) => r.decision !== 'declined'
-  );
+  const all = pr.reviewers ?? [];
+  const reviewers = activeReviewers(all);
   const row = { id: 'reviews' as const, label: 'Reviews' };
   const holding = holdingVerdict(reviewers);
-  if (holding) return { ...row, state: 'concern', text: holding };
+  if (holding) {
+    const severe = reviewers.some((r) => r.decision === 'rejected');
+    return { ...row, state: 'concern', text: holding, severe };
+  }
   if (reviewers.length === 0) {
-    return { ...row, state: 'observed', text: 'No reviewers requested' };
+    const text =
+      all.length === 0 ? 'No reviewers requested' : `Declined by ${names(all)}`;
+    return { ...row, state: 'observed', text };
   }
   const approved = reviewers.filter((r) => r.decision === 'approved');
   const pending = reviewers.length - approved.length;
