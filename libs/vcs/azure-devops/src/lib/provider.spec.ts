@@ -1078,6 +1078,7 @@ describe('azureDevOpsProvider', () => {
       mockFetch.mockResolvedValue(jsonResponse({}));
       await expect(post()).rejects.toMatchObject({
         kind: 'unexpected-response',
+        message: 'Azure DevOps answered without the new thread',
       });
     });
   });

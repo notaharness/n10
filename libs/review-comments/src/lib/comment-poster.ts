@@ -23,9 +23,11 @@ function execWithStdin(
     // that would end the whole process rather than this post.
     child.on('error', reject);
     // A command that exits without reading its input breaks the pipe
-    // under the write (EPIPE). Its exit status says why, so that is
-    // what 'close' reports; the write's own error only matters if the
-    // command claims to have succeeded without its input.
+    // under the write (EPIPE) — when the input is more than the pipe
+    // buffers; a smaller one is taken whole whether or not it is read.
+    // Its exit status says why, so that is what 'close' reports; the
+    // write's own error only matters if the command claims to have
+    // succeeded without its input.
     child.stdin.on('error', (err) => (stdinError = err));
     child.stdout.on('data', (d) => (stdout += d));
     child.stderr.on('data', (d) => (stderr += d));
