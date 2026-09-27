@@ -1,14 +1,24 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
   describePullRequest,
+  parsePullRequestRef,
   pullRequestKey,
   sameRepository,
   type PullRequestRef,
 } from '@n10/vcs-core';
-import type { ReviewDraft } from './review-draft-types.js';
+import { parseTarget, type ReviewDraft } from './review-draft-types.js';
 
 /**
  * One file per account and pull request under `~/.n10/review-drafts`,
@@ -50,16 +60,17 @@ export function readDraftFile(
   ref: PullRequestRef,
   viewer: string | null
 ): DraftFile {
+  const path = draftFilePath(dir, ref, viewer);
   let text: string;
   try {
-    text = readFileSync(draftFilePath(dir, ref, viewer), 'utf8');
+    text = readFileSync(path, 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       return { ref, viewer, drafts: [] };
     }
-    throw new Error(`Your saved drafts could not be read: ${message(err)}`);
+    throw unreadable(path, message(err));
   }
-  const file = parseFile(text);
+  const file = parseFile(path, text);
   if (
     !sameRepository(file.ref, ref) ||
     file.ref.number !== ref.number ||
@@ -80,25 +91,59 @@ export function writeDraftFile(dir: string, file: DraftFile): void {
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   const path = draftFilePath(dir, file.ref, file.viewer);
   const tmp = `${path}.${randomUUID()}.tmp`;
-  writeFileSync(tmp, JSON.stringify(file, null, 2), {
-    encoding: 'utf8',
-    mode: 0o600,
-  });
-  renameSync(tmp, path);
+  try {
+    const fd = openSync(tmp, 'w', 0o600);
+    try {
+      writeSync(fd, JSON.stringify(file, null, 2));
+      // On disk before it replaces the old file, or a crash can leave
+      // an empty one where the drafts were.
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    renameSync(tmp, path);
+  } catch (err) {
+    rmSync(tmp, { force: true });
+    throw err;
+  }
 }
 
-function parseFile(text: string): DraftFile {
-  let value: unknown;
+/** Names the file, so a reviewer can keep its contents by hand. */
+function unreadable(path: string, why: string): Error {
+  return new Error(`Your saved drafts in ${path} could not be read: ${why}`);
+}
+
+function parseFile(path: string, text: string): DraftFile {
   try {
-    value = JSON.parse(text);
+    const value = JSON.parse(text) as Record<string, unknown> | null;
+    const { ref, viewer, drafts } = value ?? {};
+    if (viewer !== null && typeof viewer !== 'string') {
+      throw new TypeError('no account');
+    }
+    if (!Array.isArray(drafts)) throw new TypeError('no drafts');
+    return {
+      ref: parsePullRequestRef(ref),
+      viewer,
+      drafts: drafts.map(parseDraft),
+    };
   } catch (err) {
-    throw new Error(`Your saved drafts could not be read: ${message(err)}`);
+    throw unreadable(path, message(err));
   }
-  const file = value as Partial<DraftFile> | null;
-  if (!file || typeof file !== 'object' || !Array.isArray(file.drafts)) {
-    throw new Error('Your saved drafts could not be read: not a drafts file');
+}
+
+/** Enough of a draft to show and save it; the rest is as written. */
+function parseDraft(value: unknown): ReviewDraft {
+  const d = (value ?? {}) as Record<string, unknown>;
+  const publication = d['publication'] as { state?: unknown } | undefined;
+  if (
+    typeof d['id'] !== 'string' ||
+    typeof d['body'] !== 'string' ||
+    typeof publication?.state !== 'string'
+  ) {
+    throw new TypeError('a draft is malformed');
   }
-  return file as DraftFile;
+  parseTarget(d['target']);
+  return d as unknown as ReviewDraft;
 }
 
 function message(err: unknown): string {

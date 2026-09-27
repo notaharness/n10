@@ -104,7 +104,7 @@ export function ThreadCard({
       { prId, thread, body },
       {
         onSuccess: () => {
-          void draft.discard();
+          void draft.clear();
           openComposer(false);
           if (alsoResolve && thread.canResolve && !thread.isResolved) {
             resolve.mutate(

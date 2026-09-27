@@ -70,7 +70,7 @@ describe('review drafts service', () => {
     await expect(
       listDrafts({ ref: REF, viewer: 'bea' })
     ).resolves.toMatchObject({ viewer: 'bea', drafts: [{ id: 'reply:T-1' }] });
-    await discardDraft({ ref: REF, viewer: 'bea', id: 'reply:T-1' });
+    await discardDraft({ ref: REF, viewer: 'bea', target: REPLY });
     await expect(
       listDrafts({ ref: REF, viewer: 'bea' })
     ).resolves.toMatchObject({ drafts: [] });

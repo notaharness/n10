@@ -1,9 +1,5 @@
-import {
-  useQuery,
-  useQueryClient,
-  type QueryClient,
-} from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import type {
   DraftTarget,
@@ -12,23 +8,26 @@ import type {
   ReviewDrafts,
 } from '../../../host/contract.js';
 import { assertAnswerFor } from '../data/pr-snapshot-query.js';
-import { keys } from '../data/query-keys.js';
+import { keys, queryClient } from '../data/query-keys.js';
 import { useRepo } from '../repo-context.js';
 import { errorMessage } from '../utils.js';
+import {
+  DraftEdits,
+  editKey,
+  sameTarget,
+  type SaveRequest,
+  type SaveState,
+} from './draft-edits.js';
 
 /**
- * The reviewer's own writing, kept as they type it. Text is saved on
- * this machine a moment after each change, and at once when the
- * composer closes or leaves the screen, so a reply survives a scroll,
- * a tab or repository switch and a restart. It is never sent to the
- * provider from here: publishing stays an explicit act.
+ * The reviewer's own writing, kept as they type it: saved on this
+ * machine a moment after each change, so a reply survives a scroll, a
+ * tab or repository switch and a restart. What is typed but not yet
+ * kept lives in `draft-edits.ts`, outside any component. Nothing here
+ * publishes: sending stays an explicit act.
  */
 
-export type SaveState =
-  | { kind: 'idle' }
-  | { kind: 'saving' }
-  | { kind: 'saved'; at: number }
-  | { kind: 'failed'; error: string };
+export type { SaveState } from './draft-edits.js';
 
 export interface DurableDraft {
   body: string;
@@ -38,19 +37,42 @@ export interface DurableDraft {
   flush: () => void;
   /** Save the text again after a failed save. */
   retry: () => void;
-  /** Remove the stored draft and clear the text. Never rejects: a
-   *  failure is reported as a toast. */
+  /** Remove the stored draft and clear the text, with an Undo. Never
+   *  rejects: a failure is reported as a toast. */
   discard: () => Promise<void>;
+  /** The same, silently, for text that was sent. */
+  clear: () => Promise<void>;
+  /** The stored drafts have not been read yet; editing waits, so the
+   *  first save cannot replace a draft nobody has seen. */
+  loading: boolean;
+  /** Why the stored drafts could not be read, when they could not. */
+  readError: string | null;
   /** False when there is no pull request identity to save against;
-   *  the text then lives only as long as the composer. */
+   *  the text then lives only as long as the renderer. */
   durable: boolean;
 }
 
-const SAVE_DELAY_MS = 400;
-
-export function draftIdOf(target: DraftTarget): string {
-  return target.kind === 'reply' ? `reply:${target.threadId}` : target.kind;
+function patchCache(req: SaveRequest, draft: ReviewDraft | null): void {
+  queryClient.setQueryData<ReviewDrafts>(
+    keys.reviewDrafts(req.cwd, req.ref, req.viewer),
+    (old) => {
+      if (!old) return old;
+      const others = old.drafts.filter(
+        (d) => !sameTarget(d.target, req.target)
+      );
+      return { ...old, drafts: draft ? [...others, draft] : others };
+    }
+  );
 }
+
+const edits = new DraftEdits({
+  save: ({ ref, viewer, target, body }) =>
+    window.n10.saveReviewDraft({ ref, viewer, target, body }),
+  saved: patchCache,
+  now: () => Date.now(),
+  setTimer: (fn, ms) => window.setTimeout(fn, ms),
+  clearTimer: (id) => window.clearTimeout(id),
+});
 
 async function loadDrafts(
   ref: PullRequestRef,
@@ -72,144 +94,71 @@ export function useReviewDrafts(ref: PullRequestRef | null) {
   });
 }
 
-/** Put `draft` (or its absence) into the cached list for `id`. */
-function patchCache(
-  client: QueryClient,
-  key: readonly unknown[],
-  id: string,
-  draft: ReviewDraft | null
-): void {
-  client.setQueryData<ReviewDrafts>(key, (old) => {
-    if (!old) return old;
-    const others = old.drafts.filter((d) => d.id !== id);
-    return { ...old, drafts: draft ? [...others, draft] : others };
-  });
-}
-
-/** What a write needs, as of the last render. */
-interface WriteContext {
-  client: QueryClient;
-  ref: PullRequestRef | null;
-  viewer: string | null;
-  target: DraftTarget;
-  key: readonly unknown[];
-}
+/** Placeholder while there is no ref: the text is kept in memory only. */
+const LOCAL: PullRequestRef = {
+  provider: 'local',
+  host: '',
+  repository: '',
+  number: 0,
+};
 
 export function useReviewDraft(
   ref: PullRequestRef | null,
   target: DraftTarget
 ): DurableDraft {
   const { repo } = useRepo();
-  const client = useQueryClient();
   const drafts = useReviewDrafts(ref);
-  const id = draftIdOf(target);
-  const stored = drafts.data?.drafts.find((d) => d.id === id) ?? null;
+  const scope = {
+    cwd: repo.cwd,
+    ref: ref ?? LOCAL,
+    viewer: repo.viewer,
+    target,
+  };
+  const key = editKey(scope);
+  const edit = useSyncExternalStore(edits.subscribe, () => edits.get(key));
+  const stored =
+    drafts.data?.drafts.find((d) => sameTarget(d.target, target)) ?? null;
+  const body = edit?.text ?? stored?.body ?? '';
 
-  // What the reader has typed since this composer mounted; until then
-  // the stored text is the text.
-  const [typed, setTyped] = useState<string | null>(null);
-  const [save, setSave] = useState<SaveState>({ kind: 'idle' });
-  const pending = useRef<{ body: string; timer: number } | null>(null);
-  const latest = useRef(0);
-  // The ref and target are rebuilt on every render; the writes read
-  // them here so their own identity, and the unmount flush, stay put.
-  const context = useRef<WriteContext | null>(null);
-  useEffect(() => {
-    context.current = {
-      client,
-      ref,
-      viewer: repo.viewer,
-      target,
-      key: keys.reviewDrafts(repo.cwd, ref, repo.viewer),
-    };
-  });
-
-  const write = useCallback((body: string, quiet: boolean) => {
-    const ctx = context.current;
-    if (!ctx?.ref) return;
-    const seq = ++latest.current;
-    const id = draftIdOf(ctx.target);
-    window.n10
-      .saveReviewDraft({
-        ref: ctx.ref,
-        viewer: ctx.viewer,
-        target: ctx.target,
-        body,
-      })
-      .then((draft) => {
-        patchCache(ctx.client, ctx.key, id, draft);
-        if (!quiet && seq === latest.current) {
-          setSave({ kind: 'saved', at: Date.now() });
-        }
-      })
-      .catch((err: unknown) => {
-        if (quiet)
-          toast.error(`Couldn't save your draft: ${errorMessage(err)}`);
-        else if (seq === latest.current) {
-          setSave({ kind: 'failed', error: errorMessage(err) });
-        }
-      });
-  }, []);
-
-  const flushWith = useCallback(
-    (quiet: boolean) => {
-      const next = pending.current;
-      if (!next) return;
-      window.clearTimeout(next.timer);
-      pending.current = null;
-      write(next.body, quiet);
-    },
-    [write]
-  );
-
-  const setBody = (body: string) => {
-    setTyped(body);
-    if (!ref) return;
-    if (pending.current) window.clearTimeout(pending.current.timer);
-    pending.current = {
-      body,
-      timer: window.setTimeout(() => flushWith(false), SAVE_DELAY_MS),
-    };
-    setSave({ kind: 'saving' });
+  const setBody = (text: string) => {
+    if (ref) edits.type(key, { ...scope, body: text });
+    else edits.local(key, { ...scope, body: text });
   };
 
-  // Leaving the screen saves what is waiting. Nobody is left to show a
-  // failure inline, so it is a toast.
-  useEffect(() => () => flushWith(true), [flushWith]);
+  const offerUndo = (text: string) =>
+    toast('Draft discarded', {
+      action: { label: 'Undo', onClick: () => setBody(text) },
+    });
 
-  const discard = async () => {
-    if (pending.current) window.clearTimeout(pending.current.timer);
-    pending.current = null;
-    latest.current += 1;
-    setTyped('');
-    setSave({ kind: 'idle' });
-    if (!ref) return;
-    try {
-      await window.n10.discardReviewDraft({ ref, viewer: repo.viewer, id });
-      patchCache(
-        client,
-        keys.reviewDrafts(repo.cwd, ref, repo.viewer),
-        id,
-        null
+  const remove = (undoable: boolean): Promise<void> => {
+    const text = body;
+    edits.forget(key);
+    if (!ref) return Promise.resolve();
+    // By target, after any save still in flight for it: IPC answers in
+    // order, so a first save that lands late is removed too.
+    return window.n10
+      .discardReviewDraft({ ref, viewer: repo.viewer, target })
+      .then(
+        () => {
+          patchCache({ ...scope, body: '' }, null);
+          if (undoable && text.trim()) offerUndo(text);
+        },
+        (err: unknown) => {
+          toast.error(`Couldn't discard your draft: ${errorMessage(err)}`);
+        }
       );
-    } catch (err) {
-      toast.error(`Couldn't discard your draft: ${errorMessage(err)}`);
-    }
   };
 
   return {
-    body: typed ?? stored?.body ?? '',
+    body,
     setBody,
-    save,
-    flush: () => flushWith(false),
-    retry: () => {
-      flushWith(false);
-      if (save.kind === 'failed') {
-        setSave({ kind: 'saving' });
-        write(typed ?? stored?.body ?? '', false);
-      }
-    },
-    discard,
+    save: edit?.save ?? { kind: 'idle' },
+    flush: () => edits.flush(key),
+    retry: () => edits.retry(key),
+    discard: () => remove(true),
+    clear: () => remove(false),
+    loading: ref != null && drafts.isPending,
+    readError: drafts.error ? errorMessage(drafts.error) : null,
     durable: ref != null,
   };
 }

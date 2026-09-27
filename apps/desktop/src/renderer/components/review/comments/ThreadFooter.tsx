@@ -1,7 +1,14 @@
-import { CheckIcon, CornerDownRightIcon, RotateCcwIcon } from 'lucide-react';
-import { useState } from 'react';
+import {
+  AlertCircleIcon,
+  CheckIcon,
+  CornerDownRightIcon,
+  RotateCcwIcon,
+  Trash2Icon,
+} from 'lucide-react';
+import { useRef, useState } from 'react';
 import type { ComposerNotice as Notice } from '../../../lib/diff/thread-model.js';
 import type { DurableDraft } from '../../../lib/review/review-drafts.js';
+import { cn } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { Textarea } from '../../ui/textarea.js';
 import { ComposerNoticeLine } from './ComposerNotice.js';
@@ -81,20 +88,41 @@ function ReplyPrompt({
   onOpen: () => void;
 }) {
   const firstLine = draft.body.trim().split('\n')[0];
+  const unsaved = draft.save.kind === 'failed' && !!firstLine;
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="flex h-7 min-w-0 flex-1 items-center gap-2 rounded-md border border-input bg-background px-2.5 text-left text-sm text-muted-foreground hover:border-ring"
+      // Until the stored drafts are read, a box that looks empty may not
+      // be: typing into it would replace a draft nobody has seen.
+      disabled={draft.loading}
+      title={draft.readError ?? undefined}
+      className={cn(
+        'flex h-7 min-w-0 flex-1 items-center gap-2 rounded-md border bg-background px-2.5 text-left text-sm text-muted-foreground hover:border-ring disabled:opacity-60',
+        unsaved ? 'border-destructive/60' : 'border-input'
+      )}
     >
-      <CornerDownRightIcon className="size-3.5 shrink-0" />
+      {unsaved ? (
+        <AlertCircleIcon className="size-3.5 shrink-0 text-destructive" />
+      ) : (
+        <CornerDownRightIcon className="size-3.5 shrink-0" />
+      )}
       {firstLine ? (
         <>
-          <span className="shrink-0 font-medium text-foreground">
-            Your draft reply
+          <span
+            className={cn(
+              'shrink-0 font-medium',
+              unsaved ? 'text-destructive' : 'text-foreground'
+            )}
+          >
+            {unsaved ? 'Your reply isn’t saved' : 'Your draft reply'}
           </span>
           <span className="truncate">{firstLine}</span>
         </>
+      ) : draft.readError ? (
+        <span className="truncate text-destructive">
+          Couldn't read your saved drafts
+        </span>
       ) : (
         'Reply…'
       )}
@@ -118,8 +146,10 @@ function ReplyComposer({
   onClose: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const box = useRef<HTMLTextAreaElement>(null);
   const empty = !draft.body.trim();
-  // Closing keeps the draft; only an unsaved one asks first.
+  // Closing keeps the draft: a save still running finishes on its own,
+  // and the closed box says if it failed. Only a failed one asks first.
   const close = () => {
     if (draft.save.kind === 'failed' && !empty) setConfirming(true);
     else {
@@ -131,6 +161,7 @@ function ReplyComposer({
     <div className="flex flex-1 flex-col gap-2">
       <ComposerNoticeLine notice={notice} />
       <Textarea
+        ref={box}
         autoFocus
         aria-label="Reply"
         value={draft.body}
@@ -150,7 +181,10 @@ function ReplyComposer({
         <UnsavedChoice
           draft={draft}
           onClose={onClose}
-          onKeepEditing={() => setConfirming(false)}
+          onKeepEditing={() => {
+            setConfirming(false);
+            box.current?.focus();
+          }}
         />
       ) : (
         <div className="flex items-center gap-2">
@@ -160,11 +194,12 @@ function ReplyComposer({
               <Button
                 variant="ghost"
                 size="sm"
+                className="text-muted-foreground hover:text-destructive"
                 onClick={() => {
                   draft.discard().then(onClose, onClose);
                 }}
               >
-                Discard
+                <Trash2Icon /> Discard
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={close}>

@@ -13,6 +13,7 @@ import {
 import {
   draftId,
   isEditable,
+  parseTarget,
   type DraftTarget,
   type ReviewDraft,
 } from './review-draft-types.js';
@@ -37,7 +38,7 @@ export interface SaveDraftRequest extends DraftsRequest {
 }
 
 export interface DiscardDraftRequest extends DraftsRequest {
-  id: string;
+  target: DraftTarget;
 }
 
 export interface ReviewDrafts {
@@ -72,27 +73,8 @@ export function parseSaveDraftRequest(value: unknown): SaveDraftRequest {
 
 export function parseDiscardDraftRequest(value: unknown): DiscardDraftRequest {
   const base = parseDraftsRequest(value);
-  const { id } = value as Record<string, unknown>;
-  if (typeof id !== 'string' || id.length === 0) {
-    throw new TypeError('Invalid draft id');
-  }
-  return { ...base, id };
-}
-
-function parseTarget(value: unknown): DraftTarget {
-  const target = (value ?? {}) as Record<string, unknown>;
-  if (target['kind'] === 'general' || target['kind'] === 'summary') {
-    return { kind: target['kind'] };
-  }
-  const threadId = target['threadId'];
-  if (
-    target['kind'] === 'reply' &&
-    typeof threadId === 'string' &&
-    threadId.length > 0
-  ) {
-    return { kind: 'reply', threadId };
-  }
-  throw new TypeError('Invalid draft target');
+  const { target } = value as Record<string, unknown>;
+  return { ...base, target: parseTarget(target) };
 }
 
 export function listReviewDrafts(
@@ -105,9 +87,26 @@ export function listReviewDrafts(
 }
 
 /**
+ * Why a draft cannot change now, if it cannot: an attempt to post it
+ * is in flight, or one ended without an answer and must be looked for
+ * before the text can change or go.
+ */
+function locked(draft: ReviewDraft | undefined): string | null {
+  switch (draft?.publication.state) {
+    case 'publishing':
+      return 'This draft is being posted and cannot change now';
+    case 'unknown':
+      return 'This draft may already have been posted; n10 has to check before it can change';
+    default:
+      return null;
+  }
+}
+
+/**
  * Store `body` as the draft for `target`, creating it if needed. An
  * empty body removes the draft: there is nothing left to keep. A draft
- * that may already have been sent is not rewritten.
+ * that may already have been sent is not rewritten; one that was
+ * published is spent, and new text for its target starts a new draft.
  */
 export function saveReviewDraft(
   req: SaveDraftRequest,
@@ -117,13 +116,13 @@ export function saveReviewDraft(
   const dir = dirOf(src);
   const file = readDraftFile(dir, req.ref, viewer);
   const id = draftId(req.target);
-  const existing = file.drafts.find((d) => d.id === id);
-  if (existing && !isEditable(existing)) {
-    throw new Error('This draft is being published and cannot change now');
-  }
+  const found = file.drafts.find((d) => d.id === id);
+  const reason = locked(found);
+  if (reason) throw new Error(reason);
+  const existing = found && isEditable(found) ? found : undefined;
   const others = file.drafts.filter((d) => d.id !== id);
   if (req.body === '') {
-    if (existing) writeDraftFile(dir, withRef(file, req.ref, others));
+    if (found) writeDraftFile(dir, withRef(file, req.ref, others));
     return null;
   }
   const now = (src.now ?? Date.now)();
@@ -149,19 +148,17 @@ export function discardReviewDraft(
   const viewer = assertSameContext(req, src);
   const dir = dirOf(src);
   const file = readDraftFile(dir, req.ref, viewer);
-  const existing = file.drafts.find((d) => d.id === req.id);
+  const id = draftId(req.target);
+  const existing = file.drafts.find((d) => d.id === id);
   if (!existing) return;
-  if (existing.publication.state === 'publishing') {
-    throw new Error(
-      'This draft is being published and cannot be discarded now'
-    );
-  }
+  const reason = locked(existing);
+  if (reason) throw new Error(reason);
   writeDraftFile(
     dir,
     withRef(
       file,
       req.ref,
-      file.drafts.filter((d) => d.id !== req.id)
+      file.drafts.filter((d) => d.id !== id)
     )
   );
 }

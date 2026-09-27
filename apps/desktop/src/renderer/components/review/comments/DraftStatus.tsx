@@ -4,24 +4,24 @@ import { copyText } from '../../../lib/copy-text.js';
 import { Button } from '../../ui/button.js';
 
 /**
- * Whether what is in the box is kept. Muted while it is, loud when a
- * save failed — then the text exists only on screen, and closing the
- * box would lose it.
+ * Whether what is in the box is kept. Saving and saved are quiet chrome,
+ * not announced at every pause in typing; a failed save is an alert,
+ * with its reason readable rather than hidden in a tooltip.
  */
 export function DraftStatus({ draft }: { draft: DurableDraft }) {
   const { save } = draft;
-  if (!draft.durable || !draft.body) {
-    return <span role="status" className="sr-only" />;
-  }
+  if (!draft.durable || !draft.body) return null;
   if (save.kind === 'failed') {
     return (
       <span
-        role="status"
+        role="alert"
         className="flex min-w-0 items-center gap-1.5 text-xs text-destructive"
-        title={save.error}
       >
         <AlertCircleIcon className="size-3.5 shrink-0" />
-        <span className="truncate">Couldn't save draft</span>
+        <span className="truncate" title={save.error}>
+          Couldn't save draft
+          <span className="sr-only">: {save.error}</span>
+        </span>
         <Button
           variant="link"
           size="sm"
@@ -35,7 +35,7 @@ export function DraftStatus({ draft }: { draft: DurableDraft }) {
   }
   return (
     <span
-      role="status"
+      data-draft-status={save.kind}
       className="flex items-center gap-1.5 text-xs text-muted-foreground"
     >
       {save.kind === 'saving' ? (
@@ -52,8 +52,8 @@ export function DraftStatus({ draft }: { draft: DurableDraft }) {
 }
 
 /**
- * Asked instead of closing when the text is not saved: the reader
- * chooses to keep it somewhere, or to let it go.
+ * Asked instead of closing when the text is not saved: keep trying,
+ * keep it somewhere else, or let it go. Escape goes back to editing.
  */
 export function UnsavedChoice({
   draft,
@@ -66,13 +66,22 @@ export function UnsavedChoice({
 }) {
   return (
     <div
-      role="alertdialog"
+      role="group"
       aria-label="This draft isn't saved"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          onKeepEditing();
+        }
+      }}
       className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-1.5 text-xs"
     >
       <span className="mr-auto text-destructive">
         This draft isn't saved. Copy it, or discard it.
       </span>
+      <Button variant="outline" size="sm" onClick={draft.retry}>
+        Retry
+      </Button>
       <Button
         variant="outline"
         size="sm"

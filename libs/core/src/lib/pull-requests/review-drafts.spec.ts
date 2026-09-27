@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { PullRequestRef } from '@n10/vcs-core';
+import type { ReviewDraft } from './review-draft-types.js';
 import { PullRequestIdentityError } from './pr-snapshot.js';
 import { draftFilePath, writeDraftFile } from './review-draft-store.js';
 import {
@@ -90,8 +91,8 @@ describe('review drafts', () => {
       src()
     );
     saveReviewDraft({ ...as('bea'), target: REPLY, body: '' }, src());
-    discardReviewDraft({ ...as('bea'), id: 'general' }, src());
-    discardReviewDraft({ ...as('bea'), id: 'general' }, src());
+    discardReviewDraft({ ...as('bea'), target: { kind: 'general' } }, src());
+    discardReviewDraft({ ...as('bea'), target: { kind: 'general' } }, src());
     expect(listReviewDrafts(as('bea'), src()).drafts).toEqual([]);
   });
 
@@ -131,10 +132,19 @@ describe('review drafts', () => {
   });
 
   it('refuses to read, and so to overwrite, a file it cannot parse', () => {
-    writeFileSync(draftFilePath(dir, REF, 'bea'), '{ not json');
-    expect(() => listReviewDrafts(as('bea'), src())).toThrow(
-      /could not be read/
+    const path = draftFilePath(dir, REF, 'bea');
+    writeFileSync(path, '{ not json');
+    // The message names the file, so its contents can be kept by hand.
+    expect(() => listReviewDrafts(as('bea'), src())).toThrow(path);
+    writeFileSync(
+      path,
+      JSON.stringify({
+        ref: REF,
+        viewer: 'bea',
+        drafts: [{ id: 'x', body: 3 }],
+      })
     );
+    expect(() => listReviewDrafts(as('bea'), src())).toThrow(/malformed/);
     expect(() =>
       saveReviewDraft({ ...as('bea'), target: REPLY, body: 'x' }, src())
     ).toThrow(/could not be read/);
@@ -158,7 +168,7 @@ describe('review drafts', () => {
     expect(readdirSync(locked)).toHaveLength(1);
   });
 
-  it('does not rewrite a draft that may already have been sent', () => {
+  const withReply = (publication: ReviewDraft['publication']) =>
     writeDraftFile(dir, {
       ref: REF,
       viewer: 'bea',
@@ -169,13 +179,34 @@ describe('review drafts', () => {
           body: 'sent?',
           createdAt: 1,
           updatedAt: 1,
-          publication: { state: 'unknown', attempt: 'a1', since: 5 },
+          publication,
         },
       ],
     });
+
+  it('neither rewrites nor discards a draft that may already have been sent', () => {
+    withReply({ state: 'unknown', attempt: 'a1', since: 5 });
     expect(() =>
       saveReviewDraft({ ...as('bea'), target: REPLY, body: 'x' }, src())
-    ).toThrow(/being published/);
+    ).toThrow(/may already have been posted/);
+    expect(() =>
+      discardReviewDraft({ ...as('bea'), target: REPLY }, src())
+    ).toThrow(/may already have been posted/);
+    withReply({ state: 'publishing', attempt: 'a1', since: 5 });
+    expect(() =>
+      discardReviewDraft({ ...as('bea'), target: REPLY }, src())
+    ).toThrow(/being posted/);
+  });
+
+  it('starts a new draft over one that was published', () => {
+    withReply({ state: 'published', attempt: 'a1', remoteId: 'C_1', at: 5 });
+    expect(
+      saveReviewDraft({ ...as('bea'), target: REPLY, body: 'again' }, src())
+    ).toMatchObject({
+      body: 'again',
+      createdAt: 1000,
+      publication: { state: 'unpublished' },
+    });
   });
 });
 

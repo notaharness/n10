@@ -52,6 +52,23 @@ export type PublicationEvent =
       at: number;
     };
 
+/** A target from untrusted input. Throws on anything off. */
+export function parseTarget(value: unknown): DraftTarget {
+  const target = (value ?? {}) as Record<string, unknown>;
+  if (target['kind'] === 'general' || target['kind'] === 'summary') {
+    return { kind: target['kind'] };
+  }
+  const threadId = target['threadId'];
+  if (
+    target['kind'] === 'reply' &&
+    typeof threadId === 'string' &&
+    threadId.length > 0
+  ) {
+    return { kind: 'reply', threadId };
+  }
+  throw new TypeError('Invalid draft target');
+}
+
 export function draftId(target: DraftTarget): string {
   return target.kind === 'reply' ? `reply:${target.threadId}` : target.kind;
 }

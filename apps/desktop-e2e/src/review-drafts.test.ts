@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
 import {
   REVIEW_FILES,
@@ -52,6 +52,10 @@ async function openThread(page: Page) {
   return page.locator('[data-thread="T-open"]');
 }
 
+/** The quiet "Draft saved" line under a reply box. */
+const saved = (thread: Locator) =>
+  thread.locator('[data-draft-status="saved"]');
+
 /** Point the repository's config at another GitHub account. */
 function actAs(repoPath: string, homeDir: string, username: string) {
   const key = createHash('sha256').update(repoPath).digest('hex').slice(0, 16);
@@ -69,7 +73,7 @@ test.describe('Review drafts', () => {
     let thread = await openThread(page);
     await thread.getByRole('button', { name: 'Reply…' }).click();
     await thread.getByRole('textbox', { name: 'Reply' }).fill(TEXT);
-    await expect(thread.getByRole('status')).toHaveText('Draft saved');
+    await expect(saved(thread)).toBeVisible();
     await thread.getByRole('button', { name: 'Close' }).click();
 
     // Closed, the box says there is a draft and opens on it.
@@ -101,7 +105,7 @@ test.describe('Review drafts', () => {
     let thread = await openThread(page);
     await thread.getByRole('button', { name: 'Reply…' }).click();
     await thread.getByRole('textbox', { name: 'Reply' }).fill('Only for bea');
-    await expect(thread.getByRole('status')).toHaveText('Draft saved');
+    await expect(saved(thread)).toBeVisible();
 
     actAs(repoPath, homeDir, 'carol');
     await page.reload();
@@ -117,7 +121,7 @@ test.describe('Review drafts', () => {
     ).toContainText('Only for bea');
   });
 
-  test('a draft that could not be saved asks before it is closed', async ({
+  test('a draft that could not be saved is never dropped', async ({
     desktop,
   }) => {
     const { page, homeDir } = desktop;
@@ -125,29 +129,65 @@ test.describe('Review drafts', () => {
     mkdirSync(dir, { recursive: true });
     chmodSync(dir, 0o500);
     try {
-      const thread = await openThread(page);
+      let thread = await openThread(page);
       await thread.getByRole('button', { name: 'Reply…' }).click();
-      const box = thread.getByRole('textbox', { name: 'Reply' });
+      let box = thread.getByRole('textbox', { name: 'Reply' });
+      // Closed before the save has even been tried: the failure still
+      // reaches the reader, on the closed box.
       await box.fill('Nowhere to keep this');
-      await expect(thread.getByRole('status')).toContainText(
+      await thread.getByRole('button', { name: 'Close' }).click();
+      const unsaved = thread.getByRole('button', {
+        name: /Your reply isn’t saved/,
+      });
+      await expect(unsaved).toContainText('Nowhere to keep this');
+
+      // Unmounted with it — the tab closed — the text is still there.
+      await tab(page, /Handle cancelled requests|#214/)
+        .getByLabel('Close tab')
+        .click();
+      thread = await openThread(page);
+      await thread
+        .getByRole('button', { name: /Your reply isn’t saved/ })
+        .click();
+      box = thread.getByRole('textbox', { name: 'Reply' });
+      await expect(box).toHaveValue('Nowhere to keep this');
+      await expect(thread.getByRole('alert')).toContainText(
         "Couldn't save draft"
       );
 
+      // Closing it now asks first.
       await box.press('Escape');
-      const choice = thread.getByRole('alertdialog', {
+      const choice = thread.getByRole('group', {
         name: "This draft isn't saved",
       });
       await expect(choice).toBeVisible();
       await choice.getByRole('button', { name: 'Keep editing' }).click();
+      await expect(box).toBeFocused();
       await expect(box).toHaveValue('Nowhere to keep this');
 
       // Once the disk takes it again, Retry saves it.
       chmodSync(dir, 0o700);
       await thread.getByRole('button', { name: 'Retry' }).click();
-      await expect(thread.getByRole('status')).toHaveText('Draft saved');
+      await expect(saved(thread)).toBeVisible();
     } finally {
       chmodSync(dir, 0o700);
     }
+  });
+
+  test('a discarded draft can be brought back', async ({ desktop }) => {
+    const { page } = desktop;
+    const thread = await openThread(page);
+    await thread.getByRole('button', { name: 'Reply…' }).click();
+    await thread
+      .getByRole('textbox', { name: 'Reply' })
+      .fill('Second thoughts');
+    await expect(saved(thread)).toBeVisible();
+    await thread.getByRole('button', { name: 'Discard' }).click();
+    await expect(thread.getByRole('button', { name: 'Reply…' })).toBeVisible();
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(
+      thread.getByRole('button', { name: /Your draft reply/ })
+    ).toContainText('Second thoughts');
   });
 
   test('sending the reply clears its draft', async ({ desktop }) => {
@@ -155,7 +195,7 @@ test.describe('Review drafts', () => {
     let thread = await openThread(page);
     await thread.getByRole('button', { name: 'Reply…' }).click();
     await thread.getByRole('textbox', { name: 'Reply' }).fill('Sent now');
-    await expect(thread.getByRole('status')).toHaveText('Draft saved');
+    await expect(saved(thread)).toBeVisible();
     await thread.getByRole('button', { name: 'Reply', exact: true }).click();
     await expect(thread.getByText('Sent now')).toBeVisible();
     await expect(thread.getByRole('button', { name: 'Reply…' })).toBeVisible();

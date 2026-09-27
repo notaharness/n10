@@ -86,7 +86,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - A reviewer's own unsent writing is a durable draft (core
   `pull-requests/review-drafts.ts`, one file per account and pull request
   under `~/.n10/review-drafts`), autosaved by `lib/review/review-drafts.ts`.
-  Nothing there publishes. The review agent's findings stay in
+  Unsaved text lives in `draft-edits.ts`, outside components, so an
+  unmount never drops it. Nothing there publishes. The review agent's findings stay in
   `@n10/review-comments`, keyed by PR number.
 - Diffs are whole-file (`-U99999`), folded client-side
   (`lib/diff/diff-model.ts`). A PR diffs commits; a bare worktree diffs its
