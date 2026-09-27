@@ -556,6 +556,27 @@ describe('assessBranchRemoval', () => {
     });
   });
 
+  // The whole status is read, and a checkout git cannot answer for is
+  // not clean: only force takes it.
+  it('reports unknown changes when git cannot read a checkout it lists', async () => {
+    answers({});
+    mockExec.mockImplementation(((command: string) => {
+      if (command.includes('git worktree list')) {
+        return Promise.resolve(
+          worktreeListPorcelain([{ branch: 'feature/busy' }])
+        );
+      }
+      if (command.includes('status --porcelain')) {
+        return Promise.reject(new Error('stdout maxBuffer length exceeded'));
+      }
+      return Promise.resolve(resolve(''));
+    }) as unknown as typeof exec);
+    expect(await assessBranchRemoval('feature/busy')).toEqual({
+      refusal: null,
+      risks: ['unknown changes'],
+    });
+  });
+
   it('has no risks for a clean, pushed checkout', async () => {
     answers({});
     expect(await assessBranchRemoval('feature/busy')).toEqual({
@@ -676,8 +697,8 @@ describe('canRemoveBranch', () => {
       reason: 'uncommitted changes',
     });
     expect(mockExec).toHaveBeenCalledWith(
-      `git -C "${realDir}" status --porcelain`,
-      { encoding: 'utf8' }
+      `git -C "${realDir}" status --porcelain -z --untracked-files=all --ignore-submodules=none`,
+      { encoding: 'utf8', maxBuffer: Infinity }
     );
   });
 

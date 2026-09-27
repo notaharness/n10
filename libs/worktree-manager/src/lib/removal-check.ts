@@ -3,7 +3,7 @@
  * branches and a rebase in progress are refused outright; everything
  * else that would be lost is a risk the user may choose to take.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { log } from '@n10/logger';
 import { exec, gitOptions } from './exec.js';
@@ -17,6 +17,8 @@ import { listWorktrees } from './worktree-list.js';
  *  `git branch -D`. */
 export type RemovalRisk =
   | 'uncommitted changes'
+  /** Git could not say whether the checkout has uncommitted changes. */
+  | 'unknown changes'
   | 'not pushed to upstream'
   | 'submodules';
 
@@ -69,9 +71,8 @@ export async function assessBranchRemoval(
   // not exist (which would silently skip the uncommitted-changes guard).
   const dir = wt?.path ?? worktreeDir(branch);
   const risks: RemovalRisk[] = [];
-  if (await hasUncommittedChanges(dir, branch)) {
-    risks.push('uncommitted changes');
-  }
+  const changes = await uncommittedChanges(dir, branch, wt !== undefined);
+  if (changes) risks.push(changes);
   if (!confirmedMerged && (await hasUnpushedCommits(branch, cwd))) {
     risks.push('not pushed to upstream');
   }
@@ -95,27 +96,41 @@ export async function canRemoveBranch(
 }
 
 /**
- * Whether the checkout at `dir` has anything uncommitted. A git call
- * that fails answers "no": the worktree may simply not exist, and this
- * guard is not the place to report that.
+ * What the checkout at `dir` has uncommitted, as a risk. Every change
+ * counts, untracked files included, whatever the repository's
+ * `status.*` settings show, and the whole answer is read. A checkout
+ * git cannot answer for is `unknown changes`: only force takes it.
+ * Without one there is nothing to lose.
  */
-async function hasUncommittedChanges(
+async function uncommittedChanges(
   dir: string,
-  branch: string
-): Promise<boolean> {
+  branch: string,
+  isCheckout: boolean
+): Promise<RemovalRisk | null> {
   try {
-    // Deliberately not `-z`: this output is only ever tested for
-    // emptiness, so NUL termination would buy nothing. Add it before
-    // parsing the entries — the newline form renders a rename as
-    // `old -> new` in one field, which is the same trap `--numstat`
-    // set with its brace form (see parseNumstat in @n10/app-core).
-    const { stdout } = await exec(`git -C "${dir}" status --porcelain`, {
-      encoding: 'utf8',
-    });
-    return stdout.trim().length > 0;
+    const { stdout } = await exec(
+      `git -C "${dir}" status --porcelain -z --untracked-files=all --ignore-submodules=none`,
+      { encoding: 'utf8', maxBuffer: Infinity }
+    );
+    return stdout.length > 0 ? 'uncommitted changes' : null;
   } catch (e) {
     log('warn', 'canRemoveBranch', `status check failed for ${branch}`, e);
-    return false;
+    return isCheckout ? 'unknown changes' : null;
+  }
+}
+
+/** The repository `dir` belongs to, as its common git directory: the
+ *  same for every checkout of one repository, and different for a
+ *  clone. Null when git cannot tell. */
+export async function repositoryOf(dir: string): Promise<string | null> {
+  try {
+    const { stdout } = await exec(
+      `git -C "${dir}" rev-parse --path-format=absolute --git-common-dir`,
+      { encoding: 'utf8' }
+    );
+    return realpathSync(stdout.trim());
+  } catch {
+    return null;
   }
 }
 
