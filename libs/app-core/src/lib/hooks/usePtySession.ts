@@ -2,8 +2,16 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import type { MouseTrackingMode } from '@n10/terminal';
 import { getSession } from '@n10/core';
 import type { PtyEntry } from '@n10/core';
-import { noteInput, resizeSession } from '@n10/core';
+import {
+  noteInput,
+  remove as removeInactiveAlert,
+  resizeSession,
+  showTerminal,
+} from '@n10/core';
 
+/** Binds the terminal pane to a session's PTY. Mount it only while that
+ * terminal is on screen: it holds `showTerminal`, which is what makes
+ * the session's output count as seen. */
 export function usePtySession(
   sessionName: string | null,
   paneCols: number,
@@ -72,6 +80,15 @@ export function usePtySession(
       entryRef.current = null;
     };
   }, [sessionName, reconnectKey, scheduleRender]);
+
+  // The caller mounts this hook only while the terminal is on screen, so
+  // the session's output is seen for as long as it is, and a queued
+  // idle alert for it is answered by showing it.
+  useEffect(() => {
+    if (!sessionName) return;
+    removeInactiveAlert(sessionName);
+    return showTerminal(sessionName);
+  }, [sessionName]);
 
   // Handle resize. This also runs whenever the pane mounts on a session;
   // `resizeSession` leaves a PTY that already has the pane's size alone.
