@@ -41,9 +41,6 @@ export interface ReviewSubmission {
 
 /** What a publication has done so far, across attempts and restarts. */
 export interface ReviewLedger {
-  /** When this publication first began, to tell its pending review
-   *  from one the reviewer started elsewhere. */
-  startedAt: number;
   /** The head the pending review was created against. */
   head: Oid;
   /** The provider's pending review, once created. */
@@ -114,9 +111,8 @@ export function isReviewPublishError(err: unknown): err is ReviewPublishError {
   return err instanceof ReviewPublishError;
 }
 
-export function freshLedger(head: Oid, now: number): ReviewLedger {
+export function freshLedger(head: Oid): ReviewLedger {
   return {
-    startedAt: now,
     head,
     reviewId: null,
     inFlight: null,

@@ -56,7 +56,6 @@ class FakeGitHub {
   lose = new Set<string>();
   drop = new Set<string>();
   refuse = new Map<string, string>();
-  clock = Date.parse('2026-09-01T00:00:00Z');
   private next = 0;
 
   gql = (query: string, v: Record<string, string | number>) => {
@@ -307,7 +306,7 @@ const SUBMISSION: ReviewSubmission = {
 };
 
 function publish(gh: FakeGitHub, store = memory(), sub = SUBMISSION) {
-  return publishGitHubReview(gh.gql, REPO, sub, store, () => gh.clock);
+  return publishGitHubReview(gh.gql, REPO, sub, store);
 }
 
 const web = (): Pending => ({
@@ -618,5 +617,19 @@ describe('publishing a GitHub review', () => {
     expect(Object.keys(published.items)).toEqual(['range']);
     expect(count(gh, 'AddReviewThread')).toBe(1);
     expect(gh.submitted).toHaveLength(0);
+  });
+
+  it('adds again a comment the reviewer took out of the pending review on GitHub', async () => {
+    const gh = new FakeGitHub();
+    const store = memory();
+    gh.refuse.set('SubmitReview', 'try again');
+    await failure(publish(gh, store));
+    gh.pending!.comments = gh.pending!.comments.filter(
+      (c) => c.path !== 'yarn.lock'
+    );
+    const published = await publish(gh, store);
+    expect(count(gh, 'AddReviewThread')).toBe(3);
+    expect(gh.submitted[0]).toMatchObject({ comments: 3 });
+    expect(Object.keys(published.items)).toContain('file');
   });
 });

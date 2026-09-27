@@ -99,7 +99,6 @@ describe('submitting a review', () => {
       src((submission, ledger) => {
         sent = submission;
         ledger.write({
-          startedAt: 1,
           head: HEAD,
           reviewId: 'R',
           inFlight: null,
@@ -155,7 +154,6 @@ describe('submitting a review', () => {
     const attempts: (string | null)[] = [];
     const lost: Publish = (_s, ledger) => {
       ledger.write({
-        startedAt: 1,
         head: HEAD,
         reviewId: 'R',
         inFlight: 'submit',
@@ -239,7 +237,6 @@ describe('submitting a review', () => {
   it('sends the request as asked, and settles a review found filed by what it holds', async () => {
     const unanswered = src((_s, ledger) => {
       ledger.write({
-        startedAt: 1,
         head: HEAD,
         reviewId: 'R',
         inFlight: 'submit',
@@ -278,7 +275,6 @@ describe('submitting a review', () => {
   it('settles every item a filed review holds, even one a later attempt deselected', async () => {
     const lostSubmit = src((_s, ledger) => {
       ledger.write({
-        startedAt: 1,
         head: HEAD,
         reviewId: 'R',
         inFlight: 'submit',
@@ -311,6 +307,48 @@ describe('submitting a review', () => {
     expect(states()).toMatchObject({
       'inline:k1': 'published',
       'inline:k2': 'published',
+    });
+  });
+
+  it('holds a deselected draft locked while an earlier step is unaccounted for', async () => {
+    const lostSubmit = src((_s, ledger) => {
+      ledger.write({
+        head: HEAD,
+        reviewId: 'R',
+        inFlight: 'submit',
+        sending: null,
+        added: {
+          'inline:k1': { id: 'C1', body: 'x' },
+          'inline:k2': { id: 'C2', body: 'y' },
+        },
+        submitted: false,
+      });
+      return Promise.reject(new ReviewPublishError('unknown', 'no answer'));
+    });
+    await submitReview(request(['inline:k1', 'inline:k2']), lostSubmit).catch(
+      () => undefined
+    );
+    await submitReview(
+      request(['inline:k1']),
+      src(() => Promise.reject(new Error('offline')))
+    ).catch(() => undefined);
+    // It may be on GitHub: not to be edited until that is known.
+    expect(states()['inline:k2']).toBe('unknown');
+    expect(() => write(inline('k2'), 'Edited.')).toThrow('may already');
+    await submitReview(
+      request(['inline:k1']),
+      src(() =>
+        Promise.resolve({
+          reviewId: 'R',
+          items: { 'inline:k1': 'C1' },
+          resumed: null,
+        })
+      )
+    );
+    // The lost submit had not landed, and k2 was taken out before it.
+    expect(states()).toMatchObject({
+      'inline:k1': 'published',
+      'inline:k2': 'unpublished',
     });
   });
 

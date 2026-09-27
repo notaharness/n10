@@ -112,15 +112,16 @@ async function submitClaimed(
   const submission = toSubmission(req, chosen);
   const attempt = file.submission?.attempt ?? randomUUID();
   const before = file.submission?.draftIds ?? [];
+  const held = heldBack(file, chosen);
 
   drafts.update((f) => ({
     ...f,
     drafts: f.drafts.map((d) =>
-      publicationFor(d, chosen, before, attempt, now())
+      publicationFor(d, chosen, { before, held }, attempt, now())
     ),
     submission: {
       attempt,
-      draftIds: chosen.map((d) => d.id),
+      draftIds: [...chosen.map((d) => d.id), ...held],
       ledger: f.submission?.ledger ?? null,
     },
   }));
@@ -149,11 +150,14 @@ async function submitClaimed(
     const unanswered = ledger.read()?.inFlight != null;
     drafts.update((f) => ({
       ...f,
-      drafts: f.drafts.map((d) =>
-        ownedBy(d, attempt)
-          ? { ...d, publication: afterFailure(d, err, unanswered, now()) }
-          : d
-      ),
+      drafts: f.drafts.map((d) => {
+        if (!ownedBy(d, attempt)) return d;
+        // Accounted for and not chosen: not on the provider.
+        if (held.includes(d.id) && !unanswered) {
+          return { ...d, publication: { state: 'unpublished' as const } };
+        }
+        return { ...d, publication: afterFailure(d, err, unanswered, now()) };
+      }),
     }));
     throw err;
   }
@@ -257,37 +261,50 @@ function toSubmission(
   };
 }
 
-/** A chosen draft goes out under `attempt`; one an earlier attempt
- *  had chosen and this one did not is back to unpublished. */
+/**
+ * Drafts an earlier attempt chose and this one does not, while a step
+ * of that attempt is still unaccounted for: any of them may be on the
+ * provider already, so they stay locked in this attempt until it is
+ * known.
+ */
+function heldBack(file: DraftFile, chosen: ReviewDraft[]): string[] {
+  const s = file.submission;
+  if (s?.ledger?.inFlight == null) return [];
+  const ids = new Set(chosen.map((d) => d.id));
+  return s.draftIds.filter((id) => !ids.has(id));
+}
+
+/** A chosen draft goes out under `attempt`; one held back waits under
+ *  it, maybe posted; one an earlier attempt had chosen and this one
+ *  did not is back to unpublished. */
 function publicationFor(
   d: ReviewDraft,
   chosen: ReviewDraft[],
-  before: string[],
+  earlier: { before: string[]; held: string[] },
   attempt: string,
   at: number
 ): ReviewDraft {
   if (chosen.some((c) => c.id === d.id)) {
     return { ...d, publication: { state: 'publishing', attempt, since: at } };
   }
-  if (before.includes(d.id)) {
+  if (earlier.held.includes(d.id)) {
+    return { ...d, publication: { state: 'unknown', attempt, since: at } };
+  }
+  if (earlier.before.includes(d.id)) {
     return { ...d, publication: { state: 'unpublished' } };
   }
   return d;
 }
 
-/** Marked `publishing` by this attempt, and not settled since. */
+/** Marked by this attempt (being posted, or held back maybe posted),
+ *  and not settled since. */
 function ownedBy(d: ReviewDraft, attempt: string): boolean {
+  const p = d.publication;
   return (
-    d.publication.state === 'publishing' && d.publication.attempt === attempt
+    (p.state === 'publishing' || p.state === 'unknown') && p.attempt === attempt
   );
 }
 
-/**
- * Where a draft stands once the review is filed: posted when the
- * review holds it (an item by its comment, the summary as the review's
- * own text when it went with the submit), or back to unpublished when
- * this attempt chose it and the review filed does not hold it.
- */
 /**
  * The summary text the filed review carries, as n10's: what this
  * submit sent, or — for a review already filed — the review's own text
@@ -305,6 +322,12 @@ function summarySent(
   return (d) => body.trim() !== '' && d.body === body;
 }
 
+/**
+ * Where a draft stands once the review is filed: posted when the
+ * review holds it (an item by its comment, the summary as the review's
+ * own text when it went with the submit), or back to unpublished when
+ * this attempt chose it and the review filed does not hold it.
+ */
 function settled(
   d: ReviewDraft,
   published: PublishedReview,

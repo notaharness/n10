@@ -10,7 +10,12 @@ import {
   type ReviewLedger,
   type ReviewSubmission,
 } from '@n10/vcs-core';
-import { findSent, reviewComments, type GraphQL } from './pr-review-match.js';
+import {
+  findSent,
+  reviewComments,
+  type GraphQL,
+  type PendingComment,
+} from './pr-review-match.js';
 import {
   readState,
   reviewById,
@@ -47,13 +52,12 @@ export async function publishGitHubReview(
   gql: GraphQL,
   repository: RepositoryRef,
   submission: ReviewSubmission,
-  store: LedgerStore,
-  now: () => number = Date.now
+  store: LedgerStore
 ): Promise<PublishedReview> {
   const [owner, repo] = repository.repository.split('/');
   if (!owner || !repo) throw new Error('GitHub project not configured');
   const pr = await readState(gql, owner, repo, submission.prId);
-  const run = new Run(gql, store, submission, now);
+  const run = new Run(gql, store, submission);
   // An earlier attempt may have got as far as the submit.
   const filed = await run.alreadyFiled(pr.pending);
   if (filed) return run.result(filed);
@@ -67,7 +71,7 @@ export async function publishGitHubReview(
     );
   }
   await run.openReview(pr);
-  await run.reconcile();
+  await run.reconcile(true);
   await run.dropUnchosen();
   for (const item of submission.items) await run.add(item);
   await run.submit();
@@ -81,10 +85,9 @@ class Run {
   constructor(
     private readonly gql: GraphQL,
     private readonly store: LedgerStore,
-    private readonly submission: ReviewSubmission,
-    now: () => number
+    private readonly submission: ReviewSubmission
   ) {
-    this.fresh = () => freshLedger(submission.head, now());
+    this.fresh = () => freshLedger(submission.head);
     this.ledger = store.read() ?? this.fresh();
   }
 
@@ -116,7 +119,7 @@ class Run {
     }
     const review = await reviewById(this.gql, reviewId);
     if (review && review.state !== 'PENDING') {
-      await this.reconcile();
+      await this.reconcile(false);
       this.save({ submitted: true, inFlight: null });
       return review;
     }
@@ -173,12 +176,32 @@ class Run {
    * else is sent: a comment added (found by what it said and where,
    * among those not already recorded), or one taken out (found gone).
    * A found comment is recorded even when its draft is no longer
-   * chosen, so it is then taken out like any other.
+   * chosen, so it is then taken out like any other. In a review still
+   * `pending`, a recorded comment the reviewer took out on GitHub is
+   * forgotten, to be added again if still chosen; a filed review's
+   * answered comments are left as they are.
    */
-  async reconcile(): Promise<void> {
-    const { inFlight, sending, reviewId } = this.ledger;
-    if (!inFlight || !reviewId || STEPS.has(inFlight)) return;
+  async reconcile(pending: boolean): Promise<void> {
+    const { inFlight, reviewId, added } = this.ledger;
+    const lost = inFlight != null && !STEPS.has(inFlight);
+    if (!reviewId || (!lost && !(pending && Object.keys(added).length))) {
+      return;
+    }
     const comments = await reviewComments(this.gql, reviewId);
+    if (lost) await this.account(inFlight, comments);
+    if (pending) {
+      const ids = new Set(comments.map((c) => c.id));
+      const kept = Object.entries(this.ledger.added).filter(([, a]) =>
+        ids.has(a.id)
+      );
+      this.save({ added: Object.fromEntries(kept) });
+    }
+  }
+
+  private async account(
+    inFlight: string,
+    comments: PendingComment[]
+  ): Promise<void> {
     if (inFlight.startsWith('drop:')) {
       const key = inFlight.slice('drop:'.length);
       const kept = comments.some((c) => c.id === this.ledger.added[key]?.id);
@@ -188,6 +211,7 @@ class Run {
       });
       return;
     }
+    const { sending } = this.ledger;
     const known = new Set(Object.values(this.ledger.added).map((a) => a.id));
     const found = sending
       ? await findSent(this.gql, comments, sending, known)
@@ -239,7 +263,7 @@ class Run {
   }
 
   async submit(): Promise<void> {
-    // A lost submit that took effect was found by `alreadySubmitted`.
+    // A lost submit that took effect was found by `alreadyFiled`.
     const review = this.ledger.reviewId!;
     const { event, body } = this.submission;
     await this.step('submit', () =>
