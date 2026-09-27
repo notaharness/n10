@@ -1,14 +1,21 @@
-import type { CheckOutcome, PullRequestCheck } from '@n10/vcs-core';
+import type {
+  CheckOutcome,
+  PullRequestCheck,
+  RequiredCheck,
+} from '@n10/vcs-core';
 
 /**
  * GitHub's check runs and commit statuses, in the shared vocabulary.
- * A check run's identity is its app, its check suite and its name: two
- * apps, two workflows, or one workflow run twice on the head (a push
- * and a pull request) report one name as separate checks.
+ * A check run's identity is its own id: two apps, two workflows, one
+ * workflow run for two events, or two jobs of one name in one run are
+ * separate checks. A re-run is a new check run, and the rollup keeps
+ * only the newest.
  */
 
 export interface CheckRunNode {
   __typename: 'CheckRun';
+  /** This check run, and no other. */
+  databaseId: number | null;
   name: string;
   status: string;
   conclusion: string | null;
@@ -74,8 +81,9 @@ const STATUS_OUTCOME: Record<string, CheckOutcome> = {
   EXPECTED: 'expected',
 };
 
-/** What a GitHub Actions event ran on: a `pull_request` run checks
- *  out the merge of the head into the base. */
+/** The commit GitHub hands an Actions run, by its event: a
+ *  `pull_request` run's context is the test merge of the head into the
+ *  base, a `push` run's the pushed commit. */
 const RAN_ON: Record<string, PullRequestCheck['ranOn']> = {
   pull_request: 'merge',
   push: 'revision',
@@ -120,9 +128,13 @@ function runOf(
 export function checkRun(node: CheckRunNode, head: string): PullRequestCheck {
   const { appId, slug, group, attempt, ranOn } = suiteOf(node);
   return {
-    key: `check:${appId ?? '-'}:${node.checkSuite?.databaseId ?? '-'}:${
-      node.name
-    }`,
+    key:
+      node.databaseId != null
+        ? `check:${node.databaseId}`
+        : `check:${appId ?? '-'}:${node.checkSuite?.databaseId ?? '-'}:${
+            node.name
+          }`,
+    requires: null,
     name: node.name,
     group,
     source: slug,
@@ -143,6 +155,7 @@ export function status(node: StatusNode, head: string): PullRequestCheck {
   const settled = outcome === 'succeeded' || outcome === 'failed';
   return {
     key: `status:${node.context}`,
+    requires: null,
     name: node.context,
     group: null,
     source: node.creator?.login ?? null,
@@ -165,10 +178,34 @@ export interface Required {
   appId: number | null;
 }
 
+/** A requirement in the shared terms, with its app named where a
+ *  check on the head shows which app that is. */
+export function requiredCheck(
+  req: Required,
+  nodes: readonly ContextNode[]
+): RequiredCheck {
+  if (req.appId == null) return { name: req.name, app: null };
+  const reporter = nodes.find(
+    (n): n is CheckRunNode =>
+      n.__typename === 'CheckRun' && n.checkSuite?.app?.databaseId === req.appId
+  );
+  return {
+    name: req.name,
+    app: {
+      id: String(req.appId),
+      slug: reporter?.checkSuite?.app?.slug ?? null,
+    },
+  };
+}
+
 /** A required check nothing on the head has reported. */
-export function expected(req: Required): PullRequestCheck {
+export function expected(
+  req: Required,
+  nodes: readonly ContextNode[]
+): PullRequestCheck {
   return {
     key: `expected:${req.appId ?? '-'}:${req.name}`,
+    requires: requiredCheck(req, nodes),
     name: req.name,
     group: null,
     source: null,

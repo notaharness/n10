@@ -21,6 +21,9 @@ const HEAD = '1'.repeat(40);
 const ACTIONS = { slug: 'github-actions', databaseId: 15368 };
 const CIRCLE = { slug: 'circleci-checks', databaseId: 18001 };
 
+/** Each check run's own id: unique, as GitHub's are. */
+let nextRun = 1;
+
 function run(
   name: string,
   over: Partial<{
@@ -38,6 +41,7 @@ function run(
 ): Json {
   return {
     __typename: 'CheckRun',
+    databaseId: nextRun++,
     name,
     status: over.status ?? 'COMPLETED',
     conclusion: over.conclusion === undefined ? 'SUCCESS' : over.conclusion,
@@ -349,7 +353,7 @@ describe('fetchPullRequestChecksGitHub: checks', () => {
     ]);
   });
 
-  it('says what a run tested only where its event says', async () => {
+  it('says which commit GitHub handed a run only where its event says', async () => {
     answerWith({
       PullRequestChecks: [
         answer({
@@ -361,9 +365,9 @@ describe('fetchPullRequestChecksGitHub: checks', () => {
         }),
       ],
     });
-    // A `pull_request_target` run checks out the base's workflow, and a
-    // third-party app's suite names no event: nothing says what either
-    // tested.
+    // A `pull_request_target` run's context is the base, and a
+    // third-party app's suite names no event: neither is the head or
+    // its test merge by GitHub's word.
     expect(items(await read()).map((c) => c.ranOn)).toEqual([
       'revision',
       null,
@@ -388,6 +392,21 @@ describe('fetchPullRequestChecksGitHub: checks', () => {
     const keys = items(await read()).map((c) => c.key);
     expect(new Set(keys).size).toBe(4);
   });
+
+  it('tells two jobs of one name in one run apart', async () => {
+    // One workflow run whose two jobs share a display name: one skipped,
+    // one passed. Merged, the skip would hide behind the pass.
+    answerWith({
+      PullRequestChecks: [
+        answer({
+          nodes: [run('Lint', { conclusion: 'SKIPPED' }), run('Lint')],
+        }),
+      ],
+    });
+    const lint = items(await read());
+    expect(lint.map((c) => c.outcome)).toEqual(['skipped', 'succeeded']);
+    expect(lint[0].key).not.toBe(lint[1].key);
+  });
 });
 
 describe('fetchPullRequestChecksGitHub: required checks nothing reported', () => {
@@ -406,6 +425,12 @@ describe('fetchPullRequestChecksGitHub: required checks nothing reported', () =>
       ['build', 'succeeded', 'optional', 'circleci-checks'],
       ['build', 'expected', 'required', null],
       ['e2e', 'expected', 'required', null],
+    ]);
+    // Each expected check carries the requirement it stands for.
+    expect(items(res).map((c) => c.requires)).toEqual([
+      null,
+      { name: 'build', app: { id: '15368', slug: null } },
+      { name: 'e2e', app: null },
     ]);
     expect(res.rules).toEqual({
       state: 'read',
@@ -632,7 +657,7 @@ describe('fetchPullRequestChecksGitHub: merge state', () => {
     ['BEHIND', true, true],
     ['BLOCKED', null, true],
     ['DIRTY', null, true],
-    ['DRAFT', null, true],
+    ['DRAFT', null, null],
     ['UNKNOWN', null, null],
     [null, null, null],
   ])(
@@ -676,8 +701,11 @@ describe('fetchPullRequestChecksGitHub: merge state', () => {
       conflicts: 'unknown',
       reviews: 'unknown',
     });
+    // Nothing else blocks it by GitHub's word; the draft is the
+    // lifecycle's to say.
     expect((await read()).merge).toMatchObject({
-      blocked: true,
+      lifecycle: { isDraft: true },
+      blocked: false,
       native: 'CLEAN',
     });
   });

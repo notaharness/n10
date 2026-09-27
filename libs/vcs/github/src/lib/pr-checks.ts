@@ -15,8 +15,8 @@ import {
   checkRun,
   expected,
   reported,
+  requiredCheck,
   status,
-  type CheckRunNode,
   type ContextNode,
   type Required,
 } from './gh-check-nodes.js';
@@ -39,7 +39,7 @@ const CONTEXTS = `
             nodes {
               __typename
               ... on CheckRun {
-                name status conclusion startedAt completedAt detailsUrl
+                databaseId name status conclusion startedAt completedAt detailsUrl
                 isRequired(pullRequestNumber: $number)
                 checkSuite {
                   databaseId
@@ -144,7 +144,8 @@ const CONFLICTS: Record<string, MergeState['conflicts']> = {
  * GitHub's own verdict. `UNSTABLE` merges with a failing check that is
  * not required; `DIRTY` has conflicts. A state that hides the other
  * question answers it with null, and `UNKNOWN` answers neither. GitHub
- * has deprecated `DRAFT` for `isDraft`, which `mergeState` reads.
+ * has deprecated `DRAFT` for `isDraft` and reports a draft by its other
+ * state; an old `DRAFT` answers neither question.
  */
 const MERGE_STATE: Record<string, [boolean | null, boolean | null]> = {
   CLEAN: [false, false],
@@ -153,7 +154,7 @@ const MERGE_STATE: Record<string, [boolean | null, boolean | null]> = {
   BEHIND: [true, true],
   BLOCKED: [null, true],
   DIRTY: [null, true],
-  DRAFT: [null, true],
+  DRAFT: [null, null],
 };
 
 function mergeState(node: ChecksNode): MergeState {
@@ -172,9 +173,9 @@ function mergeState(node: ChecksNode): MergeState {
     lifecycle: { state, isDraft: node.isDraft, native: node.state },
     conflicts: CONFLICTS[node.mergeable] ?? 'unknown',
     behind,
-    // A draft cannot merge, whatever state GitHub reports beside it: it
-    // says to read `isDraft` for that, and its merge refuses drafts.
-    blocked: node.isDraft ? true : blocked,
+    // What GitHub enforces beside the draft: the draft is the
+    // lifecycle's to say.
+    blocked,
     // GitHub leaves the decision out where a rule set requires review
     // as well as where nothing does, so its absence says neither.
     reviews: REVIEWS[node.reviewDecision ?? ''] ?? 'unknown',
@@ -272,7 +273,7 @@ function checksOf(
   // Only a complete read can say a required check is missing.
   if (complete && rules.state === 'read') {
     for (const req of rules.value.required) {
-      if (!reported(nodes, req)) items.push(expected(req));
+      if (!reported(nodes, req)) items.push(expected(req, nodes));
     }
   }
   return {
@@ -288,19 +289,10 @@ function checksOf(
 function rulesOf(rules: Rules, contexts: Contexts): ReadOutcome<BranchRules> {
   if (rules.state !== 'read') return rules;
   const nodes = contexts.state === 'read' ? contexts.value.nodes : [];
-  const slug = (appId: number | null) =>
-    nodes.find(
-      (n): n is CheckRunNode =>
-        n.__typename === 'CheckRun' && n.checkSuite?.app?.databaseId === appId
-    )?.checkSuite?.app?.slug ?? null;
   return {
     state: 'read',
     value: {
-      requiredChecks: rules.value.required.map((r) => ({
-        name: r.name,
-        app:
-          r.appId == null ? null : { id: String(r.appId), slug: slug(r.appId) },
-      })),
+      requiredChecks: rules.value.required.map((r) => requiredCheck(r, nodes)),
       conversationResolution: rules.value.resolution,
     },
   };

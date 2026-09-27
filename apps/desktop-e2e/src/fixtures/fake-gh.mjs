@@ -259,6 +259,10 @@ function contextNode(c) {
   const done = CONCLUSIONS.has(c.state);
   return {
     __typename: 'CheckRun',
+    // This check run's own id, stable for the scenario.
+    databaseId: repositoryNode(
+      `${c.workflow ?? 'CI'}:${c.event ?? ''}:${c.app ?? ''}:${c.name}`
+    ).databaseId,
     name: c.name,
     status: done ? 'COMPLETED' : c.state,
     conclusion: done ? c.state : null,

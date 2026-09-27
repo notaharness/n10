@@ -145,8 +145,9 @@ function reviewsTally({ merge }: ReadinessInputs, t: Tally): void {
   }
 }
 
-/** Unresolved threads block where a rule says so; otherwise they are
- *  there to read, not in the way. */
+/** Unresolved threads block where a rule says so and the provider does
+ *  not say it is clear; otherwise they are there to read, not in the
+ *  way. The count is the list's, older than the provider's verdict. */
 function conversationsTally(inputs: ReadinessInputs, t: Tally): void {
   const open = inputs.unresolvedThreads;
   const enforced =
@@ -163,7 +164,7 @@ function conversationsTally(inputs: ReadinessInputs, t: Tally): void {
     text: `${plural(open, 'unresolved conversation')}`,
     resolvedBy: 'author',
   };
-  if (enforced) t.blockers.push(item);
+  if (enforced && inputs.merge.blocked !== false) t.blockers.push(item);
   else t.advisories.push(item);
   if (enforced == null && inputs.merge.blocked !== false) {
     t.unknowns.push('Whether conversations must be resolved');
@@ -196,7 +197,8 @@ function mergeTally({ merge }: ReadinessInputs, t: Tally): void {
  *  it is a rule n10 cannot see. If it does not say, or says it is clear
  *  while its details name a blocker, that is unknown. */
 function enforcementTally({ merge }: ReadinessInputs, t: Tally): void {
-  const named = t.blockers.length > 0;
+  // A draft is the lifecycle's block, not one the provider enforces.
+  const named = t.blockers.some((b) => b.kind !== 'draft');
   if (merge.blocked === true && !named) {
     t.blockers.push({
       kind: 'rules',
@@ -212,9 +214,10 @@ function enforcementTally({ merge }: ReadinessInputs, t: Tally): void {
   }
 }
 
-/** The provider's verdict, unless its own details contradict it. */
+/** The provider's verdict, unless its own details contradict it. A
+ *  draft's own lifecycle is a verdict too. */
 function verdict(merge: MergeState, t: Tally): 'ready' | 'blocked' | 'unknown' {
-  if (merge.blocked === true) return 'blocked';
+  if (merge.blocked === true || merge.lifecycle.isDraft) return 'blocked';
   if (merge.blocked === false && t.blockers.length === 0) return 'ready';
   return 'unknown';
 }

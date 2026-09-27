@@ -25,6 +25,7 @@ function check(
 ): PullRequestCheck {
   return {
     key: `check:1::${name}`,
+    requires: null,
     name,
     group: null,
     source: 'github-actions',
@@ -131,6 +132,58 @@ describe('evaluateReadiness', () => {
       })
     );
     expect(enforced.blockers.map((b) => b.kind)).toEqual(['conversations']);
+  });
+
+  it('takes GitHub’s clear over the list’s older count of threads', () => {
+    // The author resolved the last thread; the list has not read again.
+    const r = evaluateReadiness(
+      inputs({
+        unresolvedThreads: 1,
+        rules: {
+          state: 'read',
+          value: { requiredChecks: [], conversationResolution: true },
+        },
+      })
+    );
+    expect(r).toMatchObject({ state: 'ready', blockers: [], unknowns: [] });
+    expect(r.advisories.map((a) => a.text)).toEqual([
+      '1 unresolved conversation',
+    ]);
+  });
+
+  it('asks about conversations only where they could be in the way', () => {
+    // No rule asks for resolution: an unread count is nothing to know.
+    expect(
+      evaluateReadiness(inputs({ unresolvedThreads: null })).unknowns
+    ).toEqual([]);
+    // Unread rules, but GitHub says it is clear: whether they must be
+    // resolved is moot.
+    const rules = { state: 'failed', kind: 'auth', reason: 'denied' } as const;
+    const r = evaluateReadiness(inputs({ rules, unresolvedThreads: 1 }));
+    expect(r.unknowns).toEqual(['Branch rules']);
+    expect(r.advisories.map((a) => a.kind)).toEqual(['conversations']);
+  });
+
+  it('blocks a draft by its own lifecycle, as quiet as any clear pull request', () => {
+    const draft = {
+      ...CLEAN,
+      lifecycle: { state: 'open', isDraft: true, native: 'OPEN' },
+      reviews: 'unknown',
+    } as const;
+    expect(evaluateReadiness(inputs({ merge: draft }))).toEqual({
+      state: 'blocked',
+      blockers: [{ kind: 'draft', text: 'Draft', resolvedBy: 'author' }],
+      advisories: [],
+      unknowns: [],
+    });
+    // GitHub reports a draft by its other state: BLOCKED is another
+    // rule, not the draft.
+    expect(
+      kinds(inputs({ merge: { ...draft, blocked: true, native: 'BLOCKED' } }))
+    ).toEqual([
+      ['draft', 'author'],
+      ['rules', 'maintainers'],
+    ]);
   });
 
   it('keeps the provider’s verdict when the rules cannot be read, and says they were not', () => {

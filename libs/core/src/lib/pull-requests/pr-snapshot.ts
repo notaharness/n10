@@ -145,12 +145,11 @@ function sameViewer(a: string | null, b: string | null): boolean {
 }
 
 /**
- * The repository at this path is not the one the caller knew: renamed
- * away and replaced, or transferred. Its #N is some other pull request,
- * so nothing read about it may answer for the one asked.
+ * The repository the caller named is the one a read answered from. One
+ * renamed away and replaced at the same path, or transferred, is
+ * another: its #N is some other pull request, so nothing read about it
+ * may answer for the one asked.
  */
-/** The repository the caller named is the one a read answered from:
- *  one renamed away and replaced at the same path is another. */
 export function assertSameRepositoryId(
   req: SnapshotRequest,
   now: string | undefined

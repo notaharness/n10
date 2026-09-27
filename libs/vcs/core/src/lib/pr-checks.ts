@@ -37,10 +37,13 @@ export type CheckOutcome =
   | 'unknown';
 
 export interface PullRequestCheck {
-  /** Provider-native identity: two apps, two workflows, or one workflow
-   *  run for two events, reporting one name are two checks. Stable
-   *  across reads of one revision. */
+  /** Provider-native identity: two apps, two workflows, or two jobs
+   *  reporting one name are two checks. Stable across reads until the
+   *  check runs again: a re-run is a new check. */
   key: string;
+  /** For an expected check, the requirement it stands for, with the
+   *  app it must come from; null for one that reported. */
+  requires: RequiredCheck | null;
   name: string;
   /** The workflow or pipeline it belongs to, where there is one. */
   group: string | null;
@@ -97,8 +100,11 @@ export interface MergeState {
   conflicts: 'none' | 'conflicting' | 'unknown';
   /** Behind its target where the rules require it up to date. */
   behind: boolean | null;
-  /** The provider's own verdict: something it enforces stands in the
-   *  way, named or not. Null where it has not worked it out. */
+  /**
+   * The provider's own verdict on what it enforces: something stands in
+   * the way, named or not. Null where it has not worked it out. A draft
+   * cannot complete whatever this says: its lifecycle says so.
+   */
   blocked: boolean | null;
   /** The review requirement as the provider states it. */
   reviews:
