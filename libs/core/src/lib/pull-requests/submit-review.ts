@@ -272,6 +272,7 @@ function toSubmission(
     head: req.head,
     event: req.event,
     body: summary?.body ?? '',
+    ...(summary ? { summaryKey: summary.id } : {}),
     items,
   };
 }

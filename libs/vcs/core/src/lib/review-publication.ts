@@ -73,6 +73,9 @@ export interface ReviewSubmission {
   event: ReviewEvent;
   /** The review's own text; may be empty where the provider allows. */
   body: string;
+  /** The caller's key for that text, where a provider posts it as an
+   *  item of its own (Azure DevOps, as a conversation thread). */
+  summaryKey?: string;
   items: ReviewItem[];
 }
 
@@ -87,7 +90,13 @@ export interface ReviewLedger {
   inFlight: string | null;
   /** What that item step was adding, to find it in the pending review
    *  even when its draft has since been deselected. */
-  sending: { body: string; place: SentPlace } | null;
+  sending: {
+    body: string;
+    place: SentPlace;
+    /** Ids of comments already saying the same in the same place when
+     *  it was sent, not to be taken for it. */
+    before?: string[];
+  } | null;
   /** Each item already in the pending review: its remote id, and the
    *  text it was added with. */
   added: Record<string, { id: string; body: string }>;

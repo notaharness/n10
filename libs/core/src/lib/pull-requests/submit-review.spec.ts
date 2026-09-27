@@ -118,6 +118,7 @@ describe('submitting a review', () => {
       head: HEAD,
       event: 'APPROVE',
       body: 'Looks right.',
+      summaryKey: 'summary',
       items: [
         {
           key: 'inline:k1',

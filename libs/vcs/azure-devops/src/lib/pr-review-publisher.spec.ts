@@ -42,13 +42,25 @@ class FakeAzure implements AdoReviewApi {
   writes: { method: string; path: string; body: Record<string, unknown> }[] =
     [];
   lose = new Set<string>();
+  /** Lost before it reaches Azure: nothing written. */
+  drop = new Set<string>();
   refuse = new Set<string>();
+  /** GETs answered 503, by path suffix, once each. */
+  unavailable = new Set<string>();
   private next = 100;
 
   me = () => Promise.resolve(ME);
 
   get = <T>(path: string): Promise<T> => {
     const p = path.split('?')[0]!;
+    for (const suffix of this.unavailable) {
+      if (p.endsWith(suffix)) {
+        this.unavailable.delete(suffix);
+        return Promise.reject(
+          new VcsError('throttled', 'Azure DevOps is busy', { status: 429 })
+        );
+      }
+    }
     const query = new URLSearchParams(path.split('?')[1]);
     if (/^pullrequests\/\d+$/.test(p)) {
       return this.ok({ lastMergeSourceCommit: { commitId: this.head } });
@@ -85,6 +97,9 @@ class FakeAzure implements AdoReviewApi {
     const b = body as Record<string, unknown>;
     const op =
       method === 'PUT' ? 'vote' : p.endsWith('/comments') ? 'reply' : 'thread';
+    if (this.drop.delete(op)) {
+      return Promise.reject(new VcsError('network', 'connection refused'));
+    }
     if (this.refuse.delete(op)) {
       return Promise.reject(
         new VcsError('server', 'Azure DevOps: TF401181: thread is closed', {
@@ -148,6 +163,7 @@ const SUBMISSION: ReviewSubmission = {
   head: HEAD,
   event: 'APPROVE',
   body: 'Looks right.',
+  summaryKey: 'summary',
   items: [
     {
       key: 'range',
@@ -206,7 +222,7 @@ describe('publishing an Azure DevOps review', () => {
       },
       pullRequestThreadContext: {
         iterationContext: {
-          firstComparingIteration: 1,
+          firstComparingIteration: 2,
           secondComparingIteration: 2,
         },
         changeTrackingId: 7,
@@ -329,5 +345,45 @@ describe('publishing an Azure DevOps review', () => {
     expect(ado.writes[1]!.body).toMatchObject({
       pullRequestThreadContext: { changeTrackingId: 9 },
     });
+  });
+
+  it('does not take an earlier comment saying the same for a write that was lost', async () => {
+    const ado = new FakeAzure();
+    const store = memory();
+    ado.threads.push({
+      id: 42,
+      threadContext: null,
+      comments: [{ id: 1, content: 'Looks right.', author: { id: ME } }],
+    });
+    ado.drop.add('thread');
+    const summaryOnly = { ...SUBMISSION, items: [] };
+    expect((await failed(publish(ado, store, summaryOnly)))?.failure).toBe(
+      'unknown'
+    );
+    const published = await publish(ado, store, summaryOnly);
+    expect(posts(ado)).toBe(1);
+    expect(published.items['summary']).not.toBe('42');
+  });
+
+  it('reports what was posted when a read after it fails', async () => {
+    const ado = new FakeAzure();
+    ado.unavailable.add('/threads/40');
+    const err = await failed(publish(ado));
+    expect(err?.failure).toBe('refused');
+    expect(Object.keys(err!.posted)).toEqual(['range', 'file']);
+    expect(ado.votes.has(ME)).toBe(false);
+  });
+
+  it('takes a 503 on a write as maybe written', async () => {
+    const ado = new FakeAzure();
+    const store = memory();
+    const send = ado.send;
+    ado.send = <T>(m: 'POST' | 'PUT', p: string, b: unknown): Promise<T> =>
+      m === 'PUT'
+        ? Promise.reject<T>(
+            new VcsError('throttled', 'Azure DevOps is busy', { status: 503 })
+          )
+        : send<T>(m, p, b);
+    expect((await failed(publish(ado, store)))?.failure).toBe('unknown');
   });
 });

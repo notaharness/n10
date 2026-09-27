@@ -11,6 +11,7 @@ import {
 } from '@n10/vcs-core';
 import {
   findPosted,
+  lookAlikes,
   newThread,
   type AdoReviewThread,
   type IterationContext,
@@ -49,7 +50,6 @@ const VOTES: Partial<Record<ReviewEvent, number>> = {
   REJECT: -10,
 };
 
-const SUMMARY = 'summary';
 const V = 'api-version=7.1';
 
 export async function publishAzureReview(
@@ -76,16 +76,21 @@ export async function publishAzureReview(
     );
   }
   const run = new Run(api, store, submission, await api.me());
-  await run.reconcile();
-  for (const item of submission.items) {
-    if (item.place.kind === 'reply')
-      await run.reply(item.key, item.body, item.place.threadId);
-    else await run.thread(item.key, item.body, item.place);
+  try {
+    await run.reconcile();
+    for (const item of submission.items) {
+      if (item.place.kind === 'reply')
+        await run.reply(item.key, item.body, item.place.threadId);
+      else await run.thread(item.key, item.body, item.place);
+    }
+    const { summaryKey, body } = submission;
+    if (summaryKey && body.trim()) {
+      await run.thread(summaryKey, body, { kind: 'conversation' });
+    }
+    await run.vote();
+  } catch (err) {
+    throw run.stopped(err);
   }
-  if (submission.body.trim()) {
-    await run.thread(SUMMARY, submission.body, { kind: 'conversation' });
-  }
-  await run.vote();
   return run.result();
 }
 
@@ -111,19 +116,35 @@ class Run {
     return { reviewId: null, items: this.posted(), resumed: null };
   }
 
+  /** Why it stopped, with what is posted: a read that failed after a
+   *  write still leaves that write posted. */
+  stopped(err: unknown): ReviewPublishError {
+    if (err instanceof ReviewPublishError) return err;
+    return new ReviewPublishError(
+      'refused',
+      err instanceof Error ? err.message : String(err),
+      { cause: err, posted: this.posted() }
+    );
+  }
+
+  /** The threads as they stand when this attempt begins: where a lost
+   *  write is looked for, and what each write must not be taken for. */
+  private threads: AdoReviewThread[] = [];
+
   /** A write whose answer was lost: found among the threads, or known
    *  not to have landed. */
   async reconcile(): Promise<void> {
+    const { value } = await this.api.get<{ value: AdoReviewThread[] }>(
+      `pullrequests/${this.submission.prId}/threads?${V}`
+    );
+    this.threads = value;
     const { inFlight, sending } = this.ledger;
     if (!inFlight || !sending || inFlight === 'submit') {
       if (inFlight && inFlight !== 'submit') this.save({ inFlight: null });
       return;
     }
-    const threads = await this.api.get<{ value: AdoReviewThread[] }>(
-      `pullrequests/${this.submission.prId}/threads?${V}`
-    );
     const recorded = new Set(Object.values(this.ledger.added).map((a) => a.id));
-    const found = findPosted(threads.value, sending, this.me, recorded);
+    const found = findPosted(value, sending, this.me, recorded);
     this.save({
       inFlight: null,
       sending: null,
@@ -140,7 +161,7 @@ class Run {
     if (this.ledger.added[key]) return;
     const context =
       place.kind === 'conversation' ? null : await this.iterationContext();
-    const posted = await this.step(key, { body, place }, () =>
+    const posted = await this.step(key, this.sending(body, place), () =>
       this.api.send<{ id: number }>(
         'POST',
         `pullrequests/${this.submission.prId}/threads?${V}`,
@@ -158,7 +179,7 @@ class Run {
       (c) => c.commentType !== 'system'
     );
     const place: SentPlace = { kind: 'reply', threadId };
-    const posted = await this.step(key, { body, place }, () =>
+    const posted = await this.step(key, this.sending(body, place), () =>
       this.api.send<{ id: number }>('POST', `${path}/comments?${V}`, {
         parentCommentId: root?.id ?? 0,
         content: body,
@@ -233,6 +254,15 @@ class Run {
     }
   }
 
+  /** What a step is sending, and the look-alikes already there. */
+  private sending(body: string, place: SentPlace): ReviewLedger['sending'] {
+    return {
+      body,
+      place,
+      before: lookAlikes(this.threads, { body, place }, this.me),
+    };
+  }
+
   private posted(): Record<string, string> {
     return Object.fromEntries(
       Object.entries(this.ledger.added).map(([key, { id }]) => [key, id])
@@ -285,6 +315,8 @@ class Run {
  *  5xx or a dropped connection may have been after the write. */
 function refused(err: unknown): boolean {
   if (!isVcsError(err)) return false;
+  // 503 is Azure being unavailable, which may be mid-write.
+  if (err.status === 503) return false;
   if (err.kind === 'throttled' || err.kind === 'auth') return true;
   return err.status !== undefined && err.status >= 400 && err.status < 500;
 }

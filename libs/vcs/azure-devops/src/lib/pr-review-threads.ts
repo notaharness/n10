@@ -70,8 +70,10 @@ export function newThread(
     ...(where && context
       ? {
           pullRequestThreadContext: {
+            // Both sides of the head's iteration: equal iterations
+            // compare it with the common commit, the diff under review.
             iterationContext: {
-              firstComparingIteration: 1,
+              firstComparingIteration: context.iteration,
               secondComparingIteration: context.iteration,
             },
             ...(tracking ? { changeTrackingId: tracking } : {}),
@@ -82,40 +84,53 @@ export function newThread(
 }
 
 /**
- * What a lost write put on the pull request, found by what it said,
- * who said it and where: a thread the viewer started with that text in
- * that place, or their reply with that text in that thread. Ids already
- * recorded for other items are passed over.
+ * The viewer's comments saying `sent.body` in `sent.place`: threads
+ * they started with that text there, or their replies with that text
+ * in that thread. A lost write is the one among them that is neither
+ * recorded for another item nor already there when it was sent.
  */
+export function lookAlikes(
+  threads: AdoReviewThread[],
+  sent: Pick<NonNullable<ReviewLedger['sending']>, 'body' | 'place'>,
+  me: string
+): string[] {
+  const { place } = sent;
+  if (place.kind === 'reply') {
+    const thread = threads.find((t) => String(t.id) === place.threadId);
+    return (thread?.comments ?? [])
+      .filter(
+        (c) =>
+          c.author?.id === me &&
+          c.content === sent.body &&
+          (c.parentCommentId ?? 0) !== 0
+      )
+      .map((c) => String(c.id));
+  }
+  const want = JSON.stringify(threadContext(place));
+  return threads
+    .filter((t) => {
+      const first = t.comments?.[0];
+      return (
+        first?.author?.id === me &&
+        first.content === sent.body &&
+        JSON.stringify(sameShape(t.threadContext)) === want
+      );
+    })
+    .map((t) => String(t.id));
+}
+
 export function findPosted(
   threads: AdoReviewThread[],
   sent: NonNullable<ReviewLedger['sending']>,
   me: string,
   recorded: Set<string>
 ): string | null {
-  const { place } = sent;
-  if (place.kind === 'reply') {
-    const thread = threads.find((t) => String(t.id) === place.threadId);
-    const reply = (thread?.comments ?? []).find(
-      (c) =>
-        c.author?.id === me &&
-        c.content === sent.body &&
-        (c.parentCommentId ?? 0) !== 0 &&
-        !recorded.has(String(c.id))
-    );
-    return reply ? String(reply.id) : null;
-  }
-  const want = JSON.stringify(threadContext(place));
-  const thread = threads.find((t) => {
-    const first = t.comments?.[0];
-    return (
-      !recorded.has(String(t.id)) &&
-      first?.author?.id === me &&
-      first.content === sent.body &&
-      JSON.stringify(sameShape(t.threadContext)) === want
-    );
-  });
-  return thread ? String(thread.id) : null;
+  const before = new Set(sent.before ?? []);
+  return (
+    lookAlikes(threads, sent, me).find(
+      (id) => !recorded.has(id) && !before.has(id)
+    ) ?? null
+  );
 }
 
 /** A thread's context in the shape `threadContext` builds: Azure
