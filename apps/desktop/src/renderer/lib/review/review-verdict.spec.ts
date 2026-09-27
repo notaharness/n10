@@ -114,6 +114,36 @@ describe('withViewerVerdict', () => {
     ]);
   });
 
+  it('keeps the groups an earlier vote answered for', () => {
+    const reviewersGroup = '[proj]\\Reviewers';
+    const next = withViewerVerdict(
+      [
+        team('no-response'),
+        {
+          displayName: 'Reviewers',
+          identifier: reviewersGroup,
+          decision: 'rejected',
+        },
+        {
+          displayName: 'Me',
+          identifier: 'me@example.com',
+          decision: 'rejected',
+          votedFor: [reviewersGroup],
+        },
+      ],
+      'me@example.com',
+      'approved'
+    );
+    expect(reviewersToCount(next)).toEqual([
+      {
+        displayName: 'Me',
+        identifier: 'me@example.com',
+        decision: 'approved',
+        votedFor: [reviewersGroup, TEAM],
+      },
+    ]);
+  });
+
   it('names no group the viewer is not in', () => {
     const next = withViewerVerdict(
       [{ ...team('no-response'), includesViewer: undefined }],
