@@ -24,7 +24,7 @@ function conversation(
     events: [],
     coverage: {
       threads: DONE,
-      replies: DONE,
+      threadComments: DONE,
       comments: DONE,
       reviews: DONE,
       events: DONE,
@@ -73,7 +73,9 @@ describe('isConversationComplete', () => {
     expect(isConversationComplete(conversation())).toBe(true);
     expect(
       isConversationComplete(
-        conversation({ replies: { loaded: 100, total: 126, complete: false } })
+        conversation({
+          threadComments: { loaded: 100, total: 126, complete: false },
+        })
       )
     ).toBe(false);
   });

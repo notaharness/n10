@@ -64,6 +64,11 @@ test.describe('Pull request conversation', () => {
     );
     expect(c.comments).toHaveLength(Q2_COUNTS.comments);
     expect(c.reviews).toHaveLength(Q2_COUNTS.reviews);
+    expect(c.events.map((e) => e.kind)).toEqual([
+      'commit',
+      'force-push',
+      'review-requested',
+    ]);
     expect(Object.values(c.coverage).every((part) => part.complete)).toBe(true);
 
     // The summary review with no inline comments keeps its verdict and
@@ -77,6 +82,14 @@ test.describe('Pull request conversation', () => {
       resolved: true,
       resolvedBy: { identifier: 'alex' },
     });
+    // An outdated left-side thread keeps its original range; a thread on
+    // a file with no lines is a file thread.
+    expect(c.threads[1]).toMatchObject({
+      isOutdated: true,
+      anchor: { current: null, original: { side: 'LEFT', end: 3 } },
+    });
+    expect(c.threads[2]).toMatchObject({ scope: 'file' });
+    expect(c.comments[0]!.author).toMatchObject({ kind: 'bot' });
   });
 
   test('reports a failed read as failed, not as an empty conversation', async ({

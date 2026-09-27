@@ -59,6 +59,12 @@ export interface ConversationComment {
    * showing it is the reader's choice, so it is labelled, not dropped.
    */
   minimized: { reason: string | null } | null;
+  /**
+   * Part of the viewer's own review, started and not yet submitted:
+   * visible only to them. A thread whose root is pending is theirs
+   * alone and is not yet feedback anyone else can see.
+   */
+  pending: boolean;
   /** The comment this one answers, where the provider threads by it. */
   replyTo: string | null;
   /** The submitted review this comment was part of (GitHub). */
@@ -67,10 +73,16 @@ export interface ConversationComment {
   capabilities: { edit: Capability; delete: Capability };
 }
 
-/** A same-side line range in a file. Lines are 1-based and inclusive. */
+/**
+ * A line range in a file's diff. Lines are 1-based and inclusive. Each
+ * end has its own side: GitHub lets a range start on a removed line and
+ * end on an added one, which is what selecting a changed block in a
+ * unified diff produces. The thread sits at `end`, on `side`.
+ */
 export interface LineRange {
-  side: 'LEFT' | 'RIGHT';
+  startSide: 'LEFT' | 'RIGHT';
   start: number;
+  side: 'LEFT' | 'RIGHT';
   end: number;
 }
 
@@ -89,6 +101,10 @@ export interface ThreadAnchor {
   originalCommit: Oid | null;
   /** The iteration pair the thread was written against (Azure). */
   iterations: { first: number; second: number } | null;
+  /** The diff excerpt the thread was written on, as the provider kept
+   *  it (GitHub): the original context, even after a force-push has
+   *  taken `originalCommit` out of the clone. */
+  diffHunk: string | null;
 }
 
 export interface ThreadStatus {
@@ -143,53 +159,63 @@ export interface ReviewSummary {
   commit: Oid | null;
   /** Inline comments submitted with it. */
   commentCount: number;
+  /** Hidden by a moderator or its author, like a comment. */
+  minimized: { reason: string | null } | null;
   url: string | null;
 }
 
-export type ConversationEventKind =
-  | 'commit'
-  | 'push'
-  | 'force-push'
-  | 'base-changed'
-  | 'review-requested'
-  | 'review-request-removed'
-  | 'review-dismissed'
-  | 'vote'
-  | 'ready-for-review'
-  | 'converted-to-draft'
-  | 'closed'
-  | 'reopened'
-  | 'merged'
-  | 'status-changed'
-  /** A provider history entry with no more specific reading. */
-  | 'system';
+/** A person or a team asked for a review. */
+export interface RequestedReviewer {
+  kind: 'user' | 'team';
+  name: string;
+}
 
-/**
- * Something that happened on the pull request that is not a comment.
- * Azure writes its history as system comments; those arrive here, not
- * among the comments, so automation is never read as a person.
- */
-export interface ConversationEvent {
+interface EventBase {
   id: string;
-  kind: ConversationEventKind;
+  /** Null when the provider names nobody, or only a name git recorded
+   *  (see `commit`). */
   actor: ConversationActor | null;
   at: string | null;
   /** The provider's own type: a GraphQL typename, an Azure thread type. */
   native: string;
-  /** The provider's description, where it writes one (Azure). */
-  text: string | null;
-  /** The commit a `commit` or `merged` event names. */
-  commit?: Oid;
-  /** A push's commits before and after, where the provider says. */
-  before?: Oid | null;
-  after?: Oid | null;
-  /** Who a review request or vote was about: a person or a team. */
-  subject?: string;
-  /** Azure's iteration number for a push. */
-  iteration?: number;
-  /** Azure's vote value: 10, 5, 0, -5, -10. */
-  vote?: number;
 }
+
+/**
+ * Something that happened on the pull request that is not a comment.
+ * Azure writes its history as system comments; those arrive here, not
+ * among the comments, so automation is never read as a person. Azure's
+ * entries carry the text Azure wrote for them.
+ */
+export type ConversationEvent = EventBase &
+  (
+    | {
+        kind: 'commit';
+        commit: Oid;
+        headline: string | null;
+        /** The author's name as git recorded it, when no account is
+         *  linked to the commit — a name, not an identity. `at` is when
+         *  it was committed; GitHub does not say when it was pushed. */
+        authorName: string | null;
+      }
+    | { kind: 'force-push'; before: Oid | null; after: Oid | null }
+    | { kind: 'base-changed'; from: string | null; to: string | null }
+    | {
+        kind: 'review-requested' | 'review-request-removed';
+        reviewer: RequestedReviewer | null;
+      }
+    | { kind: 'review-dismissed'; message: string | null }
+    | {
+        kind: 'ready-for-review' | 'converted-to-draft' | 'closed' | 'reopened';
+      }
+    | { kind: 'merged'; commit: Oid | null }
+    /** Azure's vote: 10, 5, 0, -5, -10. */
+    | { kind: 'vote'; vote: number | null; text: string | null }
+    | { kind: 'push' | 'status-changed'; text: string | null }
+    /** A provider history entry with no more specific reading. */
+    | { kind: 'system'; text: string | null }
+  );
+
+export type ConversationEventKind = ConversationEvent['kind'];
 
 export interface PullRequestConversation {
   ref: PullRequestRef;
@@ -206,8 +232,8 @@ export interface PullRequestConversation {
   events: ConversationEvent[];
   coverage: {
     threads: Coverage;
-    /** Every thread's replies, together. */
-    replies: Coverage;
+    /** Every thread's comments together, root comments included. */
+    threadComments: Coverage;
     comments: Coverage;
     reviews: Coverage;
     events: Coverage;

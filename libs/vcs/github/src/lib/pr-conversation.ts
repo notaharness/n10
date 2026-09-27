@@ -7,9 +7,9 @@ import {
   type PullRequestConversation,
   type PullRequestRef,
 } from '@n10/vcs-core';
+import { toEvent } from './pr-conversation-events.js';
 import {
   toComment,
-  toEvent,
   toReview,
   toThread,
   type ConversationResponse,
@@ -133,7 +133,7 @@ export async function fetchGitHubConversation(
     events: mappedEvents,
     coverage: {
       threads: threads.coverage,
-      replies: combineCoverage(threads.threads.map((t) => t.coverage)),
+      threadComments: combineCoverage(threads.threads.map((t) => t.coverage)),
       comments: comments.coverage,
       reviews: reviews.coverage,
       events: events.coverage,

@@ -97,7 +97,7 @@ describe('toAdoConversation', () => {
       isOutdated: false,
       anchor: {
         path: 'src/request.ts',
-        current: { side: 'RIGHT', start: 41, end: 43 },
+        current: { startSide: 'RIGHT', start: 41, side: 'RIGHT', end: 43 },
         original: null,
         iterations: { first: 1, second: 2 },
       },
@@ -120,7 +120,7 @@ describe('toAdoConversation', () => {
       anchor: {
         path: 'src/legacy.ts',
         current: null,
-        original: { side: 'LEFT', start: 18, end: 20 },
+        original: { startSide: 'LEFT', start: 18, side: 'LEFT', end: 20 },
       },
       status: { resolved: true, native: 'wontFix' },
     });

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import type { VcsErrorKind } from '@n10/vcs-core';
 import type {
   PullRequestConversationRead,
   PullRequestRef,
@@ -15,7 +16,7 @@ import { keys } from './query-keys.js';
 export class ProviderReadError extends Error {
   constructor(
     message: string,
-    readonly kind: string,
+    readonly kind: VcsErrorKind,
     readonly retryAfterMs: number | undefined
   ) {
     super(message);
@@ -43,7 +44,7 @@ export async function loadPullRequestConversation(
 
 /** A rate limit or a rejected credential is not fixed by asking again
  *  straight away; anything else gets TanStack's usual retries. */
-function retryRead(failures: number, error: unknown): boolean {
+export function retryRead(failures: number, error: unknown): boolean {
   if (error instanceof ProviderReadError) {
     if (error.kind === 'throttled' || error.kind === 'auth') return false;
   }

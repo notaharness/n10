@@ -19,7 +19,10 @@ fragment ConversationReviewComment on PullRequestReviewComment {
   replyTo { id }
   pullRequestReview { id }
   viewerCanUpdate
+  viewerCannotUpdateReasons
   viewerCanDelete
+  state
+  diffHunk
 }`;
 
 const THREAD = `
@@ -60,6 +63,7 @@ fragment ConversationIssueComment on IssueComment {
   minimizedReason
   url
   viewerCanUpdate
+  viewerCannotUpdateReasons
   viewerCanDelete
 }`;
 
@@ -73,6 +77,8 @@ fragment ConversationReview on PullRequestReview {
   url
   commit { oid }
   comments { totalCount }
+  isMinimized
+  minimizedReason
 }`;
 
 /** The timeline entries that are events rather than comments or
@@ -108,6 +114,7 @@ fragment ConversationEvent on PullRequestTimelineItems {
     commit {
       oid
       committedDate
+      messageHeadline
       author { name user { ...ConversationActor } }
     }
   }

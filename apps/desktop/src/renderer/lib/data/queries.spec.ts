@@ -20,6 +20,7 @@ import {
 import {
   loadPullRequestConversation,
   ProviderReadError,
+  retryRead,
 } from './pr-conversation-query.js';
 
 /**
@@ -272,6 +273,9 @@ describe('refreshRepoInfo', () => {
 
     expect(qc.getQueryData(keys.repo)).toEqual(GITHUB_REPO);
     expect(qc.getQueryData(keys.threads('/repo', 42))).toEqual({ threads: [] });
+  });
+});
+
 describe('pull request conversations', () => {
   const REF = {
     provider: 'github',
@@ -341,6 +345,15 @@ describe('pull request conversations', () => {
     await expect(loadPullRequestConversation(REF, 'bob')).rejects.toThrow(
       /read as carol/
     );
+  });
+
+  it('does not ask again straight away after a rate limit or a rejected credential', () => {
+    const failure = (kind: 'throttled' | 'auth' | 'server') =>
+      new ProviderReadError('no', kind, undefined);
+    expect(retryRead(0, failure('throttled'))).toBe(false);
+    expect(retryRead(0, failure('auth'))).toBe(false);
+    expect(retryRead(0, failure('server'))).toBe(true);
+    expect(retryRead(3, failure('server'))).toBe(false);
   });
 
   it('files repo A #42 and repo B #42 apart and drops both with the repository (Q8)', () => {

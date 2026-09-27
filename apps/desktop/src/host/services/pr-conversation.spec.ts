@@ -59,7 +59,7 @@ vi.mock('./pull-requests.js', () => ({
               events: [],
               coverage: {
                 threads: DONE,
-                replies: DONE,
+                threadComments: DONE,
                 comments: DONE,
                 reviews: DONE,
                 events: DONE,

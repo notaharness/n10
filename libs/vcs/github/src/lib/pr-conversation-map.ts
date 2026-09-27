@@ -1,11 +1,10 @@
+import type { RawEvent } from './pr-conversation-events.js';
 import {
   isOid,
   sanitizeBody,
   type Capability,
   type ConversationActor,
   type ConversationComment,
-  type ConversationEvent,
-  type ConversationEventKind,
   type ConversationThread,
   type Coverage,
   type LineRange,
@@ -32,7 +31,7 @@ export interface Page<T> {
   nodes: (T | null)[];
 }
 
-interface RawActor {
+export interface RawActor {
   __typename: string;
   login: string;
 }
@@ -49,7 +48,11 @@ export interface RawReviewComment {
   replyTo: { id: string } | null;
   pullRequestReview: { id: string } | null;
   viewerCanUpdate: boolean;
+  viewerCannotUpdateReasons: string[];
   viewerCanDelete: boolean;
+  /** `PENDING` while part of the viewer's unsubmitted review. */
+  state: string;
+  diffHunk: string;
   originalCommit: { oid: string } | null;
 }
 
@@ -74,7 +77,7 @@ export interface RawThread {
 
 type RawIssueComment = Omit<
   RawReviewComment,
-  'replyTo' | 'pullRequestReview' | 'originalCommit'
+  'replyTo' | 'pullRequestReview' | 'originalCommit' | 'state' | 'diffHunk'
 >;
 
 interface RawReview {
@@ -86,28 +89,8 @@ interface RawReview {
   url: string;
   commit: { oid: string } | null;
   comments: { totalCount: number };
-}
-
-interface RawEvent {
-  __typename: string;
-  id?: string;
-  createdAt?: string;
-  actor?: RawActor | null;
-  commit?: {
-    oid: string;
-    committedDate?: string;
-    author?: { name: string | null; user: RawActor | null } | null;
-  } | null;
-  beforeCommit?: { oid: string } | null;
-  afterCommit?: { oid: string } | null;
-  previousRefName?: string;
-  currentRefName?: string;
-  requestedReviewer?: {
-    __typename: string;
-    login?: string;
-    name?: string;
-  } | null;
-  dismissalMessage?: string | null;
+  isMinimized: boolean;
+  minimizedReason: string | null;
 }
 
 export interface RawPullRequest {
@@ -127,7 +110,7 @@ export interface RepliesResponse {
 
 // ── Mapping ───────────────────────────────────────────────────────
 
-function oidOf(value: { oid: string } | null | undefined): Oid | null {
+export function oidOf(value: { oid: string } | null | undefined): Oid | null {
   const oid = value?.oid;
   return isOid(oid) ? oid : null;
 }
@@ -140,7 +123,41 @@ function allowed(can: boolean, what: string): Capability {
     : { state: 'forbidden', reason: `GitHub does not let you ${what}` };
 }
 
-function toActor(raw: RawActor | null | undefined): ConversationActor | null {
+/**
+ * Why GitHub will not let the viewer edit a comment. Only a denial is
+ * about the viewer; an archived or locked repository, maintenance or an
+ * unverified email is something they cannot change here.
+ */
+const CANNOT_UPDATE: Record<string, string> = {
+  ARCHIVED: 'The repository is archived',
+  LOCKED: 'The conversation is locked',
+  MAINTENANCE: 'GitHub is in maintenance',
+  LOGIN_REQUIRED: 'GitHub needs you to sign in again',
+  VERIFIED_EMAIL_REQUIRED: 'GitHub needs a verified email address',
+};
+
+function editCapability(raw: RawIssueComment): Capability {
+  if (raw.viewerCanUpdate) return SUPPORTED;
+  const reason = raw.viewerCannotUpdateReasons
+    .map((r) => CANNOT_UPDATE[r])
+    .find((r) => r !== undefined);
+  return reason
+    ? { state: 'unavailable', reason }
+    : allowed(false, 'edit this comment');
+}
+
+function minimizedOf(raw: {
+  isMinimized: boolean;
+  minimizedReason: string | null;
+}): ConversationComment['minimized'] {
+  return raw.isMinimized
+    ? { reason: raw.minimizedReason?.toLowerCase() ?? null }
+    : null;
+}
+
+export function toActor(
+  raw: RawActor | null | undefined
+): ConversationActor | null {
   if (!raw?.login) return null;
   return {
     identifier: raw.login,
@@ -163,26 +180,36 @@ export function toComment(
     kind: 'text',
     createdAt: raw.createdAt,
     editedAt: raw.lastEditedAt,
-    minimized: raw.isMinimized
-      ? { reason: raw.minimizedReason?.toLowerCase() ?? null }
-      : null,
+    minimized: minimizedOf(raw),
+    pending: 'state' in raw && raw.state === 'PENDING',
     replyTo: replyTo?.id ?? null,
     reviewId: review?.id ?? null,
     url: raw.url,
     capabilities: {
-      edit: allowed(raw.viewerCanUpdate, 'edit this comment'),
+      edit: editCapability(raw),
       delete: allowed(raw.viewerCanDelete, 'delete this comment'),
     },
   };
 }
 
+type Side = 'LEFT' | 'RIGHT';
+
+/** GitHub names one side per end; a single-line range has no start
+ *  side, and a missing side is the new file's. */
 function range(
-  side: 'LEFT' | 'RIGHT' | null,
+  startSide: Side | null,
+  side: Side | null,
   start: number | null,
   end: number | null
 ): LineRange | null {
   if (end == null) return null;
-  return { side: side ?? 'RIGHT', start: start ?? end, end };
+  const endSide = side ?? 'RIGHT';
+  return {
+    startSide: start == null ? endSide : startSide ?? endSide,
+    start: start ?? end,
+    side: endSide,
+    end,
+  };
 }
 
 export function toThread(
@@ -191,21 +218,22 @@ export function toThread(
   coverage: Coverage
 ): ConversationThread {
   const isFile = raw.subjectType === 'FILE';
+  const { startDiffSide: startSide, diffSide: side } = raw;
+  const root = comments[0];
   return {
     id: raw.id,
     scope: isFile ? 'file' : 'line',
     anchor: {
       path: raw.path,
-      current: isFile ? null : range(raw.diffSide, raw.startLine, raw.line),
+      current: isFile ? null : range(startSide, side, raw.startLine, raw.line),
+      // GitHub keeps one pair of sides: a thread's sides do not change
+      // as it is carried across pushes, only its line numbers.
       original: isFile
         ? null
-        : range(
-            raw.startDiffSide ?? raw.diffSide,
-            raw.originalStartLine,
-            raw.originalLine
-          ),
-      originalCommit: oidOf(comments[0]?.originalCommit),
+        : range(startSide, side, raw.originalStartLine, raw.originalLine),
+      originalCommit: oidOf(root?.originalCommit),
       iterations: null,
+      diffHunk: root?.diffHunk || null,
     },
     isOutdated: raw.isOutdated,
     status: {
@@ -224,6 +252,8 @@ export function toThread(
   };
 }
 
+/** GitHub's review states, a closed enum. The native word is kept
+ *  beside the reading either way. */
 const REVIEW_STATES: Record<string, ReviewState> = {
   APPROVED: 'approved',
   CHANGES_REQUESTED: 'changes-requested',
@@ -243,69 +273,7 @@ export function toReview(raw: RawReview): ReviewSummary {
     submittedAt: raw.submittedAt,
     commit: oidOf(raw.commit),
     commentCount: raw.comments.totalCount,
+    minimized: minimizedOf(raw),
     url: raw.url,
-  };
-}
-
-const EVENT_KINDS: Record<string, ConversationEventKind> = {
-  PullRequestCommit: 'commit',
-  HeadRefForcePushedEvent: 'force-push',
-  BaseRefChangedEvent: 'base-changed',
-  ReviewRequestedEvent: 'review-requested',
-  ReviewRequestRemovedEvent: 'review-request-removed',
-  ReviewDismissedEvent: 'review-dismissed',
-  ReadyForReviewEvent: 'ready-for-review',
-  ConvertToDraftEvent: 'converted-to-draft',
-  ClosedEvent: 'closed',
-  ReopenedEvent: 'reopened',
-  MergedEvent: 'merged',
-};
-
-/** A commit's author: the GitHub account where the commit is linked to
- *  one, else the name git recorded. */
-function commitAuthor(raw: RawEvent): ConversationActor | null {
-  const author = raw.commit?.author;
-  const account = toActor(author?.user);
-  if (account || !author?.name) return account;
-  return {
-    identifier: author.name,
-    displayName: author.name,
-    id: null,
-    kind: 'user',
-  };
-}
-
-function eventDetail(raw: RawEvent): Partial<ConversationEvent> {
-  const reviewer = raw.requestedReviewer;
-  const commit = oidOf(raw.commit);
-  return {
-    ...(commit ? { commit } : {}),
-    ...(raw.__typename === 'HeadRefForcePushedEvent'
-      ? { before: oidOf(raw.beforeCommit), after: oidOf(raw.afterCommit) }
-      : {}),
-    ...(reviewer ? { subject: reviewer.login ?? reviewer.name ?? '' } : {}),
-  };
-}
-
-function eventText(raw: RawEvent): string | null {
-  if (raw.__typename === 'BaseRefChangedEvent') {
-    return `${raw.previousRefName ?? '?'} → ${raw.currentRefName ?? '?'}`;
-  }
-  return raw.dismissalMessage ?? null;
-}
-
-export function toEvent(raw: RawEvent): ConversationEvent | null {
-  const kind = EVENT_KINDS[raw.__typename];
-  const id = raw.id ?? raw.commit?.oid;
-  if (!kind || !id) return null;
-  const isCommit = raw.__typename === 'PullRequestCommit';
-  return {
-    id,
-    kind,
-    actor: isCommit ? commitAuthor(raw) : toActor(raw.actor),
-    at: (isCommit ? raw.commit?.committedDate : raw.createdAt) ?? null,
-    native: raw.__typename,
-    text: eventText(raw),
-    ...eventDetail(raw),
   };
 }

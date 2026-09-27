@@ -18,7 +18,7 @@
  * empty result rather than failing, so a test declares only what it
  * cares about.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 
 const scenarioPath = process.env.N10_FAKE_GH;
 const scenario = JSON.parse(readFileSync(scenarioPath, 'utf8'));
@@ -82,10 +82,23 @@ function failLikeGitHub() {
 /** Whether the scenario says this PR's `read` should fail right now. */
 const failing = (pr, read) => Boolean(pr?.failing?.[read]);
 
+/**
+ * Print the answer and exit. The write is synchronous: an asynchronous
+ * one into a pipe is cut off at the pipe's buffer (64 KiB) by the exit,
+ * and a conversation page is bigger than that. Node leaves the pipe
+ * non-blocking, so a full buffer answers EAGAIN until the app reads.
+ */
 const out = (value) => {
-  process.stdout.write(
+  const bytes = Buffer.from(
     typeof value === 'string' ? value : JSON.stringify(value)
   );
+  for (let at = 0; at < bytes.length; ) {
+    try {
+      at += writeSync(1, bytes, at);
+    } catch (err) {
+      if (err.code !== 'EAGAIN') throw err;
+    }
+  }
   process.exit(0);
 };
 
@@ -185,7 +198,9 @@ function pageOf(all, after) {
   };
 }
 
-const actor = (login) => (login ? { __typename: 'User', login } : null);
+/** A login ending in `bot` is a GitHub App, as `ci-bot` would be. */
+const actor = (login) =>
+  login ? { __typename: /bot$/.test(login) ? 'Bot' : 'User', login } : null;
 
 function conversationComment(c, id) {
   return {
@@ -198,6 +213,7 @@ function conversationComment(c, id) {
     minimizedReason: null,
     url: `https://github.com/n10/fixture/pull/1#${id}`,
     viewerCanUpdate: c.author === (scenario.username ?? 'n10-tester'),
+    viewerCannotUpdateReasons: [],
     viewerCanDelete: c.author === (scenario.username ?? 'n10-tester'),
   };
 }
@@ -208,6 +224,8 @@ function threadComments(t, i) {
     ...conversationComment(c, `${id}-c${j + 1}`),
     replyTo: j === 0 ? null : { id: `${id}-c1` },
     pullRequestReview: null,
+    state: 'SUBMITTED',
+    diffHunk: '',
     originalCommit: null,
   }));
 }
@@ -251,6 +269,8 @@ function conversationConnections(pr, after) {
         url: `https://github.com/n10/fixture/pull/1#review-${i + 1}`,
         commit: null,
         comments: { totalCount: r.commentCount ?? 0 },
+        isMinimized: false,
+        minimizedReason: null,
       })),
       after
     ),

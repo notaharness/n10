@@ -94,13 +94,17 @@ interface FakeConversationCoverage {
 interface FakeConversation {
   threads: {
     id: string;
+    scope: string;
+    isOutdated: boolean;
+    anchor: unknown;
     comments: { id: string; body: string }[];
     status: { resolved: boolean; resolvedBy: { identifier: string } | null };
   }[];
-  comments: { id: string; body: string }[];
+  events: { kind: string }[];
+  comments: { id: string; body: string; author: { kind: string } | null }[];
   reviews: { state: string; body: string; commentCount: number }[];
   coverage: Record<
-    'threads' | 'replies' | 'comments' | 'reviews' | 'events',
+    'threads' | 'threadComments' | 'comments' | 'reviews' | 'events',
     FakeConversationCoverage
   >;
 }

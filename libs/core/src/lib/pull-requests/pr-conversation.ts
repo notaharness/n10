@@ -1,13 +1,11 @@
-import {
-  describePullRequest,
-  readFailure,
-  samePullRequest,
-  type PullRequestConversation,
-  type PullRequestRef,
-  type ReadOutcome,
+import type {
+  PullRequestConversation,
+  PullRequestRef,
+  ReadOutcome,
 } from '@n10/vcs-core';
 import {
   assertSameContext,
+  readAbout,
   type SnapshotRequest,
   type SnapshotSources,
 } from './pr-snapshot.js';
@@ -35,38 +33,16 @@ export interface ConversationSources
   conversation?: (prId: number) => Promise<PullRequestConversation>;
 }
 
-async function readConversation(
-  ref: PullRequestRef,
-  read: ConversationSources['conversation']
-): Promise<ReadOutcome<PullRequestConversation>> {
-  if (!read) {
-    return {
-      state: 'unsupported',
-      reason: 'This provider does not read pull request conversations',
-    };
-  }
-  try {
-    const value = await read(ref.number);
-    // A conversation about another pull request must never stand in
-    // for this one's, however it came back.
-    return samePullRequest({ ...value.ref, id: undefined }, ref)
-      ? { state: 'read', value }
-      : readFailure(
-          new Error(
-            `The provider answered about ${describePullRequest(value.ref)}`
-          )
-        );
-  } catch (err) {
-    return readFailure(err);
-  }
-}
-
 export async function readPullRequestConversation(
   req: SnapshotRequest,
   src: ConversationSources
 ): Promise<PullRequestConversationRead> {
   const viewer = assertSameContext(req, src);
-  const conversation = await readConversation(req.ref, src.conversation);
+  const conversation = await readAbout(
+    req.ref,
+    src.conversation,
+    'This provider does not read pull request conversations'
+  );
   // Asked again after the read, as the account it started as.
   assertSameContext({ ...req, viewer }, src);
   return {

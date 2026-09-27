@@ -5,7 +5,6 @@ import {
   type ConversationActor,
   type ConversationComment,
   type ConversationEvent,
-  type ConversationEventKind,
   type ConversationThread,
   type LineRange,
   type PullRequestConversation,
@@ -109,6 +108,8 @@ function toComment(raw: RawComment, display: DisplayText): ConversationComment {
     createdAt: published,
     editedAt: edited && edited !== published ? edited : null,
     minimized: null,
+    // Azure has no private review drafts: a comment is posted or absent.
+    pending: false,
     replyTo: raw.parentCommentId ? String(raw.parentCommentId) : null,
     reviewId: null,
     url: null,
@@ -116,23 +117,25 @@ function toComment(raw: RawComment, display: DisplayText): ConversationComment {
   };
 }
 
-/** A range from Azure's four line refs. Right wins: a thread with only
- *  left-side refs is on a deleted or old line. */
+/** A range from Azure's four line refs, on one side. Right wins: a
+ *  thread with only left-side refs is on a deleted or old line. */
 function rangeOf(
   leftStart: RawLine | undefined,
   leftEnd: RawLine | undefined,
   rightStart: RawLine | undefined,
   rightEnd: RawLine | undefined
 ): LineRange | null {
-  if (rightStart?.line != null) {
-    const start = rightStart.line;
-    return { side: 'RIGHT', start, end: rightEnd?.line ?? start };
-  }
-  if (leftStart?.line != null) {
-    const start = leftStart.line;
-    return { side: 'LEFT', start, end: leftEnd?.line ?? start };
-  }
-  return null;
+  const [side, start, end] =
+    rightStart?.line != null
+      ? (['RIGHT', rightStart, rightEnd] as const)
+      : (['LEFT', leftStart, leftEnd] as const);
+  if (start?.line == null) return null;
+  return {
+    startSide: side,
+    start: start.line,
+    side,
+    end: end?.line ?? start.line,
+  };
 }
 
 /** Azure's resolved statuses. `pending` is open: the author has not
@@ -162,6 +165,7 @@ function anchorOf(raw: RawAdoThread): ConversationThread['anchor'] {
     ),
     originalCommit: null,
     iterations: first != null && second != null ? { first, second } : null,
+    diffHunk: null,
   };
 }
 
@@ -194,12 +198,6 @@ function toThread(
 
 // ── History ───────────────────────────────────────────────────────
 
-const EVENT_KINDS: Record<string, ConversationEventKind> = {
-  VoteUpdate: 'vote',
-  RefUpdate: 'push',
-  StatusUpdate: 'status-changed',
-};
-
 /** Which property names the person behind each kind of entry. */
 const ACTOR_PROPERTY: Record<string, string> = {
   VoteUpdate: 'CodeReviewVotedByIdentity',
@@ -227,18 +225,47 @@ function eventActor(
   return toActor(named ?? first?.author);
 }
 
+/** The events Azure's history entries can be. */
+type History = Extract<
+  ConversationEvent,
+  { kind: 'vote' | 'push' | 'status-changed' | 'system' }
+>;
+type HistoryDetail = History extends infer E
+  ? E extends History
+    ? Omit<E, 'id' | 'actor' | 'at' | 'native'>
+    : never
+  : never;
+
+/** The event reading of each kind of history entry Azure writes. */
+function detailOf(
+  raw: RawAdoThread,
+  type: string,
+  text: string | null
+): HistoryDetail {
+  switch (type) {
+    case 'VoteUpdate': {
+      const vote = integer(property(raw, 'CodeReviewVoteResult')) ?? null;
+      return { kind: 'vote', vote, text };
+    }
+    case 'RefUpdate':
+      return { kind: 'push', text };
+    case 'StatusUpdate':
+      return { kind: 'status-changed', text };
+    default:
+      return { kind: 'system', text };
+  }
+}
+
 function toEvent(raw: RawAdoThread, display: DisplayText): ConversationEvent {
   const type = property(raw, 'CodeReviewThreadType') ?? 'unknown';
   const first = raw.comments?.[0];
-  const vote = integer(property(raw, 'CodeReviewVoteResult'));
+  const text = first?.content != null ? display(first.content) : null;
   return {
     id: String(raw.id ?? ''),
-    kind: EVENT_KINDS[type] ?? 'system',
     actor: eventActor(raw, type, first),
     at: first?.publishedDate ?? raw.publishedDate ?? null,
     native: type,
-    text: first?.content != null ? display(first.content) : null,
-    ...(vote != null ? { vote } : {}),
+    ...detailOf(raw, type, text),
   };
 }
 
@@ -266,7 +293,7 @@ export function toAdoConversation(
       events.push(toEvent(t, display));
     }
   }
-  const replies = threads.reduce((n, t) => n + t.comments.length, 0);
+  const inThreads = threads.reduce((n, t) => n + t.comments.length, 0);
   return {
     ref,
     threads,
@@ -276,7 +303,7 @@ export function toAdoConversation(
     events,
     coverage: {
       threads: coverageOf(threads.length, threads.length, true),
-      replies: coverageOf(replies, replies, true),
+      threadComments: coverageOf(inThreads, inThreads, true),
       comments: coverageOf(0, 0, true),
       reviews: coverageOf(0, 0, true),
       events: coverageOf(events.length, events.length, true),

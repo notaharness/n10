@@ -48,7 +48,10 @@ function reviewComment(id: string, extra: Record<string, unknown> = {}) {
     replyTo: null,
     pullRequestReview: { id: 'review-1' },
     viewerCanUpdate: false,
+    viewerCannotUpdateReasons: ['INSUFFICIENT_ACCESS'],
     viewerCanDelete: false,
+    state: 'SUBMITTED',
+    diffHunk: '@@ -38,4 +38,6 @@ function run() {',
     originalCommit: { oid: OID_A },
     ...extra,
   };
@@ -95,6 +98,7 @@ function issueComment(i: number) {
     minimizedReason: null,
     url: `https://github.com/n10/fixture/pull/42#general-${i}`,
     viewerCanUpdate: i === 1,
+    viewerCannotUpdateReasons: i === 1 ? [] : ['INSUFFICIENT_ACCESS'],
     viewerCanDelete: i === 1,
   };
 }
@@ -109,6 +113,8 @@ function review(id: string, state: string, body: string, comments: number) {
     url: `https://github.com/n10/fixture/pull/42#${id}`,
     commit: { oid: OID_B },
     comments: { totalCount: comments },
+    isMinimized: false,
+    minimizedReason: null,
   };
 }
 
@@ -220,7 +226,7 @@ describe('fetchGitHubConversation', () => {
       total: 130,
       complete: true,
     });
-    expect(c.coverage.replies).toEqual({
+    expect(c.coverage.threadComments).toEqual({
       loaded: 129 + 126,
       total: 129 + 126,
       complete: true,
@@ -340,9 +346,10 @@ describe('thread provenance', () => {
     expect(t.anchor).toEqual({
       path: 'src/request.ts',
       current: null,
-      original: { side: 'LEFT', start: 18, end: 20 },
+      original: { startSide: 'LEFT', start: 18, side: 'LEFT', end: 20 },
       originalCommit: OID_A,
       iterations: null,
+      diffHunk: '@@ -38,4 +38,6 @@ function run() {',
     });
   });
 
@@ -358,10 +365,38 @@ describe('thread provenance', () => {
       ],
     });
     expect(c.threads[0]!.anchor).toMatchObject({
-      current: { side: 'RIGHT', start: 41, end: 43 },
-      original: { side: 'RIGHT', start: 38, end: 40 },
+      current: { startSide: 'RIGHT', start: 41, side: 'RIGHT', end: 43 },
+      original: { startSide: 'RIGHT', start: 38, side: 'RIGHT', end: 40 },
     });
     expect(c.threads[0]!.scope).toBe('line');
+  });
+
+  it('keeps each end’s side for a range that starts on a removed line', async () => {
+    const c = await readOne({
+      threads: [
+        thread(1, {
+          line: 42,
+          startLine: 40,
+          originalLine: 42,
+          originalStartLine: 40,
+          diffSide: 'RIGHT',
+          startDiffSide: 'LEFT',
+        }),
+      ],
+    });
+    const cross = { startSide: 'LEFT', start: 40, side: 'RIGHT', end: 42 };
+    expect(c.threads[0]!.anchor).toMatchObject({
+      current: cross,
+      original: cross,
+    });
+  });
+
+  it('marks the viewer’s unsubmitted comments as pending', async () => {
+    const t = thread(1);
+    t.comments = [reviewComment('c1', { state: 'PENDING' })];
+    const c = await readOne({ threads: [t, thread(2)] });
+    expect(c.threads[0]!.comments[0]!.pending).toBe(true);
+    expect(c.threads[1]!.comments[0]!.pending).toBe(false);
   });
 
   it('reads a file-level thread as a file thread with no range', async () => {
@@ -378,6 +413,10 @@ describe('thread provenance', () => {
     expect(c.threads[0]).toMatchObject({
       scope: 'file',
       anchor: { path: 'assets/logo.png', current: null, original: null },
+    });
+    expect(c.threads[0]!.comments[0]!.capabilities.edit).toEqual({
+      state: 'forbidden',
+      reason: expect.any(String),
     });
   });
 
@@ -458,6 +497,18 @@ describe('comment provenance', () => {
     expect(c.comments[1]!.author).toMatchObject({ kind: 'bot' });
   });
 
+  it('says an archived repository, not the viewer, stops an edit', async () => {
+    const archived = {
+      ...issueComment(2),
+      viewerCannotUpdateReasons: ['ARCHIVED'],
+    };
+    const c = await readOne({ comments: [archived] });
+    expect(c.comments[0]!.capabilities.edit).toEqual({
+      state: 'unavailable',
+      reason: 'The repository is archived',
+    });
+  });
+
   it('keeps conversation comments out of the threads', async () => {
     const c = await readOne({ comments: [issueComment(1)] });
     expect(c.threads).toHaveLength(0);
@@ -485,6 +536,19 @@ describe('reviews and events', () => {
     expect(c.reviews[1]!.state).toBe('changes-requested');
   });
 
+  it('labels a hidden review summary', async () => {
+    const hidden = {
+      ...review('review-9', 'COMMENTED', 'spam', 0),
+      isMinimized: true,
+      minimizedReason: 'SPAM',
+    };
+    const c = await readOne({ reviews: [hidden] });
+    expect(c.reviews[0]).toMatchObject({
+      minimized: { reason: 'spam' },
+      body: 'spam',
+    });
+  });
+
   it('reads the viewer’s unsubmitted review as pending', async () => {
     const c = await readOne({
       reviews: [review('mine', 'PENDING', '', 2)],
@@ -501,6 +565,7 @@ describe('reviews and events', () => {
           commit: {
             oid: OID_A,
             committedDate: '2026-09-01T09:00:00Z',
+            messageHeadline: 'Handle cancelled requests',
             author: { name: 'Alex Git', user: null },
           },
         },
@@ -532,7 +597,10 @@ describe('reviews and events', () => {
       expect.objectContaining({
         kind: 'commit',
         commit: OID_A,
-        actor: expect.objectContaining({ displayName: 'Alex Git' }),
+        headline: 'Handle cancelled requests',
+        // A name git recorded is not an account.
+        actor: null,
+        authorName: 'Alex Git',
         at: '2026-09-01T09:00:00Z',
       }),
       expect.objectContaining({
@@ -542,7 +610,7 @@ describe('reviews and events', () => {
       }),
       expect.objectContaining({
         kind: 'review-requested',
-        subject: 'Core team',
+        reviewer: { kind: 'team', name: 'Core team' },
       }),
       expect.objectContaining({ kind: 'ready-for-review' }),
     ]);
