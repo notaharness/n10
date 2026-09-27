@@ -72,6 +72,9 @@ vi.mock('./services/reviews.js', () =>
     'getFileDiffText',
   ])
 );
+vi.mock('./services/ci.js', () =>
+  recorder('ci', ['getCiOverview', 'getCiLog'])
+);
 vi.mock('./services/sessions.js', () =>
   recorder('sessions', [
     'launchAgent',
@@ -189,6 +192,8 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
   ],
 
   ['fetchCommentImage', ['https://x/y.png'], 'commentImages.fetchCommentImage'],
+  ['getCiOverview', [7], 'ci.getCiOverview'],
+  ['getCiLog', [{ provider: 'github', jobId: 3 }], 'ci.getCiLog'],
   [
     'saveClipboardImage',
     [new Uint8Array([1, 2]), 'image/png'],

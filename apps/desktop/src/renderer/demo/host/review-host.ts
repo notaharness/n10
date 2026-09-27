@@ -64,6 +64,8 @@ type ReviewHost = Pick<
   | 'submitReviewVerdict'
   | 'getReviewViewer'
   | 'fetchCommentImage'
+  | 'getCiOverview'
+  | 'getCiLog'
   | 'listDraftComments'
   | 'updateDraftComment'
   | 'deleteDraftComment'
@@ -124,6 +126,9 @@ export function createReviewHost(state: DemoState): ReviewHost {
     },
     getReviewViewer: () => later({ identifier: VIEWER }),
     fetchCommentImage: () => later(null),
+    // The demo has no CI to show: its page says no pipelines ran.
+    getCiOverview: () => later({ provider: 'github', pipelines: [] }),
+    getCiLog: () => Promise.reject(new Error('The demo has no CI logs')),
     listDraftComments: (prId) => later(drafts(prId)),
     updateDraftComment: (prId, id, patch) => {
       setDrafts(

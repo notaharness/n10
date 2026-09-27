@@ -12,6 +12,7 @@ import * as settings from './services/settings.js';
 import * as sidebar from './services/sidebar.js';
 import * as worktrees from './services/worktrees.js';
 import * as reviews from './services/reviews.js';
+import * as ci from './services/ci.js';
 import * as sessions from './services/sessions.js';
 import * as foreignSessions from './services/foreign-sessions.js';
 import * as terminals from './services/terminals.js';
@@ -69,6 +70,8 @@ export function createHostApi(): N10HostApi {
       reviews.submitReviewVerdict(prId, verdict),
     getReviewViewer: () => Promise.resolve(reviews.getReviewViewer()),
     fetchCommentImage: (url) => commentImages.fetchCommentImage(url),
+    getCiOverview: (prId) => ci.getCiOverview(prId),
+    getCiLog: (ref) => ci.getCiLog(ref),
     listDraftComments: (prId) =>
       Promise.resolve(drafts.listDraftComments(prId)),
     updateDraftComment: (prId, id, patch) =>
@@ -255,6 +258,8 @@ export function registerHostHandlers(
     [IPC.submitReviewVerdict]: api.submitReviewVerdict as HostMethod,
     [IPC.getReviewViewer]: api.getReviewViewer as HostMethod,
     [IPC.fetchCommentImage]: api.fetchCommentImage as HostMethod,
+    [IPC.getCiOverview]: api.getCiOverview as HostMethod,
+    [IPC.getCiLog]: api.getCiLog as HostMethod,
     [IPC.listDraftComments]: api.listDraftComments as HostMethod,
     [IPC.updateDraftComment]: api.updateDraftComment as HostMethod,
     [IPC.deleteDraftComment]: api.deleteDraftComment as HostMethod,
