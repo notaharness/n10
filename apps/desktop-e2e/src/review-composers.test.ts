@@ -336,8 +336,25 @@ test.describe('Comment composers', () => {
     await page.reload();
     await openDiff(page);
     await page.getByRole('button', { name: 'Overview' }).click();
-    await expect(page.locator('[data-my-draft="general"]')).toContainText(
-      'Thanks, this reads well.'
+    await expect(card).toContainText('Thanks, this reads well.');
+
+    // Discard in the open composer returns to the prompt; Undo returns
+    // to the card, and stays there once the toast has gone.
+    const prompt = page.getByRole('button', { name: 'Write a comment…' });
+    await card.getByRole('button', { name: 'Edit draft' }).click();
+    await page.getByRole('button', { name: 'Discard' }).click();
+    await expect(prompt).toBeFocused();
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(card).toContainText('Thanks, this reads well.');
+    await expect(card).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Undo' })).toHaveCount(0);
+    // Sonner hands focus back as the toast unmounts: a frame later.
+    await page.evaluate(
+      () =>
+        new Promise((done) =>
+          requestAnimationFrame(() => requestAnimationFrame(done))
+        )
     );
+    await expect(card).toBeFocused();
   });
 });
