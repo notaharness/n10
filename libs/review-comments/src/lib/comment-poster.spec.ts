@@ -365,6 +365,18 @@ describe('the gh process', () => {
     ).rejects.toThrow(/gh exited 1: refused/);
     expect(env.marked).toEqual([]);
   });
+
+  /** Exit 0 says the review was filed, but gh never read the review it
+   *  was given, so nothing says that it was this one. */
+  it('fails the post when gh succeeds without reading its input', async () => {
+    const gh = join(bin, 'gh');
+    writeFileSync(gh, '#!/bin/sh\nexit 0\n');
+    chmodSync(gh, 0o755);
+    await expect(
+      postReviewComments([comment({ body: 'x'.repeat(1 << 20) })], github)
+    ).rejects.toThrow(/EPIPE/);
+    expect(env.marked).toEqual([]);
+  });
 });
 
 describe('marking comments posted', () => {
