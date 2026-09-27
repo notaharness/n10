@@ -26,12 +26,41 @@ describe('escapeUnknownTags', () => {
       '</KBD>',
       '<details open>',
       '<img src="a.png" alt="a" />',
-      '<script>',
-      '<iframe srcdoc="x">',
+      '<form action="x">',
       '<!-- a comment -->',
     ]) {
       expect(escapeUnknownTags(html)).toBe(html);
     }
+  });
+
+  // GFM's tag filter: text in these would swallow what follows it.
+  it('keeps the raw-text elements as text, as GitHub does', () => {
+    for (const tag of [
+      '<Script>',
+      '<style>',
+      '</TITLE>',
+      '<textarea rows="2">',
+      '<xmp>',
+      '<iframe srcdoc="x">',
+      '<noembed>',
+      '<noframes>',
+      '<plaintext>',
+    ]) {
+      expect(escapeUnknownTags(tag)).toBe(
+        tag.replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+      );
+    }
+  });
+
+  it('reads a quoted attribute as part of its tag', () => {
+    expect(
+      escapeUnknownTags(`<iframe srcdoc="<script>x</script>"></iframe>`)
+    ).toBe(
+      '&lt;iframe srcdoc="&lt;script&gt;x&lt;/script&gt;"&gt;&lt;/iframe&gt;'
+    );
+    expect(escapeUnknownTags(`<abbr title='a <b> c'>`)).toBe(
+      `<abbr title='a <b> c'>`
+    );
   });
 
   it('escapes only the unknown tags in a block of HTML', () => {

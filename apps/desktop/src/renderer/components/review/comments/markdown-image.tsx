@@ -160,10 +160,10 @@ function retryNews(
 function notShown(src: unknown, alt: string | undefined): string | null {
   const quoted = alt ? ` “${alt}”` : '';
   if (typeof src !== 'string' || src === '' || src.startsWith('//')) {
-    return `Image${quoted} isn’t shown: only web addresses load`;
+    return `Image${quoted} isn't shown: only web addresses load`;
   }
   if (!/^https?:\/\//i.test(src)) {
-    return `Repository image${quoted} isn’t shown yet`;
+    return `Repository image${quoted} isn't shown yet`;
   }
   return null;
 }
@@ -173,6 +173,9 @@ export function CommentImage({ src, alt }: ComponentProps<'img'>) {
   const url = unshown == null ? (src as string) : '';
   const img = useCommentImage(url);
   const [retried, setRetried] = useState(false);
+  // A retry clears the query's error while it runs; the reason the last
+  // read failed still stands until it settles.
+  const [lastReason, setLastReason] = useState('unreachable');
   const view = useRef<HTMLButtonElement>(null);
   const name = alt ? `“${alt}”` : 'image';
 
@@ -193,9 +196,10 @@ export function CommentImage({ src, alt }: ComponentProps<'img'>) {
       <ImageFailure
         url={url}
         name={name}
-        reason={failureReason(img.error)}
+        reason={img.error ? failureReason(img.error) : lastReason}
         retrying={img.isFetching}
         onRetry={() => {
+          setLastReason(failureReason(img.error));
           setRetried(true);
           void img.refetch();
         }}

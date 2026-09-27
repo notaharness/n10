@@ -16,7 +16,8 @@ const azure = repoLinkBase(
 describe('inPageAnchor', () => {
   it('names the fragment an anchor points at, and nothing else', () => {
     expect(inPageAnchor('#fn-1')).toBe('fn-1');
-    expect(inPageAnchor('#caf%C3%A9')).toBe('café');
+    // As written: an id may be encoded, or not.
+    expect(inPageAnchor('#caf%C3%A9')).toBe('caf%C3%A9');
     for (const href of ['#', 'docs/a.md#x', 'https://a.b/#x', undefined]) {
       expect(inPageAnchor(href)).toBeNull();
     }

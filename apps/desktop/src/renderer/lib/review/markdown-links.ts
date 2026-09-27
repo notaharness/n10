@@ -72,14 +72,10 @@ function repoPath(href: string): string[] | null {
   return parts.length > 0 ? parts : null;
 }
 
-/** An anchor into the markdown itself, as the fragment it names. */
+/** An anchor into the markdown itself, as the fragment it names,
+ *  written as the link wrote it: an id may be encoded, or not. */
 export function inPageAnchor(href: string | undefined): string | null {
-  if (!href?.startsWith('#') || href.length < 2) return null;
-  try {
-    return decodeURIComponent(href.slice(1));
-  } catch {
-    return null;
-  }
+  return href?.startsWith('#') && href.length > 1 ? href.slice(1) : null;
 }
 
 /** The web address a link opens, or null for one n10 will not open. */

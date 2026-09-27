@@ -32,11 +32,16 @@ const BODY = [
   '',
   'Press <Enter> to retry; the queue is a List<string>.',
   '',
+  'Mounts a <Script> tag, then continues. Use <Style> to theme it.',
+  '',
+  'See [the rollout notes](#rollout-notes), not [a missing part](#nowhere).',
+  '',
   '- [x] Flag wired',
   '- [ ] Flag removed',
   '',
   '```ts',
   'const rollout = flag("cancel");',
+  'if (rollout) start();',
   '```',
   '',
   '<script>window.__pwned = "script"</script>',
@@ -52,9 +57,12 @@ const BODY = [
   '',
   '![Inline sketch](data:image/png;base64,iVBORw0KGgo=)',
   '',
-  'The rest of the description still reads.',
+  '<a name="rollout-notes"></a>Rollout notes: ship it on a Tuesday.',
+  '',
+  'The rest of the description still reads.[^café]',
   '',
   '[^1]: p95 over a day of staging traffic.',
+  '[^café]: Written over coffee.',
 ].join('\n');
 
 const GITHUB: FakeGitHub = {
@@ -150,8 +158,11 @@ test.describe('Pull request description', () => {
     const { app, page } = desktop;
     const opened = await captureExternal(app);
     const description = await openDescription(page);
+    // Shown as the text it is, as GitHub shows it, and never applied.
     await expect(description.locator('script, iframe, style')).toHaveCount(0);
-    await expect(description).not.toContainText('display: none');
+    await expect(description).toContainText(
+      '<style>.overview { display: none }</style>'
+    );
 
     // Markup does not reorder the app's Tab sequence or claim a key.
     const jump = description.getByRole('link', { name: 'Jump the queue' });
@@ -178,6 +189,10 @@ test.describe('Pull request description', () => {
     await expect(description).toContainText(
       'Press <Enter> to retry; the queue is a List<string>.'
     );
+    // Text that names a raw-text element keeps the words after it.
+    await expect(description).toContainText(
+      'Mounts a <Script> tag, then continues. Use <Style> to theme it.'
+    );
   });
 
   test('follows a footnote within the description', async ({ desktop }) => {
@@ -188,7 +203,25 @@ test.describe('Pull request description', () => {
     await expect(note).toContainText('p95 over a day');
     await description.locator('a[href="#fn-1"]').click();
     await expect(note).toBeInViewport();
+    // The keyboard follows the reader to the note.
+    await expect(note).toBeFocused();
     expect(await opened()).toEqual([]);
+
+    // A label outside ASCII, and a named anchor in the text.
+    await description.locator('a[href="#fn-caf%C3%A9"]').click();
+    await expect(
+      description.locator('[id="user-content-fn-caf%C3%A9"]')
+    ).toBeFocused();
+    await description.getByRole('link', { name: 'the rollout notes' }).click();
+    await expect(
+      description.locator('[id="user-content-rollout-notes"]')
+    ).toBeFocused();
+
+    // One that names nothing says so, rather than doing nothing.
+    await description.getByRole('link', { name: 'a missing part' }).click();
+    await expect(
+      page.getByText('Nothing in this text is called “nowhere”')
+    ).toBeVisible();
   });
 
   test('shows tasks as checkboxes, and copies a code block', async ({
@@ -207,7 +240,7 @@ test.describe('Pull request description', () => {
     await description.getByRole('button', { name: 'Copy code' }).click();
     await expect
       .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
-      .toBe('const rollout = flag("cancel");');
+      .toBe('const rollout = flag("cancel");\nif (rollout) start();');
   });
 
   test('shows an image it cannot load as that, with Retry, beside the text', async ({
@@ -231,10 +264,10 @@ test.describe('Pull request description', () => {
   }) => {
     const description = await openDescription(desktop.page);
     const repository = description.getByText(
-      'Repository image “Architecture” isn’t shown yet'
+      "Repository image “Architecture” isn't shown yet"
     );
     const inline = description.getByText(
-      'Image “Inline sketch” isn’t shown: only web addresses load'
+      "Image “Inline sketch” isn't shown: only web addresses load"
     );
     for (const note of [repository, inline]) {
       await expect(note).toBeVisible();

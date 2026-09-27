@@ -1,5 +1,11 @@
 import { CopyIcon } from 'lucide-react';
-import { useMemo, useRef, type ComponentProps } from 'react';
+import {
+  isValidElement,
+  useMemo,
+  useRef,
+  type ComponentProps,
+  type ReactNode,
+} from 'react';
 import type { ExtraProps } from 'react-markdown';
 import { copyText } from '../../../lib/copy-text.js';
 import {
@@ -16,6 +22,17 @@ import { withoutNode } from './markdown-elements.js';
  * (```lang) is highlighted with the diff viewer's colours, on the
  * muted surface in either theme, with a button that copies it.
  */
+
+/** The block's own source: its highlighted lines are separate spans,
+ *  with no newline between them in the page's text. */
+function sourceOf(children: ReactNode, pre: HTMLPreElement | null): string {
+  const code = isValidElement<{ children?: unknown }>(children)
+    ? children.props.children
+    : null;
+  return typeof code === 'string'
+    ? code.replace(/\n$/, '')
+    : pre?.textContent ?? '';
+}
 
 /** A fenced block's frame, and its copy button. */
 export function MarkdownPre(all: ComponentProps<'pre'> & ExtraProps) {
@@ -34,7 +51,7 @@ export function MarkdownPre(all: ComponentProps<'pre'> & ExtraProps) {
           // Shown on hover, and whenever it has focus.
           className="absolute top-1.5 right-1.5 bg-muted opacity-0 group-hover/code:opacity-100 focus-visible:opacity-100"
           onClick={() =>
-            copyText(pre.current?.textContent ?? '', 'Copied code')
+            copyText(sourceOf(children, pre.current), 'Copied code')
           }
         >
           <CopyIcon />

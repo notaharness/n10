@@ -19,6 +19,8 @@ const PIXEL = Buffer.from(
 interface ImageHost {
   url: string;
   serve(): void;
+  /** Answer each request this much later. */
+  delay(ms: number): void;
 }
 
 const test = base.extend<{ imageHost: ImageHost }>({
@@ -27,10 +29,13 @@ const test = base.extend<{ imageHost: ImageHost }>({
     // eslint-disable-next-line no-empty-pattern -- Playwright requires a destructured fixture dependency parameter.
     async ({}, provide) => {
       let serving = false;
+      let lag = 0;
       const server = createServer((_req, res) => {
-        if (serving) {
-          res.writeHead(200, { 'content-type': 'image/png' }).end(PIXEL);
-        } else res.writeHead(403).end();
+        setTimeout(() => {
+          if (serving) {
+            res.writeHead(200, { 'content-type': 'image/png' }).end(PIXEL);
+          } else res.writeHead(403).end();
+        }, lag);
       });
       await new Promise<void>((resolve) => {
         server.listen(0, '127.0.0.1', resolve);
@@ -39,6 +44,7 @@ const test = base.extend<{ imageHost: ImageHost }>({
       await provide({
         url: `http://127.0.0.1:${port}`,
         serve: () => (serving = true),
+        delay: (ms) => (lag = ms),
       });
       server.close();
     },
@@ -79,12 +85,23 @@ test.describe('Pull request description image', () => {
     const status = description.getByRole('status');
 
     // Refused again: the keyboard stays on Retry, and hears so.
+    imageHost.delay(1500);
     await retry.focus();
     await page.keyboard.press('Enter');
+    // Both at once: the retry is under way, and the failure still says
+    // why the last read failed.
+    const chip = description.getByText("Couldn't load");
+    await expect
+      .poll(async () => [await status.textContent(), await chip.textContent()])
+      .toEqual([
+        'Loading “Latency chart” again',
+        "Couldn't load “Latency chart”: HTTP 403",
+      ]);
     await expect(status).toHaveText("Still couldn't load “Latency chart”");
     await expect(retry).toBeFocused();
 
     // Served: the image takes the keyboard from the Retry it replaced.
+    imageHost.delay(0);
     imageHost.serve();
     await page.keyboard.press('Enter');
     // Named by its alt text; the title says a click enlarges it.

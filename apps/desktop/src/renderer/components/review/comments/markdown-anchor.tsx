@@ -1,5 +1,6 @@
 import { createContext, useContext, type ComponentProps } from 'react';
 import type { ExtraProps } from 'react-markdown';
+import { toast } from 'sonner';
 import {
   inPageAnchor,
   resolveLink,
@@ -11,27 +12,53 @@ import { withoutNode } from './markdown-elements.js';
  *  none. */
 export const MarkdownLinkBase = createContext<RepoLinkBase | null>(null);
 
+/** A fragment as written, then decoded: an id may be either. */
+function spellings(fragment: string): string[] {
+  try {
+    const decoded = decodeURIComponent(fragment);
+    return decoded === fragment ? [fragment] : [fragment, decoded];
+  } catch {
+    return [fragment];
+  }
+}
+
 /**
  * The element an in-page anchor names, in the anchor's own body. The
  * sanitizer prefixes every id with `user-content-`, the way GitHub
  * does, so a link to `#fn-1` means `user-content-fn-1`.
  */
-function anchorTarget(from: Element, fragment: string): Element | null {
+function anchorTarget(from: Element, fragment: string): HTMLElement | null {
   // Each rendered body is marked, so two bodies' `fn-1` stay apart.
   const root = from.closest('[data-markdown]');
-  const id = `user-content-${fragment}`;
-  return (
-    root?.querySelector(`[id="${CSS.escape(id)}"]`) ??
-    root?.querySelector(`[name="${CSS.escape(id)}"]`) ??
-    null
-  );
+  for (const name of spellings(fragment)) {
+    const found = root?.querySelector(
+      `[id="${CSS.escape(`user-content-${name}`)}"]`
+    );
+    if (found instanceof HTMLElement) return found;
+  }
+  return null;
+}
+
+/** Scroll to it and hand it the keyboard, so the next Tab goes on from
+ *  there rather than from the link. */
+function follow(target: HTMLElement): void {
+  target.scrollIntoView({ block: 'nearest' });
+  if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+  target.focus({ preventScroll: true });
+}
+
+function open(url: string): void {
+  window.n10.openExternal(url).catch(() => {
+    toast.error(`Couldn't open ${url}`);
+  });
 }
 
 /**
  * A link opens in the system browser, never inside the app; an anchor
- * scrolls to its place in the same body. A link n10 will not open —
- * a script, a `mailto:`, or one the sanitizer took the address from —
- * is text, so it does not look like something to click.
+ * goes to its place in the same body, or says nothing there has that
+ * name. A link n10 will not open — a script, a `mailto:`, one the
+ * sanitizer took the address from — is text, so it does not look like
+ * something to click; a named anchor (`<a name>`) stays a target.
  */
 export function MarkdownAnchor(props: ComponentProps<'a'> & ExtraProps) {
   const { href, children, ...rest } = withoutNode(props);
@@ -44,9 +71,12 @@ export function MarkdownAnchor(props: ComponentProps<'a'> & ExtraProps) {
         href={href}
         onClick={(e) => {
           e.preventDefault();
-          anchorTarget(e.currentTarget, fragment)?.scrollIntoView({
-            block: 'nearest',
-          });
+          const place = anchorTarget(e.currentTarget, fragment);
+          if (place) follow(place);
+          else {
+            const name = spellings(fragment).at(-1) ?? fragment;
+            toast(`Nothing in this text is called “${name}”`);
+          }
         }}
       >
         {children}
@@ -54,8 +84,12 @@ export function MarkdownAnchor(props: ComponentProps<'a'> & ExtraProps) {
     );
   }
   if (!target) {
+    const { id, name } = rest as { id?: string; name?: string };
     return (
-      <span title={href && `${href} — n10 opens only web and repository links`}>
+      <span
+        id={id ?? name}
+        title={href && `${href} — not a link n10 can open here`}
+      >
         {children}
       </span>
     );
@@ -66,7 +100,7 @@ export function MarkdownAnchor(props: ComponentProps<'a'> & ExtraProps) {
       href={href}
       onClick={(e) => {
         e.preventDefault();
-        void window.n10.openExternal(target);
+        open(target);
       }}
       // Where it goes, before it goes there.
       title={target}
