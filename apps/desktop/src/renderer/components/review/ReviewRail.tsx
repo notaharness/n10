@@ -1,10 +1,12 @@
 import {
   BookOpenIcon,
+  CircleCheckBigIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
 } from 'lucide-react';
 import type { ReviewComment } from '../../../host/contract.js';
 import { cn } from '../../lib/utils.js';
+import { Badge } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
 import { ScrollArea } from '../ui/scroll-area.js';
 import { Tip } from '../ui/tooltip.js';
@@ -38,6 +40,8 @@ export function ReviewRail({
   hasPr,
   overviewActive,
   onOverview,
+  ciActive,
+  onCi,
   running,
   busy,
   hasSession,
@@ -69,6 +73,8 @@ export function ReviewRail({
   hasPr: boolean;
   overviewActive: boolean;
   onOverview: () => void;
+  ciActive: boolean;
+  onCi: () => void;
   running: boolean;
   busy: boolean;
   hasSession: boolean;
@@ -131,6 +137,22 @@ export function ReviewRail({
           >
             <BookOpenIcon className="size-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate text-left">Overview</span>
+          </button>
+          {/* CI (preview): the pipelines, jobs, steps and logs. */}
+          <button
+            type="button"
+            onClick={onCi}
+            aria-pressed={ciActive}
+            className={cn(
+              'flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-base transition-colors',
+              ciActive
+                ? 'bg-sidebar-active text-foreground'
+                : 'hover:bg-sidebar-accent'
+            )}
+          >
+            <CircleCheckBigIcon className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate text-left">CI</span>
+            <Badge variant="info">Preview</Badge>
           </button>
         </div>
       )}

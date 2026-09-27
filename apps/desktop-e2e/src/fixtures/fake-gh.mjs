@@ -303,6 +303,13 @@ if (
     out({ login: scenario.username ?? 'n10-tester' });
   }
 
+  // ── gh api <path>, answered verbatim from the scenario's `api` table ──
+  // Recorded REST responses (JSON, or text such as a job log) keyed by
+  // the exact path the provider asks for.
+  if (argv[0] === 'api' && scenario.api && argv[1] in scenario.api) {
+    out(scenario.api[argv[1]]);
+  }
+
   process.stderr.write(`fake gh: unhandled invocation: ${argv.join(' ')}\n`);
   process.exit(1);
 }

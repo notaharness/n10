@@ -17,7 +17,7 @@ import type { FileEntry } from '../../components/review/diff/FileTree.js';
  */
 
 /** Which pane of the review workspace is showing. */
-export type Mode = 'diff' | 'agent' | 'review' | 'overview' | 'plan';
+export type Mode = 'diff' | 'agent' | 'review' | 'overview' | 'plan' | 'ci';
 
 /** What each mode needs in order to be showable at all. */
 export interface ModeContext {
@@ -33,8 +33,8 @@ export interface ModeContext {
 
 /**
  * The pane actually rendered. A mode is a *request*: the agent pane
- * needs a session, the walkthrough needs drafts, the overview needs a
- * PR and the plan needs something in it, and any of those can disappear
+ * needs a session, the walkthrough needs drafts, the overview and the
+ * CI page need a PR and the plan needs something in it, and any of those can disappear
  * underneath a mode that is already selected (the last draft gets
  * posted, a session is stopped and removed, the last queued comment is
  * dropped). Rather than reset the request, every mode falls back
@@ -44,7 +44,7 @@ export interface ModeContext {
 export function resolveMode(mode: Mode, ctx: ModeContext): Mode {
   if (mode === 'agent' && ctx.hasSession) return 'agent';
   if (mode === 'review' && ctx.hasDrafts) return 'review';
-  if (mode === 'overview' && ctx.hasPr) return 'overview';
+  if ((mode === 'overview' || mode === 'ci') && ctx.hasPr) return mode;
   if (mode === 'plan' && ctx.hasPlan) return 'plan';
   return 'diff';
 }

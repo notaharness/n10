@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import type { CiLogRef } from '@n10/vcs-core/ci';
 
 /**
  * The renderer's data layer: every host call is a TanStack Query so
@@ -43,6 +44,9 @@ export const keys = {
   threads: (cwd: string, prId: number) => ['threads', cwd, prId] as const,
   prDescription: (cwd: string, prId: number) =>
     ['pr-description', cwd, prId] as const,
+  ciOverview: (cwd: string, prId: number) =>
+    ['ci-overview', cwd, prId] as const,
+  ciLog: (cwd: string, ref: CiLogRef | null) => ['ci-log', cwd, ref] as const,
   activity: (cwd: string) => ['session-activity', cwd] as const,
   commentImage: (url: string) => ['comment-image', url] as const,
   drafts: (cwd: string, prId: number) => ['drafts', cwd, prId] as const,

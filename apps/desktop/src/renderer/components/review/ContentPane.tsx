@@ -13,6 +13,7 @@ import { ConnectionBanner } from '../terminal/ConnectionBanner.js';
 import type { PrConnectionBanner } from './PrWorkspace.js';
 import { DiffPane } from './diff/DiffPane.js';
 import { type DiffJumpHandle } from './diff/VirtualDiffList.js';
+import { CiPane } from './ci/CiPane.js';
 import { OverviewPane } from './OverviewPane.js';
 import { PlanPane } from './PlanPane.js';
 import { ReviewStepper } from './drafts/ReviewStepper.js';
@@ -70,6 +71,16 @@ function AgentPane({
           disabled={inputDisabled}
         />
       </div>
+    </div>
+  );
+}
+
+/** The pull request's own pages, mounted only while shown. */
+function PrPage({ pr, mode }: { pr?: PullRequestInfo; mode: Mode }) {
+  if (!pr || (mode !== 'overview' && mode !== 'ci')) return null;
+  return (
+    <div className="absolute inset-0">
+      {mode === 'overview' ? <OverviewPane pr={pr} /> : <CiPane prId={pr.id} />}
     </div>
   );
 }
@@ -211,11 +222,7 @@ export function ContentPane({
           />
         </div>
       )}
-      {pr && effMode === 'overview' && (
-        <div className="absolute inset-0">
-          <OverviewPane pr={pr} />
-        </div>
-      )}
+      <PrPage pr={pr} mode={effMode} />
       <StackedPane visible={effMode === 'diff'}>
         <DiffPane
           prId={prId}
