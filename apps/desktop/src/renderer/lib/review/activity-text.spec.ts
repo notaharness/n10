@@ -12,7 +12,7 @@ function comment(over: Partial<ConversationComment>): ConversationComment {
     body: '',
     kind: 'text',
     deleted: false,
-    createdAt: null,
+    createdAt: '2026-09-20T00:00:00Z',
     editedAt: null,
     minimized: null,
     pending: false,
