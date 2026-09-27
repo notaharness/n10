@@ -10,7 +10,11 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],
-  "references": [],
+  "references": [
+    { "path": "../core/tsconfig.lib.json" },
+    { "path": "../logger/tsconfig.lib.json" },
+    { "path": "../vcs/core/tsconfig.lib.json" }
+  ],
   "exclude": [
     "vitest.config.ts",
     "vitest.config.mts",

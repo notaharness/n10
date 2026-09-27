@@ -20,5 +20,9 @@
       "scope:engine"
     ]
   },
-  "dependencies": {}
+  "dependencies": {
+    "@n10/core": "*",
+    "@n10/logger": "*",
+    "@n10/vcs-core": "*"
+  }
 }

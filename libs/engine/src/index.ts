@@ -3,4 +3,5 @@
 // State, scheduling, caching and the events that announce them, over
 // @n10/core's operations. Node only; no React, Ink or Electron. A
 // shell creates the services it needs and renders what they report.
-export {};
+export * from './lib/pull-requests/pull-request-list.js';
+export * from './lib/pull-requests/pull-request-scope.js';
