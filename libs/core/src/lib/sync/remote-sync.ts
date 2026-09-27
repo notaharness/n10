@@ -102,7 +102,7 @@ async function autoDeleteMerged(args: {
       );
       continue;
     }
-    const check = await canRemoveBranch(branch, true);
+    const check = await canRemoveBranch(branch, { confirmedMerged: true });
     if (isCancelled()) return null;
     if (check.safe) {
       await onAutoDelete(sessionName, branch);
@@ -127,7 +127,7 @@ export interface MergedSweepResult {
 /**
  * Fetch which of `branches` have merged PRs and, when
  * `config.autoDeleteOnMerge` is on, auto-delete the ones that are safe
- * to remove (`canRemoveBranch(branch, true)`), warning once per rebase
+ * to remove (`canRemoveBranch` with `confirmedMerged`), warning once per rebase
  * episode about branches blocked by an in-progress rebase.
  */
 export async function sweepMergedBranches(opts: {

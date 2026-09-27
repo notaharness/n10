@@ -271,27 +271,32 @@ export async function removeWorktree(
   }
 }
 
+function isProtectedBranch(branch: string): boolean {
+  return (
+    branch === 'main' || branch === 'master' || branch.startsWith('gitbutler')
+  );
+}
+
 /**
- * Check whether a branch can be safely deleted.
+ * Check whether a branch can be safely deleted, in `cwd`'s repository
+ * (the process's directory when omitted).
  * Returns { safe: true } or { safe: false, reason: string }.
  */
 export async function canRemoveBranch(
   branch: string,
-  confirmedMerged = false,
-  machine?: Machine
+  {
+    confirmedMerged = false,
+    cwd,
+    machine,
+  }: { confirmedMerged?: boolean; cwd?: string; machine?: Machine } = {}
 ): Promise<{ safe: true } | { safe: false; reason: string }> {
   refuseRemote('canRemoveBranch', machine);
   assertShellSafeRef(branch);
-  // Protected branch guard
-  if (
-    branch === 'main' ||
-    branch === 'master' ||
-    branch.startsWith('gitbutler')
-  ) {
+  if (isProtectedBranch(branch)) {
     return { safe: false, reason: 'protected branch' };
   }
 
-  const wt = await worktreeForBranch(branch);
+  const wt = await worktreeForBranch(branch, cwd);
 
   // A mid-rebase worktree carries in-progress rebase state (recovered
   // from rebase-merge/rebase-apply) that force-removing the worktree
@@ -312,7 +317,7 @@ export async function canRemoveBranch(
   }
 
   // Skip when the VCS provider already confirmed the branch merged.
-  if (!confirmedMerged && (await hasUnpushedCommits(branch))) {
+  if (!confirmedMerged && (await hasUnpushedCommits(branch, cwd))) {
     return { safe: false, reason: 'not pushed to upstream' };
   }
 
@@ -348,11 +353,15 @@ async function hasUncommittedChanges(
  * Whether `branch` holds commits no remote has. As above, a failure
  * answers "no" — the branch may just have no remote tracking.
  */
-async function hasUnpushedCommits(branch: string): Promise<boolean> {
+async function hasUnpushedCommits(
+  branch: string,
+  cwd?: string
+): Promise<boolean> {
   try {
-    const { stdout } = await exec(`git log "${branch}" --not --remotes -1`, {
-      encoding: 'utf8',
-    });
+    const { stdout } = await exec(
+      `git log "${branch}" --not --remotes -1`,
+      gitOptions(cwd)
+    );
     return stdout.trim().length > 0;
   } catch (e) {
     log('warn', 'canRemoveBranch', `unpushed check failed for ${branch}`, e);

@@ -48,13 +48,14 @@ export async function checkWorktreeRemoval(
   branch: string,
   repo?: string
 ): Promise<WorktreeRemovalCheck> {
-  const check = await canRemoveBranch(branch);
+  const cwd = cwdFor(repo);
+  const check = await canRemoveBranch(branch, { cwd });
   if (!check.safe) {
     return OVERRIDABLE.has(check.reason)
       ? { verdict: 'force', reason: check.reason }
       : { verdict: 'refused', reason: check.reason };
   }
-  const key = await sessionKeyFor(branch, cwdFor(repo));
+  const key = await sessionKeyFor(branch, cwd);
   return key && isSessionAlive(key)
     ? { verdict: 'agent-running' }
     : { verdict: 'clear' };

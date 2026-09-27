@@ -549,6 +549,21 @@ describe('canRemoveBranch', () => {
     });
   });
 
+  // The checkout lookup and the unpushed check both ask the named
+  // repository, not whichever one the process happens to be in.
+  it('judges the branch in the repository it is given', async () => {
+    mockExec.mockResolvedValueOnce(
+      worktreeListPorcelain([{ branch: 'feature/done' }])
+    );
+    mockExec.mockResolvedValueOnce(resolve(''));
+    mockExec.mockResolvedValueOnce(resolve(''));
+    await canRemoveBranch('feature/done', { cwd: '/repo-b' });
+    const [list, , log] = mockExec.mock.calls;
+    expect(list?.[1]).toMatchObject({ cwd: '/repo-b' });
+    expect(log?.[0]).toContain('git log');
+    expect(log?.[1]).toMatchObject({ cwd: '/repo-b' });
+  });
+
   it('should return safe for clean, pushed branches', async () => {
     mockExec.mockResolvedValueOnce(
       worktreeListPorcelain([{ branch: 'feature/done' }])
@@ -591,7 +606,11 @@ describe('canRemoveBranch', () => {
       return Promise.resolve(resolve());
     });
 
-    expect(await canRemoveBranch('ci/perf-setup-sticky-disk', true)).toEqual({
+    expect(
+      await canRemoveBranch('ci/perf-setup-sticky-disk', {
+        confirmedMerged: true,
+      })
+    ).toEqual({
       safe: false,
       reason: 'uncommitted changes',
     });
@@ -621,7 +640,11 @@ describe('canRemoveBranch', () => {
       throw new Error(`ENOENT: ${p}`);
     }) as unknown as typeof readFileSync);
 
-    expect(await canRemoveBranch('ci/perf-setup-sticky-disk', true)).toEqual({
+    expect(
+      await canRemoveBranch('ci/perf-setup-sticky-disk', {
+        confirmedMerged: true,
+      })
+    ).toEqual({
       safe: false,
       reason: 'rebase in progress',
     });
@@ -643,7 +666,9 @@ describe('canRemoveBranch', () => {
       worktreeListPorcelain([{ branch: 'feature/squash-merged' }])
     );
     mockExec.mockResolvedValueOnce(resolve(''));
-    expect(await canRemoveBranch('feature/squash-merged', true)).toEqual({
+    expect(
+      await canRemoveBranch('feature/squash-merged', { confirmedMerged: true })
+    ).toEqual({
       safe: true,
     });
     expect(mockExec).toHaveBeenCalledTimes(2);
@@ -654,14 +679,16 @@ describe('canRemoveBranch', () => {
       worktreeListPorcelain([{ branch: 'feature/dirty-merged' }])
     );
     mockExec.mockResolvedValueOnce(resolve(' M src/file.ts\n'));
-    expect(await canRemoveBranch('feature/dirty-merged', true)).toEqual({
+    expect(
+      await canRemoveBranch('feature/dirty-merged', { confirmedMerged: true })
+    ).toEqual({
       safe: false,
       reason: 'uncommitted changes',
     });
   });
 
   it('should still reject protected branches when confirmedMerged is true', async () => {
-    expect(await canRemoveBranch('master', true)).toEqual({
+    expect(await canRemoveBranch('master', { confirmedMerged: true })).toEqual({
       safe: false,
       reason: 'protected branch',
     });
@@ -1636,7 +1663,7 @@ describe('the machine seam (D5): remote-aware functions, and explicit failure fo
         code: 0,
       }));
       await expect(
-        canRemoveBranch('feature/auth', false, machine)
+        canRemoveBranch('feature/auth', { machine })
       ).rejects.toThrow(/does not support a remote machine/);
       expect(mockExec).not.toHaveBeenCalled();
     });
