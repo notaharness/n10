@@ -14,7 +14,7 @@ import type {
 import { sanitizeBody } from '@n10/vcs-core';
 import { log } from '@n10/logger';
 import type { AdoConfig } from './client.js';
-import { authHeaders, baseUrl } from './client.js';
+import { adoOrigin, authHeaders, baseUrl } from './client.js';
 import {
   adoGet,
   adoSend,
@@ -208,7 +208,7 @@ function fetchConnectionData(config: AdoConfig): Promise<ConnectionData> {
     'fetchConnectionData',
     `${config.org}/connectiondata`,
     TTL.identity,
-    `https://dev.azure.com/${config.org}/_apis/connectiondata?api-version=7.1-preview`,
+    `${adoOrigin()}/${config.org}/_apis/connectiondata?api-version=7.1-preview`,
     authHeaders(config.pat),
     `organization ${config.org}`
   );
@@ -238,7 +238,9 @@ export async function fetchMyTeamIds(config: AdoConfig): Promise<Set<string>> {
       'fetchMyTeamIds',
       `${config.org}/${config.project}/my-teams`,
       TTL.identity,
-      `https://dev.azure.com/${config.org}/_apis/projects/${config.project}/teams?$mine=true&api-version=7.1`,
+      `${adoOrigin()}/${config.org}/_apis/projects/${
+        config.project
+      }/teams?$mine=true&api-version=7.1`,
       authHeaders(config.pat),
       `teams in ${config.project}`
     );
@@ -487,7 +489,9 @@ async function resolveMentionNames(
       'resolveMentionNames',
       `${config.org}/identities/${ids}`,
       TTL.identity,
-      `https://vssps.dev.azure.com/${config.org}/_apis/identities?identityIds=${ids}&api-version=7.1`,
+      `${adoOrigin('identities')}/${
+        config.org
+      }/_apis/identities?identityIds=${ids}&api-version=7.1`,
       authHeaders(config.pat),
       'those identities'
     );

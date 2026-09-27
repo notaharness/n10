@@ -1,6 +1,6 @@
 import type { BuildStatusState } from '@n10/vcs-core';
 import type { AdoConfig } from './client.js';
-import { authHeaders, baseUrl } from './client.js';
+import { adoOrigin, authHeaders, baseUrl } from './client.js';
 import { adoGet, adoGetPage, TTL } from './request.js';
 
 /**
@@ -83,7 +83,7 @@ export function prMergeRef(prId: number): string {
 
 function buildsUrl(config: AdoConfig, query: string): string {
   return (
-    `https://dev.azure.com/${config.org}/${config.project}/_apis/build/builds` +
+    `${adoOrigin()}/${config.org}/${config.project}/_apis/build/builds` +
     `?${query}&api-version=7.1`
   );
 }

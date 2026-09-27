@@ -15,8 +15,37 @@ export function authHeaders(pat: string): Record<string, string> {
   };
 }
 
+/**
+ * Where the REST API lives: `https://dev.azure.com`, or the Identities
+ * API's `https://vssps.dev.azure.com`.
+ *
+ * `N10_ADO_ORIGIN` sends both to one loopback server instead — the
+ * desktop e2e suite's fake Azure DevOps (`apps/desktop-e2e`), which
+ * tells them apart by path. Anything but a loopback `http` origin is
+ * refused rather than obeyed, so a stray variable cannot send a PAT to
+ * another host.
+ */
+export function adoOrigin(host: 'api' | 'identities' = 'api'): string {
+  const override = process.env.N10_ADO_ORIGIN;
+  if (!override) {
+    return host === 'api'
+      ? 'https://dev.azure.com'
+      : 'https://vssps.dev.azure.com';
+  }
+  const url = new URL(override);
+  if (
+    url.protocol !== 'http:' ||
+    !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
+  ) {
+    throw new Error(`N10_ADO_ORIGIN must be a loopback http origin`);
+  }
+  return url.origin;
+}
+
 export function baseUrl(config: AdoConfig): string {
-  return `https://dev.azure.com/${config.org}/${config.project}/_apis/git/repositories/${config.repo}`;
+  return `${adoOrigin()}/${config.org}/${
+    config.project
+  }/_apis/git/repositories/${config.repo}`;
 }
 
 /**

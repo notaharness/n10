@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { authHeaders, baseUrl } from '@n10/vcs-azure-devops';
 import type { ReviewComment } from './types.js';
 import {
   formatConventionalComment,
@@ -131,10 +132,15 @@ async function postAzureDevOps(
   comments: ReviewComment[],
   ctx: PostContext
 ): Promise<void> {
-  const org = ctx.vendorProject.org;
-  const project = ctx.vendorProject.project;
-  const repo = ctx.vendorProject.repo;
-  const pat = ctx.vendorAuth.pat;
+  const config = {
+    org: ctx.vendorProject.org ?? '',
+    project: ctx.vendorProject.project ?? '',
+    repo: ctx.vendorProject.repo ?? '',
+    pat: ctx.vendorAuth.pat ?? '',
+  };
+  const threadsUrl = `${baseUrl(config)}/pullrequests/${
+    ctx.prId
+  }/threads?api-version=7.1`;
 
   for (const comment of comments) {
     const thread = {
@@ -159,14 +165,9 @@ async function postAzureDevOps(
       status: 1, // active
     };
 
-    const url = `https://dev.azure.com/${org}/${project}/_apis/git/repositories/${repo}/pullrequests/${ctx.prId}/threads?api-version=7.1`;
-
-    const response = await fetch(url, {
+    const response = await fetch(threadsUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Basic ${btoa(':' + pat)}`,
-      },
+      headers: authHeaders(config.pat),
       body: JSON.stringify(thread),
     });
 
