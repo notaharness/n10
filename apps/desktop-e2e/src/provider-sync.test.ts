@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
-import { sidebarRow } from './setup/app.js';
+import { sidebarRow, tab } from './setup/app.js';
 import { updateFakeGh } from './setup/fake-gh.js';
 
 test.use({
@@ -27,10 +27,26 @@ test('automatic PR sync explains its scope and offers an immediate recheck', asy
   await expect(sidebarRow(page, /Clarify sync status/)).toBeVisible();
   const before = (await page.evaluate(() => window.n10.getSyncState()))
     .remoteFetches;
+  await status.hover();
+  await expect(page.getByRole('tooltip')).toContainText(
+    'View pull request sync details'
+  );
   await status.focus();
   await page.keyboard.press('Enter');
   const dialog = page.getByRole('dialog', { name: 'GitHub pull request sync' });
   await expect(dialog).toContainText('about every hour');
+  await expect(dialog).toContainText('window is visible');
+  await expect(dialog).toContainText(
+    'Merged badges and automatic worktree cleanup'
+  );
+  await expect(dialog).toContainText('hourly by default');
+  await expect(dialog).toContainText('Refresh now does not run those checks');
+  await expect(dialog).toContainText('their errors are not shown here');
+  await expect(sidebarRow(page, /Clarify sync status/)).toBeVisible();
+  const triggerBox = await status.boundingBox();
+  const detailsBox = await dialog.boundingBox();
+  expect(detailsBox!.y + detailsBox!.height).toBeLessThanOrEqual(triggerBox!.y);
+  expect(Math.abs(detailsBox!.x - triggerBox!.x)).toBeLessThan(10);
   await expect(dialog).toContainText(
     'does not push commits or publish draft comments'
   );
@@ -116,6 +132,7 @@ test.describe('Azure DevOps status presentation', () => {
     desktop,
   }, info) => {
     const { app, page } = desktop;
+    await page.addStyleTag({ content: '* { transition: none !important; }' });
     // Presentation-only Azure state. The host still uses fake GitHub; no ADO account/network.
     await app.evaluate(({ ipcMain }) => {
       ipcMain.removeHandler('n10/sidebar/sync-state');
@@ -135,6 +152,11 @@ test.describe('Azure DevOps status presentation', () => {
       name: 'Azure DevOps PR sync: Sync failed',
     });
     await expect(status).toBeVisible({ timeout: 10_000 });
+    const failureColor = await status.evaluate(
+      (element) => getComputedStyle(element).color
+    );
+    await status.hover();
+    await expect(status).toHaveCSS('color', failureColor);
     await status.click();
     const dialog = page.getByRole('dialog', {
       name: 'Azure DevOps pull request sync',
@@ -152,5 +174,46 @@ test.describe('Azure DevOps status presentation', () => {
       path: info.outputPath('sync-error-azure-light.png'),
       animations: 'disabled',
     });
+    await page.setViewportSize({ width: 700, height: 500 });
+    await dialog
+      .getByRole('button', { name: 'Open Settings', exact: true })
+      .click();
+    await expect(dialog).toBeHidden();
+    await expect(tab(page, /Settings/)).toBeVisible();
   });
+});
+
+test('missing credentials keep their warning and Settings tooltip on hover', async ({
+  desktop,
+}) => {
+  const { app, page } = desktop;
+  await page.addStyleTag({ content: '* { transition: none !important; }' });
+  await app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('n10/sidebar/sync-state');
+    ipcMain.handle('n10/sidebar/sync-state', () => ({
+      providerId: 'azure-devops',
+      providerConfigured: false,
+      lastRemoteSyncAt: null,
+      lastGitSyncAt: null,
+      remoteSyncing: false,
+      remoteIntervalMs: 60_000,
+      remoteFetches: 0,
+      remoteError: null,
+    }));
+  });
+  const status = page.getByRole('button', {
+    name: 'Azure DevOps not configured',
+    exact: true,
+  });
+  await expect(status).toBeVisible();
+  const warningColor = await status.evaluate(
+    (element) => getComputedStyle(element).color
+  );
+  await status.hover();
+  await expect(page.getByRole('tooltip')).toContainText(
+    'needs credentials — open Settings'
+  );
+  await expect(status).toHaveCSS('color', warningColor);
+  await status.click();
+  await expect(tab(page, /Settings/)).toBeVisible();
 });

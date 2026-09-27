@@ -8,14 +8,12 @@ import type { SyncState } from '../../host/contract.js';
 import { cn, relativeTime } from '../lib/utils.js';
 import { Button } from './ui/button.js';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from './ui/dialog.js';
+  Popover,
+  PopoverClose,
+  PopoverContent,
+  PopoverTrigger,
+} from './ui/popover.js';
+import { Tip } from './ui/tooltip.js';
 
 function providerName(id: string): string {
   if (id === 'github') return 'GitHub';
@@ -32,7 +30,8 @@ function cadence(ms: number): string {
     const minutes = ms / 60_000;
     return minutes === 1 ? 'minute' : `${minutes} minutes`;
   }
-  return `${Math.max(1, Math.round(ms / 1000))} seconds`;
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  return seconds === 1 ? 'second' : `${seconds} seconds`;
 }
 
 function statusText(sync: SyncState, syncing: boolean): string {
@@ -43,7 +42,7 @@ function statusText(sync: SyncState, syncing: boolean): string {
     : 'Not synced yet';
 }
 
-const triggerClass = 'h-full rounded-none px-1.5 text-xs font-normal';
+const triggerClass = 'h-full gap-1.5 rounded-none px-1.5 text-xs font-normal';
 
 export function ProviderSync({
   sync,
@@ -58,18 +57,10 @@ export function ProviderSync({
 }) {
   if (!sync.providerId || !sync.providerConfigured) {
     return (
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onOpenSettings}
-        className={cn(triggerClass, sync.providerId && 'text-warning')}
-        title="Configure pull request sync in Settings"
-      >
-        <CloudOffIcon className="size-3" />
-        {sync.providerId
-          ? `${providerName(sync.providerId)} not configured`
-          : 'No provider'}
-      </Button>
+      <UnconfiguredProvider
+        providerId={sync.providerId}
+        onOpenSettings={onOpenSettings}
+      />
     );
   }
   const name = providerName(sync.providerId);
@@ -80,28 +71,34 @@ export function ProviderSync({
     ? AlertCircleIcon
     : RefreshCwIcon;
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(triggerClass, sync.remoteError && 'text-destructive')}
-          aria-label={`${name} PR sync: ${statusText(sync, syncing)}`}
-        >
-          <Icon className={cn('size-3', syncing && 'animate-spin')} />
-          {name} PRs
-          <span className={cn(!sync.remoteError && 'text-muted-foreground')}>
-            · {statusText(sync, syncing)}
-          </span>
-        </Button>
-      </DialogTrigger>
+    <Popover>
+      <Tip label="View pull request sync details">
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              triggerClass,
+              sync.remoteError && 'text-destructive hover:text-destructive'
+            )}
+            aria-label={`${name} PR sync: ${statusText(sync, syncing)}`}
+          >
+            <Icon className={cn('size-3', syncing && 'animate-spin')} />
+            {name} PRs
+            <span className={cn(!sync.remoteError && 'text-muted-foreground')}>
+              · {statusText(sync, syncing)}
+            </span>
+          </Button>
+        </PopoverTrigger>
+      </Tip>
       <SyncDetails
         sync={sync}
         name={name}
         syncing={syncing}
         onRefresh={onRefresh}
+        onOpenSettings={onOpenSettings}
       />
-    </Dialog>
+    </Popover>
   );
 }
 
@@ -110,24 +107,31 @@ function SyncDetails({
   name,
   syncing,
   onRefresh,
+  onOpenSettings,
 }: {
   sync: SyncState;
   name: string;
   syncing: boolean;
   onRefresh: () => void;
+  onOpenSettings: () => void;
 }) {
   return (
-    <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto">
-      <DialogHeader>
-        <DialogTitle>{name} pull request sync</DialogTitle>
-        <DialogDescription>
-          Pull requests, review status and checks update automatically, about
-          every {cadence(sync.remoteIntervalMs)} while this repository is open.
-        </DialogDescription>
-      </DialogHeader>
+    <PopoverContent
+      side="top"
+      aria-label={`${name} pull request sync`}
+      className="space-y-3"
+    >
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold">{name} pull request sync</h2>
+        <p className="text-base text-muted-foreground">
+          Open pull requests, review status and checks update automatically,
+          about every {cadence(sync.remoteIntervalMs)} while this repository is
+          open and the window is visible.
+        </p>
+      </div>
       <div className="space-y-3 text-base">
         <div className="rounded-md border border-border bg-muted/30 p-3">
-          <p className="font-medium">Last successful sync</p>
+          <p className="font-medium">Last successful PR refresh</p>
           {sync.lastRemoteSyncAt ? (
             <time
               dateTime={new Date(sync.lastRemoteSyncAt).toISOString()}
@@ -154,17 +158,29 @@ function SyncDetails({
               {sync.lastRemoteSyncAt
                 ? 'Showing the last successful data; it may be out of date.'
                 : 'Pull request data is not available yet.'}{' '}
-              Automatic retries continue.
+              Automatic retries continue when the window is visible.
             </p>
           </div>
         )}
         <p className="text-muted-foreground">
           This refresh reads pull request data. It does not push commits or
-          publish draft comments. Git fetch and local branch updates run
-          separately.
+          publish draft comments.
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Merged badges and automatic worktree cleanup run on a separate
+          schedule (hourly by default). Refresh now does not run those checks,
+          and their errors are not shown here. Git fetch and local branch
+          updates also run separately.
         </p>
       </div>
-      <DialogFooter>
+      <div className="flex flex-wrap justify-end gap-2">
+        {sync.remoteError && (
+          <PopoverClose asChild>
+            <Button variant="outline" onClick={onOpenSettings}>
+              Open Settings
+            </Button>
+          </PopoverClose>
+        )}
         <Button onClick={onRefresh} disabled={syncing}>
           <RefreshCwIcon
             className={cn('size-3.5', syncing && 'animate-spin')}
@@ -175,7 +191,41 @@ function SyncDetails({
             ? 'Retry now'
             : 'Refresh now'}
         </Button>
-      </DialogFooter>
-    </DialogContent>
+      </div>
+    </PopoverContent>
+  );
+}
+
+function UnconfiguredProvider({
+  providerId,
+  onOpenSettings,
+}: {
+  providerId: string | null;
+  onOpenSettings: () => void;
+}) {
+  const Icon = providerId ? AlertCircleIcon : CloudOffIcon;
+  return (
+    <Tip
+      label={
+        providerId
+          ? `${providerName(providerId)} needs credentials — open Settings`
+          : 'No VCS provider configured — open Settings'
+      }
+    >
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onOpenSettings}
+        className={cn(
+          triggerClass,
+          providerId && 'text-warning hover:text-warning'
+        )}
+      >
+        <Icon className="size-3" />
+        {providerId
+          ? `${providerName(providerId)} not configured`
+          : 'No provider'}
+      </Button>
+    </Tip>
   );
 }
