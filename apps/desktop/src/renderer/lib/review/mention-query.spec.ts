@@ -42,6 +42,16 @@ describe('choosing someone', () => {
   });
 });
 
+describe('choosing someone at the end of a line', () => {
+  it('keeps the caret on that line, before the line break', () => {
+    const at = mentionAt('cc @al\nmore', 6)!;
+    expect(insertMention('cc @al\nmore', at, '@alex')).toEqual({
+      text: 'cc @alex \nmore',
+      caret: 9,
+    });
+  });
+});
+
 describe('showing Azure mentions', () => {
   const names = new Map([['@<8c8c>', 'Jamal Hartnett']]);
 
