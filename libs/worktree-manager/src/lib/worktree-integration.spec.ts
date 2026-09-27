@@ -207,6 +207,23 @@ describe('integration: canRemoveBranch', () => {
 
     await removeWorktree('clean-branch');
   });
+  // Named, the repository is where every check looks, even for a
+  // branch with no checkout there: a dirty checkout of the same branch
+  // in the process's repository is not this repository's.
+  it('checks the repository it is given, not the process directory', async () => {
+    const { repoDir: here } = setupGitRepo();
+    const { repoDir: there } = setupGitRepo();
+    process.chdir(here);
+    const path = await createWorktree('shared');
+    writeFileSync(join(path!, 'dirty.txt'), 'uncommitted content');
+    execSync('git branch shared', { cwd: there, stdio: 'pipe' });
+
+    expect(await canRemoveBranch('shared', true, undefined, there)).toEqual({
+      safe: true,
+    });
+
+    await removeWorktree('shared', { force: true });
+  });
 });
 
 describe('integration: listAllBranches', () => {
