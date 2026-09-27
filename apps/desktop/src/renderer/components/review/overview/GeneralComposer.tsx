@@ -1,7 +1,6 @@
 import { MessageSquarePlusIcon } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PullRequestRef } from '../../../../host/contract.js';
-import { refocusAfter } from '../../../lib/focus.js';
 import { useReviewDraft } from '../../../lib/review/review-drafts.js';
 import { CommentComposer } from '../comments/CommentComposer.js';
 import { OwnDraftCard, OwnDraftPlace } from '../comments/OwnDraftCard.js';
@@ -19,8 +18,21 @@ export function GeneralComposer({ prRef }: { prRef: PullRequestRef }) {
   const prompt = useRef<HTMLButtonElement>(null);
   const card = useRef<HTMLElement>(null);
   const place = <OwnDraftPlace>Comment on the conversation</OwnDraftPlace>;
-  // The text is back, so the card is what renders.
-  const toCard = () => refocusAfter(() => card.current);
+  // Where the keyboard goes once what replaces the control that had it
+  // is drawn: the card when the text comes back (Undo, Keep as draft),
+  // the prompt when it goes. The control itself — the composer, the
+  // toast's button — is gone by then or about to be, and what it would
+  // hand focus back to may be gone too.
+  const focusTo = useRef<'card' | 'prompt' | null>(null);
+  useEffect(() => {
+    const target = focusTo.current === 'card' ? card.current : prompt.current;
+    if (!focusTo.current || !target || target.matches(':disabled')) return;
+    focusTo.current = null;
+    target.focus({ preventScroll: true });
+  });
+  const toCard = () => {
+    focusTo.current = 'card';
+  };
 
   if (open) {
     return (
@@ -31,8 +43,8 @@ export function GeneralComposer({ prRef }: { prRef: PullRequestRef }) {
         placeholder="Write a comment… Markdown supported. ⌘/Ctrl+Enter keeps it as a draft."
         onUndo={toCard}
         onClose={(kept) => {
+          focusTo.current = kept ? 'card' : 'prompt';
           setOpen(false);
-          refocusAfter(() => (kept ? card.current : prompt.current));
         }}
       />
     );
@@ -45,12 +57,11 @@ export function GeneralComposer({ prRef }: { prRef: PullRequestRef }) {
         place={place}
         body={draft.body}
         onEdit={() => setOpen(true)}
-        // `discard` never rejects.
-        onDiscard={() =>
-          void draft
-            .discard(toCard)
-            .then(() => refocusAfter(() => prompt.current))
-        }
+        onDiscard={() => {
+          focusTo.current = 'prompt';
+          // `discard` never rejects.
+          void draft.discard(toCard);
+        }}
       />
     );
   }
