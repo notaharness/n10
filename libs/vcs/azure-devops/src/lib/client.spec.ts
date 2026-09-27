@@ -17,6 +17,14 @@ describe('adoOrigin', () => {
     );
   });
 
+  it.each(['http://localhost:4321', 'http://[::1]:4321'])(
+    'accepts the loopback name %s',
+    (origin) => {
+      vi.stubEnv('N10_ADO_ORIGIN', origin);
+      expect(adoOrigin()).toBe(origin);
+    }
+  );
+
   it('sends both hosts to a loopback override', () => {
     vi.stubEnv('N10_ADO_ORIGIN', 'http://127.0.0.1:4321/ignored/path');
     expect(adoOrigin()).toBe('http://127.0.0.1:4321');
@@ -30,6 +38,7 @@ describe('adoOrigin', () => {
     'https://127.0.0.1:4321',
     'http://example.com',
     'http://127.0.0.1.example.com',
+    '127.0.0.1:4321',
   ])('refuses %s, which would carry the PAT off the machine', (origin) => {
     vi.stubEnv('N10_ADO_ORIGIN', origin);
     expect(() => adoOrigin()).toThrow(/loopback/);

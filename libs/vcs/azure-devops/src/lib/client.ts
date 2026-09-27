@@ -32,12 +32,14 @@ export function adoOrigin(host: 'api' | 'identities' = 'api'): string {
       ? 'https://dev.azure.com'
       : 'https://vssps.dev.azure.com';
   }
-  const url = new URL(override);
+  const url = URL.parse(override);
   if (
-    url.protocol !== 'http:' ||
+    url?.protocol !== 'http:' ||
     !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
   ) {
-    throw new Error(`N10_ADO_ORIGIN must be a loopback http origin`);
+    throw new Error(
+      `N10_ADO_ORIGIN must be a loopback http origin, not ${override}`
+    );
   }
   return url.origin;
 }

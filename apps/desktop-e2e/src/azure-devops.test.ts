@@ -121,8 +121,9 @@ test.describe('Azure DevOps', () => {
     await page.getByTitle(TEAM, { exact: true }).first().hover();
     await expect(page.getByRole('tooltip')).toHaveText(`${TEAM}: approved`);
 
-    // The team's row and the teammate who voted for it are two
-    // approvals on master's count.
+    // The team's row and the teammate who voted for it count as two
+    // approvals here and `2/3` in the sidebar test. #194 counts the
+    // pair once; both assertions change when it lands.
     await page.getByRole('button', { name: /Overview/ }).click();
     await expect(visibleText(page, '2 approved')).toBeVisible();
   });

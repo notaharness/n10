@@ -9,9 +9,10 @@ import type {
 /**
  * Azure DevOps response bodies, built from a scenario.
  *
- * The shapes follow the REST API 7.1 reference and the recorded
- * responses in `libs/vcs/azure-devops/src/lib/__fixtures__/` (the
- * group-reviewer list in particular): every field Azure sends is here,
+ * Constructed from the REST API 7.1 reference, not recorded: no
+ * pull request, reviewer or thread response has been captured from a
+ * real organization (`libs/vcs/azure-devops/src/lib/__fixtures__/`
+ * holds statuses and builds). Every documented field is here,
  * including the ones n10 does not read yet, so a provider change that
  * starts reading one finds it where Azure would put it. Ids are
  * deterministic — derived from names — so a test can predict them.
@@ -225,7 +226,15 @@ export function thread(
     comments,
     status: t.status ?? 'active',
     threadContext,
-    properties: t.system ? { CodeReviewThreadType: 'VoteUpdate' } : {},
+    // Property values arrive wrapped with their .NET type.
+    properties: t.system
+      ? {
+          CodeReviewThreadType: {
+            $type: 'System.String',
+            $value: 'VoteUpdate',
+          },
+        }
+      : {},
     identities: null,
     isDeleted: false,
     _links: {
@@ -233,5 +242,24 @@ export function thread(
         href: `${repoUrl(c)}/pullRequests/${pr.id}/threads/${t.id}`,
       },
     },
+  };
+}
+
+/** `/_apis/connectiondata`: who the PAT belongs to. */
+export function connectionData(
+  c: Coordinates,
+  scenario: FakeAzureDevOps
+): Record<string, unknown> {
+  return {
+    authenticatedUser: {
+      id: guid(scenario.user.displayName),
+      descriptor: `aad.${guid(scenario.user.uniqueName)}`,
+      providerDisplayName: scenario.user.displayName,
+      isActive: true,
+      properties: {
+        Account: { $type: 'System.String', $value: scenario.user.uniqueName },
+      },
+    },
+    instanceId: guid(c.org),
   };
 }

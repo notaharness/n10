@@ -52,7 +52,7 @@ interface RawReviewer {
   isContainer?: boolean;
 }
 
-function toAdoConfig(
+export function toAdoConfig(
   auth: Record<string, string>,
   project: Record<string, string>
 ): AdoConfig {

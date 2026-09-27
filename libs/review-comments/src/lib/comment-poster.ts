@@ -1,5 +1,10 @@
 import { spawn } from 'node:child_process';
-import { authHeaders, baseUrl, invalidatePr } from '@n10/vcs-azure-devops';
+import {
+  authHeaders,
+  baseUrl,
+  invalidatePr,
+  toAdoConfig,
+} from '@n10/vcs-azure-devops';
 import type { ReviewComment } from './types.js';
 import {
   formatConventionalComment,
@@ -132,12 +137,8 @@ async function postAzureDevOps(
   comments: ReviewComment[],
   ctx: PostContext
 ): Promise<void> {
-  const config = {
-    org: ctx.vendorProject.org ?? '',
-    project: ctx.vendorProject.project ?? '',
-    repo: ctx.vendorProject.repo ?? '',
-    pat: ctx.vendorAuth.pat ?? '',
-  };
+  // The provider's own mapping: `invalidatePr` keys its cache by it.
+  const config = toAdoConfig(ctx.vendorAuth, ctx.vendorProject);
   const threadsUrl = `${baseUrl(config)}/pullrequests/${
     ctx.prId
   }/threads?api-version=7.1`;

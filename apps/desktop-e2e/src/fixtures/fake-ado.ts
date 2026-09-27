@@ -12,6 +12,7 @@ import {
 } from '../setup/fake-ado.js';
 import {
   comment,
+  connectionData,
   coordinates,
   guid,
   identity,
@@ -31,9 +32,10 @@ import { iterations, policyEvaluations, repository } from './fake-ado-api.js';
  * — so the app's next read sees what it just did, as it would upstream.
  * Tests read `scenario` and `requests` to assert on what arrived.
  *
- * A request it does not model is answered 404 and kept in `unhandled`;
- * the fixture fails the test on any, so the fake cannot silently fall
- * behind the provider.
+ * A request it does not model is answered 404 and kept in `unhandled`,
+ * as is one it refuses (wrong PAT) or fails on (a body it cannot
+ * parse); the fixture fails the test on any, so the fake cannot
+ * silently fall behind the provider.
  */
 
 export interface FakeAdoRequest {
@@ -210,24 +212,7 @@ function gitRoute(ctx: Ctx, rest: string[]): Reply {
 function orgRoute(ctx: Ctx, rest: string[]): Reply {
   const [area, ...tail] = rest;
   if (area === 'connectiondata') {
-    return [
-      200,
-      {
-        authenticatedUser: {
-          id: guid(ctx.scenario.user.displayName),
-          descriptor: `aad.${guid(ctx.scenario.user.uniqueName)}`,
-          providerDisplayName: ctx.scenario.user.displayName,
-          isActive: true,
-          properties: {
-            Account: {
-              $type: 'System.String',
-              $value: ctx.scenario.user.uniqueName,
-            },
-          },
-        },
-        instanceId: guid(ctx.c.org),
-      },
-    ];
+    return [200, connectionData(ctx.c, ctx.scenario)];
   }
   if (area === 'projects' && tail[1] === 'teams') {
     const mine = ctx.req.query.get('$mine') === 'true';
@@ -299,14 +284,17 @@ export async function startFakeAdo(
   const server = createServer((req, res) => {
     void (async () => {
       const url = new URL(req.url ?? '/', origin);
+      const label = `${req.method ?? 'GET'} ${url.pathname}${url.search}`;
       const entry: FakeAdoRequest = {
         method: req.method ?? 'GET',
         path: url.pathname,
         query: url.searchParams,
-        body: await readBody(req),
+        body: undefined,
       };
       requests.push(entry);
+      entry.body = await readBody(req);
       if (req.headers.authorization !== expected) {
+        unhandled.push(`${label} (wrong or missing PAT)`);
         send(res, 401, { message: 'TF400813: not authorized' });
         return;
       }
@@ -315,14 +303,18 @@ export async function startFakeAdo(
         scenario,
         req: entry,
       });
-      if (!reply)
-        unhandled.push(`${entry.method} ${url.pathname}${url.search}`);
+      if (!reply) unhandled.push(label);
       const [status, body] = reply ?? [
         404,
         { message: 'not modelled by fake-ado' },
       ];
       send(res, status, body);
-    })().catch((err: unknown) => send(res, 500, { message: String(err) }));
+    })().catch((err: unknown) => {
+      unhandled.push(
+        `${req.method ?? 'GET'} ${req.url ?? ''} (${String(err)})`
+      );
+      send(res, 500, { message: String(err) });
+    });
   });
 
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
