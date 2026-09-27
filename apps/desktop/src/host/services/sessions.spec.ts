@@ -570,6 +570,36 @@ describe('launchAgent', () => {
     expect(state.spawns).toEqual([]);
   });
 
+  // A row names its checkout; peers are asked about the branch Git
+  // lists for it, never the label the row happened to send.
+  it('asks peers about a row checkout by the branch it is on', async () => {
+    state.knownMachines.add('bbbbbbbbbbbbbbbb');
+    state.machines = [connectedMachine('bbbbbbbbbbbbbbbb', 'workbox')];
+    state.remoteSessions.set('bbbbbbbbbbbbbbbb', [
+      remoteWorktreeSession('/repo-a', 'feature/x', 'bbbbbbbbbbbbbbbb'),
+    ]);
+    const worktree = worktreeSessionKey(addCheckout('feature/x'), '/repo-a');
+    await expect(
+      launchAgent({ branch: 'label', worktree, intent: 'continue-or-blank' })
+    ).rejects.toThrow(/workbox/);
+  });
+
+  it('asks peers nothing for a row checkout on a detached HEAD', async () => {
+    state.knownMachines.add('bbbbbbbbbbbbbbbb');
+    state.machines = [connectedMachine('bbbbbbbbbbbbbbbb', 'workbox')];
+    state.remoteSessions.set('bbbbbbbbbbbbbbbb', [
+      remoteWorktreeSession('/repo-a', 'detached-dir', 'bbbbbbbbbbbbbbbb'),
+    ]);
+    const worktree = worktreeSessionKey(addCheckout(''), '/repo-a');
+    await expect(
+      launchAgent({
+        branch: 'detached-dir',
+        worktree,
+        intent: 'continue-or-blank',
+      })
+    ).resolves.toBeDefined();
+  });
+
   it('does not refuse an explicit remote launch on a different machine than the owner', async () => {
     state.knownMachines.add('bbbbbbbbbbbbbbbb');
     state.knownMachines.add('cccccccccccccccc');

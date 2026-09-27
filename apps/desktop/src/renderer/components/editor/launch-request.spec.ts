@@ -30,6 +30,16 @@ describe('sessionLaunchRequest', () => {
     });
   });
 
+  it('a local launch names the row checkout; a remote launch does not', () => {
+    const args = [undefined, undefined] as const;
+    expect(
+      sessionLaunchRequest('b', false, {}, ...args, undefined, undefined, 'key')
+    ).toMatchObject({ worktree: 'key' });
+    expect(
+      sessionLaunchRequest('b', false, {}, ...args, 'peer', 'l-1', 'key')
+    ).not.toHaveProperty('worktree');
+  });
+
   it('continuing (fresh: false) sends the continue-or-blank intent', () => {
     expect(sessionLaunchRequest('feature/x', false, {})).toMatchObject({
       intent: 'continue-or-blank',

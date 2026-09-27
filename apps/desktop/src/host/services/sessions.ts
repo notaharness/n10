@@ -147,9 +147,9 @@ async function doLaunchAgent(
   repoCwd: string,
   discoveredPath?: string
 ): Promise<{ name: string }> {
-  const knownWorktreePath = await knownCheckout(req, repoCwd, discoveredPath);
-  await refuseRemoteOwned(req, repoCwd, knownWorktreePath);
-  const wtPath = await resolveLaunchWorktree(req, repoCwd, knownWorktreePath);
+  const known = await knownCheckout(req, repoCwd, discoveredPath);
+  await refuseRemoteOwned(req, repoCwd, known);
+  const wtPath = await resolveLaunchWorktree(req, repoCwd, known?.path);
   const name = worktreeSessionKey(wtPath, repoCwd, req.machine);
   const reused = reuseConnection(req, name);
   if (reused) return reused;
@@ -167,7 +167,7 @@ async function doLaunchAgent(
     cwd: wtPath,
     // Discovery and a row's checkout run whatever the checkout is on
     // now; a launch by branch names the branch it expects to find there.
-    ...(knownWorktreePath ? {} : { branch: req.branch }),
+    ...(known ? {} : { branch: req.branch }),
     cols: clampDim(req.cols, DEFAULT_COLS),
     rows: clampDim(req.rows, DEFAULT_ROWS),
     config,

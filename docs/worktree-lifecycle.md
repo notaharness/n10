@@ -27,6 +27,13 @@ sessions by checkout path, adopts live sessions, and reports appeared, disappear
 switched and ended keys. Untagged tmux sessions are foreign. Initial worktree lists
 come from each shell; initial session adoption is still a discovery operation.
 
+Desktop worktree rows address their checkout by its session key: launch, the
+launch menu, the worktree diff and Open in editor send it, and the host resolves
+it only against Git's listing
+([`findWorktreeTarget`](../apps/desktop/src/host/services/worktree-target.ts)).
+A detached HEAD has no branch, and its directory label is not an address.
+Removal still takes a branch; that surface belongs to #205/#206.
+
 A Desktop sidebar row exists for every listed worktree. Creating a worktree opens
 a tab; merely discovering an idle worktree adds a row, and selecting it opens a
 preview. Live agents auto-open tabs. A stopped agent does not imply a removed
@@ -119,12 +126,6 @@ Paths below are under `apps/desktop-e2e/src` (**D**) and `apps/cli-e2e/src` (**C
 
 - [#208](https://github.com/notaharness/n10/issues/208): repository relocation
   requires a safe identity migration/recovery policy. Never match by branch alone.
-- [#209](https://github.com/notaharness/n10/issues/209): Desktop worktree rows
-  address their checkout by its session key, which the host resolves only
-  against Git's worktree listing (`findWorktreeTarget`); discovery attaches by
-  the checkout Git reported. Launch, the launch menu, the worktree diff and
-  Open in editor therefore work on a detached HEAD. Removal still takes a
-  branch; that surface belongs to #205/#206.
 - [#56](https://github.com/notaharness/n10/issues/56): master has bounded TUI exit
   and C11 passes with a running agent; the reported hang does not reproduce on this baseline.
 - Removal rows are assigned to #205/#206, not reimplemented by this test change.

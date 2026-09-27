@@ -14,6 +14,7 @@ import {
   unresolvedCommentsLabel,
   SECTION_ORDER,
   liveSessionName,
+  pairedSessionRow,
 } from './sidebar-model.js';
 
 /**
@@ -43,6 +44,32 @@ function pr(overrides: Partial<PullRequestInfo> = {}): PullRequestInfo {
 function session(name: string, running = false) {
   return { name, running };
 }
+
+describe('pairedSessionRow', () => {
+  const worktree = (branch: string | undefined, label: string) =>
+    ({
+      kind: 'session',
+      session: { ...session(`key:${label}`), label, branch: branch ?? '' },
+      branch,
+      isMerged: false,
+    } as SidebarItem);
+
+  it('pairs a pull request with the worktree that has its branch', () => {
+    const row = worktree('hotfix', 'hotfix');
+    expect(pairedSessionRow([row], 'hotfix')).toBe(row);
+  });
+
+  // A detached checkout is labelled by its directory; the label is not
+  // a branch, and a PR on a branch of that name is another checkout's.
+  it('never pairs a detached worktree by its directory label', () => {
+    const detached = worktree(undefined, 'hotfix');
+    const orphan: SidebarItem = {
+      kind: 'orphan-pr',
+      pr: pr({ sourceBranch: 'hotfix' }),
+    };
+    expect(pairedSessionRow([detached, orphan], 'hotfix')).toBeUndefined();
+  });
+});
 
 describe('itemKey identity across kinds', () => {
   const thePr = pr();

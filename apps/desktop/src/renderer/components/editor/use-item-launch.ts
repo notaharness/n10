@@ -78,18 +78,16 @@ export function useItemLaunch(
     const launchId = machine ? progress.start() : undefined;
     if (machine) setRemoteError(null);
     launch.mutate(
-      {
-        ...sessionLaunchRequest(
-          branch,
-          fresh,
-          estimateGrid(),
-          expected,
-          agentId,
-          machine,
-          launchId
-        ),
-        ...(worktree ? { worktree } : {}),
-      },
+      sessionLaunchRequest(
+        branch,
+        fresh,
+        estimateGrid(),
+        expected,
+        agentId,
+        machine,
+        launchId,
+        worktree
+      ),
       {
         onSuccess: () => {
           if (!machine) return;

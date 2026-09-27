@@ -16,6 +16,7 @@ import {
   itemRunning,
   itemSessionName,
   liveSessionName,
+  pairedSessionRow,
 } from '../../lib/sidebar/sidebar-model.js';
 import {
   clearLaunchMenuRequest,
@@ -95,7 +96,7 @@ function useItemState(
   const sessions = useSessions(cwd);
   const branch = item ? itemBranch(item) : '';
   const sessionRow = useMemo(
-    () => items.find((i) => itemBranch(i) === branch && itemSessionName(i)),
+    () => pairedSessionRow(items, branch),
     [items, branch]
   );
   const state = item

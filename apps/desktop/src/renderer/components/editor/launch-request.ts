@@ -19,6 +19,8 @@ type Grid = Pick<SessionLaunchRequest, 'cols' | 'rows'>;
  * A local launch (no `machine`) sends no `machine` and no `launchId`
  * at all, not merely `undefined`, because that is D8: a user with no
  * fleet must see no trace of machines, request payloads included.
+ * `worktree`, the row's checkout key, goes only with a local launch: a
+ * remote one runs in that machine's checkout of `branch`.
  */
 export function sessionLaunchRequest(
   branch: string,
@@ -27,7 +29,8 @@ export function sessionLaunchRequest(
   expected?: SessionIncarnation,
   agentId?: AgentId,
   machine?: string,
-  launchId?: string
+  launchId?: string,
+  worktree?: string
 ): SessionLaunchRequest {
   const base: SessionLaunchRequest = {
     branch,
@@ -37,7 +40,8 @@ export function sessionLaunchRequest(
     agentId,
     ...pane,
   };
-  return machine ? { ...base, machine, launchId } : base;
+  if (machine) return { ...base, machine, launchId };
+  return worktree ? { ...base, worktree } : base;
 }
 
 export function reviewLaunchRequest(
