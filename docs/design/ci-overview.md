@@ -309,19 +309,30 @@ Deferred items (§5) join this list when their API exists.
 
 ## 8. The proof of concept
 
-- **Model:** `libs/vcs/core/src/lib/ci.ts`. `VcsProvider` gains the optional
-  `fetchCiOverview` and `fetchCiLog`.
-- **GitHub:** `libs/vcs/github/src/lib/ci.ts`: runs, jobs and steps, and the
-  job log once the job has finished.
-- **Azure:** `libs/vcs/azure-devops/src/lib/ci.ts`: builds, timeline hierarchy,
-  per-task logs read by line range.
+- **Model:** `libs/vcs/core/src/lib/ci.ts`, browser-safe as
+  `@n10/vcs-core/ci`. `VcsProvider` gains the optional `fetchCiOverview` and
+  `fetchCiLog`.
+- **GitHub:** `libs/vcs/github/src/lib/ci.ts`: runs for the head commit, every
+  page of each run's jobs, steps by number, and a finished job's log, kept in
+  memory (8 logs, 64 MiB) and refused over 32 MiB.
+- **Azure:** `libs/vcs/azure-devops/src/lib/ci.ts`: newest build per
+  definition, the timeline by `parentId` and `order`, a phase without a job
+  shown as itself, and a task's log read by line range.
 - **Core:** `libs/core/src/lib/pull-requests/ci-overview.ts` finds the PR's
-  head in the cached list and asks the provider.
+  head in the cached list and asks the configured provider; a log reference
+  from another provider is refused.
 - **Host:** `apps/desktop/src/host/contract-ci.ts` and `services/ci.ts`:
-  `getCiOverview(prId)` and `getCiLog(ref)`.
-- **Renderer:** `components/review/ci/`: each pipeline's stages as columns in
-  the provider's order, jobs in each stage with their status, a job's steps,
-  and the log.
-- **Tests:** unit tests for both mappings against recorded public fixtures,
-  and `apps/desktop-e2e/src/ci-overview.test.ts` driving the page through the
-  fake `gh`, with a `@visual` baseline.
+  `getCiOverview(prId)` and `getCiLog(ref)`, both validated before any read.
+- **Renderer:** a **CI** rail entry marked Preview opens
+  `components/review/ci/CiPane.tsx`. Each pipeline is a card; its stages are
+  columns in the provider's order, and GitHub's single unnamed stage is a grid
+  of jobs. Choosing a job opens its steps and the last 500 lines of its log;
+  on Azure, choosing a step shows that step's log. Status is an icon with its
+  name, never colour alone. The page reads again every 15 s while a pipeline
+  is still going.
+- **Tests:** unit tests for both mappings against recorded public fixtures
+  (`libs/vcs/github/src/lib/__fixtures__/bat-ci/`,
+  `libs/vcs/azure-devops/src/lib/__fixtures__/ci/`), and
+  `apps/desktop-e2e/src/ci-overview.test.ts` driving the page through the fake
+  `gh`, which answers the recorded GitHub responses from its `api` table, plus
+  a `@visual` baseline. Azure has no desktop e2e seam yet.
