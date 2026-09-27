@@ -53,7 +53,7 @@ async function formFleet(page: Page, workbox: BeamMachine): Promise<void> {
   await page.getByLabel('Machine name').fill('laptop');
   await page.getByLabel('Fleet name').fill('home');
   await page.getByRole('button', { name: 'Create fleet' }).click();
-  await expect(page.getByTestId('fleet-fingerprint')).toBeVisible({
+  await expect(page.getByTestId('machine-row')).toHaveCount(1, {
     timeout: 60_000,
   });
 

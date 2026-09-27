@@ -6,7 +6,9 @@ import { Tip } from '../ui/tooltip.js';
 
 const JOIN_COMMAND = 'beam join --label buildbox';
 
-/** Instructions stay open until a new member arrives, or the owner closes them. */
+/** Instructions stay open until a new member arrives, or the owner
+ *  closes them. The fleet fingerprint shows here, where the owner
+ *  compares it with the joining machine's. */
 export function AddMachinePanel({
   fingerprint,
   onClose,
@@ -64,7 +66,24 @@ export function AddMachinePanel({
         <p className="text-sm text-muted-foreground">
           Check that its fleet fingerprint matches:
         </p>
-        <p className="font-mono select-all">{fingerprint}</p>
+        <div className="flex items-center gap-1">
+          <p
+            className="min-w-0 flex-1 font-mono select-all"
+            data-testid="fleet-fingerprint"
+          >
+            {fingerprint}
+          </p>
+          <Tip label="Copy fleet fingerprint">
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              aria-label="Copy fleet fingerprint"
+              onClick={() => copyText(fingerprint, 'Fleet fingerprint copied')}
+            >
+              <CopyIcon />
+            </Button>
+          </Tip>
+        </div>
       </div>
       <p role="status" className="text-sm text-muted-foreground">
         Waiting for a new machine…

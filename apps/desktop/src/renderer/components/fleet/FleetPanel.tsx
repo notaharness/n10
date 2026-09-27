@@ -13,7 +13,6 @@ import { Skeleton } from '../ui/skeleton.js';
 import { AddMachinePanel } from './AddMachinePanel.js';
 import { EnrolmentFlow } from './EnrolmentFlow.js';
 import { FirstRun } from './FirstRun.js';
-import { FleetHeader } from './FleetHeader.js';
 import { ResetFleetPanel } from './ResetFleetPanel.js';
 
 /** Until beam can answer for its fleet: its socket, then (`starting`)
@@ -119,18 +118,16 @@ function StatusNotices({ beam }: { beam: BeamStatus }) {
   return <Notice>{publicationText(false)}</Notice>;
 }
 
-/** This machine's fleet: its fingerprint, its rows and the way to
- *  reset it, or in their place the add-a-machine instructions. */
+/** This machine's fleet: its rows, or in their place the
+ *  add-a-machine instructions. */
 function EnrolledBody({
   beam,
   machines,
-  disabled,
 }: {
   beam: BeamStatus;
   machines: MachineView[] | undefined;
-  disabled: boolean;
 }) {
-  const { adding, setAdding, reset } = useFleet();
+  const { adding, setAdding } = useFleet();
   if (adding && beam.fleetId) {
     return (
       <AddMachinePanel
@@ -140,22 +137,10 @@ function EnrolledBody({
     );
   }
   return (
-    <>
-      <FleetHeader fleetId={beam.fleetId} />
-      <FleetRows
-        machines={machines ?? []}
-        disabled={beam.state === 'restarting'}
-      />
-      <Button
-        size="sm"
-        variant="ghost"
-        className="-ml-2 text-muted-foreground"
-        disabled={disabled}
-        onClick={reset.show}
-      >
-        Reset fleet…
-      </Button>
-    </>
+    <FleetRows
+      machines={machines ?? []}
+      disabled={beam.state === 'restarting'}
+    />
   );
 }
 
@@ -182,13 +167,7 @@ function FleetBody({
       {loadFailure}
       {enrolling && <EnrolmentFlow />}
       {!enrolling && !beam.enrolled && <FirstRun disabled={reconnecting} />}
-      {beam.enrolled && (
-        <EnrolledBody
-          beam={beam}
-          machines={machines}
-          disabled={reconnecting || enrolment.ceremony.running}
-        />
-      )}
+      {beam.enrolled && <EnrolledBody beam={beam} machines={machines} />}
     </div>
   );
 }

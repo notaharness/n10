@@ -18,12 +18,16 @@ and switching repositories. The status bar and Settings reveal and focus the sec
 The header shows a concise state. An enrolled fleet has a small **+** at its right
 edge, with **Add a machine** as its accessible label and tooltip. It opens and expands
 the instructions. It is disabled while reconnecting, resetting or completing a passkey
-flow. The add button is a sibling of the collapse trigger.
+flow. Beside it, **Fleet actions** (“…”) opens a menu holding **Reset fleet…**; a
+right-click on the header opens the same entry as a native context menu. Choosing it
+expands the section. The entry is disabled while reconnecting, completing a passkey
+flow or already confirming. Both buttons are siblings of the collapse trigger.
 
-The overview shows the selectable fleet fingerprint and copy icon, then compact machine
-rows, local first. Rows show name, connection state and fingerprint; queue and access
+The overview shows compact machine rows, local first. The fleet fingerprint is not
+part of it; it appears where it is compared: **Add a machine** and the post-join check.
+Rows show name, connection state and fingerprint; queue and access
 badges appear when relevant. Offline and revoked states use text and colour.
-**Reset fleet…** is a quiet action below the rows. An otherwise empty fleet says
+An otherwise empty fleet says
 “Your other machines will appear here.” Shared primitives and colour tokens serve both
 themes. Fleet stays within the sidebar’s scroll area.
 
@@ -56,7 +60,7 @@ membership is already established by the daemon.
 - **Terminal:** `beam join --label buildbox`, a copy icon, and “Run there, then open the link or scan the QR.”
 
 A fingerprint block says “Check that its fleet fingerprint matches:” above the grouped
-value. “Waiting for a new machine…” reflects the waiting state. A new member identity from a push or fallback poll
+value and a copy icon. “Waiting for a new machine…” reflects the waiting state. A new member identity from a push or fallback poll
 closes the panel, including while collapsed. Renames and reconnects cannot complete
 adding. **Close instructions** lets the owner leave early; there is no Done button.
 

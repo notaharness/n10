@@ -41,11 +41,18 @@ test.describe('An enrolled machine', () => {
     },
   });
 
-  test('shows and copies the fleet fingerprint beam status reports', async ({
+  test('shows and copies the fleet fingerprint while adding a machine', async ({
     desktop,
   }) => {
     const { page } = desktop;
     await openFleet(desktop);
+    await expect(page.getByTestId('machine-row')).toHaveCount(2);
+    await expect(fleetView(page).getByTestId('fleet-fingerprint')).toHaveCount(
+      0
+    );
+    await page
+      .getByRole('button', { name: 'Add a machine', exact: true })
+      .click();
     await expect(fleetView(page).getByTestId('fleet-fingerprint')).toHaveText(
       '3f9a 0c4e 7d12 e805'
     );

@@ -15,6 +15,7 @@ import {
 import { FocusScope } from '../../lib/fleet/use-focus-on-mount.js';
 import { Button } from '../ui/button.js';
 import { Tip } from '../ui/tooltip.js';
+import { FleetActionsMenu, useFleetActions } from './FleetActions.js';
 import { FleetPanel } from './FleetPanel.js';
 
 const TONE_CLASS: Record<SummaryTone, string> = {
@@ -33,9 +34,9 @@ function useAwaitingPasskey(): boolean {
 
 /**
  * Fleet in the sidebar (beam-fleet-ux.md §1): a collapsible section
- * whose header keeps the fleet's state in view, and whose body holds
- * the machines, the first-run and pairing steps, and the recovery
- * actions. Its state lives in `FleetProvider`, so the Workspace's
+ * whose header keeps the fleet's state in view and holds its actions
+ * (add, and behind "…" or a right-click, reset), and whose body holds
+ * the machines, the first-run and pairing steps. Its state lives in `FleetProvider`, so the Workspace's
  * sidebar and the repository picker's show the same section.
  */
 export function FleetSection() {
@@ -48,6 +49,7 @@ export function FleetSection() {
     machines,
     awaitingPasskey: useAwaitingPasskey(),
   });
+  const actions = useFleetActions();
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!takeRevealFocus()) return;
@@ -61,7 +63,10 @@ export function FleetSection() {
       onOpenChange={setExpanded}
       className="flex min-h-0 flex-col"
     >
-      <div className="flex shrink-0 items-center gap-1">
+      <div
+        className="flex shrink-0 items-center gap-1"
+        onContextMenu={actions.openContextMenu}
+      >
         <CollapsibleTrigger asChild>
           <button
             ref={trigger}
@@ -88,7 +93,7 @@ export function FleetSection() {
             )}
           </button>
         </CollapsibleTrigger>
-        {beam?.enrolled && beam.fleetId && (
+        {actions.available && (
           <Tip label="Add a machine">
             <Button
               size="icon-xs"
@@ -96,7 +101,7 @@ export function FleetSection() {
               aria-label="Add a machine"
               disabled={
                 !machines ||
-                beam.state !== 'ready' ||
+                beam?.state !== 'ready' ||
                 reset.open ||
                 enrolment.ceremony.view !== null ||
                 revocation.ceremony.running
@@ -109,6 +114,12 @@ export function FleetSection() {
               <PlusIcon />
             </Button>
           </Tip>
+        )}
+        {actions.available && (
+          <FleetActionsMenu
+            disabled={actions.disabled}
+            onReset={actions.showReset}
+          />
         )}
       </div>
       <CollapsibleContent asChild>

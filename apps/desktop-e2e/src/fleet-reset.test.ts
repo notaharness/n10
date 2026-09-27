@@ -1,6 +1,13 @@
 import { test, expect } from './fixtures/fake-beam.js';
 import { WORKBOX } from './setup/fake-beam.js';
-import { fleetView, openFleet } from './setup/machines.js';
+import { armContextMenuChoice } from './setup/menu.js';
+import {
+  chooseFleetAction,
+  collapseFleet,
+  fleetToggle,
+  fleetView,
+  openFleet,
+} from './setup/machines.js';
 
 /**
  * Resetting this machine's fleet (beam-fleet-ux.md §3): an explicit,
@@ -21,7 +28,7 @@ test.describe('Reset fleet on this machine', () => {
   }) => {
     const { page } = desktop;
     await openFleet(desktop);
-    await fleetView(page).getByRole('button', { name: 'Reset fleet…' }).click();
+    await chooseFleetAction(page, 'Reset fleet…');
     const panel = fleetView(page);
     await expect(
       panel.getByRole('heading', { name: 'Reset fleet here?' })
@@ -45,13 +52,43 @@ test.describe('Reset fleet on this machine', () => {
     await expect(page.getByTestId('machine-row')).toHaveCount(2);
   });
 
+  test('stays out of the overview, behind the header’s menus', async ({
+    desktop,
+  }) => {
+    const { page, app } = desktop;
+    await openFleet(desktop);
+    await expect(page.getByTestId('machine-row')).toHaveCount(2);
+    await expect(
+      fleetView(page).getByRole('button', { name: /Reset fleet/ })
+    ).toHaveCount(0);
+
+    await collapseFleet(page);
+    await armContextMenuChoice(app, 'Reset fleet…');
+    await fleetToggle(page).click({ button: 'right' });
+    await expect(
+      fleetView(page).getByRole('heading', { name: 'Reset fleet here?' })
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole('complementary')
+        .getByRole('button', { name: 'Fleet actions' })
+    ).toBeEnabled();
+    await page
+      .getByRole('complementary')
+      .getByRole('button', { name: 'Fleet actions' })
+      .click();
+    await expect(
+      page.getByRole('menuitem', { name: 'Reset fleet…' })
+    ).toBeDisabled();
+  });
+
   test('resets through beam, then offers to create or join', async ({
     desktop,
     beam,
   }) => {
     const { page } = desktop;
     await openFleet(desktop);
-    await fleetView(page).getByRole('button', { name: 'Reset fleet…' }).click();
+    await chooseFleetAction(page, 'Reset fleet…');
     const panel = fleetView(page);
     await panel.getByLabel('Type reset to confirm').fill('reset');
     await panel.getByLabel('Type reset to confirm').press('Enter');
@@ -77,7 +114,7 @@ test.describe('Reset fleet on this machine', () => {
     const { page } = desktop;
     beam!.refuse('fleet.reset', 'storage-failure', 'disk full');
     await openFleet(desktop);
-    await fleetView(page).getByRole('button', { name: 'Reset fleet…' }).click();
+    await chooseFleetAction(page, 'Reset fleet…');
     const panel = fleetView(page);
     await panel.getByLabel('Type reset to confirm').fill('reset');
     await panel.getByRole('button', { name: 'Reset fleet' }).click();
@@ -106,9 +143,9 @@ test.describe('after creating a fleet', () => {
     await expect(view.getByTestId('ceremony-url')).toBeVisible();
     beam!.nextPasskeyStep();
     beam!.finishCeremony();
-    await expect(view.getByTestId('fleet-fingerprint')).toBeVisible();
+    await expect(page.getByTestId('machine-row')).toHaveCount(1);
 
-    await view.getByRole('button', { name: 'Reset fleet…' }).click();
+    await chooseFleetAction(page, 'Reset fleet…');
     const panel = fleetView(page);
     await panel.getByLabel('Type reset to confirm').fill('reset');
     await panel.getByRole('button', { name: 'Reset fleet' }).click();
