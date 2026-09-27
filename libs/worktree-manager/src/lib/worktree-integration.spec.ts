@@ -258,7 +258,7 @@ describe('integration: fastForwardMainBranch', () => {
     });
     execSync('git push', { cwd: pushDir, stdio: 'pipe' });
 
-    // git branch -f master fails if HEAD is on master, so switch away
+    // Off master, the update is a local fetch rather than a merge.
     execSync('git checkout -b temp-branch', { cwd: cloneDir, stdio: 'pipe' });
 
     // Record local master before fast-forward
@@ -267,7 +267,9 @@ describe('integration: fastForwardMainBranch', () => {
       encoding: 'utf8',
     }).trim();
 
-    const result = await fastForwardMainBranch();
+    // The caller fetches; fast-forwarding only moves main to what was fetched.
+    execSync('git fetch origin', { cwd: cloneDir, stdio: 'pipe' });
+    const result = await fastForwardMainBranch(cloneDir);
     expect(result).toBe(true);
 
     // Local master should now be ahead of where it was
@@ -308,7 +310,9 @@ describe('integration: fastForwardMainBranch', () => {
       encoding: 'utf8',
     }).trim();
 
-    const result = await fastForwardMainBranch();
+    // The caller fetches; fast-forwarding only moves main to what was fetched.
+    execSync('git fetch origin', { cwd: cloneDir, stdio: 'pipe' });
+    const result = await fastForwardMainBranch(cloneDir);
     expect(result).toBe(true);
 
     // Local master should now be ahead of where it was

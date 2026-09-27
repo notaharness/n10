@@ -32,13 +32,16 @@ export function remoteSyncIntervalMs(
   );
 }
 
-/** One sync pass: fetch all remotes (pruning), through the fetch line
- *  every other fetch of the repository waits in, and fast-forward the
- *  main branch. Never throws; returns the completion timestamp. */
+/** One sync pass over the repository at `cwd`: fetch all remotes
+ *  (pruning), through the fetch line every other fetch of the
+ *  repository waits in, then fast-forward its main branch to what was
+ *  fetched. Every step names `cwd`; the process's directory may be
+ *  another repository by the time one runs. Never throws; returns the
+ *  completion timestamp. */
 export async function syncRemote(cwd = process.cwd()): Promise<number> {
   try {
     await fetchRefs({ cwd, refs: 'all' });
-    await fastForwardMainBranch();
+    await fastForwardMainBranch(cwd);
   } catch (err: unknown) {
     logError('remote-sync', err);
   }
