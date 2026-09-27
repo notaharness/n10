@@ -8,11 +8,13 @@ import {
   ghOutput,
   parseGhJson,
 } from './gh-errors.js';
+import { GH_READ_OPTIONS } from './gh-read-deadline.js';
 
 /**
  * The `gh` transport shared by the list, thread, detail and checks
  * reads: every call is logged, its output parsed, and a failure
- * classified into a `VcsError` before it leaves here.
+ * classified into a `VcsError` before it leaves here. Reads are killed
+ * at `GH_READ_DEADLINE_MS`; a mutation runs until `gh` exits.
  */
 
 const execFile = promisify(execFileCb);
@@ -32,9 +34,14 @@ function summarizeQuery(query: string): string {
   return query.trim().split('\n')[0]?.slice(0, 80) ?? 'query';
 }
 
+/**
+ * Run a GraphQL document through `gh`. With no options the call runs
+ * until `gh` exits — what a mutation needs; reads go through `ghQuery`.
+ */
 export async function ghGraphQL(
   query: string,
-  variables: Record<string, string | number>
+  variables: Record<string, string | number>,
+  options?: typeof GH_READ_OPTIONS
 ): Promise<unknown> {
   const startedAt = Date.now();
   const querySummary = summarizeQuery(query);
@@ -55,7 +62,9 @@ export async function ghGraphQL(
         args.push('-f', `${key}=${val}`);
       }
     }
-    const { stdout } = await execFile('gh', args);
+    const { stdout } = options
+      ? await execFile('gh', args, options)
+      : await execFile('gh', args);
     const durationMs = Date.now() - startedAt;
     logNetwork(
       'github.network',
@@ -78,13 +87,21 @@ export async function ghGraphQL(
   }
 }
 
+/** A read-only GraphQL query: killed at `GH_READ_DEADLINE_MS`. */
+export function ghQuery(
+  query: string,
+  variables: Record<string, string | number>
+): Promise<unknown> {
+  return ghGraphQL(query, variables, GH_READ_OPTIONS);
+}
+
 /** One REST read through `gh api`, parsed and classified like a
- *  GraphQL one. */
+ *  GraphQL one, and killed at `GH_READ_DEADLINE_MS` like one. */
 export async function ghRest(path: string): Promise<unknown> {
   const startedAt = Date.now();
   logNetwork('github.network', `→ gh api ${path}`);
   try {
-    const { stdout } = await execFile('gh', ['api', path]);
+    const { stdout } = await execFile('gh', ['api', path], GH_READ_OPTIONS);
     logNetwork(
       'github.network',
       `← gh api ${path} (${Date.now() - startedAt}ms, ${stdout.length} bytes)`

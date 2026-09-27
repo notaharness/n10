@@ -21,7 +21,7 @@ import {
   type ContextNode,
 } from './gh-check-nodes.js';
 import { restOf, type Page } from './gh-pages.js';
-import { ghGraphQL } from './gh-graphql.js';
+import { ghQuery } from './gh-graphql.js';
 
 /**
  * What stands between a GitHub pull request and merging: every check
@@ -229,7 +229,7 @@ export async function fetchPullRequestChecksGitHub(
   number: number
 ): Promise<PullRequestChecks> {
   const vars = { owner, repo, number };
-  const res = (await ghGraphQL(CHECKS_QUERY, vars)) as ChecksResponse;
+  const res = (await ghQuery(CHECKS_QUERY, vars)) as ChecksResponse;
   const node = res.data.repository?.pullRequest;
   const commit = node?.commits.nodes[0]?.commit;
   if (!node || !commit || !isOid(commit.oid)) {
@@ -242,7 +242,7 @@ export async function fetchPullRequestChecksGitHub(
   const first = commit.statusCheckRollup?.contexts ?? NO_CHECKS;
   const [contexts, rules] = await Promise.all([
     restOf(first, async (cursor) => {
-      const page = (await ghGraphQL(CONTEXTS_PAGE_QUERY, {
+      const page = (await ghQuery(CONTEXTS_PAGE_QUERY, {
         ...vars,
         contextsCursor: cursor,
       })) as PageResponse;

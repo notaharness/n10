@@ -184,11 +184,12 @@ interface Answers {
 /** Answer each `gh` call: GraphQL by query name, REST by path. */
 function answerWith(answers: Answers) {
   mockExecFile.mockImplementation(
-    (
-      _cmd: string,
-      args: string[],
-      cb: (err: unknown, res?: { stdout: string }) => void
-    ) => {
+    (_cmd: string, args: string[], ...rest: unknown[]) => {
+      // A read passes its deadline options before the callback.
+      const cb = rest.at(-1) as (
+        err: unknown,
+        res?: { stdout: string }
+      ) => void;
       let next: Json | Json[] | Failure | undefined;
       if (args[1] === 'graphql') {
         const query = args.find((a) => a.startsWith('query=')) ?? '';

@@ -7,7 +7,7 @@ import {
   type PullRequestLifecycle,
   type RepositoryRef,
 } from '@n10/vcs-core';
-import { ghGraphQL } from './gh-graphql.js';
+import { ghQuery } from './gh-graphql.js';
 import {
   REVIEWER_CURSORS,
   REVIEWER_FIELDS,
@@ -167,7 +167,7 @@ export async function fetchPullRequestDetailGitHub(
   number: number
 ): Promise<PullRequestDetail> {
   const vars = { owner, repo, number };
-  const res = (await ghGraphQL(DETAIL_QUERY, vars)) as DetailResponse;
+  const res = (await ghQuery(DETAIL_QUERY, vars)) as DetailResponse;
   const repository = res.data.repository;
   const node = repository?.pullRequest;
   if (!repository || !node) {

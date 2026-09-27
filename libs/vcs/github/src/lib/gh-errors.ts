@@ -4,6 +4,7 @@ import {
   VcsError,
   type VcsErrorKind,
 } from '@n10/vcs-core';
+import { GH_READ_DEADLINE_MS, killedAtDeadline } from './gh-read-deadline.js';
 
 /**
  * What went wrong when `gh` did.
@@ -91,6 +92,13 @@ const MESSAGES: Partial<Record<VcsErrorKind, string>> = {
  * fault, and the fix is completely different.
  */
 export function classifyGhError(err: unknown): VcsError {
+  if (killedAtDeadline(err)) {
+    return new VcsError(
+      'network',
+      `GitHub did not answer within ${GH_READ_DEADLINE_MS / 1000}s`,
+      { cause: err }
+    );
+  }
   if (code(err) === 'ENOENT') {
     return unavailableError(
       'The GitHub CLI (gh) is not installed — n10 reaches GitHub through it',
