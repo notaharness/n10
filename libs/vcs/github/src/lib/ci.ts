@@ -51,6 +51,8 @@ interface GhRun {
   conclusion: string | null;
   head_sha: string;
   html_url: string | null;
+  run_number: number | null;
+  run_attempt: number | null;
   run_started_at: string | null;
   updated_at: string | null;
 }
@@ -175,13 +177,16 @@ export function mapJob(job: GhJob): CiJob {
 export function mapRun(run: GhRun, jobs: GhJob[]): CiPipeline {
   const status = githubCiStatus(run.status, run.conclusion);
   const startedAt = run.run_started_at;
-  // A run has no completed_at: its last update is when it finished.
-  const completedAt = run.status === 'completed' ? run.updated_at : null;
+  // A run has no completion time of its own (only its jobs do), so it
+  // has none here either.
+  const completedAt = null;
   return {
     id: String(run.id),
     name: run.name ?? 'Workflow run',
     status,
     url: run.html_url,
+    number: run.run_number == null ? null : String(run.run_number),
+    attempt: run.run_attempt,
     event: run.event,
     commit: run.head_sha,
     startedAt,
@@ -200,6 +205,38 @@ export function mapRun(run: GhRun, jobs: GhJob[]): CiPipeline {
   };
 }
 
+/**
+ * A finished run's jobs change only when the run is re-run, which
+ * raises its attempt and moves its `updated_at`. Keyed by those, a
+ * cached list is exact, and a poll re-reads only runs still going.
+ */
+const RUN_JOBS_CACHE_ENTRIES = 64;
+const runJobsCache = new Map<string, GhJob[]>();
+
+function finishedRunKey(base: string, run: GhRun): string | null {
+  if (run.status !== 'completed') return null;
+  return `${base}/${run.id}/${run.run_attempt}/${run.updated_at}`;
+}
+
+async function runJobs(base: string, run: GhRun): Promise<GhJob[]> {
+  const key = finishedRunKey(base, run);
+  const cached = key ? runJobsCache.get(key) : undefined;
+  if (cached) return cached;
+  const jobs = await listAll<GhJob>(
+    `${base}/runs/${run.id}/jobs`,
+    'jobs',
+    'the jobs of a workflow run'
+  );
+  if (key) {
+    runJobsCache.set(key, jobs);
+    const oldest = runJobsCache.keys().next().value;
+    if (runJobsCache.size > RUN_JOBS_CACHE_ENTRIES && oldest) {
+      runJobsCache.delete(oldest);
+    }
+  }
+  return jobs;
+}
+
 /** The workflow runs for `headSha`, each with its jobs and steps. */
 export async function fetchGitHubCiOverview(
   owner: string,
@@ -213,16 +250,7 @@ export async function fetchGitHubCiOverview(
     'the workflow runs'
   );
   const pipelines = await Promise.all(
-    runs.map(async (run) =>
-      mapRun(
-        run,
-        await listAll<GhJob>(
-          `${base}/runs/${run.id}/jobs`,
-          'jobs',
-          'the jobs of a workflow run'
-        )
-      )
-    )
+    runs.map(async (run) => mapRun(run, await runJobs(base, run)))
   );
   return { provider: 'github', pipelines };
 }
@@ -245,8 +273,9 @@ function remember(jobId: number, text: string): void {
   }
 }
 
-/** Test seam: forget every cached log. */
-export function clearGitHubLogCache(): void {
+/** Test seam: forget every cached job list and log. */
+export function clearGitHubCiCaches(): void {
+  runJobsCache.clear();
   logCache.clear();
 }
 

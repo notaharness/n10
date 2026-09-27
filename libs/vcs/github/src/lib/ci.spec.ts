@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { isVcsError } from '@n10/vcs-core';
 import {
-  clearGitHubLogCache,
+  clearGitHubCiCaches,
   fetchGitHubCiLog,
   fetchGitHubCiOverview,
   githubCiStatus,
@@ -59,7 +59,7 @@ function serveRecordedRun(): string[][] {
 
 beforeEach(() => {
   mockExecFile.mockReset();
-  clearGitHubLogCache();
+  clearGitHubCiCaches();
 });
 
 describe('fetchGitHubCiOverview', () => {
@@ -81,10 +81,13 @@ describe('fetchGitHubCiOverview', () => {
     const cicd = overview.pipelines[1];
     expect(cicd).toMatchObject({
       id: '36270173409',
+      number: '6010',
+      attempt: 1,
       event: 'pull_request',
       commit: HEAD,
       startedAt: '2026-09-26T20:37:42Z',
-      completedAt: '2026-09-26T20:50:53Z',
+      // A run reports no completion time of its own.
+      completedAt: null,
       url: 'https://github.com/sharkdp/bat/actions/runs/36270173409',
     });
     // Workflows have no stages: one unnamed stage holds every job.
@@ -160,6 +163,56 @@ describe('fetchGitHubCiOverview', () => {
   });
 });
 
+describe('the jobs of a finished run', () => {
+  it('are read once until the run changes', async () => {
+    const calls = serveRecordedRun();
+    await fetchGitHubCiOverview('sharkdp', 'bat', HEAD);
+    await fetchGitHubCiOverview('sharkdp', 'bat', HEAD);
+    // Both runs finished: the second overview reads only the run list.
+    expect(calls.map((c) => c[1])).toEqual([
+      RUNS,
+      jobsPath(36270173260),
+      jobsPath(36270173409),
+      RUNS,
+    ]);
+  });
+
+  it('are read again after a re-run', async () => {
+    const runs = JSON.parse(fixture('runs.json')) as {
+      workflow_runs: Record<string, unknown>[];
+    };
+    const calls = serveRecordedRun();
+    await fetchGitHubCiOverview('sharkdp', 'bat', HEAD);
+    runs.workflow_runs[1].run_attempt = 2;
+    runs.workflow_runs[1].updated_at = '2026-09-26T21:10:00Z';
+    serveGh({
+      [RUNS]: JSON.stringify(runs),
+      [jobsPath(36270173409)]: fixture('jobs-36270173409.json'),
+    }).forEach((c) => calls.push(c));
+    await fetchGitHubCiOverview('sharkdp', 'bat', HEAD);
+    expect(calls.at(-1)?.[1]).toBe(jobsPath(36270173409));
+  });
+
+  it('are always read while the run is going', async () => {
+    const run = {
+      ...(
+        JSON.parse(fixture('runs.json')) as {
+          workflow_runs: Record<string, unknown>[];
+        }
+      ).workflow_runs[1],
+      status: 'in_progress',
+      conclusion: null,
+    };
+    const calls = serveGh({
+      [RUNS]: JSON.stringify({ total_count: 1, workflow_runs: [run] }),
+      [jobsPath(36270173409)]: fixture('jobs-36270173409.json'),
+    });
+    await fetchGitHubCiOverview('sharkdp', 'bat', HEAD);
+    await fetchGitHubCiOverview('sharkdp', 'bat', HEAD);
+    expect(calls).toHaveLength(4);
+  });
+});
+
 describe('githubCiStatus', () => {
   it.each([
     ['queued', null, 'queued'],
@@ -219,6 +272,36 @@ describe('fetchGitHubCiLog', () => {
     await fetchGitHubCiLog('sharkdp', 'bat', 108482497925, 10);
     await fetchGitHubCiLog('sharkdp', 'bat', 108482497925, 500);
     expect(calls).toHaveLength(1);
+  });
+
+  it('keeps at most eight logs', async () => {
+    const routes: Record<string, string> = {};
+    for (let id = 1; id <= 9; id++) {
+      routes[`repos/sharkdp/bat/actions/jobs/${id}/logs`] = `log ${id}\n`;
+    }
+    const calls = serveGh(routes);
+    for (let id = 1; id <= 9; id++) {
+      await fetchGitHubCiLog('sharkdp', 'bat', id, 10);
+    }
+    await fetchGitHubCiLog('sharkdp', 'bat', 9, 10);
+    expect(calls).toHaveLength(9);
+    // The first was the oldest, so it went.
+    await fetchGitHubCiLog('sharkdp', 'bat', 1, 10);
+    expect(calls).toHaveLength(10);
+  });
+
+  it('keeps no more than 64 MiB of logs', async () => {
+    const big = `${'x'.repeat(40 * 1024 * 1024)}\n`;
+    const calls = serveGh({
+      'repos/sharkdp/bat/actions/jobs/1/logs': big,
+      'repos/sharkdp/bat/actions/jobs/2/logs': big,
+    });
+    await fetchGitHubCiLog('sharkdp', 'bat', 1, 1);
+    await fetchGitHubCiLog('sharkdp', 'bat', 2, 1);
+    await fetchGitHubCiLog('sharkdp', 'bat', 2, 1);
+    expect(calls).toHaveLength(2);
+    await fetchGitHubCiLog('sharkdp', 'bat', 1, 1);
+    expect(calls).toHaveLength(3);
   });
 
   it('names the gh version it needs when the flag is unknown', async () => {

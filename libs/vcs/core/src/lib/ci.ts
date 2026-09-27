@@ -73,6 +73,12 @@ export interface CiPipeline extends CiTiming {
   name: string;
   status: CiStatus;
   url: string | null;
+  /** The provider's own run label: GitHub's run number, Azure's build
+   *  number. Tells two runs of one pipeline apart. */
+  number: string | null;
+  /** GitHub's run attempt; null where the provider counts attempts per
+   *  job rather than per run (Azure). */
+  attempt: number | null;
   /** What started it: `pull_request`, `push`, `pullRequest`, … */
   event: string | null;
   /** The commit it ran against: GitHub's head, Azure's merge commit. */

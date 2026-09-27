@@ -55,8 +55,6 @@ export const TTL = {
   description: 5 * 60_000,
   /** Who we are, which teams we are in, and the repository's id. */
   identity: 30 * 60_000,
-  /** A build's timeline and log list, read while the CI page is open. */
-  ci: 10_000,
 } as const;
 
 const cache = new RequestCache({ providerId: PROVIDER_ID });

@@ -101,6 +101,8 @@ describe('fetchAdoCiOverview', () => {
     expect(build).toMatchObject({
       id: '1613631',
       name: 'maui-pr',
+      number: '20260926.26',
+      attempt: null,
       status: 'failed',
       event: 'pullRequest',
       commit: '924c709ae68f3e564baea4fa343be8ab12886c86',

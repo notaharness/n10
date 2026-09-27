@@ -12,7 +12,14 @@ import {
 import type { AdoConfig } from './client.js';
 import { authHeaders } from './client.js';
 import { buildsUrl, fetchRepositoryId, prMergeRef } from './builds.js';
-import { adoGet, adoGetText, TTL } from './request.js';
+import { adoGet, adoGetText } from './request.js';
+
+/**
+ * Concurrent reads share one request; nothing is kept. The page polls
+ * no faster than a builds answer changes, and a store keyed by build
+ * would grow with every build ever opened.
+ */
+const DEDUPE_ONLY = 0;
 
 /**
  * Azure Pipelines for one pull request: the newest build of each
@@ -23,6 +30,7 @@ import { adoGet, adoGetText, TTL } from './request.js';
 
 interface AdoBuild {
   id: number;
+  buildNumber?: string | null;
   status?: string;
   result?: string | null;
   reason?: string | null;
@@ -176,6 +184,30 @@ function mapStage(ctx: TimelineContext, stage: AdoTimelineRecord): CiStage {
   };
 }
 
+/**
+ * A build's stages. A classic pipeline has phases at the top and no
+ * stages: they are the build's own, in one unnamed stage that carries
+ * the build's status and times.
+ */
+function buildStages(
+  ctx: TimelineContext,
+  build: Omit<CiStage, 'id' | 'name' | 'jobs'>
+): CiStage[] {
+  const stages = ofType(ctx, null, 'Stage');
+  const topPhases = ofType(ctx, null, 'Phase');
+  if (stages.length > 0 || topPhases.length === 0) {
+    return stages.map((s) => mapStage(ctx, s));
+  }
+  return [
+    {
+      ...build,
+      id: `${ctx.buildId}:phases`,
+      name: null,
+      jobs: topPhases.flatMap((p) => phaseJobs(ctx, p)),
+    },
+  ];
+}
+
 export function mapBuild(
   build: AdoBuild,
   records: readonly AdoTimelineRecord[]
@@ -185,36 +217,21 @@ export function mapBuild(
     url: build._links?.web?.href ?? null,
     children: childrenByParent(records),
   };
-  const status = adoBuildStatus(build);
-  const startedAt = build.startTime ?? null;
-  const completedAt = build.finishTime ?? null;
-  const stageRecords = ofType(ctx, null, 'Stage');
-  // A classic pipeline has phases at the top and no stages: they are
-  // the build's, in one unnamed stage.
-  const topPhases = ofType(ctx, null, 'Phase');
-  const stages =
-    stageRecords.length > 0 || topPhases.length === 0
-      ? stageRecords.map((s) => mapStage(ctx, s))
-      : [
-          {
-            id: `${build.id}:phases`,
-            name: null,
-            status,
-            startedAt,
-            completedAt,
-            jobs: topPhases.flatMap((p) => phaseJobs(ctx, p)),
-          },
-        ];
+  const own = {
+    status: adoBuildStatus(build),
+    startedAt: build.startTime ?? null,
+    completedAt: build.finishTime ?? null,
+  };
   return {
+    ...own,
     id: String(build.id),
     name: build.definition?.name ?? `Build ${build.id}`,
-    status,
     url: ctx.url,
+    number: build.buildNumber ?? null,
+    attempt: null,
     event: build.reason ?? null,
     commit: build.sourceVersion ?? null,
-    startedAt,
-    completedAt,
-    stages,
+    stages: buildStages(ctx, own),
   };
 }
 
@@ -248,7 +265,7 @@ export async function fetchAdoCiOverview(
   const builds = await adoGet<{ value?: AdoBuild[] }>(
     'fetchAdoCiOverview',
     cacheKey(config, 'builds', prId),
-    TTL.ci,
+    DEDUPE_ONLY,
     buildsUrl(
       config,
       `branchName=${encodeURIComponent(prMergeRef(prId))}` +
@@ -265,7 +282,7 @@ export async function fetchAdoCiOverview(
       const timeline = await adoGet<{ records?: AdoTimelineRecord[] } | null>(
         'fetchAdoCiTimeline',
         cacheKey(config, 'timeline', build.id),
-        TTL.ci,
+        DEDUPE_ONLY,
         `${buildApi(config, `${build.id}/timeline`)}?api-version=7.1`,
         headers,
         `the timeline of build ${build.id}`
@@ -287,7 +304,7 @@ export async function fetchAdoCiLog(
   const logs = await adoGet<{ value?: { id: number; lineCount?: number }[] }>(
     'fetchAdoCiLogs',
     cacheKey(config, 'logs', buildId),
-    TTL.ci,
+    DEDUPE_ONLY,
     `${buildApi(config, `${buildId}/logs`)}?api-version=7.1`,
     headers,
     `the logs of build ${buildId}`
