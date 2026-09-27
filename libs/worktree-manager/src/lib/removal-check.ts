@@ -3,6 +3,8 @@
  * branches and a rebase in progress are refused outright; everything
  * else that would be lost is a risk the user may choose to take.
  */
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { log } from '@n10/logger';
 import { exec, gitOptions } from './exec.js';
 import { refuseRemote, type Machine } from './machine.js';
@@ -11,12 +13,12 @@ import { worktreeDir } from './worktree-resolver.js';
 import { listWorktrees } from './worktree-list.js';
 
 /** Work that removal loses. `git worktree remove` needs `--force` for
- *  uncommitted changes and populated submodules; unpushed commits go
- *  with `git branch -D`. */
+ *  uncommitted changes and submodules; unpushed commits go with
+ *  `git branch -D`. */
 export type RemovalRisk =
   | 'uncommitted changes'
   | 'not pushed to upstream'
-  | 'populated submodules';
+  | 'submodules';
 
 export interface BranchRemovalAssessment {
   /** Why removal is refused whatever the user says, if it is. */
@@ -73,9 +75,7 @@ export async function assessBranchRemoval(
   if (!confirmedMerged && (await hasUnpushedCommits(branch, cwd))) {
     risks.push('not pushed to upstream');
   }
-  if (await hasPopulatedSubmodules(dir, branch)) {
-    risks.push('populated submodules');
-  }
+  if (await hasSubmodules(dir, branch)) risks.push('submodules');
   return { refusal: null, risks };
 }
 
@@ -140,21 +140,30 @@ async function hasUnpushedCommits(
 }
 
 /**
- * Whether the checkout at `dir` has a submodule checked out. Git will
- * not remove such a worktree without `--force`, which also takes any
- * work inside the submodule. A failure answers "no", as above; git
- * then refuses the unforced removal itself.
+ * Whether git will refuse to remove the checkout at `dir` for its
+ * submodules without `--force`, which also takes any work inside them.
+ * The same test git makes (`validate_no_submodules`): the worktree's
+ * own `modules` directory exists, or a gitlink in its index has a
+ * checkout. A failure answers "no", as above; git then refuses the
+ * unforced removal itself.
  */
-async function hasPopulatedSubmodules(
-  dir: string,
-  branch: string
-): Promise<boolean> {
+async function hasSubmodules(dir: string, branch: string): Promise<boolean> {
   try {
-    const { stdout } = await exec(
-      `git -C "${dir}" submodule foreach --quiet pwd`,
+    const { stdout: modules } = await exec(
+      `git -C "${dir}" rev-parse --path-format=absolute --git-path modules`,
       { encoding: 'utf8' }
     );
-    return stdout.trim().length > 0;
+    if (existsSync(modules.trim())) return true;
+    // Gitlinks only: the whole index would overflow exec's buffer in a
+    // large repository.
+    const { stdout: gitlinks } = await exec(
+      `git -C "${dir}" ls-files --stage | grep '^160000' || true`,
+      { encoding: 'utf8' }
+    );
+    return gitlinks
+      .split('\n')
+      .map((line) => line.slice(line.indexOf('\t') + 1))
+      .some((path) => path && existsSync(join(dir, path, '.git')));
   } catch (e) {
     log('warn', 'canRemoveBranch', `submodule check failed for ${branch}`, e);
     return false;

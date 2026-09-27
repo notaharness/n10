@@ -530,11 +530,29 @@ describe('assessBranchRemoval', () => {
     });
   });
 
+  // Git's own test: a gitlink with a checkout, or the worktree's own
+  // `modules` directory (left behind by `git rm` or `submodule deinit`).
   it('reports a checked-out submodule, which git only removes by force', async () => {
-    answers({ 'submodule foreach': '/wt/feature-busy/vendor/lib\n' });
+    answers({
+      "grep '^160000'": '160000 abc123 0\tvendor/lib\n',
+    });
+    mockExistsSync.mockImplementation((p) =>
+      String(p).endsWith('/vendor/lib/.git')
+    );
     expect(await assessBranchRemoval('feature/busy')).toEqual({
       refusal: null,
-      risks: ['populated submodules'],
+      risks: ['submodules'],
+    });
+  });
+
+  it('reports the modules directory a removed submodule leaves behind', async () => {
+    answers({ '--git-path modules': '/repo/.git/worktrees/busy/modules\n' });
+    mockExistsSync.mockImplementation(
+      (p) => p === '/repo/.git/worktrees/busy/modules'
+    );
+    expect(await assessBranchRemoval('feature/busy')).toEqual({
+      refusal: null,
+      risks: ['submodules'],
     });
   });
 
