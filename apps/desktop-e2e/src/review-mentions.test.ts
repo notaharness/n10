@@ -150,4 +150,18 @@ test.describe('Mentions', () => {
       '@alex @z\n@sam'
     );
   });
+
+  test('the list floats over the page: one click on a button below it acts', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    const box = await openComposer(page);
+    const list = page.getByRole('listbox', { name: 'People to mention' });
+    await box.pressSequentially('cc @sa');
+    await expect(list.getByRole('option')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Keep as draft' }).click();
+    await expect(page.locator('[data-my-draft="general"]')).toContainText(
+      'cc @sa'
+    );
+  });
 });
