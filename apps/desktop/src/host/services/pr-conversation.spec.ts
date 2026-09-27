@@ -25,7 +25,10 @@ const env = vi.hoisted(() => ({
 
 vi.mock('@n10/vcs-core', async (original) => ({
   ...(await original<Record<string, unknown>>()),
-  readConfig: () => ({ vendorProject: { owner: 'acme', repo: 'app' } }),
+  readConfig: () => ({
+    vendor: 'github',
+    vendorProject: { owner: 'acme', repo: 'app', username: 'bob' },
+  }),
 }));
 vi.mock('./repo.js', () => ({
   requireRepo: () => '/repo',
@@ -35,7 +38,6 @@ vi.mock('./repo.js', () => ({
     host: 'github.com',
     repository: 'acme/app',
   }),
-  configuredViewer: () => 'bob',
 }));
 vi.mock('./pull-requests.js', () => ({
   resolveProvider: () => ({
@@ -109,7 +111,7 @@ describe('getPullRequestConversation', () => {
       env.open = false;
     };
     await expect(getPullRequestConversation({ ref: REF })).rejects.toThrow(
-      /No pull request provider/
+      /no longer the repository open/
     );
   });
 

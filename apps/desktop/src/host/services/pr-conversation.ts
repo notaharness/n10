@@ -1,16 +1,13 @@
 import {
   parseSnapshotRequest,
+  PullRequestIdentityError,
   readPullRequestConversation,
   type PullRequestConversationRead,
 } from '@n10/core';
 import { readConfig } from '@n10/vcs-core';
 import { resolveProvider } from './pull-requests.js';
-import {
-  activeRepoIs,
-  configuredRepository,
-  configuredViewer,
-  requireRepo,
-} from './repo.js';
+import { activeRepoIs, configuredRepository, requireRepo } from './repo.js';
+import { configuredViewer } from './viewer.js';
 
 /**
  * One pull request's whole conversation, read by identity for the
@@ -33,8 +30,15 @@ export async function getPullRequestConversation(
     ? provider?.fetchPullRequestConversation?.bind(provider)
     : undefined;
   return readPullRequestConversation(req, {
-    repository: () =>
-      activeRepoIs(cwd) ? configuredRepository(readConfig(cwd)) : null,
+    // Read afresh on every check, as the snapshot does.
+    repository: () => {
+      if (!activeRepoIs(cwd)) {
+        throw new PullRequestIdentityError(
+          `${cwd} is no longer the repository open in n10`
+        );
+      }
+      return configuredRepository(readConfig(cwd));
+    },
     viewer: () => configuredViewer(readConfig(cwd)),
     conversation: read && ((prId) => read(auth, project, prId)),
   });
