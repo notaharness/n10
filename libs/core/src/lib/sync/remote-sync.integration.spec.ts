@@ -111,7 +111,7 @@ describe('syncRemote', () => {
     expect(git(b.clone, 'rev-parse', 'master')).toBe(pushed);
   });
 
-  it('never moves main off commits origin does not have', async () => {
+  it('never moves a diverged main off commits origin does not have', async () => {
     const b = remoteWithClone('b', 'main');
     git(b.clone, 'switch', '-q', 'main');
     const unpushed = commit(b.clone, 'unpushed');
@@ -123,5 +123,17 @@ describe('syncRemote', () => {
     await syncRemote(b.clone);
 
     expect(git(b.clone, 'rev-parse', 'main')).toBe(unpushed);
+  });
+
+  it('leaves a repository without a local main without one', async () => {
+    const b = remoteWithClone('b', 'main');
+    git(b.clone, 'branch', '-q', '-D', 'main');
+    commit(b.seed, 'pushed');
+    git(b.seed, 'push', '-q', 'origin', 'main');
+    process.chdir(b.clone);
+
+    await syncRemote(b.clone);
+
+    expect(git(b.clone, 'branch', '--list', 'main')).toBe('');
   });
 });

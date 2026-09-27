@@ -1100,11 +1100,13 @@ describe('getMainBranch', () => {
 describe('fastForwardMainBranch', () => {
   const LOCAL_FF =
     'git fetch --no-write-fetch-head . "refs/remotes/origin/master:refs/heads/master"';
+  const notAncestor = Object.assign(new Error('not an ancestor'), { code: 1 });
 
   it('fast-forwards through a local fetch when HEAD is not on main', async () => {
     mockExec
       .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
       .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
+      .mockRejectedValueOnce(notAncestor) // merge-base --is-ancestor
       .mockResolvedValueOnce(resolve()); // local fetch
     expect(await fastForwardMainBranch()).toBe(true);
     expect(mockExec).toHaveBeenLastCalledWith(LOCAL_FF, { encoding: 'utf8' });
@@ -1126,19 +1128,39 @@ describe('fastForwardMainBranch', () => {
     mockExec
       .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
       .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
+      .mockRejectedValueOnce(notAncestor) // merge-base --is-ancestor
       .mockResolvedValueOnce(resolve()); // local fetch
     await fastForwardMainBranch('/repo-b');
-    expect(mockExec.mock.calls.map((call) => call[1])).toEqual([
-      { encoding: 'utf8', cwd: '/repo-b' },
-      { encoding: 'utf8', cwd: '/repo-b' },
-      { encoding: 'utf8', cwd: '/repo-b' },
-    ]);
+    expect(mockExec.mock.calls.map((call) => call[1])).toEqual(
+      Array(4).fill({ encoding: 'utf8', cwd: '/repo-b' })
+    );
+  });
+
+  it('succeeds without an update when main already contains origin', async () => {
+    mockExec
+      .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
+      .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
+      .mockResolvedValueOnce(resolve()); // merge-base --is-ancestor
+    expect(await fastForwardMainBranch()).toBe(true);
+    expect(mockExec).toHaveBeenCalledTimes(3);
+  });
+
+  it('creates no main when the repository has none', async () => {
+    mockExec
+      .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
+      .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
+      .mockRejectedValueOnce(
+        Object.assign(new Error('bad ref'), { code: 128 })
+      );
+    expect(await fastForwardMainBranch()).toBe(false);
+    expect(mockExec).toHaveBeenCalledTimes(3);
   });
 
   it('returns false when git refuses the update', async () => {
     mockExec
       .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
       .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
+      .mockRejectedValueOnce(notAncestor) // merge-base --is-ancestor
       .mockRejectedValueOnce(new Error('non-fast-forward'));
     expect(await fastForwardMainBranch()).toBe(false);
   });
@@ -1147,6 +1169,7 @@ describe('fastForwardMainBranch', () => {
     mockExec
       .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
       .mockRejectedValueOnce(new Error('not a symbolic ref')) // detached
+      .mockRejectedValueOnce(notAncestor) // merge-base --is-ancestor
       .mockResolvedValueOnce(resolve()); // local fetch
     expect(await fastForwardMainBranch()).toBe(true);
     expect(mockExec).toHaveBeenLastCalledWith(LOCAL_FF, { encoding: 'utf8' });

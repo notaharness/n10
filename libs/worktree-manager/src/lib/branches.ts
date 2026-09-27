@@ -135,12 +135,13 @@ export async function listAllBranches(): Promise<string[]> {
 /**
  * Fast-forward the local main branch of the repository at `cwd` to
  * `origin/<main>` as last fetched; the caller fetches first. Returns
- * true when main is at or was moved to origin's commit.
+ * true when main already contains origin's commit or was moved to it.
  *
  * Only ever a fast-forward. Checked out here, main moves by `merge
  * --ff-only`. Otherwise git's own local fetch updates the ref in one
  * transaction and refuses a non-fast-forward (local commits origin does
- * not have) or a branch checked out in another worktree.
+ * not have) or a branch checked out in another worktree. A repository
+ * without a local main is left without one.
  */
 export async function fastForwardMainBranch(cwd?: string): Promise<boolean> {
   const main = await getMainBranch(cwd);
@@ -153,16 +154,39 @@ export async function fastForwardMainBranch(cwd?: string): Promise<boolean> {
       ({ stdout }) => stdout.trim(),
       () => '' // detached HEAD
     );
+    if (head === main) {
+      await exec(`git merge --ff-only "origin/${main}"`, gitOptions(cwd));
+      return true;
+    }
+    const contains = await mainContainsOrigin(main, cwd);
+    if (contains !== 'no') return contains === 'yes';
     await exec(
-      head === main
-        ? `git merge --ff-only "origin/${main}"`
-        : `git fetch --no-write-fetch-head . "refs/remotes/origin/${main}:refs/heads/${main}"`,
+      `git fetch --no-write-fetch-head . "refs/remotes/origin/${main}:refs/heads/${main}"`,
       gitOptions(cwd)
     );
     return true;
   } catch (e) {
     log('warn', 'fastForwardMainBranch', `${main} not fast-forwarded`, e);
     return false;
+  }
+}
+
+/** Whether local `main` already has `origin/<main>` in its history:
+ *  `'missing'` when either ref does not exist. */
+async function mainContainsOrigin(
+  main: string,
+  cwd?: string
+): Promise<'yes' | 'no' | 'missing'> {
+  try {
+    await exec(
+      `git merge-base --is-ancestor "refs/remotes/origin/${main}" "refs/heads/${main}"`,
+      gitOptions(cwd)
+    );
+    return 'yes';
+  } catch (err: unknown) {
+    // Exit 1 is "not an ancestor"; anything else is a ref git cannot
+    // resolve.
+    return (err as { code?: number }).code === 1 ? 'no' : 'missing';
   }
 }
 
