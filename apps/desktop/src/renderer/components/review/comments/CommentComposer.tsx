@@ -5,7 +5,10 @@ import { Button } from '../../ui/button.js';
 import { Textarea } from '../../ui/textarea.js';
 import { ToggleGroup, ToggleGroupItem } from '../../ui/toggle-group.js';
 import { CommentMarkdown } from './CommentMarkdown.js';
+import { displayMentions } from '../../../lib/review/mention-query.js';
+import { mentionNames } from '../../../lib/review/mention-search.js';
 import { DraftStatus, UnsavedChoice } from './DraftStatus.js';
+import { useMentionPicker } from './MentionPicker.js';
 
 /**
  * A new comment, written as a private draft. The text is kept as it is
@@ -42,6 +45,7 @@ export function CommentComposer({
   const [mode, setMode] = useState<'write' | 'preview'>('write');
   const [confirming, setConfirming] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
+  const mentions = useMentionPicker(draft, box);
   const asked = useRef(false);
   useEffect(() => {
     if (asked.current) return;
@@ -104,6 +108,7 @@ export function CommentComposer({
         <Textarea
           ref={box}
           hidden={mode === 'preview'}
+          {...mentions.inputProps}
           aria-label="Comment"
           value={draft.body}
           onChange={(e) => draft.setBody(e.target.value)}
@@ -111,6 +116,7 @@ export function CommentComposer({
           placeholder={placeholder}
           className="min-h-24 bg-background"
         />
+        {mode === 'write' && mentions.list}
         {mode === 'preview' && (
           <div className="min-h-24 rounded-md border border-border bg-background px-3 py-2">
             {empty ? (
@@ -118,7 +124,9 @@ export function CommentComposer({
                 Nothing to preview.
               </p>
             ) : (
-              <CommentMarkdown markdown={draft.body} />
+              <CommentMarkdown
+                markdown={displayMentions(draft.body, mentionNames)}
+              />
             )}
           </div>
         )}

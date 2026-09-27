@@ -63,7 +63,12 @@ beforeEach(() => {
 describe('searchMentionCandidates', () => {
   it('searches the provider with its credentials for the query', async () => {
     const found = await searchMentionCandidates({ ref: REF, query: 'al' });
-    expect(found).toEqual({ ref: REF, query: 'al', candidates: [ALICE] });
+    expect(found).toEqual({
+      ref: REF,
+      viewer: 'bob',
+      query: 'al',
+      candidates: [ALICE],
+    });
     expect(env.asked).toEqual([
       [{ token: 't' }, { owner: 'acme', repo: 'app' }, 'al'],
     ]);

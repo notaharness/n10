@@ -33,6 +33,8 @@ const isEditable = (d: ReviewDraft) =>
 export type { SaveState } from './draft-edits.js';
 
 export interface DurableDraft {
+  /** The pull request it is written on; null when there is none. */
+  ref: PullRequestRef | null;
   body: string;
   setBody: (body: string) => void;
   save: SaveState;
@@ -205,6 +207,7 @@ export function useReviewDraft(
   };
 
   return {
+    ref,
     body,
     setBody,
     save: edit?.save ?? { kind: 'idle' },

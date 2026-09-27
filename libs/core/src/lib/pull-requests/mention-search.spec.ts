@@ -32,7 +32,12 @@ describe('searchMentions', () => {
         },
       })
     );
-    expect(found).toEqual({ ref: REF, query: 'al', candidates: [ALICE] });
+    expect(found).toEqual({
+      ref: REF,
+      viewer: 'bob',
+      query: 'al',
+      candidates: [ALICE],
+    });
     expect(asked).toEqual(['al']);
   });
 

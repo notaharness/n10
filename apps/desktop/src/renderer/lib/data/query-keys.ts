@@ -74,6 +74,22 @@ export const keys = {
       ref?.id ?? null,
       viewer,
     ] as const,
+  /** People a comment on one pull request can mention, by what was
+   *  typed after `@`. Keyed like `prSnapshot`. */
+  mentions: (
+    cwd: string,
+    ref: PullRequestRef,
+    viewer: string | null,
+    query: string
+  ) =>
+    [
+      'mentions',
+      cwd,
+      pullRequestKey(ref),
+      ref.id ?? null,
+      viewer,
+      query.toLowerCase(),
+    ] as const,
   activity: (cwd: string) => ['session-activity', cwd] as const,
   commentImage: (url: string) => ['comment-image', url] as const,
   drafts: (cwd: string, prId: number) => ['drafts', cwd, prId] as const,

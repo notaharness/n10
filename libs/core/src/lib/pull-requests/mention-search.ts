@@ -20,6 +20,8 @@ export interface MentionSearchRequest extends SnapshotRequest {
  */
 export interface MentionSearch {
   ref: PullRequestRef;
+  /** The account the search was asked as. */
+  viewer: string | null;
   query: string;
   candidates: MentionCandidate[];
 }
@@ -51,5 +53,5 @@ export async function searchMentions(
   }
   const candidates = await src.search(req.query);
   assertSameContext({ ...req, viewer }, src);
-  return { ref: req.ref, query: req.query, candidates };
+  return { ref: req.ref, viewer, query: req.query, candidates };
 }
