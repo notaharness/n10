@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
 import {
@@ -9,6 +10,7 @@ import {
   tabs,
   visibleText,
 } from './setup/app.js';
+import { fixtureTmux } from './setup/lifecycle.js';
 import { listTaggedSessions } from './setup/tmux.js';
 import {
   addExternalWorktree,
@@ -84,10 +86,32 @@ test('discovers an external agent on a detached HEAD', async ({ desktop }) => {
     timeout: 15_000,
   });
   await sidebarRow(page, /detached-agent/).click();
-  test.fail(true, 'https://github.com/notaharness/n10/issues/209');
   await expect(visibleText(page, 'detached-agent-ready')).toBeVisible({
     timeout: 15_000,
   });
+});
+
+test('launches and relaunches an agent in a detached checkout', async ({
+  desktop,
+}) => {
+  const { page, repoPath, homeDir } = desktop;
+  const worktreePath = addExternalWorktree(repoPath, 'detached-launch');
+  execFileSync('git', ['checkout', '--detach'], { cwd: worktreePath });
+  execFileSync('git', ['branch', '-D', 'detached-launch'], { cwd: repoPath });
+  await sidebarRow(page, /detached-launch/).click({ timeout: 15_000 });
+  await launchAgentFromRail(page);
+  await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible();
+  const checkout = [['worktree', realpathSync(worktreePath)]];
+  const sessions = () =>
+    listTaggedSessions(homeDir).map((s) => [s.type, s.worktreePath]);
+  expect(sessions()).toEqual(checkout);
+  const [first] = listTaggedSessions(homeDir);
+  fixtureTmux(homeDir, 'kill-session', '-t', `=${first.name}:`);
+  await expect(
+    page.getByRole('button', { name: /Relaunch agent/i })
+  ).toBeVisible({ timeout: 15_000 });
+  await launchAgentFromRail(page);
+  await expect.poll(sessions, { timeout: 15_000 }).toEqual(checkout);
 });
 
 test('external worktrees respect the configured discovery directory', async ({

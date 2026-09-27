@@ -58,7 +58,8 @@ export function createHostApi(): N10HostApi {
     createWorktree: (branch) => worktrees.createWorktree(branch),
     removeWorktree: (branch, force) => worktrees.removeWorktree(branch, force),
     canRemoveBranch: (branch) => worktrees.canRemoveBranch(branch),
-    openInEditor: (branch) => worktrees.openInEditor(branch),
+    openInEditor: (branch, worktree) =>
+      worktrees.openInEditor(branch, worktree),
 
     fetchPullRequests: () => reviews.fetchPullRequests(),
     fetchCommentThreads: (prId) => reviews.fetchCommentThreads(prId),
@@ -79,8 +80,8 @@ export function createHostApi(): N10HostApi {
 
     launchAgent: (req) => sessions.launchAgent(req),
     launchReviewAgent: (req) => sessions.launchReviewAgent(req),
-    getSessionLaunchContext: (branch) =>
-      sessions.getSessionLaunchContext(branch),
+    getSessionLaunchContext: (branch, worktree) =>
+      sessions.getSessionLaunchContext(branch, worktree),
     listAgentOptions: () => Promise.resolve(sessions.listAgentOptions()),
     checkoutPlan: (req) => sessions.checkoutPlan(req),
     listSessions: () => Promise.resolve(sessions.listSessions()),
@@ -112,8 +113,8 @@ export function createHostApi(): N10HostApi {
 
     fetchDiffText: (sourceBranch, targetBranch) =>
       reviews.getDiffText(sourceBranch, targetBranch),
-    fetchWorktreeDiffText: (branch, targetBranch) =>
-      worktrees.getWorktreeDiffText(branch, targetBranch),
+    fetchWorktreeDiffText: (branch, targetBranch, worktree) =>
+      worktrees.getWorktreeDiffText(branch, targetBranch, worktree),
     fetchFileDiffText: (sourceBranch, targetBranch, file) =>
       reviews.getFileDiffText(sourceBranch, targetBranch, file),
 

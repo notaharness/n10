@@ -50,7 +50,8 @@ const api: N10HostApi = {
   removeWorktree: (branch, force) =>
     ipcRenderer.invoke(IPC.removeWorktree, branch, force),
   canRemoveBranch: (branch) => ipcRenderer.invoke(IPC.canRemoveBranch, branch),
-  openInEditor: (branch) => ipcRenderer.invoke(IPC.openInEditor, branch),
+  openInEditor: (branch, worktree) =>
+    ipcRenderer.invoke(IPC.openInEditor, branch, worktree),
 
   fetchPullRequests: () => ipcRenderer.invoke(IPC.fetchPullRequests),
   fetchCommentThreads: (prId) =>
@@ -67,8 +68,8 @@ const api: N10HostApi = {
 
   launchAgent: (req) => ipcRenderer.invoke(IPC.launchAgent, req),
   launchReviewAgent: (req) => ipcRenderer.invoke(IPC.launchReviewAgent, req),
-  getSessionLaunchContext: (branch) =>
-    ipcRenderer.invoke(IPC.getSessionLaunchContext, branch),
+  getSessionLaunchContext: (branch, worktree) =>
+    ipcRenderer.invoke(IPC.getSessionLaunchContext, branch, worktree),
   listAgentOptions: () => ipcRenderer.invoke(IPC.listAgentOptions),
   checkoutPlan: (req) => ipcRenderer.invoke(IPC.checkoutPlan, req),
   listSessions: () => ipcRenderer.invoke(IPC.listSessions),
@@ -111,8 +112,13 @@ const api: N10HostApi = {
 
   fetchDiffText: (sourceBranch, targetBranch) =>
     ipcRenderer.invoke(IPC.fetchDiffText, sourceBranch, targetBranch),
-  fetchWorktreeDiffText: (branch, targetBranch) =>
-    ipcRenderer.invoke(IPC.fetchWorktreeDiffText, branch, targetBranch),
+  fetchWorktreeDiffText: (branch, targetBranch, worktree) =>
+    ipcRenderer.invoke(
+      IPC.fetchWorktreeDiffText,
+      branch,
+      targetBranch,
+      worktree
+    ),
   fetchFileDiffText: (sourceBranch, targetBranch, file) =>
     ipcRenderer.invoke(IPC.fetchFileDiffText, sourceBranch, targetBranch, file),
 

@@ -52,6 +52,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - Pasted images are written under the OS temp dir
   (`services/clipboard-image.ts`), suffix from the host's own MIME table, and
   the path is typed into the PTY.
+- A worktree row's actions (launch, launch menu, worktree diff, editor)
+  send the row's checkout key; `services/worktree-target.ts` resolves it only
+  against Git's listing. A detached HEAD has no branch, and its label is not
+  an address.
 - Worktree removal shares core's sequence with the TUI. `stopSession` kills
   one held target or one resolved persisted target, never both.
 

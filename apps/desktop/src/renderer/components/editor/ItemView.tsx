@@ -11,6 +11,7 @@ import { useReconnectSession } from '../../lib/data/mutations-terminals.js';
 import { resolveMachineLabel } from '../../lib/machines/machine-model.js';
 import {
   itemBranch,
+  itemCheckoutKey,
   itemHasWorktree,
   itemRunning,
   itemSessionName,
@@ -42,6 +43,11 @@ import { useItemLaunch } from './use-item-launch.js';
  * a pull request.
  */
 
+/** The checkout key of whichever of the two rows has the checkout. */
+function rowCheckoutKey(item: SidebarItem, sessionRow?: SidebarItem) {
+  return itemCheckoutKey(item) ?? (sessionRow && itemCheckoutKey(sessionRow));
+}
+
 /**
  * A branch can hold two sidebar rows — the pull request, and the
  * worktree that actually owns the agent session. The tab may have been
@@ -66,6 +72,7 @@ function resolveItemState(
     running:
       itemRunning(item) || (sessionRow ? itemRunning(sessionRow) : false),
     hasWorktree: Boolean(rowSessionName) || itemHasWorktree(item),
+    worktree: rowCheckoutKey(item, sessionRow),
     pr: item.pr ?? sessionRow?.pr,
     // The pane's connection banner (ux-machines.md §6) — independent of
     // `running` above, which is processState only (decisions.md D4).
@@ -101,6 +108,7 @@ function launchTarget(branch: string, state: ItemState | undefined) {
   return {
     branch,
     hasWorktree: state?.hasWorktree ?? false,
+    worktree: state?.worktree,
     pr: state?.pr,
     sessionName: state?.sessionName,
   };
@@ -260,6 +268,7 @@ export function ItemView({
       sessionEpoch: 0,
       running: false,
       hasWorktree: false,
+      worktree: undefined,
       pr: undefined,
       connectionState: undefined,
       machine: undefined,
@@ -267,7 +276,8 @@ export function ItemView({
   );
 
   if (!item || !state) return <Preparing itemKey={itemKey} />;
-  const { sessionName, sessionEpoch, running, hasWorktree, pr } = state;
+  const { sessionName, sessionEpoch, running, hasWorktree, worktree, pr } =
+    state;
 
   const onLaunchClick = () => {
     onPin();
@@ -290,6 +300,7 @@ export function ItemView({
     <LaunchDialog
       pr={pr}
       branch={branch}
+      worktree={worktree}
       hasWorktree={hasWorktree}
       cwd={repo.cwd}
       busy={busy}
@@ -332,6 +343,7 @@ export function ItemView({
       {hasWorktree ? (
         <PrWorkspace
           branch={branch}
+          worktree={worktree}
           baseBranch={baseBranch}
           sessionName={sessionName}
           sessionEpoch={sessionEpoch}

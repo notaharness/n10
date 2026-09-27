@@ -86,6 +86,12 @@ export function itemWorktree(item: SidebarItem): string | undefined {
   return item.kind === 'session' ? item.session.path : undefined;
 }
 
+/** The session key of an item's checkout — only a worktree row has
+ *  one. What the host acts on for the row, whatever its HEAD is. */
+export function itemCheckoutKey(item: SidebarItem): string | undefined {
+  return item.kind === 'session' ? item.session.name : undefined;
+}
+
 /** PTY session name for an item — the worktree session, or (for PR
  *  items) the alive review session the host attached to it. */
 export function itemSessionName(item: SidebarItem): string | undefined {

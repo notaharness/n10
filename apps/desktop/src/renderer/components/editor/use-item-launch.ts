@@ -21,6 +21,10 @@ import { reviewLaunchRequest, sessionLaunchRequest } from './launch-request.js';
 export interface LaunchTarget {
   branch: string;
   hasWorktree: boolean;
+  /** The session key of the row's checkout, when it has one. A launch
+   *  names it so the agent starts in that checkout whatever its HEAD
+   *  is: a detached HEAD has no branch to find it by. */
+  worktree: string | undefined;
   pr: PullRequestInfo | undefined;
   sessionName: string | undefined;
 }
@@ -53,7 +57,7 @@ export function useItemLaunch(
   const create = useCreateWorktree(cwd);
   const progress = useLaunchProgress();
   const [remoteError, setRemoteError] = useState<string | null>(null);
-  const { branch, hasWorktree, pr, sessionName } = target;
+  const { branch, hasWorktree, worktree, pr, sessionName } = target;
 
   const startSession = async (
     fresh: boolean,
@@ -74,15 +78,18 @@ export function useItemLaunch(
     const launchId = machine ? progress.start() : undefined;
     if (machine) setRemoteError(null);
     launch.mutate(
-      sessionLaunchRequest(
-        branch,
-        fresh,
-        estimateGrid(),
-        expected,
-        agentId,
-        machine,
-        launchId
-      ),
+      {
+        ...sessionLaunchRequest(
+          branch,
+          fresh,
+          estimateGrid(),
+          expected,
+          agentId,
+          machine,
+          launchId
+        ),
+        ...(worktree ? { worktree } : {}),
+      },
       {
         onSuccess: () => {
           if (!machine) return;

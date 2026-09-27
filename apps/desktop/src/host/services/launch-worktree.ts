@@ -8,6 +8,7 @@ import type { SessionLaunchRequest } from '../contract.js';
 import { refuseIfRemoteOwns } from './plan-remote-owner.js';
 import { machineFor } from './remote-machines.js';
 import { broadcastLaunchStep } from './session-relay.js';
+import { findWorktreeTarget } from './worktree-target.js';
 
 /**
  * The steps of a worktree agent launch before anything starts: the
@@ -25,6 +26,26 @@ export function noteLaunchStep(
   if (req.machine && req.launchId) {
     broadcastLaunchStep({ launchId: req.launchId, step });
   }
+}
+
+/** The row checkout a launch names, unless it launches on another
+ *  machine, where the checkout is that machine's for the branch. */
+export function rowWorktree(req: SessionLaunchRequest): string | undefined {
+  return req.machine ? undefined : req.worktree;
+}
+
+/** The checkout the launch was told about: discovery's, or the row's.
+ *  Either is used as is, whatever branch its HEAD is on. */
+export async function knownCheckout(
+  req: SessionLaunchRequest,
+  repoCwd: string,
+  discovered?: string
+): Promise<string | undefined> {
+  const worktree = rowWorktree(req);
+  if (discovered || !worktree) return discovered;
+  const wt = await findWorktreeTarget(repoCwd, req.branch, worktree);
+  if (!wt) throw new Error(`The worktree for ${req.branch} is gone`);
+  return wt.path;
 }
 
 /** Refuse a local launch a fleet member already owns — before any

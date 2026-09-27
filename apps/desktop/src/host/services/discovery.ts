@@ -28,19 +28,10 @@ export function setDiscoveryNotifier(fn: (() => void) | null): void {
 }
 
 async function attach(worktree: DiscoveredWorktree): Promise<void> {
-  // The session is keyed by its checkout, but the desktop's rows and
-  // tabs for a worktree still name it by branch — a launch request, an
-  // item key — and a detached HEAD has none, so its agent is left to
-  // the TUI. Thrown rather than skipped so the scanner stops offering
-  // it every tick.
-  if (!worktree.branch) {
-    throw new Error(
-      `Cannot attach to ${worktree.name}: the worktree has no branch checked out`
-    );
-  }
-  // The scanner already resolved the checkout from git; handing it over
-  // is what lets a worktree in a non-canonical directory be attached to
-  // at all, since `createWorktree` would otherwise re-derive the path
+  // The scanner already resolved the checkout from git, and the session
+  // is keyed by that checkout: handing it over is what attaches a
+  // worktree in a non-canonical directory, or on a detached HEAD with
+  // no branch at all, where `createWorktree` would re-derive a path
   // from the branch name and miss it.
   await launchAgent(
     { branch: worktree.branch, intent: 'continue-or-blank' },

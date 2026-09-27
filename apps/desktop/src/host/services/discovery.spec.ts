@@ -187,16 +187,14 @@ describe('startDiscoveryForRepo', () => {
     ]);
   });
 
-  // The desktop is branch-keyed from the worktree it resolves down to
-  // the tab it opens, so a detached-HEAD orphan has nothing to key on.
-  // Rejecting (rather than quietly skipping) is what stops the scanner
-  // offering it again on every tick.
-  it('rejects a worktree with no branch instead of skipping it', async () => {
+  // The session is keyed by its checkout, so a detached HEAD, with no
+  // branch to resolve a worktree from, is attached where git found it.
+  it('attaches a worktree on a detached HEAD by its checkout', async () => {
     discovery.startDiscoveryForRepo('/repo-a');
-    await expect(
-      opts().adopt({ name: 'detached', branch: '', path: '/wt/detached' })
-    ).rejects.toThrow('no branch checked out');
-    expect(state.spawns).toEqual([]);
+    const path = checkoutPath('detached');
+    await opts().adopt({ name: keyFor('detached'), branch: '', path });
+    expect(state.spawns).toEqual([{ name: keyFor('detached'), cwd: path }]);
+    expect(state.createWorktreeCalls).toEqual([]);
   });
 
   // `createWorktree` resolves a directory from the branch name, so a

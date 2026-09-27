@@ -100,6 +100,13 @@ vi.mock('@n10/worktree-manager', () => ({
     }
     return Promise.resolve(addCheckout(branch, cwd));
   },
+  listWorktrees: (repo: string) =>
+    Promise.resolve(
+      [...state.worktrees].flatMap(([key, path]) => {
+        const [owner, branch] = key.split('\0');
+        return owner === repo ? [{ path, branch }] : [];
+      })
+    ),
 }));
 
 vi.mock('./remote-machines.js', () => ({
@@ -118,6 +125,7 @@ vi.mock('@n10/core', async (importOriginal) => {
   const actual = await importOriginal<typeof CoreModule>();
   return {
     worktreeSessionKey: actual.worktreeSessionKey,
+    keyForWorktree: actual.keyForWorktree,
     sessionLabel: actual.sessionLabel,
     sessionIdentity: actual.sessionIdentity,
     LOCAL_MACHINE: actual.LOCAL_MACHINE,
@@ -357,6 +365,37 @@ describe('launchAgent', () => {
     expect(state.spawns[0].name).toBe(keyFor('feature/x', '/repo-a'));
     expect(state.spawns[0].cwd).toBe('/repo-a/.claude/worktrees/feature/x');
     expect(state.spawns[0].config).toEqual({ marker: 'root-config' });
+  });
+
+  // A detached HEAD has no branch to resolve a checkout from; the row
+  // names its checkout by key, and only a checkout git lists answers.
+  it('launches in the checkout a row key names, whatever its HEAD is', async () => {
+    const path = addCheckout('');
+    const worktree = worktreeSessionKey(path, '/repo-a');
+    await launchAgent({
+      branch: 'detached-dir',
+      worktree,
+      intent: 'continue-or-blank',
+    });
+    expect(state.spawns.map((s) => [s.name, s.cwd])).toEqual([
+      [worktree, path],
+    ]);
+    expect(state.createWorktreeCalls).toEqual([]);
+  });
+
+  it('refuses a row key git does not list', async () => {
+    await expect(
+      launchAgent({
+        branch: 'gone',
+        worktree: worktreeSessionKey(
+          checkoutPath('gone', '/repo-a'),
+          '/repo-a'
+        ),
+        intent: 'continue-or-blank',
+      })
+    ).rejects.toThrow('The worktree for gone is gone');
+    expect(state.spawns).toEqual([]);
+    expect(state.createWorktreeCalls).toEqual([]);
   });
 
   it('creates the worktree on the named machine and keys the session with it (D2, D5)', async () => {
