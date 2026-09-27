@@ -9,7 +9,7 @@ import { contentKey } from '../content-key.js';
 import { loadDesktopPrefs } from '../desktop-prefs.js';
 import { parseDiffInWorker } from '../diff/diff-worker-client.js';
 import { measured } from '../perf.js';
-import { keys, resetRepoScopedCache } from './query-keys.js';
+import { keys, resetProviderScopedCache } from './query-keys.js';
 import { errorMessage } from '../utils.js';
 import { repositoryKey } from '@n10/vcs-core/pr-details';
 import type {
@@ -65,9 +65,9 @@ function sameRepoIdentity(a: RepoInfo, b: RepoInfo): boolean {
  *
  * The provider, the repository it names and the account n10 acts as
  * all come from config, and the gate's entry is otherwise only written
- * when a repository is opened. When any of the three differs, whatever
- * is cached was read somewhere else or as someone else, so it goes, as
- * on a repository switch.
+ * when a repository is opened. When any of the three differs, what the
+ * provider answered was read somewhere else or as someone else, so it
+ * goes; the rest of the repository's cache stays.
  */
 export async function refreshRepoInfo(qc: QueryClient): Promise<void> {
   const next = await window.n10.getRepo();
@@ -75,7 +75,7 @@ export async function refreshRepoInfo(qc: QueryClient): Promise<void> {
   // The host moved to another repository meanwhile: that is the
   // gate's switch to adopt, not this.
   if (!prev || !next || prev.cwd !== next.cwd) return;
-  if (!sameRepoIdentity(prev, next)) resetRepoScopedCache(qc);
+  if (!sameRepoIdentity(prev, next)) resetProviderScopedCache(qc);
   qc.setQueryData(keys.repo, next);
 }
 

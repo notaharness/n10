@@ -216,6 +216,9 @@ describe('refreshRepoInfo', () => {
     const qc = new QueryClient();
     qc.setQueryData(keys.repo, repo);
     qc.setQueryData(keys.threads('/repo', 42), { threads: [] });
+    qc.setQueryData(keys.sidebar('/repo'), ['row']);
+    qc.setQueryData(keys.settings('/repo'), { fields: [] });
+    qc.setQueryData(keys.diff('/repo', 'undo', 'main'), 'patch');
     return qc;
   }
 
@@ -233,7 +236,7 @@ describe('refreshRepoInfo', () => {
     ],
     ['the provider', { providerId: 'azure-devops' }],
   ])(
-    'adopts a change of %s and drops what was read before it',
+    'adopts a change of %s and drops what the provider answered before it',
     async (_label, change) => {
       const next = { ...GITHUB_REPO, ...change };
       stubHost({ getRepo: () => Promise.resolve(next) });
@@ -243,14 +246,20 @@ describe('refreshRepoInfo', () => {
 
       expect(qc.getQueryData(keys.repo)).toEqual(next);
       expect(qc.getQueryData(keys.threads('/repo', 42))).toBeUndefined();
+      expect(qc.getQueryData(keys.sidebar('/repo'))).toBeUndefined();
+      // The settings page that made the change keeps its answer, and
+      // git's diff never came from the provider.
+      expect(qc.getQueryData(keys.settings('/repo'))).toEqual({ fields: [] });
+      expect(qc.getQueryData(keys.diff('/repo', 'undo', 'main'))).toBe('patch');
     }
   );
 
   it('keeps what was read when the identity is unchanged', async () => {
-    // A token saved, say: the same repository read as the same account.
+    // The same provider and repository, and the account only re-cased,
+    // which both providers treat as the same login or email.
     const next = { ...GITHUB_REPO, viewer: 'BOB' };
     stubHost({ getRepo: () => Promise.resolve(next) });
-    const qc = seeded({ ...GITHUB_REPO, vcsConfigured: false });
+    const qc = seeded(GITHUB_REPO);
 
     await refreshRepoInfo(qc);
 
