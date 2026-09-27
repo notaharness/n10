@@ -12,6 +12,7 @@ export {
   appendComment,
   updateComment,
   removeComment,
+  watchComments,
   type DraftScope,
 } from './lib/comment-store.js';
 export {

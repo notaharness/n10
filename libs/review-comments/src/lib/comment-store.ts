@@ -4,6 +4,7 @@ import {
   mkdirSync,
   renameSync,
   rmSync,
+  watch,
 } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
@@ -156,4 +157,29 @@ export function removeComment(scope: DraftScope, id: string): boolean {
     comments.splice(idx, 1);
     return true;
   });
+}
+
+/**
+ * Call `onChange` whenever a PR's drafts file may have changed, until
+ * the returned function is called.
+ *
+ * A review usually starts with no drafts at all: the agent writes the
+ * first one some time after the PR is opened. A watch on a directory
+ * that does not exist yet cannot be installed, and nothing would ever
+ * install it later, so the directory is created here first. The watch
+ * is on the directory rather than the file because writes replace the
+ * file by rename.
+ *
+ * A watcher that fails (its directory removed, say) stops reporting;
+ * its 'error' event is handled, since an unheard one would be thrown.
+ */
+export function watchComments(
+  scope: DraftScope,
+  onChange: () => void
+): () => void {
+  const dir = commentDirPath(scope);
+  mkdirSync(dir, { recursive: true });
+  const watcher = watch(dir, onChange);
+  watcher.on('error', () => watcher.close());
+  return () => watcher.close();
 }

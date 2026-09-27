@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { watch } from 'node:fs';
 import {
   readComments,
-  commentDirPath,
+  watchComments,
   type DraftScope,
   type ReviewComment,
 } from '@n10/review-comments';
@@ -22,21 +21,24 @@ export function useReviewComments(scope: DraftScope | null): ReviewComment[] {
   useEffect(() => {
     if (repo === null || prId === null) return;
 
-    const dir = commentDirPath({ repo, prId });
-    let watcher: ReturnType<typeof watch> | null = null;
-
+    const changed = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(bumpRevision, 100);
+    };
+    let unwatch: (() => void) | undefined;
     try {
-      watcher = watch(dir, () => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(bumpRevision, 100);
-      });
+      unwatch = watchComments({ repo, prId }, changed);
     } catch {
-      // Directory may not exist yet
+      // No watch (the reviews directory cannot be created): the drafts
+      // still show, just not live.
     }
+    // The drafts were read during render, before this watch existed; a
+    // write in between would otherwise go unseen until the next one.
+    changed();
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      watcher?.close();
+      unwatch?.();
     };
   }, [repo, prId, bumpRevision]);
 

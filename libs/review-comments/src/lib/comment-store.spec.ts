@@ -355,3 +355,59 @@ describe('the file on disk', () => {
     expect(parsed.comments).toHaveLength(2);
   });
 });
+
+/**
+ * What the TUI's diff viewer shows the agent's drafts through while the
+ * review runs. The common case is the hard one: the PR is opened before
+ * the agent has written anything, so there is nothing on disk yet to
+ * watch.
+ */
+describe('watchComments', () => {
+  const changes = () => {
+    const seen = { count: 0 };
+    return { seen, onChange: () => (seen.count += 1) };
+  };
+  const until = async (done: () => boolean) => {
+    const deadline = Date.now() + 2_000;
+    while (!done() && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  };
+
+  it('reports the first draft written after watching a PR with none', async () => {
+    const { seen, onChange } = changes();
+    const unwatch = store.watchComments(SCOPE, onChange);
+    try {
+      store.appendComment(SCOPE, comment('first'));
+      await until(() => seen.count > 0);
+      expect(seen.count).toBeGreaterThan(0);
+    } finally {
+      unwatch();
+    }
+  });
+
+  it('reports a draft written by another process', async () => {
+    const { seen, onChange } = changes();
+    const unwatch = store.watchComments(SCOPE, onChange);
+    try {
+      // The agent's `add-comment` replaces the file by rename.
+      writeFileSync(`${store.commentFilePath(SCOPE)}.tmp`, '{}');
+      execFileSync('mv', [
+        `${store.commentFilePath(SCOPE)}.tmp`,
+        store.commentFilePath(SCOPE),
+      ]);
+      await until(() => seen.count > 0);
+      expect(seen.count).toBeGreaterThan(0);
+    } finally {
+      unwatch();
+    }
+  });
+
+  it('stops reporting once unwatched', async () => {
+    const { seen, onChange } = changes();
+    store.watchComments(SCOPE, onChange)();
+    store.appendComment(SCOPE, comment('after'));
+    await new Promise((r) => setTimeout(r, 200));
+    expect(seen.count).toBe(0);
+  });
+});
