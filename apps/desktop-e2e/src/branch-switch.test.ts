@@ -35,8 +35,8 @@ function switchOutside(repoPath: string, ...args: string[]): void {
 async function expectSwitched(page: Page): Promise<void> {
   await expect(tab(page, new RegExp(OTHER))).toBeVisible({ timeout: 15_000 });
   await expect(tabs(page)).toHaveCount(1);
-  await expect(banner(page)).toContainText(
-    `Switched from ${BRANCH} to ${OTHER} since this worktree was created.`
+  await expect(banner(page)).toHaveText(
+    `Branch switched from ${BRANCH} to ${OTHER}`
   );
 }
 

@@ -22,11 +22,9 @@ export function BranchSwitchBanner({
     >
       <AlertTriangleIcon className="size-4 shrink-0" />
       <span className="min-w-0 flex-1 truncate">
-        <strong>
-          Switched from <code className="font-mono">{original}</code> to{' '}
-          <code className="font-mono">{current}</code>
-        </strong>{' '}
-        since this worktree was created.
+        <strong>Branch switched</strong> from{' '}
+        <code className="font-mono">{original}</code> to{' '}
+        <code className="font-mono">{current}</code>
       </span>
     </div>
   );
