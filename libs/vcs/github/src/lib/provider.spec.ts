@@ -7,6 +7,7 @@ import {
   mapRollupState,
   ghGraphQL,
   ghQuery,
+  checkGhAuth,
   githubProvider,
 } from './provider.js';
 
@@ -362,11 +363,15 @@ describe('the read deadline', () => {
     expect(execOptionsOf(mockExecFile.mock.calls[0]!)).toEqual(READ);
   });
 
-  it('puts the pull request list, threads and description under it', async () => {
+  it('puts every read under it', async () => {
     ghSuccess({
       data: { search: { nodes: [], pageInfo: { hasNextPage: false } } },
     });
     await githubProvider.fetchPullRequests({}, project);
+    ghSuccess({
+      data: { search: { nodes: [], pageInfo: { hasNextPage: false } } },
+    });
+    await githubProvider.fetchMergedBranches!({}, project, ['feature']);
     ghSuccess({
       data: {
         repository: {
@@ -382,9 +387,19 @@ describe('the read deadline', () => {
       callbackOf(args)(null, { stdout: 'body' })
     );
     await githubProvider.fetchPullRequestDescription!({}, project, 1);
+    mockExecFile.mockImplementationOnce((...args: unknown[]) =>
+      callbackOf(args)(null, { stdout: 'Logged in to github.com account a' })
+    );
+    await checkGhAuth();
+    expect(mockExecFile).toHaveBeenCalledTimes(5);
     for (const call of mockExecFile.mock.calls) {
       expect(execOptionsOf(call)).toEqual(READ);
     }
+
+    mockExecSync.mockReset();
+    mockExecSync.mockReturnValueOnce('{"login":"a"}');
+    githubProvider.autoDetectFields!({ owner: 'o', repo: 'r' });
+    expect(mockExecSync.mock.calls[0]![1]).toMatchObject(READ);
   });
 
   it("puts the overview's detail, checks, conversation and mentions under it", async () => {
@@ -407,6 +422,26 @@ describe('the read deadline', () => {
   it('never puts a mutation under it', async () => {
     ghSuccess({
       data: {
+        addComment: {
+          commentEdge: {
+            node: { id: 'C', author: null, body: 'ok', createdAt: '' },
+          },
+        },
+      },
+    });
+    await githubProvider.replyToThread!(
+      {},
+      project,
+      1,
+      {
+        ...thread,
+        replyKind: 'github-issue-comment',
+        replySubjectId: 'PR1',
+      } as RemoteCommentThread,
+      'ok'
+    );
+    ghSuccess({
+      data: {
         addPullRequestReviewThreadReply: {
           comment: { id: 'C', author: null, body: 'ok', createdAt: '' },
         },
@@ -417,7 +452,7 @@ describe('the read deadline', () => {
     await githubProvider.setThreadResolved!({}, project, 1, thread, true);
     ghSuccess({});
     await githubProvider.submitReviewVerdict!({}, project, 1, 'approve');
-    expect(mockExecFile).toHaveBeenCalledTimes(3);
+    expect(mockExecFile).toHaveBeenCalledTimes(4);
     for (const call of mockExecFile.mock.calls) {
       expect(execOptionsOf(call)).toBeUndefined();
     }
