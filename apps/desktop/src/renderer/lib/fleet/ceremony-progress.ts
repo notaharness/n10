@@ -65,10 +65,7 @@ export function ceremonyStep(
 }
 
 /** The two passkey prompts a fleet's creation needs, always listed. */
-export const INIT_STEPS = [
-  'Create your fleet passkey',
-  'Authorize this machine',
-] as const;
+export const INIT_STEPS = ['Save a passkey', 'Add this machine'] as const;
 
 /** The passkey steps are answered: beam is doing its own work. */
 export function pastPasskeys(view: CeremonyView): boolean {
@@ -99,42 +96,37 @@ interface CeremonyHeading {
 }
 
 const PREPARING: CeremonyHeading = {
-  heading: 'Preparing network…',
-  explanation:
-    'beam is preparing this machine before opening the passkey steps.',
+  heading: 'Getting ready…',
+  explanation: null,
 };
 
 const PUBLISHING: Record<CeremonyOp, CeremonyHeading> = {
   init: {
-    heading: 'Publishing membership…',
-    explanation:
-      'The passkey steps are complete. beam is saving this machine’s membership.',
+    heading: 'Finishing setup…',
+    explanation: null,
   },
-  join: { heading: 'Publishing membership…', explanation: null },
-  revoke: { heading: 'Publishing revocation…', explanation: null },
+  join: { heading: 'Finishing setup…', explanation: null },
+  revoke: { heading: 'Revoking access…', explanation: null },
 };
 
 const PASSKEY: Record<CeremonyOp, CeremonyHeading[]> = {
   init: [
     {
-      heading: 'Step 1 of 2 · Create your fleet passkey',
-      explanation:
-        'Save a new passkey for beam.n10.is. Then return here for the second prompt.',
+      heading: '1 of 2 · Save a passkey',
+      explanation: 'Open or scan to save your fleet’s passkey.',
     },
     {
-      heading: 'Step 2 of 2 · Authorize this machine',
-      explanation:
-        'Use the passkey you just created. This signs this machine’s membership and derives the key for the encrypted directory.',
+      heading: '2 of 2 · Add this machine',
+      explanation: 'Use the passkey you just saved.',
     },
   ],
   join: [
     {
-      heading: 'Authorize this machine',
-      explanation:
-        'Choose this fleet’s existing passkey. Do not create another passkey.',
+      heading: 'Add this machine',
+      explanation: 'Use your fleet’s existing passkey.',
     },
   ],
-  revoke: [{ heading: 'Authorize revocation', explanation: null }],
+  revoke: [{ heading: 'Confirm with your passkey', explanation: null }],
 };
 
 /** What a running ceremony says at the top, from its latest signal. */
@@ -146,9 +138,9 @@ export function ceremonyHeading(view: CeremonyView): CeremonyHeading {
     case 'passkey':
       return PASSKEY[view.op][view.step - 1];
     case 'reading-directory':
-      return { heading: 'Reading fleet directory…', explanation: null };
+      return { heading: 'Finding machines…', explanation: null };
     case 'notifying-peers':
-      return { heading: 'Notifying peers…', explanation: null };
+      return { heading: 'Updating machines…', explanation: null };
     case 'publishing':
       return PUBLISHING[view.op];
   }
