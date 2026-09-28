@@ -205,8 +205,10 @@ export interface DetailReviewer {
    *  ignoring case. */
   identifier: string;
   /** The provider's handle for acting on this reviewer — a GitHub node
-   *  id, an Azure DevOps identity id — or null where it gives none.
-   *  Opaque: not for comparing or storing. */
+   *  id, an Azure DevOps identity id — or null where it gives none. Not
+   *  for storing, and compared only with ids the same provider gives
+   *  elsewhere: an Azure DevOps policy names its reviewers by identity
+   *  id (`ReviewRule.named`). */
   id: string | null;
   displayName: string;
   /** The shared reading of their standing verdict. A later comment does

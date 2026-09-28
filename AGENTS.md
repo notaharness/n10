@@ -75,7 +75,8 @@ Next.js requires otherwise).
   in `@n10/core`; both shells call them. When changing worktree removal,
   consolidate the duplicated TUI and desktop flows there.
 - Core cannot import React, Ink, Electron or `@n10/app-core`. The desktop
-  renderer uses the browser-safe `@n10/core/plan`, never core's Node entry.
+  renderer uses the browser-safe `@n10/core/plan` and `@n10/core/readiness`,
+  never core's Node entry.
   Keep the core and app-core barrels separate.
 - Terminal backends implement `SessionBackend` without n10-specific names.
   tmux session names are labels; `libs/core/src/lib/session-identity.ts`
