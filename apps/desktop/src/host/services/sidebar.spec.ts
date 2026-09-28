@@ -1,5 +1,6 @@
 import { worktreeSessionKey } from '@n10/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as VcsCore from '@n10/vcs-core';
 import type * as SidebarModule from './sidebar.js';
 import type * as PullRequestsModule from './pull-requests.js';
 import type * as Core from '@n10/core';
@@ -86,7 +87,10 @@ vi.mock('./remote-sync.js', () => ({
   }),
 }));
 
-vi.mock('@n10/vcs-core', () => ({
+vi.mock('@n10/vcs-core', async (importOriginal) => ({
+  // Partial: the Azure DevOps transport, loaded through
+  // @n10/review-comments, builds its request cache from this module.
+  ...(await importOriginal<typeof VcsCore>()),
   readConfig: () => ({ vendor: 'github', ...env.config }),
 }));
 

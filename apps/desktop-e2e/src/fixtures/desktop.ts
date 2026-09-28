@@ -18,6 +18,7 @@ import {
 import { killFixtureSessions } from '../setup/tmux.js';
 import { appEnv } from './app-env.js';
 import { closeDesktopApp } from '../setup/app-close.js';
+import { startFakeAdo, type FakeAdoServer } from './fake-ado.js';
 import type { TerminalSeed } from '../setup/terminals.js';
 import {
   fakeAgent,
@@ -97,7 +98,12 @@ export interface DesktopApp {
 }
 
 export const test = base.extend<
-  DesktopOptions & { desktop: DesktopApp; fixtureHome: string }
+  DesktopOptions & {
+    desktop: DesktopApp;
+    fixtureHome: string;
+    /** The fake Azure DevOps, when the test declared `fakeAzureDevOps`. */
+    fakeAdo: FakeAdoServer | undefined;
+  }
 >({
   // eslint-disable-next-line no-empty-pattern -- Playwright requires a destructured fixture dependency parameter.
   fixtureHome: async ({}, provide) => {
@@ -109,6 +115,27 @@ export const test = base.extend<
       await rm(homeDir, { recursive: true, force: true });
     }
   },
+  fakeAdo: async ({ fakeAzureDevOps }, provide) => {
+    if (!fakeAzureDevOps) {
+      await provide(undefined);
+      return;
+    }
+    // A copy: the server applies the app's writes to its scenario, and
+    // the declared one is shared by every test in the file.
+    const server = await startFakeAdo(structuredClone(fakeAzureDevOps));
+    try {
+      await provide(server);
+    } finally {
+      await server.close();
+    }
+    if (server.unhandled.length > 0) {
+      throw new Error(
+        `The app made requests fake-ado does not model:\n${server.unhandled.join(
+          '\n'
+        )}`
+      );
+    }
+  },
   n10Config: [undefined, { option: true }],
   projectConfig: [undefined, { option: true }],
   desktopPrefs: [undefined, { option: true }],
@@ -118,6 +145,7 @@ export const test = base.extend<
   githubToken: [undefined, { option: true }],
   drafts: [undefined, { option: true }],
   fakeGitHub: [undefined, { option: true }],
+  fakeAzureDevOps: [undefined, { option: true }],
   liveSessions: [undefined, { option: true }],
   env: [undefined, { option: true }],
   liveTerminals: [undefined, { option: true }],
@@ -133,6 +161,8 @@ export const test = base.extend<
       githubToken,
       drafts,
       fakeGitHub,
+      fakeAzureDevOps,
+      fakeAdo,
       liveSessions,
       env,
       liveTerminals,
@@ -153,6 +183,7 @@ export const test = base.extend<
       desktopPrefs,
       drafts,
       fakeGitHub,
+      fakeAzureDevOps,
     });
 
     seedTmux(repoPath, homeDir, liveSessions, liveTerminals);
@@ -172,7 +203,10 @@ export const test = base.extend<
         repoPath,
         startWithoutRepo,
         githubToken,
-        ghEnv,
+        fakeEnv: {
+          ...ghEnv,
+          ...(fakeAdo ? { N10_ADO_ORIGIN: fakeAdo.origin } : {}),
+        },
         extra: env,
       }),
       timeout: 60_000,

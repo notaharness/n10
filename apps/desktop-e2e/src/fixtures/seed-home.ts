@@ -9,6 +9,11 @@ import {
   type FakeGitHub,
 } from '../setup/fake-gh.js';
 import {
+  fakeAdoGlobalConfig,
+  fakeAdoProjectConfig,
+  type FakeAzureDevOps,
+} from '../setup/fake-ado.js';
+import {
   addExternalWorktree,
   startExternalTmuxSession,
 } from '../setup/external.js';
@@ -86,6 +91,13 @@ export interface HomeSeed {
    * `githubToken` is set, which is the real thing.
    */
   fakeGitHub?: FakeGitHub;
+  /**
+   * Serve the app Azure DevOps from a fake on a loopback port
+   * (`fixtures/fake-ado.ts`), with the PAT and project config written
+   * for it. The desktop fixture starts the server; `seedHome` writes
+   * the config.
+   */
+  fakeAzureDevOps?: FakeAzureDevOps;
 }
 
 /**
@@ -108,7 +120,17 @@ export function seedHome(
   writeFileSync(join(homeDir, '.zshrc'), '', 'utf8');
   writeFileSync(
     join(n10, 'config.json'),
-    JSON.stringify({ aiCommand: fakeAgent(), ...opts.n10Config }, null, 2),
+    JSON.stringify(
+      {
+        aiCommand: fakeAgent(),
+        ...(opts.fakeAzureDevOps
+          ? fakeAdoGlobalConfig(opts.fakeAzureDevOps)
+          : {}),
+        ...opts.n10Config,
+      },
+      null,
+      2
+    ),
     'utf8'
   );
 
@@ -129,11 +151,14 @@ export function seedHome(
 function seedProjectConfig(
   n10: string,
   repoPath: string,
-  opts: Pick<HomeSeed, 'projectConfig' | 'fakeGitHub'>
+  opts: Pick<HomeSeed, 'projectConfig' | 'fakeGitHub' | 'fakeAzureDevOps'>
 ): void {
   const projectConfig =
     opts.projectConfig ??
-    (opts.fakeGitHub ? fakeGhProjectConfig(opts.fakeGitHub) : undefined);
+    (opts.fakeGitHub ? fakeGhProjectConfig(opts.fakeGitHub) : undefined) ??
+    (opts.fakeAzureDevOps
+      ? fakeAdoProjectConfig(opts.fakeAzureDevOps)
+      : undefined);
   if (!projectConfig) return;
   // Per-project config lives under a hash of the repo path — see
   // projectKey() in @n10/vcs-core's config store.

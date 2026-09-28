@@ -1,4 +1,10 @@
 import { spawn } from 'node:child_process';
+import {
+  authHeaders,
+  baseUrl,
+  invalidatePr,
+  toAdoConfig,
+} from '@n10/vcs-azure-devops';
 import type { ReviewComment } from './types.js';
 import {
   formatConventionalComment,
@@ -131,10 +137,11 @@ async function postAzureDevOps(
   comments: ReviewComment[],
   ctx: PostContext
 ): Promise<void> {
-  const org = ctx.vendorProject.org;
-  const project = ctx.vendorProject.project;
-  const repo = ctx.vendorProject.repo;
-  const pat = ctx.vendorAuth.pat;
+  // The provider's own mapping: `invalidatePr` keys its cache by it.
+  const config = toAdoConfig(ctx.vendorAuth, ctx.vendorProject);
+  const threadsUrl = `${baseUrl(config)}/pullrequests/${
+    ctx.prId
+  }/threads?api-version=7.1`;
 
   for (const comment of comments) {
     const thread = {
@@ -159,14 +166,9 @@ async function postAzureDevOps(
       status: 1, // active
     };
 
-    const url = `https://dev.azure.com/${org}/${project}/_apis/git/repositories/${repo}/pullrequests/${ctx.prId}/threads?api-version=7.1`;
-
-    const response = await fetch(url, {
+    const response = await fetch(threadsUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Basic ${btoa(':' + pat)}`,
-      },
+      headers: authHeaders(config.pat),
       body: JSON.stringify(thread),
     });
 
@@ -174,5 +176,9 @@ async function postAzureDevOps(
       const text = await response.text();
       throw new Error(`Azure DevOps API ${response.status}: ${text}`);
     }
+    // The provider caches the thread list; without this the new thread
+    // stays out of the review workspace and the sidebar's count until
+    // the entry lapses and something happens to read it again.
+    invalidatePr(config, ctx.prId);
   }
 }

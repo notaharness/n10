@@ -1,6 +1,7 @@
 import type * as CoreModule from '@n10/core';
 import { worktreeSessionKey } from '@n10/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as VcsCore from '@n10/vcs-core';
 import type * as SessionsModule from './sessions.js';
 import type { MachineView } from '../contract-machines.js';
 import type { TaggedSession } from '@n10/core';
@@ -76,7 +77,10 @@ vi.mock('./repo.js', () => ({
   activeRepoIs: (cwd: string) => cwd === state.cwd,
 }));
 
-vi.mock('@n10/vcs-core', () => ({
+vi.mock('@n10/vcs-core', async (importOriginal) => ({
+  // Partial: the Azure DevOps transport, loaded through
+  // @n10/review-comments, builds its request cache from this module.
+  ...(await importOriginal<typeof VcsCore>()),
   readConfig: (cwd: string) => state.configByCwd[cwd] ?? { fromCwd: cwd },
 }));
 

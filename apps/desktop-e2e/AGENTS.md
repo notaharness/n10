@@ -22,6 +22,10 @@ build target pins production). Full notes: `docs/testing.md`.
 - `src/setup/fake-gh.ts` puts a fake `gh` on PATH answering from a JSON
   scenario (`fakeGitHub` option: PRs, review threads, comments, check
   rollup). Point `headRefName` at a real branch for a real diff. The replacement is isolated to the test PATH.
+- `src/setup/fake-ado.ts` (`fakeAzureDevOps` option) serves Azure DevOps from
+  a loopback server in the worker (`src/fixtures/fake-ado.ts`) via
+  `N10_ADO_ORIGIN`. Writes land in its scenario copy; the `fakeAdo` fixture
+  exposes `requests`. An unmodelled request fails the test at teardown.
 - Provider config from a test: project fields go under `vendorProject`, or
   auto-detect overwrites them and the provider silently returns nothing.
 - Native menus: `src/setup/menu.ts` arms a one-shot `Menu.popup` interception

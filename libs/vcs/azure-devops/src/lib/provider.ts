@@ -14,7 +14,7 @@ import type {
 import { sanitizeBody } from '@n10/vcs-core';
 import { log } from '@n10/logger';
 import type { AdoConfig } from './client.js';
-import { authHeaders, baseUrl } from './client.js';
+import { adoOrigin, authHeaders, baseUrl } from './client.js';
 import {
   adoGet,
   adoSend,
@@ -52,7 +52,7 @@ interface RawReviewer {
   isContainer?: boolean;
 }
 
-function toAdoConfig(
+export function toAdoConfig(
   auth: Record<string, string>,
   project: Record<string, string>
 ): AdoConfig {
@@ -64,16 +64,17 @@ function toAdoConfig(
   };
 }
 
-/** Everything the transport has cached about one pull request. Called
- *  after a write so the change is visible immediately rather than at
- *  the end of the entry's TTL.
+/** Forget everything the transport has cached about one pull request.
+ *  Called after a write so the change is visible immediately rather
+ *  than at the end of the entry's TTL — by the draft poster in
+ *  `@n10/review-comments` too, which creates threads outside this file.
  *
  *  Exact keys, not prefixes: `.../threads/1` is a prefix of
  *  `.../threads/10`, so replying on pull request 1 would otherwise
  *  drop the cached threads of 10 through 19 and 100 through 199 too.
  *  The individual-thread keys carry a further segment, so those are
  *  the one place a prefix is meant — and it ends at the separator. */
-function invalidatePr(config: AdoConfig, prId: number): void {
+export function invalidatePr(config: AdoConfig, prId: number): void {
   const repo = `${config.org}/${config.project}/${config.repo}`;
   // The memo too, or the sidebar's comment badge would keep the count
   // from before the write for the rest of its life.
@@ -208,7 +209,7 @@ function fetchConnectionData(config: AdoConfig): Promise<ConnectionData> {
     'fetchConnectionData',
     `${config.org}/connectiondata`,
     TTL.identity,
-    `https://dev.azure.com/${config.org}/_apis/connectiondata?api-version=7.1-preview`,
+    `${adoOrigin()}/${config.org}/_apis/connectiondata?api-version=7.1-preview`,
     authHeaders(config.pat),
     `organization ${config.org}`
   );
@@ -238,7 +239,9 @@ export async function fetchMyTeamIds(config: AdoConfig): Promise<Set<string>> {
       'fetchMyTeamIds',
       `${config.org}/${config.project}/my-teams`,
       TTL.identity,
-      `https://dev.azure.com/${config.org}/_apis/projects/${config.project}/teams?$mine=true&api-version=7.1`,
+      `${adoOrigin()}/${config.org}/_apis/projects/${
+        config.project
+      }/teams?$mine=true&api-version=7.1`,
       authHeaders(config.pat),
       `teams in ${config.project}`
     );
@@ -487,7 +490,9 @@ async function resolveMentionNames(
       'resolveMentionNames',
       `${config.org}/identities/${ids}`,
       TTL.identity,
-      `https://vssps.dev.azure.com/${config.org}/_apis/identities?identityIds=${ids}&api-version=7.1`,
+      `${adoOrigin('identities')}/${
+        config.org
+      }/_apis/identities?identityIds=${ids}&api-version=7.1`,
       authHeaders(config.pat),
       'those identities'
     );
