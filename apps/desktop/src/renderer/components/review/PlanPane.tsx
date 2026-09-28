@@ -44,7 +44,6 @@ export function PlanPane({
   onShowInDiff,
   onClear,
   onSend,
-  openNoteFor,
 }: {
   items: PlanItem[];
   branch: string;
@@ -55,21 +54,8 @@ export function PlanPane({
   onShowInDiff: (item: PlanItem) => void;
   onClear: () => void;
   onSend: (mode: 'inject' | 'new-session') => void;
-  /** A request to open one row's note composer, from somewhere that
-   *  cannot show one itself (the rail's context menu). A fresh object
-   *  each time, so asking twice for the same row still opens it. */
-  openNoteFor?: { key: string } | null;
 }) {
-  const [editing, setEditing] = useState<string | null>(
-    openNoteFor?.key ?? null
-  );
-  // Follow each request once: a composer the user has since closed must
-  // stay closed, so only a *new* request re-opens one.
-  const [prevRequest, setPrevRequest] = useState(openNoteFor);
-  if (openNoteFor !== prevRequest) {
-    setPrevRequest(openNoteFor);
-    if (openNoteFor) setEditing(openNoteFor.key);
-  }
+  const [editing, setEditing] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const rows = planRows(items);
   const { count, noted } = planSummary(items);

@@ -4,7 +4,6 @@ import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
-import type { CommentListItem } from '../../components/review/comments/CommentsList.js';
 import type { DiffJumpHandle } from '../../components/review/diff/VirtualDiffList.js';
 import {
   buildCommentRows,
@@ -19,10 +18,10 @@ import {
  * where the viewer is in it, and how to get the diff to show any of
  * them.
  *
- * It is one hook because the rail's comment list and the diff toolbar's
- * prev/next both read it, and they used to disagree about what "the
- * next comment" meant — the list is filtered once, here, and both take
- * the result.
+ * It is one hook because the diff toolbar's prev/next and the header's
+ * unresolved count both read it, and must agree about what "the next
+ * comment" is: the list is filtered once, here, and both take the
+ * result.
  */
 export function useCommentNavigator({
   files,
@@ -84,14 +83,6 @@ export function useCommentNavigator({
     [onShowDiff]
   );
 
-  const jumpToItem = useCallback(
-    (item: CommentListItem) => {
-      const row = items.find((r) => r.id === item.id);
-      jumpToId(item.id, row?.file ?? null);
-    },
-    [items, jumpToId]
-  );
-
   const step = useCallback(
     (delta: number) => {
       const target: CommentRow | null = stepComment(items, navIndex, delta);
@@ -110,7 +101,6 @@ export function useCommentNavigator({
     selectedFile,
     jumpToFile,
     jumpToId,
-    jumpToItem,
     step,
   };
 }

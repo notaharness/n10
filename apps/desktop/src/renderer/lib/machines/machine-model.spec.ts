@@ -53,7 +53,7 @@ describe('machinePresentation', () => {
       secondary: 'Direct',
     });
     expect(route('relay fra').secondary).toBe('Relay fra');
-    expect(route('unknown').secondary).toBe('Path unknown');
+    expect(route('unknown').secondary).toBe('Connecting…');
   });
 
   it('offline: muted, never a fault, with when it was last seen', () => {
@@ -63,7 +63,7 @@ describe('machinePresentation', () => {
     expect(p.label).toBe('Offline');
     expect(p.tone).toBe('muted');
     expect(p.secondary).toBe('Last seen 5m ago');
-    expect(machinePresentation(machine()).secondary).toBe('Not connected yet');
+    expect(machinePresentation(machine()).secondary).toBe('Never connected');
   });
 
   it('revoked here and revoked by the fleet are both destructive, and read apart', () => {
@@ -75,9 +75,9 @@ describe('machinePresentation', () => {
       secondary: '',
     });
     expect(there).toEqual({
-      label: 'Refuses this machine',
+      label: 'Access revoked',
       tone: 'destructive',
-      secondary: 'This machine was revoked from that peer’s fleet view.',
+      secondary: 'This machine’s access was revoked.',
     });
   });
 

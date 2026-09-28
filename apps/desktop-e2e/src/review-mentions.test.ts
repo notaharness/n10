@@ -43,8 +43,9 @@ async function openComposer(page: Page) {
   await sidebarRow(page, /Cap retries per request|#311/)
     .first()
     .click();
-  await page.getByRole('button', { name: 'Overview' }).click();
-  await page.getByRole('button', { name: 'Write a comment…' }).click();
+  await page
+    .getByRole('button', { name: 'Write a comment…' })
+    .click({ timeout: 30_000 });
   const box = page.getByRole('textbox', { name: 'Comment' });
   await expect(box).toBeFocused();
   return box;

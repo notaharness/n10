@@ -30,7 +30,8 @@ import { useComposerRefresh } from './use-composer-refresh.js';
  * distinct messages (own header, divider, replies tinted + indented)
  * inside one bordered card with a summary header and a reply footer.
  * Resolved threads start collapsed to the header; `focused` (thread
- * navigator / comment list) expands and outlines the card.
+ * navigator, the unresolved count, the Overview's activity) expands
+ * and outlines the card.
  */
 export function ThreadCard({
   thread,
@@ -80,9 +81,10 @@ export function ThreadCard({
   useEffect(() => {
     if (!focused) return;
     ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    // Keyboard focus lost on the way here — the Overview's link goes
-    // hidden as it opens the diff — lands on the thread it asked for.
-    // Focus somewhere visible, such as a rail row, stays there.
+    // Keyboard focus that is lost on the way here — the Overview's
+    // button goes hidden as it opens the diff — lands on the thread it
+    // asked for. Focus that is somewhere visible, such as the diff
+    // toolbar's next-comment button, stays there.
     if (focusIsLost()) ref.current?.focus({ preventScroll: true });
   }, [focused]);
 
@@ -136,6 +138,10 @@ export function ThreadCard({
       ref={ref}
       data-thread={thread.id}
       tabIndex={-1}
+      role="article"
+      aria-label={[`Thread by ${root.author}`, location]
+        .filter(Boolean)
+        .join(' on ')}
       className={cn(
         'group/card max-w-[900px] overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs transition-shadow outline-none focus-visible:ring-2 focus-visible:ring-ring',
         planControls.inPlan

@@ -19,6 +19,7 @@ import * as commentImages from './services/comment-images.js';
 import * as clipboardImage from './services/clipboard-image.js';
 import * as drafts from './services/drafts.js';
 import * as mentions from './services/mentions.js';
+import * as prChecks from './services/pr-checks.js';
 import * as prConversation from './services/pr-conversation.js';
 import * as prDetails from './services/pr-details.js';
 import * as reviewDrafts from './services/review-drafts.js';
@@ -60,8 +61,9 @@ export function createHostApi(): N10HostApi {
     listBranches: () => worktrees.listBranches(),
     listAllBranches: () => worktrees.listAllBranches(),
     createWorktree: (branch) => worktrees.createWorktree(branch),
-    removeWorktree: (branch, force) => worktrees.removeWorktree(branch, force),
-    canRemoveBranch: (branch) => worktrees.canRemoveBranch(branch),
+    removeWorktree: (branch, approved) =>
+      worktrees.removeWorktree(branch, approved),
+    checkWorktreeRemoval: (branch) => worktrees.checkWorktreeRemoval(branch),
     openInEditor: (branch) => worktrees.openInEditor(branch),
 
     fetchPullRequests: () => reviews.fetchPullRequests(),
@@ -70,6 +72,7 @@ export function createHostApi(): N10HostApi {
     setThreadResolved: (req: ResolveRequest) => reviews.setThreadResolved(req),
     fetchPrDescription: (prId) => reviews.fetchPrDescription(prId),
     getPullRequestSnapshot: (req) => prDetails.getPullRequestSnapshot(req),
+    getPullRequestChecks: (req) => prChecks.getPullRequestChecks(req),
     getPullRequestConversation: (req) =>
       prConversation.getPullRequestConversation(req),
     listReviewDrafts: (req) => reviewDrafts.listDrafts(req),
@@ -242,7 +245,7 @@ export function registerHostHandlers(
     [IPC.listAllBranches]: api.listAllBranches as HostMethod,
     [IPC.createWorktree]: api.createWorktree as HostMethod,
     [IPC.removeWorktree]: api.removeWorktree as HostMethod,
-    [IPC.canRemoveBranch]: api.canRemoveBranch as HostMethod,
+    [IPC.checkWorktreeRemoval]: api.checkWorktreeRemoval as HostMethod,
     [IPC.openInEditor]: api.openInEditor as HostMethod,
     [IPC.launchAgent]: api.launchAgent as HostMethod,
     [IPC.listSessions]: api.listSessions as HostMethod,
@@ -264,6 +267,7 @@ export function registerHostHandlers(
     [IPC.setThreadResolved]: api.setThreadResolved as HostMethod,
     [IPC.fetchPrDescription]: api.fetchPrDescription as HostMethod,
     [IPC.getPullRequestSnapshot]: api.getPullRequestSnapshot as HostMethod,
+    [IPC.getPullRequestChecks]: api.getPullRequestChecks as HostMethod,
     [IPC.getPullRequestConversation]:
       api.getPullRequestConversation as HostMethod,
     [IPC.listReviewDrafts]: api.listReviewDrafts as HostMethod,

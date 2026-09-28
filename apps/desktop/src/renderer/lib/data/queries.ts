@@ -9,13 +9,14 @@ import { contentKey } from '../content-key.js';
 import { loadDesktopPrefs } from '../desktop-prefs.js';
 import { parseDiffInWorker } from '../diff/diff-worker-client.js';
 import { measured } from '../perf.js';
-import { keys, resetRepoScopedCache } from './query-keys.js';
+import { keys, resetProviderScopedCache } from './query-keys.js';
 import { errorMessage } from '../utils.js';
 import { repositoryKey } from '@n10/vcs-core/pr-details';
 import type {
   MachineView,
   RepoInfo,
   SidebarItem,
+  WorktreeRemovalCheck,
 } from '../../../host/contract.js';
 
 /**
@@ -65,9 +66,9 @@ function sameRepoIdentity(a: RepoInfo, b: RepoInfo): boolean {
  *
  * The provider, the repository it names and the account n10 acts as
  * all come from config, and the gate's entry is otherwise only written
- * when a repository is opened. When any of the three differs, whatever
- * is cached was read somewhere else or as someone else, so it goes, as
- * on a repository switch.
+ * when a repository is opened. When any of the three differs, what the
+ * provider answered was read somewhere else or as someone else, so it
+ * goes; the rest of the repository's cache stays.
  */
 export async function refreshRepoInfo(qc: QueryClient): Promise<void> {
   const next = await window.n10.getRepo();
@@ -75,7 +76,7 @@ export async function refreshRepoInfo(qc: QueryClient): Promise<void> {
   // The host moved to another repository meanwhile: that is the
   // gate's switch to adopt, not this.
   if (!prev || !next || prev.cwd !== next.cwd) return;
-  if (!sameRepoIdentity(prev, next)) resetRepoScopedCache(qc);
+  if (!sameRepoIdentity(prev, next)) resetProviderScopedCache(qc);
   qc.setQueryData(keys.repo, next);
 }
 
@@ -158,23 +159,22 @@ export function useAllBranches(cwd: string, enabled = true) {
   });
 }
 
-export type BranchRemovalSafety =
-  | { safe: true }
-  | { safe: false; reason: string };
-
 /**
- * Whether git will let this branch and its worktree go. A refusal is a
- * verdict, not a failure, so a host call that throws is folded into an
- * unsafe answer: the dialog reads one value and defaults to refusing
- * when it cannot tell, rather than offering a confirm button behind an
- * error state nobody renders.
+ * What removing this branch's worktree would cost, as core decides it
+ * for both shells. A refusal is a verdict, not a failure, so a host
+ * call that throws is folded into one: the dialog reads one value and
+ * defaults to refusing when it cannot tell, rather than offering a
+ * confirm button behind an error state nobody renders.
  */
-export function loadBranchRemovalSafety(
+export function loadWorktreeRemovalCheck(
   branch: string
-): Promise<BranchRemovalSafety> {
-  return window.n10.canRemoveBranch(branch).catch((err: unknown) => ({
-    safe: false as const,
+): Promise<WorktreeRemovalCheck> {
+  return window.n10.checkWorktreeRemoval(branch).catch((err: unknown) => ({
+    verdict: 'refused' as const,
     reason: errorMessage(err),
+    tip: null,
+    repo: null,
+    checkout: null,
   }));
 }
 
@@ -183,10 +183,10 @@ export function loadBranchRemovalSafety(
  * the dialog that asked for it (`gcTime: 0`) — reopening after a commit
  * or a push has to ask again instead of replaying the old answer.
  */
-export function useBranchRemovalSafety(cwd: string, branch: string) {
+export function useWorktreeRemovalCheck(cwd: string, branch: string) {
   return useQuery({
     queryKey: keys.branchRemoval(cwd, branch),
-    queryFn: () => loadBranchRemovalSafety(branch),
+    queryFn: () => loadWorktreeRemovalCheck(branch),
     staleTime: 0,
     gcTime: 0,
   });

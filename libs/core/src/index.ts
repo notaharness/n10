@@ -53,6 +53,8 @@ export {
   noteSeen,
   snapshot,
   idleFor,
+  hasUnseenOutput,
+  showTerminal,
   __resetForTests as __resetActivityForTests,
 } from './lib/activity.js';
 export type { ActivitySnapshot } from './lib/activity.js';
@@ -80,6 +82,10 @@ export * from './lib/sync/fetch-queue.js';
 export * from './lib/pull-requests/pr-conversation.js';
 export * from './lib/pull-requests/mention-search.js';
 export * from './lib/pull-requests/pr-snapshot.js';
+export * from './lib/pull-requests/pr-readiness.js';
+export * from './lib/pull-requests/pr-readiness-aspects.js';
+export * from './lib/pull-requests/pr-check-list.js';
+export * from './lib/pull-requests/pr-checks-read.js';
 export * from './lib/pull-requests/pull-request-cache.js';
 export * from './lib/pull-requests/review-draft-anchor.js';
 export * from './lib/pull-requests/review-draft-store.js';
@@ -150,5 +156,10 @@ export {
 } from './lib/machine-registry.js';
 
 export { stopSession } from './lib/session/stop-session.js';
-export { removeWorktreeSession } from './lib/session/remove-worktree.js';
+export {
+  checkWorktreeRemoval,
+  removeWorktreeSession,
+  type WorktreeRemovalCheck,
+  type WorktreeRemovalOutcome,
+} from './lib/session/remove-worktree.js';
 export { setLocalSessionEnv } from './lib/session/local-session-env.js';

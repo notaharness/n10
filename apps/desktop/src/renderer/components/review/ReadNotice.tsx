@@ -15,7 +15,7 @@ import { Button } from '../ui/button.js';
  * screen, it is a caveat above content that is still worth reading.
  */
 
-function RetryButton({
+export function RetryButton({
   retrying,
   onRetry,
   label,
@@ -136,15 +136,16 @@ export function StaleNotice({
 }
 
 /**
- * The notice for a read shown in the review rail, or nothing when the
- * read is fine. A function rather than a component so a caller can tell
- * "nothing to say" from an element that renders nothing.
+ * The notice for a read that failed or is out of date, or nothing when
+ * the read is fine. A function rather than a component so a caller can
+ * tell "nothing to say" from an element that renders nothing.
  */
-export function railReadNotice(
+export function readNotice(
   what: string,
   state: ReadState<unknown>,
   retrying: boolean,
-  onRetry: () => void
+  onRetry: () => void,
+  className?: string
 ): ReactNode | undefined {
   if (state.kind === 'failed') {
     return (
@@ -153,8 +154,7 @@ export function railReadNotice(
         error={state.error}
         retrying={retrying}
         onRetry={onRetry}
-        stacked
-        className="mx-2 mb-2"
+        className={className}
       />
     );
   }
@@ -165,8 +165,7 @@ export function railReadNotice(
         stale={state.stale}
         retrying={retrying}
         onRetry={onRetry}
-        stacked
-        className="mx-2 mb-2"
+        className={className}
       />
     );
   }

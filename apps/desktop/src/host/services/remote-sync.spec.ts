@@ -2,16 +2,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as RemoteSyncModule from './remote-sync.js';
 
 /**
- * The sync loop runs git operations — including auto-deleting merged
- * branches — against `process.cwd()`, which the desktop changes when
- * the user opens another repository. A pass that keeps going after a
- * repo switch would therefore run the *old* repo's branch list against
- * the *new* checkout, and a pass that keeps going after quit can exit
- * between removing a worktree and deleting its branch.
+ * A pass names its repository in every git call, but the removal goes
+ * through the worktrees service, which acts on whichever repository is
+ * open. A pass that keeps going after a repo switch must therefore stop
+ * before removing anything, and a pass that keeps going after quit can
+ * exit between removing a worktree and deleting its branch.
  *
  * Both are prevented by a generation counter, and both are what these
- * tests are about.
+ * tests are about, along with each call naming the pass's repository.
  */
+
+/** The verdict core's sweep hands over with a branch to remove. */
+const SWEPT = vi.hoisted(
+  () =>
+    ({
+      verdict: 'clear',
+      tip: 'abc123',
+      repo: '/repo/.git',
+      checkout: '/repo/wt',
+    } as const)
+);
 
 const env = vi.hoisted(() => ({
   configured: true,
@@ -22,8 +32,13 @@ const env = vi.hoisted(() => ({
   /** Arguments of every computeConflictCounts call. */
   conflictCalls: [] as unknown[][],
   synced: [] as unknown[],
+  /** The repository each worktree listing and sweep was asked about. */
+  listed: [] as unknown[],
+  swept: [] as unknown[],
   sweeps: 0,
-  removed: [] as { branch: string; force: boolean }[],
+  removed: [] as { branch: string; approved: unknown }[],
+  /** What core's removal answers. */
+  removes: 'removed' as string,
   notices: [] as { message: string; kind: string }[],
   /** Resolvers for each syncRemote() call, in order. */
   pending: [] as ((ts: number) => void)[],
@@ -49,9 +64,9 @@ vi.mock('./pull-requests.js', () => ({
 }));
 
 vi.mock('./worktrees.js', () => ({
-  removeWorktree: (branch: string, force: boolean) => {
-    env.removed.push({ branch, force });
-    return Promise.resolve(true);
+  removeWorktree: (branch: string, approved: unknown) => {
+    env.removed.push({ branch, approved });
+    return Promise.resolve(env.removes);
   },
 }));
 
@@ -60,8 +75,10 @@ vi.mock('@n10/vcs-core', () => ({
 }));
 
 vi.mock('@n10/worktree-manager', () => ({
-  listWorktrees: () =>
-    Promise.resolve(env.branches.map((branch) => ({ branch }))),
+  listWorktrees: (cwd: unknown) => {
+    env.listed.push(cwd);
+    return Promise.resolve(env.branches.map((branch) => ({ branch })));
+  },
 }));
 
 vi.mock('@n10/core', () => ({
@@ -72,12 +89,18 @@ vi.mock('@n10/core', () => ({
   },
   sweepMergedBranches: async (opts: {
     isCancelled: () => boolean;
-    onAutoDelete: (session: string, branch: string) => Promise<void>;
+    onAutoDelete: (
+      session: string,
+      branch: string,
+      approved: unknown
+    ) => Promise<void>;
+    cwd?: string;
   }) => {
     env.sweeps += 1;
+    env.swept.push(opts.cwd);
     if (env.sweepThrows) throw new Error('provider unreachable');
     if (env.autoDelete) {
-      await opts.onAutoDelete(env.autoDelete, env.autoDelete);
+      await opts.onAutoDelete(env.autoDelete, env.autoDelete, SWEPT);
     }
     return { merged: env.merged, nextWarned: new Set<string>() };
   },
@@ -103,8 +126,11 @@ beforeEach(async () => {
   env.prMap = {};
   env.conflictCalls = [];
   env.synced = [];
+  env.listed = [];
+  env.swept = [];
   env.sweeps = 0;
   env.removed = [];
+  env.removes = 'removed';
   env.notices = [];
   env.pending = [];
   env.rejects = [];
@@ -174,6 +200,17 @@ describe('cancellation', () => {
     expect(env.synced).toEqual(['/repo-a']);
     expect(env.conflictCalls).toEqual([[['feature/a'], env.prMap, '/repo-a']]);
   });
+
+  // The process's directory follows whichever repository is open; the
+  // listing and the sweep must not.
+  it('lists and sweeps the repository the pass is for', async () => {
+    sync.startRemoteSyncLoop('/repo-b');
+    await flush();
+    env.pending[0](1234);
+    await flush();
+    expect(env.listed).toEqual(['/repo-b']);
+    expect(env.swept).toEqual(['/repo-b']);
+  });
 });
 
 describe('decorations across repo changes', () => {
@@ -217,16 +254,44 @@ describe('gating and effects', () => {
     expect(env.sweeps).toBe(0);
   });
 
-  it('force-removes an auto-deleted merged branch and says so', async () => {
+  it('removes an auto-deleted merged branch as the sweep judged it, and says so', async () => {
     env.autoDelete = 'feature/a';
     sync.startRemoteSyncLoop('/repo-a');
     await flush();
     env.pending[0](1000);
     await flush();
 
-    expect(env.removed).toEqual([{ branch: 'feature/a', force: true }]);
+    expect(env.removed).toEqual([{ branch: 'feature/a', approved: SWEPT }]);
     expect(env.notices).toEqual([
       { message: 'Auto-deleted merged branch: feature/a', kind: 'success' },
+    ]);
+  });
+
+  it('says nothing when core kept the worktree', async () => {
+    env.autoDelete = 'feature/a';
+    env.removes = 'changed';
+    sync.startRemoteSyncLoop('/repo-a');
+    await flush();
+    env.pending[0](1000);
+    await flush();
+
+    expect(env.notices).toEqual([]);
+  });
+
+  it('warns when core removed the worktree but kept the branch', async () => {
+    env.autoDelete = 'feature/a';
+    env.removes = 'kept-branch';
+    sync.startRemoteSyncLoop('/repo-a');
+    await flush();
+    env.pending[0](1000);
+    await flush();
+
+    expect(env.notices).toEqual([
+      {
+        message:
+          'Auto-deleted the worktree of merged branch feature/a; kept the branch: it has commits made after the check',
+        kind: 'warning',
+      },
     ]);
   });
 

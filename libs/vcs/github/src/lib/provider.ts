@@ -10,87 +10,28 @@ import type {
   PullRequestConversation,
   RemoteCommentThread,
   RemoteCommentReply,
-  ReviewDecision,
   ReviewVerdict,
   BuildStatusState,
   RepositoryRef,
   MentionCandidate,
+  PullRequestChecks,
+  PullRequestDetail,
 } from '@n10/vcs-core';
-import { isVcsError, sanitizeBody } from '@n10/vcs-core';
-import { logNetwork } from '@n10/logger';
+import { sanitizeBody, VcsError } from '@n10/vcs-core';
 import { searchGitHubMentions } from './mentions.js';
-import {
-  assertGraphQlData,
-  classifyGhError,
-  ghOutput,
-  parseGhJson,
-} from './gh-errors.js';
+import { classifyGhError, parseGhJson } from './gh-errors.js';
+import { ghGraphQL } from './gh-graphql.js';
+import { mapReviewState } from './gh-reviews.js';
+import { fetchPullRequestChecksGitHub } from './pr-checks.js';
 import { fetchGitHubConversation } from './pr-conversation.js';
+import { fetchPullRequestDetailGitHub } from './pr-details.js';
 
 // ── gh CLI transport ──────────────────────────────────────────────
 
 const execFile = promisify(execFileCb);
 
-/** What `gh` printed, for the network log. The user-facing wording is
- *  `classifyGhError`'s job. */
-function extractErrorMessage(err: unknown): string {
-  return ghOutput(err);
-}
-
-/**
- * Compact identifier for a GraphQL query — first non-blank line. Lets
- * the network log distinguish e.g. SEARCH_PRS_QUERY from
- * FETCH_PR_THREADS_QUERY without dumping the whole query body.
- */
-function summarizeQuery(query: string): string {
-  return query.trim().split('\n')[0]?.slice(0, 80) ?? 'query';
-}
-
-export async function ghGraphQL(
-  query: string,
-  variables: Record<string, string | number>
-): Promise<unknown> {
-  const startedAt = Date.now();
-  const querySummary = summarizeQuery(query);
-  logNetwork('github.network', `→ gh graphql ${querySummary}`, {
-    variables: Object.fromEntries(
-      Object.entries(variables).map(([k, v]) => [
-        k,
-        typeof v === 'string' && v.length > 60 ? `${v.slice(0, 60)}…` : v,
-      ])
-    ),
-  });
-  try {
-    const args = ['api', 'graphql', '-f', `query=${query}`];
-    for (const [key, val] of Object.entries(variables)) {
-      if (typeof val === 'number') {
-        args.push('-F', `${key}=${val}`);
-      } else {
-        args.push('-f', `${key}=${val}`);
-      }
-    }
-    const { stdout } = await execFile('gh', args);
-    const durationMs = Date.now() - startedAt;
-    logNetwork(
-      'github.network',
-      `← gh graphql ${querySummary} (${durationMs}ms, ${stdout.length} bytes)`
-    );
-    const payload = parseGhJson<unknown>(stdout, querySummary);
-    assertGraphQlData(payload, querySummary);
-    return payload;
-  } catch (err: unknown) {
-    const durationMs = Date.now() - startedAt;
-    logNetwork(
-      'github.network',
-      `× gh graphql ${querySummary} (${durationMs}ms) — ${extractErrorMessage(
-        err
-      )}`
-    );
-    // A classification made here is already the answer; only a raw
-    // subprocess failure still needs one.
-    throw isVcsError(err) ? err : classifyGhError(err);
-  }
-}
+/** These live beside the detail read, which shares them. */
+export { ghGraphQL, mapReviewState };
 
 // ── Internal helpers ───────────────────────────────────────────────
 
@@ -111,27 +52,25 @@ export function parseGitHubRemoteUrl(
   return null;
 }
 
-export function mapReviewState(state: string): ReviewDecision {
-  switch (state) {
-    case 'APPROVED':
-      return 'approved';
-    case 'CHANGES_REQUESTED':
-      return 'changes-requested';
-    case 'DISMISSED':
-      return 'declined';
-    case 'COMMENTED':
-    case 'PENDING':
-    default:
-      return 'no-response';
-  }
-}
+/** Review states that leave the reviewer's earlier verdict standing.
+ *  A dismissal does not: it sets the verdict aside. */
+const REMARKS = new Set(['COMMENTED', 'PENDING']);
 
+/**
+ * Each reviewer's standing verdict, oldest reviews first. A reply in a
+ * review thread is filed as a `COMMENTED` review, so a comment after a
+ * verdict leaves the verdict standing, as GitHub counts it.
+ */
 export function latestReviewPerUser(
   reviews: { author: { login: string } | null; state: string }[]
 ): PullRequestReviewer[] {
   const byUser = new Map<string, { login: string; state: string }>();
   for (const r of reviews) {
     if (!r.author) continue;
+    const standing = byUser.get(r.author.login);
+    if (standing && !REMARKS.has(standing.state) && REMARKS.has(r.state)) {
+      continue;
+    }
     byUser.set(r.author.login, { login: r.author.login, state: r.state });
   }
   return [...byUser.values()].map((r) => ({
@@ -276,19 +215,29 @@ export function mapRollupState(
 }
 
 function transformSearchNode(node: SearchPrNode): PullRequestInfo {
-  const reviewers = latestReviewPerUser(node.reviews.nodes);
+  // A review is not a request: someone who only commented is not asked,
+  // and the list says so rather than leaving it unsaid.
+  const reviewers = latestReviewPerUser(node.reviews.nodes).map((r) => ({
+    ...r,
+    requested: false,
+  }));
 
-  // Merge requested reviewers who haven't submitted a review yet
-  const reviewedLogins = new Set(
-    reviewers.map((r) => r.identifier.toLowerCase())
+  // Everyone with an open request is asked, including someone asked
+  // again after their verdict, who keeps it.
+  const byLogin = new Map(
+    reviewers.map((r) => [r.identifier.toLowerCase(), r])
   );
   for (const req of node.reviewRequests.nodes) {
     const login = req.requestedReviewer?.login;
-    if (login && !reviewedLogins.has(login.toLowerCase())) {
+    if (!login) continue;
+    const reviewed = byLogin.get(login.toLowerCase());
+    if (reviewed) reviewed.requested = true;
+    else {
       reviewers.push({
         displayName: login,
         identifier: login,
         decision: 'no-response',
+        requested: true,
       });
     }
   }
@@ -776,6 +725,34 @@ export const githubProvider: VcsProvider = {
       host: 'github.com',
       repository: `${owner}/${repo}`,
     };
+  },
+
+  fetchPullRequestDetail(
+    _auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestDetail> {
+    const { owner, repo } = project;
+    if (!owner || !repo) {
+      return Promise.reject(
+        new VcsError('not-found', 'No GitHub repository is configured')
+      );
+    }
+    return fetchPullRequestDetailGitHub(owner, repo, prId);
+  },
+
+  fetchPullRequestChecks(
+    _auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestChecks> {
+    const { owner, repo } = project;
+    if (!owner || !repo) {
+      return Promise.reject(
+        new VcsError('not-found', 'No GitHub repository is configured')
+      );
+    }
+    return fetchPullRequestChecksGitHub(owner, repo, prId);
   },
 
   async fetchMergedBranches(

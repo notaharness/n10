@@ -15,11 +15,11 @@ import {
 } from './review-model.js';
 
 /**
- * Property tests for the comment list, alongside the worked cases in
+ * Property tests for the comment rows, alongside the worked cases in
  * review-model.spec.ts.
  *
- * The list is a merge of three sources that the rail and the diff
- * toolbar both walk. The failures that matter are the ones no single
+ * The rows are a merge of three sources that the diff toolbar and the
+ * header's unresolved count both walk. The failures that matter are the ones no single
  * example catches: a comment that appears twice, one that disappears,
  * an order that is not an order, a "next" that lands outside the list.
  */
@@ -222,9 +222,6 @@ const rowList = fc
       (x, i): CommentRow => ({
         id: `${x.id}#${i}`,
         kind: 'thread',
-        author: 'a',
-        where: 'w',
-        preview: 'p',
         resolved: x.resolved,
         resolvable: true,
         file: 'src/a.ts',
