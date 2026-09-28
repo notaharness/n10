@@ -59,8 +59,12 @@ describe('RemoteSessionPoller (D3: one list-sessions call fans out to every back
       onState: (s) => bStates.push(s),
       onUnreachable: () => undefined,
     });
-    await flushImmediatePoll();
+    await vi.advanceTimersByTimeAsync(0);
+    run.mockClear();
+    aStates.length = 0;
+    bStates.length = 0;
 
+    await vi.advanceTimersByTimeAsync(1000);
     expect(run).toHaveBeenCalledTimes(1);
     expect(aStates).toEqual([
       {
@@ -70,7 +74,50 @@ describe('RemoteSessionPoller (D3: one list-sessions call fans out to every back
         exitSignal: undefined,
       },
     ]);
-    expect(bStates).toEqual([
+    expect(bStates).toEqual(aStates);
+    poller.dispose();
+  });
+
+  it('gives a subscription made while a listing is in flight only a listing requested after it', async () => {
+    const listings: ((
+      result: Awaited<ReturnType<MachineExecutor['run']>>
+    ) => void)[] = [];
+    run.mockImplementation(
+      () =>
+        new Promise<Awaited<ReturnType<MachineExecutor['run']>>>((resolve) =>
+          listings.push(resolve)
+        )
+    );
+    const poller = new RemoteSessionPoller(executor, 1000);
+    const unsubscribe = poller.subscribe('a', {
+      onState: () => undefined,
+      onUnreachable: () => undefined,
+    });
+    await flushImmediatePoll();
+    // The pane is respawned and a new backend subscribes under the
+    // same name before the listing that saw the dead pane arrives.
+    unsubscribe();
+    const states: { found: boolean; paneDead: boolean }[] = [];
+    poller.subscribe('a', {
+      onState: (s) => states.push(s),
+      onUnreachable: () => undefined,
+    });
+    listings[0]!({
+      stdout: listSessionsOutput([{ name: 'a', paneDead: true, exitCode: 0 }]),
+      stderr: '',
+      code: 0,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(states).toEqual([]);
+
+    expect(listings).toHaveLength(2);
+    listings[1]!({
+      stdout: listSessionsOutput([{ name: 'a' }]),
+      stderr: '',
+      code: 0,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(states).toEqual([
       {
         found: true,
         paneDead: false,
@@ -78,9 +125,6 @@ describe('RemoteSessionPoller (D3: one list-sessions call fans out to every back
         exitSignal: undefined,
       },
     ]);
-
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(run).toHaveBeenCalledTimes(2);
     poller.dispose();
   });
 
@@ -175,6 +219,83 @@ describe('RemoteSessionPoller (D3: one list-sessions call fans out to every back
     await vi.advanceTimersByTimeAsync(1000);
     expect(events).toEqual([]);
     poller.dispose();
+  });
+
+  it('waits for the next tick after a failed listing, even for a subscription made while it was in flight', async () => {
+    let fail!: (err: Error) => void;
+    run.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          fail = reject;
+        })
+    );
+    run.mockRejectedValue(new Error('connection lost'));
+    const poller = new RemoteSessionPoller(executor, 1000);
+    const events: string[] = [];
+    const subscriber = {
+      onState: () => events.push('state'),
+      onUnreachable: () => events.push('unreachable'),
+    };
+    poller.subscribe('a', subscriber);
+    await flushImmediatePoll();
+    poller.subscribe('b', { ...subscriber });
+    fail(new Error('connection lost'));
+    await vi.advanceTimersByTimeAsync(0);
+    // One miss is still a blip: no retry at once, which would turn it
+    // into two and churn every healthy stream on the machine.
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(events).toEqual([]);
+    poller.dispose();
+  });
+
+  it('keeps a newer subscription under the same name when an old one unsubscribes again', async () => {
+    run.mockResolvedValue({
+      stdout: listSessionsOutput([{ name: 'a' }]),
+      stderr: '',
+      code: 0,
+    });
+    const poller = new RemoteSessionPoller(executor, 1000);
+    const unsubscribeOld = poller.subscribe('a', {
+      onState: () => undefined,
+      onUnreachable: () => undefined,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    // The old backend exits and unsubscribes; the pane is respawned and
+    // a new backend subscribes; then the old one's dispose() unsubscribes
+    // a second time.
+    unsubscribeOld();
+    const states: unknown[] = [];
+    poller.subscribe('a', {
+      onState: (s) => states.push(s),
+      onUnreachable: () => undefined,
+    });
+    unsubscribeOld();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(states).not.toEqual([]);
+    poller.dispose();
+  });
+
+  it('does not raise an unhandled rejection when a subscriber throws', async () => {
+    run.mockRejectedValue(new Error('connection lost'));
+    const poller = new RemoteSessionPoller(executor, 1000);
+    poller.subscribe('a', {
+      onState: () => undefined,
+      onUnreachable: () => {
+        throw new Error('subscriber bug');
+      },
+    });
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
+    try {
+      // The second consecutive miss reaches the subscriber.
+      await vi.advanceTimersByTimeAsync(1000);
+      vi.useRealTimers();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off('unhandledRejection', unhandled);
+      poller.dispose();
+    }
   });
 
   it('reports a session tmux no longer lists as not found, distinct from a paneDead retained pane', async () => {

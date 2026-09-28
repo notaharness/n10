@@ -74,9 +74,9 @@ test.describe('Machines over beam', () => {
       await expect(row.getByText('Connected')).toBeVisible();
 
       await row.getByRole('button', { name: 'Machine actions' }).click();
-      await page.getByRole('menuitem', { name: 'Rename here…' }).click();
-      await row.getByLabel('Name on this machine').fill('build');
-      await row.getByLabel('Name on this machine').press('Enter');
+      await page.getByRole('menuitem', { name: 'Rename locally…' }).click();
+      await row.getByLabel('Local name').fill('build');
+      await row.getByLabel('Local name').press('Enter');
       await expect(row.getByText('build')).toBeVisible();
       expect(beam!.ops('peer.alias')[0]).toMatchObject({
         peer: WORKBOX,
