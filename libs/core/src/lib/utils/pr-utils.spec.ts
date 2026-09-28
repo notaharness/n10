@@ -4,9 +4,11 @@ import type {
   BranchPrMap,
   PullRequestInfo,
   AppConfig,
+  ReviewDecision,
   VcsProvider,
 } from '@n10/vcs-core';
 import {
+  asksForReview,
   findOrphanPrs,
   categorizeReviews,
   buildSessionPrMap,
@@ -292,6 +294,22 @@ describe('categorizeReviews', () => {
     const result = categorizeReviews(prMap, mockConfig, mockProvider);
     expect(result.waitingForAuthor.map((p) => p.id)).toEqual([1]);
     expect(result.approvedByYou.map((p) => p.id)).toEqual([2]);
+  });
+});
+
+describe('asksForReview', () => {
+  const reviewer = (decision: ReviewDecision, requested?: boolean) => ({
+    identifier: 'bob',
+    displayName: 'Bob',
+    decision,
+    requested,
+  });
+
+  it('asks a reviewer without a verdict, or asked again after one', () => {
+    expect(asksForReview(reviewer('no-response'))).toBe(true);
+    expect(asksForReview(reviewer('approved', true))).toBe(true);
+    expect(asksForReview(reviewer('approved'))).toBe(false);
+    expect(asksForReview(reviewer('declined', true))).toBe(false);
   });
 });
 

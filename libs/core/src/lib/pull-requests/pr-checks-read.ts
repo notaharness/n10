@@ -3,9 +3,11 @@ import {
   readFailure,
   samePullRequest,
   type PullRequestChecks,
+  type PullRequestInfo,
   type PullRequestRef,
   type ReadOutcome,
 } from '@n10/vcs-core';
+import { asksForReview } from '../utils/pr-utils.js';
 import { checkList, type CheckList } from './pr-check-list.js';
 import { listReadiness } from './pr-readiness-list.js';
 import {
@@ -39,6 +41,18 @@ export interface PullRequestChecksAnswer {
   /** The checks and policies to read, in order; null where they could
    *  not be read. */
   list: CheckList | null;
+}
+
+/** The list row asks the viewer for a review: the provider's own
+ *  request, as the sidebar files it under Needs your review. */
+function asksViewer(
+  row: PullRequestInfo | null,
+  viewer: string | null
+): boolean {
+  if (!row || viewer == null) return false;
+  const me = viewer.toLowerCase();
+  const entry = row.reviewers?.find((r) => r.identifier.toLowerCase() === me);
+  return entry != null && asksForReview(entry);
 }
 
 export interface ChecksSources
@@ -100,6 +114,7 @@ export async function readPullRequestChecks(
             checks: checks.value.checks,
             rules: checks.value.rules,
             unresolvedThreads: unresolved,
+            viewerAsked: asksViewer(row, viewer),
           })
         : listReadiness(row),
     list: checks.state === 'read' ? checkList(checks.value) : null,

@@ -57,6 +57,42 @@ function sources(over: Partial<ChecksSources> = {}): ChecksSources {
 }
 
 describe('readPullRequestChecks', () => {
+  it('makes a review still to come the viewer’s where the provider asks them', async () => {
+    const required = answer({
+      merge: { ...answer().merge, reviews: 'required' },
+    });
+    const withReviewers = (reviewers: PullRequestInfo['reviewers']) =>
+      sources({
+        checks: () => Promise.resolve(required),
+        lookup: () =>
+          Promise.resolve({ kind: 'found', pr: { ...ROW, reviewers } }),
+      });
+    const resolver = async (reviewers: PullRequestInfo['reviewers']) =>
+      (
+        await readPullRequestChecks(
+          { ref: REF, viewer: 'bob' },
+          withReviewers(reviewers)
+        )
+      ).readiness.blockers.find((b) => b.kind === 'reviews')?.resolvedBy;
+    const bob = { identifier: 'Bob', displayName: 'Bob' };
+    expect(await resolver([{ ...bob, decision: 'no-response' }])).toBe(
+      'viewer'
+    );
+    // Asked again after their verdict.
+    expect(
+      await resolver([{ ...bob, decision: 'approved', requested: true }])
+    ).toBe('viewer');
+    // Not asked: someone else is, or they declined.
+    expect(
+      await resolver([
+        { identifier: 'cy', displayName: 'Cy', decision: 'no-response' },
+      ])
+    ).toBe('reviewers');
+    expect(await resolver([{ ...bob, decision: 'declined' }])).toBe(
+      'reviewers'
+    );
+  });
+
   it('evaluates readiness with the list row’s unresolved conversations', async () => {
     const res = await readPullRequestChecks(
       { ref: REF, viewer: 'bob' },
