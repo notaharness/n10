@@ -10,7 +10,7 @@ import type {
 import {
   asksViewer,
   reviewRequirements,
-  ruleLines,
+  type ReviewRequirements,
 } from './pr-review-requirements.js';
 
 /**
@@ -70,6 +70,15 @@ function rules(reviews: Partial<ReviewRule>): ReadOutcome<BranchRules> {
       },
     },
   };
+}
+
+/** Each reviewer's rules, by name. */
+function rulesBy(got: ReviewRequirements) {
+  return got.reviewers.state === 'read'
+    ? Object.fromEntries(
+        got.reviewers.value.items.map((r) => [r.displayName, r.rules])
+      )
+    : {};
 }
 
 const ROW: PullRequestInfo = {
@@ -147,10 +156,10 @@ const AZURE_RULE = rules({
       applies: true,
       blocking: false,
     },
-    // Its paths match no change here: it asks nothing now, but it is
-    // what made Web Reviewers required.
+    // Its paths match no change here: it asks nothing now, and may or
+    // may not be what made Web Reviewers required.
     {
-      name: 'Required reviewers',
+      name: 'Docs reviewers',
       ids: ['aaaa-21'],
       kind: 'identity',
       approvals: null,
@@ -191,13 +200,65 @@ describe('reviewRequirements on Azure DevOps', () => {
     ]);
   });
 
-  it('puts the rule in words, naming the reviewers a policy requires where it applies', () => {
-    expect(
-      reviewRequirements(detail([RELEASE, BEN, WEB]), AZURE_RULE).rule
-    ).toEqual([
-      '2 approvals required',
-      '1 approval from Release Approvers (/release/*)',
+  it('lists each policy that names a reviewer, as Azure states it', () => {
+    const by = rulesBy(
+      reviewRequirements(detail([RELEASE, WEB, BEN, QA, OPS]), AZURE_RULE)
+    );
+    expect(by['Release Approvers']).toEqual([
+      {
+        name: 'Required reviewers',
+        asks: '1 approval required',
+        paths: ['/release/*'],
+        applies: true,
+      },
     ]);
+    // Named, and not applicable here: said so, not taken as the reason.
+    expect(by['Web Reviewers']).toEqual([
+      {
+        name: 'Docs reviewers',
+        asks: 'Must approve',
+        paths: ['/docs/*'],
+        applies: false,
+      },
+    ]);
+    expect(by['Ben Ode']).toEqual([
+      {
+        name: 'Required reviewers',
+        asks: 'Adds them; their approval is optional',
+        paths: [],
+        applies: true,
+      },
+    ]);
+    // Required, and named only by the optional policy: it names them
+    // all the same.
+    expect(by['Ola Soto']).toEqual(by['Ben Ode']);
+    expect(by['Quinn Ames']).toEqual([]);
+  });
+
+  it('names everyone a policy asks for together, where all are listed', () => {
+    const both = rules({
+      named: [
+        {
+          name: 'Required reviewers',
+          ids: ['aaaa-22', 'AAAA-02'],
+          kind: 'identity',
+          approvals: 1,
+          paths: [],
+          applies: true,
+          blocking: true,
+        },
+      ],
+    });
+    const ben = { ...BEN, required: true };
+    expect(
+      rulesBy(reviewRequirements(detail([RELEASE, ben]), both))['Ben Ode']
+    ).toMatchObject([
+      { asks: '1 approval from Release Approvers and Ben Ode' },
+    ]);
+    // One of them not listed: counted, not named.
+    expect(
+      rulesBy(reviewRequirements(detail([ben]), both))['Ben Ode']
+    ).toMatchObject([{ asks: '1 approval from 2 required reviewers' }]);
   });
 
   it('knows no reason for a required reviewer when the policies were not read', () => {
@@ -206,10 +267,9 @@ describe('reviewRequirements on Azure DevOps', () => {
       kind: 'network',
       reason: 'offline',
     });
-    expect(got.rule).toBeNull();
     expect(got.reviewers).toMatchObject({
       state: 'read',
-      value: { items: [{ requirement: 'required', reason: null }] },
+      value: { items: [{ requirement: 'required', reason: null, rules: [] }] },
     });
   });
 });
@@ -232,60 +292,101 @@ describe('reviewRequirements on GitHub', () => {
       // Asked, and nothing more: GitHub marks no one required.
       ['unknown', null],
     ]);
-    expect(got.rule).toEqual([
-      '1 approval required',
-      'Code owners must approve',
-    ]);
-  });
-
-  it('counts a required team it cannot name', () => {
+    // The code-owner rule is the owner's to explain; the count is
+    // Completion's.
     expect(
-      ruleLines(
-        {
-          approvals: 0,
-          codeOwners: false,
-          named: [
-            {
-              name: null,
-              ids: ['777'],
-              kind: 'team',
-              approvals: 2,
-              paths: ['src/**'],
-              applies: null,
-              blocking: true,
-            },
-            {
-              name: null,
-              ids: ['1', '2'],
-              kind: 'team',
-              approvals: null,
-              paths: [],
-              applies: null,
-              blocking: true,
-            },
-            // A minimum of 0: added, not required.
-            {
-              name: null,
-              ids: ['3'],
-              kind: 'team',
-              approvals: 0,
-              paths: [],
-              applies: null,
-              blocking: false,
-            },
-          ],
-          approvalsMet: null,
-        },
-        []
-      )
+      got.reviewers.state === 'read' &&
+        got.reviewers.value.items.map((r) => r.rules)
     ).toEqual([
-      '2 approvals from a required team (src/**)',
-      '2 required teams must approve',
+      [
+        {
+          name: 'Code owner review',
+          asks: 'A code owner of the changed files must approve',
+          paths: [],
+          applies: null,
+        },
+      ],
+      [],
     ]);
   });
 
-  it('says nothing where the rules ask nothing', () => {
-    expect(reviewRequirements(detail([]), rules({})).rule).toEqual([]);
+  it('names no code-owner rule where the rules do not ask for one', () => {
+    const owner = reviewer({ identifier: 'cam', reason: 'code-owner' });
+    const got = reviewRequirements(detail([owner]), rules({ approvals: 1 }));
+    expect(got.reviewers).toMatchObject({
+      value: { items: [{ reason: 'code-owner', rules: [] }] },
+    });
+  });
+
+  it('finds the rule set that names a team by the id rule sets use', () => {
+    const core = reviewer({
+      kind: 'team',
+      identifier: 'acme/core',
+      id: 'T_kwDOcore',
+      ruleId: '777',
+      displayName: 'Core',
+    });
+    const web = reviewer({
+      kind: 'team',
+      identifier: 'acme/web',
+      id: 'T_kwDOweb',
+      ruleId: '778',
+      displayName: 'Web',
+    });
+    const got = reviewRequirements(
+      detail([core, web]),
+      rules({
+        named: [
+          {
+            name: null,
+            ids: ['777'],
+            kind: 'team',
+            approvals: 2,
+            paths: ['src/**', 'libs/**'],
+            applies: null,
+            blocking: true,
+          },
+          // A minimum of 0: added, not required.
+          {
+            name: null,
+            ids: ['778'],
+            kind: 'team',
+            approvals: 0,
+            paths: [],
+            applies: null,
+            blocking: false,
+          },
+        ],
+      })
+    );
+    // GitHub does not say whether the paths match these changes, so the
+    // rule is not given as why they are listed.
+    expect(got.reviewers).toMatchObject({
+      value: {
+        items: [
+          { identifier: 'acme/core', requirement: 'unknown', reason: null },
+          { identifier: 'acme/web', requirement: 'unknown', reason: null },
+        ],
+      },
+    });
+    expect(rulesBy(got)).toEqual({
+      Core: [
+        {
+          name: 'Branch rule',
+          asks: '2 approvals required',
+          paths: ['src/**', 'libs/**'],
+          applies: null,
+        },
+      ],
+      Web: [
+        {
+          name: 'Branch rule',
+          asks: 'Adds them; their approval is optional',
+          paths: [],
+          applies: null,
+        },
+      ],
+    });
   });
 
   it('passes on a detail read that failed', () => {

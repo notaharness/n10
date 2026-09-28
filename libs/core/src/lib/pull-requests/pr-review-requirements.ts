@@ -30,6 +30,21 @@ export type ReviewerRequirement = 'required' | 'optional' | 'unknown';
  *  changes. */
 export type RequirementReason = 'policy' | 'code-owner';
 
+/** A rule that names a reviewer, or asks for their review as a code
+ *  owner, as the provider states it: what it is called, what it asks,
+ *  where, and whether it applies here. */
+export interface StandingRule {
+  /** The provider's name for it, or what it is where it names none. */
+  name: string;
+  /** What it asks, in words: "1 approval required". */
+  asks: string;
+  /** The paths it is limited to; empty for any change. */
+  paths: string[];
+  /** False where the provider evaluated it as not applying to these
+   *  changes; null where it does not say. */
+  applies: boolean | null;
+}
+
 export interface ReviewerStanding {
   kind: DetailReviewer['kind'];
   identifier: string;
@@ -39,14 +54,14 @@ export interface ReviewerStanding {
   requirement: ReviewerRequirement;
   /** Null where the provider does not say, or they were simply asked. */
   reason: RequirementReason | null;
+  /** Every rule read that names them, whether or not it is why they
+   *  are listed: each says so itself. Empty where none does. */
+  rules: StandingRule[];
 }
 
 export interface ReviewRequirements {
   /** Everyone the detail read names, each with their standing. */
   reviewers: ReadOutcome<ListRead<ReviewerStanding>>;
-  /** What the rules ask of reviews, one requirement a line; empty where
-   *  they ask nothing, null where they could not be read. */
-  rule: string[] | null;
 }
 
 function requirementOf(required: boolean | null): ReviewerRequirement {
@@ -56,6 +71,19 @@ function requirementOf(required: boolean | null): ReviewerRequirement {
 
 const sameId = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
+/** The id the rules name this reviewer by. */
+const ruleIdOf = (r: DetailReviewer) => r.ruleId ?? r.id;
+
+/** Every rule that names this reviewer by id. */
+function naming(
+  reviewer: DetailReviewer,
+  rule: ReviewRule | null
+): NamedReviewers[] {
+  const id = ruleIdOf(reviewer);
+  if (id == null || !rule) return [];
+  return rule.named.filter((n) => n.ids.some((i) => sameId(i, id)));
+}
+
 /** The policy that lists this reviewer as they are, by the provider's
  *  own evaluation: it applies to these changes, names them by id, and
  *  adds them as they are listed, a blocking one as required and
@@ -64,12 +92,9 @@ function namedBy(
   reviewer: DetailReviewer,
   rule: ReviewRule | null
 ): NamedReviewers | undefined {
-  const id = reviewer.id;
-  if (id == null || !rule) return undefined;
-  return rule.named.find(
+  return naming(reviewer, rule).find(
     (n) =>
       n.applies === true &&
-      n.ids.some((i) => sameId(i, id)) &&
       (reviewer.required == null || n.blocking === reviewer.required)
   );
 }
@@ -91,7 +116,8 @@ function reasonOf(
 
 export function standingOf(
   reviewer: DetailReviewer,
-  rule: ReviewRule | null
+  rule: ReviewRule | null,
+  everyone: readonly DetailReviewer[] = []
 ): ReviewerStanding {
   return {
     kind: reviewer.kind,
@@ -101,6 +127,7 @@ export function standingOf(
     requested: reviewer.requested,
     requirement: requirementOf(reviewer.required),
     reason: reasonOf(reviewer, rule),
+    rules: rulesOf(reviewer, rule, everyone),
   };
 }
 
@@ -114,42 +141,56 @@ function listed(names: readonly string[]): string {
 /** Who a named rule asks for: by name where every one is listed, else
  *  by number. */
 function whoOf(n: NamedReviewers, reviewers: readonly DetailReviewer[]) {
-  const names = n.ids.map(
-    (id) => reviewers.find((r) => r.id != null && sameId(r.id, id))?.displayName
-  );
+  const names = n.ids.map((id) => {
+    const named = reviewers.find((r) => {
+      const own = ruleIdOf(r);
+      return own != null && sameId(own, id);
+    });
+    return named?.displayName;
+  });
   if (names.every((name): name is string => name != null)) return listed(names);
   const what = n.kind === 'team' ? 'required team' : 'required reviewer';
-  return n.ids.length === 1 ? `a ${what}` : count(n.ids.length, what);
+  return count(n.ids.length, what);
 }
 
-function namedLine(
+/** What a named rule asks of those it names. */
+function asksOf(
   n: NamedReviewers,
   reviewers: readonly DetailReviewer[]
 ): string {
-  const who = whoOf(n, reviewers);
-  const line =
-    n.approvals == null
-      ? `${who} must approve`
-      : `${count(n.approvals, 'approval')} from ${who}`;
-  return n.paths.length > 0 ? `${line} (${n.paths.join(', ')})` : line;
+  if (!n.blocking) return 'Adds them; their approval is optional';
+  if (n.approvals == null) {
+    return n.ids.length === 1 ? 'Must approve' : 'Each must approve';
+  }
+  const approvals = count(n.approvals, 'approval');
+  return n.ids.length === 1
+    ? `${approvals} required`
+    : `${approvals} from ${whoOf(n, reviewers)}`;
 }
 
-/** The rule in words: a number of approvals, code owners, and each
- *  reviewer a rule names, where it blocks completion and is not known
- *  to leave these changes out. */
-export function ruleLines(
-  rule: ReviewRule,
-  reviewers: readonly DetailReviewer[]
-): string[] {
-  const lines: string[] = [];
-  if (rule.approvals > 0) {
-    lines.push(`${count(rule.approvals, 'approval')} required`);
-  }
-  if (rule.codeOwners) lines.push('Code owners must approve');
-  for (const n of rule.named) {
-    if (n.blocking && n.applies !== false) lines.push(namedLine(n, reviewers));
-  }
-  return lines;
+/** The rules that name this reviewer, and the code-owner rule for a
+ *  code owner, in the provider's terms. */
+function rulesOf(
+  reviewer: DetailReviewer,
+  rule: ReviewRule | null,
+  everyone: readonly DetailReviewer[]
+): StandingRule[] {
+  const named = naming(reviewer, rule).map((n) => ({
+    name: n.name ?? 'Branch rule',
+    asks: asksOf(n, everyone),
+    paths: n.paths,
+    applies: n.applies,
+  }));
+  if (reviewer.reason !== 'code-owner' || !rule?.codeOwners) return named;
+  return [
+    ...named,
+    {
+      name: 'Code owner review',
+      asks: 'A code owner of the changed files must approve',
+      paths: [],
+      applies: null,
+    },
+  ];
 }
 
 function detailReviewers(
@@ -164,19 +205,16 @@ export function reviewRequirements(
 ): ReviewRequirements {
   const rule = rules?.state === 'read' ? rules.value.reviews : null;
   const read = detailReviewers(detail);
-  const named = read.state === 'read' ? read.value.items : [];
+  if (read.state !== 'read') return { reviewers: read };
+  const everyone = read.value.items;
   return {
-    reviewers:
-      read.state === 'read'
-        ? {
-            state: 'read',
-            value: {
-              ...read.value,
-              items: read.value.items.map((r) => standingOf(r, rule)),
-            },
-          }
-        : read,
-    rule: rule ? ruleLines(rule, named) : null,
+    reviewers: {
+      state: 'read',
+      value: {
+        ...read.value,
+        items: everyone.map((r) => standingOf(r, rule, everyone)),
+      },
+    },
   };
 }
 

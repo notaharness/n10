@@ -49,9 +49,10 @@ const REVIEWS: Record<MergeState['reviews'], Omit<ReadinessAspect, 'id'>> = {
   unknown: { state: 'unknown', text: 'Requirement not stated' },
 };
 
-/** The approvals the rules ask for, in words; null where they ask
- *  none or could not be read. */
+/** The approvals the rules ask for, in words, or that the rules could
+ *  not be read; null where they ask none, or the provider reads none. */
 function approvalsAsked({ rules }: ReadinessInputs): string | null {
+  if (rules.state === 'failed') return 'rules could not be read';
   const n = rules.state === 'read' ? rules.value.reviews.approvals : 0;
   return n > 0 ? `${n} approval${n === 1 ? '' : 's'} required` : null;
 }

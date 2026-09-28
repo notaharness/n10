@@ -145,7 +145,7 @@ describe('readiness aspects', () => {
       text: '1 approval required',
     });
     expect(asking(0, 'required')?.text).toBe('Waiting for review');
-    // Unread rules add nothing.
+    // Rules that could not be read are said so: the count is unknown.
     expect(
       aspect(
         inputs({
@@ -154,7 +154,7 @@ describe('readiness aspects', () => {
         }),
         'reviews'
       )?.text
-    ).toBe('Waiting for review');
+    ).toBe('Waiting for review · rules could not be read');
   });
 
   it('names the worst required check or policy, in the verdict’s words', () => {
