@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { watch } from 'node:fs';
 import {
   readComments,
-  commentDirPath,
+  watchComments,
   type DraftScope,
   type ReviewComment,
 } from '@n10/review-comments';
@@ -32,21 +31,14 @@ export function useReviewComments(scope: DraftScope | null): ReviewComment[] {
   useEffect(() => {
     if (repo === null || prId === null) return;
 
-    const dir = commentDirPath({ repo, prId });
-    let watcher: ReturnType<typeof watch> | null = null;
-
-    try {
-      watcher = watch(dir, () => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(bumpRevision, 100);
-      });
-    } catch {
-      // Directory may not exist yet
-    }
-
+    const changed = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(bumpRevision, 100);
+    };
+    const unwatch = watchComments({ repo, prId }, changed);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      watcher?.close();
+      unwatch();
     };
   }, [repo, prId, bumpRevision]);
 

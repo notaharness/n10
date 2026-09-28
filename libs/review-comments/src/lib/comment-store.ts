@@ -1,6 +1,7 @@
+import { watch, type FSWatcher } from 'node:fs';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { withFileLock } from './file-lock.js';
 import type { ReviewComment, ReviewCommentsFile } from './types.js';
@@ -156,4 +157,56 @@ export function removeComment(scope: DraftScope, id: string): Promise<boolean> {
     comments.splice(idx, 1);
     return true;
   });
+}
+
+/**
+ * Call `onChange` whenever a PR's drafts file may have changed, until
+ * the returned function is called.
+ *
+ * A review usually starts with no drafts at all: the agent writes the
+ * first one some time after the PR is opened, and a watch cannot be
+ * installed on a directory that does not exist yet. So until the PR's
+ * own directory appears, the repository's drafts directory (created
+ * here: one per repository, not one per PR looked at) is watched for
+ * it, and the PR's is watched from then on. The watches are on
+ * directories rather than the file because writes replace the file by
+ * rename. An unheard 'error' event would be thrown, so each watcher
+ * handles its own.
+ */
+export function watchComments(
+  scope: DraftScope,
+  onChange: () => void
+): () => void {
+  const dir = commentDirPath(scope);
+  const repoDir = dirname(dir);
+  let closed = false;
+  let repoWatcher: FSWatcher | undefined;
+  let prWatcher: FSWatcher | undefined;
+  const watchPr = () => {
+    if (closed || prWatcher) return;
+    try {
+      prWatcher = watch(dir, onChange).on('error', () => prWatcher?.close());
+    } catch {
+      return; // Not there yet.
+    }
+    // The first draft may already be in it.
+    onChange();
+  };
+  const watchRepo = () => {
+    if (closed) return;
+    repoWatcher = watch(repoDir, (_event, name) => {
+      if (name === null || name === basename(dir)) watchPr();
+    }).on('error', () => repoWatcher?.close());
+    watchPr();
+  };
+  // A directory that cannot be created or watched (no space, no
+  // inotify instances left) leaves the drafts showing, just not live.
+  mkdir(repoDir, { recursive: true })
+    .then(watchRepo)
+    .catch(() => undefined);
+  return () => {
+    closed = true;
+    repoWatcher?.close();
+    prWatcher?.close();
+  };
 }
