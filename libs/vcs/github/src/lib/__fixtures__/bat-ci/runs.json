@@ -1,0 +1,31 @@
+{
+  "total_count": 2,
+  "workflow_runs": [
+    {
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "beb1258da78f003ab057914860e6907b1e2adf2b",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173260",
+      "id": 36270173260,
+      "name": "Changelog",
+      "run_attempt": 1,
+      "run_number": 2406,
+      "run_started_at": "2026-09-26T20:37:42Z",
+      "status": "completed",
+      "updated_at": "2026-09-26T20:37:48Z"
+    },
+    {
+      "conclusion": "failure",
+      "event": "pull_request",
+      "head_sha": "beb1258da78f003ab057914860e6907b1e2adf2b",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409",
+      "id": 36270173409,
+      "name": "CICD",
+      "run_attempt": 1,
+      "run_number": 6010,
+      "run_started_at": "2026-09-26T20:37:42Z",
+      "status": "completed",
+      "updated_at": "2026-09-26T20:50:53Z"
+    }
+  ]
+}

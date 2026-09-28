@@ -1,3 +1,5 @@
+import type { CiLog, CiLogRef, CiOverview } from './ci.js';
+
 export type ReviewDecision =
   | 'approved'
   | 'changes-requested'
@@ -177,6 +179,26 @@ export interface VcsProvider {
     prId: number,
     verdict: ReviewVerdict
   ): Promise<void>;
+
+  /**
+   * The pipelines that ran against a PR, as a graph of stages, jobs and
+   * steps. `headSha` is the head the cached list names; a provider that
+   * finds runs by commit (GitHub) needs it, one that finds them by PR
+   * (Azure) may ignore it.
+   */
+  fetchCiOverview?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    pr: { id: number; headSha?: string }
+  ): Promise<CiOverview>;
+
+  /** The last `tailLines` lines of one job's or step's log. */
+  fetchCiLog?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    ref: CiLogRef,
+    tailLines: number
+  ): Promise<CiLog>;
 }
 
 // ── Remote comment threads (fetched from VCS providers) ───────────

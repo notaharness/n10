@@ -7,6 +7,7 @@ import {
   networkError,
   quotaExhausted,
   readJsonResponse,
+  readTextResponse,
   RequestCache,
   retryAfterMs,
   throttledError,
@@ -185,6 +186,21 @@ export function adoGetPage<T>(
     const res = await send(context, url, { headers });
     const continuation = res.headers.get('x-ms-continuationtoken');
     return { data: await toJson<T>(res, what), continuation };
+  });
+}
+
+/** A GET of plain text, such as a log. Not cached: logs are read on
+ *  demand, one range at a time. */
+export async function adoGetText(
+  context: string,
+  url: string,
+  headers: Record<string, string>,
+  what?: string
+): Promise<string> {
+  return readTextResponse(await send(context, url, { headers }), {
+    providerName: PROVIDER_NAME,
+    what,
+    isSignInBody: looksLikeAdoSignIn,
   });
 }
 

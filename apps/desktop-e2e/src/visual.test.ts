@@ -9,6 +9,7 @@ import {
 } from './setup/app.js';
 import { armContextMenuChoice, clickAppMenuItem } from './setup/menu.js';
 import type { FakeGitHub } from './setup/fake-gh.js';
+import { RECORDED_HEAD, recordedCiApi } from './setup/ci-fixture.js';
 import { fleetView } from './setup/machines.js';
 
 /**
@@ -288,5 +289,47 @@ test.describe('Visual (plan, light theme) @visual', () => {
   test('plan checkout pane in light theme', async ({ desktop }) => {
     const pane = await buildPlan(desktop.page);
     await expect(pane).toHaveScreenshot('plan-pane-light.png', shot);
+  });
+});
+
+/**
+ * The CI page (preview) with a failed job open: its steps and the tail
+ * of its log, from a recorded `sharkdp/bat` run (setup/ci-fixture.ts).
+ * Scoped to the page: nothing in it is relative to the clock.
+ */
+test.describe('Visual (CI) @visual', () => {
+  test.use({
+    repo: {
+      name: 'n10-visual',
+      worktrees: [{ branch: 'ci-review', files: { 'a.txt': 'a\n' } }],
+    },
+    fakeGitHub: {
+      username: 'n10-tester',
+      prs: [
+        {
+          number: 4020,
+          title: 'Make -ppp disable syntax highlighting',
+          headRefName: 'ci-review',
+          headRefOid: RECORDED_HEAD,
+        },
+      ],
+      api: recordedCiApi('n10', 'fixture'),
+    },
+  });
+
+  test('CI page with a failed job open', async ({ desktop }) => {
+    const { page } = desktop;
+    await sidebarRow(page, /Make -ppp disable syntax highlighting|#4020/)
+      .first()
+      .click();
+    await page.getByRole('button', { name: /^CI\b/ }).click();
+    await page.locator('[data-ci-job="Ensure code quality"]').click();
+    await expect(page.getByText('Lines 431–930 of 930')).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.locator('[data-ci-page]')).toHaveScreenshot(
+      'ci-page.png',
+      shot
+    );
   });
 });

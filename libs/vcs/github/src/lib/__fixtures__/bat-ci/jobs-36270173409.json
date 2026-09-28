@@ -1,0 +1,3449 @@
+{
+  "jobs": [
+    {
+      "completed_at": "2026-09-26T20:38:23Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482497817",
+      "id": 108482497817,
+      "name": "Documentation",
+      "started_at": "2026-09-26T20:37:44Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:45Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:44Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:46Z",
+          "conclusion": "success",
+          "name": "Git checkout",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:45Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:47Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:46Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:21Z",
+          "conclusion": "success",
+          "name": "Check documentation",
+          "number": 4,
+          "started_at": "2026-09-26T20:37:47Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:21Z",
+          "conclusion": "success",
+          "name": "Show man page",
+          "number": 5,
+          "started_at": "2026-09-26T20:38:21Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:22Z",
+          "conclusion": "success",
+          "name": "Post Git checkout",
+          "number": 10,
+          "started_at": "2026-09-26T20:38:21Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:22Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 11,
+          "started_at": "2026-09-26T20:38:22Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:38:17Z",
+      "conclusion": "failure",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482497925",
+      "id": 108482497925,
+      "name": "Ensure code quality",
+      "started_at": "2026-09-26T20:37:44Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:46Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:45Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:47Z",
+          "conclusion": "success",
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:46Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:49Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v6",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:47Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:49Z",
+          "conclusion": "success",
+          "name": "Run cargo fmt -- --check",
+          "number": 4,
+          "started_at": "2026-09-26T20:37:49Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:16Z",
+          "conclusion": "failure",
+          "name": "Run cargo clippy --locked --all-targets --all-features -- -D warnings",
+          "number": 5,
+          "started_at": "2026-09-26T20:37:49Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:16Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v6",
+          "number": 10,
+          "started_at": "2026-09-26T20:38:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:16Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 11,
+          "started_at": "2026-09-26T20:38:16Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:37:48Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482497926",
+      "id": 108482497926,
+      "name": "Extract crate metadata",
+      "started_at": "2026-09-26T20:37:44Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:45Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:44Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:46Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v6",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:45Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:46Z",
+          "conclusion": "success",
+          "name": "Extract crate information",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:46Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:46Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v6",
+          "number": 6,
+          "started_at": "2026-09-26T20:37:46Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:46Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 7,
+          "started_at": "2026-09-26T20:37:46Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:40:18Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482497934",
+      "id": 108482497934,
+      "name": "Run tests with system wide configuration",
+      "started_at": "2026-09-26T20:37:44Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:46Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:45Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:47Z",
+          "conclusion": "success",
+          "name": "Git checkout",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:46Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:47Z",
+          "conclusion": "success",
+          "name": "Prepare environment variables",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:47Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:47Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 4,
+          "started_at": "2026-09-26T20:37:47Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:39:31Z",
+          "conclusion": "success",
+          "name": "Build and install bat",
+          "number": 5,
+          "started_at": "2026-09-26T20:37:47Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:16Z",
+          "conclusion": "success",
+          "name": "Run unit tests",
+          "number": 6,
+          "started_at": "2026-09-26T20:39:31Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:16Z",
+          "conclusion": "success",
+          "name": "Post Git checkout",
+          "number": 12,
+          "started_at": "2026-09-26T20:40:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:16Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 13,
+          "started_at": "2026-09-26T20:40:16Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:43:41Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482497950",
+      "id": 108482497950,
+      "name": "Run tests with updated syntaxes and themes",
+      "started_at": "2026-09-26T20:37:44Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:46Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:45Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:39:22Z",
+          "conclusion": "success",
+          "name": "Git checkout",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:46Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:39:23Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 3,
+          "started_at": "2026-09-26T20:39:22Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:46Z",
+          "conclusion": "success",
+          "name": "Build and install bat",
+          "number": 4,
+          "started_at": "2026-09-26T20:39:23Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:47Z",
+          "conclusion": "success",
+          "name": "Rebuild binary assets (syntaxes and themes)",
+          "number": 5,
+          "started_at": "2026-09-26T20:40:46Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:23Z",
+          "conclusion": "success",
+          "name": "Build and install bat with updated assets",
+          "number": 6,
+          "started_at": "2026-09-26T20:40:47Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:35Z",
+          "conclusion": "success",
+          "name": "Run unit tests with new syntaxes and themes",
+          "number": 7,
+          "started_at": "2026-09-26T20:41:23Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:36Z",
+          "conclusion": "success",
+          "name": "Run ignored-by-default unit tests with new syntaxes and themes",
+          "number": 8,
+          "started_at": "2026-09-26T20:43:35Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:37Z",
+          "conclusion": "success",
+          "name": "Syntax highlighting regression test",
+          "number": 9,
+          "started_at": "2026-09-26T20:43:36Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:37Z",
+          "conclusion": "success",
+          "name": "List of languages",
+          "number": 10,
+          "started_at": "2026-09-26T20:43:37Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:37Z",
+          "conclusion": "success",
+          "name": "List of themes",
+          "number": 11,
+          "started_at": "2026-09-26T20:43:37Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:37Z",
+          "conclusion": "success",
+          "name": "Test custom assets",
+          "number": 12,
+          "started_at": "2026-09-26T20:43:37Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:40Z",
+          "conclusion": "success",
+          "name": "Post Git checkout",
+          "number": 24,
+          "started_at": "2026-09-26T20:43:37Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:40Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 25,
+          "started_at": "2026-09-26T20:43:40Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:40:09Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482497957",
+      "id": 108482497957,
+      "name": "cargo audit",
+      "started_at": "2026-09-26T20:37:44Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:45Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:45Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:01Z",
+          "conclusion": "success",
+          "name": "Run cargo install cargo-audit --locked",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:45Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:03Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v6",
+          "number": 3,
+          "started_at": "2026-09-26T20:40:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:08Z",
+          "conclusion": "success",
+          "name": "Run cargo audit",
+          "number": 4,
+          "started_at": "2026-09-26T20:40:03Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:08Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v6",
+          "number": 8,
+          "started_at": "2026-09-26T20:40:08Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:08Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 9,
+          "started_at": "2026-09-26T20:40:08Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:39:53Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482497979",
+      "id": 108482497979,
+      "name": "License checks",
+      "started_at": "2026-09-26T20:37:56Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:57Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:57Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:39:48Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v6",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:57Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:39:49Z",
+          "conclusion": "success",
+          "name": "Run tests/scripts/license-checks.sh",
+          "number": 3,
+          "started_at": "2026-09-26T20:39:48Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:39:51Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v6",
+          "number": 6,
+          "started_at": "2026-09-26T20:39:49Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:39:51Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 7,
+          "started_at": "2026-09-26T20:39:51Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:38:53Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482512326",
+      "id": 108482512326,
+      "name": "Minimum supported rust version",
+      "started_at": "2026-09-26T20:37:49Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:51Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:50Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:52Z",
+          "conclusion": "success",
+          "name": "Checkout source code",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:51Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:00Z",
+          "conclusion": "success",
+          "name": "Install rust toolchain (v1.88)",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:51Z",
+          "conclusion": "success",
+          "name": "Run tests",
+          "number": 4,
+          "started_at": "2026-09-26T20:38:00Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:52Z",
+          "conclusion": "success",
+          "name": "Post Checkout source code",
+          "number": 8,
+          "started_at": "2026-09-26T20:38:51Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:52Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 9,
+          "started_at": "2026-09-26T20:38:52Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:43:30Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482512511",
+      "id": 108482512511,
+      "name": "arm-unknown-linux-gnueabihf (ubuntu-latest)",
+      "started_at": "2026-09-26T20:37:49Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:51Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:50Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:53Z",
+          "conclusion": "success",
+          "name": "Checkout source code",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:51Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:10Z",
+          "conclusion": "success",
+          "name": "Install prerequisites",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:14Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 4,
+          "started_at": "2026-09-26T20:38:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:39:01Z",
+          "conclusion": "success",
+          "name": "Install cross",
+          "number": 5,
+          "started_at": "2026-09-26T20:38:14Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:39:01Z",
+          "conclusion": "success",
+          "name": "Overwrite build command env variable",
+          "number": 6,
+          "started_at": "2026-09-26T20:39:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:39:01Z",
+          "conclusion": "success",
+          "name": "Show version information (Rust, cargo, GCC)",
+          "number": 7,
+          "started_at": "2026-09-26T20:39:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:15Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 8,
+          "started_at": "2026-09-26T20:39:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:15Z",
+          "conclusion": "success",
+          "name": "Set binary name \u0026 path",
+          "number": 9,
+          "started_at": "2026-09-26T20:41:15Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:15Z",
+          "conclusion": "success",
+          "name": "Set testing options",
+          "number": 10,
+          "started_at": "2026-09-26T20:41:15Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:28Z",
+          "conclusion": "success",
+          "name": "Run tests",
+          "number": 11,
+          "started_at": "2026-09-26T20:41:15Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:53Z",
+          "conclusion": "success",
+          "name": "Run bat",
+          "number": 12,
+          "started_at": "2026-09-26T20:42:28Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:54Z",
+          "conclusion": "success",
+          "name": "Show diagnostics (bat --diagnostic)",
+          "number": 13,
+          "started_at": "2026-09-26T20:42:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:01Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig",
+          "number": 14,
+          "started_at": "2026-09-26T20:42:54Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:11Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git",
+          "number": 15,
+          "started_at": "2026-09-26T20:43:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:14Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,paging",
+          "number": 16,
+          "started_at": "2026-09-26T20:43:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:21Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git,paging",
+          "number": 17,
+          "started_at": "2026-09-26T20:43:14Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:24Z",
+          "conclusion": "success",
+          "name": "Feature check: minimal-application",
+          "number": 18,
+          "started_at": "2026-09-26T20:43:21Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:25Z",
+          "conclusion": "success",
+          "name": "Create tarball",
+          "number": 19,
+          "started_at": "2026-09-26T20:43:24Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:27Z",
+          "conclusion": "success",
+          "name": "Create Debian package",
+          "number": 20,
+          "started_at": "2026-09-26T20:43:25Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:28Z",
+          "conclusion": "success",
+          "name": "Artifact upload: tarball",
+          "number": 21,
+          "started_at": "2026-09-26T20:43:27Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:28Z",
+          "conclusion": "success",
+          "name": "Artifact upload: Debian package",
+          "number": 22,
+          "started_at": "2026-09-26T20:43:28Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:28Z",
+          "conclusion": "success",
+          "name": "Check for release",
+          "number": 23,
+          "started_at": "2026-09-26T20:43:28Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:28Z",
+          "conclusion": "skipped",
+          "name": "Publish archives and packages",
+          "number": 24,
+          "started_at": "2026-09-26T20:43:28Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:29Z",
+          "conclusion": "success",
+          "name": "Post Checkout source code",
+          "number": 48,
+          "started_at": "2026-09-26T20:43:28Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:29Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 49,
+          "started_at": "2026-09-26T20:43:29Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:46:09Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482512522",
+      "id": 108482512522,
+      "name": "i686-pc-windows-msvc (windows-2025)",
+      "started_at": "2026-09-26T20:37:51Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:53Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:59Z",
+          "conclusion": "success",
+          "name": "Checkout source code",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:59Z",
+          "conclusion": "success",
+          "name": "Install prerequisites",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:59Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:06Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 4,
+          "started_at": "2026-09-26T20:37:59Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:06Z",
+          "conclusion": "skipped",
+          "name": "Install cross",
+          "number": 5,
+          "started_at": "2026-09-26T20:38:06Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:06Z",
+          "conclusion": "skipped",
+          "name": "Overwrite build command env variable",
+          "number": 6,
+          "started_at": "2026-09-26T20:38:06Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:08Z",
+          "conclusion": "success",
+          "name": "Show version information (Rust, cargo, GCC)",
+          "number": 7,
+          "started_at": "2026-09-26T20:38:06Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:16Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 8,
+          "started_at": "2026-09-26T20:38:08Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:16Z",
+          "conclusion": "success",
+          "name": "Set binary name \u0026 path",
+          "number": 9,
+          "started_at": "2026-09-26T20:42:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:16Z",
+          "conclusion": "success",
+          "name": "Set testing options",
+          "number": 10,
+          "started_at": "2026-09-26T20:42:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:01Z",
+          "conclusion": "success",
+          "name": "Run tests",
+          "number": 11,
+          "started_at": "2026-09-26T20:42:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:12Z",
+          "conclusion": "success",
+          "name": "Run bat",
+          "number": 12,
+          "started_at": "2026-09-26T20:45:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:13Z",
+          "conclusion": "success",
+          "name": "Show diagnostics (bat --diagnostic)",
+          "number": 13,
+          "started_at": "2026-09-26T20:45:12Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:24Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig",
+          "number": 14,
+          "started_at": "2026-09-26T20:45:13Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:40Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git",
+          "number": 15,
+          "started_at": "2026-09-26T20:45:24Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:46Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,paging",
+          "number": 16,
+          "started_at": "2026-09-26T20:45:40Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:55Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git,paging",
+          "number": 17,
+          "started_at": "2026-09-26T20:45:46Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:01Z",
+          "conclusion": "success",
+          "name": "Feature check: minimal-application",
+          "number": 18,
+          "started_at": "2026-09-26T20:45:55Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:02Z",
+          "conclusion": "success",
+          "name": "Create tarball",
+          "number": 19,
+          "started_at": "2026-09-26T20:46:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:02Z",
+          "conclusion": "skipped",
+          "name": "Create Debian package",
+          "number": 20,
+          "started_at": "2026-09-26T20:46:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:04Z",
+          "conclusion": "success",
+          "name": "Artifact upload: tarball",
+          "number": 21,
+          "started_at": "2026-09-26T20:46:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:04Z",
+          "conclusion": "skipped",
+          "name": "Artifact upload: Debian package",
+          "number": 22,
+          "started_at": "2026-09-26T20:46:04Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:05Z",
+          "conclusion": "success",
+          "name": "Check for release",
+          "number": 23,
+          "started_at": "2026-09-26T20:46:04Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:05Z",
+          "conclusion": "skipped",
+          "name": "Publish archives and packages",
+          "number": 24,
+          "started_at": "2026-09-26T20:46:05Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:07Z",
+          "conclusion": "success",
+          "name": "Post Checkout source code",
+          "number": 48,
+          "started_at": "2026-09-26T20:46:05Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:07Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 49,
+          "started_at": "2026-09-26T20:46:07Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:46:19Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482512539",
+      "id": 108482512539,
+      "name": "x86_64-pc-windows-msvc (windows-2025)",
+      "started_at": "2026-09-26T20:37:50Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:52Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:51Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:58Z",
+          "conclusion": "success",
+          "name": "Checkout source code",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:59Z",
+          "conclusion": "success",
+          "name": "Install prerequisites",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:06Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 4,
+          "started_at": "2026-09-26T20:37:59Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:06Z",
+          "conclusion": "skipped",
+          "name": "Install cross",
+          "number": 5,
+          "started_at": "2026-09-26T20:38:06Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:06Z",
+          "conclusion": "skipped",
+          "name": "Overwrite build command env variable",
+          "number": 6,
+          "started_at": "2026-09-26T20:38:06Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:08Z",
+          "conclusion": "success",
+          "name": "Show version information (Rust, cargo, GCC)",
+          "number": 7,
+          "started_at": "2026-09-26T20:38:06Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:20Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 8,
+          "started_at": "2026-09-26T20:38:08Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:20Z",
+          "conclusion": "success",
+          "name": "Set binary name \u0026 path",
+          "number": 9,
+          "started_at": "2026-09-26T20:42:20Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:21Z",
+          "conclusion": "success",
+          "name": "Set testing options",
+          "number": 10,
+          "started_at": "2026-09-26T20:42:20Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:57Z",
+          "conclusion": "success",
+          "name": "Run tests",
+          "number": 11,
+          "started_at": "2026-09-26T20:42:21Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:07Z",
+          "conclusion": "success",
+          "name": "Run bat",
+          "number": 12,
+          "started_at": "2026-09-26T20:44:57Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:08Z",
+          "conclusion": "success",
+          "name": "Show diagnostics (bat --diagnostic)",
+          "number": 13,
+          "started_at": "2026-09-26T20:45:07Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:20Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig",
+          "number": 14,
+          "started_at": "2026-09-26T20:45:08Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:37Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git",
+          "number": 15,
+          "started_at": "2026-09-26T20:45:20Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:43Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,paging",
+          "number": 16,
+          "started_at": "2026-09-26T20:45:37Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:53Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git,paging",
+          "number": 17,
+          "started_at": "2026-09-26T20:45:43Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:59Z",
+          "conclusion": "success",
+          "name": "Feature check: minimal-application",
+          "number": 18,
+          "started_at": "2026-09-26T20:45:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:11Z",
+          "conclusion": "success",
+          "name": "Create tarball",
+          "number": 19,
+          "started_at": "2026-09-26T20:45:59Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:11Z",
+          "conclusion": "skipped",
+          "name": "Create Debian package",
+          "number": 20,
+          "started_at": "2026-09-26T20:46:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:14Z",
+          "conclusion": "success",
+          "name": "Artifact upload: tarball",
+          "number": 21,
+          "started_at": "2026-09-26T20:46:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:14Z",
+          "conclusion": "skipped",
+          "name": "Artifact upload: Debian package",
+          "number": 22,
+          "started_at": "2026-09-26T20:46:14Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:14Z",
+          "conclusion": "success",
+          "name": "Check for release",
+          "number": 23,
+          "started_at": "2026-09-26T20:46:14Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:14Z",
+          "conclusion": "skipped",
+          "name": "Publish archives and packages",
+          "number": 24,
+          "started_at": "2026-09-26T20:46:14Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:17Z",
+          "conclusion": "success",
+          "name": "Post Checkout source code",
+          "number": 48,
+          "started_at": "2026-09-26T20:46:14Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:46:17Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 49,
+          "started_at": "2026-09-26T20:46:17Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:43:34Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482512546",
+      "id": 108482512546,
+      "name": "arm-unknown-linux-musleabihf (ubuntu-latest)",
+      "started_at": "2026-09-26T20:37:50Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:52Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:51Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:54Z",
+          "conclusion": "success",
+          "name": "Checkout source code",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:08Z",
+          "conclusion": "success",
+          "name": "Install prerequisites",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:54Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:10Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 4,
+          "started_at": "2026-09-26T20:38:08Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:39:01Z",
+          "conclusion": "success",
+          "name": "Install cross",
+          "number": 5,
+          "started_at": "2026-09-26T20:38:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:39:01Z",
+          "conclusion": "success",
+          "name": "Overwrite build command env variable",
+          "number": 6,
+          "started_at": "2026-09-26T20:39:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:39:01Z",
+          "conclusion": "success",
+          "name": "Show version information (Rust, cargo, GCC)",
+          "number": 7,
+          "started_at": "2026-09-26T20:39:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:16Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 8,
+          "started_at": "2026-09-26T20:39:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:16Z",
+          "conclusion": "success",
+          "name": "Set binary name \u0026 path",
+          "number": 9,
+          "started_at": "2026-09-26T20:41:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:16Z",
+          "conclusion": "success",
+          "name": "Set testing options",
+          "number": 10,
+          "started_at": "2026-09-26T20:41:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:30Z",
+          "conclusion": "success",
+          "name": "Run tests",
+          "number": 11,
+          "started_at": "2026-09-26T20:41:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:54Z",
+          "conclusion": "success",
+          "name": "Run bat",
+          "number": 12,
+          "started_at": "2026-09-26T20:42:30Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:55Z",
+          "conclusion": "success",
+          "name": "Show diagnostics (bat --diagnostic)",
+          "number": 13,
+          "started_at": "2026-09-26T20:42:54Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:02Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig",
+          "number": 14,
+          "started_at": "2026-09-26T20:42:55Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:12Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git",
+          "number": 15,
+          "started_at": "2026-09-26T20:43:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:16Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,paging",
+          "number": 16,
+          "started_at": "2026-09-26T20:43:12Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:22Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git,paging",
+          "number": 17,
+          "started_at": "2026-09-26T20:43:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:25Z",
+          "conclusion": "success",
+          "name": "Feature check: minimal-application",
+          "number": 18,
+          "started_at": "2026-09-26T20:43:22Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:26Z",
+          "conclusion": "success",
+          "name": "Create tarball",
+          "number": 19,
+          "started_at": "2026-09-26T20:43:25Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:28Z",
+          "conclusion": "success",
+          "name": "Create Debian package",
+          "number": 20,
+          "started_at": "2026-09-26T20:43:26Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:30Z",
+          "conclusion": "success",
+          "name": "Artifact upload: tarball",
+          "number": 21,
+          "started_at": "2026-09-26T20:43:28Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:32Z",
+          "conclusion": "success",
+          "name": "Artifact upload: Debian package",
+          "number": 22,
+          "started_at": "2026-09-26T20:43:30Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:32Z",
+          "conclusion": "success",
+          "name": "Check for release",
+          "number": 23,
+          "started_at": "2026-09-26T20:43:32Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:32Z",
+          "conclusion": "skipped",
+          "name": "Publish archives and packages",
+          "number": 24,
+          "started_at": "2026-09-26T20:43:32Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:32Z",
+          "conclusion": "success",
+          "name": "Post Checkout source code",
+          "number": 48,
+          "started_at": "2026-09-26T20:43:32Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:32Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 49,
+          "started_at": "2026-09-26T20:43:32Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:50:47Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482512553",
+      "id": 108482512553,
+      "name": "x86_64-apple-darwin (macos-15-intel)",
+      "started_at": "2026-09-26T20:37:51Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:47Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:44Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:52Z",
+          "conclusion": "success",
+          "name": "Checkout source code",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:48Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:52Z",
+          "conclusion": "success",
+          "name": "Install prerequisites",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:31Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 4,
+          "started_at": "2026-09-26T20:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:31Z",
+          "conclusion": "skipped",
+          "name": "Install cross",
+          "number": 5,
+          "started_at": "2026-09-26T20:38:31Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:31Z",
+          "conclusion": "skipped",
+          "name": "Overwrite build command env variable",
+          "number": 6,
+          "started_at": "2026-09-26T20:38:31Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:37Z",
+          "conclusion": "success",
+          "name": "Show version information (Rust, cargo, GCC)",
+          "number": 7,
+          "started_at": "2026-09-26T20:38:31Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:57Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 8,
+          "started_at": "2026-09-26T20:38:37Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:57Z",
+          "conclusion": "success",
+          "name": "Set binary name \u0026 path",
+          "number": 9,
+          "started_at": "2026-09-26T20:44:57Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:57Z",
+          "conclusion": "success",
+          "name": "Set testing options",
+          "number": 10,
+          "started_at": "2026-09-26T20:44:57Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:48:16Z",
+          "conclusion": "success",
+          "name": "Run tests",
+          "number": 11,
+          "started_at": "2026-09-26T20:44:57Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:49:02Z",
+          "conclusion": "success",
+          "name": "Run bat",
+          "number": 12,
+          "started_at": "2026-09-26T20:48:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:49:02Z",
+          "conclusion": "success",
+          "name": "Show diagnostics (bat --diagnostic)",
+          "number": 13,
+          "started_at": "2026-09-26T20:49:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:49:24Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig",
+          "number": 14,
+          "started_at": "2026-09-26T20:49:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:49:55Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git",
+          "number": 15,
+          "started_at": "2026-09-26T20:49:24Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:50:05Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,paging",
+          "number": 16,
+          "started_at": "2026-09-26T20:49:55Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:50:23Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git,paging",
+          "number": 17,
+          "started_at": "2026-09-26T20:50:05Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:50:31Z",
+          "conclusion": "success",
+          "name": "Feature check: minimal-application",
+          "number": 18,
+          "started_at": "2026-09-26T20:50:23Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:50:31Z",
+          "conclusion": "success",
+          "name": "Create tarball",
+          "number": 19,
+          "started_at": "2026-09-26T20:50:31Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:50:31Z",
+          "conclusion": "skipped",
+          "name": "Create Debian package",
+          "number": 20,
+          "started_at": "2026-09-26T20:50:31Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:50:33Z",
+          "conclusion": "success",
+          "name": "Artifact upload: tarball",
+          "number": 21,
+          "started_at": "2026-09-26T20:50:31Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:50:33Z",
+          "conclusion": "skipped",
+          "name": "Artifact upload: Debian package",
+          "number": 22,
+          "started_at": "2026-09-26T20:50:33Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:50:34Z",
+          "conclusion": "success",
+          "name": "Check for release",
+          "number": 23,
+          "started_at": "2026-09-26T20:50:33Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:50:34Z",
+          "conclusion": "skipped",
+          "name": "Publish archives and packages",
+          "number": 24,
+          "started_at": "2026-09-26T20:50:34Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:50:34Z",
+          "conclusion": "success",
+          "name": "Post Checkout source code",
+          "number": 48,
+          "started_at": "2026-09-26T20:50:34Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:50:36Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 49,
+          "started_at": "2026-09-26T20:50:34Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:45:26Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482512554",
+      "id": 108482512554,
+      "name": "aarch64-pc-windows-msvc (windows-11-arm)",
+      "started_at": "2026-09-26T20:37:50Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:52Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:51Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:01Z",
+          "conclusion": "success",
+          "name": "Checkout source code",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:03Z",
+          "conclusion": "success",
+          "name": "Install prerequisites",
+          "number": 3,
+          "started_at": "2026-09-26T20:38:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:10Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 4,
+          "started_at": "2026-09-26T20:38:03Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:10Z",
+          "conclusion": "skipped",
+          "name": "Install cross",
+          "number": 5,
+          "started_at": "2026-09-26T20:38:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:10Z",
+          "conclusion": "skipped",
+          "name": "Overwrite build command env variable",
+          "number": 6,
+          "started_at": "2026-09-26T20:38:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:12Z",
+          "conclusion": "success",
+          "name": "Show version information (Rust, cargo, GCC)",
+          "number": 7,
+          "started_at": "2026-09-26T20:38:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:00Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 8,
+          "started_at": "2026-09-26T20:38:12Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:01Z",
+          "conclusion": "success",
+          "name": "Set binary name \u0026 path",
+          "number": 9,
+          "started_at": "2026-09-26T20:42:00Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:01Z",
+          "conclusion": "success",
+          "name": "Set testing options",
+          "number": 10,
+          "started_at": "2026-09-26T20:42:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:11Z",
+          "conclusion": "success",
+          "name": "Run tests",
+          "number": 11,
+          "started_at": "2026-09-26T20:42:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:23Z",
+          "conclusion": "success",
+          "name": "Run bat",
+          "number": 12,
+          "started_at": "2026-09-26T20:44:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:25Z",
+          "conclusion": "success",
+          "name": "Show diagnostics (bat --diagnostic)",
+          "number": 13,
+          "started_at": "2026-09-26T20:44:23Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:37Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig",
+          "number": 14,
+          "started_at": "2026-09-26T20:44:25Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:53Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git",
+          "number": 15,
+          "started_at": "2026-09-26T20:44:37Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:59Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,paging",
+          "number": 16,
+          "started_at": "2026-09-26T20:44:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:09Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git,paging",
+          "number": 17,
+          "started_at": "2026-09-26T20:44:59Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:16Z",
+          "conclusion": "success",
+          "name": "Feature check: minimal-application",
+          "number": 18,
+          "started_at": "2026-09-26T20:45:09Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:18Z",
+          "conclusion": "success",
+          "name": "Create tarball",
+          "number": 19,
+          "started_at": "2026-09-26T20:45:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:18Z",
+          "conclusion": "skipped",
+          "name": "Create Debian package",
+          "number": 20,
+          "started_at": "2026-09-26T20:45:18Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:20Z",
+          "conclusion": "success",
+          "name": "Artifact upload: tarball",
+          "number": 21,
+          "started_at": "2026-09-26T20:45:18Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:20Z",
+          "conclusion": "skipped",
+          "name": "Artifact upload: Debian package",
+          "number": 22,
+          "started_at": "2026-09-26T20:45:20Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:20Z",
+          "conclusion": "success",
+          "name": "Check for release",
+          "number": 23,
+          "started_at": "2026-09-26T20:45:20Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:20Z",
+          "conclusion": "skipped",
+          "name": "Publish archives and packages",
+          "number": 24,
+          "started_at": "2026-09-26T20:45:20Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:25Z",
+          "conclusion": "success",
+          "name": "Post Checkout source code",
+          "number": 48,
+          "started_at": "2026-09-26T20:45:20Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:45:25Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 49,
+          "started_at": "2026-09-26T20:45:25Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:44:23Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482512555",
+      "id": 108482512555,
+      "name": "i686-unknown-linux-musl (ubuntu-latest)",
+      "started_at": "2026-09-26T20:37:50Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:54Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:56Z",
+          "conclusion": "success",
+          "name": "Checkout source code",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:54Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:56Z",
+          "conclusion": "success",
+          "name": "Install prerequisites",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:56Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:02Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 4,
+          "started_at": "2026-09-26T20:37:56Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:53Z",
+          "conclusion": "success",
+          "name": "Install cross",
+          "number": 5,
+          "started_at": "2026-09-26T20:38:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:53Z",
+          "conclusion": "success",
+          "name": "Overwrite build command env variable",
+          "number": 6,
+          "started_at": "2026-09-26T20:38:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:53Z",
+          "conclusion": "success",
+          "name": "Show version information (Rust, cargo, GCC)",
+          "number": 7,
+          "started_at": "2026-09-26T20:38:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:58Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 8,
+          "started_at": "2026-09-26T20:38:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:58Z",
+          "conclusion": "success",
+          "name": "Set binary name \u0026 path",
+          "number": 9,
+          "started_at": "2026-09-26T20:41:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:58Z",
+          "conclusion": "success",
+          "name": "Set testing options",
+          "number": 10,
+          "started_at": "2026-09-26T20:41:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:22Z",
+          "conclusion": "success",
+          "name": "Run tests",
+          "number": 11,
+          "started_at": "2026-09-26T20:41:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:41Z",
+          "conclusion": "success",
+          "name": "Run bat",
+          "number": 12,
+          "started_at": "2026-09-26T20:43:22Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:42Z",
+          "conclusion": "success",
+          "name": "Show diagnostics (bat --diagnostic)",
+          "number": 13,
+          "started_at": "2026-09-26T20:43:41Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:48Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig",
+          "number": 14,
+          "started_at": "2026-09-26T20:43:42Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:57Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git",
+          "number": 15,
+          "started_at": "2026-09-26T20:43:48Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:01Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,paging",
+          "number": 16,
+          "started_at": "2026-09-26T20:43:57Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:07Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git,paging",
+          "number": 17,
+          "started_at": "2026-09-26T20:44:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:11Z",
+          "conclusion": "success",
+          "name": "Feature check: minimal-application",
+          "number": 18,
+          "started_at": "2026-09-26T20:44:07Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:11Z",
+          "conclusion": "success",
+          "name": "Create tarball",
+          "number": 19,
+          "started_at": "2026-09-26T20:44:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:13Z",
+          "conclusion": "success",
+          "name": "Create Debian package",
+          "number": 20,
+          "started_at": "2026-09-26T20:44:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:16Z",
+          "conclusion": "success",
+          "name": "Artifact upload: tarball",
+          "number": 21,
+          "started_at": "2026-09-26T20:44:13Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:19Z",
+          "conclusion": "success",
+          "name": "Artifact upload: Debian package",
+          "number": 22,
+          "started_at": "2026-09-26T20:44:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:19Z",
+          "conclusion": "success",
+          "name": "Check for release",
+          "number": 23,
+          "started_at": "2026-09-26T20:44:19Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:19Z",
+          "conclusion": "skipped",
+          "name": "Publish archives and packages",
+          "number": 24,
+          "started_at": "2026-09-26T20:44:19Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:19Z",
+          "conclusion": "success",
+          "name": "Post Checkout source code",
+          "number": 48,
+          "started_at": "2026-09-26T20:44:19Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:44:19Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 49,
+          "started_at": "2026-09-26T20:44:19Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:43:05Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482512568",
+      "id": 108482512568,
+      "name": "aarch64-unknown-linux-musl (ubuntu-latest)",
+      "started_at": "2026-09-26T20:37:50Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:53Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:51Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:54Z",
+          "conclusion": "success",
+          "name": "Checkout source code",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:54Z",
+          "conclusion": "success",
+          "name": "Install prerequisites",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:54Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:57Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 4,
+          "started_at": "2026-09-26T20:37:54Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:40Z",
+          "conclusion": "success",
+          "name": "Install cross",
+          "number": 5,
+          "started_at": "2026-09-26T20:37:57Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:40Z",
+          "conclusion": "success",
+          "name": "Overwrite build command env variable",
+          "number": 6,
+          "started_at": "2026-09-26T20:38:40Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:40Z",
+          "conclusion": "success",
+          "name": "Show version information (Rust, cargo, GCC)",
+          "number": 7,
+          "started_at": "2026-09-26T20:38:40Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:51Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 8,
+          "started_at": "2026-09-26T20:38:40Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:52Z",
+          "conclusion": "success",
+          "name": "Set binary name \u0026 path",
+          "number": 9,
+          "started_at": "2026-09-26T20:40:51Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:52Z",
+          "conclusion": "success",
+          "name": "Set testing options",
+          "number": 10,
+          "started_at": "2026-09-26T20:40:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:04Z",
+          "conclusion": "success",
+          "name": "Run tests",
+          "number": 11,
+          "started_at": "2026-09-26T20:40:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:27Z",
+          "conclusion": "success",
+          "name": "Run bat",
+          "number": 12,
+          "started_at": "2026-09-26T20:42:04Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:28Z",
+          "conclusion": "success",
+          "name": "Show diagnostics (bat --diagnostic)",
+          "number": 13,
+          "started_at": "2026-09-26T20:42:27Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:35Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig",
+          "number": 14,
+          "started_at": "2026-09-26T20:42:28Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:44Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git",
+          "number": 15,
+          "started_at": "2026-09-26T20:42:35Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:48Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,paging",
+          "number": 16,
+          "started_at": "2026-09-26T20:42:44Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:54Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git,paging",
+          "number": 17,
+          "started_at": "2026-09-26T20:42:48Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:57Z",
+          "conclusion": "success",
+          "name": "Feature check: minimal-application",
+          "number": 18,
+          "started_at": "2026-09-26T20:42:54Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:57Z",
+          "conclusion": "success",
+          "name": "Create tarball",
+          "number": 19,
+          "started_at": "2026-09-26T20:42:57Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:59Z",
+          "conclusion": "success",
+          "name": "Create Debian package",
+          "number": 20,
+          "started_at": "2026-09-26T20:42:57Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:00Z",
+          "conclusion": "success",
+          "name": "Artifact upload: tarball",
+          "number": 21,
+          "started_at": "2026-09-26T20:42:59Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:02Z",
+          "conclusion": "success",
+          "name": "Artifact upload: Debian package",
+          "number": 22,
+          "started_at": "2026-09-26T20:43:00Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:02Z",
+          "conclusion": "success",
+          "name": "Check for release",
+          "number": 23,
+          "started_at": "2026-09-26T20:43:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:02Z",
+          "conclusion": "skipped",
+          "name": "Publish archives and packages",
+          "number": 24,
+          "started_at": "2026-09-26T20:43:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:02Z",
+          "conclusion": "success",
+          "name": "Post Checkout source code",
+          "number": 48,
+          "started_at": "2026-09-26T20:43:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:02Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 49,
+          "started_at": "2026-09-26T20:43:02Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:43:35Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482512610",
+      "id": 108482512610,
+      "name": "aarch64-unknown-linux-gnu (ubuntu-latest)",
+      "started_at": "2026-09-26T20:37:50Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:52Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:51Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:53Z",
+          "conclusion": "success",
+          "name": "Checkout source code",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:07Z",
+          "conclusion": "success",
+          "name": "Install prerequisites",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:11Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 4,
+          "started_at": "2026-09-26T20:38:07Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:55Z",
+          "conclusion": "success",
+          "name": "Install cross",
+          "number": 5,
+          "started_at": "2026-09-26T20:38:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:55Z",
+          "conclusion": "success",
+          "name": "Overwrite build command env variable",
+          "number": 6,
+          "started_at": "2026-09-26T20:38:55Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:55Z",
+          "conclusion": "success",
+          "name": "Show version information (Rust, cargo, GCC)",
+          "number": 7,
+          "started_at": "2026-09-26T20:38:55Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:25Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 8,
+          "started_at": "2026-09-26T20:38:55Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:25Z",
+          "conclusion": "success",
+          "name": "Set binary name \u0026 path",
+          "number": 9,
+          "started_at": "2026-09-26T20:41:25Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:25Z",
+          "conclusion": "success",
+          "name": "Set testing options",
+          "number": 10,
+          "started_at": "2026-09-26T20:41:25Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:34Z",
+          "conclusion": "success",
+          "name": "Run tests",
+          "number": 11,
+          "started_at": "2026-09-26T20:41:25Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:58Z",
+          "conclusion": "success",
+          "name": "Run bat",
+          "number": 12,
+          "started_at": "2026-09-26T20:42:34Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:59Z",
+          "conclusion": "success",
+          "name": "Show diagnostics (bat --diagnostic)",
+          "number": 13,
+          "started_at": "2026-09-26T20:42:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:05Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig",
+          "number": 14,
+          "started_at": "2026-09-26T20:42:59Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:15Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git",
+          "number": 15,
+          "started_at": "2026-09-26T20:43:05Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:18Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,paging",
+          "number": 16,
+          "started_at": "2026-09-26T20:43:15Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:24Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git,paging",
+          "number": 17,
+          "started_at": "2026-09-26T20:43:18Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:28Z",
+          "conclusion": "success",
+          "name": "Feature check: minimal-application",
+          "number": 18,
+          "started_at": "2026-09-26T20:43:24Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:28Z",
+          "conclusion": "success",
+          "name": "Create tarball",
+          "number": 19,
+          "started_at": "2026-09-26T20:43:28Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:30Z",
+          "conclusion": "success",
+          "name": "Create Debian package",
+          "number": 20,
+          "started_at": "2026-09-26T20:43:28Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:31Z",
+          "conclusion": "success",
+          "name": "Artifact upload: tarball",
+          "number": 21,
+          "started_at": "2026-09-26T20:43:30Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:33Z",
+          "conclusion": "success",
+          "name": "Artifact upload: Debian package",
+          "number": 22,
+          "started_at": "2026-09-26T20:43:31Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:33Z",
+          "conclusion": "success",
+          "name": "Check for release",
+          "number": 23,
+          "started_at": "2026-09-26T20:43:33Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:33Z",
+          "conclusion": "skipped",
+          "name": "Publish archives and packages",
+          "number": 24,
+          "started_at": "2026-09-26T20:43:33Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:33Z",
+          "conclusion": "success",
+          "name": "Post Checkout source code",
+          "number": 48,
+          "started_at": "2026-09-26T20:43:33Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:33Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 49,
+          "started_at": "2026-09-26T20:43:33Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:43:23Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482512611",
+      "id": 108482512611,
+      "name": "x86_64-unknown-linux-gnu (ubuntu-latest)",
+      "started_at": "2026-09-26T20:37:50Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:52Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:51Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:54Z",
+          "conclusion": "success",
+          "name": "Checkout source code",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:54Z",
+          "conclusion": "success",
+          "name": "Install prerequisites",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:54Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:55Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 4,
+          "started_at": "2026-09-26T20:37:54Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:42Z",
+          "conclusion": "success",
+          "name": "Install cross",
+          "number": 5,
+          "started_at": "2026-09-26T20:37:55Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:42Z",
+          "conclusion": "success",
+          "name": "Overwrite build command env variable",
+          "number": 6,
+          "started_at": "2026-09-26T20:38:42Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:42Z",
+          "conclusion": "success",
+          "name": "Show version information (Rust, cargo, GCC)",
+          "number": 7,
+          "started_at": "2026-09-26T20:38:42Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:10Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 8,
+          "started_at": "2026-09-26T20:38:42Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:10Z",
+          "conclusion": "success",
+          "name": "Set binary name \u0026 path",
+          "number": 9,
+          "started_at": "2026-09-26T20:41:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:10Z",
+          "conclusion": "success",
+          "name": "Set testing options",
+          "number": 10,
+          "started_at": "2026-09-26T20:41:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:22Z",
+          "conclusion": "success",
+          "name": "Run tests",
+          "number": 11,
+          "started_at": "2026-09-26T20:41:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:42Z",
+          "conclusion": "success",
+          "name": "Run bat",
+          "number": 12,
+          "started_at": "2026-09-26T20:42:22Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:42Z",
+          "conclusion": "success",
+          "name": "Show diagnostics (bat --diagnostic)",
+          "number": 13,
+          "started_at": "2026-09-26T20:42:42Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:49Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig",
+          "number": 14,
+          "started_at": "2026-09-26T20:42:42Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:00Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git",
+          "number": 15,
+          "started_at": "2026-09-26T20:42:49Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:04Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,paging",
+          "number": 16,
+          "started_at": "2026-09-26T20:43:00Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:11Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git,paging",
+          "number": 17,
+          "started_at": "2026-09-26T20:43:04Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:14Z",
+          "conclusion": "success",
+          "name": "Feature check: minimal-application",
+          "number": 18,
+          "started_at": "2026-09-26T20:43:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:15Z",
+          "conclusion": "success",
+          "name": "Create tarball",
+          "number": 19,
+          "started_at": "2026-09-26T20:43:14Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:17Z",
+          "conclusion": "success",
+          "name": "Create Debian package",
+          "number": 20,
+          "started_at": "2026-09-26T20:43:15Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:19Z",
+          "conclusion": "success",
+          "name": "Artifact upload: tarball",
+          "number": 21,
+          "started_at": "2026-09-26T20:43:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:21Z",
+          "conclusion": "success",
+          "name": "Artifact upload: Debian package",
+          "number": 22,
+          "started_at": "2026-09-26T20:43:19Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:21Z",
+          "conclusion": "success",
+          "name": "Check for release",
+          "number": 23,
+          "started_at": "2026-09-26T20:43:21Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:21Z",
+          "conclusion": "skipped",
+          "name": "Publish archives and packages",
+          "number": 24,
+          "started_at": "2026-09-26T20:43:21Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:21Z",
+          "conclusion": "success",
+          "name": "Post Checkout source code",
+          "number": 48,
+          "started_at": "2026-09-26T20:43:21Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:21Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 49,
+          "started_at": "2026-09-26T20:43:21Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:43:21Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482512635",
+      "id": 108482512635,
+      "name": "i686-unknown-linux-gnu (ubuntu-latest)",
+      "started_at": "2026-09-26T20:37:50Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:51Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:50Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:52Z",
+          "conclusion": "success",
+          "name": "Checkout source code",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:51Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:52Z",
+          "conclusion": "success",
+          "name": "Install prerequisites",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:55Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 4,
+          "started_at": "2026-09-26T20:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:43Z",
+          "conclusion": "success",
+          "name": "Install cross",
+          "number": 5,
+          "started_at": "2026-09-26T20:37:55Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:43Z",
+          "conclusion": "success",
+          "name": "Overwrite build command env variable",
+          "number": 6,
+          "started_at": "2026-09-26T20:38:43Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:43Z",
+          "conclusion": "success",
+          "name": "Show version information (Rust, cargo, GCC)",
+          "number": 7,
+          "started_at": "2026-09-26T20:38:43Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:54Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 8,
+          "started_at": "2026-09-26T20:38:43Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:54Z",
+          "conclusion": "success",
+          "name": "Set binary name \u0026 path",
+          "number": 9,
+          "started_at": "2026-09-26T20:40:54Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:54Z",
+          "conclusion": "success",
+          "name": "Set testing options",
+          "number": 10,
+          "started_at": "2026-09-26T20:40:54Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:26Z",
+          "conclusion": "success",
+          "name": "Run tests",
+          "number": 11,
+          "started_at": "2026-09-26T20:40:54Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:45Z",
+          "conclusion": "success",
+          "name": "Run bat",
+          "number": 12,
+          "started_at": "2026-09-26T20:42:26Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:46Z",
+          "conclusion": "success",
+          "name": "Show diagnostics (bat --diagnostic)",
+          "number": 13,
+          "started_at": "2026-09-26T20:42:45Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:52Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig",
+          "number": 14,
+          "started_at": "2026-09-26T20:42:46Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:01Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git",
+          "number": 15,
+          "started_at": "2026-09-26T20:42:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:05Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,paging",
+          "number": 16,
+          "started_at": "2026-09-26T20:43:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:12Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git,paging",
+          "number": 17,
+          "started_at": "2026-09-26T20:43:05Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:15Z",
+          "conclusion": "success",
+          "name": "Feature check: minimal-application",
+          "number": 18,
+          "started_at": "2026-09-26T20:43:12Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:16Z",
+          "conclusion": "success",
+          "name": "Create tarball",
+          "number": 19,
+          "started_at": "2026-09-26T20:43:15Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:18Z",
+          "conclusion": "success",
+          "name": "Create Debian package",
+          "number": 20,
+          "started_at": "2026-09-26T20:43:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:18Z",
+          "conclusion": "success",
+          "name": "Artifact upload: tarball",
+          "number": 21,
+          "started_at": "2026-09-26T20:43:18Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:19Z",
+          "conclusion": "success",
+          "name": "Artifact upload: Debian package",
+          "number": 22,
+          "started_at": "2026-09-26T20:43:18Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:19Z",
+          "conclusion": "success",
+          "name": "Check for release",
+          "number": 23,
+          "started_at": "2026-09-26T20:43:19Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:19Z",
+          "conclusion": "skipped",
+          "name": "Publish archives and packages",
+          "number": 24,
+          "started_at": "2026-09-26T20:43:19Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:19Z",
+          "conclusion": "success",
+          "name": "Post Checkout source code",
+          "number": 48,
+          "started_at": "2026-09-26T20:43:19Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:43:19Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 49,
+          "started_at": "2026-09-26T20:43:19Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:42:59Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482512646",
+      "id": 108482512646,
+      "name": "x86_64-unknown-linux-musl (ubuntu-latest)",
+      "started_at": "2026-09-26T20:37:50Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:37:51Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:50Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:52Z",
+          "conclusion": "success",
+          "name": "Checkout source code",
+          "number": 2,
+          "started_at": "2026-09-26T20:37:51Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:52Z",
+          "conclusion": "success",
+          "name": "Install prerequisites",
+          "number": 3,
+          "started_at": "2026-09-26T20:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:37:56Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 4,
+          "started_at": "2026-09-26T20:37:52Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:43Z",
+          "conclusion": "success",
+          "name": "Install cross",
+          "number": 5,
+          "started_at": "2026-09-26T20:37:56Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:43Z",
+          "conclusion": "success",
+          "name": "Overwrite build command env variable",
+          "number": 6,
+          "started_at": "2026-09-26T20:38:43Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:43Z",
+          "conclusion": "success",
+          "name": "Show version information (Rust, cargo, GCC)",
+          "number": 7,
+          "started_at": "2026-09-26T20:38:43Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:44Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 8,
+          "started_at": "2026-09-26T20:38:43Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:44Z",
+          "conclusion": "success",
+          "name": "Set binary name \u0026 path",
+          "number": 9,
+          "started_at": "2026-09-26T20:40:44Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:44Z",
+          "conclusion": "success",
+          "name": "Set testing options",
+          "number": 10,
+          "started_at": "2026-09-26T20:40:44Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:05Z",
+          "conclusion": "success",
+          "name": "Run tests",
+          "number": 11,
+          "started_at": "2026-09-26T20:40:44Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:24Z",
+          "conclusion": "success",
+          "name": "Run bat",
+          "number": 12,
+          "started_at": "2026-09-26T20:42:05Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:25Z",
+          "conclusion": "success",
+          "name": "Show diagnostics (bat --diagnostic)",
+          "number": 13,
+          "started_at": "2026-09-26T20:42:24Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:31Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig",
+          "number": 14,
+          "started_at": "2026-09-26T20:42:25Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:41Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git",
+          "number": 15,
+          "started_at": "2026-09-26T20:42:31Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:44Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,paging",
+          "number": 16,
+          "started_at": "2026-09-26T20:42:41Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:50Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git,paging",
+          "number": 17,
+          "started_at": "2026-09-26T20:42:44Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:53Z",
+          "conclusion": "success",
+          "name": "Feature check: minimal-application",
+          "number": 18,
+          "started_at": "2026-09-26T20:42:50Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:54Z",
+          "conclusion": "success",
+          "name": "Create tarball",
+          "number": 19,
+          "started_at": "2026-09-26T20:42:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:56Z",
+          "conclusion": "success",
+          "name": "Create Debian package",
+          "number": 20,
+          "started_at": "2026-09-26T20:42:54Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:57Z",
+          "conclusion": "success",
+          "name": "Artifact upload: tarball",
+          "number": 21,
+          "started_at": "2026-09-26T20:42:56Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:58Z",
+          "conclusion": "success",
+          "name": "Artifact upload: Debian package",
+          "number": 22,
+          "started_at": "2026-09-26T20:42:57Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:58Z",
+          "conclusion": "success",
+          "name": "Check for release",
+          "number": 23,
+          "started_at": "2026-09-26T20:42:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:58Z",
+          "conclusion": "skipped",
+          "name": "Publish archives and packages",
+          "number": 24,
+          "started_at": "2026-09-26T20:42:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:58Z",
+          "conclusion": "success",
+          "name": "Post Checkout source code",
+          "number": 48,
+          "started_at": "2026-09-26T20:42:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:58Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 49,
+          "started_at": "2026-09-26T20:42:58Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:42:10Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108482512702",
+      "id": 108482512702,
+      "name": "aarch64-apple-darwin (macos-latest)",
+      "started_at": "2026-09-26T20:37:58Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:38:00Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:37:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:05Z",
+          "conclusion": "success",
+          "name": "Checkout source code",
+          "number": 2,
+          "started_at": "2026-09-26T20:38:00Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:05Z",
+          "conclusion": "success",
+          "name": "Install prerequisites",
+          "number": 3,
+          "started_at": "2026-09-26T20:38:05Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:06Z",
+          "conclusion": "success",
+          "name": "Install Rust toolchain",
+          "number": 4,
+          "started_at": "2026-09-26T20:38:05Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:06Z",
+          "conclusion": "skipped",
+          "name": "Install cross",
+          "number": 5,
+          "started_at": "2026-09-26T20:38:06Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:06Z",
+          "conclusion": "skipped",
+          "name": "Overwrite build command env variable",
+          "number": 6,
+          "started_at": "2026-09-26T20:38:06Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:38:09Z",
+          "conclusion": "success",
+          "name": "Show version information (Rust, cargo, GCC)",
+          "number": 7,
+          "started_at": "2026-09-26T20:38:06Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:17Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 8,
+          "started_at": "2026-09-26T20:38:09Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:17Z",
+          "conclusion": "success",
+          "name": "Set binary name \u0026 path",
+          "number": 9,
+          "started_at": "2026-09-26T20:40:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:40:17Z",
+          "conclusion": "success",
+          "name": "Set testing options",
+          "number": 10,
+          "started_at": "2026-09-26T20:40:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:05Z",
+          "conclusion": "success",
+          "name": "Run tests",
+          "number": 11,
+          "started_at": "2026-09-26T20:40:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:28Z",
+          "conclusion": "success",
+          "name": "Run bat",
+          "number": 12,
+          "started_at": "2026-09-26T20:41:05Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:28Z",
+          "conclusion": "success",
+          "name": "Show diagnostics (bat --diagnostic)",
+          "number": 13,
+          "started_at": "2026-09-26T20:41:28Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:36Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig",
+          "number": 14,
+          "started_at": "2026-09-26T20:41:28Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:46Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git",
+          "number": 15,
+          "started_at": "2026-09-26T20:41:36Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:49Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,paging",
+          "number": 16,
+          "started_at": "2026-09-26T20:41:46Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:41:58Z",
+          "conclusion": "success",
+          "name": "Feature check: regex-onig,git,paging",
+          "number": 17,
+          "started_at": "2026-09-26T20:41:49Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:03Z",
+          "conclusion": "success",
+          "name": "Feature check: minimal-application",
+          "number": 18,
+          "started_at": "2026-09-26T20:41:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:03Z",
+          "conclusion": "success",
+          "name": "Create tarball",
+          "number": 19,
+          "started_at": "2026-09-26T20:42:03Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:03Z",
+          "conclusion": "skipped",
+          "name": "Create Debian package",
+          "number": 20,
+          "started_at": "2026-09-26T20:42:03Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:05Z",
+          "conclusion": "success",
+          "name": "Artifact upload: tarball",
+          "number": 21,
+          "started_at": "2026-09-26T20:42:03Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:05Z",
+          "conclusion": "skipped",
+          "name": "Artifact upload: Debian package",
+          "number": 22,
+          "started_at": "2026-09-26T20:42:05Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:05Z",
+          "conclusion": "success",
+          "name": "Check for release",
+          "number": 23,
+          "started_at": "2026-09-26T20:42:05Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:05Z",
+          "conclusion": "skipped",
+          "name": "Publish archives and packages",
+          "number": 24,
+          "started_at": "2026-09-26T20:42:05Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:06Z",
+          "conclusion": "success",
+          "name": "Post Checkout source code",
+          "number": 48,
+          "started_at": "2026-09-26T20:42:05Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:42:08Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 49,
+          "started_at": "2026-09-26T20:42:06Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:50:53Z",
+      "conclusion": "failure",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108484572942",
+      "id": 108484572942,
+      "name": "all-jobs",
+      "started_at": "2026-09-26T20:50:49Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-26T20:50:50Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-26T20:50:50Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:50:50Z",
+          "conclusion": "failure",
+          "name": "Run jq --exit-status 'all(.result == \"success\")' \u003c\u003c\u003c '{",
+          "number": 2,
+          "started_at": "2026-09-26T20:50:50Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-26T20:50:50Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 3,
+          "started_at": "2026-09-26T20:50:50Z",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "completed_at": "2026-09-26T20:50:47Z",
+      "conclusion": "skipped",
+      "html_url": "https://github.com/sharkdp/bat/actions/runs/36270173409/job/108484573867",
+      "id": 108484573867,
+      "name": "Publish to Winget",
+      "started_at": "2026-09-26T20:50:47Z",
+      "status": "completed",
+      "steps": []
+    }
+  ],
+  "total_count": 23
+}

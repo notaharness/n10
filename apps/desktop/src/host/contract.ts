@@ -84,6 +84,9 @@ import type {
   ResolveRequest,
   ReviewLaunchRequest,
 } from './contract-reviews.js';
+// CI (preview): pipelines, stages, jobs, steps and log tails.
+export type * from './contract-ci.js';
+import type { CiLog, CiLogRef, CiOverview } from './contract-ci.js';
 import type {
   BabysitChangedEvent,
   LaunchStepEvent,
@@ -355,6 +358,12 @@ export interface N10HostApi {
    *  DevOps PAT / GitHub token) and return it as a data URL. */
   fetchCommentImage(url: string): Promise<CommentImagePayload | null>;
 
+  // ── CI (preview) ─────────────────────────────────────────────
+  /** A pull request's pipelines, as its provider reports them. */
+  getCiOverview(prId: number): Promise<CiOverview>;
+  /** The last lines of one job's or step's log. */
+  getCiLog(ref: CiLogRef): Promise<CiLog>;
+
   // ── Draft review comments (from the review agent) ─────────────
   listDraftComments(prId: number): Promise<ReviewComment[]>;
   updateDraftComment(
@@ -542,6 +551,8 @@ export const IPC = {
   submitReviewVerdict: 'n10/reviews/submit-verdict',
   getReviewViewer: 'n10/reviews/viewer',
   fetchCommentImage: 'n10/reviews/comment-image',
+  getCiOverview: 'n10/ci/overview',
+  getCiLog: 'n10/ci/log',
   listDraftComments: 'n10/drafts/list',
   updateDraftComment: 'n10/drafts/update',
   deleteDraftComment: 'n10/drafts/delete',

@@ -1,0 +1,500 @@
+2026-09-27T02:08:46.5917970Z [30;1mAdding assembly reference to [0m[37mSystem.Threading.Tasks.Dataflow.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5918110Z [30;1mAdding assembly reference to [0m[37mSystem.Threading.Tasks.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5918270Z [30;1mAdding assembly reference to [0m[37mSystem.Threading.Tasks.Extensions.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5918400Z [30;1mAdding assembly reference to [0m[37mSystem.Threading.Timer.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5918540Z [30;1mAdding assembly reference to [0m[37mSystem.Transactions.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5918740Z [30;1mAdding assembly reference to [0m[37mSystem.ValueTuple.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5918880Z [30;1mAdding assembly reference to [0m[37mSystem.Web.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5919000Z [30;1mAdding assembly reference to [0m[37mSystem.Windows.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5919170Z [30;1mAdding assembly reference to [0m[37mSystem.Xml.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5919290Z [30;1mAdding assembly reference to [0m[37mSystem.Xml.Linq.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5919410Z [30;1mAdding assembly reference to [0m[37mSystem.Private.Xml.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5919560Z [30;1mAdding assembly reference to [0m[37mSystem.Xml.Serialization.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5919690Z [30;1mAdding assembly reference to [0m[37mSystem.Private.Xml.Linq.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5919910Z [30;1mAdding assembly reference to [0m[37mSystem.Xml.XmlDocument.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5920030Z [30;1mAdding assembly reference to [0m[37mWindowsBase.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5920140Z [30;1mAdding assembly reference to [0m[37mCake.Core.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5920260Z [30;1mAdding assembly reference to [0m[37mCake.Common.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5920430Z [30;1mAdding assembly reference to [0m[37mSpectre.Console.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5920570Z [30;1mAdding assembly reference to [0m[37mCake.Android.SdkManager.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5920720Z [30;1mAdding assembly reference to [0m[37mCake.AppleSimulator.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5920860Z [30;1mAdding assembly reference to [0m[37mCake.FileHelpers.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5921000Z [30;1mAdding assembly reference to [0m[37mNuGet.Packaging.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5921120Z [30;1mAdding assembly reference to [0m[37mNuGet.Protocol.dll[0m[30;1m...[0m
+2026-09-27T02:08:46.5921240Z [30;1mImporting namespace [0m[37mCake.AndroidSdkManager[0m[30;1m...[0m
+2026-09-27T02:08:46.5921350Z [30;1mImporting namespace [0m[37mCake.AppleSimulator[0m[30;1m...[0m
+2026-09-27T02:08:46.5921460Z [30;1mImporting namespace [0m[37mCake.AppleSimulator.SimCtl[0m[30;1m...[0m
+2026-09-27T02:08:46.5921580Z [30;1mImporting namespace [0m[37mCake.AppleSimulator.Simulator[0m[30;1m...[0m
+2026-09-27T02:08:46.5921690Z [30;1mImporting namespace [0m[37mCake.Common[0m[30;1m...[0m
+2026-09-27T02:08:46.5921860Z [30;1mImporting namespace [0m[37mCake.Common.Build[0m[30;1m...[0m
+2026-09-27T02:08:46.5921990Z [30;1mImporting namespace [0m[37mCake.Common.Build.AppVeyor[0m[30;1m...[0m
+2026-09-27T02:08:46.5922140Z [30;1mImporting namespace [0m[37mCake.Common.Build.AppVeyor.Data[0m[30;1m...[0m
+2026-09-27T02:08:46.5922260Z [30;1mImporting namespace [0m[37mCake.Common.Build.AzurePipelines[0m[30;1m...[0m
+2026-09-27T02:08:46.5922390Z [30;1mImporting namespace [0m[37mCake.Common.Build.AzurePipelines.Data[0m[30;1m...[0m
+2026-09-27T02:08:46.5922510Z [30;1mImporting namespace [0m[37mCake.Common.Build.Bamboo[0m[30;1m...[0m
+2026-09-27T02:08:46.5922620Z [30;1mImporting namespace [0m[37mCake.Common.Build.Bamboo.Data[0m[30;1m...[0m
+2026-09-27T02:08:46.5922740Z [30;1mImporting namespace [0m[37mCake.Common.Build.BitbucketPipelines[0m[30;1m...[0m
+2026-09-27T02:08:46.5922870Z [30;1mImporting namespace [0m[37mCake.Common.Build.BitbucketPipelines.Data[0m[30;1m...[0m
+2026-09-27T02:08:46.5922990Z [30;1mImporting namespace [0m[37mCake.Common.Build.Bitrise[0m[30;1m...[0m
+2026-09-27T02:08:46.5923100Z [30;1mImporting namespace [0m[37mCake.Common.Build.Bitrise.Data[0m[30;1m...[0m
+2026-09-27T02:08:46.5923220Z [30;1mImporting namespace [0m[37mCake.Common.Build.ContinuaCI[0m[30;1m...[0m
+2026-09-27T02:08:46.5923340Z [30;1mImporting namespace [0m[37mCake.Common.Build.ContinuaCI.Data[0m[30;1m...[0m
+2026-09-27T02:08:46.5923490Z [30;1mImporting namespace [0m[37mCake.Common.Build.GitHubActions[0m[30;1m...[0m
+2026-09-27T02:08:46.5923650Z [30;1mImporting namespace [0m[37mCake.Common.Build.GitHubActions.Data[0m[30;1m...[0m
+2026-09-27T02:08:46.5923780Z [30;1mImporting namespace [0m[37mCake.Common.Build.GitLabCI[0m[30;1m...[0m
+2026-09-27T02:08:46.5923890Z [30;1mImporting namespace [0m[37mCake.Common.Build.GitLabCI.Data[0m[30;1m...[0m
+2026-09-27T02:08:46.5924010Z [30;1mImporting namespace [0m[37mCake.Common.Build.GoCD[0m[30;1m...[0m
+2026-09-27T02:08:46.5924120Z [30;1mImporting namespace [0m[37mCake.Common.Build.GoCD.Data[0m[30;1m...[0m
+2026-09-27T02:08:46.5924270Z [30;1mImporting namespace [0m[37mCake.Common.Build.Jenkins[0m[30;1m...[0m
+2026-09-27T02:08:46.5924410Z [30;1mImporting namespace [0m[37mCake.Common.Build.Jenkins.Data[0m[30;1m...[0m
+2026-09-27T02:08:46.5924560Z [30;1mImporting namespace [0m[37mCake.Common.Build.MyGet[0m[30;1m...[0m
+2026-09-27T02:08:46.5924750Z [30;1mImporting namespace [0m[37mCake.Common.Build.TeamCity[0m[30;1m...[0m
+2026-09-27T02:08:46.5924880Z [30;1mImporting namespace [0m[37mCake.Common.Build.TravisCI[0m[30;1m...[0m
+2026-09-27T02:08:46.5925000Z [30;1mImporting namespace [0m[37mCake.Common.Build.TravisCI.Data[0m[30;1m...[0m
+2026-09-27T02:08:46.5925120Z [30;1mImporting namespace [0m[37mCake.Common.Diagnostics[0m[30;1m...[0m
+2026-09-27T02:08:46.5925220Z [30;1mImporting namespace [0m[37mCake.Common.IO[0m[30;1m...[0m
+2026-09-27T02:08:46.5925350Z [30;1mImporting namespace [0m[37mCake.Common.IO.Paths[0m[30;1m...[0m
+2026-09-27T02:08:46.5925460Z [30;1mImporting namespace [0m[37mCake.Common.Net[0m[30;1m...[0m
+2026-09-27T02:08:46.5925580Z [30;1mImporting namespace [0m[37mCake.Common.Security[0m[30;1m...[0m
+2026-09-27T02:08:46.5925690Z [30;1mImporting namespace [0m[37mCake.Common.Solution[0m[30;1m...[0m
+2026-09-27T02:08:46.5925800Z [30;1mImporting namespace [0m[37mCake.Common.Solution.Project[0m[30;1m...[0m
+2026-09-27T02:08:46.5925920Z [30;1mImporting namespace [0m[37mCake.Common.Solution.Project.Properties[0m[30;1m...[0m
+2026-09-27T02:08:46.5926050Z [30;1mImporting namespace [0m[37mCake.Common.Solution.Project.XmlDoc[0m[30;1m...[0m
+2026-09-27T02:08:46.5926160Z [30;1mImporting namespace [0m[37mCake.Common.Text[0m[30;1m...[0m
+2026-09-27T02:08:46.5926270Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Cake[0m[30;1m...[0m
+2026-09-27T02:08:46.5926380Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Chocolatey[0m[30;1m...[0m
+2026-09-27T02:08:46.5926500Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Chocolatey.ApiKey[0m[30;1m...[0m
+2026-09-27T02:08:46.5926650Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Chocolatey.Config[0m[30;1m...[0m
+2026-09-27T02:08:46.5926800Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Chocolatey.Download[0m[30;1m...[0m
+2026-09-27T02:08:46.5926920Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Chocolatey.Export[0m[30;1m...[0m
+2026-09-27T02:08:46.5927050Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Chocolatey.Features[0m[30;1m...[0m
+2026-09-27T02:08:46.5927200Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Chocolatey.Install[0m[30;1m...[0m
+2026-09-27T02:08:46.5927340Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Chocolatey.New[0m[30;1m...[0m
+2026-09-27T02:08:46.5927460Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Chocolatey.Pack[0m[30;1m...[0m
+2026-09-27T02:08:46.5927590Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Chocolatey.Pin[0m[30;1m...[0m
+2026-09-27T02:08:46.5927740Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Chocolatey.Push[0m[30;1m...[0m
+2026-09-27T02:08:46.5927870Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Chocolatey.Sources[0m[30;1m...[0m
+2026-09-27T02:08:46.5928020Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Chocolatey.Uninstall[0m[30;1m...[0m
+2026-09-27T02:08:46.5928170Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Chocolatey.Upgrade[0m[30;1m...[0m
+2026-09-27T02:08:46.5928340Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Command[0m[30;1m...[0m
+2026-09-27T02:08:46.5928510Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotCover[0m[30;1m...[0m
+2026-09-27T02:08:46.5928650Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotCover.Analyse[0m[30;1m...[0m
+2026-09-27T02:08:46.5928770Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotCover.Cover[0m[30;1m...[0m
+2026-09-27T02:08:46.5928890Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotCover.Merge[0m[30;1m...[0m
+2026-09-27T02:08:46.5929010Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotCover.Report[0m[30;1m...[0m
+2026-09-27T02:08:46.5929130Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet[0m[30;1m...[0m
+2026-09-27T02:08:46.5929240Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Build[0m[30;1m...[0m
+2026-09-27T02:08:46.5929420Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.BuildServer[0m[30;1m...[0m
+2026-09-27T02:08:46.5929540Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Clean[0m[30;1m...[0m
+2026-09-27T02:08:46.5929660Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Execute[0m[30;1m...[0m
+2026-09-27T02:08:46.5929780Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Format[0m[30;1m...[0m
+2026-09-27T02:08:46.5929930Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.MSBuild[0m[30;1m...[0m
+2026-09-27T02:08:46.5930050Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.NuGet.Delete[0m[30;1m...[0m
+2026-09-27T02:08:46.5930170Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.NuGet.Push[0m[30;1m...[0m
+2026-09-27T02:08:46.5930290Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.NuGet.Source[0m[30;1m...[0m
+2026-09-27T02:08:46.5930410Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Pack[0m[30;1m...[0m
+2026-09-27T02:08:46.5930530Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Package.Add[0m[30;1m...[0m
+2026-09-27T02:08:46.5930660Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Package.Remove[0m[30;1m...[0m
+2026-09-27T02:08:46.5930780Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Publish[0m[30;1m...[0m
+2026-09-27T02:08:46.5930900Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Restore[0m[30;1m...[0m
+2026-09-27T02:08:46.5931010Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Run[0m[30;1m...[0m
+2026-09-27T02:08:46.5931130Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.SDKCheck[0m[30;1m...[0m
+2026-09-27T02:08:46.5931250Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Test[0m[30;1m...[0m
+2026-09-27T02:08:46.5931360Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Tool[0m[30;1m...[0m
+2026-09-27T02:08:46.5931480Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.VSTest[0m[30;1m...[0m
+2026-09-27T02:08:46.5931610Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Workload.Install[0m[30;1m...[0m
+2026-09-27T02:08:46.5931730Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Workload.List[0m[30;1m...[0m
+2026-09-27T02:08:46.5931850Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Workload.Repair[0m[30;1m...[0m
+2026-09-27T02:08:46.5931970Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Workload.Restore[0m[30;1m...[0m
+2026-09-27T02:08:46.5932080Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Workload.Search[0m[30;1m...[0m
+2026-09-27T02:08:46.5932190Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Workload.Uninstall[0m[30;1m...[0m
+2026-09-27T02:08:46.5932310Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DotNet.Workload.Update[0m[30;1m...[0m
+2026-09-27T02:08:46.5932440Z [30;1mImporting namespace [0m[37mCake.Common.Tools.DupFinder[0m[30;1m...[0m
+2026-09-27T02:08:46.5932580Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Fixie[0m[30;1m...[0m
+2026-09-27T02:08:46.5932750Z [30;1mImporting namespace [0m[37mCake.Common.Tools.GitLink[0m[30;1m...[0m
+2026-09-27T02:08:46.5932870Z [30;1mImporting namespace [0m[37mCake.Common.Tools.GitReleaseManager[0m[30;1m...[0m
+2026-09-27T02:08:46.5932990Z [30;1mImporting namespace [0m[37mCake.Common.Tools.GitReleaseManager.AddAssets[0m[30;1m...[0m
+2026-09-27T02:08:46.5933120Z [30;1mImporting namespace [0m[37mCake.Common.Tools.GitReleaseManager.Close[0m[30;1m...[0m
+2026-09-27T02:08:46.5933250Z [30;1mImporting namespace [0m[37mCake.Common.Tools.GitReleaseManager.Create[0m[30;1m...[0m
+2026-09-27T02:08:46.5933370Z [30;1mImporting namespace [0m[37mCake.Common.Tools.GitReleaseManager.Discard[0m[30;1m...[0m
+2026-09-27T02:08:46.5933500Z [30;1mImporting namespace [0m[37mCake.Common.Tools.GitReleaseManager.Export[0m[30;1m...[0m
+2026-09-27T02:08:46.5933630Z [30;1mImporting namespace [0m[37mCake.Common.Tools.GitReleaseManager.Label[0m[30;1m...[0m
+2026-09-27T02:08:46.5933790Z [30;1mImporting namespace [0m[37mCake.Common.Tools.GitReleaseManager.Open[0m[30;1m...[0m
+2026-09-27T02:08:46.5933910Z [30;1mImporting namespace [0m[37mCake.Common.Tools.GitReleaseManager.Publish[0m[30;1m...[0m
+2026-09-27T02:08:46.5934090Z [30;1mImporting namespace [0m[37mCake.Common.Tools.GitReleaseNotes[0m[30;1m...[0m
+2026-09-27T02:08:46.5934230Z [30;1mImporting namespace [0m[37mCake.Common.Tools.GitVersion[0m[30;1m...[0m
+2026-09-27T02:08:46.5934380Z [30;1mImporting namespace [0m[37mCake.Common.Tools.ILMerge[0m[30;1m...[0m
+2026-09-27T02:08:46.5934520Z [30;1mImporting namespace [0m[37mCake.Common.Tools.ILRepack[0m[30;1m...[0m
+2026-09-27T02:08:46.5934640Z [30;1mImporting namespace [0m[37mCake.Common.Tools.InnoSetup[0m[30;1m...[0m
+2026-09-27T02:08:46.5934760Z [30;1mImporting namespace [0m[37mCake.Common.Tools.InspectCode[0m[30;1m...[0m
+2026-09-27T02:08:46.5934870Z [30;1mImporting namespace [0m[37mCake.Common.Tools.MSBuild[0m[30;1m...[0m
+2026-09-27T02:08:46.5934990Z [30;1mImporting namespace [0m[37mCake.Common.Tools.MSpec[0m[30;1m...[0m
+2026-09-27T02:08:46.5935100Z [30;1mImporting namespace [0m[37mCake.Common.Tools.MSTest[0m[30;1m...[0m
+2026-09-27T02:08:46.5935210Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NSIS[0m[30;1m...[0m
+2026-09-27T02:08:46.5935330Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NuGet[0m[30;1m...[0m
+2026-09-27T02:08:46.5935470Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NuGet.Add[0m[30;1m...[0m
+2026-09-27T02:08:46.5935600Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NuGet.Delete[0m[30;1m...[0m
+2026-09-27T02:08:46.5935750Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NuGet.Init[0m[30;1m...[0m
+2026-09-27T02:08:46.5935880Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NuGet.Install[0m[30;1m...[0m
+2026-09-27T02:08:46.5935990Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NuGet.List[0m[30;1m...[0m
+2026-09-27T02:08:46.5936110Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NuGet.Pack[0m[30;1m...[0m
+2026-09-27T02:08:46.5936230Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NuGet.Push[0m[30;1m...[0m
+2026-09-27T02:08:46.5936340Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NuGet.Restore[0m[30;1m...[0m
+2026-09-27T02:08:46.5936460Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NuGet.SetApiKey[0m[30;1m...[0m
+2026-09-27T02:08:46.5936580Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NuGet.SetProxy[0m[30;1m...[0m
+2026-09-27T02:08:46.5936700Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NuGet.Sources[0m[30;1m...[0m
+2026-09-27T02:08:46.5936820Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NuGet.Update[0m[30;1m...[0m
+2026-09-27T02:08:46.5936930Z [30;1mImporting namespace [0m[37mCake.Common.Tools.NUnit[0m[30;1m...[0m
+2026-09-27T02:08:46.5937050Z [30;1mImporting namespace [0m[37mCake.Common.Tools.OctopusDeploy[0m[30;1m...[0m
+2026-09-27T02:08:46.5937190Z [30;1mImporting namespace [0m[37mCake.Common.Tools.OpenCover[0m[30;1m...[0m
+2026-09-27T02:08:46.5937370Z [30;1mImporting namespace [0m[37mCake.Common.Tools.ReportGenerator[0m[30;1m...[0m
+2026-09-27T02:08:46.5937500Z [30;1mImporting namespace [0m[37mCake.Common.Tools.ReportUnit[0m[30;1m...[0m
+2026-09-27T02:08:46.5937710Z [30;1mImporting namespace [0m[37mCake.Common.Tools.Roundhouse[0m[30;1m...[0m
+2026-09-27T02:08:46.5937830Z [30;1mImporting namespace [0m[37mCake.Common.Tools.SignTool[0m[30;1m...[0m
+2026-09-27T02:08:46.5937950Z [30;1mImporting namespace [0m[37mCake.Common.Tools.SpecFlow[0m[30;1m...[0m
+2026-09-27T02:08:46.5938080Z [30;1mImporting namespace [0m[37mCake.Common.Tools.SpecFlow.StepDefinitionReport[0m[30;1m...[0m
+2026-09-27T02:08:46.5938240Z [30;1mImporting namespace [0m[37mCake.Common.Tools.SpecFlow.TestExecutionReport[0m[30;1m...[0m
+2026-09-27T02:08:46.5938360Z [30;1mImporting namespace [0m[37mCake.Common.Tools.TextTransform[0m[30;1m...[0m
+2026-09-27T02:08:46.5938670Z [30;1mImporting namespace [0m[37mCake.Common.Tools.VSTest[0m[30;1m...[0m
+2026-09-27T02:08:46.5938800Z [30;1mImporting namespace [0m[37mCake.Common.Tools.VSWhere[0m[30;1m...[0m
+2026-09-27T02:08:46.5938920Z [30;1mImporting namespace [0m[37mCake.Common.Tools.VSWhere.All[0m[30;1m...[0m
+2026-09-27T02:08:46.5939040Z [30;1mImporting namespace [0m[37mCake.Common.Tools.VSWhere.Latest[0m[30;1m...[0m
+2026-09-27T02:08:46.5939170Z [30;1mImporting namespace [0m[37mCake.Common.Tools.VSWhere.Legacy[0m[30;1m...[0m
+2026-09-27T02:08:46.5939290Z [30;1mImporting namespace [0m[37mCake.Common.Tools.VSWhere.Product[0m[30;1m...[0m
+2026-09-27T02:08:46.5939440Z [30;1mImporting namespace [0m[37mCake.Common.Tools.WiX[0m[30;1m...[0m
+2026-09-27T02:08:46.5939610Z [30;1mImporting namespace [0m[37mCake.Common.Tools.WiX.Heat[0m[30;1m...[0m
+2026-09-27T02:08:46.5939730Z [30;1mImporting namespace [0m[37mCake.Common.Tools.XBuild[0m[30;1m...[0m
+2026-09-27T02:08:46.5939850Z [30;1mImporting namespace [0m[37mCake.Common.Tools.XUnit[0m[30;1m...[0m
+2026-09-27T02:08:46.5940010Z [30;1mImporting namespace [0m[37mCake.Common.Xml[0m[30;1m...[0m
+2026-09-27T02:08:46.5940140Z [30;1mImporting namespace [0m[37mCake.Core[0m[30;1m...[0m
+2026-09-27T02:08:46.5940310Z [30;1mImporting namespace [0m[37mCake.Core.Diagnostics[0m[30;1m...[0m
+2026-09-27T02:08:46.5940430Z [30;1mImporting namespace [0m[37mCake.Core.IO[0m[30;1m...[0m
+2026-09-27T02:08:46.5940530Z [30;1mImporting namespace [0m[37mCake.Core.Scripting[0m[30;1m...[0m
+2026-09-27T02:08:46.5940650Z [30;1mImporting namespace [0m[37mCake.Core.Tooling[0m[30;1m...[0m
+2026-09-27T02:08:46.5940770Z [30;1mImporting namespace [0m[37mCake.FileHelpers[0m[30;1m...[0m
+2026-09-27T02:08:46.5940870Z [30;1mImporting namespace [0m[37mNuGet.Common[0m[30;1m...[0m
+2026-09-27T02:08:46.5941010Z [30;1mImporting namespace [0m[37mNuGet.Configuration[0m[30;1m...[0m
+2026-09-27T02:08:46.5941150Z [30;1mImporting namespace [0m[37mNuGet.Protocol[0m[30;1m...[0m
+2026-09-27T02:08:46.5941260Z [30;1mImporting namespace [0m[37mNuGet.Protocol.Core.Types[0m[30;1m...[0m
+2026-09-27T02:08:46.5941380Z [30;1mImporting namespace [0m[37mNuGet.Versioning[0m[30;1m...[0m
+2026-09-27T02:08:46.5941490Z [30;1mImporting namespace [0m[37mSystem[0m[30;1m...[0m
+2026-09-27T02:08:46.5941600Z [30;1mImporting namespace [0m[37mSystem.Collections.Generic[0m[30;1m...[0m
+2026-09-27T02:08:46.5941720Z [30;1mImporting namespace [0m[37mSystem.IO[0m[30;1m...[0m
+2026-09-27T02:08:46.5941830Z [30;1mImporting namespace [0m[37mSystem.Linq[0m[30;1m...[0m
+2026-09-27T02:08:46.5941940Z [30;1mImporting namespace [0m[37mSystem.Text[0m[30;1m...[0m
+2026-09-27T02:08:46.5942080Z [30;1mImporting namespace [0m[37mSystem.Threading.Tasks[0m[30;1m...[0m
+2026-09-27T02:08:46.5942170Z .NETStandard,Version=v2.0
+2026-09-27T02:08:46.6200220Z Compiling build script...
+2026-09-27T02:08:47.5418420Z 
+2026-09-27T02:08:47.5418750Z ========================================
+2026-09-27T02:08:47.5424740Z dotnet
+2026-09-27T02:08:47.5424870Z ========================================
+2026-09-27T02:08:47.5425060Z [37mExecuting task: [0m[37;1mdotnet[0m
+2026-09-27T02:08:47.5489430Z Resolved tool to path /opt/hostedtoolcache/dotnet/dotnet
+2026-09-27T02:08:47.5496490Z [37mExecuting: [0m[37;1m/opt/hostedtoolcache/dotnet/dotnet build "/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj" /property:configuration=Release /binarylogger:"/Users/cloudtest/vss/_work/1/a/logs/dotnet-Release-134349485275437830.binlog"[0m
+2026-09-27T02:08:47.8503310Z   Determining projects to restore...
+2026-09-27T02:08:48.2111720Z   Restored /Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj (in 250 ms).
+2026-09-27T02:08:48.4754510Z   dotnet-install: Note that the intended use of this script is for Continuous Integration (CI) scenarios, where:
+2026-09-27T02:08:48.4754770Z   dotnet-install: - The SDK needs to be installed without user interaction and without admin rights.
+2026-09-27T02:08:48.4755160Z   dotnet-install: - The SDK installation doesn't need to persist across multiple CI runs.
+2026-09-27T02:08:48.4755300Z   dotnet-install: To set up a development environment or to run apps, use installers rather than this script. Visit https://dotnet.microsoft.com/download to get the installer.
+2026-09-27T02:08:48.4755430Z   
+2026-09-27T02:08:48.4755520Z   dotnet-install: Calling: machine_has curl
+2026-09-27T02:08:48.4755610Z   dotnet-install: Calling: calculate_vars 
+2026-09-27T02:08:48.4785750Z   dotnet-install: Calling: get_normalized_architecture_from_architecture <auto>
+2026-09-27T02:08:48.4808430Z   dotnet-install: Calling: get_machine_architecture 
+2026-09-27T02:08:48.4851310Z   dotnet-install: Normalized architecture: 'arm64'.
+2026-09-27T02:08:48.4855810Z   dotnet-install: Calling: get_normalized_os 
+2026-09-27T02:08:48.4875430Z   dotnet-install: Calling: get_current_os_name 
+2026-09-27T02:08:48.4893140Z   dotnet-install: Normalized OS: 'osx'.
+2026-09-27T02:08:48.4897110Z   dotnet-install: Calling: get_normalized_quality 
+2026-09-27T02:08:48.4915820Z   dotnet-install: Normalized quality: ''.
+2026-09-27T02:08:48.4919830Z   dotnet-install: Calling: get_normalized_channel LTS
+2026-09-27T02:08:48.4938560Z   dotnet-install: Normalized channel: 'LTS'.
+2026-09-27T02:08:48.4941990Z   dotnet-install: Calling: get_normalized_product 
+2026-09-27T02:08:48.4959620Z   dotnet-install: Normalized product: 'dotnet-sdk'.
+2026-09-27T02:08:48.4963700Z   dotnet-install: Calling: resolve_installation_path /Users/cloudtest/vss/_work/1/s/.dotnet/
+2026-09-27T02:08:48.4965430Z   dotnet-install: InstallRoot: '/Users/cloudtest/vss/_work/1/s/.dotnet/'.
+2026-09-27T02:08:48.4968940Z   dotnet-install: Calling: get_normalized_architecture_for_specific_sdk_version 11.0.100-rc.1.26420.103 LTS arm64
+2026-09-27T02:08:48.4977650Z   dotnet-install: Calling: get_current_os_name 
+2026-09-27T02:08:48.5014550Z   dotnet-install: Calling: get_specific_version_from_version https://ci.dot.net/public LTS arm64 11.0.100-rc.1.26420.103 
+2026-09-27T02:08:48.5033850Z   dotnet-install: Calling: get_specific_product_version https://ci.dot.net/public 11.0.100-rc.1.26420.103
+2026-09-27T02:08:48.5036670Z   dotnet-install: Calling: get_specific_product_version_url https://ci.dot.net/public 11.0.100-rc.1.26420.103 true 
+2026-09-27T02:08:48.5036960Z   dotnet-install: Constructed productVersion link: https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/sdk-productVersion.txt
+2026-09-27T02:08:48.5040740Z   dotnet-install: Calling: get_specific_product_version_url https://ci.dot.net/public 11.0.100-rc.1.26420.103 false 
+2026-09-27T02:08:48.5041130Z   dotnet-install: Constructed productVersion link: https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/productVersion.txt
+2026-09-27T02:08:48.5043790Z   dotnet-install: Checking for the existence of https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/sdk-productVersion.txt
+2026-09-27T02:08:48.5043930Z   dotnet-install: Calling: machine_has curl
+2026-09-27T02:08:48.5527340Z   dotnet-install: specific_version=11.0.100-rc.1.26420.103
+2026-09-27T02:08:48.5530550Z   dotnet-install: Calling: construct_download_link https://ci.dot.net/public LTS arm64 11.0.100-rc.1.26420.103 osx
+2026-09-27T02:08:48.5534860Z   dotnet-install: Calling: get_specific_product_version https://ci.dot.net/public 11.0.100-rc.1.26420.103
+2026-09-27T02:08:48.5538690Z   dotnet-install: Calling: get_specific_product_version_url https://ci.dot.net/public 11.0.100-rc.1.26420.103 true 
+2026-09-27T02:08:48.5540120Z   dotnet-install: Constructed productVersion link: https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/sdk-productVersion.txt
+2026-09-27T02:08:48.5545100Z   dotnet-install: Calling: get_specific_product_version_url https://ci.dot.net/public 11.0.100-rc.1.26420.103 false 
+2026-09-27T02:08:48.5545870Z   dotnet-install: Constructed productVersion link: https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/productVersion.txt
+2026-09-27T02:08:48.5546290Z   dotnet-install: Checking for the existence of https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/sdk-productVersion.txt
+2026-09-27T02:08:48.5547090Z   dotnet-install: Calling: machine_has curl
+2026-09-27T02:08:48.5996800Z   dotnet-install: Constructed primary named payload URL: https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/dotnet-sdk-11.0.100-rc.1.26420.103-osx-arm64.tar.gz
+2026-09-27T02:08:48.6000160Z   dotnet-install: Calling: construct_legacy_download_link https://ci.dot.net/public LTS arm64 11.0.100-rc.1.26420.103
+2026-09-27T02:08:48.6003650Z   dotnet-install: Calling: get_legacy_os_name 
+2026-09-27T02:08:48.6023200Z   dotnet-install: Constructed legacy named payload URL: https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/dotnet-dev-osx-arm64.11.0.100-rc.1.26420.103.tar.gz
+2026-09-27T02:08:48.6024780Z   dotnet-install: Calling: is_dotnet_package_installed /Users/cloudtest/vss/_work/1/s/.dotnet/ sdk 11.0.100-rc.1.26420.103
+2026-09-27T02:08:48.6030290Z   dotnet-install: Calling: combine_paths /Users/cloudtest/vss/_work/1/s/.dotnet/ sdk
+2026-09-27T02:08:48.6036490Z   dotnet-install: combine_paths: root_path=/Users/cloudtest/vss/_work/1/s/.dotnet
+2026-09-27T02:08:48.6036700Z   dotnet-install: combine_paths: child_path=sdk
+2026-09-27T02:08:48.6038980Z   dotnet-install: Calling: combine_paths /Users/cloudtest/vss/_work/1/s/.dotnet/sdk 11.0.100-rc.1.26420.103
+2026-09-27T02:08:48.6044940Z   dotnet-install: combine_paths: root_path=/Users/cloudtest/vss/_work/1/s/.dotnet/sdk
+2026-09-27T02:08:48.6045190Z   dotnet-install: combine_paths: child_path=11.0.100-rc.1.26420.103
+2026-09-27T02:08:48.6046870Z   dotnet-install: is_dotnet_package_installed: dotnet_package_path=/Users/cloudtest/vss/_work/1/s/.dotnet/sdk/11.0.100-rc.1.26420.103
+2026-09-27T02:08:48.6047180Z   dotnet-install: Generated 2 links.
+2026-09-27T02:08:48.6047930Z   dotnet-install: Link 0: primary, 11.0.100-rc.1.26420.103, https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/dotnet-sdk-11.0.100-rc.1.26420.103-osx-arm64.tar.gz
+2026-09-27T02:08:48.6048130Z   dotnet-install: Link 1: legacy, 11.0.100-rc.1.26420.103, https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/dotnet-dev-osx-arm64.11.0.100-rc.1.26420.103.tar.gz
+2026-09-27T02:08:48.6050050Z   dotnet-install: Calling: install_dotnet 
+2026-09-27T02:08:48.6093520Z   dotnet-install: Archive path: /tmp/dotnet.AZeVigii1
+2026-09-27T02:08:48.6093690Z   dotnet-install: Attempting to download using primary link https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/dotnet-sdk-11.0.100-rc.1.26420.103-osx-arm64.tar.gz
+2026-09-27T02:08:48.6095150Z   dotnet-install: Calling: download https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/dotnet-sdk-11.0.100-rc.1.26420.103-osx-arm64.tar.gz /tmp/dotnet.AZeVigii1
+2026-09-27T02:08:48.6095750Z   dotnet-install: Calling: machine_has curl
+2026-09-27T02:08:48.6097620Z   dotnet-install: Calling: downloadcurl https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/dotnet-sdk-11.0.100-rc.1.26420.103-osx-arm64.tar.gz /tmp/dotnet.AZeVigii1
+2026-09-27T02:08:51.5812610Z   dotnet-install: Calling: machine_has curl
+2026-09-27T02:08:51.6253160Z   dotnet-install: Remote file https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/dotnet-sdk-11.0.100-rc.1.26420.103-osx-arm64.tar.gz size is 197140437 bytes.
+2026-09-27T02:08:51.6254090Z   dotnet-install: Extracting archive from https://ci.dot.net/public/Sdk/11.0.100-rc.1.26420.103/dotnet-sdk-11.0.100-rc.1.26420.103-osx-arm64.tar.gz
+2026-09-27T02:08:51.6254240Z   dotnet-install: Calling: extract_dotnet_package /tmp/dotnet.AZeVigii1 /Users/cloudtest/vss/_work/1/s/.dotnet/ 197140437
+2026-09-27T02:08:52.8784550Z   dotnet-install: Calling: copy_files_or_dirs_from_list /tmp/dotnet.S4xcv3i55 /Users/cloudtest/vss/_work/1/s/.dotnet/ false
+2026-09-27T02:08:52.8794210Z   dotnet-install: Calling: get_cp_options false
+2026-09-27T02:08:54.1558660Z   dotnet-install: Calling: copy_files_or_dirs_from_list /tmp/dotnet.S4xcv3i55 /Users/cloudtest/vss/_work/1/s/.dotnet/ true
+2026-09-27T02:08:54.1571180Z   dotnet-install: Calling: get_cp_options true
+2026-09-27T02:08:54.2170860Z   dotnet-install: Calling: validate_remote_local_file_sizes /tmp/dotnet.AZeVigii1 197140437
+2026-09-27T02:08:54.2193370Z   dotnet-install: Downloaded file size is 197140437 bytes.
+2026-09-27T02:08:54.2193980Z   dotnet-install: The remote and local file sizes are equal.
+2026-09-27T02:08:54.6654510Z   dotnet-install: Temporary archive file /tmp/dotnet.AZeVigii1 was removed
+2026-09-27T02:08:54.6654740Z   dotnet-install: Checking installation: version = 11.0.100-rc.1.26420.103
+2026-09-27T02:08:54.6655020Z   dotnet-install: Calling: is_dotnet_package_installed /Users/cloudtest/vss/_work/1/s/.dotnet/ sdk 11.0.100-rc.1.26420.103
+2026-09-27T02:08:54.6659830Z   dotnet-install: Calling: combine_paths /Users/cloudtest/vss/_work/1/s/.dotnet/ sdk
+2026-09-27T02:08:54.6669310Z   dotnet-install: combine_paths: root_path=/Users/cloudtest/vss/_work/1/s/.dotnet
+2026-09-27T02:08:54.6669440Z   dotnet-install: combine_paths: child_path=sdk
+2026-09-27T02:08:54.6673130Z   dotnet-install: Calling: combine_paths /Users/cloudtest/vss/_work/1/s/.dotnet/sdk 11.0.100-rc.1.26420.103
+2026-09-27T02:08:54.6681970Z   dotnet-install: combine_paths: root_path=/Users/cloudtest/vss/_work/1/s/.dotnet/sdk
+2026-09-27T02:08:54.6682090Z   dotnet-install: combine_paths: child_path=11.0.100-rc.1.26420.103
+2026-09-27T02:08:54.6683320Z   dotnet-install: is_dotnet_package_installed: dotnet_package_path=/Users/cloudtest/vss/_work/1/s/.dotnet/sdk/11.0.100-rc.1.26420.103
+2026-09-27T02:08:54.6683850Z   dotnet-install: Installed version is 11.0.100-rc.1.26420.103
+2026-09-27T02:08:54.6691100Z   dotnet-install: Calling: combine_paths /Users/cloudtest/vss/_work/1/s/.dotnet/ 
+2026-09-27T02:08:54.6697340Z   dotnet-install: combine_paths: root_path=/Users/cloudtest/vss/_work/1/s/.dotnet
+2026-09-27T02:08:54.6697500Z   dotnet-install: combine_paths: child_path=
+2026-09-27T02:08:54.6700200Z   dotnet-install: Calling: get_absolute_path /Users/cloudtest/vss/_work/1/s/.dotnet/
+2026-09-27T02:08:54.6742840Z   dotnet-install: Adding to current process PATH: `/Users/cloudtest/vss/_work/1/s/.dotnet`. Note: This change will be visible only when sourcing script.
+2026-09-27T02:08:54.6743030Z   dotnet-install: Note that the script does not resolve dependencies during installation.
+2026-09-27T02:08:54.6743180Z   dotnet-install: To check the list of dependencies, go to https://learn.microsoft.com/dotnet/core/install, select your operating system and check the "Dependencies" section.
+2026-09-27T02:08:54.6744180Z   dotnet-install: Installation finished successfully.
+2026-09-27T02:08:54.6765500Z   Removing stale workload manifest band: 11.0.100-preview
+2026-09-27T02:08:54.6766000Z   Removing stale workload manifest band: 11.0.100-rc
+2026-09-27T02:08:55.2721720Z   
+2026-09-27T02:08:55.2721950Z   Welcome to .NET 11.0!
+2026-09-27T02:08:55.2722340Z   ---------------------
+2026-09-27T02:08:55.2722450Z   SDK Version: 11.0.100-rc.1.26420.103
+2026-09-27T02:08:55.2722520Z   
+2026-09-27T02:08:55.2722580Z   Telemetry
+2026-09-27T02:08:55.2722640Z   ---------
+2026-09-27T02:08:55.2722820Z   The .NET tools collect usage data in order to help us improve your experience. It is collected by Microsoft and shared with the community. You can opt-out of telemetry by setting the DOTNET_CLI_TELEMETRY_OPTOUT environment variable to '1' or 'true' using your favorite shell.
+2026-09-27T02:08:55.2723230Z   
+2026-09-27T02:08:55.2723330Z   Read more about .NET CLI Tools telemetry: https://aka.ms/dotnet-cli-telemetry
+2026-09-27T02:08:55.3220770Z   
+2026-09-27T02:08:55.3220960Z   ----------------
+2026-09-27T02:08:55.3221070Z   Installed an ASP.NET Core HTTPS development certificate.
+2026-09-27T02:08:55.3221180Z   To trust the certificate, run 'dotnet dev-certs https --trust'
+2026-09-27T02:08:55.3221280Z   Learn about HTTPS: https://aka.ms/dotnet-https
+2026-09-27T02:08:55.3221360Z   
+2026-09-27T02:08:55.3221420Z   ----------------
+2026-09-27T02:08:55.3221510Z   Write your first app: https://aka.ms/dotnet-hello-world
+2026-09-27T02:08:55.3221610Z   Find out what's new: https://aka.ms/dotnet-whats-new
+2026-09-27T02:08:55.3222100Z   Explore documentation: https://aka.ms/dotnet-docs
+2026-09-27T02:08:55.3222230Z   Report issues and find source on GitHub: https://github.com/dotnet/core
+2026-09-27T02:08:55.3222360Z   Use 'dotnet --help' to see available commands or visit: https://aka.ms/dotnet-cli
+2026-09-27T02:08:55.3222480Z   --------------------------------------------------------------------------------------
+2026-09-27T02:08:56.4031170Z     Determining projects to restore...
+2026-09-27T02:08:57.5746220Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: Unable to find package Microsoft.NET.Sdk.MacCatalyst.Manifest-11.0.100-preview.7 with version (= 26.5.12194-net11-rc.1) [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5757290Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 37 version(s) in dotnet11 [ Nearest version: 26.5.12124-net11-rc.2 ] [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5757480Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in benchmark-dotnet-prerelease [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5757740Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in darc-pub-dotnet-dotnet-e17b0d0 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5757920Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-eng [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5758090Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5758260Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5758490Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-public [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5758670Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-tools [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5758850Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5759000Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5759230Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet11-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5759720Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5759870Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5760080Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: Unable to find package Microsoft.NET.Sdk.iOS.Manifest-11.0.100-preview.7 with version (= 26.5.12194-net11-rc.1) [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5760290Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 37 version(s) in dotnet11 [ Nearest version: 26.5.12124-net11-rc.2 ] [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5760570Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in benchmark-dotnet-prerelease [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5760740Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in darc-pub-dotnet-dotnet-e17b0d0 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5760930Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-eng [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5761080Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5761260Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5761440Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-public [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5761640Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-tools [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5761830Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5762010Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5762190Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet11-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5762340Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5762480Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5762640Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: Unable to find package Microsoft.NET.Sdk.tvOS.Manifest-11.0.100-preview.7 with version (= 26.5.12194-net11-rc.1) [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5762820Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 37 version(s) in dotnet11 [ Nearest version: 26.5.12124-net11-rc.2 ] [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5763040Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in benchmark-dotnet-prerelease [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5763200Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in darc-pub-dotnet-dotnet-e17b0d0 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5763350Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-eng [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5763500Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5763680Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5763830Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-public [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5763970Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-tools [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5764120Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5764290Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5764430Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet11-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5764620Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5764760Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5764920Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: Unable to find package Microsoft.NET.Sdk.macOS.Manifest-11.0.100-preview.7 with version (= 26.5.12194-net11-rc.1) [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5765090Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 37 version(s) in dotnet11 [ Nearest version: 26.5.12124-net11-rc.2 ] [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5765250Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in benchmark-dotnet-prerelease [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5765390Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in darc-pub-dotnet-dotnet-e17b0d0 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5765520Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-eng [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5765650Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5765900Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5766030Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-public [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5766150Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-tools [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5766310Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5766440Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5766630Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet11-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5766760Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.5766880Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:57.6069040Z     Failed to restore /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj (in 1.1 sec).
+2026-09-27T02:08:58.4779220Z /Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj(237,5): error MSB3073: The command ""/Users/cloudtest/vss/_work/1/s/.dotnet/dotnet" restore "/Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj" -bl:/Users/cloudtest/vss/_work/1/s/artifacts/log/Release//DotNetWorkloads.binlog" exited with code 1.
+2026-09-27T02:08:58.4797490Z 
+2026-09-27T02:08:58.4800530Z Build FAILED.
+2026-09-27T02:08:58.4800700Z 
+2026-09-27T02:08:58.4801390Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: Unable to find package Microsoft.NET.Sdk.MacCatalyst.Manifest-11.0.100-preview.7 with version (= 26.5.12194-net11-rc.1) [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4801920Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 37 version(s) in dotnet11 [ Nearest version: 26.5.12124-net11-rc.2 ] [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4802430Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in benchmark-dotnet-prerelease [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4802870Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in darc-pub-dotnet-dotnet-e17b0d0 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4803060Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-eng [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4803250Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4803400Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4803550Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-public [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4803980Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-tools [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4804170Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4804330Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4804520Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet11-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4804780Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4804970Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4805160Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: Unable to find package Microsoft.NET.Sdk.iOS.Manifest-11.0.100-preview.7 with version (= 26.5.12194-net11-rc.1) [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4805380Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 37 version(s) in dotnet11 [ Nearest version: 26.5.12124-net11-rc.2 ] [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4805580Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in benchmark-dotnet-prerelease [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4805780Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in darc-pub-dotnet-dotnet-e17b0d0 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4805960Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-eng [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4806140Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4806320Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4806510Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-public [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4806680Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-tools [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4806880Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4807060Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4807230Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet11-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4807400Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4807600Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4807760Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: Unable to find package Microsoft.NET.Sdk.tvOS.Manifest-11.0.100-preview.7 with version (= 26.5.12194-net11-rc.1) [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4807930Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 37 version(s) in dotnet11 [ Nearest version: 26.5.12124-net11-rc.2 ] [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4808120Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in benchmark-dotnet-prerelease [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4808270Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in darc-pub-dotnet-dotnet-e17b0d0 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4808410Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-eng [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4808560Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4808700Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4808850Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-public [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4808990Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-tools [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4809130Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4809270Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4809410Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet11-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4809550Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4809700Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4809860Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: Unable to find package Microsoft.NET.Sdk.macOS.Manifest-11.0.100-preview.7 with version (= 26.5.12194-net11-rc.1) [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4810060Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 37 version(s) in dotnet11 [ Nearest version: 26.5.12124-net11-rc.2 ] [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4810240Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in benchmark-dotnet-prerelease [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4810440Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in darc-pub-dotnet-dotnet-e17b0d0 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4810620Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-eng [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4810800Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4810950Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-libraries [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4811120Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-public [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4811260Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet-tools [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4811410Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4811560Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet10 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4811710Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet11-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4811850Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9-transport [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4812050Z /Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj : error NU1102: - Found 0 version(s) in dotnet9 [/Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj]
+2026-09-27T02:08:58.4812240Z /Users/cloudtest/vss/_work/1/s/src/DotNet/DotNet.csproj(237,5): error MSB3073: The command ""/Users/cloudtest/vss/_work/1/s/.dotnet/dotnet" restore "/Users/cloudtest/vss/_work/1/s/src/DotNet/Dependencies/Workloads.csproj" -bl:/Users/cloudtest/vss/_work/1/s/artifacts/log/Release//DotNetWorkloads.binlog" exited with code 1.
+2026-09-27T02:08:58.4812430Z     0 Warning(s)
+2026-09-27T02:08:58.4812510Z     57 Error(s)
+2026-09-27T02:08:58.4812540Z 
+2026-09-27T02:08:58.4812720Z Time Elapsed 00:00:10.82
+2026-09-27T02:08:58.4957620Z [41m[37;1mAn error occurred when executing task '[0m[41;1m[37;1mdotnet[0m[41m[37;1m'.[0m
+2026-09-27T02:08:58.4962810Z Completed in 00:00:10.9544617
+2026-09-27T02:08:58.5024730Z [41m[37;1mError: [0m[41;1m[37;1mCake.Core.CakeException: .NET CLI: Process returned an error (exit code 1).
+2026-09-27T02:08:58.5024940Z    at Cake.Core.Tooling.Tool`1.ProcessExitCode(Int32 exitCode) in C:\projects\cake\src\Cake.Core\Tooling\Tool.cs:line 118
+2026-09-27T02:08:58.5025100Z    at Cake.Core.Tooling.Tool`1.Run(TSettings settings, ProcessArgumentBuilder arguments, ProcessSettings processSettings, Action`1 postAction) in C:\projects\cake\src\Cake.Core\Tooling\Tool.cs:line 103
+2026-09-27T02:08:58.5025320Z    at Cake.Common.Tools.DotNet.DotNetTool`1.RunCommand(TSettings settings, ProcessArgumentBuilder arguments) in C:\projects\cake\src\Cake.Common\Tools\DotNet\DotNetTool.cs:line 64
+2026-09-27T02:08:58.5025530Z    at Cake.Common.Tools.DotNet.Build.DotNetBuilder.Build(String project, DotNetBuildSettings settings) in C:\projects\cake\src\Cake.Common\Tools\DotNet\Build\DotNetBuilder.cs:line 52
+2026-09-27T02:08:58.5025940Z    at Cake.Common.Tools.DotNet.DotNetAliases.DotNetBuild(ICakeContext context, String project, DotNetBuildSettings settings) in C:\projects\cake\src\Cake.Common\Tools\DotNet\DotNetAliases.cs:line 284
+2026-09-27T02:08:58.5026110Z    at Submission#0.DotNetBuild(String project, DotNetBuildSettings settings)
+2026-09-27T02:08:58.5026210Z    at Submission#0.<<Initialize>>b__0_0()
+2026-09-27T02:08:58.5026350Z    at Cake.Core.CakeTaskBuilderExtensions.<>c__DisplayClass36_0.<Does>b__0(ICakeContext _) in C:\projects\cake\src\Cake.Core\CakeTaskBuilder.Execution.cs:line 26
+2026-09-27T02:08:58.5026510Z    at Cake.Core.CakeTaskBuilderExtensions.<>c__DisplayClass39_0.<Does>b__0(ICakeContext context) in C:\projects\cake\src\Cake.Core\CakeTaskBuilder.Execution.cs:line 81
+2026-09-27T02:08:58.5026760Z    at Cake.Core.CakeTask.Execute(ICakeContext context) in C:\projects\cake\src\Cake.Core\CakeTask.cs:line 119
+2026-09-27T02:08:58.5026930Z    at Cake.Core.DefaultExecutionStrategy.ExecuteAsync(CakeTask task, ICakeContext context) in C:\projects\cake\src\Cake.Core\DefaultExecutionStrategy.cs:line 69
+2026-09-27T02:08:58.5027110Z    at Cake.Core.CakeEngine.ExecuteTaskAsync(ICakeContext context, IExecutionStrategy strategy, Stopwatch stopWatch, CakeTask task, CakeReport report) in C:\projects\cake\src\Cake.Core\CakeEngine.cs:line 318
+2026-09-27T02:08:58.5027290Z    at Cake.Core.CakeEngine.ExecuteTaskAsync(ICakeContext context, IExecutionStrategy strategy, Stopwatch stopWatch, CakeTask task, CakeReport report) in C:\projects\cake\src\Cake.Core\CakeEngine.cs:line 341
+2026-09-27T02:08:58.5027490Z    at Cake.Core.CakeEngine.ExecuteTaskAsync(ICakeContext context, IExecutionStrategy strategy, Stopwatch stopWatch, CakeTask task, CakeReport report) in C:\projects\cake\src\Cake.Core\CakeEngine.cs:line 353
+2026-09-27T02:08:58.5027670Z    at Cake.Core.CakeEngine.RunTask(ICakeContext context, IExecutionStrategy strategy, CakeTask task, String target, Stopwatch stopWatch, CakeReport report) in C:\projects\cake\src\Cake.Core\CakeEngine.cs:line 254
+2026-09-27T02:08:58.5027890Z    at Cake.Core.CakeEngine.RunTarget(ICakeContext context, IExecutionStrategy strategy, CakeTask[] orderedTasks, String target, Boolean exclusive, Stopwatch stopWatch, CakeReport report) in C:\projects\cake\src\Cake.Core\CakeEngine.cs:line 229
+2026-09-27T02:08:58.5028130Z    at Cake.Core.CakeEngine.RunTargetAsync(ICakeContext context, IExecutionStrategy strategy, ExecutionSettings settings) in C:\projects\cake\src\Cake.Core\CakeEngine.cs:line 199
+2026-09-27T02:08:58.5028320Z    at Cake.Cli.BuildScriptHost`1.internalRunTargetAsync() in C:\projects\cake\src\Cake.Cli\Hosts\BuildScriptHost.cs:line 87
+2026-09-27T02:08:58.5028470Z    at Cake.Cli.BuildScriptHost`1.RunTargetAsync(String target) in C:\projects\cake\src\Cake.Cli\Hosts\BuildScriptHost.cs:line 74
+2026-09-27T02:08:58.5028650Z    at Cake.Core.Scripting.ScriptHost.RunTarget(String target) in C:\projects\cake\src\Cake.Core\Scripting\ScriptHost.cs:line 110
+2026-09-27T02:08:58.5028790Z    at Submission#0.<<Initialize>>d__0.MoveNext()
+2026-09-27T02:08:58.5028920Z --- End of stack trace from previous location ---
+2026-09-27T02:08:58.5029070Z    at Microsoft.CodeAnalysis.Scripting.ScriptExecutionState.RunSubmissionsAsync[TResult](ImmutableArray`1 precedingExecutors, Func`2 currentExecutor, StrongBox`1 exceptionHolderOpt, Func`2 catchExceptionOpt, CancellationToken cancellationToken)
+2026-09-27T02:08:58.5029300Z    at Microsoft.CodeAnalysis.Scripting.Script`1.RunSubmissionsAsync(ScriptExecutionState executionState, ImmutableArray`1 precedingExecutors, Func`2 currentExecutor, Func`2 catchExceptionOpt, CancellationToken cancellationToken)
+2026-09-27T02:08:58.5029650Z    at Cake.Infrastructure.Scripting.RoslynScriptSession.Execute(Script script) in C:\projects\cake\src\Cake\Infrastructure\Scripting\RoslynScriptSession.cs:line 206
+2026-09-27T02:08:58.5029830Z    at Cake.Core.Scripting.ScriptRunner.Run(IScriptHost host, FilePath scriptPath) in C:\projects\cake\src\Cake.Core\Scripting\ScriptRunner.cs:line 172
+2026-09-27T02:08:58.5030100Z    at Cake.Features.Building.BuildFeature.RunCore(ICakeArguments arguments, BuildFeatureSettings settings) in C:\projects\cake\src\Cake\Features\Building\BuildFeature.cs:line 99
+2026-09-27T02:08:58.5030290Z    at Cake.Features.Building.BuildFeature.Run(ICakeArguments arguments, BuildFeatureSettings settings) in C:\projects\cake\src\Cake\Features\Building\BuildFeature.cs:line 49
+2026-09-27T02:08:58.5030470Z    at Cake.Commands.DefaultCommand.Execute(CommandContext context, DefaultCommandSettings settings) in C:\projects\cake\src\Cake\Commands\DefaultCommand.cs:line 76[0m
+2026-09-27T02:08:58.5106050Z 
+2026-09-27T02:08:58.5123080Z ##[error]Bash exited with code '1'.
+2026-09-27T02:08:58.5129570Z ##[warning]RetryHelper encountered task failure, will retry (attempt #: 1 out of 3) after 1000 ms
+2026-09-27T02:08:59.6206660Z [Host] Selected Node version: Node24 (Strategy: Node24Strategy)
+2026-09-27T02:08:59.6702820Z Generating script.
+2026-09-27T02:08:59.6705740Z Script contents:
+2026-09-27T02:08:59.6706310Z dotnet cake --target=dotnet-buildtasks --configuration="Release" --verbosity=diagnostic
+2026-09-27T02:08:59.6706500Z ========================== Starting Command Output ===========================
+2026-09-27T02:08:59.6710850Z [command]/bin/bash --noprofile --norc /Users/cloudtest/vss/_work/_temp/a58021f9-5d03-48f1-bb43-5be7862f51d9.sh
+2026-09-27T02:08:59.7584920Z Run "dotnet tool restore" to make the "dotnet-cake" command available.
+2026-09-27T02:09:00.0402510Z 
+2026-09-27T02:09:00.0412730Z ##[error]Bash exited with code '1'.
+2026-09-27T02:09:00.0436030Z ##[warning]RetryHelper encountered task failure, will retry (attempt #: 2 out of 3) after 4000 ms
+2026-09-27T02:09:04.1446540Z [Host] Selected Node version: Node24 (Strategy: Node24Strategy)
+2026-09-27T02:09:04.1954880Z Generating script.
+2026-09-27T02:09:04.1958170Z Script contents:
+2026-09-27T02:09:04.1958460Z dotnet cake --target=dotnet-buildtasks --configuration="Release" --verbosity=diagnostic
+2026-09-27T02:09:04.1958640Z ========================== Starting Command Output ===========================
+2026-09-27T02:09:04.1963460Z [command]/bin/bash --noprofile --norc /Users/cloudtest/vss/_work/_temp/049927a3-6140-4c59-bfb3-ffe1c5cf7a38.sh
+2026-09-27T02:09:04.2847670Z Run "dotnet tool restore" to make the "dotnet-cake" command available.
+2026-09-27T02:09:04.5474740Z 
+2026-09-27T02:09:04.5481220Z ##[error]Bash exited with code '1'.
+2026-09-27T02:09:04.5502850Z ##[warning]RetryHelper encountered task failure, will retry (attempt #: 3 out of 3) after 9000 ms
+2026-09-27T02:09:13.6532940Z [Host] Selected Node version: Node24 (Strategy: Node24Strategy)
+2026-09-27T02:09:13.7040170Z Generating script.
+2026-09-27T02:09:13.7042950Z Script contents:
+2026-09-27T02:09:13.7043420Z dotnet cake --target=dotnet-buildtasks --configuration="Release" --verbosity=diagnostic
+2026-09-27T02:09:13.7044060Z ========================== Starting Command Output ===========================
+2026-09-27T02:09:13.7048140Z [command]/bin/bash --noprofile --norc /Users/cloudtest/vss/_work/_temp/4284ad14-cdf9-4150-b220-29a4687c1bc6.sh
+2026-09-27T02:09:13.7908790Z Run "dotnet tool restore" to make the "dotnet-cake" command available.
+2026-09-27T02:09:14.0533050Z 
+2026-09-27T02:09:14.0538980Z ##[error]Bash exited with code '1'.
+2026-09-27T02:09:14.0563160Z ##[section]Finishing: 🛠️ Provision SDK & Build BuildTasks

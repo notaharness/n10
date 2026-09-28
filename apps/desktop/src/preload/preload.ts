@@ -59,6 +59,8 @@ const api: N10HostApi = {
   replyToThread: (req) => ipcRenderer.invoke(IPC.replyToThread, req),
   setThreadResolved: (req) => ipcRenderer.invoke(IPC.setThreadResolved, req),
   fetchCommentImage: (url) => ipcRenderer.invoke(IPC.fetchCommentImage, url),
+  getCiOverview: (prId) => ipcRenderer.invoke(IPC.getCiOverview, prId),
+  getCiLog: (ref) => ipcRenderer.invoke(IPC.getCiLog, ref),
   listDraftComments: (prId) => ipcRenderer.invoke(IPC.listDraftComments, prId),
   updateDraftComment: (prId, id, patch) =>
     ipcRenderer.invoke(IPC.updateDraftComment, prId, id, patch),

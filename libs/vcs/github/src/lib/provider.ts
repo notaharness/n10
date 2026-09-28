@@ -21,6 +21,7 @@ import {
   ghOutput,
   parseGhJson,
 } from './gh-errors.js';
+import { fetchGitHubCiLog, fetchGitHubCiOverview } from './ci.js';
 
 // ── gh CLI transport ──────────────────────────────────────────────
 
@@ -900,5 +901,15 @@ export const githubProvider: VcsProvider = {
     } catch (err: unknown) {
       throw classifyGhError(err);
     }
+  },
+
+  async fetchCiOverview(_auth, project, pr) {
+    if (!pr.headSha) throw new Error('The pull request has no head commit yet');
+    return fetchGitHubCiOverview(project.owner, project.repo, pr.headSha);
+  },
+
+  async fetchCiLog(_auth, project, ref, tailLines) {
+    if (ref.provider !== 'github') throw new Error('Not a GitHub log');
+    return fetchGitHubCiLog(project.owner, project.repo, ref.jobId, tailLines);
   },
 };

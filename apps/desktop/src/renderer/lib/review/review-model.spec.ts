@@ -142,7 +142,7 @@ describe('focusesAgent', () => {
 // ── resolveMode ──────────────────────────────────────────────────
 
 describe('resolveMode', () => {
-  const ALL: Mode[] = ['diff', 'agent', 'review', 'overview', 'plan'];
+  const ALL: Mode[] = ['diff', 'agent', 'review', 'overview', 'plan', 'ci'];
   const NOTHING = {
     hasSession: false,
     hasDrafts: false,
@@ -184,6 +184,7 @@ describe('resolveMode', () => {
       /* review   */ ['diff', 'review', 'diff', 'diff'],
       /* overview */ ['diff', 'diff', 'overview', 'diff'],
       /* plan     */ ['diff', 'diff', 'diff', 'plan'],
+      /* ci       */ ['diff', 'diff', 'ci', 'diff'],
     ]);
   });
 

@@ -80,6 +80,7 @@ export * from './lib/sync/remote-sync.js';
 export * from './lib/sync/conflicts.js';
 export * from './lib/sync/fetch-queue.js';
 export * from './lib/pull-requests/pull-request-cache.js';
+export * from './lib/pull-requests/ci-overview.js';
 export * from './lib/discovery/discovery-model.js';
 export * from './lib/discovery/session-discovery.js';
 export * from './lib/babysit/babysit-model.js';

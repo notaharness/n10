@@ -14,6 +14,7 @@ import type {
 import { sanitizeBody } from '@n10/vcs-core';
 import { log } from '@n10/logger';
 import type { AdoConfig } from './client.js';
+import { fetchAdoCiLog, fetchAdoCiOverview } from './ci.js';
 import { authHeaders, baseUrl } from './client.js';
 import {
   adoGet,
@@ -1137,5 +1138,15 @@ export const azureDevOpsProvider: VcsProvider = {
     // statuses and descriptions to fix something they do not hold.
     // The vote a user might still see is in the shell's own model —
     // the desktop refreshes it from services/reviews.ts.
+  },
+
+  async fetchCiOverview(auth, project, pr) {
+    return fetchAdoCiOverview(toAdoConfig(auth, project), pr.id);
+  },
+
+  async fetchCiLog(auth, project, ref, tailLines) {
+    if (ref.provider !== 'azure-devops') throw new Error('Not an Azure log');
+    const config = toAdoConfig(auth, project);
+    return fetchAdoCiLog(config, ref.buildId, ref.logId, tailLines);
   },
 };

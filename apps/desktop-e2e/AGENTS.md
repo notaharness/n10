@@ -21,7 +21,9 @@ build target pins production). Full notes: `docs/testing.md`.
   `.claude/worktrees/<branch>` verbatim while the app sanitizes the name.
 - `src/setup/fake-gh.ts` puts a fake `gh` on PATH answering from a JSON
   scenario (`fakeGitHub` option: PRs, review threads, comments, check
-  rollup). Point `headRefName` at a real branch for a real diff. The replacement is isolated to the test PATH.
+  rollup, and an `api` table of recorded `gh api` answers keyed by path). Point
+  `headRefName` at a real branch for a real diff. The replacement is isolated
+  to the test PATH.
 - Provider config from a test: project fields go under `vendorProject`, or
   auto-detect overwrites them and the provider silently returns nothing.
 - Native menus: `src/setup/menu.ts` arms a one-shot `Menu.popup` interception

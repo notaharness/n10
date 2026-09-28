@@ -28,6 +28,8 @@ export interface FakePr {
   isDraft?: boolean;
   /** Body shown on the Overview pane. */
   body?: string;
+  /** The head commit; the CI page finds workflow runs by it. */
+  headRefOid?: string;
   rollup?: 'SUCCESS' | 'FAILURE' | 'PENDING';
   reviews?: { author: string; state: string }[];
   reviewRequests?: string[];
@@ -56,6 +58,12 @@ export interface FakeGitHub {
   /** The signed-in user. PRs they authored are "yours". */
   username?: string;
   prs: FakePr[];
+  /**
+   * Recorded `gh api <path>` answers, keyed by the exact path: JSON,
+   * or text such as a job log. `{ ghError: 'Not Found (HTTP 404)' }`
+   * fails the call the way `gh` does. See `setup/ci-fixture.ts`.
+   */
+  api?: Record<string, unknown>;
   /**
    * Make every `gh` call take this long, standing in for the round trip
    * to GitHub. Left off for the e2e suite (which wants speed); the perf

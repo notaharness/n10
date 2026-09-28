@@ -265,6 +265,8 @@ export function PrWorkspace({
                   hasPr={Boolean(pr)}
                   overviewActive={effMode === 'overview'}
                   onOverview={() => setMode('overview')}
+                  ciActive={effMode === 'ci'}
+                  onCi={() => setMode('ci')}
                   running={running}
                   busy={busy}
                   hasSession={Boolean(sessionName)}

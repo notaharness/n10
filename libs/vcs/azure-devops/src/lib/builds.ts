@@ -81,7 +81,7 @@ export function prMergeRef(prId: number): string {
   return `refs/pull/${prId}/merge`;
 }
 
-function buildsUrl(config: AdoConfig, query: string): string {
+export function buildsUrl(config: AdoConfig, query: string): string {
   return (
     `https://dev.azure.com/${config.org}/${config.project}/_apis/build/builds` +
     `?${query}&api-version=7.1`
@@ -113,7 +113,9 @@ export async function fetchPrBuildRuns(
  * n10's configuration names the repository, and the builds API will
  * not take a name.
  */
-async function fetchRepositoryId(config: AdoConfig): Promise<string | null> {
+export async function fetchRepositoryId(
+  config: AdoConfig
+): Promise<string | null> {
   const repo = await adoGet<{ id?: string }>(
     'fetchRepositoryId',
     `${config.org}/${config.project}/repo-id/${config.repo}`,
