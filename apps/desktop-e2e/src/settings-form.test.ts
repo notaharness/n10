@@ -180,7 +180,11 @@ test.describe('Settings form, with a pull request provider', () => {
     await openSettings(app, page);
 
     const user = page.getByLabel('GitHub Username', { exact: true });
+    const path = page.getByLabel('Worktree Path', { exact: true });
     await expect(user).toHaveValue('n10-tester');
+    // A row the edit does not touch, marked so a remount would show.
+    await path.evaluate((el) => el.setAttribute('data-before-change', ''));
+
     await user.fill('carol');
     await user.press('Enter');
     await expect
@@ -194,12 +198,15 @@ test.describe('Settings form, with a pull request provider', () => {
         { timeout: 15_000 }
       )
       .toBe('carol');
+    // The toast comes after the save's follow-up, the repository re-read
+    // included.
+    await expect(page.getByText('GitHub Username saved')).toBeVisible();
 
-    // A new account drops everything read as the old one, this form's
-    // own answer included. It has to come back rather than sit empty,
-    // and the next save has to land.
+    // A new account drops what the provider answered as the old one,
+    // but not this form: it never falls back to loading, and the next
+    // save lands.
+    await expect(page.locator('[data-before-change]')).toHaveCount(1);
     await expect(user).toHaveValue('carol');
-    const path = page.getByLabel('Worktree Path', { exact: true });
     await path.fill('/tmp/after-account');
     await path.press('Enter');
     await expect

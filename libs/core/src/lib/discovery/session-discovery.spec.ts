@@ -55,7 +55,10 @@ vi.mock('../session-backend.js', () => ({
 
 vi.mock('../repo-root.js', () => ({ getRepoRoot: () => '/repo' }));
 
-import { startSessionDiscovery } from './session-discovery.js';
+import {
+  rescanSessionDiscovery,
+  startSessionDiscovery,
+} from './session-discovery.js';
 
 /** The registry key of the worktree checked out in directory `dir`. */
 const wtKey = (dir: string) =>
@@ -241,6 +244,27 @@ describe('startSessionDiscovery', () => {
     await discovery.scanNow();
     expect(onChanged.mock.calls[0]![0]).toMatchObject({
       ended: [wtKey('feature-a')],
+    });
+  });
+
+  // The path is what a shell closes a tab by; the name alone would not
+  // say which checkout went.
+  it('announces a removed worktree with its checkout', async () => {
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a', 'feature-b'));
+    const { discovery, onChanged } = start();
+    await discovery.scanNow();
+
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    await discovery.scanNow();
+    expect(onChanged).toHaveBeenCalledTimes(1);
+    expect(onChanged.mock.calls[0]![0]).toMatchObject({
+      disappeared: [
+        {
+          name: wtKey('feature-b'),
+          branch: 'feature-b',
+          path: '/repo/.claude/worktrees/feature-b',
+        },
+      ],
     });
   });
 
@@ -437,6 +461,31 @@ describe('startSessionDiscovery', () => {
       await discovery.scanNow();
       await discovery.scanNow();
       expect(onChanged).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('rescanSessionDiscovery', () => {
+    it('reports a change to every running scanner before it resolves', async () => {
+      listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+      const { discovery, onChanged } = start();
+      await discovery.scanNow();
+
+      listWorktreesMock.mockResolvedValue([]);
+      await rescanSessionDiscovery();
+      expect(onChanged).toHaveBeenCalledTimes(1);
+      expect(onChanged.mock.calls[0]![0]).toMatchObject({
+        disappeared: [expect.objectContaining({ name: wtKey('feature-a') })],
+      });
+    });
+
+    it('leaves a stopped scanner alone', async () => {
+      const { discovery } = start();
+      await discovery.scanNow();
+      discovery.stop();
+      const before = listWorktreesMock.mock.calls.length;
+
+      await rescanSessionDiscovery();
+      expect(listWorktreesMock.mock.calls.length).toBe(before);
     });
   });
 

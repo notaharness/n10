@@ -53,7 +53,7 @@ function AliasInput({
   return (
     <input
       autoFocus
-      aria-label="Name on this machine"
+      aria-label="Local name"
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onBlur={commit}
@@ -73,7 +73,7 @@ function RowBadges({ machine }: { machine: MachineView }) {
   return (
     <>
       {machine.grant !== 'all' && (
-        <Tip label={`Access this machine allows from ${machine.label}`}>
+        <Tip label={`${machine.label}’s access here`}>
           <Badge variant="secondary">
             {machine.grant === 'msg' ? 'Messages only' : 'No access'}
           </Badge>
@@ -81,12 +81,12 @@ function RowBadges({ machine }: { machine: MachineView }) {
       )}
       {queueLabel && <Badge variant="warning">{queueLabel}</Badge>}
       {waitingLabel && (
-        <Tip label="A report from this machine is waiting for its session to reconnect">
+        <Tip label="Waiting for the session to reconnect">
           <Badge variant="warning">{waitingLabel}</Badge>
         </Tip>
       )}
       {refusedLabel && (
-        <Tip label="A report from this machine could not be delivered">
+        <Tip label="Report delivery failed">
           <Badge variant="destructive">{refusedLabel}</Badge>
         </Tip>
       )}
@@ -109,7 +109,7 @@ export function MachineRow({
 
   return (
     <div data-testid="machine-row" data-peer-id={machine.peerId}>
-      <div className="flex items-start gap-2 px-3 py-2">
+      <div className="flex items-start gap-2 px-3 py-1.5">
         <span
           aria-hidden
           className={`mt-1.5 size-2 shrink-0 rounded-full ${
@@ -137,13 +137,13 @@ export function MachineRow({
           </div>
           {machine.queued > 0 && (
             <p className="text-sm text-muted-foreground">
-              Waiting to deliver when this machine connects.
+              Delivers when online.
             </p>
           )}
           <button
             type="button"
             onClick={() => copyFingerprint(machine.peerId)}
-            className="-ml-1 select-all rounded px-1 font-mono text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="-ml-1 select-all rounded px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
             title="Copy fingerprint"
           >
             {fingerprintGroups(machine.peerId)}

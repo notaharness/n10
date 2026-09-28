@@ -58,8 +58,9 @@ export function createHostApi(): N10HostApi {
     listBranches: () => worktrees.listBranches(),
     listAllBranches: () => worktrees.listAllBranches(),
     createWorktree: (branch) => worktrees.createWorktree(branch),
-    removeWorktree: (branch, force) => worktrees.removeWorktree(branch, force),
-    canRemoveBranch: (branch) => worktrees.canRemoveBranch(branch),
+    removeWorktree: (branch, approved) =>
+      worktrees.removeWorktree(branch, approved),
+    checkWorktreeRemoval: (branch) => worktrees.checkWorktreeRemoval(branch),
     openInEditor: (branch) => worktrees.openInEditor(branch),
 
     fetchPullRequests: () => reviews.fetchPullRequests(),
@@ -236,7 +237,7 @@ export function registerHostHandlers(
     [IPC.listAllBranches]: api.listAllBranches as HostMethod,
     [IPC.createWorktree]: api.createWorktree as HostMethod,
     [IPC.removeWorktree]: api.removeWorktree as HostMethod,
-    [IPC.canRemoveBranch]: api.canRemoveBranch as HostMethod,
+    [IPC.checkWorktreeRemoval]: api.checkWorktreeRemoval as HostMethod,
     [IPC.openInEditor]: api.openInEditor as HostMethod,
     [IPC.launchAgent]: api.launchAgent as HostMethod,
     [IPC.listSessions]: api.listSessions as HostMethod,
