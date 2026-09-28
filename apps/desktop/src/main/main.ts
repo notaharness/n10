@@ -45,6 +45,7 @@ import {
   isAllowedNavigation,
   loadTarget,
   rendererWebPreferences,
+  showWhenReadyOrLoaded,
   windowChrome,
 } from './window.js';
 
@@ -169,7 +170,7 @@ function createMainWindow(): BrowserWindow {
     void win.loadFile(target.path);
   }
 
-  win.once('ready-to-show', () => win.show());
+  showWhenReadyOrLoaded(win);
   win.webContents.on('did-finish-load', () => {
     console.log('[desktop] renderer loaded');
     void runQaSteps(win);
