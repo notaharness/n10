@@ -1,5 +1,4 @@
 import type {
-  BranchPrMap,
   N10HostApi,
   RemoteCommentThread,
   ReviewComment,
@@ -75,7 +74,6 @@ function posted(draft: ReviewComment): RemoteCommentThread {
 
 type ReviewHost = Pick<
   N10HostApi,
-  | 'fetchPullRequests'
   | 'fetchCommentThreads'
   | 'replyToThread'
   | 'setThreadResolved'
@@ -114,11 +112,6 @@ export function createReviewHost(state: DemoState): ReviewHost {
   };
   const diffOf = (branch: string) => load(repo().data.diffs[branch]);
   return {
-    fetchPullRequests: () => {
-      const map: BranchPrMap = {};
-      for (const pr of repo().pullRequests()) map[pr.sourceBranch] = pr;
-      return later(map);
-    },
     fetchCommentThreads: (prId) => later(repo().threadsOf(prId), 120),
     replyToThread: ({ prId, thread, body }) => {
       if (thread.replyKind === 'github-issue-comment') {

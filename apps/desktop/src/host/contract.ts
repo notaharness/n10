@@ -366,7 +366,6 @@ export interface N10HostApi {
   openInEditor(branch: string): Promise<{ editor: string }>;
 
   // ── Reviews ──────────────────────────────────────────────────
-  fetchPullRequests(): Promise<BranchPrMap>;
   fetchCommentThreads(prId: number): Promise<PullRequestComments>;
   replyToThread(req: ReplyRequest): Promise<void>;
   setThreadResolved(req: ResolveRequest): Promise<void>;
@@ -593,7 +592,6 @@ export const IPC = {
   launchTerminal: 'n10/terminal/launch',
   listTerminals: 'n10/terminal/list',
   killTerminal: 'n10/terminal/kill',
-  fetchPullRequests: 'n10/reviews/prs',
   fetchCommentThreads: 'n10/reviews/comments',
   replyToThread: 'n10/reviews/reply',
   setThreadResolved: 'n10/reviews/resolve',

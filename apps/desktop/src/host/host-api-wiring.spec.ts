@@ -61,7 +61,6 @@ vi.mock('./services/worktrees.js', () =>
 );
 vi.mock('./services/reviews.js', () =>
   recorder('reviews', [
-    'fetchPullRequests',
     'fetchCommentThreads',
     'replyToThread',
     'setThreadResolved',
@@ -197,7 +196,6 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
   ['checkWorktreeRemoval', ['feature'], 'worktrees.checkWorktreeRemoval'],
   ['openInEditor', ['feature'], 'worktrees.openInEditor'],
 
-  ['fetchPullRequests', [], 'reviews.fetchPullRequests'],
   ['fetchCommentThreads', [7], 'reviews.fetchCommentThreads'],
   ['fetchPrDescription', [7], 'reviews.fetchPrDescription'],
   [

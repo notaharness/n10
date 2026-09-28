@@ -66,7 +66,6 @@ export function createHostApi(): N10HostApi {
     checkWorktreeRemoval: (branch) => worktrees.checkWorktreeRemoval(branch),
     openInEditor: (branch) => worktrees.openInEditor(branch),
 
-    fetchPullRequests: () => reviews.fetchPullRequests(),
     fetchCommentThreads: (prId) => reviews.fetchCommentThreads(prId),
     replyToThread: (req: ReplyRequest) => reviews.replyToThread(req),
     setThreadResolved: (req: ResolveRequest) => reviews.setThreadResolved(req),
@@ -262,7 +261,6 @@ export function registerHostHandlers(
     [IPC.launchTerminal]: api.launchTerminal as HostMethod,
     [IPC.listTerminals]: api.listTerminals as HostMethod,
     [IPC.killTerminal]: api.killTerminal as HostMethod,
-    [IPC.fetchPullRequests]: api.fetchPullRequests as HostMethod,
     [IPC.fetchCommentThreads]: api.fetchCommentThreads as HostMethod,
     [IPC.replyToThread]: api.replyToThread as HostMethod,
     [IPC.setThreadResolved]: api.setThreadResolved as HostMethod,
