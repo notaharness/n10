@@ -1,0 +1,22 @@
+---
+title: Babysit a pull request
+description: Keep an agent told about failing checks, new review comments and conflicts.
+---
+
+Right-click a pull request in n10 Desktop's sidebar and choose
+**Babysit pull request**. n10 then watches it for failing CI, new review
+comments and conflicts, and hands them to the pull request's agent.
+
+- **Batching.** n10 waits until nothing new has arrived for ten minutes, or
+  at most thirty minutes, then sends the updates together.
+- **Idle gate.** It sends only when the agent's terminal has been quiet for
+  thirty seconds. That's a sign of idleness, not a guarantee: a long, quiet
+  tool call or a permission prompt looks idle too.
+- **No agent running.** If the pull request has no live agent when an update
+  is due, n10 checks out its branch and starts a new agent with the update.
+- **Lifetime.** Babysitting runs only while n10 Desktop is open with that
+  repository active. Switching repositories pauses it, and it doesn't
+  survive a restart: turn it on again after reopening n10.
+
+Choose **Stop babysitting** from the same menu to end the watching and the
+automatic restarts.

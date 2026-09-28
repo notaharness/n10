@@ -1,6 +1,6 @@
 # libs/core — @n10/core
 
-The shell-agnostic half: git, worktrees, PTY and session infrastructure,
+The shell-agnostic half: Git, worktrees, PTY and session infrastructure,
 config, providers, keybindings, the plan store, pure helpers. No react, ink,
 electron or `@n10/app-core` (lint-enforced). `src/plan.ts` is the
 browser-safe entry (`@n10/core/plan`); nothing under it may touch `node:`.
@@ -60,6 +60,8 @@ The reasoning behind each rule is in `docs/decisions.md`.
   shared launcher, rechecking connection state between awaits. Retired names
   are suppressed. Observe worktree processes, orphaned sessions and standalone
   terminals in one listing. Retained agent panes are not running processes.
+  `removeWorktreeSession` rescans before it resolves, so shells learn of
+  every removal, n10's or not, through `onChanged`.
 - **Terminal sessions** (`terminal/launch-terminal.ts`): explicit shell/agent
   requests use the same launcher as worktrees. Allocate the final tmux name
   before creating the registry key. Agent panes retain final output; shell
@@ -68,7 +70,11 @@ The reasoning behind each rule is in `docs/decisions.md`.
 - **Session launch** (`session/`) resolves the worktree via `createWorktree`
   (exact branch match, rejecting a derived path occupied by another branch), reads config from the
   repo root, and only replaces a live session with explicit incarnation approval. Force-remove is offered only
-  for 'uncommitted changes' and 'not pushed to upstream'.
+  for uncommitted changes, unpushed commits and submodules. `removeWorktreeSession`
+  takes the confirmed verdict, never a bare `force`. It forces only past risks
+  the verdict named, and keeps everything if the checkout changed in any way the
+  verdict did not cover, checked before and after the agent stops. It returns
+  what it did.
 - **Plan** (`plan/`): items are value snapshots taken at add time.
   `composePlanPrompt` numbers items in `planRows` order. Checkout is
   three-state: inject into a live agent, respawn, or create the worktree and
@@ -77,7 +83,7 @@ The reasoning behind each rule is in `docs/decisions.md`.
   was last seen. Send after ten minutes of quiet or thirty at most, only while
   the agent has been idle thirty seconds (`idleFor`). Spawn only through
   `checkoutWorktree` (existing branch) with `seed`, never `continue-or-seed`.
-  Every git call takes `cwd`; ask `live()` after each await. Fetches go through
+  Every Git call takes `cwd`; ask `live()` after each await. Fetches go through
   `sync/fetch-queue.ts`; the merge check is `sync/conflicts.ts` so badge and
   briefing agree. `onStatus` fires on transitions only. Timing overrides:
   `babysitTimingFromEnv`.
@@ -85,7 +91,7 @@ The reasoning behind each rule is in `docs/decisions.md`.
   commits; a credentials change clears all. `lookupPullRequest` distinguishes
   `gone` from `unknown`, and one absence is not an answer.
 - **Git output streams** (`utils/git-run.ts`): `runGit` spawns, returns what
-  arrived plus `truncated`, rejects only when git failed. `execFile` discards
+  arrived plus `truncated`, rejects only when `git` failed. `execFile` discards
   everything on overflow. `fetchWorktreeDiffText` (`utils/worktree-diff.ts`)
   bounds per file before diffing (`lstat` bytes, churn lines, a rename
   excludes both paths) and trims overruns at a file boundary; the PR path

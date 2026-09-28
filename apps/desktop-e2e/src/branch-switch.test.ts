@@ -35,8 +35,9 @@ function switchOutside(repoPath: string, ...args: string[]): void {
 async function expectSwitched(page: Page): Promise<void> {
   await expect(tab(page, new RegExp(OTHER))).toBeVisible({ timeout: 15_000 });
   await expect(tabs(page)).toHaveCount(1);
-  await expect(banner(page)).toContainText(OTHER);
-  await expect(banner(page)).toContainText(BRANCH);
+  await expect(banner(page)).toHaveText(
+    `Branch switched from ${BRANCH} to ${OTHER}`
+  );
 }
 
 async function expectBack(page: Page): Promise<void> {

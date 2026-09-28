@@ -1,6 +1,6 @@
 /** beam-fleet-ux.md §2, in beam's own rule (`identity.ValidText`). */
 export const NAME_RULE =
-  'Use 1–64 characters without /, \\, {, }, or control characters. Leave blank to use the default.';
+  'Use up to 64 characters; no /, \\, braces or control characters.';
 
 const RESERVED = /[/\\{}\p{Cc}\p{Cs}]/u;
 
