@@ -1,5 +1,5 @@
 import { ChevronRightIcon } from 'lucide-react';
-import { useEffect, useRef, type Ref } from 'react';
+import { useEffect, useRef, type Ref, type RefObject } from 'react';
 import type {
   CheckList,
   PullRequestChecksAnswer,
@@ -11,15 +11,20 @@ import {
   checksLabel,
   failureText,
   headline,
+  readingNote,
   RESOLVER_TEXT,
   shortOid,
 } from '../../../lib/review/readiness-model.js';
-import { relativeTime } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { Skeleton } from '../../ui/skeleton.js';
 import { ReadFailure, StaleNotice } from '../ReadNotice.js';
 import { Section } from './parts.js';
-import { HEADLINE_STATE, RefreshButton, StateIcon } from './ReadinessParts.js';
+import {
+  HEADLINE_STATE,
+  ReadAgo,
+  RefreshButton,
+  StateIcon,
+} from './ReadinessParts.js';
 
 function Headline({
   readiness,
@@ -118,9 +123,11 @@ function Aspects({ readiness }: { readiness: PullRequestReadiness }) {
  *  checks were not read. */
 function Provenance({
   answer,
+  head,
   reading,
 }: {
   answer: PullRequestChecksAnswer;
+  head: string | null;
   reading: boolean;
 }) {
   const { checks, fetchedAt } = answer;
@@ -132,15 +139,15 @@ function Provenance({
     );
   }
   if (checks.state !== 'read') return null;
+  const note = readingNote(checks.value.head, head, reading);
   return (
     <p className="mt-3 text-xs text-muted-foreground" data-readiness-source>
       On <span className="font-mono">{shortOid(checks.value.head)}</span>
-      {reading ? (
-        <span className="text-warning">
-          , before the latest push · reading again
-        </span>
+      {' · '}
+      {note ? (
+        <span className="text-warning">{note}</span>
       ) : (
-        <> · read {relativeTime(fetchedAt)}</>
+        <ReadAgo at={fetchedAt} />
       )}
     </p>
   );
@@ -150,14 +157,17 @@ export interface ReadinessProps {
   /** Core's readiness and check list, as far as they were read. */
   read: ReadState<PullRequestChecksAnswer>;
   provider: string | null;
-  /** The answer on screen is the last head's while the new one reads. */
+  /** The head the list row names. */
+  head: string | null;
+  /** A newer answer is being read; the one on screen may be the last
+   *  head's. */
   reading: boolean;
   /** A refresh the reader asked for is under way. */
   retrying: boolean;
   onRefresh: () => void;
   onViewChecks: () => void;
   /** The View checks button, which Back returns the keyboard to. */
-  checksRef?: Ref<HTMLButtonElement>;
+  checksRef: RefObject<HTMLButtonElement | null>;
 }
 
 function Actions({
@@ -183,7 +193,7 @@ function Actions({
           size="sm"
           disabled={list.rows.length === 0}
           onClick={onViewChecks}
-          className="h-auto min-h-8 whitespace-normal py-1 text-left"
+          className="h-auto min-h-8 max-w-full whitespace-normal py-1 text-left"
         >
           {checksLabel(list)}
           <ChevronRightIcon />
@@ -197,19 +207,29 @@ function Actions({
 }
 
 /**
- * Refresh goes once the verdict is known; the keyboard moves to the
- * verdict it brought rather than falling to the page.
+ * Refresh goes once the verdict is known. If the keyboard went with it,
+ * it moves to View checks beside where Refresh was (the headline, a
+ * live region, announces the verdict), or to the headline where there
+ * is nothing to view. Focus the reader moved elsewhere stays there.
  */
-function useRefocusAfterRefresh(showsRefresh: boolean, onRefresh: () => void) {
+function useRefocusAfterRefresh(
+  showsRefresh: boolean,
+  onRefresh: () => void,
+  checksRef: RefObject<HTMLButtonElement | null>
+) {
   const headlineRef = useRef<HTMLDivElement>(null);
-  const refocus = useRef(false);
+  const pressed = useRef(false);
   useEffect(() => {
-    if (showsRefresh || !refocus.current) return;
-    refocus.current = false;
-    headlineRef.current?.focus();
-  }, [showsRefresh]);
+    if (showsRefresh || !pressed.current) return;
+    pressed.current = false;
+    const lost =
+      !document.activeElement || document.activeElement === document.body;
+    if (!lost) return;
+    const view = checksRef.current;
+    (view && !view.disabled ? view : headlineRef.current)?.focus();
+  }, [showsRefresh, checksRef]);
   const refresh = () => {
-    refocus.current = true;
+    pressed.current = true;
     onRefresh();
   };
   return { headlineRef, refresh };
@@ -222,11 +242,13 @@ function useRefocusAfterRefresh(showsRefresh: boolean, onRefresh: () => void) {
  * everything was read it says so, with Refresh.
  */
 export function PrReadiness(props: ReadinessProps) {
-  const { read, provider, reading, retrying, onRefresh } = props;
+  const { read, provider, head, reading, retrying, onRefresh, checksRef } =
+    props;
   const data = read.kind === 'ready' ? read.data : null;
   const { headlineRef, refresh } = useRefocusAfterRefresh(
     data?.readiness.state === 'unknown',
-    onRefresh
+    onRefresh,
+    checksRef
   );
   return (
     <Section title="Completion">
@@ -269,7 +291,7 @@ export function PrReadiness(props: ReadinessProps) {
             readiness={data.readiness}
             list={data.list}
           />
-          <Provenance answer={data} reading={reading} />
+          <Provenance answer={data} head={head} reading={reading} />
         </>
       )}
     </Section>

@@ -77,7 +77,7 @@ export function OverviewPane({
   const ref = pullRequestRefFor(repo, pr.id);
   // The head the list row names: a push reads the checks again.
   const head = pr.headSha ?? null;
-  const checks = usePullRequestChecks(repo.cwd, ref, repo.viewer, head);
+  const checks = usePullRequestChecks(repo.cwd, ref, repo.viewer, pr);
   const {
     state: read,
     retrying,
@@ -86,7 +86,7 @@ export function OverviewPane({
     checks,
     keys.prChecks(repo.cwd, ref ?? NO_REF, repo.viewer, head)
   );
-  const reading = checks.isPlaceholderData;
+  const reading = checks.isPlaceholderData || checks.isFetching;
   const pane = useRef<HTMLDivElement>(null);
   const checksButton = useRef<HTMLButtonElement>(null);
   const nested = useNestedChecks(pr.id, pane, checksButton);
@@ -96,6 +96,7 @@ export function OverviewPane({
       {nested.showing ? (
         <PrChecks
           read={read}
+          head={head}
           reading={reading}
           retrying={retrying}
           onRetry={retry}
@@ -113,6 +114,7 @@ export function OverviewPane({
             <PrReadiness
               read={read}
               provider={repo.providerId}
+              head={head}
               reading={reading}
               retrying={retrying}
               onRefresh={retry}

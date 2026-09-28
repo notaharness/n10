@@ -76,31 +76,49 @@ function lowerFirst(s: string): string {
 }
 
 /** A failed read in the provider's words, with when to try again where
- *  it said. */
+ *  it said: a time of day, which stays true while it is on screen. */
 export function failureText(
-  failure: Extract<ReadOutcome<unknown>, { state: 'failed' }>
+  failure: Extract<ReadOutcome<unknown>, { state: 'failed' }>,
+  now = Date.now()
 ): string {
   const ms = failure.retryAfterMs;
   if (ms == null) return failure.reason;
-  const wait =
-    ms < 60_000 ? `${Math.ceil(ms / 1000)} s` : `${Math.ceil(ms / 60_000)} min`;
-  return `${failure.reason} (try again in ${wait})`;
+  const at = new Date(now + ms).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+  return `${failure.reason} (try again after ${at})`;
 }
 
-/** "View checks": how many passed of how many, how many of those
- *  reported on an older push, and where not all were read, how many
- *  were. */
+/** What the answer on screen is while a newer one reads: the last
+ *  head's after a push, or this head's being read again. */
+export function readingNote(
+  answerHead: string | null,
+  head: string | null,
+  reading: boolean
+): string | null {
+  if (!reading) return null;
+  return answerHead != null && head != null && answerHead !== head
+    ? 'before the latest push · reading again'
+    : 'reading again';
+}
+
+/** "View checks": how many passed of how many, how many reported on an
+ *  older push, and where not all were read, how many were. */
 export function checksLabel(list: CheckList): string {
   const shown = list.rows.length;
   if (shown === 0) {
     return list.complete ? 'No checks reported' : 'Checks not all read';
   }
-  let passed = `${list.count.passed} of ${shown} passed`;
-  if (list.stale > 0) passed += `, ${list.stale} on an older revision`;
-  if (list.complete) return `View checks · ${passed}`;
-  const read =
-    list.total != null ? `${shown} of ${list.total} read` : 'not all read';
-  return `View checks · ${passed} · ${read}`;
+  const parts = [`${list.count.passed} of ${shown} passed`];
+  if (list.stale > 0) parts.push(`${list.stale} on an older revision`);
+  if (!list.complete) {
+    parts.push(
+      list.total != null ? `${shown} of ${list.total} read` : 'not all read'
+    );
+  }
+  return `View checks · ${parts.join(' · ')}`;
 }
 
 export const OUTCOME_LABEL: Record<CheckOutcome, string> = {

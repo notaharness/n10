@@ -1,4 +1,11 @@
-import { useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
+import {
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+  type QueryKey,
+} from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
+import type { PullRequestInfo } from '@n10/vcs-core/types';
 import type {
   PullRequestChecksAnswer,
   PullRequestRef,
@@ -49,14 +56,73 @@ export function sameButHead(a: QueryKey | undefined, b: QueryKey): boolean {
   );
 }
 
+/**
+ * Whether the last head's answer stands in while this head reads: only
+ * for the same pull request, and only until this head's read has failed.
+ * After that its own failure shows, and Retry keeps it in place rather
+ * than bringing the old head back.
+ */
+export function keepsLastHead(
+  prevKey: QueryKey | undefined,
+  key: QueryKey,
+  failures: number
+): boolean {
+  return failures === 0 && sameButHead(prevKey, key);
+}
+
+/**
+ * The list row's facts readiness rests on, beside the head: its checks'
+ * rollup, the reviewers' verdicts and the unresolved count. When one
+ * moves at the same head, a check finished, a review landed or a thread
+ * was resolved, so the checks are read again.
+ */
+export function rowFacts(pr: PullRequestInfo): string {
+  const verdicts = (pr.reviewers ?? [])
+    .map((r) => `${r.identifier}:${r.decision}`)
+    .sort();
+  return JSON.stringify([pr.buildStatus, pr.activeCommentCount, verdicts]);
+}
+
+/** The placeholder: the last head's answer, where `keepsLastHead`. */
+function lastHeadAnswer(qc: QueryClient, queryKey: QueryKey) {
+  return (
+    prev: PullRequestChecksAnswer | undefined,
+    prevQuery: { queryKey: QueryKey } | undefined
+  ): PullRequestChecksAnswer | undefined => {
+    const failures = qc.getQueryState(queryKey)?.errorUpdateCount ?? 0;
+    return keepsLastHead(prevQuery?.queryKey, queryKey, failures)
+      ? prev
+      : undefined;
+  };
+}
+
+/** Reads again when the row's facts move; not on the first render. */
+function useRereadOnRowFacts(queryKey: QueryKey, facts: string) {
+  const qc = useQueryClient();
+  const seen = useRef(facts);
+  useEffect(() => {
+    if (seen.current === facts) return;
+    seen.current = facts;
+    // A failed re-read shows where the checks are shown; the invalidation
+    // itself settles either way.
+    qc.invalidateQueries({ queryKey, exact: true }).catch(() => undefined);
+  }, [qc, queryKey, facts]);
+}
+
 export function usePullRequestChecks(
   cwd: string,
   ref: PullRequestRef | null,
   viewer: string | null,
-  head: string | null
+  pr: PullRequestInfo
 ) {
   const qc = useQueryClient();
-  const queryKey = keys.prChecks(cwd, ref ?? NO_REF, viewer, head);
+  const queryKey = keys.prChecks(
+    cwd,
+    ref ?? NO_REF,
+    viewer,
+    pr.headSha ?? null
+  );
+  useRereadOnRowFacts(queryKey, rowFacts(pr));
   return useQuery({
     queryKey,
     queryFn: async () =>
@@ -65,12 +131,11 @@ export function usePullRequestChecks(
         qc.getQueryData<PullRequestChecksAnswer>(queryKey)
       ),
     enabled: ref != null,
-    // Checks move on their own; a refresh, a return or a push reads them
-    // again.
+    // A push is a new key; a refresh, or the list row moving at the same
+    // head, reads them again.
     staleTime: 20_000,
-    // After a push the last head's answer stays on screen, said to be
-    // the last head's, until the new one is read.
-    placeholderData: (prev, prevQuery) =>
-      sameButHead(prevQuery?.queryKey, queryKey) ? prev : undefined,
+    // After a push the last head's answer stays on screen, said to be the
+    // last head's, until the new one is read.
+    placeholderData: lastHeadAnswer(qc, queryKey),
   });
 }

@@ -7,11 +7,12 @@ import {
   TriangleAlertIcon,
   XCircleIcon,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import type {
   AspectState,
   PullRequestReadiness,
 } from '../../../../host/contract.js';
-import { cn } from '../../../lib/utils.js';
+import { cn, relativeTime } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 
 /** What Completion and the check list share: the state icons, and a
@@ -115,4 +116,14 @@ export function RefreshButton({
       Refresh
     </Button>
   );
+}
+
+/** "read 2 min ago", kept honest while it stays on screen. */
+export function ReadAgo({ at }: { at: number }) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((t) => t + 1), 15_000);
+    return () => clearInterval(id);
+  }, []);
+  return <>read {relativeTime(at)}</>;
 }

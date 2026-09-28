@@ -9,6 +9,7 @@ import {
   duration,
   failureText,
   headline,
+  readingNote,
   outcomeText,
 } from './readiness-model.js';
 
@@ -66,19 +67,32 @@ describe('headline', () => {
 });
 
 describe('failureText', () => {
-  it('gives the provider’s reason, and when to try again where it said', () => {
+  it('gives the provider’s reason, and the time to try again where it said', () => {
     const failed = {
       state: 'failed',
       kind: 'throttled',
       reason: 'Rate limited',
     } as const;
     expect(failureText(failed)).toBe('Rate limited');
-    expect(failureText({ ...failed, retryAfterMs: 30_000 })).toBe(
-      'Rate limited (try again in 30 s)'
+    const now = Date.parse('2026-09-28T10:00:00Z');
+    const at = new Date(now + 30_000).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    expect(failureText({ ...failed, retryAfterMs: 30_000 }, now)).toBe(
+      `Rate limited (try again after ${at})`
     );
-    expect(failureText({ ...failed, retryAfterMs: 150_000 })).toBe(
-      'Rate limited (try again in 3 min)'
+  });
+});
+
+describe('readingNote', () => {
+  it('says the answer on screen is the last head’s after a push', () => {
+    expect(readingNote('a', 'b', true)).toBe(
+      'before the latest push · reading again'
     );
+    expect(readingNote('a', 'a', true)).toBe('reading again');
+    expect(readingNote('a', 'b', false)).toBeNull();
   });
 });
 
@@ -135,8 +149,9 @@ describe('checksLabel', () => {
   });
 
   it('says how many reported on an older push', () => {
+    // Any standing: a failure on an older push is not the head's either.
     expect(checksLabel(list({ stale: 1 }))).toBe(
-      'View checks · 1 of 3 passed, 1 on an older revision'
+      'View checks · 1 of 3 passed · 1 on an older revision'
     );
   });
 });

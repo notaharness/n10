@@ -123,8 +123,34 @@ test.describe('Completion', () => {
     });
     await completion.getByRole('button', { name: 'Refresh' }).click();
     await expect(completion).toContainText('Ready to merge');
-    // Refresh went with the unknown; the keyboard is on the verdict.
-    await expect(completion.locator('[data-readiness-headline]')).toBeFocused();
+    // Refresh went with the unknown; the keyboard moves beside where it
+    // was, and the verdict is announced where it is shown.
+    await expect(
+      completion.getByRole('button', { name: /View checks/ })
+    ).toBeFocused();
+  });
+
+  test('leaves the keyboard where the reader moved it', async ({ desktop }) => {
+    const { page } = desktop;
+    updateFakeGh(desktop.homeDir, (s) => {
+      s.prs[1].failing = { checks: true };
+    });
+    const completion = await openPr(page, /#215/);
+    const refresh = completion.getByRole('button', { name: 'Refresh' });
+    // A refresh that still cannot read the checks leaves it unknown.
+    await refresh.click();
+    await expect(refresh).toHaveAttribute('aria-disabled', 'false');
+    await expect(completion).toContainText('Readiness not fully known');
+
+    updateFakeGh(desktop.homeDir, (s) => {
+      s.prs[1].failing = undefined;
+    });
+    const header = page.getByRole('button', {
+      name: 'Refresh this pull request',
+    });
+    await header.click();
+    await expect(completion).toContainText('Ready to merge');
+    await expect(header).toBeFocused();
   });
 
   test('lists every check in the order that matters, and Back returns where the reader was', async ({
@@ -283,6 +309,25 @@ test.describe('Completion', () => {
     await expect(heading).toBeVisible();
     await page.getByRole('button', { name: 'Back to the Overview' }).click();
     await expect(completion).toContainText('Readiness not fully known');
+  });
+
+  test('reads the checks again when the list row moves at the same head', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    const completion = await openPr(page, /#214/);
+    const also = completion.getByRole('list', { name: 'Also blocking' });
+    await expect(also).toContainText('1 unresolved conversation');
+
+    updateFakeGh(desktop.homeDir, (s) => {
+      const thread = s.prs[0].threads?.[0];
+      if (thread) thread.isResolved = true;
+    });
+    // Only the list is read again: its count moved, so the checks are.
+    await sidebar(page)
+      .getByRole('button', { name: 'Refresh', exact: true })
+      .click();
+    await expect(also).not.toContainText('unresolved conversation');
   });
 
   test('reads the checks again after a push, and says which head it shows', async ({

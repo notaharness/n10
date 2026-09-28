@@ -21,17 +21,18 @@ import {
   duration,
   failureText,
   outcomeText,
+  readingNote,
   REQUIREMENT_LABEL,
   requiredFrom,
   shortOid,
   waitsFor,
 } from '../../../lib/review/readiness-model.js';
-import { cn, relativeTime } from '../../../lib/utils.js';
+import { cn } from '../../../lib/utils.js';
 import { Badge } from '../../ui/badge.js';
 import { Button } from '../../ui/button.js';
 import { Skeleton } from '../../ui/skeleton.js';
 import { ReadFailure, StaleNotice } from '../ReadNotice.js';
-import { RefreshButton } from './ReadinessParts.js';
+import { ReadAgo, RefreshButton } from './ReadinessParts.js';
 
 /** Each standing's icon and colour; the words beside it carry it too. */
 const STANDING: Record<
@@ -150,26 +151,28 @@ function Partial({ list }: { list: CheckList }) {
 /** Which head the list is about and when it was read. */
 function Source({
   answer,
+  head,
   reading,
 }: {
   answer: PullRequestChecksAnswer;
+  head: string | null;
   reading: boolean;
 }) {
   const { checks, fetchedAt } = answer;
+  const shown = checks.state === 'read' ? checks.value.head : null;
+  const note = readingNote(shown, head, reading);
   return (
     <p className="mb-3 text-sm text-muted-foreground">
-      {checks.state === 'read' && (
+      {shown && (
         <>
-          On <span className="font-mono">{shortOid(checks.value.head)}</span>
+          On <span className="font-mono">{shortOid(shown)}</span>
           {' · '}
         </>
       )}
-      {reading ? (
-        <span className="text-warning">
-          before the latest push · reading again
-        </span>
+      {note ? (
+        <span className="text-warning">{note}</span>
       ) : (
-        <>read {relativeTime(fetchedAt)}</>
+        <ReadAgo at={fetchedAt} />
       )}
     </p>
   );
@@ -207,7 +210,9 @@ function NotRead({
 
 export interface ChecksProps {
   read: ReadState<PullRequestChecksAnswer>;
-  /** The answer on screen is the last head's while the new one reads. */
+  /** The head the list row names. */
+  head: string | null;
+  /** A newer answer is being read. */
   reading: boolean;
   retrying: boolean;
   onRetry: () => void;
@@ -216,6 +221,7 @@ export interface ChecksProps {
 
 function Body({
   read,
+  head,
   reading,
   retrying,
   onRetry,
@@ -242,7 +248,7 @@ function Body({
   const { data, stale } = read;
   return (
     <>
-      <Source answer={data} reading={reading} />
+      <Source answer={data} head={head} reading={reading} />
       {stale && (
         <StaleNotice
           what="checks"

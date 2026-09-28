@@ -200,8 +200,11 @@ export function PrHeader({
           variant="ghost"
           size="icon-sm"
           aria-label="Refresh this pull request"
-          disabled={refresh.pending}
+          // aria-disabled rather than disabled: a disabled button drops
+          // keyboard focus mid-refresh. A press while one runs is ignored.
+          aria-disabled={refresh.pending}
           onClick={() => refresh.run(pr)}
+          className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
         >
           <RefreshCwIcon className={cn(refresh.pending && 'animate-spin')} />
         </Button>

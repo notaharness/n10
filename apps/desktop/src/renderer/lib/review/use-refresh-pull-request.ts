@@ -40,6 +40,7 @@ export function useRefreshPullRequest() {
     ]);
   };
   const run = (pr: PullRequestInfo) => {
+    if (pending) return;
     setPending(true);
     remote
       .mutateAsync()
