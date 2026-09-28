@@ -420,6 +420,52 @@ describe('snapshots and subscriptions', () => {
     settle(1);
   });
 
+  it('never evicts what a watched repository shows', async () => {
+    // Evicting a watched repository's list makes its watch read it back
+    // at once, which evicts the next watched one: past the bound, the
+    // watches would refetch each other as fast as the provider answers.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const answerAll = () => {
+      while (pending.length > 0) pending.shift()!.resolve({});
+    };
+    for (let i = 0; i < 9; i++) {
+      now += 20;
+      list.watch(`/watched-${i}`);
+      answerAll();
+      await flush();
+    }
+    for (let i = 0; i < 50; i++) {
+      now += 20;
+      await vi.advanceTimersByTimeAsync(20);
+      answerAll();
+      await flush();
+    }
+    expect(fetchCount()).toBe(9);
+    for (let i = 0; i < 9; i++) {
+      expect(list.getSnapshot(`/watched-${i}`).fetchedAt).not.toBeNull();
+    }
+  });
+
+  it('evicts a scope no repository shows before one that is shown', async () => {
+    await sync('/b', { b: null }); // the oldest list, still shown
+    now += 1_000;
+    await sync('/a', { widgets: null });
+    now += 1_000;
+    project = { owner: 'acme', repo: 'gadgets' };
+    await sync('/a', { gadgets: null }); // /a's widgets list: unshown
+    for (let i = 0; i < 6; i++) {
+      now += 1_000;
+      await sync(`/repo-${i}`, {});
+    }
+    // Nine scopes. The one no repository shows goes, though /b's is older.
+    expect(list.getSnapshot('/b').prMap).toEqual({ b: null });
+    project = { owner: 'acme', repo: 'widgets' };
+    const again = list.read('/a');
+    expect(fetchCount()).toBe(10);
+    settle(9);
+    await again;
+  });
+
   it('tells a repository its scope was evicted', async () => {
     await sync('/first', { a: null });
     const heard: string[] = [];

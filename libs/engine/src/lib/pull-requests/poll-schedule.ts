@@ -12,6 +12,8 @@ export interface PollSchedule {
    *  are counted: the repository stops being polled when the last one
    *  lets go. The first watch reads straight away. */
   watch(cwd: string): () => void;
+  /** Whether anything holds a watch on `cwd`. */
+  watching(cwd: string): boolean;
   /** Something moved `cwd`'s due time: re-arm its timer. */
   reschedule(cwd: string): void;
   rescheduleAll(): void;
@@ -79,6 +81,7 @@ export function createPollSchedule(deps: PollScheduleDeps): PollSchedule {
 
   return {
     watch,
+    watching: (cwd) => watches.has(cwd),
     reschedule,
     rescheduleAll: () => {
       for (const cwd of watches.keys()) reschedule(cwd);

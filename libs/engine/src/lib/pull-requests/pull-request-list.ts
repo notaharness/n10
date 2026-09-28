@@ -155,24 +155,38 @@ export function createPullRequestList(
     if (currentSlot(slot.scope.cwd) === slot) emit(slot.scope.cwd);
   };
 
-  /** Drop the least recently used idle scopes past the bound. The one
-   *  being read is never a candidate. */
+  /** Whether `slot` is what its repository shows now. */
+  const shown = (slot: Slot): boolean =>
+    current.get(slot.scope.cwd) === slot.scope.key;
+
+  /** Never the scope being read, one with a request out, or one a
+   *  watched repository shows: evicting that makes the watch read it
+   *  back at once, which evicts the next, and so on. */
+  const evictable = (slot: Slot, keep: Slot): boolean =>
+    slot !== keep &&
+    !busy(slot) &&
+    !(shown(slot) && schedule.watching(slot.scope.cwd));
+
+  /** Scopes no repository shows go first, then the least recently used. */
+  const evictsBefore = (a: Slot, b: Slot): boolean =>
+    shown(a) === shown(b) ? a.usedAt < b.usedAt : !shown(a);
+
+  /** Drop scopes past the bound. Past it with nothing evictable — more
+   *  watched repositories than the bound — the cache holds them all. */
   const evict = (keep: Slot): void => {
     while (slots.size > MAX_CACHED_SCOPES) {
-      let oldest: Slot | null = null;
+      let victim: Slot | null = null;
       for (const slot of slots.values()) {
-        if (slot === keep || busy(slot)) continue;
-        if (!oldest || slot.usedAt < oldest.usedAt) oldest = slot;
+        if (!evictable(slot, keep)) continue;
+        if (!victim || evictsBefore(slot, victim)) victim = slot;
       }
-      if (!oldest) return;
-      const { cwd, key } = oldest.scope;
-      slots.delete(key);
-      if (current.get(cwd) === key) {
-        // Still what `cwd` shows: it shows nothing now, and a watch on
-        // it is due at once.
-        current.delete(cwd);
-        emit(cwd);
-        schedule.reschedule(cwd);
+      if (!victim) return;
+      const wasShown = shown(victim);
+      slots.delete(victim.scope.key);
+      if (wasShown) {
+        // What its repository showed: it shows nothing now.
+        current.delete(victim.scope.cwd);
+        emit(victim.scope.cwd);
       }
     }
   };

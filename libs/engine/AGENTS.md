@@ -17,5 +17,6 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   project, credentials generation) — never by secrets. One request per scope;
   a forced read queues exactly one request behind the one out. `refresh`
   forgets the provider memo when its own request starts. Failures keep the last
-  good list with the error. Tests drive time with fake timers and a matching
+  good list with the error. Eviction never takes the scope a watched repository
+  shows: its watch would read it back and evict the next. Tests drive time with fake timers and a matching
   `now`.
