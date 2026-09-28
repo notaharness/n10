@@ -23,7 +23,7 @@ const STATE_LABEL: Record<MachineState, string> = {
   connected: 'Connected',
   offline: 'Offline',
   revoked: 'Revoked',
-  'revoked-by-fleet': 'Refuses this machine',
+  'revoked-by-fleet': 'Access revoked',
 };
 
 const STATE_TONE: Record<MachineState, MachineTone> = {
@@ -37,7 +37,7 @@ const STATE_TONE: Record<MachineState, MachineTone> = {
 function routeText(path: string | null): string {
   if (path === 'direct') return 'Direct';
   const region = path?.match(/^relay (.+)$/)?.[1];
-  return region ? `Relay ${region}` : 'Path unknown';
+  return region ? `Relay ${region}` : 'Connecting…';
 }
 
 function secondaryText(machine: MachineView): string {
@@ -46,12 +46,12 @@ function secondaryText(machine: MachineView): string {
       return routeText(machine.path);
     case 'offline':
       return machine.lastSeenAt == null
-        ? 'Not connected yet'
+        ? 'Never connected'
         : `Last seen ${relativeTime(machine.lastSeenAt)}`;
     case 'revoked':
       return '';
     case 'revoked-by-fleet':
-      return 'This machine was revoked from that peer’s fleet view.';
+      return 'This machine’s access was revoked.';
   }
 }
 

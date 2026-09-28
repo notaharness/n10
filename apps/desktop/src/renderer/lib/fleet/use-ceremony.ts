@@ -12,7 +12,7 @@ import {
 
 /** Told how a ceremony ended; pass a stable one. */
 export interface CeremonyHooks {
-  onSettled: (outcome: CeremonyOutcome) => void;
+  onSettled: (outcome: CeremonyOutcome, dismiss: () => void) => void;
 }
 
 /**
@@ -28,6 +28,12 @@ export function useCeremony({ onSettled }: CeremonyHooks) {
   const [outcome, setOutcome] = useState<CeremonyOutcome | null>(null);
   const runningRef = useRef(false);
 
+  /** Forgets a finished ceremony, for the next one to start clean. */
+  const reset = useCallback(() => {
+    setView(null);
+    setOutcome(null);
+  }, []);
+
   const start = useCallback(
     (request: CeremonyRequest) => {
       if (runningRef.current) return;
@@ -40,7 +46,7 @@ export function useCeremony({ onSettled }: CeremonyHooks) {
       );
       const settle = (result: CeremonyOutcome) => {
         setOutcome(result);
-        onSettled(result);
+        onSettled(result, reset);
       };
       window.n10
         .runCeremony(request)
@@ -53,14 +59,8 @@ export function useCeremony({ onSettled }: CeremonyHooks) {
           setRunning(false);
         });
     },
-    [onSettled]
+    [onSettled, reset]
   );
-
-  /** Forgets a finished ceremony, for the next one to start clean. */
-  const reset = useCallback(() => {
-    setView(null);
-    setOutcome(null);
-  }, []);
 
   /** Asks beam to cancel; the ceremony ends with its outcome. */
   const cancel = useCallback(() => {

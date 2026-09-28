@@ -3,10 +3,9 @@
  * Records the README media: launches the built desktop app on a
  * dedicated Xvfb display at 2x device scale, drives it like a user
  * (gliding cursor, real typing), records with ffmpeg (x11grab) and
- * downscales to palette-optimized GIFs. Stills come from Playwright
- * screenshots at the same 2x scale.
+ * downscales to palette-optimized GIFs.
  *
- *   node apps/desktop-e2e/demo/capture.mjs [hero|worktrees|review|plan|babysit|all]
+ *   node apps/desktop-e2e/demo/capture.mjs [worktrees|review|review-in-place|plan|babysit|tui|all]
  *
  * Requires `nx build desktop` first, plus Xvfb and ffmpeg on PATH.
  * Output lands in docs/media/.
@@ -521,42 +520,6 @@ async function openPr(page, title) {
 const card = (page, text) =>
   page.locator('[data-thread]').filter({ hasText: text });
 
-async function demoHero(scenario) {
-  for (const theme of ['dark', 'light']) {
-    const { app, page } = await launchApp(scenario, { theme });
-    // An agent running in the background puts the workspace in its
-    // natural state: green dot on the row, Agent entry in the rail.
-    await page.evaluate(() =>
-      window.n10.launchAgent({
-        branch: 'command-palette',
-        intent: 'continue-or-blank',
-      })
-    );
-    await openPr(page, /Add a command palette/);
-    // Launching showed the agent terminal; the hero is the diff, so
-    // bring it back through the rail's file tree.
-    await page
-      .getByRole('button', { name: /palette\.ts/ })
-      .filter({ visible: true })
-      .last()
-      .click();
-    await card(page, 'runs the whole command list')
-      .first()
-      .waitFor({ state: 'visible', timeout: 30_000 });
-    // Give the sync loop a beat so the status bar reads "synced".
-    await page
-      .getByText(/synced (just now|\d)/)
-      .first()
-      .waitFor({ state: 'visible', timeout: 30_000 })
-      .catch(() => undefined);
-    await sleep(2500);
-    await page.screenshot({
-      path: join(MEDIA, theme === 'dark' ? 'hero.png' : 'hero-light.png'),
-    });
-    await app.close();
-  }
-}
-
 async function demoWorktrees(scenario) {
   const { app, page } = await launchApp(scenario);
   await installCursor(page);
@@ -592,8 +555,7 @@ async function demoWorktrees(scenario) {
   // default agent from there.
   const start = page
     .getByRole('dialog')
-    .filter({ hasText: 'What would you like to do?' })
-    .getByRole('button', { name: 'Start session' });
+    .getByRole('button', { name: 'Start new session' });
   await start.waitFor({ state: 'visible', timeout: 30_000 });
   await sleep(1300);
   await click(page, start, { dwell: 600 });
@@ -739,7 +701,7 @@ async function demoPlan(scenario) {
 
   // Queue the first comment with one click.
   const first = card(page, 'runs the whole command list');
-  await glide(page, first.getByText('sofia-codes').first());
+  await glide(page, first.getByText('demo-teammate').first());
   await click(
     page,
     first.getByRole('button', { name: 'Add to plan', exact: true }),
@@ -750,7 +712,7 @@ async function demoPlan(scenario) {
   // Queue the second with a note.
   const second = card(page, 'keeps the old query');
   await second.scrollIntoViewIfNeeded();
-  await glide(page, second.getByText('marcusv').first());
+  await glide(page, second.getByText('demo-reviewer').first());
   await click(
     page,
     second.getByRole('button', {
@@ -917,7 +879,6 @@ const xvfb = startXvfb();
 await sleep(1200);
 
 const demos = {
-  hero: demoHero,
   worktrees: demoWorktrees,
   review: demoReview,
   'review-in-place': demoReviewInPlace,

@@ -1,6 +1,8 @@
 # README media
 
-Regenerates the screenshots and GIFs in `docs/media/`.
+Regenerates the GIFs in `docs/media/`. The hero stills beside them are
+screenshots of the website's desktop demo, taken by
+`node apps/website/scripts/record-media/record.mjs hero`.
 
 ```sh
 npx nx build desktop                              # for the desktop demos
@@ -8,25 +10,19 @@ npx nx build cli-wterm-host                       # for the TUI demo
 node apps/desktop-e2e/demo/capture.mjs            # everything
 node apps/desktop-e2e/demo/capture.mjs plan       # one demo
 node apps/desktop-e2e/demo/capture.mjs review,plan
-
-python3 apps/desktop-e2e/demo/theme-slider.py     # docs/media/theme.gif
 ```
 
-Needs `Xvfb` and `ffmpeg` on `PATH` (`sudo apt install xvfb ffmpeg`), and
-Pillow for the slider. Nothing else: no network, no GitHub token, no real
-agent.
+Needs `Xvfb` and `ffmpeg` on `PATH` (`sudo apt install xvfb ffmpeg`).
+Nothing else: no network, no GitHub token, no real agent.
 
-| demo        | what it records                                                                                             |
-| ----------- | ----------------------------------------------------------------------------------------------------------- |
-| `hero`      | `hero.png` + `hero-light.png` — stills, both themes                                                         |
-| `worktrees` | the sidebar's CI/review status, then creating a worktree and launching an agent                             |
-| `review`    | walking the agent's draft comments and posting one                                                          |
-| `plan`      | queueing comments, annotating one, sending the plan to an agent                                             |
-| `babysit`   | babysitting a red pull request: the row's badge, then the update reaching an agent — cropped to the sidebar |
-| `tui`       | the terminal UI: sidebar, changed files, diff with threads inline                                           |
-
-`theme.gif` is built separately by `theme-slider.py`, from the two
-`hero` stills — so re-run `hero` before it if the UI has moved.
+| demo              | what it records                                                                                             |
+| ----------------- | ----------------------------------------------------------------------------------------------------------- |
+| `worktrees`       | the sidebar's CI/review status, then creating a worktree and launching an agent                             |
+| `review`          | walking the agent's draft comments and posting one                                                          |
+| `review-in-place` | reading a pull request, switching diff views, replying to and resolving a thread                            |
+| `plan`            | queueing comments, annotating one, sending the plan to an agent                                             |
+| `babysit`         | babysitting a red pull request: the row's badge, then the update reaching an agent — cropped to the sidebar |
+| `tui`             | the terminal UI: sidebar, changed files, diff with threads inline                                           |
 
 ## How it works
 
@@ -55,14 +51,8 @@ what ships. Three things make it a demo rather than a test:
   that is nothing but a full-bleed terminal, and Chromium renders that
   page in app mode, so the recording is the terminal with no browser
   around it.
-- **`theme-slider.py`** composites the two hero stills into a wipe with
-  Pillow and encodes it with the same palette settings. They are the
-  same frame of the same app in two themes, captured back to back, so
-  the wipe lines up pixel for pixel and reads as one window changing its
-  mind rather than two screenshots being swapped.
 
-Stills are Playwright screenshots at the same 2x scale. GIFs are
-downscaled to 960px with a per-frame palette, which is what keeps text
+GIFs are downscaled to 960px with a per-frame palette, which is what keeps text
 legible at a size a README can carry.
 
 ## Notes

@@ -37,11 +37,10 @@ let warnedRebase: ReadonlySet<string> = new Set();
 let timer: ReturnType<typeof setInterval> | null = null;
 // Every startRemoteSyncLoop bumps the generation; a pass carries the
 // generation it was started under and aborts (via the shared sweep's
-// isCancelled hook) as soon as a newer one exists. This matters
-// because worktree-manager resolves process.cwd() at call time: after
-// a repo switch, a stale pass would otherwise run git operations —
-// including auto-delete — against the *new* repo using the old repo's
-// branch list.
+// isCancelled hook) as soon as a newer one exists. Every git call in a
+// pass names the pass's repository, but the removal goes through the
+// worktrees service, which acts on the open one: the synchronous check
+// right before it keeps a stale pass from removing anything there.
 let generation = 0;
 let lastCwd: string | null = null;
 // Passes are serialized so a repo switch's kickoff pass isn't skipped
@@ -109,7 +108,7 @@ async function runSyncPass(cwd: string, gen: number): Promise<void> {
 
     const ts = await syncRemote(cwd);
     if (cancelled()) return;
-    const branches = (await listWorktrees())
+    const branches = (await listWorktrees(cwd))
       .map((w) => w.branch)
       .filter(Boolean);
     if (cancelled()) return;
@@ -121,15 +120,23 @@ async function runSyncPass(cwd: string, gen: number): Promise<void> {
       branches,
       warnedRebase,
       isCancelled: cancelled,
-      onAutoDelete: async (_sessionName, branch) => {
+      cwd,
+      onAutoDelete: async (_sessionName, branch, approved) => {
         if (cancelled()) return;
-        // Same triple as the TUI's performDelete (kill session, remove
-        // worktree, delete branch) — the worktrees service owns it.
-        await removeWorktree(branch, true);
-        notifier?.({
-          message: `Auto-deleted merged branch: ${branch}`,
-          kind: 'success',
-        });
+        // Core's removal, as in the TUI: kept if the branch moved after
+        // the sweep judged it.
+        const outcome = await removeWorktree(branch, approved);
+        if (outcome === 'removed') {
+          notifier?.({
+            message: `Auto-deleted merged branch: ${branch}`,
+            kind: 'success',
+          });
+        } else if (outcome === 'kept-branch') {
+          notifier?.({
+            message: `Auto-deleted the worktree of merged branch ${branch}; kept the branch: it has commits made after the check`,
+            kind: 'warning',
+          });
+        }
       },
       onRebaseInProgress: (branch) =>
         notifier?.({
