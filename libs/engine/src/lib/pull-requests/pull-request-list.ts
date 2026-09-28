@@ -50,13 +50,22 @@ import { logError } from '@n10/logger';
 import type { PullRequestLookup } from '@n10/core';
 import type { AppConfig, BranchPrMap, VcsProvider } from '@n10/vcs-core';
 import { createPollSchedule } from './poll-schedule.js';
+import { providerResolver, scopeOf } from './pull-request-scope.js';
 import {
-  providerResolver,
-  scopeOf,
-  type PullRequestScope,
-} from './pull-request-scope.js';
-
-export const PULL_REQUEST_POLL_DEFAULT_MS = 60_000;
+  EMPTY_PULL_REQUEST_LIST,
+  type PullRequestListSnapshot,
+} from './pull-request-snapshot.js';
+import {
+  NO_PULL_REQUESTS,
+  busy,
+  describe,
+  lastAttempt,
+  sameSnapshot,
+  snapshotOf,
+  ttlOf,
+  type Queued,
+  type Slot,
+} from './pull-request-slot.js';
 
 /**
  * How many scopes' lists to keep: enough to cover moving between the
@@ -64,32 +73,6 @@ export const PULL_REQUEST_POLL_DEFAULT_MS = 60_000;
  * spans repositories, and following a tab opens its repository.
  */
 export const MAX_CACHED_SCOPES = 8;
-
-/** No minimum: `prPollInterval` is honoured verbatim. */
-export function pullRequestPollIntervalMs(
-  interval: number | undefined
-): number {
-  return interval ?? PULL_REQUEST_POLL_DEFAULT_MS;
-}
-
-export interface PullRequestListSnapshot {
-  /** The last successful answer for the repository's current scope. */
-  readonly prMap: BranchPrMap;
-  /** When that answer landed; null before the first. */
-  readonly fetchedAt: number | null;
-  /** Why the last attempt failed, if it did. `prMap` stays. */
-  readonly error: string | null;
-  /** A request is out, or queued behind one that is. */
-  readonly refreshing: boolean;
-}
-
-/** What a repository with no answer yet shows. Stable identity. */
-export const EMPTY_PULL_REQUEST_LIST: PullRequestListSnapshot = Object.freeze({
-  prMap: Object.freeze({}) as BranchPrMap,
-  fetchedAt: null,
-  error: null,
-  refreshing: false,
-});
 
 export interface PullRequestListOptions {
   providers: readonly VcsProvider[];
@@ -128,52 +111,6 @@ export interface PullRequestList {
   dispose(): void;
 }
 
-interface Queued {
-  promise: Promise<BranchPrMap>;
-  /** Some refresh sharing this request asked the provider to forget. */
-  forget: boolean;
-}
-
-interface Slot {
-  scope: PullRequestScope;
-  prMap: BranchPrMap;
-  fetchedAt: number | null;
-  failedAt: number | null;
-  error: string | null;
-  inflight: Promise<BranchPrMap> | null;
-  queued: Queued | null;
-  usedAt: number;
-  snapshot: PullRequestListSnapshot;
-}
-
-const NO_PULL_REQUESTS = EMPTY_PULL_REQUEST_LIST.prMap;
-
-function describe(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-function busy(slot: Slot): boolean {
-  return slot.inflight !== null || slot.queued !== null;
-}
-
-function snapshotOf(slot: Slot): PullRequestListSnapshot {
-  return {
-    prMap: slot.prMap,
-    fetchedAt: slot.fetchedAt,
-    error: slot.error,
-    refreshing: busy(slot),
-  };
-}
-
-function ttlOf(slot: Slot): number {
-  return pullRequestPollIntervalMs(slot.scope.config.prPollInterval);
-}
-
-/** When the last attempt, successful or not, finished; 0 for never. */
-function lastAttempt(slot: Slot): number {
-  return Math.max(slot.fetchedAt ?? 0, slot.failedAt ?? 0);
-}
-
 export function createPullRequestList(
   options: PullRequestListOptions
 ): PullRequestList {
@@ -188,7 +125,15 @@ export function createPullRequestList(
   let fetches = 0;
 
   const emit = (cwd: string): void => {
-    for (const listener of [...listeners]) listener(cwd);
+    for (const listener of [...listeners]) {
+      // One listener's failure must not reach a read's caller or stop
+      // a watch between its tick and its re-arm.
+      try {
+        listener(cwd);
+      } catch (err: unknown) {
+        logError('pull request list listener', err);
+      }
+    }
   };
 
   const currentSlot = (cwd: string): Slot | undefined => {
@@ -201,9 +146,12 @@ export function createPullRequestList(
 
   const live = (slot: Slot): boolean => slots.get(slot.scope.key) === slot;
 
-  /** Re-derive a slot's snapshot and tell whoever is looking. */
+  /** Re-derive a slot's snapshot and, if it moved, tell whoever is
+   *  looking. An unchanged snapshot keeps its identity. */
   const changed = (slot: Slot): void => {
-    slot.snapshot = snapshotOf(slot);
+    const next = snapshotOf(slot);
+    if (sameSnapshot(next, slot.snapshot)) return;
+    slot.snapshot = next;
     if (currentSlot(slot.scope.cwd) === slot) emit(slot.scope.cwd);
   };
 
@@ -217,9 +165,14 @@ export function createPullRequestList(
         if (!oldest || slot.usedAt < oldest.usedAt) oldest = slot;
       }
       if (!oldest) return;
-      slots.delete(oldest.scope.key);
-      if (current.get(oldest.scope.cwd) === oldest.scope.key) {
-        current.delete(oldest.scope.cwd);
+      const { cwd, key } = oldest.scope;
+      slots.delete(key);
+      if (current.get(cwd) === key) {
+        // Still what `cwd` shows: it shows nothing now, and a watch on
+        // it is due at once.
+        current.delete(cwd);
+        emit(cwd);
+        schedule.reschedule(cwd);
       }
     }
   };
@@ -323,10 +276,13 @@ export function createPullRequestList(
     queued.promise = slot.inflight.then(() => {
       slot.queued = null;
       // Resolved again: the config may have moved while the request
-      // ahead was out. A different scope has no stale request to wait
-      // out, so an ordinary read answers there.
+      // ahead was out. The caller still asked for an answer newer than
+      // their call, so it is a forced read in whichever scope is
+      // current now.
       const next = slotFor(slot.scope.cwd);
-      return next === slot ? start(slot, queued.forget) : readIn(next, {});
+      if (next === slot) return start(slot, queued.forget);
+      changed(slot);
+      return readIn(next, { force: true, forget: queued.forget });
     });
     slot.queued = queued;
     return queued.promise;

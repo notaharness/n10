@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppConfig, BranchPrMap, VcsProvider } from '@n10/vcs-core';
 import {
-  EMPTY_PULL_REQUEST_LIST,
   createPullRequestList,
   type PullRequestList,
 } from './pull-request-list.js';
+import { EMPTY_PULL_REQUEST_LIST } from './pull-request-snapshot.js';
 
 /**
  * Every reader of a repository's pull requests sits on this service —
@@ -390,6 +390,48 @@ describe('snapshots and subscriptions', () => {
     expect(heard).toEqual([]);
   });
 
+  it('keeps a snapshot’s identity when a queued request takes over', async () => {
+    void list.read('/a');
+    void list.read('/a', { force: true });
+    const seen: unknown[] = [];
+    list.subscribe((cwd) => seen.push(list.getSnapshot(cwd)));
+    settle(0, { a: null });
+    await flush();
+    // The first request landing is one change. The queued one starting
+    // behind it changes nothing a snapshot says, so it is not another.
+    expect(fetchCount()).toBe(2);
+    expect(seen).toHaveLength(1);
+    expect(list.getSnapshot('/a')).toBe(seen[0]);
+    settle(1);
+  });
+
+  it('keeps reading and polling when a listener throws', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    list.subscribe(() => {
+      throw new Error('listener broke');
+    });
+    list.watch('/a');
+    settle(0, { a: null });
+    await flush();
+    expect(list.getSnapshot('/a').prMap).toEqual({ a: null });
+    now += 60_000;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchCount()).toBe(2);
+    settle(1);
+  });
+
+  it('tells a repository its scope was evicted', async () => {
+    await sync('/first', { a: null });
+    const heard: string[] = [];
+    list.subscribe((cwd) => heard.push(cwd));
+    for (let i = 0; i < 8; i++) {
+      now += 1_000;
+      await sync(`/repo-${i}`, {});
+    }
+    expect(list.getSnapshot('/first').fetchedAt).toBeNull();
+    expect(heard).toContain('/first');
+  });
+
   it('stays quiet when the list was already fresh', async () => {
     await sync('/a', {});
     const heard: string[] = [];
@@ -454,6 +496,31 @@ describe('scope', () => {
     expect(fetchCount()).toBe(2);
     settle(1, { fresh: null });
     expect(await refreshed).toEqual({ fresh: null });
+  });
+
+  it('still refreshes when the scope it moved to is inside its TTL', async () => {
+    // Back to a project listed a moment ago: the refresh was asked for
+    // after that list, so the list must not answer it.
+    await sync('/a', { widgets: null });
+    project = { owner: 'acme', repo: 'gadgets' };
+    await sync('/a', { gadgets: null });
+
+    project = { owner: 'acme', repo: 'widgets' };
+    const poll = list.read('/a', { force: true });
+    const refreshed = list.refresh('/a');
+    project = { owner: 'acme', repo: 'gadgets' };
+    settle(2);
+    await poll;
+    await flush();
+    expect(events.at(-2)).toBe('forget:github');
+    expect(fetchCount()).toBe(4);
+    settle(3, { fresh: null });
+    expect(await refreshed).toEqual({ fresh: null });
+
+    // The scope it left is not still marked as refreshing.
+    project = { owner: 'acme', repo: 'widgets' };
+    await list.read('/a');
+    expect(list.getSnapshot('/a').refreshing).toBe(false);
   });
 });
 
