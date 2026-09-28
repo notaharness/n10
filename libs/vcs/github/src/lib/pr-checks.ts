@@ -10,7 +10,8 @@ import {
   type PullRequestLifecycle,
   type ReadOutcome,
 } from '@n10/vcs-core';
-import { branchRules } from './gh-branch-rules.js';
+import { branchRules, type GitHubBranchRules } from './gh-branch-rules.js';
+import type { ClassicReviewRule } from './gh-review-rule.js';
 import {
   checkRun,
   expected,
@@ -18,7 +19,6 @@ import {
   requiredCheck,
   status,
   type ContextNode,
-  type Required,
 } from './gh-check-nodes.js';
 import { restOf, type Page } from './gh-pages.js';
 import { ghGraphQL } from './gh-graphql.js';
@@ -71,7 +71,10 @@ const CHECKS_QUERY = `
       pullRequest(number: $number) {
         number state isDraft baseRefName
         mergeable mergeStateStatus reviewDecision
-        baseRef { refUpdateRule { requiresConversationResolution } }${ROLLUP}
+        baseRef { refUpdateRule {
+          requiresConversationResolution
+          requiredApprovingReviewCount requiresCodeOwnerReviews
+        } }${ROLLUP}
       }
     }
   }
@@ -96,7 +99,9 @@ interface ChecksNode {
   mergeStateStatus: string | null;
   reviewDecision: string | null;
   baseRef: {
-    refUpdateRule: { requiresConversationResolution: boolean } | null;
+    refUpdateRule:
+      | ({ requiresConversationResolution: boolean } & ClassicReviewRule)
+      | null;
   } | null;
   commits: {
     nodes: {
@@ -185,6 +190,16 @@ function mergeState(node: ChecksNode): MergeState {
   };
 }
 
+/** What classic protection enforces on this account: no rule enforced
+ *  on it is no classic rule for it. */
+function enforcedOf(node: ChecksNode) {
+  const rule = node.baseRef?.refUpdateRule ?? null;
+  return {
+    resolution: rule?.requiresConversationResolution ?? false,
+    reviews: rule,
+  };
+}
+
 /** The pull request's own repository, with the id GitHub answered. */
 function refOf(
   res: ChecksResponse,
@@ -242,11 +257,10 @@ export async function fetchPullRequestChecksGitHub(
       }
       return rollup.statusCheckRollup.contexts;
     }).then((value) => ({ state: 'read' as const, value }), readFailure),
-    branchRules(owner, repo, node.baseRefName, {
-      // No rule enforced on this account is no classic rule for it.
-      resolution:
-        node.baseRef?.refUpdateRule?.requiresConversationResolution ?? false,
-    }).then((value) => ({ state: 'read' as const, value }), readFailure),
+    branchRules(owner, repo, node.baseRefName, enforcedOf(node)).then(
+      (value) => ({ state: 'read' as const, value }),
+      readFailure
+    ),
   ]);
   return {
     ref: refOf(res, owner, repo, number),
@@ -258,7 +272,7 @@ export async function fetchPullRequestChecksGitHub(
 }
 
 type Contexts = ReadOutcome<{ nodes: ContextNode[]; complete: boolean }>;
-type Rules = ReadOutcome<{ required: Required[]; resolution: boolean }>;
+type Rules = ReadOutcome<GitHubBranchRules>;
 
 function checksOf(
   contexts: Contexts,
@@ -296,6 +310,7 @@ function rulesOf(rules: Rules, contexts: Contexts): ReadOutcome<BranchRules> {
     value: {
       requiredChecks: rules.value.required.map((r) => requiredCheck(r, nodes)),
       conversationResolution: rules.value.resolution,
+      reviews: rules.value.reviews,
     },
   };
 }

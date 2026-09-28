@@ -38,7 +38,13 @@ export interface FakePr {
     commentCount?: number;
     submittedAt?: string;
   }[];
-  reviewRequests?: string[];
+  /** Logins asked to review, or a person or team asked as a code
+   *  owner. The list row names people only. */
+  reviewRequests?: (
+    | string
+    | { login: string; codeOwner?: boolean }
+    | { team: string; name?: string; codeOwner?: boolean }
+  )[];
   threads?: FakeThread[];
   generalComments?: { author: string; body: string; createdAt?: string }[];
   /** Timeline entries, as GraphQL `PullRequestTimelineItems` nodes. */
@@ -121,6 +127,13 @@ export interface FakeGitHub {
   rules?: {
     required?: string[];
     conversationResolution?: boolean;
+    /** A rule set's review rule: approvals, code owners, and teams by
+     *  id, each with the paths it covers. */
+    approvals?: number;
+    codeOwners?: boolean;
+    requiredTeams?: { id: number; paths?: string[]; approvals?: number }[];
+    /** Classic protection's review rule, as enforced on this account. */
+    classic?: { approvals?: number; codeOwners?: boolean };
     failing?: boolean;
   };
   /**

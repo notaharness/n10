@@ -35,6 +35,7 @@ import {
   statusNameOf,
   type RawEvaluation,
 } from './pr-policies.js';
+import { reviewRuleOf } from './pr-review-rule.js';
 import { adoGet, TTL } from './request.js';
 
 /**
@@ -259,7 +260,10 @@ export async function fetchPullRequestChecksAzure(
     checks: checksOf(config, statuses, evaluations, headsOf(iterations)),
     rules:
       evaluations.state === 'read'
-        ? read(rulesOf(evaluations.value))
+        ? read({
+            ...rulesOf(evaluations.value),
+            reviews: reviewRuleOf(evaluations.value),
+          })
         : evaluations,
     merge: mergeOf(raw, evaluations),
   };

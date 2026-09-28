@@ -16,6 +16,11 @@
       "import": "./src/plan.ts",
       "default": "./src/plan.ts"
     },
+    "./readiness": {
+      "types": "./src/readiness.ts",
+      "import": "./src/readiness.ts",
+      "default": "./src/readiness.ts"
+    },
     "./package.json": "./package.json"
   },
   "nx": {

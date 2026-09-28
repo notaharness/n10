@@ -52,6 +52,13 @@ export interface RawEvaluation {
       allowDownvotes?: boolean;
       /** Build: someone must queue it; it never starts by itself. */
       manualQueueOnly?: boolean;
+      /** Minimum reviewers: approvals needed. Required reviewers: how
+       *  many of those it names must approve, where not each. */
+      minimumApproverCount?: number;
+      /** Required reviewers: the identities it adds, people or groups. */
+      requiredReviewerIds?: string[];
+      /** The paths a policy is limited to; absent for any change. */
+      filenamePatterns?: string[];
     };
   };
   /** What a build policy ran: its build, and the source commit it
@@ -106,7 +113,7 @@ function blocking(e: RawEvaluation): boolean {
   return e.configuration?.isBlocking === true;
 }
 
-function typeOf(e: RawEvaluation): string {
+export function typeOf(e: RawEvaluation): string {
   return e.configuration?.type?.id ?? '';
 }
 
@@ -224,8 +231,11 @@ export function policyCheck(
   };
 }
 
-/** The branch's rules, as its blocking policies state them. */
-export function rulesOf(evaluations: readonly RawEvaluation[]): BranchRules {
+/** The branch's rules, as its blocking policies state them, but for
+ *  reviews: `reviewRuleOf` reads those. */
+export function rulesOf(
+  evaluations: readonly RawEvaluation[]
+): Omit<BranchRules, 'reviews'> {
   const required = evaluations.filter(
     (e) => isActive(e) && blocking(e) && CHECK_POLICIES.includes(typeOf(e))
   );
