@@ -37,7 +37,10 @@ function named(
       kind: 'team',
       approvals: req.minimum_approvals ?? null,
       paths: req.file_patterns ?? [],
-      blocking: true,
+      // GitHub does not say whether the paths match this change.
+      applies: null,
+      // A minimum of 0 adds the team without requiring its approval.
+      blocking: (req.minimum_approvals ?? 1) > 0,
     },
   ];
 }
@@ -57,5 +60,8 @@ export function reviewRuleOf(
       (classic?.requiresCodeOwnerReviews ?? false) ||
       rules.some((r) => r.require_code_owner_review === true),
     named: rules.flatMap((r) => (r.required_reviewers ?? []).flatMap(named)),
+    // GitHub's reviewDecision says whether the review requirement is
+    // met as a whole, not this count.
+    approvalsMet: null,
   };
 }

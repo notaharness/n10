@@ -61,7 +61,13 @@ function rules(reviews: Partial<ReviewRule>): ReadOutcome<BranchRules> {
     value: {
       requiredChecks: [],
       conversationResolution: false,
-      reviews: { approvals: 0, codeOwners: false, named: [], ...reviews },
+      reviews: {
+        approvals: 0,
+        codeOwners: false,
+        named: [],
+        approvalsMet: null,
+        ...reviews,
+      },
     },
   };
 }
@@ -107,6 +113,18 @@ const ELI = reviewer({
   displayName: 'Eli Park',
   required: false,
 });
+const QA = reviewer({
+  identifier: 'qa@contoso.test',
+  id: 'aaaa-09',
+  displayName: 'Quinn Ames',
+  required: true,
+});
+const OPS = reviewer({
+  identifier: 'ops@contoso.test',
+  id: 'aaaa-10',
+  displayName: 'Ola Soto',
+  required: true,
+});
 
 const AZURE_RULE = rules({
   approvals: 2,
@@ -116,14 +134,26 @@ const AZURE_RULE = rules({
       kind: 'identity',
       approvals: 1,
       paths: ['/release/*'],
+      applies: true,
       blocking: true,
     },
     {
-      ids: ['aaaa-02'],
+      ids: ['aaaa-02', 'aaaa-10'],
       kind: 'identity',
       approvals: null,
       paths: [],
+      applies: true,
       blocking: false,
+    },
+    // Its paths match no change here: it asks nothing now, but it is
+    // what made Web Reviewers required.
+    {
+      ids: ['aaaa-21'],
+      kind: 'identity',
+      approvals: null,
+      paths: ['/docs/*'],
+      applies: false,
+      blocking: true,
     },
   ],
 });
@@ -131,7 +161,7 @@ const AZURE_RULE = rules({
 describe('reviewRequirements on Azure DevOps', () => {
   it('says who is required and why: a policy, or a hand', () => {
     const got = reviewRequirements(
-      detail([RELEASE, WEB, BEN, ELI]),
+      detail([RELEASE, WEB, BEN, ELI, QA, OPS]),
       AZURE_RULE
     );
     expect(
@@ -144,18 +174,25 @@ describe('reviewRequirements on Azure DevOps', () => {
     ).toEqual([
       // Named by a blocking policy; the id compares ignoring case.
       ['Release Approvers', 'required', 'policy'],
-      // Required, and named by no policy that applies: by hand.
-      ['Web Reviewers', 'required', 'manual'],
+      // Named by a blocking policy that no longer applies: still why.
+      ['Web Reviewers', 'required', 'policy'],
       // Added as optional by a policy that does not block.
       ['Ben Ode', 'optional', 'policy'],
       ['Eli Park', 'optional', null],
+      // Required, and named by no policy: by hand.
+      ['Quinn Ames', 'required', 'manual'],
+      // Required, where only an optional policy names them: by hand.
+      ['Ola Soto', 'required', 'manual'],
     ]);
   });
 
-  it('puts the rule in words, naming the reviewers a policy requires', () => {
-    expect(reviewRequirements(detail([RELEASE, BEN]), AZURE_RULE).rule).toEqual(
-      ['2 approvals required', '1 approval from Release Approvers (/release/*)']
-    );
+  it('puts the rule in words, naming the reviewers a policy requires where it applies', () => {
+    expect(
+      reviewRequirements(detail([RELEASE, BEN, WEB]), AZURE_RULE).rule
+    ).toEqual([
+      '2 approvals required',
+      '1 approval from Release Approvers (/release/*)',
+    ]);
   });
 
   it('knows no reason for a required reviewer when the policies were not read', () => {
@@ -208,6 +245,7 @@ describe('reviewRequirements on GitHub', () => {
               kind: 'team',
               approvals: 2,
               paths: ['src/**'],
+              applies: null,
               blocking: true,
             },
             {
@@ -215,9 +253,20 @@ describe('reviewRequirements on GitHub', () => {
               kind: 'team',
               approvals: null,
               paths: [],
+              applies: null,
               blocking: true,
             },
+            // A minimum of 0: added, not required.
+            {
+              ids: ['3'],
+              kind: 'team',
+              approvals: 0,
+              paths: [],
+              applies: null,
+              blocking: false,
+            },
           ],
+          approvalsMet: null,
         },
         []
       )
@@ -244,10 +293,32 @@ describe('asksViewer', () => {
     const bob = reviewer({ identifier: 'Bob', required: false });
     // Only a required reviewer's approval is missing.
     expect(asksViewer(ROW, 'bob', detail([bob]), rules({}))).toBe(false);
-    // Under a minimum-approvals policy anyone's approval counts.
+    // Under a minimum-approvals policy anyone's approval counts, until
+    // Azure says the minimum is met.
     expect(asksViewer(ROW, 'bob', detail([bob]), rules({ approvals: 2 }))).toBe(
       true
     );
+    expect(
+      asksViewer(
+        ROW,
+        'bob',
+        detail([bob]),
+        rules({ approvals: 2, approvalsMet: true })
+      )
+    ).toBe(false);
+  });
+
+  it('waits on an optional reviewer who may answer for a required group', () => {
+    const bob = reviewer({ identifier: 'bob', required: false });
+    const group = (decision: DetailReviewer['decision']) =>
+      reviewer({ kind: 'team', identifier: 'Web', required: true, decision });
+    // Membership is not read: their vote may be the group's.
+    expect(
+      asksViewer(ROW, 'bob', detail([bob, group('no-response')]), rules({}))
+    ).toBe(true);
+    expect(
+      asksViewer(ROW, 'bob', detail([bob, group('approved')]), rules({}))
+    ).toBe(false);
   });
 
   it('waits on a required reviewer, and on one GitHub asked', () => {

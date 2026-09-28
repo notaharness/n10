@@ -5,12 +5,11 @@ import { isActive, POLICY, typeOf, type RawEvaluation } from './pr-policies.js';
  * What an Azure DevOps pull request's reviewer policies ask of its
  * reviews: a minimum number of approvals, and reviewers a policy adds by
  * name. A policy Azure evaluated as not applicable, its paths matching
- * no change here, asks nothing of this pull request.
+ * no change here, asks nothing of this pull request, but is kept among
+ * the named: it may be what added a reviewer.
  */
 
-function applies(e: RawEvaluation): boolean {
-  return isActive(e) && e.status !== 'notApplicable';
-}
+const applies = (e: RawEvaluation) => e.status !== 'notApplicable';
 
 const isBlocking = (e: RawEvaluation) => e.configuration?.isBlocking === true;
 
@@ -26,6 +25,7 @@ function named(e: RawEvaluation): NamedReviewers[] {
       kind: 'identity',
       approvals: settings?.minimumApproverCount ?? null,
       paths: settings?.filenamePatterns ?? [],
+      applies: applies(e),
       blocking: isBlocking(e),
     },
   ];
@@ -34,17 +34,25 @@ function named(e: RawEvaluation): NamedReviewers[] {
 export function reviewRuleOf(
   evaluations: readonly RawEvaluation[]
 ): ReviewRule {
-  const live = evaluations.filter(applies);
-  const counts = live
-    .filter((e) => typeOf(e) === POLICY.minimumReviewers && isBlocking(e))
-    .map((e) => e.configuration?.settings?.minimumApproverCount ?? 0);
+  const active = evaluations.filter(isActive);
+  const minimums = active.filter(
+    (e) => typeOf(e) === POLICY.minimumReviewers && isBlocking(e) && applies(e)
+  );
+  const counts = minimums.map(
+    (e) => e.configuration?.settings?.minimumApproverCount ?? 0
+  );
   return {
     approvals: Math.max(0, ...counts),
     // Azure has no code owners; its path-limited reviewer policies are
     // named reviewers.
     codeOwners: false,
-    named: live
+    named: active
       .filter((e) => typeOf(e) === POLICY.requiredReviewers)
       .flatMap(named),
+    // Azure's own verdict on its minimum: met once each is approved.
+    approvalsMet:
+      minimums.length > 0
+        ? minimums.every((e) => e.status === 'approved')
+        : null,
   };
 }

@@ -157,7 +157,12 @@ function requiredRule(...names: [string, number | null][]): Json {
 }
 
 /** A rule that asks nothing of reviews. */
-const NO_REVIEWS = { approvals: 0, codeOwners: false, named: [] };
+const NO_REVIEWS = {
+  approvals: 0,
+  codeOwners: false,
+  named: [],
+  approvalsMet: null,
+};
 
 const RESOLUTION_RULE = {
   type: 'pull_request',
@@ -660,6 +665,12 @@ describe('fetchPullRequestChecksGitHub: rules', () => {
                 minimum_approvals: 1,
                 reviewer: { id: 777, type: 'Team' },
               },
+              // Added without requiring its approval.
+              {
+                file_patterns: [],
+                minimum_approvals: 0,
+                reviewer: { id: 778, type: 'Team' },
+              },
             ],
           },
         },
@@ -681,9 +692,19 @@ describe('fetchPullRequestChecksGitHub: rules', () => {
               kind: 'team',
               approvals: 1,
               paths: ['src/**'],
+              applies: null,
               blocking: true,
             },
+            {
+              ids: ['778'],
+              kind: 'team',
+              approvals: 0,
+              paths: [],
+              applies: null,
+              blocking: false,
+            },
           ],
+          approvalsMet: null,
         },
       },
     });

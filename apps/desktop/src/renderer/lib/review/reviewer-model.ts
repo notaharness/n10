@@ -1,4 +1,5 @@
 import type { PullRequestReviewer } from '@n10/vcs-core/types';
+import { providerName } from '../provider-name.js';
 import type {
   ReviewerStanding,
   ReviewRequirements,
@@ -34,11 +35,6 @@ export function standingLabel(
   return base;
 }
 
-const PROVIDER_NAME: Record<string, string> = {
-  github: 'GitHub',
-  'azure-devops': 'Azure DevOps',
-};
-
 /** The rows, and a note on what the reads could not say. */
 export function reviewerRows(
   listed: readonly PullRequestReviewer[],
@@ -49,14 +45,20 @@ export function reviewerRows(
   if (read?.state !== 'read') {
     const rows = listed.map((r) => ({ ...r, standing: null }));
     const notes =
-      read?.state === 'failed' ? ['Who is required could not be read.'] : [];
+      read?.state === 'failed'
+        ? ["The reviewers' details could not be read."]
+        : [];
     return { rows, notes };
   }
   const { items, complete, total } = read.value;
   const notes: string[] = [];
   if (items.some((s) => s.requirement === 'unknown')) {
-    const name = (provider && PROVIDER_NAME[provider]) ?? 'The provider';
-    notes.push(`${name} doesn't mark reviewers required.`);
+    const name = providerName(provider);
+    notes.push(
+      `${name.charAt(0).toUpperCase()}${name.slice(
+        1
+      )} doesn't mark reviewers required.`
+    );
   }
   if (!complete) {
     notes.push(

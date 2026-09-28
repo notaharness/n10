@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { MergeState, PullRequestCheck, ReviewRule } from '@n10/vcs-core';
 import { evaluateReadiness, type ReadinessInputs } from './pr-readiness.js';
 
-const NO_RULE: ReviewRule = { approvals: 0, codeOwners: false, named: [] };
+const NO_RULE: ReviewRule = {
+  approvals: 0,
+  codeOwners: false,
+  named: [],
+  approvalsMet: null,
+};
 
 /** Each readiness row on its own, as the Completion section shows it. */
 

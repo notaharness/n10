@@ -105,8 +105,13 @@ export interface NamedReviewers {
   approvals: number | null;
   /** The file patterns the rule is limited to; empty for any change. */
   paths: string[];
+  /** Whether it applies to this pull request's changes: false where
+   *  the provider evaluated it as not applicable (Azure DevOps), null
+   *  where it does not say (GitHub lists a rule set's paths only). */
+  applies: boolean | null;
   /** Completion waits for it. Azure DevOps also adds reviewers as
-   *  optional, which asks for their review without requiring it. */
+   *  optional, which asks for their review without requiring it, and
+   *  GitHub adds a team whose minimum is 0 without requiring it. */
   blocking: boolean;
 }
 
@@ -118,8 +123,13 @@ export interface ReviewRule {
   approvals: number;
   /** A code owner of the changed files must approve (GitHub). */
   codeOwners: boolean;
-  /** Reviewers a rule names, where it applies to this pull request. */
+  /** Reviewers a rule names, whether or not it applies here: one that
+   *  added a reviewer still says why they are listed. */
   named: NamedReviewers[];
+  /** Whether the approvals asked for are given, where the provider
+   *  says (Azure's minimum-reviewers evaluation); null where it does
+   *  not. */
+  approvalsMet: boolean | null;
 }
 
 /** What the target branch's rules ask of every pull request into it. */

@@ -72,7 +72,7 @@ describe('reviewerRows', () => {
         },
         'github'
       ).notes
-    ).toEqual(['Who is required could not be read.']);
+    ).toEqual(["The reviewers' details could not be read."]);
   });
 
   it('names the provider that does not mark reviewers required', () => {

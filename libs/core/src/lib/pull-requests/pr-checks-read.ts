@@ -77,8 +77,10 @@ export async function readPullRequestChecks(
   assertSameContext({ ...req, viewer }, src);
   const readId = checks.state === 'read' ? checks.value.ref.id : undefined;
   assertSameRepositoryId(req, readId);
+  // The detail and the checks must be about one repository, even where
+  // the caller named no id.
   assertSameRepositoryId(
-    req,
+    { ...req, ref: withId(req.ref, readId ?? req.ref.id) },
     detail.state === 'read' ? detail.value.ref.id : undefined
   );
   const rules = checks.state === 'read' ? checks.value.rules : null;

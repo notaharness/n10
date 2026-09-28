@@ -8,7 +8,12 @@ import type {
 } from '@n10/vcs-core';
 import { evaluateReadiness, type ReadinessInputs } from './pr-readiness.js';
 
-const NO_RULE: ReviewRule = { approvals: 0, codeOwners: false, named: [] };
+const NO_RULE: ReviewRule = {
+  approvals: 0,
+  codeOwners: false,
+  named: [],
+  approvalsMet: null,
+};
 
 /** Every blocker alone and together, as O9 asks. */
 

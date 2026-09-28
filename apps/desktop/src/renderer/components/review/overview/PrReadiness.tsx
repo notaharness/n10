@@ -102,10 +102,18 @@ function ReviewRule({ answer }: { answer: PullRequestChecksAnswer }) {
   if (answer.checks.state !== 'read') return null;
   const lines = rule ?? ['Review rules not read'];
   if (lines.length === 0) return null;
+  // Two rules can read the same (two teams GitHub names by id alone),
+  // so each line is keyed by its words and which repeat it is.
+  const seen = new Map<string, number>();
+  const keyed = lines.map((line) => {
+    const n = (seen.get(line) ?? 0) + 1;
+    seen.set(line, n);
+    return { line, key: `${line}#${n}` };
+  });
   return (
     <span data-review-rule className="block text-xs text-muted-foreground">
-      {lines.map((line) => (
-        <span key={line} className="block">
+      {keyed.map(({ line, key }) => (
+        <span key={key} className="block">
           {line}
         </span>
       ))}

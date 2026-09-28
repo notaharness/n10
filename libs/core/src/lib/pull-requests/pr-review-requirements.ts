@@ -55,14 +55,20 @@ function requirementOf(required: boolean | null): ReviewerRequirement {
 
 const sameId = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
-/** The rule that names this reviewer by id, where one does. */
+/** The rule that names this reviewer by id, and would have added them
+ *  as they are listed: a blocking one as required, another as optional.
+ *  One that no longer applies to the changes still names them. */
 function namedBy(
   reviewer: DetailReviewer,
   rule: ReviewRule | null
 ): NamedReviewers | undefined {
   const id = reviewer.id;
   if (id == null || !rule) return undefined;
-  return rule.named.find((n) => n.ids.some((i) => sameId(i, id)));
+  return rule.named.find(
+    (n) =>
+      n.ids.some((i) => sameId(i, id)) &&
+      (reviewer.required == null || n.blocking === reviewer.required)
+  );
 }
 
 function reasonOf(
@@ -121,7 +127,8 @@ function namedLine(
 }
 
 /** The rule in words: a number of approvals, code owners, and each
- *  reviewer a rule names, where it blocks completion. */
+ *  reviewer a rule names, where it blocks completion and is not known
+ *  to leave these changes out. */
 export function ruleLines(
   rule: ReviewRule,
   reviewers: readonly DetailReviewer[]
@@ -132,7 +139,7 @@ export function ruleLines(
   }
   if (rule.codeOwners) lines.push('Code owners must approve');
   for (const n of rule.named) {
-    if (n.blocking) lines.push(namedLine(n, reviewers));
+    if (n.blocking && n.applies !== false) lines.push(namedLine(n, reviewers));
   }
   return lines;
 }
@@ -165,11 +172,22 @@ export function reviewRequirements(
   };
 }
 
-/** Their approval would count: they are required, or a rule counts
- *  anyone's. Where neither is known, the provider's asking stands. */
-function counts(reviewer: DetailReviewer, rule: ReviewRule | null): boolean {
-  if (reviewer.required !== false) return true;
-  return rule == null || rule.approvals > 0;
+/**
+ * Their approval would count: they are required, a rule counts anyone's
+ * and is not yet met, or a required group still waits and they may be
+ * in it (membership is not read). Where the rule is not known, the
+ * provider's asking stands.
+ */
+function counts(
+  reviewer: DetailReviewer,
+  rule: ReviewRule | null,
+  everyone: readonly DetailReviewer[]
+): boolean {
+  if (reviewer.required !== false || rule == null) return true;
+  if (rule.approvals > 0 && rule.approvalsMet !== true) return true;
+  return everyone.some(
+    (r) => r.kind === 'team' && r.required === true && r.decision !== 'approved'
+  );
 }
 
 /**
@@ -185,10 +203,11 @@ export function asksViewer(
   rules: ReadOutcome<BranchRules> | null
 ): boolean {
   if (!row || row.isDraft || viewer == null) return false;
-  const own = find(detailReviewers(detail), viewer);
-  if (own) {
+  const read = detailReviewers(detail);
+  const own = find(read, viewer);
+  if (own && read.state === 'read') {
     const rule = rules?.state === 'read' ? rules.value.reviews : null;
-    return stillAsked(own) && counts(own, rule);
+    return stillAsked(own) && counts(own, rule, read.value.items);
   }
   const entry = row.reviewers?.find((r) => sameId(r.identifier, viewer));
   return entry != null && stillAsked(entry);

@@ -10,7 +10,12 @@ import {
 import { readPullRequestChecks, type ChecksSources } from './pr-checks-read.js';
 import { PullRequestIdentityError } from './pr-snapshot.js';
 
-const NO_RULE: ReviewRule = { approvals: 0, codeOwners: false, named: [] };
+const NO_RULE: ReviewRule = {
+  approvals: 0,
+  codeOwners: false,
+  named: [],
+  approvalsMet: null,
+};
 
 const HEAD = '1'.repeat(40);
 const REPO = { provider: 'github', host: 'github.com', repository: 'acme/app' };
