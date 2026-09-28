@@ -135,6 +135,7 @@ export function checkRun(node: CheckRunNode, head: string): PullRequestCheck {
             node.name
           }`,
     requires: null,
+    kind: 'check',
     name: node.name,
     group,
     source: slug,
@@ -156,6 +157,7 @@ export function status(node: StatusNode, head: string): PullRequestCheck {
   return {
     key: `status:${node.context}`,
     requires: null,
+    kind: 'check',
     name: node.context,
     group: null,
     source: node.creator?.login ?? null,
@@ -206,6 +208,7 @@ export function expected(
   return {
     key: `expected:${req.appId ?? '-'}:${req.name}`,
     requires: requiredCheck(req, nodes),
+    kind: 'check',
     name: req.name,
     group: null,
     source: null,

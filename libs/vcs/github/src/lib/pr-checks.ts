@@ -179,6 +179,8 @@ function mergeState(node: ChecksNode): MergeState {
     // GitHub leaves the decision out where a rule set requires review
     // as well as where nothing does, so its absence says neither.
     reviews: REVIEWS[node.reviewDecision ?? ''] ?? 'unknown',
+    // GitHub gives no verdict on threads, only the rule.
+    conversations: null,
     native: node.mergeStateStatus,
   };
 }

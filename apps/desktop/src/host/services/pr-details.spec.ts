@@ -211,6 +211,7 @@ describe('getPullRequestChecks', () => {
           behind: false,
           blocked: false,
           reviews: 'not-required',
+          conversations: null,
           native: 'CLEAN',
         },
       } as PullRequestChecks);

@@ -41,6 +41,13 @@ export interface PullRequestCheck {
    *  reporting one name are two checks. Stable across reads until the
    *  check runs again: a re-run is a new check. */
   key: string;
+  /**
+   * A check reports on the code: a run, a commit status, a build. A
+   * policy is a rule the provider evaluates on the pull request itself
+   * (Azure's work item linking). Reviews and conversations are not
+   * listed either way: `MergeState` carries their verdicts.
+   */
+  kind: 'check' | 'policy';
   /** For an expected check, the requirement it stands for, with the
    *  app it must come from; null for one that reported. */
   requires: RequiredCheck | null;
@@ -66,6 +73,9 @@ export interface PullRequestCheck {
   completedAt: string | null;
   /** Which attempt of its run, where the provider numbers them. */
   attempt: number | null;
+  /** It waits for someone to start it: a build policy with a manual
+   *  trigger that has not run on this revision. Absent otherwise. */
+  manual?: boolean;
   /** Where its details are, on the provider or the service that ran
    *  it. */
   url: string | null;
@@ -113,6 +123,12 @@ export interface MergeState {
     | 'required'
     | 'not-required'
     | 'unknown';
+  /**
+   * The provider's own verdict on review threads, where a rule it
+   * evaluates gives one (Azure's comment requirements policy); null
+   * where it gives none, as GitHub does.
+   */
+  conversations: 'resolved' | 'unresolved' | null;
   /** The provider's own word for the whole: `CLEAN`, `BLOCKED`… */
   native: string | null;
 }

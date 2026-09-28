@@ -39,7 +39,7 @@ function authorOf(who: RawIdentity | undefined) {
     : null;
 }
 
-interface RawReviewer extends RawIdentity {
+export interface RawReviewer extends RawIdentity {
   vote?: number;
   hasDeclined?: boolean;
   isRequired?: boolean;
@@ -51,13 +51,15 @@ interface RawReviewer extends RawIdentity {
 interface RawRepository {
   id?: string;
   name?: string;
-  project?: { name?: string };
+  project?: { id?: string; name?: string };
 }
 
-interface RawPullRequest {
+export interface RawPullRequest {
   pullRequestId?: number;
   title?: string;
   status?: string;
+  /** How Azure's last merge went: `succeeded`, `conflicts`, `queued`… */
+  mergeStatus?: string;
   isDraft?: boolean;
   creationDate?: string;
   createdBy?: RawIdentity;
@@ -71,7 +73,7 @@ interface RawPullRequest {
   reviewers?: RawReviewer[];
 }
 
-interface RawIteration {
+export interface RawIteration {
   id?: number;
   sourceRefCommit?: { commitId?: string };
   targetRefCommit?: { commitId?: string };
@@ -84,7 +86,7 @@ const LIFECYCLE: Record<string, PullRequestLifecycle['state']> = {
   completed: 'merged',
 };
 
-function lifecycle(raw: RawPullRequest): PullRequestLifecycle {
+export function lifecycle(raw: RawPullRequest): PullRequestLifecycle {
   const state = LIFECYCLE[raw.status ?? ''];
   if (!state) {
     throw new VcsError(
@@ -105,7 +107,10 @@ function oid(commit: { commitId?: string } | undefined): string | null {
 
 /** The configured repository, which is how the request named it, with
  *  the id Azure answered for it. */
-function ownRepository(config: AdoConfig, raw: RawPullRequest): RepositoryRef {
+export function ownRepository(
+  config: AdoConfig,
+  raw: RawPullRequest
+): RepositoryRef {
   return {
     provider: 'azure-devops',
     host: `dev.azure.com/${config.org}`,
@@ -219,7 +224,7 @@ interface Revision {
  * iteration does not. A merged commit no iteration lists yet is a push
  * the iterations read missed, and names no iteration.
  */
-function revision(
+export function revision(
   raw: RawPullRequest,
   iterations: readonly RawIteration[] | null
 ): Revision {
@@ -278,7 +283,7 @@ function detailOf(
 }
 
 /** A failed read's error again, with its kind and wait. */
-function failureOf(
+export function failureOf(
   outcome: Exclude<ReadOutcome<unknown>, { state: 'read' }>
 ): VcsError {
   if (outcome.state === 'unsupported') {
@@ -289,10 +294,18 @@ function failureOf(
   });
 }
 
-export async function fetchPullRequestDetailAzure(
+/**
+ * The pull request and its iterations, the latter its own outcome: the
+ * pull request stands without them. Shared by the detail and the
+ * checks read, so one asks what the other just read at no cost.
+ */
+export async function readPullRequest(
   config: AdoConfig,
   prId: number
-): Promise<PullRequestDetail> {
+): Promise<{
+  raw: RawPullRequest;
+  iterations: ReadOutcome<RawIteration[]>;
+}> {
   const repo = `${config.org}/${config.project}/${config.repo}`;
   const headers = authHeaders(config.pat);
   const url = `${baseUrl(config)}/pullrequests/${prId}`;
@@ -318,6 +331,14 @@ export async function fetchPullRequestDetailAzure(
       readFailure
     ),
   ]);
+  return { raw, iterations };
+}
+
+export async function fetchPullRequestDetailAzure(
+  config: AdoConfig,
+  prId: number
+): Promise<PullRequestDetail> {
+  const { raw, iterations } = await readPullRequest(config, prId);
   if (iterations.state !== 'read') {
     const merged = revision(raw, null);
     // Nothing else names the head: the failure is the iterations'.
