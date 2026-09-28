@@ -156,8 +156,7 @@ export function PrHeader({
 }: {
   pr: PullRequestInfo;
   onShowUnresolved: () => void;
-  /** Up to the pull request's review, from a pane that is not it (the
-   *  agent's terminal). Absent where the pane is the review. */
+  /** Up from the pane showing, toward the Overview. */
   onBack?: () => void;
 }) {
   const reviewers = pr.reviewers ?? [];
@@ -279,8 +278,9 @@ export function terminalInset(mode: Mode, hasPr: boolean): number {
 
 /**
  * The bar across a workspace, over the rail and the pane. A pull
- * request's Overview is headed by its own identity, so it has none; its
- * terminal's bar offers the way back up to the review. A worktree
+ * request's Overview is headed by its own identity, so it has none;
+ * every other pane's bar offers the way back up, the changes' to the
+ * Overview and the rest to the review pane last shown. A worktree
  * without a pull request has the branch's bar, and no review to go back
  * to.
  */
@@ -299,7 +299,7 @@ export function WorkspaceHeader({
   baseBranch: string;
   fileCount: number;
   onShowUnresolved: () => void;
-  /** Up to the review pane the reader was last on. */
+  /** Up from the pane showing (`backTarget`). */
   onBack: () => void;
 }) {
   if (!pr) {
@@ -313,10 +313,6 @@ export function WorkspaceHeader({
   }
   if (!hasBar(mode, true)) return null;
   return (
-    <PrHeader
-      pr={pr}
-      onShowUnresolved={onShowUnresolved}
-      onBack={mode === 'agent' ? onBack : undefined}
-    />
+    <PrHeader pr={pr} onShowUnresolved={onShowUnresolved} onBack={onBack} />
   );
 }

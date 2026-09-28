@@ -75,7 +75,7 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `TabsProvider` sits above the repo gate in `App.tsx`.
   `tabs.properties.spec.ts` holds the invariants.
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
-  collapsible rail (Agent · Files · Comments) beside one content pane that
+  collapsible rail (Agent · Files) beside one content pane that
   swaps between Overview, diff, agent terminal (kept mounted) and
   `ReviewStepper`. It opens on the Overview for someone else's PR and on the
   diff for yours (`lib/review/overview-model.ts`). The diff toolbar lives in

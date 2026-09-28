@@ -69,14 +69,22 @@ export function lastReviewPane(
   return mode === 'overview' || mode === 'diff' ? mode : last;
 }
 
-/** Where the terminal's Back goes: up to the review pane the reader was
- *  last on, never back through where they have been; before either has
- *  shown, the one the pull request opens on for them. */
+/** The review pane the reader was last on; before either has shown,
+ *  the one the pull request opens on for them. */
 export function backToReviewPane(
   last: ReviewPane | null,
   role: ReviewRole
 ): ReviewPane {
   return last ?? reviewPaneFor(role);
+}
+
+/** Where Back goes from `mode`, always up, never back through where the
+ *  reader has been: from the changes to the Overview, the top of the
+ *  review; from the terminal, the plan or the walkthrough to the review
+ *  pane last shown. The Overview has nowhere further up. */
+export function backTarget(mode: Mode, review: ReviewPane): ReviewPane | null {
+  if (mode === 'overview') return null;
+  return mode === 'diff' ? 'overview' : review;
 }
 
 /** A reviewer's decision in words. `no-response` is a request nobody

@@ -4,7 +4,6 @@ import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
-import type { CommentListItem } from '../../components/review/comments/CommentsList.js';
 import type { DiffJumpHandle } from '../../components/review/diff/VirtualDiffList.js';
 import {
   buildCommentRows,
@@ -84,14 +83,6 @@ export function useCommentNavigator({
     [onShowDiff]
   );
 
-  const jumpToItem = useCallback(
-    (item: CommentListItem) => {
-      const row = items.find((r) => r.id === item.id);
-      jumpToId(item.id, row?.file ?? null);
-    },
-    [items, jumpToId]
-  );
-
   const step = useCallback(
     (delta: number) => {
       const target: CommentRow | null = stepComment(items, navIndex, delta);
@@ -110,7 +101,6 @@ export function useCommentNavigator({
     selectedFile,
     jumpToFile,
     jumpToId,
-    jumpToItem,
     step,
   };
 }

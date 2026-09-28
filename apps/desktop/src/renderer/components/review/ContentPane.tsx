@@ -113,6 +113,7 @@ export function ContentPane({
   drafts,
   hasDrafts,
   commentsLoading,
+  threadsNotice,
   diffRead,
   diffRetrying,
   onRetryDiff,
@@ -153,6 +154,8 @@ export function ContentPane({
   drafts: ReviewComment[];
   hasDrafts: boolean;
   commentsLoading: boolean;
+  /** Why the diff's threads are missing or out of date. */
+  threadsNotice?: ReactNode;
   diffRead: DiffReadState;
   diffRetrying: boolean;
   onRetryDiff: () => void;
@@ -179,7 +182,6 @@ export function ContentPane({
     onShowInDiff: (item: PlanItem) => void;
     onClear: () => void;
     onSend: (mode: 'inject' | 'new-session') => void;
-    openNoteFor: { key: string } | null;
   };
 }) {
   const headSha = pr?.headSha;
@@ -232,7 +234,6 @@ export function ContentPane({
             onShowInDiff={plan.onShowInDiff}
             onClear={plan.onClear}
             onSend={plan.onSend}
-            openNoteFor={plan.openNoteFor}
           />
         </div>
       )}
@@ -260,6 +261,7 @@ export function ContentPane({
           draftsByFile={draftsByFile}
           generalThreads={generalThreads}
           commentsLoading={commentsLoading}
+          threadsNotice={threadsNotice}
           read={diffRead}
           retrying={diffRetrying}
           onRetry={onRetryDiff}

@@ -33,7 +33,7 @@ import {
 import { ContentPane } from './ContentPane.js';
 import { type FileEntry } from './diff/FileTree.js';
 import { WorkspaceHeader } from './PrHeader.js';
-import { railReadNotice } from './ReadNotice.js';
+import { readNotice } from './ReadNotice.js';
 import { CollapsedRail, ReviewRail } from './ReviewRail.js';
 
 /** A worktree without a pull request has no threads to be missing. */
@@ -187,22 +187,13 @@ export function PrWorkspace({
   );
   const backToAgent = useCallback(() => setMode('agent'), [setMode]);
   const openPlanPane = useCallback(() => setMode('plan'), [setMode]);
-  // Both comment sources the rail can offer, as one list to resolve an
-  // id against.
-  const allThreads = useMemo(
-    () => [...inlineThreads, ...general],
-    [inlineThreads, general]
-  );
   const plan = usePlanCheckout({
     cwd: repo.cwd,
     pr,
     running,
     paneRef: rootRef,
-    threads: allThreads,
-    drafts,
     onSent: backToAgent,
     onShowInDiff: showPlanItemInDiff,
-    onOpenPlan: openPlanPane,
   });
 
   // Which pane is actually showing. Computed last because it asks
@@ -250,9 +241,6 @@ export function PrWorkspace({
                 className="min-w-0"
               >
                 <ReviewRail
-                  hasPr={Boolean(pr)}
-                  overviewActive={effMode === 'overview'}
-                  onOverview={() => setMode('overview')}
                   running={running}
                   busy={busy}
                   hasSession={Boolean(sessionName)}
@@ -274,21 +262,6 @@ export function PrWorkspace({
                   diffLoading={diff.pending}
                   selectedFile={effMode === 'diff' ? nav.selectedFile : null}
                   onSelectFile={nav.jumpToFile}
-                  commentItems={nav.items}
-                  activeCommentId={effMode === 'diff' ? nav.focusId : null}
-                  commentsOpen={rail.commentsOpen}
-                  onCommentsOpenChange={rail.setCommentsOpen}
-                  onJumpComment={nav.jumpToItem}
-                  onCommentContextMenu={(row) =>
-                    plan.onCommentContextMenu(row.id)
-                  }
-                  commentsNotice={railReadNotice(
-                    'comments',
-                    threadsRead,
-                    threads.retrying,
-                    threads.retry
-                  )}
-                  threads={threadsRead.kind}
                 />
               </Panel>
               <PanelSeparator className="relative w-px bg-border transition-colors after:absolute after:inset-y-0 after:-left-1 after:w-2 hover:bg-primary data-[resize-handle-state=drag]:bg-primary" />
@@ -317,6 +290,13 @@ export function PrWorkspace({
               drafts={drafts}
               hasDrafts={hasDrafts}
               commentsLoading={comments.isLoading}
+              threadsNotice={readNotice(
+                'comments',
+                threadsRead,
+                threads.retrying,
+                threads.retry,
+                'mx-2 mt-2 shrink-0'
+              )}
               diffRead={diff.read}
               diffRetrying={diff.retrying}
               onRetryDiff={diff.retry}

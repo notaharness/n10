@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type {
   PullRequestConversation,
   PullRequestRef,
@@ -10,13 +17,18 @@ import {
   buildActivity,
   filterCounts,
   groupActivity,
+  isResolved,
+  resolvedIds,
   rowContaining,
   selectActivity,
   splitNew,
+  withoutHidden,
+  withoutResolved,
   type ActivityFilter,
 } from '../../../lib/review/activity-model.js';
 import { useRepo } from '../../../lib/repo-context.js';
 import { Skeleton } from '../../ui/skeleton.js';
+import { Switch } from '../../ui/switch.js';
 import { ToggleGroup, ToggleGroupItem } from '../../ui/toggle-group.js';
 import { ReadFailure, StaleNotice } from '../ReadNotice.js';
 import { ActivityRowView } from './ActivityEntries.js';
@@ -28,13 +40,14 @@ import { NewSince } from './new-since.js';
  * The Overview's activity: every review, comment, thread and event on
  * the pull request, oldest first, with filters and a search over all
  * of it. Reading it never moves under the reader — what arrives on a
- * refresh waits behind "N new updates".
+ * refresh waits behind "N new updates". Resolved threads stay out of
+ * view until the reader shows them: the provider's own resolved state,
+ * so an Azure DevOps thread closed as "won't fix" is resolved too.
  */
 
 const FILTERS: { value: ActivityFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'open', label: 'Open' },
-  { value: 'resolved', label: 'Resolved' },
   { value: 'outdated', label: 'Outdated' },
   { value: 'mine', label: 'Mine' },
 ];
@@ -133,7 +146,13 @@ function Activity({
 }) {
   const [filter, setFilter] = useState<ActivityFilter>('all');
   const [query, setQuery] = useState('');
+  const [showResolved, setShowResolved] = useState(false);
   const entries = useMemo(() => buildActivity(conversation), [conversation]);
+  // Resolved threads out of view: those resolved on arrival, or when
+  // the reader last hid them.
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() =>
+    resolvedIds(entries)
+  );
   // What the reader has been shown: the first answer, and later ones
   // only when the reader asks to see them.
   const [seen, setSeen] = useState<ReadonlySet<string>>(
@@ -150,11 +169,23 @@ function Activity({
   // does not fall back to the page when the button goes.
   const reveal = useRef<string | null>(null);
 
-  const counts = filterCounts(shown, viewer);
-  const selected = selectActivity(shown, filter, query, viewer);
+  const visible = showResolved ? shown : withoutHidden(shown, hidden);
+  const resolvedCount = shown.filter(isResolved).length;
+  const showOrHide = (on: boolean) => {
+    if (!on) setHidden(resolvedIds(shown));
+    setShowResolved(on);
+  };
+  const counts = filterCounts(visible, viewer);
+  const selected = selectActivity(visible, filter, query, viewer);
   // New updates are counted against what the reader is looking at; the
-  // rest wait until the filter or search would show them.
-  const arrived = selectActivity(held, filter, query, viewer);
+  // rest wait until the filter, search or resolved switch would show
+  // them. A thread that arrives resolved is out of view with the rest.
+  const arrived = selectActivity(
+    showResolved ? held : withoutResolved(held),
+    filter,
+    query,
+    viewer
+  );
   const narrowed = filter !== 'all' || query.trim() !== '';
   // Grouping folds noise; a filtered or searched list shows each match.
   const rows = narrowed ? selected : groupActivity(selected);
@@ -172,7 +203,7 @@ function Activity({
   return (
     <NewSince.Provider value={isNew}>
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <ActivityHeading count={shown.length} />
+        <ActivityHeading count={visible.length} />
         <ToggleGroup
           type="single"
           value={filter}
@@ -191,16 +222,23 @@ function Activity({
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
+        <ShowResolved
+          checked={showResolved}
+          count={resolvedCount}
+          onChange={showOrHide}
+        />
         <SearchBox query={query} onChange={setQuery} />
       </div>
       <CoverageNotice coverage={conversation.coverage} />
       {rows.length === 0 ? (
         <EmptyActivity
           narrowed={narrowed}
+          hiddenResolved={shown.length - visible.length}
           onClear={() => {
             setFilter('all');
             setQuery('');
           }}
+          onShowResolved={() => showOrHide(true)}
         />
       ) : (
         <ol ref={list} className="space-y-3">
@@ -228,6 +266,28 @@ function Activity({
         }}
       />
     </NewSince.Provider>
+  );
+}
+
+/** Resolved threads are out of view until this is on. */
+function ShowResolved({
+  checked,
+  count,
+  onChange,
+}: {
+  checked: boolean;
+  count: number;
+  onChange: (on: boolean) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Switch id={id} checked={checked} onCheckedChange={onChange} />
+      <label htmlFor={id} className="flex items-center gap-1">
+        Show resolved
+        <span className="tabular-nums opacity-70">{count}</span>
+      </label>
+    </div>
   );
 }
 

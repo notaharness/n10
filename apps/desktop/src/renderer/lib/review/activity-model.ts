@@ -46,7 +46,7 @@ export type ActivityRow =
       entries: ActivityEntry[];
     };
 
-export type ActivityFilter = 'all' | 'open' | 'resolved' | 'outdated' | 'mine';
+export type ActivityFilter = 'all' | 'open' | 'outdated' | 'mine';
 
 function time(at: string | null): number {
   const t = at == null ? NaN : Date.parse(at);
@@ -241,9 +241,39 @@ const THREAD_FILTERS: Partial<
   Record<ActivityFilter, (t: ConversationThread) => boolean>
 > = {
   open: (t) => !t.status.resolved,
-  resolved: (t) => t.status.resolved,
   outdated: (t) => t.isOutdated,
 };
+
+/** A thread its provider says is resolved. */
+export function isResolved(entry: ActivityEntry): boolean {
+  return entry.kind === 'thread' && entry.thread.status.resolved;
+}
+
+/** The activity without its resolved threads, which stay out of view
+ *  until the reader asks for them. */
+export function withoutResolved(
+  entries: readonly ActivityEntry[]
+): ActivityEntry[] {
+  return entries.filter((e) => !isResolved(e));
+}
+
+/** The resolved threads among `entries`, by id. */
+export function resolvedIds(entries: readonly ActivityEntry[]): Set<string> {
+  return new Set(entries.filter(isResolved).map((e) => e.id));
+}
+
+/**
+ * The activity with the resolved threads in `hidden` out of view:
+ * those resolved when the reader arrived, or when they last hid them.
+ * One resolved while in view stays with its new status, so the list
+ * never shifts under the reader; one reopened comes back.
+ */
+export function withoutHidden(
+  entries: readonly ActivityEntry[],
+  hidden: ReadonlySet<string>
+): ActivityEntry[] {
+  return entries.filter((e) => !(isResolved(e) && hidden.has(e.id)));
+}
 
 export function matchesFilter(
   entry: ActivityEntry,
@@ -312,7 +342,6 @@ export function filterCounts(
   return {
     all: entries.length,
     open: count('open'),
-    resolved: count('resolved'),
     outdated: count('outdated'),
     mine: count('mine'),
   };

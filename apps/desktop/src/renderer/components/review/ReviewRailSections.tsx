@@ -1,5 +1,6 @@
 import {
   BotIcon,
+  ChevronRightIcon,
   ClipboardCheckIcon,
   ClipboardListIcon,
   Loader2Icon,
@@ -21,8 +22,9 @@ import { Tip } from '../ui/tooltip.js';
  */
 
 /**
- * A running agent is a row you select to see its terminal, with Stop
- * beside it; an idle one is just the button that starts it.
+ * A running agent is the rail's headline: a card that takes the reader
+ * to its terminal, saying it is running, with Stop beside it. An idle
+ * one is just the button that starts it.
  */
 export function AgentSection({
   running,
@@ -50,37 +52,44 @@ export function AgentSection({
     );
   }
   return (
-    <div className="flex items-center gap-1">
+    <div
+      className={cn(
+        'flex items-stretch overflow-hidden rounded-md border transition-colors',
+        agentActive
+          ? 'border-primary/60 bg-primary/10'
+          : 'border-border bg-background hover:border-foreground/25'
+      )}
+    >
       <button
         type="button"
         onClick={onSelectAgent}
-        className={cn(
-          'flex h-7 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-base transition-colors',
-          agentActive
-            ? 'bg-sidebar-active text-foreground'
-            : 'hover:bg-sidebar-accent'
-        )}
+        className="group flex min-w-0 flex-1 items-center gap-3 px-2.5 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
       >
-        <span className="relative flex size-4 shrink-0 items-center justify-center">
-          <BotIcon className="size-4 text-muted-foreground" />
-          <span className="absolute -right-0.5 -bottom-0.5 flex size-2">
+        <span className="relative flex size-9 shrink-0 items-center justify-center rounded-md bg-success/15 text-success">
+          <BotIcon className="size-5" />
+          <span className="absolute -right-0.5 -bottom-0.5 flex size-2.5">
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
-            <span className="relative inline-flex size-2 rounded-full bg-success ring-2 ring-sidebar" />
+            <span className="relative inline-flex size-2.5 rounded-full bg-success ring-2 ring-background" />
           </span>
         </span>
-        <span className="min-w-0 flex-1 truncate text-left">Agent</span>
-        <span className="shrink-0 text-xs text-muted-foreground">running</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-base font-medium">Agent</span>
+          <span className="block truncate text-xs text-success">Running</span>
+        </span>
+        <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
       </button>
-      <Tip label="Stop agent">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={onStop}
-          aria-label="Stop agent"
-        >
-          <SquareIcon />
-        </Button>
-      </Tip>
+      <div className="flex items-center border-l border-border px-1">
+        <Tip label="Stop agent">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onStop}
+            aria-label="Stop agent"
+          >
+            <SquareIcon />
+          </Button>
+        </Tip>
+      </div>
     </div>
   );
 }

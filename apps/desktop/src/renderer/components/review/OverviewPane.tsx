@@ -22,14 +22,14 @@ import { PrActions } from './PrHeader.js';
 
 /**
  * One column below 900 px of pane width — identity, next step,
- * readiness, description, people — and from there a reading column
- * beside a context column, the description running down the left while
- * readiness and reviewers stack on the right. The last row takes up
- * whatever the description needs, so the right column never spreads out
- * to match it.
+ * reviewers, completion, then the description and the conversation —
+ * and from there a reading column beside a context column: the
+ * description and conversation run down the left while the reviewers
+ * and completion stack on the right. The last row takes up whatever the
+ * reading column needs, so the right column never spreads out to match.
  */
 const LAYOUT =
-  "mx-auto grid max-w-[1120px] gap-x-8 gap-y-6 px-6 py-6 [grid-template-areas:'head'_'next'_'ready'_'main'_'people'] @min-[900px]:grid-cols-[minmax(0,1fr)_260px] @min-[900px]:grid-rows-[auto_auto_auto_auto_1fr] @min-[900px]:[grid-template-areas:'head_head'_'next_next'_'main_ready'_'main_people'_'main_.']";
+  "mx-auto grid max-w-[1120px] gap-x-8 gap-y-6 px-6 py-6 [grid-template-areas:'head'_'next'_'people'_'ready'_'main'] @min-[900px]:grid-cols-[minmax(0,1fr)_260px] @min-[900px]:grid-rows-[auto_auto_auto_auto_1fr] @min-[900px]:[grid-template-areas:'head_head'_'next_next'_'main_people'_'main_ready'_'main_.']";
 
 /**
  * The Overview or, nested in it, the check list; the list stays until
@@ -120,6 +120,9 @@ export function OverviewPane({
             onAction={onAction}
             className="[grid-area:next]"
           />
+          <div className="[grid-area:people]">
+            <PrReviewers reviewers={pr.reviewers ?? []} viewer={repo.viewer} />
+          </div>
           <div className="[grid-area:ready]">
             <PrReadiness
               read={read}
@@ -141,9 +144,6 @@ export function OverviewPane({
                 onOpenThread={onOpenThread}
               />
             )}
-          </div>
-          <div className="[grid-area:people]">
-            <PrReviewers reviewers={pr.reviewers ?? []} viewer={repo.viewer} />
           </div>
         </div>
       )}

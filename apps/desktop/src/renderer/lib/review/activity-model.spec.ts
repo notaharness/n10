@@ -11,10 +11,14 @@ import {
   buildActivity,
   filterCounts,
   groupActivity,
+  isResolved,
   matchingComments,
+  resolvedIds,
   rowContaining,
   selectActivity,
   splitNew,
+  withoutHidden,
+  withoutResolved,
 } from './activity-model.js';
 
 const DONE = { loaded: 0, total: 0, complete: true };
@@ -318,8 +322,33 @@ describe('selectActivity', () => {
 
   it('keeps resolved and outdated independent', () => {
     expect(ids('open')).toEqual(['open', 'old']);
-    expect(ids('resolved')).toEqual(['done']);
+    expect(entries.filter(isResolved).map((e) => e.id)).toEqual(['done']);
     expect(ids('outdated')).toEqual(['old']);
+  });
+
+  it('keeps a thread resolved in view, and brings back one reopened', () => {
+    const hidden = resolvedIds(entries);
+    expect([...hidden]).toEqual(['done']);
+    // Nothing was hidden on arrival: the thread resolved since stays.
+    expect(withoutHidden(entries, new Set())).toHaveLength(entries.length);
+    expect(withoutHidden(entries, hidden).map((e) => e.id)).not.toContain(
+      'done'
+    );
+    // A hidden id that is no longer resolved shows again.
+    expect(
+      withoutHidden(entries, new Set(['open'])).map((e) => e.id)
+    ).toContain('open');
+  });
+
+  it('hides resolved threads, and only those', () => {
+    expect(withoutResolved(entries).map((e) => e.id)).toEqual([
+      'open',
+      'old',
+      'ping',
+      'email',
+      'code',
+      'r1',
+    ]);
   });
 
   it('finds what the viewer wrote', () => {
@@ -330,7 +359,6 @@ describe('selectActivity', () => {
     expect(filterCounts(entries, 'me')).toEqual({
       all: 7,
       open: 2,
-      resolved: 1,
       outdated: 1,
       mine: 2,
     });
@@ -405,7 +433,10 @@ describe('an Azure DevOps conversation', () => {
 
   it('files general threads by their status like any other', () => {
     expect(ids('open')).toEqual(['general']);
-    expect(ids('resolved')).toEqual(['fixed', 'wontfix']);
+    expect(entries.filter(isResolved).map((e) => e.id)).toEqual([
+      'fixed',
+      'wontfix',
+    ]);
   });
 
   it('counts the viewer’s vote as theirs, as a GitHub review is', () => {

@@ -45,11 +45,32 @@ export function SearchBox({
 
 export function EmptyActivity({
   narrowed,
+  hiddenResolved,
   onClear,
+  onShowResolved,
 }: {
   narrowed: boolean;
+  /** Resolved threads out of view; with nothing else, they are all
+   *  there is. */
+  hiddenResolved: number;
   onClear: () => void;
+  onShowResolved: () => void;
 }) {
+  if (!narrowed && hiddenResolved > 0) {
+    return (
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        Every thread is resolved.
+        <Button
+          variant="link"
+          size="sm"
+          className="h-auto p-0"
+          onClick={onShowResolved}
+        >
+          Show resolved
+        </Button>
+      </p>
+    );
+  }
   if (!narrowed) {
     return (
       <p className="text-sm text-muted-foreground">

@@ -1,10 +1,10 @@
 import type { DiffLine } from '@n10/diff';
 import { commentBodyParts } from '@n10/review-comments/conventional';
 import type {
+  CommentSeverity,
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
-import type { CommentListItem } from '../../components/review/comments/CommentsList.js';
 import { contentKey } from '../content-key.js';
 import type { FileEntry } from '../../components/review/diff/FileTree.js';
 
@@ -149,6 +149,23 @@ export function buildFileEntries(
 }
 
 // ── The unified comment list ─────────────────────────────────────
+
+/** One comment the diff's navigator steps through: a remote thread
+ *  (inline or general) or an agent draft. */
+export interface CommentListItem {
+  id: string;
+  /** 'thread' = a real (remote) comment; 'draft' = an agent draft. */
+  kind: 'thread' | 'draft';
+  author: string;
+  /** "file:line" or "Conversation" for general PR comments. */
+  where: string;
+  preview: string;
+  resolved: boolean;
+  /** Whether it can be resolved at all: a general comment on GitHub
+   *  cannot, and is never counted as open. */
+  resolvable: boolean;
+  severity?: CommentSeverity;
+}
 
 /**
  * A `CommentListItem` plus where it sits in the document, which is what

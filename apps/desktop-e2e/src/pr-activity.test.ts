@@ -9,9 +9,9 @@ import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
 
 /**
  * The Overview's activity (C1, C2): the whole conversation in order,
- * its filters and search, the code an outdated thread was written on,
- * the way into the diff, and updates that wait rather than moving the
- * list under the reader.
+ * its filters and search, resolved threads out of view until asked for,
+ * the code an outdated thread was written on, the way into the diff,
+ * and updates that wait rather than moving the list under the reader.
  */
 
 const BRANCH = 'cancel-requests';
@@ -37,12 +37,14 @@ test.use({
 
 const filtersOf = (activity: Locator) =>
   activity.getByRole('radiogroup', { name: 'Show' });
+const showResolved = (activity: Locator) =>
+  activity.getByRole('switch', { name: /Show resolved/ });
 
+/** Bea reviews alex's pull request, which opens on its Overview. */
 async function openOverview(page: Page) {
   await sidebarRow(page, /Handle cancelled requests|#214/)
     .first()
     .click();
-  await page.getByRole('button', { name: 'Overview' }).click();
   const activity = page.getByRole('region', { name: /Activity/ });
   await expect(activity.getByRole('list').first()).toBeVisible({
     timeout: 30_000,
@@ -81,9 +83,15 @@ test.describe('Pull request activity', () => {
       'send(token, { retry: true });'
     );
 
-    // Resolved starts folded to its author and first line, and says who
-    // resolved it.
+    // Resolved is out of view until asked for; then it starts folded to
+    // its author and first line, and says who resolved it.
     const resolved = activity.locator('[data-thread-id="T-resolved"]');
+    await expect(resolved).toHaveCount(0);
+    await expect(showResolved(activity)).not.toBeChecked();
+    await expect(showResolved(activity)).toHaveAccessibleName(
+      'Show resolved 1'
+    );
+    await showResolved(activity).click();
     await expect(resolved).toContainText('Resolved');
     await expect(resolved).toContainText('alex');
     await expect(
@@ -100,14 +108,11 @@ test.describe('Pull request activity', () => {
     // A summary-only approval keeps its text and verdict.
     await expect(activity).toContainText('Read it end to end — looks right.');
 
-    // The rail counts what the Overview counts: threads that can be
-    // resolved and are not, never general comments.
+    // Open counts threads that can be resolved and are not, never
+    // general comments.
     await expect(
       filtersOf(activity).getByRole('radio', { name: /Open/ })
     ).toContainText('4');
-    await expect(page.getByRole('button', { name: /^Comments/ })).toContainText(
-      '4 open'
-    );
 
     await page.screenshot({ path: testInfo.outputPath('activity.png') });
     await activity
@@ -123,8 +128,12 @@ test.describe('Pull request activity', () => {
     const activity = await openOverview(page);
     const filters = activity.getByRole('radiogroup', { name: 'Show' });
 
-    await filters.getByRole('radio', { name: /Resolved/ }).click();
-    await expect(activity.locator('[data-thread-id]')).toHaveCount(1);
+    await filters.getByRole('radio', { name: /Open/ }).click();
+    await expect(activity.locator('[data-thread-id="T-resolved"]')).toHaveCount(
+      0
+    );
+    await showResolved(activity).click();
+    await filters.getByRole('radio', { name: /^All/ }).click();
     await expect(
       activity.locator('[data-thread-id="T-resolved"]')
     ).toBeVisible();
@@ -167,9 +176,6 @@ test.describe('Pull request activity', () => {
         name: 'Show the thread on src/request.ts · new 3 in the diff',
       })
       .click();
-    await expect(
-      page.locator('[data-comment-row="T-open"][aria-current="true"]')
-    ).toBeVisible();
     await expect(
       page
         .locator('[data-thread="T-open"]')
@@ -217,17 +223,21 @@ test.describe('Pull request activity', () => {
       .locator('[data-thread="T-open"]')
       .getByRole('button', { name: 'Resolve' })
       .click();
-    await page.getByRole('button', { name: 'Overview' }).click();
+    await page.getByRole('button', { name: 'Back to review' }).click();
 
-    // Under a filter the arrival would not show in, nothing is announced.
+    // Under a search the arrival would not show in, nothing is
+    // announced; the thread just resolved stays in view.
     const filters = activity.getByRole('radiogroup', { name: 'Show' });
-    await filters.getByRole('radio', { name: /Resolved/ }).click();
+    const search = activity.getByRole('searchbox', { name: 'Search activity' });
+    await search.fill('early return');
     const update = activity.getByRole('button', { name: '1 new update' });
-    await expect(activity.locator('[data-thread-id="T-open"]')).toBeVisible({
-      timeout: 15_000,
-    });
+    // The re-read has landed once the resolved thread leaves Open's count.
+    await expect(filters.getByRole('radio', { name: /Open/ })).toContainText(
+      '3',
+      { timeout: 15_000 }
+    );
     await expect(update).toHaveCount(0);
-    await filters.getByRole('radio', { name: /^All/ }).click();
+    await search.fill('');
     await expect(update).toBeVisible({ timeout: 15_000 });
     await expect(activity.getByText('Late to the party')).toHaveCount(0);
     // The thread the reader already had in view shows its new status,
@@ -262,7 +272,6 @@ test.describe('Pull request activity', () => {
     await sidebarRow(page, /Handle cancelled requests|#214/)
       .first()
       .click();
-    await page.getByRole('button', { name: 'Overview' }).click();
     await expect(
       page
         .getByRole('alert')

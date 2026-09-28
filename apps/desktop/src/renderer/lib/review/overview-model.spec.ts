@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PullRequestInfo } from '@n10/vcs-core/types';
 import {
   adoptPullRequest,
+  backTarget,
   backToReviewPane,
   initialMode,
   lastReviewPane,
@@ -59,6 +60,20 @@ describe('backToReviewPane', () => {
     // Straight into the terminal: the reader's role decides, as it is now.
     expect(backToReviewPane(null, 'reviewer')).toBe('overview');
     expect(backToReviewPane(null, 'author')).toBe('diff');
+  });
+});
+
+describe('backTarget', () => {
+  it('goes up from the changes to the Overview, the top of the review', () => {
+    expect(backTarget('diff', 'diff')).toBe('overview');
+    expect(backTarget('overview', 'diff')).toBeNull();
+  });
+
+  it('goes up from the terminal, the plan and the walkthrough to the review pane last shown', () => {
+    for (const mode of ['agent', 'plan', 'review'] as const) {
+      expect(backTarget(mode, 'diff')).toBe('diff');
+      expect(backTarget(mode, 'overview')).toBe('overview');
+    }
   });
 });
 
