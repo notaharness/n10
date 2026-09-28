@@ -51,6 +51,11 @@ function detail(over: Partial<PullRequestDetail> = {}): PullRequestDetail {
     target: { branch: 'main', head: TARGET_NOW },
     createdAt: null,
     updatedAt: null,
+    reviewers: {
+      state: 'read',
+      value: { items: [], total: 0, complete: true },
+    },
+    capabilities: { update: { state: 'supported' } },
     ...over,
   };
 }

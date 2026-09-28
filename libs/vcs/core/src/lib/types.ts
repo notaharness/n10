@@ -33,6 +33,10 @@ export interface PullRequestReviewer {
   displayName: string;
   identifier: string;
   decision: ReviewDecision;
+  /** The provider holds an open request for their review — asked again
+   *  after a verdict, where `decision` still holds that verdict. Absent
+   *  where the list does not say. */
+  requested?: boolean;
 }
 
 export interface PullRequestInfo {

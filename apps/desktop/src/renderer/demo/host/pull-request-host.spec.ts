@@ -29,6 +29,25 @@ describe('the demo pull request host', () => {
       oid: '905bbcb2036a4f1e8c2d7b9a5e3f6c1d8b4a2e7f',
       from: 'detail',
     });
+    // The teammate's changes requested, in GitHub's words, on the head.
+    expect(snapshot.detail).toMatchObject({
+      value: {
+        reviewers: {
+          state: 'read',
+          value: {
+            items: [
+              {
+                identifier: 'demo-teammate',
+                decision: 'changes-requested',
+                native: 'CHANGES_REQUESTED',
+                reviewedHead: '905bbcb2036a4f1e8c2d7b9a5e3f6c1d8b4a2e7f',
+              },
+            ],
+            complete: true,
+          },
+        },
+      },
+    });
   });
 
   it('says a number the demo does not have is not found', async () => {

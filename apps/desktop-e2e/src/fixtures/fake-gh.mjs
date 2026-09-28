@@ -144,6 +144,93 @@ function searchNode(pr) {
   };
 }
 
+/** A repository's `databaseId`: a stable number derived from its name,
+ *  so the same repository always answers with the same id. */
+function repositoryNode(nameWithOwner) {
+  let databaseId = 7;
+  for (const c of nameWithOwner) {
+    databaseId = (databaseId * 31 + c.charCodeAt(0)) % 2_000_000_000;
+  }
+  return { databaseId, nameWithOwner };
+}
+
+/** The repository the scenario stands for. */
+function scenarioRepository() {
+  return repositoryNode(
+    `${scenario.owner ?? 'n10'}/${scenario.repo ?? 'fixture'}`
+  );
+}
+
+/** Each author's latest review among `reviews`, oldest first, whose
+ *  state passes `keep`. */
+function latestPerAuthor(reviews, keep) {
+  const byAuthor = new Map();
+  for (const r of reviews) if (keep(r.state)) byAuthor.set(r.author, r);
+  return [...byAuthor.values()];
+}
+
+const VERDICT_STATES = new Set(['APPROVED', 'CHANGES_REQUESTED']);
+
+/**
+ * The selected-pull-request read (libs/vcs/github/src/lib/pr-details.ts),
+ * answered in one page. `fork` names the head repository when it is not
+ * the scenario's own; `null` is a deleted fork.
+ */
+function detailNode(pr) {
+  const list = searchNode(pr);
+  const repository = scenarioRepository();
+  const head =
+    pr.fork === undefined || pr.fork === repository.nameWithOwner
+      ? repository
+      : pr.fork && repositoryNode(pr.fork);
+  const connection = (nodes) => ({
+    totalCount: nodes.length,
+    pageInfo: page,
+    nodes,
+  });
+  const author = (login) => ({ __typename: 'User', login, id: `U_${login}` });
+  const reviews = pr.reviews ?? [];
+  return {
+    ...repository,
+    pullRequest: {
+      number: pr.number,
+      title: pr.title,
+      url: list.url,
+      state: pr.state ?? 'OPEN',
+      isDraft: list.isDraft,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-02T00:00:00Z',
+      viewerCanUpdate: pr.canUpdate ?? true,
+      author: list.author,
+      headRefName: pr.headRefName,
+      headRefOid: list.headRefOid,
+      headRepository: head,
+      baseRefName: list.baseRefName,
+      baseRefOid: 'e'.repeat(40),
+      latestOpinionatedReviews: connection(
+        latestPerAuthor(reviews, (s) => VERDICT_STATES.has(s)).map((r) => ({
+          author: author(r.author),
+          state: r.state,
+          commit: { oid: list.headRefOid },
+          onBehalfOf: { nodes: [] },
+        }))
+      ),
+      latestReviews: connection(
+        latestPerAuthor(reviews, (s) => s !== 'PENDING').map((r) => ({
+          author: author(r.author),
+          state: r.state,
+        }))
+      ),
+      reviewRequests: connection(
+        (pr.reviewRequests ?? []).map((login) => ({
+          asCodeOwner: false,
+          requestedReviewer: { __typename: 'User', id: `U_${login}`, login },
+        }))
+      ),
+    },
+  };
+}
+
 function threadNode(t, i) {
   return {
     id: t.id ?? `thread-${i + 1}`,
@@ -189,6 +276,12 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
   }
   if (query.includes('search(')) {
     out({ data: { search: { pageInfo: page, nodes: [] } } });
+  }
+
+  if (query.includes('query PullRequestDetail(')) {
+    const pr = prs.find((p) => String(p.number) === String(vars.number));
+    if (failing(pr, 'detail')) failLikeGitHub();
+    out({ data: { repository: pr ? detailNode(pr) : null } });
   }
 
   if (query.includes('reviewThreads(first: 100, after: $threadCursor)')) {

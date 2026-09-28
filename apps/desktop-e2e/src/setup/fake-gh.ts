@@ -34,8 +34,16 @@ export interface FakePr {
   threads?: FakeThread[];
   generalComments?: { author: string; body: string }[];
   /** Reads that answer with GitHub's 502 until cleared with
-   *  `updateFakeGh`: the description, and the threads query. */
-  failing?: { body?: boolean; threads?: boolean };
+   *  `updateFakeGh`: the description, the threads query, and the
+   *  selected pull request's detail. */
+  failing?: { body?: boolean; threads?: boolean; detail?: boolean };
+  /** The detail read's lifecycle; open unless said. */
+  state?: 'OPEN' | 'CLOSED' | 'MERGED';
+  /** The head repository as `owner/repo` when it is a fork, or null
+   *  for a fork that was deleted. Defaults to the scenario's own. */
+  fork?: string | null;
+  /** Whether the signed-in account may edit it; defaults to true. */
+  canUpdate?: boolean;
 }
 
 /** An inline review thread, anchored to a file and line in the diff. */

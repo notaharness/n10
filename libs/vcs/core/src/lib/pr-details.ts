@@ -1,4 +1,5 @@
 import { VcsError, type VcsErrorKind } from './errors.js';
+import type { ReviewDecision } from './types.js';
 
 /**
  * The identity vocabulary every pull request surface shares: which
@@ -179,6 +180,68 @@ export interface PullRequestLifecycle {
 }
 
 /**
+ * Some of a list, and whether it is the whole of it. A caller that
+ * shows an incomplete list says so ("12 of 30", "total unknown"); it
+ * never presents a partial list as everyone. `total` counts everyone,
+ * named or not: an incomplete list may know it, because the provider
+ * counted people it would not name to this account, or may not.
+ */
+export type ListRead<T> =
+  | { items: T[]; complete: true; total: number }
+  | { items: T[]; complete: false; total: number | null };
+
+/**
+ * Someone asked to review, or who has, as the detail read names them.
+ * A team is a reviewer too: GitHub requests teams, Azure DevOps adds
+ * groups, and neither is a person.
+ */
+export interface DetailReviewer {
+  /** A person, an app acting as a reviewer (GitHub's `Bot`, such as
+   *  Copilot), or a team or group. A GitHub mannequin, an imported
+   *  account's placeholder, stands for a person. */
+  kind: 'user' | 'bot' | 'team';
+  /** A login or email; for a team, the provider's name for it
+   *  (`org/slug` on GitHub). Reviewers are compared by this,
+   *  ignoring case. */
+  identifier: string;
+  /** The provider's handle for acting on this reviewer — a GitHub node
+   *  id, an Azure DevOps identity id — or null where it gives none.
+   *  Opaque: not for comparing or storing. */
+  id: string | null;
+  displayName: string;
+  /** The shared reading of their standing verdict. A later comment does
+   *  not withdraw a verdict. */
+  decision: ReviewDecision;
+  /** The provider's own verdict — `APPROVED`, `COMMENTED`, an Azure
+   *  vote of `-5` or `10` — or null where none was given. The shared
+   *  reading merges some votes (Azure's `10` and `5` are both
+   *  approved), so a label in the provider's words reads this. */
+  native: string | null;
+  /** The provider holds an open request for their review. Someone can
+   *  be asked again after giving a verdict, so this and `decision` are
+   *  separate facts. Azure DevOps keeps no request apart from its list,
+   *  so there a listed reviewer who has neither voted nor declined is
+   *  asked; flagging a reviewer for attention is not a request. */
+  requested: boolean;
+  /** Required by the provider's own rules, or null where the provider
+   *  does not say. */
+  required: boolean | null;
+  /** Why the provider asked for them, where it says: as a code owner of
+   *  the changed files, or by a branch policy. A code owner's review is
+   *  not required unless a rule makes it so, and a required reviewer
+   *  someone added by hand has no reason. */
+  reason: 'code-owner' | 'policy' | null;
+  /** The teams or groups their review answered for. On GitHub a team's
+   *  request is met, and leaves the list, once a member reviews for it;
+   *  on Azure DevOps the group stays listed with its members' vote. */
+  onBehalfOf: string[];
+  /** The commit the verdict was given on; null for no verdict or where
+   *  the provider does not say. A verdict on an older commit is not an
+   *  approval of the head. */
+  reviewedHead: Oid | null;
+}
+
+/**
  * The selected pull request as its provider describes it, read on
  * demand rather than with the list. Providers fill this through
  * `VcsProvider.fetchPullRequestDetail`.
@@ -200,4 +263,10 @@ export interface PullRequestDetail {
   target: { branch: string; head: Oid | null };
   createdAt: string | null;
   updatedAt: string | null;
+  /** Everyone asked to review and everyone who has, all pages read, or
+   *  marked incomplete. Read after the rest, and failed on its own. */
+  reviewers: ReadOutcome<ListRead<DetailReviewer>>;
+  /** Whether the viewer may edit the title and description. Draft and
+   *  ready depend on the lifecycle as well, and are not this. */
+  capabilities: { update: Capability };
 }
