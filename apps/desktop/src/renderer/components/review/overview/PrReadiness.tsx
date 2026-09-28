@@ -100,7 +100,7 @@ function MoreBlockers({ readiness }: { readiness: PullRequestReadiness }) {
 function ReviewRule({ answer }: { answer: PullRequestChecksAnswer }) {
   const { rule } = answer.requirements;
   if (answer.checks.state !== 'read') return null;
-  const lines = rule ?? ['Review rules not read'];
+  const lines = rule ?? ['The review rules could not be read.'];
   if (lines.length === 0) return null;
   // Two rules can read the same (two teams GitHub names by id alone),
   // so each line is keyed by its words and which repeat it is.

@@ -101,6 +101,6 @@ test.describe('Reviewer requirements when the rules cannot be read', () => {
     const { completion } = await openOverview(desktop.page);
     await expect(
       completion.locator('[data-readiness-row="reviews"] [data-review-rule]')
-    ).toHaveText('Review rules not read');
+    ).toHaveText('The review rules could not be read.');
   });
 });
