@@ -427,7 +427,8 @@ test.describe('Pull request Overview', () => {
   test('the terminal goes back up to the review it came from, and the keyboard with it', async ({
     desktop,
   }) => {
-    const { page } = desktop;
+    const { app, page } = desktop;
+    await resize(app, 1360, 860);
     await openPr(page, /#214/);
     const back = prHeader(page).getByRole('button', { name: 'Back to review' });
     const pressBack = async () => {
@@ -439,6 +440,13 @@ test.describe('Pull request Overview', () => {
     await showChanges(page);
     await launchAgentFromRail(page);
     await agentReady(page);
+    // The terminal's bar is the changes' bar with Back in front: the
+    // title keeps room to be read.
+    const titleWidth = await prHeader(page)
+      .getByText(LONG_TITLE)
+      .first()
+      .evaluate((el) => el.getBoundingClientRect().width);
+    expect(titleWidth).toBeGreaterThanOrEqual(280);
     await pressBack();
     await expect(visibleText(page, 'socket.close();')).toBeVisible();
     await expect(back).toHaveCount(0);
@@ -455,6 +463,19 @@ test.describe('Pull request Overview', () => {
     await expect(title).toBeVisible();
     await expect(title).toBeFocused();
     await expect(prHeader(page)).toHaveCount(0);
+
+    // The Overview showing its check list: Back returns to the list, and
+    // the keyboard to its heading.
+    await page
+      .getByRole('region', { name: 'Completion' })
+      .getByRole('button', { name: /View checks/ })
+      .click();
+    await page.getByRole('button', { name: /^Agent/ }).click();
+    await agentReady(page);
+    await pressBack();
+    await expect(
+      page.getByRole('heading', { name: 'Checks and policies' })
+    ).toBeFocused();
   });
 
   test('goes up to the review, not back to the plan shown in between', async ({

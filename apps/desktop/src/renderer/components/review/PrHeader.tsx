@@ -43,7 +43,7 @@ export function OpenInEditorButton({ branch }: { branch: string }) {
         }
       >
         <CodeIcon />
-        <span className="hidden @min-[630px]:inline">Editor</span>
+        <span className="hidden @min-[900px]:inline">Editor</span>
       </Button>
     </Tip>
   );
@@ -110,7 +110,7 @@ export function PrActions({ pr }: { pr: PullRequestInfo }) {
           onClick={() => void window.n10.openExternal(pr.url)}
         >
           <ExternalLinkIcon />
-          <span className="hidden @min-[630px]:inline">{provider}</span>
+          <span className="hidden @min-[900px]:inline">{provider}</span>
         </Button>
       </Tip>
       <Tip label="Refresh this pull request">
@@ -147,9 +147,7 @@ export function PrActions({ pr }: { pr: PullRequestInfo }) {
  * The compact identity of a pull request tab, sized by its own width:
  * the title truncates first, then the branches go, the reviewer avatars
  * become a count and the button labels become icons. The number and
- * the state always stay; the Overview carries every value in full. It
- * sits beside the review rail, so its steps are the rail's width below
- * the window widths they stand for.
+ * the state always stay; the Overview carries every value in full.
  */
 export function PrHeader({
   pr,
@@ -191,7 +189,7 @@ export function PrHeader({
           <button
             type="button"
             onClick={() => copyText(pr.sourceBranch, 'Branch name copied')}
-            className="hidden min-w-0 items-center gap-1 rounded px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground @min-[930px]:flex"
+            className="hidden min-w-0 items-center gap-1 rounded px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground @min-[1200px]:flex"
           >
             <span className="truncate">{pr.sourceBranch}</span>
             <span className="shrink-0">→ {pr.targetBranch}</span>
@@ -208,18 +206,18 @@ export function PrHeader({
         <Tip label={`Opened by ${pr.createdByDisplayName}`}>
           <span className="flex items-center gap-1.5">
             <Avatar name={pr.createdByDisplayName} size="xs" />
-            <span className="hidden truncate text-muted-foreground @min-[930px]:inline">
+            <span className="hidden truncate text-muted-foreground @min-[1200px]:inline">
               {pr.createdByDisplayName}
             </span>
           </span>
         </Tip>
         <ReviewerDots
           reviewers={reviewers}
-          className="hidden @min-[730px]:flex"
+          className="hidden @min-[1000px]:flex"
         />
         <ReviewerSummary
           reviewers={reviewers}
-          className="hidden @min-[600px]:flex"
+          className="hidden @min-[720px]:flex"
         />
         {(pr.activeCommentCount ?? 0) > 0 && (
           <UnresolvedButton
@@ -280,12 +278,11 @@ export function terminalInset(mode: Mode, hasPr: boolean): number {
 }
 
 /**
- * The bar over a workspace's pane, in the content's column: it changes
- * with the pane, and over the rail it would move the rail as it comes
- * and goes. A pull request's Overview is headed by its own identity, so
- * it has none; its terminal's bar offers the way back up to the review.
- * A worktree without a pull request has the branch's bar, and no review
- * to go back to.
+ * The bar across a workspace, over the rail and the pane. A pull
+ * request's Overview is headed by its own identity, so it has none; its
+ * terminal's bar offers the way back up to the review. A worktree
+ * without a pull request has the branch's bar, and no review to go back
+ * to.
  */
 export function WorkspaceHeader({
   pr,

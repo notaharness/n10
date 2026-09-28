@@ -305,6 +305,7 @@ export function PrChecks({ onBack, actions, ...body }: ChecksProps) {
       </div>
       <h2
         ref={heading}
+        data-overview-heading
         tabIndex={-1}
         className="mt-2 text-lg font-semibold outline-none"
       >

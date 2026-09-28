@@ -227,6 +227,15 @@ export function PrWorkspace({
 
   return (
     <div ref={rootRef} className="flex h-full min-h-0 min-w-0 flex-col">
+      <WorkspaceHeader
+        pr={pr}
+        mode={effMode}
+        branch={branch}
+        baseBranch={baseBranch}
+        fileCount={files.length}
+        onShowUnresolved={rail.showUnresolved}
+        onBack={backToReview}
+      />
       <div className="flex min-h-0 min-w-0 flex-1">
         {rail.hidden && <CollapsedRail onShow={() => rail.setHidden(false)} />}
 
@@ -287,55 +296,42 @@ export function PrWorkspace({
           )}
 
           <Panel id="review-content" minSize="30%" className="min-w-0">
-            <div className="flex h-full min-h-0 min-w-0 flex-col">
-              <WorkspaceHeader
-                pr={pr}
-                mode={effMode}
-                branch={branch}
-                baseBranch={baseBranch}
-                fileCount={files.length}
-                onShowUnresolved={rail.showUnresolved}
-                onBack={backToReview}
-              />
-              <div className="min-h-0 flex-1">
-                <ContentPane
-                  effMode={effMode}
-                  pr={pr}
-                  prId={prId}
-                  branch={branch}
-                  baseBranch={baseBranch}
-                  sessionName={sessionName}
-                  sessionEpoch={sessionEpoch}
-                  active={active}
-                  connectionBanner={connectionBanner}
-                  inputDisabled={inputDisabled}
-                  files={files}
-                  filesByName={filesByName}
-                  fileOrder={fileOrder}
-                  threadsByFile={threadsByFile}
-                  draftsByFile={draftsByFile}
-                  general={general}
-                  hideResolved={options.hideResolved}
-                  drafts={drafts}
-                  hasDrafts={hasDrafts}
-                  commentsLoading={comments.isLoading}
-                  diffRead={diff.read}
-                  diffRetrying={diff.retrying}
-                  onRetryDiff={diff.retry}
-                  focusThreadId={nav.focusId}
-                  scrollRef={nav.scrollRef}
-                  jumpRef={nav.jumpRef}
-                  navCount={nav.items.length}
-                  navIndex={nav.navIndex}
-                  onPrev={() => nav.step(-1)}
-                  onNext={() => nav.step(1)}
-                  onExitReview={showDiff}
-                  onOpenInDiff={nav.jumpToFile}
-                  onOverviewAction={onOverviewAction}
-                  plan={plan.wiring}
-                />
-              </div>
-            </div>
+            <ContentPane
+              effMode={effMode}
+              pr={pr}
+              prId={prId}
+              branch={branch}
+              baseBranch={baseBranch}
+              sessionName={sessionName}
+              sessionEpoch={sessionEpoch}
+              active={active}
+              connectionBanner={connectionBanner}
+              inputDisabled={inputDisabled}
+              files={files}
+              filesByName={filesByName}
+              fileOrder={fileOrder}
+              threadsByFile={threadsByFile}
+              draftsByFile={draftsByFile}
+              general={general}
+              hideResolved={options.hideResolved}
+              drafts={drafts}
+              hasDrafts={hasDrafts}
+              commentsLoading={comments.isLoading}
+              diffRead={diff.read}
+              diffRetrying={diff.retrying}
+              onRetryDiff={diff.retry}
+              focusThreadId={nav.focusId}
+              scrollRef={nav.scrollRef}
+              jumpRef={nav.jumpRef}
+              navCount={nav.items.length}
+              navIndex={nav.navIndex}
+              onPrev={() => nav.step(-1)}
+              onNext={() => nav.step(1)}
+              onExitReview={showDiff}
+              onOpenInDiff={nav.jumpToFile}
+              onOverviewAction={onOverviewAction}
+              plan={plan.wiring}
+            />
           </Panel>
         </Group>
       </div>

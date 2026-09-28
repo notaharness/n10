@@ -26,8 +26,9 @@ function Detail({
     <Button
       variant="link"
       size="sm"
+      aria-label={`Show ${detail}`}
       onClick={() => onAction(detailAction)}
-      className="h-auto p-0 text-sm font-normal text-muted-foreground hover:text-foreground"
+      className="h-auto p-0 text-sm font-normal text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 hover:text-foreground hover:decoration-foreground"
     >
       {detail}
     </Button>

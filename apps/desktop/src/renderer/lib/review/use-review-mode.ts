@@ -100,7 +100,8 @@ export function useLastReviewPane(
 /**
  * The terminal header's Back: up to the review pane the reader was last
  * on. The button goes with the terminal's header, so the keyboard goes
- * to the review it leads to: the changes, or the Overview's heading.
+ * to the review it leads to: the changes, or the heading of what the
+ * Overview shows (its own, or its check list's).
  */
 export function useBackToReview({
   mode,
