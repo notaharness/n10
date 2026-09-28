@@ -45,7 +45,7 @@ describe('useReviewComments', () => {
     const { lastFrame, unmount } = render(<Drafts />);
     try {
       expect(lastFrame()).toContain('ids:[]');
-      appendComment(scope, {
+      await appendComment(scope, {
         id: 'first',
         file: 'a.ts',
         lineStart: 1,

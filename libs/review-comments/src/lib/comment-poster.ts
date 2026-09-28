@@ -112,7 +112,7 @@ export async function postReviewComments(
 
   // Mark all as posted
   for (const comment of comments) {
-    updateComment(drafts, comment.id, { status: 'posted' });
+    await updateComment(drafts, comment.id, { status: 'posted' });
   }
 }
 

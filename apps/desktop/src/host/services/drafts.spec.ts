@@ -114,18 +114,20 @@ describe('PR id validation', () => {
     ['a negative', -3],
     ['null', null],
     ['undefined', undefined],
-  ])('rejects %s', (_label, value) => {
-    expect(() => listDraftComments(value as number)).toThrow('Invalid PR id');
-    expect(() => updateDraftComment(value as number, 'a', {})).toThrow(
+  ])('rejects %s', async (_label, value) => {
+    await expect(listDraftComments(value as number)).rejects.toThrow(
       'Invalid PR id'
     );
-    expect(() => deleteDraftComment(value as number, 'a')).toThrow(
+    await expect(updateDraftComment(value as number, 'a', {})).rejects.toThrow(
+      'Invalid PR id'
+    );
+    await expect(deleteDraftComment(value as number, 'a')).rejects.toThrow(
       'Invalid PR id'
     );
   });
 
-  it('accepts a positive integer', () => {
-    expect(() => listDraftComments(42)).not.toThrow();
+  it('accepts a positive integer', async () => {
+    await expect(listDraftComments(42)).resolves.toEqual(expect.any(Array));
   });
 });
 
@@ -137,42 +139,42 @@ describe('the drafts a PR id means', () => {
 
   /** Every repository has a #7; the open one decides whose. */
   it('are the open repository’s, for every read and write', async () => {
-    listDraftComments(7);
-    updateDraftComment(7, 'a', { body: 'x' });
-    deleteDraftComment(7, 'b');
+    await listDraftComments(7);
+    await updateDraftComment(7, 'a', { body: 'x' });
+    await deleteDraftComment(7, 'b');
     await postDraftComments({ prId: 7, headSha: 'sha' });
     expect(new Set(state.scopes.map((s) => JSON.stringify(s)))).toEqual(
       new Set([JSON.stringify({ repo: widgets, prId: 7 })])
     );
   });
 
-  it('are none when the project names no repository', () => {
+  it('are none when the project names no repository', async () => {
     state.config = { vendor: 'github', vendorAuth: {}, vendorProject: {} };
-    expect(listDraftComments(7)).toEqual([]);
-    expect(() => updateDraftComment(7, 'a', { body: 'x' })).toThrow(
+    expect(await listDraftComments(7)).toEqual([]);
+    await expect(updateDraftComment(7, 'a', { body: 'x' })).rejects.toThrow(
       'No repository is configured'
     );
   });
 });
 
 describe('editing drafts', () => {
-  it('refuses to edit or delete a comment that is already posted', () => {
+  it('refuses to edit or delete a comment that is already posted', async () => {
     state.comments = [draft('a', 'posted')];
-    expect(() => updateDraftComment(1, 'a', { body: 'x' })).toThrow(
+    await expect(updateDraftComment(1, 'a', { body: 'x' })).rejects.toThrow(
       'already posted'
     );
-    expect(() => deleteDraftComment(1, 'a')).toThrow('already posted');
+    await expect(deleteDraftComment(1, 'a')).rejects.toThrow('already posted');
   });
 
-  it('refuses to edit a comment mid-post', () => {
+  it('refuses to edit a comment mid-post', async () => {
     state.comments = [draft('a', 'posting')];
-    expect(() => updateDraftComment(1, 'a', { body: 'x' })).toThrow(
+    await expect(updateDraftComment(1, 'a', { body: 'x' })).rejects.toThrow(
       'being posted'
     );
   });
 
-  it('reports a comment that no longer exists', () => {
-    expect(() => updateDraftComment(1, 'gone', { body: 'x' })).toThrow(
+  it('reports a comment that no longer exists', async () => {
+    await expect(updateDraftComment(1, 'gone', { body: 'x' })).rejects.toThrow(
       'no longer exists'
     );
   });
@@ -276,7 +278,7 @@ describe('editing a draft settles its body against its severity', () => {
    *  — have to leave the file in the same shape, or the walkthrough
    *  order, the rail dot and the TUI chip start disagreeing with the
    *  badge the body itself carries. */
-  it('raises the severity when the edited body carries a louder header', () => {
+  it('raises the severity when the edited body carries a louder header', async () => {
     state.comments = [
       {
         id: 'a',
@@ -285,13 +287,13 @@ describe('editing a draft settles its body against its severity', () => {
         severity: 'nit',
       } as ReviewComment,
     ];
-    updateDraftComment(1, 'a', {
+    await updateDraftComment(1, 'a', {
       body: 'question (blocking): does this drop writes?',
     });
     expect(state.comments[0].severity).toBe('critical');
   });
 
-  it('will not let an accidental label quieten the declared severity', () => {
+  it('will not let an accidental label quieten the declared severity', async () => {
     state.comments = [
       {
         id: 'a',
@@ -300,12 +302,14 @@ describe('editing a draft settles its body against its severity', () => {
         severity: 'critical',
       } as ReviewComment,
     ];
-    updateDraftComment(1, 'a', { body: 'Note: this drops writes on crash' });
+    await updateDraftComment(1, 'a', {
+      body: 'Note: this drops writes on crash',
+    });
     expect(state.comments[0].severity).toBe('critical');
   });
 
   /** A severity-only edit (the dropdown) must not be second-guessed. */
-  it('leaves a patch that does not touch the body alone', () => {
+  it('leaves a patch that does not touch the body alone', async () => {
     state.comments = [
       {
         id: 'a',
@@ -314,7 +318,7 @@ describe('editing a draft settles its body against its severity', () => {
         severity: 'nit',
       } as ReviewComment,
     ];
-    updateDraftComment(1, 'a', { severity: 'major' });
+    await updateDraftComment(1, 'a', { severity: 'major' });
     expect(state.comments[0].severity).toBe('major');
   });
 });

@@ -1,14 +1,7 @@
-import {
-  closeSync,
-  fstatSync,
-  linkSync,
-  openSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { link, open, rm, writeFile, type FileHandle } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 /**
  * A lock file several processes can take in turn, for critical sections
@@ -22,6 +15,10 @@ import { hostname } from 'node:os';
  * to be gone — its process no longer exists — and only under a second
  * lock, re-checking that the file still holds the dead writer's token,
  * so two waiters cannot both break it and both get in.
+ *
+ * Waiting is on timers, never by blocking: the processes that take this
+ * lock are the TUI and the desktop host, whose one thread draws the UI
+ * and answers everything else while a writer holds it.
  */
 
 export interface LockTiming {
@@ -74,42 +71,38 @@ function ownerOf(token: string): Owner | null {
   }
 }
 
-function sleepSync(ms: number): void {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
-
 /**
  * Create `path` holding `token`, or answer false when it exists. The
  * token is written first and the finished file linked into place, so
  * the lock never exists without it.
  */
-function tryCreate(path: string, token: string): boolean {
+async function tryCreate(path: string, token: string): Promise<boolean> {
   const tmp = `${path}.${randomUUID()}.tmp`;
-  writeFileSync(tmp, token, 'utf8');
+  await writeFile(tmp, token, 'utf8');
   try {
-    linkSync(tmp, path);
+    await link(tmp, path);
     return true;
   } catch (err) {
     if (errorCode(err) === 'EEXIST') return false;
     throw err;
   } finally {
-    rmSync(tmp, { force: true });
+    await rm(tmp, { force: true });
   }
 }
 
 /** Who holds `path` and for how long, read from one open file. */
-function readHolder(path: string): Holder | null {
-  let fd: number;
+async function readHolder(path: string): Promise<Holder | null> {
+  let file: FileHandle;
   try {
-    fd = openSync(path, 'r');
+    file = await open(path, 'r');
   } catch {
     return null;
   }
   try {
-    const ageMs = Date.now() - fstatSync(fd).mtimeMs;
-    return { token: readFileSync(fd, 'utf8'), ageMs };
+    const ageMs = Date.now() - (await file.stat()).mtimeMs;
+    return { token: await file.readFile('utf8'), ageMs };
   } finally {
-    closeSync(fd);
+    await file.close();
   }
 }
 
@@ -128,8 +121,10 @@ function isAbandoned(holder: Holder, timing: LockTiming): boolean {
   return owner?.host === HOST && !isRunning(owner.pid);
 }
 
-function removeIfHeldBy(path: string, token: string): void {
-  if (readHolder(path)?.token === token) rmSync(path, { force: true });
+async function removeIfHeldBy(path: string, token: string): Promise<void> {
+  if ((await readHolder(path))?.token === token) {
+    await rm(path, { force: true });
+  }
 }
 
 /**
@@ -137,48 +132,51 @@ function removeIfHeldBy(path: string, token: string): void {
  * so only one waiter breaks it. Returns without breaking anything when
  * another waiter is already doing so.
  */
-export function breakAbandonedLock(
+export async function breakAbandonedLock(
   lockPath: string,
   abandoned: string,
   timing: LockTiming = DEFAULT_TIMING
-): void {
+): Promise<void> {
   const breaker = `${lockPath}.break`;
   const token = newToken();
-  if (!tryCreate(breaker, token)) {
-    const other = readHolder(breaker);
+  if (!(await tryCreate(breaker, token))) {
+    const other = await readHolder(breaker);
     if (other && isAbandoned(other, timing)) {
-      removeIfHeldBy(breaker, other.token);
+      await removeIfHeldBy(breaker, other.token);
     }
     return;
   }
   try {
-    removeIfHeldBy(lockPath, abandoned);
+    await removeIfHeldBy(lockPath, abandoned);
   } finally {
-    removeIfHeldBy(breaker, token);
+    await removeIfHeldBy(breaker, token);
   }
 }
 
-/** Run `fn` holding `lockPath`. */
-export function withFileLock<T>(
+/**
+ * Run `fn` holding `lockPath`. Each call is its own holder, so two in
+ * one process wait for each other as two processes would.
+ */
+export async function withFileLock<T>(
   lockPath: string,
-  fn: () => T,
+  fn: () => Promise<T> | T,
   timing: LockTiming = DEFAULT_TIMING
-): T {
+): Promise<T> {
   const token = newToken();
   const deadline = Date.now() + timing.timeoutMs;
-  while (!tryCreate(lockPath, token)) {
+  while (!(await tryCreate(lockPath, token))) {
     if (Date.now() > deadline) {
       throw new Error(`Timed out waiting for ${lockPath}`);
     }
-    const holder = readHolder(lockPath);
+    const holder = await readHolder(lockPath);
     if (holder && isAbandoned(holder, timing)) {
-      breakAbandonedLock(lockPath, holder.token, timing);
+      await breakAbandonedLock(lockPath, holder.token, timing);
     }
-    sleepSync(timing.retryMs);
+    await sleep(timing.retryMs);
   }
   try {
-    return fn();
+    return await fn();
   } finally {
-    removeIfHeldBy(lockPath, token);
+    await removeIfHeldBy(lockPath, token);
   }
 }
