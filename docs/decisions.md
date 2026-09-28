@@ -259,11 +259,15 @@ leaves the hidden set (`pruneHidden`), so resolved again, it stays in view.
 Who must review is said only in the providers' own terms
 (`pr-review-requirements.ts`). Azure DevOps marks each reviewer required or
 optional, and its required-reviewer policies name identities. A reviewer is
-listed by policy where an enabled policy of the same standing names them,
-whether or not it applies to these changes now, since a policy that added
-them on an earlier push may no longer. A required reviewer no enabled policy
-names was marked by hand: the one reason n10 infers, since Azure never says
-why a reviewer is listed. GitHub marks no one:
+listed by policy only where a policy that applies to these changes names them
+and adds them as they are listed, required by a blocking one or optional by
+another: Azure lists them because of that policy now. Anything else would be
+reconstructed from overlapping ids. A policy that no longer applies may or may
+not be what added someone, and a required reviewer no policy names may have
+been added by hand or by a policy since disabled, so neither gets a reason.
+Azure records who added each reviewer in the pull request's `ReviewersUpdate`
+history threads, which the conversation read already fetches; reading the
+reason from there is a follow-up. GitHub marks no one:
 its rules ask for a number of approvals, for code owners and for teams by id,
 and a request says only whether it went to a code owner. A GitHub reviewer's
 requirement is therefore unknown, never inferred from their being asked, and

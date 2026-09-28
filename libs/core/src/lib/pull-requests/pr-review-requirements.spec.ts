@@ -159,7 +159,7 @@ const AZURE_RULE = rules({
 });
 
 describe('reviewRequirements on Azure DevOps', () => {
-  it('says who is required and why: a policy, or a hand', () => {
+  it('says who is required, and why only where a policy that applies says so', () => {
     const got = reviewRequirements(
       detail([RELEASE, WEB, BEN, ELI, QA, OPS]),
       AZURE_RULE
@@ -174,15 +174,17 @@ describe('reviewRequirements on Azure DevOps', () => {
     ).toEqual([
       // Named by a blocking policy; the id compares ignoring case.
       ['Release Approvers', 'required', 'policy'],
-      // Named by a blocking policy that no longer applies: still why.
-      ['Web Reviewers', 'required', 'policy'],
+      // Named by a blocking policy that no longer applies: it may not
+      // be what added them.
+      ['Web Reviewers', 'required', null],
       // Added as optional by a policy that does not block.
       ['Ben Ode', 'optional', 'policy'],
       ['Eli Park', 'optional', null],
-      // Required, and named by no policy: by hand.
-      ['Quinn Ames', 'required', 'manual'],
-      // Required, where only an optional policy names them: by hand.
-      ['Ola Soto', 'required', 'manual'],
+      // Required, and named by no policy: by hand, or by a policy
+      // since disabled. The history would say; it is not read.
+      ['Quinn Ames', 'required', null],
+      // Required, where only an optional policy names them.
+      ['Ola Soto', 'required', null],
     ]);
   });
 
