@@ -1,5 +1,6 @@
 import { sessionBranch } from './setup/session-keys.js';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
@@ -43,13 +44,60 @@ test.describe('Worktree removal', () => {
     const dialog = await openRemoveDialog(page, app);
     await confirmButton(dialog).click();
 
-    // The row and tab go immediately — removal is optimistic — and the
-    // directory follows once git finishes.
+    // The row goes immediately — removal is optimistic — and the tab
+    // and the directory follow once git finishes.
     await expect(sidebarRow(page, new RegExp(BRANCH))).toHaveCount(0);
     await expect(tab(page, new RegExp(BRANCH))).toHaveCount(0);
     await expect
       .poll(() => existsSync(worktreeDir), { timeout: 20_000 })
       .toBe(false);
+  });
+
+  // An agent can commit while the dialog is open. Nothing it did then
+  // was judged, so the removal keeps everything and says why.
+  test('a worktree that changed after the dialog opened keeps its row and tab', async ({
+    desktop,
+  }) => {
+    const { page, app, repoPath } = desktop;
+    await createWorktree(page, BRANCH);
+    const worktreeDir = join(repoPath, '.claude', 'worktrees', BRANCH);
+
+    const dialog = await openRemoveDialog(page, app);
+    await expect(confirmButton(dialog)).toBeVisible();
+    execFileSync(
+      'git',
+      ['commit', '-q', '--allow-empty', '-m', 'after the check'],
+      { cwd: worktreeDir }
+    );
+    await confirmButton(dialog).click();
+
+    await expect(
+      page.getByText(`Kept ${BRANCH}: it changed after the check`)
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(sidebarRow(page, new RegExp(BRANCH))).toBeVisible();
+    await expect(tab(page, new RegExp(BRANCH))).toBeVisible();
+    expect(existsSync(worktreeDir)).toBe(true);
+  });
+
+  // Forcing takes whatever is uncommitted when it runs, not only what
+  // the check saw; unpushed commits alone need no force.
+  test('Force remove says it discards whatever is uncommitted', async ({
+    desktop,
+  }) => {
+    const { page, app, repoPath } = desktop;
+    await createWorktree(page, BRANCH);
+    const note = /discards whatever is uncommitted when it runs/;
+
+    let dialog = await openRemoveDialog(page, app);
+    await expect(confirmButton(dialog)).toBeVisible();
+    await expect(dialog.getByText(note)).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+
+    execFileSync('touch', [
+      join(repoPath, '.claude', 'worktrees', BRANCH, 'draft.txt'),
+    ]);
+    dialog = await openRemoveDialog(page, app);
+    await expect(dialog.getByText(note)).toBeVisible();
   });
 
   test('cancelling leaves the worktree alone', async ({ desktop }) => {

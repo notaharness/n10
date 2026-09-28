@@ -10,14 +10,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const calls = vi.hoisted(() => ({
   log: [] as string[],
-  removed: true,
+  removed: 'removed' as string,
   worktrees: [] as { branch: string; path: string }[],
   config: { editor: undefined } as Record<string, unknown>,
   spawned: [] as { cmd: string; args: string[]; detached: boolean }[],
   createReturns: '/repo/.claude/worktrees/b' as string | null,
 }));
 
-vi.mock('./repo.js', () => ({ requireRepo: () => '/repo' }));
+vi.mock('./repo.js', () => ({
+  requireRepo: () => '/repo',
+  activeRepoIs: (cwd: string) => cwd === '/repo',
+}));
 
 vi.mock('@n10/vcs-core', () => ({ readConfig: () => calls.config }));
 
@@ -29,15 +32,25 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('@n10/core', () => ({
-  removeWorktreeSession: (branch: string, force: boolean, repo: string) => {
-    calls.log.push(`remove-session:${repo}:${branch}:${force}`);
+  removeWorktreeSession: (
+    branch: string,
+    approved: { verdict: string },
+    repo: string
+  ) => {
+    calls.log.push(`remove-session:${repo}:${branch}:${approved.verdict}`);
     return Promise.resolve(calls.removed);
   },
 }));
 
 vi.mock('./babysit.js', () => ({
-  stopBabysitForBranch: (branch: string) =>
-    calls.log.push(`stop-babysit:${branch}`),
+  stopBabysitForBranch: (branch: string) => {
+    calls.log.push(`stop-babysit:${branch}`);
+    return [42];
+  },
+  startBabysit: (prId: number) => {
+    calls.log.push(`start-babysit:${prId}`);
+    return Promise.resolve({ phase: 'watching' });
+  },
 }));
 
 vi.mock('@n10/worktree-manager', () => ({
@@ -66,7 +79,7 @@ const { openInEditor, removeWorktree } = await import('./worktrees.js');
 
 beforeEach(() => {
   calls.log = [];
-  calls.removed = true;
+  calls.removed = 'removed';
   calls.worktrees = [
     { branch: 'feature/x', path: '/repo/.claude/worktrees/feature/x' },
   ];
@@ -79,16 +92,62 @@ beforeEach(() => {
 
 describe('removeWorktree', () => {
   it('stops babysitting then delegates removal with the captured repository', async () => {
-    expect(await removeWorktree('feature/x', true)).toBe(true);
+    expect(
+      await removeWorktree('feature/x', {
+        verdict: 'force',
+        reason: 'uncommitted changes',
+        risks: ['uncommitted changes'],
+        discardsUncommitted: true,
+        tip: 'abc123',
+        repo: '/repo/.git',
+        checkout: '/repo/wt',
+      })
+    ).toBe('removed');
     expect(calls.log).toEqual([
       'stop-babysit:feature/x',
-      'remove-session:/repo:feature/x:true',
+      'remove-session:/repo:feature/x:force',
     ]);
   });
-  it('returns a failed removal to the caller', async () => {
-    calls.removed = false;
-    expect(await removeWorktree('feature/x', false)).toBe(false);
+  it("returns core's outcome to the caller", async () => {
+    calls.removed = 'git-refused';
+    expect(
+      await removeWorktree('feature/x', {
+        verdict: 'clear',
+        tip: 'abc123',
+        repo: '/repo/.git',
+        checkout: '/repo/wt',
+      })
+    ).toBe('git-refused');
   });
+
+  // The agent a kept worktree still holds is still worth watching.
+  it.each(['changed', 'git-refused'])(
+    'babysits the pull request again when core answers %s',
+    async (outcome) => {
+      calls.removed = outcome;
+      await removeWorktree('feature/x', {
+        verdict: 'clear',
+        tip: 'abc123',
+        repo: '/repo/.git',
+        checkout: '/repo/wt',
+      });
+      expect(calls.log.at(-1)).toBe('start-babysit:42');
+    }
+  );
+
+  it.each(['removed', 'kept-branch'])(
+    'leaves babysitting stopped when core answers %s',
+    async (outcome) => {
+      calls.removed = outcome;
+      await removeWorktree('feature/x', {
+        verdict: 'clear',
+        tip: 'abc123',
+        repo: '/repo/.git',
+        checkout: '/repo/wt',
+      });
+      expect(calls.log).not.toContain('start-babysit:42');
+    }
+  );
 });
 
 describe('openInEditor', () => {

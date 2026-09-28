@@ -49,7 +49,7 @@ const shot = {
 test.beforeEach(async ({ desktop }) => {
   await expect(
     fleetView(desktop.page).getByRole('heading', {
-      name: 'Connect your first machine',
+      name: 'Your machines, together',
     })
   ).toBeVisible({ timeout: 30_000 });
 });
