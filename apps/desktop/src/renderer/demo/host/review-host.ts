@@ -14,12 +14,14 @@ import type { DemoState } from './state.js';
  * repository is open. Diffs and descriptions are the real ones, loaded
  * only when a tab asks for them.
  */
-async function load(loader: (() => Promise<{ default: string }>) | undefined) {
+export async function load(
+  loader: (() => Promise<{ default: string }>) | undefined
+) {
   return loader ? (await loader()).default : '';
 }
 
 /** One file's section of a whole-repository patch. */
-function fileSection(patch: string, file: string): string {
+export function fileSection(patch: string, file: string): string {
   const sections = patch.split(/^(?=diff --git )/m);
   return sections.find((s) => s.startsWith(`diff --git a/${file} `)) ?? '';
 }

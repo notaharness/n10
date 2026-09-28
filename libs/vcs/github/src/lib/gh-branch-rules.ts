@@ -1,6 +1,11 @@
-import { VcsError } from '@n10/vcs-core';
+import { VcsError, type ReviewRule } from '@n10/vcs-core';
 import { ghRest } from './gh-graphql.js';
 import type { Required } from './gh-check-nodes.js';
+import {
+  reviewRuleOf,
+  type ClassicReviewRule,
+  type PullRequestRuleParameters,
+} from './gh-review-rule.js';
 
 /**
  * The base branch's rules: classic protection's required checks, which
@@ -20,13 +25,20 @@ interface ProtectionAnswer {
 
 interface RuleAnswer {
   type: string;
-  parameters?: {
+  parameters?: PullRequestRuleParameters & {
     required_status_checks?: {
       context: string;
       integration_id?: number | null;
     }[];
     required_review_thread_resolution?: boolean;
   };
+}
+
+/** What the base branch's rules require. */
+export interface GitHubBranchRules {
+  required: Required[];
+  resolution: boolean;
+  reviews: ReviewRule;
 }
 
 /** Rule sets asked for in one page; a full page may not be all. */
@@ -59,8 +71,8 @@ export async function branchRules(
   repo: string,
   branch: string,
   /** What classic protection enforces on this account. */
-  enforced: { resolution: boolean }
-): Promise<{ required: Required[]; resolution: boolean }> {
+  enforced: { resolution: boolean; reviews: ClassicReviewRule | null }
+): Promise<GitHubBranchRules> {
   const name = encodeURIComponent(branch);
   const [branchAnswer, rules] = await Promise.all([
     ghRest(`repos/${owner}/${repo}/branches/${name}`),
@@ -76,12 +88,18 @@ export async function branchRules(
   }
   const required = classic(branchAnswer as ProtectionAnswer);
   let resolution = enforced.resolution;
+  const reviews: PullRequestRuleParameters[] = [];
   for (const rule of rules as RuleAnswer[]) {
     const params = rule.parameters;
     for (const c of params?.required_status_checks ?? []) {
       required.push({ name: c.context, appId: c.integration_id ?? null });
     }
     if (params?.required_review_thread_resolution) resolution = true;
+    if (rule.type === 'pull_request' && params) reviews.push(params);
   }
-  return { required: distinct(required), resolution };
+  return {
+    required: distinct(required),
+    resolution,
+    reviews: reviewRuleOf(enforced.reviews, reviews),
+  };
 }
