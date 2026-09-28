@@ -242,6 +242,42 @@ describe('fetchPullRequestChecksAzure', () => {
           { name: 'SonarCloud quality gate', app: null },
         ],
         conversationResolution: true,
+        reviews: {
+          approvals: 2,
+          codeOwners: false,
+          // The optional one asks without requiring. The docs policy is
+          // not applicable here, none of its paths changed, but still
+          // names whom it added; the disabled one names no one.
+          named: [
+            {
+              ids: ['00000000-0000-4000-8000-000000000022'],
+              kind: 'identity',
+              approvals: 1,
+              paths: ['/release/*'],
+              applies: true,
+              blocking: true,
+            },
+            {
+              ids: ['00000000-0000-4000-8000-000000000002'],
+              kind: 'identity',
+              approvals: null,
+              paths: [],
+              applies: true,
+              blocking: false,
+            },
+            {
+              ids: ['00000000-0000-4000-8000-000000000021'],
+              kind: 'identity',
+              approvals: null,
+              paths: ['/docs/*'],
+              applies: false,
+              blocking: true,
+            },
+          ],
+          // The blocking minimum of 2 is rejected; the optional 5 asks
+          // for nothing.
+          approvalsMet: false,
+        },
       },
     });
   });

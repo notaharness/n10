@@ -106,7 +106,7 @@ test.describe('Reset fleet on this machine', () => {
     ]);
     await expect(
       fleetView(page).getByRole('heading', {
-        name: 'Your machines, together',
+        name: 'Your machines, connected anywhere',
       })
     ).toBeVisible();
     await expect(page.getByTestId('machine-row')).toHaveCount(0);
@@ -171,7 +171,7 @@ test.describe('after creating a fleet', () => {
     await panel.getByLabel('Type reset to confirm').fill('reset');
     await panel.getByRole('button', { name: 'Reset fleet' }).click();
     await expect(
-      view.getByRole('heading', { name: 'Your machines, together' })
+      view.getByRole('heading', { name: 'Your machines, connected anywhere' })
     ).toBeVisible();
     await expect(
       view.getByRole('heading', { name: 'Fleet created' })

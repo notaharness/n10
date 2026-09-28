@@ -95,7 +95,34 @@ function MoreBlockers({ readiness }: { readiness: PullRequestReadiness }) {
   );
 }
 
-function Aspects({ readiness }: { readiness: PullRequestReadiness }) {
+/** What the rules ask of reviews, under the reviews row: each
+ *  requirement, or that the rules could not be read. */
+function ReviewRule({ answer }: { answer: PullRequestChecksAnswer }) {
+  const { rule } = answer.requirements;
+  if (answer.checks.state !== 'read') return null;
+  const lines = rule ?? ['The review rules could not be read.'];
+  if (lines.length === 0) return null;
+  // Two rules can read the same (two teams GitHub names by id alone),
+  // so each line is keyed by its words and which repeat it is.
+  const seen = new Map<string, number>();
+  const keyed = lines.map((line) => {
+    const n = (seen.get(line) ?? 0) + 1;
+    seen.set(line, n);
+    return { line, key: `${line}#${n}` };
+  });
+  return (
+    <span data-review-rule className="block text-xs text-muted-foreground">
+      {keyed.map(({ line, key }) => (
+        <span key={key} className="block">
+          {line}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function Aspects({ answer }: { answer: PullRequestChecksAnswer }) {
+  const { readiness } = answer;
   return (
     <ul className="mt-3 space-y-1.5 text-sm">
       {readiness.aspects.map((a) => (
@@ -112,7 +139,10 @@ function Aspects({ readiness }: { readiness: PullRequestReadiness }) {
           <span className="w-24 shrink-0 text-muted-foreground">
             {ASPECT_LABEL[a.id]}
           </span>
-          <span className="min-w-0 break-words">{a.text}</span>
+          <span className="min-w-0 break-words">
+            {a.text}
+            {a.id === 'reviews' && <ReviewRule answer={answer} />}
+          </span>
         </li>
       ))}
     </ul>
@@ -295,7 +325,7 @@ export function PrReadiness(props: ReadinessProps) {
             headlineRef={headlineRef}
           />
           <MoreBlockers readiness={data.readiness} />
-          <Aspects readiness={data.readiness} />
+          <Aspects answer={data} />
           <Actions
             {...props}
             onRefresh={refresh}

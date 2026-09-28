@@ -86,4 +86,13 @@ export const BEAM_REPO: RepoData = {
     39: () => import('./descriptions/beam-39.md?raw'),
     38: () => import('./descriptions/beam-38.md?raw'),
   },
+  // beam's own workflow and rules: `ci` is required, nothing else.
+  ci: {
+    jobs: [
+      { name: 'ci', workflow: 'CI', required: true, seconds: 95 },
+      { name: 'darwin', workflow: 'CI', required: false, seconds: 140 },
+    ],
+    approvals: 0,
+    conversationResolution: false,
+  },
 };
