@@ -33,6 +33,7 @@ import {
   ShowResolved,
 } from './ActivityControls.js';
 import { focusAfter } from '../../../lib/focus.js';
+import { ActivityActionsProvider } from './activity-actions.js';
 import { CoverageNotice } from './CoverageNotice.js';
 import { NewSince } from './new-since.js';
 
@@ -92,11 +93,13 @@ export function PrActivity({
             />
           )}
           {state.data.conversation.state === 'read' ? (
-            <Activity
-              conversation={state.data.conversation.value}
-              viewer={repo.viewer}
-              onOpenThread={onOpenThread}
-            />
+            <ActivityActionsProvider prId={prRef.number}>
+              <Activity
+                conversation={state.data.conversation.value}
+                viewer={repo.viewer}
+                onOpenThread={onOpenThread}
+              />
+            </ActivityActionsProvider>
           ) : (
             <>
               <ActivityHeading />

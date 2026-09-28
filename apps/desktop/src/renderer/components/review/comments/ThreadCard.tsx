@@ -1,27 +1,22 @@
 import { CornerDownRightIcon } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { useEffect, useRef, useState } from 'react';
 import type {
   RemoteCommentReply,
   RemoteCommentThread,
 } from '../../../../host/contract.js';
-import { snapshotRemote } from '@n10/core/plan';
-import { usePlan, usePlanControls } from '../../../lib/plan/plan.js';
-import { useRepo } from '../../../lib/repo-context.js';
-import { useReply, useSetResolved } from '../../../lib/data/mutations.js';
 import {
   threadExpanded,
   threadLocation,
 } from '../../../lib/diff/thread-model.js';
 import { focusIsLost } from '../../../lib/focus.js';
-import { cn, errorMessage, relativeTime } from '../../../lib/utils.js';
+import { cn, relativeTime } from '../../../lib/utils.js';
 import { Avatar } from '../../ui/avatar.js';
 import { Badge } from '../../ui/badge.js';
-import { CommentBody } from './CommentBody.js';
+import { CommentBody, ConventionalLabels } from './CommentBody.js';
 import { ThreadSummary } from './ThreadSummary.js';
 import { PlanAttachment } from '../PlanControls.js';
 import { ThreadFooter } from './ThreadFooter.js';
-import { useComposerRefresh } from './use-composer-refresh.js';
+import { useThreadActions } from './use-thread-actions.js';
 
 /**
  * One review thread. The root comment and every reply render as
@@ -42,26 +37,6 @@ export function ThreadCard({
   showLocation?: boolean;
   focused?: boolean;
 }) {
-  const { repo } = useRepo();
-  const plan = usePlan(prId);
-  const planControls = usePlanControls(
-    plan,
-    'remote',
-    thread.id,
-    useCallback(() => snapshotRemote(thread), [thread])
-  );
-  const reply = useReply(repo.cwd);
-  const resolve = useSetResolved(repo.cwd);
-  const [draft, setDraft] = useState('');
-  const [composing, setComposing] = useState(false);
-  // Opening the box refetches the thread, so a reply is never written
-  // against a conversation that has already moved on.
-  const refresh = useComposerRefresh(prId, thread.comments.length);
-  const openComposer = (next: boolean) => {
-    setComposing(next);
-    if (next) refresh.begin();
-    else refresh.end();
-  };
   // Expansion: user toggles win until the card is (re)focused, at
   // which point it always opens. Resolved threads start collapsed.
   const [override, setOverride] = useState<boolean | null>(null);
@@ -71,6 +46,7 @@ export function ThreadCard({
     if (focused) setOverride(null);
   }
   const expanded = threadExpanded(override, focused, thread.isResolved);
+  const { planControls, footer } = useThreadActions(prId, thread, expanded);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -83,48 +59,9 @@ export function ThreadCard({
     if (focusIsLost()) ref.current?.focus({ preventScroll: true });
   }, [focused]);
 
-  // The notice belongs to a composer the reader can actually see. The
-  // footer lives inside the expanded branch while `composing` and the
-  // baseline live out here, so collapsing a card mid-reply would leave
-  // the baseline armed — and any later refetch of this pull request
-  // would greet the reader, on re-expanding, with news of a check they
-  // never asked for.
-  const composerVisible = expanded && composing;
-  const { end: endRefresh } = refresh;
-  useEffect(() => {
-    if (!composerVisible) endRefresh();
-  }, [composerVisible, endRefresh]);
-
   const root = thread.comments[0];
   if (!root) return null;
   const replies = thread.comments.slice(1);
-
-  const send = (alsoResolve = false) => {
-    const body = draft.trim();
-    if (!body) return;
-    reply.mutate(
-      { prId, thread, body },
-      {
-        onSuccess: () => {
-          setDraft('');
-          openComposer(false);
-          if (alsoResolve && thread.canResolve && !thread.isResolved) {
-            resolve.mutate(
-              { prId, thread, resolved: true },
-              { onError: (e) => toast.error(errorMessage(e)) }
-            );
-          }
-        },
-        onError: (e) => toast.error(errorMessage(e)),
-      }
-    );
-  };
-
-  const toggleResolved = () =>
-    resolve.mutate(
-      { prId, thread, resolved: !thread.isResolved },
-      { onError: (e) => toast.error(errorMessage(e)) }
-    );
 
   const location = threadLocation(thread);
 
@@ -183,15 +120,7 @@ export function ThreadCard({
           <ThreadFooter
             canResolve={thread.canResolve}
             isResolved={thread.isResolved}
-            composing={composing}
-            setComposing={openComposer}
-            notice={refresh.notice}
-            draft={draft}
-            setDraft={setDraft}
-            sending={reply.isPending}
-            resolving={resolve.isPending}
-            onSend={send}
-            onToggleResolved={toggleResolved}
+            {...footer}
           />
         </>
       )}
@@ -214,7 +143,7 @@ function Message({
         reply && 'border-l-[3px] border-l-border bg-muted/15 pl-4'
       )}
     >
-      <header className="mb-1 flex items-center gap-2 text-sm">
+      <header className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
         {reply && (
           <CornerDownRightIcon className="size-3.5 shrink-0 text-muted-foreground" />
         )}
@@ -223,6 +152,7 @@ function Message({
         <span className="text-muted-foreground">
           {reply ? 'replied' : 'commented'} {relativeTime(comment.createdAt)}
         </span>
+        <ConventionalLabels markdown={comment.body} />
         {comment.isMinimized && (
           <Badge variant="outline" className="ml-auto">
             Hidden
@@ -232,7 +162,7 @@ function Message({
       <div
         className={cn(reply ? 'pl-[calc(1.25rem+0.875rem+0.5rem)]' : 'pl-7')}
       >
-        <CommentBody markdown={comment.body} />
+        <CommentBody markdown={comment.body} labels={false} />
       </div>
     </article>
   );

@@ -9,7 +9,7 @@ import { cn, relativeTime } from '../../../lib/utils.js';
 import { Avatar } from '../../ui/avatar.js';
 import { Badge } from '../../ui/badge.js';
 import { Button } from '../../ui/button.js';
-import { CommentBody } from '../comments/CommentBody.js';
+import { CommentBody, ConventionalLabels } from '../comments/CommentBody.js';
 import { useIsNew } from './new-since.js';
 
 /** "3h ago", with the exact time on hover and for assistive tech. */
@@ -98,7 +98,7 @@ function Body({ comment }: { comment: ConversationComment }) {
   if (comment.kind === 'system') {
     return <p className="text-sm text-muted-foreground">{comment.body}</p>;
   }
-  const body = <CommentBody markdown={comment.body} />;
+  const body = <CommentBody markdown={comment.body} labels={false} />;
   return comment.minimized ? (
     <Minimized reason={comment.minimized.reason}>{body}</Minimized>
   ) : (
@@ -106,14 +106,22 @@ function Body({ comment }: { comment: ConversationComment }) {
   );
 }
 
-/** One comment: who, when, and what they wrote. */
+/** A comment whose words are shown: its labels go in the header. */
+function labelled(comment: ConversationComment): boolean {
+  return !comment.deleted && comment.kind === 'text' && !comment.minimized;
+}
+
+/** One comment: who, when, what kind of comment, and what they wrote. */
 export function ActivityComment({
   comment,
   highlighted = false,
+  actions,
 }: {
   comment: ConversationComment;
   /** Matches the reader's search. */
   highlighted?: boolean;
+  /** Controls at the end of the header row. */
+  actions?: ReactNode;
 }) {
   const isNew = useIsNew();
   return (
@@ -137,6 +145,8 @@ export function ActivityComment({
             · edited
           </span>
         )}
+        {/* A hidden comment's labels are part of what it hides. */}
+        {labelled(comment) && <ConventionalLabels markdown={comment.body} />}
         {isNew(comment.id) && (
           <Badge variant="outline" className="border-primary/40 text-primary">
             New
@@ -150,6 +160,7 @@ export function ActivityComment({
             Pending · only you
           </Badge>
         )}
+        {actions && <span className="ml-auto">{actions}</span>}
       </div>
       <Body comment={comment} />
     </div>

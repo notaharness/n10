@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
 import { sidebarRow } from './setup/app.js';
 import type { FakeGitHub, FakePr } from './setup/fake-gh.js';
@@ -41,6 +41,14 @@ const GITHUB: FakeGitHub = {
 };
 
 test.use({ repo: { worktrees: [{ branch: 'split-queue' }] } });
+
+/** Move the pointer onto a spot in steps: Radix closes a tooltip on
+ *  the pointer's next move outside the way to it, not on the leave. */
+async function pointAt(page: Page, target: Locator) {
+  const box = await target.boundingBox();
+  if (!box) throw new Error('nothing to point at');
+  await page.mouse.move(box.x + 20, box.y + box.height / 2, { steps: 8 });
+}
 
 async function openOverview(page: Page) {
   await sidebarRow(page, /#301/).first().click();
@@ -87,13 +95,10 @@ test.describe('Reviewer requirements on GitHub', () => {
     // One path a line.
     await expect(tip.locator('li')).toHaveText(['src/**', 'libs/queue/**']);
     await expect(tip).toContainText('Code owner review');
-    // A code owner no rule set names explains only the code-owner rule.
-    // Leaving the standing closes it. Radix closes on the pointer's next
-    // move outside the way to the tip, so it is moved in steps.
-    const away = await reviewers.locator('[data-reviewer="bea"]').boundingBox();
-    if (!away) throw new Error('no row for bea');
-    await page.mouse.move(away.x + 20, away.y + away.height / 2, { steps: 8 });
+    // Leaving the standing closes it.
+    await pointAt(page, reviewers.locator('[data-reviewer="bea"]'));
     await expect(tip).toHaveCount(0);
+    // A code owner no rule set names explains only the code-owner rule.
     await reviewers
       .locator('[data-reviewer="cam"] [data-reviewer-standing]')
       .hover();

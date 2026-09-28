@@ -118,6 +118,10 @@ export interface FakeThread {
   side?: 'LEFT' | 'RIGHT';
   /** The diff excerpt GitHub keeps with the thread's first comment. */
   diffHunk?: string;
+  /** Whether GitHub lets the viewer reply, and resolve or reopen, as
+   *  on a locked conversation; both default to true. */
+  canReply?: boolean;
+  canResolve?: boolean;
   comments: { author: string; body: string; createdAt?: string }[];
 }
 
