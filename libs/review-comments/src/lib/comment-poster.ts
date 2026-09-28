@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { createPullRequestThread } from '@n10/vcs-azure-devops';
 import type { ReviewComment } from './types.js';
 import {
   formatConventionalComment,
@@ -16,14 +17,24 @@ function execWithStdin(
     const child = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
+    let stdinError: Error | undefined;
+    // A command that could not start (not installed, not executable) is
+    // an 'error' event, and an emitter throws one nobody listens for:
+    // that would end the whole process rather than this post.
+    child.on('error', reject);
+    // A command that exits without reading its input breaks the pipe
+    // under the write (EPIPE). Its exit status says why, so that is
+    // what 'close' reports; the write's own error only matters if the
+    // command claims to have succeeded without its input.
+    child.stdin.on('error', (err) => (stdinError = err));
     child.stdout.on('data', (d) => (stdout += d));
     child.stderr.on('data', (d) => (stderr += d));
     child.on('close', (code) => {
       if (code !== 0) reject(new Error(`${cmd} exited ${code}: ${stderr}`));
+      else if (stdinError) reject(stdinError);
       else resolve(stdout);
     });
-    child.stdin.write(input);
-    child.stdin.end();
+    child.stdin.end(input);
   });
 }
 
@@ -131,48 +142,13 @@ async function postAzureDevOps(
   comments: ReviewComment[],
   ctx: PostContext
 ): Promise<void> {
-  const org = ctx.vendorProject.org;
-  const project = ctx.vendorProject.project;
-  const repo = ctx.vendorProject.repo;
-  const pat = ctx.vendorAuth.pat;
-
   for (const comment of comments) {
-    const thread = {
-      comments: [
-        {
-          parentCommentId: 0,
-          content: renderCommentBody(comment),
-          commentType: 1,
-        },
-      ],
-      threadContext: {
-        filePath: `/${comment.file}`,
-        rightFileStart: {
-          line: comment.lineStart,
-          offset: 1,
-        },
-        rightFileEnd: {
-          line: comment.lineEnd,
-          offset: 1,
-        },
-      },
-      status: 1, // active
-    };
-
-    const url = `https://dev.azure.com/${org}/${project}/_apis/git/repositories/${repo}/pullrequests/${ctx.prId}/threads?api-version=7.1`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Basic ${btoa(':' + pat)}`,
-      },
-      body: JSON.stringify(thread),
+    await createPullRequestThread(ctx.vendorAuth, ctx.vendorProject, ctx.prId, {
+      content: renderCommentBody(comment),
+      file: comment.file,
+      side: comment.side,
+      lineStart: comment.lineStart,
+      lineEnd: comment.lineEnd,
     });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Azure DevOps API ${response.status}: ${text}`);
-    }
   }
 }

@@ -43,7 +43,10 @@ vi.mock('./recent-repos.js', () => ({
   ensureRecent: () => undefined,
 }));
 
-vi.mock('@n10/vcs-core', () => ({
+vi.mock('@n10/vcs-core', async (importOriginal) => ({
+  // The rest is real: the Azure transport @n10/review-comments posts
+  // through is built from it at import time.
+  ...(await importOriginal<object>()),
   readConfig: (cwd: string) => state.configByCwd[cwd] ?? { fromCwd: cwd },
 }));
 

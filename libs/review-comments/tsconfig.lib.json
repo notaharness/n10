@@ -18,6 +18,9 @@
       "path": "../diff/tsconfig.lib.json"
     },
     {
+      "path": "../vcs/azure-devops/tsconfig.lib.json"
+    },
+    {
       "path": "../logger/tsconfig.lib.json"
     }
   ],

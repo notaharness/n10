@@ -1,5 +1,15 @@
+import type * as ChildProcess from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PostContext } from './comment-poster.js';
 import type { ReviewComment } from './types.js';
 
@@ -19,8 +29,10 @@ const env = vi.hoisted(() => ({
   ghInputs: [] as { args: string[]; body: unknown }[],
   ghExitCode: 0,
   fetches: [] as { url: string; init: RequestInit }[],
-  fetchOk: true,
-  fetchStatus: 200,
+  /** What Azure answers each POST with. */
+  fetchReply: (() => new Response()) as () => Response,
+  /** Spawn the real executable found on PATH, not the scripted one. */
+  realSpawn: false,
   marked: [] as { id: string; patch: Record<string, unknown> }[],
 }));
 
@@ -35,31 +47,44 @@ vi.mock('./comment-store.js', () => ({
   },
 }));
 
-vi.mock('node:child_process', () => ({
-  spawn: (_cmd: string, args: string[]) => {
-    const child = new EventEmitter() as EventEmitter & {
-      stdout: EventEmitter;
-      stderr: EventEmitter;
-      stdin: { write(s: string): void; end(): void };
-    };
-    child.stdout = new EventEmitter();
-    child.stderr = new EventEmitter();
-    let input = '';
-    child.stdin = {
-      write: (s: string) => {
-        input += s;
-      },
-      end: () => {
-        env.ghInputs.push({ args, body: JSON.parse(input) });
-        setImmediate(() => {
-          if (env.ghExitCode !== 0) child.stderr.emit('data', 'gh failed');
-          child.emit('close', env.ghExitCode);
-        });
-      },
-    };
-    return child;
-  },
-}));
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof ChildProcess>();
+  return {
+    spawn: (...a: Parameters<typeof actual.spawn>) =>
+      env.realSpawn ? actual.spawn(...a) : scriptedGh(a[1] as string[]),
+  };
+});
+
+/** A `gh` that records the JSON it was handed and exits with
+ *  `env.ghExitCode`. */
+function scriptedGh(args: string[]) {
+  type Stream = EventEmitter & {
+    write(s: string): void;
+    end(s?: string): void;
+  };
+  const child = new EventEmitter() as EventEmitter & {
+    stdout: EventEmitter;
+    stderr: EventEmitter;
+    stdin: Stream;
+  };
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  let input = '';
+  child.stdin = Object.assign(new EventEmitter(), {
+    write: (s: string) => {
+      input += s;
+    },
+    end: (s = '') => {
+      input += s;
+      env.ghInputs.push({ args, body: JSON.parse(input) });
+      setImmediate(() => {
+        if (env.ghExitCode !== 0) child.stderr.emit('data', 'gh failed');
+        child.emit('close', env.ghExitCode);
+      });
+    },
+  });
+  return child;
+}
 
 const { postReviewComments } = await import('./comment-poster.js');
 
@@ -97,22 +122,25 @@ beforeEach(() => {
   env.ghInputs = [];
   env.ghExitCode = 0;
   env.fetches = [];
-  env.fetchOk = true;
-  env.fetchStatus = 200;
+  env.fetchReply = () => json(200, { id: 101 });
+  env.realSpawn = false;
   env.marked = [];
 
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string, init: RequestInit) => {
       env.fetches.push({ url, init });
-      return Promise.resolve({
-        ok: env.fetchOk,
-        status: env.fetchStatus,
-        text: () => Promise.resolve('provider said no'),
-      });
+      return Promise.resolve(env.fetchReply());
     })
   );
 });
+
+function json(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8' },
+  });
+}
 
 describe('posting to GitHub', () => {
   it('files one review carrying every comment', async () => {
@@ -304,12 +332,111 @@ describe('posting to Azure DevOps', () => {
     expect(headers.Authorization).toBe(`Basic ${btoa(':secret-pat')}`);
   });
 
-  it('reports the provider status and body when it refuses', async () => {
-    env.fetchOk = false;
-    env.fetchStatus = 422;
+  it('reports the provider’s own message when it refuses', async () => {
+    env.fetchReply = () => json(422, { message: 'provider said no' });
     await expect(postReviewComments([comment()], azure)).rejects.toThrow(
-      /422.*provider said no/
+      /provider said no/
     );
+  });
+
+  /** What Azure serves in place of JSON when the PAT has expired: a
+   *  sign-in page under 203, a status fetch counts as success. Taking it
+   *  for a post would mark a comment posted that exists nowhere. */
+  it('treats a sign-in page under a success status as a rejected token', async () => {
+    const signIn = readFileSync(
+      join(
+        __dirname,
+        '../../../vcs/azure-devops/src/lib/__fixtures__/signin-page.html'
+      ),
+      'utf8'
+    );
+    env.fetchReply = () =>
+      new Response(signIn, {
+        status: 203,
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+    await expect(postReviewComments([comment()], azure)).rejects.toThrow(
+      'rejected the access token'
+    );
+    expect(env.marked).toEqual([]);
+  });
+
+  it('refuses a success that did not create a thread', async () => {
+    env.fetchReply = () => json(200, {});
+    await expect(postReviewComments([comment()], azure)).rejects.toThrow();
+    expect(env.marked).toEqual([]);
+  });
+
+  /** A comment on a removed line exists only on the old side of the
+   *  diff; anchored on the right it lands on whatever now has that
+   *  line number, or is refused when nothing does. */
+  it('anchors a LEFT comment on the old side of the diff', async () => {
+    await postReviewComments(
+      [comment({ side: 'LEFT', lineStart: 4, lineEnd: 6 })],
+      azure
+    );
+    const { threadContext } = JSON.parse(String(env.fetches[0].init.body)) as {
+      threadContext: Record<string, unknown>;
+    };
+    expect(threadContext).toEqual({
+      filePath: '/src/a.ts',
+      leftFileStart: { line: 4, offset: 1 },
+      leftFileEnd: { line: 6, offset: 1 },
+    });
+  });
+
+  it('anchors a RIGHT comment on the new side only', async () => {
+    await postReviewComments([comment({ side: 'RIGHT' })], azure);
+    const { threadContext } = JSON.parse(String(env.fetches[0].init.body)) as {
+      threadContext: Record<string, unknown>;
+    };
+    expect(Object.keys(threadContext).sort()).toEqual([
+      'filePath',
+      'rightFileEnd',
+      'rightFileStart',
+    ]);
+  });
+});
+
+/**
+ * `gh` is a real executable found on PATH, and two of the ways it can
+ * fail are events rather than an exit status. Unheard, either is thrown
+ * by the emitter, which takes down the whole host process instead of
+ * failing this post.
+ */
+describe('the gh process', () => {
+  let bin: string;
+  let path: string | undefined;
+
+  beforeEach(() => {
+    bin = mkdtempSync(join(tmpdir(), 'n10-poster-bin-'));
+    path = process.env.PATH;
+    process.env.PATH = bin;
+    env.realSpawn = true;
+  });
+
+  afterEach(() => {
+    process.env.PATH = path;
+    rmSync(bin, { recursive: true, force: true });
+  });
+
+  it('fails the post when gh is not installed', async () => {
+    await expect(postReviewComments([comment()], github)).rejects.toThrow(
+      /ENOENT/
+    );
+    expect(env.marked).toEqual([]);
+  });
+
+  it('fails the post when gh exits without reading its input', async () => {
+    // Exiting unread closes the pipe under the pending write: EPIPE.
+    // The input has to outgrow the pipe's buffer for that to be certain.
+    const gh = join(bin, 'gh');
+    writeFileSync(gh, '#!/bin/sh\necho refused >&2\nexit 1\n');
+    chmodSync(gh, 0o755);
+    await expect(
+      postReviewComments([comment({ body: 'x'.repeat(1 << 20) })], github)
+    ).rejects.toThrow(/gh exited 1: refused/);
+    expect(env.marked).toEqual([]);
   });
 });
 

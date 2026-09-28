@@ -76,7 +76,10 @@ vi.mock('./repo.js', () => ({
   activeRepoIs: (cwd: string) => cwd === state.cwd,
 }));
 
-vi.mock('@n10/vcs-core', () => ({
+vi.mock('@n10/vcs-core', async (importOriginal) => ({
+  // The rest is real: the Azure transport @n10/review-comments posts
+  // through is built from it at import time.
+  ...(await importOriginal<object>()),
   readConfig: (cwd: string) => state.configByCwd[cwd] ?? { fromCwd: cwd },
 }));
 
