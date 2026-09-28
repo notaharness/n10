@@ -32,13 +32,6 @@ export function findOrphanPrs(
 
 type ReviewBucket = keyof CategorizedReviews;
 
-/** The provider still asks this reviewer for a verdict: listed without
- *  one, or asked again after theirs. Someone who declined is not asked. */
-export function asksForReview(reviewer: PullRequestReviewer): boolean {
-  if (reviewer.decision === 'declined') return false;
-  return reviewer.decision === 'no-response' || reviewer.requested === true;
-}
-
 /** Where the viewer's own entry files a pull request, or nowhere. */
 function reviewBucket(
   reviewer: PullRequestReviewer,

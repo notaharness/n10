@@ -61,27 +61,42 @@ describe('readPullRequestChecks', () => {
     const required = answer({
       merge: { ...answer().merge, reviews: 'required' },
     });
-    const withReviewers = (reviewers: PullRequestInfo['reviewers']) =>
+    const withReviewers = (
+      reviewers: PullRequestInfo['reviewers'],
+      isDraft = false
+    ) =>
       sources({
         checks: () => Promise.resolve(required),
         lookup: () =>
-          Promise.resolve({ kind: 'found', pr: { ...ROW, reviewers } }),
+          Promise.resolve({
+            kind: 'found',
+            pr: { ...ROW, reviewers, isDraft },
+          }),
       });
-    const resolver = async (reviewers: PullRequestInfo['reviewers']) =>
+    const resolver = async (
+      reviewers: PullRequestInfo['reviewers'],
+      isDraft?: boolean
+    ) =>
       (
         await readPullRequestChecks(
           { ref: REF, viewer: 'bob' },
-          withReviewers(reviewers)
+          withReviewers(reviewers, isDraft)
         )
       ).readiness.blockers.find((b) => b.kind === 'reviews')?.resolvedBy;
     const bob = { identifier: 'Bob', displayName: 'Bob' };
     expect(await resolver([{ ...bob, decision: 'no-response' }])).toBe(
       'viewer'
     );
-    // Asked again after their verdict.
+    // Asked again after holding it: their next review is what is missing.
+    expect(
+      await resolver([
+        { ...bob, decision: 'changes-requested', requested: true },
+      ])
+    ).toBe('viewer');
+    // Asked again after approving: the approval already counts.
     expect(
       await resolver([{ ...bob, decision: 'approved', requested: true }])
-    ).toBe('viewer');
+    ).toBe('reviewers');
     // Not asked: someone else is, or they declined.
     expect(
       await resolver([
@@ -89,6 +104,14 @@ describe('readPullRequestChecks', () => {
       ])
     ).toBe('reviewers');
     expect(await resolver([{ ...bob, decision: 'declined' }])).toBe(
+      'reviewers'
+    );
+    // Only commented, where the list says who was asked.
+    expect(
+      await resolver([{ ...bob, decision: 'no-response', requested: false }])
+    ).toBe('reviewers');
+    // A draft asks no one yet.
+    expect(await resolver([{ ...bob, decision: 'no-response' }], true)).toBe(
       'reviewers'
     );
   });
