@@ -49,12 +49,32 @@ const REVIEWS: Record<MergeState['reviews'], Omit<ReadinessAspect, 'id'>> = {
   unknown: { state: 'unknown', text: 'Requirement not stated' },
 };
 
-function reviews({ merge }: ReadinessInputs): ReadinessAspect {
+/** The approvals the rules ask for, in words; null where they ask
+ *  none or could not be read. */
+function approvalsAsked({ rules }: ReadinessInputs): string | null {
+  const n = rules.state === 'read' ? rules.value.reviews.approvals : 0;
+  return n > 0 ? `${n} approval${n === 1 ? '' : 's'} required` : null;
+}
+
+/** The provider's verdict and the count the rules ask for. Who must
+ *  approve, and why, is the reviewers' to say. */
+function reviews(inputs: ReadinessInputs): ReadinessAspect {
+  const { merge } = inputs;
+  const asked = approvalsAsked(inputs);
   // Moot where the provider says nothing it enforces is in the way.
   if (merge.reviews === 'unknown' && merge.blocked === false) {
     return { id: 'reviews', state: 'met', text: 'Not in the way' };
   }
-  return { id: 'reviews', ...REVIEWS[merge.reviews] };
+  const { state, text } = REVIEWS[merge.reviews];
+  if (!asked || merge.reviews === 'not-required') {
+    return { id: 'reviews', state, text };
+  }
+  // A count with no verdict stated is the rule alone.
+  return {
+    id: 'reviews',
+    state,
+    text: merge.reviews === 'unknown' ? asked : `${text} · ${asked}`,
+  };
 }
 
 const CHECK_KINDS = new Set<ReadinessItem['kind']>(['checks', 'policies']);
@@ -144,18 +164,19 @@ function unstated(
     : { ...row, state: 'met', text: 'Not in the way' };
 }
 
-function conflicts({ merge }: ReadinessInputs): ReadinessAspect {
+/** Shown only where the provider reports a conflict, or a branch
+ *  behind a target its rules require it up to date with: otherwise
+ *  there is nothing to act on, and a mergeability the provider has not
+ *  worked out is among the verdict's unknowns. */
+function conflicts({ merge }: ReadinessInputs): ReadinessAspect[] {
   const row = { id: 'conflicts' as const };
   if (merge.conflicts === 'conflicting') {
-    return { ...row, state: 'blocked', text: 'Conflicts with its target' };
+    return [{ ...row, state: 'blocked', text: 'Conflicts with its target' }];
   }
   if (merge.behind) {
-    return { ...row, state: 'blocked', text: 'Behind its target' };
+    return [{ ...row, state: 'blocked', text: 'Behind its target' }];
   }
-  if (merge.conflicts === 'unknown') {
-    return { ...row, state: 'unknown', text: 'Not worked out yet' };
-  }
-  return { ...row, state: 'met', text: 'No conflicts' };
+  return [];
 }
 
 /** Whether the rules ask for threads to be resolved; null unread. */
@@ -203,7 +224,7 @@ export function readinessAspects(
       : LIFECYCLE_ASPECT.open,
     reviews(inputs),
     checks(inputs, t),
-    conflicts(inputs),
+    ...conflicts(inputs),
     conversations(inputs, t),
   ];
 }

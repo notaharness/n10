@@ -110,6 +110,53 @@ describe('readiness aspects', () => {
     });
   });
 
+  it('adds the count of approvals the rules ask for, and no more', () => {
+    const asking = (
+      approvals: number,
+      r: MergeState['reviews'],
+      blocked = true
+    ) =>
+      aspect(
+        inputs({
+          merge: { ...CLEAN, reviews: r, blocked },
+          rules: {
+            state: 'read',
+            value: {
+              requiredChecks: [],
+              conversationResolution: true,
+              // Code owners and named teams are the reviewers' to say.
+              reviews: { ...NO_RULE, approvals, codeOwners: true },
+            },
+          },
+        }),
+        'reviews'
+      );
+    expect(asking(1, 'changes-requested')).toEqual({
+      state: 'blocked',
+      text: 'Changes requested · 1 approval required',
+    });
+    expect(asking(2, 'approved', false)).toEqual({
+      state: 'met',
+      text: 'Approved · 2 approvals required',
+    });
+    // The rule without a stated verdict is the rule alone.
+    expect(asking(1, 'unknown')).toEqual({
+      state: 'unknown',
+      text: '1 approval required',
+    });
+    expect(asking(0, 'required')?.text).toBe('Waiting for review');
+    // Unread rules add nothing.
+    expect(
+      aspect(
+        inputs({
+          merge: { ...CLEAN, reviews: 'required', blocked: true },
+          rules: { state: 'failed', kind: 'network', reason: 'offline' },
+        }),
+        'reviews'
+      )?.text
+    ).toBe('Waiting for review');
+  });
+
   it('names the worst required check or policy, in the verdict’s words', () => {
     const blocked = { ...CLEAN, blocked: true };
     expect(
@@ -184,7 +231,8 @@ describe('readiness aspects', () => {
       state: 'blocked',
       text: 'Behind its target',
     });
-    expect(conflicts({ conflicts: 'unknown' })?.state).toBe('unknown');
+    // Not worked out yet is among the verdict's unknowns, not a row.
+    expect(conflicts({ conflicts: 'unknown' })).toBeUndefined();
   });
 
   it('reads conversations: enforced, advisory, resolved or unread', () => {
@@ -234,11 +282,8 @@ describe('readiness aspects', () => {
     ).toBe('unknown');
   });
 
-  it('reads no conflicts as met', () => {
-    expect(aspect(inputs(), 'conflicts')).toEqual({
-      state: 'met',
-      text: 'No conflicts',
-    });
+  it('shows no conflicts row where the provider reports none', () => {
+    expect(aspect(inputs(), 'conflicts')).toBeUndefined();
   });
 
   it('names a failure over what is still going, across kinds', () => {
