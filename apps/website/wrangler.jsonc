@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "n10-website",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // esbuild's keepNames wraps named functions in `__name(...)` calls, and
+  // Next serializes some functions into inline <script>s (next-themes'
+  // pre-hydration theme script), where the browser has no `__name`.
+  "keep_names": false,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "workers_dev": true,
+  "routes": [{ "pattern": "n10.is", "custom_domain": true }]
+}

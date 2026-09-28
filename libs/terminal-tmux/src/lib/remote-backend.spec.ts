@@ -657,4 +657,44 @@ describe('RemoteTmuxBackend (D4)', () => {
     expect(backend.connectionState).toBe('connected');
     expect(exited).toHaveBeenCalled();
   });
+
+  it('a listing requested before the session was created does not mark it exited', async () => {
+    const listings: ((result: ReturnType<typeof aliveListing>) => void)[] = [];
+    run.mockImplementation((argv: string[]) => {
+      if (argv.includes('list-sessions'))
+        return new Promise<ReturnType<typeof aliveListing>>((resolve) =>
+          listings.push(resolve)
+        );
+      if (argv.includes('has-session'))
+        return Promise.resolve({ stdout: '', stderr: '', code: 1 });
+      return Promise.resolve({ stdout: '', stderr: '', code: 0 });
+    });
+    poller.subscribe('existing', {
+      onState: () => undefined,
+      onUnreachable: () => undefined,
+    });
+    await flushMicrotasks();
+    expect(listings).toHaveLength(1);
+
+    // 'wt' is created and subscribed while that listing is in flight,
+    // so the listing cannot contain it.
+    const backend = await createRemoteTmuxBackend(
+      spec,
+      { mode: 'create', label: 'wt', tags: {} },
+      machine,
+      poller
+    );
+    const exited = vi.fn();
+    backend.onExit(exited);
+    listings[0]!(aliveListing('existing'));
+    await flushMicrotasks();
+    expect(exited).not.toHaveBeenCalled();
+    expect(backend.processState?.running).toBe(true);
+
+    // A fresh listing follows at once rather than a full interval later.
+    expect(listings).toHaveLength(2);
+    listings[1]!({ stdout: '', stderr: '', code: 0 });
+    await flushMicrotasks();
+    expect(exited).toHaveBeenCalledWith(0, undefined);
+  });
 });
