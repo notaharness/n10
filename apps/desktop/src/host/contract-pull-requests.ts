@@ -8,10 +8,18 @@
  * same shape.
  */
 
-export type { PullRequestSnapshot, SnapshotRequest } from '@n10/core';
+export type {
+  PullRequestChecksAnswer,
+  PullRequestReadiness,
+  PullRequestSnapshot,
+  ReadinessItem,
+  SnapshotRequest,
+} from '@n10/core';
 export type {
   Capability,
   Oid,
+  PullRequestCheck,
+  PullRequestChecks,
   PullRequestDetail,
   PullRequestLifecycle,
   PullRequestRef,

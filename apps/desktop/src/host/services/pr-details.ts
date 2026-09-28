@@ -1,13 +1,11 @@
 import {
   parseSnapshotRequest,
-  PullRequestIdentityError,
   readPullRequestSnapshot,
   type PullRequestSnapshot,
 } from '@n10/core';
-import { readConfig } from '@n10/vcs-core';
-import { lookupPullRequest, resolveProvider } from './pull-requests.js';
-import { activeRepoIs, configuredRepository, requireRepo } from './repo.js';
-import { configuredViewer } from './viewer.js';
+import { resolveProvider } from './pull-requests.js';
+import { identitySources } from './pr-identity.js';
+import { requireRepo } from './repo.js';
 
 /**
  * One pull request, read by identity for the renderer.
@@ -30,18 +28,7 @@ export async function getPullRequestSnapshot(
     ? provider?.fetchPullRequestDetail?.bind(provider)
     : undefined;
   return readPullRequestSnapshot(req, {
-    // Read afresh on every check: the open repository, its config and
-    // the account can all change while the reads are in flight.
-    repository: () => {
-      if (!activeRepoIs(cwd)) {
-        throw new PullRequestIdentityError(
-          `${cwd} is no longer the repository open in n10`
-        );
-      }
-      return configuredRepository(readConfig(cwd));
-    },
-    viewer: () => configuredViewer(readConfig(cwd)),
-    lookup: (prId) => lookupPullRequest(cwd, prId),
+    ...identitySources(cwd),
     detail: readDetail && ((prId) => readDetail(auth, project, prId)),
   });
 }

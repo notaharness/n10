@@ -5,6 +5,7 @@ import {
   type ListRead,
 } from '@n10/vcs-core';
 import { ghGraphQL } from './gh-graphql.js';
+import { restOf, type Page } from './gh-pages.js';
 import { mapReviewState } from './gh-reviews.js';
 
 /**
@@ -82,16 +83,6 @@ function pageQuery(key: Key): string {
 `;
 }
 
-/** A connection is read at most this many pages deep — 1,000 reviewers
- *  — and reported incomplete past it rather than read forever. */
-const MAX_PAGES = 10;
-
-export interface Page<T> {
-  totalCount: number;
-  pageInfo: { hasNextPage: boolean; endCursor: string | null };
-  nodes: T[];
-}
-
 interface Actor {
   /** `User`, `Bot`, `Mannequin`, …; a bot is not a person. */
   __typename?: string;
@@ -129,25 +120,6 @@ export interface ReviewerConnections {
   latestOpinionatedReviews: Page<OpinionNode>;
   latestReviews: Page<ReviewNode>;
   reviewRequests: Page<RequestNode>;
-}
-
-/**
- * Every page after the first of one connection. `more` reads the page
- * after a cursor; the answer says whether it reached the end.
- */
-async function restOf<T>(
-  first: Page<T>,
-  more: (cursor: string) => Promise<Page<T>>
-): Promise<{ nodes: T[]; complete: boolean }> {
-  const nodes = [...first.nodes];
-  let page = first;
-  for (let read = 1; page.pageInfo.hasNextPage; read++) {
-    const cursor = page.pageInfo.endCursor;
-    if (read >= MAX_PAGES || !cursor) return { nodes, complete: false };
-    page = await more(cursor);
-    nodes.push(...page.nodes);
-  }
-  return { nodes, complete: true };
 }
 
 /** A reviewer before anything is known of them. */

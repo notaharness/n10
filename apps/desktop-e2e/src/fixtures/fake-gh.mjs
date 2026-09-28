@@ -231,6 +231,129 @@ function detailNode(pr) {
   };
 }
 
+/** Check-run conclusions; any other `state` is a run still going. */
+const CONCLUSIONS = new Set([
+  'SUCCESS',
+  'FAILURE',
+  'NEUTRAL',
+  'SKIPPED',
+  'CANCELLED',
+  'TIMED_OUT',
+  'ACTION_REQUIRED',
+]);
+
+/** A check as the checks read selects it (pr-checks.ts). */
+function contextNode(c, index) {
+  const isRequired = c.required ?? false;
+  if (c.status) {
+    return {
+      __typename: 'StatusContext',
+      context: c.name,
+      state: c.state,
+      targetUrl: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      creator: { login: c.app ?? 'ci-bot' },
+      isRequired,
+    };
+  }
+  const done = CONCLUSIONS.has(c.state);
+  return {
+    __typename: 'CheckRun',
+    // This check run's own id: its place in the scenario, so two runs
+    // of one name in one workflow stay two, as on GitHub.
+    databaseId: 9000 + index,
+    name: c.name,
+    status: done ? 'COMPLETED' : c.state,
+    conclusion: done ? c.state : null,
+    startedAt: '2026-01-01T00:00:00Z',
+    completedAt: done ? '2026-01-01T00:05:00Z' : null,
+    detailsUrl: `https://github.com/n10/fixture/actions/runs/${c.name.length}`,
+    isRequired,
+    checkSuite: {
+      // One suite per workflow and event, as a run per trigger has.
+      databaseId: repositoryNode(`${c.workflow ?? 'CI'}:${c.event ?? ''}`)
+        .databaseId,
+      app: { slug: c.app ?? 'github-actions', databaseId: c.appId ?? 15368 },
+      workflowRun: {
+        runAttempt: 1,
+        event: c.event ?? 'pull_request',
+        workflow: { name: c.workflow ?? 'CI' },
+      },
+    },
+  };
+}
+
+/** The checks read (libs/vcs/github/src/lib/pr-checks.ts), in one page. */
+function checksNode(pr) {
+  const nodes = (pr.checks ?? []).map(contextNode);
+  return {
+    databaseId: scenarioRepository().databaseId,
+    pullRequest: {
+      number: pr.number,
+      state: pr.state ?? 'OPEN',
+      isDraft: pr.isDraft ?? false,
+      baseRefName: pr.baseRefName ?? 'main',
+      mergeable: pr.mergeable ?? 'MERGEABLE',
+      mergeStateStatus: pr.mergeStateStatus ?? 'CLEAN',
+      reviewDecision: pr.reviewDecision ?? null,
+      // No classic protection: the scenario's rules are rule sets.
+      baseRef: { refUpdateRule: null },
+      commits: {
+        nodes: [
+          {
+            commit: {
+              oid: pr.headRefOid ?? 'f'.repeat(40),
+              statusCheckRollup: {
+                contexts: { totalCount: nodes.length, pageInfo: page, nodes },
+              },
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+/** The base branch's classic protection, as `branches/<name>` shows it. */
+function branchAnswer(name) {
+  return {
+    name,
+    protected: false,
+    protection: {
+      enabled: false,
+      required_status_checks: {
+        enforcement_level: 'off',
+        contexts: [],
+        checks: [],
+      },
+    },
+  };
+}
+
+/** The rule sets on every base branch, from the scenario's `rules`. */
+function rulesAnswer() {
+  const rules = scenario.rules ?? {};
+  const answer = [];
+  if (rules.required?.length) {
+    answer.push({
+      type: 'required_status_checks',
+      parameters: {
+        required_status_checks: rules.required.map((context) => ({
+          context,
+          integration_id: 15368,
+        })),
+      },
+    });
+  }
+  if (rules.conversationResolution) {
+    answer.push({
+      type: 'pull_request',
+      parameters: { required_review_thread_resolution: true },
+    });
+  }
+  return answer;
+}
+
 function threadNode(t, i) {
   return {
     id: t.id ?? `thread-${i + 1}`,
@@ -268,7 +391,17 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
   const vars = flags(argv);
   const query = vars.query ?? '';
 
-  // The open-PR search is the only one asking for a check rollup; the
+  // Before the list search below, which also names `statusCheckRollup`.
+  if (
+    query.includes('query PullRequestChecks(') ||
+    query.includes('query PullRequestCheckContexts(')
+  ) {
+    const pr = prs.find((p) => String(p.number) === String(vars.number));
+    if (failing(pr, 'checks')) failLikeGitHub();
+    out({ data: { repository: pr ? checksNode(pr) : null } });
+  }
+
+  // The open-PR search is the other query asking for a check rollup; the
   // merged-branch sweep asks for headRefName alone and gets nothing,
   // which keeps the sync loop from deleting a test's branches.
   if (query.includes('statusCheckRollup')) {
@@ -405,6 +538,20 @@ if (
     const pr = prs.find((p) => String(p.number) === pullPath[1]);
     if (failing(pr, 'body')) failLikeGitHub();
     out(pr?.body ?? '');
+  }
+
+  // ── gh api repos/<owner>/<repo>/branches/<b> and rules/branches/<b> ──
+  // The checks read's base-branch rules.
+  const rulesPath = argv[1]?.match(
+    /^repos\/[^/]+\/[^/]+\/(rules\/)?branches\/([^?]+)/
+  );
+  if (argv[0] === 'api' && rulesPath) {
+    if (scenario.rules?.failing) failLikeGitHub();
+    out(
+      rulesPath[1]
+        ? rulesAnswer()
+        : branchAnswer(decodeURIComponent(rulesPath[2]))
+    );
   }
 
   if (argv[0] === 'api' && argv[1] === '/user') {

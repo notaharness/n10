@@ -10,8 +10,8 @@ import {
 } from './gh-errors.js';
 
 /**
- * The GraphQL half of the `gh` transport, shared by the list, thread and
- * detail reads: every call is logged, its output parsed, and a failure
+ * The `gh` transport shared by the list, thread, detail and checks
+ * reads: every call is logged, its output parsed, and a failure
  * classified into a `VcsError` before it leaves here.
  */
 
@@ -74,6 +74,29 @@ export async function ghGraphQL(
     );
     // A classification made here is already the answer; only a raw
     // subprocess failure still needs one.
+    throw isVcsError(err) ? err : classifyGhError(err);
+  }
+}
+
+/** One REST read through `gh api`, parsed and classified like a
+ *  GraphQL one. */
+export async function ghRest(path: string): Promise<unknown> {
+  const startedAt = Date.now();
+  logNetwork('github.network', `→ gh api ${path}`);
+  try {
+    const { stdout } = await execFile('gh', ['api', path]);
+    logNetwork(
+      'github.network',
+      `← gh api ${path} (${Date.now() - startedAt}ms, ${stdout.length} bytes)`
+    );
+    return parseGhJson<unknown>(stdout, path);
+  } catch (err: unknown) {
+    logNetwork(
+      'github.network',
+      `× gh api ${path} (${Date.now() - startedAt}ms) — ${extractErrorMessage(
+        err
+      )}`
+    );
     throw isVcsError(err) ? err : classifyGhError(err);
   }
 }

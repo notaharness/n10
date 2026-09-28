@@ -87,6 +87,7 @@ import type {
 // Pull request reads addressed by identity and exact commits.
 export type * from './contract-pull-requests.js';
 import type {
+  PullRequestChecksAnswer,
   PullRequestSnapshot,
   RepositoryRef,
   SnapshotRequest,
@@ -364,6 +365,10 @@ export interface N10HostApi {
    *  and the exact commits its review compares. Rejects a ref from
    *  another repository or a caller that last saw another account. */
   getPullRequestSnapshot(req: SnapshotRequest): Promise<PullRequestSnapshot>;
+  /** What stands between one pull request and completion: its checks,
+   *  the target's rules and the provider's merge state, with n10's
+   *  reading of them. Identity-checked like the snapshot. */
+  getPullRequestChecks(req: SnapshotRequest): Promise<PullRequestChecksAnswer>;
   /** Cast the current user's review verdict on a PR. */
   submitReviewVerdict(prId: number, verdict: ReviewVerdict): Promise<void>;
   /** The reviewer-list identifier of the authenticated user (GitHub
@@ -558,6 +563,7 @@ export const IPC = {
   setThreadResolved: 'n10/reviews/resolve',
   fetchPrDescription: 'n10/reviews/pr-description',
   getPullRequestSnapshot: 'n10/pull-requests/snapshot',
+  getPullRequestChecks: 'n10/pull-requests/checks',
   submitReviewVerdict: 'n10/reviews/submit-verdict',
   getReviewViewer: 'n10/reviews/viewer',
   fetchCommentImage: 'n10/reviews/comment-image',

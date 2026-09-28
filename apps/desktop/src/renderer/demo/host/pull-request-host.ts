@@ -15,7 +15,12 @@ import type { DemoState } from './state.js';
  * a provider's detail read would describe them.
  */
 
-type PullRequestHost = Pick<N10HostApi, 'getPullRequestSnapshot'>;
+type PullRequestHost = Pick<
+  N10HostApi,
+  'getPullRequestSnapshot' | 'getPullRequestChecks'
+>;
+
+const NO_CHECKS = 'The web demo does not read checks and policies';
 
 /** GitHub's word for each verdict the demo's rows hold. */
 const NATIVE: Partial<Record<PullRequestReviewer['decision'], string>> = {
@@ -114,5 +119,6 @@ export function createPullRequestHost(state: DemoState): PullRequestHost {
         target: null,
       });
     },
+    getPullRequestChecks: () => Promise.reject(new Error(NO_CHECKS)),
   };
 }
