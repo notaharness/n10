@@ -195,6 +195,7 @@ export function createPullRequestList(
   const slotFor = (cwd: string): Slot => {
     const scope = scopeOf(cwd, resolve(cwd), generation);
     let slot = slots.get(scope.key);
+    const created = !slot;
     if (slot) {
       // Same scope, fresher config: an interval edit is seen here.
       slot.scope = scope;
@@ -211,13 +212,15 @@ export function createPullRequestList(
         snapshot: EMPTY_PULL_REQUEST_LIST,
       };
       slots.set(scope.key, slot);
-      evict(slot);
     }
     if (current.get(cwd) !== scope.key) {
       current.set(cwd, scope.key);
       emit(cwd);
       schedule.reschedule(cwd);
     }
+    // After `current` moves, so the scope `cwd` just left counts as
+    // unshown and goes before another repository's list.
+    if (created) evict(slot);
     return slot;
   };
 

@@ -466,6 +466,21 @@ describe('snapshots and subscriptions', () => {
     await again;
   });
 
+  it('evicts the scope a repository just left before another repository’s list', async () => {
+    await sync('/x', { x: null }); // the oldest list, still shown
+    now += 1_000;
+    await sync('/a', { widgets: null });
+    for (let i = 0; i < 6; i++) {
+      now += 1_000;
+      await sync(`/repo-${i}`, {});
+    }
+    // Eight scopes, all shown. /a moving to another project leaves its
+    // widgets scope unshown: that one goes, not /x's list.
+    project = { owner: 'acme', repo: 'gadgets' };
+    await sync('/a', { gadgets: null });
+    expect(list.getSnapshot('/x').prMap).toEqual({ x: null });
+  });
+
   it('tells a repository its scope was evicted', async () => {
     await sync('/first', { a: null });
     const heard: string[] = [];
