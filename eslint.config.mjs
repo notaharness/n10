@@ -416,6 +416,7 @@ export default tseslint.config(
                 '@n10/*/*',
                 // Browser-safe by construction, and tested as such.
                 '!@n10/core/plan',
+                '!@n10/core/readiness',
                 '!@n10/app-core/plan',
                 '!@n10/vcs-core/types',
                 '!@n10/vcs-core/pr-details',

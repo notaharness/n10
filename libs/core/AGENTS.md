@@ -2,8 +2,10 @@
 
 The shell-agnostic half: Git, worktrees, PTY and session infrastructure,
 config, providers, keybindings, the plan store, pure helpers. No react, ink,
-electron or `@n10/app-core` (lint-enforced). `src/plan.ts` is the
-browser-safe entry (`@n10/core/plan`); nothing under it may touch `node:`.
+electron or `@n10/app-core` (lint-enforced). `src/plan.ts` and
+`src/readiness.ts` are the browser-safe entries (`@n10/core/plan`,
+`@n10/core/readiness`); nothing under them may touch `node:`, and they
+import `@n10/vcs-core` as types, or its `./types` subpath for values.
 The reasoning behind each rule is in `docs/decisions.md`.
 
 - **Tmux requirement** (`session-backend.ts`): await `probeTmuxAvailability()`
