@@ -100,6 +100,8 @@ export type MenuCommand =
 
 export interface MenuCommandEvent {
   command: MenuCommand;
+  /** `set-theme`'s theme, `open-url`'s URL, and the repository a later
+   *  launch named for `open-repo`, which without one opens the picker. */
   arg?: string;
 }
 

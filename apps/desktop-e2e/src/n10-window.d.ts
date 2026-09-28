@@ -51,7 +51,9 @@ interface N10Bridge {
   }): Promise<{ name: string }>;
   killSession(name: string): Promise<void>;
   getSessionBuffer(name: string): Promise<{ data: string; seq: number }>;
-  listRecentRepos(): Promise<{ cwd: string; valid: boolean }[]>;
+  listRecentRepos(): Promise<
+    { cwd: string; valid: boolean; lastOpenedAt: number }[]
+  >;
   listTerminals(): Promise<
     {
       name: string;

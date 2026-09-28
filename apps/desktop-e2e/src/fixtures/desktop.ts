@@ -18,6 +18,7 @@ import {
 import { killFixtureSessions } from '../setup/tmux.js';
 import { appEnv } from './app-env.js';
 import { closeDesktopApp } from '../setup/app-close.js';
+import { launchAgain } from '../setup/launch-again.js';
 import type { TerminalSeed } from '../setup/terminals.js';
 import {
   fakeAgent,
@@ -94,6 +95,12 @@ export interface DesktopApp {
   pageErrors: string[];
   /** Evaluate in the main process (e.g. to inspect host services). */
   main: ElectronApplication['evaluate'];
+  /**
+   * Launch the app again while this one runs, as a user would from a
+   * shell in `startDir` (the npm launcher's `N10_START_DIR`). Resolves
+   * once that process has handed over and quit.
+   */
+  launchAgain: (startDir: string) => Promise<void>;
 }
 
 export const test = base.extend<
@@ -157,24 +164,26 @@ export const test = base.extend<
 
     seedTmux(repoPath, homeDir, liveSessions, liveTerminals);
 
+    const args = [
+      APP_DIR,
+      // CI runners have no user namespaces for the sandbox, and
+      // software rendering is both available and deterministic.
+      '--no-sandbox',
+      '--disable-gpu',
+      '--ozone-platform=x11',
+    ];
+    const launchEnv = appEnv({
+      homeDir,
+      repoPath,
+      startWithoutRepo,
+      githubToken,
+      ghEnv,
+      extra: env,
+    });
     const app = await electron.launch({
-      args: [
-        APP_DIR,
-        // CI runners have no user namespaces for the sandbox, and
-        // software rendering is both available and deterministic.
-        '--no-sandbox',
-        '--disable-gpu',
-        '--ozone-platform=x11',
-      ],
+      args,
       cwd: WORKSPACE_ROOT,
-      env: appEnv({
-        homeDir,
-        repoPath,
-        startWithoutRepo,
-        githubToken,
-        ghEnv,
-        extra: env,
-      }),
+      env: launchEnv,
       timeout: 60_000,
     });
 
@@ -223,6 +232,12 @@ export const test = base.extend<
         homeDir,
         pageErrors,
         main: app.evaluate.bind(app),
+        launchAgain: (startDir) =>
+          launchAgain({
+            args,
+            cwd: WORKSPACE_ROOT,
+            env: { ...launchEnv, N10_START_DIR: startDir },
+          }),
       });
       used = true;
     } finally {

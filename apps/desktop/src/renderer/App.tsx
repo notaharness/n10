@@ -1,5 +1,5 @@
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import type { N10HostApi, RepoInfo } from '../host/contract.js';
 import { RevokeMachineDialog } from './components/machines/RevokeMachineDialog.js';
@@ -95,6 +95,31 @@ function Gate() {
       .catch((err: unknown) => toast.error(errorMessage(err)));
   }, [openRepo]);
 
+  // File › Open Repository, and a later launch naming a repository
+  // (main/second-launch.ts), which applies with no repository open
+  // too. Naming the one on screen changes nothing. Launches are claimed
+  // only once the gate has its first answer, which would otherwise
+  // land over a repository opened from one; until then they wait.
+  const repoCwd = repo?.cwd ?? null;
+  useEffect(() => {
+    if (isPending) return;
+    const openLaunched = (cwd: string) => {
+      if (cwd !== repoCwd) openRepo(cwd);
+    };
+    const off = window.n10.onMenuCommand(({ command, arg }) => {
+      if (command !== 'open-repo') return;
+      if (arg) openLaunched(arg);
+      else pickRepoFolder();
+    });
+    window.n10
+      .takeLaunchRepo()
+      .then((cwd) => {
+        if (cwd) openLaunched(cwd);
+      })
+      .catch((err: unknown) => toast.error(errorMessage(err)));
+    return off;
+  }, [isPending, repoCwd, openRepo, pickRepoFolder]);
+
   if (isPending) {
     return (
       <main className="flex h-screen items-center justify-center bg-background">
@@ -115,7 +140,6 @@ function Gate() {
       repo={repo}
       onSwitchRepo={() => qc.setQueryData(keys.repo, null)}
       onOpenRepo={openRepo}
-      onPickRepoFolder={pickRepoFolder}
     />
   );
 }

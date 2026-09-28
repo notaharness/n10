@@ -37,6 +37,7 @@ import { installDesktopTmuxPreparer } from './tmux-session-preparer.js';
 import { MAIN_MARKS, mark } from './boot-marks.js';
 import { pickFolderWithDialog } from './folder-picker.js';
 import { buildMenuTemplate } from '../host/menu-template.js';
+import { installSecondLaunch, secondLaunchData } from './second-launch.js';
 import {
   installProcessDiagnostics,
   installRendererRecovery,
@@ -55,6 +56,9 @@ const DIST = join(import.meta.dirname, '..');
 const DEV_SERVER_URL = process.env.N10_VITE_URL;
 const APP_VERSION = process.env.N10_DESKTOP_VERSION ?? 'dev';
 const IS_DEV = Boolean(DEV_SERVER_URL) || APP_VERSION === 'dev';
+// The directory this launch was asked to open. Read here, once, for the
+// single-instance lock: a second launch hands it to the running app.
+const START_DIR = process.env.N10_START_DIR || undefined;
 
 let prefs: DesktopPrefs = loadDesktopPrefs();
 
@@ -289,19 +293,14 @@ installMachineResolver();
 // ── App lifecycle ────────────────────────────────────────────────
 
 // One instance at a time: a second launch focuses the existing
-// window instead of opening a competing (possibly stale-cached) one.
-if (!app.requestSingleInstanceLock()) {
+// window, and opens the repository it was started for, instead of
+// opening a competing (possibly stale-cached) one.
+if (!app.requestSingleInstanceLock(secondLaunchData(START_DIR))) {
   app.quit();
 } else {
   // Only the instance that holds the lock rewrites what its sessions run.
   installSessionBin(app.getPath('userData'));
-  app.on('second-instance', () => {
-    const win = BrowserWindow.getAllWindows()[0];
-    if (win) {
-      if (win.isMinimized()) win.restore();
-      win.focus();
-    }
-  });
+  installSecondLaunch((cwd) => sendMenuCommand('open-repo', cwd));
 
   // A throw in here leaves the app running with no window and no
   // sign of why, so startup failures are logged rather than dropped.

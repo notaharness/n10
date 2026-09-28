@@ -41,6 +41,9 @@ vi.mock('./services/repo.js', () =>
     'forgetRecentRepo',
   ])
 );
+vi.mock('./services/launch-repo.js', () =>
+  recorder('launchRepo', ['claimLaunchRepo'])
+);
 vi.mock('./services/settings.js', () =>
   recorder('settings', ['getSettingsView', 'updateSettingsFromView'])
 );
@@ -143,6 +146,7 @@ beforeEach(() => {
 const WIRING: [keyof N10HostApi, unknown[], string][] = [
   ['openRepo', ['/repo'], 'repo.openRepo'],
   ['getRepo', [], 'repo.getRepo'],
+  ['takeLaunchRepo', [], 'launchRepo.claimLaunchRepo'],
   ['listRecentRepos', [], 'repo.listRecentRepos'],
   ['forgetRecent', ['/repo'], 'repo.forgetRecentRepo'],
 
