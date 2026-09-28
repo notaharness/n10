@@ -12,8 +12,8 @@ import {
   type PullRequestRef,
 } from '@n10/vcs-core/pr-details';
 import type { N10HostApi } from '../../../host/contract.js';
-import { VIEWER } from '../data/identity.js';
-import { demoChecks } from './checks.js';
+import { VIEWER, type DemoCi, type DemoTeam } from '../data/identity.js';
+import { demoChecks, teamsOn } from './checks.js';
 import { demoConversation } from './conversation.js';
 import { later } from './hub.js';
 import { fileSection, load } from './review-host.js';
@@ -61,14 +61,39 @@ function detailReviewer(
   };
 }
 
+/** A team GitHub asked for its paths, as the detail read names it: by
+ *  its slug, with the database id its rule sets use. */
+function detailTeam(t: DemoTeam): DetailReviewer {
+  return {
+    kind: 'team',
+    identifier: t.slug,
+    id: `T_demo_${t.id}`,
+    ruleId: String(t.id),
+    displayName: t.name,
+    decision: 'no-response',
+    native: null,
+    requested: true,
+    attention: null,
+    required: null,
+    reason: null,
+    onBehalfOf: [],
+    reviewedHead: null,
+  };
+}
+
 /** The pull request as a detail read names it: the repository it and
  *  its branch belong to, the commits the row reports, and everyone
- *  asked to review. The demo's viewer may edit their own pull requests,
- *  and the teammate lets them edit theirs. */
+ *  asked to review, teams too. The demo's viewer may edit their own
+ *  pull requests, and the teammate lets them edit theirs. */
 export function demoDetail(
   pr: PullRequestInfo,
-  ref: PullRequestRef
+  ref: PullRequestRef,
+  ci?: DemoCi
 ): PullRequestDetail {
+  const reviewers = [
+    ...(pr.reviewers ?? []).map((r) => detailReviewer(r, pr.headSha)),
+    ...(ci ? teamsOn(pr, ci) : []).map(detailTeam),
+  ];
   const repository = {
     provider: ref.provider,
     host: ref.host,
@@ -94,8 +119,8 @@ export function demoDetail(
     reviewers: {
       state: 'read',
       value: {
-        items: (pr.reviewers ?? []).map((r) => detailReviewer(r, pr.headSha)),
-        total: pr.reviewers?.length ?? 0,
+        items: reviewers,
+        total: reviewers.length,
         complete: true,
       },
     },
@@ -110,14 +135,15 @@ export function demoDetail(
 export function createPullRequestHost(state: DemoState): PullRequestHost {
   return {
     getPullRequestSnapshot: ({ ref }) => {
-      const pr = state.repo().pr(ref.number);
+      const repo = state.repo();
+      const pr = repo.pr(ref.number);
       return later({
         ref,
         viewer: VIEWER,
         fetchedAt: Date.now(),
         summary: pr ? { kind: 'found', pr } : { kind: 'gone' },
         detail: pr
-          ? { state: 'read', value: demoDetail(pr, ref) }
+          ? { state: 'read', value: demoDetail(pr, ref, repo.data.ci) }
           : {
               state: 'failed',
               kind: 'not-found',
@@ -137,7 +163,10 @@ export function createPullRequestHost(state: DemoState): PullRequestHost {
         return Promise.reject(new Error(`#${ref.number} is not in the demo`));
       }
       const checks = demoChecks(pr, ref, repo.data.ci);
-      const detail = { state: 'read', value: demoDetail(pr, ref) } as const;
+      const detail = {
+        state: 'read',
+        value: demoDetail(pr, ref, repo.data.ci),
+      } as const;
       return later({
         ref,
         viewer: VIEWER,
