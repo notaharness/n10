@@ -130,6 +130,7 @@ const AZURE_RULE = rules({
   approvals: 2,
   named: [
     {
+      name: 'Required reviewers',
       ids: ['aaaa-22'],
       kind: 'identity',
       approvals: 1,
@@ -138,6 +139,7 @@ const AZURE_RULE = rules({
       blocking: true,
     },
     {
+      name: 'Required reviewers',
       ids: ['aaaa-02', 'aaaa-10'],
       kind: 'identity',
       approvals: null,
@@ -148,6 +150,7 @@ const AZURE_RULE = rules({
     // Its paths match no change here: it asks nothing now, but it is
     // what made Web Reviewers required.
     {
+      name: 'Required reviewers',
       ids: ['aaaa-21'],
       kind: 'identity',
       approvals: null,
@@ -243,6 +246,7 @@ describe('reviewRequirements on GitHub', () => {
           codeOwners: false,
           named: [
             {
+              name: null,
               ids: ['777'],
               kind: 'team',
               approvals: 2,
@@ -251,6 +255,7 @@ describe('reviewRequirements on GitHub', () => {
               blocking: true,
             },
             {
+              name: null,
               ids: ['1', '2'],
               kind: 'team',
               approvals: null,
@@ -260,6 +265,7 @@ describe('reviewRequirements on GitHub', () => {
             },
             // A minimum of 0: added, not required.
             {
+              name: null,
               ids: ['3'],
               kind: 'team',
               approvals: 0,

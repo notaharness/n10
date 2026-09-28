@@ -96,6 +96,10 @@ export interface RequiredCheck {
  * DevOps required-reviewers policy, a GitHub rule set's required team.
  */
 export interface NamedReviewers {
+  /** The rule as the provider names it: an Azure DevOps policy's name
+   *  ("Required reviewers"). Null where the rules read names none:
+   *  GitHub's give a rule set's id alone. */
+  name: string | null;
   /** The provider's ids for them: Azure DevOps identity ids, people or
    *  groups; GitHub team ids. Compared ignoring case. */
   ids: string[];

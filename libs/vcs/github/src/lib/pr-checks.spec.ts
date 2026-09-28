@@ -688,6 +688,7 @@ describe('fetchPullRequestChecksGitHub: rules', () => {
           codeOwners: true,
           named: [
             {
+              name: null,
               ids: ['777'],
               kind: 'team',
               approvals: 1,
@@ -696,6 +697,7 @@ describe('fetchPullRequestChecksGitHub: rules', () => {
               blocking: true,
             },
             {
+              name: null,
               ids: ['778'],
               kind: 'team',
               approvals: 0,

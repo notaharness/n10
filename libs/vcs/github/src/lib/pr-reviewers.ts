@@ -44,7 +44,7 @@ const CONNECTIONS = {
               ... on User { login name }
               ... on Bot { login }
               ... on Mannequin { login }
-              ... on Team { combinedSlug name }
+              ... on Team { combinedSlug name databaseId }
               ... on EnterpriseTeam { combinedSlug name }
             }`,
   },
@@ -113,6 +113,8 @@ export interface RequestNode {
     login?: string;
     name?: string | null;
     combinedSlug?: string;
+    /** A team's: the id its rule sets name it by. */
+    databaseId?: number | null;
   } | null;
 }
 
@@ -196,6 +198,7 @@ function request(node: RequestNode): DetailReviewer | null {
       kind: 'team',
       identifier: name,
       displayName: who.name || name,
+      ...(who.databaseId != null ? { ruleId: String(who.databaseId) } : {}),
     };
   }
   if (!who?.login) return null;

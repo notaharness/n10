@@ -210,6 +210,10 @@ export interface DetailReviewer {
    *  elsewhere: an Azure DevOps policy names its reviewers by identity
    *  id (`ReviewRule.named`). */
   id: string | null;
+  /** The id the provider's rules name them by, where it is not `id`: a
+   *  GitHub team's database id, which its rule sets give. Absent where
+   *  rules name them by `id`, or not at all. */
+  ruleId?: string;
   displayName: string;
   /** The shared reading of their standing verdict. A later comment does
    *  not withdraw a verdict. */

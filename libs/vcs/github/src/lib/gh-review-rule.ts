@@ -33,6 +33,8 @@ function named(
   if (id == null) return [];
   return [
     {
+      // The rules read gives the rule set's id, not its name.
+      name: null,
       ids: [String(id)],
       kind: 'team',
       approvals: req.minimum_approvals ?? null,
