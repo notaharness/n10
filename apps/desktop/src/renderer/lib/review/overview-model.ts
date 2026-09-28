@@ -1,4 +1,5 @@
 import {
+  asksForReview,
   holdingVerdict,
   type PullRequestInfo,
   type PullRequestReviewer,
@@ -12,9 +13,9 @@ import type { Mode } from './review-model.js';
  * Everything here reads the pull request list's row: whose pull request
  * it is, where the tab opens, and the reader's next step, in facts the
  * row states. Nothing here decides what blocks: which verdict holds a
- * pull request back is vcs-core's (`holdingVerdict`), and whether a
- * review is required is core's readiness, which the Completion section
- * shows.
+ * pull request back is vcs-core's (`holdingVerdict`), as is whether the
+ * provider asks a reviewer (`asksForReview`), and whether a review is
+ * required is core's readiness, which the Completion section shows.
  */
 
 export type ReviewRole = 'author' | 'reviewer';
@@ -46,7 +47,36 @@ export function initialMode({
   role: ReviewRole;
 }): Mode {
   if (running) return 'agent';
-  return hasPr && role === 'reviewer' ? 'overview' : 'diff';
+  return hasPr ? reviewPaneFor(role) : 'diff';
+}
+
+/** The panes that are the pull request's review, as opposed to the
+ *  agent, a walkthrough or the plan. */
+export type ReviewPane = 'overview' | 'diff';
+
+/** The review a reader starts on: the Overview for someone else's pull
+ *  request, the diff for their own. */
+export function reviewPaneFor(role: ReviewRole): ReviewPane {
+  return role === 'reviewer' ? 'overview' : 'diff';
+}
+
+/** The review pane the reader was last on, or null before either has
+ *  shown. The terminal, a walkthrough and the plan leave it as it was. */
+export function lastReviewPane(
+  last: ReviewPane | null,
+  mode: Mode
+): ReviewPane | null {
+  return mode === 'overview' || mode === 'diff' ? mode : last;
+}
+
+/** Where the terminal's Back goes: up to the review pane the reader was
+ *  last on, never back through where they have been; before either has
+ *  shown, the one the pull request opens on for them. */
+export function backToReviewPane(
+  last: ReviewPane | null,
+  role: ReviewRole
+): ReviewPane {
+  return last ?? reviewPaneFor(role);
 }
 
 /** A reviewer's decision in words. `no-response` is a request nobody
@@ -100,6 +130,8 @@ export interface NextStep {
   summary: string;
   /** Supporting facts, or null. */
   detail: string | null;
+  /** Where the detail leads, when it names something to go to. */
+  detailAction?: AttentionAction;
   action: AttentionAction;
   label: string;
 }
@@ -137,8 +169,11 @@ const OWN_VERDICT: Partial<Record<PullRequestReviewer['decision'], string>> = {
 };
 
 function reviewerStep(pr: PullRequestInfo, viewer: string | null): NextStep {
+  const unresolved = unresolvedDetail(pr);
+  // The count leads to the first open thread, as the header's does.
   const step = {
-    detail: unresolvedDetail(pr),
+    detail: unresolved,
+    ...(unresolved && { detailAction: 'show-unresolved' as const }),
     action: 'review-changes' as const,
     label: 'Review changes',
   };
@@ -153,9 +188,10 @@ function reviewerStep(pr: PullRequestInfo, viewer: string | null): NextStep {
   }
   if (viewer == null) {
     return {
-      ...step,
       summary: 'n10 cannot see your review',
       detail: 'No account is configured for this repository.',
+      action: step.action,
+      label: step.label,
     };
   }
   const mine = viewerReview(pr, viewer);
@@ -163,7 +199,10 @@ function reviewerStep(pr: PullRequestInfo, viewer: string | null): NextStep {
   if (own) return { ...step, summary: own };
   return {
     ...step,
-    summary: mine ? 'Your review is requested' : 'Not reviewed by you yet',
+    summary:
+      mine && asksForReview(mine)
+        ? 'Your review is requested'
+        : 'Not reviewed by you yet',
   };
 }
 

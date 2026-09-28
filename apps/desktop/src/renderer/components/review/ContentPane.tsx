@@ -16,6 +16,7 @@ import type { PrConnectionBanner } from './PrWorkspace.js';
 import { DiffPane } from './diff/DiffPane.js';
 import { type DiffJumpHandle } from './diff/VirtualDiffList.js';
 import { OverviewPane } from './OverviewPane.js';
+import { terminalInset } from './PrHeader.js';
 import { PlanPane } from './PlanPane.js';
 import { ReviewStepper } from './drafts/ReviewStepper.js';
 
@@ -184,7 +185,11 @@ export function ContentPane({
     ? general.filter((t) => !t.isResolved)
     : general;
   return (
-    <div data-terminal-pane className="relative h-full min-h-0">
+    <div
+      data-terminal-pane
+      data-terminal-inset={terminalInset(effMode, pr != null)}
+      className="relative h-full min-h-0"
+    >
       {sessionName && (
         <StackedPane visible={effMode === 'agent'}>
           <AgentPane

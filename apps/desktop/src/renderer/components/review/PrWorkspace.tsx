@@ -4,12 +4,10 @@ import {
   Panel,
   Separator as PanelSeparator,
 } from 'react-resizable-panels';
-import { toast } from 'sonner';
 import type { PlanItem } from '@n10/core/plan';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import { useDiffOptions } from '../../lib/diff/diff-options.js';
 import { useDraftComments, useThreads } from '../../lib/data/queries.js';
-import { usePostDrafts } from '../../lib/data/mutations.js';
 import type { ReadState } from '../../lib/data/read-state.js';
 import { keys } from '../../lib/data/query-keys.js';
 import { useReadState } from '../../lib/data/use-read-state.js';
@@ -18,9 +16,13 @@ import { useRepo } from '../../lib/repo-context.js';
 import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { useCommentNavigator } from '../../lib/review/use-comment-navigator.js';
 import { useReviewDiff } from '../../lib/review/use-review-diff.js';
-import { useReviewMode } from '../../lib/review/use-review-mode.js';
+import {
+  useBackToReview,
+  useReviewMode,
+} from '../../lib/review/use-review-mode.js';
 import { useReviewRail } from '../../lib/review/use-review-rail.js';
 import { usePlanCheckout } from '../../lib/plan/use-plan-checkout.js';
+import { usePostAll } from '../../lib/review/use-post-all.js';
 import {
   buildFileEntries,
   groupDraftsByFile,
@@ -28,10 +30,9 @@ import {
   resolveMode,
   unpostedDrafts,
 } from '../../lib/review/review-model.js';
-import { errorMessage } from '../../lib/utils.js';
 import { ContentPane } from './ContentPane.js';
 import { type FileEntry } from './diff/FileTree.js';
-import { BranchHeader, PrHeader } from './PrHeader.js';
+import { WorkspaceHeader } from './PrHeader.js';
 import { railReadNotice } from './ReadNotice.js';
 import { CollapsedRail, ReviewRail } from './ReviewRail.js';
 
@@ -114,7 +115,7 @@ export function PrWorkspace({
   const threads = useReadState(comments, keys.threads(repo.cwd, prId));
   const threadsRead = pr ? threads.state : NO_THREADS;
   const draftsQuery = useDraftComments(repo.cwd, prId);
-  const postAll = usePostDrafts(repo.cwd);
+  const postAll = usePostAll(repo.cwd, prId, pr?.headSha);
   const options = useDiffOptions();
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -215,18 +216,26 @@ export function PrWorkspace({
     // comments, and the prompt names them. A bare worktree has none.
     hasPlan: plan.count > 0,
   });
+  const backToReview = useBackToReview({
+    mode: effMode,
+    pr,
+    viewer: repo.viewer,
+    setMode,
+    changes: scrollRef,
+    root: rootRef,
+  });
 
   return (
     <div ref={rootRef} className="flex h-full min-h-0 min-w-0 flex-col">
-      {pr ? (
-        <PrHeader pr={pr} onShowUnresolved={rail.showUnresolved} />
-      ) : (
-        <BranchHeader
-          branch={branch}
-          baseBranch={baseBranch}
-          fileCount={files.length}
-        />
-      )}
+      <WorkspaceHeader
+        pr={pr}
+        mode={effMode}
+        branch={branch}
+        baseBranch={baseBranch}
+        fileCount={files.length}
+        onShowUnresolved={rail.showUnresolved}
+        onBack={backToReview}
+      />
       <div className="flex min-h-0 min-w-0 flex-1">
         {rail.hidden && <CollapsedRail onShow={() => rail.setHidden(false)} />}
 
@@ -255,20 +264,8 @@ export function PrWorkspace({
                   drafts={drafts}
                   reviewActive={effMode === 'review'}
                   onReview={() => setMode('review')}
-                  postingAll={postAll.isPending}
-                  onPostAll={() =>
-                    postAll.mutate(
-                      { prId, headSha: pr?.headSha },
-                      {
-                        onSuccess: (n) =>
-                          toast.success(
-                            `Posted ${n} comment${n === 1 ? '' : 's'}`
-                          ),
-                        onError: (e) =>
-                          toast.error(`Post failed: ${errorMessage(e)}`),
-                      }
-                    )
-                  }
+                  postingAll={postAll.pending}
+                  onPostAll={postAll.post}
                   planCount={plan.count}
                   planNoted={plan.noted}
                   planActive={effMode === 'plan'}

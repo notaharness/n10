@@ -72,14 +72,14 @@ export function keepsLastHead(
 
 /**
  * The list row's facts readiness rests on, beside the head: its checks'
- * rollup, the reviewers' verdicts, the unresolved count, the draft flag
- * and the target. When one moves at the same head, a check finished, a
- * review landed, a thread was resolved, it left draft or was retargeted,
- * so the checks are read again.
+ * rollup, the reviewers' verdicts and requests, the unresolved count,
+ * the draft flag and the target. When one moves at the same head, a
+ * check finished, a review landed or was asked for, a thread was
+ * resolved, it left draft or was retargeted, so the checks are read again.
  */
 export function rowFacts(pr: PullRequestInfo): string {
   const verdicts = (pr.reviewers ?? [])
-    .map((r) => `${r.identifier}:${r.decision}`)
+    .map((r) => `${r.identifier}:${r.decision}:${r.requested ?? ''}`)
     .sort();
   return JSON.stringify([
     pr.buildStatus,

@@ -11,10 +11,35 @@ const ICON: Record<AttentionAction, typeof FileDiffIcon> = {
   'show-unresolved': MessageSquareIcon,
 };
 
+function Detail({
+  step,
+  onAction,
+}: {
+  step: NextStep;
+  onAction: (action: AttentionAction) => void;
+}) {
+  const { detail, detailAction } = step;
+  if (!detailAction) {
+    return <p className="text-sm text-muted-foreground">{detail}</p>;
+  }
+  return (
+    <Button
+      variant="link"
+      size="sm"
+      aria-label={`Show ${detail}`}
+      onClick={() => onAction(detailAction)}
+      className="h-auto p-0 text-sm font-normal text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 hover:text-foreground hover:decoration-foreground"
+    >
+      {detail}
+    </Button>
+  );
+}
+
 /**
  * The reader's next step, stated once, with the one action that takes
- * it. This is the Overview's only primary button: verdicts sit in the
- * context column, below what they judge.
+ * it. This is the Overview's only primary button, and its way into a
+ * review. A detail that names something to go to, such as the
+ * unresolved threads, leads there.
  */
 export function PrAttention({
   step,
@@ -36,9 +61,7 @@ export function PrAttention({
     >
       <div className="min-w-0 flex-1 basis-56">
         <p className="font-medium">{step.summary}</p>
-        {step.detail && (
-          <p className="text-sm text-muted-foreground">{step.detail}</p>
-        )}
+        {step.detail && <Detail step={step} onAction={onAction} />}
       </div>
       <Button size="sm" onClick={() => onAction(step.action)}>
         <Icon />

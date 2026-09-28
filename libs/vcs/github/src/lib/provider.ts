@@ -211,7 +211,12 @@ export function mapRollupState(
 }
 
 function transformSearchNode(node: SearchPrNode): PullRequestInfo {
-  const reviewers = latestReviewPerUser(node.reviews.nodes);
+  // A review is not a request: someone who only commented is not asked,
+  // and the list says so rather than leaving it unsaid.
+  const reviewers = latestReviewPerUser(node.reviews.nodes).map((r) => ({
+    ...r,
+    requested: false,
+  }));
 
   // Everyone with an open request is asked, including someone asked
   // again after their verdict, who keeps it.

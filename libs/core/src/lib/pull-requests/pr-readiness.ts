@@ -23,9 +23,15 @@ import type {
  * as unknown beside the verdict.
  */
 
-/** Who can clear a blocker: the author pushes, reviewers review,
- *  maintainers change rules or settings, checks finish on their own. */
-export type Resolver = 'author' | 'reviewers' | 'maintainers' | 'checks';
+/** Who can clear a blocker: the author pushes, reviewers review (the
+ *  viewer, where the provider asks them), maintainers change rules or
+ *  settings, checks finish on their own. */
+export type Resolver =
+  | 'author'
+  | 'reviewers'
+  | 'viewer'
+  | 'maintainers'
+  | 'checks';
 
 export interface ReadinessItem {
   kind:
@@ -64,6 +70,9 @@ export interface ReadinessInputs {
   rules: ReadOutcome<BranchRules>;
   /** Unresolved review threads, where known. */
   unresolvedThreads: number | null;
+  /** The provider asks the viewer for a review they have not given:
+   *  then a missing review is theirs to give. */
+  viewerAsked?: boolean;
 }
 
 export interface ReadinessTally {
@@ -213,9 +222,12 @@ const REVIEW_BLOCKERS: Partial<Record<MergeState['reviews'], ReadinessItem>> = {
 
 /** An unstated requirement is moot where the provider says nothing it
  *  enforces is in the way: GitHub states none when none applies. */
-function reviewsTally({ merge }: ReadinessInputs, t: Tally): void {
+function reviewsTally({ merge, viewerAsked }: ReadinessInputs, t: Tally): void {
   const blocker = REVIEW_BLOCKERS[merge.reviews];
-  if (blocker) t.blockers.push(blocker);
+  // A review still to come is the viewer's where they are asked for it.
+  const theirs = blocker?.resolvedBy === 'reviewers' && viewerAsked;
+  if (blocker)
+    t.blockers.push(theirs ? { ...blocker, resolvedBy: 'viewer' } : blocker);
   if (merge.reviews === 'unknown' && merge.blocked !== false) {
     t.unknowns.push('The review requirement');
   }

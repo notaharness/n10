@@ -440,10 +440,13 @@ describe('githubProvider', () => {
                 author: { login: 'octocat' },
                 isDraft: false,
                 reviews: {
-                  nodes: [{ author: { login: 'bob' }, state: 'APPROVED' }],
+                  nodes: [
+                    { author: { login: 'bob' }, state: 'APPROVED' },
+                    { author: { login: 'dan' }, state: 'COMMENTED' },
+                  ],
                 },
                 // Bob is asked again after approving; carol for the
-                // first time.
+                // first time. Dan only commented, and nobody asked him.
                 reviewRequests: {
                   nodes: [
                     { requestedReviewer: { login: 'Bob' } },
@@ -513,6 +516,12 @@ describe('githubProvider', () => {
             identifier: 'bob',
             decision: 'approved',
             requested: true,
+          },
+          {
+            displayName: 'dan',
+            identifier: 'dan',
+            decision: 'no-response',
+            requested: false,
           },
           {
             displayName: 'carol',

@@ -256,12 +256,17 @@ test.describe('Completion', () => {
     const top = () =>
       completion.evaluate((el) => el.getBoundingClientRect().top);
     const before = await top();
+    // The list's refresh, outside the pane the reader has scrolled: the
+    // row moving is what reads the checks again.
     const refresh = () =>
-      page.getByRole('button', { name: 'Refresh this pull request' }).click();
+      sidebar(page)
+        .getByRole('button', { name: 'Refresh', exact: true })
+        .click();
 
     updateFakeGh(desktop.homeDir, (s) => {
       const build = s.prs[0].checks?.find((c) => c.name === 'build');
       if (build) build.state = 'SUCCESS';
+      s.prs[0].rollup = 'PENDING';
     });
     await refresh();
     // What won't clear by waiting leads: the conversation, not the
@@ -295,6 +300,8 @@ test.describe('Completion', () => {
     const rows = page.getByRole('list', { name: 'Checks and policies' });
     await expect(rows.locator('[data-check]')).toHaveCount(5);
 
+    // The pull request's own Refresh sits beside Back, and the read it
+    // asks for fails.
     updateFakeGh(desktop.homeDir, (s) => {
       s.prs[0].failing = { checks: true };
     });

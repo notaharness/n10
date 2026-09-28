@@ -1,8 +1,10 @@
 import {
+  asksForReview,
   describePullRequest,
   readFailure,
   samePullRequest,
   type PullRequestChecks,
+  type PullRequestInfo,
   type PullRequestRef,
   type ReadOutcome,
 } from '@n10/vcs-core';
@@ -39,6 +41,20 @@ export interface PullRequestChecksAnswer {
   /** The checks and policies to read, in order; null where they could
    *  not be read. */
   list: CheckList | null;
+}
+
+/** The list row asks the viewer for a review that would count: the
+ *  provider's own request. A draft asks no one yet, and an approval
+ *  asked for again already counts, so a review still missing is not
+ *  one the viewer can add. */
+function asksViewer(
+  row: PullRequestInfo | null,
+  viewer: string | null
+): boolean {
+  if (!row || row.isDraft || viewer == null) return false;
+  const me = viewer.toLowerCase();
+  const entry = row.reviewers?.find((r) => r.identifier.toLowerCase() === me);
+  return entry != null && entry.decision !== 'approved' && asksForReview(entry);
 }
 
 export interface ChecksSources
@@ -100,6 +116,7 @@ export async function readPullRequestChecks(
             checks: checks.value.checks,
             rules: checks.value.rules,
             unresolvedThreads: unresolved,
+            viewerAsked: asksViewer(row, viewer),
           })
         : listReadiness(row),
     list: checks.state === 'read' ? checkList(checks.value) : null,

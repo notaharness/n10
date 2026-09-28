@@ -5,10 +5,18 @@ import {
   useState,
   type RefObject,
 } from 'react';
+import { useNarrow } from '../use-narrow.js';
+import {
+  NARROW_WORKSPACE,
+  RAIL_SHOWN,
+  railAtWidth,
+  railByReader,
+} from './rail-model.js';
 import { firstUnresolvedThread, type CommentRow } from './review-model.js';
 
 /**
- * The review rail's own visibility: hidden or shown, its Comments list
+ * The review rail's own visibility: hidden or shown (by the reader, or
+ * for a workspace too narrow for it; `rail-model.ts`), its Comments list
  * collapsed or expanded, and the header's "N unresolved" count, which
  * opens both and focuses the first open thread in the diff and the list.
  */
@@ -20,7 +28,17 @@ export function useReviewRail(
   threads: { isFetching: boolean; refetch: () => Promise<unknown> },
   rootRef: RefObject<HTMLElement | null>
 ) {
-  const [hidden, setHidden] = useState(false);
+  const narrow = useNarrow(rootRef, NARROW_WORKSPACE);
+  const [rail, setRail] = useState(RAIL_SHOWN);
+  // Adjusted during render, so the rail never paints at a width it has
+  // already left.
+  const atWidth = railAtWidth(rail, narrow);
+  if (atWidth !== rail) setRail(atWidth);
+  const { hidden } = atWidth;
+  const setHidden = useCallback(
+    (next: boolean) => setRail((r) => railByReader(r, next)),
+    []
+  );
   const [commentsOpen, setCommentsOpen] = useState(true);
   const { items, jumpToId } = nav;
   const { isFetching, refetch } = threads;
@@ -68,7 +86,7 @@ export function useReviewRail(
     refetch().catch(() => {
       pending.current = false;
     });
-  }, [items, reveal, refetch]);
+  }, [items, reveal, refetch, setHidden]);
 
   return { hidden, setHidden, commentsOpen, setCommentsOpen, showUnresolved };
 }

@@ -233,8 +233,24 @@ no policies, required reviewers, conflicts or merge permission, so readiness
 stays "not fully known" until those are read. Until a native requirement signal
 is read, an approval or a passing check is an observation, and a failing check
 or a holding verdict is a concern, not a block; only the provider's own
-lifecycle (open, draft) is a verdict. Verdicts sit below the reviewers, as
-outline buttons; the next step is the only primary action.
+lifecycle (open, draft) is a verdict. The next step's button is the Overview's
+one way into a review: there are no instant verdict buttons, so a verdict is
+given from the changes, where the reviewer has read them.
+
+The Overview has no header bar; its heading carries the pull request's identity
+and actions. Every other pane keeps the bar across the rail and the pane, so the
+rail sits 40 px lower there than on the Overview: beside the rail, the bar would
+lose the rail's width and its title or its details. The terminal's bar has
+"← Review", which goes up to the review pane last shown, never back through
+history. Below 720 px of workspace width the rail folds with its own collapse
+control, and it comes back once there is room unless the reader chose since
+(`rail-model.ts`).
+
+Completion says "Waiting for your review" where the provider asks the viewer for
+a review that would count (`asksViewer`). Readiness knows only that a review is
+required, not whose would satisfy it: GitHub code owners and Azure DevOps
+required reviewers are not on the list row, so an optional reviewer or a
+non-owner who is asked is still named.
 
 The checks read (`getPullRequestChecks`) takes readiness from the provider's own
 verdict, GitHub's `mergeStateStatus`, and explains it with the provider's facts:

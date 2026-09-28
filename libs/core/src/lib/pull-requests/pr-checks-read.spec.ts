@@ -57,6 +57,65 @@ function sources(over: Partial<ChecksSources> = {}): ChecksSources {
 }
 
 describe('readPullRequestChecks', () => {
+  it('makes a review still to come the viewer’s where the provider asks them', async () => {
+    const required = answer({
+      merge: { ...answer().merge, reviews: 'required' },
+    });
+    const withReviewers = (
+      reviewers: PullRequestInfo['reviewers'],
+      isDraft = false
+    ) =>
+      sources({
+        checks: () => Promise.resolve(required),
+        lookup: () =>
+          Promise.resolve({
+            kind: 'found',
+            pr: { ...ROW, reviewers, isDraft },
+          }),
+      });
+    const resolver = async (
+      reviewers: PullRequestInfo['reviewers'],
+      isDraft?: boolean
+    ) =>
+      (
+        await readPullRequestChecks(
+          { ref: REF, viewer: 'bob' },
+          withReviewers(reviewers, isDraft)
+        )
+      ).readiness.blockers.find((b) => b.kind === 'reviews')?.resolvedBy;
+    const bob = { identifier: 'Bob', displayName: 'Bob' };
+    expect(await resolver([{ ...bob, decision: 'no-response' }])).toBe(
+      'viewer'
+    );
+    // Asked again after holding it: their next review is what is missing.
+    expect(
+      await resolver([
+        { ...bob, decision: 'changes-requested', requested: true },
+      ])
+    ).toBe('viewer');
+    // Asked again after approving: the approval already counts.
+    expect(
+      await resolver([{ ...bob, decision: 'approved', requested: true }])
+    ).toBe('reviewers');
+    // Not asked: someone else is, or they declined.
+    expect(
+      await resolver([
+        { identifier: 'cy', displayName: 'Cy', decision: 'no-response' },
+      ])
+    ).toBe('reviewers');
+    expect(await resolver([{ ...bob, decision: 'declined' }])).toBe(
+      'reviewers'
+    );
+    // Only commented, where the list says who was asked.
+    expect(
+      await resolver([{ ...bob, decision: 'no-response', requested: false }])
+    ).toBe('reviewers');
+    // A draft asks no one yet.
+    expect(await resolver([{ ...bob, decision: 'no-response' }], true)).toBe(
+      'reviewers'
+    );
+  });
+
   it('evaluates readiness with the list row’s unresolved conversations', async () => {
     const res = await readPullRequestChecks(
       { ref: REF, viewer: 'bob' },

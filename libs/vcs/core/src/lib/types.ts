@@ -61,6 +61,16 @@ export interface PullRequestReviewer {
   requested?: boolean;
 }
 
+/** The provider holds a request for this reviewer's verdict. Where the
+ *  list says (GitHub's review requests, including one asked again after
+ *  a verdict), that is the answer; a comment is not a request. Where it
+ *  does not (Azure DevOps keeps no request apart from its list), a
+ *  listed reviewer who has neither voted nor declined is asked. */
+export function asksForReview(reviewer: PullRequestReviewer): boolean {
+  if (reviewer.decision === 'declined') return false;
+  return reviewer.requested ?? reviewer.decision === 'no-response';
+}
+
 export interface PullRequestInfo {
   id: number;
   title: string;
