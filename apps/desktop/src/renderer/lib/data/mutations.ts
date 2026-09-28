@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import { keys } from './query-keys.js';
 import { verdictDecision } from '../review/review-verdict.js';
 import { errorMessage } from '../utils.js';
+import { useTabs } from '../tabs/tabs.js';
+import { keptNotice } from './removal-notice.js';
 import type {
   PlanCheckoutRequest,
   PostDraftsRequest,
@@ -19,6 +21,7 @@ import type {
   ReviewVerdict,
   SessionLaunchRequest,
   SidebarItem,
+  WorktreeRemovalCheck,
 } from '../../../host/contract.js';
 
 /**
@@ -127,15 +130,30 @@ const REMOVE_WORKTREE_KEY = ['remove-worktree'] as const;
 
 export function useRemoveWorktree(cwd: string) {
   const inv = useInvalidator(cwd);
+  const tabs = useTabs();
   return useMutation({
     mutationKey: REMOVE_WORKTREE_KEY,
-    mutationFn: ({ branch, force }: { branch: string; force: boolean }) =>
-      window.n10.removeWorktree(branch, force),
+    mutationFn: ({
+      branch,
+      approved,
+    }: {
+      branch: string;
+      approved: WorktreeRemovalCheck;
+      /** The worktree's tab, closed once the worktree is gone. */
+      tabId?: string;
+    }) => window.n10.removeWorktree(branch, approved),
     // Reported here rather than through `mutate`'s own callbacks: the
     // confirm dialog closes as soon as it fires, and per-call callbacks
     // are dropped when their component unmounts. Mutation-level ones run
     // either way, so the outcome is never swallowed.
-    onSuccess: (_r, { branch }) => toast.success(`Removed worktree ${branch}`),
+    onSuccess: (outcome, { branch, tabId }) => {
+      // A kept worktree keeps its tab: its agent may still be running.
+      const gone = outcome === 'removed' || outcome === 'kept-branch';
+      if (gone && tabId) tabs.close(tabId, cwd);
+      const notice = keptNotice(branch, outcome);
+      if (notice) toast.warning(notice);
+      else toast.success(`Removed worktree ${branch}`);
+    },
     onError: (err) => toast.error(errorMessage(err)),
     onSettled: () => {
       void inv.sidebar();

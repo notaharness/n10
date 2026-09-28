@@ -256,7 +256,7 @@ function MainTabBody({
     selectByKey: sidebar.selectByKey,
   });
 
-  useInactiveAlertWatcher(sidebar.sessionNameForTerminal);
+  useInactiveAlertWatcher();
 
   const jumpEnabled = configCtx.config.jumpToInactiveOnEscape !== false;
   const onTerminalEscape = useCallback(() => {

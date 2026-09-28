@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { WorktreeRemovalCheck } from '@n10/core';
 
 export type DeleteConfirmMode = 'type-branch' | 'yes-no';
 
@@ -11,6 +12,9 @@ export interface DeleteConfirmState {
   // 'yes-no' = low friction (Y/N) when only the in-memory agent session
   // is at stake — the branch itself is git-clean.
   mode: DeleteConfirmMode;
+  /** The verdict the prompt shows. Confirming removes with exactly
+   *  this, so nothing the check did not see is forced away. */
+  approved: WorktreeRemovalCheck;
 }
 
 export function useDeleteConfirmation() {
