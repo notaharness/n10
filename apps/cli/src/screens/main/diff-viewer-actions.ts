@@ -15,6 +15,7 @@ import {
   selectedRemoteThread,
   selectedPlanTarget,
   findAdjacentCommentId,
+  reportFailure,
   scrollToComment,
 } from './diff-viewer-action-context.js';
 
@@ -171,12 +172,14 @@ function actionPostComment(a: DiffViewerActionCtx): void {
   };
 
   const postedId = comment.id;
-  const prId = commentCtx.prId;
-  updateComment(prId, postedId, { status: 'posting' });
+  const drafts = commentCtx.drafts;
 
   // Loading state shown by the top-right spinner; no "Posting
-  // comment…" flash. Result/failure toasts fire on completion.
+  // comment…" flash. Result/failure toasts fire on completion. The
+  // draft is marked posting inside the op: a press while a post is in
+  // flight is dropped by `run`, and must not leave its draft marked.
   void ctx.asyncOps.run('post-comment', async () => {
+    await updateComment(drafts, postedId, { status: 'posting' });
     try {
       await postReviewComments([comment], postCtx);
       ctx.sessions.flashStatus('Comment posted');
@@ -186,7 +189,7 @@ function actionPostComment(a: DiffViewerActionCtx): void {
       // without this refresh there'd be a visual gap until the user
       // re-opened the PR.
       ctx.remoteCtx?.refresh();
-      const freshComments = readComments(prId).filter(
+      const freshComments = (await readComments(drafts)).filter(
         (c) => c.file === ctx.pane.diffViewFile
       );
       const nextDraftId = findAdjacentCommentId(
@@ -203,8 +206,8 @@ function actionPostComment(a: DiffViewerActionCtx): void {
         ctx.pane.setSelectedCommentId(null);
       }
     } catch (err) {
-      updateComment(prId, postedId, { status: 'draft' });
       ctx.sessions.flashStatus(`Post failed: ${(err as Error).message}`);
+      await updateComment(drafts, postedId, { status: 'draft' });
     }
   });
 }
@@ -224,13 +227,17 @@ function actionEditorEdit(a: DiffViewerActionCtx): void {
     return;
   }
 
-  const prId = commentCtx.prId;
+  const drafts = commentCtx.drafts;
   openCommentInEditor({
     commentId: comment.id,
     initialBody: comment.body,
     editor,
     onUpdate: (newBody) => {
-      updateComment(prId, comment.id, { body: newBody });
+      reportFailure(
+        ctx,
+        'Save',
+        updateComment(drafts, comment.id, { body: newBody })
+      );
     },
   });
 

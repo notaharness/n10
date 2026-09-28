@@ -271,8 +271,13 @@ export function buildScenario() {
   );
 
   // Agent-drafted review comments on #131, as `n10 util add-comment`
-  // leaves them.
-  const draftsDir = join(n10, 'reviews', 'pr-131');
+  // leaves them: under the repository's key — see draftRepoKey() in
+  // @n10/review-comments' comment store.
+  const repoKey = createHash('sha256')
+    .update(JSON.stringify(['github', 'acme', 'atlas']))
+    .digest('hex')
+    .slice(0, 16);
+  const draftsDir = join(n10, 'reviews', repoKey, 'pr-131');
   mkdirSync(draftsDir, { recursive: true });
   writeFileSync(
     join(draftsDir, 'comments.json'),

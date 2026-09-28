@@ -3,6 +3,7 @@ import type * as ReviewCommentsModule from '@n10/review-comments';
 import {
   readComments,
   updateComment,
+  removeComment,
   postReviewComments,
   type ReviewComment,
   type CommentPositionInfo,
@@ -37,9 +38,9 @@ vi.mock('@n10/review-comments', async (importOriginal) => {
   const actual = await importOriginal<typeof ReviewCommentsModule>();
   return {
     ...actual,
-    readComments: vi.fn().mockReturnValue([]),
-    updateComment: vi.fn(),
-    removeComment: vi.fn(),
+    readComments: vi.fn().mockResolvedValue([]),
+    updateComment: vi.fn().mockResolvedValue(true),
+    removeComment: vi.fn().mockResolvedValue(true),
     postReviewComments: vi.fn().mockResolvedValue(undefined),
   };
 });
@@ -193,6 +194,7 @@ interface CtxOpts {
 }
 
 const PR_ID = 1;
+const DRAFT_REPO = '0123456789abcdef';
 
 function makeCtx(
   pane: DiffViewerHandlerCtx['pane'],
@@ -236,6 +238,7 @@ function makeCommentCtx(opts: CtxOpts) {
   return {
     comments: opts.comments ?? [],
     prId: opts.prId ?? PR_ID,
+    drafts: { repo: DRAFT_REPO, prId: opts.prId ?? PR_ID },
     positions: opts.positions ?? new Map(),
     selectedReviewPr: {
       id: opts.prId ?? PR_ID,
@@ -256,7 +259,9 @@ function makeRemoteCtx(opts: CtxOpts) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(readComments).mockReturnValue([]);
+  vi.mocked(readComments).mockResolvedValue([]);
+  vi.mocked(updateComment).mockResolvedValue(true);
+  vi.mocked(removeComment).mockResolvedValue(true);
   vi.mocked(postReviewComments).mockResolvedValue(undefined);
 });
 
@@ -671,9 +676,14 @@ describe('diff-viewer handler — post-comment', () => {
     );
   });
 
-  it('marks the comment posting and hands off to asyncOps.run', () => {
+  /** `run` drops a press while a post is in flight; marking the draft
+   *  outside it would leave that draft stuck as posting. */
+  it('marks the comment posting inside the asyncOps.run op', async () => {
     const pane = makePane({ selectedCommentId: 'd1' });
-    const run = vi.fn();
+    let captured: (() => Promise<void>) | undefined;
+    const run = vi.fn((_key: string, fn: () => Promise<void>) => {
+      captured = fn;
+    });
     const ctx = makeCtx(pane, {
       comments: [makeComment({ id: 'd1', status: 'draft' })],
       config: { vendor: 'github' },
@@ -682,15 +692,24 @@ describe('diff-viewer handler — post-comment', () => {
       asyncOpsRun: run,
     });
     handleDiffViewerInput('p', makeKey(), ctx);
-    expect(updateComment).toHaveBeenCalledWith(7, 'd1', { status: 'posting' });
     expect(run).toHaveBeenCalledWith('post-comment', expect.any(Function));
+    expect(updateComment).not.toHaveBeenCalled();
+    await captured!();
+    expect(updateComment).toHaveBeenCalledWith(
+      { repo: DRAFT_REPO, prId: 7 },
+      'd1',
+      { status: 'posting' }
+    );
   });
 
   it('on success, refreshes remote threads and selects the next draft', async () => {
     const pane = makePane({ selectedCommentId: 'd1' });
     const d1 = makeComment({ id: 'd1', status: 'draft', lineStart: 1 });
     const d2 = makeComment({ id: 'd2', status: 'draft', lineStart: 2 });
-    vi.mocked(readComments).mockReturnValue([{ ...d1, status: 'posted' }, d2]);
+    vi.mocked(readComments).mockResolvedValue([
+      { ...d1, status: 'posted' },
+      d2,
+    ]);
     const refresh = vi.fn();
     let captured: (() => Promise<void>) | undefined;
     const run = vi.fn((_key: string, fn: () => Promise<void>) => {
@@ -731,7 +750,11 @@ describe('diff-viewer handler — post-comment', () => {
     });
     handleDiffViewerInput('p', makeKey(), ctx);
     await captured!();
-    expect(updateComment).toHaveBeenCalledWith(7, 'd1', { status: 'draft' });
+    expect(updateComment).toHaveBeenCalledWith(
+      { repo: DRAFT_REPO, prId: 7 },
+      'd1',
+      { status: 'draft' }
+    );
     expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
       'Post failed: network down'
     );
@@ -888,6 +911,27 @@ describe('diff-viewer handler — toggle-thread-resolved', () => {
 // internal Esc/Enter/text-append contract; these two tests only pin
 // that the diff-viewer wires the bypass in *before* any of the 22
 // actions can dispatch.
+
+describe('diff-viewer handler — draft writes', () => {
+  /** A draft write waits on the drafts lock and can fail; the handler
+   *  has already returned by then, so the failure is flashed. */
+  it('flashes a save that failed', async () => {
+    vi.mocked(updateComment).mockRejectedValue(new Error('Timed out'));
+    const pane = makePane({ editingCommentId: 'd1', editBuffer: 'new body' });
+    const ctx = makeCtx(pane, { comments: [makeComment({ id: 'd1' })] });
+    handleDiffViewerInput('', makeKey({ escape: true }), ctx);
+    expect(updateComment).toHaveBeenCalledWith(
+      { repo: DRAFT_REPO, prId: PR_ID },
+      'd1',
+      { body: 'new body' }
+    );
+    await vi.waitFor(() =>
+      expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
+        'Save failed: Timed out'
+      )
+    );
+  });
+});
 
 describe('diff-viewer handler — reply-mode bypass', () => {
   it('swallows a bound key as text input instead of firing its action', () => {

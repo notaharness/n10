@@ -1,10 +1,12 @@
 import { readConfig } from '@n10/vcs-core';
 import {
+  draftRepoKey,
   postReviewComments,
   readComments,
   removeComment,
   resolveComment,
   updateComment,
+  type DraftScope,
   type PostContext,
   type ReviewComment,
 } from '@n10/review-comments';
@@ -13,9 +15,10 @@ import type { PostDraftsRequest } from '../contract.js';
 
 /**
  * Draft review comments written by the review agent through
- * `n10 util add-comment` (stored per PR under ~/.n10/reviews). The
- * desktop shows them live in the diff and posts them with the same
- * poster the TUI uses, so both shells stay interchangeable.
+ * `n10 util add-comment` (stored per repository and PR under
+ * ~/.n10/reviews). The desktop shows them live in the diff and posts
+ * them with the same poster the TUI uses, so both shells stay
+ * interchangeable.
  */
 
 /** IPC-boundary validation, matching reviews.ts. `prId` becomes a path
@@ -28,14 +31,32 @@ function requirePrId(prId: unknown): number {
   return prId;
 }
 
-export function listDraftComments(prId: number): ReviewComment[] {
-  return readComments(requirePrId(prId));
+/** The open repository's drafts for `prId`, or null when its project
+ *  names no repository to keep drafts for. */
+function draftScope(prId: unknown): DraftScope | null {
+  const id = requirePrId(prId);
+  const config = readConfig(requireRepo());
+  const repo = draftRepoKey(config.vendor, config.vendorProject);
+  return repo ? { repo, prId: id } : null;
+}
+
+function requireDraftScope(prId: unknown): DraftScope {
+  const scope = draftScope(prId);
+  if (!scope) throw new Error('No repository is configured for drafts');
+  return scope;
+}
+
+export async function listDraftComments(
+  prId: number
+): Promise<ReviewComment[]> {
+  const scope = draftScope(prId);
+  return scope ? readComments(scope) : [];
 }
 
 /** TUI parity: posted comments are immutable and a comment mid-post
  *  can't be edited or deleted out from under the poster. */
-function requireEditable(prId: number, id: string): void {
-  const existing = readComments(requirePrId(prId)).find((c) => c.id === id);
+async function requireEditable(scope: DraftScope, id: string): Promise<void> {
+  const existing = (await readComments(scope)).find((c) => c.id === id);
   if (!existing) {
     throw new Error('Draft comment no longer exists');
   }
@@ -47,13 +68,15 @@ function requireEditable(prId: number, id: string): void {
   }
 }
 
-export function updateDraftComment(
+export async function updateDraftComment(
   prId: number,
   id: string,
   patch: Partial<Pick<ReviewComment, 'body' | 'severity'>>
-): void {
-  requireEditable(requirePrId(prId), id);
-  if (!updateComment(prId, id, resolvedPatch(prId, id, patch))) {
+): Promise<void> {
+  const scope = requireDraftScope(prId);
+  await requireEditable(scope, id);
+  const resolved = await resolvedPatch(scope, id, patch);
+  if (!(await updateComment(scope, id, resolved))) {
     throw new Error('Draft comment no longer exists');
   }
 }
@@ -68,13 +91,13 @@ export function updateDraftComment(
  * `n10 util add-comment` does when the agent writes the draft, so the
  * two write paths cannot leave the file in different shapes.
  */
-function resolvedPatch(
-  prId: number,
+async function resolvedPatch(
+  scope: DraftScope,
   id: string,
   patch: Partial<Pick<ReviewComment, 'body' | 'severity'>>
-): Partial<Pick<ReviewComment, 'body' | 'severity'>> {
+): Promise<Partial<Pick<ReviewComment, 'body' | 'severity'>>> {
   if (patch.body === undefined) return patch;
-  const existing = readComments(prId).find((c) => c.id === id);
+  const existing = (await readComments(scope)).find((c) => c.id === id);
   const declared = patch.severity ?? existing?.severity;
   if (!declared) return patch;
   return {
@@ -83,9 +106,13 @@ function resolvedPatch(
   };
 }
 
-export function deleteDraftComment(prId: number, id: string): void {
-  requireEditable(requirePrId(prId), id);
-  if (!removeComment(prId, id)) {
+export async function deleteDraftComment(
+  prId: number,
+  id: string
+): Promise<void> {
+  const scope = requireDraftScope(prId);
+  await requireEditable(scope, id);
+  if (!(await removeComment(scope, id))) {
     throw new Error('Draft comment no longer exists');
   }
 }
@@ -123,7 +150,8 @@ export async function postDraftComments(
   requirePrId(req.prId);
   const config = readConfig(cwd);
   const vendor = requirePostVendor(config.vendor, req.headSha);
-  const all = readComments(req.prId);
+  const scope = requireDraftScope(req.prId);
+  const all = await readComments(scope);
   const wanted = all.filter(
     (c) => c.status === 'draft' && (!req.ids || req.ids.includes(c.id))
   );
@@ -142,7 +170,7 @@ export async function postDraftComments(
   // failure to exactly the comment that failed.
   let posted = 0;
   for (const c of wanted) {
-    updateComment(req.prId, c.id, { status: 'posting' });
+    await updateComment(scope, c.id, { status: 'posting' });
     try {
       // A non-COMMENT event (verdict) must ride exactly one review —
       // repeating it per comment would file N approvals on GitHub.
@@ -153,7 +181,7 @@ export async function postDraftComments(
       );
       posted += 1;
     } catch (err) {
-      updateComment(req.prId, c.id, { status: 'draft' });
+      await updateComment(scope, c.id, { status: 'draft' });
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(
         posted > 0

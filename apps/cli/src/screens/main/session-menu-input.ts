@@ -104,6 +104,9 @@ async function launchReview(
 ): Promise<string | null> {
   const pr = ctx.pane.sessionMenu?.pr;
   if (!pr) return null;
+  // Before the worktree: a project with no repository to keep the
+  // agent's drafts for refuses here, not after creating a checkout.
+  const request = buildReviewLaunchRequest(pr, ctx.config.config, instruction);
   const worktreePath = await createWorktree(pr.sourceBranch);
   if (!worktreePath) {
     ctx.sessions.flashStatus(
@@ -119,7 +122,7 @@ async function launchReview(
     cols: ctx.terminal.paneCols,
     rows: ctx.terminal.paneRows,
     config: ctx.config.config,
-    request: buildReviewLaunchRequest(pr, instruction),
+    request,
   });
   return name;
 }

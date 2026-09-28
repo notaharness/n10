@@ -21,7 +21,11 @@ import type {
   SettingsValue,
   TerminalLayout,
 } from '../../input-handlers.js';
-import type { CommentPositionInfo, RowMap } from '@n10/review-comments';
+import type {
+  CommentPositionInfo,
+  DraftScope,
+  RowMap,
+} from '@n10/review-comments';
 
 // ── Context slice types ──────────────────────────────────────────
 
@@ -92,6 +96,8 @@ export interface DiffFileListHandlerCtx {
 export interface CommentContext {
   comments: ReviewComment[];
   prId: number;
+  /** Where `comments` are stored: this repository's drafts for `prId`. */
+  drafts: DraftScope;
   positions: Map<string, CommentPositionInfo>;
   selectedReviewPr: PullRequestInfo;
 }

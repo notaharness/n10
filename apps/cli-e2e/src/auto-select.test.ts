@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { draftRepoKey } from '@n10/review-comments';
 import { test, expect } from './fixtures/n10.js';
 import { registerCleanup } from './setup/git-repo.js';
 import { selectSidebarRow } from './setup/sidebar.js';
@@ -178,7 +179,16 @@ test.describe('@integration Auto-select first comment', () => {
     // (interleaveComments drops them), so `info` is undefined,
     // `rowEntry` is undefined, and the auto-select effect bails
     // forever — no thread gets selected.
-    const reviewsDir = join(homeDir, '.n10', 'reviews', 'pr-38');
+    // Under the key of the repository the fixture checkout's remote
+    // names, which is the project the TUI auto-detects.
+    const [owner, repo] = TEST_REPO.split('/');
+    const reviewsDir = join(
+      homeDir,
+      '.n10',
+      'reviews',
+      draftRepoKey('github', { owner, repo })!,
+      'pr-38'
+    );
     mkdirSync(reviewsDir, { recursive: true });
     const seededLine = Math.max(1, firstInlineThread!.line - 5);
     const file = {

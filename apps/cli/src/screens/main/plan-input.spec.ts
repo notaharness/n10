@@ -151,6 +151,7 @@ function viewerCtx(pane: DiffViewerHandlerCtx['pane']): DiffViewerHandlerCtx {
     commentCtx: {
       comments: [localDraft()],
       prId: PR_ID,
+      drafts: { repo: '0123456789abcdef', prId: PR_ID },
       positions: new Map(),
       selectedReviewPr: { id: PR_ID } as never,
     },

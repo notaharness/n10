@@ -295,6 +295,28 @@ Babysitter thread reads use the provider throttle and TTL outside the list-cycle
 budget. GitHub gets rollup and counts with its list query and needs no equivalent
 per-row cache-reset methods. `request-budget.spec.ts` checks request counts.
 
+## Review drafts
+
+A review agent's drafts live in `~/.n10/reviews/<repo>/pr-<id>/comments.json`.
+`<repo>` is `draftRepoKey`: a hash of the provider and the project fields the
+poster addresses (GitHub owner/repo, Azure org/project/repo), case-folded. A PR
+number alone is shared by every repository, and a draft read under the wrong
+one would be posted to it. The agent's worktree cannot derive the key, so the
+review launch names it (`add-comment --repo=`); the poster derives the same key
+from its own post context, so a draft is marked posted in the repository it was
+posted to.
+
+Agents, the TUI and the desktop all rewrite the file. Each read-modify-write
+runs under a lock file beside it (`file-lock.ts`) holding its owner's host, pid
+and a nonce. A holder releases the lock only while it still holds its token. A
+waiter takes over only from a holder shown to be gone: a process on this machine
+that no longer exists, or a lock older than a minute when the holder cannot be
+checked. It does so under a second lock, re-checking the token, so two waiters
+cannot both break it. A live holder is waited for, and a waiter gives up loudly
+after ten seconds. The store is async throughout and waits on timers: the TUI
+and the desktop host take the lock on the thread that draws the UI. Readers take no lock: writes go to a unique temporary file
+and are renamed into place.
+
 ## Diff generation and rendering
 
 PR diffs compare commits so review anchors remain stable. Bare worktree diffs

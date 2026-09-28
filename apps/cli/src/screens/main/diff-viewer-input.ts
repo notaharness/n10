@@ -9,6 +9,7 @@ import { updateComment, removeComment } from '@n10/review-comments';
 import { handlePlanAnnotateInput } from '../../utils/plan-annotate-mode.js';
 import type { DiffViewerHandlerCtx } from './input-types.js';
 import { DIFF_VIEWER_ACTIONS } from './diff-viewer-actions.js';
+import { reportFailure } from './diff-viewer-action-context.js';
 
 // ── Modes exempt from keybind resolution ─────────────────────────
 // These sit *above* action dispatch: while one is active the keypress
@@ -23,9 +24,13 @@ function handleInlineEditMode(
 ): void {
   if (key.escape) {
     if (ctx.commentCtx) {
-      updateComment(ctx.commentCtx.prId, editingCommentId, {
-        body: ctx.pane.editBuffer,
-      });
+      reportFailure(
+        ctx,
+        'Save',
+        updateComment(ctx.commentCtx.drafts, editingCommentId, {
+          body: ctx.pane.editBuffer,
+        })
+      );
     }
     ctx.pane.setEditingCommentId(null);
     ctx.pane.setEditBuffer('');
@@ -51,7 +56,11 @@ function handleDeleteConfirmMode(
   pendingDeleteCommentId: string
 ): void {
   if (input === 'y' && ctx.commentCtx) {
-    removeComment(ctx.commentCtx.prId, pendingDeleteCommentId);
+    reportFailure(
+      ctx,
+      'Delete',
+      removeComment(ctx.commentCtx.drafts, pendingDeleteCommentId)
+    );
     ctx.pane.setPendingDeleteCommentId(null);
     ctx.pane.setSelectedCommentId(null);
     return;

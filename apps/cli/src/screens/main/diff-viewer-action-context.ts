@@ -189,3 +189,19 @@ export function selectedPlanTarget(a: DiffViewerActionCtx): PlanItem | null {
   const remote = selectedRemoteThread(a);
   return remote ? snapshotRemote(remote) : null;
 }
+
+/**
+ * Flash a draft write that failed. Not `asyncOps.run`: it drops a call
+ * while one of the same name is in flight, and a save dropped that way
+ * is an edit lost.
+ */
+export function reportFailure(
+  ctx: Pick<DiffViewerHandlerCtx, 'sessions'>,
+  what: string,
+  write: Promise<unknown>
+): void {
+  write.catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    ctx.sessions.flashStatus(`${what} failed: ${message}`);
+  });
+}
