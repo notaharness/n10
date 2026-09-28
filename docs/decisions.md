@@ -393,7 +393,9 @@ demand is its renderer's sidebar poll.
   reached GitHub.
 - The engine resolves providers from the persisted config. The TUI persists a
   settings edit in a microtask, so its settings effects are queued behind that
-  write.
+  write. A settings edit's `refresh-remote` is a forced read, not `refresh()`:
+  a credential change has already reset every provider, and an interval edit
+  should not cost a cycle of per-row reads.
 
 GitHub uses authenticated `gh`; offline tests replace that executable on PATH.
 Azure DevOps uses REST and a PAT, with recorded anonymized fixtures rather than
