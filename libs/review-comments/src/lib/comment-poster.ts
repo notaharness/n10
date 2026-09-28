@@ -116,7 +116,7 @@ export async function postReviewComments(
   if (ctx.vendor === 'github' && !ctx.headSha) {
     throw new Error('headSha is required for GitHub reviews');
   }
-  const { token, claimed } = claimForPosting(
+  const { token, claimed } = await claimForPosting(
     drafts,
     comments.map((c) => c.id)
   );
@@ -132,11 +132,11 @@ export async function postReviewComments(
       await postAzureDevOps(claimed, ctx);
     }
   } catch (err) {
-    releaseClaim(drafts, ids, token);
+    await releaseClaim(drafts, ids, token);
     throw err;
   }
   try {
-    settleClaim(drafts, ids, token, 'posted');
+    await settleClaim(drafts, ids, token, 'posted');
   } catch (err) {
     // The provider has them. Reporting a failure would invite a retry
     // that posts them twice; the claim stays until this process exits.
@@ -150,9 +150,13 @@ export async function postReviewComments(
 
 /** Offer the drafts again. A failure here must not hide the post's own
  *  error: the claim then ends with this process instead. */
-function releaseClaim(drafts: DraftScope, ids: string[], token: string): void {
+async function releaseClaim(
+  drafts: DraftScope,
+  ids: string[],
+  token: string
+): Promise<void> {
   try {
-    settleClaim(drafts, ids, token, 'draft');
+    await settleClaim(drafts, ids, token, 'draft');
   } catch {
     // Readers offer a dead poster's drafts again (`readComments`).
   }

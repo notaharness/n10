@@ -53,7 +53,7 @@ function parseScope(parsed: Record<string, string>): DraftScope {
   return { repo: parsed.repo, prId };
 }
 
-function handleAddComment(args: string[]): void {
+async function handleAddComment(args: string[]): Promise<void> {
   const parsed = parseArgs(args);
 
   const missing: string[] = [];
@@ -121,7 +121,7 @@ function handleAddComment(args: string[]): void {
     ...(parsed.thread ? { threadId: parsed.thread } : {}),
   };
 
-  appendComment(scope, comment);
+  await appendComment(scope, comment);
   console.log(comment.id);
 }
 
@@ -129,7 +129,7 @@ export async function handleUtilCommand(args: string[]): Promise<void> {
   const subcommand = args[0];
 
   if (subcommand === 'add-comment') {
-    handleAddComment(args.slice(1));
+    await handleAddComment(args.slice(1));
     return;
   }
 

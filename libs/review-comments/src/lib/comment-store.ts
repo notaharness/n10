@@ -1,10 +1,4 @@
-import {
-  readFileSync,
-  writeFileSync,
-  mkdirSync,
-  renameSync,
-  rmSync,
-} from 'node:fs';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -82,13 +76,16 @@ export function commentFilePath(scope: DraftScope): string {
 }
 
 /**
- * A PR's drafts. A draft whose poster died mid-post reads as a draft
- * again (`isClaimGone`), so either shell can offer it to be posted.
+ * A PR's drafts; none when there is no file yet, or it cannot be read.
+ * A draft whose poster died mid-post reads as a draft again
+ * (`isClaimGone`), so either shell can offer it to be posted.
  */
-export function readComments(scope: DraftScope): ReviewComment[] {
+export async function readComments(
+  scope: DraftScope
+): Promise<ReviewComment[]> {
   let comments: ReviewComment[];
   try {
-    const data = readFileSync(commentFilePath(scope), 'utf8');
+    const data = await readFile(commentFilePath(scope), 'utf8');
     const parsed: ReviewCommentsFile = JSON.parse(data);
     comments = parsed.comments ?? [];
   } catch {
@@ -117,31 +114,34 @@ export function readComments(scope: DraftScope): ReviewComment[] {
  * `change` edits the array in place and says whether it changed
  * anything; nothing is written when it did not.
  */
-function modifyComments(
+async function modifyComments(
   scope: DraftScope,
   change: (comments: ReviewComment[]) => boolean
-): boolean {
+): Promise<boolean> {
   const dir = commentDirPath(scope);
-  mkdirSync(dir, { recursive: true });
+  await mkdir(dir, { recursive: true });
   const filePath = join(dir, 'comments.json');
-  return withFileLock(`${filePath}.lock`, () => {
-    const comments = readComments(scope);
+  return withFileLock(`${filePath}.lock`, async () => {
+    const comments = await readComments(scope);
     if (!change(comments)) return false;
     const data: ReviewCommentsFile = { prId: scope.prId, comments };
     const tmpPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
     try {
-      writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-      renameSync(tmpPath, filePath);
+      await writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf8');
+      await rename(tmpPath, filePath);
     } catch (err) {
-      rmSync(tmpPath, { force: true });
+      await rm(tmpPath, { force: true });
       throw err;
     }
     return true;
   });
 }
 
-export function appendComment(scope: DraftScope, comment: ReviewComment): void {
-  modifyComments(scope, (comments) => {
+export async function appendComment(
+  scope: DraftScope,
+  comment: ReviewComment
+): Promise<void> {
+  await modifyComments(scope, (comments) => {
     comments.push(comment);
     return true;
   });
@@ -151,7 +151,7 @@ export function updateComment(
   scope: DraftScope,
   id: string,
   patch: Partial<ReviewComment>
-): boolean {
+): Promise<boolean> {
   return modifyComments(scope, (comments) => {
     const idx = comments.findIndex((c) => c.id === id);
     if (idx === -1) return false;
@@ -160,7 +160,7 @@ export function updateComment(
   });
 }
 
-export function removeComment(scope: DraftScope, id: string): boolean {
+export function removeComment(scope: DraftScope, id: string): Promise<boolean> {
   return modifyComments(scope, (comments) => {
     const idx = comments.findIndex((c) => c.id === id);
     if (idx === -1) return false;
@@ -199,14 +199,14 @@ function isClaimGone(comment: ReviewComment, now: number): boolean {
  * draft is only ever posted by the one that claimed it. Returns the
  * token and the claimed drafts as stored, in `ids` order.
  */
-export function claimForPosting(
+export async function claimForPosting(
   scope: DraftScope,
   ids: readonly string[]
-): { token: string; claimed: ReviewComment[] } {
+): Promise<{ token: string; claimed: ReviewComment[] }> {
   const token = ownerToken();
   const at = Date.now();
   const claimed = new Map<string, ReviewComment>();
-  modifyComments(scope, (comments) => {
+  await modifyComments(scope, (comments) => {
     for (const comment of comments) {
       // A dead poster's claim already reads as `draft`.
       if (!ids.includes(comment.id) || comment.status !== 'draft') continue;
@@ -224,13 +224,13 @@ export function claimForPosting(
  * offer them again. Only drafts still claimed under `token` change, so
  * a poster whose claim was taken over cannot undo the new one.
  */
-export function settleClaim(
+export async function settleClaim(
   scope: DraftScope,
   ids: readonly string[],
   token: string,
   status: 'posted' | 'draft'
-): void {
-  modifyComments(scope, (comments) => {
+): Promise<void> {
+  await modifyComments(scope, (comments) => {
     let changed = false;
     for (const comment of comments) {
       if (!ids.includes(comment.id) || comment.claim?.token !== token) continue;

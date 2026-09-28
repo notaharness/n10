@@ -46,15 +46,17 @@ function requireDraftScope(prId: unknown): DraftScope {
   return scope;
 }
 
-export function listDraftComments(prId: number): ReviewComment[] {
+export async function listDraftComments(
+  prId: number
+): Promise<ReviewComment[]> {
   const scope = draftScope(prId);
   return scope ? readComments(scope) : [];
 }
 
 /** TUI parity: posted comments are immutable and a comment mid-post
  *  can't be edited or deleted out from under the poster. */
-function requireEditable(scope: DraftScope, id: string): void {
-  const existing = readComments(scope).find((c) => c.id === id);
+async function requireEditable(scope: DraftScope, id: string): Promise<void> {
+  const existing = (await readComments(scope)).find((c) => c.id === id);
   if (!existing) {
     throw new Error('Draft comment no longer exists');
   }
@@ -66,14 +68,15 @@ function requireEditable(scope: DraftScope, id: string): void {
   }
 }
 
-export function updateDraftComment(
+export async function updateDraftComment(
   prId: number,
   id: string,
   patch: Partial<Pick<ReviewComment, 'body' | 'severity'>>
-): void {
+): Promise<void> {
   const scope = requireDraftScope(prId);
-  requireEditable(scope, id);
-  if (!updateComment(scope, id, resolvedPatch(scope, id, patch))) {
+  await requireEditable(scope, id);
+  const resolved = await resolvedPatch(scope, id, patch);
+  if (!(await updateComment(scope, id, resolved))) {
     throw new Error('Draft comment no longer exists');
   }
 }
@@ -88,13 +91,13 @@ export function updateDraftComment(
  * `n10 util add-comment` does when the agent writes the draft, so the
  * two write paths cannot leave the file in different shapes.
  */
-function resolvedPatch(
+async function resolvedPatch(
   scope: DraftScope,
   id: string,
   patch: Partial<Pick<ReviewComment, 'body' | 'severity'>>
-): Partial<Pick<ReviewComment, 'body' | 'severity'>> {
+): Promise<Partial<Pick<ReviewComment, 'body' | 'severity'>>> {
   if (patch.body === undefined) return patch;
-  const existing = readComments(scope).find((c) => c.id === id);
+  const existing = (await readComments(scope)).find((c) => c.id === id);
   const declared = patch.severity ?? existing?.severity;
   if (!declared) return patch;
   return {
@@ -103,10 +106,13 @@ function resolvedPatch(
   };
 }
 
-export function deleteDraftComment(prId: number, id: string): void {
+export async function deleteDraftComment(
+  prId: number,
+  id: string
+): Promise<void> {
   const scope = requireDraftScope(prId);
-  requireEditable(scope, id);
-  if (!removeComment(scope, id)) {
+  await requireEditable(scope, id);
+  if (!(await removeComment(scope, id))) {
     throw new Error('Draft comment no longer exists');
   }
 }
@@ -146,7 +152,7 @@ export async function postDraftComments(
   const config = readConfig(cwd);
   const vendor = requirePostVendor(config.vendor, req.headSha);
   const scope = requireDraftScope(req.prId);
-  const all = readComments(scope);
+  const all = await readComments(scope);
   const wanted = all.filter(
     (c) => c.status === 'draft' && (!req.ids || req.ids.includes(c.id))
   );

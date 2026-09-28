@@ -15,6 +15,7 @@ import {
   selectedRemoteThread,
   selectedPlanTarget,
   findAdjacentCommentId,
+  reportFailure,
   scrollToComment,
 } from './diff-viewer-action-context.js';
 
@@ -187,7 +188,7 @@ function actionPostComment(a: DiffViewerActionCtx): void {
       // without this refresh there'd be a visual gap until the user
       // re-opened the PR.
       ctx.remoteCtx?.refresh();
-      const freshComments = readComments(drafts).filter(
+      const freshComments = (await readComments(drafts)).filter(
         (c) => c.file === ctx.pane.diffViewFile
       );
       const nextDraftId = findAdjacentCommentId(
@@ -230,7 +231,11 @@ function actionEditorEdit(a: DiffViewerActionCtx): void {
     initialBody: comment.body,
     editor,
     onUpdate: (newBody) => {
-      updateComment(drafts, comment.id, { body: newBody });
+      reportFailure(
+        ctx,
+        'Save',
+        updateComment(drafts, comment.id, { body: newBody })
+      );
     },
   });
 

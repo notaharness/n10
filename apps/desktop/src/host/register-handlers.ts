@@ -69,12 +69,10 @@ export function createHostApi(): N10HostApi {
       reviews.submitReviewVerdict(prId, verdict),
     getReviewViewer: () => Promise.resolve(reviews.getReviewViewer()),
     fetchCommentImage: (url) => commentImages.fetchCommentImage(url),
-    listDraftComments: (prId) =>
-      Promise.resolve(drafts.listDraftComments(prId)),
+    listDraftComments: (prId) => drafts.listDraftComments(prId),
     updateDraftComment: (prId, id, patch) =>
-      Promise.resolve(drafts.updateDraftComment(prId, id, patch)),
-    deleteDraftComment: (prId, id) =>
-      Promise.resolve(drafts.deleteDraftComment(prId, id)),
+      drafts.updateDraftComment(prId, id, patch),
+    deleteDraftComment: (prId, id) => drafts.deleteDraftComment(prId, id),
     postDraftComments: (req) => drafts.postDraftComments(req),
 
     launchAgent: (req) => sessions.launchAgent(req),

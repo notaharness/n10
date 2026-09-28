@@ -34,11 +34,11 @@ const env = vi.hoisted(() => ({
 
 vi.mock('./comment-store.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  claimForPosting: (_scope: DraftScope, ids: string[]) => ({
+  claimForPosting: async (_scope: DraftScope, ids: string[]) => ({
     token: 'token',
     claimed: env.claimedElsewhere ? [] : ids.map((id) => env.drafts.get(id)!),
   }),
-  settleClaim: (
+  settleClaim: async (
     scope: DraftScope,
     ids: string[],
     _token: string,

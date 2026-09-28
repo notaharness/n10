@@ -3,6 +3,7 @@ import type * as ReviewCommentsModule from '@n10/review-comments';
 import {
   readComments,
   updateComment,
+  removeComment,
   postReviewComments,
   type ReviewComment,
   type CommentPositionInfo,
@@ -37,9 +38,9 @@ vi.mock('@n10/review-comments', async (importOriginal) => {
   const actual = await importOriginal<typeof ReviewCommentsModule>();
   return {
     ...actual,
-    readComments: vi.fn().mockReturnValue([]),
-    updateComment: vi.fn(),
-    removeComment: vi.fn(),
+    readComments: vi.fn().mockResolvedValue([]),
+    updateComment: vi.fn().mockResolvedValue(true),
+    removeComment: vi.fn().mockResolvedValue(true),
     postReviewComments: vi.fn().mockResolvedValue(undefined),
   };
 });
@@ -258,7 +259,9 @@ function makeRemoteCtx(opts: CtxOpts) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(readComments).mockReturnValue([]);
+  vi.mocked(readComments).mockResolvedValue([]);
+  vi.mocked(updateComment).mockResolvedValue(true);
+  vi.mocked(removeComment).mockResolvedValue(true);
   vi.mocked(postReviewComments).mockImplementation((comments) =>
     Promise.resolve(comments)
   );
@@ -675,9 +678,12 @@ describe('diff-viewer handler — post-comment', () => {
     );
   });
 
-  it('hands the post to asyncOps.run, leaving the claim to the poster', () => {
+  it('hands the post to asyncOps.run, leaving the claim to the poster', async () => {
     const pane = makePane({ selectedCommentId: 'd1' });
-    const run = vi.fn();
+    let captured: (() => Promise<void>) | undefined;
+    const run = vi.fn((_key: string, fn: () => Promise<void>) => {
+      captured = fn;
+    });
     const ctx = makeCtx(pane, {
       comments: [makeComment({ id: 'd1', status: 'draft' })],
       config: { vendor: 'github' },
@@ -686,16 +692,20 @@ describe('diff-viewer handler — post-comment', () => {
       asyncOpsRun: run,
     });
     handleDiffViewerInput('p', makeKey(), ctx);
+    expect(run).toHaveBeenCalledWith('post-comment', expect.any(Function));
+    await captured!();
     // Claiming outside the drafts' lock would let two shells both post.
     expect(updateComment).not.toHaveBeenCalled();
-    expect(run).toHaveBeenCalledWith('post-comment', expect.any(Function));
   });
 
   it('on success, refreshes remote threads and selects the next draft', async () => {
     const pane = makePane({ selectedCommentId: 'd1' });
     const d1 = makeComment({ id: 'd1', status: 'draft', lineStart: 1 });
     const d2 = makeComment({ id: 'd2', status: 'draft', lineStart: 2 });
-    vi.mocked(readComments).mockReturnValue([{ ...d1, status: 'posted' }, d2]);
+    vi.mocked(readComments).mockResolvedValue([
+      { ...d1, status: 'posted' },
+      d2,
+    ]);
     const refresh = vi.fn();
     let captured: (() => Promise<void>) | undefined;
     const run = vi.fn((_key: string, fn: () => Promise<void>) => {
@@ -913,6 +923,27 @@ describe('diff-viewer handler — toggle-thread-resolved', () => {
 // internal Esc/Enter/text-append contract; these two tests only pin
 // that the diff-viewer wires the bypass in *before* any of the 22
 // actions can dispatch.
+
+describe('diff-viewer handler — draft writes', () => {
+  /** A draft write waits on the drafts lock and can fail; the handler
+   *  has already returned by then, so the failure is flashed. */
+  it('flashes a save that failed', async () => {
+    vi.mocked(updateComment).mockRejectedValue(new Error('Timed out'));
+    const pane = makePane({ editingCommentId: 'd1', editBuffer: 'new body' });
+    const ctx = makeCtx(pane, { comments: [makeComment({ id: 'd1' })] });
+    handleDiffViewerInput('', makeKey({ escape: true }), ctx);
+    expect(updateComment).toHaveBeenCalledWith(
+      { repo: DRAFT_REPO, prId: PR_ID },
+      'd1',
+      { body: 'new body' }
+    );
+    await vi.waitFor(() =>
+      expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
+        'Save failed: Timed out'
+      )
+    );
+  });
+});
 
 describe('diff-viewer handler — reply-mode bypass', () => {
   it('swallows a bound key as text input instead of firing its action', () => {

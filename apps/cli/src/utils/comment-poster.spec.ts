@@ -24,9 +24,9 @@ afterAll(() => {
 });
 
 /** Post a draft that is in the store, as both shells do. */
-function post(comment: ReviewComment, ctx: PostContext) {
+async function post(comment: ReviewComment, ctx: PostContext) {
   const repo = draftRepoKey(ctx.vendor, ctx.vendorProject);
-  if (repo) appendComment({ repo, prId: ctx.prId }, comment);
+  if (repo) await appendComment({ repo, prId: ctx.prId }, comment);
   return postReviewComments([comment], ctx);
 }
 
