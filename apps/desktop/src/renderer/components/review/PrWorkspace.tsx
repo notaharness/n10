@@ -18,7 +18,10 @@ import { useRepo } from '../../lib/repo-context.js';
 import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { useCommentNavigator } from '../../lib/review/use-comment-navigator.js';
 import { useReviewDiff } from '../../lib/review/use-review-diff.js';
-import { useReviewMode } from '../../lib/review/use-review-mode.js';
+import {
+  useLastReviewPane,
+  useReviewMode,
+} from '../../lib/review/use-review-mode.js';
 import { useReviewRail } from '../../lib/review/use-review-rail.js';
 import { usePlanCheckout } from '../../lib/plan/use-plan-checkout.js';
 import {
@@ -31,7 +34,7 @@ import {
 import { errorMessage } from '../../lib/utils.js';
 import { ContentPane } from './ContentPane.js';
 import { type FileEntry } from './diff/FileTree.js';
-import { BranchHeader, PrHeader } from './PrHeader.js';
+import { WorkspaceHeader } from './PrHeader.js';
 import { railReadNotice } from './ReadNotice.js';
 import { CollapsedRail, ReviewRail } from './ReviewRail.js';
 
@@ -215,18 +218,19 @@ export function PrWorkspace({
     // comments, and the prompt names them. A bare worktree has none.
     hasPlan: plan.count > 0,
   });
+  const reviewPane = useLastReviewPane(effMode, pr, repo.viewer);
 
   return (
     <div ref={rootRef} className="flex h-full min-h-0 min-w-0 flex-col">
-      {pr ? (
-        <PrHeader pr={pr} onShowUnresolved={rail.showUnresolved} />
-      ) : (
-        <BranchHeader
-          branch={branch}
-          baseBranch={baseBranch}
-          fileCount={files.length}
-        />
-      )}
+      <WorkspaceHeader
+        pr={pr}
+        mode={effMode}
+        branch={branch}
+        baseBranch={baseBranch}
+        fileCount={files.length}
+        onShowUnresolved={rail.showUnresolved}
+        onBack={() => setMode(reviewPane)}
+      />
       <div className="flex min-h-0 min-w-0 flex-1">
         {rail.hidden && <CollapsedRail onShow={() => rail.setHidden(false)} />}
 

@@ -3,6 +3,7 @@ import type { PullRequestInfo } from '@n10/vcs-core/types';
 import {
   adoptPullRequest,
   initialMode,
+  lastReviewPane,
   nextStep,
   reviewRole,
 } from './overview-model.js';
@@ -34,6 +35,18 @@ describe('reviewRole', () => {
   it('reads an unknown account as a reviewer', () => {
     // The Overview is the safe start: it shows the change before code.
     expect(reviewRole(PR, null)).toBe('reviewer');
+  });
+});
+
+describe('lastReviewPane', () => {
+  it('goes up to the review pane the reader was last on, whatever came since', () => {
+    expect(lastReviewPane('overview', 'diff')).toBe('diff');
+    expect(lastReviewPane('diff', 'overview')).toBe('overview');
+    // The terminal, a walkthrough and the plan are not the review.
+    for (const mode of ['agent', 'review', 'plan'] as const) {
+      expect(lastReviewPane('overview', mode)).toBe('overview');
+      expect(lastReviewPane('diff', mode)).toBe('diff');
+    }
   });
 });
 

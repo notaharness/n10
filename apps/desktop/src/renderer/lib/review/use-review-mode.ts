@@ -8,8 +8,11 @@ import type { PullRequestInfo } from '@n10/vcs-core/types';
 import {
   adoptPullRequest,
   initialMode,
+  lastReviewPane,
+  reviewPaneFor,
   reviewRole,
   type PaneState,
+  type ReviewPane,
 } from './overview-model.js';
 import { focusesAgent, type AgentPresence, type Mode } from './review-model.js';
 
@@ -73,4 +76,22 @@ export function useReviewMode({
   }, []);
   useAgentFocus(agent, () => setMode('agent'));
   return [pane.mode, setMode];
+}
+
+/**
+ * The review pane the reader was last on, which the terminal's Back
+ * returns to. Before either has shown, the one the pull request opens on
+ * for this reader. Adjusted during render, like the pane itself.
+ */
+export function useLastReviewPane(
+  mode: Mode,
+  pr: PullRequestInfo | undefined,
+  viewer: string | null
+): ReviewPane {
+  const [last, setLast] = useState<ReviewPane>(() =>
+    reviewPaneFor(pr ? reviewRole(pr, viewer) : 'author')
+  );
+  const next = lastReviewPane(last, mode);
+  if (next !== last) setLast(next);
+  return next;
 }

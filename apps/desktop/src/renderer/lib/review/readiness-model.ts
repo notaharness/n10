@@ -30,6 +30,7 @@ export const ASPECT_LABEL: Record<ReadinessAspect['id'], string> = {
 export const RESOLVER_TEXT: Record<Resolver, string> = {
   author: 'The author can fix this',
   reviewers: 'Needs a reviewer',
+  viewer: 'Waiting for your review',
   maintainers: 'Needs a maintainer',
   checks: 'Clears when the checks finish',
 };

@@ -1,13 +1,19 @@
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { sidebarRow, visibleText } from './setup/app.js';
+import {
+  createWorktree,
+  launchAgentFromRail,
+  sidebarRow,
+  visibleText,
+} from './setup/app.js';
 import type { FakeGitHub } from './setup/fake-gh.js';
 import { armContextMenuChoice } from './setup/menu.js';
 
 /**
  * The pull request Overview (spec O1/O9, fixture Q1): which pane a
- * pull request opens on, what the Overview says about it, and the
- * header that stays readable as the window narrows.
+ * pull request opens on, what the Overview says about it, the header
+ * the other panes keep and that stays readable as the window narrows,
+ * and the way back up to the review from the agent's terminal.
  */
 
 const LONG_TITLE =
@@ -85,7 +91,8 @@ test.use({
   },
 });
 
-/** The pull request tab's own header, not the Overview's title block. */
+/** The pull request tab's header bar, which every pane but the Overview
+ *  has: the Overview is headed by its own title block. */
 function prHeader(page: Page): Locator {
   return page.locator('header').filter({
     has: page.getByRole('button', { name: 'Refresh this pull request' }),
@@ -133,7 +140,16 @@ function visibleRight(el: Element): number {
 
 async function openPr(page: Page, row: RegExp): Promise<void> {
   await sidebarRow(page, row).first().click();
-  await expect(prHeader(page)).toBeVisible({ timeout: 30_000 });
+  // In the header bar, or beside the Overview's title.
+  await expect(
+    page.getByRole('button', { name: 'Refresh this pull request' })
+  ).toBeVisible({ timeout: 30_000 });
+}
+
+/** From the Overview to the changes, where the header bar is. */
+async function showChanges(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Review changes' }).click();
+  await expect(prHeader(page)).toBeVisible();
 }
 
 test.describe('Pull request Overview', () => {
@@ -146,21 +162,36 @@ test.describe('Pull request Overview', () => {
     await expect(
       overviewTitle(page, 'Handle cancelled requests')
     ).toBeVisible();
+    // Headed by its own title, with the pull request's actions beside it,
+    // and no header bar above.
+    await expect(prHeader(page)).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Open on GitHub' })
+    ).toBeVisible();
     const next = page.getByRole('region', { name: 'Next step' });
     await expect(next).toContainText('Your review is requested');
+    // One way in to a review: Review changes, and no instant vote.
     await expect(
       next.getByRole('button', { name: 'Review changes' })
     ).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Approve/ })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Request changes' })
+    ).toHaveCount(0);
+    await expect(page.getByText('A vote posts to GitHub at once')).toHaveCount(
+      0
+    );
 
     // The author's description is the context, read in full.
     await expect(
       page.getByRole('heading', { name: 'Verification' })
     ).toBeVisible();
 
-    // Everything else is green; GitHub still wants a review, and says so.
+    // Everything else is green; GitHub still wants a review, and the
+    // reader is asked for it.
     const completion = page.getByRole('region', { name: 'Completion' });
     await expect(completion).toContainText('Waiting for review');
-    await expect(completion).toContainText('Needs a reviewer');
+    await expect(completion).toContainText('Waiting for your review');
     await expect(page.locator('[data-reviewer="bea"]')).toContainText(
       'Approved'
     );
@@ -177,6 +208,13 @@ test.describe('Pull request Overview', () => {
 
     await expect(visibleText(page, 'socket.close();')).toBeVisible();
     await expect(overviewTitle(page, 'Handle cancelled requests')).toBeHidden();
+    // The changes keep the header bar, and it has no CI badge: CI is
+    // Completion's, and the sidebar row's.
+    await expect(prHeader(page)).toBeVisible();
+    await expect(prHeader(page).getByText(/^CI /)).toHaveCount(0);
+    await expect(
+      prHeader(page).getByRole('button', { name: 'Back to review' })
+    ).toHaveCount(0);
     // Not left on the hidden button: the next key acts on the changes.
     await expect(page.getByRole('region', { name: 'Changes' })).toBeFocused();
   });
@@ -231,7 +269,7 @@ test.describe('Pull request Overview', () => {
     await openPr(page, /#214/);
 
     await armContextMenuChoice(app, 'Copy Link');
-    await prHeader(page).getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('button', { name: 'More actions' }).click();
 
     await expect
       .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
@@ -244,6 +282,12 @@ test.describe('Pull request Overview', () => {
     await resize(app, 1024, 768);
     await page.getByRole('button', { name: 'Hide sidebar' }).click();
 
+    // An approval beside a pending request is not called met: GitHub
+    // still requires review.
+    await expect(page.locator('[data-readiness-row="reviews"]')).toContainText(
+      'Waiting for review'
+    );
+    await showChanges(page);
     const header = prHeader(page);
     await expect(header.locator('[data-reviewer-summary]')).toHaveText(
       '1/2 approved'
@@ -254,11 +298,6 @@ test.describe('Pull request Overview', () => {
     await expect(
       header.getByRole('button', { name: 'Open on GitHub' })
     ).toBeVisible();
-    // An approval beside a pending request is not called met: GitHub
-    // still requires review.
-    await expect(page.locator('[data-readiness-row="reviews"]')).toContainText(
-      'Waiting for review'
-    );
   });
 
   test('keeps a wide table and a long link inside the reading column', async ({
@@ -268,13 +307,6 @@ test.describe('Pull request Overview', () => {
     await openPr(page, /#214/);
     await resize(app, 1360, 860);
     await page.getByRole('button', { name: 'Hide sidebar' }).click();
-    // The header has room for the branches here, read as one name.
-    await expect(
-      prHeader(page).getByRole('button', {
-        name: 'cancel-requests → main',
-        exact: true,
-      })
-    ).toBeVisible();
 
     const completion = page.getByRole('region', { name: 'Completion' });
     const table = page.getByRole('table');
@@ -297,6 +329,16 @@ test.describe('Pull request Overview', () => {
       return pane ? pane.scrollWidth - pane.clientWidth : -1;
     });
     expect(sideways).toBe(0);
+
+    // The changes' header has room for the branches here, read as one
+    // name.
+    await showChanges(page);
+    await expect(
+      prHeader(page).getByRole('button', {
+        name: 'cancel-requests → main',
+        exact: true,
+      })
+    ).toBeVisible();
   });
 
   test('keeps the number and state in view at a narrow width', async ({
@@ -306,19 +348,80 @@ test.describe('Pull request Overview', () => {
     await openPr(page, /#214/);
     await resize(app, 800, 600);
 
+    // The review rail folds away as its own control would, so the
+    // content is not squeezed beside it, and comes back with room.
+    const showRail = page.getByRole('button', { name: 'Show review sidebar' });
+    await expect(showRail).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Overview', exact: true })
+    ).toBeHidden();
+
+    // The Overview carries the title whole, and in one column: the next
+    // step and readiness come before the description…
+    await expect(overviewTitle(page, LONG_TITLE)).toBeVisible();
+    const readiness = page.getByRole('region', { name: 'Completion' });
+    const description = page.getByRole('region', { name: 'Description' });
+    expect(await top(readiness)).toBeLessThan(await top(description));
+
+    // …while the changes' header cuts it short, keeping the number and
+    // state, and letting reviews give way.
+    await showChanges(page);
     const header = prHeader(page);
     await expect(header.getByText('#214', { exact: true })).toBeVisible();
     await expect(
       header.locator('[data-slot="badge"]', { hasText: 'Open' })
     ).toBeVisible();
-    // Checks and reviews give way to the title, which is cut short here…
     await expect(header.locator('[data-reviewer-summary]')).toBeHidden();
-    await expect(header.getByText('CI succeeded')).toBeHidden();
-    // …but the Overview carries it whole, and in one column: the next
-    // step and readiness come before the description.
-    await expect(overviewTitle(page, LONG_TITLE)).toBeVisible();
-    const readiness = page.getByRole('region', { name: 'Completion' });
-    const description = page.getByRole('region', { name: 'Description' });
-    expect(await top(readiness)).toBeLessThan(await top(description));
+
+    await resize(app, 1360, 860);
+    await expect(showRail).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Overview', exact: true })
+    ).toBeVisible();
+  });
+
+  test('the terminal goes back up to the review it came from, not back through history', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openPr(page, /#214/);
+    const back = prHeader(page).getByRole('button', { name: 'Back to review' });
+    const agentReady = () =>
+      expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
+        timeout: 30_000,
+      });
+
+    // From the changes to the terminal, and Back to the changes.
+    await showChanges(page);
+    await launchAgentFromRail(page);
+    await agentReady();
+    await back.click();
+    await expect(visibleText(page, 'socket.close();')).toBeVisible();
+    await expect(back).toHaveCount(0);
+
+    // From the Overview to the terminal: Back goes to the Overview, the
+    // last review pane shown, which has no header bar.
+    await page.getByRole('button', { name: 'Overview', exact: true }).click();
+    await page.getByRole('button', { name: /^Agent/ }).click();
+    await agentReady();
+    await back.click();
+    await expect(
+      overviewTitle(page, 'Handle cancelled requests')
+    ).toBeVisible();
+    await expect(prHeader(page)).toHaveCount(0);
+  });
+
+  test('a worktree without a pull request has no review to go back to', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await createWorktree(page, 'plain-work');
+    await launchAgentFromRail(page);
+    await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(
+      page.getByRole('button', { name: 'Back to review' })
+    ).toHaveCount(0);
   });
 });

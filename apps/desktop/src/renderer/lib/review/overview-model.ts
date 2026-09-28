@@ -46,7 +46,23 @@ export function initialMode({
   role: ReviewRole;
 }): Mode {
   if (running) return 'agent';
-  return hasPr && role === 'reviewer' ? 'overview' : 'diff';
+  return hasPr ? reviewPaneFor(role) : 'diff';
+}
+
+/** The panes that are the pull request's review, as opposed to the
+ *  agent, a walkthrough or the plan. */
+export type ReviewPane = 'overview' | 'diff';
+
+/** The review a reader starts on: the Overview for someone else's pull
+ *  request, the diff for their own. */
+export function reviewPaneFor(role: ReviewRole): ReviewPane {
+  return role === 'reviewer' ? 'overview' : 'diff';
+}
+
+/** Where the terminal's Back goes: up to the review pane the reader was
+ *  last on, never back through where they have been. */
+export function lastReviewPane(last: ReviewPane, mode: Mode): ReviewPane {
+  return mode === 'overview' || mode === 'diff' ? mode : last;
 }
 
 /** A reviewer's decision in words. `no-response` is a request nobody

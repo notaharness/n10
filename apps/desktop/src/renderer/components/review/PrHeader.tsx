@@ -1,6 +1,5 @@
 import {
-  CheckCircle2Icon,
-  CircleDotIcon,
+  ArrowLeftIcon,
   CodeIcon,
   CopyIcon,
   EllipsisIcon,
@@ -9,10 +8,10 @@ import {
   GitPullRequestIcon,
   MessageSquareIcon,
   RefreshCwIcon,
-  XCircleIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PullRequestInfo } from '@n10/vcs-core';
+import type { Mode } from '../../lib/review/review-model.js';
 import { copyText } from '../../lib/copy-text.js';
 import { useOpenInEditor } from '../../lib/data/mutations.js';
 import { providerName } from '../../lib/provider-name.js';
@@ -21,7 +20,6 @@ import { useRefreshPullRequest } from '../../lib/review/use-refresh-pull-request
 import { unresolvedCommentsLabel } from '../../lib/sidebar/sidebar-model.js';
 import { cn, errorMessage } from '../../lib/utils.js';
 import { Avatar } from '../ui/avatar.js';
-import { Badge } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
 import { Tip } from '../ui/tooltip.js';
 import { LifecycleBadge } from './overview/parts.js';
@@ -48,25 +46,6 @@ export function OpenInEditorButton({ branch }: { branch: string }) {
         <span className="hidden @min-[900px]:inline">Editor</span>
       </Button>
     </Tip>
-  );
-}
-
-/** CI verdict, or nothing at all when no build has reported. */
-function CiBadge({ ci }: { ci: PullRequestInfo['buildStatus'] }) {
-  if (!ci || ci === 'none') return null;
-  const variant =
-    ci === 'succeeded'
-      ? 'success'
-      : ci === 'failed'
-      ? 'destructive'
-      : 'warning';
-  return (
-    <Badge variant={variant}>
-      {ci === 'succeeded' && <CheckCircle2Icon />}
-      {ci === 'failed' && <XCircleIcon />}
-      {ci === 'pending' && <CircleDotIcon />}
-      CI {ci}
-    </Badge>
   );
 }
 
@@ -111,78 +90,17 @@ async function runMoreMenu(pr: PullRequestInfo): Promise<void> {
 }
 
 /**
- * The compact identity of a pull request tab, sized by its own width:
- * the title truncates first, then the branches go, the reviewer avatars
- * become a count and the button labels become icons. The number and
- * the state always stay; the Overview carries every value in full.
+ * What can be done with a pull request from where it is shown: open its
+ * worktree or its page, read it again, copy what names it. The header
+ * and the Overview's heading carry the same buttons, labelled where the
+ * container has room.
  */
-export function PrHeader({
-  pr,
-  onShowUnresolved,
-}: {
-  pr: PullRequestInfo;
-  onShowUnresolved: () => void;
-}) {
+export function PrActions({ pr }: { pr: PullRequestInfo }) {
   const { repo } = useRepo();
   const refresh = useRefreshPullRequest();
   const provider = providerName(repo.providerId);
-  const reviewers = pr.reviewers ?? [];
   return (
-    <header className="@container flex h-10 shrink-0 items-center gap-3 border-b border-border px-3">
-      <GitPullRequestIcon className="size-4 shrink-0 text-info" />
-      <span className="flex min-w-0 shrink items-center gap-2">
-        <Tip label={pr.title}>
-          <span className="truncate font-medium">{pr.title}</span>
-        </Tip>
-        <span className="shrink-0 text-sm text-muted-foreground">#{pr.id}</span>
-        <LifecycleBadge isDraft={pr.isDraft} />
-        <Tip label="Copy branch name">
-          <button
-            type="button"
-            onClick={() => copyText(pr.sourceBranch, 'Branch name copied')}
-            className="hidden min-w-0 items-center gap-1 rounded px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground @min-[1200px]:flex"
-          >
-            <span className="truncate">{pr.sourceBranch}</span>
-            <span className="shrink-0">→ {pr.targetBranch}</span>
-            <CopyIcon className="size-3 shrink-0" />
-          </button>
-        </Tip>
-      </span>
-
-      <span className="mx-1 h-4 w-px shrink-0 bg-border" />
-
-      {/* Never squeezed: the title truncates instead, and what does not
-          fit at this width is said more briefly or left to the Overview. */}
-      <span className="flex shrink-0 items-center gap-2 text-sm whitespace-nowrap">
-        <Tip label={`Opened by ${pr.createdByDisplayName}`}>
-          <span className="flex items-center gap-1.5">
-            <Avatar name={pr.createdByDisplayName} size="xs" />
-            <span className="hidden truncate text-muted-foreground @min-[1200px]:inline">
-              {pr.createdByDisplayName}
-            </span>
-          </span>
-        </Tip>
-        <span className="hidden @min-[720px]:contents">
-          <CiBadge ci={pr.buildStatus} />
-        </span>
-        <ReviewerDots
-          reviewers={reviewers}
-          className="hidden @min-[1000px]:flex"
-        />
-        <ReviewerSummary
-          reviewers={reviewers}
-          className="hidden @min-[720px]:flex"
-        />
-        {(pr.activeCommentCount ?? 0) > 0 && (
-          <UnresolvedButton
-            count={pr.activeCommentCount ?? 0}
-            onClick={onShowUnresolved}
-          />
-        )}
-      </span>
-
-      <div className="flex-1" />
-
+    <>
       <OpenInEditorButton branch={pr.sourceBranch} />
       <Tip label={`Open on ${provider}`}>
         <Button
@@ -221,6 +139,97 @@ export function PrHeader({
           <EllipsisIcon />
         </Button>
       </Tip>
+    </>
+  );
+}
+
+/**
+ * The compact identity of a pull request tab, sized by its own width:
+ * the title truncates first, then the branches go, the reviewer avatars
+ * become a count and the button labels become icons. The number and
+ * the state always stay; the Overview carries every value in full.
+ */
+export function PrHeader({
+  pr,
+  onShowUnresolved,
+  onBack,
+}: {
+  pr: PullRequestInfo;
+  onShowUnresolved: () => void;
+  /** Up to the pull request's review, from a pane that is not it (the
+   *  agent's terminal). Absent where the pane is the review. */
+  onBack?: () => void;
+}) {
+  const reviewers = pr.reviewers ?? [];
+  return (
+    <header className="@container flex h-10 shrink-0 items-center gap-3 border-b border-border px-3">
+      {onBack && (
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Back to review"
+            onClick={onBack}
+            className="-ml-1.5 shrink-0"
+          >
+            <ArrowLeftIcon />
+            Review
+          </Button>
+          <span className="h-4 w-px shrink-0 bg-border" />
+        </>
+      )}
+      <GitPullRequestIcon className="size-4 shrink-0 text-info" />
+      <span className="flex min-w-0 shrink items-center gap-2">
+        <Tip label={pr.title}>
+          <span className="truncate font-medium">{pr.title}</span>
+        </Tip>
+        <span className="shrink-0 text-sm text-muted-foreground">#{pr.id}</span>
+        <LifecycleBadge isDraft={pr.isDraft} />
+        <Tip label="Copy branch name">
+          <button
+            type="button"
+            onClick={() => copyText(pr.sourceBranch, 'Branch name copied')}
+            className="hidden min-w-0 items-center gap-1 rounded px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground @min-[1200px]:flex"
+          >
+            <span className="truncate">{pr.sourceBranch}</span>
+            <span className="shrink-0">→ {pr.targetBranch}</span>
+            <CopyIcon className="size-3 shrink-0" />
+          </button>
+        </Tip>
+      </span>
+
+      <span className="mx-1 h-4 w-px shrink-0 bg-border" />
+
+      {/* Never squeezed: the title truncates instead, and what does not
+          fit at this width is said more briefly or left to the Overview. */}
+      <span className="flex shrink-0 items-center gap-2 text-sm whitespace-nowrap">
+        <Tip label={`Opened by ${pr.createdByDisplayName}`}>
+          <span className="flex items-center gap-1.5">
+            <Avatar name={pr.createdByDisplayName} size="xs" />
+            <span className="hidden truncate text-muted-foreground @min-[1200px]:inline">
+              {pr.createdByDisplayName}
+            </span>
+          </span>
+        </Tip>
+        <ReviewerDots
+          reviewers={reviewers}
+          className="hidden @min-[1000px]:flex"
+        />
+        <ReviewerSummary
+          reviewers={reviewers}
+          className="hidden @min-[720px]:flex"
+        />
+        {(pr.activeCommentCount ?? 0) > 0 && (
+          <UnresolvedButton
+            count={pr.activeCommentCount ?? 0}
+            onClick={onShowUnresolved}
+          />
+        )}
+      </span>
+
+      <div className="flex-1" />
+
+      <PrActions pr={pr} />
     </header>
   );
 }
@@ -250,5 +259,48 @@ export function BranchHeader({
       </span>
       <OpenInEditorButton branch={branch} />
     </header>
+  );
+}
+
+/**
+ * The bar over a workspace's pane. A pull request's Overview is headed by
+ * its own identity, so it has none; its terminal's bar offers the way
+ * back up to the review. A worktree without a pull request has the
+ * branch's bar, and no review to go back to.
+ */
+export function WorkspaceHeader({
+  pr,
+  mode,
+  branch,
+  baseBranch,
+  fileCount,
+  onShowUnresolved,
+  onBack,
+}: {
+  pr: PullRequestInfo | undefined;
+  mode: Mode;
+  branch: string;
+  baseBranch: string;
+  fileCount: number;
+  onShowUnresolved: () => void;
+  /** Up to the review pane the reader was last on. */
+  onBack: () => void;
+}) {
+  if (!pr) {
+    return (
+      <BranchHeader
+        branch={branch}
+        baseBranch={baseBranch}
+        fileCount={fileCount}
+      />
+    );
+  }
+  if (mode === 'overview') return null;
+  return (
+    <PrHeader
+      pr={pr}
+      onShowUnresolved={onShowUnresolved}
+      onBack={mode === 'agent' ? onBack : undefined}
+    />
   );
 }
