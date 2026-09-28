@@ -284,8 +284,9 @@
 
 /* ── Fleet first-run illustration ──────────────────────────────────
  * The website's beam mesh (apps/website/src/app/global.css), trimmed to
- * two machines and one beam. Box faces are three tones of the theme's
- * surface, lit from the top left; the beam keeps the mark's sage.
+ * two machines and one beam, arcing between them. Box faces are three
+ * tones of the theme's surface, lit from the top left; the beam keeps
+ * the mark's sage.
  */
 .fleet-art {
   --fleet-art-top: var(--background);
@@ -376,7 +377,9 @@
  * repeats every quarter of the (normalised, 100-long) path, so sliding
  * it by one whole path length loops without a seam. */
 .fleet-art-ribbon {
-  fill: var(--fleet-art-sage);
+  fill: none;
+  stroke: var(--fleet-art-sage);
+  stroke-width: 2.5;
   opacity: 0.42;
 }
 .fleet-art-packet {

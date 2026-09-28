@@ -3,6 +3,7 @@ import {
   inQuad,
   onLeft,
   onRight,
+  project,
   toPoints,
   type Box,
   type Vec3,
@@ -10,7 +11,7 @@ import {
 
 /**
  * Two machines of the website's beam mesh, a laptop and a tower, joined
- * by one beam with traffic both ways. Machines and the beam's colour
+ * by one beam arcing between them, with traffic both ways. Machines and the beam's colour
  * follow the website (apps/website/src/components/beam/mesh); surfaces
  * come from the app's theme tokens (`.fleet-art` in styles.css).
  */
@@ -19,7 +20,6 @@ import {
 const SPAN = 4.2;
 /** How far each direction's track sits from the beam's centre line. */
 const LANE = 0.18;
-const TRACK_WIDTH = 0.2;
 
 function Faces({ box }: { box: Box }) {
   return (
@@ -135,30 +135,28 @@ function Laptop({ cx, cy }: { cx: number; cy: number }) {
   );
 }
 
+/** Heights of the beam's ends (laptop deck, tower side) and of its arc's control point. */
+const RISE = { from: 0.14, to: 1.2, peak: 5 } as const;
+
 /**
- * One direction's track from (0, SPAN) to (SPAN, 0): a line running
- * straight across the screen, moved `offset` toward the viewer.
+ * One direction's track from the laptop (0, SPAN) to the tower
+ * (SPAN, 0), moved `offset` toward the viewer: a parabola in the
+ * vertical plane between them, which the projection keeps a quadratic
+ * curve on screen.
  */
 function Track({ offset, back }: { offset: number; back?: boolean }) {
-  const half = TRACK_WIDTH / 2 / Math.SQRT2;
-  const from = [offset, SPAN + offset] as const;
-  const to = [SPAN + offset, offset] as const;
+  const mid = SPAN / 2 + offset;
+  const [from, control, to] = [
+    [offset, SPAN + offset, RISE.from],
+    [mid, mid, RISE.peak],
+    [SPAN + offset, offset, RISE.to],
+  ].map((p) => project(p as unknown as Vec3).join(','));
+  const d = `M${from} Q${control} ${to}`;
   return (
     <g>
-      <polygon
-        className="fleet-art-ribbon"
-        points={toPoints([
-          [from[0] - half, from[1] - half, 0],
-          [to[0] - half, to[1] - half, 0],
-          [to[0] + half, to[1] + half, 0],
-          [from[0] + half, from[1] + half, 0],
-        ])}
-      />
-      <polyline
-        points={toPoints([
-          [...from, 0.02],
-          [...to, 0.02],
-        ])}
+      <path d={d} className="fleet-art-ribbon" />
+      <path
+        d={d}
         pathLength={100}
         className={
           back ? 'fleet-art-packet fleet-art-packet--back' : 'fleet-art-packet'

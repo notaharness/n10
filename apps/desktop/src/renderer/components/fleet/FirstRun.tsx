@@ -31,26 +31,17 @@ function Choices({ disabled }: { disabled: boolean }) {
   const { choose } = useFleet().enrolment;
   return (
     <div className="flex flex-col items-center gap-3 text-center">
-      <FleetIllustration />
       <h2 className="text-base font-semibold">
         Your machines, connected anywhere
       </h2>
+      <div className="flex flex-col items-center gap-1">
+        <FleetIllustration />
+        <PoweredByTailscale />
+      </div>
       <p className="text-base text-muted-foreground">
         Connect your machines, secured with your passkey, accessible from
         anywhere. No VPN or SSH required.
       </p>
-      <Button variant="link" size="sm" asChild>
-        <a
-          href={BEAM_URL}
-          onClick={(e) => {
-            e.preventDefault();
-            openLink(BEAM_URL);
-          }}
-        >
-          <LinkIcon className="size-3.5" />
-          More information
-        </a>
-      </Button>
       <div className="flex flex-wrap justify-center gap-2">
         <Button disabled={disabled} onClick={() => choose('create')}>
           Create a fleet
@@ -63,7 +54,18 @@ function Choices({ disabled }: { disabled: boolean }) {
           Join a fleet
         </Button>
       </div>
-      <PoweredByTailscale />
+      <Button variant="link" size="sm" asChild>
+        <a
+          href={BEAM_URL}
+          onClick={(e) => {
+            e.preventDefault();
+            openLink(BEAM_URL);
+          }}
+        >
+          <LinkIcon className="size-3.5" />
+          More information
+        </a>
+      </Button>
     </div>
   );
 }
