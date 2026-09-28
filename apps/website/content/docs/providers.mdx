@@ -1,0 +1,20 @@
+---
+title: Version control providers
+description: n10 supports GitHub and Azure DevOps.
+---
+
+| Provider | Sign in with |
+| --- | --- |
+| GitHub | The `gh` CLI (`gh auth login`) |
+| Azure DevOps | A personal access token |
+
+n10 picks the provider from your repository's Git remote.
+
+For Azure DevOps, create a personal access token with Code (Read & Write),
+Build (Read) and Project and Team (Read), and enter it in Settings under **Provider**. Azure DevOps
+support is less tested than GitHub's. If something breaks, please
+[open an issue](https://github.com/notaharness/n10/issues).
+
+GitLab, Bitbucket and other providers are not supported yet. Providers share
+one interface, and adding one is a welcome
+[contribution](/docs/contributing).

@@ -7,7 +7,7 @@ import type {
 } from '../../../host/contract.js';
 import { keys, resetRepoScopedCache } from './query-keys.js';
 import {
-  loadBranchRemovalSafety,
+  loadWorktreeRemovalCheck,
   loadRepoGate,
   loadSidebarModel,
   machinesQuery,
@@ -280,31 +280,44 @@ describe('refreshRepoInfo', () => {
   });
 });
 
-describe('loadBranchRemovalSafety', () => {
+describe('loadWorktreeRemovalCheck', () => {
   it('passes the host verdict through', async () => {
     stubHost({
-      canRemoveBranch: () =>
-        Promise.resolve({ safe: false, reason: 'rebase in progress' }),
+      checkWorktreeRemoval: () =>
+        Promise.resolve({
+          verdict: 'refused',
+          reason: 'rebase in progress',
+          tip: 'abc123',
+          repo: '/repo/.git',
+          checkout: '/repo/wt',
+        }),
     });
 
-    await expect(loadBranchRemovalSafety('wip')).resolves.toEqual({
-      safe: false,
+    await expect(loadWorktreeRemovalCheck('wip')).resolves.toEqual({
+      verdict: 'refused',
       reason: 'rebase in progress',
+      tip: 'abc123',
+      repo: '/repo/.git',
+      checkout: '/repo/wt',
     });
   });
 
   it('refuses when the host call fails, rather than failing', async () => {
     stubHost({
-      canRemoveBranch: () => Promise.reject(new Error('not a git repository')),
+      checkWorktreeRemoval: () =>
+        Promise.reject(new Error('not a git repository')),
     });
 
     // The dialog only ever reads this value. A rejection left as query
     // error state would leave `data` undefined, which is the same shape
     // as "still loading" — and an unanswerable question must refuse,
     // not offer a confirm button.
-    await expect(loadBranchRemovalSafety('wip')).resolves.toEqual({
-      safe: false,
+    await expect(loadWorktreeRemovalCheck('wip')).resolves.toEqual({
+      verdict: 'refused',
       reason: 'not a git repository',
+      tip: null,
+      repo: null,
+      checkout: null,
     });
   });
 });
