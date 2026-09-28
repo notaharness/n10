@@ -1,10 +1,4 @@
-import {
-  readFileSync,
-  writeFileSync,
-  mkdirSync,
-  renameSync,
-  rmSync,
-} from 'node:fs';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -81,9 +75,12 @@ export function commentFilePath(scope: DraftScope): string {
   return join(commentDirPath(scope), 'comments.json');
 }
 
-export function readComments(scope: DraftScope): ReviewComment[] {
+/** A PR's drafts; none when there is no file yet, or it cannot be read. */
+export async function readComments(
+  scope: DraftScope
+): Promise<ReviewComment[]> {
   try {
-    const data = readFileSync(commentFilePath(scope), 'utf8');
+    const data = await readFile(commentFilePath(scope), 'utf8');
     const parsed: ReviewCommentsFile = JSON.parse(data);
     return parsed.comments ?? [];
   } catch {
@@ -106,31 +103,34 @@ export function readComments(scope: DraftScope): ReviewComment[] {
  * `change` edits the array in place and says whether it changed
  * anything; nothing is written when it did not.
  */
-function modifyComments(
+async function modifyComments(
   scope: DraftScope,
   change: (comments: ReviewComment[]) => boolean
-): boolean {
+): Promise<boolean> {
   const dir = commentDirPath(scope);
-  mkdirSync(dir, { recursive: true });
+  await mkdir(dir, { recursive: true });
   const filePath = join(dir, 'comments.json');
-  return withFileLock(`${filePath}.lock`, () => {
-    const comments = readComments(scope);
+  return withFileLock(`${filePath}.lock`, async () => {
+    const comments = await readComments(scope);
     if (!change(comments)) return false;
     const data: ReviewCommentsFile = { prId: scope.prId, comments };
     const tmpPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
     try {
-      writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-      renameSync(tmpPath, filePath);
+      await writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf8');
+      await rename(tmpPath, filePath);
     } catch (err) {
-      rmSync(tmpPath, { force: true });
+      await rm(tmpPath, { force: true });
       throw err;
     }
     return true;
   });
 }
 
-export function appendComment(scope: DraftScope, comment: ReviewComment): void {
-  modifyComments(scope, (comments) => {
+export async function appendComment(
+  scope: DraftScope,
+  comment: ReviewComment
+): Promise<void> {
+  await modifyComments(scope, (comments) => {
     comments.push(comment);
     return true;
   });
@@ -140,7 +140,7 @@ export function updateComment(
   scope: DraftScope,
   id: string,
   patch: Partial<ReviewComment>
-): boolean {
+): Promise<boolean> {
   return modifyComments(scope, (comments) => {
     const idx = comments.findIndex((c) => c.id === id);
     if (idx === -1) return false;
@@ -149,7 +149,7 @@ export function updateComment(
   });
 }
 
-export function removeComment(scope: DraftScope, id: string): boolean {
+export function removeComment(scope: DraftScope, id: string): Promise<boolean> {
   return modifyComments(scope, (comments) => {
     const idx = comments.findIndex((c) => c.id === id);
     if (idx === -1) return false;

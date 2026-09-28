@@ -284,7 +284,8 @@ waiter takes over only from a holder shown to be gone: a process on this machine
 that no longer exists, or a lock older than a minute when the holder cannot be
 checked. It does so under a second lock, re-checking the token, so two waiters
 cannot both break it. A live holder is waited for, and a waiter gives up loudly
-after ten seconds. Readers take no lock: writes go to a unique temporary file
+after ten seconds. The store is async throughout and waits on timers: the TUI
+and the desktop host take the lock on the thread that draws the UI. Readers take no lock: writes go to a unique temporary file
 and are renamed into place.
 
 ## Diff generation and rendering
