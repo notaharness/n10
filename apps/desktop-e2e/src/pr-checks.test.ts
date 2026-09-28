@@ -4,9 +4,9 @@ import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
 
 /**
  * What stands between a pull request and merging, read through the
- * whole stack the Completion section will use: the bridge, the host's
- * identity checks, the GitHub provider and `gh`. Nothing renders it
- * yet, so this asks the bridge directly.
+ * whole stack the Completion section uses: the bridge, the host's
+ * identity checks, the GitHub provider and `gh`, asked directly. What
+ * the section shows of it is `pr-completion.test.ts`.
  */
 
 const GITHUB: FakeGitHub = {
@@ -176,9 +176,11 @@ test.describe('Selected pull request checks', () => {
     updateFakeGh(desktop.homeDir, (s) => {
       s.prs[0].failing = { checks: true };
     });
+    // Readiness falls back to the list row, which never says ready.
     await expect(checks(desktop.page)).resolves.toMatchObject({
       checks: { state: 'failed' },
-      readiness: null,
+      readiness: { state: 'unknown' },
+      list: null,
     });
   });
 

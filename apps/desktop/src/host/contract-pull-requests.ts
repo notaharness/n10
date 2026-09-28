@@ -9,10 +9,16 @@
  */
 
 export type {
+  AspectState,
+  CheckList,
+  CheckRow,
+  CheckStanding,
   PullRequestChecksAnswer,
   PullRequestReadiness,
   PullRequestSnapshot,
+  ReadinessAspect,
   ReadinessItem,
+  Resolver,
   SnapshotRequest,
 } from '@n10/core';
 export type {
@@ -20,6 +26,7 @@ export type {
   Oid,
   PullRequestCheck,
   PullRequestChecks,
+  RequiredCheck,
   PullRequestDetail,
   PullRequestLifecycle,
   PullRequestRef,

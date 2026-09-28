@@ -9,8 +9,8 @@ import { errorMessage } from '../utils.js';
 /**
  * Refresh one pull request as an action: the list row (reviewers,
  * checks, unresolved count) through the same refresh as the status
- * bar's, then its threads and description. `pending` lasts until all
- * three have been read again.
+ * bar's, then its threads, description, and checks and policies.
+ * `pending` lasts until all of them have been read again.
  *
  * Not the diff: that is git's, read from the last fetch of the branch,
  * and refreshing the pull request does not fetch it.
@@ -30,6 +30,7 @@ export function useRefreshPullRequest(cwd: string) {
       ),
       qc.invalidateQueries({ queryKey: keys.threads(cwd, pr.id) }),
       qc.invalidateQueries({ queryKey: keys.prDescription(cwd, pr.id) }),
+      qc.invalidateQueries({ queryKey: keys.prChecksOf(cwd) }),
     ]);
   const run = (pr: PullRequestInfo) => {
     setPending(true);

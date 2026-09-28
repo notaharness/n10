@@ -4,7 +4,6 @@ import {
   adoptPullRequest,
   initialMode,
   nextStep,
-  readiness,
   reviewRole,
 } from './overview-model.js';
 
@@ -167,112 +166,6 @@ describe('nextStep', () => {
     expect(nextStep(PR, 'author', 'alex')).toMatchObject({
       summary: 'Waiting for review',
       detail: 'No reviewers are requested.',
-    });
-  });
-});
-
-describe('readiness', () => {
-  const cy = (decision: Decision) => ({
-    identifier: 'cy',
-    displayName: 'Cy',
-    decision,
-  });
-  const row = (pr: PullRequestInfo, id: string) =>
-    readiness(pr).rows.find((r) => r.id === id);
-
-  it('never calls a pull request ready, or a requirement met, from the list', () => {
-    // Everything n10 can see is green; what it cannot see still decides,
-    // so an approval and passing checks are observations, not verdicts.
-    // Only the state is met: the provider itself says it is open.
-    const green = {
-      ...PR,
-      buildStatus: 'succeeded' as const,
-      reviewers: [bea('approved')],
-    };
-    const r = readiness(green);
-    expect(r.headline).toEqual({
-      state: 'unknown',
-      text: 'Readiness not fully known',
-      detail: null,
-    });
-    expect(r.rows.map((x) => [x.id, x.state, x.text])).toEqual([
-      ['lifecycle', 'met', 'Open'],
-      ['reviews', 'observed', 'Approved by Bea'],
-      ['checks', 'observed', 'Reported checks pass'],
-      [
-        'unknown',
-        'unknown',
-        'Conflicts, branch policies and merge permission are not visible to n10',
-      ],
-    ]);
-  });
-
-  it('counts who is still to review', () => {
-    expect(
-      row({ ...PR, reviewers: [bea('approved'), cy('no-response')] }, 'reviews')
-    ).toMatchObject({
-      state: 'observed',
-      text: 'Approved by Bea · 1 pending',
-    });
-    // A declined request asks nothing more.
-    expect(
-      row({ ...PR, reviewers: [bea('approved'), cy('declined')] }, 'reviews')
-        ?.text
-    ).toBe('Approved by Bea');
-    // Nobody left to ask is not the same as nobody asked.
-    expect(
-      row({ ...PR, reviewers: [cy('declined')] }, 'reviews')
-    ).toMatchObject({ state: 'observed', text: 'Declined by Cy' });
-    expect(row({ ...PR, reviewers: [] }, 'reviews')?.text).toBe(
-      'No reviewers requested'
-    );
-  });
-
-  it('shows problems as concerns beside "not fully known", never as blockers', () => {
-    // A failing check may be optional, and changes requested block only
-    // where the provider's rules say so; neither is read here.
-    const r = readiness({
-      ...PR,
-      buildStatus: 'failed',
-      reviewers: [bea('changes-requested')],
-    });
-    expect(r.headline).toEqual({
-      state: 'unknown',
-      text: 'Readiness not fully known',
-      detail: 'Changes requested by Bea · Checks failing',
-    });
-    expect(
-      r.rows.filter((x) => x.state === 'concern').map((x) => x.id)
-    ).toEqual(['reviews', 'checks']);
-    expect(r.rows.some((x) => x.state === 'blocked')).toBe(false);
-  });
-
-  it("keeps Azure's votes apart, most severe first", () => {
-    // Rejected keeps the red it has in the reviewers list and header.
-    expect(
-      row(
-        { ...PR, reviewers: [bea('waiting-for-author'), cy('rejected')] },
-        'reviews'
-      )
-    ).toMatchObject({ text: 'Rejected by Cy', severe: true });
-    expect(
-      row({ ...PR, reviewers: [bea('waiting-for-author')] }, 'reviews')
-    ).toMatchObject({ text: 'Waiting for author: Bea', severe: false });
-  });
-
-  it('says a draft is not ready: the provider says so itself', () => {
-    const r = readiness({ ...PR, isDraft: true, buildStatus: 'succeeded' });
-    expect(r.headline).toEqual({
-      state: 'waiting',
-      text: 'Draft: not ready to merge',
-      detail: null,
-    });
-  });
-
-  it('reports no checks as unknown, not as passing', () => {
-    expect(row(PR, 'checks')).toMatchObject({
-      state: 'unknown',
-      text: 'None reported',
     });
   });
 });

@@ -8,12 +8,10 @@ import type { Mode } from './review-model.js';
 /**
  * What the pull request Overview says, decided from the data it has.
  *
- * Everything here reads the pull request list's row, which carries the
- * draft flag, reviewer verdicts, the CI rollup and the unresolved
- * count — and nothing about branch policies, required reviewers,
- * conflicts or merge permission. So the Overview can name blockers it
- * sees, but can never call a pull request ready: readiness stays "not
- * fully known" until those are read.
+ * Everything here reads the pull request list's row: whose pull request
+ * it is, where the tab opens, and the reader's next step. Readiness is
+ * not decided here: core evaluates it from the provider's own facts
+ * (`pr-readiness.ts`), and the Completion section only shows it.
  */
 
 export type ReviewRole = 'author' | 'reviewer';
@@ -222,115 +220,9 @@ export function nextStep(
   return role === 'author' ? authorStep(pr) : reviewerStep(pr, viewer);
 }
 
-/**
- * One fact about completing the pull request, and what n10 can say about
- * its effect.
- *
- * `met`, `blocked` and `waiting` are verdicts, and need the provider's
- * own requirement signal: a draft cannot be merged, and says so itself.
- * The list row carries no branch rules or policies, so what it shows —
- * an approval, a failing check — is `observed` (or a `concern`, when it
- * is a problem): a fact whose weight n10 cannot read, never shown as
- * satisfying or blocking anything. `unknown` is what n10 has not read.
- */
-export type ReadinessState =
-  | 'met'
-  | 'blocked'
-  | 'waiting'
-  | 'concern'
-  | 'observed'
-  | 'unknown';
-
-export interface ReadinessRow {
-  id: 'lifecycle' | 'reviews' | 'checks' | 'unknown';
-  label: string;
-  state: ReadinessState;
-  text: string;
-  /** A concern in the colour the vote has everywhere else: Azure's
-   *  Rejected is the one verdict shown red. */
-  severe?: boolean;
-}
-
-export interface Readiness {
-  /** A verdict n10 can stand behind, or "not fully known" with the
-   *  visible problems beside it. */
-  headline: { state: ReadinessState; text: string; detail: string | null };
-  rows: ReadinessRow[];
-}
-
 /** The reviewers still asked for a verdict: one who declined is not. */
 export function activeReviewers(
   reviewers: readonly PullRequestReviewer[]
 ): PullRequestReviewer[] {
   return reviewers.filter((r) => r.decision !== 'declined');
-}
-
-/** Where the reviews stand, in the provider's words. */
-function reviewsRow(pr: PullRequestInfo): ReadinessRow {
-  const all = pr.reviewers ?? [];
-  const reviewers = activeReviewers(all);
-  const row = { id: 'reviews' as const, label: 'Reviews' };
-  const holding = holdingVerdict(reviewers);
-  if (holding) {
-    const severe = reviewers.some((r) => r.decision === 'rejected');
-    return { ...row, state: 'concern', text: holding, severe };
-  }
-  if (reviewers.length === 0) {
-    const text =
-      all.length === 0 ? 'No reviewers requested' : `Declined by ${names(all)}`;
-    return { ...row, state: 'observed', text };
-  }
-  const approved = reviewers.filter((r) => r.decision === 'approved');
-  const pending = reviewers.length - approved.length;
-  const text =
-    approved.length === 0
-      ? `${pending} pending`
-      : pending === 0
-      ? `Approved by ${names(approved)}`
-      : `Approved by ${names(approved)} · ${pending} pending`;
-  return { ...row, state: 'observed', text };
-}
-
-/** GitHub's rollup and Azure's statuses carry only what reported: a
- *  required check that never ran is absent, and a failing one may be
- *  optional. */
-const CHECKS: Record<
-  NonNullable<PullRequestInfo['buildStatus']>,
-  Pick<ReadinessRow, 'state' | 'text'>
-> = {
-  succeeded: { state: 'observed', text: 'Reported checks pass' },
-  failed: { state: 'concern', text: 'Failing' },
-  pending: { state: 'observed', text: 'Running' },
-  none: { state: 'unknown', text: 'None reported' },
-};
-
-export function readiness(pr: PullRequestInfo): Readiness {
-  const rows: ReadinessRow[] = [
-    pr.isDraft
-      ? { id: 'lifecycle', label: 'State', state: 'waiting', text: 'Draft' }
-      : { id: 'lifecycle', label: 'State', state: 'met', text: 'Open' },
-    reviewsRow(pr),
-    { id: 'checks', label: 'Checks', ...CHECKS[pr.buildStatus ?? 'none'] },
-    {
-      id: 'unknown',
-      label: 'Unknown',
-      state: 'unknown',
-      text: 'Conflicts, branch policies and merge permission are not visible to n10',
-    },
-  ];
-  return { headline: headline(pr, rows), rows };
-}
-
-function headline(
-  pr: PullRequestInfo,
-  rows: readonly ReadinessRow[]
-): Readiness['headline'] {
-  const concerns = rows
-    .filter((r) => r.state === 'concern')
-    .map((r) => (r.id === 'checks' ? 'Checks failing' : r.text));
-  const detail = concerns.length > 0 ? concerns.join(' · ') : null;
-  if (pr.isDraft) {
-    return { state: 'waiting', text: 'Draft: not ready to merge', detail };
-  }
-  return { state: 'unknown', text: 'Readiness not fully known', detail };
 }
