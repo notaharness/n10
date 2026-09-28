@@ -91,6 +91,37 @@ export interface RequiredCheck {
   app: { id: string; slug: string | null } | null;
 }
 
+/**
+ * Reviewers a rule names, some number of whom must approve: an Azure
+ * DevOps required-reviewers policy, a GitHub rule set's required team.
+ */
+export interface NamedReviewers {
+  /** The provider's ids for them: Azure DevOps identity ids, people or
+   *  groups; GitHub team ids. Compared ignoring case. */
+  ids: string[];
+  /** Teams alone (GitHub's rule sets), or any identity. */
+  kind: 'team' | 'identity';
+  /** How many of them must approve; null where the rule asks each. */
+  approvals: number | null;
+  /** The file patterns the rule is limited to; empty for any change. */
+  paths: string[];
+  /** Completion waits for it. Azure DevOps also adds reviewers as
+   *  optional, which asks for their review without requiring it. */
+  blocking: boolean;
+}
+
+/** What the target branch's rules ask of reviews, in the provider's own
+ *  terms: nothing here is inferred from who happens to be asked. */
+export interface ReviewRule {
+  /** Approvals needed, the most any rule asks; 0 where none sets a
+   *  number. */
+  approvals: number;
+  /** A code owner of the changed files must approve (GitHub). */
+  codeOwners: boolean;
+  /** Reviewers a rule names, where it applies to this pull request. */
+  named: NamedReviewers[];
+}
+
 /** What the target branch's rules ask of every pull request into it. */
 export interface BranchRules {
   /** Checks that must pass, by name. */
@@ -98,6 +129,8 @@ export interface BranchRules {
   /** Review threads must be resolved; null where the rules that would
    *  say so could not be read. */
   conversationResolution: boolean | null;
+  /** What reviews the rules ask for. */
+  reviews: ReviewRule;
 }
 
 /**

@@ -1,0 +1,61 @@
+import type { NamedReviewers, ReviewRule } from '@n10/vcs-core';
+
+/**
+ * What the base branch's rules ask of reviews on GitHub: classic
+ * protection as `refUpdateRule` shows it to this account, and the
+ * `pull_request` rules of every rule set that applies. The strictest of
+ * each wins, as GitHub applies them all.
+ */
+
+/** A `pull_request` rule's review parameters, as the rules API gives
+ *  them. */
+export interface PullRequestRuleParameters {
+  required_approving_review_count?: number;
+  require_code_owner_review?: boolean;
+  /** Teams that must approve changes to the paths given. */
+  required_reviewers?: {
+    file_patterns?: string[];
+    minimum_approvals?: number;
+    reviewer?: { id?: number; type?: string };
+  }[];
+}
+
+/** Classic protection's review requirement, enforced on this account. */
+export interface ClassicReviewRule {
+  requiredApprovingReviewCount: number | null;
+  requiresCodeOwnerReviews: boolean;
+}
+
+function named(
+  req: NonNullable<PullRequestRuleParameters['required_reviewers']>[number]
+): NamedReviewers[] {
+  const id = req.reviewer?.id;
+  if (id == null) return [];
+  return [
+    {
+      ids: [String(id)],
+      kind: 'team',
+      approvals: req.minimum_approvals ?? null,
+      paths: req.file_patterns ?? [],
+      blocking: true,
+    },
+  ];
+}
+
+export function reviewRuleOf(
+  classic: ClassicReviewRule | null,
+  rules: readonly PullRequestRuleParameters[]
+): ReviewRule {
+  const counts = rules.map((r) => r.required_approving_review_count ?? 0);
+  return {
+    approvals: Math.max(
+      0,
+      classic?.requiredApprovingReviewCount ?? 0,
+      ...counts
+    ),
+    codeOwners:
+      (classic?.requiresCodeOwnerReviews ?? false) ||
+      rules.some((r) => r.require_code_owner_review === true),
+    named: rules.flatMap((r) => (r.required_reviewers ?? []).flatMap(named)),
+  };
+}

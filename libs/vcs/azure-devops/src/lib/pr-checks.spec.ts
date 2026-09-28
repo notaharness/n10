@@ -242,6 +242,28 @@ describe('fetchPullRequestChecksAzure', () => {
           { name: 'SonarCloud quality gate', app: null },
         ],
         conversationResolution: true,
+        reviews: {
+          approvals: 2,
+          codeOwners: false,
+          // The docs policy is not applicable here: none of its paths
+          // changed. The optional one asks without requiring.
+          named: [
+            {
+              ids: ['00000000-0000-4000-8000-000000000022'],
+              kind: 'identity',
+              approvals: 1,
+              paths: ['/release/*'],
+              blocking: true,
+            },
+            {
+              ids: ['00000000-0000-4000-8000-000000000002'],
+              kind: 'identity',
+              approvals: null,
+              paths: [],
+              blocking: false,
+            },
+          ],
+        },
       },
     });
   });

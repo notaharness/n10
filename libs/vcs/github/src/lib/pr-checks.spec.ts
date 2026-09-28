@@ -156,6 +156,9 @@ function requiredRule(...names: [string, number | null][]): Json {
   };
 }
 
+/** A rule that asks nothing of reviews. */
+const NO_REVIEWS = { approvals: 0, codeOwners: false, named: [] };
+
 const RESOLUTION_RULE = {
   type: 'pull_request',
   parameters: { required_review_thread_resolution: true },
@@ -444,6 +447,7 @@ describe('fetchPullRequestChecksGitHub: required checks nothing reported', () =>
           { name: 'e2e', app: null },
         ],
         conversationResolution: false,
+        reviews: NO_REVIEWS,
       },
     });
   });
@@ -566,6 +570,7 @@ describe('fetchPullRequestChecksGitHub: rules', () => {
           { name: 'lint', app: { id: '15368', slug: null } },
         ],
         conversationResolution: true,
+        reviews: NO_REVIEWS,
       },
     });
     // `lint` must come from GitHub Actions: CircleCI's does not count.
@@ -619,7 +624,89 @@ describe('fetchPullRequestChecksGitHub: rules', () => {
     expect((await read()).rules).toEqual({
       state: 'read',
       // Checks under enforcement `off` are not required.
-      value: { requiredChecks: [], conversationResolution: true },
+      value: {
+        requiredChecks: [],
+        conversationResolution: true,
+        reviews: NO_REVIEWS,
+      },
+    });
+  });
+
+  it('reads the review rule from classic protection and every rule set, the strictest of each', async () => {
+    answerWith({
+      PullRequestChecks: [
+        answer(
+          { nodes: [] },
+          {
+            baseRef: {
+              refUpdateRule: {
+                requiresConversationResolution: false,
+                requiredApprovingReviewCount: 1,
+                requiresCodeOwnerReviews: false,
+              },
+            },
+          }
+        ),
+      ],
+      rules: [
+        {
+          type: 'pull_request',
+          parameters: {
+            required_approving_review_count: 2,
+            require_code_owner_review: true,
+            required_reviewers: [
+              {
+                file_patterns: ['src/**'],
+                minimum_approvals: 1,
+                reviewer: { id: 777, type: 'Team' },
+              },
+            ],
+          },
+        },
+        {
+          type: 'pull_request',
+          parameters: { required_approving_review_count: 1 },
+        },
+      ],
+    });
+    expect((await read()).rules).toMatchObject({
+      state: 'read',
+      value: {
+        reviews: {
+          approvals: 2,
+          codeOwners: true,
+          named: [
+            {
+              ids: ['777'],
+              kind: 'team',
+              approvals: 1,
+              paths: ['src/**'],
+              blocking: true,
+            },
+          ],
+        },
+      },
+    });
+
+    // Classic protection alone: its count and its code-owner rule.
+    answerWith({
+      PullRequestChecks: [
+        answer(
+          { nodes: [] },
+          {
+            baseRef: {
+              refUpdateRule: {
+                requiresConversationResolution: false,
+                requiredApprovingReviewCount: 3,
+                requiresCodeOwnerReviews: true,
+              },
+            },
+          }
+        ),
+      ],
+    });
+    expect((await read()).rules).toMatchObject({
+      value: { reviews: { approvals: 3, codeOwners: true, named: [] } },
     });
   });
 
