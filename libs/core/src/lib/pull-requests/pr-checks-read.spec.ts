@@ -268,6 +268,26 @@ describe('readPullRequestChecks', () => {
     expect(unconfirmed.ref).not.toHaveProperty('id');
   });
 
+  it('refuses a detail read about another repository than the checks read', async () => {
+    // Asked with no id, the two parallel reads answer about repositories
+    // with different ids: one was replaced between them.
+    const read = readPullRequestChecks(
+      { ref: REF },
+      sources({
+        checks: () => Promise.resolve(answer({ ref: { ...REF, id: '2' } })),
+        detail: () =>
+          Promise.resolve({
+            ref: { ...REF, id: '3' },
+            reviewers: {
+              state: 'read',
+              value: { items: [], total: 0, complete: true },
+            },
+          } as unknown as PullRequestDetail),
+      })
+    );
+    await expect(read).rejects.toThrow('is now a different repository');
+  });
+
   it('does not take checks about another pull request for this one', async () => {
     const res = await readPullRequestChecks(
       { ref: REF },
