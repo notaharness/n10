@@ -3,21 +3,29 @@ import {
   CircleDotIcon,
   CodeIcon,
   CopyIcon,
+  EllipsisIcon,
   ExternalLinkIcon,
   GitBranchIcon,
   GitPullRequestIcon,
   MessageSquareIcon,
+  RefreshCwIcon,
   XCircleIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PullRequestInfo } from '@n10/vcs-core';
+import { copyText } from '../../lib/copy-text.js';
 import { useOpenInEditor } from '../../lib/data/mutations.js';
+import { providerName } from '../../lib/provider-name.js';
+import { useRepo } from '../../lib/repo-context.js';
+import { useRefreshPullRequest } from '../../lib/review/use-refresh-pull-request.js';
 import { unresolvedCommentsLabel } from '../../lib/sidebar/sidebar-model.js';
 import { cn, errorMessage } from '../../lib/utils.js';
 import { Avatar } from '../ui/avatar.js';
 import { Badge } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
 import { Tip } from '../ui/tooltip.js';
+import { LifecycleBadge } from './overview/parts.js';
+import { ReviewerDots, ReviewerSummary } from './PrHeaderReviewers.js';
 
 /** Launch the configured external editor on the branch's worktree. */
 export function OpenInEditorButton({ branch }: { branch: string }) {
@@ -27,6 +35,7 @@ export function OpenInEditorButton({ branch }: { branch: string }) {
       <Button
         variant="ghost"
         size="sm"
+        aria-label="Open worktree in editor"
         disabled={open.isPending}
         onClick={() =>
           open.mutate(branch, {
@@ -35,7 +44,8 @@ export function OpenInEditorButton({ branch }: { branch: string }) {
           })
         }
       >
-        <CodeIcon /> Editor
+        <CodeIcon />
+        <span className="hidden @min-[900px]:inline">Editor</span>
       </Button>
     </Tip>
   );
@@ -57,47 +67,6 @@ function CiBadge({ ci }: { ci: PullRequestInfo['buildStatus'] }) {
       {ci === 'pending' && <CircleDotIcon />}
       CI {ci}
     </Badge>
-  );
-}
-
-/** Colour of the dot on a reviewer's avatar, by their verdict. */
-function decisionDotClass(decision: string): string {
-  if (decision === 'approved') return 'bg-success';
-  if (decision === 'rejected') return 'bg-destructive';
-  if (decision === 'changes-requested' || decision === 'waiting-for-author') {
-    return 'bg-warning';
-  }
-  if (decision === 'no-response') return 'bg-muted-foreground/50';
-  if (decision === 'declined') return 'bg-muted-foreground';
-  return '';
-}
-
-/** Reviewer avatars, each dotted with where that reviewer landed. */
-function ReviewerDots({
-  reviewers,
-}: {
-  reviewers: NonNullable<PullRequestInfo['reviewers']>;
-}) {
-  if (reviewers.length === 0) return null;
-  return (
-    <span className="flex items-center gap-1.5">
-      {reviewers.slice(0, 6).map((r) => (
-        <Tip
-          key={r.identifier}
-          label={`${r.displayName}: ${r.decision.replaceAll('-', ' ')}`}
-        >
-          <span className="relative">
-            <Avatar name={r.displayName} size="xs" />
-            <span
-              className={cn(
-                'absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-2 ring-background',
-                decisionDotClass(r.decision)
-              )}
-            />
-          </span>
-        </Tip>
-      ))}
-    </span>
   );
 }
 
@@ -126,6 +95,27 @@ function UnresolvedButton({
   );
 }
 
+/** Copy what names this pull request, through the native menu. */
+async function runMoreMenu(pr: PullRequestInfo): Promise<void> {
+  const chosen = await window.n10.showContextMenu([
+    { id: 'copy-link', label: 'Copy Link' },
+    { id: 'copy-branch', label: 'Copy Branch Name' },
+    { id: 'copy-head', label: 'Copy Head Commit', enabled: !!pr.headSha },
+  ]);
+  if (chosen === 'copy-link') copyText(pr.url, 'Link copied');
+  else if (chosen === 'copy-branch') {
+    copyText(pr.sourceBranch, 'Branch name copied');
+  } else if (chosen === 'copy-head' && pr.headSha) {
+    copyText(pr.headSha, 'Commit id copied');
+  }
+}
+
+/**
+ * The compact identity of a pull request tab, sized by its own width:
+ * the title truncates first, then the branches go, the reviewer avatars
+ * become a count and the button labels become icons. The number and
+ * the state always stay; the Overview carries every value in full.
+ */
 export function PrHeader({
   pr,
   onShowUnresolved,
@@ -133,25 +123,27 @@ export function PrHeader({
   pr: PullRequestInfo;
   onShowUnresolved: () => void;
 }) {
+  const { repo } = useRepo();
+  const refresh = useRefreshPullRequest(repo.cwd);
+  const provider = providerName(repo.providerId);
   const reviewers = pr.reviewers ?? [];
   return (
-    <header className="flex h-10 shrink-0 items-center gap-3 border-b border-border px-3">
+    <header className="@container flex h-10 shrink-0 items-center gap-3 border-b border-border px-3">
       <GitPullRequestIcon className="size-4 shrink-0 text-info" />
       <span className="flex min-w-0 shrink items-center gap-2">
-        <span className="truncate font-medium">{pr.title}</span>
+        <Tip label={pr.title}>
+          <span className="truncate font-medium">{pr.title}</span>
+        </Tip>
         <span className="shrink-0 text-sm text-muted-foreground">#{pr.id}</span>
+        <LifecycleBadge isDraft={pr.isDraft} />
         <Tip label="Copy branch name">
           <button
             type="button"
-            onClick={() => {
-              void navigator.clipboard.writeText(pr.sourceBranch);
-              toast.success('Branch name copied');
-            }}
-            className="hidden min-w-0 items-center gap-1 truncate rounded px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground sm:flex"
+            onClick={() => copyText(pr.sourceBranch, 'Branch name copied')}
+            className="hidden min-w-0 items-center gap-1 rounded px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground @min-[1200px]:flex"
           >
-            <span className="truncate">
-              {pr.sourceBranch} → {pr.targetBranch}
-            </span>
+            <span className="truncate">{pr.sourceBranch}</span>
+            <span className="shrink-0">→ {pr.targetBranch}</span>
             <CopyIcon className="size-3 shrink-0" />
           </button>
         </Tip>
@@ -159,21 +151,28 @@ export function PrHeader({
 
       <span className="mx-1 h-4 w-px shrink-0 bg-border" />
 
-      {/* Never squeezed: the title truncates instead, and a cluster that
-          shrinks wraps its counts onto a second line or runs under the
-          buttons. */}
+      {/* Never squeezed: the title truncates instead, and what does not
+          fit at this width is said more briefly or left to the Overview. */}
       <span className="flex shrink-0 items-center gap-2 text-sm whitespace-nowrap">
         <Tip label={`Opened by ${pr.createdByDisplayName}`}>
           <span className="flex items-center gap-1.5">
             <Avatar name={pr.createdByDisplayName} size="xs" />
-            <span className="hidden truncate text-muted-foreground md:inline">
+            <span className="hidden truncate text-muted-foreground @min-[1200px]:inline">
               {pr.createdByDisplayName}
             </span>
           </span>
         </Tip>
-        {pr.isDraft && <Badge variant="outline">Draft</Badge>}
-        <CiBadge ci={pr.buildStatus} />
-        <ReviewerDots reviewers={reviewers} />
+        <span className="hidden @min-[720px]:contents">
+          <CiBadge ci={pr.buildStatus} />
+        </span>
+        <ReviewerDots
+          reviewers={reviewers}
+          className="hidden @min-[1000px]:flex"
+        />
+        <ReviewerSummary
+          reviewers={reviewers}
+          className="hidden @min-[720px]:flex"
+        />
         {(pr.activeCommentCount ?? 0) > 0 && (
           <UnresolvedButton
             count={pr.activeCommentCount ?? 0}
@@ -185,13 +184,38 @@ export function PrHeader({
       <div className="flex-1" />
 
       <OpenInEditorButton branch={pr.sourceBranch} />
-      <Tip label="Open on the provider">
+      <Tip label={`Open on ${provider}`}>
         <Button
           variant="ghost"
           size="sm"
+          aria-label={`Open on ${provider}`}
           onClick={() => void window.n10.openExternal(pr.url)}
         >
-          <ExternalLinkIcon /> Open
+          <ExternalLinkIcon />
+          <span className="hidden @min-[900px]:inline">{provider}</span>
+        </Button>
+      </Tip>
+      <Tip label="Refresh this pull request">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Refresh this pull request"
+          disabled={refresh.pending}
+          onClick={() => refresh.run(pr)}
+        >
+          <RefreshCwIcon className={cn(refresh.pending && 'animate-spin')} />
+        </Button>
+      </Tip>
+      <Tip label="More actions">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="More actions"
+          onClick={() =>
+            runMoreMenu(pr).catch((e: unknown) => toast.error(errorMessage(e)))
+          }
+        >
+          <EllipsisIcon />
         </Button>
       </Tip>
     </header>
@@ -209,7 +233,7 @@ export function BranchHeader({
   fileCount: number;
 }) {
   return (
-    <header className="flex h-10 shrink-0 items-center gap-3 border-b border-border px-3">
+    <header className="@container flex h-10 shrink-0 items-center gap-3 border-b border-border px-3">
       <GitBranchIcon className="size-4 shrink-0 text-muted-foreground" />
       <span className="flex min-w-0 shrink items-center gap-2">
         <span className="truncate font-medium">{branch}</span>
