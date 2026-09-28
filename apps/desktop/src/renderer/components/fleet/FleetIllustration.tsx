@@ -3,7 +3,6 @@ import {
   inQuad,
   onLeft,
   onRight,
-  project,
   toPoints,
   type Box,
   type Vec3,
@@ -11,7 +10,7 @@ import {
 
 /**
  * Two machines of the website's beam mesh, a laptop and a tower, joined
- * by one beam arcing between them, with traffic both ways. Machines and the beam's colour
+ * by one beam with traffic both ways. Machines and the beam's colour
  * follow the website (apps/website/src/components/beam/mesh); surfaces
  * come from the app's theme tokens (`.fleet-art` in styles.css).
  */
@@ -20,6 +19,13 @@ import {
 const SPAN = 4.2;
 /** How far each direction's track sits from the beam's centre line. */
 const LANE = 0.18;
+/**
+ * The laptop is drawn larger and the tower slightly shorter than on the
+ * website, so the pair carry the same weight side by side: their tops
+ * line up, and the beam runs level between their middles.
+ */
+const LAPTOP_SCALE = 1.15;
+const BEAM_HEIGHT = 1.25;
 
 function Faces({ box }: { box: Box }) {
   return (
@@ -51,7 +57,7 @@ function Shadow({ box }: { box: Box }) {
 }
 
 function Tower({ cx, cy }: { cx: number; cy: number }) {
-  const body: Box = { x: cx - 0.75, y: cy - 1.3, z: 0, w: 1.5, d: 2.6, h: 3 };
+  const body: Box = { x: cx - 0.8, y: cy - 1.3, z: 0, w: 1.6, d: 2.6, h: 2.9 };
   return (
     <g>
       <Shadow box={body} />
@@ -91,14 +97,23 @@ const CODE_LINES = [
   { v: 0.725, u0: 0.14, u1: 0.36, tone: 'sage' },
 ] as const;
 
+/** The laptop, centred on its footprint (lid included) at cx, cy. */
 function Laptop({ cx, cy }: { cx: number; cy: number }) {
-  const base: Box = { x: cx - 1.5, y: cy - 0.8, z: 0, w: 3, d: 2, h: 0.14 };
+  const k = LAPTOP_SCALE;
+  const base: Box = {
+    x: cx - 1.5 * k,
+    y: cy - 0.725 * k,
+    z: 0,
+    w: 3 * k,
+    d: 2 * k,
+    h: 0.14 * k,
+  };
   const deck = base.z + base.h;
   const lid: readonly [Vec3, Vec3, Vec3, Vec3] = [
-    [base.x, base.y - 0.55, deck + 1.85],
-    [base.x + base.w, base.y - 0.55, deck + 1.85],
-    [base.x + base.w, base.y + 0.06, deck],
-    [base.x, base.y + 0.06, deck],
+    [base.x, base.y - 0.55 * k, deck + 1.85 * k],
+    [base.x + base.w, base.y - 0.55 * k, deck + 1.85 * k],
+    [base.x + base.w, base.y + 0.06 * k, deck],
+    [base.x, base.y + 0.06 * k, deck],
   ];
   const display = [
     inQuad(lid, 0.05, 0.07),
@@ -112,10 +127,10 @@ function Laptop({ cx, cy }: { cx: number; cy: number }) {
       <Faces box={base} />
       <polygon
         points={toPoints([
-          [base.x + 0.3, base.y + 0.35, deck],
-          [base.x + base.w - 0.3, base.y + 0.35, deck],
-          [base.x + base.w - 0.3, base.y + 1.2, deck],
-          [base.x + 0.3, base.y + 1.2, deck],
+          [base.x + 0.3 * k, base.y + 0.35 * k, deck],
+          [base.x + base.w - 0.3 * k, base.y + 0.35 * k, deck],
+          [base.x + base.w - 0.3 * k, base.y + 1.2 * k, deck],
+          [base.x + 0.3 * k, base.y + 1.2 * k, deck],
         ])}
         className="fleet-art-inset"
       />
@@ -135,28 +150,21 @@ function Laptop({ cx, cy }: { cx: number; cy: number }) {
   );
 }
 
-/** Heights of the beam's ends (laptop deck, tower side) and of its arc's control point. */
-const RISE = { from: 0.14, to: 1.2, peak: 5 } as const;
-
 /**
  * One direction's track from the laptop (0, SPAN) to the tower
- * (SPAN, 0), moved `offset` toward the viewer: a parabola in the
- * vertical plane between them, which the projection keeps a quadratic
- * curve on screen.
+ * (SPAN, 0), level at `BEAM_HEIGHT` and moved `offset` toward the
+ * viewer. Both ends sit inside the machines, which are painted over them.
  */
 function Track({ offset, back }: { offset: number; back?: boolean }) {
-  const mid = SPAN / 2 + offset;
-  const [from, control, to] = [
-    [offset, SPAN + offset, RISE.from],
-    [mid, mid, RISE.peak],
-    [SPAN + offset, offset, RISE.to],
-  ].map((p) => project(p as unknown as Vec3).join(','));
-  const d = `M${from} Q${control} ${to}`;
+  const points = toPoints([
+    [offset, SPAN + offset, BEAM_HEIGHT],
+    [SPAN + offset, offset, BEAM_HEIGHT],
+  ]);
   return (
     <g>
-      <path d={d} className="fleet-art-ribbon" />
-      <path
-        d={d}
+      <polyline points={points} className="fleet-art-ribbon" />
+      <polyline
+        points={points}
         pathLength={100}
         className={
           back ? 'fleet-art-packet fleet-art-packet--back' : 'fleet-art-packet'
@@ -169,7 +177,7 @@ function Track({ offset, back }: { offset: number; back?: boolean }) {
 export function FleetIllustration() {
   return (
     <svg
-      viewBox="-157 -56 301 149"
+      viewBox="-162 -53 301 150"
       className="fleet-art h-auto w-48 overflow-visible"
       aria-hidden
     >

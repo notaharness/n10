@@ -40,7 +40,9 @@ function Choices({ disabled }: { disabled: boolean }) {
       </div>
       <p className="text-base text-muted-foreground">
         Connect your machines, secured with your passkey, accessible from
-        anywhere. No VPN or SSH required.
+        anywhere.
+        <br />
+        No VPN or SSH required.
       </p>
       <div className="flex flex-wrap justify-center gap-2">
         <Button disabled={disabled} onClick={() => choose('create')}>
