@@ -334,7 +334,7 @@ describe('buildFileEntries', () => {
   });
 });
 
-// ── the unified comment list ─────────────────────────────────────
+// ── the comment rows ─────────────────────────────────────────────
 
 describe('buildCommentRows ordering', () => {
   /**
@@ -421,27 +421,14 @@ describe('buildCommentRows ordering', () => {
 });
 
 describe('buildCommentRows row contents', () => {
-  it('labels a general comment Conversation and takes its root author', () => {
+  it('places a general comment ahead of every file, resolvable as its provider says', () => {
     const [row] = buildCommentRows(
       [],
       [
         thread({
           id: 'g',
           file: null,
-          comments: [
-            {
-              id: 'c',
-              author: 'grace',
-              body: 'ship it',
-              createdAt: '2024-01-01T00:00:00Z',
-            },
-            {
-              id: 'c2',
-              author: 'ada',
-              body: 'later',
-              createdAt: '2024-01-02T00:00:00Z',
-            },
-          ],
+          canResolve: false,
         } as Partial<RemoteCommentThread>),
       ],
       [],
@@ -449,108 +436,31 @@ describe('buildCommentRows row contents', () => {
     );
     expect(row).toMatchObject({
       kind: 'thread',
-      author: 'grace',
-      where: 'Conversation',
-      preview: 'ship it',
+      file: null,
       line: 0,
       fileRank: -1,
+      resolvable: false,
     });
   });
 
-  /**
-   * The rail has one line to say what a comment is about. A
-   * Conventional Comments header is already drawn as a badge on the
-   * card, so repeating "issue (blocking):" here says nothing new and
-   * pushes out the part that identifies which comment this is; the
-   * signature goes for the same reason, since every agent comment ends
-   * with the same words.
-   */
-  it('previews the prose, not the header or the signature', () => {
-    const [row] = buildCommentRows(
-      [],
-      [
-        thread({
-          id: 'g',
-          file: null,
-          comments: [
-            {
-              id: 'c',
-              author: 'grace',
-              body:
-                'issue (blocking): The undo stack is never bounded.\n\n' +
-                'Nothing ever pops.\n\n---\n' +
-                '_Posted via [n10](https://github.com/notaharness/n10) by an agent_',
-              createdAt: '2024-01-01T00:00:00Z',
-            },
-          ],
-        } as Partial<RemoteCommentThread>),
-      ],
-      [],
-      []
-    );
-    expect(row.preview).toBe(
-      'The undo stack is never bounded.\n\nNothing ever pops.'
-    );
-  });
-
-  /** Most comments on a pull request are people's, written however
-   *  they like, and must reach the rail exactly as typed. */
-  it('leaves an ordinary comment as its own preview', () => {
-    const [row] = buildCommentRows(
-      [],
-      [
-        thread({
-          id: 'g',
-          file: null,
-          comments: [
-            {
-              id: 'c',
-              author: 'grace',
-              body: 'note this: it looks fine',
-              createdAt: '2024-01-01T00:00:00Z',
-            },
-          ],
-        } as Partial<RemoteCommentThread>),
-      ],
-      [],
-      []
-    );
-    expect(row.preview).toBe('note this: it looks fine');
-  });
-
-  it('survives a thread with no comments at all', () => {
-    const [row] = buildCommentRows(
-      [],
-      [thread({ id: 'empty', file: null, comments: [] })],
-      [],
-      []
-    );
-    expect(row).toMatchObject({ author: '', preview: '' });
-  });
-
-  it('shows an inline thread as basename:line, not the full path', () => {
+  it('places an inline thread at its line, and one without a line at 0', () => {
     const [row] = buildCommentRows(
       files('src/deep/nested/a.ts'),
       [],
       [thread({ file: 'src/deep/nested/a.ts', lineStart: 12 })],
       []
     );
-    expect(row.where).toBe('a.ts:12');
-    expect(row.line).toBe(12);
-  });
-
-  it('omits the line from a thread that has none, and ranks it at 0', () => {
-    const [row] = buildCommentRows(
+    expect(row).toMatchObject({ file: 'src/deep/nested/a.ts', line: 12 });
+    const [none] = buildCommentRows(
       files('src/a.ts'),
       [],
       [thread({ file: 'src/a.ts', lineStart: null })],
       []
     );
-    expect(row.where).toBe('a.ts');
-    expect(row.line).toBe(0);
+    expect(none.line).toBe(0);
   });
 
-  it('carries a draft’s severity through, and never marks it resolved', () => {
+  it('never marks a draft resolved or resolvable', () => {
     const [row] = buildCommentRows(
       files('src/a.ts'),
       [],
@@ -559,10 +469,9 @@ describe('buildCommentRows row contents', () => {
     );
     expect(row).toMatchObject({
       kind: 'draft',
-      author: 'Draft',
-      where: 'a.ts:3',
-      severity: 'critical',
+      line: 3,
       resolved: false,
+      resolvable: false,
     });
   });
 
@@ -586,10 +495,8 @@ function rows(...specs: [string, boolean][]): CommentRow[] {
   return specs.map(([id, resolved], i) => ({
     id,
     kind: 'thread',
-    author: 'a',
-    where: 'w',
-    preview: 'p',
     resolved,
+    resolvable: true,
     file: 'src/a.ts',
     line: i,
     fileRank: 0,
@@ -646,6 +553,16 @@ describe('firstUnresolvedThread', () => {
 
   it('is null when every thread is resolved', () => {
     expect(firstUnresolvedThread(rows(['a', true]))).toBeNull();
+  });
+
+  /** A GitHub conversation comment sorts first and can never be
+   *  resolved: the count does not include it, so neither does the
+   *  thread the count leads to. */
+  it('skips a comment that cannot be resolved', () => {
+    const [general, open] = rows(['general', false], ['open', false]);
+    expect(
+      firstUnresolvedThread([{ ...general, resolvable: false }, open])?.id
+    ).toBe('open');
   });
 });
 

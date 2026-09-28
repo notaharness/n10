@@ -101,8 +101,14 @@ vi.mock('./services/comment-images.js', () =>
 vi.mock('./services/clipboard-image.js', () =>
   recorder('clipboardImage', ['saveClipboardImage'])
 );
+vi.mock('./services/pr-checks.js', () =>
+  recorder('prChecks', ['getPullRequestChecks'])
+);
 vi.mock('./services/pr-details.js', () =>
   recorder('prDetails', ['getPullRequestSnapshot'])
+);
+vi.mock('./services/pr-conversation.js', () =>
+  recorder('prConversation', ['getPullRequestConversation'])
 );
 vi.mock('./services/drafts.js', () =>
   recorder('drafts', [
@@ -187,6 +193,16 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
     'getPullRequestSnapshot',
     [{ ref: { number: 7 } }],
     'prDetails.getPullRequestSnapshot',
+  ],
+  [
+    'getPullRequestChecks',
+    [{ ref: { number: 7 } }],
+    'prChecks.getPullRequestChecks',
+  ],
+  [
+    'getPullRequestConversation',
+    [{ ref: { number: 7 } }],
+    'prConversation.getPullRequestConversation',
   ],
   [
     'replyToThread',

@@ -8,10 +8,38 @@
  * same shape.
  */
 
-export type { PullRequestSnapshot, SnapshotRequest } from '@n10/core';
+export type {
+  AspectState,
+  CheckList,
+  CheckRow,
+  CheckStanding,
+  PullRequestChecksAnswer,
+  PullRequestReadiness,
+  PullRequestSnapshot,
+  ReadinessAspect,
+  ReadinessItem,
+  Resolver,
+  PullRequestConversationRead,
+  SnapshotRequest,
+} from '@n10/core';
 export type {
   Capability,
+  ConversationActor,
+  ConversationComment,
+  ConversationEvent,
+  ConversationEventKind,
+  ConversationThread,
+  Coverage,
+  LineRange,
+  PullRequestConversation,
+  ReviewState,
+  ReviewSummary,
+  ThreadAnchor,
+  ThreadStatus,
   Oid,
+  PullRequestCheck,
+  PullRequestChecks,
+  RequiredCheck,
   PullRequestDetail,
   PullRequestLifecycle,
   PullRequestRef,

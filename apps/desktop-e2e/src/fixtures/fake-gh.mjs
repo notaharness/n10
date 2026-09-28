@@ -18,7 +18,7 @@
  * empty result rather than failing, so a test declares only what it
  * cares about.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 
 const scenarioPath = process.env.N10_FAKE_GH;
 const scenario = JSON.parse(readFileSync(scenarioPath, 'utf8'));
@@ -82,10 +82,23 @@ function failLikeGitHub() {
 /** Whether the scenario says this PR's `read` should fail right now. */
 const failing = (pr, read) => Boolean(pr?.failing?.[read]);
 
+/**
+ * Print the answer and exit. The write is synchronous: an asynchronous
+ * one into a pipe is cut off at the pipe's buffer (64 KiB) by the exit,
+ * and a conversation page is bigger than that. Node leaves the pipe
+ * non-blocking, so a full buffer answers EAGAIN until the app reads.
+ */
 const out = (value) => {
-  process.stdout.write(
+  const bytes = Buffer.from(
     typeof value === 'string' ? value : JSON.stringify(value)
   );
+  for (let at = 0; at < bytes.length; ) {
+    try {
+      at += writeSync(1, bytes, at);
+    } catch (err) {
+      if (err.code !== 'EAGAIN') throw err;
+    }
+  }
   process.exit(0);
 };
 
@@ -144,6 +157,216 @@ function searchNode(pr) {
   };
 }
 
+/** A repository's `databaseId`: a stable number derived from its name,
+ *  so the same repository always answers with the same id. */
+function repositoryNode(nameWithOwner) {
+  let databaseId = 7;
+  for (const c of nameWithOwner) {
+    databaseId = (databaseId * 31 + c.charCodeAt(0)) % 2_000_000_000;
+  }
+  return { databaseId, nameWithOwner };
+}
+
+/** The repository the scenario stands for. */
+function scenarioRepository() {
+  return repositoryNode(
+    `${scenario.owner ?? 'n10'}/${scenario.repo ?? 'fixture'}`
+  );
+}
+
+/** Each author's latest review among `reviews`, oldest first, whose
+ *  state passes `keep`. */
+function latestPerAuthor(reviews, keep) {
+  const byAuthor = new Map();
+  for (const r of reviews) if (keep(r.state)) byAuthor.set(r.author, r);
+  return [...byAuthor.values()];
+}
+
+const VERDICT_STATES = new Set(['APPROVED', 'CHANGES_REQUESTED']);
+
+/**
+ * The selected-pull-request read (libs/vcs/github/src/lib/pr-details.ts),
+ * answered in one page. `fork` names the head repository when it is not
+ * the scenario's own; `null` is a deleted fork.
+ */
+function detailNode(pr) {
+  const list = searchNode(pr);
+  const repository = scenarioRepository();
+  const head =
+    pr.fork === undefined || pr.fork === repository.nameWithOwner
+      ? repository
+      : pr.fork && repositoryNode(pr.fork);
+  const connection = (nodes) => ({
+    totalCount: nodes.length,
+    pageInfo: page,
+    nodes,
+  });
+  const author = (login) => ({ __typename: 'User', login, id: `U_${login}` });
+  const reviews = pr.reviews ?? [];
+  return {
+    ...repository,
+    pullRequest: {
+      number: pr.number,
+      title: pr.title,
+      url: list.url,
+      state: pr.state ?? 'OPEN',
+      isDraft: list.isDraft,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-02T00:00:00Z',
+      viewerCanUpdate: pr.canUpdate ?? true,
+      author: list.author,
+      headRefName: pr.headRefName,
+      headRefOid: list.headRefOid,
+      headRepository: head,
+      baseRefName: list.baseRefName,
+      baseRefOid: 'e'.repeat(40),
+      latestOpinionatedReviews: connection(
+        latestPerAuthor(reviews, (s) => VERDICT_STATES.has(s)).map((r) => ({
+          author: author(r.author),
+          state: r.state,
+          commit: { oid: list.headRefOid },
+          onBehalfOf: { nodes: [] },
+        }))
+      ),
+      latestReviews: connection(
+        latestPerAuthor(reviews, (s) => s !== 'PENDING').map((r) => ({
+          author: author(r.author),
+          state: r.state,
+        }))
+      ),
+      reviewRequests: connection(
+        (pr.reviewRequests ?? []).map((login) => ({
+          asCodeOwner: false,
+          requestedReviewer: { __typename: 'User', id: `U_${login}`, login },
+        }))
+      ),
+    },
+  };
+}
+
+/** Check-run conclusions; any other `state` is a run still going. */
+const CONCLUSIONS = new Set([
+  'SUCCESS',
+  'FAILURE',
+  'NEUTRAL',
+  'SKIPPED',
+  'CANCELLED',
+  'TIMED_OUT',
+  'ACTION_REQUIRED',
+]);
+
+/** A check as the checks read selects it (pr-checks.ts). */
+function contextNode(c, index) {
+  const isRequired = c.required ?? false;
+  if (c.status) {
+    return {
+      __typename: 'StatusContext',
+      context: c.name,
+      state: c.state,
+      targetUrl: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      creator: { login: c.app ?? 'ci-bot' },
+      isRequired,
+    };
+  }
+  const done = CONCLUSIONS.has(c.state);
+  return {
+    __typename: 'CheckRun',
+    // This check run's own id: its place in the scenario, so two runs
+    // of one name in one workflow stay two, as on GitHub.
+    databaseId: 9000 + index,
+    name: c.name,
+    status: done ? 'COMPLETED' : c.state,
+    conclusion: done ? c.state : null,
+    startedAt: '2026-01-01T00:00:00Z',
+    completedAt: done ? '2026-01-01T00:05:00Z' : null,
+    detailsUrl: `https://github.com/n10/fixture/actions/runs/${c.name.length}`,
+    isRequired,
+    checkSuite: {
+      // One suite per workflow and event, as a run per trigger has.
+      databaseId: repositoryNode(`${c.workflow ?? 'CI'}:${c.event ?? ''}`)
+        .databaseId,
+      app: { slug: c.app ?? 'github-actions', databaseId: c.appId ?? 15368 },
+      workflowRun: {
+        runAttempt: 1,
+        event: c.event ?? 'pull_request',
+        workflow: { name: c.workflow ?? 'CI' },
+      },
+    },
+  };
+}
+
+/** The checks read (libs/vcs/github/src/lib/pr-checks.ts), in one page. */
+function checksNode(pr) {
+  const nodes = (pr.checks ?? []).map(contextNode);
+  return {
+    databaseId: scenarioRepository().databaseId,
+    pullRequest: {
+      number: pr.number,
+      state: pr.state ?? 'OPEN',
+      isDraft: pr.isDraft ?? false,
+      baseRefName: pr.baseRefName ?? 'main',
+      mergeable: pr.mergeable ?? 'MERGEABLE',
+      mergeStateStatus: pr.mergeStateStatus ?? 'CLEAN',
+      reviewDecision: pr.reviewDecision ?? null,
+      // No classic protection: the scenario's rules are rule sets.
+      baseRef: { refUpdateRule: null },
+      commits: {
+        nodes: [
+          {
+            commit: {
+              oid: pr.headRefOid ?? 'f'.repeat(40),
+              statusCheckRollup: {
+                contexts: { totalCount: nodes.length, pageInfo: page, nodes },
+              },
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+/** The base branch's classic protection, as `branches/<name>` shows it. */
+function branchAnswer(name) {
+  return {
+    name,
+    protected: false,
+    protection: {
+      enabled: false,
+      required_status_checks: {
+        enforcement_level: 'off',
+        contexts: [],
+        checks: [],
+      },
+    },
+  };
+}
+
+/** The rule sets on every base branch, from the scenario's `rules`. */
+function rulesAnswer() {
+  const rules = scenario.rules ?? {};
+  const answer = [];
+  if (rules.required?.length) {
+    answer.push({
+      type: 'required_status_checks',
+      parameters: {
+        required_status_checks: rules.required.map((context) => ({
+          context,
+          integration_id: 15368,
+        })),
+      },
+    });
+  }
+  if (rules.conversationResolution) {
+    answer.push({
+      type: 'pull_request',
+      parameters: { required_review_thread_resolution: true },
+    });
+  }
+  return answer;
+}
+
 function threadNode(t, i) {
   return {
     id: t.id ?? `thread-${i + 1}`,
@@ -167,6 +390,106 @@ function threadNode(t, i) {
   };
 }
 
+// ── The whole conversation, a hundred nodes a page ──
+//
+// The conversation reader follows every connection past its first page,
+// so this pages the way GitHub does: at most a hundred nodes, an offset
+// cursor, and a total count. A reader that stops early shows up in the
+// counts a test asserts.
+
+function pageOf(all, after) {
+  const start = after ? Number(after) : 0;
+  const nodes = all.slice(start, start + 100);
+  const end = start + nodes.length;
+  return {
+    totalCount: all.length,
+    pageInfo: { hasNextPage: end < all.length, endCursor: String(end) },
+    nodes,
+  };
+}
+
+/** A login ending in `bot` is a GitHub App, as `ci-bot` would be. */
+const actor = (login) =>
+  login ? { __typename: /bot$/.test(login) ? 'Bot' : 'User', login } : null;
+
+function conversationComment(c, id) {
+  return {
+    id,
+    author: actor(c.author),
+    body: c.body,
+    createdAt: c.createdAt ?? '2026-01-01T00:00:00Z',
+    lastEditedAt: null,
+    isMinimized: false,
+    minimizedReason: null,
+    url: `https://github.com/n10/fixture/pull/1#${id}`,
+    viewerCanUpdate: c.author === (scenario.username ?? 'n10-tester'),
+    viewerCannotUpdateReasons: [],
+    viewerCanDelete: c.author === (scenario.username ?? 'n10-tester'),
+  };
+}
+
+function threadComments(t, i) {
+  const id = t.id ?? `thread-${i + 1}`;
+  return (t.comments ?? []).map((c, j) => ({
+    ...conversationComment(c, `${id}-c${j + 1}`),
+    replyTo: j === 0 ? null : { id: `${id}-c1` },
+    pullRequestReview: null,
+    state: 'SUBMITTED',
+  }));
+}
+
+function conversationThread(t, i) {
+  const node = threadNode(t, i);
+  return {
+    ...node,
+    subjectType: t.line == null && t.originalLine == null ? 'FILE' : 'LINE',
+    startDiffSide: null,
+    resolvedBy: t.isResolved ? actor(t.resolvedBy) : null,
+    viewerCanReply: true,
+    viewerCanResolve: !node.isResolved,
+    viewerCanUnresolve: node.isResolved,
+    root: { nodes: [{ diffHunk: t.diffHunk ?? '', originalCommit: null }] },
+    comments: pageOf(threadComments(t, i), undefined),
+  };
+}
+
+function conversationConnections(pr, after) {
+  const threads = pageOf(pr?.threads ?? [], after);
+  return {
+    reviewThreads: {
+      ...threads,
+      nodes: threads.nodes.map((t, k) =>
+        conversationThread(t, (after ? Number(after) : 0) + k)
+      ),
+    },
+    comments: pageOf(
+      (pr?.generalComments ?? []).map((c, i) =>
+        conversationComment(c, `general-${i + 1}`)
+      ),
+      after
+    ),
+    reviews: pageOf(
+      (pr?.reviews ?? []).map((r, i) => ({
+        id: `review-${i + 1}`,
+        author: actor(r.author),
+        state: r.state,
+        body: r.body ?? '',
+        submittedAt: r.submittedAt ?? '2026-01-01T00:00:00Z',
+        url: `https://github.com/n10/fixture/pull/1#review-${i + 1}`,
+        commit: null,
+        comments: { totalCount: r.commentCount ?? 0 },
+        isMinimized: false,
+        minimizedReason: null,
+      })),
+      after
+    ),
+    timelineItems: {
+      ...pageOf(pr?.events ?? [], after),
+      totalCount: undefined,
+    },
+  };
+}
+
 // ── gh auth status ──
 if (argv[0] === 'auth' && argv[1] === 'status') {
   out(
@@ -181,7 +504,17 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
   const vars = flags(argv);
   const query = vars.query ?? '';
 
-  // The open-PR search is the only one asking for a check rollup; the
+  // Before the list search below, which also names `statusCheckRollup`.
+  if (
+    query.includes('query PullRequestChecks(') ||
+    query.includes('query PullRequestCheckContexts(')
+  ) {
+    const pr = prs.find((p) => String(p.number) === String(vars.number));
+    if (failing(pr, 'checks')) failLikeGitHub();
+    out({ data: { repository: pr ? checksNode(pr) : null } });
+  }
+
+  // The open-PR search is the other query asking for a check rollup; the
   // merged-branch sweep asks for headRefName alone and gets nothing,
   // which keeps the sync loop from deleting a test's branches.
   if (query.includes('statusCheckRollup')) {
@@ -189,6 +522,37 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
   }
   if (query.includes('search(')) {
     out({ data: { search: { pageInfo: page, nodes: [] } } });
+  }
+
+  if (query.includes('query PullRequestDetail(')) {
+    const pr = prs.find((p) => String(p.number) === String(vars.number));
+    if (failing(pr, 'detail')) failLikeGitHub();
+    out({ data: { repository: pr ? detailNode(pr) : null } });
+  }
+  if (query.includes('query PullRequestConversation(')) {
+    const pr = prs.find((p) => String(p.number) === String(vars.number));
+    if (failing(pr, 'conversation')) failLikeGitHub();
+    out({
+      data: { repository: { pullRequest: conversationConnections(pr) } },
+    });
+  }
+  if (query.includes('query PullRequestConversationPage(')) {
+    const pr = prs.find((p) => String(p.number) === String(vars.number));
+    if (failing(pr, 'conversation')) failLikeGitHub();
+    const all = conversationConnections(pr, vars.after);
+    const name = Object.keys(all).find((n) => query.includes(`${n}(first:`));
+    out({ data: { repository: { pullRequest: { [name]: all[name] } } } });
+  }
+  if (query.includes('query PullRequestThreadReplies(')) {
+    for (const pr of prs) {
+      const i = (pr.threads ?? []).findIndex(
+        (t, k) => (t.id ?? `thread-${k + 1}`) === vars.thread
+      );
+      if (i < 0) continue;
+      const comments = pageOf(threadComments(pr.threads[i], i), vars.after);
+      out({ data: { node: { comments } } });
+    }
+    out({ data: { node: null } });
   }
 
   if (query.includes('reviewThreads(first: 100, after: $threadCursor)')) {
@@ -312,6 +676,20 @@ if (
     const pr = prs.find((p) => String(p.number) === pullPath[1]);
     if (failing(pr, 'body')) failLikeGitHub();
     out(pr?.body ?? '');
+  }
+
+  // ── gh api repos/<owner>/<repo>/branches/<b> and rules/branches/<b> ──
+  // The checks read's base-branch rules.
+  const rulesPath = argv[1]?.match(
+    /^repos\/[^/]+\/[^/]+\/(rules\/)?branches\/([^?]+)/
+  );
+  if (argv[0] === 'api' && rulesPath) {
+    if (scenario.rules?.failing) failLikeGitHub();
+    out(
+      rulesPath[1]
+        ? rulesAnswer()
+        : branchAnswer(decodeURIComponent(rulesPath[2]))
+    );
   }
 
   if (argv[0] === 'api' && argv[1] === '/user') {

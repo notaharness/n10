@@ -13,6 +13,7 @@ import {
   threadExpanded,
   threadLocation,
 } from '../../../lib/diff/thread-model.js';
+import { focusIsLost } from '../../../lib/focus.js';
 import { cn, errorMessage, relativeTime } from '../../../lib/utils.js';
 import { Avatar } from '../../ui/avatar.js';
 import { Badge } from '../../ui/badge.js';
@@ -27,7 +28,8 @@ import { useComposerRefresh } from './use-composer-refresh.js';
  * distinct messages (own header, divider, replies tinted + indented)
  * inside one bordered card with a summary header and a reply footer.
  * Resolved threads start collapsed to the header; `focused` (thread
- * navigator / comment list) expands and outlines the card.
+ * navigator, the unresolved count, the Overview's activity) expands
+ * and outlines the card.
  */
 export function ThreadCard({
   thread,
@@ -72,8 +74,13 @@ export function ThreadCard({
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (focused)
-      ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (!focused) return;
+    ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    // Keyboard focus that is lost on the way here — the Overview's
+    // button goes hidden as it opens the diff — lands on the thread it
+    // asked for. Focus that is somewhere visible, such as the diff
+    // toolbar's next-comment button, stays there.
+    if (focusIsLost()) ref.current?.focus({ preventScroll: true });
   }, [focused]);
 
   // The notice belongs to a composer the reader can actually see. The
@@ -125,8 +132,13 @@ export function ThreadCard({
     <div
       ref={ref}
       data-thread={thread.id}
+      tabIndex={-1}
+      role="article"
+      aria-label={[`Thread by ${root.author}`, location]
+        .filter(Boolean)
+        .join(' on ')}
       className={cn(
-        'group/card max-w-[900px] overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs transition-shadow',
+        'group/card max-w-[900px] overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs transition-shadow outline-none focus-visible:ring-2 focus-visible:ring-ring',
         planControls.inPlan
           ? 'border-primary/40'
           : thread.isResolved

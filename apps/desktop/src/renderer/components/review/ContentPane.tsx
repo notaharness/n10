@@ -1,12 +1,13 @@
 import type { DiffLine } from '@n10/diff';
 import type { PullRequestInfo } from '@n10/vcs-core';
-import type { ReactNode, Ref, RefObject } from 'react';
+import { useState, type ReactNode, type Ref, type RefObject } from 'react';
 import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
 import type { PlanItem } from '@n10/core/plan';
 import type { DiffReadState } from '../../lib/data/read-state.js';
+import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { type Mode } from '../../lib/review/review-model.js';
 import { cn } from '../../lib/utils.js';
 import { SessionTerminal } from '../terminal/SessionTerminal.js';
@@ -15,6 +16,7 @@ import type { PrConnectionBanner } from './PrWorkspace.js';
 import { DiffPane } from './diff/DiffPane.js';
 import { type DiffJumpHandle } from './diff/VirtualDiffList.js';
 import { OverviewPane } from './OverviewPane.js';
+import { terminalInset } from './PrHeader.js';
 import { PlanPane } from './PlanPane.js';
 import { ReviewStepper } from './drafts/ReviewStepper.js';
 
@@ -35,6 +37,15 @@ function StackedPane({
       {children}
     </div>
   );
+}
+
+/** True from the first render where `on` is, onwards: a pane mounted
+ *  on first visit and kept, so a pull request nobody opens the Overview
+ *  of never fetches its description. */
+function useMountedOnce(on: boolean): boolean {
+  const [seen, setSeen] = useState(on);
+  if (on && !seen) setSeen(true);
+  return seen || on;
 }
 
 /** The agent's terminal, plus its connection banner (ux-machines.md
@@ -102,6 +113,7 @@ export function ContentPane({
   drafts,
   hasDrafts,
   commentsLoading,
+  threadsNotice,
   diffRead,
   diffRetrying,
   onRetryDiff,
@@ -114,6 +126,8 @@ export function ContentPane({
   onNext,
   onExitReview,
   onOpenInDiff,
+  onOverviewAction,
+  onOpenThread,
   plan,
 }: {
   effMode: Mode;
@@ -140,6 +154,8 @@ export function ContentPane({
   drafts: ReviewComment[];
   hasDrafts: boolean;
   commentsLoading: boolean;
+  /** Why the diff's threads are missing or out of date. */
+  threadsNotice?: ReactNode;
   diffRead: DiffReadState;
   diffRetrying: boolean;
   onRetryDiff: () => void;
@@ -152,6 +168,10 @@ export function ContentPane({
   onNext: () => void;
   onExitReview: () => void;
   onOpenInDiff: (file: string) => void;
+  /** The Overview's next-step button. */
+  onOverviewAction: (action: AttentionAction) => void;
+  /** Show a remote thread in the diff, from the Overview's activity. */
+  onOpenThread: (id: string, path: string | null) => void;
   /** Everything the plan pane needs; absent on a bare worktree tab. */
   plan?: {
     items: PlanItem[];
@@ -162,15 +182,19 @@ export function ContentPane({
     onShowInDiff: (item: PlanItem) => void;
     onClear: () => void;
     onSend: (mode: 'inject' | 'new-session') => void;
-    openNoteFor: { key: string } | null;
   };
 }) {
   const headSha = pr?.headSha;
+  const overviewMounted = useMountedOnce(effMode === 'overview');
   const generalThreads = hideResolved
     ? general.filter((t) => !t.isResolved)
     : general;
   return (
-    <div data-terminal-pane className="relative h-full min-h-0">
+    <div
+      data-terminal-pane
+      data-terminal-inset={terminalInset(effMode, pr != null)}
+      className="relative h-full min-h-0"
+    >
       {sessionName && (
         <StackedPane visible={effMode === 'agent'}>
           <AgentPane
@@ -210,14 +234,21 @@ export function ContentPane({
             onShowInDiff={plan.onShowInDiff}
             onClear={plan.onClear}
             onSend={plan.onSend}
-            openNoteFor={plan.openNoteFor}
           />
         </div>
       )}
-      {pr && effMode === 'overview' && (
-        <div className="absolute inset-0">
-          <OverviewPane pr={pr} />
-        </div>
+      {pr && overviewMounted && (
+        // Kept mounted like the diff once it has been shown: the
+        // reader's place in the activity, its filter and search survive
+        // a trip to the diff. Not before, so a tab that never shows it
+        // never reads its conversation.
+        <StackedPane visible={effMode === 'overview'}>
+          <OverviewPane
+            pr={pr}
+            onAction={onOverviewAction}
+            onOpenThread={onOpenThread}
+          />
+        </StackedPane>
       )}
       <StackedPane visible={effMode === 'diff'}>
         <DiffPane
@@ -230,6 +261,7 @@ export function ContentPane({
           draftsByFile={draftsByFile}
           generalThreads={generalThreads}
           commentsLoading={commentsLoading}
+          threadsNotice={threadsNotice}
           read={diffRead}
           retrying={diffRetrying}
           onRetry={onRetryDiff}

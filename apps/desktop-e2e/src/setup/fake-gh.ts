@@ -29,27 +29,83 @@ export interface FakePr {
   /** Body shown on the Overview pane. */
   body?: string;
   rollup?: 'SUCCESS' | 'FAILURE' | 'PENDING';
-  reviews?: { author: string; state: string }[];
+  /** Submitted reviews: the list reads the verdicts, the conversation
+   *  reads the summaries too. */
+  reviews?: {
+    author: string;
+    state: string;
+    body?: string;
+    commentCount?: number;
+    submittedAt?: string;
+  }[];
   reviewRequests?: string[];
   threads?: FakeThread[];
-  generalComments?: { author: string; body: string }[];
+  generalComments?: { author: string; body: string; createdAt?: string }[];
+  /** Timeline entries, as GraphQL `PullRequestTimelineItems` nodes. */
+  events?: Record<string, unknown>[];
   /** Reads that answer with GitHub's 502 until cleared with
-   *  `updateFakeGh`: the description, and the threads query. */
-  failing?: { body?: boolean; threads?: boolean };
+   *  `updateFakeGh`: the description, the threads query, the selected
+   *  pull request's detail, its checks, and the conversation queries. */
+  failing?: {
+    body?: boolean;
+    threads?: boolean;
+    detail?: boolean;
+    checks?: boolean;
+    conversation?: boolean;
+  };
+  /** The head commit; forty `f`s unless said. */
+  headRefOid?: string;
+  /** Check runs and statuses on the head, for the checks read. */
+  checks?: FakeCheck[];
+  /** GitHub's reading of the pull request, for the checks read. */
+  mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
+  mergeStateStatus?: string;
+  reviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+  /** The detail read's lifecycle; open unless said. */
+  state?: 'OPEN' | 'CLOSED' | 'MERGED';
+  /** The head repository as `owner/repo` when it is a fork, or null
+   *  for a fork that was deleted. Defaults to the scenario's own. */
+  fork?: string | null;
+  /** Whether the signed-in account may edit it; defaults to true. */
+  canUpdate?: boolean;
+}
+
+/**
+ * A check on the head. `state` is a check run's conclusion
+ * (`SUCCESS`, `FAILURE`, …) or, for one still going, its status
+ * (`QUEUED`, `IN_PROGRESS`); with `status: true` it is a commit status
+ * and `state` is the status's (`SUCCESS`, `PENDING`, …).
+ */
+export interface FakeCheck {
+  name: string;
+  state: string;
+  /** GitHub's `isRequired`, which is never null; false unless said. */
+  required?: boolean;
+  status?: boolean;
+  workflow?: string;
+  /** The Actions event; `pull_request` unless said. */
+  event?: string;
+  app?: string;
+  appId?: number;
 }
 
 /** An inline review thread, anchored to a file and line in the diff. */
 export interface FakeThread {
   id?: string;
   path: string;
-  line: number;
+  /** Left off, with no `originalLine` either, for a file-level thread. */
+  line?: number;
   startLine?: number;
   /** Set with `line: null` semantics by leaving `line` off — see the
    *  outdated-thread case in the TUI suite. */
   originalLine?: number;
   isResolved?: boolean;
+  /** Who resolved it, for the conversation read. */
+  resolvedBy?: string;
   isOutdated?: boolean;
   side?: 'LEFT' | 'RIGHT';
+  /** The diff excerpt GitHub keeps with the thread's first comment. */
+  diffHunk?: string;
   comments: { author: string; body: string; createdAt?: string }[];
 }
 
@@ -59,6 +115,14 @@ export interface FakeGitHub {
   /** The signed-in user. PRs they authored are "yours". */
   username?: string;
   prs: FakePr[];
+  /** Rule sets on every base branch: required checks (by name, from
+   *  GitHub Actions) and whether conversations must be resolved.
+   *  `failing` answers both rules reads with a 502. */
+  rules?: {
+    required?: string[];
+    conversationResolution?: boolean;
+    failing?: boolean;
+  };
   /**
    * Make every `gh` call take this long, standing in for the round trip
    * to GitHub. Left off for the e2e suite (which wants speed); the perf

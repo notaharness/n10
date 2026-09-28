@@ -103,10 +103,11 @@ export function parseSnapshotRequest(value: unknown): SnapshotRequest {
 }
 
 /** The account the context reads as; throws unless the repository and
- *  the account are the ones the caller asked about. */
-function assertSameContext(
+ *  the account are the ones the caller asked about. Every read by
+ *  identity asks this before its reads and again after them. */
+export function assertSameContext(
   req: SnapshotRequest,
-  src: SnapshotSources
+  src: Pick<SnapshotSources, 'repository' | 'viewer'>
 ): string | null {
   const repository = src.repository();
   if (!repository) {
@@ -144,16 +145,16 @@ function sameViewer(a: string | null, b: string | null): boolean {
 }
 
 /**
- * The repository at this path is not the one the caller knew: renamed
- * away and replaced, or transferred. Its #N is some other pull request,
- * so nothing read about it may answer for the one asked.
+ * The repository the caller named is the one a read answered from. One
+ * renamed away and replaced at the same path, or transferred, is
+ * another: its #N is some other pull request, so nothing read about it
+ * may answer for the one asked.
  */
-function assertSameRepositoryId(
+export function assertSameRepositoryId(
   req: SnapshotRequest,
-  detail: ReadOutcome<PullRequestDetail>
+  now: string | undefined
 ): void {
   const known = req.ref.id;
-  const now = detail.state === 'read' ? detail.value.ref.id : undefined;
   if (known != null && now != null && known !== now) {
     throw new PullRequestIdentityError(
       `${req.ref.host}/${req.ref.repository} is now a different repository than the one this pull request was read from`
@@ -161,21 +162,21 @@ function assertSameRepositoryId(
   }
 }
 
-async function readDetail(
+/**
+ * One provider read about pull request `ref`, as an outcome. An answer
+ * about some other pull request is a failed read, however it came back:
+ * it must never stand in for this one's. The repository id is left out
+ * of that comparison; a replaced repository is refused as a whole by
+ * the caller.
+ */
+export async function readAbout<T extends { ref: PullRequestRef }>(
   ref: PullRequestRef,
-  read: SnapshotSources['detail']
-): Promise<ReadOutcome<PullRequestDetail>> {
-  if (!read) {
-    return {
-      state: 'unsupported',
-      reason: 'This provider does not read pull request detail',
-    };
-  }
+  read: ((prId: number) => Promise<T>) | undefined,
+  unsupported: string
+): Promise<ReadOutcome<T>> {
+  if (!read) return { state: 'unsupported', reason: unsupported };
   try {
     const value = await read(ref.number);
-    // A detail about some other pull request is not this one's, however
-    // it came back — never let it lend this one its commits. The id is
-    // left out: a replaced repository is refused as a whole, below.
     return samePullRequest({ ...value.ref, id: undefined }, ref)
       ? { state: 'read', value }
       : readFailure(
@@ -200,7 +201,10 @@ function reportedHead(
 }
 
 /** `ref` carrying exactly `id`: the caller's own is dropped, not kept. */
-function withId(ref: PullRequestRef, id: string | undefined): PullRequestRef {
+export function withId(
+  ref: PullRequestRef,
+  id: string | undefined
+): PullRequestRef {
   const out = { ...ref };
   delete out.id;
   return id === undefined ? out : { ...out, id };
@@ -213,14 +217,21 @@ export async function readPullRequestSnapshot(
   const viewer = assertSameContext(req, src);
   const [summary, detail] = await Promise.all([
     src.lookup(req.ref.number),
-    readDetail(req.ref, src.detail),
+    readAbout(
+      req.ref,
+      src.detail,
+      'This provider does not read pull request detail'
+    ),
   ]);
   // Asked again after the reads, as the account they started as: the
   // list is cached per checkout, not per repository, so a config change
   // while they ran would hand back another repository's row, or one
   // read as someone else, under this ref.
   assertSameContext({ ...req, viewer }, src);
-  assertSameRepositoryId(req, detail);
+  assertSameRepositoryId(
+    req,
+    detail.state === 'read' ? detail.value.ref.id : undefined
+  );
   const target = detail.state === 'read' ? detail.value.target.head : null;
   return {
     ref: withId(

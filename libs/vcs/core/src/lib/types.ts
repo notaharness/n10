@@ -1,3 +1,5 @@
+import type { PullRequestChecks } from './pr-checks.js';
+import type { PullRequestConversation } from './pr-conversation.js';
 import type { PullRequestDetail, RepositoryRef } from './pr-details.js';
 
 export type ReviewDecision =
@@ -17,6 +19,27 @@ export function isBlockingDecision(d: ReviewDecision): boolean {
     d === 'changes-requested' || d === 'waiting-for-author' || d === 'rejected'
   );
 }
+
+/** The blocking decisions, most severe first: Azure's −10, its −5,
+ *  then GitHub's changes requested. */
+export const HOLDING_DECISIONS = [
+  'rejected',
+  'waiting-for-author',
+  'changes-requested',
+] as const satisfies readonly ReviewDecision[];
+
+/** The most severe verdict holding a pull request back, with everyone
+ *  who gave it; null where none does. Every frontend words the same
+ *  verdict. */
+export function holdingVerdict<R extends { decision: ReviewDecision }>(
+  reviewers: readonly R[]
+): { decision: (typeof HOLDING_DECISIONS)[number]; by: R[] } | null {
+  for (const decision of HOLDING_DECISIONS) {
+    const by = reviewers.filter((r) => r.decision === decision);
+    if (by.length > 0) return { decision, by };
+  }
+  return null;
+}
 export type BuildStatusState = 'succeeded' | 'failed' | 'pending' | 'none';
 
 /** The current user's review verdict on a PR, in ADO's vocabulary
@@ -33,6 +56,20 @@ export interface PullRequestReviewer {
   displayName: string;
   identifier: string;
   decision: ReviewDecision;
+  /** The provider holds an open request for their review — asked again
+   *  after a verdict, where `decision` still holds that verdict. Absent
+   *  where the list does not say. */
+  requested?: boolean;
+}
+
+/** The provider holds a request for this reviewer's verdict. Where the
+ *  list says (GitHub's review requests, including one asked again after
+ *  a verdict), that is the answer; a comment is not a request. Where it
+ *  does not (Azure DevOps keeps no request apart from its list), a
+ *  listed reviewer who has neither voted nor declined is asked. */
+export function asksForReview(reviewer: PullRequestReviewer): boolean {
+  if (reviewer.decision === 'declined') return false;
+  return reviewer.requested ?? reviewer.decision === 'no-response';
 }
 
 export interface PullRequestInfo {
@@ -149,6 +186,18 @@ export interface VcsProvider {
     prId: number
   ): Promise<PullRequestComments>;
 
+  /**
+   * Everything said and done on a pull request — threads with every
+   * reply, conversation comments, submitted reviews and events — read
+   * to the end of every page. Read on demand for the selected pull
+   * request, never per sidebar row.
+   */
+  fetchPullRequestConversation?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestConversation>;
+
   /** Reply to an existing comment thread. The thread is passed (not just
    *  the id) so providers can dispatch on `replyKind` — GitHub review
    *  threads use one mutation, GitHub issue comments (general PR
@@ -188,6 +237,15 @@ export interface VcsProvider {
     project: Record<string, string>,
     prId: number
   ): Promise<PullRequestDetail>;
+
+  /** What stands between one pull request and completion, read on
+   *  demand: its head's checks, the target's rules, and the provider's
+   *  reading of mergeability and reviews. */
+  fetchPullRequestChecks?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestChecks>;
 
   /** Cast the current user's review verdict on a PR. */
   submitReviewVerdict?(

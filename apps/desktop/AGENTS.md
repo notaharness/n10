@@ -76,9 +76,18 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `TabsProvider` sits above the repo gate in `App.tsx`.
   `tabs.properties.spec.ts` holds the invariants.
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
-  collapsible rail (Agent · Files · Comments) beside one content pane that
-  swaps between diff, agent terminal (kept mounted) and `ReviewStepper`. The
-  diff toolbar lives in `DiffPane`, not the tab header.
+  collapsible rail (Agent · Files) beside one content pane that
+  swaps between Overview, diff, agent terminal (kept mounted) and
+  `ReviewStepper`. It opens on the Overview for someone else's PR and on the
+  diff for yours (`lib/review/overview-model.ts`). The diff toolbar lives in
+  `DiffPane`, not the tab header. Overview and header lay out by container
+  width (`@container`), not viewport.
+- The Overview's activity reads the whole conversation by identity
+  (`lib/data/pr-conversation-query.ts`, `lib/review/activity-model.ts`).
+  The Overview mounts on first show and then stays mounted, hidden under
+  its check list too, so its place, filter and search survive both.
+  Entries that arrive on a refresh wait behind "N new updates"; thread
+  writes invalidate the conversation.
 - Diffs are whole-file (`-U99999`), folded client-side
   (`lib/diff/diff-model.ts`). A PR diffs commits; a bare worktree diffs its
   working tree, polled at 2 s only while the agent runs. `FileTree` collapse

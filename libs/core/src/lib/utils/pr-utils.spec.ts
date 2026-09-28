@@ -122,6 +122,37 @@ describe('categorizeReviews', () => {
     expect(result.waitingForAuthor.map((p) => p.id)).toEqual([3]);
   });
 
+  it('files a review asked for again under Needs your review, unless it is a draft', () => {
+    const me = (decision: 'approved' | 'changes-requested') => ({
+      displayName: 'Me',
+      identifier: 'me@test.com',
+      decision,
+      requested: true,
+    });
+    const prMap: BranchPrMap = {
+      'branch-a': makePr({
+        id: 1,
+        createdByIdentifier: 'other@test.com',
+        reviewers: [me('approved')],
+      }),
+      'branch-b': makePr({
+        id: 2,
+        createdByIdentifier: 'other@test.com',
+        reviewers: [me('changes-requested')],
+      }),
+      'branch-c': makePr({
+        id: 3,
+        createdByIdentifier: 'other@test.com',
+        isDraft: true,
+        reviewers: [me('approved')],
+      }),
+    };
+    const result = categorizeReviews(prMap, mockConfig, mockProvider);
+    expect(result.needsReview.map((p) => p.id)).toEqual([1, 2]);
+    expect(result.approvedByYou.map((p) => p.id)).toEqual([3]);
+    expect(result.waitingForAuthor).toEqual([]);
+  });
+
   it('skips declined reviewers', () => {
     const prMap: BranchPrMap = {
       'branch-a': makePr({
