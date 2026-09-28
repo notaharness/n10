@@ -74,10 +74,13 @@ export function estimateTerminalGrid(
  *
  * A pane with no box yet answers `null`: the minimums above would
  * otherwise turn an unlaid-out pane into a plausible-looking 20x5 and
- * spawn an agent in it.
+ * spawn an agent in it. A pane measured without a bar the terminal will
+ * sit under says how tall it is in `data-terminal-inset`.
  */
 export function paneTerminalGrid(paneEl: HTMLElement): Grid | null {
-  const box = paneEl.getBoundingClientRect();
+  const rect = paneEl.getBoundingClientRect();
+  const inset = Number(paneEl.dataset.terminalInset) || 0;
+  const box = { width: rect.width, height: rect.height - inset };
   if (box.width < 2 || box.height < 2) return null;
   const probe = document.createElement('div');
   probe.className = 'wterm';

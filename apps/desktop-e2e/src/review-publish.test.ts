@@ -87,7 +87,10 @@ async function openDiff(page: Page, homeDir: string): Promise<string> {
   await sidebarRow(page, /Cap retries per request|#321/)
     .first()
     .click();
-  await expect(gutterOf(page, 'RIGHT', 1)).toBeVisible({ timeout: 30_000 });
+  await page
+    .getByRole('button', { name: 'Review changes' })
+    .click({ timeout: 30_000 });
+  await expect(gutterOf(page, 'RIGHT', 1)).toBeVisible();
   return head;
 }
 

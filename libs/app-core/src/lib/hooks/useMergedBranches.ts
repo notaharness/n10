@@ -1,12 +1,17 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { useConfig } from '../context/ConfigContext.js';
 import { sweepMergedBranches } from '@n10/core';
+import type { WorktreeRemovalCheck } from '@n10/core';
 
 /** TUI state shell around the shared {@link sweepMergedBranches}. */
 export function useMergedBranches(
   branches: string[],
   lastSynced: number,
-  onAutoDelete: (sessionName: string, branch: string) => void,
+  onAutoDelete: (
+    sessionName: string,
+    branch: string,
+    approved: WorktreeRemovalCheck
+  ) => void,
   onRebaseInProgress: (branch: string) => void
 ) {
   const { config, provider, vcsConfigured } = useConfig();
@@ -58,7 +63,8 @@ export function useMergedBranches(
           setMergedBranches(merged);
           setLoading(false);
         },
-        onAutoDelete: (sessionName, branch) => autoDelete(sessionName, branch),
+        onAutoDelete: (sessionName, branch, approved) =>
+          autoDelete(sessionName, branch, approved),
         onRebaseInProgress: (branch) => rebaseInProgress(branch),
         isCancelled: () => cancelled,
       });

@@ -40,7 +40,18 @@ export async function loadPullRequestSnapshot(
   ref: PullRequestRef,
   viewer: string | null
 ): Promise<PullRequestSnapshot> {
-  const answer = await window.n10.getPullRequestSnapshot({ ref, viewer });
+  return assertEcho(
+    await window.n10.getPullRequestSnapshot({ ref, viewer }),
+    ref,
+    viewer
+  );
+}
+
+/** An answer about the pull request asked for, read as the account
+ *  asked for; anything else is an error, never data in the entry. */
+export function assertEcho<
+  T extends { ref: PullRequestRef; viewer: string | null }
+>(answer: T, ref: PullRequestRef, viewer: string | null): T {
   assertAnswerFor(ref, viewer, answer);
   return answer;
 }
@@ -70,7 +81,7 @@ export function assertAnswerFor(
 }
 
 /** Placeholder while there is no ref; the query is disabled then. */
-const NO_REF: PullRequestRef = {
+export const NO_REF: PullRequestRef = {
   provider: '',
   host: '',
   repository: '',

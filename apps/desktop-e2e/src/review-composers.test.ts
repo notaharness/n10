@@ -56,6 +56,9 @@ async function openDiff(page: Page) {
   await sidebarRow(page, /Stop timers through the token|#301/)
     .first()
     .click();
+  await page
+    .getByRole('button', { name: 'Review changes' })
+    .click({ timeout: 30_000 });
   const gutter = gutterOf(page, 'RIGHT', 1);
   await expect(gutter).toBeVisible({ timeout: 30_000 });
 }
@@ -322,7 +325,7 @@ test.describe('Comment composers', () => {
   }) => {
     const { page } = desktop;
     await openDiff(page);
-    await page.getByRole('button', { name: 'Overview' }).click();
+    await page.getByRole('button', { name: 'Back to review' }).click();
     await expect(
       page.getByText('No comments, reviews or activity yet.')
     ).toBeVisible();
@@ -335,7 +338,7 @@ test.describe('Comment composers', () => {
 
     await page.reload();
     await openDiff(page);
-    await page.getByRole('button', { name: 'Overview' }).click();
+    await page.getByRole('button', { name: 'Back to review' }).click();
     await expect(card).toContainText('Thanks, this reads well.');
 
     // Discard in the open composer returns to the prompt; Undo returns

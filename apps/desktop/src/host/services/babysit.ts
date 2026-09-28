@@ -110,17 +110,20 @@ export function stopBabysit(prId: number): void {
 
 /**
  * Stop babysitting whichever pull request `branch` is the source of,
- * in the open repository. Worktree removal calls this first: a watcher
- * left behind would start a fresh agent in a fresh checkout at its
- * next update, undoing the removal.
+ * in the open repository, and answer which ones stopped. Worktree
+ * removal calls this first: a watcher left behind would start a fresh
+ * agent in a fresh checkout at its next update, undoing the removal.
  */
-export function stopBabysitForBranch(branch: string): void {
+export function stopBabysitForBranch(branch: string): number[] {
   const byId = forRepo(requireRepo());
+  const stopped: number[] = [];
   for (const [prId, sitter] of byId) {
     if (sitter.sourceBranch !== branch) continue;
     sitter.handle.stop();
     byId.delete(prId);
+    stopped.push(prId);
   }
+  return stopped;
 }
 
 /** The babysitters of `cwd`, by pull request id — what the sidebar

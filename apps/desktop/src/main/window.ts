@@ -109,3 +109,36 @@ export function reloadAfterRendererGone(
   ];
   return { history: recent, reload: recent.length <= RENDERER_RELOAD_LIMIT };
 }
+
+/** The part of a BrowserWindow that showing it needs. */
+export interface ShowableWindow {
+  once(event: 'ready-to-show', listener: () => void): unknown;
+  off(event: 'ready-to-show', listener: () => void): unknown;
+  webContents: {
+    once(event: 'did-finish-load', listener: () => void): unknown;
+    off(event: 'did-finish-load', listener: () => void): unknown;
+  };
+  isDestroyed(): boolean;
+  show(): void;
+}
+
+/**
+ * Show a window created hidden on the first of two events, once:
+ * `did-finish-load`, the page having loaded, which for this local page
+ * usually comes first and may briefly show the background colour
+ * before the page renders; or `ready-to-show`, the first frame, which
+ * on some Linux stacks never fires for a hidden window (Electron 38
+ * and later, electron/electron#48859, where a maintainer suggests
+ * `did-finish-load`; FreeTube did the same in its PR #8294). Both
+ * listeners go when either fires: a reload later must not show a
+ * window the user hid.
+ */
+export function showWhenReadyOrLoaded(win: ShowableWindow): void {
+  const show = () => {
+    win.off('ready-to-show', show);
+    win.webContents.off('did-finish-load', show);
+    if (!win.isDestroyed()) win.show();
+  };
+  win.once('ready-to-show', show);
+  win.webContents.once('did-finish-load', show);
+}
