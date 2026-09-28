@@ -23,6 +23,7 @@ export type {
   ReviewerRequirement,
   ReviewerStanding,
   ReviewRequirements,
+  StandingRule,
   PullRequestConversationRead,
   SnapshotRequest,
 } from '@n10/core';

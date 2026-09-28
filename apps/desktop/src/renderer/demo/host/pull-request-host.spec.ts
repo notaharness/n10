@@ -131,8 +131,12 @@ describe('the demo checks read', () => {
       ],
     });
     // GitHub states the rule's count and marks no reviewer required.
+    expect(answer.readiness.aspects).toContainEqual({
+      id: 'reviews',
+      state: 'waiting',
+      text: 'Waiting for review · 1 approval required',
+    });
     expect(answer.requirements).toMatchObject({
-      rule: ['1 approval required'],
       reviewers: {
         state: 'read',
         value: {
@@ -165,7 +169,11 @@ describe('the demo checks read', () => {
       'required',
       'optional',
     ]);
-    expect(answer.requirements.rule).toEqual([]);
+    expect(answer.readiness.aspects).toContainEqual({
+      id: 'reviews',
+      state: 'met',
+      text: 'Not in the way',
+    });
     // GitHub states no review decision without a rule that asks one.
     expect((await read(39)).readiness).toMatchObject({
       state: 'blocked',

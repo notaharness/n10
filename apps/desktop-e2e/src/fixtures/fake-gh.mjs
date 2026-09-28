@@ -131,6 +131,7 @@ function requestedReviewer(req) {
       id: `T_${req.team}`,
       combinedSlug: req.team,
       name: req.name ?? req.team,
+      databaseId: req.id ?? null,
     };
   }
   return { __typename: 'User', id: `U_${req.login}`, login: req.login };

@@ -43,7 +43,13 @@ export interface FakePr {
   reviewRequests?: (
     | string
     | { login: string; codeOwner?: boolean }
-    | { team: string; name?: string; codeOwner?: boolean }
+    | {
+        team: string;
+        name?: string;
+        codeOwner?: boolean;
+        /** The team's database id, which rule sets name it by. */
+        id?: number;
+      }
   )[];
   threads?: FakeThread[];
   generalComments?: { author: string; body: string; createdAt?: string }[];

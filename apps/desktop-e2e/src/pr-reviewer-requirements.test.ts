@@ -7,8 +7,9 @@ import type { FakeGitHub, FakePr } from './setup/fake-gh.js';
  * Who must review, on the Overview, as GitHub says it. GitHub marks no
  * reviewer required: its rules ask for a number of approvals, for code
  * owners, and for teams by id, and a request says only whether it went
- * to a code owner. The Reviewers list names code owners and says GitHub
- * marks no one else; Completion states the rule under its Reviews row.
+ * to a code owner. The Reviewers list names code owners, says GitHub
+ * marks no one else, and shows the rules that name a reviewer on hover;
+ * Completion's Reviews row is the verdict and the count.
  * Azure DevOps, which marks each reviewer, is covered by core's and the
  * provider's specs until it has a fake of its own.
  */
@@ -23,7 +24,7 @@ const PR: FakePr = {
   reviewRequests: [
     'bea',
     { login: 'cam', codeOwner: true },
-    { team: 'n10/core', name: 'Core', codeOwner: true },
+    { team: 'n10/core', name: 'Core', codeOwner: true, id: 42 },
   ],
   reviews: [{ author: 'dee', state: 'APPROVED' }],
   checks: [{ name: 'build', state: 'SUCCESS' }],
@@ -34,7 +35,7 @@ const GITHUB: FakeGitHub = {
   rules: {
     approvals: 2,
     codeOwners: true,
-    requiredTeams: [{ id: 42, paths: ['src/**'] }],
+    requiredTeams: [{ id: 42, paths: ['src/**', 'libs/queue/**'] }],
   },
   prs: [PR],
 };
@@ -73,18 +74,43 @@ test.describe('Reviewer requirements on GitHub', () => {
     );
   });
 
-  test('states the rule under the Reviews row, and waits on the viewer', async ({
+  test('shows the rules that name a team, with their paths, on hover', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    const { reviewers } = await openOverview(page);
+    const core = reviewers.locator('[data-reviewer="n10/core"]');
+    await core.locator('[data-reviewer-standing]').hover();
+    const tip = page.locator('[data-reviewer-rules]').filter({ visible: true });
+    await expect(tip).toContainText('Branch rule');
+    await expect(tip).toContainText('1 approval required');
+    // One path a line.
+    await expect(tip.locator('li')).toHaveText(['src/**', 'libs/queue/**']);
+    await expect(tip).toContainText('Code owner review');
+    // A code owner no rule set names explains only the code-owner rule.
+    // Leaving the standing closes it. Radix closes on the pointer's next
+    // move outside the way to the tip, so it is moved in steps.
+    const away = await reviewers.locator('[data-reviewer="bea"]').boundingBox();
+    if (!away) throw new Error('no row for bea');
+    await page.mouse.move(away.x + 20, away.y + away.height / 2, { steps: 8 });
+    await expect(tip).toHaveCount(0);
+    await reviewers
+      .locator('[data-reviewer="cam"] [data-reviewer-standing]')
+      .hover();
+    await expect(tip).toContainText('Code owner review');
+    await expect(tip).not.toContainText('Branch rule');
+  });
+
+  test('reads the verdict and the count on the Reviews row, and waits on the viewer', async ({
     desktop,
   }) => {
     const { completion } = await openOverview(desktop.page);
     const reviews = completion.locator('[data-readiness-row="reviews"]');
-    await expect(reviews).toContainText('Waiting for review');
-    // One requirement a line.
-    await expect(reviews.locator('[data-review-rule] > span')).toHaveText([
-      '2 approvals required',
-      'Code owners must approve',
-      '1 approval from a required team (src/**)',
-    ]);
+    // Who must approve, and why, is the Reviewers list's to say.
+    await expect(reviews).toContainText(
+      'Waiting for review · 2 approvals required'
+    );
+    await expect(reviews).not.toContainText('Code owners');
     // GitHub asked Bea, and does not say her review is optional.
     await expect(completion.locator('[data-readiness-headline]')).toContainText(
       'Waiting for your review'
@@ -97,10 +123,12 @@ test.describe('Reviewer requirements when the rules cannot be read', () => {
     fakeGitHub: { ...GITHUB, rules: { ...GITHUB.rules, failing: true } },
   });
 
-  test('says so, rather than stating no rule', async ({ desktop }) => {
+  test('says so on the Reviews row, rather than stating no count', async ({
+    desktop,
+  }) => {
     const { completion } = await openOverview(desktop.page);
     await expect(
-      completion.locator('[data-readiness-row="reviews"] [data-review-rule]')
-    ).toHaveText('The review rules could not be read.');
+      completion.locator('[data-readiness-row="reviews"]')
+    ).toContainText('Waiting for review · rules could not be read');
   });
 });

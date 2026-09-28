@@ -6,11 +6,18 @@ import {
   XCircleIcon,
 } from 'lucide-react';
 import type { PullRequestReviewer, ReviewDecision } from '@n10/vcs-core/types';
-import type { ReviewRequirements } from '../../../../host/contract.js';
+import type {
+  ReviewRequirements,
+  StandingRule,
+} from '../../../../host/contract.js';
 import { DECISION_LABEL } from '../../../lib/review/overview-model.js';
-import { reviewerRows } from '../../../lib/review/reviewer-model.js';
+import {
+  reviewerRows,
+  type ReviewerRow,
+} from '../../../lib/review/reviewer-model.js';
 import { cn } from '../../../lib/utils.js';
 import { Avatar } from '../../ui/avatar.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/tooltip.js';
 import { Section } from './parts.js';
 
 const DECISION_ICON: Record<
@@ -40,10 +47,86 @@ function Decision({ decision }: { decision: ReviewDecision }) {
   );
 }
 
+/** Each rule keyed by what it says and which repeat it is: two policies
+ *  can read the same. */
+function keyed(rules: readonly StandingRule[]) {
+  const seen = new Map<string, number>();
+  return rules.map((rule) => {
+    const says = JSON.stringify(rule);
+    const n = (seen.get(says) ?? 0) + 1;
+    seen.set(says, n);
+    return { rule, key: `${says}#${n}` };
+  });
+}
+
+/** The rules that name a reviewer, as the provider states them: each
+ *  with what it asks and its paths, one a line. */
+function RulesTip({ rules }: { rules: readonly StandingRule[] }) {
+  return (
+    <div data-reviewer-rules className="space-y-2 py-0.5">
+      {keyed(rules).map(({ rule, key }) => (
+        <div key={key}>
+          <p className="font-medium">{rule.name}</p>
+          <p className="text-xs text-muted-foreground">{rule.asks}</p>
+          {rule.applies === false && (
+            <p className="text-xs text-muted-foreground">
+              Not applicable to these changes
+            </p>
+          )}
+          {rule.paths.length > 0 && (
+            <ul className="mt-1 font-mono text-xs">
+              {rule.paths.map((path) => (
+                <li key={path} className="break-all">
+                  {path}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Required or optional and why, under the name; a rule behind it shows
+ *  on hover or focus. */
+function Standing({ row }: { row: ReviewerRow }) {
+  if (!row.standing) return null;
+  const text = 'block text-xs text-muted-foreground';
+  if (row.rules.length === 0) {
+    return (
+      <span data-reviewer-standing className={text}>
+        {row.standing}
+      </span>
+    );
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          data-reviewer-standing
+          className={cn(
+            text,
+            'cursor-default text-left underline decoration-dotted underline-offset-2 hover:text-foreground'
+          )}
+        >
+          {row.standing}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="start" className="max-w-sm">
+        <RulesTip rules={row.rules} />
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 /**
  * Everyone asked to review, each with their verdict in words and, where
- * the provider says, whether their review is required and why. The list
- * row names them until the detail read, which also names teams, answers.
+ * the provider says, whether their review is required and why. The rules
+ * that name a reviewer, with their paths, show on the standing's hover.
+ * The list row names them until the detail read, which also names
+ * teams, answers.
  */
 export function PrReviewers({
   reviewers,
@@ -78,14 +161,7 @@ export function PrReviewers({
                     <span className="text-muted-foreground"> (you)</span>
                   )}
                 </span>
-                {r.standing && (
-                  <span
-                    data-reviewer-standing
-                    className="block text-xs text-muted-foreground"
-                  >
-                    {r.standing}
-                  </span>
-                )}
+                <Standing row={r} />
               </span>
               <Decision decision={r.decision} />
             </li>
