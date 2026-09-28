@@ -16,6 +16,26 @@ export const HOME = '/home/you';
 
 type Loader = () => Promise<{ default: string }>;
 
+/** A job a repository's workflows run on every pull request. */
+export interface DemoJob {
+  name: string;
+  workflow: string;
+  /** The target branch's rules require it to pass. */
+  required: boolean;
+  /** How long a run takes. */
+  seconds: number;
+}
+
+/** What a repository runs on its pull requests, and what its default
+ *  branch's rules ask of them. */
+export interface DemoCi {
+  jobs: DemoJob[];
+  /** Approving reviews the rules ask for; 0 where they ask none. */
+  approvals: number;
+  /** Review threads must be resolved. */
+  conversationResolution: boolean;
+}
+
 /** One repository the demo knows, as its host would read it off disk
  *  and the provider. */
 export interface RepoData {
@@ -27,6 +47,8 @@ export interface RepoData {
   /** Whole-file patches by source branch, loaded on demand. */
   diffs: Record<string, Loader>;
   descriptions: Record<number, Loader>;
+  /** Absent for a repository with no pull requests to check. */
+  ci?: DemoCi;
   branches: readonly string[];
   /** Branches with a worktree, besides the main checkout's. */
   worktrees: readonly string[];
