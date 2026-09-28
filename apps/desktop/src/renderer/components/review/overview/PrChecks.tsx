@@ -13,10 +13,13 @@ import type {
   CheckList,
   CheckRow,
   CheckStanding,
+  PullRequestChecksAnswer,
 } from '../../../../host/contract.js';
+import type { ReadState } from '../../../lib/data/read-state.js';
 import { openLink } from '../../../lib/open-link.js';
 import {
   duration,
+  failureText,
   outcomeText,
   REQUIREMENT_LABEL,
   requiredFrom,
@@ -26,6 +29,9 @@ import {
 import { cn, relativeTime } from '../../../lib/utils.js';
 import { Badge } from '../../ui/badge.js';
 import { Button } from '../../ui/button.js';
+import { Skeleton } from '../../ui/skeleton.js';
+import { ReadFailure, StaleNotice } from '../ReadNotice.js';
+import { RefreshButton } from './ReadinessParts.js';
 
 /** Each standing's icon and colour; the words beside it carry it too. */
 const STANDING: Record<
@@ -82,7 +88,10 @@ function Facts({ row }: { row: CheckRow }) {
 
 function Row({ row }: { row: CheckRow }) {
   const { check, standing } = row;
-  const { icon: Icon, className } = STANDING[standing];
+  const { icon: Icon, className: tone } = STANDING[standing];
+  // A pass on an older push says nothing about the head: not green.
+  const className =
+    row.stale && standing === 'passed' ? 'text-muted-foreground' : tone;
   return (
     <li
       data-check={check.key}
@@ -138,23 +147,136 @@ function Partial({ list }: { list: CheckList }) {
   );
 }
 
+/** Which head the list is about and when it was read. */
+function Source({
+  answer,
+  reading,
+}: {
+  answer: PullRequestChecksAnswer;
+  reading: boolean;
+}) {
+  const { checks, fetchedAt } = answer;
+  return (
+    <p className="mb-3 text-sm text-muted-foreground">
+      {checks.state === 'read' && (
+        <>
+          On <span className="font-mono">{shortOid(checks.value.head)}</span>
+          {' · '}
+        </>
+      )}
+      {reading ? (
+        <span className="text-warning">
+          before the latest push · reading again
+        </span>
+      ) : (
+        <>read {relativeTime(fetchedAt)}</>
+      )}
+    </p>
+  );
+}
+
+/** The list went away under the reader: a re-read at a new head that
+ *  could not read the checks. Back is still where it was. */
+function NotRead({
+  answer,
+  retrying,
+  onRetry,
+}: {
+  answer: PullRequestChecksAnswer;
+  retrying: boolean;
+  onRetry: () => void;
+}) {
+  const { checks } = answer;
+  const why =
+    checks.state === 'failed'
+      ? failureText(checks)
+      : checks.state === 'unsupported'
+      ? checks.reason
+      : null;
+  return (
+    <div role="status" className="space-y-2 text-sm">
+      <p>The checks could not be read{why ? `: ${why}` : '.'}</p>
+      <RefreshButton
+        variant="outline"
+        retrying={retrying}
+        onRefresh={onRetry}
+      />
+    </div>
+  );
+}
+
+export interface ChecksProps {
+  read: ReadState<PullRequestChecksAnswer>;
+  /** The answer on screen is the last head's while the new one reads. */
+  reading: boolean;
+  retrying: boolean;
+  onRetry: () => void;
+  onBack: () => void;
+}
+
+function Body({
+  read,
+  reading,
+  retrying,
+  onRetry,
+}: Omit<ChecksProps, 'onBack'>) {
+  if (read.kind === 'failed') {
+    return (
+      <ReadFailure
+        title="Couldn't read the checks"
+        error={read.error}
+        retrying={retrying}
+        onRetry={onRetry}
+        stacked
+      />
+    );
+  }
+  if (read.kind === 'loading') {
+    return (
+      <div aria-busy className="space-y-2">
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-8 w-full" />
+      </div>
+    );
+  }
+  const { data, stale } = read;
+  return (
+    <>
+      <Source answer={data} reading={reading} />
+      {stale && (
+        <StaleNotice
+          what="checks"
+          stale={stale}
+          retrying={retrying}
+          onRetry={onRetry}
+          stacked
+          className="mb-3"
+        />
+      )}
+      {data.list ? (
+        <>
+          <Partial list={data.list} />
+          <ul aria-label="Checks and policies">
+            {data.list.rows.map((row) => (
+              <Row key={row.check.key} row={row} />
+            ))}
+          </ul>
+        </>
+      ) : (
+        <NotRead answer={data} retrying={retrying} onRetry={onRetry} />
+      )}
+    </>
+  );
+}
+
 /**
  * The pull request's checks and policies, nested in the Overview: what
  * blocks first, each with its requirement, outcome, the revision it
- * reported on and where its details are. Back returns to the Overview
- * where the reader left it.
+ * reported on and where its details are. It stays until the reader goes
+ * Back, whatever a re-read brings, and Back returns to the Overview
+ * where they left it.
  */
-export function PrChecks({
-  list,
-  head,
-  fetchedAt,
-  onBack,
-}: {
-  list: CheckList;
-  head: string | null;
-  fetchedAt: number;
-  onBack: () => void;
-}) {
+export function PrChecks({ onBack, ...body }: ChecksProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   // The keyboard lands on the view it opened, not back at the top.
   useEffect(() => heading.current?.focus(), []);
@@ -177,20 +299,7 @@ export function PrChecks({
       >
         Checks and policies
       </h2>
-      <p className="mb-3 text-sm text-muted-foreground">
-        {head && (
-          <>
-            On <span className="font-mono">{shortOid(head)}</span> ·{' '}
-          </>
-        )}
-        read {relativeTime(fetchedAt)}
-      </p>
-      <Partial list={list} />
-      <ul aria-label="Checks and policies">
-        {list.rows.map((row) => (
-          <Row key={row.check.key} row={row} />
-        ))}
-      </ul>
+      <Body {...body} />
     </div>
   );
 }

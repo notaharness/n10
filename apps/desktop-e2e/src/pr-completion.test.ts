@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { sidebarRow } from './setup/app.js';
+import { sidebar, sidebarRow } from './setup/app.js';
 import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
 
 /**
@@ -78,6 +78,8 @@ test.describe('Completion', () => {
     );
     await expect(headline).toContainText('1 required check failing: build');
     await expect(headline).toContainText('The author can fix this');
+    // Heard as a state, not only seen as a colour.
+    await expect(headline.locator('.sr-only')).toHaveText(/^Blocked:/);
     const also = completion.getByRole('list', { name: 'Also blocking' });
     await expect(also).toContainText(
       'Waiting for 2 required checks: lint, e2e · Clears when the checks finish'
@@ -121,6 +123,8 @@ test.describe('Completion', () => {
     });
     await completion.getByRole('button', { name: 'Refresh' }).click();
     await expect(completion).toContainText('Ready to merge');
+    // Refresh went with the unknown; the keyboard is on the verdict.
+    await expect(completion.locator('[data-readiness-headline]')).toBeFocused();
   });
 
   test('lists every check in the order that matters, and Back returns where the reader was', async ({
@@ -184,22 +188,127 @@ test.describe('Completion', () => {
   }) => {
     const { page } = desktop;
     const completion = await openPr(page, /#214/);
-    const pane = completion.locator(
-      'xpath=ancestor::*[contains(@class,"overflow-auto")][1]'
-    );
-    await pane.evaluate((el) => el.scrollTo({ top: 120 }));
-    const before = await pane.evaluate((el) => el.scrollTop);
+    const headline = completion.locator('[data-readiness-headline]');
+    // The reader is reading Completion: it is the top of what is in view,
+    // which the browser keeps still when anything above it changes height.
+    await completion.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    const top = () =>
+      completion.evaluate((el) => el.getBoundingClientRect().top);
+    const before = await top();
+    const refresh = () =>
+      page.getByRole('button', { name: 'Refresh this pull request' }).click();
 
     updateFakeGh(desktop.homeDir, (s) => {
       const build = s.prs[0].checks?.find((c) => c.name === 'build');
       if (build) build.state = 'SUCCESS';
     });
+    await refresh();
+    // What won't clear by waiting leads: the conversation, not the
+    // checks still running.
+    await expect(headline).toContainText('1 unresolved conversation');
+    await expect(headline).toContainText('The author can fix this');
+    await expect(
+      completion.locator('[data-readiness-row="checks"]')
+    ).toContainText('Waiting for 2 required checks: lint, e2e');
+    expect(await top()).toBe(before);
+
+    // With the thread resolved, what is left clears by itself.
+    updateFakeGh(desktop.homeDir, (s) => {
+      const thread = s.prs[0].threads?.[0];
+      if (thread) thread.isResolved = true;
+    });
+    await refresh();
+    await expect(headline).toContainText(
+      'Waiting for 2 required checks: lint, e2e'
+    );
+    await expect(headline.locator('.sr-only')).toHaveText(/^Waiting:/);
+    expect(await top()).toBe(before);
+  });
+
+  test('keeps what it read when a re-read fails, in the list and out of it', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    const completion = await openPr(page, /#214/);
+    await completion.getByRole('button', { name: /View checks/ }).click();
+    const rows = page.getByRole('list', { name: 'Checks and policies' });
+    await expect(rows.locator('[data-check]')).toHaveCount(5);
+
+    updateFakeGh(desktop.homeDir, (s) => {
+      s.prs[0].failing = { checks: true };
+    });
     await page
       .getByRole('button', { name: 'Refresh this pull request' })
       .click();
+    // The reader stays where they were, with the list they had and why
+    // it is not newer.
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Showing the checks from' })
+    ).toContainText('Refreshing failed');
+    await expect(rows.locator('[data-check]')).toHaveCount(5);
+
+    await page.getByRole('button', { name: 'Back to the Overview' }).click();
+    await expect(
+      completion
+        .getByRole('status')
+        .filter({ hasText: 'Showing the completion from' })
+    ).toBeVisible();
     await expect(completion.locator('[data-readiness-headline]')).toContainText(
-      'Waiting for 2 required checks: lint, e2e'
+      '1 required check failing: build'
     );
-    expect(await pane.evaluate((el) => el.scrollTop)).toBe(before);
+  });
+
+  test('keeps the reader in the list when a push cannot be read', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    const completion = await openPr(page, /#214/);
+    await completion.getByRole('button', { name: /View checks/ }).click();
+    const heading = page.getByRole('heading', { name: 'Checks and policies' });
+    await expect(heading).toBeFocused();
+
+    updateFakeGh(desktop.homeDir, (s) => {
+      s.prs[0].headRefOid = 'e'.repeat(40);
+      s.prs[0].failing = { checks: true };
+    });
+    await sidebar(page)
+      .getByRole('button', { name: 'Refresh', exact: true })
+      .click();
+    // Nothing was read at the new head: the list says so, where it was.
+    await expect(
+      page
+        .getByRole('status')
+        .filter({ hasText: 'The checks could not be read' })
+    ).toBeVisible();
+    await expect(heading).toBeVisible();
+    await page.getByRole('button', { name: 'Back to the Overview' }).click();
+    await expect(completion).toContainText('Readiness not fully known');
+  });
+
+  test('reads the checks again after a push, and says which head it shows', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    const completion = await openPr(page, /#215/);
+    const headline = completion.locator('[data-readiness-headline]');
+    const source = completion.locator('[data-readiness-source]');
+    await expect(headline).toContainText('Ready to merge');
+    await expect(source).toContainText('On fffffff');
+
+    updateFakeGh(desktop.homeDir, (s) => {
+      const pr = s.prs[1];
+      pr.headRefOid = 'e'.repeat(40);
+      pr.mergeStateStatus = 'BLOCKED';
+      pr.checks = [
+        { name: 'build', state: 'IN_PROGRESS', required: true },
+        { name: 'e2e', state: 'SUCCESS', required: true },
+      ];
+    });
+    // Only the list is read again; the new head is what reads the checks.
+    await sidebar(page)
+      .getByRole('button', { name: 'Refresh', exact: true })
+      .click();
+    await expect(headline).toContainText('Waiting for 1 required check: build');
+    await expect(source).toContainText('On eeeeeee');
   });
 });

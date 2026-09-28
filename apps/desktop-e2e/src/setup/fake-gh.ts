@@ -42,6 +42,8 @@ export interface FakePr {
     detail?: boolean;
     checks?: boolean;
   };
+  /** The head commit; forty `f`s unless said. */
+  headRefOid?: string;
   /** Check runs and statuses on the head, for the checks read. */
   checks?: FakeCheck[];
   /** GitHub's reading of the pull request, for the checks read. */

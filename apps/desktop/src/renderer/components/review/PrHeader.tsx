@@ -124,7 +124,7 @@ export function PrHeader({
   onShowUnresolved: () => void;
 }) {
   const { repo } = useRepo();
-  const refresh = useRefreshPullRequest(repo.cwd);
+  const refresh = useRefreshPullRequest();
   const provider = providerName(repo.providerId);
   const reviewers = pr.reviewers ?? [];
   return (

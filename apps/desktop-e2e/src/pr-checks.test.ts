@@ -106,6 +106,7 @@ test.describe('Selected pull request checks', () => {
       },
       readiness: {
         state: 'blocked',
+        // What won't clear by waiting first.
         blockers: [
           {
             kind: 'checks',
@@ -113,14 +114,14 @@ test.describe('Selected pull request checks', () => {
             resolvedBy: 'author',
           },
           {
-            kind: 'checks',
-            text: 'Waiting for 2 required checks: lint, e2e',
-            resolvedBy: 'checks',
-          },
-          {
             kind: 'conversations',
             text: '1 unresolved conversation',
             resolvedBy: 'author',
+          },
+          {
+            kind: 'checks',
+            text: 'Waiting for 2 required checks: lint, e2e',
+            resolvedBy: 'checks',
           },
         ],
         advisories: [

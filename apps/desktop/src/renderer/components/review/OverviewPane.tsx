@@ -1,8 +1,9 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import { usePullRequestChecks } from '../../lib/data/pr-checks-query.js';
-import { pullRequestRefFor } from '../../lib/data/pr-snapshot-query.js';
-import { readState } from '../../lib/data/read-state.js';
+import { NO_REF, pullRequestRefFor } from '../../lib/data/pr-snapshot-query.js';
+import { keys } from '../../lib/data/query-keys.js';
+import { useReadState } from '../../lib/data/use-read-state.js';
 import { useRepo } from '../../lib/repo-context.js';
 import {
   nextStep,
@@ -29,9 +30,10 @@ const LAYOUT =
   "mx-auto grid max-w-[1120px] gap-x-8 gap-y-6 px-6 py-6 [grid-template-areas:'head'_'next'_'ready'_'main'_'people'] @min-[900px]:grid-cols-[minmax(0,1fr)_260px] @min-[900px]:grid-rows-[auto_auto_auto_auto_1fr] @min-[900px]:[grid-template-areas:'head_head'_'next_next'_'main_ready'_'main_people'_'main_.']";
 
 /**
- * The Overview or, nested in it, the check list; Back from the list
- * returns to where the reader was, scroll and keyboard both. Keyed by
- * the pull request so another one opens on its Overview.
+ * The Overview or, nested in it, the check list; the list stays until
+ * the reader goes Back, whatever a re-read brings, and Back returns to
+ * where they were, scroll and keyboard both. Keyed by the pull request
+ * so another one opens on its Overview.
  */
 function useNestedChecks(
   prId: number,
@@ -73,24 +75,30 @@ export function OverviewPane({
   const { repo } = useRepo();
   const role = reviewRole(pr, repo.viewer);
   const ref = pullRequestRefFor(repo, pr.id);
-  const checks = usePullRequestChecks(repo.cwd, ref, repo.viewer);
-  const read = readState(checks);
+  // The head the list row names: a push reads the checks again.
+  const head = pr.headSha ?? null;
+  const checks = usePullRequestChecks(repo.cwd, ref, repo.viewer, head);
+  const {
+    state: read,
+    retrying,
+    retry,
+  } = useReadState(
+    checks,
+    keys.prChecks(repo.cwd, ref ?? NO_REF, repo.viewer, head)
+  );
+  const reading = checks.isPlaceholderData;
   const pane = useRef<HTMLDivElement>(null);
   const checksButton = useRef<HTMLButtonElement>(null);
   const nested = useNestedChecks(pr.id, pane, checksButton);
-  const refresh = () => void checks.refetch();
 
   return (
     <div ref={pane} className="@container h-full overflow-auto">
-      {nested.showing && read.kind === 'ready' && read.data.list ? (
+      {nested.showing ? (
         <PrChecks
-          list={read.data.list}
-          head={
-            read.data.checks.state === 'read'
-              ? read.data.checks.value.head
-              : null
-          }
-          fetchedAt={read.data.fetchedAt}
+          read={read}
+          reading={reading}
+          retrying={retrying}
+          onRetry={retry}
           onBack={nested.close}
         />
       ) : (
@@ -105,8 +113,9 @@ export function OverviewPane({
             <PrReadiness
               read={read}
               provider={repo.providerId}
-              refreshing={checks.isFetching}
-              onRefresh={refresh}
+              reading={reading}
+              retrying={retrying}
+              onRefresh={retry}
               onViewChecks={nested.open}
               checksRef={checksButton}
             />

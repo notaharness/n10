@@ -1,4 +1,5 @@
 import {
+  holdingVerdict,
   type PullRequestInfo,
   type PullRequestReviewer,
   type ReviewDecision,
@@ -9,9 +10,11 @@ import type { Mode } from './review-model.js';
  * What the pull request Overview says, decided from the data it has.
  *
  * Everything here reads the pull request list's row: whose pull request
- * it is, where the tab opens, and the reader's next step. Readiness is
- * not decided here: core evaluates it from the provider's own facts
- * (`pr-readiness.ts`), and the Completion section only shows it.
+ * it is, where the tab opens, and the reader's next step, in facts the
+ * row states. Nothing here decides what blocks: which verdict holds a
+ * pull request back is vcs-core's (`holdingVerdict`), and whether a
+ * review is required is core's readiness, which the Completion section
+ * shows.
  */
 
 export type ReviewRole = 'author' | 'reviewer';
@@ -107,34 +110,16 @@ function names(reviewers: readonly PullRequestReviewer[]): string {
   return `${first} and ${rest.length} other${rest.length === 1 ? '' : 's'}`;
 }
 
-/** The verdicts that hold a pull request back, most severe first, each
- *  in its provider's own words: Azure's -10 and -5 are different votes,
- *  and GitHub has only the third. */
-export const HOLDING_VERDICTS = [
-  'rejected',
-  'waiting-for-author',
-  'changes-requested',
-] as const;
-
+/** A holding verdict in its provider's own words: Azure's -10 and -5
+ *  are different votes, and GitHub has only the third. */
 const HOLDING_PHRASE: Record<
-  (typeof HOLDING_VERDICTS)[number],
+  NonNullable<ReturnType<typeof holdingVerdict>>['decision'],
   (who: string) => string
 > = {
   rejected: (who) => `Rejected by ${who}`,
   'waiting-for-author': (who) => `Waiting for author: ${who}`,
   'changes-requested': (who) => `Changes requested by ${who}`,
 };
-
-/** The most severe verdict holding the pull request back, or null. */
-function holdingVerdict(
-  reviewers: readonly PullRequestReviewer[]
-): string | null {
-  for (const decision of HOLDING_VERDICTS) {
-    const who = reviewers.filter((r) => r.decision === decision);
-    if (who.length > 0) return HOLDING_PHRASE[decision](names(who));
-  }
-  return null;
-}
 
 function unresolvedDetail(pr: PullRequestInfo): string | null {
   const n = pr.activeCommentCount ?? 0;
@@ -197,16 +182,25 @@ function authorStep(pr: PullRequestInfo): NextStep {
     };
   }
   const holding = holdingVerdict(reviewers);
-  if (holding) return { ...view, summary: holding, detail: null };
+  if (holding) {
+    return {
+      ...view,
+      summary: HOLDING_PHRASE[holding.decision](names(holding.by)),
+      detail: null,
+    };
+  }
   if (pr.isDraft) return { ...view, summary: 'Draft', detail: null };
   const approved = reviewers.filter((r) => r.decision === 'approved');
   if (approved.length > 0) {
     return { ...view, summary: `Approved by ${names(approved)}`, detail: null };
   }
+  // What the row says, not whether a review is required: that is
+  // Completion's, from the provider.
   return {
     ...view,
-    summary: 'Waiting for review',
-    detail: reviewers.length === 0 ? 'No reviewers are requested.' : null,
+    summary:
+      reviewers.length === 0 ? 'No reviewers requested' : 'No approvals yet',
+    detail: null,
   };
 }
 

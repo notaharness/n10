@@ -2,6 +2,7 @@ import type {
   CheckOutcome,
   CheckRequirement,
   PullRequestCheck,
+  ReadOutcome,
 } from '@n10/vcs-core';
 import type {
   CheckList,
@@ -22,8 +23,7 @@ export const ASPECT_LABEL: Record<ReadinessAspect['id'], string> = {
   reviews: 'Reviews',
   checks: 'Checks',
   conflicts: 'Conflicts',
-  conversations: 'Threads',
-  permission: 'Permission',
+  conversations: 'Conversations',
 };
 
 /** Who can clear a blocker, said as what happens next. */
@@ -63,20 +63,44 @@ export function headline(
   }
   return {
     text: 'Readiness not fully known',
-    detail: unknowns.length > 0 ? `Not known: ${unknowns.join(', ')}` : null,
+    detail:
+      unknowns.length > 0
+        ? `Not known: ${unknowns.map(lowerFirst).join(', ')}`
+        : null,
   };
 }
 
-/** "View checks": how many passed, and of how many — or, where not all
- *  were read, how many passed of what was. */
+/** Core's unknowns are sentence case; after "Not known:" they run on. */
+function lowerFirst(s: string): string {
+  return s.charAt(0).toLowerCase() + s.slice(1);
+}
+
+/** A failed read in the provider's words, with when to try again where
+ *  it said. */
+export function failureText(
+  failure: Extract<ReadOutcome<unknown>, { state: 'failed' }>
+): string {
+  const ms = failure.retryAfterMs;
+  if (ms == null) return failure.reason;
+  const wait =
+    ms < 60_000 ? `${Math.ceil(ms / 1000)} s` : `${Math.ceil(ms / 60_000)} min`;
+  return `${failure.reason} (try again in ${wait})`;
+}
+
+/** "View checks": how many passed of how many, how many of those
+ *  reported on an older push, and where not all were read, how many
+ *  were. */
 export function checksLabel(list: CheckList): string {
   const shown = list.rows.length;
-  if (shown === 0) return 'No checks reported';
-  const { passed } = list.count;
-  if (list.complete) return `View checks · ${passed} of ${shown} passed`;
+  if (shown === 0) {
+    return list.complete ? 'No checks reported' : 'Checks not all read';
+  }
+  let passed = `${list.count.passed} of ${shown} passed`;
+  if (list.stale > 0) passed += `, ${list.stale} on an older revision`;
+  if (list.complete) return `View checks · ${passed}`;
   const read =
     list.total != null ? `${shown} of ${list.total} read` : 'not all read';
-  return `View checks · ${passed} passed · ${read}`;
+  return `View checks · ${passed} · ${read}`;
 }
 
 export const OUTCOME_LABEL: Record<CheckOutcome, string> = {

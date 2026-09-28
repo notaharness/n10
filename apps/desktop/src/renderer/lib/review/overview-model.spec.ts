@@ -163,9 +163,17 @@ describe('nextStep', () => {
     expect(
       nextStep({ ...PR, reviewers: approvers }, 'author', 'alex').summary
     ).toBe('Approved by Bea and 1 other');
+  });
+
+  it('says what the row shows about reviews, never that one is required', () => {
+    // Whether a review is required is the provider's, in Completion.
     expect(nextStep(PR, 'author', 'alex')).toMatchObject({
-      summary: 'Waiting for review',
-      detail: 'No reviewers are requested.',
+      summary: 'No reviewers requested',
+      detail: null,
     });
+    expect(
+      nextStep({ ...PR, reviewers: [bea('no-response')] }, 'author', 'alex')
+        .summary
+    ).toBe('No approvals yet');
   });
 });

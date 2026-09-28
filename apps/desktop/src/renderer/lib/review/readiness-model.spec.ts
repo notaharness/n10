@@ -7,6 +7,7 @@ import type {
 import {
   checksLabel,
   duration,
+  failureText,
   headline,
   outcomeText,
 } from './readiness-model.js';
@@ -46,11 +47,38 @@ describe('headline', () => {
   });
 
   it('says what it does not know, never ready', () => {
-    const unknown = readiness({ unknowns: ['Branch rules', 'Checks'] });
+    const unknown = readiness({
+      unknowns: ['Branch rules', 'The review requirement'],
+    });
     expect(headline(unknown, 'github')).toEqual({
       text: 'Readiness not fully known',
-      detail: 'Not known: Branch rules, Checks',
+      detail: 'Not known: branch rules, the review requirement',
     });
+    // Blockers core names do not make it blocked where the provider
+    // has not said so.
+    const named = readiness({
+      blockers: [
+        { kind: 'conflicts', text: 'Conflicts', resolvedBy: 'author' },
+      ],
+    });
+    expect(headline(named, 'github').text).toBe('Readiness not fully known');
+  });
+});
+
+describe('failureText', () => {
+  it('gives the provider’s reason, and when to try again where it said', () => {
+    const failed = {
+      state: 'failed',
+      kind: 'throttled',
+      reason: 'Rate limited',
+    } as const;
+    expect(failureText(failed)).toBe('Rate limited');
+    expect(failureText({ ...failed, retryAfterMs: 30_000 })).toBe(
+      'Rate limited (try again in 30 s)'
+    );
+    expect(failureText({ ...failed, retryAfterMs: 150_000 })).toBe(
+      'Rate limited (try again in 3 min)'
+    );
   });
 });
 
@@ -85,6 +113,7 @@ describe('checksLabel', () => {
   const list = (over: Partial<CheckList>): CheckList => ({
     rows: Array.from({ length: 3 }, () => ({} as CheckList['rows'][number])),
     count: { passed: 1 } as CheckList['count'],
+    stale: 0,
     total: 3,
     complete: true,
     ...over,
@@ -93,11 +122,21 @@ describe('checksLabel', () => {
   it('counts what passed of what there is, and of what was read where not all was', () => {
     expect(checksLabel(list({}))).toBe('View checks · 1 of 3 passed');
     expect(checksLabel(list({ complete: false, total: 5 }))).toBe(
-      'View checks · 1 passed · 3 of 5 read'
+      'View checks · 1 of 3 passed · 3 of 5 read'
     );
     expect(checksLabel(list({ complete: false, total: null }))).toBe(
-      'View checks · 1 passed · not all read'
+      'View checks · 1 of 3 passed · not all read'
     );
     expect(checksLabel(list({ rows: [] }))).toBe('No checks reported');
+    // A list that stopped short with nothing in it is not "none".
+    expect(checksLabel(list({ rows: [], complete: false, total: null }))).toBe(
+      'Checks not all read'
+    );
+  });
+
+  it('says how many reported on an older push', () => {
+    expect(checksLabel(list({ stale: 1 }))).toBe(
+      'View checks · 1 of 3 passed, 1 on an older revision'
+    );
   });
 });
