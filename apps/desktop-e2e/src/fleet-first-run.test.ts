@@ -23,6 +23,46 @@ function step(page: Page, name: string) {
 test.describe('First run', () => {
   test.use({ beamScenario: { enrolled: false } });
 
+  test('More information opens beam’s site in the browser, not the window', async ({
+    desktop,
+  }) => {
+    const { page, app } = desktop;
+    await app.evaluate(({ shell }) => {
+      const opened: string[] = [];
+      Object.assign(globalThis, { openedUrls: opened });
+      shell.openExternal = async (url) => {
+        opened.push(url);
+      };
+    });
+    await openFleet(desktop);
+    const windowUrl = page.url();
+    await fleetView(page)
+      .getByRole('link', { name: 'More information' })
+      .click();
+    await expect
+      .poll(() =>
+        app.evaluate(() => (globalThis as { openedUrls?: string[] }).openedUrls)
+      )
+      .toEqual(['https://beam.n10.is']);
+    expect(page.url()).toBe(windowUrl);
+    await expect(
+      fleetView(page).getByRole('img', { name: 'Tailscale' })
+    ).toBeVisible();
+  });
+
+  test('the beam illustration holds still under reduced motion', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openFleet(desktop);
+    const packet = fleetView(page).locator('.fleet-art-packet').first();
+    const playState = () =>
+      packet.evaluate((el) => getComputedStyle(el).animationPlayState);
+    await expect.poll(playState).toBe('running');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect.poll(playState).toBe('paused');
+  });
+
   test('creates a fleet through both passkey steps, each with its own link', async ({
     desktop,
     beam,
