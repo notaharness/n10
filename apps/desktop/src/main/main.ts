@@ -36,7 +36,7 @@ import { installHostEventBridge } from './host-events.js';
 import { installDesktopTmuxPreparer } from './tmux-session-preparer.js';
 import { MAIN_MARKS, mark } from './boot-marks.js';
 import { pickFolderWithDialog } from './folder-picker.js';
-import { buildMenuTemplate } from './menu.js';
+import { buildMenuTemplate } from '../host/menu-template.js';
 import { installUnsavedGuard } from './unsaved-guard.js';
 import {
   installProcessDiagnostics,
@@ -46,6 +46,7 @@ import {
   isAllowedNavigation,
   loadTarget,
   rendererWebPreferences,
+  showWhenReadyOrLoaded,
   windowChrome,
 } from './window.js';
 
@@ -170,7 +171,7 @@ function createMainWindow(): BrowserWindow {
     void win.loadFile(target.path);
   }
 
-  win.once('ready-to-show', () => win.show());
+  showWhenReadyOrLoaded(win);
   win.webContents.on('did-finish-load', () => {
     console.log('[desktop] renderer loaded');
     void runQaSteps(win);

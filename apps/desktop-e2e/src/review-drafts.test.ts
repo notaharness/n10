@@ -43,7 +43,6 @@ async function openThread(page: Page) {
   await sidebarRow(page, /Handle cancelled requests|#214/)
     .first()
     .click();
-  await page.getByRole('button', { name: 'Overview' }).click();
   await page
     .getByRole('button', {
       name: 'Show the thread on src/request.ts · new 3 in the diff',
@@ -83,7 +82,7 @@ test.describe('Review drafts', () => {
     await expect(prompt).toBeFocused();
 
     // The Overview says so too.
-    await page.getByRole('button', { name: 'Overview' }).click();
+    await page.getByRole('button', { name: 'Back to review' }).click();
     await expect(
       page.locator('[data-thread-id="T-open"]').getByText('Draft reply')
     ).toBeVisible();

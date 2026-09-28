@@ -158,6 +158,216 @@ function searchNode(pr) {
   };
 }
 
+/** A repository's `databaseId`: a stable number derived from its name,
+ *  so the same repository always answers with the same id. */
+function repositoryNode(nameWithOwner) {
+  let databaseId = 7;
+  for (const c of nameWithOwner) {
+    databaseId = (databaseId * 31 + c.charCodeAt(0)) % 2_000_000_000;
+  }
+  return { databaseId, nameWithOwner };
+}
+
+/** The repository the scenario stands for. */
+function scenarioRepository() {
+  return repositoryNode(
+    `${scenario.owner ?? 'n10'}/${scenario.repo ?? 'fixture'}`
+  );
+}
+
+/** Each author's latest review among `reviews`, oldest first, whose
+ *  state passes `keep`. */
+function latestPerAuthor(reviews, keep) {
+  const byAuthor = new Map();
+  for (const r of reviews) if (keep(r.state)) byAuthor.set(r.author, r);
+  return [...byAuthor.values()];
+}
+
+const VERDICT_STATES = new Set(['APPROVED', 'CHANGES_REQUESTED']);
+
+/**
+ * The selected-pull-request read (libs/vcs/github/src/lib/pr-details.ts),
+ * answered in one page. `fork` names the head repository when it is not
+ * the scenario's own; `null` is a deleted fork.
+ */
+function detailNode(pr) {
+  const list = searchNode(pr);
+  const repository = scenarioRepository();
+  const head =
+    pr.fork === undefined || pr.fork === repository.nameWithOwner
+      ? repository
+      : pr.fork && repositoryNode(pr.fork);
+  const connection = (nodes) => ({
+    totalCount: nodes.length,
+    pageInfo: page,
+    nodes,
+  });
+  const author = (login) => ({ __typename: 'User', login, id: `U_${login}` });
+  const reviews = pr.reviews ?? [];
+  return {
+    ...repository,
+    pullRequest: {
+      number: pr.number,
+      title: pr.title,
+      url: list.url,
+      state: pr.state ?? 'OPEN',
+      isDraft: list.isDraft,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-02T00:00:00Z',
+      viewerCanUpdate: pr.canUpdate ?? true,
+      author: list.author,
+      headRefName: pr.headRefName,
+      headRefOid: list.headRefOid,
+      headRepository: head,
+      baseRefName: list.baseRefName,
+      baseRefOid: 'e'.repeat(40),
+      latestOpinionatedReviews: connection(
+        latestPerAuthor(reviews, (s) => VERDICT_STATES.has(s)).map((r) => ({
+          author: author(r.author),
+          state: r.state,
+          commit: { oid: list.headRefOid },
+          onBehalfOf: { nodes: [] },
+        }))
+      ),
+      latestReviews: connection(
+        latestPerAuthor(reviews, (s) => s !== 'PENDING').map((r) => ({
+          author: author(r.author),
+          state: r.state,
+        }))
+      ),
+      reviewRequests: connection(
+        (pr.reviewRequests ?? []).map((login) => ({
+          asCodeOwner: false,
+          requestedReviewer: { __typename: 'User', id: `U_${login}`, login },
+        }))
+      ),
+    },
+  };
+}
+
+/** Check-run conclusions; any other `state` is a run still going. */
+const CONCLUSIONS = new Set([
+  'SUCCESS',
+  'FAILURE',
+  'NEUTRAL',
+  'SKIPPED',
+  'CANCELLED',
+  'TIMED_OUT',
+  'ACTION_REQUIRED',
+]);
+
+/** A check as the checks read selects it (pr-checks.ts). */
+function contextNode(c, index) {
+  const isRequired = c.required ?? false;
+  if (c.status) {
+    return {
+      __typename: 'StatusContext',
+      context: c.name,
+      state: c.state,
+      targetUrl: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      creator: { login: c.app ?? 'ci-bot' },
+      isRequired,
+    };
+  }
+  const done = CONCLUSIONS.has(c.state);
+  return {
+    __typename: 'CheckRun',
+    // This check run's own id: its place in the scenario, so two runs
+    // of one name in one workflow stay two, as on GitHub.
+    databaseId: 9000 + index,
+    name: c.name,
+    status: done ? 'COMPLETED' : c.state,
+    conclusion: done ? c.state : null,
+    startedAt: '2026-01-01T00:00:00Z',
+    completedAt: done ? '2026-01-01T00:05:00Z' : null,
+    detailsUrl: `https://github.com/n10/fixture/actions/runs/${c.name.length}`,
+    isRequired,
+    checkSuite: {
+      // One suite per workflow and event, as a run per trigger has.
+      databaseId: repositoryNode(`${c.workflow ?? 'CI'}:${c.event ?? ''}`)
+        .databaseId,
+      app: { slug: c.app ?? 'github-actions', databaseId: c.appId ?? 15368 },
+      workflowRun: {
+        runAttempt: 1,
+        event: c.event ?? 'pull_request',
+        workflow: { name: c.workflow ?? 'CI' },
+      },
+    },
+  };
+}
+
+/** The checks read (libs/vcs/github/src/lib/pr-checks.ts), in one page. */
+function checksNode(pr) {
+  const nodes = (pr.checks ?? []).map(contextNode);
+  return {
+    databaseId: scenarioRepository().databaseId,
+    pullRequest: {
+      number: pr.number,
+      state: pr.state ?? 'OPEN',
+      isDraft: pr.isDraft ?? false,
+      baseRefName: pr.baseRefName ?? 'main',
+      mergeable: pr.mergeable ?? 'MERGEABLE',
+      mergeStateStatus: pr.mergeStateStatus ?? 'CLEAN',
+      reviewDecision: pr.reviewDecision ?? null,
+      // No classic protection: the scenario's rules are rule sets.
+      baseRef: { refUpdateRule: null },
+      commits: {
+        nodes: [
+          {
+            commit: {
+              oid: pr.headRefOid ?? 'f'.repeat(40),
+              statusCheckRollup: {
+                contexts: { totalCount: nodes.length, pageInfo: page, nodes },
+              },
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+/** The base branch's classic protection, as `branches/<name>` shows it. */
+function branchAnswer(name) {
+  return {
+    name,
+    protected: false,
+    protection: {
+      enabled: false,
+      required_status_checks: {
+        enforcement_level: 'off',
+        contexts: [],
+        checks: [],
+      },
+    },
+  };
+}
+
+/** The rule sets on every base branch, from the scenario's `rules`. */
+function rulesAnswer() {
+  const rules = scenario.rules ?? {};
+  const answer = [];
+  if (rules.required?.length) {
+    answer.push({
+      type: 'required_status_checks',
+      parameters: {
+        required_status_checks: rules.required.map((context) => ({
+          context,
+          integration_id: 15368,
+        })),
+      },
+    });
+  }
+  if (rules.conversationResolution) {
+    answer.push({
+      type: 'pull_request',
+      parameters: { required_review_thread_resolution: true },
+    });
+  }
+  return answer;
+}
+
 function threadNode(t, i) {
   return {
     id: t.id ?? `thread-${i + 1}`,
@@ -295,7 +505,17 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
   const vars = flags(argv);
   const query = vars.query ?? '';
 
-  // The open-PR search is the only one asking for a check rollup; the
+  // Before the list search below, which also names `statusCheckRollup`.
+  if (
+    query.includes('query PullRequestChecks(') ||
+    query.includes('query PullRequestCheckContexts(')
+  ) {
+    const pr = prs.find((p) => String(p.number) === String(vars.number));
+    if (failing(pr, 'checks')) failLikeGitHub();
+    out({ data: { repository: pr ? checksNode(pr) : null } });
+  }
+
+  // The open-PR search is the other query asking for a check rollup; the
   // merged-branch sweep asks for headRefName alone and gets nothing,
   // which keeps the sync loop from deleting a test's branches.
   if (query.includes('statusCheckRollup')) {
@@ -305,6 +525,11 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
     out({ data: { search: { pageInfo: page, nodes: [] } } });
   }
 
+  if (query.includes('query PullRequestDetail(')) {
+    const pr = prs.find((p) => String(p.number) === String(vars.number));
+    if (failing(pr, 'detail')) failLikeGitHub();
+    out({ data: { repository: pr ? detailNode(pr) : null } });
+  }
   if (query.includes('query PullRequestConversation(')) {
     const pr = prs.find((p) => String(p.number) === String(vars.number));
     if (failing(pr, 'conversation')) failLikeGitHub();
@@ -478,6 +703,20 @@ if (
     const pr = prs.find((p) => String(p.number) === pullPath[1]);
     if (failing(pr, 'body')) failLikeGitHub();
     out(pr?.body ?? '');
+  }
+
+  // ── gh api repos/<owner>/<repo>/branches/<b> and rules/branches/<b> ──
+  // The checks read's base-branch rules.
+  const rulesPath = argv[1]?.match(
+    /^repos\/[^/]+\/[^/]+\/(rules\/)?branches\/([^?]+)/
+  );
+  if (argv[0] === 'api' && rulesPath) {
+    if (scenario.rules?.failing) failLikeGitHub();
+    out(
+      rulesPath[1]
+        ? rulesAnswer()
+        : branchAnswer(decodeURIComponent(rulesPath[2]))
+    );
   }
 
   if (argv[0] === 'api' && argv[1] === '/user') {

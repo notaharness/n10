@@ -18,6 +18,7 @@ import { useMachines, useSyncState, useVersion } from '../lib/data/queries.js';
 import { useFleet } from '../lib/fleet/fleet-context.js';
 import { useRefreshRemote } from '../lib/data/mutations.js';
 import { machinesSummary } from '../lib/machines/machine-model.js';
+import { providerName } from '../lib/provider-name.js';
 import { itemRunning } from '../lib/sidebar/sidebar-model.js';
 import { basename, cn, relativeTime } from '../lib/utils.js';
 import { Tip } from './ui/tooltip.js';
@@ -184,12 +185,6 @@ function MachinesSegment({
       {summary.text}
     </Segment>
   );
-}
-
-function providerName(id: string): string {
-  if (id === 'github') return 'GitHub';
-  if (id === 'azure-devops') return 'Azure DevOps';
-  return id;
 }
 
 function Segment({

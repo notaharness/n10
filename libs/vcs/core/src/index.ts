@@ -1,5 +1,6 @@
 export * from './lib/types.js';
 export * from './lib/pr-details.js';
+export type * from './lib/pr-checks.js';
 export * from './lib/pr-conversation.js';
 export type * from './lib/mentions.js';
 export * from './lib/review-publication.js';

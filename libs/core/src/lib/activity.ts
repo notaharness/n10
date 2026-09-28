@@ -153,6 +153,49 @@ export function noteSeen(name: string): void {
   if (state) state.lastSeenAt = Date.now();
 }
 
+/** Sessions whose terminal is on screen, with how many panes show it.
+ * Kept apart from `sessions` so a re-attach does not drop it. */
+const shown = new Map<string, number>();
+
+/**
+ * Mark the session's terminal as on screen until the returned release
+ * runs. Output that arrives while it is shown is seen as it arrives;
+ * the release acknowledges everything up to then. Whatever renders the
+ * terminal holds this, so selecting a session whose pane shows
+ * something else (the branch picker, settings, a diff) does not count
+ * as seeing its output.
+ */
+export function showTerminal(name: string): () => void {
+  shown.set(name, (shown.get(name) ?? 0) + 1);
+  noteSeen(name);
+  let held = true;
+  return () => {
+    if (!held) return;
+    held = false;
+    const left = (shown.get(name) ?? 1) - 1;
+    if (left > 0) shown.set(name, left);
+    else shown.delete(name);
+    noteSeen(name);
+  };
+}
+
+function unseen(name: string, state: SessionActivity): boolean {
+  return (
+    !shown.has(name) &&
+    state.lastDataAt != null &&
+    state.lastDataAt > state.lastSeenAt
+  );
+}
+
+/** Whether the session produced output the user has not seen: output
+ * while its terminal was not on screen, after the last `noteSeen`.
+ * Output the user watched does not need their attention, even if the
+ * session only reads as idle after they moved away. */
+export function hasUnseenOutput(name: string): boolean {
+  const state = sessions.get(name);
+  return state != null && unseen(name, state);
+}
+
 /**
  * How long the session has produced nothing, in ms — the raw fact
  * behind `snapshot().active`, for callers whose idea of idle is longer
@@ -171,8 +214,8 @@ export function idleFor(name: string): number {
 export interface ActivitySnapshot {
   /** Agent is currently producing output. */
   active: boolean;
-  /** Session ran for at least MIN_ACTIVE_MS, then went idle, and the
-   * user hasn't looked at it since the most recent output. */
+  /** Session ran for at least MIN_ACTIVE_MS, then went idle, and its
+   * most recent output is unseen (`hasUnseenOutput`). */
   flashing: boolean;
   /** The PTY has exited. The session is no longer "waiting on the
    * user" — it's done — so the inactive-alert watcher must not treat
@@ -187,6 +230,7 @@ const QUIET: ActivitySnapshot = { active: false, flashing: false };
 export function __resetForTests(): void {
   for (const state of sessions.values()) state.dispose();
   sessions.clear();
+  shown.clear();
 }
 
 export function snapshot(name: string): ActivitySnapshot {
@@ -196,8 +240,7 @@ export function snapshot(name: string): ActivitySnapshot {
   const active = !state.exited && t - state.lastDataAt < ACTIVITY_IDLE_MS;
   const streakMs =
     state.activeSince != null ? state.lastDataAt - state.activeSince : 0;
-  const flashing =
-    !active && streakMs >= MIN_ACTIVE_MS && state.lastDataAt > state.lastSeenAt;
+  const flashing = !active && streakMs >= MIN_ACTIVE_MS && unseen(name, state);
   // Don't collapse an exited session to QUIET: callers (the inactive-
   // alert watcher) need to see `exited` to suppress the spurious
   // "needs attention" enqueue that its active→idle transition triggers.

@@ -4,6 +4,7 @@ import {
   isBlockingDecision,
   type BranchPrMap,
   type PullRequestInfo,
+  type PullRequestReviewer,
   type CategorizedReviews,
   type AppConfig,
   type VcsProvider,
@@ -29,6 +30,28 @@ export function findOrphanPrs(
     .sort((a, b) => b.id - a.id);
 }
 
+type ReviewBucket = keyof CategorizedReviews;
+
+/** Where the viewer's own entry files a pull request, or nowhere. */
+function reviewBucket(
+  reviewer: PullRequestReviewer,
+  isDraft: boolean
+): ReviewBucket | null {
+  if (reviewer.decision === 'declined') return null;
+  // Asked again after a verdict: the author wants another look. A draft
+  // asks for none yet, so its verdict files it as before.
+  const askedAgain = reviewer.requested && reviewer.decision !== 'no-response';
+  if (askedAgain && !isDraft) return 'needsReview';
+  if (reviewer.decision === 'approved') return 'approvedByYou';
+  if (isBlockingDecision(reviewer.decision)) return 'waitingForAuthor';
+  // A draft is not asking for review yet, so it does not belong in
+  // "Needs Your Review" — being listed there is a standing job that
+  // cannot be cleared. The other two buckets still take drafts: both
+  // record a decision already made, and one of them ("Waiting for
+  // Author") is exactly where a PR put back into draft belongs.
+  return isDraft ? null : 'needsReview';
+}
+
 /**
  * Categorize PRs where the current user is a reviewer.
  */
@@ -37,10 +60,11 @@ export function categorizeReviews(
   config: AppConfig,
   provider: VcsProvider
 ): CategorizedReviews {
-  const needsReview: PullRequestInfo[] = [];
-  const waitingForAuthor: PullRequestInfo[] = [];
-  const approvedByYou: PullRequestInfo[] = [];
-
+  const buckets: CategorizedReviews = {
+    needsReview: [],
+    waitingForAuthor: [],
+    approvedByYou: [],
+  };
   for (const pr of Object.values(prMap)) {
     if (!pr || !pr.reviewers) continue;
     // Skip PRs created by the current user — they belong in sessions, not reviews
@@ -48,22 +72,10 @@ export function categorizeReviews(
     const reviewer = pr.reviewers.find((r) =>
       provider.matchesUser(r.identifier, config)
     );
-    if (!reviewer) continue;
-    if (reviewer.decision === 'declined') continue;
-    if (reviewer.decision === 'approved') {
-      approvedByYou.push(pr);
-    } else if (isBlockingDecision(reviewer.decision)) {
-      waitingForAuthor.push(pr);
-    } else if (!pr.isDraft) {
-      // A draft is not asking for review yet, so it does not belong in
-      // "Needs Your Review" — being listed there is a standing job that
-      // cannot be cleared. The other two buckets still take drafts:
-      // both record a decision already made, and one of them ("Waiting
-      // for Author") is exactly where a PR put back into draft belongs.
-      needsReview.push(pr);
-    }
+    const bucket = reviewer && reviewBucket(reviewer, pr.isDraft ?? false);
+    if (bucket) buckets[bucket].push(pr);
   }
-  return { needsReview, waitingForAuthor, approvedByYou };
+  return buckets;
 }
 
 /**

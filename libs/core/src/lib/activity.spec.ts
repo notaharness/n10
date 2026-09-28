@@ -4,8 +4,10 @@ import {
   __resetForTests,
   attach,
   detach,
+  hasUnseenOutput,
   noteInput,
   noteSeen,
+  showTerminal,
   snapshot,
 } from './activity.js';
 import {
@@ -128,6 +130,74 @@ describe('activity', () => {
     vi.advanceTimersByTime(ACTIVITY_IDLE_MS + 1);
 
     expect(snapshot('s1').flashing).toBe(false);
+  });
+
+  it('reports output as unseen until noteSeen acknowledges it', () => {
+    const pty = new MockPty();
+    attach('s1', pty.asPty());
+    expect(hasUnseenOutput('s1')).toBe(false);
+
+    vi.advanceTimersByTime(100);
+    pty.emit('xxxx');
+    expect(hasUnseenOutput('s1')).toBe(true);
+
+    vi.advanceTimersByTime(100);
+    noteSeen('s1');
+    vi.advanceTimersByTime(ACTIVITY_IDLE_MS + 1);
+    // Lapsing into idle after the user saw the output leaves it seen.
+    expect(snapshot('s1').active).toBe(false);
+    expect(hasUnseenOutput('s1')).toBe(false);
+    expect(hasUnseenOutput('unknown')).toBe(false);
+  });
+
+  it('sees output while the terminal is on screen and after its release', () => {
+    const pty = new MockPty();
+    attach('s1', pty.asPty());
+    vi.advanceTimersByTime(100);
+    const release = showTerminal('s1');
+
+    vi.advanceTimersByTime(100);
+    pty.emit('xxxx');
+    expect(hasUnseenOutput('s1')).toBe(false);
+
+    vi.advanceTimersByTime(100);
+    release();
+    expect(hasUnseenOutput('s1')).toBe(false);
+
+    // Output once the terminal is off screen is unseen.
+    vi.advanceTimersByTime(100);
+    pty.emit('xxxx');
+    expect(hasUnseenOutput('s1')).toBe(true);
+  });
+
+  it('does not flash a streak the user watched on screen', () => {
+    const pty = new MockPty();
+    attach('s1', pty.asPty());
+    const release = showTerminal('s1');
+
+    pty.emit('xxxx');
+    for (let i = 0; i < Math.ceil(MIN_ACTIVE_MS / 200) + 1; i++) {
+      vi.advanceTimersByTime(200);
+      pty.emit('xxxx');
+    }
+    vi.advanceTimersByTime(ACTIVITY_IDLE_MS + 1);
+    expect(snapshot('s1').flashing).toBe(false);
+
+    release();
+    expect(snapshot('s1').flashing).toBe(false);
+  });
+
+  it('keeps a terminal on screen across a re-attach under the same name', () => {
+    attach('s1', new MockPty().asPty());
+    const release = showTerminal('s1');
+
+    const pty2 = new MockPty();
+    attach('s1', pty2.asPty());
+    vi.advanceTimersByTime(100);
+    pty2.emit('xxxx');
+    expect(hasUnseenOutput('s1')).toBe(false);
+
+    release();
   });
 
   it('detach unsubscribes from the PTY and makes future calls no-ops', () => {

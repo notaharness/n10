@@ -468,6 +468,54 @@ test.describe('Terminal fit', () => {
   });
 
   /**
+   * An agent launched from someone else's pull request, on its Overview.
+   * The Overview has no header bar and the terminal has one, so the
+   * grid the agent is spawned with leaves the bar's rows out: its first
+   * frame is the one the reader sees.
+   */
+  test.describe('from a pull request Overview', () => {
+    test.use({
+      repo: {
+        worktrees: [
+          { branch: 'cancel-requests', files: { 'request.ts': 'close();\n' } },
+        ],
+      },
+      n10Config: { aiCommand: fakeAgent({ printSize: true }) },
+      fakeGitHub: {
+        username: 'n10-tester',
+        prs: [
+          {
+            number: 214,
+            title: 'Handle cancelled requests',
+            headRefName: 'cancel-requests',
+            author: 'alex',
+            reviewRequests: ['n10-tester'],
+            rollup: 'SUCCESS',
+          },
+        ],
+      },
+    });
+
+    test('spawns the agent on the grid it gets under the bar', async ({
+      desktop,
+    }) => {
+      const { page } = desktop;
+      await sidebarRow(page, /#214/).first().click();
+      await expect(
+        page.getByRole('heading', { level: 1, name: /Handle cancelled/ })
+      ).toBeVisible({ timeout: 30_000 });
+      await launchAgentFromRail(page);
+      await expect(visibleText(page, BANNER)).toBeVisible({ timeout: 30_000 });
+
+      await expectAgentFillsPane(page);
+      const [spawned] = await reportedGrids(page);
+      expect({ cols: spawned.cols, rows: spawned.rows }).toEqual(
+        await paneGrid(page)
+      );
+    });
+  });
+
+  /**
    * The same restart, through tmux.
    *
    * A tmux session outlives the local PTY that shows it, and tmux sizes

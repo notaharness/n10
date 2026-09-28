@@ -4,9 +4,9 @@ import {
   checkoutWorktree,
   createWorktree,
   removeWorktree,
-  canRemoveBranch,
   rebaseOntoMaster,
 } from './worktree.js';
+import { assessBranchRemoval, canRemoveBranch } from './removal-check.js';
 import { assertShellSafeRef, branchToSessionName } from './refs.js';
 import {
   parseWorktrees,
@@ -504,6 +504,88 @@ describe('deleteBranch', () => {
   });
 });
 
+// Every risk, not the first: a prompt that names one is the user's
+// whole picture of what they agree to lose.
+describe('assessBranchRemoval', () => {
+  function answers(outputs: Record<string, string>) {
+    mockExec.mockImplementation(((command: string) => {
+      if (command.includes('git worktree list')) {
+        return Promise.resolve(
+          worktreeListPorcelain([{ branch: 'feature/busy' }])
+        );
+      }
+      const hit = Object.keys(outputs).find((k) => command.includes(k));
+      return Promise.resolve(resolve(hit ? outputs[hit] : ''));
+    }) as unknown as typeof exec);
+  }
+
+  it('reports uncommitted changes and unpushed commits together', async () => {
+    answers({
+      'status --porcelain': ' M src/file.ts\n',
+      'git log': 'abc1234 unpushed\n',
+    });
+    expect(await assessBranchRemoval('feature/busy')).toEqual({
+      refusal: null,
+      risks: ['uncommitted changes', 'not pushed to upstream'],
+    });
+  });
+
+  // Git's own test: a gitlink with a checkout, or the worktree's own
+  // `modules` directory (left behind by `git rm` or `submodule deinit`).
+  it('reports a checked-out submodule, which git only removes by force', async () => {
+    answers({
+      "grep '^160000'": '160000 abc123 0\tvendor/lib\n',
+    });
+    mockExistsSync.mockImplementation((p) =>
+      String(p).endsWith('/vendor/lib/.git')
+    );
+    expect(await assessBranchRemoval('feature/busy')).toEqual({
+      refusal: null,
+      risks: ['submodules'],
+    });
+  });
+
+  it('reports the modules directory a removed submodule leaves behind', async () => {
+    answers({ '--git-path modules': '/repo/.git/worktrees/busy/modules\n' });
+    mockExistsSync.mockImplementation(
+      (p) => p === '/repo/.git/worktrees/busy/modules'
+    );
+    expect(await assessBranchRemoval('feature/busy')).toEqual({
+      refusal: null,
+      risks: ['submodules'],
+    });
+  });
+
+  // The whole status is read, and a checkout git cannot answer for is
+  // not clean: only force takes it.
+  it('reports unknown changes when git cannot read a checkout it lists', async () => {
+    answers({});
+    mockExec.mockImplementation(((command: string) => {
+      if (command.includes('git worktree list')) {
+        return Promise.resolve(
+          worktreeListPorcelain([{ branch: 'feature/busy' }])
+        );
+      }
+      if (command.includes('status --porcelain')) {
+        return Promise.reject(new Error('stdout maxBuffer length exceeded'));
+      }
+      return Promise.resolve(resolve(''));
+    }) as unknown as typeof exec);
+    expect(await assessBranchRemoval('feature/busy')).toEqual({
+      refusal: null,
+      risks: ['unknown changes'],
+    });
+  });
+
+  it('has no risks for a clean, pushed checkout', async () => {
+    answers({});
+    expect(await assessBranchRemoval('feature/busy')).toEqual({
+      refusal: null,
+      risks: [],
+    });
+  });
+});
+
 describe('canRemoveBranch', () => {
   it('should reject main as protected', async () => {
     expect(await canRemoveBranch('main')).toEqual({
@@ -549,6 +631,21 @@ describe('canRemoveBranch', () => {
     });
   });
 
+  // The checkout lookup and the unpushed check both ask the named
+  // repository, not whichever one the process happens to be in.
+  it('judges the branch in the repository it is given', async () => {
+    mockExec.mockResolvedValueOnce(
+      worktreeListPorcelain([{ branch: 'feature/done' }])
+    );
+    mockExec.mockResolvedValueOnce(resolve(''));
+    mockExec.mockResolvedValueOnce(resolve(''));
+    await canRemoveBranch('feature/done', { cwd: '/repo-b' });
+    const [list, , log] = mockExec.mock.calls;
+    expect(list?.[1]).toMatchObject({ cwd: '/repo-b' });
+    expect(log?.[0]).toContain('git log');
+    expect(log?.[1]).toMatchObject({ cwd: '/repo-b' });
+  });
+
   it('should return safe for clean, pushed branches', async () => {
     mockExec.mockResolvedValueOnce(
       worktreeListPorcelain([{ branch: 'feature/done' }])
@@ -591,13 +688,17 @@ describe('canRemoveBranch', () => {
       return Promise.resolve(resolve());
     });
 
-    expect(await canRemoveBranch('ci/perf-setup-sticky-disk', true)).toEqual({
+    expect(
+      await canRemoveBranch('ci/perf-setup-sticky-disk', {
+        confirmedMerged: true,
+      })
+    ).toEqual({
       safe: false,
       reason: 'uncommitted changes',
     });
     expect(mockExec).toHaveBeenCalledWith(
-      `git -C "${realDir}" status --porcelain`,
-      { encoding: 'utf8' }
+      `git -C "${realDir}" status --porcelain -z --untracked-files=all --ignore-submodules=none`,
+      { encoding: 'utf8', maxBuffer: Infinity }
     );
   });
 
@@ -621,7 +722,11 @@ describe('canRemoveBranch', () => {
       throw new Error(`ENOENT: ${p}`);
     }) as unknown as typeof readFileSync);
 
-    expect(await canRemoveBranch('ci/perf-setup-sticky-disk', true)).toEqual({
+    expect(
+      await canRemoveBranch('ci/perf-setup-sticky-disk', {
+        confirmedMerged: true,
+      })
+    ).toEqual({
       safe: false,
       reason: 'rebase in progress',
     });
@@ -638,15 +743,17 @@ describe('canRemoveBranch', () => {
   });
 
   it('should skip unpushed check when confirmedMerged is true', async () => {
-    // Only the worktree lookup + status check run (status clean), no git log call
     mockExec.mockResolvedValueOnce(
       worktreeListPorcelain([{ branch: 'feature/squash-merged' }])
     );
-    mockExec.mockResolvedValueOnce(resolve(''));
-    expect(await canRemoveBranch('feature/squash-merged', true)).toEqual({
+    mockExec.mockResolvedValue(resolve(''));
+    expect(
+      await canRemoveBranch('feature/squash-merged', { confirmedMerged: true })
+    ).toEqual({
       safe: true,
     });
-    expect(mockExec).toHaveBeenCalledTimes(2);
+    const commands = mockExec.mock.calls.map(([command]) => command);
+    expect(commands.some((c) => c.includes('git log'))).toBe(false);
   });
 
   it('should still reject uncommitted changes when confirmedMerged is true', async () => {
@@ -654,14 +761,16 @@ describe('canRemoveBranch', () => {
       worktreeListPorcelain([{ branch: 'feature/dirty-merged' }])
     );
     mockExec.mockResolvedValueOnce(resolve(' M src/file.ts\n'));
-    expect(await canRemoveBranch('feature/dirty-merged', true)).toEqual({
+    expect(
+      await canRemoveBranch('feature/dirty-merged', { confirmedMerged: true })
+    ).toEqual({
       safe: false,
       reason: 'uncommitted changes',
     });
   });
 
   it('should still reject protected branches when confirmedMerged is true', async () => {
-    expect(await canRemoveBranch('master', true)).toEqual({
+    expect(await canRemoveBranch('master', { confirmedMerged: true })).toEqual({
       safe: false,
       reason: 'protected branch',
     });
@@ -1098,60 +1207,81 @@ describe('getMainBranch', () => {
 });
 
 describe('fastForwardMainBranch', () => {
-  it('should use branch -f when HEAD is not on main branch', async () => {
+  const LOCAL_FF =
+    'git fetch --no-write-fetch-head . "refs/remotes/origin/master:refs/heads/master"';
+  const notAncestor = Object.assign(new Error('not an ancestor'), { code: 1 });
+
+  it('fast-forwards through a local fetch when HEAD is not on main', async () => {
     mockExec
       .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
-      .mockResolvedValueOnce(resolve()) // fetch
       .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
-      .mockResolvedValueOnce(resolve()); // branch -f
+      .mockRejectedValueOnce(notAncestor) // merge-base --is-ancestor
+      .mockResolvedValueOnce(resolve()); // local fetch
     expect(await fastForwardMainBranch()).toBe(true);
-    expect(mockExec).toHaveBeenCalledWith('git fetch origin master', {
-      encoding: 'utf8',
-    });
-    expect(mockExec).toHaveBeenCalledWith('git symbolic-ref --short HEAD', {
-      encoding: 'utf8',
-    });
-    expect(mockExec).toHaveBeenCalledWith(
-      'git branch -f master origin/master',
+    expect(mockExec).toHaveBeenLastCalledWith(LOCAL_FF, { encoding: 'utf8' });
+  });
+
+  it('uses merge --ff-only when HEAD is on main', async () => {
+    mockExec
+      .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
+      .mockResolvedValueOnce(resolve('master\n')) // symbolic-ref HEAD
+      .mockResolvedValueOnce(resolve()); // merge --ff-only
+    expect(await fastForwardMainBranch()).toBe(true);
+    expect(mockExec).toHaveBeenLastCalledWith(
+      'git merge --ff-only "origin/master"',
       { encoding: 'utf8' }
     );
   });
 
-  it('should use merge --ff-only when HEAD IS on main branch', async () => {
+  it('runs every command in the repository it is given', async () => {
     mockExec
       .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
-      .mockResolvedValueOnce(resolve()) // fetch
-      .mockResolvedValueOnce(resolve('master\n')) // symbolic-ref HEAD
-      .mockResolvedValueOnce(resolve()); // merge --ff-only
-    expect(await fastForwardMainBranch()).toBe(true);
-    expect(mockExec).toHaveBeenCalledWith('git merge --ff-only origin/master', {
-      encoding: 'utf8',
-    });
-  });
-
-  it('should return false when fetch fails', async () => {
-    mockExec
-      .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
-      .mockRejectedValueOnce(new Error('fetch failed'));
-    expect(await fastForwardMainBranch()).toBe(false);
-    expect(mockExec).toHaveBeenCalledTimes(2); // getMainBranch + fetch
-  });
-
-  it('should return false when branch update fails', async () => {
-    mockExec
-      .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
-      .mockResolvedValueOnce(resolve()) // fetch
       .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
-      .mockRejectedValueOnce(new Error('branch update failed'));
+      .mockRejectedValueOnce(notAncestor) // merge-base --is-ancestor
+      .mockResolvedValueOnce(resolve()); // local fetch
+    await fastForwardMainBranch('/repo-b');
+    expect(mockExec.mock.calls.map((call) => call[1])).toEqual(
+      Array(4).fill({ encoding: 'utf8', cwd: '/repo-b' })
+    );
+  });
+
+  it('succeeds without an update when main already contains origin', async () => {
+    mockExec
+      .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
+      .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
+      .mockResolvedValueOnce(resolve()); // merge-base --is-ancestor
+    expect(await fastForwardMainBranch()).toBe(true);
+    expect(mockExec).toHaveBeenCalledTimes(3);
+  });
+
+  it('creates no main when the repository has none', async () => {
+    mockExec
+      .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
+      .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
+      .mockRejectedValueOnce(
+        Object.assign(new Error('bad ref'), { code: 128 })
+      );
+    expect(await fastForwardMainBranch()).toBe(false);
+    expect(mockExec).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns false when git refuses the update', async () => {
+    mockExec
+      .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
+      .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
+      .mockRejectedValueOnce(notAncestor) // merge-base --is-ancestor
+      .mockRejectedValueOnce(new Error('non-fast-forward'));
     expect(await fastForwardMainBranch()).toBe(false);
   });
 
-  it('should return false when HEAD is detached and branch -f fails', async () => {
+  it('fast-forwards through a local fetch on a detached HEAD', async () => {
     mockExec
       .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
-      .mockResolvedValueOnce(resolve()) // fetch
-      .mockRejectedValueOnce(new Error('not a symbolic ref')); // symbolic-ref HEAD fails (detached)
-    expect(await fastForwardMainBranch()).toBe(false);
+      .mockRejectedValueOnce(new Error('not a symbolic ref')) // detached
+      .mockRejectedValueOnce(notAncestor) // merge-base --is-ancestor
+      .mockResolvedValueOnce(resolve()); // local fetch
+    expect(await fastForwardMainBranch()).toBe(true);
+    expect(mockExec).toHaveBeenLastCalledWith(LOCAL_FF, { encoding: 'utf8' });
   });
 });
 
@@ -1636,7 +1766,7 @@ describe('the machine seam (D5): remote-aware functions, and explicit failure fo
         code: 0,
       }));
       await expect(
-        canRemoveBranch('feature/auth', false, machine)
+        canRemoveBranch('feature/auth', { machine })
       ).rejects.toThrow(/does not support a remote machine/);
       expect(mockExec).not.toHaveBeenCalled();
     });
