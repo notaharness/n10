@@ -31,7 +31,6 @@ export function standingLabel(
   if (s.requirement === 'unknown') return null;
   const base = s.requirement === 'required' ? 'Required' : 'Optional';
   if (s.reason === 'policy') return `${base}, by policy`;
-  if (s.reason === 'manual') return `${base}, added by hand`;
   return base;
 }
 

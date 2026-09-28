@@ -25,10 +25,10 @@ import { asksForReview } from '@n10/vcs-core/types';
 
 export type ReviewerRequirement = 'required' | 'optional' | 'unknown';
 
-/** Why a reviewer is on the list: a policy or rule names them, they own
- *  code the pull request changes, or someone marked them required by
- *  hand. */
-export type RequirementReason = 'policy' | 'code-owner' | 'manual';
+/** Why a reviewer is on the list, where the provider states it: a
+ *  policy that applies names them, or they own code the pull request
+ *  changes. */
+export type RequirementReason = 'policy' | 'code-owner';
 
 export interface ReviewerStanding {
   kind: DetailReviewer['kind'];
@@ -56,9 +56,10 @@ function requirementOf(required: boolean | null): ReviewerRequirement {
 
 const sameId = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
-/** The rule that names this reviewer by id, and would have added them
- *  as they are listed: a blocking one as required, another as optional.
- *  One that no longer applies to the changes still names them. */
+/** The policy that lists this reviewer as they are, by the provider's
+ *  own evaluation: it applies to these changes, names them by id, and
+ *  adds them as they are listed, a blocking one as required and
+ *  another as optional. */
 function namedBy(
   reviewer: DetailReviewer,
   rule: ReviewRule | null
@@ -67,19 +68,25 @@ function namedBy(
   if (id == null || !rule) return undefined;
   return rule.named.find(
     (n) =>
+      n.applies === true &&
       n.ids.some((i) => sameId(i, id)) &&
       (reviewer.required == null || n.blocking === reviewer.required)
   );
 }
 
+/**
+ * Only a reason the provider states. A policy that no longer applies
+ * may or may not be what added someone, and a required reviewer no
+ * policy names may have been added by hand or by a policy since
+ * disabled: Azure's reviewer history says which, and until that is
+ * read no reason is given.
+ */
 function reasonOf(
   reviewer: DetailReviewer,
   rule: ReviewRule | null
 ): RequirementReason | null {
   if (reviewer.reason) return reviewer.reason;
-  if (namedBy(reviewer, rule)) return 'policy';
-  // Required, and named by no rule that was read: marked by hand.
-  return reviewer.required === true && rule ? 'manual' : null;
+  return namedBy(reviewer, rule) ? 'policy' : null;
 }
 
 export function standingOf(

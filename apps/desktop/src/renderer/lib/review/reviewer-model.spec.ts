@@ -39,9 +39,6 @@ describe('standingLabel', () => {
     expect(label({ requirement: 'required', reason: 'policy' })).toBe(
       'Required, by policy'
     );
-    expect(label({ requirement: 'required', reason: 'manual' })).toBe(
-      'Required, added by hand'
-    );
     expect(label({ requirement: 'required' })).toBe('Required');
     expect(label({ requirement: 'optional', reason: 'policy' })).toBe(
       'Optional, by policy'
@@ -95,10 +92,7 @@ describe('reviewerRows', () => {
   });
 
   it('says nothing more where every standing is known, and counts a partial list', () => {
-    const azure = requirements(
-      [standing({ requirement: 'required', reason: 'manual' })],
-      false
-    );
+    const azure = requirements([standing({ requirement: 'required' })], false);
     expect(reviewerRows(listed, azure, 'azure-devops').notes).toEqual([
       '1 of 12 reviewers shown.',
     ]);
