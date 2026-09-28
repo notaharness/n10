@@ -18,6 +18,7 @@ import { PrDescription } from './overview/PrDescription.js';
 import { PrIdentity } from './overview/PrIdentity.js';
 import { PrReadiness } from './overview/PrReadiness.js';
 import { PrReviewers } from './overview/PrReviewers.js';
+import { cn } from '../../lib/utils.js';
 import { PrActions } from './PrHeader.js';
 
 /**
@@ -98,7 +99,7 @@ export function OverviewPane({
 
   return (
     <div ref={pane} className="@container h-full overflow-auto">
-      {nested.showing ? (
+      {nested.showing && (
         <PrChecks
           read={read}
           head={head}
@@ -108,45 +109,47 @@ export function OverviewPane({
           onBack={nested.close}
           actions={<PrActions pr={pr} />}
         />
-      ) : (
-        <div className={LAYOUT}>
-          <PrIdentity
-            pr={pr}
-            actions={<PrActions pr={pr} />}
-            className="[grid-area:head]"
-          />
-          <PrAttention
-            step={nextStep(pr, role, repo.viewer)}
-            onAction={onAction}
-            className="[grid-area:next]"
-          />
-          <div className="[grid-area:people]">
-            <PrReviewers reviewers={pr.reviewers ?? []} viewer={repo.viewer} />
-          </div>
-          <div className="[grid-area:ready]">
-            <PrReadiness
-              read={read}
-              provider={repo.providerId}
-              head={head}
-              reading={reading}
-              retrying={retrying}
-              onRefresh={retry}
-              onViewChecks={nested.open}
-              checksRef={checksButton}
-            />
-          </div>
-          <div className="min-w-0 [grid-area:main]">
-            <PrDescription pr={pr} />
-            {ref && (
-              <PrActivity
-                key={pullRequestKey(ref)}
-                prRef={ref}
-                onOpenThread={onOpenThread}
-              />
-            )}
-          </div>
-        </div>
       )}
+      {/* Kept mounted under the check list: the activity's filter,
+          search, held updates and resolved threads stay as the reader
+          left them. */}
+      <div className={cn(LAYOUT, nested.showing && 'hidden')}>
+        <PrIdentity
+          pr={pr}
+          actions={<PrActions pr={pr} />}
+          className="[grid-area:head]"
+        />
+        <PrAttention
+          step={nextStep(pr, role, repo.viewer)}
+          onAction={onAction}
+          className="[grid-area:next]"
+        />
+        <div className="[grid-area:people]">
+          <PrReviewers reviewers={pr.reviewers ?? []} viewer={repo.viewer} />
+        </div>
+        <div className="[grid-area:ready]">
+          <PrReadiness
+            read={read}
+            provider={repo.providerId}
+            head={head}
+            reading={reading}
+            retrying={retrying}
+            onRefresh={retry}
+            onViewChecks={nested.open}
+            checksRef={checksButton}
+          />
+        </div>
+        <div className="min-w-0 [grid-area:main]">
+          <PrDescription pr={pr} />
+          {ref && (
+            <PrActivity
+              key={pullRequestKey(ref)}
+              prRef={ref}
+              onOpenThread={onOpenThread}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

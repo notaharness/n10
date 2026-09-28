@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   PullRequestConversation,
   PullRequestRef,
@@ -18,21 +11,28 @@ import {
   filterCounts,
   groupActivity,
   isResolved,
+  pruneHidden,
   resolvedIds,
   rowContaining,
   selectActivity,
   splitNew,
   withoutHidden,
   withoutResolved,
+  type ActivityEntry,
   type ActivityFilter,
 } from '../../../lib/review/activity-model.js';
 import { useRepo } from '../../../lib/repo-context.js';
 import { Skeleton } from '../../ui/skeleton.js';
-import { Switch } from '../../ui/switch.js';
 import { ToggleGroup, ToggleGroupItem } from '../../ui/toggle-group.js';
 import { ReadFailure, StaleNotice } from '../ReadNotice.js';
 import { ActivityRowView } from './ActivityEntries.js';
-import { EmptyActivity, NewUpdates, SearchBox } from './ActivityControls.js';
+import {
+  EmptyActivity,
+  NewUpdates,
+  SearchBox,
+  ShowResolved,
+} from './ActivityControls.js';
+import { focusAfter } from '../../../lib/focus.js';
 import { CoverageNotice } from './CoverageNotice.js';
 import { NewSince } from './new-since.js';
 
@@ -169,8 +169,12 @@ function Activity({
   // does not fall back to the page when the button goes.
   const reveal = useRef<string | null>(null);
 
-  const visible = showResolved ? shown : withoutHidden(shown, hidden);
+  const kept = pruneHidden(hidden, shown);
+  if (kept !== hidden) setHidden(kept);
+  const visible = showResolved ? shown : withoutHidden(shown, kept);
+  const out = outOfView(shown, visible);
   const resolvedCount = shown.filter(isResolved).length;
+  const switchRef = useRef<HTMLButtonElement>(null);
   const showOrHide = (on: boolean) => {
     if (!on) setHidden(resolvedIds(shown));
     setShowResolved(on);
@@ -222,23 +226,31 @@ function Activity({
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        <ShowResolved
-          checked={showResolved}
-          count={resolvedCount}
-          onChange={showOrHide}
-        />
+        {(resolvedCount > 0 || showResolved) && (
+          <ShowResolved
+            ref={switchRef}
+            checked={showResolved}
+            // What the switch changes: the threads it would show, or
+            // every resolved one it would hide.
+            count={showResolved ? resolvedCount : out.length}
+            onChange={showOrHide}
+          />
+        )}
         <SearchBox query={query} onChange={setQuery} />
       </div>
       <CoverageNotice coverage={conversation.coverage} />
       {rows.length === 0 ? (
         <EmptyActivity
           narrowed={narrowed}
-          hiddenResolved={shown.length - visible.length}
+          hiddenMatches={selectActivity(out, filter, query, viewer).length}
           onClear={() => {
             setFilter('all');
             setQuery('');
           }}
-          onShowResolved={() => showOrHide(true)}
+          onShowResolved={() => {
+            showOrHide(true);
+            focusAfter(() => switchRef.current);
+          }}
         />
       ) : (
         <ol ref={list} className="space-y-3">
@@ -269,26 +281,13 @@ function Activity({
   );
 }
 
-/** Resolved threads are out of view until this is on. */
-function ShowResolved({
-  checked,
-  count,
-  onChange,
-}: {
-  checked: boolean;
-  count: number;
-  onChange: (on: boolean) => void;
-}) {
-  const id = useId();
-  return (
-    <div className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-      <Switch id={id} checked={checked} onCheckedChange={onChange} />
-      <label htmlFor={id} className="flex items-center gap-1">
-        Show resolved
-        <span className="tabular-nums opacity-70">{count}</span>
-      </label>
-    </div>
-  );
+/** The entries the resolved switch keeps out of view. */
+function outOfView(
+  shown: readonly ActivityEntry[],
+  visible: readonly ActivityEntry[]
+): ActivityEntry[] {
+  const inView = new Set(visible);
+  return shown.filter((e) => !inView.has(e));
 }
 
 function commentIds(c: PullRequestConversation): string[] {

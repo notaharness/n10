@@ -10,6 +10,7 @@ import {
   focusTerminal,
   launchAgentFromRail,
   openPalette,
+  showOverview,
   sidebarRow,
   tabs,
   visibleText,
@@ -216,7 +217,7 @@ test.describe('An agent command that does not exist', () => {
  * A pull request's reads fail one at a time, and each section says so
  * for itself. The lie these guard against is a failure rendered as a
  * successful empty answer: "no description", "no changes" and an
- * absent comment list all look like facts about the pull request, and
+ * diff without its threads all look like facts about the pull request, and
  * a reviewer acts on them.
  */
 test.describe('Pull request reads that fail', () => {
@@ -280,7 +281,7 @@ test.describe('Pull request reads that fail', () => {
 
   async function openOverview(page: Page, title: string) {
     await openPr(page, title);
-    await page.getByRole('button', { name: 'Back to review' }).click();
+    await showOverview(page);
   }
 
   const setFailing = (

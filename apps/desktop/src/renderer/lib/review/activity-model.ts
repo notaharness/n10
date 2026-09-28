@@ -268,6 +268,22 @@ export function resolvedIds(entries: readonly ActivityEntry[]): Set<string> {
  * One resolved while in view stays with its new status, so the list
  * never shifts under the reader; one reopened comes back.
  */
+/**
+ * `hidden` without the threads no longer resolved: one reopened comes
+ * back, and resolved again while in view, it stays there. `hidden`
+ * itself when nothing changes.
+ */
+export function pruneHidden(
+  hidden: ReadonlySet<string>,
+  entries: readonly ActivityEntry[]
+): ReadonlySet<string> {
+  const reopened = entries.filter((e) => hidden.has(e.id) && !isResolved(e));
+  if (reopened.length === 0) return hidden;
+  const next = new Set(hidden);
+  for (const e of reopened) next.delete(e.id);
+  return next;
+}
+
 export function withoutHidden(
   entries: readonly ActivityEntry[],
   hidden: ReadonlySet<string>

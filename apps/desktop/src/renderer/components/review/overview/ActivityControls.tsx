@@ -1,7 +1,9 @@
 import { ArrowDownIcon, SearchIcon, XIcon } from 'lucide-react';
+import { useId, type Ref } from 'react';
 import { cn } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { Input } from '../../ui/input.js';
+import { Switch } from '../../ui/switch.js';
 
 /** The activity's search, its empty states and its new-updates button. */
 
@@ -43,23 +45,49 @@ export function SearchBox({
   );
 }
 
+/** Resolved threads are out of view until this is on. */
+export function ShowResolved({
+  ref,
+  checked,
+  count,
+  onChange,
+}: {
+  ref?: Ref<HTMLButtonElement>;
+  checked: boolean;
+  count: number;
+  onChange: (on: boolean) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Switch ref={ref} id={id} checked={checked} onCheckedChange={onChange} />
+      <label htmlFor={id} className="flex items-center gap-1">
+        Show resolved
+        <span className="tabular-nums opacity-70">{count}</span>
+      </label>
+    </div>
+  );
+}
+
 export function EmptyActivity({
   narrowed,
-  hiddenResolved,
+  hiddenMatches,
   onClear,
   onShowResolved,
 }: {
   narrowed: boolean;
-  /** Resolved threads out of view; with nothing else, they are all
-   *  there is. */
-  hiddenResolved: number;
+  /** Resolved threads out of view that the filter and search would
+   *  show: all there is to show, when nothing else is. */
+  hiddenMatches: number;
   onClear: () => void;
   onShowResolved: () => void;
 }) {
-  if (!narrowed && hiddenResolved > 0) {
+  if (hiddenMatches > 0) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
-        Every thread is resolved.
+        {narrowed
+          ? `Only resolved threads match (${hiddenMatches}).`
+          : 'Every thread is resolved.'}
         <Button
           variant="link"
           size="sm"

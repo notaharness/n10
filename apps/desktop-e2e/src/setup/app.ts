@@ -165,6 +165,24 @@ export async function dismissSessionMenu(page: Page): Promise<void> {
 }
 
 /**
+ * Bring a pull request tab's Overview into view the way a reader does:
+ * the rail has no Overview entry, so Back, up from whichever pane
+ * shows, until the Overview's own heading does. At most two steps: the
+ * terminal, plan and walkthrough go up to the review pane last shown,
+ * the changes to the Overview.
+ */
+export async function showOverview(page: Page): Promise<void> {
+  const heading = page.locator('h1[data-overview-heading]');
+  const back = page.getByRole('button', { name: 'Back to review' });
+  for (let step = 0; step < 3; step++) {
+    await expect(heading.or(back).first()).toBeVisible({ timeout: 30_000 });
+    if (await heading.isVisible()) return;
+    await back.click();
+  }
+  await expect(heading).toBeVisible();
+}
+
+/**
  * Launch the tab's agent the way a user does: the rail's Launch button
  * opens the session menu, and its session row starts the default
  * agent. Returns once the menu is gone — follow with an assertion on

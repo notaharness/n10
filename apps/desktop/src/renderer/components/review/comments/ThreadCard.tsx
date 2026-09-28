@@ -28,7 +28,8 @@ import { useComposerRefresh } from './use-composer-refresh.js';
  * distinct messages (own header, divider, replies tinted + indented)
  * inside one bordered card with a summary header and a reply footer.
  * Resolved threads start collapsed to the header; `focused` (thread
- * navigator / comment list) expands and outlines the card.
+ * navigator, the unresolved count, the Overview's activity) expands
+ * and outlines the card.
  */
 export function ThreadCard({
   thread,

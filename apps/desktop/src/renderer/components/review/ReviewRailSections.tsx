@@ -56,20 +56,21 @@ export function AgentSection({
       className={cn(
         'flex items-stretch overflow-hidden rounded-md border transition-colors',
         agentActive
-          ? 'border-primary/60 bg-primary/10'
-          : 'border-border bg-background hover:border-foreground/25'
+          ? 'border-primary bg-primary/10'
+          : 'border-border hover:bg-sidebar-accent'
       )}
     >
       <button
         type="button"
         onClick={onSelectAgent}
+        aria-current={agentActive ? 'true' : undefined}
         className="group flex min-w-0 flex-1 items-center gap-3 px-2.5 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
       >
         <span className="relative flex size-9 shrink-0 items-center justify-center rounded-md bg-success/15 text-success">
           <BotIcon className="size-5" />
           <span className="absolute -right-0.5 -bottom-0.5 flex size-2.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
-            <span className="relative inline-flex size-2.5 rounded-full bg-success ring-2 ring-background" />
+            <span className="absolute inline-flex size-full rounded-full bg-success opacity-60 motion-safe:animate-ping" />
+            <span className="relative inline-flex size-2.5 rounded-full bg-success ring-2 ring-sidebar" />
           </span>
         </span>
         <span className="min-w-0 flex-1">

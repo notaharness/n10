@@ -25,6 +25,7 @@ const GITHUB: FakeGitHub = {
       headRefName: BRANCH,
       author: 'alex',
       body: 'Cancelled requests leak their timer.',
+      checks: [{ name: 'build', state: 'SUCCESS', required: true }],
       ...reviewConversation(),
     },
   ],
@@ -128,11 +129,12 @@ test.describe('Pull request activity', () => {
     const activity = await openOverview(page);
     const filters = activity.getByRole('radiogroup', { name: 'Show' });
 
+    // Shown or not, a resolved thread is never Open.
+    await showResolved(activity).click();
     await filters.getByRole('radio', { name: /Open/ }).click();
     await expect(activity.locator('[data-thread-id="T-resolved"]')).toHaveCount(
       0
     );
-    await showResolved(activity).click();
     await filters.getByRole('radio', { name: /^All/ }).click();
     await expect(
       activity.locator('[data-thread-id="T-resolved"]')
@@ -166,6 +168,31 @@ test.describe('Pull request activity', () => {
     // Unfolding moves focus to the first reply it shows.
     await long.getByRole('button', { name: 'Show 6 more replies' }).click();
     await expect(long.locator(':focus')).toContainText('Discussion 2.');
+  });
+
+  test('keeps its filter, search and resolved threads across the check list', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    const activity = await openOverview(page);
+    await showResolved(activity).click();
+    const search = activity.getByRole('searchbox', { name: 'Search activity' });
+    await search.fill('name this');
+    await expect(
+      activity.locator('[data-thread-id="T-resolved"]')
+    ).toBeVisible();
+
+    await page
+      .getByRole('region', { name: 'Completion' })
+      .getByRole('button', { name: /View checks/ })
+      .click();
+    await page.getByRole('button', { name: 'Back to the Overview' }).click();
+
+    await expect(showResolved(activity)).toBeChecked();
+    await expect(search).toHaveValue('name this');
+    await expect(
+      activity.locator('[data-thread-id="T-resolved"]')
+    ).toBeVisible();
   });
 
   test('opens a thread in the diff at its place', async ({ desktop }) => {

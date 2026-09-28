@@ -465,13 +465,17 @@ test.describe('Pull request Overview', () => {
     await expect(title).toBeFocused();
 
     // From the Overview to the terminal: Back goes to the Overview, the
-    // last review pane shown, which has no header bar.
-    await page.getByRole('button', { name: /^Agent/ }).click();
+    // last review pane shown, which has no header bar. The Agent card
+    // says it is the pane showing only while its terminal is.
+    const agent = page.getByRole('button', { name: /^Agent/ });
+    await agent.click();
     await agentReady(page);
+    await expect(agent).toHaveAttribute('aria-current', 'true');
     await pressBack();
     await expect(title).toBeVisible();
     await expect(title).toBeFocused();
     await expect(prHeader(page)).toHaveCount(0);
+    await expect(agent).not.toHaveAttribute('aria-current');
 
     // The Overview showing its check list: Back returns to the list, and
     // the keyboard to its heading.
@@ -479,7 +483,7 @@ test.describe('Pull request Overview', () => {
       .getByRole('region', { name: 'Completion' })
       .getByRole('button', { name: /View checks/ })
       .click();
-    await page.getByRole('button', { name: /^Agent/ }).click();
+    await agent.click();
     await agentReady(page);
     await pressBack();
     await expect(

@@ -49,8 +49,8 @@ export function OpenInEditorButton({ branch }: { branch: string }) {
   );
 }
 
-/** The unresolved-thread count, which opens the rail's comments at the
- *  first of them. */
+/** The unresolved-thread count, which opens the diff at the first of
+ *  them. */
 function UnresolvedButton({
   count,
   onClick,

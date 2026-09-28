@@ -214,8 +214,8 @@ rail sits 40 px lower there than on the Overview: beside the rail, the bar would
 lose the rail's width and its title or its details. Every other pane's bar has
 "← Review", which goes up, never back through history: from the changes to the
 Overview, and from the terminal, plan or walkthrough to the review pane last
-shown (`backTarget`). The Overview is where a pull request opens and where Back
-leads, so the rail lists neither it nor the comments: the conversation is the
+shown (`backTarget`). The Overview is the top of the review, where Back leads,
+so the rail lists neither it nor the comments: the conversation is the
 Overview's, below the description, and the threads are the diff's. Its context
 column leads with the reviewers, then completion. Below 720 px of workspace width
 the rail folds with its own collapse control, and it comes back once there is

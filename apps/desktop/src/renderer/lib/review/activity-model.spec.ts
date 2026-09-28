@@ -13,6 +13,7 @@ import {
   groupActivity,
   isResolved,
   matchingComments,
+  pruneHidden,
   resolvedIds,
   rowContaining,
   selectActivity,
@@ -338,6 +339,23 @@ describe('selectActivity', () => {
     expect(
       withoutHidden(entries, new Set(['open'])).map((e) => e.id)
     ).toContain('open');
+  });
+
+  it('forgets a hidden thread once it is reopened', () => {
+    const hidden = resolvedIds(entries);
+    expect(pruneHidden(hidden, entries)).toBe(hidden);
+    const reopened = entries.map((e) =>
+      e.kind === 'thread' && e.id === 'done'
+        ? {
+            ...e,
+            thread: {
+              ...e.thread,
+              status: { ...e.thread.status, resolved: false },
+            },
+          }
+        : e
+    );
+    expect([...pruneHidden(hidden, reopened)]).toEqual([]);
   });
 
   it('hides resolved threads, and only those', () => {

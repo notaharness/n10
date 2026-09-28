@@ -30,7 +30,7 @@ export function CollapsedRail({ onShow }: { onShow: () => void }) {
 
 /**
  * The review rail: the agent, the review and plan when they have
- * something, and the files. The Overview is where a pull request opens
+ * something, and the files. The Overview is the top of the review
  * and where every Back leads, and it carries the conversation, so the
  * rail lists neither.
  */
