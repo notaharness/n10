@@ -54,7 +54,7 @@ vi.mock('./services/worktrees.js', () =>
     'listAllBranches',
     'createWorktree',
     'removeWorktree',
-    'canRemoveBranch',
+    'checkWorktreeRemoval',
     'openInEditor',
     'getWorktreeDiffText',
   ])
@@ -170,8 +170,20 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
   ['listBranches', [], 'worktrees.listBranches'],
   ['listAllBranches', [], 'worktrees.listAllBranches'],
   ['createWorktree', ['feature'], 'worktrees.createWorktree'],
-  ['removeWorktree', ['feature', true], 'worktrees.removeWorktree'],
-  ['canRemoveBranch', ['feature'], 'worktrees.canRemoveBranch'],
+  [
+    'removeWorktree',
+    [
+      'feature',
+      {
+        verdict: 'clear',
+        tip: 'abc123',
+        repo: '/repo/.git',
+        checkout: '/repo/wt',
+      },
+    ],
+    'worktrees.removeWorktree',
+  ],
+  ['checkWorktreeRemoval', ['feature'], 'worktrees.checkWorktreeRemoval'],
   ['openInEditor', ['feature'], 'worktrees.openInEditor'],
 
   ['fetchPullRequests', [], 'reviews.fetchPullRequests'],

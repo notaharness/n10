@@ -67,15 +67,13 @@ export function MachineMenu({
       <DropdownMenuContent align="end">
         {member && (
           <DropdownMenuItem disabled={disabled} onSelect={onRename}>
-            Rename here…
+            Rename locally…
           </DropdownMenuItem>
         )}
         {member && (
           <DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>
-              Access this machine allows from {machine.label}
-            </DropdownMenuLabel>
+            <DropdownMenuLabel>{machine.label}’s access here</DropdownMenuLabel>
             {GRANTS.map((g) => (
               <DropdownMenuCheckboxItem
                 key={g.grant}

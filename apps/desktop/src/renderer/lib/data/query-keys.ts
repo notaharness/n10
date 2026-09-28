@@ -101,6 +101,35 @@ const CROSS_REPO_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Keys whose answers came from the pull request provider, read as the
+ * configured account. A change of provider, repository or account makes
+ * every one of them someone else's; git-side and local answers (diffs,
+ * branches, sessions, settings) are unaffected and stay.
+ */
+const PROVIDER_KEYS: ReadonlySet<string> = new Set([
+  'sidebar',
+  'sync',
+  'threads',
+  'pr-description',
+  'pr-snapshot',
+  'comment-image',
+  'drafts',
+  'review-viewer',
+]);
+
+/**
+ * Drop what the provider answered for the open repository, which now
+ * names another provider, repository or account. Narrower than a
+ * repository switch: the page that made the change — Settings — keeps
+ * its own answer and stays on screen.
+ */
+export function resetProviderScopedCache(qc: QueryClient): void {
+  qc.removeQueries({
+    predicate: (query) => PROVIDER_KEYS.has(String(query.queryKey[0])),
+  });
+}
+
+/**
  * Drop everything cached for the repository being left.
  *
  * Every other key is repo-scoped — sidebar, diffs, threads, settings —

@@ -1,0 +1,62 @@
+---
+title: Orchestra
+description: Let one coding agent hand work to other coding agents, each in its own tmux session.
+---
+
+Orchestra lets one coding agent delegate work to other coding agents. The
+**orchestrator** splits a task into branch-sized pieces and supervises them.
+Each **player** is an agent in its own tmux session and Git worktree, and
+reports its progress, questions and results back to the orchestrator. A
+**dir player** works in an existing directory instead, with no branch or
+worktree, for reviews or work outside a repository.
+
+Orchestra is two agent skills. Claude Code and Codex can be the
+orchestrator; players can also be Gemini, Copilot or OpenCode.
+
+The source and full documentation are at
+[github.com/notaharness/plugins](https://github.com/notaharness/plugins/tree/main/orchestra).
+
+## Install
+
+Orchestra needs Linux or macOS with Bash, Git, tmux 3.x and `python3`, and
+the authenticated CLI of each agent you run as a player: `claude`, `codex`,
+`gemini`, `copilot` or `opencode`. A
+Claude Code orchestrator also needs Claude Code 2.1.224 or later and `socat`
+or OpenBSD `nc`; without them, run it inside tmux. The
+[README](https://github.com/notaharness/plugins/tree/main/orchestra#requirements)
+has the full list.
+
+In Claude Code:
+
+```text
+/plugin marketplace add notaharness/plugins
+/plugin install orchestra@notaharness
+```
+
+For Codex, install both skills with Node.js and npm. Leave out
+`--agent codex` to pick other agents from a list.
+
+```sh
+npx skills@latest add notaharness/plugins --global --agent codex --skill orchestrator player
+```
+
+## Use it
+
+Start the orchestrator with your task: `/orchestra:orchestrator` followed by
+the task in Claude Code, or `$orchestrator` in Codex. It spawns players as it
+needs them and tells you when a decision is yours to make. You can attach to
+any player's tmux session to watch it or talk to it directly.
+
+## With n10
+
+n10 lists Orchestra's worktree players next to its own worktrees, so you can
+follow and review their work in n10. It doesn't list dir players.
+
+With [Beam](/docs/beam), `--machine NAME` runs a player on another of your
+machines. That machine needs Orchestra installed at the same path under
+`$HOME`, the repository at an absolute or `~/` path, tmux, Git and the
+player's agent CLI; the README's
+[Other machines](https://github.com/notaharness/plugins/tree/main/orchestra#other-machines)
+section has the details. n10 Desktop delivers the player's reports to a
+Claude or tmux orchestrator on this machine. For a Codex orchestrator, run
+Orchestra's `relay.sh` instead. See the [Fleet guide](/docs/guides/fleet).
