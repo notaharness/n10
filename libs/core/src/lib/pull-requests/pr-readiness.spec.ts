@@ -4,8 +4,16 @@ import type {
   MergeState,
   PullRequestCheck,
   ReadOutcome,
+  ReviewRule,
 } from '@n10/vcs-core';
 import { evaluateReadiness, type ReadinessInputs } from './pr-readiness.js';
+
+const NO_RULE: ReviewRule = {
+  approvals: 0,
+  codeOwners: false,
+  named: [],
+  approvalsMet: null,
+};
 
 /** Every blocker alone and together, as O9 asks. */
 
@@ -48,6 +56,7 @@ const RULES: ReadOutcome<BranchRules> = {
   value: {
     requiredChecks: [{ name: 'test', app: null }],
     conversationResolution: false,
+    reviews: NO_RULE,
   },
 };
 
@@ -141,7 +150,11 @@ describe('evaluateReadiness', () => {
         merge: { ...CLEAN, blocked: true, native: 'BLOCKED' },
         rules: {
           state: 'read',
-          value: { requiredChecks: [], conversationResolution: true },
+          value: {
+            requiredChecks: [],
+            conversationResolution: true,
+            reviews: NO_RULE,
+          },
         },
       })
     );
@@ -155,7 +168,11 @@ describe('evaluateReadiness', () => {
         unresolvedThreads: 1,
         rules: {
           state: 'read',
-          value: { requiredChecks: [], conversationResolution: true },
+          value: {
+            requiredChecks: [],
+            conversationResolution: true,
+            reviews: NO_RULE,
+          },
         },
       })
     );
@@ -173,7 +190,11 @@ describe('evaluateReadiness', () => {
     // A rule does, but GitHub says it is clear: the count is moot.
     const ruled: ReadOutcome<BranchRules> = {
       state: 'read',
-      value: { requiredChecks: [], conversationResolution: true },
+      value: {
+        requiredChecks: [],
+        conversationResolution: true,
+        reviews: NO_RULE,
+      },
     };
     expect(
       evaluateReadiness(inputs({ unresolvedThreads: null, rules: ruled }))
@@ -421,7 +442,11 @@ describe('evaluateReadiness', () => {
         unresolvedThreads: 2,
         rules: {
           state: 'read',
-          value: { requiredChecks: [], conversationResolution: true },
+          value: {
+            requiredChecks: [],
+            conversationResolution: true,
+            reviews: NO_RULE,
+          },
         },
       })
     );
@@ -436,7 +461,11 @@ describe('evaluateReadiness', () => {
         unresolvedThreads: 2,
         rules: {
           state: 'read',
-          value: { requiredChecks: [], conversationResolution: true },
+          value: {
+            requiredChecks: [],
+            conversationResolution: true,
+            reviews: NO_RULE,
+          },
         },
       })
     );
@@ -502,7 +531,11 @@ describe('evaluateReadiness', () => {
         unresolvedThreads: 3,
         rules: {
           state: 'read',
-          value: { requiredChecks: [], conversationResolution: true },
+          value: {
+            requiredChecks: [],
+            conversationResolution: true,
+            reviews: NO_RULE,
+          },
         },
       })
     );

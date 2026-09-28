@@ -28,7 +28,11 @@ export type {
   PullRequestReadiness,
   ReadinessAspect,
   ReadinessItem,
+  RequirementReason,
   Resolver,
+  ReviewerRequirement,
+  ReviewerStanding,
+  ReviewRequirements,
   SnapshotRequest,
 } from '@n10/core';
 export type {

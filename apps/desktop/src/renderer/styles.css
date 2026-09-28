@@ -281,3 +281,132 @@
 .wterm.theme-light {
   --term-bg: var(--term-bg-app);
 }
+
+/* ── Fleet first-run illustration ──────────────────────────────────
+ * The website's beam mesh (apps/website/src/app/global.css), trimmed to
+ * two machines and one beam. Box faces are three tones of the theme's
+ * surface, lit from the top left; the beam keeps the mark's sage.
+ */
+.fleet-art {
+  --fleet-art-top: var(--background);
+  --fleet-art-left: color-mix(in srgb, var(--foreground) 8%, var(--background));
+  --fleet-art-right: color-mix(
+    in srgb,
+    var(--foreground) 16%,
+    var(--background)
+  );
+  --fleet-art-line: color-mix(in srgb, var(--foreground) 35%, transparent);
+  --fleet-art-inset: color-mix(in srgb, var(--foreground) 18%, transparent);
+  --fleet-art-shadow: rgb(0 0 0 / 0.18);
+  --fleet-art-sage: #7d9168;
+  --fleet-art-sand: #b3902f;
+  --fleet-art-play: running;
+}
+.dark .fleet-art {
+  --fleet-art-top: color-mix(in srgb, var(--foreground) 22%, var(--sidebar));
+  --fleet-art-left: color-mix(in srgb, var(--foreground) 13%, var(--sidebar));
+  --fleet-art-right: color-mix(in srgb, var(--foreground) 6%, var(--sidebar));
+  --fleet-art-line: color-mix(in srgb, var(--foreground) 22%, transparent);
+  --fleet-art-inset: rgb(0 0 0 / 0.4);
+  --fleet-art-shadow: rgb(0 0 0 / 0.55);
+  --fleet-art-sage: #9caf88;
+  --fleet-art-sand: #e3c16f;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fleet-art {
+    --fleet-art-play: paused;
+  }
+}
+.fleet-art-face {
+  stroke: var(--fleet-art-line);
+  stroke-width: 0.75;
+  stroke-linejoin: round;
+}
+.fleet-art-face--top {
+  fill: var(--fleet-art-top);
+}
+.fleet-art-face--left {
+  fill: var(--fleet-art-left);
+}
+.fleet-art-face--right {
+  fill: var(--fleet-art-right);
+}
+.fleet-art-shadow {
+  fill: var(--fleet-art-shadow);
+  filter: blur(3px);
+}
+.fleet-art-inset {
+  fill: var(--fleet-art-inset);
+}
+.fleet-art-screen {
+  fill: var(--background);
+  stroke: var(--fleet-art-line);
+  stroke-width: 0.5;
+}
+.dark .fleet-art-screen {
+  fill: color-mix(in srgb, black 55%, var(--sidebar));
+}
+.fleet-art-code {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke: var(--fleet-art-inset);
+}
+.fleet-art-code--sage {
+  stroke: var(--fleet-art-sage);
+}
+.fleet-art-code--sand {
+  stroke: var(--fleet-art-sand);
+}
+.fleet-art-led {
+  fill: var(--fleet-art-sage);
+  animation: fleet-art-blink 2.8s steps(1, end) infinite;
+  animation-play-state: var(--fleet-art-play);
+}
+@keyframes fleet-art-blink {
+  60% {
+    opacity: 0.25;
+  }
+  75% {
+    opacity: 1;
+  }
+}
+/* A beam is two thin translucent tracks, one per direction: long
+ * packets out on one, short ones back on the other. The dash pattern
+ * repeats every quarter of the (normalised, 100-long) path, so sliding
+ * it by one whole path length loops without a seam. */
+.fleet-art-ribbon {
+  fill: none;
+  stroke: var(--fleet-art-sage);
+  stroke-width: 2.5;
+  opacity: 0.42;
+}
+.fleet-art-packet {
+  fill: none;
+  stroke: var(--fleet-art-sage);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 4 21;
+  filter: drop-shadow(0 0 2px var(--fleet-art-sage));
+  animation: fleet-art-flow 3.2s linear infinite;
+  animation-play-state: var(--fleet-art-play);
+}
+.fleet-art-packet--back {
+  stroke-dasharray: 1.5 23.5;
+  stroke-dashoffset: 12;
+  animation-name: fleet-art-flow-back;
+  animation-duration: 4.32s;
+}
+.dark .fleet-art-packet {
+  filter: drop-shadow(0 0 3px var(--fleet-art-sage));
+}
+@keyframes fleet-art-flow {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+@keyframes fleet-art-flow-back {
+  to {
+    stroke-dashoffset: 112;
+  }
+}

@@ -256,11 +256,34 @@ arrives or hides them again: a thread resolved while in view stays there with
 its new status, since the list never moves under the reader. A reopened thread
 leaves the hidden set (`pruneHidden`), so resolved again, it stays in view.
 
-Completion says "Waiting for your review" where the provider asks the viewer for
-a review that would count (`asksViewer`). Readiness knows only that a review is
-required, not whose would satisfy it: GitHub code owners and Azure DevOps
-required reviewers are not on the list row, so an optional reviewer or a
-non-owner who is asked is still named.
+Who must review is said only in the providers' own terms
+(`pr-review-requirements.ts`). Azure DevOps marks each reviewer required or
+optional, and its required-reviewer policies name identities. A reviewer is
+listed by policy only where a policy that applies to these changes names them
+and adds them as they are listed, required by a blocking one or optional by
+another: Azure lists them because of that policy now. Anything else would be
+reconstructed from overlapping ids. A policy that no longer applies may or may
+not be what added someone, and a required reviewer no policy names may have
+been added by hand or by a policy since disabled, so neither gets a reason.
+Azure records who added each reviewer in the pull request's `ReviewersUpdate`
+history threads, which the conversation read already fetches; reading the
+reason from there is a follow-up. GitHub marks no one:
+its rules ask for a number of approvals, for code owners and for teams by id,
+and a request says only whether it went to a code owner. A GitHub reviewer's
+requirement is therefore unknown, never inferred from their being asked, and
+the Overview says GitHub does not mark reviewers. The rule itself sits under
+Completion's Reviews row, one requirement a line; GitHub's is the strictest of
+classic protection, as enforced on this account, and every rule set.
+
+Completion says "Waiting for your review" where the provider asks the viewer
+for a review that would count (`asksViewer`). The checks read also reads the
+detail for this: where it names the viewer, an optional reviewer's approval
+counts only while a rule that counts anyone's is not met (Azure's minimum
+reviewers, by its own evaluation), or while a required group has not approved.
+Group membership is not read, so an optional viewer is kept for any waiting
+group. Where the detail or the rules were not read, the request stands. On Azure the
+detail shares the checks read's cached requests; on GitHub it adds the detail
+query to each checks read.
 
 The checks read (`getPullRequestChecks`) takes readiness from the provider's own
 verdict, GitHub's `mergeStateStatus`, and explains it with the provider's facts:
