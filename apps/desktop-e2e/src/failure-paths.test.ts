@@ -10,6 +10,7 @@ import {
   focusTerminal,
   launchAgentFromRail,
   openPalette,
+  showOverview,
   sidebarRow,
   tabs,
   visibleText,
@@ -216,7 +217,7 @@ test.describe('An agent command that does not exist', () => {
  * A pull request's reads fail one at a time, and each section says so
  * for itself. The lie these guard against is a failure rendered as a
  * successful empty answer: "no description", "no changes" and an
- * absent comment list all look like facts about the pull request, and
+ * diff without its threads all look like facts about the pull request, and
  * a reviewer acts on them.
  */
 test.describe('Pull request reads that fail', () => {
@@ -270,16 +271,17 @@ test.describe('Pull request reads that fail', () => {
     },
   });
 
+  /** The viewer's own pull request, which opens on its changes. */
   async function openPr(page: Page, title: string) {
     await sidebarRow(page, new RegExp(title)).first().click();
     await expect(
-      page.getByRole('button', { name: 'Overview', exact: true })
+      page.getByRole('button', { name: 'Back to review' })
     ).toBeVisible({ timeout: 30_000 });
   }
 
   async function openOverview(page: Page, title: string) {
     await openPr(page, title);
-    await page.getByRole('button', { name: 'Overview', exact: true }).click();
+    await showOverview(page);
   }
 
   const setFailing = (
@@ -332,10 +334,7 @@ test.describe('Pull request reads that fail', () => {
       .getByRole('alert')
       .filter({ hasText: "Couldn't load comments" });
     await expect(failure).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole('button', { name: /^Comments/ })).toContainText(
-      'not loaded'
-    );
-    await expect(page.locator('[data-comment-row="T1"]')).toHaveCount(0);
+    await expect(page.locator('[data-thread="T1"]')).toHaveCount(0);
     // The rest of the pull request is still readable.
     await expect(
       page.locator('[data-diff-scroll]').getByText('one', { exact: true })
@@ -343,7 +342,7 @@ test.describe('Pull request reads that fail', () => {
 
     setFailing(homeDir, 51, {});
     await failure.getByRole('button', { name: /^Retry/ }).click();
-    await expect(page.locator('[data-comment-row="T1"]')).toBeVisible();
+    await expect(page.locator('[data-thread="T1"]')).toBeVisible();
     await expect(failure).toHaveCount(0);
   });
 
@@ -352,7 +351,7 @@ test.describe('Pull request reads that fail', () => {
   }) => {
     const { page, homeDir } = desktop;
     await openPr(page, 'Steady reads');
-    const row = page.locator('[data-comment-row="T1"]');
+    const row = page.locator('[data-thread="T1"]');
     await expect(row).toBeVisible({ timeout: 30_000 });
 
     // Opening a reply box re-reads the threads; this time GitHub fails.

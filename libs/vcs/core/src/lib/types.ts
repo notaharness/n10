@@ -1,4 +1,5 @@
 import type { PullRequestChecks } from './pr-checks.js';
+import type { PullRequestConversation } from './pr-conversation.js';
 import type { PullRequestDetail, RepositoryRef } from './pr-details.js';
 
 export type ReviewDecision =
@@ -184,6 +185,18 @@ export interface VcsProvider {
     project: Record<string, string>,
     prId: number
   ): Promise<PullRequestComments>;
+
+  /**
+   * Everything said and done on a pull request — threads with every
+   * reply, conversation comments, submitted reviews and events — read
+   * to the end of every page. Read on demand for the selected pull
+   * request, never per sidebar row.
+   */
+  fetchPullRequestConversation?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestConversation>;
 
   /** Reply to an existing comment thread. The thread is passed (not just
    *  the id) so providers can dispatch on `replyKind` — GitHub review

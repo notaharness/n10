@@ -16,9 +16,9 @@ import { firstUnresolvedThread, type CommentRow } from './review-model.js';
 
 /**
  * The review rail's own visibility: hidden or shown (by the reader, or
- * for a workspace too narrow for it; `rail-model.ts`), its Comments list
- * collapsed or expanded, and the header's "N unresolved" count, which
- * opens both and focuses the first open thread in the diff and the list.
+ * for a workspace too narrow for it; `rail-model.ts`), and the header's
+ * "N unresolved" count, which takes the reader to the first open thread
+ * in the diff.
  */
 export function useReviewRail(
   nav: {
@@ -39,22 +39,11 @@ export function useReviewRail(
     (next: boolean) => setRail((r) => railByReader(r, next)),
     []
   );
-  const [commentsOpen, setCommentsOpen] = useState(true);
   const { items, jumpToId } = nav;
   const { isFetching, refetch } = threads;
-
-  // The row is looked up after the click commits: the rail may have
-  // just been unhidden or the list expanded.
   const reveal = useCallback(
-    (row: CommentRow) => {
-      jumpToId(row.id, row.file);
-      requestAnimationFrame(() =>
-        rootRef.current
-          ?.querySelector(`[data-comment-row="${CSS.escape(row.id)}"]`)
-          ?.scrollIntoView({ block: 'nearest' })
-      );
-    },
-    [jumpToId, rootRef]
+    (row: CommentRow) => jumpToId(row.id, row.file),
+    [jumpToId]
   );
 
   // The count is the pull request list's and the threads are their own
@@ -75,8 +64,6 @@ export function useReviewRail(
   }, [items, isFetching, reveal]);
 
   const showUnresolved = useCallback(() => {
-    setHidden(false);
-    setCommentsOpen(true);
     const first = firstUnresolvedThread(items);
     pending.current = first == null;
     if (first) {
@@ -86,7 +73,7 @@ export function useReviewRail(
     refetch().catch(() => {
       pending.current = false;
     });
-  }, [items, reveal, refetch, setHidden]);
+  }, [items, reveal, refetch]);
 
-  return { hidden, setHidden, commentsOpen, setCommentsOpen, showUnresolved };
+  return { hidden, setHidden, showUnresolved };
 }

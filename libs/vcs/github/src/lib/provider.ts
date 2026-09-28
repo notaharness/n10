@@ -7,6 +7,7 @@ import type {
   PullRequestInfo,
   PullRequestReviewer,
   PullRequestComments,
+  PullRequestConversation,
   RemoteCommentThread,
   RemoteCommentReply,
   ReviewVerdict,
@@ -20,6 +21,7 @@ import { classifyGhError, parseGhJson } from './gh-errors.js';
 import { ghGraphQL } from './gh-graphql.js';
 import { mapReviewState } from './gh-reviews.js';
 import { fetchPullRequestChecksGitHub } from './pr-checks.js';
+import { fetchGitHubConversation } from './pr-conversation.js';
 import { fetchPullRequestDetailGitHub } from './pr-details.js';
 
 // ── gh CLI transport ──────────────────────────────────────────────
@@ -782,6 +784,16 @@ export const githubProvider: VcsProvider = {
     const { owner, repo } = project;
     if (!owner || !repo) return { threads: [], generalComments: [] };
     return fetchCommentThreadsGitHub(owner, repo, prId);
+  },
+
+  async fetchPullRequestConversation(
+    _auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestConversation> {
+    const repository = this.repositoryRef?.(project);
+    if (!repository) throw new Error('GitHub project not configured');
+    return fetchGitHubConversation(ghGraphQL, { ...repository, number: prId });
   },
 
   async replyToThread(

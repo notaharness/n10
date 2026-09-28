@@ -152,6 +152,11 @@ async function agentReady(page: Page): Promise<void> {
   });
 }
 
+/** The header's Back, up from the pane showing. */
+async function backToReview(page: Page): Promise<void> {
+  await prHeader(page).getByRole('button', { name: 'Back to review' }).click();
+}
+
 /** From the Overview to the changes, where the header bar is. */
 async function showChanges(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Review changes' }).click();
@@ -215,22 +220,43 @@ test.describe('Pull request Overview', () => {
     await expect(visibleText(page, 'socket.close();')).toBeVisible();
     await expect(overviewTitle(page, 'Handle cancelled requests')).toBeHidden();
     // The changes keep the header bar, and it has no CI badge: CI is
-    // Completion's, and the sidebar row's.
+    // Completion's, and the sidebar row's. Its Back leads up to the
+    // Overview.
     await expect(prHeader(page)).toBeVisible();
     await expect(prHeader(page).getByText(/^CI /)).toHaveCount(0);
     await expect(
       prHeader(page).getByRole('button', { name: 'Back to review' })
-    ).toHaveCount(0);
+    ).toBeVisible();
     // Not left on the hidden button: the next key acts on the changes.
     await expect(page.getByRole('region', { name: 'Changes' })).toBeFocused();
   });
 
-  test('opens your own pull request on its diff', async ({ desktop }) => {
+  test('opens your own pull request on its diff, and Back goes up to its Overview', async ({
+    desktop,
+  }) => {
     const { page } = desktop;
     await openPr(page, /#215/);
 
     await expect(visibleText(page, 'retryDelay')).toBeVisible();
     await expect(overviewTitle(page, 'Tidy the retry helper')).toBeHidden();
+    // The rail lists neither the Overview nor the comments: Back leads
+    // to the one, and the other is the Overview's and the diff's.
+    await expect(
+      page.locator('[data-thread]', { hasText: 'Why keep the old name?' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Overview', exact: true })
+    ).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Comments/ })).toHaveCount(
+      0
+    );
+
+    const back = prHeader(page).getByRole('button', { name: 'Back to review' });
+    await back.focus();
+    await page.keyboard.press('Enter');
+    const title = overviewTitle(page, 'Tidy the retry helper');
+    await expect(title).toBeVisible();
+    await expect(title).toBeFocused();
   });
 
   test('sends an author to the first unresolved thread, and the keyboard with it', async ({
@@ -238,17 +264,14 @@ test.describe('Pull request Overview', () => {
   }) => {
     const { page } = desktop;
     await openPr(page, /#215/);
-    await page.getByRole('button', { name: 'Overview', exact: true }).click();
+    await backToReview(page);
 
     const next = page.getByRole('region', { name: 'Next step' });
     await expect(next).toContainText('1 unresolved thread');
     await next.getByRole('button', { name: 'Respond to feedback' }).focus();
     await page.keyboard.press('Enter');
 
-    // The navigator went to the thread, and the keyboard with it.
-    await expect(
-      page.locator('[data-comment-row][aria-current="true"]')
-    ).toContainText('Why keep the old name?');
+    // The diff went to the thread, and the keyboard with it.
     await expect(
       page.locator('[data-thread]', { hasText: 'Why keep the old name?' })
     ).toBeFocused();
@@ -284,28 +307,9 @@ test.describe('Pull request Overview', () => {
       await next.getByRole('button', { name: '1 unresolved thread' }).click();
 
       await expect(
-        page.locator('[data-comment-row][aria-current="true"]')
-      ).toContainText('Can this close twice?');
-      await expect(
         page.locator('[data-thread]', { hasText: 'Can this close twice?' })
       ).toBeFocused();
     });
-  });
-
-  test('leaves the keyboard on a rail row that opens a thread', async ({
-    desktop,
-  }) => {
-    const { page } = desktop;
-    await openPr(page, /#215/);
-    const row = page.locator('[data-comment-row]').first();
-    await row.focus();
-    await page.keyboard.press('Enter');
-    // The thread opens beside it, but the reader is still arrowing
-    // through the list.
-    await expect(
-      page.locator('[data-thread]', { hasText: 'Why keep the old name?' })
-    ).toBeVisible();
-    await expect(row).toBeFocused();
   });
 
   test('copies the link from the native More menu', async ({ desktop }) => {
@@ -356,6 +360,10 @@ test.describe('Pull request Overview', () => {
     const table = page.getByRole('table');
     await expect(table).toBeVisible();
     const completionBox = await completion.boundingBox();
+    // The context column leads with the reviewers, then completion.
+    const reviewers = page.getByRole('region', { name: 'Reviewers' });
+    expect(await top(reviewers)).toBeLessThan(completionBox?.y ?? 0);
+    expect((await reviewers.boundingBox())?.x).toBe(completionBox?.x);
     // The table scrolls in its own box, so what shows of it ends before
     // the context column starts…
     const shownRight = await table.evaluate(visibleRight);
@@ -395,16 +403,17 @@ test.describe('Pull request Overview', () => {
     // The review rail folds away as its own control would, so the
     // content is not squeezed beside it, and comes back with room.
     const showRail = page.getByRole('button', { name: 'Show review sidebar' });
+    const launch = page.getByRole('button', { name: 'Launch agent' });
     await expect(showRail).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Overview', exact: true })
-    ).toBeHidden();
+    await expect(launch).toBeHidden();
 
-    // The Overview carries the title whole, and in one column: the next
-    // step and readiness come before the description…
+    // The Overview carries the title whole, and in one column: the
+    // reviewers, then completion, come before the description…
     await expect(overviewTitle(page, LONG_TITLE)).toBeVisible();
+    const reviewers = page.getByRole('region', { name: 'Reviewers' });
     const readiness = page.getByRole('region', { name: 'Completion' });
     const description = page.getByRole('region', { name: 'Description' });
+    expect(await top(reviewers)).toBeLessThan(await top(readiness));
     expect(await top(readiness)).toBeLessThan(await top(description));
 
     // …while the changes' header cuts it short, keeping the number and
@@ -419,9 +428,7 @@ test.describe('Pull request Overview', () => {
 
     await resize(app, 1360, 860);
     await expect(showRail).toHaveCount(0);
-    await expect(
-      page.getByRole('button', { name: 'Overview', exact: true })
-    ).toBeVisible();
+    await expect(launch).toBeVisible();
   });
 
   test('the terminal goes back up to the review it came from, and the keyboard with it', async ({
@@ -449,20 +456,26 @@ test.describe('Pull request Overview', () => {
     expect(titleWidth).toBeGreaterThanOrEqual(280);
     await pressBack();
     await expect(visibleText(page, 'socket.close();')).toBeVisible();
-    await expect(back).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Changes' })).toBeFocused();
 
-    // From the Overview to the terminal: Back goes to the Overview, the
-    // last review pane shown, which has no header bar; the keyboard
-    // lands on its heading.
-    await page.getByRole('button', { name: 'Overview', exact: true }).click();
-    await page.getByRole('button', { name: /^Agent/ }).click();
-    await agentReady(page);
+    // Up from the changes is the Overview, with the keyboard on its
+    // heading.
     await pressBack();
     const title = overviewTitle(page, 'Handle cancelled requests');
+    await expect(title).toBeFocused();
+
+    // From the Overview to the terminal: Back goes to the Overview, the
+    // last review pane shown, which has no header bar. The Agent card
+    // says it is the pane showing only while its terminal is.
+    const agent = page.getByRole('button', { name: /^Agent/ });
+    await agent.click();
+    await agentReady(page);
+    await expect(agent).toHaveAttribute('aria-current', 'true');
+    await pressBack();
     await expect(title).toBeVisible();
     await expect(title).toBeFocused();
     await expect(prHeader(page)).toHaveCount(0);
+    await expect(agent).not.toHaveAttribute('aria-current');
 
     // The Overview showing its check list: Back returns to the list, and
     // the keyboard to its heading.
@@ -470,7 +483,7 @@ test.describe('Pull request Overview', () => {
       .getByRole('region', { name: 'Completion' })
       .getByRole('button', { name: /View checks/ })
       .click();
-    await page.getByRole('button', { name: /^Agent/ }).click();
+    await agent.click();
     await agentReady(page);
     await pressBack();
     await expect(
@@ -483,7 +496,6 @@ test.describe('Pull request Overview', () => {
   }) => {
     const { page } = desktop;
     await openPr(page, /#215/);
-    await page.locator('[data-comment-row]').first().click();
     const thread = page.locator('[data-thread]', {
       hasText: 'Why keep the old name?',
     });
@@ -493,7 +505,7 @@ test.describe('Pull request Overview', () => {
       .click();
 
     // The Overview, then the plan, then the terminal.
-    await page.getByRole('button', { name: 'Overview', exact: true }).click();
+    await backToReview(page);
     await page.getByRole('button', { name: /^Plan\b/ }).click();
     await expect(page.getByRole('region', { name: 'Plan' })).toBeVisible();
     await launchAgentFromRail(page);

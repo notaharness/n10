@@ -113,6 +113,7 @@ export function ContentPane({
   drafts,
   hasDrafts,
   commentsLoading,
+  threadsNotice,
   diffRead,
   diffRetrying,
   onRetryDiff,
@@ -126,6 +127,7 @@ export function ContentPane({
   onExitReview,
   onOpenInDiff,
   onOverviewAction,
+  onOpenThread,
   plan,
 }: {
   effMode: Mode;
@@ -152,6 +154,8 @@ export function ContentPane({
   drafts: ReviewComment[];
   hasDrafts: boolean;
   commentsLoading: boolean;
+  /** Why the diff's threads are missing or out of date. */
+  threadsNotice?: ReactNode;
   diffRead: DiffReadState;
   diffRetrying: boolean;
   onRetryDiff: () => void;
@@ -166,6 +170,8 @@ export function ContentPane({
   onOpenInDiff: (file: string) => void;
   /** The Overview's next-step button. */
   onOverviewAction: (action: AttentionAction) => void;
+  /** Show a remote thread in the diff, from the Overview's activity. */
+  onOpenThread: (id: string, path: string | null) => void;
   /** Everything the plan pane needs; absent on a bare worktree tab. */
   plan?: {
     items: PlanItem[];
@@ -176,7 +182,6 @@ export function ContentPane({
     onShowInDiff: (item: PlanItem) => void;
     onClear: () => void;
     onSend: (mode: 'inject' | 'new-session') => void;
-    openNoteFor: { key: string } | null;
   };
 }) {
   const headSha = pr?.headSha;
@@ -229,13 +234,20 @@ export function ContentPane({
             onShowInDiff={plan.onShowInDiff}
             onClear={plan.onClear}
             onSend={plan.onSend}
-            openNoteFor={plan.openNoteFor}
           />
         </div>
       )}
       {pr && overviewMounted && (
+        // Kept mounted like the diff once it has been shown: the
+        // reader's place in the activity, its filter and search survive
+        // a trip to the diff. Not before, so a tab that never shows it
+        // never reads its conversation.
         <StackedPane visible={effMode === 'overview'}>
-          <OverviewPane pr={pr} onAction={onOverviewAction} />
+          <OverviewPane
+            pr={pr}
+            onAction={onOverviewAction}
+            onOpenThread={onOpenThread}
+          />
         </StackedPane>
       )}
       <StackedPane visible={effMode === 'diff'}>
@@ -249,6 +261,7 @@ export function ContentPane({
           draftsByFile={draftsByFile}
           generalThreads={generalThreads}
           commentsLoading={commentsLoading}
+          threadsNotice={threadsNotice}
           read={diffRead}
           retrying={diffRetrying}
           onRetry={onRetryDiff}

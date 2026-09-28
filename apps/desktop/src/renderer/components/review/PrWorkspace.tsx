@@ -33,7 +33,7 @@ import {
 import { ContentPane } from './ContentPane.js';
 import { type FileEntry } from './diff/FileTree.js';
 import { WorkspaceHeader } from './PrHeader.js';
-import { railReadNotice } from './ReadNotice.js';
+import { readNotice } from './ReadNotice.js';
 import { CollapsedRail, ReviewRail } from './ReviewRail.js';
 
 /** A worktree without a pull request has no threads to be missing. */
@@ -44,14 +44,15 @@ const NO_THREADS: ReadState<unknown> = {
 };
 
 /**
- * The review workspace for a PR: a persistent left rail (Agent · Files
- * · Comments) beside a single content pane that swaps between the diff
- * and the agent terminal. Selecting a file/comment shows the diff;
- * selecting the agent shows its terminal (which stays mounted so its
- * scrollback survives). The diff's own toolbar lives inside the diff
- * pane, so it's gone while the terminal is showing.
+ * The review workspace for a PR: a collapsible left rail (Agent ·
+ * Files) beside a single content pane that swaps between the Overview,
+ * the diff, the agent terminal, the plan and the walkthrough. Selecting
+ * a file shows the diff; selecting the agent shows its terminal (which
+ * stays mounted so its scrollback survives). The diff's own toolbar
+ * lives inside the diff pane, so it's gone while the terminal is
+ * showing.
  *
- * What to show is decided in `lib/review-model.ts`; this component
+ * What to show is decided in `lib/review/review-model.ts`; this component
  * wires that to the queries, the refs and the markup.
  */
 /** What the agent pane's connection banner needs (ux-machines.md §6),
@@ -187,22 +188,13 @@ export function PrWorkspace({
   );
   const backToAgent = useCallback(() => setMode('agent'), [setMode]);
   const openPlanPane = useCallback(() => setMode('plan'), [setMode]);
-  // Both comment sources the rail can offer, as one list to resolve an
-  // id against.
-  const allThreads = useMemo(
-    () => [...inlineThreads, ...general],
-    [inlineThreads, general]
-  );
   const plan = usePlanCheckout({
     cwd: repo.cwd,
     pr,
     running,
     paneRef: rootRef,
-    threads: allThreads,
-    drafts,
     onSent: backToAgent,
     onShowInDiff: showPlanItemInDiff,
-    onOpenPlan: openPlanPane,
   });
 
   // Which pane is actually showing. Computed last because it asks
@@ -250,9 +242,6 @@ export function PrWorkspace({
                 className="min-w-0"
               >
                 <ReviewRail
-                  hasPr={Boolean(pr)}
-                  overviewActive={effMode === 'overview'}
-                  onOverview={() => setMode('overview')}
                   running={running}
                   busy={busy}
                   hasSession={Boolean(sessionName)}
@@ -274,21 +263,6 @@ export function PrWorkspace({
                   diffLoading={diff.pending}
                   selectedFile={effMode === 'diff' ? nav.selectedFile : null}
                   onSelectFile={nav.jumpToFile}
-                  commentItems={nav.items}
-                  activeCommentId={effMode === 'diff' ? nav.focusId : null}
-                  commentsOpen={rail.commentsOpen}
-                  onCommentsOpenChange={rail.setCommentsOpen}
-                  onJumpComment={nav.jumpToItem}
-                  onCommentContextMenu={(row) =>
-                    plan.onCommentContextMenu(row.id)
-                  }
-                  commentsNotice={railReadNotice(
-                    'comments',
-                    threadsRead,
-                    threads.retrying,
-                    threads.retry
-                  )}
-                  threads={threadsRead.kind}
                 />
               </Panel>
               <PanelSeparator className="relative w-px bg-border transition-colors after:absolute after:inset-y-0 after:-left-1 after:w-2 hover:bg-primary data-[resize-handle-state=drag]:bg-primary" />
@@ -317,6 +291,13 @@ export function PrWorkspace({
               drafts={drafts}
               hasDrafts={hasDrafts}
               commentsLoading={comments.isLoading}
+              threadsNotice={readNotice(
+                'comments',
+                threadsRead,
+                threads.retrying,
+                threads.retry,
+                'mx-2 mt-2 shrink-0'
+              )}
               diffRead={diff.read}
               diffRetrying={diff.retrying}
               onRetryDiff={diff.retry}
@@ -330,6 +311,7 @@ export function PrWorkspace({
               onExitReview={showDiff}
               onOpenInDiff={nav.jumpToFile}
               onOverviewAction={onOverviewAction}
+              onOpenThread={nav.jumpToId}
               plan={plan.wiring}
             />
           </Panel>

@@ -44,7 +44,11 @@ interface N10Bridge {
     remoteFetches: number;
   }>;
   openRepo(cwd: string): Promise<{ cwd: string }>;
-  getRepo(): Promise<{ cwd: string } | null>;
+  getRepo(): Promise<{
+    cwd: string;
+    repository?: { provider: string; host: string; repository: string } | null;
+    viewer?: string | null;
+  } | null>;
   launchAgent(req: {
     branch: string;
     intent: string;
@@ -66,8 +70,43 @@ interface N10Bridge {
   listForeignSessions(): Promise<
     { repo: string; branch: string; sessionName: string }[]
   >;
+  /** Asserted on for completeness: the conversation has no UI yet. */
+  getPullRequestConversation(req: {
+    ref: Record<string, unknown>;
+    viewer?: string;
+  }): Promise<{
+    ref: { number: number };
+    conversation:
+      | { state: 'read'; value: FakeConversation }
+      | { state: 'failed'; kind: string; reason: string }
+      | { state: 'unsupported'; reason: string };
+  }>;
   /** Used by the perf probes to time the host half of a tab open. */
   fetchWorktreeDiffText(branch: string, target: string): Promise<string>;
+}
+
+interface FakeConversationCoverage {
+  loaded: number;
+  total: number | null;
+  complete: boolean;
+}
+
+interface FakeConversation {
+  threads: {
+    id: string;
+    scope: string;
+    isOutdated: boolean;
+    anchor: unknown;
+    comments: { id: string; body: string }[];
+    status: { resolved: boolean; resolvedBy: { identifier: string } | null };
+  }[];
+  events: { kind: string }[];
+  comments: { id: string; body: string; author: { kind: string } | null }[];
+  reviews: { state: string; body: string; commentCount: number }[];
+  coverage: Record<
+    'threads' | 'threadComments' | 'comments' | 'reviews' | 'events',
+    FakeConversationCoverage
+  >;
 }
 
 interface Window {

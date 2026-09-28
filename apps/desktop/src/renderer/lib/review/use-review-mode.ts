@@ -5,10 +5,11 @@ import {
   type RefObject,
   type SetStateAction,
 } from 'react';
-import { refocusAfter } from '../focus.js';
+import { focusAfter } from '../focus.js';
 import type { PullRequestInfo } from '@n10/vcs-core/types';
 import {
   adoptPullRequest,
+  backTarget,
   backToReviewPane,
   initialMode,
   lastReviewPane,
@@ -98,10 +99,9 @@ export function useLastReviewPane(
 }
 
 /**
- * The terminal header's Back: up to the review pane the reader was last
- * on. The button goes with the terminal's header, so the keyboard goes
- * to the review it leads to: the changes, or the heading of what the
- * Overview shows (its own, or its check list's).
+ * The header's Back, up from the pane showing (`backTarget`). The
+ * keyboard goes to where it leads: the changes, or the heading of what
+ * the Overview shows (its own, or its check list's).
  */
 export function useBackToReview({
   mode,
@@ -118,10 +118,11 @@ export function useBackToReview({
   changes: RefObject<HTMLElement | null>;
   root: RefObject<HTMLElement | null>;
 }): () => void {
-  const pane = useLastReviewPane(mode, pr, viewer);
+  const last = useLastReviewPane(mode, pr, viewer);
+  const pane = backTarget(mode, last) ?? last;
   return () => {
     setMode(pane);
-    refocusAfter(() =>
+    focusAfter(() =>
       pane === 'diff'
         ? changes.current
         : root.current?.querySelector<HTMLElement>('[data-overview-heading]')

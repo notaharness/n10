@@ -17,10 +17,13 @@ import type { DemoState } from './state.js';
 
 type PullRequestHost = Pick<
   N10HostApi,
-  'getPullRequestSnapshot' | 'getPullRequestChecks'
+  | 'getPullRequestSnapshot'
+  | 'getPullRequestChecks'
+  | 'getPullRequestConversation'
 >;
 
 const NO_CHECKS = 'The web demo does not read checks and policies';
+const NO_CONVERSATION = 'The web demo does not read the conversation';
 
 /** GitHub's word for each verdict the demo's rows hold. */
 const NATIVE: Partial<Record<PullRequestReviewer['decision'], string>> = {
@@ -120,5 +123,7 @@ export function createPullRequestHost(state: DemoState): PullRequestHost {
       });
     },
     getPullRequestChecks: () => Promise.reject(new Error(NO_CHECKS)),
+    getPullRequestConversation: () =>
+      Promise.reject(new Error(NO_CONVERSATION)),
   };
 }

@@ -107,6 +107,9 @@ vi.mock('./services/pr-checks.js', () =>
 vi.mock('./services/pr-details.js', () =>
   recorder('prDetails', ['getPullRequestSnapshot'])
 );
+vi.mock('./services/pr-conversation.js', () =>
+  recorder('prConversation', ['getPullRequestConversation'])
+);
 vi.mock('./services/drafts.js', () =>
   recorder('drafts', [
     'listDraftComments',
@@ -195,6 +198,11 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
     'getPullRequestChecks',
     [{ ref: { number: 7 } }],
     'prChecks.getPullRequestChecks',
+  ],
+  [
+    'getPullRequestConversation',
+    [{ ref: { number: 7 } }],
+    'prConversation.getPullRequestConversation',
   ],
   [
     'replyToThread',

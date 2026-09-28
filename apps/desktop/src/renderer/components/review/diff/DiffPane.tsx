@@ -13,6 +13,7 @@ import {
   useState,
   type Ref,
   type RefObject,
+  type ReactNode,
 } from 'react';
 import type { DiffLine } from '@n10/diff';
 import type {
@@ -48,6 +49,7 @@ export function DiffPane({
   draftsByFile,
   generalThreads,
   commentsLoading,
+  threadsNotice,
   read,
   retrying,
   onRetry,
@@ -68,6 +70,8 @@ export function DiffPane({
   draftsByFile: Map<string, ReviewComment[]>;
   generalThreads: RemoteCommentThread[];
   commentsLoading: boolean;
+  /** Why the threads are missing or out of date, above the changes. */
+  threadsNotice?: ReactNode;
   /** What the patch and its parse amount to — see `diffReadState`. */
   read: DiffReadState;
   retrying: boolean;
@@ -111,6 +115,7 @@ export function DiffPane({
           className="mx-2 mt-2 shrink-0"
         />
       )}
+      {threadsNotice}
       <div
         ref={scrollRef}
         data-diff-scroll

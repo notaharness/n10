@@ -29,18 +29,29 @@ export interface FakePr {
   /** Body shown on the Overview pane. */
   body?: string;
   rollup?: 'SUCCESS' | 'FAILURE' | 'PENDING';
-  reviews?: { author: string; state: string }[];
+  /** Submitted reviews: the list reads the verdicts, the conversation
+   *  reads the summaries too. */
+  reviews?: {
+    author: string;
+    state: string;
+    body?: string;
+    commentCount?: number;
+    submittedAt?: string;
+  }[];
   reviewRequests?: string[];
   threads?: FakeThread[];
-  generalComments?: { author: string; body: string }[];
+  generalComments?: { author: string; body: string; createdAt?: string }[];
+  /** Timeline entries, as GraphQL `PullRequestTimelineItems` nodes. */
+  events?: Record<string, unknown>[];
   /** Reads that answer with GitHub's 502 until cleared with
    *  `updateFakeGh`: the description, the threads query, the selected
-   *  pull request's detail, and its checks. */
+   *  pull request's detail, its checks, and the conversation queries. */
   failing?: {
     body?: boolean;
     threads?: boolean;
     detail?: boolean;
     checks?: boolean;
+    conversation?: boolean;
   };
   /** The head commit; forty `f`s unless said. */
   headRefOid?: string;
@@ -82,14 +93,19 @@ export interface FakeCheck {
 export interface FakeThread {
   id?: string;
   path: string;
-  line: number;
+  /** Left off, with no `originalLine` either, for a file-level thread. */
+  line?: number;
   startLine?: number;
   /** Set with `line: null` semantics by leaving `line` off — see the
    *  outdated-thread case in the TUI suite. */
   originalLine?: number;
   isResolved?: boolean;
+  /** Who resolved it, for the conversation read. */
+  resolvedBy?: string;
   isOutdated?: boolean;
   side?: 'LEFT' | 'RIGHT';
+  /** The diff excerpt GitHub keeps with the thread's first comment. */
+  diffHunk?: string;
   comments: { author: string; body: string; createdAt?: string }[];
 }
 

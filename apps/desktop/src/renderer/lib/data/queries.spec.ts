@@ -17,6 +17,11 @@ import {
   loadPullRequestSnapshot,
   pullRequestRefFor,
 } from './pr-snapshot-query.js';
+import {
+  loadPullRequestConversation,
+  ProviderReadError,
+  retryRead,
+} from './pr-conversation-query.js';
 
 /**
  * The renderer runs in a browser; these tests run in node. Only the
@@ -277,6 +282,101 @@ describe('refreshRepoInfo', () => {
 
     expect(qc.getQueryData(keys.repo)).toEqual(GITHUB_REPO);
     expect(qc.getQueryData(keys.threads('/repo', 42))).toEqual({ threads: [] });
+  });
+});
+
+describe('pull request conversations', () => {
+  const REF = {
+    provider: 'github',
+    host: 'github.com',
+    repository: 'acme/app',
+    number: 42,
+  };
+
+  it('resolves with a conversation the provider read', async () => {
+    const asked: unknown[] = [];
+    stubHost({
+      getPullRequestConversation: (req) => {
+        asked.push(req);
+        return Promise.resolve({
+          ref: req.ref,
+          viewer: 'bob',
+          fetchedAt: 1,
+          conversation: { state: 'read', value: {} },
+        } as never);
+      },
+    });
+    await expect(
+      loadPullRequestConversation(REF, 'bob')
+    ).resolves.toMatchObject({ conversation: { state: 'read' } });
+    expect(asked).toEqual([{ ref: REF, viewer: 'bob' }]);
+  });
+
+  it('rejects a failed read with its kind and retry time, never empty data', async () => {
+    stubHost({
+      getPullRequestConversation: (req) =>
+        Promise.resolve({
+          ref: req.ref,
+          viewer: 'bob',
+          fetchedAt: 1,
+          conversation: {
+            state: 'failed',
+            kind: 'throttled',
+            reason: 'GitHub is rate limiting n10',
+            retryAfterMs: 30_000,
+          },
+        } as never),
+    });
+    const failure = loadPullRequestConversation(REF, 'bob');
+    await expect(failure).rejects.toBeInstanceOf(ProviderReadError);
+    await expect(failure).rejects.toMatchObject({
+      message: 'GitHub is rate limiting n10',
+      kind: 'throttled',
+      retryAfterMs: 30_000,
+    });
+  });
+
+  it('refuses an answer that names another pull request', async () => {
+    stubHost({
+      getPullRequestConversation: () =>
+        Promise.resolve({ ref: { ...REF, number: 43 } } as never),
+    });
+    await expect(loadPullRequestConversation(REF, null)).rejects.toThrow(
+      /got one about github.com\/acme\/app#43/
+    );
+  });
+
+  it('refuses an answer read as another account', async () => {
+    stubHost({
+      getPullRequestConversation: (req) =>
+        Promise.resolve({ ref: req.ref, viewer: 'carol' } as never),
+    });
+    await expect(loadPullRequestConversation(REF, 'bob')).rejects.toThrow(
+      /read as carol/
+    );
+  });
+
+  it('does not ask again straight away after a rate limit or a rejected credential', () => {
+    const failure = (kind: 'throttled' | 'auth' | 'server') =>
+      new ProviderReadError('no', kind, undefined);
+    expect(retryRead(0, failure('throttled'))).toBe(false);
+    expect(retryRead(0, failure('auth'))).toBe(false);
+    expect(retryRead(0, failure('server'))).toBe(true);
+    expect(retryRead(3, failure('server'))).toBe(false);
+  });
+
+  it('files repo A #42 and repo B #42 apart and drops both with the repository (Q8)', () => {
+    const a = REF;
+    const b = { ...REF, repository: 'acme/lib' };
+    expect(keys.prConversation('/repo', a, 'bob')).not.toEqual(
+      keys.prConversation('/repo', b, 'bob')
+    );
+    const qc = new QueryClient();
+    qc.setQueryData(keys.prConversation('/repo', a, 'bob'), { ref: REF });
+    resetRepoScopedCache(qc);
+    expect(
+      qc.getQueryData(keys.prConversation('/repo', a, 'bob'))
+    ).toBeUndefined();
   });
 });
 
