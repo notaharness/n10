@@ -44,14 +44,15 @@ const NO_THREADS: ReadState<unknown> = {
 };
 
 /**
- * The review workspace for a PR: a persistent left rail (Agent · Files
- * · Comments) beside a single content pane that swaps between the diff
- * and the agent terminal. Selecting a file/comment shows the diff;
- * selecting the agent shows its terminal (which stays mounted so its
- * scrollback survives). The diff's own toolbar lives inside the diff
- * pane, so it's gone while the terminal is showing.
+ * The review workspace for a PR: a collapsible left rail (Agent ·
+ * Files) beside a single content pane that swaps between the Overview,
+ * the diff, the agent terminal, the plan and the walkthrough. Selecting
+ * a file shows the diff; selecting the agent shows its terminal (which
+ * stays mounted so its scrollback survives). The diff's own toolbar
+ * lives inside the diff pane, so it's gone while the terminal is
+ * showing.
  *
- * What to show is decided in `lib/review-model.ts`; this component
+ * What to show is decided in `lib/review/review-model.ts`; this component
  * wires that to the queries, the refs and the markup.
  */
 /** What the agent pane's connection banner needs (ux-machines.md §6),

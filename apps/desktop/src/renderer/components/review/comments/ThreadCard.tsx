@@ -78,8 +78,8 @@ export function ThreadCard({
     ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     // Keyboard focus that is lost on the way here — the Overview's
     // button goes hidden as it opens the diff — lands on the thread it
-    // asked for. Focus that is somewhere visible, such as a rail row
-    // being arrowed through, stays there.
+    // asked for. Focus that is somewhere visible, such as the diff
+    // toolbar's next-comment button, stays there.
     if (focusIsLost()) ref.current?.focus({ preventScroll: true });
   }, [focused]);
 

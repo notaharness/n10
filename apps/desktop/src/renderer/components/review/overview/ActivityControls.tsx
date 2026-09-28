@@ -63,7 +63,9 @@ export function ShowResolved({
       <Switch ref={ref} id={id} checked={checked} onCheckedChange={onChange} />
       <label htmlFor={id} className="flex items-center gap-1">
         Show resolved
-        <span className="tabular-nums opacity-70">{count}</span>
+        {/* No number when switching on would show nothing new: the
+            only resolved threads were resolved in view. */}
+        {count > 0 && <span className="tabular-nums opacity-70">{count}</span>}
       </label>
     </div>
   );

@@ -175,9 +175,20 @@ test.describe('Pull request activity', () => {
   }) => {
     const { page } = desktop;
     const activity = await openOverview(page);
-    await showResolved(activity).click();
+    const mine = activity
+      .getByRole('radiogroup', { name: 'Show' })
+      .getByRole('radio', { name: /Mine/ });
+    await mine.click();
     const search = activity.getByRole('searchbox', { name: 'Search activity' });
     await search.fill('name this');
+    // All that matches is out of view: the empty state says so, and
+    // showing it hands the keyboard to the switch.
+    await expect(
+      activity.getByText('Only resolved threads match (1).')
+    ).toBeVisible();
+    await activity.getByRole('button', { name: 'Show resolved' }).click();
+    await expect(showResolved(activity)).toBeChecked();
+    await expect(showResolved(activity)).toBeFocused();
     await expect(
       activity.locator('[data-thread-id="T-resolved"]')
     ).toBeVisible();
@@ -188,6 +199,7 @@ test.describe('Pull request activity', () => {
       .click();
     await page.getByRole('button', { name: 'Back to the Overview' }).click();
 
+    await expect(mine).toBeChecked();
     await expect(showResolved(activity)).toBeChecked();
     await expect(search).toHaveValue('name this');
     await expect(
@@ -262,6 +274,11 @@ test.describe('Pull request activity', () => {
     await expect(filters.getByRole('radio', { name: /Open/ })).toContainText(
       '3',
       { timeout: 15_000 }
+    );
+    // The switch counts what it would bring into view, not the thread
+    // resolved in view.
+    await expect(showResolved(activity)).toHaveAccessibleName(
+      'Show resolved 1'
     );
     await expect(update).toHaveCount(0);
     await search.fill('');

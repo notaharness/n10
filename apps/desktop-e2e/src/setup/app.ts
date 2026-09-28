@@ -172,7 +172,10 @@ export async function dismissSessionMenu(page: Page): Promise<void> {
  * the changes to the Overview.
  */
 export async function showOverview(page: Page): Promise<void> {
-  const heading = page.locator('h1[data-overview-heading]');
+  // Every open tab stays mounted, and so does an Overview once shown.
+  const heading = page
+    .locator('h1[data-overview-heading]')
+    .filter({ visible: true });
   const back = page.getByRole('button', { name: 'Back to review' });
   for (let step = 0; step < 3; step++) {
     await expect(heading.or(back).first()).toBeVisible({ timeout: 30_000 });

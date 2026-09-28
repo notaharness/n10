@@ -83,9 +83,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
   width (`@container`), not viewport.
 - The Overview's activity reads the whole conversation by identity
   (`lib/data/pr-conversation-query.ts`, `lib/review/activity-model.ts`).
-  The Overview mounts on first show and then stays mounted, so its place,
-  filter and search survive the diff. Entries that arrive on a refresh
-  wait behind "N new updates"; thread writes invalidate the conversation.
+  The Overview mounts on first show and then stays mounted, hidden under
+  its check list too, so its place, filter and search survive both.
+  Entries that arrive on a refresh wait behind "N new updates"; thread
+  writes invalidate the conversation.
 - Diffs are whole-file (`-U99999`), folded client-side
   (`lib/diff/diff-model.ts`). A PR diffs commits; a bare worktree diffs its
   working tree, polled at 2 s only while the agent runs. `FileTree` collapse

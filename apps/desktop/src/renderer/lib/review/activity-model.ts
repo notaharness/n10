@@ -263,12 +263,6 @@ export function resolvedIds(entries: readonly ActivityEntry[]): Set<string> {
 }
 
 /**
- * The activity with the resolved threads in `hidden` out of view:
- * those resolved when the reader arrived, or when they last hid them.
- * One resolved while in view stays with its new status, so the list
- * never shifts under the reader; one reopened comes back.
- */
-/**
  * `hidden` without the threads no longer resolved: one reopened comes
  * back, and resolved again while in view, it stays there. `hidden`
  * itself when nothing changes.
@@ -284,6 +278,12 @@ export function pruneHidden(
   return next;
 }
 
+/**
+ * The activity with the resolved threads in `hidden` out of view:
+ * those resolved when the reader arrived, or when they last hid them.
+ * One resolved while in view stays with its new status, so the list
+ * never shifts under the reader; one reopened comes back.
+ */
 export function withoutHidden(
   entries: readonly ActivityEntry[],
   hidden: ReadonlySet<string>

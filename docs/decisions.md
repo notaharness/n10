@@ -224,7 +224,8 @@ room unless the reader chose since (`rail-model.ts`).
 The activity keeps resolved threads out of view until the reader shows them, by
 the provider's own resolved state. What is hidden is fixed when the reader
 arrives or hides them again: a thread resolved while in view stays there with
-its new status, since the list never moves under the reader.
+its new status, since the list never moves under the reader. A reopened thread
+leaves the hidden set (`pruneHidden`), so resolved again, it stays in view.
 
 Completion says "Waiting for your review" where the provider asks the viewer for
 a review that would count (`asksViewer`). Readiness knows only that a review is
