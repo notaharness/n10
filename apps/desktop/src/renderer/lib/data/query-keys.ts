@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { pullRequestKey, type PullRequestRef } from '@n10/vcs-core/pr-details';
 
 /**
  * The renderer's data layer: every host call is a TanStack Query so
@@ -43,6 +44,12 @@ export const keys = {
   threads: (cwd: string, prId: number) => ['threads', cwd, prId] as const,
   prDescription: (cwd: string, prId: number) =>
     ['pr-description', cwd, prId] as const,
+  /** Keyed by the provider-qualified pull request, not the number —
+   *  repo A's #42 and repo B's are different entries — by the
+   *  repository's id where it is known, so a repository replaced at the
+   *  same path never reads the old one's entry, and by the account. */
+  prSnapshot: (cwd: string, ref: PullRequestRef, viewer: string | null) =>
+    ['pr-snapshot', cwd, pullRequestKey(ref), ref.id ?? null, viewer] as const,
   activity: (cwd: string) => ['session-activity', cwd] as const,
   commentImage: (url: string) => ['comment-image', url] as const,
   drafts: (cwd: string, prId: number) => ['drafts', cwd, prId] as const,
@@ -68,6 +75,35 @@ const CROSS_REPO_KEYS: ReadonlySet<string> = new Set([
   keys.machines[0],
   keys.beamStatus[0],
 ]);
+
+/**
+ * Keys whose answers came from the pull request provider, read as the
+ * configured account. A change of provider, repository or account makes
+ * every one of them someone else's; git-side and local answers (diffs,
+ * branches, sessions, settings) are unaffected and stay.
+ */
+const PROVIDER_KEYS: ReadonlySet<string> = new Set([
+  'sidebar',
+  'sync',
+  'threads',
+  'pr-description',
+  'pr-snapshot',
+  'comment-image',
+  'drafts',
+  'review-viewer',
+]);
+
+/**
+ * Drop what the provider answered for the open repository, which now
+ * names another provider, repository or account. Narrower than a
+ * repository switch: the page that made the change — Settings — keeps
+ * its own answer and stays on screen.
+ */
+export function resetProviderScopedCache(qc: QueryClient): void {
+  qc.removeQueries({
+    predicate: (query) => PROVIDER_KEYS.has(String(query.queryKey[0])),
+  });
+}
 
 /**
  * Drop everything cached for the repository being left.

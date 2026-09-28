@@ -1,12 +1,17 @@
 import { useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import type { DiffLine } from '@n10/diff';
 import { contentKey } from '../content-key.js';
 import { loadDesktopPrefs } from '../desktop-prefs.js';
 import { parseDiffInWorker } from '../diff/diff-worker-client.js';
 import { measured } from '../perf.js';
-import { keys } from './query-keys.js';
+import { keys, resetProviderScopedCache } from './query-keys.js';
 import { errorMessage } from '../utils.js';
+import { repositoryKey } from '@n10/vcs-core/pr-details';
 import type {
   MachineView,
   RepoInfo,
@@ -42,6 +47,37 @@ export async function loadRepoGate(): Promise<RepoInfo | null> {
     loadDesktopPrefs(),
   ]);
   return repo;
+}
+
+/** Whether two answers about the open repository name the same
+ *  provider, repository and account — what every pull request entry in
+ *  the cache was read for. */
+function sameRepoIdentity(a: RepoInfo, b: RepoInfo): boolean {
+  const repo = (r: RepoInfo) => r.repository && repositoryKey(r.repository);
+  return (
+    a.providerId === b.providerId &&
+    repo(a) === repo(b) &&
+    a.viewer?.toLowerCase() === b.viewer?.toLowerCase()
+  );
+}
+
+/**
+ * Re-read the open repository's info after its settings change.
+ *
+ * The provider, the repository it names and the account n10 acts as
+ * all come from config, and the gate's entry is otherwise only written
+ * when a repository is opened. When any of the three differs, what the
+ * provider answered was read somewhere else or as someone else, so it
+ * goes; the rest of the repository's cache stays.
+ */
+export async function refreshRepoInfo(qc: QueryClient): Promise<void> {
+  const next = await window.n10.getRepo();
+  const prev = qc.getQueryData<RepoInfo | null>(keys.repo);
+  // The host moved to another repository meanwhile: that is the
+  // gate's switch to adopt, not this.
+  if (!prev || !next || prev.cwd !== next.cwd) return;
+  if (!sameRepoIdentity(prev, next)) resetProviderScopedCache(qc);
+  qc.setQueryData(keys.repo, next);
 }
 
 export function useRepoGate() {

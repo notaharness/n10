@@ -5,12 +5,13 @@ import type {
   RepoInfo,
   SettingsFieldView,
 } from '../../../host/contract.js';
+import { VIEWER } from '../data/identity.js';
 import { requestedTheme } from '../embed.js';
 import { showAppMenu } from '../native/app-menu.js';
 import { showContextMenu } from '../native/context-menu.js';
 import { pickFolder } from '../native/folder-picker.js';
 import { Channel, later } from './hub.js';
-import type { DemoState } from './state.js';
+import type { DemoState, RepoState } from './state.js';
 
 /**
  * The window around the repositories: which one is open and the recent
@@ -19,10 +20,16 @@ import type { DemoState } from './state.js';
  * would leave the page (a browser tab, an editor, a passkey) is a
  * no-op.
  */
-const info = (cwd: string): RepoInfo => ({
-  cwd,
+const info = (repo: RepoState): RepoInfo => ({
+  cwd: repo.cwd,
   providerId: 'github',
   vcsConfigured: true,
+  repository: {
+    provider: 'github',
+    host: 'github.com',
+    repository: repo.data.slug,
+  },
+  viewer: VIEWER,
 });
 
 const SETTINGS: SettingsFieldView[] = [
@@ -98,9 +105,9 @@ export function createShellHost(state: DemoState): ShellHost {
       later({ app: '1.0.0', electron: '44.0.0', node: '24.4.0', chrome: '' }),
     openRepo: async (cwd) => {
       await later(null, 250);
-      return info(state.open(cwd).cwd);
+      return info(state.open(cwd));
     },
-    getRepo: () => later(info(state.current)),
+    getRepo: () => later(info(state.repo())),
     listRecentRepos: () =>
       later(
         state.recent.map((cwd, i) => ({

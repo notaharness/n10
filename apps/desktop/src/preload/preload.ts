@@ -90,6 +90,8 @@ const api: N10HostApi = {
   killTerminal: (name) => ipcRenderer.invoke(IPC.killTerminal, name),
   fetchPrDescription: (prId) =>
     ipcRenderer.invoke(IPC.fetchPrDescription, prId),
+  getPullRequestSnapshot: (req) =>
+    ipcRenderer.invoke(IPC.getPullRequestSnapshot, req),
   submitReviewVerdict: (prId, verdict) =>
     ipcRenderer.invoke(IPC.submitReviewVerdict, prId, verdict),
   getReviewViewer: () => ipcRenderer.invoke(IPC.getReviewViewer),

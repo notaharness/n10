@@ -11,7 +11,12 @@ import {
   loadRepoGate,
   loadSidebarModel,
   machinesQuery,
+  refreshRepoInfo,
 } from './queries.js';
+import {
+  loadPullRequestSnapshot,
+  pullRequestRefFor,
+} from './pr-snapshot-query.js';
 
 /**
  * The renderer runs in a browser; these tests run in node. Only the
@@ -30,6 +35,8 @@ const REPO: RepoInfo = {
   cwd: '/repo',
   providerId: null,
   vcsConfigured: false,
+  repository: null,
+  viewer: null,
 };
 
 /** The value of `p`, or 'pending' if it has not settled by the time
@@ -85,6 +92,191 @@ describe('loadRepoGate', () => {
     });
 
     await expect(loadRepoGate()).resolves.toEqual(REPO);
+  });
+});
+
+describe('pull request snapshots', () => {
+  const GITHUB = {
+    provider: 'github',
+    host: 'github.com',
+    repository: 'acme/app',
+  };
+  const REF = { ...GITHUB, number: 42 };
+
+  it('qualifies a number with the open repository, or not at all', () => {
+    expect(pullRequestRefFor({ ...REPO, repository: GITHUB }, 42)).toEqual(REF);
+    expect(pullRequestRefFor(REPO, 42)).toBeNull();
+    // 0 is a worktree without a pull request.
+    expect(pullRequestRefFor({ ...REPO, repository: GITHUB }, 0)).toBeNull();
+  });
+
+  it('asks as the account it knows, and keeps an answer about that pull request', async () => {
+    const asked: unknown[] = [];
+    stubHost({
+      getPullRequestSnapshot: (req) => {
+        asked.push(req);
+        return Promise.resolve({ ref: req.ref, viewer: 'bob' } as never);
+      },
+    });
+    await expect(loadPullRequestSnapshot(REF, 'bob')).resolves.toMatchObject({
+      ref: REF,
+    });
+    expect(asked).toEqual([{ ref: REF, viewer: 'bob' }]);
+  });
+
+  it('says so when it knows no account, rather than leaving the account open', async () => {
+    const asked: unknown[] = [];
+    stubHost({
+      getPullRequestSnapshot: (req) => {
+        asked.push(req);
+        return Promise.resolve({ ref: req.ref, viewer: null } as never);
+      },
+    });
+    await loadPullRequestSnapshot(REF, null);
+    expect(asked).toEqual([{ ref: REF, viewer: null }]);
+  });
+
+  it('refuses an answer read as another account (Q8)', async () => {
+    stubHost({
+      getPullRequestSnapshot: (req) =>
+        Promise.resolve({ ref: req.ref, viewer: 'carol' } as never),
+    });
+    await expect(loadPullRequestSnapshot(REF, 'bob')).rejects.toThrow(
+      'Expected an answer read as bob, got one read as carol'
+    );
+    await expect(loadPullRequestSnapshot(REF, null)).rejects.toThrow(
+      'Expected an answer read as no account, got one read as carol'
+    );
+  });
+
+  it('files each repository, pull request, known repository id and account apart (Q8)', () => {
+    const key = (ref: typeof REF & { id?: string }, viewer = 'bob') =>
+      JSON.stringify(keys.prSnapshot('/repo', ref, viewer));
+    const all = [
+      key(REF),
+      key({ ...REF, repository: 'acme/lib' }),
+      key({ ...REF, number: 43 }),
+      key({ ...REF, id: 'R_OLD' }),
+      key({ ...REF, id: 'R_NEW' }),
+      key(REF, 'carol'),
+    ];
+    expect(new Set(all).size).toBe(all.length);
+  });
+
+  it('never serves a replaced repository the entry of the one it replaced (Q8)', async () => {
+    // Same path, number and account; the repository at that path is a
+    // different one now. A fresh entry must be read, not the old one's.
+    const qc = new QueryClient();
+    const read = (ref: typeof REF & { id: string }) =>
+      qc.fetchQuery({
+        queryKey: keys.prSnapshot('/repo', ref, 'alice'),
+        queryFn: () => Promise.resolve({ ref }),
+        staleTime: 60_000,
+      });
+    await read({ ...REF, id: 'R_OLD' });
+    await expect(read({ ...REF, id: 'R_NEW' })).resolves.toEqual({
+      ref: { ...REF, id: 'R_NEW' },
+    });
+  });
+
+  it('drops every snapshot with the repository it belonged to', () => {
+    const qc = new QueryClient();
+    qc.setQueryData(keys.prSnapshot('/repo', REF, 'bob'), { ref: REF });
+    resetRepoScopedCache(qc);
+    expect(
+      qc.getQueryData(keys.prSnapshot('/repo', REF, 'bob'))
+    ).toBeUndefined();
+  });
+
+  it('refuses an answer that names another pull request', async () => {
+    stubHost({
+      getPullRequestSnapshot: () =>
+        Promise.resolve({ ref: { ...REF, repository: 'acme/lib' } } as never),
+    });
+    await expect(loadPullRequestSnapshot(REF, null)).rejects.toThrow(
+      'Expected an answer about github.com/acme/app#42, got one about github.com/acme/lib#42'
+    );
+  });
+});
+
+describe('refreshRepoInfo', () => {
+  const GITHUB_REPO: RepoInfo = {
+    cwd: '/repo',
+    providerId: 'github',
+    vcsConfigured: true,
+    repository: {
+      provider: 'github',
+      host: 'github.com',
+      repository: 'acme/app',
+    },
+    viewer: 'bob',
+  };
+
+  function seeded(repo: RepoInfo) {
+    const qc = new QueryClient();
+    qc.setQueryData(keys.repo, repo);
+    qc.setQueryData(keys.threads('/repo', 42), { threads: [] });
+    qc.setQueryData(keys.sidebar('/repo'), ['row']);
+    qc.setQueryData(keys.settings('/repo'), { fields: [] });
+    qc.setQueryData(keys.diff('/repo', 'undo', 'main'), 'patch');
+    return qc;
+  }
+
+  it.each([
+    ['the account', { viewer: 'carol' }],
+    [
+      'the repository',
+      {
+        repository: {
+          provider: 'github',
+          host: 'github.com',
+          repository: 'acme/lib',
+        },
+      },
+    ],
+    ['the provider', { providerId: 'azure-devops' }],
+  ])(
+    'adopts a change of %s and drops what the provider answered before it',
+    async (_label, change) => {
+      const next = { ...GITHUB_REPO, ...change };
+      stubHost({ getRepo: () => Promise.resolve(next) });
+      const qc = seeded(GITHUB_REPO);
+
+      await refreshRepoInfo(qc);
+
+      expect(qc.getQueryData(keys.repo)).toEqual(next);
+      expect(qc.getQueryData(keys.threads('/repo', 42))).toBeUndefined();
+      expect(qc.getQueryData(keys.sidebar('/repo'))).toBeUndefined();
+      // The settings page that made the change keeps its answer, and
+      // git's diff never came from the provider.
+      expect(qc.getQueryData(keys.settings('/repo'))).toEqual({ fields: [] });
+      expect(qc.getQueryData(keys.diff('/repo', 'undo', 'main'))).toBe('patch');
+    }
+  );
+
+  it('keeps what was read when the identity is unchanged', async () => {
+    // The same provider and repository, and the account only re-cased,
+    // which both providers treat as the same login or email.
+    const next = { ...GITHUB_REPO, viewer: 'BOB' };
+    stubHost({ getRepo: () => Promise.resolve(next) });
+    const qc = seeded(GITHUB_REPO);
+
+    await refreshRepoInfo(qc);
+
+    expect(qc.getQueryData(keys.repo)).toEqual(next);
+    expect(qc.getQueryData(keys.threads('/repo', 42))).toEqual({ threads: [] });
+  });
+
+  it('leaves a repository switch to the gate', async () => {
+    stubHost({
+      getRepo: () => Promise.resolve({ ...GITHUB_REPO, cwd: '/other' }),
+    });
+    const qc = seeded(GITHUB_REPO);
+
+    await refreshRepoInfo(qc);
+
+    expect(qc.getQueryData(keys.repo)).toEqual(GITHUB_REPO);
+    expect(qc.getQueryData(keys.threads('/repo', 42))).toEqual({ threads: [] });
   });
 });
 

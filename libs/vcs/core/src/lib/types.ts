@@ -1,3 +1,5 @@
+import type { PullRequestDetail, RepositoryRef } from './pr-details.js';
+
 export type ReviewDecision =
   | 'approved'
   | 'changes-requested'
@@ -125,6 +127,14 @@ export interface VcsProvider {
   /** Web URL for a specific PR */
   getPullRequestUrl(project: Record<string, string>, prId: number): string;
 
+  /**
+   * The repository this project config addresses, as a pull request
+   * ref's repository half — or null while the config is incomplete.
+   * What a cached answer, a draft or a write is checked against before
+   * it is trusted to belong to the repository that is open.
+   */
+  repositoryRef?(project: Record<string, string>): RepositoryRef | null;
+
   /** Return branch names (from the provided list) whose PRs have been merged */
   fetchMergedBranches?(
     auth: Record<string, string>,
@@ -169,6 +179,15 @@ export interface VcsProvider {
     project: Record<string, string>,
     prId: number
   ): Promise<string>;
+
+  /** The selected pull request in full: lifecycle, source and target
+   *  commits, fork identity. Read on demand for one pull request, never
+   *  per sidebar row. */
+  fetchPullRequestDetail?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestDetail>;
 
   /** Cast the current user's review verdict on a PR. */
   submitReviewVerdict?(

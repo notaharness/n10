@@ -60,6 +60,8 @@ describe('registerHostHandlers', () => {
           cwd,
           providerId: null,
           vcsConfigured: false,
+          repository: null,
+          viewer: null,
         });
       },
     };

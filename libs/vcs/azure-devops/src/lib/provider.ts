@@ -10,6 +10,7 @@ import type {
   ReviewDecision,
   ReviewVerdict,
   BuildStatusState,
+  RepositoryRef,
 } from '@n10/vcs-core';
 import { sanitizeBody } from '@n10/vcs-core';
 import { log } from '@n10/logger';
@@ -1027,6 +1028,16 @@ export const azureDevOpsProvider: VcsProvider = {
 
   getPullRequestUrl(project: Record<string, string>, prId: number): string {
     return `https://dev.azure.com/${project.org}/${project.project}/_git/${project.repo}/pullrequest/${prId}`;
+  },
+
+  repositoryRef(project: Record<string, string>): RepositoryRef | null {
+    const { org, project: name, repo } = project;
+    if (!org || !name || !repo) return null;
+    return {
+      provider: 'azure-devops',
+      host: `dev.azure.com/${org}`,
+      repository: `${name}/${repo}`,
+    };
   },
 
   async fetchMergedBranches(
