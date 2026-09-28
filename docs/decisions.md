@@ -258,8 +258,12 @@ leaves the hidden set (`pruneHidden`), so resolved again, it stays in view.
 
 Who must review is said only in the providers' own terms
 (`pr-review-requirements.ts`). Azure DevOps marks each reviewer required or
-optional, and its required-reviewer policies name identities, so a required
-reviewer no applicable policy names was marked by hand. GitHub marks no one:
+optional, and its required-reviewer policies name identities. A reviewer is
+listed by policy where an enabled policy of the same standing names them,
+whether or not it applies to these changes now, since a policy that added
+them on an earlier push may no longer. A required reviewer no enabled policy
+names was marked by hand: the one reason n10 infers, since Azure never says
+why a reviewer is listed. GitHub marks no one:
 its rules ask for a number of approvals, for code owners and for teams by id,
 and a request says only whether it went to a code owner. A GitHub reviewer's
 requirement is therefore unknown, never inferred from their being asked, and
@@ -270,8 +274,10 @@ classic protection, as enforced on this account, and every rule set.
 Completion says "Waiting for your review" where the provider asks the viewer
 for a review that would count (`asksViewer`). The checks read also reads the
 detail for this: where it names the viewer, an optional reviewer's approval
-counts only under a rule that counts anyone's (Azure's minimum reviewers).
-Where the detail or the rules were not read, the request stands. On Azure the
+counts only while a rule that counts anyone's is not met (Azure's minimum
+reviewers, by its own evaluation), or while a required group has not approved.
+Group membership is not read, so an optional viewer is kept for any waiting
+group. Where the detail or the rules were not read, the request stands. On Azure the
 detail shares the checks read's cached requests; on GitHub it adds the detail
 query to each checks read.
 
