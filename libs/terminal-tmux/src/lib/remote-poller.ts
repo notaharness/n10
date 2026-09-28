@@ -40,7 +40,9 @@ const DEFAULT_INTERVAL_MS = 1000;
 const UNREACHABLE_AFTER_MISSES = 2;
 
 export class RemoteSessionPoller {
-  private readonly subscribers = new Map<string, Set<PollSubscriber>>();
+  /** Each subscription's sequence number, per session name. */
+  private readonly subscribers = new Map<string, Map<PollSubscriber, number>>();
+  private subscriptionSeq = 0;
   private timer?: ReturnType<typeof setInterval>;
   private polling: Promise<void> | null = null;
   private disposed = false;
@@ -55,16 +57,20 @@ export class RemoteSessionPoller {
    *  there is something to poll, and the first poll fires immediately
    *  so a backend attached mid-interval is not left waiting a full tick. */
   subscribe(name: string, subscriber: PollSubscriber): () => void {
-    let set = this.subscribers.get(name);
-    if (!set) {
-      set = new Set();
-      this.subscribers.set(name, set);
+    let entries = this.subscribers.get(name);
+    if (!entries) {
+      entries = new Map();
+      this.subscribers.set(name, entries);
     }
-    set.add(subscriber);
+    entries.set(subscriber, ++this.subscriptionSeq);
     this.ensureTimer();
     return () => {
-      set!.delete(subscriber);
-      if (set!.size === 0) this.subscribers.delete(name);
+      entries!.delete(subscriber);
+      // A backend unsubscribes again from dispose() after its exit. By
+      // then a respawned session may have subscribed under the same
+      // name, into a new map this call must leave alone.
+      if (entries!.size === 0 && this.subscribers.get(name) === entries)
+        this.subscribers.delete(name);
       if (this.subscribers.size === 0) this.stopTimer();
     };
   }
@@ -81,24 +87,35 @@ export class RemoteSessionPoller {
     this.timer = undefined;
   }
 
+  /** Never rejects, so neither the interval nor the follow-up below
+   *  can raise an unhandled rejection over a subscriber that threw. */
   private poll(): Promise<void> {
     if (this.polling) return this.polling;
-    const promise = this.runOnePoll().finally(() => {
-      this.polling = null;
-    });
+    const requestedAt = this.subscriptionSeq;
+    const promise = this.runOnePoll(requestedAt)
+      .catch(() => undefined)
+      .finally(() => {
+        this.polling = null;
+        // A subscription made while a successful listing was in flight
+        // got nothing from it: list again now rather than a full
+        // interval later. A failed listing gave nobody anything, and
+        // retrying it at once would get around UNREACHABLE_AFTER_MISSES.
+        if (
+          this.subscriptionSeq > requestedAt &&
+          this.consecutiveFailures === 0 &&
+          !this.disposed
+        )
+          void this.poll();
+      });
     this.polling = promise;
     return promise;
   }
 
-  private async runOnePoll(): Promise<void> {
+  private async runOnePoll(requestedAt: number): Promise<void> {
     if (this.subscribers.size === 0) return;
     try {
       const sessions = await tmuxListSessionsDetailedWith(this.executor);
       this.consecutiveFailures = 0;
-      // Read subscribers *after* the await, not a snapshot taken
-      // before it: a backend that subscribes while this call is in
-      // flight must still see this same tick's result rather than
-      // waiting a full interval for the next one.
       const byName = new Map(sessions.map((s) => [s.name, s]));
       for (const name of [...this.subscribers.keys()]) {
         const info = byName.get(name);
@@ -110,8 +127,11 @@ export class RemoteSessionPoller {
               exitSignal: info.exitSignal,
             }
           : { found: false, paneDead: false };
-        for (const subscriber of this.subscribers.get(name) ?? [])
-          subscriber.onState(state);
+        // A subscription newer than the request may be for a session
+        // created, or respawned, after tmux took this listing; its
+        // absence or dead pane here says nothing about that session.
+        for (const [subscriber, seq] of this.subscribers.get(name) ?? [])
+          if (seq <= requestedAt) subscriber.onState(state);
       }
     } catch {
       // The list call itself failed: the machine could not be reached
@@ -122,8 +142,8 @@ export class RemoteSessionPoller {
       // process having exited.
       this.consecutiveFailures += 1;
       if (this.consecutiveFailures < UNREACHABLE_AFTER_MISSES) return;
-      for (const set of this.subscribers.values())
-        for (const subscriber of set) subscriber.onUnreachable();
+      for (const entries of this.subscribers.values())
+        for (const subscriber of entries.keys()) subscriber.onUnreachable();
     }
   }
 
