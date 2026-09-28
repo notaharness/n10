@@ -192,7 +192,7 @@ function NotRead({
   const { checks } = answer;
   const why =
     checks.state === 'failed'
-      ? failureText(checks)
+      ? failureText(checks, answer.fetchedAt)
       : checks.state === 'unsupported'
       ? checks.reason
       : null;

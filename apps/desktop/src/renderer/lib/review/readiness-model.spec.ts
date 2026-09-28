@@ -73,7 +73,7 @@ describe('failureText', () => {
       kind: 'throttled',
       reason: 'Rate limited',
     } as const;
-    expect(failureText(failed)).toBe('Rate limited');
+    expect(failureText(failed, 0)).toBe('Rate limited');
     const now = Date.parse('2026-09-28T10:00:00Z');
     const at = new Date(now + 30_000).toLocaleTimeString([], {
       hour: '2-digit',

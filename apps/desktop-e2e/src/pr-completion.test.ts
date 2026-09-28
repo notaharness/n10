@@ -153,6 +153,41 @@ test.describe('Completion', () => {
     await expect(header).toBeFocused();
   });
 
+  test('leaves the keyboard alone once a refresh has settled', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    updateFakeGh(desktop.homeDir, (s) => {
+      s.prs[1].failing = { checks: true };
+    });
+    const completion = await openPr(page, /#215/);
+    const refresh = completion.getByRole('button', { name: 'Refresh' });
+    // A refresh that comes back still unknown settles the press.
+    await refresh.click();
+    await expect(refresh).toHaveAttribute('aria-disabled', 'false');
+    await expect(completion).toContainText('Readiness not fully known');
+    // The reader clicks away, and later the list moves on its own.
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+    updateFakeGh(desktop.homeDir, (s) => {
+      s.prs[1].failing = undefined;
+      s.prs[1].threads = [
+        {
+          path: 'src/request.ts',
+          line: 1,
+          comments: [{ author: 'bea', body: 'Nit.' }],
+        },
+      ];
+    });
+    await sidebar(page)
+      .getByRole('button', { name: 'Refresh', exact: true })
+      .evaluate((el: HTMLElement) => el.click());
+    await expect(completion).toContainText('Ready to merge');
+    // That verdict was not the reader's refresh: the keyboard stays put.
+    await expect(
+      completion.getByRole('button', { name: /View checks/ })
+    ).not.toBeFocused();
+  });
+
   test('lists every check in the order that matters, and Back returns where the reader was', async ({
     desktop,
   }) => {

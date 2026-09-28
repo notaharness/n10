@@ -134,7 +134,7 @@ function Provenance({
   if (checks.state === 'failed') {
     return (
       <p role="status" className="mt-3 text-xs text-muted-foreground">
-        The checks could not be read: {failureText(checks)}
+        The checks could not be read: {failureText(checks, fetchedAt)}
       </p>
     );
   }
@@ -210,26 +210,31 @@ function Actions({
  * Refresh goes once the verdict is known. If the keyboard went with it,
  * it moves to View checks beside where Refresh was (the headline, a
  * live region, announces the verdict), or to the headline where there
- * is nothing to view. Focus the reader moved elsewhere stays there.
+ * is nothing to view. The press is settled by the next answer or
+ * failure, whatever it brings: a later verdict never pulls focus, and
+ * focus the reader moved elsewhere stays there.
  */
 function useRefocusAfterRefresh(
+  settled: string,
   showsRefresh: boolean,
   onRefresh: () => void,
   checksRef: RefObject<HTMLButtonElement | null>
 ) {
   const headlineRef = useRef<HTMLDivElement>(null);
-  const pressed = useRef(false);
+  const pressedAt = useRef<string | null>(null);
   useEffect(() => {
-    if (showsRefresh || !pressed.current) return;
-    pressed.current = false;
+    if (pressedAt.current == null || pressedAt.current === settled) return;
+    pressedAt.current = null;
     const lost =
       !document.activeElement || document.activeElement === document.body;
-    if (!lost) return;
+    if (showsRefresh || !lost) return;
     const view = checksRef.current;
-    (view && !view.disabled ? view : headlineRef.current)?.focus();
-  }, [showsRefresh, checksRef]);
+    (view && !view.disabled ? view : headlineRef.current)?.focus({
+      preventScroll: true,
+    });
+  }, [settled, showsRefresh, checksRef]);
   const refresh = () => {
-    pressed.current = true;
+    pressedAt.current = settled;
     onRefresh();
   };
   return { headlineRef, refresh };
@@ -245,7 +250,13 @@ export function PrReadiness(props: ReadinessProps) {
   const { read, provider, head, reading, retrying, onRefresh, checksRef } =
     props;
   const data = read.kind === 'ready' ? read.data : null;
+  // What a refresh settles on: a new answer, or a new failure.
+  const settled = JSON.stringify([
+    data?.fetchedAt,
+    read.kind === 'ready' ? read.stale : null,
+  ]);
   const { headlineRef, refresh } = useRefocusAfterRefresh(
+    settled,
     data?.readiness.state === 'unknown',
     onRefresh,
     checksRef

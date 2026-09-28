@@ -43,7 +43,7 @@ export function keepRead(
   prev: PullRequestChecksAnswer | undefined
 ): PullRequestChecksAnswer {
   if (answer.checks.state === 'failed' && prev?.checks.state === 'read') {
-    throw new Error(failureText(answer.checks));
+    throw new Error(failureText(answer.checks, answer.fetchedAt));
   }
   return answer;
 }
@@ -72,15 +72,22 @@ export function keepsLastHead(
 
 /**
  * The list row's facts readiness rests on, beside the head: its checks'
- * rollup, the reviewers' verdicts and the unresolved count. When one
- * moves at the same head, a check finished, a review landed or a thread
- * was resolved, so the checks are read again.
+ * rollup, the reviewers' verdicts, the unresolved count, the draft flag
+ * and the target. When one moves at the same head, a check finished, a
+ * review landed, a thread was resolved, it left draft or was retargeted,
+ * so the checks are read again.
  */
 export function rowFacts(pr: PullRequestInfo): string {
   const verdicts = (pr.reviewers ?? [])
     .map((r) => `${r.identifier}:${r.decision}`)
     .sort();
-  return JSON.stringify([pr.buildStatus, pr.activeCommentCount, verdicts]);
+  return JSON.stringify([
+    pr.buildStatus,
+    pr.activeCommentCount,
+    verdicts,
+    pr.isDraft,
+    pr.targetBranch,
+  ]);
 }
 
 /** The placeholder: the last head's answer, where `keepsLastHead`. */

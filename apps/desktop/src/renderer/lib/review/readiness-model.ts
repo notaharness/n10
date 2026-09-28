@@ -76,14 +76,15 @@ function lowerFirst(s: string): string {
 }
 
 /** A failed read in the provider's words, with when to try again where
- *  it said: a time of day, which stays true while it is on screen. */
+ *  it said: a time of day counted from when it was read, which stays
+ *  true while it is on screen. */
 export function failureText(
   failure: Extract<ReadOutcome<unknown>, { state: 'failed' }>,
-  now = Date.now()
+  readAt: number
 ): string {
   const ms = failure.retryAfterMs;
   if (ms == null) return failure.reason;
-  const at = new Date(now + ms).toLocaleTimeString([], {
+  const at = new Date(readAt + ms).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',

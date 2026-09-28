@@ -81,10 +81,12 @@ describe('rowFacts', () => {
     ],
   } as PullRequestInfo;
 
-  it('moves when a check finishes, a review lands or a thread is resolved', () => {
+  it('moves when a check finishes, a review lands, a thread is resolved, or it leaves draft or is retargeted', () => {
     const facts = rowFacts(PR);
     expect(rowFacts({ ...PR, buildStatus: 'succeeded' })).not.toBe(facts);
     expect(rowFacts({ ...PR, activeCommentCount: 0 })).not.toBe(facts);
+    expect(rowFacts({ ...PR, isDraft: true })).not.toBe(facts);
+    expect(rowFacts({ ...PR, targetBranch: 'release' })).not.toBe(facts);
     expect(
       rowFacts({
         ...PR,
