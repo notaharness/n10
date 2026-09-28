@@ -1,8 +1,9 @@
 import { AlertTriangleIcon } from 'lucide-react';
 import { useRepo } from '../../lib/repo-context.js';
-import { useBranchRemovalSafety } from '../../lib/data/queries.js';
+import { useWorktreeRemovalCheck } from '../../lib/data/queries.js';
 import { useRemoveWorktree } from '../../lib/data/mutations.js';
 import { useTabs } from '../../lib/tabs/tabs.js';
+import type { WorktreeRemovalCheck } from '../../../host/contract.js';
 import { Button } from '../ui/button.js';
 import {
   Dialog,
@@ -13,10 +14,19 @@ import {
   DialogTitle,
 } from '../ui/dialog.js';
 
+/** What stands between the user and a plain Remove, if anything: work
+ *  they may force past, or a refusal. */
+function blockerOf(
+  check: WorktreeRemovalCheck | undefined
+): Extract<WorktreeRemovalCheck, { reason: string }> | null {
+  return check && 'reason' in check ? check : null;
+}
+
 /**
- * Confirm + execute worktree removal. Asks the host whether the branch
- * is safe to delete first (unpushed commits, open PR, …) and surfaces
- * the reason with a force option, mirroring the TUI's delete modal.
+ * Confirm + execute worktree removal. Asks core, through the host, what
+ * removal would cost (uncommitted work, unpushed commits, a protected
+ * branch, …) — the same verdict the TUI's delete modal renders — and
+ * offers a force option for the overridable ones.
  */
 export function RemoveWorktreeDialog({
   branch,
@@ -36,21 +46,16 @@ export function RemoveWorktreeDialog({
   const remove = useRemoveWorktree(repo.cwd);
   // `undefined` until the host answers — the confirm button stays
   // disabled for as long as that is the case.
-  const { data: safety } = useBranchRemovalSafety(repo.cwd, branch);
+  const { data: check } = useWorktreeRemovalCheck(repo.cwd, branch);
+  const warning = blockerOf(check);
 
-  // Only these safety reasons may be overridden, matching the TUI:
-  // protected branches and in-progress rebases are hard refusals.
-  const overridable =
-    safety?.safe === false &&
-    (safety.reason === 'uncommitted changes' ||
-      safety.reason === 'not pushed to upstream');
-
-  // Optimistic: the tab and this dialog close on confirm, and the
-  // sidebar row hides itself for as long as the mutation is pending
-  // (useRemovingBranches). Removal virtually always succeeds; if it
-  // doesn't, the row reappears by itself and the error is toasted from
-  // the mutation, which outlives this component.
-  const doRemove = (force: boolean) => {
+  // The dialog closes on confirm, and the sidebar row hides itself for
+  // as long as the mutation is pending (useRemovingBranches). The tab
+  // waits for the host: core keeps a worktree that changed after the
+  // check, and its agent may still be running. If it is kept, the row
+  // reappears by itself and the mutation, which outlives this component,
+  // says why.
+  const doRemove = (approved: WorktreeRemovalCheck) => {
     // Look the tab up by item key rather than rebuilding its id: a tab
     // keeps the id it was opened with even after `sync-items` re-keys
     // it (worktree `branch:x` → `pr:42` once a PR appears), so the
@@ -59,9 +64,8 @@ export function RemoveWorktreeDialog({
     const tab = tabs.tabs.find(
       (t) => t.kind === 'item' && t.repo === repo.cwd && t.itemKey === itemKey
     );
-    if (tab) tabs.close(tab.id);
     onClose();
-    remove.mutate({ branch, force });
+    remove.mutate({ branch, approved, tabId: tab?.id });
   };
 
   return (
@@ -72,19 +76,29 @@ export function RemoveWorktreeDialog({
           <DialogDescription>
             This deletes the worktree for{' '}
             <span className="font-mono text-foreground">{branch}</span>
-            {running ? ' and stops its running agent' : ''}. The branch is
-            deleted too unless git refuses.
+            {running || check?.verdict === 'agent-running'
+              ? ' and stops its running agent'
+              : ''}
+            . The branch is deleted too, unless it gains commits before the
+            removal runs.
           </DialogDescription>
         </DialogHeader>
 
-        {safety && !safety.safe && (
+        {warning && (
           <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground">
             <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-warning" />
             <div>
               <p className="font-medium">
-                {overridable ? 'Not safe to delete' : 'Cannot delete'}
+                {warning.verdict === 'force'
+                  ? 'Not safe to delete'
+                  : 'Cannot delete'}
               </p>
-              <p className="text-muted-foreground">{safety.reason}</p>
+              <p className="text-muted-foreground">{warning.reason}</p>
+              {warning.verdict === 'force' && warning.discardsUncommitted && (
+                <p className="text-muted-foreground">
+                  Force remove discards whatever is uncommitted when it runs.
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -93,16 +107,16 @@ export function RemoveWorktreeDialog({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          {safety?.safe !== false ? (
+          {!warning ? (
             <Button
               variant="destructive"
-              disabled={!safety}
-              onClick={() => doRemove(false)}
+              disabled={!check}
+              onClick={() => check && doRemove(check)}
             >
               Remove
             </Button>
-          ) : overridable ? (
-            <Button variant="destructive" onClick={() => doRemove(true)}>
+          ) : warning.verdict === 'force' ? (
+            <Button variant="destructive" onClick={() => doRemove(warning)}>
               Force remove
             </Button>
           ) : null}

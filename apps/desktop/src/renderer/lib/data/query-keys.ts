@@ -50,6 +50,25 @@ export const keys = {
    *  same path never reads the old one's entry, and by the account. */
   prSnapshot: (cwd: string, ref: PullRequestRef, viewer: string | null) =>
     ['pr-snapshot', cwd, pullRequestKey(ref), ref.id ?? null, viewer] as const,
+  /** Keyed like the snapshot, and by the head the list row names: a
+   *  push is a new read. `prChecksFor(cwd, ref)` is every entry of one
+   *  pull request's, for its refresh. */
+  prChecks: (
+    cwd: string,
+    ref: PullRequestRef,
+    viewer: string | null,
+    head: string | null
+  ) =>
+    [
+      'pr-checks',
+      cwd,
+      pullRequestKey(ref),
+      ref.id ?? null,
+      viewer,
+      head,
+    ] as const,
+  prChecksFor: (cwd: string, ref: PullRequestRef) =>
+    ['pr-checks', cwd, pullRequestKey(ref)] as const,
   /** Every conversation read in this repository, to invalidate. */
   prConversations: (cwd: string) => ['pr-conversation', cwd] as const,
   /** Keyed like `prSnapshot`. */
@@ -99,6 +118,35 @@ const CROSS_REPO_KEYS: ReadonlySet<string> = new Set([
   keys.machines[0],
   keys.beamStatus[0],
 ]);
+
+/**
+ * Keys whose answers came from the pull request provider, read as the
+ * configured account. A change of provider, repository or account makes
+ * every one of them someone else's; git-side and local answers (diffs,
+ * branches, sessions, settings) are unaffected and stay.
+ */
+const PROVIDER_KEYS: ReadonlySet<string> = new Set([
+  'sidebar',
+  'sync',
+  'threads',
+  'pr-description',
+  'pr-snapshot',
+  'comment-image',
+  'drafts',
+  'review-viewer',
+]);
+
+/**
+ * Drop what the provider answered for the open repository, which now
+ * names another provider, repository or account. Narrower than a
+ * repository switch: the page that made the change — Settings — keeps
+ * its own answer and stays on screen.
+ */
+export function resetProviderScopedCache(qc: QueryClient): void {
+  qc.removeQueries({
+    predicate: (query) => PROVIDER_KEYS.has(String(query.queryKey[0])),
+  });
+}
 
 /**
  * Drop everything cached for the repository being left.

@@ -1,296 +1,160 @@
-import {
-  CheckCircle2Icon,
-  CheckIcon,
-  ClockIcon,
-  Loader2Icon,
-  MessageSquarePlusIcon,
-  XCircleIcon,
-} from 'lucide-react';
-import type { ComponentProps, ReactNode } from 'react';
-import { toast } from 'sonner';
-import type { PullRequestInfo, ReviewVerdict } from '@n10/vcs-core';
+import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import type { PullRequestInfo } from '@n10/vcs-core';
 import { pullRequestKey } from '@n10/vcs-core/pr-details';
-import { pullRequestRefFor } from '../../lib/data/pr-snapshot-query.js';
-import { usePrDescription } from '../../lib/data/queries.js';
-import type { ReadState } from '../../lib/data/read-state.js';
+import { usePullRequestChecks } from '../../lib/data/pr-checks-query.js';
+import { NO_REF, pullRequestRefFor } from '../../lib/data/pr-snapshot-query.js';
 import { keys } from '../../lib/data/query-keys.js';
 import { useReadState } from '../../lib/data/use-read-state.js';
-import { useSubmitVerdict } from '../../lib/data/mutations.js';
 import { useRepo } from '../../lib/repo-context.js';
-import { errorMessage } from '../../lib/utils.js';
-import { Avatar } from '../ui/avatar.js';
-import { Badge } from '../ui/badge.js';
-import { Button } from '../ui/button.js';
-import { Skeleton } from '../ui/skeleton.js';
-import { Tip } from '../ui/tooltip.js';
-import { CommentMarkdown } from './comments/CommentMarkdown.js';
+import {
+  nextStep,
+  reviewRole,
+  type AttentionAction,
+} from '../../lib/review/overview-model.js';
 import { GeneralComposer } from './overview/GeneralComposer.js';
 import { PrActivity } from './overview/PrActivity.js';
-import { ReadFailure, StaleNotice } from './ReadNotice.js';
+import { PrAttention } from './overview/PrAttention.js';
+import { PrChecks } from './overview/PrChecks.js';
+import { PrDescription } from './overview/PrDescription.js';
+import { PrIdentity } from './overview/PrIdentity.js';
+import { PrReadiness } from './overview/PrReadiness.js';
+import { PrReviewers } from './overview/PrReviewers.js';
+import { cn } from '../../lib/utils.js';
+import { PrActions } from './PrHeader.js';
 
 /**
- * The PR overview: title, meta, full description, and the review
- * verdict actions (Approve / Approve with suggestions).
+ * One column below 900 px of pane width — identity, next step,
+ * reviewers, completion, then the description and the conversation —
+ * and from there a reading column beside a context column: the
+ * description and conversation run down the left while the reviewers
+ * and completion stack on the right. The last row takes up whatever the
+ * reading column needs, so the right column never spreads out to match.
  */
-const VERDICT_DONE: Record<ReviewVerdict, string> = {
-  approve: 'Approved',
-  'approve-with-suggestions': 'Approved with suggestions',
-  'wait-for-author': 'Marked as waiting for author',
-  reject: 'Changes requested',
-};
+const LAYOUT =
+  "mx-auto grid max-w-[1120px] gap-x-8 gap-y-6 px-6 py-6 [grid-template-areas:'head'_'next'_'people'_'ready'_'main'] @min-[900px]:grid-cols-[minmax(0,1fr)_260px] @min-[900px]:grid-rows-[auto_auto_auto_auto_1fr] @min-[900px]:[grid-template-areas:'head_head'_'next_next'_'main_people'_'main_ready'_'main_.']";
 
-/** One vote. Its own icon is swapped for a spinner while it is in flight. */
-function VerdictButton({
-  tip,
-  icon,
-  pending,
-  disabled,
-  onClick,
-  variant,
-  className,
-  children,
-}: {
-  tip: string;
-  icon: ReactNode;
-  pending: boolean;
-  disabled: boolean;
-  onClick: () => void;
-  variant?: ComponentProps<typeof Button>['variant'];
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <Tip label={tip}>
-      <Button
-        variant={variant}
-        size="sm"
-        onClick={onClick}
-        disabled={disabled}
-        className={className}
-      >
-        {pending ? <Loader2Icon className="animate-spin" /> : icon}
-        {children}
-      </Button>
-    </Tip>
-  );
+/**
+ * The Overview or, nested in it, the check list; the list stays until
+ * the reader goes Back, whatever a re-read brings, and Back returns to
+ * where they were, scroll and keyboard both. Keyed by the pull request
+ * so another one opens on its Overview.
+ */
+function useNestedChecks(
+  prId: number,
+  pane: RefObject<HTMLDivElement | null>,
+  checksButton: RefObject<HTMLButtonElement | null>
+) {
+  const [view, setView] = useState({ prId, checks: false });
+  const top = useRef<number | null>(null);
+  const showing = view.prId === prId && view.checks;
+  useLayoutEffect(() => {
+    if (showing || top.current == null || !pane.current) return;
+    pane.current.scrollTo({ top: top.current });
+    checksButton.current?.focus({ preventScroll: true });
+    top.current = null;
+  }, [showing, pane, checksButton]);
+  return {
+    showing,
+    open: () => {
+      top.current = pane.current?.scrollTop ?? 0;
+      setView({ prId, checks: true });
+      pane.current?.scrollTo({ top: 0 });
+    },
+    close: () => setView({ prId, checks: false }),
+  };
 }
 
 /**
- * The vote row. Azure DevOps has four votes; GitHub knows only approve
- * and request-changes, so the negative side collapses to one red
- * button and "wait for author" is not offered at all.
+ * The pull request Overview: what the change is and why, what the
+ * reader should do next, what stands between it and completion, and
+ * who has weighed in.
  */
-function VerdictBar({
-  pr,
-  isGitHub,
-  submitting,
-  pendingVerdict,
-  onSubmit,
-}: {
-  pr: PullRequestInfo;
-  isGitHub: boolean;
-  submitting: boolean;
-  pendingVerdict: ReviewVerdict | null | undefined;
-  onSubmit: (v: ReviewVerdict) => void;
-}) {
-  const reviewers = pr.reviewers ?? [];
-  const approvals = reviewers.filter((r) => r.decision === 'approved').length;
-  return (
-    <div className="mt-4 flex flex-wrap items-center gap-2 border-y border-border py-3">
-      <VerdictButton
-        tip="Approve this pull request"
-        icon={<CheckCircle2Icon />}
-        pending={pendingVerdict === 'approve'}
-        disabled={submitting}
-        onClick={() => onSubmit('approve')}
-        className="bg-success text-white hover:bg-success/90"
-      >
-        Approve
-      </VerdictButton>
-      <VerdictButton
-        tip={
-          isGitHub
-            ? 'Approve with a non-blocking note (GitHub has no separate vote for this)'
-            : 'Approve, with non-blocking suggestions'
-        }
-        icon={<MessageSquarePlusIcon />}
-        pending={pendingVerdict === 'approve-with-suggestions'}
-        disabled={submitting}
-        onClick={() => onSubmit('approve-with-suggestions')}
-        variant="outline"
-        className="border-success/60 text-success hover:bg-success/10 hover:text-success"
-      >
-        Approve with suggestions
-      </VerdictButton>
-      {!isGitHub && (
-        <VerdictButton
-          tip="Block the PR until the author responds"
-          icon={<ClockIcon />}
-          pending={pendingVerdict === 'wait-for-author'}
-          disabled={submitting}
-          onClick={() => onSubmit('wait-for-author')}
-          variant="outline"
-          className="border-warning/60 text-warning hover:bg-warning/10 hover:text-warning"
-        >
-          Wait for author
-        </VerdictButton>
-      )}
-      <VerdictButton
-        tip={
-          isGitHub
-            ? 'Submit a changes-requested review'
-            : 'Reject this pull request'
-        }
-        icon={<XCircleIcon />}
-        pending={pendingVerdict === 'reject'}
-        disabled={submitting}
-        onClick={() => onSubmit('reject')}
-        variant="destructive"
-      >
-        {isGitHub ? 'Request changes' : 'Reject'}
-      </VerdictButton>
-      {approvals > 0 && (
-        <span className="ml-auto flex items-center gap-1 text-xs text-success">
-          <CheckIcon className="size-3.5" />
-          {approvals} approved
-        </span>
-      )}
-    </div>
-  );
-}
-
-/**
- * The author's description. An empty body and a failed fetch are
- * different facts: only the first is "no description".
- */
-function Description({
-  state,
-  retrying,
-  onRetry,
-}: {
-  state: ReadState<string>;
-  retrying: boolean;
-  onRetry: () => void;
-}) {
-  if (state.kind === 'loading') {
-    return (
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-2/3" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-5/6" />
-      </div>
-    );
-  }
-  if (state.kind === 'failed') {
-    return (
-      <ReadFailure
-        title="Couldn't load the description"
-        error={state.error}
-        retrying={retrying}
-        onRetry={onRetry}
-      />
-    );
-  }
-  return (
-    <>
-      {state.stale && (
-        <StaleNotice
-          what="description"
-          stale={state.stale}
-          retrying={retrying}
-          onRetry={onRetry}
-          className="mb-3"
-        />
-      )}
-      {state.data ? (
-        <CommentMarkdown markdown={state.data} />
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          This pull request has no description.
-        </p>
-      )}
-    </>
-  );
-}
-
 export function OverviewPane({
   pr,
+  onAction,
   onOpenThread,
 }: {
   pr: PullRequestInfo;
+  onAction: (action: AttentionAction) => void;
+  /** Show a remote thread in the diff, from the activity. */
   onOpenThread: (id: string, path: string | null) => void;
 }) {
   const { repo } = useRepo();
-  const prRef = pullRequestRefFor(repo, pr.id);
-  const description = useReadState(
-    usePrDescription(repo.cwd, pr.id),
-    keys.prDescription(repo.cwd, pr.id)
+  const role = reviewRole(pr, repo.viewer);
+  const ref = pullRequestRefFor(repo, pr.id);
+  // The head the list row names: a push reads the checks again.
+  const head = pr.headSha ?? null;
+  const checks = usePullRequestChecks(repo.cwd, ref, repo.viewer, pr);
+  const {
+    state: read,
+    retrying,
+    retry,
+  } = useReadState(
+    checks,
+    keys.prChecks(repo.cwd, ref ?? NO_REF, repo.viewer, head)
   );
-  const verdict = useSubmitVerdict(repo.cwd, repo.providerId ?? undefined);
-  // Speak the provider's language: ADO has four votes; GitHub only
-  // knows approve and request-changes, so the negative side collapses
-  // to one red button and "wait for author" doesn't exist.
-  const isGitHub = repo.providerId === 'github';
-
-  // Which verdict is mid-flight — its button gets the spinner.
-  const pendingVerdict = verdict.isPending ? verdict.variables?.verdict : null;
-
-  const submit = (v: ReviewVerdict) =>
-    verdict.mutate(
-      { prId: pr.id, verdict: v },
-      {
-        onSuccess: () => toast.success(VERDICT_DONE[v]),
-        onError: (e) => toast.error(`Review vote failed: ${errorMessage(e)}`),
-      }
-    );
+  const reading = checks.isPlaceholderData || checks.isFetching;
+  const pane = useRef<HTMLDivElement>(null);
+  const checksButton = useRef<HTMLButtonElement>(null);
+  const nested = useNestedChecks(pr.id, pane, checksButton);
 
   return (
-    <div className="h-full overflow-auto">
-      <div className="mx-auto max-w-[860px] px-6 py-6">
-        <h1 className="text-xl font-semibold leading-snug">
-          {pr.title}{' '}
-          <span className="font-normal text-muted-foreground">#{pr.id}</span>
-        </h1>
-
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <Avatar name={pr.createdByDisplayName} size="xs" />
-            {pr.createdByDisplayName}
-          </span>
-          <span className="font-mono text-xs">
-            {pr.sourceBranch} → {pr.targetBranch}
-          </span>
-          {pr.isDraft && <Badge variant="outline">Draft</Badge>}
-        </div>
-
-        <VerdictBar
-          pr={pr}
-          isGitHub={isGitHub}
-          submitting={verdict.isPending}
-          pendingVerdict={pendingVerdict}
-          onSubmit={submit}
+    <div ref={pane} className="@container h-full overflow-auto">
+      {nested.showing && (
+        <PrChecks
+          read={read}
+          head={head}
+          reading={reading}
+          retrying={retrying}
+          onRetry={retry}
+          onBack={nested.close}
+          actions={<PrActions pr={pr} />}
         />
-
-        <div className="mt-4">
-          <Description
-            state={description.state}
-            retrying={description.retrying}
-            onRetry={description.retry}
+      )}
+      {/* Kept mounted under the check list: the activity's filter,
+          search, held updates and resolved threads stay as the reader
+          left them. */}
+      <div className={cn(LAYOUT, nested.showing && 'hidden')}>
+        <PrIdentity
+          pr={pr}
+          actions={<PrActions pr={pr} />}
+          className="[grid-area:head]"
+        />
+        <PrAttention
+          step={nextStep(pr, role, repo.viewer)}
+          onAction={onAction}
+          className="[grid-area:next]"
+        />
+        <div className="[grid-area:people]">
+          <PrReviewers reviewers={pr.reviewers ?? []} viewer={repo.viewer} />
+        </div>
+        <div className="[grid-area:ready]">
+          <PrReadiness
+            read={read}
+            provider={repo.providerId}
+            head={head}
+            reading={reading}
+            retrying={retrying}
+            onRefresh={retry}
+            onViewChecks={nested.open}
+            checksRef={checksButton}
           />
         </div>
-
-        {prRef && (
-          <>
-            <PrActivity
-              key={pullRequestKey(prRef)}
-              prRef={prRef}
-              onOpenThread={onOpenThread}
-            />
-            <div className="mt-6">
-              <GeneralComposer key={pullRequestKey(prRef)} prRef={prRef} />
-            </div>
-          </>
-        )}
+        <div className="min-w-0 [grid-area:main]">
+          <PrDescription pr={pr} />
+          {ref && (
+            <>
+              <PrActivity
+                key={pullRequestKey(ref)}
+                prRef={ref}
+                onOpenThread={onOpenThread}
+              />
+              <div className="mt-6">
+                <GeneralComposer key={pullRequestKey(ref)} prRef={ref} />
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

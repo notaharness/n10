@@ -33,6 +33,7 @@ export function useFleetReset(onReset: () => void) {
         (result) => {
           if (result.ok || result.code === 'connection-lost') onReset();
           setOutcome(result);
+          if (result.ok) setOpen(false);
         },
         (err: unknown) =>
           setOutcome({ ok: false, code: 'internal', detail: errorMessage(err) })

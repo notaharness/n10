@@ -31,3 +31,13 @@ export function refocusAfter(
     if (focusIsLost()) target()?.focus({ preventScroll: true });
   });
 }
+
+/**
+ * Focus `target` once React has drawn the next frame, whether or not
+ * focus was lost: navigation the reader asked for, such as Back, takes
+ * the keyboard to where it leads even when the button they pressed is
+ * still on screen.
+ */
+export function focusAfter(target: () => HTMLElement | null | undefined): void {
+  requestAnimationFrame(() => target()?.focus({ preventScroll: true }));
+}

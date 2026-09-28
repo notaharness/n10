@@ -54,7 +54,7 @@ vi.mock('./services/worktrees.js', () =>
     'listAllBranches',
     'createWorktree',
     'removeWorktree',
-    'canRemoveBranch',
+    'checkWorktreeRemoval',
     'openInEditor',
     'getWorktreeDiffText',
   ])
@@ -100,6 +100,9 @@ vi.mock('./services/comment-images.js', () =>
 );
 vi.mock('./services/clipboard-image.js', () =>
   recorder('clipboardImage', ['saveClipboardImage'])
+);
+vi.mock('./services/pr-checks.js', () =>
+  recorder('prChecks', ['getPullRequestChecks'])
 );
 vi.mock('./services/pr-details.js', () =>
   recorder('prDetails', ['getPullRequestSnapshot'])
@@ -170,8 +173,20 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
   ['listBranches', [], 'worktrees.listBranches'],
   ['listAllBranches', [], 'worktrees.listAllBranches'],
   ['createWorktree', ['feature'], 'worktrees.createWorktree'],
-  ['removeWorktree', ['feature', true], 'worktrees.removeWorktree'],
-  ['canRemoveBranch', ['feature'], 'worktrees.canRemoveBranch'],
+  [
+    'removeWorktree',
+    [
+      'feature',
+      {
+        verdict: 'clear',
+        tip: 'abc123',
+        repo: '/repo/.git',
+        checkout: '/repo/wt',
+      },
+    ],
+    'worktrees.removeWorktree',
+  ],
+  ['checkWorktreeRemoval', ['feature'], 'worktrees.checkWorktreeRemoval'],
   ['openInEditor', ['feature'], 'worktrees.openInEditor'],
 
   ['fetchPullRequests', [], 'reviews.fetchPullRequests'],
@@ -181,6 +196,11 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
     'getPullRequestSnapshot',
     [{ ref: { number: 7 } }],
     'prDetails.getPullRequestSnapshot',
+  ],
+  [
+    'getPullRequestChecks',
+    [{ ref: { number: 7 } }],
+    'prChecks.getPullRequestChecks',
   ],
   [
     'getPullRequestConversation',

@@ -1,5 +1,6 @@
 import { keyForWorktree } from '../session-key.js';
 import {
+  branchTip,
   canRemoveBranch,
   fastForwardMainBranch,
   listWorktrees,
@@ -8,6 +9,10 @@ import { logError } from '@n10/logger';
 import type { AppConfig, BranchPrMap, VcsProvider } from '@n10/vcs-core';
 import { isSessionAlive } from '../pty-registry.js';
 import { hasLiveTmuxSession } from '../session-backend.js';
+import {
+  clearVerdictAt,
+  type WorktreeRemovalCheck,
+} from '../session/remove-worktree.js';
 import { countBranchConflicts } from './conflicts.js';
 import { fetchRefs } from './fetch-queue.js';
 
@@ -32,13 +37,16 @@ export function remoteSyncIntervalMs(
   );
 }
 
-/** One sync pass: fetch all remotes (pruning), through the fetch line
- *  every other fetch of the repository waits in, and fast-forward the
- *  main branch. Never throws; returns the completion timestamp. */
+/** One sync pass over the repository at `cwd`: fetch all remotes
+ *  (pruning), through the fetch line every other fetch of the
+ *  repository waits in, then fast-forward its main branch to what was
+ *  fetched. Every step names `cwd`; the process's directory may be
+ *  another repository by the time one runs. Never throws; returns the
+ *  completion timestamp. */
 export async function syncRemote(cwd = process.cwd()): Promise<number> {
   try {
     await fetchRefs({ cwd, refs: 'all' });
-    await fastForwardMainBranch();
+    await fastForwardMainBranch(cwd);
   } catch (err: unknown) {
     logError('remote-sync', err);
   }
@@ -74,6 +82,14 @@ type SweepConfig = Pick<
   'vendorAuth' | 'vendorProject' | 'autoDeleteOnMerge'
 >;
 
+/** Called with a merged branch's checkout session, the branch, and the
+ *  verdict to remove it with: `clear`, at the commit it was judged. */
+type AutoDelete = (
+  sessionName: string,
+  branch: string,
+  approved: WorktreeRemovalCheck
+) => void | Promise<void>;
+
 /**
  * Delete the worktrees of merged branches that are safe to delete, and
  * return the ones a rebase is holding up. Null means the caller
@@ -81,20 +97,21 @@ type SweepConfig = Pick<
  */
 async function autoDeleteMerged(args: {
   merged: Set<string>;
-  onAutoDelete: (sessionName: string, branch: string) => void | Promise<void>;
+  onAutoDelete: AutoDelete;
   isCancelled: () => boolean;
+  cwd: string | undefined;
 }): Promise<string[] | null> {
-  const { merged, onAutoDelete, isCancelled } = args;
+  const { merged, onAutoDelete, isCancelled, cwd } = args;
   const rebasingNow: string[] = [];
   // One listing for the pass: each merged branch's session is the one in
   // the checkout that has it.
-  const checkouts = await listWorktrees();
+  const checkouts = await listWorktrees(cwd);
   for (const branch of merged) {
     // A live agent prevents auto-deletion even when n10 is detached.
     // Deleting its working directory would disrupt the running process.
     const checkout = checkouts.find((w) => w.branch === branch);
     if (!checkout) continue;
-    const sessionName = keyForWorktree(checkout);
+    const sessionName = keyForWorktree(checkout, cwd);
     if (isSessionAlive(sessionName) || hasLiveTmuxSession(sessionName)) {
       logError(
         'sweepMergedBranches',
@@ -102,10 +119,15 @@ async function autoDeleteMerged(args: {
       );
       continue;
     }
-    const check = await canRemoveBranch(branch, true);
+    const tip = await branchTip(branch, checkout.path);
+    const check = await canRemoveBranch(branch, { confirmedMerged: true, cwd });
     if (isCancelled()) return null;
     if (check.safe) {
-      await onAutoDelete(sessionName, branch);
+      await onAutoDelete(
+        sessionName,
+        branch,
+        await clearVerdictAt(checkout.path, tip)
+      );
     } else {
       if (check.reason === 'rebase in progress') rebasingNow.push(branch);
       logError(
@@ -127,7 +149,7 @@ export interface MergedSweepResult {
 /**
  * Fetch which of `branches` have merged PRs and, when
  * `config.autoDeleteOnMerge` is on, auto-delete the ones that are safe
- * to remove (`canRemoveBranch(branch, true)`), warning once per rebase
+ * to remove (`canRemoveBranch` with `confirmedMerged`), warning once per rebase
  * episode about branches blocked by an in-progress rebase.
  */
 export async function sweepMergedBranches(opts: {
@@ -141,10 +163,15 @@ export async function sweepMergedBranches(opts: {
    *  (potentially slow) auto-delete pass — lets UIs show merged
    *  badges without waiting for deletions. */
   onMerged?: (merged: Set<string>) => void;
-  onAutoDelete: (sessionName: string, branch: string) => void | Promise<void>;
+  onAutoDelete: AutoDelete;
   onRebaseInProgress: (branch: string) => void;
   /** Abort between async steps (the TUI passes its effect-cancel flag). */
   isCancelled?: () => boolean;
+  /** The repository's root, which every git call and session key names;
+   *  the process's repository when not given. The desktop passes the
+   *  repository it captured, since the process's directory follows
+   *  whichever repository is open by the time a step runs. */
+  cwd?: string;
 }): Promise<MergedSweepResult> {
   const {
     provider,
@@ -156,6 +183,7 @@ export async function sweepMergedBranches(opts: {
     onAutoDelete,
     onRebaseInProgress,
     isCancelled = () => false,
+    cwd,
   } = opts;
   const keepWarned = new Set(warnedRebase);
   const fetchMerged = provider?.fetchMergedBranches;
@@ -184,6 +212,7 @@ export async function sweepMergedBranches(opts: {
     merged,
     onAutoDelete,
     isCancelled,
+    cwd,
   });
   if (rebasingNow === null) return { merged, nextWarned: keepWarned };
 

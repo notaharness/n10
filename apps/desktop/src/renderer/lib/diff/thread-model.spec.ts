@@ -51,8 +51,7 @@ describe('threadExpanded', () => {
 });
 
 describe('threadLocation', () => {
-  /** The card has the width for a path; the comment list does not, and
-   *  shows the basename instead. These two must not converge. */
+  /** The card has the width for a path, so it shows the whole of it. */
   it('shows the whole path, not the basename', () => {
     expect(threadLocation({ file: 'src/deep/a.ts', lineStart: 12 })).toBe(
       'src/deep/a.ts:12'

@@ -129,6 +129,22 @@ export interface SessionDiscovery {
   stop(): void;
 }
 
+/** Every scanner running in this process. */
+const running = new Set<SessionDiscovery>();
+
+/**
+ * Scan now in every running discovery, and resolve once each has
+ * finished and told its shell what changed.
+ *
+ * How core reports a change it made itself: a worktree n10 removed
+ * reaches the shells through the same `onChanged` as one removed with
+ * `git worktree remove` or deleted from disk, so neither shell needs a
+ * second path for its own removals.
+ */
+export async function rescanSessionDiscovery(): Promise<void> {
+  await Promise.all([...running].map((d) => d.scanNow()));
+}
+
 /**
  * Start watching for externally created worktrees and sessions.
  *
@@ -335,10 +351,11 @@ export function startSessionDiscovery(
   ensureWatch();
   void scanNow();
 
-  return {
+  const handle: SessionDiscovery = {
     scanNow,
     stop() {
       stopped = true;
+      running.delete(handle);
       clearInterval(timer);
       if (watchTimer) clearTimeout(watchTimer);
       watchTimer = null;
@@ -346,4 +363,6 @@ export function startSessionDiscovery(
       watcher = null;
     },
   };
+  running.add(handle);
+  return handle;
 }

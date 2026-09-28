@@ -20,6 +20,8 @@ import type {
   BabysitStatus,
   LaunchIntent,
   SidebarItem,
+  WorktreeRemovalCheck,
+  WorktreeRemovalOutcome,
 } from '@n10/core';
 import type { CommentSeverity, ReviewComment } from '@n10/review-comments';
 export type { CommentSeverity, ReviewComment };
@@ -36,7 +38,13 @@ export type {
   RemoteCommentReply,
   RemoteCommentThread,
 };
-export type { BabysitStatus, PullRequestLookup, SidebarItem } from '@n10/core';
+export type {
+  BabysitStatus,
+  PullRequestLookup,
+  SidebarItem,
+  WorktreeRemovalCheck,
+  WorktreeRemovalOutcome,
+} from '@n10/core';
 
 // The push half of the contract — channel names and their payloads.
 export * from './contract-events.js';
@@ -81,6 +89,7 @@ export type * from './contract-pull-requests.js';
 import type {
   DiscardDraftRequest,
   DraftsRequest,
+  PullRequestChecksAnswer,
   PullRequestConversationRead,
   PullRequestSnapshot,
   RepositoryRef,
@@ -336,10 +345,15 @@ export interface N10HostApi {
   /** All local + remote branch names (checkout candidates). */
   listAllBranches(): Promise<string[]>;
   createWorktree(branch: string): Promise<string | null>;
-  removeWorktree(branch: string, force: boolean): Promise<boolean>;
-  canRemoveBranch(
-    branch: string
-  ): Promise<{ safe: true } | { safe: false; reason: string }>;
+  /** Remove with the verdict the user confirmed; core's outcome says
+   *  what was kept, if anything. */
+  removeWorktree(
+    branch: string,
+    approved: WorktreeRemovalCheck
+  ): Promise<WorktreeRemovalOutcome>;
+  /** What removing the branch's worktree would cost — core's verdict,
+   *  shared with the TUI. */
+  checkWorktreeRemoval(branch: string): Promise<WorktreeRemovalCheck>;
   /** Open the branch's worktree in the configured external editor
    *  (config.editor, falling back to $VISUAL / $EDITOR — same as the
    *  TUI). Creates the worktree if needed. Resolves to the editor
@@ -357,6 +371,10 @@ export interface N10HostApi {
    *  and the exact commits its review compares. Rejects a ref from
    *  another repository or a caller that last saw another account. */
   getPullRequestSnapshot(req: SnapshotRequest): Promise<PullRequestSnapshot>;
+  /** What stands between one pull request and completion: its checks,
+   *  the target's rules and the provider's merge state, with n10's
+   *  reading of them. Identity-checked like the snapshot. */
+  getPullRequestChecks(req: SnapshotRequest): Promise<PullRequestChecksAnswer>;
   /** One pull request's whole conversation by identity: threads with
    *  every reply, conversation comments, reviews and events, with how
    *  much of each was read. Refused like the snapshot. */
@@ -542,7 +560,7 @@ export const IPC = {
   listAllBranches: 'n10/worktree/all-branches',
   createWorktree: 'n10/worktree/create',
   removeWorktree: 'n10/worktree/remove',
-  canRemoveBranch: 'n10/worktree/can-remove',
+  checkWorktreeRemoval: 'n10/worktree/check-removal',
   openInEditor: 'n10/worktree/open-in-editor',
   launchAgent: 'n10/session/launch',
   listSessions: 'n10/session/list',
@@ -564,6 +582,7 @@ export const IPC = {
   setThreadResolved: 'n10/reviews/resolve',
   fetchPrDescription: 'n10/reviews/pr-description',
   getPullRequestSnapshot: 'n10/pull-requests/snapshot',
+  getPullRequestChecks: 'n10/pull-requests/checks',
   getPullRequestConversation: 'n10/pull-requests/conversation',
   listReviewDrafts: 'n10/review-drafts/list',
   saveReviewDraft: 'n10/review-drafts/save',

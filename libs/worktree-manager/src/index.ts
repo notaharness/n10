@@ -1,4 +1,5 @@
 export * from './lib/worktree.js';
+export * from './lib/removal-check.js';
 export * from './lib/worktree-list.js';
 export * from './lib/worktree-resolver.js';
 export * from './lib/branches.js';

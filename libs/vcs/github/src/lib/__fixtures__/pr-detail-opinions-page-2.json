@@ -1,0 +1,32 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "latestOpinionatedReviews": {
+          "totalCount": 3,
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "op-2"
+          },
+          "nodes": [
+            {
+              "author": {
+                "__typename": "User",
+                "login": "fay",
+                "id": "U_fay",
+                "name": "Fay"
+              },
+              "state": "APPROVED",
+              "commit": {
+                "oid": "1111111111111111111111111111111111111111"
+              },
+              "onBehalfOf": {
+                "nodes": []
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
