@@ -1,9 +1,8 @@
 import { UsersIcon, XCircleIcon } from 'lucide-react';
-import type { PullRequestReviewer } from '@n10/vcs-core/types';
+import { holdingVerdict, type PullRequestReviewer } from '@n10/vcs-core/types';
 import {
   activeReviewers,
   DECISION_LABEL,
-  HOLDING_VERDICTS,
 } from '../../lib/review/overview-model.js';
 import { cn } from '../../lib/utils.js';
 import { Avatar } from '../ui/avatar.js';
@@ -79,9 +78,7 @@ export function ReviewerSummary({
   const asked = activeReviewers(reviewers);
   if (asked.length === 0) return null;
   // The most severe verdict holding it back, in the provider's words.
-  const holding = HOLDING_VERDICTS.find((d) =>
-    asked.some((r) => r.decision === d)
-  );
+  const holding = holdingVerdict(asked)?.decision;
   const approved = asked.filter((r) => r.decision === 'approved').length;
   return (
     <span

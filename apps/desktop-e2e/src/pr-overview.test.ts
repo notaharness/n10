@@ -45,6 +45,10 @@ const GITHUB: FakeGitHub = {
       rollup: 'SUCCESS',
       reviews: [{ author: 'bea', state: 'APPROVED' }],
       reviewRequests: ['n10-tester'],
+      // GitHub's own word: one approval is not the two the rules want.
+      mergeStateStatus: 'BLOCKED',
+      reviewDecision: 'REVIEW_REQUIRED',
+      checks: [{ name: 'build', state: 'SUCCESS', required: true }],
     },
     {
       number: 215,
@@ -153,10 +157,10 @@ test.describe('Pull request Overview', () => {
       page.getByRole('heading', { name: 'Verification' })
     ).toBeVisible();
 
-    // Everything n10 can see is green, and it still does not say ready.
-    await expect(
-      page.getByRole('region', { name: 'Completion' })
-    ).toContainText('Readiness not fully known');
+    // Everything else is green; GitHub still wants a review, and says so.
+    const completion = page.getByRole('region', { name: 'Completion' });
+    await expect(completion).toContainText('Waiting for review');
+    await expect(completion).toContainText('Needs a reviewer');
     await expect(page.locator('[data-reviewer="bea"]')).toContainText(
       'Approved'
     );
@@ -250,9 +254,10 @@ test.describe('Pull request Overview', () => {
     await expect(
       header.getByRole('button', { name: 'Open on GitHub' })
     ).toBeVisible();
-    // An approval beside a pending request is counted, not called met.
+    // An approval beside a pending request is not called met: GitHub
+    // still requires review.
     await expect(page.locator('[data-readiness-row="reviews"]')).toContainText(
-      'Approved by bea · 1 pending'
+      'Waiting for review'
     );
   });
 

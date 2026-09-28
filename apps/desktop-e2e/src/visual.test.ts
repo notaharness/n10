@@ -309,6 +309,14 @@ const OVERVIEW_GITHUB: FakeGitHub = {
       rollup: 'SUCCESS',
       reviews: [{ author: 'bea', state: 'APPROVED' }],
       reviewRequests: ['n10-tester'],
+      // GitHub's own word: green, and still waiting for a review.
+      mergeStateStatus: 'BLOCKED',
+      reviewDecision: 'REVIEW_REQUIRED',
+      checks: [
+        { name: 'build', state: 'SUCCESS', required: true },
+        { name: 'lint', state: 'SUCCESS', required: true },
+        { name: 'docs', state: 'SKIPPED' },
+      ],
       body: [
         '## Why',
         '',

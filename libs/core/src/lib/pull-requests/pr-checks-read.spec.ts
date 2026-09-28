@@ -62,7 +62,12 @@ describe('readPullRequestChecks', () => {
       { ref: REF, viewer: 'bob' },
       sources()
     );
-    expect(res).toMatchObject({ ref: REF, viewer: 'bob', fetchedAt: 1000 });
+    expect(res).toMatchObject({
+      ref: REF,
+      viewer: 'bob',
+      fetchedAt: 1000,
+      list: { rows: [], total: 0, complete: true },
+    });
     // Two unresolved threads and a rule that they be resolved: the
     // provider's BLOCKED is named, not a rule n10 cannot see.
     expect(res.readiness?.blockers).toEqual([
@@ -128,7 +133,20 @@ describe('readPullRequestChecks', () => {
       })
     );
     expect(res.checks).toMatchObject({ state: 'failed' });
-    expect(res.readiness).toBeNull();
+    // Readiness falls back to the list row, and so is not fully known;
+    // the row still says it is open, and its unresolved threads.
+    expect(res.readiness.state).toBe('unknown');
+    expect(res.readiness.aspects).toContainEqual({
+      id: 'lifecycle',
+      state: 'met',
+      text: 'Open',
+    });
+    expect(res.readiness.aspects).toContainEqual({
+      id: 'conversations',
+      state: 'observed',
+      text: '2 unresolved, not known if required',
+    });
+    expect(res.list).toBeNull();
   });
 
   it('keeps a failed read’s kind, and says a provider without checks has none to read', async () => {

@@ -18,6 +18,27 @@ export function isBlockingDecision(d: ReviewDecision): boolean {
     d === 'changes-requested' || d === 'waiting-for-author' || d === 'rejected'
   );
 }
+
+/** The blocking decisions, most severe first: Azure's −10, its −5,
+ *  then GitHub's changes requested. */
+export const HOLDING_DECISIONS = [
+  'rejected',
+  'waiting-for-author',
+  'changes-requested',
+] as const satisfies readonly ReviewDecision[];
+
+/** The most severe verdict holding a pull request back, with everyone
+ *  who gave it; null where none does. Every frontend words the same
+ *  verdict. */
+export function holdingVerdict<R extends { decision: ReviewDecision }>(
+  reviewers: readonly R[]
+): { decision: (typeof HOLDING_DECISIONS)[number]; by: R[] } | null {
+  for (const decision of HOLDING_DECISIONS) {
+    const by = reviewers.filter((r) => r.decision === decision);
+    if (by.length > 0) return { decision, by };
+  }
+  return null;
+}
 export type BuildStatusState = 'succeeded' | 'failed' | 'pending' | 'none';
 
 /** The current user's review verdict on a PR, in ADO's vocabulary

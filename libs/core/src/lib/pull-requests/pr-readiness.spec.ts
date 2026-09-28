@@ -81,6 +81,13 @@ describe('evaluateReadiness', () => {
       blockers: [],
       advisories: [],
       unknowns: [],
+      aspects: [
+        { id: 'lifecycle', state: 'met', text: 'Open' },
+        { id: 'reviews', state: 'met', text: 'Approved' },
+        { id: 'checks', state: 'met', text: 'Required checks pass' },
+        { id: 'conflicts', state: 'met', text: 'No conflicts' },
+        { id: 'conversations', state: 'met', text: 'Not required' },
+      ],
     });
   });
 
@@ -97,7 +104,12 @@ describe('evaluateReadiness', () => {
     );
     expect(r.state).toBe('blocked');
     expect(r.blockers).toEqual([
-      { kind: 'reviews', text: 'Waiting for review', resolvedBy: 'reviewers' },
+      {
+        kind: 'reviews',
+        text: 'Waiting for review',
+        resolvedBy: 'reviewers',
+        pending: true,
+      },
     ]);
   });
 
@@ -189,7 +201,7 @@ describe('evaluateReadiness', () => {
       lifecycle: { state: 'open', isDraft: true, native: 'OPEN' },
       reviews: 'unknown',
     } as const;
-    expect(evaluateReadiness(inputs({ merge: draft }))).toEqual({
+    expect(evaluateReadiness(inputs({ merge: draft }))).toMatchObject({
       state: 'blocked',
       blockers: [{ kind: 'draft', text: 'Draft', resolvedBy: 'author' }],
       advisories: [],
@@ -351,6 +363,7 @@ describe('evaluateReadiness', () => {
         kind: 'policies',
         text: 'Waiting for 1 required policy: Merge strategy',
         resolvedBy: 'checks',
+        pending: true,
       },
     ]);
     expect(r.advisories.map((a) => a.text)).toEqual([
@@ -368,16 +381,19 @@ describe('evaluateReadiness', () => {
         ),
       })
     );
+    // Someone must act on it, so it leads what finishes by itself.
     expect(r.blockers).toEqual([
-      {
-        kind: 'checks',
-        text: 'Waiting for 1 required check: ci',
-        resolvedBy: 'checks',
-      },
       {
         kind: 'checks',
         text: 'Someone must start 1 required check: nightly',
         resolvedBy: 'author',
+        pending: true,
+      },
+      {
+        kind: 'checks',
+        text: 'Waiting for 1 required check: ci',
+        resolvedBy: 'checks',
+        pending: true,
       },
     ]);
   });
@@ -500,6 +516,27 @@ describe('evaluateReadiness', () => {
     ]);
   });
 
+  it('leads with what someone must act on, and leaves what the checks clear last', () => {
+    const lead = (merge: Partial<MergeState>) =>
+      evaluateReadiness(
+        inputs({
+          merge: { ...CLEAN, blocked: true, ...merge },
+          checks: checks(check('e2e', 'running'), check('lint', 'queued')),
+        })
+      ).blockers.map((b) => b.text);
+    // A verdict that stands.
+    expect(lead({ reviews: 'changes-requested' })).toEqual([
+      'Changes requested',
+      'Waiting for 2 required checks: e2e, lint',
+    ]);
+    // A review still to come waits too, but on a person: every new pull
+    // request under protection while its CI runs.
+    expect(lead({ reviews: 'required' })).toEqual([
+      'Waiting for review',
+      'Waiting for 2 required checks: e2e, lint',
+    ]);
+  });
+
   it('says a closed or merged pull request is that, and nothing else', () => {
     for (const state of ['closed', 'merged'] as const) {
       const r = evaluateReadiness(
@@ -510,7 +547,13 @@ describe('evaluateReadiness', () => {
           },
         })
       );
-      expect(r).toEqual({ state, blockers: [], advisories: [], unknowns: [] });
+      expect(r).toEqual({
+        state,
+        blockers: [],
+        advisories: [],
+        unknowns: [],
+        aspects: [],
+      });
     }
   });
 });
