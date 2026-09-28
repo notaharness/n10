@@ -1,15 +1,16 @@
-import {
-  asksForReview,
-  type BranchRules,
-  type DetailReviewer,
-  type ListRead,
-  type NamedReviewers,
-  type PullRequestDetail,
-  type PullRequestInfo,
-  type ReadOutcome,
-  type ReviewDecision,
-  type ReviewRule,
+import type {
+  BranchRules,
+  DetailReviewer,
+  ListRead,
+  NamedReviewers,
+  PullRequestDetail,
+  PullRequestInfo,
+  ReadOutcome,
+  ReviewDecision,
+  ReviewRule,
 } from '@n10/vcs-core';
+// The browser-safe subpath: `@n10/core/readiness` exports this module.
+import { asksForReview } from '@n10/vcs-core/types';
 
 /**
  * Who must review a pull request, and why, in the providers' own terms.
