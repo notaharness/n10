@@ -162,21 +162,21 @@ export function assertSameRepositoryId(
   }
 }
 
-async function readDetail(
+/**
+ * One provider read about pull request `ref`, as an outcome. An answer
+ * about some other pull request is a failed read, however it came back:
+ * it must never stand in for this one's. The repository id is left out
+ * of that comparison; a replaced repository is refused as a whole by
+ * the caller.
+ */
+export async function readAbout<T extends { ref: PullRequestRef }>(
   ref: PullRequestRef,
-  read: SnapshotSources['detail']
-): Promise<ReadOutcome<PullRequestDetail>> {
-  if (!read) {
-    return {
-      state: 'unsupported',
-      reason: 'This provider does not read pull request detail',
-    };
-  }
+  read: ((prId: number) => Promise<T>) | undefined,
+  unsupported: string
+): Promise<ReadOutcome<T>> {
+  if (!read) return { state: 'unsupported', reason: unsupported };
   try {
     const value = await read(ref.number);
-    // A detail about some other pull request is not this one's, however
-    // it came back — never let it lend this one its commits. The id is
-    // left out: a replaced repository is refused as a whole, below.
     return samePullRequest({ ...value.ref, id: undefined }, ref)
       ? { state: 'read', value }
       : readFailure(
@@ -217,7 +217,11 @@ export async function readPullRequestSnapshot(
   const viewer = assertSameContext(req, src);
   const [summary, detail] = await Promise.all([
     src.lookup(req.ref.number),
-    readDetail(req.ref, src.detail),
+    readAbout(
+      req.ref,
+      src.detail,
+      'This provider does not read pull request detail'
+    ),
   ]);
   // Asked again after the reads, as the account they started as: the
   // list is cached per checkout, not per repository, so a config change

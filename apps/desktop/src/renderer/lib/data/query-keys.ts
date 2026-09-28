@@ -69,6 +69,17 @@ export const keys = {
     ] as const,
   prChecksFor: (cwd: string, ref: PullRequestRef) =>
     ['pr-checks', cwd, pullRequestKey(ref)] as const,
+  /** Every conversation read in this repository, to invalidate. */
+  prConversations: (cwd: string) => ['pr-conversation', cwd] as const,
+  /** Keyed like `prSnapshot`. */
+  prConversation: (cwd: string, ref: PullRequestRef, viewer: string | null) =>
+    [
+      'pr-conversation',
+      cwd,
+      pullRequestKey(ref),
+      ref.id ?? null,
+      viewer,
+    ] as const,
   activity: (cwd: string) => ['session-activity', cwd] as const,
   commentImage: (url: string) => ['comment-image', url] as const,
   drafts: (cwd: string, prId: number) => ['drafts', cwd, prId] as const,

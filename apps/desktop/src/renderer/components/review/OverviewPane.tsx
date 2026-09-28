@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { PullRequestInfo } from '@n10/vcs-core';
+import { pullRequestKey } from '@n10/vcs-core/pr-details';
 import { usePullRequestChecks } from '../../lib/data/pr-checks-query.js';
 import { NO_REF, pullRequestRefFor } from '../../lib/data/pr-snapshot-query.js';
 import { keys } from '../../lib/data/query-keys.js';
@@ -10,6 +11,7 @@ import {
   reviewRole,
   type AttentionAction,
 } from '../../lib/review/overview-model.js';
+import { PrActivity } from './overview/PrActivity.js';
 import { PrAttention } from './overview/PrAttention.js';
 import { PrChecks } from './overview/PrChecks.js';
 import { PrDescription } from './overview/PrDescription.js';
@@ -68,9 +70,12 @@ function useNestedChecks(
 export function OverviewPane({
   pr,
   onAction,
+  onOpenThread,
 }: {
   pr: PullRequestInfo;
   onAction: (action: AttentionAction) => void;
+  /** Show a remote thread in the diff, from the activity. */
+  onOpenThread: (id: string, path: string | null) => void;
 }) {
   const { repo } = useRepo();
   const role = reviewRole(pr, repo.viewer);
@@ -127,7 +132,16 @@ export function OverviewPane({
               checksRef={checksButton}
             />
           </div>
-          <PrDescription pr={pr} className="min-w-0 [grid-area:main]" />
+          <div className="min-w-0 [grid-area:main]">
+            <PrDescription pr={pr} />
+            {ref && (
+              <PrActivity
+                key={pullRequestKey(ref)}
+                prRef={ref}
+                onOpenThread={onOpenThread}
+              />
+            )}
+          </div>
           <div className="[grid-area:people]">
             <PrReviewers reviewers={pr.reviewers ?? []} viewer={repo.viewer} />
           </div>

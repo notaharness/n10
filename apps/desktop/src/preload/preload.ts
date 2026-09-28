@@ -93,6 +93,8 @@ const api: N10HostApi = {
     ipcRenderer.invoke(IPC.getPullRequestSnapshot, req),
   getPullRequestChecks: (req) =>
     ipcRenderer.invoke(IPC.getPullRequestChecks, req),
+  getPullRequestConversation: (req) =>
+    ipcRenderer.invoke(IPC.getPullRequestConversation, req),
   submitReviewVerdict: (prId, verdict) =>
     ipcRenderer.invoke(IPC.submitReviewVerdict, prId, verdict),
   getReviewViewer: () => ipcRenderer.invoke(IPC.getReviewViewer),

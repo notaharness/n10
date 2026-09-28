@@ -126,6 +126,7 @@ export function ContentPane({
   onExitReview,
   onOpenInDiff,
   onOverviewAction,
+  onOpenThread,
   plan,
 }: {
   effMode: Mode;
@@ -166,6 +167,8 @@ export function ContentPane({
   onOpenInDiff: (file: string) => void;
   /** The Overview's next-step button. */
   onOverviewAction: (action: AttentionAction) => void;
+  /** Show a remote thread in the diff, from the Overview's activity. */
+  onOpenThread: (id: string, path: string | null) => void;
   /** Everything the plan pane needs; absent on a bare worktree tab. */
   plan?: {
     items: PlanItem[];
@@ -234,8 +237,16 @@ export function ContentPane({
         </div>
       )}
       {pr && overviewMounted && (
+        // Kept mounted like the diff once it has been shown: the
+        // reader's place in the activity, its filter and search survive
+        // a trip to the diff. Not before, so a tab that never shows it
+        // never reads its conversation.
         <StackedPane visible={effMode === 'overview'}>
-          <OverviewPane pr={pr} onAction={onOverviewAction} />
+          <OverviewPane
+            pr={pr}
+            onAction={onOverviewAction}
+            onOpenThread={onOpenThread}
+          />
         </StackedPane>
       )}
       <StackedPane visible={effMode === 'diff'}>

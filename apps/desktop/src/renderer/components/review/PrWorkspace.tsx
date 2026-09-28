@@ -330,6 +330,7 @@ export function PrWorkspace({
               onExitReview={showDiff}
               onOpenInDiff={nav.jumpToFile}
               onOverviewAction={onOverviewAction}
+              onOpenThread={nav.jumpToId}
               plan={plan.wiring}
             />
           </Panel>

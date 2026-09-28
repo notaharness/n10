@@ -137,7 +137,7 @@ export function ThreadCard({
         .filter(Boolean)
         .join(' on ')}
       className={cn(
-        'group/card max-w-[900px] overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs transition-shadow outline-none',
+        'group/card max-w-[900px] overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs transition-shadow outline-none focus-visible:ring-2 focus-visible:ring-ring',
         planControls.inPlan
           ? 'border-primary/40'
           : thread.isResolved

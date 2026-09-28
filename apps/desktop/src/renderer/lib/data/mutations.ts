@@ -35,8 +35,14 @@ function useInvalidator(cwd: string) {
     sync: () => qc.invalidateQueries({ queryKey: keys.sync(cwd) }),
     branches: () => qc.invalidateQueries({ queryKey: keys.branches(cwd) }),
     sessions: () => qc.invalidateQueries({ queryKey: keys.sessions(cwd) }),
+    // A write to a thread changes the conversation the Overview reads
+    // too; its entries are keyed by ref, so every one in this
+    // repository goes, which is the pull request on screen.
     threads: (prId: number) =>
-      qc.invalidateQueries({ queryKey: keys.threads(cwd, prId) }),
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.threads(cwd, prId) }),
+        qc.invalidateQueries({ queryKey: keys.prConversations(cwd) }),
+      ]),
     drafts: (prId: number) =>
       qc.invalidateQueries({ queryKey: keys.drafts(cwd, prId) }),
   };
