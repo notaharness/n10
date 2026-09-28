@@ -10,6 +10,7 @@ import type {
   ReviewDecision,
   ReviewVerdict,
   BuildStatusState,
+  MergedBranchHeads,
 } from '@n10/vcs-core';
 import { sanitizeBody } from '@n10/vcs-core';
 import { log } from '@n10/logger';
@@ -917,6 +918,13 @@ async function setAdoThreadResolved(
 
 // ── VcsProvider implementation ──────────────────────────────────────
 
+/** A completed pull request, as far as the merged-branch sweep reads it. */
+interface CompletedPr {
+  sourceRefName?: string;
+  /** The source commit the pull request merged. */
+  lastMergeSourceCommit?: { commitId?: string };
+}
+
 export const azureDevOpsProvider: VcsProvider = {
   id: 'azure-devops',
   displayName: 'Azure DevOps',
@@ -1033,13 +1041,13 @@ export const azureDevOpsProvider: VcsProvider = {
     auth: Record<string, string>,
     project: Record<string, string>,
     branches: string[]
-  ): Promise<Set<string>> {
-    if (branches.length === 0) return new Set();
+  ): Promise<MergedBranchHeads> {
+    if (branches.length === 0) return new Map();
     const config = toAdoConfig(auth, project);
     // A failed lookup answers with no merged branches rather than
     // throwing: the sweep that consumes this deletes branches, and
     // "the request failed" must never read as "nothing is merged".
-    const data = await adoGet<{ value?: { sourceRefName?: string }[] }>(
+    const data = await adoGet<{ value?: CompletedPr[] }>(
       'fetchMergedBranches',
       `${config.org}/${config.project}/${config.repo}/completed-prs`,
       TTL.mergedPrs,
@@ -1048,12 +1056,15 @@ export const azureDevOpsProvider: VcsProvider = {
       )}/pullrequests?searchCriteria.status=completed&api-version=7.1`,
       authHeaders(config.pat),
       `repository ${config.repo}`
-    ).catch(() => ({ value: [] as { sourceRefName?: string }[] }));
+    ).catch(() => ({ value: [] as CompletedPr[] }));
     const branchSet = new Set(branches);
-    const matched = new Set<string>();
+    const matched: MergedBranchHeads = new Map();
     for (const pr of data.value ?? []) {
       const source = (pr.sourceRefName ?? '').replace(/^refs\/heads\//, '');
-      if (branchSet.has(source)) matched.add(source);
+      const head = pr.lastMergeSourceCommit?.commitId;
+      // A pull request without its head commit vouches for nothing.
+      if (!branchSet.has(source) || !head) continue;
+      matched.set(source, [...(matched.get(source) ?? []), head]);
     }
     return matched;
   },

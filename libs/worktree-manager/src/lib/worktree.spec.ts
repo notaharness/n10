@@ -31,6 +31,7 @@ import {
   countConflictsBetween,
   fetchBranches,
   refExists,
+  isAncestorOf,
   getMainBranch,
   resetMainBranchCache,
 } from './branches.js';
@@ -105,6 +106,27 @@ beforeEach(() => {
   });
   resetMainBranchCache();
   resetWorktreeResolver();
+});
+
+// The merged-branch sweep deletes on a yes: not knowing must be a no.
+describe('isAncestorOf', () => {
+  it('answers yes when git says the commit is in the other', async () => {
+    mockExec.mockResolvedValueOnce(resolve(''));
+    expect(await isAncestorOf('abc123', 'def456', '/repo')).toBe(true);
+    expect(mockExec).toHaveBeenCalledWith(
+      'git merge-base --is-ancestor "abc123" "def456"',
+      { encoding: 'utf8', cwd: '/repo' }
+    );
+  });
+
+  it('answers no when git cannot find a commit', async () => {
+    mockExec.mockRejectedValueOnce(
+      Object.assign(new Error('fatal: Not a valid commit name def456'), {
+        code: 128,
+      })
+    );
+    expect(await isAncestorOf('abc123', 'def456', '/repo')).toBe(false);
+  });
 });
 
 describe('listBranches', () => {

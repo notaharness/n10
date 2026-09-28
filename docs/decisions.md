@@ -191,7 +191,14 @@ verdict did not name, such as a file written into a checkout judged clean. Any
 of them keeps everything. A branch that moves during the removal itself, or
 that git will not delete, keeps the branch. `removeWorktreeSession`
 returns what it did, and each shell says what was kept and why. The
-merged-branch sweep uses the same guard. `removeWorktreeSession`
+merged-branch sweep uses the same guard, at the branch's own tip, and only while
+a merged pull request carried that tip: a merge vouches for the commits it
+carried, not for the branch name. Providers answer with each merged pull
+request's head commit, and the sweep removes a branch only while its tip is one
+of them or an ancestor of one, fetching by commit a head the clone lacks. Work
+committed after the merge exists nowhere else, so such a branch is left alone.
+It keeps its merged badge, since its pull request did merge, and like every
+merged branch it gets no conflict count. `removeWorktreeSession`
 scans discovery before and after removing, so the shells learn of n10's
 removals through `onChanged`, as they learn of `git worktree remove`: discovery
 can only report the removal of a worktree it has seen.

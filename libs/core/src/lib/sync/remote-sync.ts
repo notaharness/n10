@@ -1,12 +1,16 @@
 import { keyForWorktree } from '../session-key.js';
 import {
-  branchTip,
   canRemoveBranch,
   fastForwardMainBranch,
   listWorktrees,
 } from '@n10/worktree-manager';
 import { logError } from '@n10/logger';
-import type { AppConfig, BranchPrMap, VcsProvider } from '@n10/vcs-core';
+import type {
+  AppConfig,
+  BranchPrMap,
+  MergedBranchHeads,
+  VcsProvider,
+} from '@n10/vcs-core';
 import { isSessionAlive } from '../pty-registry.js';
 import { hasLiveTmuxSession } from '../session-backend.js';
 import {
@@ -15,6 +19,7 @@ import {
 } from '../session/remove-worktree.js';
 import { countBranchConflicts } from './conflicts.js';
 import { fetchRefs } from './fetch-queue.js';
+import { mergedTip, type MergedTip } from './merged-tip.js';
 
 // ── Remote sync core ─────────────────────────────────────────────
 //
@@ -83,12 +88,20 @@ type SweepConfig = Pick<
 >;
 
 /** Called with a merged branch's checkout session, the branch, and the
- *  verdict to remove it with: `clear`, at the commit it was judged. */
+ *  verdict to remove it with: `clear`, at the tip its merged pull
+ *  request carried. */
 type AutoDelete = (
   sessionName: string,
   branch: string,
   approved: WorktreeRemovalCheck
 ) => void | Promise<void>;
+
+/** Why the sweep leaves a merged branch, as the log says it. */
+const SKIPPED: Record<Exclude<MergedTip, { tip: string }>['skip'], string> = {
+  'no-tip': 'git cannot find its tip',
+  'new-work': 'it has commits its merged pull request did not',
+  'unknown-head': 'the head of its merged pull request is not in this clone',
+};
 
 /**
  * Delete the worktrees of merged branches that are safe to delete, and
@@ -96,7 +109,7 @@ type AutoDelete = (
  * cancelled partway, which is not the same as "nothing was blocked".
  */
 async function autoDeleteMerged(args: {
-  merged: Set<string>;
+  merged: MergedBranchHeads;
   onAutoDelete: AutoDelete;
   isCancelled: () => boolean;
   cwd: string | undefined;
@@ -106,7 +119,7 @@ async function autoDeleteMerged(args: {
   // One listing for the pass: each merged branch's session is the one in
   // the checkout that has it.
   const checkouts = await listWorktrees(cwd);
-  for (const branch of merged) {
+  for (const [branch, heads] of merged) {
     // A live agent prevents auto-deletion even when n10 is detached.
     // Deleting its working directory would disrupt the running process.
     const checkout = checkouts.find((w) => w.branch === branch);
@@ -119,7 +132,23 @@ async function autoDeleteMerged(args: {
       );
       continue;
     }
-    const tip = await branchTip(branch, checkout.path);
+    // A merge vouches for the commits its pull request carried, not for
+    // the branch name: work committed since exists nowhere else. A head
+    // git lacks is fetched in the repository being swept.
+    const judged = await mergedTip(
+      branch,
+      heads,
+      checkout.path,
+      cwd ?? process.cwd()
+    );
+    if (!('tip' in judged)) {
+      logError(
+        'sweepMergedBranches',
+        `Skipping auto-delete of ${branch}: ${SKIPPED[judged.skip]}`
+      );
+      continue;
+    }
+    const { tip } = judged;
     const check = await canRemoveBranch(branch, { confirmedMerged: true, cwd });
     if (isCancelled()) return null;
     if (check.safe) {
@@ -191,17 +220,18 @@ export async function sweepMergedBranches(opts: {
     return { merged: new Set(), nextWarned: keepWarned };
   }
 
-  let merged: Set<string>;
+  let heads: MergedBranchHeads;
   try {
-    merged = await fetchMerged(
+    heads = await fetchMerged(
       config.vendorAuth,
       config.vendorProject,
       branches
     );
   } catch (err: unknown) {
     logError('fetchMergedBranches', err);
-    merged = new Set<string>();
+    heads = new Map();
   }
+  const merged = new Set(heads.keys());
   if (isCancelled()) return { merged, nextWarned: keepWarned };
   onMerged?.(merged);
   if (!config.autoDeleteOnMerge) {
@@ -209,7 +239,7 @@ export async function sweepMergedBranches(opts: {
   }
 
   const rebasingNow = await autoDeleteMerged({
-    merged,
+    merged: heads,
     onAutoDelete,
     isCancelled,
     cwd,

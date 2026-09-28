@@ -155,13 +155,15 @@ describe('sweepMergedBranches', () => {
     return { repo: realpathSync(repo), checkout: realpathSync(checkout) };
   }
 
-  /** Sweep `repo` with `feature` reported merged and auto-delete on,
-   *  and return what it asked to delete. */
+  /** Sweep `repo` with `feature` reported merged at its tip and
+   *  auto-delete on, and return what it asked to delete. */
   async function sweep(repo: string): Promise<[string, string][]> {
     const deleted: [string, string][] = [];
+    const head = git(repo, 'rev-parse', 'feature');
     await sweepMergedBranches({
       provider: {
-        fetchMergedBranches: () => Promise.resolve(new Set(['feature'])),
+        fetchMergedBranches: () =>
+          Promise.resolve(new Map([['feature', [head]]])),
       } as never,
       vcsConfigured: true,
       config: { vendorAuth: {}, vendorProject: {}, autoDeleteOnMerge: true },
