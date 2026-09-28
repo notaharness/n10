@@ -18,7 +18,11 @@ export type {
   PullRequestSnapshot,
   ReadinessAspect,
   ReadinessItem,
+  RequirementReason,
   Resolver,
+  ReviewerRequirement,
+  ReviewerStanding,
+  ReviewRequirements,
   PullRequestConversationRead,
   SnapshotRequest,
 } from '@n10/core';

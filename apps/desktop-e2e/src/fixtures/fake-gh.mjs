@@ -117,6 +117,25 @@ function flags(args) {
 
 const page = { hasNextPage: false, endCursor: null };
 
+/** A review request as the scenario gives it: a login, or a person or
+ *  team asked as a code owner. */
+function requestOf(entry) {
+  return typeof entry === 'string' ? { login: entry } : entry;
+}
+
+/** The requested reviewer as the detail read selects it. */
+function requestedReviewer(req) {
+  if (req.team) {
+    return {
+      __typename: 'Team',
+      id: `T_${req.team}`,
+      combinedSlug: req.team,
+      name: req.name ?? req.team,
+    };
+  }
+  return { __typename: 'User', id: `U_${req.login}`, login: req.login };
+}
+
 function searchNode(pr) {
   return {
     number: pr.number,
@@ -136,9 +155,15 @@ function searchNode(pr) {
       })),
     },
     reviewRequests: {
-      nodes: (pr.reviewRequests ?? []).map((login) => ({
-        requestedReviewer: { login },
-      })),
+      // The list names people only, as GitHub's search answer does here.
+      nodes: (pr.reviewRequests ?? []).map((entry) => {
+        const req = requestOf(entry);
+        return {
+          requestedReviewer: req.team
+            ? { name: req.team }
+            : { login: req.login },
+        };
+      }),
     },
     reviewThreads: {
       nodes: (pr.threads ?? []).map((t) => ({
@@ -235,10 +260,13 @@ function detailNode(pr) {
         }))
       ),
       reviewRequests: connection(
-        (pr.reviewRequests ?? []).map((login) => ({
-          asCodeOwner: false,
-          requestedReviewer: { __typename: 'User', id: `U_${login}`, login },
-        }))
+        (pr.reviewRequests ?? []).map((entry) => {
+          const req = requestOf(entry);
+          return {
+            asCodeOwner: req.codeOwner ?? false,
+            requestedReviewer: requestedReviewer(req),
+          };
+        })
       ),
     },
   };
@@ -309,8 +337,9 @@ function checksNode(pr) {
       mergeable: pr.mergeable ?? 'MERGEABLE',
       mergeStateStatus: pr.mergeStateStatus ?? 'CLEAN',
       reviewDecision: pr.reviewDecision ?? null,
-      // No classic protection: the scenario's rules are rule sets.
-      baseRef: { refUpdateRule: null },
+      // Classic protection only where the scenario gives its review
+      // rule; the rest of its rules are rule sets.
+      baseRef: { refUpdateRule: classicRule() },
       commits: {
         nodes: [
           {
@@ -343,10 +372,40 @@ function branchAnswer(name) {
   };
 }
 
+/** Classic protection's rule as `refUpdateRule` shows it. */
+function classicRule() {
+  const classic = scenario.rules?.classic;
+  if (!classic) return null;
+  return {
+    requiresConversationResolution: false,
+    requiredApprovingReviewCount: classic.approvals ?? 0,
+    requiresCodeOwnerReviews: classic.codeOwners ?? false,
+  };
+}
+
+/** A rule set's `pull_request` rule for the scenario's review rule. */
+function reviewRule(rules) {
+  const params = {};
+  if (rules.approvals) params.required_approving_review_count = rules.approvals;
+  if (rules.codeOwners) params.require_code_owner_review = true;
+  if (rules.requiredTeams?.length) {
+    params.required_reviewers = rules.requiredTeams.map((t) => ({
+      file_patterns: t.paths ?? [],
+      minimum_approvals: t.approvals ?? 1,
+      reviewer: { id: t.id, type: 'Team' },
+    }));
+  }
+  return Object.keys(params).length > 0
+    ? { type: 'pull_request', parameters: params }
+    : null;
+}
+
 /** The rule sets on every base branch, from the scenario's `rules`. */
 function rulesAnswer() {
   const rules = scenario.rules ?? {};
   const answer = [];
+  const reviews = reviewRule(rules);
+  if (reviews) answer.push(reviews);
   if (rules.required?.length) {
     answer.push({
       type: 'required_status_checks',

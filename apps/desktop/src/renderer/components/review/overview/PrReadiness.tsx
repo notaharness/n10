@@ -95,7 +95,26 @@ function MoreBlockers({ readiness }: { readiness: PullRequestReadiness }) {
   );
 }
 
-function Aspects({ readiness }: { readiness: PullRequestReadiness }) {
+/** What the rules ask of reviews, under the reviews row: each
+ *  requirement, or that the rules could not be read. */
+function ReviewRule({ answer }: { answer: PullRequestChecksAnswer }) {
+  const { rule } = answer.requirements;
+  if (answer.checks.state !== 'read') return null;
+  const lines = rule ?? ['Review rules not read'];
+  if (lines.length === 0) return null;
+  return (
+    <span data-review-rule className="block text-xs text-muted-foreground">
+      {lines.map((line) => (
+        <span key={line} className="block">
+          {line}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function Aspects({ answer }: { answer: PullRequestChecksAnswer }) {
+  const { readiness } = answer;
   return (
     <ul className="mt-3 space-y-1.5 text-sm">
       {readiness.aspects.map((a) => (
@@ -112,7 +131,10 @@ function Aspects({ readiness }: { readiness: PullRequestReadiness }) {
           <span className="w-24 shrink-0 text-muted-foreground">
             {ASPECT_LABEL[a.id]}
           </span>
-          <span className="min-w-0 break-words">{a.text}</span>
+          <span className="min-w-0 break-words">
+            {a.text}
+            {a.id === 'reviews' && <ReviewRule answer={answer} />}
+          </span>
         </li>
       ))}
     </ul>
@@ -295,7 +317,7 @@ export function PrReadiness(props: ReadinessProps) {
             headlineRef={headlineRef}
           />
           <MoreBlockers readiness={data.readiness} />
-          <Aspects readiness={data.readiness} />
+          <Aspects answer={data} />
           <Actions
             {...props}
             onRefresh={refresh}
