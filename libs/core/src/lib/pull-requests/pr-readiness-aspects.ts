@@ -64,15 +64,13 @@ const UNREAD = {
   unsupported: 'Not read by this provider',
 } as const;
 
-/** Which checks the provider requires is known: its rules were read and
- *  it named every check's requirement, or it says nothing enforced is in
- *  the way. Without its rules, a required check that never reported is
- *  simply absent. */
-function requirementsKnown(
-  { merge, rules }: ReadinessInputs,
+/** The provider named which checks it requires: its rules were read
+ *  and every check's requirement is stated. Without its rules, a
+ *  required check that never reported is simply absent. */
+function requirementsStated(
+  { rules }: ReadinessInputs,
   items: readonly PullRequestCheck[]
 ): boolean {
-  if (merge.blocked === false) return true;
   return (
     rules.state === 'read' && items.every((c) => c.requirement !== 'unknown')
   );
@@ -84,7 +82,7 @@ function checks(inputs: ReadinessInputs, t: ReadinessTally): ReadinessAspect {
   if (inputs.checks.state !== 'read') {
     return { ...row, state: 'unknown', text: UNREAD[inputs.checks.state] };
   }
-  // Blockers come what won't clear by waiting first.
+  // Blockers come what someone must act on first.
   const [held] = t.blockers.filter((b) => CHECK_KINDS.has(b.kind));
   if (held) {
     return {
@@ -100,25 +98,50 @@ function checks(inputs: ReadinessInputs, t: ReadinessTally): ReadinessAspect {
     return { ...row, state: 'unknown', text: 'Outcome not known' };
   }
   const advisory = t.advisories.find((a) => CHECK_KINDS.has(a.kind))?.text;
-  if (!requirementsKnown(inputs, items)) {
-    return {
-      ...row,
-      state: 'unknown',
-      text: advisory ?? 'Not known which are required',
-    };
+  if (!requirementsStated(inputs, items)) {
+    return unstated(inputs, row, required.length > 0, advisory);
   }
   if (required.length === 0) {
     return advisory
       ? { ...row, state: 'advisory', text: advisory }
       : { ...row, state: 'met', text: 'None required' };
   }
-  // A failure nothing enforces stays in sight beside the pass.
+  return passing(row, advisory);
+}
+
+/** A failure nothing enforces stays in sight beside the pass. */
+function passing(
+  row: { id: 'checks' },
+  advisory: string | undefined
+): ReadinessAspect {
   const pass = 'Required checks pass';
   return {
     ...row,
     state: 'met',
     text: advisory ? `${pass} · ${advisory}` : pass,
   };
+}
+
+/** Which checks are required is not stated. Where the provider says
+ *  nothing enforced is in the way that is moot, and says only that;
+ *  otherwise it is not known. */
+function unstated(
+  { merge }: ReadinessInputs,
+  row: { id: 'checks' },
+  anyRequired: boolean,
+  advisory: string | undefined
+): ReadinessAspect {
+  if (merge.blocked !== false) {
+    return {
+      ...row,
+      state: 'unknown',
+      text: advisory ?? 'Not known which are required',
+    };
+  }
+  if (advisory) return { ...row, state: 'advisory', text: advisory };
+  return anyRequired
+    ? passing(row, undefined)
+    : { ...row, state: 'met', text: 'Not in the way' };
 }
 
 function conflicts({ merge }: ReadinessInputs): ReadinessAspect {

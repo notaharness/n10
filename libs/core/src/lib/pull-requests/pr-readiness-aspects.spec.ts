@@ -279,10 +279,23 @@ describe('readiness aspects', () => {
       state: 'unknown',
       text: '1 check failing, not known if required: build',
     });
-    // Moot where the provider says nothing enforced is in the way.
+    // Moot where the provider says nothing enforced is in the way, and
+    // said as only that.
     expect(
       aspect(inputs({ rules: unread, checks: listed() }), 'checks')
-    ).toEqual({ state: 'met', text: 'None required' });
+    ).toEqual({ state: 'met', text: 'Not in the way' });
+    expect(
+      aspect(
+        inputs({
+          rules: unread,
+          checks: listed(check('build', 'failed', { requirement: 'unknown' })),
+        }),
+        'checks'
+      )
+    ).toEqual({
+      state: 'advisory',
+      text: '1 check failing, not known if required: build',
+    });
   });
 
   it('keeps a failure nothing enforces in sight beside a pass', () => {

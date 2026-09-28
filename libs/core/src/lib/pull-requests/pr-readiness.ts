@@ -45,7 +45,8 @@ export interface ReadinessItem {
 
 export interface PullRequestReadiness {
   state: 'ready' | 'blocked' | 'unknown' | 'closed' | 'merged';
-  /** What stops completion now, what won't clear by waiting first. */
+  /** What stops completion now: what someone must act on first, what
+   *  clears when the checks finish last. */
   blockers: ReadinessItem[];
   /** Visible problems not known to block: a failed optional check, or
    *  one not known to be required. */
@@ -327,8 +328,10 @@ export function evaluateReadiness(
   conversationsTally(inputs, t);
   if (inputs.rules.state !== 'read') t.unknowns.push('Branch rules');
   enforcementTally(inputs, t);
-  // What won't clear by waiting leads; each group keeps its order.
-  t.blockers.sort((a, b) => Number(!!a.pending) - Number(!!b.pending));
+  // What someone must act on leads; what the checks clear by finishing
+  // comes last. Each group keeps its order.
+  const byChecks = (b: ReadinessItem) => Number(b.resolvedBy === 'checks');
+  t.blockers.sort((a, b) => byChecks(a) - byChecks(b));
   return {
     state: verdict(inputs.merge, t),
     ...t,

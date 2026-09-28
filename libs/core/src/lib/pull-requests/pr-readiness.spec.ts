@@ -381,17 +381,18 @@ describe('evaluateReadiness', () => {
         ),
       })
     );
+    // Someone must act on it, so it leads what finishes by itself.
     expect(r.blockers).toEqual([
-      {
-        kind: 'checks',
-        text: 'Waiting for 1 required check: ci',
-        resolvedBy: 'checks',
-        pending: true,
-      },
       {
         kind: 'checks',
         text: 'Someone must start 1 required check: nightly',
         resolvedBy: 'author',
+        pending: true,
+      },
+      {
+        kind: 'checks',
+        text: 'Waiting for 1 required check: ci',
+        resolvedBy: 'checks',
         pending: true,
       },
     ]);
@@ -515,17 +516,24 @@ describe('evaluateReadiness', () => {
     ]);
   });
 
-  it('leads with what will not clear by waiting', () => {
-    // A running check, a review still to come, and a verdict that stands.
-    const r = evaluateReadiness(
-      inputs({
-        merge: { ...CLEAN, blocked: true, reviews: 'changes-requested' },
-        checks: checks(check('e2e', 'running'), check('lint', 'queued')),
-      })
-    );
-    expect(r.blockers.map((b) => [b.text, b.pending ?? false])).toEqual([
-      ['Changes requested', false],
-      ['Waiting for 2 required checks: e2e, lint', true],
+  it('leads with what someone must act on, and leaves what the checks clear last', () => {
+    const lead = (merge: Partial<MergeState>) =>
+      evaluateReadiness(
+        inputs({
+          merge: { ...CLEAN, blocked: true, ...merge },
+          checks: checks(check('e2e', 'running'), check('lint', 'queued')),
+        })
+      ).blockers.map((b) => b.text);
+    // A verdict that stands.
+    expect(lead({ reviews: 'changes-requested' })).toEqual([
+      'Changes requested',
+      'Waiting for 2 required checks: e2e, lint',
+    ]);
+    // A review still to come waits too, but on a person: every new pull
+    // request under protection while its CI runs.
+    expect(lead({ reviews: 'required' })).toEqual([
+      'Waiting for review',
+      'Waiting for 2 required checks: e2e, lint',
     ]);
   });
 
