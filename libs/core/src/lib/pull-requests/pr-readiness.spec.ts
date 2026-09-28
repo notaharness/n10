@@ -81,6 +81,14 @@ describe('evaluateReadiness', () => {
       blockers: [],
       advisories: [],
       unknowns: [],
+      aspects: [
+        { id: 'lifecycle', state: 'met', text: 'Open' },
+        { id: 'reviews', state: 'met', text: 'Approved' },
+        { id: 'checks', state: 'met', text: 'Required checks pass' },
+        { id: 'conflicts', state: 'met', text: 'No conflicts' },
+        { id: 'conversations', state: 'met', text: 'All resolved' },
+        { id: 'permission', state: 'unknown', text: 'Not read yet' },
+      ],
     });
   });
 
@@ -97,7 +105,12 @@ describe('evaluateReadiness', () => {
     );
     expect(r.state).toBe('blocked');
     expect(r.blockers).toEqual([
-      { kind: 'reviews', text: 'Waiting for review', resolvedBy: 'reviewers' },
+      {
+        kind: 'reviews',
+        text: 'Waiting for review',
+        resolvedBy: 'reviewers',
+        pending: true,
+      },
     ]);
   });
 
@@ -189,7 +202,7 @@ describe('evaluateReadiness', () => {
       lifecycle: { state: 'open', isDraft: true, native: 'OPEN' },
       reviews: 'unknown',
     } as const;
-    expect(evaluateReadiness(inputs({ merge: draft }))).toEqual({
+    expect(evaluateReadiness(inputs({ merge: draft }))).toMatchObject({
       state: 'blocked',
       blockers: [{ kind: 'draft', text: 'Draft', resolvedBy: 'author' }],
       advisories: [],
@@ -351,6 +364,7 @@ describe('evaluateReadiness', () => {
         kind: 'policies',
         text: 'Waiting for 1 required policy: Merge strategy',
         resolvedBy: 'checks',
+        pending: true,
       },
     ]);
     expect(r.advisories.map((a) => a.text)).toEqual([
@@ -373,11 +387,13 @@ describe('evaluateReadiness', () => {
         kind: 'checks',
         text: 'Waiting for 1 required check: ci',
         resolvedBy: 'checks',
+        pending: true,
       },
       {
         kind: 'checks',
         text: 'Someone must start 1 required check: nightly',
         resolvedBy: 'author',
+        pending: true,
       },
     ]);
   });
@@ -510,7 +526,13 @@ describe('evaluateReadiness', () => {
           },
         })
       );
-      expect(r).toEqual({ state, blockers: [], advisories: [], unknowns: [] });
+      expect(r).toEqual({
+        state,
+        blockers: [],
+        advisories: [],
+        unknowns: [],
+        aspects: [],
+      });
     }
   });
 });

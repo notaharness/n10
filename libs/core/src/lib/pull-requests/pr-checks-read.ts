@@ -6,6 +6,8 @@ import {
   type PullRequestRef,
   type ReadOutcome,
 } from '@n10/vcs-core';
+import { checkList, type CheckList } from './pr-check-list.js';
+import { listReadiness } from './pr-readiness-list.js';
 import {
   evaluateReadiness,
   type PullRequestReadiness,
@@ -31,8 +33,12 @@ export interface PullRequestChecksAnswer {
   viewer: string | null;
   fetchedAt: number;
   checks: ReadOutcome<PullRequestChecks>;
-  /** Null when the checks could not be read: nothing to evaluate. */
-  readiness: PullRequestReadiness | null;
+  /** From the checks where they were read; from the list row where
+   *  not, which leaves it not fully known. */
+  readiness: PullRequestReadiness;
+  /** The checks and policies to read, in order; null where they could
+   *  not be read. */
+  list: CheckList | null;
 }
 
 export interface ChecksSources
@@ -80,8 +86,8 @@ export async function readPullRequestChecks(
   // The list row's count of unresolved threads, which the checks read
   // does not carry: a lower bound, from its first page of threads, as
   // of the list's own read. Readiness uses it to explain, not to decide.
-  const unresolved =
-    summary.kind === 'found' ? summary.pr.activeCommentCount ?? null : null;
+  const row = summary.kind === 'found' ? summary.pr : null;
+  const unresolved = row?.activeCommentCount ?? null;
   return {
     ref: withId(req.ref, readId),
     viewer,
@@ -95,6 +101,7 @@ export async function readPullRequestChecks(
             rules: checks.value.rules,
             unresolvedThreads: unresolved,
           })
-        : null,
+        : listReadiness(row),
+    list: checks.state === 'read' ? checkList(checks.value) : null,
   };
 }

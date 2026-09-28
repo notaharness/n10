@@ -1,3 +1,7 @@
+import {
+  readinessAspects,
+  type ReadinessAspect,
+} from './pr-readiness-aspects.js';
 import type {
   BranchRules,
   ListRead,
@@ -34,6 +38,8 @@ export interface ReadinessItem {
     | 'rules';
   text: string;
   resolvedBy: Resolver;
+  /** Nothing has failed: it waits for something to start or finish. */
+  pending?: boolean;
 }
 
 export interface PullRequestReadiness {
@@ -44,6 +50,9 @@ export interface PullRequestReadiness {
   advisories: ReadinessItem[];
   /** What could not be read, or the provider has not worked out. */
   unknowns: string[];
+  /** Each fact on its own row: lifecycle, reviews, checks, conflicts,
+   *  conversations and merge permission. */
+  aspects: ReadinessAspect[];
 }
 
 export interface ReadinessInputs {
@@ -54,11 +63,13 @@ export interface ReadinessInputs {
   unresolvedThreads: number | null;
 }
 
-interface Tally {
+export interface ReadinessTally {
   blockers: ReadinessItem[];
   advisories: ReadinessItem[];
   unknowns: string[];
 }
+
+type Tally = ReadinessTally;
 
 function count(n: number, [one, many]: Noun): string {
   return `${n} ${n === 1 ? one : many}`;
@@ -133,6 +144,7 @@ function kindTally(
         waiting
       )}`,
       resolvedBy: 'checks',
+      pending: true,
     });
   }
   if (unstarted.length > 0) {
@@ -143,6 +155,7 @@ function kindTally(
         words.required
       )}: ${names(unstarted)}`,
       resolvedBy: 'author',
+      pending: true,
     });
   }
   if (other.length > 0) {
@@ -196,6 +209,7 @@ const REVIEW_BLOCKERS: Partial<Record<MergeState['reviews'], ReadinessItem>> = {
     kind: 'reviews',
     text: 'Waiting for review',
     resolvedBy: 'reviewers',
+    pending: true,
   },
 };
 
@@ -310,6 +324,7 @@ export function evaluateReadiness(
       blockers: [],
       advisories: [],
       unknowns: [],
+      aspects: [],
     };
   }
   const t: Tally = { blockers: [], advisories: [], unknowns: [] };
@@ -319,5 +334,9 @@ export function evaluateReadiness(
   conversationsTally(inputs, t);
   if (inputs.rules.state !== 'read') t.unknowns.push('Branch rules');
   enforcementTally(inputs, t);
-  return { state: verdict(inputs.merge, t), ...t };
+  return {
+    state: verdict(inputs.merge, t),
+    ...t,
+    aspects: readinessAspects(inputs, t),
+  };
 }
