@@ -178,23 +178,136 @@ describe('readiness aspects', () => {
 
   it('reads conversations: enforced, advisory, resolved or unread', () => {
     const blocked = { ...CLEAN, blocked: true };
+    const rule = (
+      conversationResolution: boolean
+    ): ReadinessInputs['rules'] => ({
+      state: 'read',
+      value: { requiredChecks: [], conversationResolution },
+    });
     expect(
       aspect(inputs({ merge: blocked, unresolvedThreads: 2 }), 'conversations')
     ).toEqual({ state: 'blocked', text: '2 unresolved conversations' });
     expect(
       aspect(inputs({ unresolvedThreads: 2 }), 'conversations')?.state
     ).toBe('advisory');
+    // Resolved on the provider's word: Azure's verdict, or GitHub's clear
+    // under the rule.
     expect(
       aspect(
         inputs({
-          merge: { ...CLEAN, conversations: 'resolved' },
+          merge: { ...CLEAN, blocked: null, conversations: 'resolved' },
           unresolvedThreads: null,
         }),
         'conversations'
       )
     ).toEqual({ state: 'met', text: 'All resolved' });
     expect(
-      aspect(inputs({ unresolvedThreads: null }), 'conversations')?.state
+      aspect(inputs({ unresolvedThreads: null }), 'conversations')
+    ).toEqual({ state: 'met', text: 'All resolved' });
+    expect(
+      aspect(
+        inputs({ merge: blocked, rules: rule(false), unresolvedThreads: 0 }),
+        'conversations'
+      )
+    ).toEqual({ state: 'met', text: 'Not required' });
+    // The list's count is a lower bound: none unresolved on its first
+    // page is not all resolved while the provider blocks.
+    expect(
+      aspect(inputs({ merge: blocked, unresolvedThreads: 0 }), 'conversations')
+    ).toEqual({ state: 'observed', text: 'None unresolved' });
+    expect(
+      aspect(
+        inputs({ merge: { ...CLEAN, blocked: null }, unresolvedThreads: null }),
+        'conversations'
+      )?.state
     ).toBe('unknown');
+  });
+
+  it('reads no conflicts as met', () => {
+    expect(aspect(inputs(), 'conflicts')).toEqual({
+      state: 'met',
+      text: 'No conflicts',
+    });
+  });
+
+  it('names a failure over what is still going, across kinds', () => {
+    expect(
+      aspect(
+        inputs({
+          merge: { ...CLEAN, blocked: true },
+          checks: listed(
+            check('e2e', 'running'),
+            check('linking', 'failed', { kind: 'policy' })
+          ),
+        }),
+        'checks'
+      )
+    ).toEqual({ state: 'blocked', text: '1 required policy not met: linking' });
+  });
+
+  it('never calls the checks passing where it cannot vouch for them', () => {
+    const blocked = { ...CLEAN, blocked: true };
+    // An outcome n10 does not know is not a pass.
+    expect(
+      aspect(
+        inputs({
+          merge: blocked,
+          checks: listed(check('build', 'unknown', { native: 'NEW_THING' })),
+        }),
+        'checks'
+      )
+    ).toEqual({ state: 'unknown', text: 'Outcome not known' });
+    // Without the rules, a required check that never reported is absent.
+    const unread = { state: 'failed', kind: 'auth', reason: 'x' } as const;
+    expect(
+      aspect(
+        inputs({ merge: blocked, rules: unread, checks: listed() }),
+        'checks'
+      )
+    ).toEqual({ state: 'unknown', text: 'Not known which are required' });
+    // A failure not known to be required is neither a block nor "not
+    // required".
+    expect(
+      aspect(
+        inputs({
+          merge: blocked,
+          checks: listed(check('build', 'failed', { requirement: 'unknown' })),
+        }),
+        'checks'
+      )
+    ).toEqual({
+      state: 'unknown',
+      text: '1 check failing, not known if required: build',
+    });
+    // Moot where the provider says nothing enforced is in the way.
+    expect(
+      aspect(inputs({ rules: unread, checks: listed() }), 'checks')
+    ).toEqual({ state: 'met', text: 'None required' });
+  });
+
+  it('keeps a failure nothing enforces in sight beside a pass', () => {
+    expect(
+      aspect(
+        inputs({
+          checks: listed(
+            check('build', 'succeeded'),
+            check('docs', 'failed', { requirement: 'optional' })
+          ),
+        }),
+        'checks'
+      )
+    ).toEqual({
+      state: 'met',
+      text: 'Required checks pass · 1 check failing, not required: docs',
+    });
+  });
+
+  it('says a provider that reads no checks does not', () => {
+    expect(
+      aspect(
+        inputs({ checks: { state: 'unsupported', reason: 'x' } }),
+        'checks'
+      )
+    ).toEqual({ state: 'unknown', text: 'Not read by this provider' });
   });
 });

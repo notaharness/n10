@@ -1,11 +1,10 @@
-import type {
-  PullRequestInfo,
-  PullRequestReviewer,
-  ReviewDecision,
+import {
+  holdingVerdict,
+  type PullRequestInfo,
+  type PullRequestReviewer,
 } from '@n10/vcs-core';
 import {
   LIFECYCLE_ASPECT,
-  PERMISSION_ASPECT,
   type ReadinessAspect,
 } from './pr-readiness-aspects.js';
 import type { PullRequestReadiness, ReadinessItem } from './pr-readiness.js';
@@ -14,19 +13,22 @@ import type { PullRequestReadiness, ReadinessItem } from './pr-readiness.js';
  * Readiness from the pull request list's row alone, where its checks
  * and policies could not be read. The row carries the draft flag,
  * reviewer verdicts, the CI rollup and the unresolved count, and
- * nothing about requirements, conflicts or merge permission. So only
+ * nothing about requirements or conflicts. So only
  * the draft is a verdict; a holding verdict or a failing check is a
  * visible problem whose weight is not known, and an approval or a
  * passing check is a fact, never a satisfied requirement.
  */
 
-/** The verdicts that hold a pull request back, most severe first, in
- *  the provider's own words: Azure's -10 and -5 are different votes. */
-const HOLDING: readonly [ReviewDecision, (who: string) => string][] = [
-  ['rejected', (who) => `Rejected by ${who}`],
-  ['waiting-for-author', (who) => `Waiting for author: ${who}`],
-  ['changes-requested', (who) => `Changes requested by ${who}`],
-];
+/** A holding verdict in the provider's own words: Azure's -10 and -5
+ *  are different votes. */
+const HOLDING_PHRASE: Record<
+  NonNullable<ReturnType<typeof holdingVerdict>>['decision'],
+  (who: string) => string
+> = {
+  rejected: (who) => `Rejected by ${who}`,
+  'waiting-for-author': (who) => `Waiting for author: ${who}`,
+  'changes-requested': (who) => `Changes requested by ${who}`,
+};
 
 function names(reviewers: readonly PullRequestReviewer[]): string {
   const [first, ...rest] = reviewers.map((r) => r.displayName);
@@ -35,11 +37,8 @@ function names(reviewers: readonly PullRequestReviewer[]): string {
 }
 
 function holding(reviewers: readonly PullRequestReviewer[]): string | null {
-  for (const [decision, phrase] of HOLDING) {
-    const who = reviewers.filter((r) => r.decision === decision);
-    if (who.length > 0) return phrase(names(who));
-  }
-  return null;
+  const verdict = holdingVerdict(reviewers);
+  return verdict && HOLDING_PHRASE[verdict.decision](names(verdict.by));
 }
 
 function reviews(pr: PullRequestInfo): ReadinessAspect {
@@ -97,7 +96,6 @@ const UNREAD: ReadinessAspect[] = [
   { id: 'checks', state: 'unknown', text: 'Could not be read' },
   { id: 'conflicts', state: 'unknown', text: 'Not read' },
   { id: 'conversations', state: 'unknown', text: 'Not read' },
-  PERMISSION_ASPECT,
 ];
 
 function advisoriesOf(aspects: readonly ReadinessAspect[]): ReadinessItem[] {
@@ -123,7 +121,6 @@ export function listReadiness(
         { id: 'checks', ...ROLLUP[pr.buildStatus ?? 'none'] },
         { id: 'conflicts', state: 'unknown', text: 'Not read' },
         conversations(pr),
-        PERMISSION_ASPECT,
       ]
     : [{ id: 'lifecycle', state: 'unknown', text: 'Not read' }, ...UNREAD];
   return {

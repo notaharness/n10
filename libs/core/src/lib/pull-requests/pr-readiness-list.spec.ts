@@ -47,7 +47,6 @@ describe('listReadiness', () => {
       ['checks', 'observed', 'Reported checks pass'],
       ['conflicts', 'unknown', 'Not read'],
       ['conversations', 'observed', 'None unresolved'],
-      ['permission', 'unknown', 'Not read yet'],
     ]);
     expect(r.unknowns).toEqual([
       'Checks and policies',

@@ -1,4 +1,5 @@
 import {
+  conversationRule,
   readinessAspects,
   type ReadinessAspect,
 } from './pr-readiness-aspects.js';
@@ -44,14 +45,15 @@ export interface ReadinessItem {
 
 export interface PullRequestReadiness {
   state: 'ready' | 'blocked' | 'unknown' | 'closed' | 'merged';
-  /** What stops completion now. */
+  /** What stops completion now, what won't clear by waiting first. */
   blockers: ReadinessItem[];
-  /** Visible problems nothing enforces: a failed optional check. */
+  /** Visible problems not known to block: a failed optional check, or
+   *  one not known to be required. */
   advisories: ReadinessItem[];
   /** What could not be read, or the provider has not worked out. */
   unknowns: string[];
-  /** Each fact on its own row: lifecycle, reviews, checks, conflicts,
-   *  conversations and merge permission. */
+  /** Each fact on its own row: lifecycle, reviews, checks, conflicts
+   *  and conversations. */
   aspects: ReadinessAspect[];
 }
 
@@ -112,62 +114,57 @@ const WORDS = {
 const FAILED = new Set(['failed', 'cancelled']);
 const WAITING = new Set(['queued', 'running', 'waiting', 'expected']);
 
-/** One kind's failing and waiting requirements, and its failures
- *  nothing enforces. */
+/** One kind's failing and waiting requirements, and its failures not
+ *  known to block: optional, or not known to be required. */
 function kindTally(
   items: readonly PullRequestCheck[],
   words: (typeof WORDS)[keyof typeof WORDS],
   t: Tally
 ): void {
   const { kind, fails } = words;
-  const required = items.filter((c) => c.requirement === 'required');
-  const failing = required.filter((c) => FAILED.has(c.outcome));
-  const going = required.filter((c) => WAITING.has(c.outcome));
-  const waiting = going.filter((c) => !c.manual);
-  const unstarted = going.filter((c) => c.manual);
-  const other = items.filter(
-    (c) => c.requirement !== 'required' && FAILED.has(c.outcome)
+  const failed = (requirement: PullRequestCheck['requirement']) =>
+    items.filter((c) => c.requirement === requirement && FAILED.has(c.outcome));
+  const going = items.filter(
+    (c) => c.requirement === 'required' && WAITING.has(c.outcome)
   );
-  if (failing.length > 0) {
-    t.blockers.push({
-      kind,
-      text: `${count(failing.length, words.required)} ${fails}: ${names(
-        failing
-      )}`,
-      resolvedBy: 'author',
-    });
-  }
-  if (waiting.length > 0) {
-    t.blockers.push({
-      kind,
-      text: `Waiting for ${count(waiting.length, words.required)}: ${names(
-        waiting
-      )}`,
-      resolvedBy: 'checks',
-      pending: true,
-    });
-  }
-  if (unstarted.length > 0) {
-    t.blockers.push({
-      kind,
-      text: `Someone must start ${count(
-        unstarted.length,
-        words.required
-      )}: ${names(unstarted)}`,
-      resolvedBy: 'author',
-      pending: true,
-    });
-  }
-  if (other.length > 0) {
-    t.advisories.push({
-      kind,
-      text: `${count(
-        other.length,
-        words.other
-      )} ${fails}, not required: ${names(other)}`,
-      resolvedBy: 'author',
-    });
-  }
+  const say = (
+    list: readonly PullRequestCheck[],
+    text: (n: number, names: string) => string,
+    rest: Pick<ReadinessItem, 'resolvedBy' | 'pending'>
+  ): ReadinessItem[] =>
+    list.length > 0
+      ? [{ kind, text: text(list.length, names(list)), ...rest }]
+      : [];
+  t.blockers.push(
+    ...say(
+      failed('required'),
+      (n, who) => `${count(n, words.required)} ${fails}: ${who}`,
+      { resolvedBy: 'author' }
+    ),
+    ...say(
+      going.filter((c) => !c.manual),
+      (n, who) => `Waiting for ${count(n, words.required)}: ${who}`,
+      { resolvedBy: 'checks', pending: true }
+    ),
+    ...say(
+      going.filter((c) => c.manual),
+      (n, who) => `Someone must start ${count(n, words.required)}: ${who}`,
+      { resolvedBy: 'author', pending: true }
+    )
+  );
+  t.advisories.push(
+    ...say(
+      failed('optional'),
+      (n, who) => `${count(n, words.other)} ${fails}, not required: ${who}`,
+      { resolvedBy: 'author' }
+    ),
+    ...say(
+      failed('unknown'),
+      (n, who) =>
+        `${count(n, words.other)} ${fails}, not known if required: ${who}`,
+      { resolvedBy: 'author' }
+    )
+  );
 }
 
 function checksTally(inputs: ReadinessInputs, t: Tally): void {
@@ -223,11 +220,6 @@ function reviewsTally({ merge }: ReadinessInputs, t: Tally): void {
   }
 }
 
-/** Whether the rules ask for threads to be resolved; null unread. */
-function ruleOf(rules: ReadinessInputs['rules']): boolean | null {
-  return rules.state === 'read' ? rules.value.conversationResolution : null;
-}
-
 /** Unresolved threads block where a rule says so and the provider does
  *  not say it is clear; otherwise they are there to read, not in the
  *  way. The count is the list's, older than the provider's verdict.
@@ -247,7 +239,8 @@ function conversationsTally(inputs: ReadinessInputs, t: Tally): void {
     t.blockers.push(item);
     return;
   }
-  const enforced = judged === 'resolved' ? false : ruleOf(inputs.rules);
+  const enforced =
+    judged === 'resolved' ? false : conversationRule(inputs.rules);
   if (open == null) {
     // Moot where no rule asks, or the provider says it is clear.
     if (enforced !== false && inputs.merge.blocked !== false) {
@@ -334,6 +327,8 @@ export function evaluateReadiness(
   conversationsTally(inputs, t);
   if (inputs.rules.state !== 'read') t.unknowns.push('Branch rules');
   enforcementTally(inputs, t);
+  // What won't clear by waiting leads; each group keeps its order.
+  t.blockers.sort((a, b) => Number(!!a.pending) - Number(!!b.pending));
   return {
     state: verdict(inputs.merge, t),
     ...t,

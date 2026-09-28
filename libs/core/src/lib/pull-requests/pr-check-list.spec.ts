@@ -114,6 +114,9 @@ describe('checkList', () => {
     expect(
       Object.fromEntries(list?.rows.map((r) => [r.check.name, r.stale]) ?? [])
     ).toEqual({ build: true, lint: false, e2e: false });
+    // Counted apart, so a pass on an older push is never the head's.
+    expect(list?.stale).toBe(1);
+    expect(list?.count.passed).toBe(2);
   });
 
   it('keeps two checks of one name apart, in a stable order', () => {

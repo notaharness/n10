@@ -86,8 +86,7 @@ describe('evaluateReadiness', () => {
         { id: 'reviews', state: 'met', text: 'Approved' },
         { id: 'checks', state: 'met', text: 'Required checks pass' },
         { id: 'conflicts', state: 'met', text: 'No conflicts' },
-        { id: 'conversations', state: 'met', text: 'All resolved' },
-        { id: 'permission', state: 'unknown', text: 'Not read yet' },
+        { id: 'conversations', state: 'met', text: 'Not required' },
       ],
     });
   });
@@ -513,6 +512,20 @@ describe('evaluateReadiness', () => {
       'checks',
       'reviews',
       'conversations',
+    ]);
+  });
+
+  it('leads with what will not clear by waiting', () => {
+    // A running check, a review still to come, and a verdict that stands.
+    const r = evaluateReadiness(
+      inputs({
+        merge: { ...CLEAN, blocked: true, reviews: 'changes-requested' },
+        checks: checks(check('e2e', 'running'), check('lint', 'queued')),
+      })
+    );
+    expect(r.blockers.map((b) => [b.text, b.pending ?? false])).toEqual([
+      ['Changes requested', false],
+      ['Waiting for 2 required checks: e2e, lint', true],
     ]);
   });
 

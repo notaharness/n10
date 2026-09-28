@@ -35,6 +35,9 @@ export interface CheckList {
   rows: CheckRow[];
   /** Rows at each standing. */
   count: Record<CheckStanding, number>;
+  /** Rows that reported on an older revision, whatever their standing:
+   *  a pass among them is not the head's. */
+  stale: number;
   /** What the provider counts; null where it does not say. */
   total: number | null;
   complete: boolean;
@@ -92,5 +95,6 @@ export function checkList(checks: PullRequestChecks): CheckList | null {
     number
   >;
   for (const row of rows) count[row.standing] += 1;
-  return { rows, count, total, complete };
+  const stale = rows.filter((r) => r.stale).length;
+  return { rows, count, stale, total, complete };
 }
