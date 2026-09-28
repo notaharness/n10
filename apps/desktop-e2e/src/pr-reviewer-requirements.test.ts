@@ -66,6 +66,7 @@ test.describe('Reviewer requirements on GitHub', () => {
     // Asked, or approved, and nothing more known: no standing.
     await expect(row('bea')).toContainText('(you)');
     await expect(row('bea').locator('[data-reviewer-standing]')).toHaveCount(0);
+    await expect(row('dee')).toContainText('Approved');
     await expect(row('dee').locator('[data-reviewer-standing]')).toHaveCount(0);
     await expect(reviewers).toContainText(
       "GitHub doesn't mark reviewers required."
