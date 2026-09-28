@@ -1,0 +1,50 @@
+---
+title: Configuration
+description: Settings, keyboard shortcuts, and where n10 keeps its files.
+---
+
+Open settings with `⌘,` (`Ctrl+,` on Linux) in n10 Desktop, or
+`s` in the terminal UI. Both change the same configuration.
+
+| Setting | What it does |
+| --- | --- |
+| **AI Tool** | The agent n10 launches: Claude (the default), Codex, Gemini, Copilot or OpenCode. |
+| **Editor** | The editor **Open in editor** uses, globally or per project. |
+| **Worktree Path** | Where new worktrees go, such as `../worktrees/{session}`. `{session}` is a filesystem-safe form of the branch name and `{branch}` the name itself. The default is `.claude/worktrees/{session}` inside the repository. Takes effect after a restart. |
+| **Sync Interval** | How often n10 fetches, fast-forwards your default branch, checks worktrees for conflicts and looks for merged pull requests. Default 1 hour, minimum 5 minutes. The pull request list refreshes every minute regardless. |
+| **Auto Delete on Merge** | Off by default. On each sync, removes worktrees whose pull requests have merged (on GitHub, pull requests you opened). It skips worktrees with a running agent, uncommitted changes or a rebase in progress, and main or master. |
+| **Auto Rebase** | Has no effect yet. |
+| Provider fields | The owner, repository and GitHub username (GitHub), or organization, project, repository and access token (Azure DevOps). |
+
+n10 fills in the provider fields from your Git remote when you open a
+repository, so you rarely set them by hand.
+
+## Keyboard shortcuts
+
+In n10 Desktop, **Help → Keyboard Shortcuts** lists them. The ones you'll use
+most:
+
+| Shortcut | Action |
+| --- | --- |
+| `⌘K` / `Ctrl+K` | Search branches, pull requests and commands |
+| `⌘N` / `Ctrl+N` | New worktree |
+| `⌘⇧T` / `Ctrl+Shift+T` | New terminal |
+| `⌘O` / `Ctrl+O` | Open a repository |
+| `⌘B` / `Ctrl+B` | Toggle the sidebar |
+| `⌘R` / `Ctrl+R` | Refresh pull requests |
+
+For the terminal UI's keys, see [the terminal UI](/docs/terminal-ui).
+
+## Where n10 keeps its files
+
+n10's own files are in `~/.n10/`:
+
+- `config.json`: global settings.
+- `projects/<hash>/config.json`: each repository's settings.
+- `desktop-prefs.json` and `desktop-recents.json`: n10 Desktop's
+  preferences and recent repositories.
+- `reviews/`: agents' draft review comments.
+
+Beam, which runs [Fleet](/docs/guides/fleet), keeps its state in
+`~/.config/beam`. Agent conversations live wherever each agent CLI keeps
+them.

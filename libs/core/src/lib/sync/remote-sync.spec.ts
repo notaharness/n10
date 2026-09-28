@@ -27,7 +27,7 @@ const env = vi.hoisted(() => ({
   alive: new Set<string>(),
   persisted: new Set<string>(),
   removable: {} as Record<string, { safe: boolean; reason?: string }>,
-  deleted: [] as { session: string; branch: string }[],
+  deleted: [] as { session: string; branch: string; tip: string | null }[],
   rebaseWarned: [] as string[],
   conflicts: {} as Record<string, number>,
   /** Every merge check, as `base..head`. */
@@ -37,6 +37,8 @@ const env = vi.hoisted(() => ({
 }));
 
 vi.mock('@n10/worktree-manager', () => ({
+  branchTip: (branch: string) => Promise.resolve(`tip:${branch}`),
+  repositoryOf: () => Promise.resolve('/repo/.git'),
   branchToSessionName: (b: string) => b.replace(/\//g, '-'),
   canRemoveBranch: (branch: string) => {
     env.checks += 1;
@@ -101,8 +103,9 @@ function sweep(over: Partial<Parameters<typeof sweepMergedBranches>[0]> = {}) {
     config: { autoDeleteOnMerge: true } as never,
     branches: ['feature/a'],
     warnedRebase: new Set<string>(),
-    onAutoDelete: (session, branch) => {
-      env.deleted.push({ session, branch });
+    onAutoDelete: (session, branch, approved) => {
+      expect(approved.verdict).toBe('clear');
+      env.deleted.push({ session, branch, tip: approved.tip });
     },
     onRebaseInProgress: (branch) => env.rebaseWarned.push(branch),
     isCancelled: () => env.checks >= env.cancelAfterChecks,
@@ -165,6 +168,9 @@ describe('sweepMergedBranches', () => {
       {
         session: worktreeSessionKey(checkout('feature/a')),
         branch: 'feature/a',
+        // The commit it was judged at, so removal leaves a branch that
+        // moves on before the removal runs.
+        tip: 'tip:feature/a',
       },
     ]);
   });

@@ -5,7 +5,19 @@ import { expect, type Page } from '@playwright/test';
 export function fleetToggle(page: Page) {
   return page
     .getByRole('complementary')
-    .getByRole('button', { name: /^Fleet/ });
+    .getByRole('button', { name: /^Fleet(?! actions$)/ });
+}
+
+/** Picks an entry from the Fleet header's "…" menu. */
+export async function chooseFleetAction(
+  page: Page,
+  label: string
+): Promise<void> {
+  await page
+    .getByRole('complementary')
+    .getByRole('button', { name: 'Fleet actions' })
+    .click();
+  await page.getByRole('menuitem', { name: label }).click();
 }
 
 export function fleetView(page: Page) {

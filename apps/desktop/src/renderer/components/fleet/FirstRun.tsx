@@ -9,11 +9,10 @@ function Choices({ disabled }: { disabled: boolean }) {
   const { choose } = useFleet().enrolment;
   return (
     <div className="space-y-3">
-      <h2 className="text-base font-semibold">Connect your first machine</h2>
+      <h2 className="text-base font-semibold">Your machines, together</h2>
       <p className="text-base text-muted-foreground">
-        Create a fleet once. On your other machines, join it with the same
-        passkey. Members can run commands as your user unless you restrict their
-        access.
+        Connect your machines with a passkey. Fleet members can run commands
+        here; you control their access.
       </p>
       <div className="flex flex-wrap gap-2">
         <Button disabled={disabled} onClick={() => choose('create')}>
@@ -24,7 +23,7 @@ function Choices({ disabled }: { disabled: boolean }) {
           disabled={disabled}
           onClick={() => choose('join')}
         >
-          Join an existing fleet
+          Join a fleet
         </Button>
       </div>
     </div>
@@ -84,19 +83,9 @@ function NameField({
 
 function CreateSteps() {
   return (
-    <div className="space-y-2 text-base">
-      <ol className="list-decimal space-y-1 pl-5">
-        <li>Create your fleet passkey — save a new passkey for beam.n10.is.</li>
-        <li>
-          Authorize this machine — use that same passkey to sign its membership
-          and unlock the encrypted directory.
-        </li>
-      </ol>
-      <p className="text-muted-foreground">
-        Two passkey prompts, once per fleet. Each prompt has its own link and QR
-        code.
-      </p>
-    </div>
+    <p className="text-base text-muted-foreground">
+      Save a passkey, then use it to add this machine.
+    </p>
   );
 }
 
@@ -117,18 +106,17 @@ function EnrolmentForm({ disabled }: { disabled: boolean }) {
       }}
     >
       <h2 className="text-base font-semibold">
-        {creating ? 'Create a fleet' : 'Join an existing fleet'}
+        {creating ? 'Create a fleet' : 'Join a fleet'}
       </h2>
       {!creating && (
         <p className="text-base text-muted-foreground">
-          Use the passkey you created for this fleet. One passkey prompt
-          authorizes this machine.
+          Use your fleet’s passkey.
         </p>
       )}
       <div className="grid gap-3">
         <NameField
           id="beam-label"
-          label="This machine’s name"
+          label="Machine name"
           placeholder="Host name"
           value={e.label}
           onChange={e.setLabel}
@@ -140,7 +128,7 @@ function EnrolmentForm({ disabled }: { disabled: boolean }) {
             placeholder="beam"
             value={e.fleetName}
             onChange={e.setFleetName}
-            helper="The fleet name appears in your passkey manager."
+            helper="Shown in your passkey manager."
           />
         )}
       </div>

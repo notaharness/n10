@@ -4,31 +4,44 @@
  *
  * Nothing here knows about worktrees.
  */
+import { resolve } from 'node:path';
 import { log } from '@n10/logger';
 import { exec, gitOptions } from './exec.js';
 import { assertShellSafeRef } from './refs.js';
 
-let cachedMainBranch: string | null = null;
+/** Main-branch names by repository directory: two repositories open
+ *  in one process can name theirs differently. */
+const mainBranches = new Map<string, string>();
 
-/** Auto-detect the main branch name (master or main) and cache it. */
-export async function getMainBranch(): Promise<string> {
-  if (cachedMainBranch) return cachedMainBranch;
+/** Auto-detect the main branch name (master or main) of the repository
+ *  at `cwd` (the process's directory when not given), and cache it for
+ *  that directory. */
+export async function getMainBranch(cwd?: string): Promise<string> {
+  const key = resolve(cwd ?? process.cwd());
+  const cached = mainBranches.get(key);
+  if (cached) return cached;
+  const main = await detectMainBranch(cwd);
+  mainBranches.set(key, main);
+  return main;
+}
+
+async function detectMainBranch(cwd?: string): Promise<string> {
   try {
     // git symbolic-ref refs/remotes/origin/HEAD → "refs/remotes/origin/master"
-    const { stdout } = await exec('git symbolic-ref refs/remotes/origin/HEAD', {
-      encoding: 'utf8',
-    });
-    cachedMainBranch = stdout.trim().split('/').pop()!;
-    return cachedMainBranch;
+    const { stdout } = await exec(
+      'git symbolic-ref refs/remotes/origin/HEAD',
+      gitOptions(cwd)
+    );
+    return stdout.trim().split('/').pop()!;
   } catch (e) {
     log('warn', 'getMainBranch', 'symbolic-ref failed, trying fallback', e);
     // Fallback: check which remote branch exists
     try {
-      await exec('git rev-parse --verify --quiet origin/master', {
-        encoding: 'utf8',
-      });
-      cachedMainBranch = 'master';
-      return cachedMainBranch;
+      await exec(
+        'git rev-parse --verify --quiet origin/master',
+        gitOptions(cwd)
+      );
+      return 'master';
     } catch (e2) {
       log(
         'warn',
@@ -36,15 +49,14 @@ export async function getMainBranch(): Promise<string> {
         'origin/master not found, defaulting to main',
         e2
       );
-      cachedMainBranch = 'main';
-      return cachedMainBranch;
+      return 'main';
     }
   }
 }
 
-/** Reset the cached main branch name (for testing). */
+/** Forget every cached main branch name (for testing). */
 export function resetMainBranchCache(): void {
-  cachedMainBranch = null;
+  mainBranches.clear();
 }
 
 /** List local git branches.
@@ -120,29 +132,61 @@ export async function listAllBranches(): Promise<string[]> {
   }
 }
 
-/** Fast-forward local main branch to match origin. Returns true on success. */
-export async function fastForwardMainBranch(): Promise<boolean> {
-  const main = await getMainBranch();
+/**
+ * Fast-forward the local main branch of the repository at `cwd` to
+ * `origin/<main>` as last fetched; the caller fetches first. Returns
+ * true when main already contains origin's commit or was moved to it.
+ *
+ * Only ever a fast-forward. Checked out here, main moves by `merge
+ * --ff-only`. Otherwise git's own local fetch updates the ref in one
+ * transaction and refuses a non-fast-forward (local commits origin does
+ * not have) or a branch checked out in another worktree. A repository
+ * without a local main is left without one.
+ */
+export async function fastForwardMainBranch(cwd?: string): Promise<boolean> {
+  const main = await getMainBranch(cwd);
+  assertShellSafeRef(main, 'main branch');
   try {
-    await exec(`git fetch origin ${main}`, { encoding: 'utf8' });
-  } catch (e) {
-    log('error', 'fastForwardMainBranch', `git fetch origin ${main} failed`, e);
-    return false;
-  }
-  try {
-    const { stdout } = await exec('git symbolic-ref --short HEAD', {
-      encoding: 'utf8',
-    });
-    if (stdout.trim() === main) {
-      // HEAD is on the main branch — use merge --ff-only instead
-      await exec(`git merge --ff-only origin/${main}`, { encoding: 'utf8' });
-    } else {
-      await exec(`git branch -f ${main} origin/${main}`, { encoding: 'utf8' });
+    const head = await exec(
+      'git symbolic-ref --quiet --short HEAD',
+      gitOptions(cwd)
+    ).then(
+      ({ stdout }) => stdout.trim(),
+      () => '' // detached HEAD
+    );
+    if (head === main) {
+      await exec(`git merge --ff-only "origin/${main}"`, gitOptions(cwd));
+      return true;
     }
+    const contains = await mainContainsOrigin(main, cwd);
+    if (contains !== 'no') return contains === 'yes';
+    await exec(
+      `git fetch --no-write-fetch-head . "refs/remotes/origin/${main}:refs/heads/${main}"`,
+      gitOptions(cwd)
+    );
     return true;
   } catch (e) {
-    log('error', 'fastForwardMainBranch', 'fast-forward failed', e);
+    log('warn', 'fastForwardMainBranch', `${main} not fast-forwarded`, e);
     return false;
+  }
+}
+
+/** Whether local `main` already has `origin/<main>` in its history:
+ *  `'missing'` when either ref does not exist. */
+async function mainContainsOrigin(
+  main: string,
+  cwd?: string
+): Promise<'yes' | 'no' | 'missing'> {
+  try {
+    await exec(
+      `git merge-base --is-ancestor "refs/remotes/origin/${main}" "refs/heads/${main}"`,
+      gitOptions(cwd)
+    );
+    return 'yes';
+  } catch (err: unknown) {
+    // Exit 1 is "not an ancestor"; anything else is a ref git cannot
+    // resolve.
+    return (err as { code?: number }).code === 1 ? 'no' : 'missing';
   }
 }
 
@@ -188,7 +232,7 @@ export async function countConflicts(
   branch: string,
   cwd?: string
 ): Promise<number> {
-  const main = await getMainBranch();
+  const main = await getMainBranch(cwd);
   return (await countConflictsBetween(`origin/${main}`, branch, cwd)) ?? 0;
 }
 
@@ -222,6 +266,23 @@ export async function refExists(ref: string, cwd?: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/** The commit local `branch` points at, or null when there is none. */
+export async function branchTip(
+  branch: string,
+  cwd?: string
+): Promise<string | null> {
+  assertShellSafeRef(branch);
+  try {
+    const { stdout } = await exec(
+      `git rev-parse --verify --quiet "refs/heads/${branch}^{commit}"`,
+      gitOptions(cwd)
+    );
+    return stdout.trim() || null;
+  } catch {
+    return null;
   }
 }
 

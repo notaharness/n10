@@ -44,3 +44,11 @@ export {
 } from './lib/plan/plan-store.js';
 
 export { composePlanPrompt } from './lib/plan/prompt-composer.js';
+
+// The babysitter's update, pure in the same way: the web demo shows the
+// message n10 would type into the agent's session.
+export { composeBabysitPrompt } from './lib/babysit/babysit-prompt.js';
+export type {
+  BabysitReport,
+  BabysitThread,
+} from './lib/babysit/babysit-model.js';
