@@ -1,8 +1,4 @@
 import type { PullRequestInfo } from '@n10/vcs-core';
-import { usePrDescription } from '../../lib/data/queries.js';
-import type { ReadState } from '../../lib/data/read-state.js';
-import { keys } from '../../lib/data/query-keys.js';
-import { useReadState } from '../../lib/data/use-read-state.js';
 import { useRepo } from '../../lib/repo-context.js';
 import {
   nextStep,
@@ -10,69 +6,12 @@ import {
   reviewRole,
   type AttentionAction,
 } from '../../lib/review/overview-model.js';
-import { Skeleton } from '../ui/skeleton.js';
-import { CommentMarkdown } from './comments/CommentMarkdown.js';
-import { Section } from './overview/parts.js';
 import { PrAttention } from './overview/PrAttention.js';
+import { PrDescription } from './overview/PrDescription.js';
 import { PrIdentity } from './overview/PrIdentity.js';
 import { PrReadiness } from './overview/PrReadiness.js';
 import { PrReviewers } from './overview/PrReviewers.js';
 import { VerdictActions } from './overview/VerdictActions.js';
-import { ReadFailure, StaleNotice } from './ReadNotice.js';
-
-/**
- * The author's description. An empty body and a failed fetch are
- * different facts: only the first is "no description".
- */
-function Description({
-  state,
-  retrying,
-  onRetry,
-}: {
-  state: ReadState<string>;
-  retrying: boolean;
-  onRetry: () => void;
-}) {
-  if (state.kind === 'loading') {
-    return (
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-2/3" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-5/6" />
-      </div>
-    );
-  }
-  if (state.kind === 'failed') {
-    return (
-      <ReadFailure
-        title="Couldn't load the description"
-        error={state.error}
-        retrying={retrying}
-        onRetry={onRetry}
-      />
-    );
-  }
-  return (
-    <>
-      {state.stale && (
-        <StaleNotice
-          what="description"
-          stale={state.stale}
-          retrying={retrying}
-          onRetry={onRetry}
-          className="mb-3"
-        />
-      )}
-      {state.data ? (
-        <CommentMarkdown markdown={state.data} />
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          This pull request has no description.
-        </p>
-      )}
-    </>
-  );
-}
 
 /**
  * One column below 900 px of pane width — identity, next step,
@@ -99,10 +38,6 @@ export function OverviewPane({
 }) {
   const { repo } = useRepo();
   const role = reviewRole(pr, repo.viewer);
-  const description = useReadState(
-    usePrDescription(repo.cwd, pr.id),
-    keys.prDescription(repo.cwd, pr.id)
-  );
 
   return (
     <div className="@container h-full overflow-auto">
@@ -116,13 +51,7 @@ export function OverviewPane({
         <div className="[grid-area:ready]">
           <PrReadiness readiness={readiness(pr)} />
         </div>
-        <Section title="Description" className="min-w-0 [grid-area:main]">
-          <Description
-            state={description.state}
-            retrying={description.retrying}
-            onRetry={description.retry}
-          />
-        </Section>
+        <PrDescription pr={pr} className="min-w-0 [grid-area:main]" />
         <div className="space-y-6 [grid-area:people]">
           <PrReviewers reviewers={pr.reviewers ?? []} viewer={repo.viewer} />
           {role === 'reviewer' && <VerdictActions prId={pr.id} />}
