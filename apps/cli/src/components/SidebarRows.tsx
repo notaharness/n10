@@ -3,7 +3,7 @@ import { Text, Box } from 'ink';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import type { AgentSession } from '@n10/core';
 import { useActivityStatus, useFlashPhase } from '@n10/app-core';
-import { noteSeen, remove as removeInactiveAlert, tabDigit } from '@n10/core';
+import { remove as removeInactiveAlert, tabDigit } from '@n10/core';
 import { Divider } from './Divider.js';
 import { PrBadge } from './PrBadge.js';
 import { RainbowSpinner } from './RainbowSpinner.js';
@@ -114,23 +114,13 @@ export const SessionItemRow = memo(function SessionItemRow({
   const activity = useActivityStatus(session.name);
   const title = pr?.title || session.label || session.name;
 
-  // The selected row is what the user is looking at, so ack any output
-  // (poll while selected, plus a final ack on deselect) — that way the
-  // row does not flash the moment it is deselected. Runs at 1Hz; flash
-  // requires ACTIVITY_IDLE_MS (2s) of silence after data, so a single
-  // missed tick at the tail can't make the flash appear for content
-  // the user actually saw.
+  // Visiting acks any pending inactive-alert: the user is here, they
+  // don't need a queued jump back to a session they're already on.
+  // Whether its output was seen is up to the terminal pane
+  // (`showTerminal`), not the selection: the pane may show the branch
+  // picker or a diff instead, and auto-hide unmounts this row.
   useEffect(() => {
-    if (!selected) return;
-    noteSeen(session.name);
-    // Visiting acks any pending inactive-alert: the user is here, they
-    // don't need a queued jump back to a session they're already on.
-    removeInactiveAlert(session.name);
-    const id = setInterval(() => noteSeen(session.name), 1000);
-    return () => {
-      clearInterval(id);
-      noteSeen(session.name);
-    };
+    if (selected) removeInactiveAlert(session.name);
   }, [selected, session.name]);
 
   // Short-circuit animations for the selected row: the user can see it

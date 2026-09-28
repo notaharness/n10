@@ -6,7 +6,11 @@ import {
   setWorktreeResolver,
   createTemplateResolver,
 } from '@n10/worktree-manager';
-import type { AgentSession, DiscoveredWorktree } from '@n10/core';
+import type {
+  AgentSession,
+  DiscoveredWorktree,
+  WorktreeRemovalCheck,
+} from '@n10/core';
 import { readConfig, autoDetectProjectConfig } from '@n10/vcs-core';
 import type { VcsProvider } from '@n10/vcs-core';
 import {
@@ -40,12 +44,13 @@ export function useSessionManager(
     return filtered;
   }, []);
 
+  // No refresh of its own: core's removal has discovery look again, and
+  // `onDiscovered` below re-reads the rows, as it does for a worktree
+  // removed outside n10.
   const performDelete = useCallback(
-    async (_sessionName: string, branch: string) => {
-      await removeWorktreeSession(branch, true);
-      await refreshSessions();
-    },
-    [refreshSessions]
+    (_sessionName: string, branch: string, approved: WorktreeRemovalCheck) =>
+      removeWorktreeSession(branch, approved),
+    []
   );
 
   // Attach to an agent session that was started outside this process —
@@ -72,9 +77,9 @@ export function useSessionManager(
     }
   );
 
-  // Something outside this process changed the worktrees or the live
-  // sessions. Both are read from disk by refreshSessions, so re-reading
-  // is the whole response.
+  // Something changed the worktrees or the live sessions — outside this
+  // process, or a removal core made here. Both are read from disk by
+  // refreshSessions, so re-reading is the whole response.
   const onDiscovered = useEffectEvent(() => {
     void refreshSessions();
   });

@@ -1,0 +1,19 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "installation",
+    "getting-started",
+    "---Using n10---",
+    "guides",
+    "terminal-ui",
+    "configuration",
+    "providers",
+    "---Companions---",
+    "beam",
+    "orchestra",
+    "---Project---",
+    "roadmap",
+    "contributing"
+  ]
+}

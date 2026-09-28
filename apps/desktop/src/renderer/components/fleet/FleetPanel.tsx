@@ -13,7 +13,6 @@ import { Skeleton } from '../ui/skeleton.js';
 import { AddMachinePanel } from './AddMachinePanel.js';
 import { EnrolmentFlow } from './EnrolmentFlow.js';
 import { FirstRun } from './FirstRun.js';
-import { FleetHeader } from './FleetHeader.js';
 import { ResetFleetPanel } from './ResetFleetPanel.js';
 
 /** Until beam can answer for its fleet: its socket, then (`starting`)
@@ -22,7 +21,7 @@ function Loading({ starting }: { starting: boolean }) {
   return (
     <div className="space-y-2" role="status">
       <p className="text-base text-muted-foreground">
-        {starting ? 'Preparing network…' : 'Connecting to beam…'}
+        {starting ? 'Starting Fleet…' : 'Connecting…'}
       </p>
       <Skeleton className="h-8 w-full" />
       <Skeleton className="h-8 w-full" />
@@ -47,9 +46,12 @@ function Failure({
     <div className="space-y-2" role="alert">
       <p className="text-base font-medium text-destructive">{title}</p>
       {detail && (
-        <p className="font-mono text-sm break-words text-muted-foreground select-text">
-          {detail}
-        </p>
+        <details>
+          <summary className="text-sm text-muted-foreground">Details</summary>
+          <p className="font-mono text-sm break-words text-muted-foreground select-text">
+            {detail}
+          </p>
+        </details>
       )}
       <Button size="sm" variant="outline" onClick={onRetry}>
         {action}
@@ -99,7 +101,7 @@ function FleetRows({
       ))}
       {others.length === 0 && (
         <p className="px-3 py-2 text-base text-muted-foreground">
-          No other machines yet. Add a desktop or a headless machine.
+          Your other machines will appear here.
         </p>
       )}
     </div>
@@ -109,30 +111,23 @@ function FleetRows({
 /** Reconnecting, or an observed write still pending once the card
  *  that reported it has gone, while this machine is still enrolled. */
 function StatusNotices({ beam }: { beam: BeamStatus }) {
-  const { enrolment, revocation, publication } = useFleet();
-  const cardShowing = enrolment.ceremony.view !== null || !!revocation.target;
+  const { publication } = useFleet();
   if (beam.state === 'restarting')
-    return (
-      <Notice warning>
-        Reconnecting to beam… Machine information may be out of date.
-      </Notice>
-    );
-  if (!publication.pending || cardShowing || !beam.enrolled) return null;
+    return <Notice warning>Reconnecting… Status may be out of date.</Notice>;
+  if (!publication.pending || !beam.enrolled) return null;
   return <Notice>{publicationText(false)}</Notice>;
 }
 
-/** This machine's fleet: its fingerprint, its rows and the way to
- *  reset it, or in their place the add-a-machine instructions. */
+/** This machine's fleet: its rows, or in their place the
+ *  add-a-machine instructions. */
 function EnrolledBody({
   beam,
   machines,
-  disabled,
 }: {
   beam: BeamStatus;
   machines: MachineView[] | undefined;
-  disabled: boolean;
 }) {
-  const { adding, setAdding, reset } = useFleet();
+  const { adding, setAdding } = useFleet();
   if (adding && beam.fleetId) {
     return (
       <AddMachinePanel
@@ -142,22 +137,10 @@ function EnrolledBody({
     );
   }
   return (
-    <>
-      <FleetHeader fleetId={beam.fleetId} onAdd={() => setAdding(true)} />
-      <FleetRows
-        machines={machines ?? []}
-        disabled={beam.state === 'restarting'}
-      />
-      <Button
-        size="sm"
-        variant="ghost"
-        className="-ml-2 text-muted-foreground"
-        disabled={disabled}
-        onClick={reset.show}
-      >
-        Reset fleet on this machine…
-      </Button>
-    </>
+    <FleetRows
+      machines={machines ?? []}
+      disabled={beam.state === 'restarting'}
+    />
   );
 }
 
@@ -184,13 +167,7 @@ function FleetBody({
       {loadFailure}
       {enrolling && <EnrolmentFlow />}
       {!enrolling && !beam.enrolled && <FirstRun disabled={reconnecting} />}
-      {beam.enrolled && (
-        <EnrolledBody
-          beam={beam}
-          machines={machines}
-          disabled={reconnecting || enrolment.ceremony.running}
-        />
-      )}
+      {beam.enrolled && <EnrolledBody beam={beam} machines={machines} />}
     </div>
   );
 }
@@ -215,9 +192,9 @@ export function FleetPanel() {
   if (status.isError || beam?.state === 'unavailable') {
     return (
       <Failure
-        title="Cannot connect to beam."
+        title="Fleet is unavailable."
         detail={beam?.detail ?? errorMessage(status.error)}
-        action="Retry connection"
+        action="Retry"
         onRetry={retry}
       />
     );

@@ -68,15 +68,17 @@ export function CeremonyFailure({
           <p>{SAME_PASSKEY_NOTE}</p>
         )}
       </div>
-      <p className="text-sm text-muted-foreground">
-        Error code{' '}
-        <code className="font-mono text-foreground select-all">{code}</code>
-      </p>
-      {detail && (
-        <p className="font-mono text-sm break-words text-muted-foreground select-text">
-          {detail}
+      <details className="text-sm text-muted-foreground">
+        <summary>Details</summary>
+        <p>
+          <code className="font-mono text-foreground select-all">{code}</code>
         </p>
-      )}
+        {detail && (
+          <p className="font-mono text-sm break-words text-muted-foreground select-text">
+            {detail}
+          </p>
+        )}
+      </details>
       {copy.actions.includes('compatibility') && (
         <PasskeyCompatibility defaultOpen />
       )}

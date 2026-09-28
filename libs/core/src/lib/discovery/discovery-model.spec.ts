@@ -47,7 +47,7 @@ describe('diffScans', () => {
         scan([wt('feature-a')]),
         nothingAlive
       );
-      expect(delta.disappeared).toEqual(['feature-b']);
+      expect(delta.disappeared).toEqual([wt('feature-b')]);
       expect(delta.changed).toBe(true);
     });
 
@@ -77,7 +77,7 @@ describe('diffScans', () => {
         nothingAlive
       );
       expect(delta.appeared).toEqual([wt('feature-b')]);
-      expect(delta.disappeared).toEqual(['feature-a']);
+      expect(delta.disappeared).toEqual([wt('feature-a')]);
     });
   });
 
@@ -167,7 +167,7 @@ describe('diffScans', () => {
         allAlive
       );
       expect(delta.ended).toEqual(['feature-a']);
-      expect(delta.disappeared).toEqual(['feature-a']);
+      expect(delta.disappeared).toEqual([wt('feature-a')]);
     });
 
     it('stays empty when neither scan reports persisted sessions', () => {
