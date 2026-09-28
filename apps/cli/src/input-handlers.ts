@@ -46,8 +46,9 @@ function runSettingsEffects(
         break;
       case 'refresh-remote':
         // Without this a corrected token sits behind the poll
-        // interval, showing the failure it just fixed.
-        void ctx.sessions.refreshPr();
+        // interval, showing the failure it just fixed. Forced, but not
+        // a user refresh: the provider keeps its per-row answers.
+        void ctx.engine.pullRequests.read(ctx.engine.repo, { force: true });
         break;
       case 'restart-sync-loop':
         void ctx.sessions.triggerSync();

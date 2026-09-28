@@ -115,11 +115,11 @@ describe('a credential edit', () => {
       repo: '/repo',
       pullRequests: {
         credentialsChanged: () => events.push('credentials'),
+        read: (cwd: string, opts: { force?: boolean }) => {
+          events.push(`read ${cwd} force=${String(opts.force)}`);
+          return Promise.resolve({});
+        },
       },
-    };
-    ctx.sessions.refreshPr = () => {
-      events.push('refresh');
-      return Promise.resolve();
     };
     ctx.sessions.triggerSync = () => {
       events.push('sync');
@@ -133,6 +133,11 @@ describe('a credential edit', () => {
     const events = editPat();
     expect(events).toEqual([]);
     await Promise.resolve();
-    expect(events).toEqual(['persisted', 'credentials', 'refresh', 'sync']);
+    expect(events).toEqual([
+      'persisted',
+      'credentials',
+      'read /repo force=true',
+      'sync',
+    ]);
   });
 });

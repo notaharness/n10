@@ -134,7 +134,10 @@ function runSettingsEffects(effects: SettingsEffect[]): void {
         pullRequests.credentialsChanged();
         break;
       case 'refresh-remote':
-        void pullRequests.refresh(requireRepo());
+        // Forced, but not a user refresh: a credential change has
+        // already reset every provider's caches, and an interval edit
+        // is no reason to make one spend a cycle's per-row reads.
+        void pullRequests.read(requireRepo(), { force: true });
         break;
       case 'restart-sync-loop':
         startRemoteSyncLoop(requireRepo());

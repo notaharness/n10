@@ -34,8 +34,8 @@ vi.mock('./pull-requests.js', () => ({
     credentialsChanged: () => {
       state.credentialChanges += 1;
     },
-    refresh: () => {
-      state.remoteRefreshes += 1;
+    read: (_cwd: string, opts?: { force?: boolean }) => {
+      if (opts?.force) state.remoteRefreshes += 1;
       return Promise.resolve({});
     },
   },
