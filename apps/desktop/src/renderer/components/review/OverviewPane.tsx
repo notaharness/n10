@@ -101,6 +101,7 @@ export function OverviewPane({
           retrying={retrying}
           onRetry={retry}
           onBack={nested.close}
+          actions={<PrActions pr={pr} />}
         />
       ) : (
         <div className={LAYOUT}>

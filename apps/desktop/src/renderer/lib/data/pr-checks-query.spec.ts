@@ -81,7 +81,7 @@ describe('rowFacts', () => {
     ],
   } as PullRequestInfo;
 
-  it('moves when a check finishes, a review lands, a thread is resolved, or it leaves draft or is retargeted', () => {
+  it('moves when a check finishes, a review lands or is asked for, a thread is resolved, or it leaves draft or is retargeted', () => {
     const facts = rowFacts(PR);
     expect(rowFacts({ ...PR, buildStatus: 'succeeded' })).not.toBe(facts);
     expect(rowFacts({ ...PR, activeCommentCount: 0 })).not.toBe(facts);
@@ -94,6 +94,13 @@ describe('rowFacts', () => {
           { ...PR.reviewers![0], decision: 'approved' },
           PR.reviewers![1],
         ],
+      })
+    ).not.toBe(facts);
+    // Asked again after a verdict: the verdict stays, the request is new.
+    expect(
+      rowFacts({
+        ...PR,
+        reviewers: [PR.reviewers![0], { ...PR.reviewers![1], requested: true }],
       })
     ).not.toBe(facts);
   });

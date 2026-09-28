@@ -300,13 +300,13 @@ test.describe('Completion', () => {
     const rows = page.getByRole('list', { name: 'Checks and policies' });
     await expect(rows.locator('[data-check]')).toHaveCount(5);
 
-    // The list moves and the checks read that follows it fails.
+    // The pull request's own Refresh sits beside Back, and the read it
+    // asks for fails.
     updateFakeGh(desktop.homeDir, (s) => {
       s.prs[0].failing = { checks: true };
-      s.prs[0].rollup = 'PENDING';
     });
-    await sidebar(page)
-      .getByRole('button', { name: 'Refresh', exact: true })
+    await page
+      .getByRole('button', { name: 'Refresh this pull request' })
       .click();
     // The reader stays where they were, with the list they had and why
     // it is not newer.

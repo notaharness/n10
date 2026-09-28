@@ -2,14 +2,16 @@ import {
   useCallback,
   useState,
   type Dispatch,
+  type RefObject,
   type SetStateAction,
 } from 'react';
+import { refocusAfter } from '../focus.js';
 import type { PullRequestInfo } from '@n10/vcs-core/types';
 import {
   adoptPullRequest,
+  backToReviewPane,
   initialMode,
   lastReviewPane,
-  reviewPaneFor,
   reviewRole,
   type PaneState,
   type ReviewPane,
@@ -79,19 +81,49 @@ export function useReviewMode({
 }
 
 /**
- * The review pane the reader was last on, which the terminal's Back
- * returns to. Before either has shown, the one the pull request opens on
- * for this reader. Adjusted during render, like the pane itself.
+ * The review pane the terminal's Back returns to: the one the reader was
+ * last on, or before either has shown, the one the pull request opens on
+ * for this reader as the list reads now. Adjusted during render, like
+ * the pane itself.
  */
 export function useLastReviewPane(
   mode: Mode,
   pr: PullRequestInfo | undefined,
   viewer: string | null
 ): ReviewPane {
-  const [last, setLast] = useState<ReviewPane>(() =>
-    reviewPaneFor(pr ? reviewRole(pr, viewer) : 'author')
-  );
+  const [last, setLast] = useState<ReviewPane | null>(null);
   const next = lastReviewPane(last, mode);
   if (next !== last) setLast(next);
-  return next;
+  return backToReviewPane(next, pr ? reviewRole(pr, viewer) : 'author');
+}
+
+/**
+ * The terminal header's Back: up to the review pane the reader was last
+ * on. The button goes with the terminal's header, so the keyboard goes
+ * to the review it leads to: the changes, or the Overview's heading.
+ */
+export function useBackToReview({
+  mode,
+  pr,
+  viewer,
+  setMode,
+  changes,
+  root,
+}: {
+  mode: Mode;
+  pr: PullRequestInfo | undefined;
+  viewer: string | null;
+  setMode: (mode: Mode) => void;
+  changes: RefObject<HTMLElement | null>;
+  root: RefObject<HTMLElement | null>;
+}): () => void {
+  const pane = useLastReviewPane(mode, pr, viewer);
+  return () => {
+    setMode(pane);
+    refocusAfter(() =>
+      pane === 'diff'
+        ? changes.current
+        : root.current?.querySelector<HTMLElement>('[data-overview-heading]')
+    );
+  };
 }

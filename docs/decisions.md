@@ -204,8 +204,17 @@ no policies, required reviewers, conflicts or merge permission, so readiness
 stays "not fully known" until those are read. Until a native requirement signal
 is read, an approval or a passing check is an observation, and a failing check
 or a holding verdict is a concern, not a block; only the provider's own
-lifecycle (open, draft) is a verdict. Verdicts sit below the reviewers, as
-outline buttons; the next step is the only primary action.
+lifecycle (open, draft) is a verdict. The next step's button is the Overview's
+one way into a review: there are no instant verdict buttons, so a verdict is
+given from the changes, where the reviewer has read them.
+
+The Overview has no header bar; its heading carries the pull request's identity
+and actions. The bar sits in the content column, above every other pane, so
+moving between panes never shifts the rail under the pointer. The terminal's
+bar has "← Review", which goes up to the review pane last shown, never back
+through history. Below 720 px of workspace width the rail folds with its own
+collapse control, and it comes back once there is room unless the reader chose
+since (`rail-model.ts`).
 
 The checks read (`getPullRequestChecks`) takes readiness from the provider's own
 verdict, GitHub's `mergeStateStatus`, and explains it with the provider's facts:

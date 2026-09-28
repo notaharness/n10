@@ -20,4 +20,10 @@ describe('railAtWidth', () => {
     const hidden = railByReader(RAIL_SHOWN, true);
     expect(railAtWidth(railAtWidth(hidden, true), false).hidden).toBe(true);
   });
+
+  it('keeps it collapsed when the reader shows and then hides it while narrow', () => {
+    const folded = railAtWidth(RAIL_SHOWN, true);
+    const hidden = railByReader(railByReader(folded, false), true);
+    expect(railAtWidth(hidden, false).hidden).toBe(true);
+  });
 });

@@ -24,7 +24,11 @@ export function PrIdentity({
   return (
     <div className={cn('min-w-0', className)}>
       <div className="flex items-start gap-3">
-        <h1 className="min-w-0 flex-1 text-xl leading-snug font-semibold break-words">
+        <h1
+          data-overview-heading
+          tabIndex={-1}
+          className="min-w-0 flex-1 text-xl leading-snug font-semibold break-words outline-none"
+        >
           {pr.title}{' '}
           <span className="font-normal text-muted-foreground">#{pr.id}</span>
         </h1>

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PullRequestInfo } from '@n10/vcs-core/types';
 import {
   adoptPullRequest,
+  backToReviewPane,
   initialMode,
   lastReviewPane,
   nextStep,
@@ -46,7 +47,18 @@ describe('lastReviewPane', () => {
     for (const mode of ['agent', 'review', 'plan'] as const) {
       expect(lastReviewPane('overview', mode)).toBe('overview');
       expect(lastReviewPane('diff', mode)).toBe('diff');
+      expect(lastReviewPane(null, mode)).toBeNull();
     }
+  });
+});
+
+describe('backToReviewPane', () => {
+  it('goes to the pane last shown, or else the one the pull request opens on for the reader', () => {
+    expect(backToReviewPane('diff', 'reviewer')).toBe('diff');
+    expect(backToReviewPane('overview', 'author')).toBe('overview');
+    // Straight into the terminal: the reader's role decides, as it is now.
+    expect(backToReviewPane(null, 'reviewer')).toBe('overview');
+    expect(backToReviewPane(null, 'author')).toBe('diff');
   });
 });
 
@@ -122,6 +134,32 @@ describe('nextStep', () => {
       summary: 'Draft: not ready for review yet',
       label: 'View changes',
     });
+  });
+
+  it('leads a reviewer from the unresolved count to the first open thread', () => {
+    const pr = {
+      ...PR,
+      activeCommentCount: 2,
+      reviewers: [bea('no-response')],
+    };
+    expect(nextStep(pr, 'reviewer', 'bea')).toMatchObject({
+      detail: '2 unresolved threads',
+      detailAction: 'show-unresolved',
+      action: 'review-changes',
+    });
+    // No account: the detail says so, and leads nowhere.
+    expect(nextStep(pr, 'reviewer', null)).not.toHaveProperty('detailAction');
+  });
+
+  it('says a review is requested only where the provider asks for it', () => {
+    // On GitHub, a reply in a thread lists the reader without a request.
+    const pr = {
+      ...PR,
+      reviewers: [{ ...bea('no-response'), requested: false }],
+    };
+    expect(nextStep(pr, 'reviewer', 'bea').summary).toBe(
+      'Not reviewed by you yet'
+    );
   });
 
   it('claims nothing about "you" without an account', () => {

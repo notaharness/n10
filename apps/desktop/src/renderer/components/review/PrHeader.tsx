@@ -43,7 +43,7 @@ export function OpenInEditorButton({ branch }: { branch: string }) {
         }
       >
         <CodeIcon />
-        <span className="hidden @min-[900px]:inline">Editor</span>
+        <span className="hidden @min-[630px]:inline">Editor</span>
       </Button>
     </Tip>
   );
@@ -110,7 +110,7 @@ export function PrActions({ pr }: { pr: PullRequestInfo }) {
           onClick={() => void window.n10.openExternal(pr.url)}
         >
           <ExternalLinkIcon />
-          <span className="hidden @min-[900px]:inline">{provider}</span>
+          <span className="hidden @min-[630px]:inline">{provider}</span>
         </Button>
       </Tip>
       <Tip label="Refresh this pull request">
@@ -147,7 +147,9 @@ export function PrActions({ pr }: { pr: PullRequestInfo }) {
  * The compact identity of a pull request tab, sized by its own width:
  * the title truncates first, then the branches go, the reviewer avatars
  * become a count and the button labels become icons. The number and
- * the state always stay; the Overview carries every value in full.
+ * the state always stay; the Overview carries every value in full. It
+ * sits beside the review rail, so its steps are the rail's width below
+ * the window widths they stand for.
  */
 export function PrHeader({
   pr,
@@ -189,7 +191,7 @@ export function PrHeader({
           <button
             type="button"
             onClick={() => copyText(pr.sourceBranch, 'Branch name copied')}
-            className="hidden min-w-0 items-center gap-1 rounded px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground @min-[1200px]:flex"
+            className="hidden min-w-0 items-center gap-1 rounded px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground @min-[930px]:flex"
           >
             <span className="truncate">{pr.sourceBranch}</span>
             <span className="shrink-0">→ {pr.targetBranch}</span>
@@ -206,18 +208,18 @@ export function PrHeader({
         <Tip label={`Opened by ${pr.createdByDisplayName}`}>
           <span className="flex items-center gap-1.5">
             <Avatar name={pr.createdByDisplayName} size="xs" />
-            <span className="hidden truncate text-muted-foreground @min-[1200px]:inline">
+            <span className="hidden truncate text-muted-foreground @min-[930px]:inline">
               {pr.createdByDisplayName}
             </span>
           </span>
         </Tip>
         <ReviewerDots
           reviewers={reviewers}
-          className="hidden @min-[1000px]:flex"
+          className="hidden @min-[730px]:flex"
         />
         <ReviewerSummary
           reviewers={reviewers}
-          className="hidden @min-[720px]:flex"
+          className="hidden @min-[600px]:flex"
         />
         {(pr.activeCommentCount ?? 0) > 0 && (
           <UnresolvedButton
@@ -262,11 +264,28 @@ export function BranchHeader({
   );
 }
 
+/** The bar's height (`h-10`), which a terminal under it goes without. */
+const BAR_HEIGHT = 40;
+
+/** Every pane has the bar but a pull request's Overview, which its own
+ *  heading heads. */
+function hasBar(mode: Mode, hasPr: boolean): boolean {
+  return !(hasPr && mode === 'overview');
+}
+
+/** How much shorter the terminal will be than the content pane measures
+ *  in `mode`: an agent launched from the Overview gets the bar above it. */
+export function terminalInset(mode: Mode, hasPr: boolean): number {
+  return hasBar(mode, hasPr) ? 0 : BAR_HEIGHT;
+}
+
 /**
- * The bar over a workspace's pane. A pull request's Overview is headed by
- * its own identity, so it has none; its terminal's bar offers the way
- * back up to the review. A worktree without a pull request has the
- * branch's bar, and no review to go back to.
+ * The bar over a workspace's pane, in the content's column: it changes
+ * with the pane, and over the rail it would move the rail as it comes
+ * and goes. A pull request's Overview is headed by its own identity, so
+ * it has none; its terminal's bar offers the way back up to the review.
+ * A worktree without a pull request has the branch's bar, and no review
+ * to go back to.
  */
 export function WorkspaceHeader({
   pr,
@@ -295,7 +314,7 @@ export function WorkspaceHeader({
       />
     );
   }
-  if (mode === 'overview') return null;
+  if (!hasBar(mode, true)) return null;
   return (
     <PrHeader
       pr={pr}

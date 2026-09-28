@@ -146,6 +146,12 @@ async function openPr(page: Page, row: RegExp): Promise<void> {
   ).toBeVisible({ timeout: 30_000 });
 }
 
+async function agentReady(page: Page): Promise<void> {
+  await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
 /** From the Overview to the changes, where the header bar is. */
 async function showChanges(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Review changes' }).click();
@@ -246,6 +252,44 @@ test.describe('Pull request Overview', () => {
     await expect(
       page.locator('[data-thread]', { hasText: 'Why keep the old name?' })
     ).toBeFocused();
+  });
+
+  test.describe('with an open thread', () => {
+    test.use({
+      fakeGitHub: {
+        ...GITHUB,
+        prs: [
+          {
+            ...GITHUB.prs[0],
+            threads: [
+              {
+                id: 'T9',
+                path: 'request.ts',
+                line: 2,
+                comments: [{ author: 'bea', body: 'Can this close twice?' }],
+              },
+            ],
+          },
+          GITHUB.prs[1],
+        ],
+      },
+    });
+
+    test('leads a reviewer from the unresolved count to the first open thread', async ({
+      desktop,
+    }) => {
+      const { page } = desktop;
+      await openPr(page, /#214/);
+      const next = page.getByRole('region', { name: 'Next step' });
+      await next.getByRole('button', { name: '1 unresolved thread' }).click();
+
+      await expect(
+        page.locator('[data-comment-row][aria-current="true"]')
+      ).toContainText('Can this close twice?');
+      await expect(
+        page.locator('[data-thread]', { hasText: 'Can this close twice?' })
+      ).toBeFocused();
+    });
   });
 
   test('leaves the keyboard on a rail row that opens a thread', async ({
@@ -380,35 +424,65 @@ test.describe('Pull request Overview', () => {
     ).toBeVisible();
   });
 
-  test('the terminal goes back up to the review it came from, not back through history', async ({
+  test('the terminal goes back up to the review it came from, and the keyboard with it', async ({
     desktop,
   }) => {
     const { page } = desktop;
     await openPr(page, /#214/);
     const back = prHeader(page).getByRole('button', { name: 'Back to review' });
-    const agentReady = () =>
-      expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
-        timeout: 30_000,
-      });
+    const pressBack = async () => {
+      await back.focus();
+      await page.keyboard.press('Enter');
+    };
 
     // From the changes to the terminal, and Back to the changes.
     await showChanges(page);
     await launchAgentFromRail(page);
-    await agentReady();
-    await back.click();
+    await agentReady(page);
+    await pressBack();
     await expect(visibleText(page, 'socket.close();')).toBeVisible();
     await expect(back).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Changes' })).toBeFocused();
 
     // From the Overview to the terminal: Back goes to the Overview, the
-    // last review pane shown, which has no header bar.
+    // last review pane shown, which has no header bar; the keyboard
+    // lands on its heading.
     await page.getByRole('button', { name: 'Overview', exact: true }).click();
     await page.getByRole('button', { name: /^Agent/ }).click();
-    await agentReady();
-    await back.click();
-    await expect(
-      overviewTitle(page, 'Handle cancelled requests')
-    ).toBeVisible();
+    await agentReady(page);
+    await pressBack();
+    const title = overviewTitle(page, 'Handle cancelled requests');
+    await expect(title).toBeVisible();
+    await expect(title).toBeFocused();
     await expect(prHeader(page)).toHaveCount(0);
+  });
+
+  test('goes up to the review, not back to the plan shown in between', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openPr(page, /#215/);
+    await page.locator('[data-comment-row]').first().click();
+    const thread = page.locator('[data-thread]', {
+      hasText: 'Why keep the old name?',
+    });
+    await thread.hover();
+    await thread
+      .getByRole('button', { name: 'Add to plan', exact: true })
+      .click();
+
+    // The Overview, then the plan, then the terminal.
+    await page.getByRole('button', { name: 'Overview', exact: true }).click();
+    await page.getByRole('button', { name: /^Plan\b/ }).click();
+    await expect(page.getByRole('region', { name: 'Plan' })).toBeVisible();
+    await launchAgentFromRail(page);
+    await agentReady(page);
+
+    await prHeader(page)
+      .getByRole('button', { name: 'Back to review' })
+      .click();
+    await expect(overviewTitle(page, 'Tidy the retry helper')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Plan' })).toBeHidden();
   });
 
   test('a worktree without a pull request has no review to go back to', async ({
@@ -417,9 +491,7 @@ test.describe('Pull request Overview', () => {
     const { page } = desktop;
     await createWorktree(page, 'plain-work');
     await launchAgentFromRail(page);
-    await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
-      timeout: 30_000,
-    });
+    await agentReady(page);
     await expect(
       page.getByRole('button', { name: 'Back to review' })
     ).toHaveCount(0);

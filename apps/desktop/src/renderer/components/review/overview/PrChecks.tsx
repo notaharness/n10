@@ -8,7 +8,7 @@ import {
   TriangleAlertIcon,
   XCircleIcon,
 } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import type {
   CheckList,
   CheckRow,
@@ -217,6 +217,8 @@ export interface ChecksProps {
   retrying: boolean;
   onRetry: () => void;
   onBack: () => void;
+  /** The pull request's own actions, beside Back. */
+  actions?: ReactNode;
 }
 
 function Body({
@@ -225,7 +227,7 @@ function Body({
   reading,
   retrying,
   onRetry,
-}: Omit<ChecksProps, 'onBack'>) {
+}: Omit<ChecksProps, 'onBack' | 'actions'>) {
   if (read.kind === 'failed') {
     return (
       <ReadFailure
@@ -282,22 +284,25 @@ function Body({
  * Back, whatever a re-read brings, and Back returns to the Overview
  * where they left it.
  */
-export function PrChecks({ onBack, ...body }: ChecksProps) {
+export function PrChecks({ onBack, actions, ...body }: ChecksProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   // The keyboard lands on the view it opened, not back at the top.
   useEffect(() => heading.current?.focus(), []);
   return (
     <div className="mx-auto max-w-[900px] px-6 py-6">
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-label="Back to the Overview"
-        onClick={onBack}
-        className="-ml-2"
-      >
-        <ArrowLeftIcon />
-        Overview
-      </Button>
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label="Back to the Overview"
+          onClick={onBack}
+          className="-ml-2"
+        >
+          <ArrowLeftIcon />
+          Overview
+        </Button>
+        {actions}
+      </div>
       <h2
         ref={heading}
         tabIndex={-1}

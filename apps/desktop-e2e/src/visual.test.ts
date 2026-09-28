@@ -295,7 +295,7 @@ test.describe('Visual (plan, light theme) @visual', () => {
  * The pull request Overview, for a pull request someone else opened —
  * which is where it opens. One column at the window's own size, two
  * once the outer sidebar is hidden and the content pane passes 900 px,
- * and the header's compact form at 800×600.
+ * and at 800×600 the review rail folded to its strip beside one column.
  */
 const OVERVIEW_GITHUB: FakeGitHub = {
   username: 'n10-tester',
