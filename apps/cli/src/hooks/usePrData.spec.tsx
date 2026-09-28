@@ -13,14 +13,15 @@ import { createPullRequestList, type PullRequestList } from '@n10/engine';
 import { EngineProvider, usePrData } from '@n10/app-core';
 
 const flashes = vi.hoisted(() => [] as string[]);
-// Stable identity: the hook re-takes its watch when the config changes.
-const configValue = vi.hoisted(() => ({ config: {} }));
+// Stable identity between renders: the hook re-takes its watch when the
+// config changes, which a test does by replacing `current`.
+const configValue = vi.hoisted(() => ({ current: { config: {} } }));
 
 vi.mock(
   '../../../../libs/app-core/src/lib/context/ConfigContext.js',
   async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()),
-    useConfig: () => configValue,
+    useConfig: () => configValue.current,
   })
 );
 
@@ -38,6 +39,7 @@ let pending: {
   resolve: (v: BranchPrMap) => void;
   reject: (e: Error) => void;
 }[];
+let project: Record<string, string>;
 let list: PullRequestList;
 
 const provider = {
@@ -65,16 +67,19 @@ function mount() {
     });
     return <Box />;
   }
-  const { unmount } = render(
+  const tree = () => (
     <EngineProvider pullRequests={list} repo="/repo">
       <Probe />
     </EngineProvider>
   );
-  return { outRef, unmount };
+  const { unmount, rerender } = render(tree());
+  return { outRef, unmount, rerender: () => rerender(tree()) };
 }
 
 beforeEach(() => {
   pending = [];
+  project = { owner: 'acme', repo: 'widgets' };
+  configValue.current = { config: {} };
   flashes.length = 0;
   list = createPullRequestList({
     providers: [provider],
@@ -82,7 +87,7 @@ beforeEach(() => {
       ({
         vendor: 'github',
         vendorAuth: {},
-        vendorProject: { owner: 'acme', repo: 'widgets' },
+        vendorProject: { ...project },
       } as AppConfig),
   });
 });
@@ -135,6 +140,26 @@ describe('usePrData', () => {
       error: 'rate limited',
     });
     expect(flashes).toEqual(['PR error: rate limited']);
+    probe.unmount();
+  });
+
+  it('reads the new scope as soon as the config changes', async () => {
+    // Auto-detect or a settings edit points the repo at another project.
+    // Without re-taking the watch, its list would wait out an interval.
+    const probe = mount();
+    await flush();
+    pending[0]!.resolve({ widgets: null });
+    await flush();
+
+    project = { owner: 'acme', repo: 'gadgets' };
+    configValue.current = { config: {} };
+    probe.rerender();
+    await flush();
+    expect(list.fetchCount()).toBe(2);
+    expect(probe.outRef.current?.prMap).toEqual({});
+    pending[1]!.resolve({ gadgets: null });
+    await flush();
+    expect(probe.outRef.current?.prMap).toEqual({ gadgets: null });
     probe.unmount();
   });
 
