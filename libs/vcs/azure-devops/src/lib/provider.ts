@@ -7,7 +7,6 @@ import type {
   PullRequestComments,
   RemoteCommentThread,
   RemoteCommentReply,
-  ReviewDecision,
   ReviewVerdict,
   BuildStatusState,
   RepositoryRef,
@@ -26,6 +25,8 @@ import {
   TTL,
 } from './request.js';
 import { fetchPrBuildStatus } from './build-status.js';
+import { fetchPullRequestDetailAzure } from './pr-overview-details.js';
+import { voteToDecision } from './votes.js';
 import { fetchPrBuildRunsBatch } from './builds.js';
 import {
   forgetPrDetails,
@@ -82,15 +83,9 @@ function invalidatePr(config: AdoConfig, prId: number): void {
   invalidateAdoKey(`${repo}/threads/${prId}`);
   invalidateAdoKey(`${repo}/statuses/${prId}`);
   invalidateAdoKey(`${repo}/description/${prId}`);
+  invalidateAdoKey(`${repo}/detail/${prId}`);
+  invalidateAdoKey(`${repo}/iterations/${prId}`);
   invalidateAdoCache(`${repo}/thread/${prId}/`);
-}
-
-function voteToDecision(vote: number, hasDeclined: boolean): ReviewDecision {
-  if (hasDeclined) return 'declined';
-  if (vote === 10 || vote === 5) return 'approved';
-  if (vote === -5) return 'waiting-for-author';
-  if (vote === -10) return 'rejected';
-  return 'no-response';
 }
 
 export function parseReviewer(raw: RawReviewer): PullRequestReviewer {
@@ -1118,6 +1113,14 @@ export const azureDevOpsProvider: VcsProvider = {
     return sanitizeBody(data.description ?? '');
   },
 
+  fetchPullRequestDetail(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ) {
+    return fetchPullRequestDetailAzure(toAdoConfig(auth, project), prId);
+  },
+
   async submitReviewVerdict(
     auth: Record<string, string>,
     project: Record<string, string>,
@@ -1142,11 +1145,14 @@ export const azureDevOpsProvider: VcsProvider = {
       body: JSON.stringify({ id: userId, vote }),
       bodyForLog: { vote },
     });
-    // Nothing cached here carries a reviewer vote: the list that does
-    // is fetched with a zero TTL, so it is deduped and never stored.
-    // Wiping the repository prefix would therefore drop threads,
-    // statuses and descriptions to fix something they do not hold.
-    // The vote a user might still see is in the shell's own model —
-    // the desktop refreshes it from services/reviews.ts.
+    // The selected pull request's detail is the one cached answer that
+    // carries votes; the list is fetched with a zero TTL, so it is
+    // deduped and never stored. Wiping the repository prefix would drop
+    // threads, statuses and descriptions to fix something they do not
+    // hold. The vote a user might still see is in the shell's own model
+    // — the desktop refreshes it from services/reviews.ts.
+    invalidateAdoKey(
+      `${config.org}/${config.project}/${config.repo}/detail/${prId}`
+    );
   },
 };

@@ -153,6 +153,10 @@ function detailOf(
     createdAt: node.createdAt,
     updatedAt: node.updatedAt,
     reviewers,
+    iteration: {
+      state: 'unsupported',
+      reason: 'GitHub names a revision by its head commit alone',
+    },
     capabilities: { update: updateCapability(node.viewerCanUpdate) },
   };
 }

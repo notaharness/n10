@@ -23,6 +23,8 @@ ceiling: it is a REST surface. Reasoning: `docs/decisions.md`.
   to that identity. 25 reads of each kind per cycle, longest-unread first,
   ties on id. Memos age out and are never deleted (`forgetRepoDetails`). On a
   truncated runs page an unresolved row is omitted from the map ("not looked
-  up"); only a complete page records `none`.
+  up"); only a complete page records `none`. The selected pull request's
+  detail (`pr-overview-details.ts`) is two reads on demand and touches no
+  cycle memo.
 - GitHub's search returns the rollup and counts with the list, so it
   implements neither `forgetPullRequestCache` nor `resetCaches`.

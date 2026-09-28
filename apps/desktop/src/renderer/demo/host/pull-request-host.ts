@@ -38,6 +38,8 @@ function detailReviewer(
     decision: r.decision,
     native,
     requested: r.requested ?? r.decision === 'no-response',
+    // GitHub has no flag apart from a request.
+    attention: null,
     required: null,
     reason: null,
     onBehalfOf: [],
@@ -82,6 +84,10 @@ export function demoDetail(
         total: pr.reviewers?.length ?? 0,
         complete: true,
       },
+    },
+    iteration: {
+      state: 'unsupported',
+      reason: 'GitHub names a revision by its head commit alone',
     },
     capabilities: { update: { state: 'supported' } },
   };

@@ -223,6 +223,10 @@ export interface DetailReviewer {
    *  so there a listed reviewer who has neither voted nor declined is
    *  asked; flagging a reviewer for attention is not a request. */
   requested: boolean;
+  /** Flagged for attention without touching their vote — Azure DevOps'
+   *  "request attention". Null where the provider has no such flag, so
+   *  "not flagged" and "cannot be flagged" stay apart. */
+  attention: boolean | null;
   /** Required by the provider's own rules, or null where the provider
    *  does not say. */
   required: boolean | null;
@@ -242,6 +246,22 @@ export interface DetailReviewer {
 }
 
 /**
+ * One iteration of an Azure DevOps pull request — a push, or a retarget
+ * onto another branch: the provider's own name for a revision, numbered
+ * from 1, with the commits it compared. Comments and review ranges are
+ * tracked against it.
+ */
+export interface PullRequestIteration {
+  id: number;
+  /** The source branch's head when it was pushed. */
+  source: Oid;
+  /** The target branch's head it was compared with, where given. */
+  target: Oid | null;
+  /** The merge base of the two, where given. */
+  base: Oid | null;
+}
+
+/**
  * The selected pull request as its provider describes it, read on
  * demand rather than with the list. Providers fill this through
  * `VcsProvider.fetchPullRequestDetail`.
@@ -251,7 +271,9 @@ export interface PullRequestDetail {
   ref: PullRequestRef;
   title: string;
   url: string;
-  author: { identifier: string; displayName: string };
+  /** Who opened it, or null where the provider names no one. GitHub
+   *  names a deleted account `ghost`, as it shows one. */
+  author: { identifier: string; displayName: string } | null;
   lifecycle: PullRequestLifecycle;
   source: {
     branch: string;
@@ -260,12 +282,24 @@ export interface PullRequestDetail {
     repository: RepositoryRef | null;
     head: Oid;
   };
+  /**
+   * The target branch, and the commit this head was compared with —
+   * not necessarily the branch's head now. On Azure DevOps it is the
+   * target recorded with the newest iteration, which stays put when
+   * the branch moves without a push to the pull request; on GitHub it
+   * is `baseRefOid`. Null where not given.
+   */
   target: { branch: string; head: Oid | null };
   createdAt: string | null;
   updatedAt: string | null;
   /** Everyone asked to review and everyone who has, all pages read, or
    *  marked incomplete. Read after the rest, and failed on its own. */
   reviewers: ReadOutcome<ListRead<DetailReviewer>>;
+  /** The newest iteration, whose source is `source.head`, where the
+   *  provider numbers revisions; `null` when it lists none for that head
+   *  yet (a push landed between the reads). Unsupported where the head
+   *  commit is the only name a revision has. */
+  iteration: ReadOutcome<PullRequestIteration | null>;
   /** Whether the viewer may edit the title and description. Draft and
    *  ready depend on the lifecycle as well, and are not this. */
   capabilities: { update: Capability };
