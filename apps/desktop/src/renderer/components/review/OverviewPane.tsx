@@ -10,6 +10,9 @@ import type { ComponentProps, ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { PullRequestInfo, ReviewVerdict } from '@n10/vcs-core';
 import { usePrDescription } from '../../lib/data/queries.js';
+import type { ReadState } from '../../lib/data/read-state.js';
+import { keys } from '../../lib/data/query-keys.js';
+import { useReadState } from '../../lib/data/use-read-state.js';
 import { useSubmitVerdict } from '../../lib/data/mutations.js';
 import { useRepo } from '../../lib/repo-context.js';
 import { errorMessage } from '../../lib/utils.js';
@@ -19,6 +22,7 @@ import { Button } from '../ui/button.js';
 import { Skeleton } from '../ui/skeleton.js';
 import { Tip } from '../ui/tooltip.js';
 import { CommentMarkdown } from './comments/CommentMarkdown.js';
+import { ReadFailure, StaleNotice } from './ReadNotice.js';
 
 /**
  * The PR overview: title, meta, full description, and the review
@@ -151,9 +155,66 @@ function VerdictBar({
   );
 }
 
+/**
+ * The author's description. An empty body and a failed fetch are
+ * different facts: only the first is "no description".
+ */
+function Description({
+  state,
+  retrying,
+  onRetry,
+}: {
+  state: ReadState<string>;
+  retrying: boolean;
+  onRetry: () => void;
+}) {
+  if (state.kind === 'loading') {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-5/6" />
+      </div>
+    );
+  }
+  if (state.kind === 'failed') {
+    return (
+      <ReadFailure
+        title="Couldn't load the description"
+        error={state.error}
+        retrying={retrying}
+        onRetry={onRetry}
+      />
+    );
+  }
+  return (
+    <>
+      {state.stale && (
+        <StaleNotice
+          what="description"
+          stale={state.stale}
+          retrying={retrying}
+          onRetry={onRetry}
+          className="mb-3"
+        />
+      )}
+      {state.data ? (
+        <CommentMarkdown markdown={state.data} />
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          This pull request has no description.
+        </p>
+      )}
+    </>
+  );
+}
+
 export function OverviewPane({ pr }: { pr: PullRequestInfo }) {
   const { repo } = useRepo();
-  const description = usePrDescription(repo.cwd, pr.id);
+  const description = useReadState(
+    usePrDescription(repo.cwd, pr.id),
+    keys.prDescription(repo.cwd, pr.id)
+  );
   const verdict = useSubmitVerdict(repo.cwd, repo.providerId ?? undefined);
   // Speak the provider's language: ADO has four votes; GitHub only
   // knows approve and request-changes, so the negative side collapses
@@ -200,19 +261,11 @@ export function OverviewPane({ pr }: { pr: PullRequestInfo }) {
         />
 
         <div className="mt-4">
-          {description.isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-2/3" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-5/6" />
-            </div>
-          ) : description.data ? (
-            <CommentMarkdown markdown={description.data} />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              This pull request has no description.
-            </p>
-          )}
+          <Description
+            state={description.state}
+            retrying={description.retrying}
+            onRetry={description.retry}
+          />
         </div>
       </div>
     </div>

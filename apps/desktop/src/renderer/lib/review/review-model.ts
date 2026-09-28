@@ -83,22 +83,6 @@ export function focusesAgent(
   return next.active && !prev.active && next.running;
 }
 
-/**
- * Whether the viewer should show its loading state: either the patch
- * itself is still in flight, or a patch has arrived and the worker has
- * not finished parsing *that* patch yet. The parse query is keyed on
- * the patch content, so while a newer patch is parsing there is no data
- * for its key — without the second clause the viewer would report "no
- * files" for the new patch instead of "still working".
- */
-export function diffIsPending(
-  isLoading: boolean,
-  patch: string | undefined,
-  parsed: [string, DiffLine[]][] | undefined
-): boolean {
-  return isLoading || (patch != null && parsed === undefined);
-}
-
 /** Drafts the agent has written but not yet posted. */
 export function unpostedDrafts(
   drafts: readonly ReviewComment[]

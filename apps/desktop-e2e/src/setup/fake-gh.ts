@@ -33,6 +33,9 @@ export interface FakePr {
   reviewRequests?: string[];
   threads?: FakeThread[];
   generalComments?: { author: string; body: string }[];
+  /** Reads that answer with GitHub's 502 until cleared with
+   *  `updateFakeGh`: the description, and the threads query. */
+  failing?: { body?: boolean; threads?: boolean };
 }
 
 /** An inline review thread, anchored to a file and line in the diff. */

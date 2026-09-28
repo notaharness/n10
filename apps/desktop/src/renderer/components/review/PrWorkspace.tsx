@@ -5,25 +5,21 @@ import {
   Separator as PanelSeparator,
 } from 'react-resizable-panels';
 import { toast } from 'sonner';
-import { type DiffLine } from '@n10/diff';
 import type { PlanItem } from '@n10/core/plan';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import { useDiffOptions } from '../../lib/diff/diff-options.js';
-import {
-  useDiff,
-  useDraftComments,
-  useParsedDiff,
-  useThreads,
-  useWorktreeDiff,
-} from '../../lib/data/queries.js';
+import { useDraftComments, useThreads } from '../../lib/data/queries.js';
 import { usePostDrafts } from '../../lib/data/mutations.js';
+import type { ReadState } from '../../lib/data/read-state.js';
+import { keys } from '../../lib/data/query-keys.js';
+import { useReadState } from '../../lib/data/use-read-state.js';
 import { useRepo } from '../../lib/repo-context.js';
 import { useCommentNavigator } from '../../lib/review/use-comment-navigator.js';
+import { useReviewDiff } from '../../lib/review/use-review-diff.js';
 import { useReviewRail } from '../../lib/review/use-review-rail.js';
 import { usePlanCheckout } from '../../lib/plan/use-plan-checkout.js';
 import {
   buildFileEntries,
-  diffIsPending,
   groupDraftsByFile,
   groupThreadsByFile,
   focusesAgent,
@@ -36,11 +32,15 @@ import { errorMessage } from '../../lib/utils.js';
 import { ContentPane } from './ContentPane.js';
 import { type FileEntry } from './diff/FileTree.js';
 import { BranchHeader, PrHeader } from './PrHeader.js';
+import { railReadNotice } from './ReadNotice.js';
 import { CollapsedRail, ReviewRail } from './ReviewRail.js';
 
-/** Shared empty parse, so "no files yet" keeps a stable identity and
- *  the derived lists below are not rebuilt on every render. */
-const NO_FILES: [string, DiffLine[]][] = [];
+/** A worktree without a pull request has no threads to be missing. */
+const NO_THREADS: ReadState<unknown> = {
+  kind: 'ready',
+  data: null,
+  stale: null,
+};
 
 /**
  * The review workspace for a PR: a persistent left rail (Agent · Files
@@ -124,21 +124,17 @@ export function PrWorkspace({
 }) {
   const { repo } = useRepo();
   const prId = pr?.id ?? 0;
-  // A pull request is reviewed against its commits — that is what the
-  // comment threads anchor to. A worktree without one has nothing to
-  // anchor, so it shows the working tree instead and follows the agent
-  // as it edits, which is the whole reason to have the pane open while
-  // one is running.
-  const isWorktreeOnly = pr == null;
-  const commitDiff = useDiff(repo.cwd, branch, baseBranch, {
-    enabled: !isWorktreeOnly,
+  const diff = useReviewDiff({
+    cwd: repo.cwd,
+    branch,
+    baseBranch,
+    isPr: pr != null,
+    running,
   });
-  const workingDiff = useWorktreeDiff(repo.cwd, branch, baseBranch, {
-    enabled: isWorktreeOnly,
-    live: running,
-  });
-  const diff = isWorktreeOnly ? workingDiff : commitDiff;
+  const files = diff.files;
   const comments = useThreads(repo.cwd, prId);
+  const threads = useReadState(comments, keys.threads(repo.cwd, prId));
+  const threadsRead = pr ? threads.state : NO_THREADS;
   const draftsQuery = useDraftComments(repo.cwd, prId);
   const postAll = usePostDrafts(repo.cwd);
   const options = useDiffOptions();
@@ -149,14 +145,6 @@ export function PrWorkspace({
   useAgentFocus({ hasSession: Boolean(sessionName), running, active }, () =>
     setMode('agent')
   );
-  // Whole-file diffs can be megabytes; the parse runs in the diff
-  // worker so opening a tab never blocks the UI thread on it. The query
-  // is keyed on the patch content, so what it hands back always belongs
-  // to the text on screen — while a newer patch is parsing there is no
-  // data for its key and the viewer shows no files, never the old ones.
-  const parsed = useParsedDiff(diff.data);
-  const files = parsed.data ?? NO_FILES;
-  const diffPending = diffIsPending(diff.isLoading, diff.data, parsed.data);
   const inlineThreads = useMemo(
     () => comments.data?.threads ?? [],
     [comments.data]
@@ -295,7 +283,7 @@ export function PrWorkspace({
                   planActive={effMode === 'plan'}
                   onPlan={openPlanPane}
                   entries={entries}
-                  diffLoading={diffPending}
+                  diffLoading={diff.pending}
                   selectedFile={effMode === 'diff' ? nav.selectedFile : null}
                   onSelectFile={nav.jumpToFile}
                   commentItems={nav.items}
@@ -306,6 +294,13 @@ export function PrWorkspace({
                   onCommentContextMenu={(row) =>
                     plan.onCommentContextMenu(row.id)
                   }
+                  commentsNotice={railReadNotice(
+                    'comments',
+                    threadsRead,
+                    threads.retrying,
+                    threads.retry
+                  )}
+                  threads={threadsRead.kind}
                 />
               </Panel>
               <PanelSeparator className="relative w-px bg-border transition-colors after:absolute after:inset-y-0 after:-left-1 after:w-2 hover:bg-primary data-[resize-handle-state=drag]:bg-primary" />
@@ -334,8 +329,9 @@ export function PrWorkspace({
               drafts={drafts}
               hasDrafts={hasDrafts}
               commentsLoading={comments.isLoading}
-              diffPending={diffPending}
-              diffError={diff.error}
+              diffRead={diff.read}
+              diffRetrying={diff.retrying}
+              onRetryDiff={diff.retry}
               focusThreadId={nav.focusId}
               scrollRef={nav.scrollRef}
               jumpRef={nav.jumpRef}
