@@ -135,4 +135,19 @@ export const N10_REPO: RepoData = {
     177: () => import('./descriptions/pr-177.md?raw'),
     182: () => import('./descriptions/pr-182.md?raw'),
   },
+  // The workflows are n10's own; the rules are what a team would set
+  // on master.
+  ci: {
+    jobs: [
+      { name: 'main', workflow: 'CI', required: true, seconds: 820 },
+      {
+        name: 'integration',
+        workflow: 'Integration Tests',
+        required: false,
+        seconds: 540,
+      },
+    ],
+    approvals: 1,
+    conversationResolution: true,
+  },
 };

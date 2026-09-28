@@ -1,3 +1,9 @@
+import {
+  asksViewer,
+  checkList,
+  evaluateReadiness,
+  reviewRequirements,
+} from '@n10/core/readiness';
 import type { PullRequestInfo, PullRequestReviewer } from '@n10/vcs-core';
 import {
   isOid,
@@ -7,7 +13,10 @@ import {
 } from '@n10/vcs-core/pr-details';
 import type { N10HostApi } from '../../../host/contract.js';
 import { VIEWER } from '../data/identity.js';
+import { demoChecks } from './checks.js';
+import { demoConversation } from './conversation.js';
 import { later } from './hub.js';
+import { fileSection, load } from './review-host.js';
 import type { DemoState } from './state.js';
 
 /**
@@ -21,9 +30,6 @@ type PullRequestHost = Pick<
   | 'getPullRequestChecks'
   | 'getPullRequestConversation'
 >;
-
-const NO_CHECKS = 'The web demo does not read checks and policies';
-const NO_CONVERSATION = 'The web demo does not read the conversation';
 
 /** GitHub's word for each verdict the demo's rows hold. */
 const NATIVE: Partial<Record<PullRequestReviewer['decision'], string>> = {
@@ -122,8 +128,50 @@ export function createPullRequestHost(state: DemoState): PullRequestHost {
         target: null,
       });
     },
-    getPullRequestChecks: () => Promise.reject(new Error(NO_CHECKS)),
-    getPullRequestConversation: () =>
-      Promise.reject(new Error(NO_CONVERSATION)),
+    // Readiness, the list and who must review, as core makes them of a
+    // provider's reads.
+    getPullRequestChecks: ({ ref }) => {
+      const repo = state.repo();
+      const pr = repo.pr(ref.number);
+      if (!pr) {
+        return Promise.reject(new Error(`#${ref.number} is not in the demo`));
+      }
+      const checks = demoChecks(pr, ref, repo.data.ci);
+      const detail = { state: 'read', value: demoDetail(pr, ref) } as const;
+      return later({
+        ref,
+        viewer: VIEWER,
+        fetchedAt: Date.now(),
+        checks: { state: 'read', value: checks },
+        readiness: evaluateReadiness({
+          merge: checks.merge,
+          checks: checks.checks,
+          rules: checks.rules,
+          unresolvedThreads: pr.activeCommentCount ?? null,
+          viewerAsked: asksViewer(pr, VIEWER, detail, checks.rules),
+        }),
+        list: checkList(checks),
+        requirements: reviewRequirements(detail, checks.rules),
+      });
+    },
+    // The threads the review host holds, anchored in the real diff.
+    getPullRequestConversation: async ({ ref }) => {
+      const repo = state.repo();
+      const pr = repo.pr(ref.number);
+      if (!pr) throw new Error(`#${ref.number} is not in the demo`);
+      const patch = load(repo.data.diffs[pr.sourceBranch]);
+      const conversation = await demoConversation(
+        pr,
+        ref,
+        repo.threadsOf(pr.id),
+        async (file) => fileSection(await patch, file)
+      );
+      return later({
+        ref,
+        viewer: VIEWER,
+        fetchedAt: Date.now(),
+        conversation: { state: 'read', value: conversation },
+      });
+    },
   };
 }

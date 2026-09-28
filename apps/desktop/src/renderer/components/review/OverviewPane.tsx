@@ -126,7 +126,12 @@ export function OverviewPane({
           className="[grid-area:next]"
         />
         <div className="[grid-area:people]">
-          <PrReviewers reviewers={pr.reviewers ?? []} viewer={repo.viewer} />
+          <PrReviewers
+            reviewers={pr.reviewers ?? []}
+            requirements={read.kind === 'ready' ? read.data.requirements : null}
+            provider={repo.providerId}
+            viewer={repo.viewer}
+          />
         </div>
         <div className="[grid-area:ready]">
           <PrReadiness

@@ -23,8 +23,12 @@ export async function getPullRequestChecks(
   const readChecks = configured
     ? provider?.fetchPullRequestChecks?.bind(provider)
     : undefined;
+  const readDetail = configured
+    ? provider?.fetchPullRequestDetail?.bind(provider)
+    : undefined;
   return readPullRequestChecks(req, {
     ...identitySources(cwd),
     checks: readChecks && ((prId) => readChecks(auth, project, prId)),
+    detail: readDetail && ((prId) => readDetail(auth, project, prId)),
   });
 }

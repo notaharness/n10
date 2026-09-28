@@ -1,20 +1,50 @@
+import { LinkIcon } from 'lucide-react';
+import tailscaleBlack from '../../assets/tailscale-logo-black.svg?url';
+import tailscaleWhite from '../../assets/tailscale-logo-white.svg?url';
 import { useFleet } from '../../lib/fleet/fleet-context.js';
 import { nameError } from '../../lib/fleet/names.js';
+import { openLink } from '../../lib/open-link.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
 import { Label } from '../ui/label.js';
+import { FleetIllustration } from './FleetIllustration.js';
 import { PasskeyCompatibility } from './PasskeyCompatibility.js';
+
+const BEAM_URL = 'https://beam.n10.is';
+
+/** Tailscale's own wordmark, its black or white file by theme. */
+function PoweredByTailscale() {
+  return (
+    <div className="flex flex-col items-center gap-1.5 text-xs text-muted-foreground">
+      <span>Powered by</span>
+      <img src={tailscaleBlack} alt="Tailscale" className="h-3.5 dark:hidden" />
+      <img
+        src={tailscaleWhite}
+        alt="Tailscale"
+        className="hidden h-3.5 dark:block"
+      />
+    </div>
+  );
+}
 
 function Choices({ disabled }: { disabled: boolean }) {
   const { choose } = useFleet().enrolment;
   return (
-    <div className="space-y-3">
-      <h2 className="text-base font-semibold">Your machines, together</h2>
+    <div className="flex flex-col items-center gap-3 text-center">
+      <h2 className="text-base font-semibold">
+        Your machines, connected anywhere
+      </h2>
+      <div className="flex flex-col items-center gap-1">
+        <FleetIllustration />
+        <PoweredByTailscale />
+      </div>
       <p className="text-base text-muted-foreground">
-        Connect your machines with a passkey. Fleet members can run commands
-        here; you control their access.
+        Connect your machines, secured with your passkey, accessible from
+        anywhere.
+        <br />
+        No VPN or SSH required.
       </p>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         <Button disabled={disabled} onClick={() => choose('create')}>
           Create a fleet
         </Button>
@@ -26,6 +56,18 @@ function Choices({ disabled }: { disabled: boolean }) {
           Join a fleet
         </Button>
       </div>
+      <Button variant="link" size="sm" asChild>
+        <a
+          href={BEAM_URL}
+          onClick={(e) => {
+            e.preventDefault();
+            openLink(BEAM_URL);
+          }}
+        >
+          <LinkIcon className="size-3.5" />
+          More information
+        </a>
+      </Button>
     </div>
   );
 }

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { MergeState, PullRequestCheck } from '@n10/vcs-core';
+import type { MergeState, PullRequestCheck, ReviewRule } from '@n10/vcs-core';
 import { evaluateReadiness, type ReadinessInputs } from './pr-readiness.js';
+
+const NO_RULE: ReviewRule = {
+  approvals: 0,
+  codeOwners: false,
+  named: [],
+  approvalsMet: null,
+};
 
 /** Each readiness row on its own, as the Completion section shows it. */
 
@@ -48,7 +55,11 @@ function inputs(over: Partial<ReadinessInputs> = {}): ReadinessInputs {
     },
     rules: {
       state: 'read',
-      value: { requiredChecks: [], conversationResolution: true },
+      value: {
+        requiredChecks: [],
+        conversationResolution: true,
+        reviews: NO_RULE,
+      },
     },
     unresolvedThreads: 0,
     ...over,
@@ -182,7 +193,7 @@ describe('readiness aspects', () => {
       conversationResolution: boolean
     ): ReadinessInputs['rules'] => ({
       state: 'read',
-      value: { requiredChecks: [], conversationResolution },
+      value: { requiredChecks: [], conversationResolution, reviews: NO_RULE },
     });
     expect(
       aspect(inputs({ merge: blocked, unresolvedThreads: 2 }), 'conversations')

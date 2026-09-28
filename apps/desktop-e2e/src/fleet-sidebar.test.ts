@@ -28,7 +28,7 @@ test.describe('Fleet in the sidebar', () => {
       await openFleet(desktop);
       await expect(
         fleetView(page).getByRole('heading', {
-          name: 'Your machines, together',
+          name: 'Your machines, connected anywhere',
         })
       ).toBeVisible();
       await expect(
