@@ -6,8 +6,9 @@ import {
   withAgentFooter,
 } from './conventional.js';
 import {
+  claimForPosting,
   draftRepoKey,
-  updateComment,
+  settleClaim,
   type DraftScope,
 } from './comment-store.js';
 
@@ -95,25 +96,74 @@ function draftScopeOf(ctx: PostContext): DraftScope {
   return { repo, prId: ctx.prId };
 }
 
+/**
+ * Post drafts, each by one poster however many shells try at the same
+ * time.
+ *
+ * The drafts are claimed first (`claimForPosting`): only those this
+ * call claims are sent, and a draft another poster holds is skipped.
+ * They end `posted`, or back at `draft` when the provider refused, so a
+ * retry offers them again. Returns the drafts it posted — empty when
+ * someone else was already posting all of them.
+ */
 export async function postReviewComments(
   comments: ReviewComment[],
   ctx: PostContext,
   event: 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES' = 'COMMENT'
-): Promise<void> {
+): Promise<ReviewComment[]> {
   assertPostable(comments);
   const drafts = draftScopeOf(ctx);
-  if (ctx.vendor === 'github') {
-    await postGitHub(comments, ctx, event);
-  } else if (ctx.vendor === 'azure-devops') {
-    await postAzureDevOps(comments, ctx);
-  } else {
-    throw new Error(`Unsupported vendor: ${ctx.vendor}`);
+  if (ctx.vendor === 'github' && !ctx.headSha) {
+    throw new Error('headSha is required for GitHub reviews');
   }
+  const { token, claimed } = await claimForPosting(
+    drafts,
+    comments.map((c) => c.id)
+  );
+  if (claimed.length === 0) return [];
+  const ids = claimed.map((c) => c.id);
+  try {
+    // What is sent is what was claimed: the drafts as stored now, with
+    // any edit made since the caller read them.
+    assertPostable(claimed);
+    if (ctx.vendor === 'github') {
+      await postGitHub(claimed, ctx, event);
+    } else {
+      await postAzureDevOps(claimed, ctx);
+    }
+  } catch (err) {
+    await releaseClaim(drafts, ids, token);
+    throw err;
+  }
+  try {
+    await settleClaim(drafts, ids, token, 'posted');
+  } catch (err) {
+    // The provider has them. Reporting a failure would invite a retry
+    // that posts them twice; the claim stays until this process exits.
+    throw new Error(
+      `Posted, but could not mark the drafts posted (${errorText(err)}). ` +
+        'Check the pull request before posting them again.'
+    );
+  }
+  return claimed;
+}
 
-  // Mark all as posted
-  for (const comment of comments) {
-    await updateComment(drafts, comment.id, { status: 'posted' });
+/** Offer the drafts again. A failure here must not hide the post's own
+ *  error: the claim then ends with this process instead. */
+async function releaseClaim(
+  drafts: DraftScope,
+  ids: string[],
+  token: string
+): Promise<void> {
+  try {
+    await settleClaim(drafts, ids, token, 'draft');
+  } catch {
+    // Readers offer a dead poster's drafts again (`readComments`).
   }
+}
+
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 async function postGitHub(
@@ -121,9 +171,6 @@ async function postGitHub(
   ctx: PostContext,
   event: 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES'
 ): Promise<void> {
-  if (!ctx.headSha) {
-    throw new Error('headSha is required for GitHub reviews');
-  }
   const owner = ctx.vendorProject.owner;
   const repo = ctx.vendorProject.repo;
 

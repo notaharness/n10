@@ -38,11 +38,11 @@ vi.mock('@n10/review-comments', async () => {
     // under test here, not collaborators to stub out.
     resolveComment: actual.resolveComment,
     draftRepoKey: actual.draftRepoKey,
-    readComments: (scope: DraftScope) => {
+    readComments: async (scope: DraftScope) => {
       state.scopes.push(scope);
       return state.comments.map((c) => ({ ...c }));
     },
-    updateComment: (
+    updateComment: async (
       scope: DraftScope,
       id: string,
       patch: Partial<ReviewComment>
@@ -53,7 +53,7 @@ vi.mock('@n10/review-comments', async () => {
       Object.assign(found, patch);
       return true;
     },
-    removeComment: (scope: DraftScope, id: string) => {
+    removeComment: async (scope: DraftScope, id: string) => {
       state.scopes.push(scope);
       const before = state.comments.length;
       state.comments = state.comments.filter((c) => c.id !== id);
@@ -73,7 +73,7 @@ vi.mock('@n10/review-comments', async () => {
         const found = state.comments.find((x) => x.id === c.id);
         if (found) found.status = 'posted';
       }
-      return Promise.resolve(undefined);
+      return Promise.resolve(comments);
     },
   };
 });

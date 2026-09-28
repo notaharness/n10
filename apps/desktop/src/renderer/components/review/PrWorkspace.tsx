@@ -282,9 +282,11 @@ export function PrWorkspace({
                       { prId, headSha: pr?.headSha },
                       {
                         onSuccess: (n) =>
-                          toast.success(
-                            `Posted ${n} comment${n === 1 ? '' : 's'}`
-                          ),
+                          n > 0
+                            ? toast.success(
+                                `Posted ${n} comment${n === 1 ? '' : 's'}`
+                              )
+                            : toast.info('Already being posted elsewhere'),
                         onError: (e) =>
                           toast.error(`Post failed: ${errorMessage(e)}`),
                       }

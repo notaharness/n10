@@ -288,6 +288,16 @@ after ten seconds. The store is async throughout and waits on timers: the TUI
 and the desktop host take the lock on the thread that draws the UI. Readers take no lock: writes go to a unique temporary file
 and are renamed into place.
 
+A draft is claimed before it is posted: under the same lock, `claimForPosting`
+turns it from `draft` to `posting` with the poster's token, and a second shell
+finds the claim and skips it. The claim settles to `posted`, or back to `draft`
+when the provider refused. A live poster on this machine keeps its claim however
+long the post takes; one that cannot be checked (another machine) loses it after
+ten minutes. A draft whose poster died reads as `draft` again, so recovery is
+at-least-once: if the dead post had landed, posting again duplicates it. A
+duplicate can be deleted; a draft marked posted that never reached the pull
+request cannot be recovered.
+
 ## Diff generation and rendering
 
 PR diffs compare commits so review anchors remain stable. Bare worktree diffs

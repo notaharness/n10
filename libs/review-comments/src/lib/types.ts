@@ -9,6 +9,13 @@ export interface ReviewComment {
   body: string;
   side: 'LEFT' | 'RIGHT';
   status: 'draft' | 'posting' | 'posted';
+  /**
+   * Who is posting it, while `status` is `posting`: the poster's
+   * process token (`file-lock.ts`) and when it claimed the draft. A
+   * second poster skips a claimed draft; a claim whose process is gone
+   * can be taken over (`claimForPosting`).
+   */
+  claim?: { token: string; at: number };
   createdAt: string;
   /**
    * The provider's id for an existing review thread this draft was

@@ -224,7 +224,10 @@ export function DraftCard({
     post.mutate(
       { prId, ids: [draft.id], headSha },
       {
-        onSuccess: () => toast.success('Comment posted'),
+        onSuccess: (n) =>
+          n > 0
+            ? toast.success('Comment posted')
+            : toast.info('Already being posted elsewhere'),
         onError: (e) => toast.error(`Post failed: ${errorMessage(e)}`),
       }
     );

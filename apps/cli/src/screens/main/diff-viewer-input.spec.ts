@@ -262,7 +262,9 @@ beforeEach(() => {
   vi.mocked(readComments).mockResolvedValue([]);
   vi.mocked(updateComment).mockResolvedValue(true);
   vi.mocked(removeComment).mockResolvedValue(true);
-  vi.mocked(postReviewComments).mockResolvedValue(undefined);
+  vi.mocked(postReviewComments).mockImplementation((comments) =>
+    Promise.resolve(comments)
+  );
 });
 
 // ── back ────────────────────────────────────────────────────────
@@ -676,9 +678,7 @@ describe('diff-viewer handler — post-comment', () => {
     );
   });
 
-  /** `run` drops a press while a post is in flight; marking the draft
-   *  outside it would leave that draft stuck as posting. */
-  it('marks the comment posting inside the asyncOps.run op', async () => {
+  it('hands the post to asyncOps.run, leaving the claim to the poster', async () => {
     const pane = makePane({ selectedCommentId: 'd1' });
     let captured: (() => Promise<void>) | undefined;
     const run = vi.fn((_key: string, fn: () => Promise<void>) => {
@@ -693,13 +693,9 @@ describe('diff-viewer handler — post-comment', () => {
     });
     handleDiffViewerInput('p', makeKey(), ctx);
     expect(run).toHaveBeenCalledWith('post-comment', expect.any(Function));
-    expect(updateComment).not.toHaveBeenCalled();
     await captured!();
-    expect(updateComment).toHaveBeenCalledWith(
-      { repo: DRAFT_REPO, prId: 7 },
-      'd1',
-      { status: 'posting' }
-    );
+    // Claiming outside the drafts' lock would let two shells both post.
+    expect(updateComment).not.toHaveBeenCalled();
   });
 
   it('on success, refreshes remote threads and selects the next draft', async () => {
@@ -734,7 +730,27 @@ describe('diff-viewer handler — post-comment', () => {
     expect(ctx.sessions.flashStatus).toHaveBeenCalledWith('Comment posted');
   });
 
-  it('on failure, reverts the comment to draft and flashes the error', async () => {
+  it('says so when another shell already has the draft', async () => {
+    const pane = makePane({ selectedCommentId: 'd1' });
+    vi.mocked(postReviewComments).mockResolvedValue([]);
+    let captured: (() => Promise<void>) | undefined;
+    const ctx = makeCtx(pane, {
+      comments: [makeComment({ id: 'd1', status: 'draft' })],
+      config: { vendor: 'github' },
+      headSha: 'sha1',
+      prId: 7,
+      asyncOpsRun: vi.fn((_key: string, fn: () => Promise<void>) => {
+        captured = fn;
+      }),
+    });
+    handleDiffViewerInput('p', makeKey(), ctx);
+    await captured!();
+    expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
+      'Already being posted elsewhere'
+    );
+  });
+
+  it('on failure, flashes the error; the poster put the draft back', async () => {
     const pane = makePane({ selectedCommentId: 'd1' });
     vi.mocked(postReviewComments).mockRejectedValue(new Error('network down'));
     let captured: (() => Promise<void>) | undefined;
@@ -750,11 +766,7 @@ describe('diff-viewer handler — post-comment', () => {
     });
     handleDiffViewerInput('p', makeKey(), ctx);
     await captured!();
-    expect(updateComment).toHaveBeenCalledWith(
-      { repo: DRAFT_REPO, prId: 7 },
-      'd1',
-      { status: 'draft' }
-    );
+    expect(updateComment).not.toHaveBeenCalled();
     expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
       'Post failed: network down'
     );

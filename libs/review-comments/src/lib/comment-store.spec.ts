@@ -401,3 +401,67 @@ describe('the file on disk', () => {
     expect(parsed.comments).toHaveLength(2);
   });
 });
+
+describe('claiming drafts for posting', () => {
+  const token = (pid: number, host = hostname()) =>
+    JSON.stringify({ host, pid, id: 'x' });
+  const status = async () =>
+    (await store.readComments(SCOPE)).map((c) => [
+      c.id,
+      c.status,
+      c.claim?.token,
+    ]);
+  const claimedBy = (claim: ReviewComment['claim']) =>
+    store.appendComment(SCOPE, {
+      ...comment('a'),
+      status: 'posting',
+      claim,
+    });
+  const deadPid = () => spawnSync(process.execPath, ['-e', '']).pid!;
+  const minutesAgo = (m: number) => Date.now() - m * 60_000;
+
+  it('claims drafts, and only drafts', async () => {
+    await store.appendComment(SCOPE, comment('a'));
+    await store.appendComment(SCOPE, { ...comment('b'), status: 'posted' });
+    const { token: mine, claimed } = await store.claimForPosting(SCOPE, [
+      'a',
+      'b',
+    ]);
+    expect(claimed.map((c) => c.id)).toEqual(['a']);
+    expect(await status()).toEqual([
+      ['a', 'posting', mine],
+      ['b', 'posted', undefined],
+    ]);
+  });
+
+  it('leaves a live poster its claim, however long its post takes', async () => {
+    await claimedBy({ token: token(process.pid), at: minutesAgo(60) });
+    expect((await store.claimForPosting(SCOPE, ['a'])).claimed).toEqual([]);
+    expect(await status()).toEqual([['a', 'posting', token(process.pid)]]);
+  });
+
+  it('offers again the draft of a poster that died mid-post', async () => {
+    await claimedBy({ token: token(deadPid()), at: Date.now() });
+    expect(await status()).toEqual([['a', 'draft', undefined]]);
+    expect((await store.claimForPosting(SCOPE, ['a'])).claimed).toHaveLength(1);
+  });
+
+  it('gives up on a claim it cannot check only once it is old', async () => {
+    await claimedBy({ token: token(1, 'another-machine'), at: minutesAgo(1) });
+    expect(await status()).toEqual([
+      ['a', 'posting', token(1, 'another-machine')],
+    ]);
+    await store.removeComment(SCOPE, 'a');
+    await claimedBy({ token: token(1, 'another-machine'), at: minutesAgo(11) });
+    expect(await status()).toEqual([['a', 'draft', undefined]]);
+  });
+
+  it('settles only a claim it still holds', async () => {
+    await store.appendComment(SCOPE, comment('a'));
+    const first = await store.claimForPosting(SCOPE, ['a']);
+    await store.settleClaim(SCOPE, ['a'], 'someone else', 'draft');
+    expect(await status()).toEqual([['a', 'posting', first.token]]);
+    await store.settleClaim(SCOPE, ['a'], first.token, 'posted');
+    expect(await status()).toEqual([['a', 'posted', undefined]]);
+  });
+});

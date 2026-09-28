@@ -56,7 +56,8 @@ function errorCode(err: unknown): string | undefined {
   return (err as NodeJS.ErrnoException).code;
 }
 
-function newToken(): string {
+/** A token naming this process: its machine, its pid and a nonce. */
+export function ownerToken(): string {
   return JSON.stringify({ host: HOST, pid: process.pid, id: randomUUID() });
 }
 
@@ -115,10 +116,30 @@ function isRunning(pid: number): boolean {
   }
 }
 
+/**
+ * Whether the process `token` names is gone: shown dead on this machine,
+ * or — when that cannot be checked, or its pid may since have been
+ * reused — older than `abandonedMs`.
+ */
+export function isOwnerGone(
+  token: string,
+  ageMs: number,
+  abandonedMs: number
+): boolean {
+  return ageMs > abandonedMs || ownerAlive(token) === false;
+}
+
+/**
+ * Whether the process `token` names is running, or undefined when that
+ * cannot be checked: it is on another machine, or the token names none.
+ */
+export function ownerAlive(token: string): boolean | undefined {
+  const owner = ownerOf(token);
+  return owner?.host === HOST ? isRunning(owner.pid) : undefined;
+}
+
 function isAbandoned(holder: Holder, timing: LockTiming): boolean {
-  if (holder.ageMs > timing.abandonedMs) return true;
-  const owner = ownerOf(holder.token);
-  return owner?.host === HOST && !isRunning(owner.pid);
+  return isOwnerGone(holder.token, holder.ageMs, timing.abandonedMs);
 }
 
 async function removeIfHeldBy(path: string, token: string): Promise<void> {
@@ -138,7 +159,7 @@ export async function breakAbandonedLock(
   timing: LockTiming = DEFAULT_TIMING
 ): Promise<void> {
   const breaker = `${lockPath}.break`;
-  const token = newToken();
+  const token = ownerToken();
   if (!(await tryCreate(breaker, token))) {
     const other = await readHolder(breaker);
     if (other && isAbandoned(other, timing)) {
@@ -162,7 +183,7 @@ export async function withFileLock<T>(
   fn: () => Promise<T> | T,
   timing: LockTiming = DEFAULT_TIMING
 ): Promise<T> {
-  const token = newToken();
+  const token = ownerToken();
   const deadline = Date.now() + timing.timeoutMs;
   while (!(await tryCreate(lockPath, token))) {
     if (Date.now() > deadline) {

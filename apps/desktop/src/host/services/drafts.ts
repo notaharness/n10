@@ -139,9 +139,10 @@ function requirePostVendor(
 }
 
 /**
- * Post the given drafts (or every draft when `ids` is omitted). Marks
- * them `posting` while in flight, `posted` on success (done by the
- * poster), and back to `draft` on failure so nothing is lost.
+ * Post the given drafts (or every draft when `ids` is omitted). The
+ * poster claims each one (`posting`), marks it `posted` on success and
+ * `draft` on failure so nothing is lost, and skips one the TUI or
+ * another window is already posting. Returns how many this call posted.
  */
 export async function postDraftComments(
   req: PostDraftsRequest
@@ -170,18 +171,16 @@ export async function postDraftComments(
   // failure to exactly the comment that failed.
   let posted = 0;
   for (const c of wanted) {
-    await updateComment(scope, c.id, { status: 'posting' });
     try {
       // A non-COMMENT event (verdict) must ride exactly one review —
       // repeating it per comment would file N approvals on GitHub.
-      await postReviewComments(
+      const done = await postReviewComments(
         [c],
         ctx,
         posted === 0 ? req.event ?? 'COMMENT' : 'COMMENT'
       );
-      posted += 1;
+      posted += done.length;
     } catch (err) {
-      await updateComment(scope, c.id, { status: 'draft' });
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(
         posted > 0
