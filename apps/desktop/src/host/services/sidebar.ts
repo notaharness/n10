@@ -5,6 +5,7 @@ import {
   categorizeReviews,
   findOrphanPrs,
   pullRequestPollIntervalMs,
+  remoteSyncIntervalMs,
   sortSessionsByPrId,
   worktreeSessionRow,
   type SidebarItem,
@@ -127,6 +128,7 @@ export function getSyncState(): SyncState {
     remoteError: remote.error,
     remoteSyncing: remote.inflight,
     remoteIntervalMs: pullRequestPollIntervalMs(config.prPollInterval),
+    maintenanceIntervalMs: remoteSyncIntervalMs(config.mergePollInterval),
     remoteFetches: remote.fetchCount,
   };
 }

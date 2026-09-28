@@ -175,6 +175,7 @@ describe('sync state', () => {
       remoteError: null,
       remoteSyncing: false,
       remoteIntervalMs: 60_000,
+      maintenanceIntervalMs: 3_600_000,
       remoteFetches: 1,
     });
 
@@ -188,6 +189,17 @@ describe('sync state', () => {
     env.config = { prPollInterval: 5_000 };
     expect(sidebar.getSyncState().remoteIntervalMs).toBe(5_000);
   });
+
+  it.each([
+    [600_000, 600_000],
+    [1_000, 300_000],
+  ])(
+    'reports maintenance interval %i with the scheduler clamp (%i)',
+    (configured, effective) => {
+      env.config = { mergePollInterval: configured };
+      expect(sidebar.getSyncState().maintenanceIntervalMs).toBe(effective);
+    }
+  );
 
   it('does not call the provider at all when it is not configured', async () => {
     env.configured = false;

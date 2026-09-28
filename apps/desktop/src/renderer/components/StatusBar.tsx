@@ -1,30 +1,19 @@
-import {
-  AlertCircleIcon,
-  CloudOffIcon,
-  GitBranchIcon,
-  Loader2Icon,
-  MonitorIcon,
-  RefreshCwIcon,
-  TerminalIcon,
-} from 'lucide-react';
+import { GitBranchIcon, MonitorIcon, TerminalIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type {
-  MachineView,
-  SidebarItem,
-  SyncState,
-} from '../../host/contract.js';
+import type { MachineView, SidebarItem } from '../../host/contract.js';
 import { useRepo } from '../lib/repo-context.js';
 import { useMachines, useSyncState, useVersion } from '../lib/data/queries.js';
 import { useFleet } from '../lib/fleet/fleet-context.js';
 import { useRefreshRemote } from '../lib/data/mutations.js';
 import { machinesSummary } from '../lib/machines/machine-model.js';
 import { itemRunning } from '../lib/sidebar/sidebar-model.js';
-import { basename, cn, relativeTime } from '../lib/utils.js';
+import { basename, cn } from '../lib/utils.js';
+import { ProviderSync } from './ProviderSync.js';
 import { Tip } from './ui/tooltip.js';
 
 /**
  * Bottom status strip: repo, provider sync state, running agent count,
- * build stamp. Every segment is a quiet button; clicking sync refreshes.
+ * build stamp. Clicking sync explains automatic refresh and offers a recheck.
  */
 export function StatusBar({
   items,
@@ -58,7 +47,7 @@ export function StatusBar({
       </Segment>
 
       {s && (
-        <ProviderSegment
+        <ProviderSync
           sync={s}
           refreshing={refresh.isPending}
           onRefresh={() => refresh.mutate()}
@@ -88,80 +77,6 @@ export function StatusBar({
   );
 }
 
-/**
- * The provider's state, in three: none configured, one configured but
- * missing credentials, or a working one reporting its last sync. Only
- * the last is a refresh button — the other two open Settings, which is
- * where the thing they're complaining about gets fixed.
- */
-function ProviderSegment({
-  sync: s,
-  refreshing,
-  onRefresh,
-  onOpenSettings,
-}: {
-  sync: SyncState;
-  refreshing: boolean;
-  onRefresh: () => void;
-  onOpenSettings: () => void;
-}) {
-  if (!s.providerId) {
-    return (
-      <Segment
-        label="No VCS provider configured — open Settings"
-        onClick={onOpenSettings}
-      >
-        <CloudOffIcon className="size-3" />
-        No provider
-      </Segment>
-    );
-  }
-  if (!s.providerConfigured) {
-    return (
-      <Segment
-        label={`${providerName(
-          s.providerId
-        )} needs credentials — open Settings`}
-        onClick={onOpenSettings}
-        className="text-warning"
-      >
-        <AlertCircleIcon className="size-3" />
-        {providerName(s.providerId)} not configured
-      </Segment>
-    );
-  }
-  const syncing = refreshing || s.remoteSyncing;
-  return (
-    <Segment
-      label={
-        s.remoteError
-          ? `Last sync failed: ${s.remoteError}`
-          : `Refresh pull requests (auto every ${Math.round(
-              s.remoteIntervalMs / 1000
-            )}s)`
-      }
-      onClick={onRefresh}
-      className={cn(s.remoteError && 'text-destructive')}
-    >
-      {syncing ? (
-        <Loader2Icon className="size-3 animate-spin" />
-      ) : s.remoteError ? (
-        <AlertCircleIcon className="size-3" />
-      ) : (
-        <RefreshCwIcon className="size-3" />
-      )}
-      {providerName(s.providerId)}
-      <span className="text-muted-foreground">
-        {syncing
-          ? 'syncing…'
-          : s.lastRemoteSyncAt
-          ? `synced ${relativeTime(s.lastRemoteSyncAt)}`
-          : 'not synced'}
-      </span>
-    </Segment>
-  );
-}
-
 /** The fleet's size and what needs attention, hidden entirely with
  *  only this machine (D8): a user who never joins a fleet sees
  *  today's app. */
@@ -184,12 +99,6 @@ function MachinesSegment({
       {summary.text}
     </Segment>
   );
-}
-
-function providerName(id: string): string {
-  if (id === 'github') return 'GitHub';
-  if (id === 'azure-devops') return 'Azure DevOps';
-  return id;
 }
 
 function Segment({
