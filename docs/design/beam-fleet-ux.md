@@ -37,9 +37,13 @@ themes. Fleet stays within the sidebar’s scroll area.
 
 ## 2. Create, join and add
 
-First run says **Your machines, together**, with one sentence explaining passkey and
-command access. **Create a fleet** and **Join a fleet** are prominent. Forms ask for
-**Machine name**, and for creation **Fleet name** (“Shown in your passkey manager.”).
+First run is centred: a small isometric laptop and tower from the website's beam mesh,
+joined by one animated beam (still under reduced motion), then **Your machines,
+connected anywhere**, one sentence on the passkey and reach (“No VPN or SSH required.”),
+a **More information** link to beam.n10.is that opens in the system browser, then
+**Create a fleet** and **Join a fleet**, and below them “Powered by” over Tailscale’s
+wordmark (its black or white file by theme, bundled locally). Forms ask for **Machine
+name**, and for creation **Fleet name** (“Shown in your passkey manager.”).
 Blank names use daemon defaults; invalid names stay intact. Creation explains only
 “Save a passkey, then use it to add this machine.”
 
