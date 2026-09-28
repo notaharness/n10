@@ -46,8 +46,10 @@ export interface DiscoveryScan {
 export interface DiscoveryDelta {
   /** Worktrees this scan reports that the previous one did not. */
   appeared: DiscoveredWorktree[];
-  /** Session names whose worktree is no longer there. */
-  disappeared: string[];
+  /** Worktrees the previous scan reported and this one does not —
+   *  removed by n10, by `git worktree remove`, or deleted from disk —
+   *  as that scan saw them. */
+  disappeared: DiscoveredWorktree[];
   /** Worktrees still there, now on another branch (`git switch`, a
    *  rename, a detached HEAD): same key, since a worktree is its
    *  checkout, but a row whose label and pull request have changed. */
@@ -111,7 +113,7 @@ export function diffScans(
     previous === null
       ? []
       : next.worktrees.filter((wt) => !before.has(wt.name));
-  const disappeared = [...before].filter((name) => !now.has(name));
+  const disappeared = base.worktrees.filter((wt) => !now.has(wt.name));
   const branchBefore = new Map(
     base.worktrees.map((wt) => [wt.name, wt.branch])
   );

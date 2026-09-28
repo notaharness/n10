@@ -1,0 +1,73 @@
+---
+title: Beam
+description: Pool the machines you own, then open shells, run commands and send messages between them.
+---
+
+Beam pools the machines you own into a fleet. From any machine in the fleet
+you can open a shell on another, run a command there, or send a message that
+waits until the other machine is online. n10 Desktop uses it to run agents on
+your other machines.
+
+Machines connect over encrypted tunnels built with
+[tailcat](https://github.com/tailscale/tailcat), no Tailscale account needed.
+One passkey signs every machine into the fleet, and machines find each other
+through an encrypted directory at [beam.n10.is](https://beam.n10.is). Shells,
+commands and messages travel through the tunnels, never through beam.n10.is.
+When two machines can't connect directly, the tunnel goes through an
+encrypted relay.
+
+Beam is in beta. The source, the full command reference and the trust model
+are at [github.com/notaharness/beam](https://github.com/notaharness/beam).
+
+## Install
+
+n10 Desktop includes Beam for its [Fleet section](/docs/guides/fleet), so you
+don't need Beam to use Fleet. The `beam` command is on the `PATH` only in
+terminals and sessions n10 Desktop starts. Install it yourself to use `beam`
+from any shell, or on machines without n10 Desktop, such as a headless build
+box. It runs on macOS and Linux, arm64 and x64.
+
+You need a passkey provider that supports the WebAuthn PRF extension, in a
+browser or on your phone.
+
+```sh
+npm install -g @notaharness/beam
+```
+
+## Use it
+
+Create the fleet on your first machine, then join each of the others:
+
+```sh
+beam init --label laptop     # on the first machine: two passkey prompts
+beam join --label buildbox   # on every other machine: one passkey prompt
+```
+
+Each prompt opens a browser, or on a headless machine draws a QR code to scan
+with your phone. After joining, compare the fleet fingerprint that
+`beam join` prints with `beam status` on a machine already in the fleet.
+They must match.
+
+Then, from any machine:
+
+```sh
+beam peers                                   # the fleet and who is online
+beam connect buildbox                        # a shell on buildbox
+beam exec buildbox -- uname -a               # one command, with its exit code
+beam msg send buildbox --topic jobs 'ready'  # delivered now, or when buildbox connects
+beam msg listen --topic jobs                 # on buildbox: print incoming messages
+```
+
+A shell ends when the connection does, so run long-lived work in tmux:
+`beam connect buildbox -- tmux new-session -A -s agents`.
+
+By default every machine in the fleet can run commands as you on every
+other. Run `beam --help` for every command, including limiting and revoking
+machines.
+
+## With n10 and Orchestra
+
+n10 Desktop's [Fleet section](/docs/guides/fleet) manages the fleet and
+launches agents on its machines, and [Orchestra](/docs/orchestra)'s scripts
+take `--machine NAME` to run a player on one; that machine needs Orchestra
+installed too.
