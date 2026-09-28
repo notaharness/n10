@@ -18,6 +18,7 @@ import * as terminals from './services/terminals.js';
 import * as commentImages from './services/comment-images.js';
 import * as clipboardImage from './services/clipboard-image.js';
 import * as drafts from './services/drafts.js';
+import * as prChecks from './services/pr-checks.js';
 import * as prConversation from './services/pr-conversation.js';
 import * as prDetails from './services/pr-details.js';
 import * as reviewDrafts from './services/review-drafts.js';
@@ -70,6 +71,7 @@ export function createHostApi(): N10HostApi {
     setThreadResolved: (req: ResolveRequest) => reviews.setThreadResolved(req),
     fetchPrDescription: (prId) => reviews.fetchPrDescription(prId),
     getPullRequestSnapshot: (req) => prDetails.getPullRequestSnapshot(req),
+    getPullRequestChecks: (req) => prChecks.getPullRequestChecks(req),
     getPullRequestConversation: (req) =>
       prConversation.getPullRequestConversation(req),
     listReviewDrafts: (req) => reviewDrafts.listDrafts(req),
@@ -263,6 +265,7 @@ export function registerHostHandlers(
     [IPC.setThreadResolved]: api.setThreadResolved as HostMethod,
     [IPC.fetchPrDescription]: api.fetchPrDescription as HostMethod,
     [IPC.getPullRequestSnapshot]: api.getPullRequestSnapshot as HostMethod,
+    [IPC.getPullRequestChecks]: api.getPullRequestChecks as HostMethod,
     [IPC.getPullRequestConversation]:
       api.getPullRequestConversation as HostMethod,
     [IPC.listReviewDrafts]: api.listReviewDrafts as HostMethod,

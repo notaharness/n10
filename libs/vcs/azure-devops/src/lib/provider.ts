@@ -9,7 +9,6 @@ import type {
   PullRequestRef,
   RemoteCommentThread,
   RemoteCommentReply,
-  ReviewDecision,
   ReviewVerdict,
   BuildStatusState,
   RepositoryRef,
@@ -28,6 +27,10 @@ import {
   TTL,
 } from './request.js';
 import { fetchPrBuildStatus } from './build-status.js';
+import { fetchPullRequestChecksAzure } from './pr-checks.js';
+import { parseAdoRemoteUrl } from './remote-url.js';
+import { fetchPullRequestDetailAzure } from './pr-overview-details.js';
+import { voteToDecision } from './votes.js';
 import {
   commentSources,
   toAdoConversation,
@@ -46,6 +49,8 @@ import {
   rowsReadingStatus,
   type RowReaders,
 } from './pr-cycle.js';
+
+export { parseAdoRemoteUrl };
 
 // ── Internal ADO types ─────────────────────────────────────────────
 
@@ -89,15 +94,10 @@ function invalidatePr(config: AdoConfig, prId: number): void {
   invalidateAdoKey(`${repo}/threads/${prId}`);
   invalidateAdoKey(`${repo}/statuses/${prId}`);
   invalidateAdoKey(`${repo}/description/${prId}`);
+  invalidateAdoKey(`${repo}/detail/${prId}`);
+  invalidateAdoKey(`${repo}/iterations/${prId}`);
+  invalidateAdoKey(`${repo}/policies/${prId}`);
   invalidateAdoCache(`${repo}/thread/${prId}/`);
-}
-
-function voteToDecision(vote: number, hasDeclined: boolean): ReviewDecision {
-  if (hasDeclined) return 'declined';
-  if (vote === 10 || vote === 5) return 'approved';
-  if (vote === -5) return 'waiting-for-author';
-  if (vote === -10) return 'rejected';
-  return 'no-response';
 }
 
 export function parseReviewer(raw: RawReviewer): PullRequestReviewer {
@@ -350,38 +350,6 @@ export async function fetchActiveCommentCount(
 ): Promise<number> {
   const data = await fetchRawThreads(config, prId);
   return countActiveThreads(data.value ?? []);
-}
-
-/**
- * Parse org, project, and repo from an Azure DevOps git remote URL.
- * Supports both SSH and HTTPS formats.
- */
-export function parseAdoRemoteUrl(
-  url: string
-): { org: string; project: string; repo: string } | null {
-  const httpsMatch = url.match(
-    /dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/\s]+)/
-  );
-  if (httpsMatch) {
-    return {
-      org: httpsMatch[1]!,
-      project: httpsMatch[2]!,
-      repo: httpsMatch[3]!.replace(/\.git$/, ''),
-    };
-  }
-
-  const sshMatch = url.match(
-    /ssh\.dev\.azure\.com:v3\/([^/]+)\/([^/]+)\/([^/\s]+)/
-  );
-  if (sshMatch) {
-    return {
-      org: sshMatch[1]!,
-      project: sshMatch[2]!,
-      repo: sshMatch[3]!.replace(/\.git$/, ''),
-    };
-  }
-
-  return null;
 }
 
 // ── Identity ────────────────────────────────────────────────────────
@@ -1151,6 +1119,22 @@ export const azureDevOpsProvider: VcsProvider = {
     return sanitizeBody(data.description ?? '');
   },
 
+  fetchPullRequestDetail(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ) {
+    return fetchPullRequestDetailAzure(toAdoConfig(auth, project), prId);
+  },
+
+  fetchPullRequestChecks(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ) {
+    return fetchPullRequestChecksAzure(toAdoConfig(auth, project), prId);
+  },
+
   async submitReviewVerdict(
     auth: Record<string, string>,
     project: Record<string, string>,
@@ -1175,11 +1159,15 @@ export const azureDevOpsProvider: VcsProvider = {
       body: JSON.stringify({ id: userId, vote }),
       bodyForLog: { vote },
     });
-    // Nothing cached here carries a reviewer vote: the list that does
-    // is fetched with a zero TTL, so it is deduped and never stored.
-    // Wiping the repository prefix would therefore drop threads,
-    // statuses and descriptions to fix something they do not hold.
-    // The vote a user might still see is in the shell's own model —
-    // the desktop refreshes it from services/reviews.ts.
+    // The selected pull request's detail carries votes, and its policy
+    // evaluations the reviewer policies' verdict on them; the list is
+    // fetched with a zero TTL, so it is deduped and never stored.
+    // Wiping the repository prefix would drop threads, statuses and
+    // descriptions to fix something they do not hold. The vote a user
+    // might still see is in the shell's own model — the desktop
+    // refreshes it from services/reviews.ts.
+    const repo = `${config.org}/${config.project}/${config.repo}`;
+    invalidateAdoKey(`${repo}/detail/${prId}`);
+    invalidateAdoKey(`${repo}/policies/${prId}`);
   },
 };

@@ -5,12 +5,20 @@ import {
   useState,
   type RefObject,
 } from 'react';
+import { useNarrow } from '../use-narrow.js';
+import {
+  NARROW_WORKSPACE,
+  RAIL_SHOWN,
+  railAtWidth,
+  railByReader,
+} from './rail-model.js';
 import { firstUnresolvedThread, type CommentRow } from './review-model.js';
 
 /**
- * The review rail's own visibility: hidden or shown, its Comments list
- * collapsed or expanded, and the header's "N unresolved" count, which
- * opens both and focuses the first open thread in the diff and the list.
+ * The review rail's own visibility: hidden or shown (by the reader, or
+ * for a workspace too narrow for it; `rail-model.ts`), and the header's
+ * "N unresolved" count, which takes the reader to the first open thread
+ * in the diff.
  */
 export function useReviewRail(
   nav: {
@@ -20,23 +28,22 @@ export function useReviewRail(
   threads: { isFetching: boolean; refetch: () => Promise<unknown> },
   rootRef: RefObject<HTMLElement | null>
 ) {
-  const [hidden, setHidden] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(true);
+  const narrow = useNarrow(rootRef, NARROW_WORKSPACE);
+  const [rail, setRail] = useState(RAIL_SHOWN);
+  // Adjusted during render, so the rail never paints at a width it has
+  // already left.
+  const atWidth = railAtWidth(rail, narrow);
+  if (atWidth !== rail) setRail(atWidth);
+  const { hidden } = atWidth;
+  const setHidden = useCallback(
+    (next: boolean) => setRail((r) => railByReader(r, next)),
+    []
+  );
   const { items, jumpToId } = nav;
   const { isFetching, refetch } = threads;
-
-  // The row is looked up after the click commits: the rail may have
-  // just been unhidden or the list expanded.
   const reveal = useCallback(
-    (row: CommentRow) => {
-      jumpToId(row.id, row.file);
-      requestAnimationFrame(() =>
-        rootRef.current
-          ?.querySelector(`[data-comment-row="${CSS.escape(row.id)}"]`)
-          ?.scrollIntoView({ block: 'nearest' })
-      );
-    },
-    [jumpToId, rootRef]
+    (row: CommentRow) => jumpToId(row.id, row.file),
+    [jumpToId]
   );
 
   // The count is the pull request list's and the threads are their own
@@ -57,8 +64,6 @@ export function useReviewRail(
   }, [items, isFetching, reveal]);
 
   const showUnresolved = useCallback(() => {
-    setHidden(false);
-    setCommentsOpen(true);
     const first = firstUnresolvedThread(items);
     pending.current = first == null;
     if (first) {
@@ -70,5 +75,5 @@ export function useReviewRail(
     });
   }, [items, reveal, refetch]);
 
-  return { hidden, setHidden, commentsOpen, setCommentsOpen, showUnresolved };
+  return { hidden, setHidden, showUnresolved };
 }

@@ -1,7 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import { createWorktree, sidebarRow, tab, visibleText } from './setup/app.js';
-import { armContextMenuChoice } from './setup/menu.js';
 import type { FakeGitHub } from './setup/fake-gh.js';
 
 /**
@@ -82,27 +81,6 @@ async function addToPlan(page: Page, body: string) {
   await target
     .getByRole('button', { name: 'Add to plan', exact: true })
     .click();
-}
-
-/**
- * Bring the diff back into the content pane by jumping to a comment
- * from the rail. Launching an agent switches the pane to its terminal,
- * which hides the comment cards.
- */
-async function jumpToComment(page: Page, body: string) {
-  await page
-    .getByRole('button', { name: new RegExp(body) })
-    .filter({ visible: true })
-    .first()
-    .click();
-}
-
-/** The rail's comment-list row for `body`. */
-function railComment(page: Page, body: string) {
-  return page
-    .getByRole('button', { name: new RegExp(body) })
-    .filter({ visible: true })
-    .first();
 }
 
 /** The rail's plan entry. */
@@ -290,7 +268,9 @@ test.describe('Sending the plan', () => {
       timeout: 30_000,
     });
 
-    await jumpToComment(page, UNBOUNDED);
+    // Up from the terminal to the changes, where the comment is.
+    await page.getByRole('button', { name: 'Back to review' }).click();
+    await expect(card(page, UNBOUNDED)).toBeVisible();
     await addToPlan(page, UNBOUNDED);
     await planEntry(page).click();
     // With an agent live, injecting leads and restarting is the
@@ -326,89 +306,5 @@ test.describe('Reaching the plan from elsewhere', () => {
         '1 comment in the plan'
       )
     ).toBeVisible();
-  });
-
-  test('right-clicking a comment in the rail queues it', async ({
-    desktop,
-  }) => {
-    const { page, app } = desktop;
-    await openPr(page);
-    await expect(visibleText(page, UNBOUNDED)).toBeVisible({ timeout: 30_000 });
-
-    await armContextMenuChoice(app, 'Add to plan');
-    await page
-      .getByRole('button', { name: new RegExp(NAMING) })
-      .filter({ visible: true })
-      .first()
-      .click({ button: 'right' });
-
-    await expect(planEntry(page)).toBeVisible();
-    await planEntry(page).click();
-    await expect(
-      page.getByRole('list', { name: 'Queued comments' }).getByText(NAMING)
-    ).toBeVisible();
-  });
-
-  test('asking for a note from the rail opens the plan on that comment', async ({
-    desktop,
-  }) => {
-    const { page, app } = desktop;
-    await openPr(page);
-    await expect(visibleText(page, UNBOUNDED)).toBeVisible({ timeout: 30_000 });
-
-    // The rail has nowhere to compose a note, so the request has to
-    // land somewhere that does.
-    await armContextMenuChoice(app, 'Add to plan with a note…');
-    await page
-      .getByRole('button', { name: new RegExp(NAMING) })
-      .filter({ visible: true })
-      .first()
-      .click({ button: 'right' });
-
-    const composer = page.getByLabel('Your note to the agent');
-    await expect(composer).toBeVisible();
-    await composer.fill('Pick a name that says what it holds.');
-    await page.getByRole('button', { name: 'Save note' }).click();
-    // Saved on the queued row, and on the card back in the diff.
-    await expect(
-      page
-        .getByRole('list', { name: 'Queued comments' })
-        .getByText('Pick a name that says what it holds.')
-    ).toBeVisible();
-    // And it is the same note back on the card in the diff — one value,
-    // two places it can be read and edited.
-    await jumpToComment(page, NAMING);
-    await expect(
-      card(page, NAMING).getByText('Pick a name that says what it holds.')
-    ).toBeVisible();
-  });
-
-  /**
-   * The rail stays on screen beside the plan pane, so a second request
-   * for the same row arrives without the pane remounting. That is the
-   * case the note request carries identity for: compare on the row's
-   * key alone and the second ask looks identical to the first, so
-   * nothing reopens.
-   */
-  test('asking twice for the same note reopens the composer', async ({
-    desktop,
-  }) => {
-    const { page, app } = desktop;
-    await openPr(page);
-    await expect(visibleText(page, UNBOUNDED)).toBeVisible({ timeout: 30_000 });
-
-    await armContextMenuChoice(app, 'Add to plan with a note…');
-    await railComment(page, NAMING).click({ button: 'right' });
-    const composer = page.getByLabel('Your note to the agent');
-    await expect(composer).toBeVisible();
-
-    // Close it without saving — the comment stays queued.
-    await page.getByRole('button', { name: 'Cancel' }).click();
-    await expect(composer).toHaveCount(0);
-
-    // Same row, same key, pane still mounted.
-    await armContextMenuChoice(app, 'Edit note…');
-    await railComment(page, NAMING).click({ button: 'right' });
-    await expect(composer).toBeVisible();
   });
 });

@@ -1,6 +1,7 @@
-import type { PullRequestInfo } from '@n10/vcs-core';
+import type { PullRequestInfo, PullRequestReviewer } from '@n10/vcs-core';
 import {
   isOid,
+  type DetailReviewer,
   type PullRequestDetail,
   type PullRequestRef,
 } from '@n10/vcs-core/pr-details';
@@ -16,11 +17,48 @@ import type { DemoState } from './state.js';
 
 type PullRequestHost = Pick<
   N10HostApi,
-  'getPullRequestSnapshot' | 'getPullRequestConversation'
+  | 'getPullRequestSnapshot'
+  | 'getPullRequestChecks'
+  | 'getPullRequestConversation'
 >;
 
+const NO_CHECKS = 'The web demo does not read checks and policies';
+const NO_CONVERSATION = 'The web demo does not read the conversation';
+
+/** GitHub's word for each verdict the demo's rows hold. */
+const NATIVE: Partial<Record<PullRequestReviewer['decision'], string>> = {
+  approved: 'APPROVED',
+  'changes-requested': 'CHANGES_REQUESTED',
+};
+
+/** A row's reviewer as GitHub's detail read names them: asked where
+ *  they have not reviewed, and their verdict on the head. */
+function detailReviewer(
+  r: PullRequestReviewer,
+  head: string | undefined
+): DetailReviewer {
+  const native = NATIVE[r.decision] ?? null;
+  return {
+    kind: 'user',
+    identifier: r.identifier,
+    id: `U_demo_${r.identifier}`,
+    displayName: r.displayName,
+    decision: r.decision,
+    native,
+    requested: r.requested ?? r.decision === 'no-response',
+    // GitHub has no flag apart from a request.
+    attention: null,
+    required: null,
+    reason: null,
+    onBehalfOf: [],
+    reviewedHead: native && isOid(head) ? head : null,
+  };
+}
+
 /** The pull request as a detail read names it: the repository it and
- *  its branch belong to, and the commits the row reports. */
+ *  its branch belong to, the commits the row reports, and everyone
+ *  asked to review. The demo's viewer may edit their own pull requests,
+ *  and the teammate lets them edit theirs. */
 export function demoDetail(
   pr: PullRequestInfo,
   ref: PullRequestRef
@@ -47,6 +85,19 @@ export function demoDetail(
     target: { branch: pr.targetBranch, head: null },
     createdAt: null,
     updatedAt: null,
+    reviewers: {
+      state: 'read',
+      value: {
+        items: (pr.reviewers ?? []).map((r) => detailReviewer(r, pr.headSha)),
+        total: pr.reviewers?.length ?? 0,
+        complete: true,
+      },
+    },
+    iteration: {
+      state: 'unsupported',
+      reason: 'GitHub names a revision by its head commit alone',
+    },
+    capabilities: { update: { state: 'supported' } },
   };
 }
 
@@ -71,17 +122,8 @@ export function createPullRequestHost(state: DemoState): PullRequestHost {
         target: null,
       });
     },
-    // The demo has rows, not conversations: it says so rather than
-    // showing an empty one.
-    getPullRequestConversation: ({ ref }) =>
-      later({
-        ref,
-        viewer: VIEWER,
-        fetchedAt: Date.now(),
-        conversation: {
-          state: 'unsupported',
-          reason: 'The demo has no conversation to read',
-        },
-      }),
+    getPullRequestChecks: () => Promise.reject(new Error(NO_CHECKS)),
+    getPullRequestConversation: () =>
+      Promise.reject(new Error(NO_CONVERSATION)),
   };
 }

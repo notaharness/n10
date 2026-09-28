@@ -1,38 +1,39 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import {
   Group,
   Panel,
   Separator as PanelSeparator,
 } from 'react-resizable-panels';
-import { toast } from 'sonner';
 import type { PlanItem } from '@n10/core/plan';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import { useDiffOptions } from '../../lib/diff/diff-options.js';
 import { useDraftComments, useThreads } from '../../lib/data/queries.js';
-import { usePostDrafts } from '../../lib/data/mutations.js';
 import type { ReadState } from '../../lib/data/read-state.js';
 import { keys } from '../../lib/data/query-keys.js';
 import { useReadState } from '../../lib/data/use-read-state.js';
+import { refocusAfter } from '../../lib/focus.js';
 import { useRepo } from '../../lib/repo-context.js';
+import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { useCommentNavigator } from '../../lib/review/use-comment-navigator.js';
 import { useReviewDiff } from '../../lib/review/use-review-diff.js';
+import {
+  useBackToReview,
+  useReviewMode,
+} from '../../lib/review/use-review-mode.js';
 import { useReviewRail } from '../../lib/review/use-review-rail.js';
 import { usePlanCheckout } from '../../lib/plan/use-plan-checkout.js';
+import { usePostAll } from '../../lib/review/use-post-all.js';
 import {
   buildFileEntries,
   groupDraftsByFile,
   groupThreadsByFile,
-  focusesAgent,
   resolveMode,
-  type AgentPresence,
   unpostedDrafts,
-  type Mode,
 } from '../../lib/review/review-model.js';
-import { errorMessage } from '../../lib/utils.js';
 import { ContentPane } from './ContentPane.js';
 import { type FileEntry } from './diff/FileTree.js';
-import { BranchHeader, PrHeader } from './PrHeader.js';
-import { railReadNotice } from './ReadNotice.js';
+import { WorkspaceHeader } from './PrHeader.js';
+import { readNotice } from './ReadNotice.js';
 import { CollapsedRail, ReviewRail } from './ReviewRail.js';
 
 /** A worktree without a pull request has no threads to be missing. */
@@ -43,38 +44,17 @@ const NO_THREADS: ReadState<unknown> = {
 };
 
 /**
- * The review workspace for a PR: a persistent left rail (Agent · Files
- * · Comments) beside a single content pane that swaps between the diff
- * and the agent terminal. Selecting a file/comment shows the diff;
- * selecting the agent shows its terminal (which stays mounted so its
- * scrollback survives). The diff's own toolbar lives inside the diff
- * pane, so it's gone while the terminal is showing.
+ * The review workspace for a PR: a collapsible left rail (Agent ·
+ * Files) beside a single content pane that swaps between the Overview,
+ * the diff, the agent terminal, the plan and the walkthrough. Selecting
+ * a file shows the diff; selecting the agent shows its terminal (which
+ * stays mounted so its scrollback survives). The diff's own toolbar
+ * lives inside the diff pane, so it's gone while the terminal is
+ * showing.
  *
- * What to show is decided in `lib/review-model.ts`; this component
+ * What to show is decided in `lib/review/review-model.ts`; this component
  * wires that to the queries, the refs and the markup.
  */
-/**
- * The terminal takes over the pane whenever an agent starts, and
- * whenever the user comes back to a tab that already has one running —
- * the agent is what they returned for, not the diff. {@link focusesAgent}
- * owns which changes count as either.
- *
- * Written as state adjusted during render (React's own pattern for
- * "derive from a prop change") rather than an effect, so the pane never
- * paints the diff for one frame before switching.
- */
-function useAgentFocus(next: AgentPresence, onFocusAgent: () => void): void {
-  const [prev, setPrev] = useState(next);
-  if (
-    prev.hasSession !== next.hasSession ||
-    prev.running !== next.running ||
-    prev.active !== next.active
-  ) {
-    setPrev(next);
-    if (focusesAgent(prev, next)) onFocusAgent();
-  }
-}
-
 /** What the agent pane's connection banner needs (ux-machines.md §6),
  *  resolved by the caller (ItemView) so PrWorkspace stays free of the
  *  machines query and the reconnect mutation. */
@@ -136,15 +116,15 @@ export function PrWorkspace({
   const threads = useReadState(comments, keys.threads(repo.cwd, prId));
   const threadsRead = pr ? threads.state : NO_THREADS;
   const draftsQuery = useDraftComments(repo.cwd, prId);
-  const postAll = usePostDrafts(repo.cwd);
+  const postAll = usePostAll(repo.cwd, prId, pr?.headSha);
   const options = useDiffOptions();
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const [mode, setMode] = useState<Mode>(running ? 'agent' : 'diff');
-
-  useAgentFocus({ hasSession: Boolean(sessionName), running, active }, () =>
-    setMode('agent')
-  );
+  const [mode, setMode] = useReviewMode({
+    pr,
+    viewer: repo.viewer,
+    agent: { hasSession: Boolean(sessionName), running, active },
+  });
   const inlineThreads = useMemo(
     () => comments.data?.threads ?? [],
     [comments.data]
@@ -176,7 +156,7 @@ export function PrWorkspace({
     [files, threadsByFile, draftsByFile]
   );
 
-  const showDiff = useCallback(() => setMode('diff'), []);
+  const showDiff = useCallback(() => setMode('diff'), [setMode]);
   const nav = useCommentNavigator({
     files,
     general,
@@ -187,30 +167,34 @@ export function PrWorkspace({
   });
 
   const rail = useReviewRail(nav, comments, rootRef);
+  const { showUnresolved } = rail;
+  const { scrollRef } = nav;
+  // The pressed button goes hidden with the Overview, so focus follows
+  // the reader: to the changes, or (in ThreadCard) to the thread.
+  const onOverviewAction = useCallback(
+    (action: AttentionAction) => {
+      if (action === 'show-unresolved') return showUnresolved();
+      setMode('diff');
+      // The pressed button is hidden with the Overview.
+      refocusAfter(() => scrollRef.current);
+    },
+    [showUnresolved, setMode, scrollRef]
+  );
 
   // ── The plan ───────────────────────────────────────────────────
   const showPlanItemInDiff = useCallback(
     (item: PlanItem) => nav.jumpToId(item.id, item.file),
     [nav]
   );
-  const backToAgent = useCallback(() => setMode('agent'), []);
-  const openPlanPane = useCallback(() => setMode('plan'), []);
-  // Both comment sources the rail can offer, as one list to resolve an
-  // id against.
-  const allThreads = useMemo(
-    () => [...inlineThreads, ...general],
-    [inlineThreads, general]
-  );
+  const backToAgent = useCallback(() => setMode('agent'), [setMode]);
+  const openPlanPane = useCallback(() => setMode('plan'), [setMode]);
   const plan = usePlanCheckout({
     cwd: repo.cwd,
     pr,
     running,
     paneRef: rootRef,
-    threads: allThreads,
-    drafts,
     onSent: backToAgent,
     onShowInDiff: showPlanItemInDiff,
-    onOpenPlan: openPlanPane,
   });
 
   // Which pane is actually showing. Computed last because it asks
@@ -224,18 +208,26 @@ export function PrWorkspace({
     // comments, and the prompt names them. A bare worktree has none.
     hasPlan: plan.count > 0,
   });
+  const backToReview = useBackToReview({
+    mode: effMode,
+    pr,
+    viewer: repo.viewer,
+    setMode,
+    changes: scrollRef,
+    root: rootRef,
+  });
 
   return (
     <div ref={rootRef} className="flex h-full min-h-0 min-w-0 flex-col">
-      {pr ? (
-        <PrHeader pr={pr} onShowUnresolved={rail.showUnresolved} />
-      ) : (
-        <BranchHeader
-          branch={branch}
-          baseBranch={baseBranch}
-          fileCount={files.length}
-        />
-      )}
+      <WorkspaceHeader
+        pr={pr}
+        mode={effMode}
+        branch={branch}
+        baseBranch={baseBranch}
+        fileCount={files.length}
+        onShowUnresolved={rail.showUnresolved}
+        onBack={backToReview}
+      />
       <div className="flex min-h-0 min-w-0 flex-1">
         {rail.hidden && <CollapsedRail onShow={() => rail.setHidden(false)} />}
 
@@ -250,9 +242,6 @@ export function PrWorkspace({
                 className="min-w-0"
               >
                 <ReviewRail
-                  hasPr={Boolean(pr)}
-                  overviewActive={effMode === 'overview'}
-                  onOverview={() => setMode('overview')}
                   running={running}
                   busy={busy}
                   hasSession={Boolean(sessionName)}
@@ -264,20 +253,8 @@ export function PrWorkspace({
                   drafts={drafts}
                   reviewActive={effMode === 'review'}
                   onReview={() => setMode('review')}
-                  postingAll={postAll.isPending}
-                  onPostAll={() =>
-                    postAll.mutate(
-                      { prId, headSha: pr?.headSha },
-                      {
-                        onSuccess: (n) =>
-                          toast.success(
-                            `Posted ${n} comment${n === 1 ? '' : 's'}`
-                          ),
-                        onError: (e) =>
-                          toast.error(`Post failed: ${errorMessage(e)}`),
-                      }
-                    )
-                  }
+                  postingAll={postAll.pending}
+                  onPostAll={postAll.post}
                   planCount={plan.count}
                   planNoted={plan.noted}
                   planActive={effMode === 'plan'}
@@ -286,21 +263,6 @@ export function PrWorkspace({
                   diffLoading={diff.pending}
                   selectedFile={effMode === 'diff' ? nav.selectedFile : null}
                   onSelectFile={nav.jumpToFile}
-                  commentItems={nav.items}
-                  activeCommentId={effMode === 'diff' ? nav.focusId : null}
-                  commentsOpen={rail.commentsOpen}
-                  onCommentsOpenChange={rail.setCommentsOpen}
-                  onJumpComment={nav.jumpToItem}
-                  onCommentContextMenu={(row) =>
-                    plan.onCommentContextMenu(row.id)
-                  }
-                  commentsNotice={railReadNotice(
-                    'comments',
-                    threadsRead,
-                    threads.retrying,
-                    threads.retry
-                  )}
-                  threads={threadsRead.kind}
                 />
               </Panel>
               <PanelSeparator className="relative w-px bg-border transition-colors after:absolute after:inset-y-0 after:-left-1 after:w-2 hover:bg-primary data-[resize-handle-state=drag]:bg-primary" />
@@ -329,6 +291,13 @@ export function PrWorkspace({
               drafts={drafts}
               hasDrafts={hasDrafts}
               commentsLoading={comments.isLoading}
+              threadsNotice={readNotice(
+                'comments',
+                threadsRead,
+                threads.retrying,
+                threads.retry,
+                'mx-2 mt-2 shrink-0'
+              )}
               diffRead={diff.read}
               diffRetrying={diff.retrying}
               onRetryDiff={diff.retry}
@@ -341,6 +310,7 @@ export function PrWorkspace({
               onNext={() => nav.step(1)}
               onExitReview={showDiff}
               onOpenInDiff={nav.jumpToFile}
+              onOverviewAction={onOverviewAction}
               onOpenThread={nav.jumpToId}
               plan={plan.wiring}
             />

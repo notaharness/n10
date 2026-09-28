@@ -1,224 +1,110 @@
-import { ExternalLinkIcon, ImageOffIcon } from 'lucide-react';
-import { useMemo, useState, type ComponentProps } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Options } from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
-import {
-  useHighlightedCodeBlock,
-  type LineTokens,
-} from '../../../lib/diff/highlight.js';
-import { useCommentImage } from '../../../lib/data/queries.js';
-import { useTheme } from '../../../lib/theme.js';
+import { remarkLiteralTags } from '../../../lib/review/markdown-tags.js';
 import { cn } from '../../../lib/utils.js';
-import { Button } from '../../ui/button.js';
-import { Dialog, DialogContent, DialogTitle } from '../../ui/dialog.js';
-import { Skeleton } from '../../ui/skeleton.js';
+import { MarkdownAnchor } from './markdown-anchor.js';
+import { CommentImage } from './markdown-image.js';
+import { MarkdownCode, MarkdownPre } from './markdown-code.js';
+import {
+  DESCRIPTION_HEADINGS,
+  MarkdownDetails,
+  MarkdownParagraph,
+  MarkdownSummary,
+  MarkdownTable,
+} from './markdown-elements.js';
 
 /**
- * Markdown body for PR comments.
- *  • Images are fetched by the host with the provider's credentials
- *    (Azure DevOps attachments need the PAT, private GitHub assets the
- *    gh token) and shown from a data URL; click opens a lightbox.
- *  • Links open in the system browser, never inside the app.
+ * Markdown body for PR descriptions and comments.
+ *  • Raw HTML is parsed and then sanitized to GitHub's own allow-list,
+ *    so a disclosure block renders and a script or event handler never
+ *    reaches the page. A tag that names no element (`<Enter>`,
+ *    `List<string>`, `@<GUID>`) stays as text (`markdown-tags.ts`).
+ *  • Images go through the host's credentialed fetch
+ *    (`markdown-image.tsx`).
+ *  • Links open in the system browser, never inside the app; a
+ *    repository path opens at the pull request's commit, through
+ *    `MarkdownLinkBase`.
  *  • Headings are capped so a reply can't shout over the page.
  */
-// Comment images render as block elements (and show a block skeleton
-// while loading); a real <p> can't legally contain a <div>, so
-// paragraphs render as <div> to keep the nesting valid.
-function MarkdownParagraph(props: ComponentProps<'div'>) {
-  return <div className="my-1.5" {...props} />;
-}
+
+/**
+ * GitHub's own allow-list, as rehype-sanitize ships it, less two
+ * attributes markup should not have in an app: `tabindex` would put a
+ * link ahead of every control in the Tab order, `accesskey` would claim
+ * a key. A `<style>` goes with its contents, like a `<script>`.
+ */
+const SCHEMA = {
+  ...defaultSchema,
+  strip: [...(defaultSchema.strip ?? []), 'style'],
+  attributes: {
+    ...defaultSchema.attributes,
+    '*': (defaultSchema.attributes?.['*'] ?? []).filter(
+      (name) => name !== 'tabIndex' && name !== 'accessKey'
+    ),
+  },
+};
+
+const REMARK_PLUGINS: Options['remarkPlugins'] = [remarkGfm, remarkLiteralTags];
+
+const REHYPE_PLUGINS: Options['rehypePlugins'] = [
+  rehypeRaw,
+  [rehypeSanitize, SCHEMA],
+];
+
+/** The sanitizer prefixes every id, footnotes' included, so they are
+ *  not prefixed twice. */
+const REMARK_REHYPE: Options['remarkRehypeOptions'] = { clobberPrefix: '' };
 
 const MARKDOWN_COMPONENTS = {
   img: CommentImage,
-  a: ExternalAnchor,
+  a: MarkdownAnchor,
   p: MarkdownParagraph,
+  pre: MarkdownPre,
   code: MarkdownCode,
+  table: MarkdownTable,
+  details: MarkdownDetails,
+  summary: MarkdownSummary,
 };
 
-export function CommentMarkdown({ markdown }: { markdown: string }) {
+const DESCRIPTION_COMPONENTS = {
+  ...MARKDOWN_COMPONENTS,
+  ...DESCRIPTION_HEADINGS,
+};
+
+const PROSE =
+  'prose prose-sm dark:prose-invert max-w-none break-words text-base leading-relaxed prose-p:my-1.5 prose-pre:my-0 prose-pre:text-sm prose-code:before:content-none prose-code:after:content-none prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-pre:bg-muted prose-pre:text-foreground [&_pre_code]:bg-transparent [&_pre_code]:p-0 prose-a:text-primary prose-headings:my-2 prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-h4:text-base prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-table:my-2 prose-th:py-1 prose-th:px-2 prose-td:py-1 prose-td:px-2 prose-blockquote:my-2 prose-blockquote:border-l-border prose-hr:my-3 [&_.contains-task-list]:ps-1 [&_.task-list-item]:list-none [&_.task-list-item]:ps-0 [&_.task-list-item_input]:me-1.5 [&_.task-list-item_input]:align-middle';
+
+/**
+ * A description's headings, shifted to `h3`–`h6`: its `#` one step
+ * above the body text, the rest the body's size and set apart by
+ * weight, and none as large as the pull request's title. A heading
+ * that opens the description starts level with the column beside it.
+ */
+const DESCRIPTION_PROSE =
+  'prose-headings:mt-4 prose-h3:text-lg prose-h4:text-base prose-h5:text-base prose-h6:text-sm [&>:first-child]:mt-0';
+
+export function CommentMarkdown({
+  markdown,
+  description = false,
+}: {
+  markdown: string;
+  /** The pull request's description, whose headings sit under the
+   *  Overview's own. */
+  description?: boolean;
+}) {
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none text-base leading-relaxed prose-p:my-1.5 prose-pre:my-2 prose-pre:text-sm prose-code:before:content-none prose-code:after:content-none prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-a:text-primary prose-headings:my-2 prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-h4:text-base prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-table:my-2 prose-th:py-1 prose-th:px-2 prose-td:py-1 prose-td:px-2 prose-blockquote:my-2 prose-blockquote:border-l-border prose-hr:my-3">
+    // `data-markdown` scopes an anchor's target to this body.
+    <div className={cn(PROSE, description && DESCRIPTION_PROSE)} data-markdown>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={MARKDOWN_COMPONENTS}
+        remarkPlugins={REMARK_PLUGINS}
+        rehypePlugins={REHYPE_PLUGINS}
+        remarkRehypeOptions={REMARK_REHYPE}
+        components={description ? DESCRIPTION_COMPONENTS : MARKDOWN_COMPONENTS}
       >
         {markdown}
       </ReactMarkdown>
     </div>
-  );
-}
-
-function ExternalAnchor({ href, children, ...rest }: ComponentProps<'a'>) {
-  return (
-    <a
-      {...rest}
-      href={href}
-      onClick={(e) => {
-        e.preventDefault();
-        if (href && /^https?:/i.test(href)) void window.n10.openExternal(href);
-      }}
-      title={href}
-    >
-      {children}
-    </a>
-  );
-}
-
-function CommentImage({ src, alt }: ComponentProps<'img'>) {
-  const url = typeof src === 'string' ? src : '';
-  const img = useCommentImage(url);
-  const [open, setOpen] = useState(false);
-
-  if (!url) return null;
-
-  if (img.isLoading) {
-    return (
-      <span className="my-2 block">
-        <Skeleton className="h-32 w-64 max-w-full" />
-      </span>
-    );
-  }
-  if (img.isError || !img.data) {
-    return (
-      <span className="my-2 inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 text-sm text-muted-foreground">
-        <ImageOffIcon className="size-3.5" />
-        <span>{alt || 'image'}</span>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 text-primary hover:underline"
-          onClick={() => void window.n10.openExternal(url)}
-        >
-          open <ExternalLinkIcon className="size-3" />
-        </button>
-      </span>
-    );
-  }
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="my-2 block cursor-zoom-in rounded-md border border-border bg-background p-0.5 text-left hover:border-ring"
-        title={alt ? `${alt} — click to enlarge` : 'Click to enlarge'}
-      >
-        <img
-          src={img.data.dataUrl}
-          alt={alt ?? ''}
-          className="!my-0 max-h-72 max-w-full rounded object-contain"
-        />
-      </button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[92vh] w-auto max-w-[min(96vw,1400px)] overflow-auto p-3 sm:max-w-[min(96vw,1400px)]">
-          <DialogTitle className="sr-only">{alt || 'Image'}</DialogTitle>
-          <img
-            src={img.data.dataUrl}
-            alt={alt ?? ''}
-            className="mx-auto block max-h-[84vh] max-w-full object-contain"
-          />
-          <div
-            className={cn(
-              'flex items-center justify-between gap-3 pt-2 text-sm text-muted-foreground'
-            )}
-          >
-            <span className="truncate">
-              {alt || 'image'} · {img.data.contentType} ·{' '}
-              {(img.data.bytes / 1024).toFixed(0)} KB
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void window.n10.openExternal(url)}
-            >
-              <ExternalLinkIcon /> Open original
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
-/**
- * Markdown code: inline stays plain; fenced blocks (```lang) are
- * shiki-highlighted with the same colours as the diff viewer.
- */
-function MarkdownCode({
-  className,
-  children,
-  ...props
-}: ComponentProps<'code'>) {
-  const match = /language-([\w+-]+)/.exec(className ?? '');
-  if (!match) {
-    return (
-      <code className={className} {...props}>
-        {children}
-      </code>
-    );
-  }
-  return (
-    <HighlightedCodeBlock
-      code={String(children).replace(/\n$/, '')}
-      tag={match[1]}
-    />
-  );
-}
-
-/** Running start offset for each item, given their lengths. */
-function startsOf(lengths: number[]): number[] {
-  const starts: number[] = [];
-  lengths.reduce((at, len) => {
-    starts.push(at);
-    return at + len;
-  }, 0);
-  return starts;
-}
-
-function HighlightedCodeBlock({ code, tag }: { code: string; tag: string }) {
-  const { resolved } = useTheme();
-  const tokens = useHighlightedCodeBlock(code, tag, resolved);
-
-  // Each row carries where it starts in `code`, so a line and a token
-  // are keyed by their character offset — a position in the document
-  // rather than a position in an array. The rendered DOM is the same
-  // either way; this is only about what identifies a row to React.
-  const rows = useMemo(() => {
-    const lines = code.split('\n');
-    // +1 per line for the newline the split consumed.
-    const starts = startsOf(lines.map((line) => line.length + 1));
-    return lines.map((line, i) => ({
-      start: starts[i],
-      line,
-      tokens: tokens?.[i],
-    }));
-  }, [code, tokens]);
-
-  return (
-    <code className="block">
-      {rows.map((row) => (
-        <span key={row.start} className="block">
-          {row.tokens ? (
-            <TokenLine tokens={row.tokens} start={row.start} />
-          ) : (
-            row.line || ' '
-          )}
-        </span>
-      ))}
-    </code>
-  );
-}
-
-/** Colour spans for one line, keyed by each token's offset in the file. */
-function TokenLine({ tokens, start }: { tokens: LineTokens; start: number }) {
-  const starts = startsOf(tokens.map((tok) => tok.content.length));
-  const spans = tokens.map((tok, i) => ({ tok, at: start + starts[i] }));
-  return (
-    <>
-      {spans.map(({ tok, at }) => (
-        <span key={at} style={{ color: tok.color }}>
-          {tok.content}
-        </span>
-      ))}
-    </>
   );
 }

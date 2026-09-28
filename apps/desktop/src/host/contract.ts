@@ -89,6 +89,7 @@ export type * from './contract-pull-requests.js';
 import type {
   DiscardDraftRequest,
   DraftsRequest,
+  PullRequestChecksAnswer,
   PullRequestConversationRead,
   PullRequestSnapshot,
   RepositoryRef,
@@ -370,6 +371,10 @@ export interface N10HostApi {
    *  and the exact commits its review compares. Rejects a ref from
    *  another repository or a caller that last saw another account. */
   getPullRequestSnapshot(req: SnapshotRequest): Promise<PullRequestSnapshot>;
+  /** What stands between one pull request and completion: its checks,
+   *  the target's rules and the provider's merge state, with n10's
+   *  reading of them. Identity-checked like the snapshot. */
+  getPullRequestChecks(req: SnapshotRequest): Promise<PullRequestChecksAnswer>;
   /** One pull request's whole conversation by identity: threads with
    *  every reply, conversation comments, reviews and events, with how
    *  much of each was read. Refused like the snapshot. */
@@ -577,6 +582,7 @@ export const IPC = {
   setThreadResolved: 'n10/reviews/resolve',
   fetchPrDescription: 'n10/reviews/pr-description',
   getPullRequestSnapshot: 'n10/pull-requests/snapshot',
+  getPullRequestChecks: 'n10/pull-requests/checks',
   getPullRequestConversation: 'n10/pull-requests/conversation',
   listReviewDrafts: 'n10/review-drafts/list',
   saveReviewDraft: 'n10/review-drafts/save',

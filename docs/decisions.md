@@ -225,6 +225,65 @@ when switching to the diff so scrollback survives. The diff owns its toolbar.
 Each tab has an ErrorBoundary. Markdown paragraphs render as `div` when they may
 contain block images; the host fetches protected images with provider auth.
 
+A pull request tab opens on its Overview when someone else wrote it, and on the
+diff when you did (`initialMode`). An unknown account counts as a reviewer, so
+the safe start is the change's purpose before its code. A running agent still
+takes the pane. The Overview never calls a pull request ready: the list row has
+no policies, required reviewers, conflicts or merge permission, so readiness
+stays "not fully known" until those are read. Until a native requirement signal
+is read, an approval or a passing check is an observation, and a failing check
+or a holding verdict is a concern, not a block; only the provider's own
+lifecycle (open, draft) is a verdict. The next step's button is the Overview's
+one way into a review: there are no instant verdict buttons, so a verdict is
+given from the changes, where the reviewer has read them.
+
+The Overview has no header bar; its heading carries the pull request's identity
+and actions. Every other pane keeps the bar across the rail and the pane, so the
+rail sits 40 px lower there than on the Overview: beside the rail, the bar would
+lose the rail's width and its title or its details. Every other pane's bar has
+"← Review", which goes up, never back through history: from the changes to the
+Overview, and from the terminal, plan or walkthrough to the review pane last
+shown (`backTarget`). The Overview is the top of the review, where Back leads,
+so the rail lists neither it nor the comments: the conversation is the
+Overview's, below the description, and the threads are the diff's. Its context
+column leads with the reviewers, then completion. Below 720 px of workspace width
+the rail folds with its own collapse control, and it comes back once there is
+room unless the reader chose since (`rail-model.ts`).
+
+The activity keeps resolved threads out of view until the reader shows them, by
+the provider's own resolved state. What is hidden is fixed when the reader
+arrives or hides them again: a thread resolved while in view stays there with
+its new status, since the list never moves under the reader. A reopened thread
+leaves the hidden set (`pruneHidden`), so resolved again, it stays in view.
+
+Completion says "Waiting for your review" where the provider asks the viewer for
+a review that would count (`asksViewer`). Readiness knows only that a review is
+required, not whose would satisfy it: GitHub code owners and Azure DevOps
+required reviewers are not on the list row, so an optional reviewer or a
+non-owner who is asked is still named.
+
+The checks read (`getPullRequestChecks`) takes readiness from the provider's own
+verdict, GitHub's `mergeStateStatus`, and explains it with the provider's facts:
+`mergeable`, `reviewDecision`, each check's `isRequired`, and the base branch's
+protection and rule sets. Core (`pr-readiness.ts`) adds no verdict of its own.
+It is ready only where the provider says so and none of its details disagree,
+and blocked where the provider says so or the pull request is a draft (its own
+lifecycle). Anything else is unknown. A block that nothing read explains is "a
+rule n10 cannot see". The unresolved-thread count comes from the list, older
+than the verdict, so it explains a block but never overturns a clear one. Anything that could not be
+read is listed beside the verdict and does not override it.
+
+Azure DevOps has no single verdict field. Its completion gate, in its own
+words, is that "all required reviewers approved it and all required branch
+policies are met", so the adapter (`pr-checks.ts`, `pr-policies.ts`) reads
+exactly that: the required reviewers' votes, each blocking policy's evaluation
+(an expired build's approval is not met) and `mergeStatus`. Blocked where any
+of them stops it; clear only where every blocking policy is met on a merge that
+succeeded; undecided otherwise. A draft is blocked by its lifecycle, as on
+GitHub. Reviewer and comment policies are not listed as items, since the review
+requirement and `MergeState.conversations` carry their verdicts; other
+policies, such as work item linking, are listed with `kind: 'policy'`.
+
 Optimistic removal drops a session row but retains a PR row with its session
 fields cleared: the PR outlives its checkout. Status indicators combine CI and
 review status; CI can worsen the result, but passing CI does not imply approval.

@@ -290,3 +290,125 @@ test.describe('Visual (plan, light theme) @visual', () => {
     await expect(pane).toHaveScreenshot('plan-pane-light.png', shot);
   });
 });
+
+/**
+ * The pull request Overview, for a pull request someone else opened —
+ * which is where it opens. One column at the window's own size, two
+ * once the outer sidebar is hidden and the content pane passes 900 px,
+ * and at 800×600 the review rail folded to its strip beside one column.
+ */
+const OVERVIEW_GITHUB: FakeGitHub = {
+  username: 'n10-tester',
+  prs: [
+    {
+      number: 214,
+      title:
+        'Handle cancelled requests without leaking the socket, the retry timer or the half-written cache entry',
+      headRefName: 'cancel-requests',
+      author: 'alex',
+      rollup: 'SUCCESS',
+      reviews: [{ author: 'bea', state: 'APPROVED' }],
+      reviewRequests: ['n10-tester'],
+      // GitHub's own word: green, and still waiting for a review.
+      mergeStateStatus: 'BLOCKED',
+      reviewDecision: 'REVIEW_REQUIRED',
+      checks: [
+        { name: 'build', state: 'SUCCESS', required: true },
+        { name: 'lint', state: 'SUCCESS', required: true },
+        { name: 'docs', state: 'SKIPPED' },
+      ],
+      body: [
+        '## Why',
+        '',
+        'A cancelled request kept its socket open until the server gave up.',
+        '',
+        '## Verification',
+        '',
+        '- [x] Unit tests cover cancel before connect',
+        '- [ ] Soak test on staging',
+        '',
+        '<details>',
+        '<summary>Rollout plan</summary>',
+        '',
+        'Ship behind the flag, then remove it after a week.',
+        '',
+        '</details>',
+        '',
+        '| Case | Before | After | Socket | Timer | Cache | Retries |',
+        '| --- | --- | --- | --- | --- | --- | --- |',
+        '| `cancelBeforeConnect` | `leakedUntilServerTimeout` | `closedImmediatelyOnCancel` | `requestSocketCancellationRegression` | cleared | untouched | none |',
+        '',
+        'Trace: https://traces.example.com/sessions/cancelled-request-socket-leak/spans/0123456789abcdef',
+        '',
+        'Digest 9f2c1e7a4b8d3f60c5e1a2b7d9043e6f8a1c2b3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5061728394a5b6c7d8e9f',
+      ].join('\n'),
+    },
+  ],
+};
+
+const OVERVIEW_REPO = {
+  name: 'n10-visual',
+  worktrees: [
+    {
+      branch: 'cancel-requests',
+      files: { 'request.ts': 'export function cancel() {}\n' },
+    },
+  ],
+};
+
+async function openOverview(page: Page) {
+  await sidebarRow(page, /#214/).first().click();
+  await expect(page.getByRole('heading', { name: 'Verification' })).toBeVisible(
+    { timeout: 30_000 }
+  );
+  // The rail's file list settles last; a shot before it would catch
+  // its loading skeleton.
+  await expect(
+    page.getByRole('button', { name: /request\.ts/ }).first()
+  ).toBeVisible({ timeout: 30_000 });
+}
+
+test.describe('Visual (overview) @visual', () => {
+  test.use({ repo: OVERVIEW_REPO, fakeGitHub: OVERVIEW_GITHUB });
+
+  test('pull request overview', async ({ desktop }) => {
+    await openOverview(desktop.page);
+    await expect(desktop.page).toHaveScreenshot('pr-overview.png', shot);
+  });
+
+  test('pull request overview in two columns', async ({ desktop }) => {
+    const { page } = desktop;
+    await openOverview(page);
+    await page.getByRole('button', { name: 'Hide sidebar' }).click();
+    await expect(page).toHaveScreenshot('pr-overview-wide.png', shot);
+  });
+
+  test('pull request overview at 800×600', async ({ desktop }) => {
+    const { app, page } = desktop;
+    await openOverview(page);
+    await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      window.setMinimumSize(0, 0);
+      window.setContentSize(800, 600);
+    });
+    await expect(page.getByText('Your review is requested')).toBeVisible();
+    await expect(page).toHaveScreenshot('pr-overview-narrow.png', shot);
+  });
+});
+
+test.describe('Visual (overview, dark theme) @visual', () => {
+  test.use({
+    repo: OVERVIEW_REPO,
+    fakeGitHub: OVERVIEW_GITHUB,
+    desktopPrefs: { theme: 'dark', nativeFrame: false },
+  });
+
+  test('pull request overview in two columns, dark theme', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openOverview(page);
+    await page.getByRole('button', { name: 'Hide sidebar' }).click();
+    await expect(page).toHaveScreenshot('pr-overview-wide-dark.png', shot);
+  });
+});

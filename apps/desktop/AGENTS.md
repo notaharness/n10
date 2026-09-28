@@ -76,14 +76,18 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `TabsProvider` sits above the repo gate in `App.tsx`.
   `tabs.properties.spec.ts` holds the invariants.
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
-  collapsible rail (Agent · Files · Comments) beside one content pane that
-  swaps between diff, agent terminal (kept mounted) and `ReviewStepper`. The
-  diff toolbar lives in `DiffPane`, not the tab header.
+  collapsible rail (Agent · Files) beside one content pane that
+  swaps between Overview, diff, agent terminal (kept mounted) and
+  `ReviewStepper`. It opens on the Overview for someone else's PR and on the
+  diff for yours (`lib/review/overview-model.ts`). The diff toolbar lives in
+  `DiffPane`, not the tab header. Overview and header lay out by container
+  width (`@container`), not viewport.
 - The Overview's activity reads the whole conversation by identity
   (`lib/data/pr-conversation-query.ts`, `lib/review/activity-model.ts`).
-  The Overview mounts on first show and then stays mounted, so its place,
-  filter and search survive the diff. Entries that arrive on a refresh
-  wait behind "N new updates"; thread writes invalidate the conversation.
+  The Overview mounts on first show and then stays mounted, hidden under
+  its check list too, so its place, filter and search survive both.
+  Entries that arrive on a refresh wait behind "N new updates"; thread
+  writes invalidate the conversation.
 - A reviewer's own unsent writing is a durable draft (core
   `pull-requests/review-drafts.ts`, one file per account and pull request
   under `~/.n10/review-drafts`), autosaved by `lib/review/review-drafts.ts`.

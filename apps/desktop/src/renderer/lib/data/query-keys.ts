@@ -50,6 +50,25 @@ export const keys = {
    *  same path never reads the old one's entry, and by the account. */
   prSnapshot: (cwd: string, ref: PullRequestRef, viewer: string | null) =>
     ['pr-snapshot', cwd, pullRequestKey(ref), ref.id ?? null, viewer] as const,
+  /** Keyed like the snapshot, and by the head the list row names: a
+   *  push is a new read. `prChecksFor(cwd, ref)` is every entry of one
+   *  pull request's, for its refresh. */
+  prChecks: (
+    cwd: string,
+    ref: PullRequestRef,
+    viewer: string | null,
+    head: string | null
+  ) =>
+    [
+      'pr-checks',
+      cwd,
+      pullRequestKey(ref),
+      ref.id ?? null,
+      viewer,
+      head,
+    ] as const,
+  prChecksFor: (cwd: string, ref: PullRequestRef) =>
+    ['pr-checks', cwd, pullRequestKey(ref)] as const,
   /** Every conversation read in this repository, to invalidate. */
   prConversations: (cwd: string) => ['pr-conversation', cwd] as const,
   /** Keyed like `prSnapshot`. */
