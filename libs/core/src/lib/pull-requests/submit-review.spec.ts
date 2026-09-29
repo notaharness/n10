@@ -119,6 +119,7 @@ describe('submitting a review', () => {
       head: HEAD,
       event: 'APPROVE',
       body: 'Looks right.',
+      summaryKey: 'summary',
       items: [
         {
           key: 'inline:k1',
@@ -422,6 +423,84 @@ describe('submitting a review', () => {
     expect(states()['inline:k1']).toBe('unknown');
   });
 
+  it('settles what was posted before a failure as posted, and the ledger forgets it', async () => {
+    const partly: Publish = (_s, ledger) => {
+      ledger.write({
+        head: HEAD,
+        reviewId: null,
+        inFlight: null,
+        sending: null,
+        added: { 'inline:k1': { id: '101', body: 'x' } },
+        submitted: false,
+      });
+      return Promise.reject(
+        new ReviewPublishError('refused', 'thread is closed', {
+          item: 'reply:PRRT_1',
+          posted: { 'inline:k1': '101' },
+        })
+      );
+    };
+    await submitReview(
+      request(['inline:k1', 'reply:PRRT_1'], 'REJECT'),
+      src(partly)
+    ).catch(() => undefined);
+    expect(states()).toMatchObject({
+      'inline:k1': 'published',
+      'reply:PRRT_1': 'failed',
+    });
+    expect(readDraftFile(dir, REF, 'bea').submission!.ledger!.added).toEqual(
+      {}
+    );
+    // The vote alone is left: what was posted already says what to change.
+    let sent: ReviewSubmission | null = null;
+    await submitReview(
+      request([], 'REJECT'),
+      src((submission) => {
+        sent = submission;
+        return Promise.resolve({ reviewId: null, items: {}, resumed: null });
+      })
+    );
+    expect(sent).toMatchObject({ event: 'REJECT', items: [] });
+    expect(states()['inline:k1']).toBe('published');
+  });
+
+  it('settles a summary posted as its own item, where there is no review', async () => {
+    await submitReview(
+      request(['summary', 'reply:PRRT_1'], 'REJECT'),
+      src(() =>
+        Promise.reject(
+          new ReviewPublishError('refused', 'thread is closed', {
+            item: 'reply:PRRT_1',
+            posted: { summary: '103' },
+          })
+        )
+      )
+    ).catch(() => undefined);
+    expect(states()).toMatchObject({
+      summary: 'published',
+      'reply:PRRT_1': 'failed',
+    });
+    write({ kind: 'summary' }, 'Second round.');
+    await submitReview(
+      request(['summary']),
+      src(() =>
+        Promise.resolve({
+          reviewId: null,
+          items: { summary: '104' },
+          resumed: null,
+        })
+      )
+    );
+    const summary = listReviewDrafts(
+      { ref: REF, viewer: 'bea' },
+      src()
+    ).drafts.find((d) => d.id === 'summary')!;
+    expect(summary.publication).toMatchObject({
+      state: 'published',
+      remoteId: '104',
+    });
+  });
+
   it('refuses a comment written on another commit, before anything changes', async () => {
     const other = 'b'.repeat(40);
     saveReviewDraft(
@@ -522,6 +601,10 @@ describe('parseSubmitReviewRequest', () => {
     expect(() =>
       parseSubmitReviewRequest({ ...request([]), event: 'MERGE' })
     ).toThrow('event');
+    expect(
+      parseSubmitReviewRequest({ ...request([]), event: 'WAIT_FOR_AUTHOR' })
+        .event
+    ).toBe('WAIT_FOR_AUTHOR');
     expect(() =>
       parseSubmitReviewRequest({ ...request([]), draftIds: [1] })
     ).toThrow('ids');

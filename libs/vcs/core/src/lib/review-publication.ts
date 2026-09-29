@@ -13,13 +13,50 @@ import type { Oid } from './pr-details.js';
  * strength of a guess.
  */
 
-export type ReviewEvent = 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES';
+/**
+ * The verdict filed with the review, in each provider's own terms.
+ * `COMMENT` leaves the verdict as it is. GitHub takes `APPROVE` and
+ * `REQUEST_CHANGES`; Azure DevOps takes its votes: `APPROVE` (10),
+ * `APPROVE_WITH_SUGGESTIONS` (5), `WAIT_FOR_AUTHOR` (-5), `REJECT`
+ * (-10) and `RESET_VOTE` (0). A provider refuses one it does not have
+ * before anything is sent.
+ */
+export type ReviewEvent =
+  | 'COMMENT'
+  | 'APPROVE'
+  | 'REQUEST_CHANGES'
+  | 'APPROVE_WITH_SUGGESTIONS'
+  | 'WAIT_FOR_AUTHOR'
+  | 'REJECT'
+  | 'RESET_VOTE';
+
+export const REVIEW_EVENTS: readonly ReviewEvent[] = [
+  'COMMENT',
+  'APPROVE',
+  'REQUEST_CHANGES',
+  'APPROVE_WITH_SUGGESTIONS',
+  'WAIT_FOR_AUTHOR',
+  'REJECT',
+  'RESET_VOTE',
+];
+
+/** Verdicts that ask the author for changes: a review filing one says
+ *  what, in a summary or a comment. */
+export const CHANGES_EVENTS: readonly ReviewEvent[] = [
+  'REQUEST_CHANGES',
+  'WAIT_FOR_AUTHOR',
+  'REJECT',
+];
 
 /** Where a comment in the review goes. */
 export type ReviewPlace =
   | { kind: 'line'; path: string; range: LineRange }
   | { kind: 'file'; path: string }
   | { kind: 'reply'; threadId: string };
+
+/** Where a step wrote: an item's place, or the conversation, where
+ *  Azure DevOps posts the review's summary as a thread of its own. */
+export type SentPlace = ReviewPlace | { kind: 'conversation' };
 
 export interface ReviewItem {
   /** The caller's name for the item; the ledger is keyed by it. */
@@ -36,6 +73,9 @@ export interface ReviewSubmission {
   event: ReviewEvent;
   /** The review's own text; may be empty where the provider allows. */
   body: string;
+  /** The caller's key for that text, where a provider posts it as an
+   *  item of its own (Azure DevOps, as a conversation thread). */
+  summaryKey?: string;
   items: ReviewItem[];
 }
 
@@ -50,7 +90,13 @@ export interface ReviewLedger {
   inFlight: string | null;
   /** What that item step was adding, to find it in the pending review
    *  even when its draft has since been deselected. */
-  sending: { body: string; place: ReviewPlace } | null;
+  sending: {
+    body: string;
+    place: SentPlace;
+    /** Ids of comments already saying the same in the same place when
+     *  it was sent, not to be taken for it. */
+    before?: string[];
+  } | null;
   /** Each item already in the pending review: its remote id, and the
    *  text it was added with. */
   added: Record<string, { id: string; body: string }>;
@@ -63,7 +109,9 @@ export interface LedgerStore {
 }
 
 export interface PublishedReview {
-  reviewId: string;
+  /** The provider's review, where it has one (GitHub); Azure DevOps
+   *  files comments and a vote, not a review. */
+  reviewId: string | null;
   /** Each item in the filed review, by key, with its remote comment id. */
   items: Record<string, string>;
   /** The review had already been filed, by an earlier attempt whose
@@ -92,10 +140,18 @@ export class ReviewPublishError extends Error {
   readonly failure: PublishFailure;
   /** The item whose step stopped it, when it was an item's. */
   readonly item: string | null;
+  /** Items already visible to others when it stopped, by key, with
+   *  their remote ids: posted, whatever happens to the rest. Empty
+   *  where nothing is visible before the whole review is filed. */
+  readonly posted: Record<string, string>;
   constructor(
     failure: PublishFailure,
     message: string,
-    details: { cause?: unknown; item?: string | null } = {}
+    details: {
+      cause?: unknown;
+      item?: string | null;
+      posted?: Record<string, string>;
+    } = {}
   ) {
     super(
       message,
@@ -104,6 +160,7 @@ export class ReviewPublishError extends Error {
     this.name = 'ReviewPublishError';
     this.failure = failure;
     this.item = details.item ?? null;
+    this.posted = details.posted ?? {};
   }
 }
 

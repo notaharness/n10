@@ -89,7 +89,14 @@ interface N10Bridge {
     ref: Record<string, unknown>;
     viewer?: string | null;
     head: string;
-    event: 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES';
+    event:
+      | 'COMMENT'
+      | 'APPROVE'
+      | 'REQUEST_CHANGES'
+      | 'APPROVE_WITH_SUGGESTIONS'
+      | 'WAIT_FOR_AUTHOR'
+      | 'REJECT'
+      | 'RESET_VOTE';
     draftIds: string[];
   }): Promise<{ drafts: FakeReviewDraft[]; resumed: { state: string } | null }>;
   /** Asserted on for completeness: the conversation has no UI yet. */

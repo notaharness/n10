@@ -632,4 +632,12 @@ describe('publishing a GitHub review', () => {
     expect(gh.submitted[0]).toMatchObject({ comments: 3 });
     expect(Object.keys(published.items)).toContain('file');
   });
+
+  it('refuses a verdict GitHub does not have, before anything is read', async () => {
+    const gh = new FakeGitHub();
+    expect(
+      await failure(publish(gh, memory(), { ...SUBMISSION, event: 'REJECT' }))
+    ).toBe('refused');
+    expect(gh.sent).toEqual([]);
+  });
 });

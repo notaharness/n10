@@ -1,4 +1,4 @@
-import type { ReviewLedger } from '@n10/vcs-core';
+import type { ReviewLedger, SentPlace } from '@n10/vcs-core';
 import { REVIEW_COMMENTS, THREAD_ROOT } from './pr-review-queries.js';
 
 /**
@@ -88,8 +88,21 @@ export function sameItem(
 ): boolean {
   const { place } = sent;
   if (c.body !== sent.body) return false;
-  if (place.kind === 'reply') return root != null && c.replyTo?.id === root;
-  if (c.replyTo != null || c.path !== place.path) return false;
+  switch (place.kind) {
+    case 'conversation':
+      // GitHub files the summary as the review's own text.
+      return false;
+    case 'reply':
+      return root != null && c.replyTo?.id === root;
+    default:
+      return c.replyTo == null && c.path === place.path && samePlace(c, place);
+  }
+}
+
+function samePlace(
+  c: PendingComment,
+  place: Exclude<SentPlace, { kind: 'reply' | 'conversation' }>
+): boolean {
   if (place.kind === 'file') return c.subjectType === 'FILE';
   const { start, end } = place.range;
   return (

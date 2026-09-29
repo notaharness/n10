@@ -13,6 +13,9 @@ import type {
   BuildStatusState,
   RepositoryRef,
   MentionCandidate,
+  LedgerStore,
+  PublishedReview,
+  ReviewSubmission,
 } from '@n10/vcs-core';
 import { sanitizeBody } from '@n10/vcs-core';
 import { log } from '@n10/logger';
@@ -45,6 +48,7 @@ import {
   type RawAdoThread,
 } from './pr-conversation.js';
 import { fetchPrBuildRunsBatch } from './builds.js';
+import { publishAzureReview } from './pr-review-publisher.js';
 import {
   forgetPrDetails,
   forgetRepoDetails,
@@ -1025,6 +1029,44 @@ export const azureDevOpsProvider: VcsProvider = {
     query: string
   ): Promise<MentionCandidate[]> {
     return searchAdoMentions(toAdoConfig(auth, project), query);
+  },
+
+  async publishReview(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    submission: ReviewSubmission,
+    ledger: LedgerStore
+  ): Promise<PublishedReview> {
+    const config = toAdoConfig(auth, project);
+    const base = baseUrl(config);
+    const headers = authHeaders(config.pat);
+    try {
+      return await publishAzureReview(
+        {
+          // Uncached: each read is what the publication acts on.
+          get: (path) =>
+            adoGet(
+              'publishReview',
+              `publish/${path}`,
+              0,
+              `${base}/${path}`,
+              headers
+            ),
+          send: (method, path, body) =>
+            adoSend('publishReview', `${base}/${path}`, {
+              method,
+              headers,
+              body: JSON.stringify(body),
+              bodyForLog: { path },
+            }),
+          me: () => fetchAuthenticatedUserId(config),
+        },
+        submission,
+        ledger
+      );
+    } finally {
+      invalidatePr(config, submission.prId);
+    }
   },
 
   fetchPullRequestDetail(
