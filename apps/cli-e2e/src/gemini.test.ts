@@ -8,7 +8,7 @@ const gemini = fakeCli('gemini');
 
 test.use({
   n10Config: {
-    aiCommand: 'gemini',
+    agentId: 'gemini',
     autoHideSidebar: false,
     keybindPreset: 'vim',
   },

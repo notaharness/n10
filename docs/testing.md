@@ -277,10 +277,10 @@ and v0.61.0 [argument parser](https://github.com/google-gemini/gemini-cli/blob/v
 and [session entry point](https://github.com/google-gemini/gemini-cli/blob/v0.61.0/packages/cli/src/gemini.tsx).
 No real Gemini binary, authentication or model session is exercised by the tests.
 
-The registry resolves `agentId: "gemini"` and legacy `aiCommand: "gemini"`.
-Blank launches use `gemini`; seeds use one `--prompt-interactive=PROMPT` argument
-so yargs does not treat option-like text as flags. Review guidance is folded into
-the prompt. Headless `-p` is not used.
+`agentId: "gemini"` selects the agent. Blank launches use `gemini`; seeds use
+one `--prompt-interactive=PROMPT` argument so yargs does not treat option-like
+text as flags. Review guidance is folded into the prompt. Headless `-p` is not
+used.
 
 Automatic resume is refused: native `--resume latest` can create a fresh
 conversation when project history is missing, and n10 does not record Gemini

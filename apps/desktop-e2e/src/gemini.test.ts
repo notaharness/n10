@@ -45,7 +45,7 @@ test('Gemini worktree launch, activity and explicit fresh restart in Desktop', a
     name,
     {
       '@orchestra-orchestrator': 'tmux:fixture-orchestrator',
-      '@orchestra-last-report': 'PROGRESS 2026-09-09T14:32:00Z',
+      '@orchestra-last-report': 'PROGRESS 2026-09-09T14:32:00Z inbox',
     },
     homeDir
   );
@@ -107,7 +107,7 @@ test('Gemini standalone terminal refuses resume and permits an explicit fresh st
   );
   expect(gemini.calls(repoPath)).toHaveLength(1);
   await page
-    .getByRole('button', { name: 'Start new (directory default)', exact: true })
+    .getByRole('button', { name: 'Start default agent', exact: true })
     .click();
   await expect
     .poll(() => gemini.calls(repoPath))
