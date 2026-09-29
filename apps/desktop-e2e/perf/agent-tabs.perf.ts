@@ -12,6 +12,7 @@ import { launchApp, unthrottle } from './setup/launch.js';
 import { pace } from './setup/pace.js';
 import { collect, saveSamples, type Samples } from './setup/metrics.js';
 import { startMainLag, stopMainLag } from './setup/main-lag.js';
+import { cpuMs } from './setup/proc-cpu.js';
 
 /**
  * Many agent tabs open at once: what the renderer pays for the ones
@@ -131,55 +132,51 @@ async function timedSwitch(page: Page, branch: string): Promise<Switch> {
   );
 }
 
-/** Per-process CPU and memory over `windowMs`, as Electron reports it
- *  (CPU in percent of all cores together, averaged since the previous
- *  reading; `mainCorePct` is main alone in percent of one core, from
- *  `process.cpuUsage`),
- *  with the main process's timer lag over the same window. A utility
- *  process named `n10 host` is the session host when there is one;
- *  others (the beam daemon's) are counted apart. */
+/** Per-process CPU and memory over `windowMs`, with the main
+ *  process's timer lag over the same window. CPU is each process's own
+ *  clock from `/proc`, in percent of one core. A utility process named
+ *  `n10 host` is the session host when there is one; others (the beam
+ *  daemon's) count only in the total. */
 async function costOver(
   page: Page,
   app: ElectronApplication,
   windowMs: number
 ): Promise<Record<string, number>> {
-  await app.evaluate(({ app: a }) => a.getAppMetrics());
-  const cpuBefore = await app.evaluate(() => process.cpuUsage());
+  const processes = () =>
+    app.evaluate(({ app: a }) =>
+      a.getAppMetrics().map((p) => ({
+        pid: p.pid,
+        role:
+          p.type === 'Tab'
+            ? 'renderer'
+            : p.type === 'Browser'
+            ? 'main'
+            : p.type === 'Utility' && p.name === 'n10 host'
+            ? 'host'
+            : 'other',
+        rssMb: (p.memory?.workingSetSize ?? 0) / 1024,
+      }))
+    );
+  const before = await processes();
+  const cpuBefore = new Map(before.map((p) => [p.pid, cpuMs(p.pid)]));
+  const t0 = Date.now();
   await startMainLag(app);
   await pace(page, windowMs);
   const lag = await stopMainLag(app);
-  const cpuAfter = await app.evaluate(() => process.cpuUsage());
-  // Electron's percentages are normalised in ways that vary by
-  // platform; the main process's own clock is not.
-  const mainCoreMs =
-    (cpuAfter.user - cpuBefore.user + cpuAfter.system - cpuBefore.system) /
-    1000;
-  const cost = await app.evaluate(({ app: a }) => {
-    const m = a.getAppMetrics();
-    const pick = (test: (p: (typeof m)[number]) => boolean) => m.filter(test);
-    const cpu = (ps: typeof m) =>
-      ps.reduce((s, p) => s + (p.cpu?.percentCPUUsage ?? 0), 0);
-    const rss = (ps: typeof m) =>
-      ps.reduce((s, p) => s + (p.memory?.workingSetSize ?? 0), 0) / 1024;
-    const isHost = (p: (typeof m)[number]) =>
-      p.type === 'Utility' && (p.serviceName ?? p.name) === 'n10 host';
-    const renderer = pick((p) => p.type === 'Tab');
-    const main = pick((p) => p.type === 'Browser');
-    const host = pick(isHost);
-    return {
-      rendererCpuPct: cpu(renderer),
-      mainCpuPct: cpu(main),
-      hostCpuPct: cpu(host),
-      totalCpuPct: cpu(m),
-      rendererRssMb: rss(renderer),
-      mainRssMb: rss(main),
-      hostRssMb: rss(host),
-      totalRssMb: rss(m),
-    };
-  });
+  const after = await processes();
+  const elapsed = Date.now() - t0;
+  const cost: Record<string, number> = {};
+  for (const role of ['renderer', 'main', 'host', 'total']) {
+    const ps = after.filter((p) => role === 'total' || p.role === role);
+    const used = ps.reduce(
+      (s, p) => s + cpuMs(p.pid) - (cpuBefore.get(p.pid) ?? cpuMs(p.pid)),
+      0
+    );
+    cost[`${role}CorePct`] = (used / elapsed) * 100;
+    cost[`${role}RssMb`] = ps.reduce((s, p) => s + p.rssMb, 0);
+  }
   return {
     ...cost,
-    mainCorePct: (mainCoreMs / windowMs) * 100,
     mainLagP50Ms: lag.p50,
     mainLagP99Ms: lag.p99,
     mainLagMaxMs: lag.max,
