@@ -37,7 +37,7 @@ type Standing = Pick<ReviewerStanding, 'requirement' | 'reason' | 'rules'>;
 function why(s: Standing): string | null {
   if (s.reason === 'code-owner') return 'Code owner';
   if (s.reason === 'policy') return 'By policy';
-  return s.rules.length > 0 ? 'Named by a rule' : null;
+  return s.rules.length > 0 ? 'Named in a rule' : null;
 }
 
 /** What a row adds to its group, in a few words; null where nothing.
@@ -98,7 +98,7 @@ export function reviewerRows(
     const rows = listed.map((r) => ({ ...r, standing: null, rules: [] }));
     const notes =
       read?.state === 'failed'
-        ? ["The reviewers' details could not be read."]
+        ? ["Couldn't load which reviewers are required."]
         : [];
     return { groups: [{ kind: 'all', title: null, rows }], notes };
   }
@@ -107,7 +107,7 @@ export function reviewerRows(
   if (!complete) {
     notes.push(
       total == null
-        ? 'Not every reviewer could be read.'
+        ? "Some reviewers didn't load."
         : `${items.length} of ${total} reviewers shown.`
     );
   }

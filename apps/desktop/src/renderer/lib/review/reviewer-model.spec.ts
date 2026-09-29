@@ -50,7 +50,7 @@ describe('standingLabel', () => {
     );
     expect(label({ reason: 'code-owner' })).toBe('Code owner');
     // A rule names them, though GitHub does not say they are required.
-    expect(label({ rules: [RULE] })).toBe('Named by a rule');
+    expect(label({ rules: [RULE] })).toBe('Named in a rule');
     // Asked, and nothing more is known: nothing to add.
     expect(label({})).toBeNull();
     expect(label({ requirement: 'optional' })).toBeNull();
@@ -97,7 +97,7 @@ describe('reviewerRows', () => {
       reviewerRows(listed, {
         reviewers: { state: 'failed', kind: 'network', reason: 'offline' },
       }).notes
-    ).toEqual(["The reviewers' details could not be read."]);
+    ).toEqual(["Couldn't load which reviewers are required."]);
   });
 
   it('puts the required first and the optional under a heading', () => {

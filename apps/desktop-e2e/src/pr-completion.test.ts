@@ -109,7 +109,7 @@ test.describe('Completion', () => {
       s.prs[1].failing = { checks: true };
     });
     const completion = await openPr(desktop.page, /#215/);
-    await expect(completion).toContainText('Readiness not fully known');
+    await expect(completion).toContainText('May not be ready to merge');
     await expect(
       completion.getByRole('button', { name: 'Refresh' })
     ).toBeVisible();
@@ -140,7 +140,7 @@ test.describe('Completion', () => {
     // A refresh that still cannot read the checks leaves it unknown.
     await refresh.click();
     await expect(refresh).toHaveAttribute('aria-disabled', 'false');
-    await expect(completion).toContainText('Readiness not fully known');
+    await expect(completion).toContainText('May not be ready to merge');
 
     updateFakeGh(desktop.homeDir, (s) => {
       s.prs[1].failing = undefined;
@@ -165,7 +165,7 @@ test.describe('Completion', () => {
     // A refresh that comes back still unknown settles the press.
     await refresh.click();
     await expect(refresh).toHaveAttribute('aria-disabled', 'false');
-    await expect(completion).toContainText('Readiness not fully known');
+    await expect(completion).toContainText('May not be ready to merge');
     // The reader clicks away, and later the list moves on its own.
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     updateFakeGh(desktop.homeDir, (s) => {
@@ -347,7 +347,7 @@ test.describe('Completion', () => {
     ).toBeVisible();
     await expect(heading).toBeVisible();
     await page.getByRole('button', { name: 'Back to the Overview' }).click();
-    await expect(completion).toContainText('Readiness not fully known');
+    await expect(completion).toContainText('May not be ready to merge');
   });
 
   test('reads the checks again when the list row moves at the same head', async ({

@@ -46,13 +46,13 @@ const REVIEWS: Record<MergeState['reviews'], Omit<ReadinessAspect, 'id'>> = {
   'not-required': { state: 'met', text: 'No review required' },
   required: { state: 'waiting', text: 'Waiting for review' },
   'changes-requested': { state: 'blocked', text: 'Changes requested' },
-  unknown: { state: 'unknown', text: 'Requirement not stated' },
+  unknown: { state: 'unknown', text: 'May need a review' },
 };
 
 /** The approvals the rules ask for, in words, or that the rules could
  *  not be read; null where they ask none, or the provider reads none. */
 function approvalsAsked({ rules }: ReadinessInputs): string | null {
-  if (rules.state === 'failed') return 'rules could not be read';
+  if (rules.state === 'failed') return "branch rules didn't load";
   const n = rules.state === 'read' ? rules.value.reviews.approvals : 0;
   return n > 0 ? `${n} approval${n === 1 ? '' : 's'} required` : null;
 }
@@ -64,7 +64,7 @@ function reviews(inputs: ReadinessInputs): ReadinessAspect {
   const asked = approvalsAsked(inputs);
   // Moot where the provider says nothing it enforces is in the way.
   if (merge.reviews === 'unknown' && merge.blocked === false) {
-    return { id: 'reviews', state: 'met', text: 'Not in the way' };
+    return { id: 'reviews', state: 'met', text: 'Nothing blocking' };
   }
   const { state, text } = REVIEWS[merge.reviews];
   if (!asked || merge.reviews === 'not-required') {
@@ -79,8 +79,8 @@ function reviews(inputs: ReadinessInputs): ReadinessAspect {
 const CHECK_KINDS = new Set<ReadinessItem['kind']>(['checks', 'policies']);
 
 const UNREAD = {
-  failed: 'Could not be read',
-  unsupported: 'Not read by this provider',
+  failed: "Couldn't load",
+  unsupported: 'Not available',
 } as const;
 
 /** The provider named which checks it requires: its rules were read
@@ -111,10 +111,14 @@ function checks(inputs: ReadinessInputs, t: ReadinessTally): ReadinessAspect {
     };
   }
   const { items, complete } = inputs.checks.value;
-  if (!complete) return { ...row, state: 'unknown', text: 'Not all read' };
+  if (!complete) return { ...row, state: 'unknown', text: "Some didn't load" };
   const required = items.filter((c) => c.requirement === 'required');
   if (required.some((c) => c.outcome === 'unknown')) {
-    return { ...row, state: 'unknown', text: 'Outcome not known' };
+    return {
+      ...row,
+      state: 'unknown',
+      text: 'A required check has no clear result',
+    };
   }
   const advisory = t.advisories.find((a) => CHECK_KINDS.has(a.kind))?.text;
   if (!requirementsStated(inputs, items)) {
@@ -154,13 +158,13 @@ function unstated(
     return {
       ...row,
       state: 'unknown',
-      text: advisory ?? 'Not known which are required',
+      text: advisory ?? 'Unclear which are required',
     };
   }
   if (advisory) return { ...row, state: 'advisory', text: advisory };
   return anyRequired
     ? passing(row, undefined)
-    : { ...row, state: 'met', text: 'Not in the way' };
+    : { ...row, state: 'met', text: 'Nothing blocking' };
 }
 
 /** Shown only where the provider reports a conflict: otherwise there
@@ -206,7 +210,7 @@ function conversations(
   if (inputs.unresolvedThreads === 0) {
     return { ...row, state: 'observed', text: 'None unresolved' };
   }
-  return { ...row, state: 'unknown', text: 'Not read' };
+  return { ...row, state: 'unknown', text: "Couldn't check" };
 }
 
 export function readinessAspects(

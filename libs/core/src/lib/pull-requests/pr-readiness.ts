@@ -170,8 +170,7 @@ function kindTally(
     ),
     ...say(
       failed('unknown'),
-      (n, who) =>
-        `${count(n, words.other)} ${fails}, not known if required: ${who}`,
+      (n, who) => `${count(n, words.other)} ${fails}, may be required: ${who}`,
       { resolvedBy: 'author' }
     )
   );
@@ -291,7 +290,7 @@ function mergeTally({ merge }: ReadinessInputs, t: Tally): void {
   if (merge.behind) {
     t.blockers.push({
       kind: 'behind',
-      text: 'Behind its target, which the rules require it to be up to date with',
+      text: 'Behind its target and must be updated',
       resolvedBy: 'author',
     });
   }
@@ -306,15 +305,11 @@ function enforcementTally({ merge }: ReadinessInputs, t: Tally): void {
   if (merge.blocked === true && !named) {
     t.blockers.push({
       kind: 'rules',
-      text: 'Blocked by a rule n10 cannot see',
+      text: 'Blocked by a branch rule',
       resolvedBy: 'maintainers',
     });
-  } else if (merge.blocked == null) {
-    t.unknowns.push('Whether the provider will allow completion');
-  } else if (merge.blocked === false && named) {
-    t.unknowns.push(
-      'Whether completion is allowed: the provider says so, its details do not'
-    );
+  } else if (merge.blocked == null || (merge.blocked === false && named)) {
+    t.unknowns.push('Whether completion is allowed');
   }
 }
 

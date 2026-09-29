@@ -306,7 +306,7 @@ describe('readPullRequestChecks', () => {
     expect(res.readiness.aspects).toContainEqual({
       id: 'conversations',
       state: 'observed',
-      text: '2 unresolved, not known if required',
+      text: '2 unresolved, may need resolving',
     });
     expect(res.list).toBeNull();
   });

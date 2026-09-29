@@ -203,7 +203,7 @@ describe('the demo checks read', () => {
     expect(answer.readiness.aspects).toContainEqual({
       id: 'reviews',
       state: 'met',
-      text: 'Not in the way',
+      text: 'Nothing blocking',
     });
     // GitHub states no review decision without a rule that asks one.
     expect((await read(39)).readiness).toMatchObject({

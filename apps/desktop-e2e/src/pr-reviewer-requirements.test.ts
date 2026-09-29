@@ -169,6 +169,6 @@ test.describe('Reviewer requirements when the rules cannot be read', () => {
     const { completion } = await openOverview(desktop.page);
     await expect(
       completion.locator('[data-readiness-row="reviews"]')
-    ).toContainText('Waiting for review · rules could not be read');
+    ).toContainText("Waiting for review · branch rules didn't load");
   });
 });

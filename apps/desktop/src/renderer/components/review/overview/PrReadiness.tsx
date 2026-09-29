@@ -125,7 +125,7 @@ function Provenance({
   if (checks.state === 'failed') {
     return (
       <p role="status" className="mt-3 text-xs text-muted-foreground">
-        The checks could not be read: {failureText(checks, fetchedAt)}
+        Couldn't load the checks: {failureText(checks, fetchedAt)}
       </p>
     );
   }
@@ -256,7 +256,7 @@ export function PrReadiness(props: ReadinessProps) {
     <Section title="Completion">
       {read.kind === 'failed' ? (
         <ReadFailure
-          title="Couldn't read what completion needs"
+          title="Couldn't load what completion needs"
           error={read.error}
           retrying={retrying}
           onRetry={onRefresh}
