@@ -11,6 +11,7 @@ import {
   reviewRole,
   type AttentionAction,
 } from '../../lib/review/overview-model.js';
+import { GeneralComposer } from './overview/GeneralComposer.js';
 import { PrActivity } from './overview/PrActivity.js';
 import { PrAttention } from './overview/PrAttention.js';
 import { PrChecks } from './overview/PrChecks.js';
@@ -147,11 +148,16 @@ export function OverviewPane({
         <div className="min-w-0 [grid-area:main]">
           <PrDescription pr={pr} />
           {ref && (
-            <PrActivity
-              key={pullRequestKey(ref)}
-              prRef={ref}
-              onOpenThread={onOpenThread}
-            />
+            <>
+              <PrActivity
+                key={pullRequestKey(ref)}
+                prRef={ref}
+                onOpenThread={onOpenThread}
+              />
+              <div className="mt-6">
+                <GeneralComposer key={pullRequestKey(ref)} prRef={ref} />
+              </div>
+            </>
           )}
         </div>
       </div>

@@ -210,7 +210,89 @@ describe('review drafts', () => {
   });
 });
 
+const HEAD = 'a'.repeat(40);
+const inline = (key: string, over: Record<string, unknown> = {}) => ({
+  kind: 'inline',
+  key,
+  anchor: {
+    path: 'src/request.ts',
+    previousPath: null,
+    range: { startSide: 'RIGHT', start: 41, side: 'RIGHT', end: 43 },
+    head: HEAD,
+    lines: ['a', 'b', 'c'],
+    ...over,
+  },
+});
+
+describe('inline drafts', () => {
+  it('keeps many on one pull request, each with its anchor', () => {
+    const right = inline('k1');
+    const left = inline('k2', {
+      range: { startSide: 'LEFT', start: 18, side: 'LEFT', end: 20 },
+    });
+    const file = inline('k3', { range: null, lines: [], path: 'logo.png' });
+    for (const target of [right, left, file]) {
+      saveReviewDraft(
+        parseSaveDraftRequest({ ...as('bea'), target, body: 'note' }),
+        src()
+      );
+    }
+    const { drafts } = listReviewDrafts(as('bea'), src());
+    expect(drafts.map((d) => d.id).sort()).toEqual([
+      'inline:k1',
+      'inline:k2',
+      'inline:k3',
+    ]);
+    expect(drafts.find((d) => d.id === 'inline:k2')?.target).toEqual(left);
+  });
+
+  it('keeps the order they were started in when one is saved again', () => {
+    const save = (key: string, body: string) =>
+      saveReviewDraft(
+        parseSaveDraftRequest({ ...as('bea'), target: inline(key), body }),
+        src()
+      );
+    save('k1', 'first');
+    save('k2', 'second');
+    save('k1', 'first, edited');
+    const { drafts } = listReviewDrafts(as('bea'), src());
+    expect(drafts.map((d) => d.body)).toEqual(['first, edited', 'second']);
+  });
+});
+
 describe('parseSaveDraftRequest', () => {
+  it.each([
+    [
+      'a range across sides',
+      { range: { startSide: 'LEFT', start: 1, side: 'RIGHT', end: 2 } },
+    ],
+    [
+      'a range that runs backwards',
+      { range: { startSide: 'RIGHT', start: 5, side: 'RIGHT', end: 2 } },
+    ],
+    [
+      'line zero',
+      { range: { startSide: 'RIGHT', start: 0, side: 'RIGHT', end: 1 } },
+    ],
+    ['no path', { path: '' }],
+    ['a short commit id', { head: 'abc123' }],
+    ['lines that are not text', { lines: [1] }],
+  ])('refuses an inline anchor with %s', (_, over) => {
+    expect(() =>
+      parseSaveDraftRequest({
+        ...as('bea'),
+        target: inline('k', over),
+        body: 'x',
+      })
+    ).toThrow(TypeError);
+  });
+
+  it('refuses an inline key that could be anything', () => {
+    expect(() =>
+      parseSaveDraftRequest({ ...as('bea'), target: inline('../x'), body: 'x' })
+    ).toThrow(TypeError);
+  });
+
   it('accepts the three targets', () => {
     for (const target of [REPLY, { kind: 'general' }, { kind: 'summary' }]) {
       expect(

@@ -87,6 +87,7 @@ export * from './lib/pull-requests/pr-check-list.js';
 export * from './lib/pull-requests/pr-checks-read.js';
 export * from './lib/pull-requests/pr-review-requirements.js';
 export * from './lib/pull-requests/pull-request-cache.js';
+export * from './lib/pull-requests/review-draft-anchor.js';
 export * from './lib/pull-requests/review-draft-store.js';
 export * from './lib/pull-requests/review-draft-types.js';
 export * from './lib/pull-requests/review-drafts.js';

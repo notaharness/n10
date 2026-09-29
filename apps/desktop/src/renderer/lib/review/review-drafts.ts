@@ -15,6 +15,7 @@ import {
   DraftEdits,
   editKey,
   sameTarget,
+  withDraft,
   type SaveRequest,
   type SaveState,
 } from './draft-edits.js';
@@ -40,9 +41,10 @@ export interface DurableDraft {
   flush: () => void;
   /** Save the text again after a failed save. */
   retry: () => void;
-  /** Remove the stored draft and clear the text, with an Undo; told
-   *  when the text comes back. Never rejects: a failure is a toast. */
-  discard: (onUndo?: () => void) => Promise<void>;
+  /** Remove the stored draft and clear the text, with an Undo that
+   *  brings back `text` (by default what is in the box); told when the
+   *  text comes back. Never rejects: a failure is a toast. */
+  discard: (onUndo?: () => void, text?: string) => Promise<void>;
   /** The same, silently, for text that was sent. */
   clear: () => Promise<void>;
   /** The stored drafts have not been read yet; editing waits, so the
@@ -60,10 +62,7 @@ function patchCache(req: SaveRequest, draft: ReviewDraft | null): void {
     keys.reviewDrafts(req.cwd, req.ref, req.viewer),
     (old) => {
       if (!old) return old;
-      const others = old.drafts.filter(
-        (d) => !sameTarget(d.target, req.target)
-      );
-      return { ...old, drafts: draft ? [...others, draft] : others };
+      return { ...old, drafts: withDraft(old.drafts, req.target, draft) };
     }
   );
 }
@@ -111,6 +110,35 @@ export function useReviewDrafts(ref: PullRequestRef | null) {
   });
 }
 
+type InlineDraftTarget = Extract<DraftTarget, { kind: 'inline' }>;
+const NO_TARGETS: InlineDraftTarget[] = [];
+const inlineTargetsOf = (d: ReviewDrafts): InlineDraftTarget[] =>
+  d.drafts.flatMap((x) =>
+    x.target.kind === 'inline' && isEditable(x) && x.body.trim()
+      ? [x.target]
+      : []
+  );
+
+/**
+ * Where the reviewer's comments on code are: the targets of the stored
+ * drafts a card can show. The answer is structurally shared, so a save
+ * that changes only a body leaves it the same array and the diff that
+ * places them is not rebuilt while someone types.
+ */
+export function useInlineDraftTargets(
+  ref: PullRequestRef | null
+): InlineDraftTarget[] {
+  const { repo } = useRepo();
+  const { data } = useQuery({
+    queryKey: keys.reviewDrafts(repo.cwd, ref, repo.viewer),
+    queryFn: () => loadDrafts(ref!, repo.viewer),
+    enabled: ref != null,
+    staleTime: Infinity,
+    select: inlineTargetsOf,
+  });
+  return data ?? NO_TARGETS;
+}
+
 /** Placeholder while there is no ref: the text is kept in memory only. */
 const LOCAL: PullRequestRef = {
   provider: 'local',
@@ -156,21 +184,32 @@ export function useReviewDraft(
       },
     });
 
-  const remove = (undoable: boolean, onUndo?: () => void): Promise<void> => {
-    const text = body;
+  const remove = (
+    undoable: boolean,
+    onUndo?: () => void,
+    text = body
+  ): Promise<void> => {
     edits.forget(key);
     if (!ref) return Promise.resolve();
+    const gone = () => patchCache({ ...scope, body: '' }, null);
+    // Gone from the screen at once, so the stored text never shows again
+    // while the host answers.
+    gone();
     // By target, after any save still in flight for it: IPC answers in
     // order, so a first save that lands late is removed too.
     return window.n10
       .discardReviewDraft({ ref, viewer: repo.viewer, target })
       .then(
         () => {
-          patchCache({ ...scope, body: '' }, null);
+          gone();
           if (undoable && text.trim()) offerUndo(text, onUndo);
         },
         (err: unknown) => {
           toast.error(`Couldn't discard your draft: ${readError(err)}`);
+          // What is stored is still there: read it back.
+          void queryClient.invalidateQueries({
+            queryKey: keys.reviewDrafts(repo.cwd, ref, repo.viewer),
+          });
         }
       );
   };
@@ -181,7 +220,7 @@ export function useReviewDraft(
     save: edit?.save ?? { kind: 'idle' },
     flush: () => edits.flush(key),
     retry: () => edits.retry(key),
-    discard: (onUndo) => remove(true, onUndo),
+    discard: (onUndo, text) => remove(true, onUndo, text),
     clear: () => remove(false),
     loading: ref != null && drafts.isPending,
     readError: drafts.error ? readError(drafts.error) : null,

@@ -94,7 +94,11 @@ Every rule below has its reasoning in `docs/decisions.md`.
   Unsaved text lives in `draft-edits.ts`, outside components, so an
   unmount never drops it; leaving the window with a failed save asks
   first (`main/unsaved-guard.ts`). Nothing there publishes. Focus that a
-  closing control drops goes through `lib/focus.ts`. The review agent's findings stay in
+  closing control drops goes through `lib/focus.ts`.
+- New comments on code: the line number is the selection control
+  (`diff/LineGutter.tsx`, one tab stop per file, one file and one side
+  per range, consecutive lines on screen only). Composers and the reviewer's inline drafts hang in the
+  flat diff through `mineByFile` (`diff/use-diff-comments.ts`). The review agent's findings stay in
   `@n10/review-comments`, keyed by PR number.
 - Diffs are whole-file (`-U99999`), folded client-side
   (`lib/diff/diff-model.ts`). A PR diffs commits; a bare worktree diffs its

@@ -55,9 +55,38 @@ interface Slot {
 
 export const SAVE_DELAY_MS = 400;
 
+/** An inline draft is known by its key: its anchor is data, not identity. */
+function targetKey(target: DraftTarget): string {
+  switch (target.kind) {
+    case 'reply':
+      return `reply:${target.threadId}`;
+    case 'inline':
+      return `inline:${target.key}`;
+    default:
+      return target.kind;
+  }
+}
+
 export function sameTarget(a: DraftTarget, b: DraftTarget): boolean {
-  if (a.kind !== b.kind) return false;
-  return a.kind !== 'reply' || a.threadId === (b as typeof a).threadId;
+  return targetKey(a) === targetKey(b);
+}
+
+/**
+ * `drafts` with the one for `target` replaced in place, added at the
+ * end, or removed (null). A save moves nothing, so drafts sharing a row
+ * keep their order and a focused composer is never re-parented.
+ */
+export function withDraft(
+  drafts: readonly ReviewDraft[],
+  target: DraftTarget,
+  draft: ReviewDraft | null
+): ReviewDraft[] {
+  const at = drafts.findIndex((d) => sameTarget(d.target, target));
+  if (at < 0) return draft ? [...drafts, draft] : [...drafts];
+  const out = [...drafts];
+  if (draft) out[at] = draft;
+  else out.splice(at, 1);
+  return out;
 }
 
 export function editKey(req: Omit<SaveRequest, 'body'>): string {
@@ -65,7 +94,7 @@ export function editKey(req: Omit<SaveRequest, 'body'>): string {
     req.cwd,
     pullRequestKey(req.ref),
     req.viewer?.toLowerCase() ?? null,
-    req.target,
+    targetKey(req.target),
   ]);
 }
 
