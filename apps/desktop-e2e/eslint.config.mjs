@@ -20,8 +20,10 @@ export default [
     // (`perf/setup/pace.ts`) so the rule still covers the rest of the
     // directory, and scoped here rather than inline because the
     // pre-commit hook runs eslint without the Playwright plugin, where
-    // an inline directive naming one of its rules is a hard error.
-    files: ['perf/setup/pace.ts'],
+    // an inline directive naming one of its rules is a hard error. The
+    // pre-warm tests' `src/setup/linger.ts` is the same: the pointer
+    // resting for a while is what they test.
+    files: ['perf/setup/pace.ts', 'src/setup/linger.ts'],
     rules: { 'playwright/no-wait-for-timeout': 'off' },
   },
   {

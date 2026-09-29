@@ -170,6 +170,7 @@ export function Sidebar({
                     onOpen={(preview) =>
                       tabs.openItem(itemKey(item), { preview })
                     }
+                    opening={() => tabs.tabOpening(itemKey(item))}
                   />
                 ))}
               </CollapsibleContent>

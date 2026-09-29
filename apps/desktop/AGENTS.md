@@ -133,10 +133,17 @@ Every rule below has its reasoning in `docs/decisions.md`.
   composed in the renderer so the preview is the delivery; `plan-model.spec.ts`
   asserts numbering against `planRows`. Adopting a respawned session carries
   the chunk `seq` forward.
-- `EditorArea` mounts only the active tab. `SessionTerminal` is mounted only
-  while shown; it watches its session (`watchSession`/`unwatchSession`,
-  counted per window in `services/session-watch.ts`), and the host sends PTY
-  output only to watching windows. Watching is what marks output seen.
+- `EditorArea` renders the active tab's pane and at most one spare, hidden
+  and `inert` (`use-editor-panes.ts`, `lib/tabs/editor-panes.ts`): the tab a
+  hover settled on (`lib/tabs/prewarm.tsx`, 150 ms, one at a time,
+  superseded rather than queued), else the tab left last. Pressing the
+  spare's tab shows the same pane; anything that acts without an event on it
+  asks `usePaneShown`. Tabs and sidebar rows are chosen on a plain primary
+  press (`useSortableTab` composes it after the drag sensor's own
+  `onPointerDown`). A mounted `SessionTerminal` watches its session
+  (`watchSession`, counted per window in `services/session-watch.ts`) and
+  the host sends PTY output only to watching windows; only one on screen
+  shows it (`showSession`), which is what marks output seen.
 - `SessionTerminal` sends `resizeSession` on every fit and refits on the
   session's `spawnedAt` epoch. It reckons the grid exactly as wterm's own
   observer does (`terminalBox`, `measureTerminalGrid`); any other answer

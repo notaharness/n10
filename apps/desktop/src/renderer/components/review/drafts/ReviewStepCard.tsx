@@ -19,6 +19,7 @@ import type {
 import { useThreads } from '../../../lib/data/queries.js';
 import { totalCommentCount } from '../../../lib/diff/thread-model.js';
 import { useRepo } from '../../../lib/repo-context.js';
+import { usePaneShown } from '../../../lib/tabs/pane-shown.js';
 import { cn } from '../../../lib/utils.js';
 import {
   SEVERITIES,
@@ -89,6 +90,7 @@ export function StepCard({
     threads.data ? totalCommentCount(threads.data) : null
   );
 
+  const shown = usePaneShown();
   const startEditing = () => {
     setBody(draft.body);
     setSeverity(draft.severity);
@@ -96,7 +98,8 @@ export function StepCard({
     refresh.begin();
   };
 
-  useStepperShortcuts(!editing, {
+  // A spare pane's card waits off screen; its keys are not the user's.
+  useStepperShortcuts(!editing && shown, {
     onNext,
     onPrev,
     onEdit: startEditing,

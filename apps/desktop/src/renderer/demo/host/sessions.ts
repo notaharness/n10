@@ -49,7 +49,7 @@ export class DemoSession implements Tty {
   active = false;
   flashing = false;
   /** Terminals showing this session; output they show is seen. */
-  watchers = 0;
+  onScreen = 0;
   cols = 100;
   rows = 30;
   readonly spawnedAt = Date.now();
@@ -77,7 +77,7 @@ export class DemoSession implements Tty {
   }
 
   setActive(active: boolean): void {
-    if (this.active && !active && this.watchers === 0) this.flashing = true;
+    if (this.active && !active && this.onScreen === 0) this.flashing = true;
     this.active = active;
   }
 

@@ -82,6 +82,8 @@ vi.mock('./services/sessions.js', () =>
     'getSessionActivity',
     'watchSession',
     'unwatchSession',
+    'showSession',
+    'hideSession',
     'writeSession',
     'resizeSession',
     'killSession',
@@ -345,6 +347,8 @@ describe('host API wiring', () => {
   it.each([
     ['watchSession', 'sessions.watchSession'],
     ['unwatchSession', 'sessions.unwatchSession'],
+    ['showSession', 'sessions.showSession'],
+    ['hideSession', 'sessions.hideSession'],
   ] as const)(
     '%s reaches %s with the asking window',
     async (method, expected) => {

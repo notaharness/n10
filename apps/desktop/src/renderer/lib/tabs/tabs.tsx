@@ -11,10 +11,12 @@ import {
   reduce,
   type ForeignSessionEntry,
   type ItemEntry,
+  type Tab,
   type TabsState,
   type TerminalEntry,
 } from './tabs-model.js';
 import { useRepo } from '../repo-context.js';
+import { tabOpening } from './tab-identity.js';
 
 export type {
   ForeignSessionEntry,
@@ -33,6 +35,7 @@ export {
   itemTabId,
   standsFor,
   tabIdFor,
+  tabOpening,
   terminalTabId,
 } from './tab-identity.js';
 
@@ -232,6 +235,7 @@ export function useRepoTabs(): RepoTabsApi {
       ...tabs,
       openItem: (itemKey: string, opts?: { preview?: boolean }) =>
         tabs.openItem(cwd, itemKey, opts),
+      tabOpening: (itemKey: string) => tabOpening(tabs.tabs, cwd, itemKey),
       syncItems: (
         entries: ItemEntry[],
         terminals: TerminalEntry[] | undefined,
@@ -247,6 +251,8 @@ export function useRepoTabs(): RepoTabsApi {
 export interface RepoTabsApi
   extends Omit<TabsApi, 'openItem' | 'syncItems' | 'terminalEnded'> {
   openItem: (itemKey: string, opts?: { preview?: boolean }) => void;
+  /** The tab a single click on `itemKey` would show. */
+  tabOpening: (itemKey: string) => Tab;
   syncItems: (
     entries: ItemEntry[],
     terminals: TerminalEntry[] | undefined,
