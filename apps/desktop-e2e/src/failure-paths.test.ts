@@ -405,7 +405,7 @@ test.describe('Pull request reads that fail', () => {
     const { page } = desktop;
     await openPr(page, 'Accented path');
     await expect(
-      page.getByRole('alert').filter({ hasText: "Couldn't read the diff" })
+      page.getByRole('alert').filter({ hasText: "Couldn't show the diff" })
     ).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(/No changes between/)).toHaveCount(0);
     // A failed read is finished: nothing, the file tree included, is

@@ -102,11 +102,13 @@ function requirePostVendor(
 ): 'github' | 'azure-devops' {
   if (vendor !== 'github' && vendor !== 'azure-devops') {
     throw new Error(
-      vendor ? `Unsupported vendor: ${vendor}` : 'No VCS provider configured'
+      vendor
+        ? "Can't post comments for this repository"
+        : 'No provider set up — open Settings'
     );
   }
   if (vendor === 'github' && !headSha) {
-    throw new Error('Missing head SHA — refresh pull requests and try again');
+    throw new Error('Refresh pull requests and try again');
   }
   return vendor;
 }

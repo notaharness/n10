@@ -81,10 +81,7 @@ export function MarkdownAnchor(props: ComponentProps<'a'> & ExtraProps) {
   if (!target) {
     const { id, name } = rest as { id?: string; name?: string };
     return (
-      <span
-        id={id ?? name}
-        title={href && `${href} — not a link n10 can open here`}
-      >
+      <span id={id ?? name} title={href && `${href} — can't be opened here`}>
         {children}
       </span>
     );

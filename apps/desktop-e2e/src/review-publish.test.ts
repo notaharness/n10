@@ -179,7 +179,7 @@ test.describe('Publishing a review', () => {
     await openDiff(page, homeDir);
     await expect(
       page.getByText(
-        'This may already have been posted. n10 will check before sending it again.'
+        "This may already be posted. Retrying won't post it twice."
       )
     ).toBeVisible();
     await expect(

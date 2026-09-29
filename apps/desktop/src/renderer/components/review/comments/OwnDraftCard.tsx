@@ -107,7 +107,7 @@ export function PostingNotice({
     state === 'publishing'
       ? 'Posting with your review…'
       : state === 'unknown'
-      ? 'This may already have been posted. n10 will check before sending it again.'
+      ? "This may already be posted. Retrying won't post it twice."
       : `Couldn't post: ${refused}`;
   return (
     <p

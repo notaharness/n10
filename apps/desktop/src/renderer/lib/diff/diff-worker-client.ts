@@ -117,9 +117,7 @@ export function requireFiles(
 ): [string, DiffLine[]][] {
   if (entries.length === 0 && text.trim() !== '') {
     throw new Error(
-      `n10 received ${patchSize(
-        text
-      )} of patch text but could not read any files from it`
+      `No files could be shown from this ${patchSize(text)} diff`
     );
   }
   return entries;

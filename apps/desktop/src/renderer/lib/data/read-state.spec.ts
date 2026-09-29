@@ -119,7 +119,7 @@ describe('requireFiles', () => {
     // not read: every file of such a diff used to vanish into "No changes".
     const quoted =
       'diff --git "a/caf\\303\\251.txt" "b/caf\\303\\251.txt"\n+x\n';
-    expect(() => requireFiles(quoted, [])).toThrow(/could not read any files/);
+    expect(() => requireFiles(quoted, [])).toThrow(/No files could be shown/);
   });
 
   it('passes parsed files through', () => {

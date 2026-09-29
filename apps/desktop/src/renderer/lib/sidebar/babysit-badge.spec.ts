@@ -55,7 +55,7 @@ describe('babysitBadge', () => {
       150 * MIN
     );
     expect(badge.title).toContain('2 updates sent, last 1 h ago');
-    expect(badge.title).toContain('Last poll failed: gh: rate limited');
+    expect(badge.title).toContain('Last check failed: gh: rate limited');
     expect(badge.tone).toBe('warning');
   });
 });

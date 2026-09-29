@@ -344,9 +344,7 @@ test.describe('Completion', () => {
       .click();
     // Nothing was read at the new head: the list says so, where it was.
     await expect(
-      page
-        .getByRole('status')
-        .filter({ hasText: 'The checks could not be read' })
+      page.getByRole('status').filter({ hasText: "Couldn't load the checks" })
     ).toBeVisible();
     await expect(heading).toBeVisible();
     await page.getByRole('button', { name: 'Back to the Overview' }).click();

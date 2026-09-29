@@ -172,7 +172,7 @@ function ReplyPrompt({
         </>
       ) : draft.readError ? (
         <span className="truncate text-destructive">
-          Couldn't read your saved drafts
+          Couldn't load your saved drafts
         </span>
       ) : (
         'Reply…'
