@@ -55,9 +55,9 @@ export interface ActionsView {
 }
 
 /**
- * The diff card's actions for one activity card, each only where the
- * provider lets the viewer take it. Rendered only where the diff knows
- * the thread, since its hooks need one.
+ * The diff card's actions for one activity card; the card says which of
+ * reply and resolve to offer (`threadOffers`). Rendered only where the
+ * diff knows the thread, since its hooks need one.
  */
 export function ThreadActionsFor({
   remote,
