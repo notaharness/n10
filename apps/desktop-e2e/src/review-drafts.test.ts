@@ -81,11 +81,14 @@ test.describe('Review drafts', () => {
     await expect(prompt).toContainText('First, the early return.');
     await expect(prompt).toBeFocused();
 
-    // The Overview says so too.
+    // The Overview says so too: on the thread's header, and in its
+    // reply box, which is the same draft.
     await page.getByRole('button', { name: 'Back to review' }).click();
+    const card = page.locator('[data-thread-id="T-open"]');
+    await expect(card.getByText('Draft reply', { exact: true })).toBeVisible();
     await expect(
-      page.locator('[data-thread-id="T-open"]').getByText('Draft reply')
-    ).toBeVisible();
+      card.getByRole('button', { name: /Your draft reply/ })
+    ).toContainText('First, the early return.');
 
     await page.reload();
     thread = await openThread(page);
