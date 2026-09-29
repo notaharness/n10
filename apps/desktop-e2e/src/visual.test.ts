@@ -4,6 +4,7 @@ import {
   createWorktree,
   openPalette,
   sessionMenu,
+  showChanges,
   sidebarRow,
   tab,
 } from './setup/app.js';
@@ -214,6 +215,7 @@ async function buildPlan(page: Page) {
   await sidebarRow(page, /Add undo support|#42/)
     .first()
     .click();
+  await showChanges(page);
   const first = page
     .locator('[data-thread]')
     .filter({ hasText: 'never bounded' });

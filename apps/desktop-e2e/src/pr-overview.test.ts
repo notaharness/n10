@@ -3,6 +3,7 @@ import { test, expect } from './fixtures/desktop.js';
 import {
   createWorktree,
   launchAgentFromRail,
+  showChanges,
   sidebarRow,
   visibleText,
 } from './setup/app.js';
@@ -157,12 +158,6 @@ async function backToReview(page: Page): Promise<void> {
   await prHeader(page).getByRole('button', { name: 'Back to review' }).click();
 }
 
-/** From the Overview to the changes, where the header bar is. */
-async function showChanges(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Review changes' }).click();
-  await expect(prHeader(page)).toBeVisible();
-}
-
 test.describe('Pull request Overview', () => {
   test("opens someone else's pull request on its Overview, with the next step first", async ({
     desktop,
@@ -231,12 +226,14 @@ test.describe('Pull request Overview', () => {
     await expect(page.getByRole('region', { name: 'Changes' })).toBeFocused();
   });
 
-  test('opens your own pull request on its diff, and Back goes up to its Overview', async ({
+  test('opens your own pull request on its Overview too, and Back goes up to it from the diff', async ({
     desktop,
   }) => {
     const { page } = desktop;
     await openPr(page, /#215/);
+    await expect(overviewTitle(page, 'Tidy the retry helper')).toBeVisible();
 
+    await showChanges(page);
     await expect(visibleText(page, 'retryDelay')).toBeVisible();
     await expect(overviewTitle(page, 'Tidy the retry helper')).toBeHidden();
     // The rail lists neither the Overview nor the comments: Back leads
@@ -264,7 +261,6 @@ test.describe('Pull request Overview', () => {
   }) => {
     const { page } = desktop;
     await openPr(page, /#215/);
-    await backToReview(page);
 
     const next = page.getByRole('region', { name: 'Next step' });
     await expect(next).toContainText('1 unresolved thread');
@@ -496,6 +492,7 @@ test.describe('Pull request Overview', () => {
   }) => {
     const { page } = desktop;
     await openPr(page, /#215/);
+    await showChanges(page);
     const thread = page.locator('[data-thread]', {
       hasText: 'Why keep the old name?',
     });

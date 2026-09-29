@@ -186,6 +186,45 @@ export async function showOverview(page: Page): Promise<void> {
 }
 
 /**
+ * From a pull request's Overview, where it opens with no agent running,
+ * on to its changes the way a reader goes: the next step's button,
+ * which reads Review changes, View changes or Respond to feedback, and
+ * leads to the diff whichever it is.
+ */
+export async function showChanges(page: Page): Promise<void> {
+  await page
+    .getByRole('region', { name: 'Next step' })
+    .getByRole('button', {
+      name: /^(Review changes|View changes|Respond to feedback)$/,
+    })
+    .filter({ visible: true })
+    .first()
+    .click({ timeout: 30_000 });
+  await expect(
+    page.getByRole('button', { name: 'Back to review' })
+  ).toBeVisible();
+}
+
+/**
+ * From a pull request's Overview to its diff by a file in the rail,
+ * for a test that must not take the next step's button — for an author
+ * with open threads that is Respond to feedback, which goes to the
+ * first of them.
+ */
+export async function showFile(page: Page): Promise<void> {
+  // A file row carries its path as its title; the section's own
+  // toggle and the folders do not.
+  await fileTree(page)
+    .filter({ visible: true })
+    .locator('button[title]')
+    .first()
+    .click({ timeout: 30_000 });
+  await expect(
+    page.getByRole('button', { name: 'Back to review' })
+  ).toBeVisible();
+}
+
+/**
  * Launch the tab's agent the way a user does: the rail's Launch button
  * opens the session menu, and its session row starts the default
  * agent. Returns once the menu is gone — follow with an assertion on

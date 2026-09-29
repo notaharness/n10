@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { sidebarRow } from './setup/app.js';
+import { showFile, sidebarRow } from './setup/app.js';
 import type { FakeGitHub } from './setup/fake-gh.js';
 
 /**
@@ -69,6 +69,9 @@ async function openPr(page: Page) {
   await sidebarRow(page, /Long review|#7/)
     .first()
     .click();
+  // To the diff without the Overview's next step, which would already
+  // go to the first open thread.
+  await showFile(page);
   const indicator = page.getByRole('button', {
     name: 'Show 2 unresolved comments',
   });

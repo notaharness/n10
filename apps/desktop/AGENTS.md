@@ -92,8 +92,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
   collapsible rail (Agent · Files) beside one content pane that
   swaps between Overview, diff, agent terminal (mounted only while shown) and
-  `ReviewStepper`. It opens on the Overview for someone else's PR and on the
-  diff for yours (`lib/review/overview-model.ts`). The diff toolbar lives in
+  `ReviewStepper`. It opens on a running agent's terminal, else on the PR's
+  Overview, whoever wrote it (`lib/review/overview-model.ts`). The diff toolbar lives in
   `DiffPane`, not the tab header. Overview and header lay out by container
   width (`@container`), not viewport.
 - The Overview's activity reads the whole conversation by identity

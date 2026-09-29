@@ -253,10 +253,10 @@ pane, walkthrough step and diff scroll it was left on are not kept.
 Each tab has an ErrorBoundary. Markdown paragraphs render as `div` when they may
 contain block images; the host fetches protected images with provider auth.
 
-A pull request tab opens on its Overview when someone else wrote it, and on the
-diff when you did (`initialMode`). An unknown account counts as a reviewer, so
-the safe start is the change's purpose before its code. A running agent still
-takes the pane. The Overview never calls a pull request ready: the list row has
+A pull request tab opens on its Overview, whoever wrote it (`initialMode`): the
+Overview is the pull request's main page, and Review changes leads on to the
+diff. A running agent takes the pane instead, and a worktree without a pull
+request has no Overview and opens on its diff. The Overview never calls a pull request ready: the list row has
 no policies, required reviewers, conflicts or merge permission, so readiness
 stays "not fully known" until those are read. Until a native requirement signal
 is read, an approval or a passing check is an observation, and a failing check

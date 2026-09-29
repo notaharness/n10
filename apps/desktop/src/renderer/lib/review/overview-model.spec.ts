@@ -54,12 +54,12 @@ describe('lastReviewPane', () => {
 });
 
 describe('backToReviewPane', () => {
-  it('goes to the pane last shown, or else the one the pull request opens on for the reader', () => {
-    expect(backToReviewPane('diff', 'reviewer')).toBe('diff');
-    expect(backToReviewPane('overview', 'author')).toBe('overview');
-    // Straight into the terminal: the reader's role decides, as it is now.
-    expect(backToReviewPane(null, 'reviewer')).toBe('overview');
-    expect(backToReviewPane(null, 'author')).toBe('diff');
+  it('goes to the pane last shown, or else where the review starts', () => {
+    expect(backToReviewPane('diff', true)).toBe('diff');
+    expect(backToReviewPane('overview', true)).toBe('overview');
+    // Straight into the terminal: the Overview, when there is one.
+    expect(backToReviewPane(null, true)).toBe('overview');
+    expect(backToReviewPane(null, false)).toBe('diff');
   });
 });
 
@@ -78,25 +78,17 @@ describe('backTarget', () => {
 });
 
 describe('initialMode', () => {
-  it("opens someone else's pull request on its Overview", () => {
-    expect(initialMode({ running: false, hasPr: true, role: 'reviewer' })).toBe(
-      'overview'
-    );
+  it('opens every pull request on its Overview, yours included', () => {
+    expect(initialMode({ running: false, hasPr: true })).toBe('overview');
   });
 
-  it('opens your own pull request, and a bare worktree, on the diff', () => {
-    expect(initialMode({ running: false, hasPr: true, role: 'author' })).toBe(
-      'diff'
-    );
-    expect(initialMode({ running: false, hasPr: false, role: 'author' })).toBe(
-      'diff'
-    );
+  it('opens a bare worktree, which has no Overview, on the diff', () => {
+    expect(initialMode({ running: false, hasPr: false })).toBe('diff');
   });
 
-  it('opens on a running agent whoever wrote the pull request', () => {
-    expect(initialMode({ running: true, hasPr: true, role: 'reviewer' })).toBe(
-      'agent'
-    );
+  it('opens on a running agent', () => {
+    expect(initialMode({ running: true, hasPr: true })).toBe('agent');
+    expect(initialMode({ running: true, hasPr: false })).toBe('agent');
   });
 });
 

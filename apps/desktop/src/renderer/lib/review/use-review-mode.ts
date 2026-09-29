@@ -13,7 +13,6 @@ import {
   backToReviewPane,
   initialMode,
   lastReviewPane,
-  reviewRole,
   type PaneState,
   type ReviewPane,
 } from './overview-model.js';
@@ -39,27 +38,20 @@ function useAgentFocus(next: AgentPresence, onFocusAgent: () => void): void {
 
 /**
  * The pane a review workspace shows. It opens where {@link initialMode}
- * says — the Overview for someone else's pull request, the diff for
- * your own, the terminal while an agent runs — and after that changes
- * only when the reader picks a pane, an agent takes it over, or the
- * pull request itself arrives before either has happened.
+ * says — the terminal while an agent runs, else a pull request's
+ * Overview or a bare worktree's diff — and after that changes only when
+ * the reader picks a pane, an agent takes it over, or the pull request
+ * itself arrives before either has happened.
  */
 export function useReviewMode({
   pr,
-  viewer,
   agent,
 }: {
   pr: PullRequestInfo | undefined;
-  viewer: string | null;
   agent: AgentPresence;
 }): [Mode, Dispatch<SetStateAction<Mode>>] {
   const hasPr = pr != null;
-  const initial = () =>
-    initialMode({
-      running: agent.running,
-      hasPr,
-      role: pr ? reviewRole(pr, viewer) : 'author',
-    });
+  const initial = () => initialMode({ running: agent.running, hasPr });
   const [pane, setPane] = useState<PaneState>(() => ({
     mode: initial(),
     chosen: false,
@@ -79,19 +71,17 @@ export function useReviewMode({
 
 /**
  * The review pane the terminal's Back returns to: the one the reader was
- * last on, or before either has shown, the one the pull request opens on
- * for this reader as the list reads now. Adjusted during render, like
- * the pane itself.
+ * last on, or before either has shown, where the review starts.
+ * Adjusted during render, like the pane itself.
  */
 export function useLastReviewPane(
   mode: Mode,
-  pr: PullRequestInfo | undefined,
-  viewer: string | null
+  pr: PullRequestInfo | undefined
 ): ReviewPane {
   const [last, setLast] = useState<ReviewPane | null>(null);
   const next = lastReviewPane(last, mode);
   if (next !== last) setLast(next);
-  return backToReviewPane(next, pr ? reviewRole(pr, viewer) : 'author');
+  return backToReviewPane(next, pr != null);
 }
 
 /**
@@ -102,19 +92,17 @@ export function useLastReviewPane(
 export function useBackToReview({
   mode,
   pr,
-  viewer,
   setMode,
   changes,
   root,
 }: {
   mode: Mode;
   pr: PullRequestInfo | undefined;
-  viewer: string | null;
   setMode: (mode: Mode) => void;
   changes: RefObject<HTMLElement | null>;
   root: RefObject<HTMLElement | null>;
 }): () => void {
-  const last = useLastReviewPane(mode, pr, viewer);
+  const last = useLastReviewPane(mode, pr);
   const pane = backTarget(mode, last) ?? last;
   return () => {
     setMode(pane);
