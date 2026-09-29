@@ -203,7 +203,14 @@ export function createSessionHost(
         session.watchers += 1;
         session.flashing = false;
       }
-      return later({ data: session?.output ?? '', seq: session?.seq ?? 0 }, 20);
+      return later(
+        {
+          data: session?.output ?? '',
+          seq: session?.seq ?? 0,
+          truncated: false,
+        },
+        20
+      );
     },
     unwatchSession: (name) => {
       const session = hub.get(name);

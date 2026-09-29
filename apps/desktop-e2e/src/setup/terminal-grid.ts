@@ -39,37 +39,88 @@ export async function currentPid(page: Page): Promise<string> {
  * The grid that fills the terminal on screen, measured off its own
  * box and cell metrics — so this says nothing about how the app
  * computes a grid, only how much of the pane the agent covers.
+ *
+ * Reckoned the way wterm lays out its own grid: its observer's
+ * `contentRect` (fractional, inside borders, scrollbar and padding)
+ * over the width of one glyph. Any other reckoning can land a column
+ * away from wterm's, and its observer then resizes the PTY back to its
+ * own answer.
  */
 export async function paneGrid(page: Page): Promise<Grid> {
+  return (await gridReckonings(page)).contentRect;
+}
+
+/**
+ * The terminal's grid by wterm's reckoning, and by one that reads the
+ * box from `clientWidth`/`clientHeight`, which round to whole pixels.
+ * They differ when a column (or row) boundary falls within that
+ * rounding — the pane widths where an app reckoning the second way
+ * and wterm resize the PTY back and forth.
+ */
+export async function gridReckonings(
+  page: Page
+): Promise<{ contentRect: Grid; clientBox: Grid }> {
   return page.evaluate(() => {
     const el = document.querySelector<HTMLElement>('.wterm');
     const row = el?.querySelector<HTMLElement>('.term-row');
     if (!el || !row) throw new Error('no terminal on screen');
-    const style = getComputedStyle(el);
+    const cs = getComputedStyle(el);
+    const px = (v: string) => parseFloat(v) || 0;
     const probe = document.createElement('div');
     probe.className = 'term-row';
     probe.style.position = 'absolute';
     probe.style.visibility = 'hidden';
     const span = document.createElement('span');
-    span.textContent = 'W'.repeat(40);
+    span.textContent = 'W';
     probe.appendChild(span);
     el.appendChild(probe);
-    const charWidth = span.getBoundingClientRect().width / 40;
+    const charWidth = span.getBoundingClientRect().width;
+    const rowHeight = probe.getBoundingClientRect().height;
     probe.remove();
-    const box = el.getBoundingClientRect();
-    const inner = {
-      width:
-        box.width -
-        parseFloat(style.paddingLeft) -
-        parseFloat(style.paddingRight),
-      height:
-        box.height -
-        parseFloat(style.paddingTop) -
-        parseFloat(style.paddingBottom),
-    };
+    const padX = px(cs.paddingLeft) + px(cs.paddingRight);
+    const padY = px(cs.paddingTop) + px(cs.paddingBottom);
+    const bordersX = px(cs.borderLeftWidth) + px(cs.borderRightWidth);
+    const bordersY = px(cs.borderTopWidth) + px(cs.borderBottomWidth);
+    const rect = el.getBoundingClientRect();
+    const grid = (width: number, height: number) => ({
+      cols: Math.floor((width - padX) / charWidth),
+      rows: Math.floor((height - padY) / rowHeight),
+    });
     return {
-      cols: Math.floor(inner.width / charWidth),
-      rows: Math.floor(inner.height / row.getBoundingClientRect().height),
+      contentRect: grid(
+        rect.width -
+          bordersX -
+          Math.round(el.offsetWidth - el.clientWidth - bordersX),
+        rect.height -
+          bordersY -
+          Math.round(el.offsetHeight - el.clientHeight - bordersY)
+      ),
+      clientBox: grid(el.clientWidth, el.clientHeight),
     };
   });
+}
+
+/**
+ * Wait for the agent to settle on the grid that fills its pane.
+ *
+ * `notPid` is the agent that was there before. Without it a restart
+ * reads the *previous* agent's last line — still on screen, and still
+ * correct — and passes on a terminal that never resized at all.
+ */
+export async function expectAgentFillsPane(
+  page: Page,
+  notPid?: string
+): Promise<void> {
+  const expected = await paneGrid(page);
+  await expect
+    .poll(
+      async () => {
+        const last = (await reportedGrids(page))
+          .filter((g) => g.pid !== notPid)
+          .at(-1);
+        return last ? { cols: last.cols, rows: last.rows } : null;
+      },
+      { timeout: 20_000 }
+    )
+    .toEqual(expected);
 }

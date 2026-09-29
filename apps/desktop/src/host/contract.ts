@@ -187,6 +187,10 @@ export interface SessionBuffer {
   data: string;
   /** seq of the last chunk included in `data`. */
   seq: number;
+  /** The buffer has dropped its oldest output, so `data` starts part
+   *  way through the stream: without the attach's full redraw, it only
+   *  repaints what changed after it. */
+  truncated: boolean;
 }
 
 // ── Settings ─────────────────────────────────────────────────────

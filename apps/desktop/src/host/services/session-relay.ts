@@ -43,10 +43,12 @@ export interface RelayEntry {
    *  its replay ended at, so numbering from 1 again would leave the new
    *  process looking dead in the pane the restart came from. */
   seq: number;
+  /** Output has been dropped off the front of `chunks`. */
+  truncated: boolean;
 }
 
 export function newRelayEntry(seq = 0): RelayEntry {
-  return { chunks: [], bytes: 0, seq };
+  return { chunks: [], bytes: 0, seq, truncated: false };
 }
 
 /** Start relaying the registry session under `name` into `entry`.
@@ -61,6 +63,7 @@ export function attachRelay(name: string, entry: RelayEntry): void {
     entry.bytes += data.length;
     while (entry.bytes > BUFFER_LIMIT && entry.chunks.length > 1) {
       entry.bytes -= entry.chunks.shift()?.length ?? 0;
+      entry.truncated = true;
     }
     const payload = { name, data, seq: entry.seq };
     for (const viewer of viewersOf(name)) {
@@ -87,7 +90,11 @@ export function attachRelay(name: string, entry: RelayEntry): void {
 }
 
 export function relayBuffer(entry: RelayEntry): SessionBuffer {
-  return { data: entry.chunks.join(''), seq: entry.seq };
+  return {
+    data: entry.chunks.join(''),
+    seq: entry.seq,
+    truncated: entry.truncated,
+  };
 }
 
 /** Named progress for a remote launch (ux-machines.md §5), keyed to

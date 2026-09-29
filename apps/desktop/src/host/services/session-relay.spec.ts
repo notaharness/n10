@@ -59,7 +59,22 @@ describe('session output relay', () => {
     const entry = start('a');
     print('a', 'hello');
     expect(sent).toEqual([]);
-    expect(relay.relayBuffer(entry)).toEqual({ data: 'hello', seq: 1 });
+    expect(relay.relayBuffer(entry)).toEqual({
+      data: 'hello',
+      seq: 1,
+      truncated: false,
+    });
+  });
+
+  it('says when the buffer no longer starts at the beginning', () => {
+    const entry = start('a');
+    print('a', 'x'.repeat(300 * 1024));
+    expect(relay.relayBuffer(entry).truncated).toBe(false);
+    print('a', 'y'.repeat(300 * 1024));
+    const buffer = relay.relayBuffer(entry);
+    expect(buffer.truncated).toBe(true);
+    expect(buffer.data).toBe('y'.repeat(300 * 1024));
+    expect(buffer.seq).toBe(2);
   });
 
   it('sends a watched session to the watching window only', () => {

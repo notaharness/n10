@@ -831,11 +831,16 @@ describe('session buffer', () => {
     expect(getSessionBuffer(keyFor('buf', '/repo-a'))).toEqual({
       data: 'one two',
       seq: 2,
+      truncated: false,
     });
   });
 
   it('is empty for a session that was never launched', () => {
-    expect(getSessionBuffer('nothing')).toEqual({ data: '', seq: 0 });
+    expect(getSessionBuffer('nothing')).toEqual({
+      data: '',
+      seq: 0,
+      truncated: false,
+    });
   });
 
   it('drops the oldest output once the buffer is full', async () => {

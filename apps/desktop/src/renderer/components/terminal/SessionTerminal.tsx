@@ -5,9 +5,27 @@ import { toast } from 'sonner';
 import {
   estimateTerminalGrid,
   measureTerminalGrid,
+  terminalBox,
 } from '../../lib/terminal-grid.js';
+import {
+  sessionFeed,
+  type SessionFeed,
+} from '../../lib/terminals/session-feed.js';
 import { useTheme } from '../../lib/theme.js';
 import { errorMessage } from '../../lib/utils.js';
+
+/** The grid that fills the wrapper, reckoned the way wterm's own
+ *  observer does (`terminalBox`, in its own cell metrics) so the two
+ *  agree; null before the pane has a box. */
+function paneGrid(el: HTMLElement, term: TerminalHandle) {
+  const inst = term.instance;
+  const rect = el.getBoundingClientRect();
+  if (!inst || rect.width < 2 || rect.height < 2) return null;
+  return (
+    measureTerminalGrid(inst.element, terminalBox(inst.element)) ??
+    estimateTerminalGrid(rect)
+  );
+}
 
 /**
  * The terminal of the session on screen, bound to its host PTY.
@@ -71,55 +89,64 @@ export function SessionTerminal({
     [name, reportError]
   );
 
+  // A full repaint the fit effect owes the terminal, and how to ask it
+  // for one once it is running.
+  const repaintRef = useRef(false);
+  const fitRef = useRef<(() => void) | null>(null);
+  const requestRepaint = useCallback(() => {
+    repaintRef.current = true;
+    fitRef.current?.();
+  }, []);
+
+  // Watching starts on mount, not once wterm is ready: its WASM loads
+  // in the meantime, and the host's answer is held until it has.
+  const feedRef = useRef<SessionFeed | null>(null);
   useEffect(() => {
-    if (!ready) return;
-    const term = termRef.current;
-    if (!term) return;
-
-    let snapshotSeq: number | null = null;
-    const pending: { seq: number; data: string }[] = [];
-
+    const feed = sessionFeed();
+    feedRef.current = feed;
     // Listening before watching: a chunk pushed the moment the watch
-    // lands is queued until the snapshot it follows is written.
+    // lands waits for the snapshot it follows.
     const offData = window.n10.onSessionData(({ name: n, data, seq }) => {
-      if (n !== name) return;
-      if (snapshotSeq === null) {
-        pending.push({ seq, data });
-      } else if (seq > snapshotSeq) {
-        term.write(data);
-      }
+      if (n === name) feed.live(seq, data);
     });
-
-    // The snapshot must not land after this effect is torn down: React
-    // StrictMode mounts twice in development, so a second one would
-    // duplicate the screen, and a pane closing mid-fetch would write
-    // into a disposed terminal.
+    // Nothing may land after this effect is torn down: React StrictMode
+    // mounts twice in development, so a second snapshot would duplicate
+    // the screen, and a pane closing mid-fetch would write into a
+    // disposed terminal.
     let cancelled = false;
     void window.n10
       .watchSession(name)
-      .then(({ data, seq }) => {
+      .then(({ data, seq, truncated }) => {
         if (cancelled) return;
-        if (data) term.write(data);
-        snapshotSeq = seq;
-        for (const chunk of pending) {
-          if (chunk.seq > seq) term.write(chunk.data);
-        }
-        pending.length = 0;
+        feed.snapshot(data, seq);
+        if (truncated) requestRepaint();
       })
-      .catch(() => {
-        if (cancelled) return;
-        snapshotSeq = 0;
-        for (const chunk of pending) term.write(chunk.data);
-        pending.length = 0;
+      .catch((error: unknown) => {
+        // The host holds no watch, so nothing will arrive: say so
+        // rather than leave a blank terminal.
+        if (!cancelled) reportError(error);
       });
-
     return () => {
       cancelled = true;
       offData();
+      if (feedRef.current === feed) feedRef.current = null;
       // Every watch is counted; this one ends with the terminal.
       void window.n10.unwatchSession(name).catch(reportError);
     };
-  }, [name, ready, reportError]);
+  }, [name, reportError, requestRepaint]);
+
+  // wterm is ready at its default grid, and the snapshot was drawn for
+  // the PTY's: written first, the rows past the default are cut off
+  // until the app next redraws. So the terminal takes the pane's grid,
+  // then its output.
+  useEffect(() => {
+    const term = termRef.current;
+    const el = wrapRef.current;
+    if (!ready || !term || !el) return;
+    const grid = paneGrid(el, term);
+    if (grid) term.resize(grid.cols, grid.rows);
+    feedRef.current?.attach((data) => term.write(data));
+  }, [ready, name]);
 
   // Pasting a picture into the terminal.
   //
@@ -166,10 +193,18 @@ export function SessionTerminal({
     return () => el.removeEventListener('paste', onPaste, true);
   }, [ready, name]);
 
-  // wterm focuses its input when it starts; this covers a reconnect
-  // giving input back, and a terminal mounted while reconnecting.
+  // wterm focuses its input when it starts. While reconnecting that
+  // would take keystrokes `write` then drops, so the focus is handed
+  // back; a reconnect gives it to the terminal again.
   useEffect(() => {
-    if (ready && !disabled) termRef.current?.focus();
+    if (!ready) return;
+    if (!disabled) {
+      termRef.current?.focus();
+      return;
+    }
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && wrapRef.current?.contains(focused))
+      focused.blur();
   }, [ready, disabled]);
 
   // Fit the terminal grid to its pane. autoResize stays ON (with it off
@@ -180,14 +215,14 @@ export function SessionTerminal({
   // resize() from the wrapper's real box whenever it changes, using
   // wterm's measured cell metrics so the two observers agree.
   //
-  // The first fit always bounces the grid one row, which makes the app
+  // A snapshot that no longer starts at the attach's full redraw only
+  // repaints the rows that changed since, so a terminal starting from
+  // one (or from none) bounces its grid one row, which makes the app
   // repaint its whole screen — the same thing a manual window resize
-  // does. A terminal arriving on a tab switch needs that: the snapshot
-  // it starts from was drawn for the PTY's grid, and can land before
-  // wterm has taken the pane's; once the ring buffer has dropped the
-  // attach's first full redraw, what is left repaints only the rows
-  // that changed. Fitting alone is not enough, because the PTY already
-  // has the pane's grid and skips a same-size SIGWINCH.
+  // does. Fitting alone is not enough, because the PTY already has the
+  // pane's grid and skips a same-size SIGWINCH. A complete snapshot
+  // needs no bounce, and gets none: the repaint clears the screen it
+  // drew and the app draws it again, a flicker on every switch.
   //
   // The host is told the grid on every fit, not only when wterm's own
   // grid moved. A launch can only *estimate* the pane, so the PTY starts
@@ -203,19 +238,16 @@ export function SessionTerminal({
     const inst = term?.instance;
     if (!el || !term || !inst) return;
     let raf = 0;
-    // Stays set until a fit has run with a box to measure, so the
-    // observer's first callback cannot cancel it.
-    let repaint = true;
     const fit = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        const rect = el.getBoundingClientRect();
-        if (rect.width < 2 || rect.height < 2) return;
-        const grid =
-          measureTerminalGrid(inst.element, rect) ?? estimateTerminalGrid(rect);
-        if (repaint) {
+        const grid = paneGrid(el, term);
+        if (!grid) return;
+        // Stays owed until a fit has run with a box to measure, so the
+        // observer's first callback cannot cancel it.
+        if (repaintRef.current) {
           // Each step reaches the host through wterm's `onResize`.
-          repaint = false;
+          repaintRef.current = false;
           term.resize(grid.cols, grid.rows - 1);
           raf = requestAnimationFrame(() => term.resize(grid.cols, grid.rows));
           return;
@@ -228,9 +260,11 @@ export function SessionTerminal({
       });
     };
     fit();
+    fitRef.current = fit;
     const ro = new ResizeObserver(() => fit());
     ro.observe(el);
     return () => {
+      if (fitRef.current === fit) fitRef.current = null;
       ro.disconnect();
       cancelAnimationFrame(raf);
     };

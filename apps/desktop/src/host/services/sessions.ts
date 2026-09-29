@@ -410,5 +410,5 @@ export function getSessionBuffer(name: string): SessionBuffer {
   if (entry) return relayBuffer(entry);
   // A terminal tab belongs to a directory, not to the open repository,
   // so its scrollback is answered whatever repository that is.
-  return terminalBuffer(name) ?? { data: '', seq: 0 };
+  return terminalBuffer(name) ?? { data: '', seq: 0, truncated: false };
 }

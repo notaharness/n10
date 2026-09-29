@@ -44,7 +44,7 @@ export function adoptSession(name: string, repoCwd: string): void {
   const prev = known.get(name);
   const entry: KnownSession =
     prev && prev.repoCwd === repoCwd
-      ? Object.assign(prev, { chunks: [], bytes: 0 })
+      ? Object.assign(prev, { chunks: [], bytes: 0, truncated: false })
       : { ...newRelayEntry(), repoCwd };
   known.set(name, entry);
   attachRelay(name, entry);

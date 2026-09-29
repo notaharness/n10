@@ -275,6 +275,7 @@ describe('launchTerminal', () => {
     expect(terminals.terminalBuffer(name)).toEqual({
       data: '$ ls\r\n',
       seq: 2,
+      truncated: false,
     });
   });
 
@@ -340,6 +341,7 @@ describe('adoptTerminal', () => {
     expect(terminals.terminalBuffer(terminal.name)).toEqual({
       data: 'one output',
       seq: 1,
+      truncated: false,
     });
   });
 

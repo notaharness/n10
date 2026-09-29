@@ -2,7 +2,12 @@ import { sessionBranch, sessionKey } from './setup/session-keys.js';
 import type { Page } from '@playwright/test';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import { killN10Sessions, tmuxAvailable } from './setup/tmux.js';
-import { currentPid, paneGrid, reportedGrids } from './setup/terminal-grid.js';
+import {
+  currentPid,
+  expectAgentFillsPane,
+  paneGrid,
+  reportedGrids,
+} from './setup/terminal-grid.js';
 import {
   createWorktree,
   focusTerminal,
@@ -273,31 +278,6 @@ async function finishAgentClose(page: Page): Promise<void> {
 
 test.describe('Terminal fit', () => {
   test.use({ n10Config: { aiCommand: fakeAgent({ printSize: true }) } });
-
-  /**
-   * Wait for the agent to settle on the grid that fills its pane.
-   *
-   * `notPid` is the agent that was there before. Without it a restart
-   * reads the *previous* agent's last line — still on screen, and still
-   * correct — and passes on a terminal that never resized at all.
-   */
-  async function expectAgentFillsPane(
-    page: Page,
-    notPid?: string
-  ): Promise<void> {
-    const expected = await paneGrid(page);
-    await expect
-      .poll(
-        async () => {
-          const last = (await reportedGrids(page))
-            .filter((g) => g.pid !== notPid)
-            .at(-1);
-          return last ? { cols: last.cols, rows: last.rows } : null;
-        },
-        { timeout: 20_000 }
-      )
-      .toEqual(expected);
-  }
 
   test('an agent restarted in place is given the pane it is drawn in', async ({
     desktop,
