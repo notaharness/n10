@@ -104,6 +104,7 @@ export function ContentPane({
   connectionBanner,
   inputDisabled,
   files,
+  diffHead,
   filesByName,
   fileOrder,
   threadsByFile,
@@ -145,6 +146,8 @@ export function ContentPane({
   connectionBanner?: PrConnectionBanner | null;
   inputDisabled?: boolean;
   files: [string, DiffLine[]][];
+  /** The commit the diff was read at; what new comments anchor to. */
+  diffHead: string | null;
   filesByName: Map<string, DiffLine[]>;
   fileOrder: Map<string, number>;
   threadsByFile: Map<string, RemoteCommentThread[]>;
@@ -257,6 +260,7 @@ export function ContentPane({
           sourceBranch={branch}
           targetBranch={baseBranch}
           files={files}
+          diffHead={diffHead}
           threadsByFile={threadsByFile}
           draftsByFile={draftsByFile}
           generalThreads={generalThreads}

@@ -8,6 +8,12 @@
  * up or assert on host state are declared. Whether the bridge and the
  * contract still agree is the contract unit test's job, not this file's.
  */
+interface FakeReviewDraft {
+  id: string;
+  body: string;
+  publication: { state: string };
+}
+
 interface N10Bridge {
   getVersion(): Promise<{
     app: string;
@@ -70,6 +76,22 @@ interface N10Bridge {
   listForeignSessions(): Promise<
     { repo: string; branch: string; sessionName: string }[]
   >;
+  listReviewDrafts(req: {
+    ref: Record<string, unknown>;
+    viewer?: string | null;
+  }): Promise<{ drafts: FakeReviewDraft[] }>;
+  fetchDiffText(
+    sourceBranch: string,
+    targetBranch: string
+  ): Promise<{ text: string; head: string }>;
+  /** What the Finish review form calls (its UI is a later slice). */
+  submitReview(req: {
+    ref: Record<string, unknown>;
+    viewer?: string | null;
+    head: string;
+    event: 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES';
+    draftIds: string[];
+  }): Promise<{ drafts: FakeReviewDraft[]; resumed: { state: string } | null }>;
   /** Asserted on for completeness: the conversation has no UI yet. */
   getPullRequestConversation(req: {
     ref: Record<string, unknown>;

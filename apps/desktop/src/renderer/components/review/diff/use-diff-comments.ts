@@ -57,10 +57,14 @@ const STOPPED = 'The range can’t grow further on this side';
  */
 export function useDiffComments({
   prId,
+  head,
   linesByFile,
   split,
 }: {
   prId: number;
+  /** The commit the diff was read at: the one a new comment's line
+   *  numbers belong to. */
+  head: string | null;
   linesByFile: ReadonlyMap<string, DiffLine[]>;
   split: boolean;
 }) {
@@ -130,10 +134,10 @@ export function useDiffComments({
         path: file,
         previousPath: null,
         range,
-        // The diff is read by branch name, so which commit its line
-        // numbers belong to is not known here; the draft keeps the
-        // lines themselves to tell when the code under it changes.
-        head: null,
+        // The commit these line numbers belong to; publication files
+        // the comment on that commit or not at all. The lines
+        // themselves tell when the code under it changes.
+        head,
         lines: range ? rangeSource(lines, range) : [],
       },
     };

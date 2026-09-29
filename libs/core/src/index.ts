@@ -81,6 +81,7 @@ export * from './lib/sync/conflicts.js';
 export * from './lib/sync/fetch-queue.js';
 export * from './lib/pull-requests/pr-conversation.js';
 export * from './lib/pull-requests/mention-search.js';
+export * from './lib/pull-requests/submit-review.js';
 export * from './lib/pull-requests/pr-snapshot.js';
 export * from './lib/pull-requests/pr-readiness.js';
 export * from './lib/pull-requests/pr-readiness-aspects.js';

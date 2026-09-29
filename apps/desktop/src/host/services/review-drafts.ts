@@ -1,5 +1,7 @@
 import {
   discardReviewDraft,
+  parseSubmitReviewRequest,
+  submitReview as submitDraftsAsReview,
   listReviewDrafts,
   parseDiscardDraftRequest,
   parseDraftsRequest,
@@ -8,8 +10,10 @@ import {
   type DraftSources,
   type ReviewDraft,
   type ReviewDrafts,
+  type SubmittedReview,
 } from '@n10/core';
 import { openContext } from './open-context.js';
+import { resolveProvider } from './pull-requests.js';
 import { requireRepo } from './repo.js';
 
 /**
@@ -36,4 +40,25 @@ export async function saveDraft(request: unknown): Promise<ReviewDraft | null> {
 
 export async function discardDraft(request: unknown): Promise<void> {
   discardReviewDraft(parseDiscardDraftRequest(request), sources());
+}
+
+/**
+ * File the chosen drafts as one review through the configured provider.
+ * Nothing is sent unless the reviewer asked for exactly this; a review
+ * that stops part-way is resumed by the next call, never repeated.
+ */
+export async function submitReview(request: unknown): Promise<SubmittedReview> {
+  const req = parseSubmitReviewRequest(request);
+  const cwd = requireRepo();
+  const { config, provider, configured } = resolveProvider(cwd);
+  const publish = configured
+    ? provider?.publishReview?.bind(provider)
+    : undefined;
+  return submitDraftsAsReview(req, {
+    ...openContext(cwd),
+    publish:
+      publish &&
+      ((submission, ledger) =>
+        publish(config.vendorAuth, config.vendorProject, submission, ledger)),
+  });
 }

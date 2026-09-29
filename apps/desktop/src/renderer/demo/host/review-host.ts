@@ -4,6 +4,7 @@ import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
+import { isOid } from '@n10/vcs-core/pr-details';
 import { VIEWER } from '../data/identity.js';
 import { later } from './hub.js';
 import type { DemoState } from './state.js';
@@ -156,7 +157,13 @@ export function createReviewHost(state: DemoState): ReviewHost {
       repo().recount(prId);
       return later(chosen.length, 400);
     },
-    fetchDiffText: (source) => diffOf(source),
+    fetchDiffText: async (source) => {
+      const pr = repo()
+        .pullRequests()
+        .find((p) => p.sourceBranch === source);
+      const head = pr && isOid(pr.headSha) ? pr.headSha : '0'.repeat(40);
+      return { text: await diffOf(source), head };
+    },
     fetchWorktreeDiffText: () => later(''),
     fetchFileDiffText: async (source, _target, file) =>
       fileSection(await diffOf(source), file),

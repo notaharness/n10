@@ -8,12 +8,13 @@ import { later } from './hub.js';
 
 /**
  * The reviewer's private drafts, kept for as long as the demo page is
- * open: the demo has no disk to save them to, and nothing is posted.
+ * open: the demo has no disk to save them to. Submitting marks the
+ * chosen drafts published; nothing leaves the page.
  */
 
 type DraftsHost = Pick<
   N10HostApi,
-  'listReviewDrafts' | 'saveReviewDraft' | 'discardReviewDraft'
+  'listReviewDrafts' | 'saveReviewDraft' | 'discardReviewDraft' | 'submitReview'
 >;
 
 /** One draft per target, as the host keeps them. */
@@ -56,6 +57,30 @@ export function createDraftsHost(): DraftsHost {
         drafts(ref.number).filter((d) => d.id !== id)
       );
       return later(undefined);
+    },
+    submitReview: ({ ref, draftIds }) => {
+      const at = Date.now();
+      const attempt = `demo-${at}`;
+      byPr.set(
+        ref.number,
+        drafts(ref.number).map((d) =>
+          draftIds.includes(d.id)
+            ? {
+                ...d,
+                publication: {
+                  state: 'published',
+                  attempt,
+                  remoteId: attempt,
+                  at,
+                },
+              }
+            : d
+        )
+      );
+      return later(
+        { ref, viewer: VIEWER, drafts: drafts(ref.number), resumed: null },
+        400
+      );
     },
   };
 }

@@ -91,11 +91,14 @@ import type {
   DraftsRequest,
   MentionSearch,
   MentionSearchRequest,
+  SubmitReviewRequest,
+  SubmittedReview,
   PullRequestChecksAnswer,
   PullRequestConversationRead,
   PullRequestSnapshot,
   RepositoryRef,
   ReviewDraft,
+  ReviewDiffText,
   ReviewDrafts,
   SaveDraftRequest,
   SnapshotRequest,
@@ -393,6 +396,10 @@ export interface N10HostApi {
   /** People a comment on one pull request can mention, found by the
    *  provider's own search. Refused like the snapshot. */
   searchMentionCandidates(req: MentionSearchRequest): Promise<MentionSearch>;
+  /** File the chosen drafts as one native review on the head the
+   *  reviewer read. Resolves to the drafts as they now stand; a failure
+   *  leaves each draft saying where it got to. Refused like the snapshot. */
+  submitReview(req: SubmitReviewRequest): Promise<SubmittedReview>;
   /** Cast the current user's review verdict on a PR. */
   submitReviewVerdict(prId: number, verdict: ReviewVerdict): Promise<void>;
   /** The reviewer-list identifier of the authenticated user (GitHub
@@ -470,7 +477,12 @@ export interface N10HostApi {
   onLaunchStep(cb: (payload: LaunchStepEvent) => void): () => void;
 
   // ── Diff ─────────────────────────────────────────────────────
-  fetchDiffText(sourceBranch: string, targetBranch: string): Promise<string>;
+  /** A pull request's diff, with the commit its new side was read at:
+   *  what a comment's line numbers belong to. */
+  fetchDiffText(
+    sourceBranch: string,
+    targetBranch: string
+  ): Promise<ReviewDiffText>;
   /** Diff of a branch's worktree against its base including uncommitted
    *  and untracked work — what an agent has done so far, as opposed to
    *  what it has committed. Empty string when the branch has no
@@ -593,6 +605,7 @@ export const IPC = {
   saveReviewDraft: 'n10/review-drafts/save',
   discardReviewDraft: 'n10/review-drafts/discard',
   searchMentionCandidates: 'n10/pull-requests/mentions',
+  submitReview: 'n10/review-drafts/submit',
   submitReviewVerdict: 'n10/reviews/submit-verdict',
   getReviewViewer: 'n10/reviews/viewer',
   fetchCommentImage: 'n10/reviews/comment-image',

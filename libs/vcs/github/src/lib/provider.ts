@@ -14,11 +14,15 @@ import type {
   BuildStatusState,
   RepositoryRef,
   MentionCandidate,
+  LedgerStore,
+  PublishedReview,
+  ReviewSubmission,
   PullRequestChecks,
   PullRequestDetail,
 } from '@n10/vcs-core';
 import { sanitizeBody, VcsError } from '@n10/vcs-core';
 import { searchGitHubMentions } from './mentions.js';
+import { publishGitHubReview } from './pr-review-publisher.js';
 import { classifyGhError, parseGhJson } from './gh-errors.js';
 import { ghGraphQL } from './gh-graphql.js';
 import { mapReviewState } from './gh-reviews.js';
@@ -806,6 +810,17 @@ export const githubProvider: VcsProvider = {
     const repository = this.repositoryRef?.(project);
     if (!repository) throw new Error('GitHub project not configured');
     return searchGitHubMentions(ghGraphQL, repository, query);
+  },
+
+  async publishReview(
+    _auth: Record<string, string>,
+    project: Record<string, string>,
+    submission: ReviewSubmission,
+    ledger: LedgerStore
+  ): Promise<PublishedReview> {
+    const repository = this.repositoryRef?.(project);
+    if (!repository) throw new Error('GitHub project not configured');
+    return publishGitHubReview(ghGraphQL, repository, submission, ledger);
   },
 
   async replyToThread(

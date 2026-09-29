@@ -79,6 +79,7 @@ export function createHostApi(): N10HostApi {
     saveReviewDraft: (req) => reviewDrafts.saveDraft(req),
     discardReviewDraft: (req) => reviewDrafts.discardDraft(req),
     searchMentionCandidates: (req) => mentions.searchMentionCandidates(req),
+    submitReview: (req) => reviewDrafts.submitReview(req),
     submitReviewVerdict: (prId, verdict) =>
       reviews.submitReviewVerdict(prId, verdict),
     getReviewViewer: () => Promise.resolve(reviews.getReviewViewer()),
@@ -274,6 +275,7 @@ export function registerHostHandlers(
     [IPC.saveReviewDraft]: api.saveReviewDraft as HostMethod,
     [IPC.discardReviewDraft]: api.discardReviewDraft as HostMethod,
     [IPC.searchMentionCandidates]: api.searchMentionCandidates as HostMethod,
+    [IPC.submitReview]: api.submitReview as HostMethod,
     [IPC.submitReviewVerdict]: api.submitReviewVerdict as HostMethod,
     [IPC.getReviewViewer]: api.getReviewViewer as HostMethod,
     [IPC.fetchCommentImage]: api.fetchCommentImage as HostMethod,
