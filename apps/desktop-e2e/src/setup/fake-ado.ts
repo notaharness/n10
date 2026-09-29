@@ -254,7 +254,7 @@ export function fakeAdoMisses(homeDir: string): string[] {
 
 /**
  * The per-project config that points the app at the fake.
- * `vendorProject` must be present or the host auto-detects from the git
+ * `vendorProject` must be present or the host auto-detects from the Git
  * remote and overwrites it; `email` is who `matchesUser` takes you for.
  */
 export function fakeAdoProjectConfig(

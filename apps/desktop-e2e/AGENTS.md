@@ -24,7 +24,8 @@ build target pins production). Full notes: `docs/testing.md`.
   rollup). Point `headRefName` at a real branch for a real diff. The replacement is isolated to the test PATH.
 - `src/setup/fake-ado.ts` (`fakeAzureDevOps` option) answers Azure DevOps's
   REST API from a preload in the main process (`fixtures/fake-ado.cjs`).
-  Never point a test at Azure without it: the fixture checks it loaded.
+  The token comes from the preload alone, so an app without it asks Azure
+  nothing; seed no Azure DevOps token of your own beside it.
 - Playwright's Electron launcher drops `NODE_OPTIONS`, so a main-process
   preload goes on the Electron command line (`-r`).
 - Provider config from a test: project fields go under `vendorProject`, or

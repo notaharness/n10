@@ -73,7 +73,9 @@ function projectApi(s, url, path) {
 
 function route(s, url) {
   // Identities: who a mention or an id names. None are known here.
-  if (url.hostname.startsWith('vssps.')) return list([]);
+  if (url.hostname.startsWith('vssps.')) {
+    return url.pathname.endsWith('/_apis/identities') ? list([]) : null;
+  }
   const path = url.pathname.split('/').filter(Boolean).map(decodeURIComponent);
   const [, second, third, fourth, , sixth] = path;
   if (second === '_apis' && third === 'connectiondata') {
@@ -112,5 +114,12 @@ function writeToken() {
   writeFileSync(path, JSON.stringify(config, null, 2), 'utf8');
 }
 
-writeToken();
+try {
+  writeToken();
+} catch (error) {
+  // No token, no app: better a launch that fails saying why than an
+  // app left waiting on a window the fixture will time out on.
+  console.error('[fake-ado] could not write the token:', error);
+  process.exit(1);
+}
 globalThis.__n10FakeAzure = true;

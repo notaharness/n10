@@ -110,6 +110,14 @@ export function seedHome(
   repoPath: string,
   opts: HomeSeed
 ): Record<string, string> {
+  // The Azure DevOps fake's preload writes the only token, so an app it
+  // is not in has none; one seeded here would undo that.
+  const auth = opts.n10Config?.vendorAuth as
+    | Record<string, unknown>
+    | undefined;
+  if (opts.fakeAzureDevOps && auth?.['azure-devops']) {
+    throw new Error('fakeAzureDevOps brings its own token; seed none');
+  }
   const n10 = join(homeDir, '.n10');
   mkdirSync(n10, { recursive: true });
   // A terminal tab runs the developer's login shell in this home. zsh
