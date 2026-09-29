@@ -251,16 +251,15 @@ network or tool work can appear idle. These tests verify n10's integration,
 not model responses, authentication, or exact Codex screen rendering.
 
 Reporting uses Orchestra's `codex queue --thread ID --message TEXT` adapter;
-`orchestra.integration.spec.ts` runs the pinned report scripts with a fake
-queue and checks success, failure and retained reporting metadata. That pinned
-archive emits legacy two-field receipts. Unit tests and handwritten Desktop
-fixtures cover the three-field receipt parser, including `delivered` for a direct
-`codex:` target and `queue` for a tmux-hosted Codex TUI. The launch dialog accepts
-both formats. Claude's inbox is a separate transport. Desktop's inbound relay
-deliberately refuses
-`codex:` targets (covered by `relay-target.spec.ts`); it does not silently
-route them to a guessed session. Local n10-managed agent panes can receive
-messages through their `tmux:` target.
+`orchestra.integration.spec.ts` runs the pinned Orchestra 1.6.0 report scripts
+with a fake queue and checks success, failure and retained reporting metadata.
+n10 reads `@orchestra-last-report` only in Orchestra's `KIND TIMESTAMP OUTCOME`
+form; unit tests cover each outcome, including `delivered` for a direct `codex:`
+target and `queue` for a tmux-hosted Codex TUI. Claude's inbox is a separate
+transport. Desktop's inbound relay deliberately refuses `codex:` targets
+(covered by `relay-target.spec.ts`); it does not silently route them to a
+guessed session. Local n10-managed agent panes can receive messages through
+their `tmux:` target.
 
 Run the offline checks (choose an unused `PORT` when other worktrees are running
 the TUI browser bridge):

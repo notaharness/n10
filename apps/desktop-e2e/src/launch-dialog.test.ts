@@ -114,7 +114,7 @@ test('Orchestra context shows real report metadata only for Continue and preserv
     {
       '@orchestra-spawner': 'orchestra',
       '@orchestra-orchestrator': 'planning',
-      '@orchestra-last-report': `DONE ${REPORT_TIME}`,
+      '@orchestra-last-report': `DONE ${REPORT_TIME} inbox`,
     },
     homeDir
   );
@@ -136,7 +136,7 @@ test('Orchestra context shows real report metadata only for Continue and preserv
     'planning'
   );
   expect(await pane(homeDir, name, '#{@orchestra-last-report}')).toBe(
-    `DONE ${REPORT_TIME}`
+    `DONE ${REPORT_TIME} inbox`
   );
 });
 
@@ -178,7 +178,7 @@ test('Review sends its selected agent and instructions to the same guarded workt
     {
       '@orchestra-spawner': 'orchestra',
       '@orchestra-orchestrator': 'planning',
-      '@orchestra-last-report': `DONE ${REPORT_TIME}`,
+      '@orchestra-last-report': `DONE ${REPORT_TIME} inbox`,
     },
     homeDir
   );

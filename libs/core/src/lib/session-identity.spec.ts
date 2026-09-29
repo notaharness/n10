@@ -157,14 +157,14 @@ describe('taggedSession', () => {
         '@orchestra-spawner': 'orchestra',
         '@orchestra-agent': 'codex',
         '@orchestra-orchestrator': 'tmux:n10-main',
-        '@orchestra-last-report': 'DONE 2026-09-14T10:22:03Z',
+        '@orchestra-last-report': 'DONE 2026-09-14T10:22:03Z inbox',
       })
     );
     expect(session).toMatchObject({
       spawner: 'orchestra',
       agent: 'codex',
       orchestrator: 'tmux:n10-main',
-      lastReport: 'DONE 2026-09-14T10:22:03Z',
+      lastReport: 'DONE 2026-09-14T10:22:03Z inbox',
     });
     expect(taggedSession(listed('x', OURS))).not.toHaveProperty('agent');
   });

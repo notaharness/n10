@@ -4,7 +4,7 @@ const state = vi.hoisted(() => ({
   agent: 'claude',
   dead: true,
   exists: true,
-  report: 'PROGRESS 2026-01-01T00:00:00Z',
+  report: 'PROGRESS 2026-01-01T00:00:00Z inbox',
 }));
 vi.mock('../session-resolver.js', () => ({
   resolveWorktreeSession: () => ({ name: 'player' }),
@@ -48,7 +48,7 @@ beforeEach(() => {
   state.agent = 'claude';
   state.dead = true;
   state.exists = true;
-  state.report = 'PROGRESS 2026-01-01T00:00:00Z';
+  state.report = 'PROGRESS 2026-01-01T00:00:00Z inbox';
 });
 it.each(['test', '', 'unknown', 'gemini'])(
   'does not promise continuation for a stopped %s agent',
@@ -86,11 +86,11 @@ it('treats a vanished native target as absent', () => {
   ).toEqual({ exists: false, running: false, canResume: false });
 });
 
-it.each(['', ' queue', ' inbox', ' stored', ' delivered', ' paste'])(
-  'reads a Codex report with delivery suffix %j',
-  (suffix) => {
+it.each(['delivered', 'stored', 'inbox', 'queue', 'paste'])(
+  'reads a Codex report delivered by %s',
+  (outcome) => {
     state.agent = 'codex';
-    state.report += suffix;
+    state.report = `PROGRESS 2026-01-01T00:00:00Z ${outcome}`;
     expect(
       getSessionLaunchContext(
         worktreeSessionKey('/repo/worktree', '/repo'),
@@ -104,6 +104,7 @@ it.each(['', ' queue', ' inbox', ' stored', ' delivered', ' paste'])(
   }
 );
 it.each([
+  'PROGRESS 2026-01-01T00:00:00Z',
   'PROGRESS invalid queue',
   'PROGRESS 2026-01-01T00:00:00Z queue extra',
 ])('ignores malformed report metadata %j', (report) => {
