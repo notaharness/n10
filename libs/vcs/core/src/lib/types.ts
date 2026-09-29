@@ -1,3 +1,9 @@
+import type { MentionCandidate } from './mentions.js';
+import type {
+  LedgerStore,
+  PublishedReview,
+  ReviewSubmission,
+} from './review-publication.js';
 import type { PullRequestChecks } from './pr-checks.js';
 import type { PullRequestConversation } from './pr-conversation.js';
 import type { PullRequestDetail, RepositoryRef } from './pr-details.js';
@@ -198,6 +204,18 @@ export interface VcsProvider {
     prId: number
   ): Promise<PullRequestConversation>;
 
+  /**
+   * People a comment on this repository can mention for `query`, as the
+   * provider's own search answers it; how much of a name it matches is
+   * the provider's. Each carries the token the provider stores for the
+   * mention, which is what a composer inserts.
+   */
+  searchMentionCandidates?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    query: string
+  ): Promise<MentionCandidate[]>;
+
   /** Reply to an existing comment thread. The thread is passed (not just
    *  the id) so providers can dispatch on `replyKind` — GitHub review
    *  threads use one mutation, GitHub issue comments (general PR
@@ -238,6 +256,17 @@ export interface VcsProvider {
     prId: number
   ): Promise<PullRequestDetail>;
 
+  /**
+   * File the reviewer's drafts as one native review (see
+   * review-publication.ts). Progress goes to `ledger` step by step, so
+   * an attempt that stops part-way is resumed, never repeated.
+   */
+  publishReview?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    submission: ReviewSubmission,
+    ledger: LedgerStore
+  ): Promise<PublishedReview>;
   /** What stands between one pull request and completion, read on
    *  demand: its head's checks, the target's rules, and the provider's
    *  reading of mergeability and reviews. */

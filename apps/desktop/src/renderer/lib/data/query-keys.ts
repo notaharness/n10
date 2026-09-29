@@ -80,6 +80,35 @@ export const keys = {
       ref.id ?? null,
       viewer,
     ] as const,
+  /** The reviewer's own drafts on one pull request, by identity. */
+  reviewDrafts: (
+    cwd: string,
+    ref: PullRequestRef | null,
+    viewer: string | null
+  ) =>
+    [
+      'review-drafts',
+      cwd,
+      ref ? pullRequestKey(ref) : null,
+      ref?.id ?? null,
+      viewer,
+    ] as const,
+  /** People a comment on one pull request can mention, by what was
+   *  typed after `@`. Keyed like `prSnapshot`. */
+  mentions: (
+    cwd: string,
+    ref: PullRequestRef | null,
+    viewer: string | null,
+    query: string
+  ) =>
+    [
+      'mentions',
+      cwd,
+      ref ? pullRequestKey(ref) : null,
+      ref?.id ?? null,
+      viewer,
+      query.toLowerCase(),
+    ] as const,
   activity: (cwd: string) => ['session-activity', cwd] as const,
   commentImage: (url: string) => ['comment-image', url] as const,
   drafts: (cwd: string, prId: number) => ['drafts', cwd, prId] as const,

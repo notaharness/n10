@@ -26,6 +26,7 @@ import {
   useRemoteThread,
   type ActionsView,
 } from './activity-actions.js';
+import { useHasDraftReply } from './drafted.js';
 import { useIsNew } from './new-since.js';
 
 function StatusBadges({ thread }: { thread: ConversationThread }) {
@@ -137,6 +138,7 @@ function ThreadHeader({
   const root = thread.comments[0];
   const isNew = useIsNew();
   const arrived = thread.comments.filter((c) => isNew(c.id)).length;
+  const drafted = useHasDraftReply(thread.id);
   return (
     <header
       className={cn(
@@ -175,6 +177,11 @@ function ThreadHeader({
       </button>
       <span className="flex shrink-0 items-center gap-1">
         {plan}
+        {drafted && (
+          <Badge variant="outline" className="border-primary/40 text-primary">
+            Draft reply
+          </Badge>
+        )}
         <StatusBadges thread={thread} />
         <Tip label="Show this thread in the diff">
           <Button

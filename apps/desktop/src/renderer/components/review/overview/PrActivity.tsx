@@ -21,6 +21,7 @@ import {
   type ActivityEntry,
   type ActivityFilter,
 } from '../../../lib/review/activity-model.js';
+import { useReviewDrafts } from '../../../lib/review/review-drafts.js';
 import { useRepo } from '../../../lib/repo-context.js';
 import { Skeleton } from '../../ui/skeleton.js';
 import { ToggleGroup, ToggleGroupItem } from '../../ui/toggle-group.js';
@@ -35,6 +36,7 @@ import {
 import { focusAfter } from '../../../lib/focus.js';
 import { ActivityActionsProvider } from './activity-actions.js';
 import { CoverageNotice } from './CoverageNotice.js';
+import { DraftedThreads } from './drafted.js';
 import { NewSince } from './new-since.js';
 
 /**
@@ -67,6 +69,16 @@ export function PrActivity({
     keys.prConversation(repo.cwd, prRef, repo.viewer)
   );
   const { state } = read;
+  const drafts = useReviewDrafts(prRef).data?.drafts;
+  const drafted = useMemo(
+    () =>
+      new Set(
+        (drafts ?? []).flatMap((d) =>
+          d.target.kind === 'reply' && d.body.trim() ? [d.target.threadId] : []
+        )
+      ),
+    [drafts]
+  );
   return (
     <section aria-label="Activity" className="mt-8">
       {state.kind === 'loading' && <ActivitySkeleton />}
@@ -94,11 +106,13 @@ export function PrActivity({
           )}
           {state.data.conversation.state === 'read' ? (
             <ActivityActionsProvider prId={prRef.number}>
-              <Activity
-                conversation={state.data.conversation.value}
-                viewer={repo.viewer}
-                onOpenThread={onOpenThread}
-              />
+              <DraftedThreads.Provider value={drafted}>
+                <Activity
+                  conversation={state.data.conversation.value}
+                  viewer={repo.viewer}
+                  onOpenThread={onOpenThread}
+                />
+              </DraftedThreads.Provider>
             </ActivityActionsProvider>
           ) : (
             <>

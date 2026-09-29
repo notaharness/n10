@@ -45,6 +45,7 @@ export function DiffPane({
   sourceBranch,
   targetBranch,
   files,
+  diffHead,
   threadsByFile,
   draftsByFile,
   generalThreads,
@@ -66,6 +67,8 @@ export function DiffPane({
   sourceBranch: string;
   targetBranch: string;
   files: [string, DiffLine[]][];
+  /** The commit the diff was read at; what new comments anchor to. */
+  diffHead: string | null;
   threadsByFile: Map<string, RemoteCommentThread[]>;
   draftsByFile: Map<string, ReviewComment[]>;
   generalThreads: RemoteCommentThread[];
@@ -154,6 +157,7 @@ export function DiffPane({
         {!loading && (
           <VirtualDiffList
             files={files}
+            diffHead={diffHead}
             threadsByFile={threadsByFile}
             draftsByFile={draftsByFile}
             generalThreads={generalThreads}

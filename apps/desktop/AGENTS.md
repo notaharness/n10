@@ -88,6 +88,28 @@ Every rule below has its reasoning in `docs/decisions.md`.
   its check list too, so its place, filter and search survive both.
   Entries that arrive on a refresh wait behind "N new updates"; thread
   writes invalidate the conversation.
+- A reviewer's own unsent writing is a durable draft (core
+  `pull-requests/review-drafts.ts`, one file per account and pull request
+  under `~/.n10/review-drafts`), autosaved by `lib/review/review-drafts.ts`.
+  Unsaved text lives in `draft-edits.ts`, outside components, so an
+  unmount never drops it; leaving the window with a failed save asks
+  first (`main/unsaved-guard.ts`). Nothing there publishes. Focus that a
+  closing control drops goes through `lib/focus.ts`.
+- New comments on code: the line number is the selection control
+  (`diff/LineGutter.tsx`, one tab stop per file, one file and one side
+  per range, consecutive lines on screen only). Composers and the reviewer's inline drafts hang in the
+  flat diff through `mineByFile` (`diff/use-diff-comments.ts`). The review agent's findings stay in
+  `@n10/review-comments`, keyed by PR number.
+- A mention is the provider's token (`@login`, Azure's `@<id>`) from its
+  own search (core `pull-requests/mention-search.ts`,
+  `comments/MentionPicker.tsx`); a display name is only ever shown.
+- Drafts are filed as one native review through core's
+  `pull-requests/submit-review.ts`; the provider's ledger lives in the
+  drafts file, so an unanswered step is looked for, never re-sent. Azure
+  DevOps has no grouped review: each comment posts as it goes and the
+  vote is cast last, so a failure leaves what posted as posted. An
+  inline draft being posted or maybe posted is shown, locked; a reply
+  draft in that state is not yet shown in its thread.
 - Diffs are whole-file (`-U99999`), folded client-side
   (`lib/diff/diff-model.ts`). A PR diffs commits; a bare worktree diffs its
   working tree, polled at 2 s only while the agent runs. `FileTree` collapse

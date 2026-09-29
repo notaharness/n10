@@ -3,7 +3,9 @@ import { toast } from 'sonner';
 import { snapshotRemote } from '@n10/core/plan';
 import type { RemoteCommentThread } from '../../../../host/contract.js';
 import { useReply, useSetResolved } from '../../../lib/data/mutations.js';
+import { pullRequestRefFor } from '../../../lib/data/pr-snapshot-query.js';
 import { usePlan, usePlanControls } from '../../../lib/plan/plan.js';
+import { useReviewDraft } from '../../../lib/review/review-drafts.js';
 import { useRepo } from '../../../lib/repo-context.js';
 import { errorMessage } from '../../../lib/utils.js';
 import { useComposerRefresh } from './use-composer-refresh.js';
@@ -34,7 +36,10 @@ export function useThreadActions(
   );
   const reply = useReply(repo.cwd);
   const resolve = useSetResolved(repo.cwd);
-  const [draft, setDraft] = useState('');
+  const draft = useReviewDraft(pullRequestRefFor(repo, prId), {
+    kind: 'reply',
+    threadId: thread.id,
+  });
   const [composing, setComposing] = useState(false);
   // Opening the box refetches the thread, so a reply is never written
   // against a conversation that has already moved on.
@@ -51,13 +56,13 @@ export function useThreadActions(
   }, [composerVisible, endRefresh]);
 
   const send = (alsoResolve = false) => {
-    const body = draft.trim();
+    const body = draft.body.trim();
     if (!body) return;
     reply.mutate(
       { prId, thread, body },
       {
         onSuccess: () => {
-          setDraft('');
+          void draft.clear();
           openComposer(false);
           if (alsoResolve && thread.canResolve && !thread.isResolved) {
             resolve.mutate(
@@ -84,7 +89,6 @@ export function useThreadActions(
       setComposing: openComposer,
       notice: refresh.notice,
       draft,
-      setDraft,
       sending: reply.isPending,
       resolving: resolve.isPending,
       onSend: send,

@@ -22,6 +22,8 @@ export interface FakePr {
   title: string;
   headRefName: string;
   baseRefName?: string;
+  /** The head commit GitHub reports; `f` × 40 when left off. */
+  headRefOid?: string;
   /** Defaults to the scenario's username, which makes it *your* PR and
    *  puts it under "Pull Requests" rather than a review bucket. */
   author?: string;
@@ -32,8 +34,11 @@ export interface FakePr {
   /** Submitted reviews: the list reads the verdicts, the conversation
    *  reads the summaries too. */
   reviews?: {
+    id?: string;
     author: string;
     state: string;
+    /** The commit a review filed through n10 was made on. */
+    commit?: string;
     body?: string;
     commentCount?: number;
     submittedAt?: string;
@@ -65,8 +70,6 @@ export interface FakePr {
     checks?: boolean;
     conversation?: boolean;
   };
-  /** The head commit; forty `f`s unless said. */
-  headRefOid?: string;
   /** Check runs and statuses on the head, for the checks read. */
   checks?: FakeCheck[];
   /** GitHub's reading of the pull request, for the checks read. */
@@ -108,6 +111,7 @@ export interface FakeThread {
   /** Left off, with no `originalLine` either, for a file-level thread. */
   line?: number;
   startLine?: number;
+  startSide?: 'LEFT' | 'RIGHT';
   /** Set with `line: null` semantics by leaving `line` off — see the
    *  outdated-thread case in the TUI suite. */
   originalLine?: number;
@@ -131,6 +135,9 @@ export interface FakeGitHub {
   /** The signed-in user. PRs they authored are "yours". */
   username?: string;
   prs: FakePr[];
+  /** Who `mentionableUsers` finds: a login or name containing the
+   *  query, ignoring case, first eight. */
+  mentionable?: { login: string; name?: string }[];
   /** Rule sets on every base branch: required checks (by name, from
    *  GitHub Actions) and whether conversations must be resolved.
    *  `failing` answers both rules reads with a 502. */
@@ -153,6 +160,11 @@ export interface FakeGitHub {
    * hides what the app does with the window while it waits.
    */
   latencyMs?: number;
+  /** Review operations whose write is kept but whose answer is lost,
+   *  once each (fake-gh-review.mjs). */
+  loseAnswers?: string[];
+  /** Written by the fake: how many of each review write reached it. */
+  reviewWrites?: Record<string, number>;
 }
 
 /**
@@ -197,6 +209,11 @@ export function installFakeGh(
   const gh = join(binDir, 'gh');
   copyFileSync(join(HERE, '..', 'fixtures', 'fake-gh.mjs'), gh);
   chmodSync(gh, 0o755);
+  // The review half, which `gh` imports from beside itself.
+  copyFileSync(
+    join(HERE, '..', 'fixtures', 'fake-gh-review.mjs'),
+    join(binDir, 'fake-gh-review.mjs')
+  );
 
   const scenarioPath = fakeGhScenarioPath(homeDir);
   writeFileSync(scenarioPath, JSON.stringify(scenario, null, 2), 'utf8');

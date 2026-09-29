@@ -282,6 +282,7 @@ export function PrWorkspace({
               connectionBanner={connectionBanner}
               inputDisabled={inputDisabled}
               files={files}
+              diffHead={diff.head}
               filesByName={filesByName}
               fileOrder={fileOrder}
               threadsByFile={threadsByFile}

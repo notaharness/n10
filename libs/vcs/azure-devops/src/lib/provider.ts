@@ -12,6 +12,10 @@ import type {
   ReviewVerdict,
   BuildStatusState,
   RepositoryRef,
+  MentionCandidate,
+  LedgerStore,
+  PublishedReview,
+  ReviewSubmission,
 } from '@n10/vcs-core';
 import { sanitizeBody } from '@n10/vcs-core';
 import { log } from '@n10/logger';
@@ -32,11 +36,19 @@ import { parseAdoRemoteUrl } from './remote-url.js';
 import { fetchPullRequestDetailAzure } from './pr-overview-details.js';
 import { voteToDecision } from './votes.js';
 import {
+  extractMentionGuids,
+  mentionCache,
+  resolveMentionNames,
+  rewriteMentions,
+  searchAdoMentions,
+} from './mentions.js';
+import {
   commentSources,
   toAdoConversation,
   type RawAdoThread,
 } from './pr-conversation.js';
 import { fetchPrBuildRunsBatch } from './builds.js';
+import { publishAzureReview } from './pr-review-publisher.js';
 import {
   forgetPrDetails,
   forgetRepoDetails,
@@ -365,114 +377,6 @@ async function getCachedIdentity(
     fetchMyTeamIds(config),
   ]);
   return { userEmail, myTeamIds };
-}
-
-// ── @mention resolution (GUID → display name) ──────────────────────
-//
-// ADO's REST API returns comment bodies with raw `@<GUID>` tokens
-// where the web UI renders `@<Display Name>`. n10 post-processes
-// fetched comment bodies: extracts mention GUIDs, batch-resolves them
-// against the ADO Identities API, caches the results, and substitutes
-// the tokens inline before handing off to the renderer.
-//
-// Fallback: if the API call fails OR a specific GUID doesn't resolve,
-// the original `@<GUID>` stays put. Better to show the UUID than to
-// silently drop the reference.
-
-const MENTION_GUID_RE =
-  /@<([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})>/gi;
-
-/** Extract unique mention GUIDs from a comment body, lowercased. */
-export function extractMentionGuids(text: string): string[] {
-  const seen = new Set<string>();
-  for (const m of text.matchAll(MENTION_GUID_RE)) {
-    seen.add(m[1]!.toLowerCase());
-  }
-  return [...seen];
-}
-
-/**
- * Substitute `@<guid>` tokens with `@<displayName>` using the provided
- * cache. Unresolved GUIDs stay intact (the whole `@<GUID>` token,
- * including the angle brackets) so no reference silently disappears.
- */
-export function rewriteMentions(
-  text: string,
-  cache: Map<string, string>
-): string {
-  return text.replace(MENTION_GUID_RE, (orig, guid: string) => {
-    const name = cache.get(guid.toLowerCase());
-    return name ? `@${name}` : orig;
-  });
-}
-
-// Module-level cache shared across provider calls. TTL matches the
-// identity cache above — identities change rarely and a stale name is
-// a better failure mode than a rate-limited API.
-const mentionCache = new Map<string, string>();
-let mentionCacheFetchedAt = 0;
-const MENTION_CACHE_TTL_MS = 30 * 60 * 1000;
-
-/** Test helper — resets the module-level cache. */
-export function _clearMentionCacheForTests(): void {
-  mentionCache.clear();
-  mentionCacheFetchedAt = 0;
-}
-
-interface AdoIdentity {
-  id?: string;
-  providerDisplayName?: string;
-  customDisplayName?: string;
-}
-
-/**
- * Batch-resolve GUIDs via ADO's Identities API
- * (https://vssps.dev.azure.com/{org}/_apis/identities). Updates the
- * module-level cache in place. Unresolved GUIDs are NOT cached, so a
- * later retry has a chance to pick them up.
- */
-/**
- * Fold an identities response into the cache. An entry with no id or
- * no usable display name is skipped rather than cached blank, so a
- * later fetch can still resolve it.
- */
-function cacheIdentities(identities: AdoIdentity[]): void {
-  for (const identity of identities) {
-    const id = identity.id?.toLowerCase();
-    const name =
-      identity.providerDisplayName ?? identity.customDisplayName ?? '';
-    if (id && name) mentionCache.set(id, name);
-  }
-}
-
-async function resolveMentionNames(
-  config: AdoConfig,
-  guids: string[]
-): Promise<void> {
-  if (guids.length === 0) return;
-  if (Date.now() - mentionCacheFetchedAt > MENTION_CACHE_TTL_MS) {
-    mentionCache.clear();
-    mentionCacheFetchedAt = Date.now();
-  }
-  const uncached = guids.filter((g) => !mentionCache.has(g));
-  if (uncached.length === 0) return;
-
-  const ids = uncached.join(',');
-  try {
-    const data = await adoGet<{ value?: AdoIdentity[] }>(
-      'resolveMentionNames',
-      `${config.org}/identities/${ids}`,
-      TTL.identity,
-      `https://vssps.dev.azure.com/${config.org}/_apis/identities?identityIds=${ids}&api-version=7.1`,
-      authHeaders(config.pat),
-      'those identities'
-    );
-    cacheIdentities(data.value ?? []);
-    if (mentionCacheFetchedAt === 0) mentionCacheFetchedAt = Date.now();
-  } catch {
-    // Network failure — leave cache as-is. `rewriteMentions` falls back
-    // to the original `@<GUID>` for anything it can't resolve.
-  }
 }
 
 // ── Comment thread helpers ──────────────────────────────────────────
@@ -1117,6 +1021,52 @@ export const azureDevOpsProvider: VcsProvider = {
       `pull request ${prId}`
     );
     return sanitizeBody(data.description ?? '');
+  },
+
+  async searchMentionCandidates(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    query: string
+  ): Promise<MentionCandidate[]> {
+    return searchAdoMentions(toAdoConfig(auth, project), query);
+  },
+
+  async publishReview(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    submission: ReviewSubmission,
+    ledger: LedgerStore
+  ): Promise<PublishedReview> {
+    const config = toAdoConfig(auth, project);
+    const base = baseUrl(config);
+    const headers = authHeaders(config.pat);
+    try {
+      return await publishAzureReview(
+        {
+          // Uncached: each read is what the publication acts on.
+          get: (path) =>
+            adoGet(
+              'publishReview',
+              `publish/${path}`,
+              0,
+              `${base}/${path}`,
+              headers
+            ),
+          send: (method, path, body) =>
+            adoSend('publishReview', `${base}/${path}`, {
+              method,
+              headers,
+              body: JSON.stringify(body),
+              bodyForLog: { path },
+            }),
+          me: () => fetchAuthenticatedUserId(config),
+        },
+        submission,
+        ledger
+      );
+    } finally {
+      invalidatePr(config, submission.prId);
+    }
   },
 
   fetchPullRequestDetail(

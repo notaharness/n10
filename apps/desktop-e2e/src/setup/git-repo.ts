@@ -62,6 +62,9 @@ export interface TestRepoOptions {
   name?: string;
   /** Extra branches to create off the initial commit. */
   branches?: string[];
+  /** Files committed on main before anything branches, path →
+   *  contents, so a worktree's edits to them diff with removed lines. */
+  baseFiles?: Record<string, string>;
   /**
    * Worktrees to create before the app launches, in the same location
    * the app uses.
@@ -85,7 +88,11 @@ export function createTestRepo(opts: TestRepoOptions = {}): string {
   // Commit hooks and signing would prompt or fail in CI.
   git(dir, ['config', 'commit.gpgsign', 'false']);
   writeFileSync(join(dir, 'README.md'), '# test repo\n', 'utf8');
-  git(dir, ['add', 'README.md']);
+  for (const [name, contents] of Object.entries(opts.baseFiles ?? {})) {
+    mkdirSync(dirname(join(dir, name)), { recursive: true });
+    writeFileSync(join(dir, name), contents, 'utf8');
+  }
+  git(dir, ['add', '.']);
   git(dir, ['commit', '-q', '-m', 'initial']);
 
   for (const branch of opts.branches ?? []) {

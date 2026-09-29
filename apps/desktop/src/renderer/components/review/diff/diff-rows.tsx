@@ -11,6 +11,7 @@ import type { LineTokens } from '../../../lib/diff/highlight.js';
 import { cn } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { Tip } from '../../ui/tooltip.js';
+import { LineGutter, type GutterProps } from './LineGutter.js';
 
 export const ROW_BG: Record<DiffLine['type'], string> = {
   add: 'bg-diff-add',
@@ -137,12 +138,24 @@ export function UnifiedRow({
   tokens,
   ranges,
   wrap,
+  gutter,
 }: {
   line: DiffLine;
   tokens: LineTokens | undefined;
   ranges?: CharRange[];
   wrap: boolean;
+  gutter?: GutterProps;
 }) {
+  const numbers = (
+    <>
+      <span className="w-11 pr-2 text-right tabular-nums">
+        {line.oldLine ?? ''}
+      </span>
+      <span className="w-11 pr-2 text-right tabular-nums">
+        {line.newLine ?? ''}
+      </span>
+    </>
+  );
   return (
     <div
       className={cn('flex', wrap ? 'w-full' : 'min-w-max', ROW_BG[line.type])}
@@ -153,12 +166,7 @@ export function UnifiedRow({
           GUTTER_BG[line.type]
         )}
       >
-        <span className="w-11 pr-2 text-right tabular-nums">
-          {line.oldLine ?? ''}
-        </span>
-        <span className="w-11 pr-2 text-right tabular-nums">
-          {line.newLine ?? ''}
-        </span>
+        {gutter ? <LineGutter gutter={gutter}>{numbers}</LineGutter> : numbers}
         <SignCell type={line.type} />
       </span>
       <LineContent line={line} tokens={tokens} ranges={ranges} wrap={wrap} />
@@ -173,12 +181,14 @@ export function SplitCell({
   ranges,
   side,
   wrap,
+  gutter,
 }: {
   cell: SplitCell | null;
   tokens: LineTokens | undefined;
   ranges?: CharRange[];
   side: 'L' | 'R';
   wrap: boolean;
+  gutter?: GutterProps;
 }) {
   if (!cell) {
     return <div className="min-w-0 border-l border-border bg-muted/20" />;
@@ -199,7 +209,15 @@ export function SplitCell({
           GUTTER_BG[line.type]
         )}
       >
-        <span className="w-11 pr-2 text-right tabular-nums">{num ?? ''}</span>
+        {gutter ? (
+          <LineGutter gutter={gutter}>
+            <span className="w-11 pr-2 text-right tabular-nums">
+              {num ?? ''}
+            </span>
+          </LineGutter>
+        ) : (
+          <span className="w-11 pr-2 text-right tabular-nums">{num ?? ''}</span>
+        )}
         <SignCell type={line.type} />
       </span>
       <LineContent line={line} tokens={tokens} ranges={ranges} wrap={wrap} />

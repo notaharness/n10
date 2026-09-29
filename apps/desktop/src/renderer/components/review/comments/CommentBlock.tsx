@@ -2,8 +2,10 @@ import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../../host/contract.js';
+import type { InlineTarget } from '../../../lib/review/my-drafts.js';
 import { cn } from '../../../lib/utils.js';
 import { DraftCard } from '../drafts/DraftCard.js';
+import { MyDraftCard } from './MyDraftCard.js';
 import { ThreadCard } from './ThreadCard.js';
 
 /**
@@ -14,6 +16,7 @@ import { ThreadCard } from './ThreadCard.js';
 export function CommentBlock({
   threads,
   drafts = [],
+  mine = [],
   prId,
   headSha,
   focusId,
@@ -21,12 +24,15 @@ export function CommentBlock({
 }: {
   threads: RemoteCommentThread[];
   drafts?: ReviewComment[];
+  /** The reviewer's own drafts, shown first: they are what is being
+   *  written now. */
+  mine?: InlineTarget[];
   prId: number;
   headSha?: string;
   focusId: string | null;
   indent?: boolean;
 }) {
-  if (threads.length === 0 && drafts.length === 0) return null;
+  if (threads.length + drafts.length + mine.length === 0) return null;
   return (
     <div
       className={cn(
@@ -34,6 +40,9 @@ export function CommentBlock({
         indent ? 'pl-[5.5rem]' : 'pl-4'
       )}
     >
+      {mine.map((m) => (
+        <MyDraftCard key={m.key} target={m} />
+      ))}
       {drafts.map((d) => (
         <DraftCard
           key={d.id}
@@ -59,12 +68,14 @@ export function CommentBlock({
 export function OrphanBlock({
   threads,
   drafts,
+  mine = [],
   prId,
   headSha,
   focusId,
 }: {
   threads: RemoteCommentThread[];
   drafts: ReviewComment[];
+  mine?: InlineTarget[];
   prId: number;
   headSha?: string;
   focusId: string | null;
@@ -74,6 +85,9 @@ export function OrphanBlock({
       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Comments on lines not in this diff
       </p>
+      {mine.map((m) => (
+        <MyDraftCard key={m.key} target={m} />
+      ))}
       {drafts.map((d) => (
         <DraftCard
           key={d.id}
