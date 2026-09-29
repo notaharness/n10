@@ -39,6 +39,11 @@ const BACKLOG_KB = 640;
 const IDLE_MS = Number(process.env.N10_PERF_IDLE_MS ?? 15_000);
 const SWITCHES = Number(process.env.N10_PERF_SWITCHES ?? 20);
 const BIG = 'agent-big';
+/** Full-screen repaints per second per agent; 0 streams a line per
+ *  interval instead. */
+const REDRAW_FPS = Number(process.env.N10_PERF_REDRAW_FPS ?? 0);
+/** KB the backlog agent prints at once every three seconds; 0 for none. */
+const BURST_KB = Number(process.env.N10_PERF_BURST_KB ?? 0);
 
 const branches = [
   ...Array.from({ length: TABS - 1 }, (_, i) => `agent-${i}`),
@@ -137,9 +142,16 @@ async function costOver(
   windowMs: number
 ): Promise<Record<string, number>> {
   await app.evaluate(({ app: a }) => a.getAppMetrics());
+  const cpuBefore = await app.evaluate(() => process.cpuUsage());
   await startMainLag(app);
   await pace(page, windowMs);
   const lag = await stopMainLag(app);
+  const cpuAfter = await app.evaluate(() => process.cpuUsage());
+  // Electron's percentages are normalised in ways that vary by
+  // platform; the main process's own clock is not.
+  const mainCoreMs =
+    (cpuAfter.user - cpuBefore.user + cpuAfter.system - cpuBefore.system) /
+    1000;
   const cost = await app.evaluate(({ app: a }) => {
     const m = a.getAppMetrics();
     const pick = (test: (p: (typeof m)[number]) => boolean) => m.filter(test);
@@ -165,6 +177,7 @@ async function costOver(
   });
   return {
     ...cost,
+    mainCorePct: (mainCoreMs / windowMs) * 100,
     mainLagP50Ms: lag.p50,
     mainLagP99Ms: lag.p99,
     mainLagMaxMs: lag.max,
@@ -237,6 +250,8 @@ async function measureOnce(repoPath: string, samples: Samples): Promise<void> {
         `--interval-ms=${INTERVAL_MS}`,
         `--backlog-kb=${BACKLOG_KB}`,
         `--backlog-match=${BIG}`,
+        `--redraw-fps=${REDRAW_FPS}`,
+        `--burst-kb=${BURST_KB}`,
       ].join(' '),
     },
   });
@@ -323,5 +338,9 @@ test('many agent tabs: steady-state cost and switch latency', async () => {
   expect(samples.switchMs, 'never recorded').toHaveLength(
     SWITCHES * ITERATIONS
   );
-  saveSamples('agent-tabs', samples);
+  const load = [
+    REDRAW_FPS > 0 ? 'redraw' : '',
+    BURST_KB > 0 ? 'burst' : '',
+  ].filter(Boolean);
+  saveSamples(['agent-tabs', ...load].join('-'), samples);
 });
