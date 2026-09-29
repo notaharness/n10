@@ -1,11 +1,13 @@
 import {
   useCallback,
+  useEffect,
   useState,
   type Dispatch,
   type RefObject,
   type SetStateAction,
 } from 'react';
 import { focusAfter } from '../focus.js';
+import { useTabView } from '../tabs/tab-views.js';
 import type { PullRequestInfo } from '@n10/vcs-core/types';
 import {
   adoptPullRequest,
@@ -52,11 +54,12 @@ export function useReviewMode({
 }): [Mode, Dispatch<SetStateAction<Mode>>] {
   const hasPr = pr != null;
   const initial = () => initialMode({ running: agent.running, hasPr });
-  const [pane, setPane] = useState<PaneState>(() => ({
-    mode: initial(),
-    chosen: false,
-    hasPr,
-  }));
+  // A tab the reader comes back to opens where they left it.
+  const { saved, save } = useTabView();
+  const [pane, setPane] = useState<PaneState>(
+    () => saved.pane ?? { mode: initial(), chosen: false, hasPr }
+  );
+  useEffect(() => save({ pane }), [pane, save]);
   if (pane.hasPr !== hasPr) setPane(adoptPullRequest(pane, hasPr, initial()));
   const setMode = useCallback((next: SetStateAction<Mode>) => {
     setPane((p) => ({

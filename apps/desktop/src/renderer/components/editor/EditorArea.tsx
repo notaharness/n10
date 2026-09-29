@@ -18,6 +18,11 @@ import {
   itemWorktree,
 } from '../../lib/sidebar/sidebar-model.js';
 import { PaneShownContext } from '../../lib/tabs/pane-shown.js';
+import {
+  TabViewScope,
+  TabViewsProvider,
+  useTabViewsHost,
+} from '../../lib/tabs/tab-views.js';
 import { foreignRepoOf, useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { cn } from '../../lib/utils.js';
@@ -94,24 +99,26 @@ function Pane({
       aria-hidden={!shown || undefined}
       data-spare-pane={!shown || undefined}
     >
-      <PaneShownContext.Provider value={shown}>
-        {switched && <BranchSwitchBanner {...switched} />}
-        <div className="flex min-h-0 flex-1 flex-col">
-          <ErrorBoundary resetKey={tab.id}>
-            {/* The pane bodies are code-split (see lazy-panes), but none
+      <TabViewScope value={tab.id}>
+        <PaneShownContext.Provider value={shown}>
+          {switched && <BranchSwitchBanner {...switched} />}
+          <div className="flex min-h-0 flex-1 flex-col">
+            <ErrorBoundary resetKey={tab.id}>
+              {/* The pane bodies are code-split (see lazy-panes), but none
               suspends — each renders its own placeholder until its
               module lands, so there is no Suspense boundary here to
               throttle the swap. */}
-            <PaneBody
-              tab={tab}
-              item={item}
-              items={items}
-              menuActive={menuActive}
-              onPin={onPin}
-            />
-          </ErrorBoundary>
-        </div>
-      </PaneShownContext.Provider>
+              <PaneBody
+                tab={tab}
+                item={item}
+                items={items}
+                menuActive={menuActive}
+                onPin={onPin}
+              />
+            </ErrorBoundary>
+          </div>
+        </PaneShownContext.Provider>
+      </TabViewScope>
     </div>
   );
 }
@@ -230,6 +237,8 @@ export function EditorArea({
   const tabStopId = tabs.tabs.some((t) => t.id === tabs.activeId)
     ? tabs.activeId
     : tabs.tabs[0]?.id;
+  const openIds = useMemo(() => tabs.tabs.map((t) => t.id), [tabs.tabs]);
+  const views = useTabViewsHost(openIds);
   const { activePane, paneActiveId, foreignCwd, panes } = useEditorPanes(
     tabs.tabs,
     tabs.activeId,
@@ -266,36 +275,38 @@ export function EditorArea({
           );
         })}
       </TabStrip>
-      <div className="relative min-h-0 flex-1" data-editor-panes>
-        {/* A foreign tab has no pane here: its data lives in a
+      <TabViewsProvider value={views}>
+        <div className="relative min-h-0 flex-1" data-editor-panes>
+          {/* A foreign tab has no pane here: its data lives in a
             repository this window is not pointing at. */}
-        {panes.map((tab) => (
-          <Pane
-            key={tab.id}
-            tab={tab}
-            item={itemFor(tab)}
-            items={items}
-            shown={tab.id === activePane?.id}
-            menuActive={tab.id === activePane?.id && tab.id === tabs.activeId}
-            onPin={() => tabs.pin(tab.id)}
-          />
-        ))}
-        {foreignCwd && (
-          <div className="absolute inset-0 flex min-h-0 flex-col">
-            <ForeignRepoPane cwd={foreignCwd} />
-          </div>
-        )}
-        {paneActiveId === null && (
-          // Tabs on the strip, but none of them this repository's — it
-          // was just opened and has nothing of its own open yet.
-          <div className="absolute inset-0 flex min-h-0 flex-col">
-            <EmptyState
-              onOpenPalette={onOpenPalette}
-              hasItems={items.length > 0}
+          {panes.map((tab) => (
+            <Pane
+              key={tab.id}
+              tab={tab}
+              item={itemFor(tab)}
+              items={items}
+              shown={tab.id === activePane?.id}
+              menuActive={tab.id === activePane?.id && tab.id === tabs.activeId}
+              onPin={() => tabs.pin(tab.id)}
             />
-          </div>
-        )}
-      </div>
+          ))}
+          {foreignCwd && (
+            <div className="absolute inset-0 flex min-h-0 flex-col">
+              <ForeignRepoPane cwd={foreignCwd} />
+            </div>
+          )}
+          {paneActiveId === null && (
+            // Tabs on the strip, but none of them this repository's — it
+            // was just opened and has nothing of its own open yet.
+            <div className="absolute inset-0 flex min-h-0 flex-col">
+              <EmptyState
+                onOpenPalette={onOpenPalette}
+                hasItems={items.length > 0}
+              />
+            </div>
+          )}
+        </div>
+      </TabViewsProvider>
       {confirmDialog}
     </div>
   );

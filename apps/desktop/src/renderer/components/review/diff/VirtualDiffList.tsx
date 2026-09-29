@@ -27,6 +27,7 @@ import { MyDraftsContext } from '../../../lib/review/my-drafts-context.js';
 import { useTheme } from '../../../lib/theme.js';
 import { DiffRowView, type RowContext } from './DiffRowView.js';
 import { pointId } from './LineGutter.js';
+import { useDiffAnchor } from './use-diff-anchor.js';
 import { useDiffComments } from './use-diff-comments.js';
 
 /** Imperative scrolling into the virtualized list — jump targets may
@@ -131,6 +132,12 @@ export function VirtualDiffList({
     overscan: 16,
   });
   const virtualItems = virtualizer.getVirtualItems();
+  useDiffAnchor({
+    ready: files.length > 0,
+    points,
+    virtualizer,
+    scrollRef,
+  });
 
   // Highlight only files that currently have rows on screen.
   const wantedFiles = useMemo(() => {

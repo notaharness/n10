@@ -193,6 +193,7 @@ function TreeRow({
     <button
       type="button"
       onClick={() => onSelect(entry.path)}
+      aria-current={isSel || undefined}
       style={{ paddingLeft: 8 + depth * 12 + 16 }}
       title={entry.path}
       className={cn(

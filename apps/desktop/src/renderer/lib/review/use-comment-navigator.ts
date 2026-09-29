@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DiffLine } from '@n10/diff';
 import type {
   RemoteCommentThread,
@@ -12,6 +12,7 @@ import {
   visibleComments,
   type CommentRow,
 } from './review-model.js';
+import { useTabView } from '../tabs/tab-views.js';
 
 /**
  * Walking the comments on a pull request: one document-ordered list,
@@ -41,7 +42,20 @@ export function useCommentNavigator({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const jumpRef = useRef<DiffJumpHandle | null>(null);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  // The file picked when the reader left the tab, while the diff still
+  // has it; gone from the diff, nothing is picked.
+  const { saved, save } = useTabView();
+  const [selectedFile, setSelectedFile] = useState<string | null>(
+    saved.file ?? null
+  );
+  if (
+    selectedFile !== null &&
+    files.length > 0 &&
+    !files.some(([f]) => f === selectedFile)
+  ) {
+    setSelectedFile(null);
+  }
+  useEffect(() => save({ file: selectedFile }), [selectedFile, save]);
   const [focusId, setFocusId] = useState<string | null>(null);
 
   // General (Conversation) comments first, then per file the remote
