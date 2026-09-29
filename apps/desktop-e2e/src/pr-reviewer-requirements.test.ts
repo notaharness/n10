@@ -106,6 +106,39 @@ test.describe('Reviewer requirements on GitHub', () => {
     await expect(tip).not.toContainText('Ruleset');
   });
 
+  test('shows the rules at once, and hides them at once, where motion is reduced', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const { reviewers } = await openOverview(page);
+    // Every animation the tip starts, from before it opens.
+    await page.evaluate(() => {
+      const seen: string[] = [];
+      (window as unknown as { tipAnimations: string[] }).tipAnimations = seen;
+      document.addEventListener('animationstart', (e) => {
+        const el = e.target as Element;
+        if (el.closest('[data-slot="tooltip-content"]')) {
+          seen.push(e.animationName);
+        }
+      });
+    });
+    const started = () =>
+      page.evaluate(
+        () => (window as unknown as { tipAnimations: string[] }).tipAnimations
+      );
+    await reviewers
+      .locator('[data-reviewer="n10/core"] [data-reviewer-standing]')
+      .hover();
+    const tip = page.locator('[data-slot="tooltip-content"]');
+    await expect(tip).toContainText('Ruleset');
+    // Whole from its first frame: no fade to catch it halfway through.
+    await expect(tip).toHaveCSS('opacity', '1');
+    await pointAt(page, reviewers.locator('[data-reviewer="bea"]'));
+    await expect(tip).toHaveCount(0);
+    expect(await started()).toEqual([]);
+  });
+
   test('reads the verdict and the count on the Reviews row, and waits on the viewer', async ({
     desktop,
   }) => {
