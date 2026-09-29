@@ -91,7 +91,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       const manifest = JSON.parse(
         readFileSync(join(fixture.plugin, '.claude-plugin/plugin.json'), 'utf8')
       );
-      expect(manifest).toMatchObject({ name: 'orchestra', version: '1.0.0' });
+      expect(manifest).toMatchObject({ name: 'orchestra', version: '1.6.0' });
       for (const skill of ['orchestrator', 'player']) {
         expect(
           readFileSync(
@@ -207,7 +207,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         fixture.repo,
         player.worktreePath
       )?.lastReport;
-      expect(lastReport).toMatch(/^PROGRESS \d{4}-.*Z$/);
+      expect(lastReport).toMatch(/^PROGRESS \d{4}-\S+Z delivered$/);
       writeFileSync(join(fixture.home, 'refuse-queue'), '1');
       rmSync(join(fixture.home, 'report-result.json'));
       const failed = fixture.script(
@@ -305,7 +305,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         '-t',
         `=${player.name}:`,
         '@orchestra-last-report',
-        'PROGRESS 2026-01-01T00:00:00Z'
+        'PROGRESS 2026-01-01T00:00:00Z delivered'
       );
       // A stale server/session environment must not point the new conversation
       // at another player's supervisor after its own tags have been cleared.
