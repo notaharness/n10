@@ -1,39 +1,14 @@
 import { join } from 'node:path';
-import {
-  app,
-  BrowserWindow,
-  dialog,
-  ipcMain,
-  Menu,
-  nativeTheme,
-  shell,
-} from 'electron';
-import {
-  registerHostHandlers,
-  setExternalOpener,
-  setFolderPicker,
-  setShellGlue,
-} from '../host/register-handlers.js';
-import { applySessionBackend, killAll, probeTmuxAvailability } from '@n10/core';
+import { app, BrowserWindow, dialog, Menu, nativeTheme, shell } from 'electron';
 import {
   MENU_EVENTS,
   type ContextMenuItem,
   type DesktopPrefs,
   type MenuCommand,
 } from '../host/contract.js';
-import { openStartupRepo } from '../host/services/repo.js';
-import { stopRemoteSyncLoop } from '../host/services/remote-sync.js';
-import { stopDiscovery } from '../host/services/discovery.js';
-import { stopAllBabysitters } from '../host/services/babysit.js';
 import { loadDesktopPrefs } from '../host/services/desktop-prefs.js';
-import { installMachineResolver } from '../host/services/remote-machines.js';
-import {
-  appBeamClient,
-  installSessionBin,
-  quitAfterBeam,
-} from './beam/app-beam.js';
-import { installHostEventBridge } from './host-events.js';
-import { installDesktopTmuxPreparer } from './tmux-session-preparer.js';
+import { onPageGone, windowPushes } from './host-events.js';
+import { startHostProcess, type HostProcess } from './host-process.js';
 import { MAIN_MARKS, mark } from './boot-marks.js';
 import { pickFolderWithDialog } from './folder-picker.js';
 import { buildMenuTemplate } from '../host/menu-template.js';
@@ -58,6 +33,7 @@ const APP_VERSION = process.env.N10_DESKTOP_VERSION ?? 'dev';
 const IS_DEV = Boolean(DEV_SERVER_URL) || APP_VERSION === 'dev';
 
 let prefs: DesktopPrefs = loadDesktopPrefs();
+let host: HostProcess | null = null;
 
 // ── Native application menu ──────────────────────────────────────
 
@@ -252,41 +228,59 @@ async function runQaSteps(win: BrowserWindow): Promise<void> {
   app.quit();
 }
 
-// ── Host contract (main-process side) ────────────────────────────
+// ── The session host ─────────────────────────────────────────────
+// Every host service runs in its own utility process (host-worker.ts);
+// this process forwards the contract to it and does what only it can.
 
-registerHostHandlers(ipcMain);
+function startHost(): HostProcess {
+  const host = startHostProcess({
+    pushes: windowPushes,
+    shell: {
+      pickFolder: pickFolderWithDialog,
+      openExternal: async (url) => {
+        if (!/^https?:/i.test(url)) throw new Error(`Refusing to open ${url}`);
+        await shell.openExternal(url);
+      },
+      contextMenu: popupContextMenu,
+      appMenuPopup: async () => {
+        const menu = Menu.getApplicationMenu();
+        const win = BrowserWindow.getFocusedWindow() ?? undefined;
+        menu?.popup({ window: win });
+      },
+      aboutBox: showAbout,
+      prefsChanged: async (next) => {
+        prefs = next;
+        nativeTheme.themeSource = next.theme; // recolors overlay + native menus
+        installAppMenu(); // theme radio state lives in the menu
+      },
+    },
+    // The new host has no watches; reloaded pages watch again.
+    onRespawn: () => {
+      for (const win of BrowserWindow.getAllWindows()) win.webContents.reload();
+    },
+    // The message says it all; the title only names the app.
+    onFailed: (message) => {
+      dialog
+        .showMessageBox({
+          type: 'error',
+          title: 'n10',
+          message,
+          buttons: ['Quit', 'Keep Window Open'],
+          defaultId: 0,
+        })
+        .then(({ response }) => {
+          if (response === 0) app.quit();
+        })
+        .catch((err: unknown) =>
+          console.error('[desktop] host failure dialog', err)
+        );
+    },
+  });
+  onPageGone((viewer) => host.dropViewer(viewer));
+  return host;
+}
 
-setFolderPicker(pickFolderWithDialog);
-
-setExternalOpener(async (url) => {
-  if (!/^https?:/i.test(url)) throw new Error(`Refusing to open ${url}`);
-  await shell.openExternal(url);
-});
-
-setShellGlue({
-  contextMenu: popupContextMenu,
-  appMenuPopup: async () => {
-    const menu = Menu.getApplicationMenu();
-    const win = BrowserWindow.getFocusedWindow() ?? undefined;
-    menu?.popup({ window: win });
-  },
-  aboutBox: showAbout,
-  prefsChanged: (next) => {
-    prefs = next;
-    nativeTheme.themeSource = next.theme; // recolors overlay + native menus
-    installAppMenu(); // theme radio state lives in the menu
-  },
-});
-
-installHostEventBridge();
 installProcessDiagnostics();
-
-// Machines come from the beam daemon's control socket; remote launches
-// resolve their machine through the ports the client installs. The app
-// starts a daemon when none is running (D15), once ready: a utility
-// process cannot be forked before then.
-const beam = appBeamClient();
-installMachineResolver();
 
 // ── App lifecycle ────────────────────────────────────────────────
 
@@ -295,8 +289,6 @@ installMachineResolver();
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  // Only the instance that holds the lock rewrites what its sessions run.
-  installSessionBin(app.getPath('userData'));
   app.on('second-instance', () => {
     const win = BrowserWindow.getAllWindows()[0];
     if (win) {
@@ -311,15 +303,14 @@ if (!app.requestSingleInstanceLock()) {
     .whenReady()
     .then(async () => {
       mark(MAIN_MARKS.ready);
-      beam.start();
       nativeTheme.themeSource = prefs.theme;
       installAppMenu();
-      installDesktopTmuxPreparer();
-      await probeTmuxAvailability();
-      applySessionBackend();
-      const opened = openStartupRepo();
+      // Only the instance that holds the lock starts a host, so only it
+      // rewrites what its sessions run (the host's session bin).
+      host = startHost();
+      const opened = await host.started;
       mark(MAIN_MARKS.repo);
-      console.log(`[desktop] startup repo: ${opened ? opened.cwd : 'none'}`);
+      console.log(`[desktop] startup repo: ${opened ?? 'none'}`);
 
       void createMainWindow();
       mark(MAIN_MARKS.window);
@@ -350,15 +341,18 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Release local terminal clients; the tmux-hosted processes survive app exit.
-// Then wait for the beam daemon the app started to stop.
-quitAfterBeam(beam, () => {
-  stopRemoteSyncLoop();
-  stopDiscovery();
-  stopAllBabysitters();
-  try {
-    killAll();
-  } catch {
-    // nothing was running
-  }
+// The host releases its terminal clients (the tmux-hosted processes
+// survive app exit) and stops the beam daemon the app started (D15).
+// `app.exit`, because an `app.quit` from here can land inside this quit
+// and be ignored.
+let quitting = false;
+app.on('will-quit', (event) => {
+  event.preventDefault();
+  if (quitting) return;
+  quitting = true;
+  // A relaunch while this one waits on the host must win, not quit into it.
+  app.releaseSingleInstanceLock();
+  (host?.stop() ?? Promise.resolve())
+    .catch((err: unknown) => console.error('[desktop] host stop', err))
+    .finally(() => app.exit());
 });

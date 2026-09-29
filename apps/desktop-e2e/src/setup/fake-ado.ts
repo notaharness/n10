@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { ElectronApplication } from '@playwright/test';
 
 /**
  * An Azure DevOps scenario as a test declares it, and the config that
@@ -229,20 +228,18 @@ function served(s: FakeAzureDevOps) {
 export function installFakeAdo(
   homeDir: string,
   scenario: FakeAzureDevOps
-): { N10_FAKE_ADO: string } {
+): { N10_FAKE_ADO: string; N10_HOST_REQUIRE: string } {
   const path = join(homeDir, 'fake-ado.json');
   writeFileSync(path, JSON.stringify(served(scenario), null, 2), 'utf8');
-  return { N10_FAKE_ADO: path };
+  return { N10_FAKE_ADO: path, N10_HOST_REQUIRE: FAKE_ADO_PRELOAD };
 }
 
-/** Whether the preload is in the app's main process. */
-export async function fakeAdoLoaded(
-  app: ElectronApplication
-): Promise<boolean> {
-  const loaded = await app.evaluate(
-    () => (globalThis as { __n10FakeAzure?: boolean }).__n10FakeAzure
-  );
-  return loaded === true;
+/** Whether the preload is in the app's session host, which makes the
+ *  provider's requests. It says so in a file beside the scenario: a
+ *  test cannot evaluate in a utility process. The host is up before
+ *  the first window opens. */
+export function fakeAdoLoaded(homeDir: string): boolean {
+  return existsSync(join(homeDir, 'fake-ado.json.loaded'));
 }
 
 /** The requests the fake had no answer for, as `METHOD url` lines. */

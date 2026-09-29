@@ -17,11 +17,7 @@ import {
 } from '../setup/git-repo.js';
 import { killFixtureSessions } from '../setup/tmux.js';
 import { appEnv } from './app-env.js';
-import {
-  FAKE_ADO_PRELOAD,
-  fakeAdoLoaded,
-  fakeAdoMisses,
-} from '../setup/fake-ado.js';
+import { fakeAdoLoaded, fakeAdoMisses } from '../setup/fake-ado.js';
 import { closeDesktopApp } from '../setup/app-close.js';
 import type { TerminalSeed } from '../setup/terminals.js';
 import {
@@ -166,7 +162,7 @@ export const test = base.extend<
     seedTmux(repoPath, homeDir, liveSessions, liveTerminals);
 
     const app = await electron.launch({
-      args: launchArgs(!!fakeAzureDevOps),
+      args: launchArgs(),
       cwd: WORKSPACE_ROOT,
       env: appEnv({
         homeDir,
@@ -181,7 +177,11 @@ export const test = base.extend<
 
     const page = await app.firstWindow();
     if (fakeAzureDevOps) {
-      await requireFakeAdo(app, () => ownsRepo && cleanupTestRepo(repoPath));
+      await requireFakeAdo(
+        app,
+        homeDir,
+        () => ownsRepo && cleanupTestRepo(repoPath)
+      );
     }
 
     // Chromium throttles requestAnimationFrame in a window it considers
@@ -256,11 +256,9 @@ export const test = base.extend<
   },
 });
 
-/** Electron's arguments. The Azure DevOps preload goes first, before
- *  any of the app's code, so no request can reach Azure. */
-function launchArgs(fakeAzureDevOps: boolean): string[] {
+/** Electron's arguments. */
+function launchArgs(): string[] {
   return [
-    ...(fakeAzureDevOps ? ['-r', FAKE_ADO_PRELOAD] : []),
     APP_DIR,
     // CI runners have no user namespaces for the sandbox, and
     // software rendering is both available and deterministic.
@@ -270,14 +268,15 @@ function launchArgs(fakeAzureDevOps: boolean): string[] {
   ];
 }
 
-/** Stop unless the Azure DevOps fake is in the main process. The
+/** Stop unless the Azure DevOps fake is in the session host. The
  *  preload writes the token, so without it the app has no credentials
  *  and has asked Azure nothing; it is stopped all the same. */
 async function requireFakeAdo(
   app: ElectronApplication,
+  homeDir: string,
   cleanup: () => void
 ): Promise<void> {
-  if (await fakeAdoLoaded(app)) return;
+  if (fakeAdoLoaded(homeDir)) return;
   await closeDesktopApp(app);
   cleanup();
   throw new Error('The Azure DevOps fake did not load');

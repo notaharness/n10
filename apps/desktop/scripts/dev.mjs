@@ -34,6 +34,7 @@ const REQUIRE_BANNER =
 const mainOptions = {
   entryPoints: [
     join(appRoot, 'src/main/main.ts'),
+    join(appRoot, 'src/main/host-worker.ts'),
     join(appRoot, 'src/main/tmux-session-worker.ts'),
     join(appRoot, 'src/main/beam-daemon-worker.ts'),
     join(appRoot, 'src/main/n10-shim.ts'),
