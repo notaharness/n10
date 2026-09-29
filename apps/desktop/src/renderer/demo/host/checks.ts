@@ -7,7 +7,7 @@ import type {
   PullRequestInfo,
 } from '@n10/vcs-core';
 import { isOid, type PullRequestRef } from '@n10/vcs-core/pr-details';
-import type { DemoCi, DemoJob } from '../data/identity.js';
+import type { DemoCi, DemoJob, DemoTeam } from '../data/identity.js';
 
 /**
  * A demo pull request's checks read, as GitHub's would describe it:
@@ -101,14 +101,25 @@ function checksOf(
   });
 }
 
+/** The teams GitHub asked to review this pull request, for its paths. */
+export function teamsOn(pr: PullRequestInfo, ci: DemoCi): DemoTeam[] {
+  return (ci.teams ?? []).filter((t) => t.requestedOn.includes(pr.id));
+}
+
+/** A required team still to approve: the demo's teams never do. */
+const teamWaits = (pr: PullRequestInfo, ci: DemoCi) =>
+  teamsOn(pr, ci).some((t) => t.approvals > 0);
+
 /** GitHub's `reviewDecision`: stated only where the rules ask for
  *  approvals. */
 function reviewsOf(pr: PullRequestInfo, ci: DemoCi): MergeState['reviews'] {
-  if (ci.approvals === 0) return 'unknown';
+  if (ci.approvals === 0 && !ci.teams?.length) return 'unknown';
   const decisions = (pr.reviewers ?? []).map((r) => r.decision);
   if (decisions.includes('changes-requested')) return 'changes-requested';
   const approvals = decisions.filter((d) => d === 'approved').length;
-  return approvals >= ci.approvals ? 'approved' : 'required';
+  return approvals >= ci.approvals && !teamWaits(pr, ci)
+    ? 'approved'
+    : 'required';
 }
 
 /** GitHub's `mergeStateStatus` over what the demo holds, and what the
@@ -123,7 +134,7 @@ function mergeOf(
     checks.some(
       (c) => c.requirement === 'required' && c.outcome !== 'succeeded'
     ) ||
-    (ci.approvals > 0 && reviews !== 'approved') ||
+    (reviews !== 'unknown' && reviews !== 'approved') ||
     (ci.conversationResolution && (pr.activeCommentCount ?? 0) > 0);
   const unstable = checks.some((c) => c.outcome === 'failed');
   const native = blocked ? 'BLOCKED' : unstable ? 'UNSTABLE' : 'CLEAN';
@@ -139,6 +150,16 @@ function mergeOf(
 }
 
 function rulesOf(ci: DemoCi): BranchRules {
+  const named = (ci.teams ?? []).map((t) => ({
+    // The rules read gives the rule set's id, not its name.
+    name: null,
+    ids: [String(t.id)],
+    kind: 'team' as const,
+    approvals: t.approvals,
+    paths: t.paths,
+    applies: null,
+    blocking: t.approvals > 0,
+  }));
   return {
     requiredChecks: ci.jobs
       .filter((j) => j.required)
@@ -148,7 +169,7 @@ function rulesOf(ci: DemoCi): BranchRules {
     reviews: {
       approvals: ci.approvals,
       codeOwners: false,
-      named: [],
+      named,
       approvalsMet: null,
     },
   };

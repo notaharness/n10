@@ -110,6 +110,66 @@ describe('readiness aspects', () => {
     });
   });
 
+  it('adds the count of approvals the rules ask for, and no more', () => {
+    const asking = (
+      approvals: number,
+      r: MergeState['reviews'],
+      blocked = true
+    ) =>
+      aspect(
+        inputs({
+          merge: { ...CLEAN, reviews: r, blocked },
+          rules: {
+            state: 'read',
+            value: {
+              requiredChecks: [],
+              conversationResolution: true,
+              // Code owners and named teams are the reviewers' to say.
+              reviews: { ...NO_RULE, approvals, codeOwners: true },
+            },
+          },
+        }),
+        'reviews'
+      );
+    expect(asking(1, 'changes-requested')).toEqual({
+      state: 'blocked',
+      text: 'Changes requested · 1 approval required',
+    });
+    expect(asking(2, 'approved', false)).toEqual({
+      state: 'met',
+      text: 'Approved · 2 approvals required',
+    });
+    // The rule without a stated verdict is the rule alone.
+    expect(asking(1, 'unknown')).toEqual({
+      state: 'unknown',
+      text: '1 approval required',
+    });
+    expect(asking(0, 'required')?.text).toBe('Waiting for review');
+    // Rules that could not be read are said so: the count is unknown.
+    expect(
+      aspect(
+        inputs({
+          merge: { ...CLEAN, reviews: 'required', blocked: true },
+          rules: { state: 'failed', kind: 'network', reason: 'offline' },
+        }),
+        'reviews'
+      )?.text
+    ).toBe('Waiting for review · rules could not be read');
+    // With no verdict stated either, both unknowns are said.
+    expect(
+      aspect(
+        inputs({
+          merge: { ...CLEAN, reviews: 'unknown', blocked: true },
+          rules: { state: 'failed', kind: 'network', reason: 'offline' },
+        }),
+        'reviews'
+      )
+    ).toEqual({
+      state: 'unknown',
+      text: 'Requirement not stated · rules could not be read',
+    });
+  });
+
   it('names the worst required check or policy, in the verdict’s words', () => {
     const blocked = { ...CLEAN, blocked: true };
     expect(
@@ -173,18 +233,20 @@ describe('readiness aspects', () => {
     });
   });
 
-  it('reads conflicts and branch currency', () => {
+  it('reads conflicts only where the provider reports them', () => {
     const conflicts = (merge: Partial<MergeState>) =>
       aspect(
         inputs({ merge: { ...CLEAN, blocked: true, ...merge } }),
         'conflicts'
       );
-    expect(conflicts({ conflicts: 'conflicting' })?.state).toBe('blocked');
-    expect(conflicts({ behind: true })).toEqual({
+    expect(conflicts({ conflicts: 'conflicting' })).toEqual({
       state: 'blocked',
-      text: 'Behind its target',
+      text: 'Conflicts with its target',
     });
-    expect(conflicts({ conflicts: 'unknown' })?.state).toBe('unknown');
+    // Behind its target is no conflict: the verdict's blockers name it.
+    expect(conflicts({ behind: true })).toBeUndefined();
+    // Not worked out yet is among the verdict's unknowns, not a row.
+    expect(conflicts({ conflicts: 'unknown' })).toBeUndefined();
   });
 
   it('reads conversations: enforced, advisory, resolved or unread', () => {
@@ -234,11 +296,8 @@ describe('readiness aspects', () => {
     ).toBe('unknown');
   });
 
-  it('reads no conflicts as met', () => {
-    expect(aspect(inputs(), 'conflicts')).toEqual({
-      state: 'met',
-      text: 'No conflicts',
-    });
+  it('shows no conflicts row where the provider reports none', () => {
+    expect(aspect(inputs(), 'conflicts')).toBeUndefined();
   });
 
   it('names a failure over what is still going, across kinds', () => {

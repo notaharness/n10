@@ -132,6 +132,7 @@ function requestedReviewer(req) {
       id: `T_${req.team}`,
       combinedSlug: req.team,
       name: req.name ?? req.team,
+      databaseId: req.id ?? null,
     };
   }
   return { __typename: 'User', id: `U_${req.login}`, login: req.login };
@@ -505,9 +506,9 @@ function conversationThread(t, i) {
     subjectType: t.line == null && t.originalLine == null ? 'FILE' : 'LINE',
     startDiffSide: null,
     resolvedBy: t.isResolved ? actor(t.resolvedBy) : null,
-    viewerCanReply: true,
-    viewerCanResolve: !node.isResolved,
-    viewerCanUnresolve: node.isResolved,
+    viewerCanReply: t.canReply ?? true,
+    viewerCanResolve: (t.canResolve ?? true) && !node.isResolved,
+    viewerCanUnresolve: (t.canResolve ?? true) && node.isResolved,
     root: { nodes: [{ diffHunk: t.diffHunk ?? '', originalCommit: null }] },
     comments: pageOf(threadComments(t, i), undefined),
   };

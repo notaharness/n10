@@ -3,6 +3,7 @@ import { providerName } from '../provider-name.js';
 import type {
   ReviewerStanding,
   ReviewRequirements,
+  StandingRule,
 } from '../../../host/contract.js';
 
 /**
@@ -18,17 +19,22 @@ export interface ReviewerRow {
   displayName: string;
   decision: PullRequestReviewer['decision'];
   standing: string | null;
+  /** The rules that name them, for the standing's hover. */
+  rules: StandingRule[];
 }
 
 /** Required or optional, and why, in a few words; null where there is
- *  nothing to say beyond their having been asked. */
+ *  nothing to say beyond their having been asked. A rule that names
+ *  them is worth a line even where their requirement is unknown. */
 export function standingLabel(
-  s: Pick<ReviewerStanding, 'requirement' | 'reason'>
+  s: Pick<ReviewerStanding, 'requirement' | 'reason' | 'rules'>
 ): string | null {
   if (s.reason === 'code-owner') {
     return s.requirement === 'required' ? 'Required code owner' : 'Code owner';
   }
-  if (s.requirement === 'unknown') return null;
+  if (s.requirement === 'unknown') {
+    return s.rules.length > 0 ? 'Named by a rule' : null;
+  }
   const base = s.requirement === 'required' ? 'Required' : 'Optional';
   if (s.reason === 'policy') return `${base}, by policy`;
   return base;
@@ -42,7 +48,7 @@ export function reviewerRows(
 ): { rows: ReviewerRow[]; notes: string[] } {
   const read = requirements?.reviewers;
   if (read?.state !== 'read') {
-    const rows = listed.map((r) => ({ ...r, standing: null }));
+    const rows = listed.map((r) => ({ ...r, standing: null, rules: [] }));
     const notes =
       read?.state === 'failed'
         ? ["The reviewers' details could not be read."]
@@ -72,6 +78,7 @@ export function reviewerRows(
       displayName: s.displayName,
       decision: s.decision,
       standing: standingLabel(s),
+      rules: s.rules,
     })),
     notes,
   };

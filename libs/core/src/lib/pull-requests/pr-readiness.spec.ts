@@ -94,7 +94,6 @@ describe('evaluateReadiness', () => {
         { id: 'lifecycle', state: 'met', text: 'Open' },
         { id: 'reviews', state: 'met', text: 'Approved' },
         { id: 'checks', state: 'met', text: 'Required checks pass' },
-        { id: 'conflicts', state: 'met', text: 'No conflicts' },
         { id: 'conversations', state: 'met', text: 'Not required' },
       ],
     });

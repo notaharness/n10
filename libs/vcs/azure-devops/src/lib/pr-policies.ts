@@ -136,7 +136,7 @@ export function statusNameOf(e: RawEvaluation): string | null {
 }
 
 /** The name Azure's own page shows, the most specific first. */
-function nameOf(e: RawEvaluation): string {
+export function nameOf(e: RawEvaluation): string {
   const settings = e.configuration?.settings;
   const names = [
     settings?.displayName,

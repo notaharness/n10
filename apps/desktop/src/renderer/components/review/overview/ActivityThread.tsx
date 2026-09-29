@@ -5,7 +5,7 @@ import {
   CodeXmlIcon,
   MessageSquareIcon,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ConversationThread } from '../../../../host/contract.js';
 import { commentPreview } from '../../../lib/review/activity-text.js';
 import { foldReplies } from '../../../lib/review/reply-fold.js';
@@ -20,6 +20,12 @@ import { Button } from '../../ui/button.js';
 import { Tip } from '../../ui/tooltip.js';
 import { ThreadContext } from '../comments/ThreadContext.js';
 import { ActivityComment, ActorName } from './ActivityComment.js';
+import { threadOffers } from '../../../lib/review/thread-offers.js';
+import {
+  ThreadActionsFor,
+  useRemoteThread,
+  type ActionsView,
+} from './activity-actions.js';
 import { useHasDraftReply } from './drafted.js';
 import { useIsNew } from './new-since.js';
 
@@ -73,19 +79,42 @@ export function ActivityThread({
     if (searching) setFoldedFor(open ? query : null);
     else setExpanded(!open);
   };
-  return (
+  const remote = useRemoteThread(thread.id);
+  const card = (actions?: ActionsView) => (
     <article
       data-thread-id={thread.id}
-      className="overflow-hidden rounded-md border border-border"
+      className="group/card overflow-hidden rounded-md border border-border"
     >
       <ThreadHeader
         thread={thread}
         open={open}
         onToggle={toggle}
         onOpen={onOpen}
+        plan={actions?.plan}
       />
-      {open && <ThreadBody thread={thread} matches={matches} />}
+      {open && (
+        <ThreadBody
+          thread={thread}
+          matches={matches}
+          footer={actions?.footer}
+        />
+      )}
     </article>
+  );
+  if (!remote) return card();
+  const offers = threadOffers(thread, remote.thread);
+  return (
+    <ThreadActionsFor
+      remote={remote}
+      open={open}
+      canReply={offers.reply}
+      canResolve={offers.resolve}
+      onUnfold={() => {
+        if (!open) toggle();
+      }}
+    >
+      {card}
+    </ThreadActionsFor>
   );
 }
 
@@ -94,11 +123,14 @@ function ThreadHeader({
   open,
   onToggle,
   onOpen,
+  plan,
 }: {
   thread: ConversationThread;
   open: boolean;
   onToggle: () => void;
   onOpen: (id: string, path: string | null) => void;
+  /** Queue it in the plan, where the diff knows the thread. */
+  plan?: ReactNode;
 }) {
   const place = threadPlace(thread) ?? 'Conversation';
   const Chevron = open ? ChevronDownIcon : ChevronRightIcon;
@@ -144,6 +176,7 @@ function ThreadHeader({
         </span>
       </button>
       <span className="flex shrink-0 items-center gap-1">
+        {plan}
         {drafted && (
           <Badge variant="outline" className="border-primary/40 text-primary">
             Draft reply
@@ -168,9 +201,12 @@ function ThreadHeader({
 function ThreadBody({
   thread,
   matches,
+  footer,
 }: {
   thread: ConversationThread;
   matches: Set<string>;
+  /** The note, and the reply box and resolve button. */
+  footer?: ReactNode;
 }) {
   const [root, ...replies] = thread.comments;
   const { anchor, coverage } = thread;
@@ -194,6 +230,7 @@ function ThreadBody({
             : `Showing ${coverage.loaded} of ${coverage.total} comments; the rest did not load.`}
         </p>
       )}
+      {footer}
     </div>
   );
 }

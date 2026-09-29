@@ -32,4 +32,5 @@ export {
   type ReviewerRequirement,
   type ReviewerStanding,
   type ReviewRequirements,
+  type StandingRule,
 } from './lib/pull-requests/pr-review-requirements.js';

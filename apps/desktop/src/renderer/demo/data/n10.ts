@@ -149,5 +149,15 @@ export const N10_REPO: RepoData = {
     ],
     approvals: 1,
     conversationResolution: true,
+    teams: [
+      {
+        slug: 'notaharness/desktop',
+        name: 'Desktop',
+        id: 7301,
+        approvals: 1,
+        paths: ['apps/desktop/**', 'apps/desktop-e2e/**', 'libs/app-core/**'],
+        requestedOn: [PR_TABS.id, PR_REVIEW.id],
+      },
+    ],
   },
 };

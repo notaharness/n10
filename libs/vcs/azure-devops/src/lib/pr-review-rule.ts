@@ -1,5 +1,11 @@
 import type { NamedReviewers, ReviewRule } from '@n10/vcs-core';
-import { isActive, POLICY, typeOf, type RawEvaluation } from './pr-policies.js';
+import {
+  isActive,
+  nameOf,
+  POLICY,
+  typeOf,
+  type RawEvaluation,
+} from './pr-policies.js';
 
 /**
  * What an Azure DevOps pull request's reviewer policies ask of its
@@ -21,6 +27,7 @@ function named(e: RawEvaluation): NamedReviewers[] {
   if (ids.length === 0) return [];
   return [
     {
+      name: nameOf(e),
       ids,
       kind: 'identity',
       approvals: settings?.minimumApproverCount ?? null,

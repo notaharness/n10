@@ -250,6 +250,8 @@ describe('fetchPullRequestChecksAzure', () => {
           // names whom it added; the disabled one names no one.
           named: [
             {
+              // Azure's name for the policy.
+              name: 'Required reviewers',
               ids: ['00000000-0000-4000-8000-000000000022'],
               kind: 'identity',
               approvals: 1,
@@ -258,6 +260,7 @@ describe('fetchPullRequestChecksAzure', () => {
               blocking: true,
             },
             {
+              name: 'Required reviewers',
               ids: ['00000000-0000-4000-8000-000000000002'],
               kind: 'identity',
               approvals: null,
@@ -266,6 +269,7 @@ describe('fetchPullRequestChecksAzure', () => {
               blocking: false,
             },
             {
+              name: 'Required reviewers',
               ids: ['00000000-0000-4000-8000-000000000021'],
               kind: 'identity',
               approvals: null,

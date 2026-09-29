@@ -26,6 +26,22 @@ export function fileSection(patch: string, file: string): string {
   return sections.find((s) => s.startsWith(`diff --git a/${file} `)) ?? '';
 }
 
+/** A GitHub conversation comment answered: another comment on the pull
+ *  request, a thread of its own in the diff's read. */
+function answer(
+  thread: RemoteCommentThread,
+  body: string
+): RemoteCommentThread {
+  const id = `IC_demo_${Date.now().toString(36)}`;
+  return {
+    ...thread,
+    id,
+    comments: [
+      { id, author: VIEWER, body, createdAt: new Date().toISOString() },
+    ],
+  };
+}
+
 function reply(thread: RemoteCommentThread, body: string): RemoteCommentThread {
   const id = `${thread.id}-${thread.comments.length + 1}`;
   const createdAt = new Date().toISOString();
@@ -105,7 +121,15 @@ export function createReviewHost(state: DemoState): ReviewHost {
     },
     fetchCommentThreads: (prId) => later(repo().threadsOf(prId), 120),
     replyToThread: ({ prId, thread, body }) => {
-      editThreads(prId, (t) => reply(t, body), thread.id);
+      if (thread.replyKind === 'github-issue-comment') {
+        const current = repo().threadsOf(prId);
+        repo().threads[prId] = {
+          ...current,
+          generalComments: [...current.generalComments, answer(thread, body)],
+        };
+      } else {
+        editThreads(prId, (t) => reply(t, body), thread.id);
+      }
       return later(undefined);
     },
     setThreadResolved: ({ prId, thread, resolved }) => {

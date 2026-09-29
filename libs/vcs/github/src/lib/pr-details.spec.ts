@@ -314,6 +314,8 @@ describe('fetchPullRequestDetailGitHub: reviewers', () => {
         kind: 'team',
         identifier: 'acme/core',
         id: 'T_core',
+        // The id its rule sets name it by.
+        ruleId: '777',
         displayName: 'Core team',
         requested: true,
         reason: 'code-owner',

@@ -16,11 +16,13 @@ import { ComposerNoticeLine } from './ComposerNotice.js';
 import { DraftStatus, UnsavedChoice } from './DraftStatus.js';
 
 /**
- * The card's reply box and resolve button. The reply is a durable
- * draft: closing the box keeps it, and a closed box with a draft says
- * so and opens on it.
+ * The card's reply box and resolve button, each where the provider lets
+ * the viewer use it. The reply is a durable draft: closing the box keeps
+ * it, and a closed box with a draft says so and opens on it, even where
+ * replying is no longer allowed, so nothing written is lost from sight.
  */
 export function ThreadFooter({
+  canReply = true,
   canResolve,
   isResolved,
   composing,
@@ -32,6 +34,8 @@ export function ThreadFooter({
   onToggleResolved,
   notice = null,
 }: {
+  /** The provider lets the viewer reply; true unless it says not. */
+  canReply?: boolean;
   canResolve: boolean;
   isResolved: boolean;
   composing: boolean;
@@ -66,30 +70,21 @@ export function ThreadFooter({
             onClose={() => setComposing(false)}
             onUndo={toPrompt}
           />
-        ) : (
+        ) : canReply || draft.body.trim() ? (
           <ReplyPrompt
             ref={prompt}
             draft={draft}
             onOpen={() => setComposing(true)}
           />
+        ) : (
+          <span className="flex-1" />
         )}
         {canResolve && !composing && (
-          <Button
-            variant={isResolved ? 'ghost' : 'outline'}
-            size="sm"
-            onClick={onToggleResolved}
-            disabled={resolving}
-          >
-            {isResolved ? (
-              <>
-                <RotateCcwIcon /> Reopen
-              </>
-            ) : (
-              <>
-                <CheckIcon /> Resolve
-              </>
-            )}
-          </Button>
+          <ResolveButton
+            isResolved={isResolved}
+            resolving={resolving}
+            onToggle={onToggleResolved}
+          />
         )}
       </div>
       {draft.readError && !composing && (
@@ -100,6 +95,35 @@ export function ThreadFooter({
         </p>
       )}
     </div>
+  );
+}
+
+function ResolveButton({
+  isResolved,
+  resolving,
+  onToggle,
+}: {
+  isResolved: boolean;
+  resolving: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Button
+      variant={isResolved ? 'ghost' : 'outline'}
+      size="sm"
+      onClick={onToggle}
+      disabled={resolving}
+    >
+      {isResolved ? (
+        <>
+          <RotateCcwIcon /> Reopen
+        </>
+      ) : (
+        <>
+          <CheckIcon /> Resolve
+        </>
+      )}
+    </Button>
   );
 }
 

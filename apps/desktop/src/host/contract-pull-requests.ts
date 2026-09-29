@@ -36,6 +36,7 @@ export type {
   ReviewerRequirement,
   ReviewerStanding,
   ReviewRequirements,
+  StandingRule,
   SnapshotRequest,
 } from '@n10/core';
 export type {

@@ -45,6 +45,13 @@ describe('the demo pull request host', () => {
                 native: 'CHANGES_REQUESTED',
                 reviewedHead: '905bbcb2036a4f1e8c2d7b9a5e3f6c1d8b4a2e7f',
               },
+              // Asked for its paths, by the id its rule sets use.
+              {
+                kind: 'team',
+                identifier: 'notaharness/desktop',
+                ruleId: '7301',
+                requested: true,
+              },
             ],
             complete: true,
           },
@@ -131,8 +138,12 @@ describe('the demo checks read', () => {
       ],
     });
     // GitHub states the rule's count and marks no reviewer required.
+    expect(answer.readiness.aspects).toContainEqual({
+      id: 'reviews',
+      state: 'waiting',
+      text: 'Waiting for review · 1 approval required',
+    });
     expect(answer.requirements).toMatchObject({
-      rule: ['1 approval required'],
       reviewers: {
         state: 'read',
         value: {
@@ -141,6 +152,26 @@ describe('the demo checks read', () => {
               identifier: 'HermannBjorgvin',
               requirement: 'unknown',
               requested: true,
+              rules: [],
+            },
+            // The rule set that names the team, with its paths: the
+            // Reviewers hover.
+            {
+              identifier: 'notaharness/desktop',
+              requirement: 'unknown',
+              reason: null,
+              rules: [
+                {
+                  name: 'Ruleset',
+                  asks: '1 approval required',
+                  paths: [
+                    'apps/desktop/**',
+                    'apps/desktop-e2e/**',
+                    'libs/app-core/**',
+                  ],
+                  applies: null,
+                },
+              ],
             },
           ],
         },
@@ -165,7 +196,11 @@ describe('the demo checks read', () => {
       'required',
       'optional',
     ]);
-    expect(answer.requirements.rule).toEqual([]);
+    expect(answer.readiness.aspects).toContainEqual({
+      id: 'reviews',
+      state: 'met',
+      text: 'Not in the way',
+    });
     // GitHub states no review decision without a rule that asks one.
     expect((await read(39)).readiness).toMatchObject({
       state: 'blocked',
@@ -245,6 +280,29 @@ describe('the demo conversation read', () => {
       body: 'Fixed.',
       replyTo: thread?.comments[0]?.id,
       capabilities: { edit: { state: 'supported' } },
+    });
+  });
+
+  it('answers a conversation comment with another, as GitHub does', async () => {
+    const state = new DemoState();
+    state.open(N10);
+    const review = createReviewHost(state);
+    const [general] = state.repo().threadsOf(177).generalComments;
+    if (!general) throw new Error('no comment');
+    await review.replyToThread({ prId: 177, thread: general, body: 'On it.' });
+    const { conversation } = await createPullRequestHost(
+      state
+    ).getPullRequestConversation({ ref });
+    if (conversation.state !== 'read') throw new Error('not read');
+    // Each comment is known by the id the diff's read gives its thread,
+    // which is what the Overview's actions look it up by.
+    const held = state.repo().threadsOf(177).generalComments;
+    expect(conversation.value.comments.map((c) => [c.id, c.body])).toEqual(
+      held.map((t) => [t.id, t.comments[0]?.body])
+    );
+    expect(conversation.value.comments.at(-1)).toMatchObject({
+      body: 'On it.',
+      replyTo: null,
     });
   });
 });

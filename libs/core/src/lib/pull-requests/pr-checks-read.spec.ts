@@ -196,7 +196,6 @@ describe('readPullRequestChecks', () => {
         state: 'read',
         value: { items: [{ identifier: 'bob', requirement: 'required' }] },
       },
-      rule: [],
     });
   });
 

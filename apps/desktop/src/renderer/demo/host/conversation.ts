@@ -230,15 +230,19 @@ export function demoConversation(
       return threadOf(t, pr, hunk);
     })
   ).then((threads) => {
-    // A GitHub conversation comment stands alone: an answer is another.
-    const comments = held.generalComments.flatMap((t) =>
-      t.comments.map((c) =>
+    // A GitHub conversation comment stands alone, and its id is the one
+    // the diff's comment read gives it as a thread.
+    const comments = held.generalComments.flatMap((t) => {
+      const [first] = t.comments;
+      if (!first) return [];
+      const c = { ...first, id: t.id };
+      return [
         comment(c, `${pr.url}#issuecomment-${c.id}`, {
           replyTo: null,
           reviewId: null,
-        })
-      )
-    );
+        }),
+      ];
+    });
     const reviews = reviewsOf(pr, held.threads);
     const events = eventsOf(pr);
     const threadComments = threads.reduce((n, t) => n + t.comments.length, 0);

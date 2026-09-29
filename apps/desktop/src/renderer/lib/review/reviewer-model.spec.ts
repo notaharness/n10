@@ -14,6 +14,7 @@ function standing(over: Partial<ReviewerStanding>): ReviewerStanding {
     requested: true,
     requirement: 'unknown',
     reason: null,
+    rules: [],
     ...over,
   };
 }
@@ -29,7 +30,6 @@ function requirements(
         ? { items, total: items.length, complete: true }
         : { items, total: 12, complete: false },
     },
-    rule: [],
   };
 }
 
@@ -45,6 +45,14 @@ describe('standingLabel', () => {
     );
     expect(label({ requirement: 'optional' })).toBe('Optional');
     expect(label({ reason: 'code-owner' })).toBe('Code owner');
+    // A rule names them, though GitHub does not say they are required.
+    const rule = {
+      name: 'Ruleset',
+      asks: '1 approval required',
+      paths: ['src/**'],
+      applies: null,
+    };
+    expect(label({ rules: [rule] })).toBe('Named by a rule');
     // Asked, and nothing more is known: nothing to add.
     expect(label({})).toBeNull();
   });
@@ -57,7 +65,7 @@ describe('reviewerRows', () => {
 
   it('shows the list row, without standings, until the detail answers', () => {
     expect(reviewerRows(listed, null, 'github')).toEqual({
-      rows: [{ ...listed[0], standing: null }],
+      rows: [{ ...listed[0], standing: null, rules: [] }],
       notes: [],
     });
     expect(
@@ -65,7 +73,6 @@ describe('reviewerRows', () => {
         listed,
         {
           reviewers: { state: 'failed', kind: 'network', reason: 'offline' },
-          rule: null,
         },
         'github'
       ).notes
@@ -86,6 +93,7 @@ describe('reviewerRows', () => {
         displayName: 'Someone',
         decision: 'no-response',
         standing: 'Code owner',
+        rules: [],
       },
     ]);
     expect(got.notes).toEqual(["GitHub doesn't mark reviewers required."]);

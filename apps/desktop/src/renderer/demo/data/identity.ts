@@ -26,6 +26,21 @@ export interface DemoJob {
   seconds: number;
 }
 
+/** A team a rule set requires for changes to its paths. GitHub asks it
+ *  to review a pull request that changes them. */
+export interface DemoTeam {
+  /** GitHub's `org/slug`. */
+  slug: string;
+  name: string;
+  /** Its database id, which rule sets name it by. */
+  id: number;
+  approvals: number;
+  paths: string[];
+  /** The pull requests that change its paths, which GitHub asked it to
+   *  review. */
+  requestedOn: number[];
+}
+
 /** What a repository runs on its pull requests, and what its default
  *  branch's rules ask of them. */
 export interface DemoCi {
@@ -34,6 +49,8 @@ export interface DemoCi {
   approvals: number;
   /** Review threads must be resolved. */
   conversationResolution: boolean;
+  /** Teams a rule set requires, by path. */
+  teams?: DemoTeam[];
 }
 
 /** One repository the demo knows, as its host would read it off disk

@@ -34,6 +34,7 @@ import {
   ShowResolved,
 } from './ActivityControls.js';
 import { focusAfter } from '../../../lib/focus.js';
+import { ActivityActionsProvider } from './activity-actions.js';
 import { CoverageNotice } from './CoverageNotice.js';
 import { DraftedThreads } from './drafted.js';
 import { NewSince } from './new-since.js';
@@ -104,13 +105,15 @@ export function PrActivity({
             />
           )}
           {state.data.conversation.state === 'read' ? (
-            <DraftedThreads.Provider value={drafted}>
-              <Activity
-                conversation={state.data.conversation.value}
-                viewer={repo.viewer}
-                onOpenThread={onOpenThread}
-              />
-            </DraftedThreads.Provider>
+            <ActivityActionsProvider prId={prRef.number}>
+              <DraftedThreads.Provider value={drafted}>
+                <Activity
+                  conversation={state.data.conversation.value}
+                  viewer={repo.viewer}
+                  onOpenThread={onOpenThread}
+                />
+              </DraftedThreads.Provider>
+            </ActivityActionsProvider>
           ) : (
             <>
               <ActivityHeading />

@@ -108,7 +108,8 @@
                 "__typename": "Team",
                 "id": "T_core",
                 "combinedSlug": "acme/core",
-                "name": "Core team"
+                "name": "Core team",
+                "databaseId": 777
               }
             }
           ]

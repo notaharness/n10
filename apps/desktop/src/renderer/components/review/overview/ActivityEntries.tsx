@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import type {
+  ConversationComment,
   ConversationEvent,
   ReviewSummary,
 } from '../../../../host/contract.js';
@@ -34,6 +35,11 @@ import {
   When,
 } from './ActivityComment.js';
 import { ActivityThread } from './ActivityThread.js';
+import {
+  ThreadActionsFor,
+  useRemoteThread,
+  type ActionsView,
+} from './activity-actions.js';
 
 type OpenThread = (id: string, path: string | null) => void;
 
@@ -83,6 +89,33 @@ function ReviewEntry({ review }: { review: ReviewSummary }) {
         </div>
       )}
     </article>
+  );
+}
+
+/**
+ * A conversation comment that stands alone. GitHub answers one with
+ * another comment on the pull request, as the diff's card does, and has
+ * no resolving it; the diff's thread says which it is.
+ */
+function CommentEntry({ comment }: { comment: ConversationComment }) {
+  const remote = useRemoteThread(comment.id);
+  const card = (actions?: ActionsView) => (
+    <article className="group/card overflow-hidden rounded-md border border-border">
+      <ActivityComment comment={comment} actions={actions?.plan} />
+      {actions?.footer}
+    </article>
+  );
+  if (!remote) return card();
+  return (
+    <ThreadActionsFor
+      remote={remote}
+      open
+      canReply
+      canResolve={remote.thread.canResolve}
+      onUnfold={() => undefined}
+    >
+      {card}
+    </ThreadActionsFor>
   );
 }
 
@@ -166,11 +199,7 @@ function EntryView({
     case 'review':
       return <ReviewEntry review={entry.review} />;
     case 'comment':
-      return (
-        <article className="overflow-hidden rounded-md border border-border">
-          <ActivityComment comment={entry.comment} />
-        </article>
-      );
+      return <CommentEntry comment={entry.comment} />;
     case 'thread':
       return (
         <ActivityThread
