@@ -588,7 +588,7 @@ describe('sidebar handler — delete-branch', () => {
     expect(t.deleteConfirm.setConfirmDelete).toHaveBeenCalledExactlyOnceWith({
       branch: 'alpha',
       sessionName: worktreeSessionKey('/wt/alpha'),
-      reason: 'session is active — agent process will be killed',
+      reason: 'An agent is running here — deleting stops it',
       mode: 'yes-no',
       // Confirming removes with this verdict, which does not force.
       approved: running,

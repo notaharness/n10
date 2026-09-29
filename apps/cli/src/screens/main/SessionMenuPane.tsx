@@ -119,7 +119,7 @@ export const SessionMenuPane = memo(function SessionMenuPane({
   const fresh = safeAgentIdx > 0;
   const agentName = fresh
     ? agentOptions[safeAgentIdx - 1]!.name
-    : 'Recorded agent / default';
+    : 'Last used or default';
 
   const options = sessionMenuOptions(pr != null);
   const optKey = options[Math.min(selectedOption, options.length - 1)]!;

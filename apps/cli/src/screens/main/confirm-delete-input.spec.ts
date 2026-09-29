@@ -54,7 +54,7 @@ const FORCED: DeleteConfirmState = {
 const RUNNING: DeleteConfirmState = {
   branch: 'alpha',
   sessionName: 'wt:alpha',
-  reason: 'session is active — agent process will be killed',
+  reason: 'An agent is running here — deleting stops it',
   mode: 'yes-no',
   approved: {
     verdict: 'agent-running',

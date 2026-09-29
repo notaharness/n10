@@ -86,7 +86,7 @@ describe('readPullRequestSnapshot: whose answer this is', () => {
   it('refuses a caller that last saw another account', async () => {
     await expect(
       readPullRequestSnapshot({ ref: REF, viewer: 'alice' }, sources())
-    ).rejects.toThrow('n10 acts as bob now, not alice');
+    ).rejects.toThrow('The account changed from alice to bob');
     await expect(
       readPullRequestSnapshot({ ref: REF, viewer: 'BOB' }, sources())
     ).resolves.toMatchObject({ viewer: 'bob' });
@@ -121,7 +121,7 @@ describe('readPullRequestSnapshot: whose answer this is', () => {
         },
       })
     );
-    await expect(snap).rejects.toThrow('n10 acts as carol now, not bob');
+    await expect(snap).rejects.toThrow('The account changed from bob to carol');
   });
 
   it('refuses an account change during the reads when the caller named no account', async () => {
@@ -139,22 +139,20 @@ describe('readPullRequestSnapshot: whose answer this is', () => {
           },
         })
       );
-      await expect(snap).rejects.toThrow(
-        'n10 acts as carol now; no account was configured when this was asked'
-      );
+      await expect(snap).rejects.toThrow('The account changed to carol');
     }
   });
 
   it('refuses a caller that saw no account once one is configured', async () => {
     await expect(
       readPullRequestSnapshot({ ref: REF, viewer: null }, sources())
-    ).rejects.toThrow('n10 acts as bob now; no account was configured');
+    ).rejects.toThrow('The account changed to bob');
     await expect(
       readPullRequestSnapshot(
         { ref: REF, viewer: 'bob' },
         sources({ viewer: () => null })
       )
-    ).rejects.toThrow('No account is configured now; this was asked as bob');
+    ).rejects.toThrow('bob is no longer the configured account');
   });
 
   it('echoes only an id the provider named, never the one it was sent', async () => {
@@ -202,7 +200,7 @@ describe('readPullRequestSnapshot: which commits', () => {
     const snap = await readPullRequestSnapshot({ ref: REF }, sources());
     expect(snap.detail).toEqual({
       state: 'unsupported',
-      reason: 'This provider does not read pull request detail',
+      reason: "Pull request details aren't available for this repository",
     });
     expect(snap.head).toEqual({ oid: H1, from: 'list' });
     expect(snap.target).toBeNull();
@@ -225,7 +223,7 @@ describe('readPullRequestSnapshot: which commits', () => {
     );
     expect(snap.detail).toMatchObject({
       state: 'failed',
-      reason: 'The provider answered about github.com/acme/app#43',
+      reason: 'Got github.com/acme/app#43 instead of this pull request',
     });
     expect(snap.head).toEqual({ oid: H1, from: 'list' });
     expect(snap.target).toBeNull();

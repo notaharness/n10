@@ -130,13 +130,9 @@ export function assertSameContext(
 }
 
 function accountChanged(asked: string | null, now: string | null): string {
-  if (asked === null) {
-    return `n10 acts as ${now} now; no account was configured when this was asked`;
-  }
-  if (now === null) {
-    return `No account is configured now; this was asked as ${asked}`;
-  }
-  return `n10 acts as ${now} now, not ${asked}`;
+  if (asked === null) return `The account changed to ${now}`;
+  if (now === null) return `${asked} is no longer the configured account`;
+  return `The account changed from ${asked} to ${now}`;
 }
 
 /** Accounts compare as the providers compare logins and emails. */
@@ -181,7 +177,7 @@ export async function readAbout<T extends { ref: PullRequestRef }>(
       ? { state: 'read', value }
       : readFailure(
           new Error(
-            `The provider answered about ${describePullRequest(value.ref)}`
+            `Got ${describePullRequest(value.ref)} instead of this pull request`
           )
         );
   } catch (err) {
@@ -220,7 +216,7 @@ export async function readPullRequestSnapshot(
     readAbout(
       req.ref,
       src.detail,
-      'This provider does not read pull request detail'
+      "Pull request details aren't available for this repository"
     ),
   ]);
   // Asked again after the reads, as the account they started as: the

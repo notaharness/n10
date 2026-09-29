@@ -65,7 +65,7 @@ describe('readPullRequestConversation', () => {
   it('refuses a caller that last saw another account', async () => {
     await expect(
       readPullRequestConversation({ ref: REF, viewer: 'alice' }, sources())
-    ).rejects.toThrow(/acts as bob now, not alice/);
+    ).rejects.toThrow(/account changed from alice to bob/);
   });
 
   it('refuses an answer when the repository changed during the read', async () => {

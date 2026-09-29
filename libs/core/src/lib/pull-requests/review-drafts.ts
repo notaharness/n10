@@ -103,7 +103,7 @@ function locked(draft: ReviewDraft | undefined): string | null {
     case 'publishing':
       return 'This draft is being posted and cannot change now';
     case 'unknown':
-      return 'This draft may already have been posted; n10 has to check before it can change';
+      return 'This draft may already be posted. Retry posting it before you change it';
     default:
       return null;
   }

@@ -101,7 +101,7 @@ export function useRemoteComments(
   const replyToThread = useCallback(
     async (threadId: string, body: string): Promise<RemoteCommentReply> => {
       if (!prId || !provider?.replyToThread) {
-        throw new Error('Reply not available — no provider or PR');
+        throw new Error("Can't reply on this pull request");
       }
       // Look up the thread by id — providers branch on its `replyKind`
       // to pick the right mutation (GitHub review-thread vs issue-comment).

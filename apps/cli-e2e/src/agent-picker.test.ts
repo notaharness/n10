@@ -41,7 +41,7 @@ test.describe('Session menu agent selector', () => {
     await expect(n10.term.getByText('Start/Continue review')).toBeHidden();
 
     // Automatic selection preserves a recorded agent on later opens.
-    await expect(n10.term.getByText('Recorded agent / default')).toBeVisible();
+    await expect(n10.term.getByText('Last used or default')).toBeVisible();
 
     // Arrows cycle the agent for this session only.
     await n10.term.press('ArrowRight');
@@ -54,7 +54,7 @@ test.describe('Session menu agent selector', () => {
     await n10.term.press('ArrowLeft');
     await expect(n10.term.getByText('Claude (default)')).toBeVisible();
     await n10.term.press('ArrowLeft');
-    await expect(n10.term.getByText('Recorded agent / default')).toBeVisible();
+    await expect(n10.term.getByText('Last used or default')).toBeVisible();
     await n10.term.press('ArrowLeft');
     await expect(n10.term.getByText('OpenCode')).toBeVisible();
 
@@ -85,6 +85,6 @@ test.describe('Session menu agent selector', () => {
     await expect(n10.term.getByText(MENU_PROMPT)).toBeVisible({
       timeout: 5_000,
     });
-    await expect(n10.term.getByText('Recorded agent / default')).toBeVisible();
+    await expect(n10.term.getByText('Last used or default')).toBeVisible();
   });
 });

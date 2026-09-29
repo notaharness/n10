@@ -152,7 +152,9 @@ function autoDetect({ ctx }: SettingsActionCtx): void {
     ctx.config.providers
   );
   if (!updated) {
-    ctx.sessions.flashStatus('Nothing new to detect (all fields already set)');
+    ctx.sessions.flashStatus(
+      'Nothing new to detect; every setting is filled in'
+    );
     return;
   }
   ctx.config.reloadFromDisk();

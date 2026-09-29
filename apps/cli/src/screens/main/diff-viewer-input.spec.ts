@@ -642,7 +642,9 @@ describe('diff-viewer handler — post-comment', () => {
       config: {},
     });
     handleDiffViewerInput('p', makeKey(), ctx);
-    expect(ctx.sessions.flashStatus).toHaveBeenCalledWith('No VCS configured');
+    expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
+      'No provider set up — open settings'
+    );
     expect(updateComment).not.toHaveBeenCalled();
   });
 
@@ -654,7 +656,7 @@ describe('diff-viewer handler — post-comment', () => {
     });
     handleDiffViewerInput('p', makeKey(), ctx);
     expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
-      'Unsupported vendor: gitlab'
+      "Can't post comments for this repository"
     );
   });
 
@@ -667,7 +669,7 @@ describe('diff-viewer handler — post-comment', () => {
     });
     handleDiffViewerInput('p', makeKey(), ctx);
     expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
-      'Missing head SHA — try refreshing PR data'
+      "Couldn't post: refresh pull requests and try again"
     );
   });
 

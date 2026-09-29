@@ -80,7 +80,7 @@ describe('review drafts service', () => {
     await saveDraft({ ref: REF, viewer: 'bea', target: REPLY, body: 'mine' });
     env.username = 'carol';
     await expect(listDrafts({ ref: REF, viewer: 'bea' })).rejects.toThrow(
-      /acts as carol/
+      /account changed from bea to carol/
     );
     await expect(
       listDrafts({ ref: REF, viewer: 'carol' })

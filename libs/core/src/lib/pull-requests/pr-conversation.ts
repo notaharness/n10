@@ -41,7 +41,7 @@ export async function readPullRequestConversation(
   const conversation = await readAbout(
     req.ref,
     src.conversation,
-    'This provider does not read pull request conversations'
+    "The conversation isn't available for this repository"
   );
   // Asked again after the read, as the account it started as.
   assertSameContext({ ...req, viewer }, src);

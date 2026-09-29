@@ -110,7 +110,7 @@ describe('getPullRequestSnapshot', () => {
   it('refuses a caller that last saw another account', async () => {
     await expect(
       getPullRequestSnapshot({ ref: REF, viewer: 'alice' })
-    ).rejects.toThrow('n10 acts as bob now, not alice');
+    ).rejects.toThrow('The account changed from alice to bob');
   });
 
   it('refuses to answer once another repository was opened during the read', async () => {
@@ -136,7 +136,7 @@ describe('getPullRequestSnapshot', () => {
       env.project = { ...env.project, username: 'carol' };
     };
     await expect(getPullRequestSnapshot({ ref: REF })).rejects.toThrow(
-      'n10 acts as carol now, not bob'
+      'The account changed from bob to carol'
     );
   });
 
