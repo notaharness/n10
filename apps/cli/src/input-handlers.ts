@@ -1,5 +1,6 @@
 import type {
   ConfigContextValue,
+  EngineContextValue,
   KeybindContextValue,
   SessionActionsContextValue,
   TerminalLayout,
@@ -28,14 +29,20 @@ function writeFieldChange(
   ctx: SettingsHandlerCtx
 ): void {
   ctx.config.updateField(field, value);
+  // The engine reads the persisted config, which updateField writes in
+  // a microtask it queued before returning. Queued behind that write,
+  // the effects see the value just entered.
+  queueMicrotask(() => runSettingsEffects(field, ctx));
+}
+
+function runSettingsEffects(
+  field: SettingsField,
+  ctx: SettingsHandlerCtx
+): void {
   for (const effect of settingsEffects(field)) {
     switch (effect) {
       case 'reset-provider-cache':
-        // Every provider, not just the selected one. Everything cached
-        // was fetched as somebody else, and on a `vendor` change the
-        // stale entries belong to the provider being left — which
-        // `ctx.config.provider` no longer is by the time this runs.
-        for (const p of ctx.config.providers) p.resetCaches?.();
+        ctx.engine.pullRequests.credentialsChanged();
         break;
       case 'refresh-remote':
         // Without this a corrected token sits behind the poll
@@ -61,6 +68,7 @@ export type { TerminalLayout };
 export interface SettingsHandlerCtx {
   settings: SettingsValue;
   config: ConfigContextValue;
+  engine: EngineContextValue;
   sessions: SessionActionsContextValue;
   keybinds: KeybindContextValue;
 }

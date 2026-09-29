@@ -34,8 +34,10 @@ holds the keybind-driven state transitions; screens under `src/screens/main`
   is set. Strip them from any env that spawns n10.
 - Worktree removal uses core's shared stop → remove → delete sequence.
   `stopSession` terminates one held target or one persisted target, never both.
-- `usePrData` polls the provider itself; it is the only reader in this process.
-  The desktop reads a shared cache instead.
+- The pull request list is `@n10/engine`'s, created in `tui.tsx` and provided
+  by `EngineProvider`. `usePrData` observes it and holds a watch; nothing here
+  calls the provider's list. Settings effects run after the config write lands
+  (`input-handlers.ts`), since the engine reads the persisted config.
 - Rows are named by branch here; the desktop names a PR row by its title.
 - Tests: `ink-testing-library` for text content and keyboard navigation. ANSI
   rendering, PTY forwarding and real terminal interaction are manual or

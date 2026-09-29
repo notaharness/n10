@@ -134,6 +134,9 @@ export interface ConfigContextValue {
   provider: VcsProvider | null;
   providers: VcsProvider[];
   vcsConfigured: boolean;
+  /** Update a field in state and persist it. The write runs in a
+   *  microtask queued before this returns, so work queued after the
+   *  call reads the file with the new value in it. */
   updateField: (field: SettingsField, value: string | undefined) => void;
   /**
    * Update keybind-related fields and persist them to global config in a

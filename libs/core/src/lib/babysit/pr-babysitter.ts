@@ -51,7 +51,7 @@ import {
 } from './babysit-model.js';
 import { observePullRequest, type RemoteSnapshot } from './babysit-observe.js';
 import { composeBabysitPrompt } from './babysit-prompt.js';
-import type { PullRequestLookup } from '../pull-requests/pull-request-cache.js';
+import type { PullRequestLookup } from '../pull-requests/pull-request-lookup.js';
 
 export interface PrBabysitterOptions {
   pr: PullRequestInfo;

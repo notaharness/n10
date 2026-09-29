@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Text, Box, useInput } from 'ink';
 import {
   useConfig,
+  useEngine,
   useKeybindResolve,
   useKeybinds,
   useSettingsState,
@@ -54,6 +55,7 @@ export function SettingsPanel({
     () => ({ ...settingsState, ...settingsActions }),
     [settingsState, settingsActions]
   );
+  const engine = useEngine();
   const sessions = useSessionActions();
   // handleSettingsInput uses both resolve() and setPreset(), so we
   // subscribe to the combined Keybind context.
@@ -64,6 +66,7 @@ export function SettingsPanel({
       handleSettingsInput(input, key, {
         settings,
         config: configCtx,
+        engine,
         sessions,
         keybinds,
       });
