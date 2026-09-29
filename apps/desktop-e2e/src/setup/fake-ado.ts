@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { ElectronApplication } from '@playwright/test';
 
 /**
  * An Azure DevOps scenario as a test declares it, and the config that
@@ -111,8 +112,9 @@ function identity(
   };
 }
 
-const head = (pr: FakeAdoPr) =>
-  createHash('sha1').update(`head-${pr.id}`).digest('hex');
+/** A stable 40-hex commit id for a label. */
+const commitId = (label: string) =>
+  createHash('sha1').update(label).digest('hex');
 
 function pullRequest(s: FakeAzureDevOps, pr: FakeAdoPr) {
   const { project, repo } = coordinates(s);
@@ -136,8 +138,8 @@ function pullRequest(s: FakeAzureDevOps, pr: FakeAdoPr) {
     targetRefName: `refs/heads/${pr.targetBranch ?? 'main'}`,
     mergeStatus: 'succeeded',
     isDraft: false,
-    lastMergeSourceCommit: { commitId: head(pr) },
-    lastMergeTargetCommit: { commitId: 'b'.repeat(40) },
+    lastMergeSourceCommit: { commitId: commitId(`source-${pr.id}`) },
+    lastMergeTargetCommit: { commitId: commitId(`target-${pr.id}`) },
     reviewers: (pr.reviewers ?? []).map((r) => ({
       ...identity(project, r.name, r),
       vote: r.vote ?? 0,
@@ -201,16 +203,28 @@ function served(s: FakeAzureDevOps) {
     evaluations: byId((pr) =>
       (pr.policies ?? []).map((p) => evaluation(s, pr, p))
     ),
-    iterations: byId((pr) => [
-      { id: 1, sourceRefCommit: { commitId: head(pr) } },
-    ]),
+    iterations: byId((pr) => {
+      const target = { commitId: commitId(`target-${pr.id}`) };
+      return [
+        {
+          id: 1,
+          sourceRefCommit: { commitId: commitId(`source-${pr.id}-1`) },
+          targetRefCommit: target,
+          commonRefCommit: target,
+        },
+      ];
+    }),
+    // Written into the app's config by the preload itself, so a run
+    // whose preload did not load has no token and asks Azure nothing.
+    globalConfig: fakeAdoGlobalConfig(s),
   };
 }
 
 /**
  * Write the scenario and return the environment that points the
  * preload at it. The preload reads it on every request, so a test may
- * write it again mid-run.
+ * write it again mid-run; the token it writes into the config once, as
+ * the app starts.
  */
 export function installFakeAdo(
   homeDir: string,
@@ -219,6 +233,16 @@ export function installFakeAdo(
   const path = join(homeDir, 'fake-ado.json');
   writeFileSync(path, JSON.stringify(served(scenario), null, 2), 'utf8');
   return { N10_FAKE_ADO: path };
+}
+
+/** Whether the preload is in the app's main process. */
+export async function fakeAdoLoaded(
+  app: ElectronApplication
+): Promise<boolean> {
+  const loaded = await app.evaluate(
+    () => (globalThis as { __n10FakeAzure?: boolean }).__n10FakeAzure
+  );
+  return loaded === true;
 }
 
 /** The requests the fake had no answer for, as `METHOD url` lines. */

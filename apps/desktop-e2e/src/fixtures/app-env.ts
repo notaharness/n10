@@ -60,8 +60,8 @@ export function appEnv(opts: {
     N10_START_DIR: opts.startWithoutRepo ? '' : opts.repoPath,
     N10_DESKTOP_VERSION: 'e2e',
     ...(opts.githubToken ? { GH_TOKEN: opts.githubToken } : {}),
-    // The fake `gh` has to win the PATH lookup, and the Azure DevOps
-    // shim has to load before the app does.
+    // The fake `gh` has to win the PATH lookup; the Azure DevOps
+    // preload finds its scenario here.
     ...opts.ghEnv,
     // Last, and not negotiable. A tmux server is identified by its
     // socket directory, and the default one is the developer's own —

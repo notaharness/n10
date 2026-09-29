@@ -9,7 +9,6 @@ import {
   type FakeGitHub,
 } from '../setup/fake-gh.js';
 import {
-  fakeAdoGlobalConfig,
   fakeAdoProjectConfig,
   installFakeAdo,
   type FakeAzureDevOps,
@@ -123,9 +122,6 @@ export function seedHome(
     JSON.stringify(
       {
         aiCommand: fakeAgent(),
-        ...(opts.fakeAzureDevOps
-          ? fakeAdoGlobalConfig(opts.fakeAzureDevOps)
-          : {}),
         ...opts.n10Config,
       },
       null,

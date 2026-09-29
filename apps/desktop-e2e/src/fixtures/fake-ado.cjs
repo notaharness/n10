@@ -6,14 +6,19 @@
  * The fixture preloads this file with Electron's `-r` (Playwright drops
  * `NODE_OPTIONS`, and Electron takes no `--import` on its command line),
  * so it is in place before any of the app's code runs. It answers every
- * request to an Azure host from the
- * scenario at `$N10_FAKE_ADO` (see `setup/fake-ado.ts`), read afresh
- * each time, and passes anything else through. Nothing reaches Azure:
- * a route it does not know answers 404, and is noted in
- * `<scenario>.misses` for whoever writes the next test.
+ * request to an Azure host from the scenario at `$N10_FAKE_ADO` (see
+ * `setup/fake-ado.ts`), read afresh each time, and passes anything else
+ * through. Nothing reaches Azure: a request it does not model answers
+ * 404 and is noted in `<scenario>.misses`, which fails the test.
+ *
+ * It fails closed. The token is written into the app's config here,
+ * after `fetch` is replaced, so an app this did not load into has no
+ * Azure DevOps credentials and asks Azure nothing.
  */
-// A preload runs as CommonJS; the built-in is fetched without require.
-const { appendFileSync, readFileSync } = process.getBuiltinModule('node:fs');
+// A preload runs as CommonJS; built-ins are fetched without require.
+const { appendFileSync, existsSync, readFileSync, writeFileSync } =
+  process.getBuiltinModule('node:fs');
+const { join } = process.getBuiltinModule('node:path');
 
 const SCENARIO = process.env.N10_FAKE_ADO;
 // The app's own children (tmux, shells, agents) are not Azure clients.
@@ -83,13 +88,29 @@ function route(s, url) {
 
 const passThrough = globalThis.fetch;
 
-globalThis.__n10FakeAzure = true;
 globalThis.fetch = async (input, init) => {
-  const url = new URL(typeof input === 'string' ? input : input.url);
+  const request = input instanceof Request ? input : null;
+  const url = new URL(request ? request.url : String(input));
   if (!AZURE.test(url.hostname)) return passThrough(input, init);
+  const method = (init?.method ?? request?.method ?? 'GET').toUpperCase();
   const s = JSON.parse(readFileSync(SCENARIO, 'utf8'));
-  const answer = route(s, url);
+  // Reads only: a write it does not model must not pass for done.
+  const answer = method === 'GET' ? route(s, url) : null;
   if (answer) return answer;
-  appendFileSync(`${SCENARIO}.misses`, `${init?.method ?? 'GET'} ${url}\n`);
+  appendFileSync(`${SCENARIO}.misses`, `${method} ${url}\n`);
   return json({ message: `fake Azure DevOps has no route for ${url}` }, 404);
 };
+
+/** The scenario's token, merged into the app's own config. */
+function writeToken() {
+  const path = join(process.env.HOME ?? '', '.n10', 'config.json');
+  const config = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {};
+  const { vendorAuth } = JSON.parse(
+    readFileSync(SCENARIO, 'utf8')
+  ).globalConfig;
+  config.vendorAuth = { ...config.vendorAuth, ...vendorAuth };
+  writeFileSync(path, JSON.stringify(config, null, 2), 'utf8');
+}
+
+writeToken();
+globalThis.__n10FakeAzure = true;

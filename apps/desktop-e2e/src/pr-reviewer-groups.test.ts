@@ -2,7 +2,6 @@ import type { Locator, Page } from '@playwright/test';
 import { AZURE_REVIEWERS } from './fixtures/azure-reviewers.js';
 import { test, expect } from './fixtures/desktop.js';
 import { sidebarRow } from './setup/app.js';
-import { fakeAdoMisses } from './setup/fake-ado.js';
 
 /**
  * Who must review, as Azure DevOps says it: it marks each reviewer
@@ -36,16 +35,19 @@ test.describe('Reviewer groups on Azure DevOps', () => {
   }) => {
     const reviewers = await openReviewers(desktop.page);
     const group = (name: string) =>
-      reviewers.locator(`[data-reviewer-group="${name}"] [data-reviewer]`);
-    await expect(group('required')).toHaveText([
+      reviewers.getByRole('list', { name }).locator('[data-reviewer]');
+    await expect(group('Required')).toHaveText([
       /\[Fabrikam\]\\API reviewers/,
       /\[Fabrikam\]\\Team DES/,
     ]);
-    await expect(
-      reviewers
-        .getByRole('list', { name: 'Optional' })
-        .locator('[data-reviewer]')
-    ).toHaveText([/Harrie Essing/, /Daan Kerkhoff/]);
+    // Only the optional have a heading on screen.
+    await expect(reviewers.getByRole('heading', { level: 3 })).toHaveText([
+      'Optional',
+    ]);
+    await expect(group('Optional')).toHaveText([
+      /Harrie Essing/,
+      /Daan Kerkhoff/,
+    ]);
     // The heading says required or optional; a row says only why.
     const standing = (name: string) =>
       row(reviewers, name).locator('[data-reviewer-standing]');
@@ -72,12 +74,5 @@ test.describe('Reviewer groups on Azure DevOps', () => {
       '/apps/api/*',
       '/libs/queue/*',
     ]);
-  });
-
-  test('reads Azure DevOps through the fake alone', async ({ desktop }) => {
-    await openReviewers(desktop.page);
-    // Anything the fake does not know answers 404 and is noted; the
-    // Overview's reads are all known.
-    expect(fakeAdoMisses(desktop.homeDir)).toEqual([]);
   });
 });
