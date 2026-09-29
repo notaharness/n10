@@ -94,7 +94,6 @@ function conversations(pr: PullRequestInfo): ReadinessAspect {
 const UNREAD: ReadinessAspect[] = [
   { id: 'reviews', state: 'unknown', text: 'Not read' },
   { id: 'checks', state: 'unknown', text: 'Could not be read' },
-  { id: 'conflicts', state: 'unknown', text: 'Not read' },
   { id: 'conversations', state: 'unknown', text: 'Not read' },
 ];
 
@@ -119,7 +118,8 @@ export function listReadiness(
         draft ? LIFECYCLE_ASPECT.draft : LIFECYCLE_ASPECT.open,
         reviews(pr),
         { id: 'checks', ...ROLLUP[pr.buildStatus ?? 'none'] },
-        { id: 'conflicts', state: 'unknown', text: 'Not read' },
+        // Conflicts are a row only where the provider reports one; the
+        // list reads none, so they are among the unknowns.
         conversations(pr),
       ]
     : [{ id: 'lifecycle', state: 'unknown', text: 'Not read' }, ...UNREAD];
