@@ -67,6 +67,27 @@ function assertPostable(comments: ReviewComment[]): void {
   }
 }
 
+type ReviewEvent = 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES';
+
+/**
+ * Azure DevOps has no review for a verdict to ride on. A comment is a
+ * thread, and a verdict is the caller's vote on the pull request's
+ * reviewer resource: a separate write, on a scale GitHub's events do not
+ * map onto — REQUEST_CHANGES could be "wait for author" (−5) or
+ * "reject" (−10). `VcsProvider.submitReviewVerdict` casts that vote.
+ *
+ * Refused before anything is sent: dropping the verdict and posting the
+ * comments anyway would leave a pull request the caller meant to block
+ * unblocked, with nothing to say so.
+ */
+function assertNoAzureVerdict(event: ReviewEvent): void {
+  if (event === 'COMMENT') return;
+  throw new Error(
+    `Cannot post comments with ${event} on Azure DevOps: comments there ` +
+      'carry no verdict, so cast the vote separately'
+  );
+}
+
 export interface PostContext {
   vendor: 'github' | 'azure-devops';
   vendorAuth: Record<string, string>;
@@ -78,12 +99,13 @@ export interface PostContext {
 export async function postReviewComments(
   comments: ReviewComment[],
   ctx: PostContext,
-  event: 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES' = 'COMMENT'
+  event: ReviewEvent = 'COMMENT'
 ): Promise<void> {
   assertPostable(comments);
   if (ctx.vendor === 'github') {
     await postGitHub(comments, ctx, event);
   } else if (ctx.vendor === 'azure-devops') {
+    assertNoAzureVerdict(event);
     await postAzureDevOps(comments, ctx);
   } else {
     throw new Error(`Unsupported vendor: ${ctx.vendor}`);
@@ -98,7 +120,7 @@ export async function postReviewComments(
 async function postGitHub(
   comments: ReviewComment[],
   ctx: PostContext,
-  event: 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES'
+  event: ReviewEvent
 ): Promise<void> {
   if (!ctx.headSha) {
     throw new Error('headSha is required for GitHub reviews');
