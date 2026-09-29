@@ -7,8 +7,8 @@ import type { FakeGitHub, FakePr } from './setup/fake-gh.js';
  * Who must review, on the Overview, as GitHub says it. GitHub marks no
  * reviewer required: its rules ask for a number of approvals, for code
  * owners, and for teams by id, and a request says only whether it went
- * to a code owner. The Reviewers list names code owners, says GitHub
- * marks no one else, and shows the rules that name a reviewer on hover;
+ * to a code owner. The Reviewers list names code owners, shows no one
+ * as required, and shows the rules that name a reviewer on hover;
  * Completion's Reviews row is the verdict and the count.
  * Azure DevOps, which marks each reviewer, is covered by core's and the
  * provider's specs until it has a fake of its own.
@@ -63,9 +63,7 @@ async function openOverview(page: Page) {
 test.describe('Reviewer requirements on GitHub', () => {
   test.use({ fakeGitHub: GITHUB });
 
-  test('names code owners, and says GitHub marks no one required', async ({
-    desktop,
-  }) => {
+  test('names code owners, and marks no one required', async ({ desktop }) => {
     const { reviewers } = await openOverview(desktop.page);
     const row = (id: string) => reviewers.locator(`[data-reviewer="${id}"]`);
     // The detail read names the team the list row leaves out.
@@ -77,9 +75,13 @@ test.describe('Reviewer requirements on GitHub', () => {
     await expect(row('bea').locator('[data-reviewer-standing]')).toHaveCount(0);
     await expect(row('dee')).toContainText('Approved');
     await expect(row('dee').locator('[data-reviewer-standing]')).toHaveCount(0);
-    await expect(reviewers).toContainText(
-      "GitHub doesn't mark reviewers required."
-    );
+    // GitHub marks no one required, so none is shown as required, and
+    // nothing explains why.
+    await expect(reviewers).not.toContainText('Required');
+    await expect(reviewers).not.toContainText("doesn't mark");
+    await expect(
+      reviewers.getByRole('heading', { name: 'Optional' })
+    ).toHaveCount(0);
   });
 
   test('shows the rules that name a team, with their paths, on hover', async ({

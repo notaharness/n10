@@ -129,7 +129,6 @@ export function OverviewPane({
           <PrReviewers
             reviewers={pr.reviewers ?? []}
             requirements={read.kind === 'ready' ? read.data.requirements : null}
-            provider={repo.providerId}
             viewer={repo.viewer}
           />
         </div>
