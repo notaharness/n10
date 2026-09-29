@@ -74,7 +74,7 @@ const ROLLUP: Record<
   Pick<ReadinessAspect, 'state' | 'text'>
 > = {
   succeeded: { state: 'observed', text: 'Reported checks pass' },
-  failed: { state: 'advisory', text: 'Failing, not known if required' },
+  failed: { state: 'advisory', text: 'Failing, may be required' },
   pending: { state: 'observed', text: 'Running' },
   none: { state: 'unknown', text: 'None reported' },
 };
@@ -82,19 +82,19 @@ const ROLLUP: Record<
 function conversations(pr: PullRequestInfo): ReadinessAspect {
   const n = pr.activeCommentCount;
   const row = { id: 'conversations' as const };
-  if (n == null) return { ...row, state: 'unknown', text: 'Not read' };
+  if (n == null) return { ...row, state: 'unknown', text: "Couldn't check" };
   if (n === 0) return { ...row, state: 'observed', text: 'None unresolved' };
   return {
     ...row,
     state: 'observed',
-    text: `${n} unresolved, not known if required`,
+    text: `${n} unresolved, may need resolving`,
   };
 }
 
 const UNREAD: ReadinessAspect[] = [
-  { id: 'reviews', state: 'unknown', text: 'Not read' },
-  { id: 'checks', state: 'unknown', text: 'Could not be read' },
-  { id: 'conversations', state: 'unknown', text: 'Not read' },
+  { id: 'reviews', state: 'unknown', text: "Couldn't check" },
+  { id: 'checks', state: 'unknown', text: "Couldn't load" },
+  { id: 'conversations', state: 'unknown', text: "Couldn't check" },
 ];
 
 function advisoriesOf(aspects: readonly ReadinessAspect[]): ReadinessItem[] {
@@ -122,7 +122,10 @@ export function listReadiness(
         // list reads none, so they are among the unknowns.
         conversations(pr),
       ]
-    : [{ id: 'lifecycle', state: 'unknown', text: 'Not read' }, ...UNREAD];
+    : [
+        { id: 'lifecycle', state: 'unknown', text: "Couldn't check" },
+        ...UNREAD,
+      ];
   return {
     state: draft ? 'blocked' : 'unknown',
     blockers: draft

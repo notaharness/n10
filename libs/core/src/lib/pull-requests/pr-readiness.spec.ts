@@ -283,9 +283,7 @@ describe('evaluateReadiness', () => {
     expect(r.blockers.map((b) => b.text)).toEqual([
       '1 required check failing: test',
     ]);
-    expect(r.unknowns).toEqual([
-      'Whether completion is allowed: the provider says so, its details do not',
-    ]);
+    expect(r.unknowns).toEqual(['Whether completion is allowed']);
   });
 
   it('takes no outcome it does not know for a pass or a failure', () => {
@@ -509,7 +507,7 @@ describe('evaluateReadiness', () => {
     expect(r.state).toBe('unknown');
     expect(r.unknowns).toEqual([
       'Whether it conflicts with its target',
-      'Whether the provider will allow completion',
+      'Whether completion is allowed',
     ]);
   });
 

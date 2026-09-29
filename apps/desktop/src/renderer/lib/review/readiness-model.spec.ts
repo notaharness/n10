@@ -52,8 +52,8 @@ describe('headline', () => {
       unknowns: ['Branch rules', 'The review requirement'],
     });
     expect(headline(unknown, 'github')).toEqual({
-      text: 'Readiness not fully known',
-      detail: 'Not known: branch rules, the review requirement',
+      text: 'May not be ready to merge',
+      detail: "Couldn't confirm: branch rules, the review requirement",
     });
     // Blockers core names do not make it blocked where the provider
     // has not said so.
@@ -62,7 +62,10 @@ describe('headline', () => {
         { kind: 'conflicts', text: 'Conflicts', resolvedBy: 'author' },
       ],
     });
-    expect(headline(named, 'github').text).toBe('Readiness not fully known');
+    expect(headline(named, 'github').text).toBe('May not be ready to merge');
+    expect(headline(named, 'azure-devops').text).toBe(
+      'May not be ready to complete'
+    );
   });
 });
 
@@ -89,9 +92,9 @@ describe('failureText', () => {
 describe('readingNote', () => {
   it('says the answer on screen is the last head’s after a push', () => {
     expect(readingNote('a', 'b', true)).toBe(
-      'before the latest push · reading again'
+      'from before the latest push · updating'
     );
-    expect(readingNote('a', 'a', true)).toBe('reading again');
+    expect(readingNote('a', 'a', true)).toBe('updating');
     expect(readingNote('a', 'b', false)).toBeNull();
   });
 });
@@ -136,15 +139,15 @@ describe('checksLabel', () => {
   it('counts what passed of what there is, and of what was read where not all was', () => {
     expect(checksLabel(list({}))).toBe('View checks · 1 of 3 passed');
     expect(checksLabel(list({ complete: false, total: 5 }))).toBe(
-      'View checks · 1 of 3 passed · 3 of 5 read'
+      'View checks · 1 of 3 passed · 3 of 5 loaded'
     );
     expect(checksLabel(list({ complete: false, total: null }))).toBe(
-      'View checks · 1 of 3 passed · not all read'
+      "View checks · 1 of 3 passed · some didn't load"
     );
     expect(checksLabel(list({ rows: [] }))).toBe('No checks reported');
     // A list that stopped short with nothing in it is not "none".
     expect(checksLabel(list({ rows: [], complete: false, total: null }))).toBe(
-      'Checks not all read'
+      "Some checks didn't load"
     );
   });
 

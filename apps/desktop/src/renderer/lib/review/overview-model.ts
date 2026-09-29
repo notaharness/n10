@@ -196,7 +196,7 @@ function reviewerStep(pr: PullRequestInfo, viewer: string | null): NextStep {
   }
   if (viewer == null) {
     return {
-      summary: 'n10 cannot see your review',
+      summary: "Can't show your review",
       detail: 'No account is configured for this repository.',
       action: step.action,
       label: step.label,

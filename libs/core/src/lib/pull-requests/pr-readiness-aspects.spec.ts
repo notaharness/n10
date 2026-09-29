@@ -102,11 +102,11 @@ describe('readiness aspects', () => {
     expect(reviews('not-required', false)?.state).toBe('met');
     expect(reviews('unknown', true)).toEqual({
       state: 'unknown',
-      text: 'Requirement not stated',
+      text: 'May need a review',
     });
     expect(reviews('unknown', false)).toEqual({
       state: 'met',
-      text: 'Not in the way',
+      text: 'Nothing blocking',
     });
   });
 
@@ -154,7 +154,7 @@ describe('readiness aspects', () => {
         }),
         'reviews'
       )?.text
-    ).toBe('Waiting for review · rules could not be read');
+    ).toBe("Waiting for review · branch rules didn't load");
     // With no verdict stated either, both unknowns are said.
     expect(
       aspect(
@@ -166,7 +166,7 @@ describe('readiness aspects', () => {
       )
     ).toEqual({
       state: 'unknown',
-      text: 'Requirement not stated · rules could not be read',
+      text: "May need a review · branch rules didn't load",
     });
   });
 
@@ -221,7 +221,7 @@ describe('readiness aspects', () => {
     const failed = { state: 'failed', kind: 'network', reason: 'x' } as const;
     expect(aspect(inputs({ checks: failed }), 'checks')).toEqual({
       state: 'unknown',
-      text: 'Could not be read',
+      text: "Couldn't load",
     });
     const partial: ReadinessInputs['checks'] = {
       state: 'read',
@@ -229,7 +229,7 @@ describe('readiness aspects', () => {
     };
     expect(aspect(inputs({ checks: partial }), 'checks')).toEqual({
       state: 'unknown',
-      text: 'Not all read',
+      text: "Some didn't load",
     });
   });
 
@@ -326,7 +326,10 @@ describe('readiness aspects', () => {
         }),
         'checks'
       )
-    ).toEqual({ state: 'unknown', text: 'Outcome not known' });
+    ).toEqual({
+      state: 'unknown',
+      text: 'A required check has no clear result',
+    });
     // Without the rules, a required check that never reported is absent.
     const unread = { state: 'failed', kind: 'auth', reason: 'x' } as const;
     expect(
@@ -334,7 +337,7 @@ describe('readiness aspects', () => {
         inputs({ merge: blocked, rules: unread, checks: listed() }),
         'checks'
       )
-    ).toEqual({ state: 'unknown', text: 'Not known which are required' });
+    ).toEqual({ state: 'unknown', text: 'Unclear which are required' });
     // A failure not known to be required is neither a block nor "not
     // required".
     expect(
@@ -347,13 +350,13 @@ describe('readiness aspects', () => {
       )
     ).toEqual({
       state: 'unknown',
-      text: '1 check failing, not known if required: build',
+      text: '1 check failing, may be required: build',
     });
     // Moot where the provider says nothing enforced is in the way, and
     // said as only that.
     expect(
       aspect(inputs({ rules: unread, checks: listed() }), 'checks')
-    ).toEqual({ state: 'met', text: 'Not in the way' });
+    ).toEqual({ state: 'met', text: 'Nothing blocking' });
     expect(
       aspect(
         inputs({
@@ -364,7 +367,7 @@ describe('readiness aspects', () => {
       )
     ).toEqual({
       state: 'advisory',
-      text: '1 check failing, not known if required: build',
+      text: '1 check failing, may be required: build',
     });
   });
 
@@ -391,6 +394,6 @@ describe('readiness aspects', () => {
         inputs({ checks: { state: 'unsupported', reason: 'x' } }),
         'checks'
       )
-    ).toEqual({ state: 'unknown', text: 'Not read by this provider' });
+    ).toEqual({ state: 'unknown', text: 'Not available' });
   });
 });

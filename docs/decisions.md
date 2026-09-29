@@ -303,8 +303,8 @@ verdict, GitHub's `mergeStateStatus`, and explains it with the provider's facts:
 protection and rule sets. Core (`pr-readiness.ts`) adds no verdict of its own.
 It is ready only where the provider says so and none of its details disagree,
 and blocked where the provider says so or the pull request is a draft (its own
-lifecycle). Anything else is unknown. A block that nothing read explains is "a
-rule n10 cannot see". The unresolved-thread count comes from the list, older
+lifecycle). Anything else is unknown. A block that nothing read explains reads "Blocked by a
+branch rule". The unresolved-thread count comes from the list, older
 than the verdict, so it explains a block but never overturns a clear one. Anything that could not be
 read is listed beside the verdict and does not override it.
 

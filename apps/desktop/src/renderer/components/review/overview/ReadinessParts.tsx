@@ -22,7 +22,7 @@ import { Button } from '../../ui/button.js';
  *  colour is never the only signal. */
 const STATE: Record<
   AspectState,
-  { icon: typeof CheckCircle2Icon; className: string; label: string }
+  { icon: typeof CheckCircle2Icon; className: string; label: string | null }
 > = {
   met: { icon: CheckCircle2Icon, className: 'text-success', label: 'Met' },
   blocked: {
@@ -43,12 +43,13 @@ const STATE: Record<
   observed: {
     icon: CircleIcon,
     className: 'text-muted-foreground',
-    label: 'Observed',
+    // Neutral: the row's own text says what was seen, good or not.
+    label: null,
   },
   unknown: {
     icon: CircleDashedIcon,
     className: 'text-muted-foreground',
-    label: 'Not known',
+    label: 'Unconfirmed',
   },
 };
 
@@ -60,7 +61,7 @@ export const HEADLINE_STATE: Record<
 > = {
   ready: { state: 'met', label: 'Ready' },
   blocked: { state: 'blocked', label: 'Blocked' },
-  unknown: { state: 'unknown', label: 'Not fully known' },
+  unknown: { state: 'unknown', label: 'Unconfirmed' },
   merged: { state: 'met', label: null },
   closed: { state: 'observed', label: null },
 };
@@ -118,12 +119,12 @@ export function RefreshButton({
   );
 }
 
-/** "read 2 min ago", kept honest while it stays on screen. */
+/** "updated 2 min ago", kept honest while it stays on screen. */
 export function ReadAgo({ at }: { at: number }) {
   const [, tick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => tick((t) => t + 1), 15_000);
     return () => clearInterval(id);
   }, []);
-  return <>read {relativeTime(at)}</>;
+  return <>updated {relativeTime(at)}</>;
 }

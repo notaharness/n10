@@ -179,7 +179,7 @@ describe('nextStep', () => {
 
   it('claims nothing about "you" without an account', () => {
     expect(nextStep(PR, 'reviewer', null)).toMatchObject({
-      summary: 'n10 cannot see your review',
+      summary: "Can't show your review",
       detail: 'No account is configured for this repository.',
     });
     expect(nextStep(PR, 'reviewer', 'carol').summary).toBe(

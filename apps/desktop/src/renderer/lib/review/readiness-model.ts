@@ -53,15 +53,15 @@ export function headline(
     return { text: blockers[0].text, detail: null };
   }
   return {
-    text: 'Readiness not fully known',
+    text: `May not be ready to ${verb(provider)}`,
     detail:
       unknowns.length > 0
-        ? `Not known: ${unknowns.map(lowerFirst).join(', ')}`
+        ? `Couldn't confirm: ${unknowns.map(lowerFirst).join(', ')}`
         : null,
   };
 }
 
-/** Core's unknowns are sentence case; after "Not known:" they run on. */
+/** Core's unknowns are sentence case; after "Couldn't confirm:" they run on. */
 function lowerFirst(s: string): string {
   return s.charAt(0).toLowerCase() + s.slice(1);
 }
@@ -92,8 +92,8 @@ export function readingNote(
 ): string | null {
   if (!reading) return null;
   return answerHead != null && head != null && answerHead !== head
-    ? 'before the latest push · reading again'
-    : 'reading again';
+    ? 'from before the latest push · updating'
+    : 'updating';
 }
 
 /** "View checks": how many passed of how many, how many reported on an
@@ -101,13 +101,15 @@ export function readingNote(
 export function checksLabel(list: CheckList): string {
   const shown = list.rows.length;
   if (shown === 0) {
-    return list.complete ? 'No checks reported' : 'Checks not all read';
+    return list.complete ? 'No checks reported' : "Some checks didn't load";
   }
   const parts = [`${list.count.passed} of ${shown} passed`];
   if (list.stale > 0) parts.push(`${list.stale} on an older revision`);
   if (!list.complete) {
     parts.push(
-      list.total != null ? `${shown} of ${list.total} read` : 'not all read'
+      list.total != null
+        ? `${shown} of ${list.total} loaded`
+        : "some didn't load"
     );
   }
   return `View checks · ${parts.join(' · ')}`;
@@ -122,14 +124,14 @@ export const OUTCOME_LABEL: Record<CheckOutcome, string> = {
   cancelled: 'Cancelled',
   skipped: 'Skipped',
   neutral: 'Neutral',
-  expected: 'Expected',
+  expected: 'Not reported yet',
   unknown: 'Unknown',
 };
 
 export const REQUIREMENT_LABEL: Record<CheckRequirement, string> = {
   required: 'Required',
   optional: 'Optional',
-  unknown: 'Not known if required',
+  unknown: 'May be required',
 };
 
 /** An outcome n10 has no word for keeps the provider's. */
