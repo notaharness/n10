@@ -90,8 +90,8 @@ function RulesTip({ rules }: { rules: readonly StandingRule[] }) {
   );
 }
 
-/** Required or optional and why, under the name; a rule behind it shows
- *  on hover or focus. */
+/** What a row adds to its group, under the name: why they were asked,
+ *  or that they are required; a rule behind it shows on hover or focus. */
 function Standing({ row }: { row: ReviewerRow }) {
   if (!row.standing) return null;
   const text = 'block text-xs text-muted-foreground';
@@ -141,11 +141,12 @@ function ReviewerItem({ row, me }: { row: ReviewerRow; me?: string }) {
   );
 }
 
-/** A group of reviewers; the optional ones under their own heading. */
+/** A group of reviewers: the optional ones under their own heading,
+ *  and the required above them named for a screen reader. */
 function Group({ group, me }: { group: ReviewerGroup; me?: string }) {
   const id = useId();
   return (
-    <div data-reviewer-group={group.title ?? 'required'}>
+    <div data-reviewer-group={group.kind}>
       {group.title && (
         <h3 id={id} className="mt-3 mb-1.5 text-xs text-muted-foreground">
           {group.title}
@@ -153,6 +154,7 @@ function Group({ group, me }: { group: ReviewerGroup; me?: string }) {
       )}
       <ul
         aria-labelledby={group.title ? id : undefined}
+        aria-label={group.kind === 'required' ? 'Required' : undefined}
         className="space-y-1.5 text-sm"
       >
         {group.rows.map((r) => (
@@ -187,7 +189,7 @@ export function PrReviewers({
       {none ? (
         <p className="text-sm text-muted-foreground">No reviewers requested.</p>
       ) : (
-        groups.map((g) => <Group key={g.title ?? ''} group={g} me={me} />)
+        groups.map((g) => <Group key={g.kind} group={g} me={me} />)
       )}
       {notes.map((n) => (
         <p key={n} className="mt-2 text-xs text-muted-foreground">

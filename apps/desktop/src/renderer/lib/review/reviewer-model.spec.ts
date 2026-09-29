@@ -75,16 +75,21 @@ describe('reviewerRows', () => {
   const listed = [
     { identifier: 'bob', displayName: 'Bob', decision: 'approved' as const },
   ];
+  /** Each group's kind and its rows' standings. */
   const titles = (r: ReturnType<typeof reviewerRows>) =>
     r.groups.map((g) => [
-      g.title,
+      g.kind,
       g.rows.map((row) => [row.identifier, row.standing]),
     ]);
 
   it('shows the list row, without standings, until the detail answers', () => {
     expect(reviewerRows(listed, null)).toEqual({
       groups: [
-        { title: null, rows: [{ ...listed[0], standing: null, rules: [] }] },
+        {
+          kind: 'all',
+          title: null,
+          rows: [{ ...listed[0], standing: null, rules: [] }],
+        },
       ],
       notes: [],
     });
@@ -116,20 +121,21 @@ describe('reviewerRows', () => {
     );
     expect(titles(got)).toEqual([
       [
-        null,
+        'required',
         [
           ['a70xx', 'By policy'],
           ['des', null],
         ],
       ],
       [
-        'Optional',
+        'optional',
         [
           ['harrie', null],
           ['juul', 'By policy'],
         ],
       ],
     ]);
+    expect(got.groups.map((g) => g.title)).toEqual([null, 'Optional']);
     expect(got.groups[1]?.rows[1]?.rules).toEqual([RULE]);
     expect(got.notes).toEqual([]);
   });
@@ -145,7 +151,7 @@ describe('reviewerRows', () => {
     );
     expect(titles(github)).toEqual([
       [
-        null,
+        'all',
         [
           ['org/core', 'Code owner'],
           ['bea', null],
@@ -157,7 +163,7 @@ describe('reviewerRows', () => {
       listed,
       requirements([standing({ identifier: 'des', requirement: 'required' })])
     );
-    expect(titles(required)).toEqual([[null, [['des', 'Required']]]]);
+    expect(titles(required)).toEqual([['all', [['des', 'Required']]]]);
     // A requirement left unstated is read as neither: no heading.
     const mixed = reviewerRows(
       listed,
@@ -169,7 +175,7 @@ describe('reviewerRows', () => {
     );
     expect(titles(mixed)).toEqual([
       [
-        null,
+        'all',
         [
           ['des', 'Required'],
           ['bea', null],
@@ -181,7 +187,7 @@ describe('reviewerRows', () => {
       listed,
       requirements([standing({ identifier: 'bea', requirement: 'optional' })])
     );
-    expect(titles(optional)).toEqual([[null, [['bea', null]]]]);
+    expect(titles(optional)).toEqual([['all', [['bea', null]]]]);
   });
 
   it('counts a partial list', () => {

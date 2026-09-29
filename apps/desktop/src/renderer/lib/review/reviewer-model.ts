@@ -6,9 +6,9 @@ import type {
 } from '../../../host/contract.js';
 
 /**
- * The Overview's reviewer list in words. Who is required, and why, is
- * core's to decide (`reviewRequirements`); this only says it, and says
- * where the provider does not.
+ * The Overview's reviewer list in words and groups. Who is required,
+ * and why, is core's to decide (`reviewRequirements`); this only says
+ * it, and never reads a requirement the provider did not state.
  */
 
 /** One reviewer as the list shows them: from the detail read with their
@@ -22,8 +22,10 @@ export interface ReviewerRow {
   rules: StandingRule[];
 }
 
-/** The required reviewers, or the optional ones under their heading. */
+/** The required reviewers, the optional ones under their heading, or
+ *  everyone in one list where the provider does not say which is which. */
 export interface ReviewerGroup {
+  kind: 'required' | 'optional' | 'all';
   title: string | null;
   rows: ReviewerRow[];
 }
@@ -64,13 +66,25 @@ function grouped(items: readonly ReviewerStanding[]): ReviewerGroup[] {
   const stated = required.length + optional.length === items.length;
   if (stated && required.length > 0 && optional.length > 0) {
     return [
-      { title: null, rows: required.map((s) => row(s, true)) },
-      { title: 'Optional', rows: optional.map((s) => row(s, true)) },
+      {
+        kind: 'required',
+        title: null,
+        rows: required.map((s) => row(s, true)),
+      },
+      {
+        kind: 'optional',
+        title: 'Optional',
+        rows: optional.map((s) => row(s, true)),
+      },
     ];
   }
   const rest = items.filter((s) => s.requirement !== 'required');
   return [
-    { title: null, rows: [...required, ...rest].map((s) => row(s, false)) },
+    {
+      kind: 'all',
+      title: null,
+      rows: [...required, ...rest].map((s) => row(s, false)),
+    },
   ];
 }
 
@@ -86,7 +100,7 @@ export function reviewerRows(
       read?.state === 'failed'
         ? ["The reviewers' details could not be read."]
         : [];
-    return { groups: [{ title: null, rows }], notes };
+    return { groups: [{ kind: 'all', title: null, rows }], notes };
   }
   const { items, complete, total } = read.value;
   const notes: string[] = [];
