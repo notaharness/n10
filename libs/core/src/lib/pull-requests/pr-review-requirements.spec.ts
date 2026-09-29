@@ -372,7 +372,7 @@ describe('reviewRequirements on GitHub', () => {
     expect(rulesBy(got)).toEqual({
       Core: [
         {
-          name: 'Branch rule',
+          name: 'Ruleset',
           asks: '2 approvals required',
           paths: ['src/**', 'libs/**'],
           applies: null,
@@ -380,7 +380,7 @@ describe('reviewRequirements on GitHub', () => {
       ],
       Web: [
         {
-          name: 'Branch rule',
+          name: 'Ruleset',
           asks: 'Adds them; their approval is optional',
           paths: [],
           applies: null,

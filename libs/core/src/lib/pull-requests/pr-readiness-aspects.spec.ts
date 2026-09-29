@@ -155,6 +155,19 @@ describe('readiness aspects', () => {
         'reviews'
       )?.text
     ).toBe('Waiting for review · rules could not be read');
+    // With no verdict stated either, both unknowns are said.
+    expect(
+      aspect(
+        inputs({
+          merge: { ...CLEAN, reviews: 'unknown', blocked: true },
+          rules: { state: 'failed', kind: 'network', reason: 'offline' },
+        }),
+        'reviews'
+      )
+    ).toEqual({
+      state: 'unknown',
+      text: 'Requirement not stated · rules could not be read',
+    });
   });
 
   it('names the worst required check or policy, in the verdict’s words', () => {
@@ -220,17 +233,18 @@ describe('readiness aspects', () => {
     });
   });
 
-  it('reads conflicts and branch currency', () => {
+  it('reads conflicts only where the provider reports them', () => {
     const conflicts = (merge: Partial<MergeState>) =>
       aspect(
         inputs({ merge: { ...CLEAN, blocked: true, ...merge } }),
         'conflicts'
       );
-    expect(conflicts({ conflicts: 'conflicting' })?.state).toBe('blocked');
-    expect(conflicts({ behind: true })).toEqual({
+    expect(conflicts({ conflicts: 'conflicting' })).toEqual({
       state: 'blocked',
-      text: 'Behind its target',
+      text: 'Conflicts with its target',
     });
+    // Behind its target is no conflict: the verdict's blockers name it.
+    expect(conflicts({ behind: true })).toBeUndefined();
     // Not worked out yet is among the verdict's unknowns, not a row.
     expect(conflicts({ conflicts: 'unknown' })).toBeUndefined();
   });

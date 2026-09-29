@@ -162,7 +162,7 @@ describe('the demo checks read', () => {
               reason: null,
               rules: [
                 {
-                  name: 'Branch rule',
+                  name: 'Ruleset',
                   asks: '1 approval required',
                   paths: [
                     'apps/desktop/**',

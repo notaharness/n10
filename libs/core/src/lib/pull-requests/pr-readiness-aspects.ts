@@ -70,12 +70,10 @@ function reviews(inputs: ReadinessInputs): ReadinessAspect {
   if (!asked || merge.reviews === 'not-required') {
     return { id: 'reviews', state, text };
   }
-  // A count with no verdict stated is the rule alone.
-  return {
-    id: 'reviews',
-    state,
-    text: merge.reviews === 'unknown' ? asked : `${text} · ${asked}`,
-  };
+  // A count with no verdict stated is the rule alone; rules that could
+  // not be read leave the verdict's own words beside them.
+  const alone = merge.reviews === 'unknown' && inputs.rules.state === 'read';
+  return { id: 'reviews', state, text: alone ? asked : `${text} · ${asked}` };
 }
 
 const CHECK_KINDS = new Set<ReadinessItem['kind']>(['checks', 'policies']);
@@ -165,19 +163,15 @@ function unstated(
     : { ...row, state: 'met', text: 'Not in the way' };
 }
 
-/** Shown only where the provider reports a conflict, or a branch
- *  behind a target its rules require it up to date with: otherwise
- *  there is nothing to act on, and a mergeability the provider has not
- *  worked out is among the verdict's unknowns. */
+/** Shown only where the provider reports a conflict: otherwise there
+ *  is nothing to act on, and a mergeability the provider has not worked
+ *  out is among the verdict's unknowns. A branch behind its target is
+ *  not a conflict; the verdict's blockers name it. */
 function conflicts({ merge }: ReadinessInputs): ReadinessAspect[] {
-  const row = { id: 'conflicts' as const };
-  if (merge.conflicts === 'conflicting') {
-    return [{ ...row, state: 'blocked', text: 'Conflicts with its target' }];
-  }
-  if (merge.behind) {
-    return [{ ...row, state: 'blocked', text: 'Behind its target' }];
-  }
-  return [];
+  if (merge.conflicts !== 'conflicting') return [];
+  return [
+    { id: 'conflicts', state: 'blocked', text: 'Conflicts with its target' },
+  ];
 }
 
 /** Whether the rules ask for threads to be resolved; null unread. */

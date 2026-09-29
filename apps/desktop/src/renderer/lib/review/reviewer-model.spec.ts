@@ -47,7 +47,7 @@ describe('standingLabel', () => {
     expect(label({ reason: 'code-owner' })).toBe('Code owner');
     // A rule names them, though GitHub does not say they are required.
     const rule = {
-      name: 'Branch rule',
+      name: 'Ruleset',
       asks: '1 approval required',
       paths: ['src/**'],
       applies: null,

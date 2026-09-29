@@ -278,8 +278,9 @@ rule set. Who must approve, and why, is the Reviewers list's: hovering a
 reviewer's standing shows every rule read that names them (`StandingRule`),
 with its paths and whether the provider says it applies here. A rule naming
 someone is the provider's own statement even where it is not why they are
-listed, so the hover shows it while the reason stays unset. GitHub's rule sets
-name teams by database id, which the detail read carries as `ruleId`.
+listed, so the hover shows it while the reason stays unset. GitHub's rulesets
+name teams by database id, which the detail read carries as `ruleId`. Its rules
+read gives a ruleset's id but not its name, so the hover calls one "Ruleset".
 
 Completion says "Waiting for your review" where the provider asks the viewer
 for a review that would count (`asksViewer`). The checks read also reads the

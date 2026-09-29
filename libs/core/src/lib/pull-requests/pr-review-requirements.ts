@@ -176,7 +176,8 @@ function rulesOf(
   everyone: readonly DetailReviewer[]
 ): StandingRule[] {
   const named = naming(reviewer, rule).map((n) => ({
-    name: n.name ?? 'Branch rule',
+    // GitHub's rules read gives a ruleset's id, not its name.
+    name: n.name ?? 'Ruleset',
     asks: asksOf(n, everyone),
     paths: n.paths,
     applies: n.applies,

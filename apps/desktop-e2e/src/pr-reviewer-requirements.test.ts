@@ -90,7 +90,7 @@ test.describe('Reviewer requirements on GitHub', () => {
     const core = reviewers.locator('[data-reviewer="n10/core"]');
     await core.locator('[data-reviewer-standing]').hover();
     const tip = page.locator('[data-reviewer-rules]').filter({ visible: true });
-    await expect(tip).toContainText('Branch rule');
+    await expect(tip).toContainText('Ruleset');
     await expect(tip).toContainText('1 approval required');
     // One path a line.
     await expect(tip.locator('li')).toHaveText(['src/**', 'libs/queue/**']);
@@ -98,12 +98,12 @@ test.describe('Reviewer requirements on GitHub', () => {
     // Leaving the standing closes it.
     await pointAt(page, reviewers.locator('[data-reviewer="bea"]'));
     await expect(tip).toHaveCount(0);
-    // A code owner no rule set names explains only the code-owner rule.
+    // A code owner no ruleset names explains only the code-owner rule.
     await reviewers
       .locator('[data-reviewer="cam"] [data-reviewer-standing]')
       .hover();
     await expect(tip).toContainText('Code owner review');
-    await expect(tip).not.toContainText('Branch rule');
+    await expect(tip).not.toContainText('Ruleset');
   });
 
   test('reads the verdict and the count on the Reviews row, and waits on the viewer', async ({
