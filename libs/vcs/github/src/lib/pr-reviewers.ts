@@ -4,7 +4,7 @@ import {
   type DetailReviewer,
   type ListRead,
 } from '@n10/vcs-core';
-import { ghGraphQL } from './gh-graphql.js';
+import { ghQuery } from './gh-graphql.js';
 import { restOf, type Page } from './gh-pages.js';
 import { mapReviewState } from './gh-reviews.js';
 
@@ -260,7 +260,7 @@ function pages<K extends Key>(
   key: K
 ) {
   return async (cursor: string) => {
-    const res = (await ghGraphQL(pageQuery(key), {
+    const res = (await ghQuery(pageQuery(key), {
       ...vars,
       [CONNECTIONS[key].cursor]: cursor,
     })) as PageResponse<K>;

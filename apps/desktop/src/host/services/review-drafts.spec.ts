@@ -36,6 +36,10 @@ vi.mock('./repo.js', () => ({
     repository: 'acme/app',
   }),
 }));
+// Only a submit resolves the provider; these tests never publish.
+vi.mock('./pull-requests.js', () => ({
+  resolveProvider: () => ({ config: {}, provider: null, configured: false }),
+}));
 
 const { discardDraft, listDrafts, saveDraft } = await import(
   './review-drafts.js'

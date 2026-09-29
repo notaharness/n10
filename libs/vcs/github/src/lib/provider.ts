@@ -24,7 +24,8 @@ import { sanitizeBody, VcsError } from '@n10/vcs-core';
 import { searchGitHubMentions } from './mentions.js';
 import { publishGitHubReview } from './pr-review-publisher.js';
 import { classifyGhError, parseGhJson } from './gh-errors.js';
-import { ghGraphQL } from './gh-graphql.js';
+import { ghGraphQL, ghQuery } from './gh-graphql.js';
+import { GH_READ_OPTIONS } from './gh-read-deadline.js';
 import { mapReviewState } from './gh-reviews.js';
 import { fetchPullRequestChecksGitHub } from './pr-checks.js';
 import { fetchGitHubConversation } from './pr-conversation.js';
@@ -35,7 +36,7 @@ import { fetchPullRequestDetailGitHub } from './pr-details.js';
 const execFile = promisify(execFileCb);
 
 /** These live beside the detail read, which shares them. */
-export { ghGraphQL, mapReviewState };
+export { ghGraphQL, ghQuery, mapReviewState };
 
 // ── Internal helpers ───────────────────────────────────────────────
 
@@ -91,7 +92,11 @@ export async function checkGhAuth(): Promise<{
   username?: string;
 }> {
   try {
-    const { stdout } = await execFile('gh', ['auth', 'status']);
+    const { stdout } = await execFile(
+      'gh',
+      ['auth', 'status'],
+      GH_READ_OPTIONS
+    );
     const match = stdout.match(/Logged in to github\.com account (\S+)/);
     if (match) return { authenticated: true, username: match[1] };
     // Fallback: if "Logged in" appears without the exact pattern
@@ -463,7 +468,7 @@ async function fetchMergedHeads(searchQuery: string): Promise<Set<string>> {
     const variables: Record<string, string> = { searchQuery };
     if (cursor) variables.cursor = cursor;
 
-    const result = (await ghGraphQL(
+    const result = (await ghQuery(
       SEARCH_MERGED_PRS_QUERY,
       variables
     )) as SearchMergedPrsResponse;
@@ -514,7 +519,7 @@ async function fetchCommentThreadsGitHub(
     if (threadCursor) variables.threadCursor = threadCursor;
     if (commentCursor) variables.commentCursor = commentCursor;
 
-    const result = (await ghGraphQL(
+    const result = (await ghQuery(
       FETCH_PR_THREADS_QUERY,
       variables
     )) as FetchPrThreadsResponse;
@@ -656,6 +661,7 @@ export const githubProvider: VcsProvider = {
       const out = execSync('gh api /user', {
         encoding: 'utf8',
         stdio: 'pipe',
+        ...GH_READ_OPTIONS,
       });
       const { login } = parseGhJson<{ login?: string }>(
         out,
@@ -697,7 +703,7 @@ export const githubProvider: VcsProvider = {
       const variables: Record<string, string> = { searchQuery };
       if (cursor) variables.cursor = cursor;
 
-      const result = (await ghGraphQL(
+      const result = (await ghQuery(
         SEARCH_PRS_QUERY,
         variables
       )) as SearchPrsResponse;
@@ -799,7 +805,7 @@ export const githubProvider: VcsProvider = {
   ): Promise<PullRequestConversation> {
     const repository = this.repositoryRef?.(project);
     if (!repository) throw new Error('GitHub project not configured');
-    return fetchGitHubConversation(ghGraphQL, { ...repository, number: prId });
+    return fetchGitHubConversation(ghQuery, { ...repository, number: prId });
   },
 
   async searchMentionCandidates(
@@ -809,7 +815,7 @@ export const githubProvider: VcsProvider = {
   ): Promise<MentionCandidate[]> {
     const repository = this.repositoryRef?.(project);
     if (!repository) throw new Error('GitHub project not configured');
-    return searchGitHubMentions(ghGraphQL, repository, query);
+    return searchGitHubMentions(ghQuery, repository, query);
   },
 
   async publishReview(
@@ -883,12 +889,11 @@ export const githubProvider: VcsProvider = {
     const { owner, repo } = project;
     if (!owner || !repo) return '';
     try {
-      const { stdout } = await execFile('gh', [
-        'api',
-        `repos/${owner}/${repo}/pulls/${prId}`,
-        '--jq',
-        '.body // ""',
-      ]);
+      const { stdout } = await execFile(
+        'gh',
+        ['api', `repos/${owner}/${repo}/pulls/${prId}`, '--jq', '.body // ""'],
+        GH_READ_OPTIONS
+      );
       return sanitizeBody(stdout.trim());
     } catch (err: unknown) {
       throw classifyGhError(err);

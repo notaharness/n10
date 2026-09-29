@@ -1,9 +1,10 @@
 # libs/core — @n10/core
 
-The shell-agnostic half: Git, worktrees, PTY and session infrastructure,
-config, providers, keybindings, the plan store, pure helpers. No react, ink,
-electron or `@n10/app-core` (lint-enforced). `src/plan.ts` and
-`src/readiness.ts` are the browser-safe entries (`@n10/core/plan`,
+The shell-agnostic operations: Git, worktrees, PTY and session
+infrastructure, config, providers, keybindings, the plan store, pure helpers.
+No react, ink, electron, `@n10/app-core` or `@n10/engine` (lint-enforced);
+state, scheduling and caching over these belong in `libs/engine`. `src/plan.ts`
+and `src/readiness.ts` are the browser-safe entries (`@n10/core/plan`,
 `@n10/core/readiness`); nothing under them may touch `node:`, and they
 import `@n10/vcs-core` as types, or its `./types` subpath for values.
 The reasoning behind each rule is in `docs/decisions.md`.
@@ -89,9 +90,9 @@ The reasoning behind each rule is in `docs/decisions.md`.
   `sync/fetch-queue.ts`; the merge check is `sync/conflicts.ts` so badge and
   briefing agree. `onStatus` fires on transitions only. Timing overrides:
   `babysitTimingFromEnv`.
-- **Pull request cache** (`pull-requests/pull-request-cache.ts`): shared per-repo provider reads at `prPollInterval`. Only the newest fetch
-  commits; a credentials change clears all. `lookupPullRequest` distinguishes
-  `gone` from `unknown`, and one absence is not an answer.
+- **Pull request lookup** (`pull-requests/pull-request-lookup.ts`): the
+  `found`/`gone`/`unknown` answer a babysitter reads. The list behind it is
+  `@n10/engine`'s.
 - **Git output streams** (`utils/git-run.ts`): `runGit` spawns, returns what
   arrived plus `truncated`, rejects only when `git` failed. `execFile` discards
   everything on overflow. `fetchWorktreeDiffText` (`utils/worktree-diff.ts`)

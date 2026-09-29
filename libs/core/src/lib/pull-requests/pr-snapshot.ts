@@ -11,7 +11,7 @@ import {
   type ReadOutcome,
   type RepositoryRef,
 } from '@n10/vcs-core';
-import type { PullRequestLookup } from './pull-request-cache.js';
+import type { PullRequestLookup } from './pull-request-lookup.js';
 
 /**
  * One pull request as a reader sees it at one moment: which pull

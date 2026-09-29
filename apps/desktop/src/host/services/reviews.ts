@@ -1,9 +1,5 @@
 import { readConfig } from '@n10/vcs-core';
-import type {
-  BranchPrMap,
-  PullRequestComments,
-  ReviewVerdict,
-} from '@n10/vcs-core';
+import type { PullRequestComments, ReviewVerdict } from '@n10/vcs-core';
 import { fetchFileDiffText, fetchReviewDiff } from '@n10/core';
 import { PROVIDERS, requireRepo } from './repo.js';
 import { configuredViewer } from './viewer.js';
@@ -11,7 +7,6 @@ import { refreshPrList } from './sidebar.js';
 import type { ReplyRequest, ResolveRequest } from '../contract.js';
 
 interface ActiveProvider {
-  fetchPullRequests(): Promise<BranchPrMap>;
   fetchCommentThreads(prId: number): Promise<PullRequestComments>;
   replyToThread(req: ReplyRequest): Promise<void>;
   setThreadResolved(req: ResolveRequest): Promise<void>;
@@ -38,7 +33,6 @@ function resolveProvider(): ActiveProvider | null {
   }
   const { vendorAuth: auth, vendorProject: project } = config;
   return {
-    fetchPullRequests: () => provider.fetchPullRequests(auth, project),
     fetchCommentThreads: (prId) => {
       if (!provider.fetchCommentThreads) {
         throw new Error(`Provider ${provider.id} does not support comments`);
@@ -74,14 +68,6 @@ function resolveProvider(): ActiveProvider | null {
       return provider.submitReviewVerdict(auth, project, prId, verdict);
     },
   };
-}
-
-export async function fetchPullRequests(): Promise<BranchPrMap> {
-  // No provider / unconfigured auth → no reviews. Not an error: bare
-  // repos are first-class, mirroring the TUI's usePrData.
-  const provider = resolveProvider();
-  if (!provider) return {};
-  return provider.fetchPullRequests();
 }
 
 /** The identifier the provider uses for the authenticated user in

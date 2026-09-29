@@ -30,3 +30,7 @@ ceiling: it is a REST surface. Reasoning: `docs/decisions.md`.
   read while the cycle's statuses are fresh (30 s), two after.
 - GitHub's search returns the rollup and counts with the list, so it
   implements neither `forgetPullRequestCache` nor `resetCaches`.
+- Every `gh` read — `ghQuery`, `ghRest`, the provider's GETs, `gh auth
+  status`, `gh api /user` — runs under `GH_READ_OPTIONS` and is killed at 30s
+  (`gh-read-deadline.ts`). A mutation goes through `ghGraphQL` or `execFile`
+  without them, and so does `publishReview`: never put one under a deadline.

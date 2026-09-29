@@ -57,11 +57,12 @@ interface Failure {
 /** Answer each `gh` call with the next of `answers`, by query name. */
 function answerWith(answers: Record<string, (Json | Failure)[]>) {
   mockExecFile.mockImplementation(
-    (
-      _cmd: string,
-      args: string[],
-      cb: (err: unknown, res?: { stdout: string }) => void
-    ) => {
+    (_cmd: string, args: string[], ...rest: unknown[]) => {
+      // A read passes its deadline options before the callback.
+      const cb = rest.at(-1) as (
+        err: unknown,
+        res?: { stdout: string }
+      ) => void;
       const query = args.find((a) => a.startsWith('query=')) ?? '';
       const name = /query (\w+)/.exec(query)?.[1] ?? '';
       const next = answers[name]?.shift();
@@ -531,8 +532,8 @@ describe('fetchPullRequestDetailGitHub: refusals', () => {
 
   it("classifies gh's own not-found", async () => {
     mockExecFile.mockImplementation(
-      (_c: string, _a: string[], cb: (err: unknown) => void) =>
-        cb({
+      (_c: string, _a: string[], ...rest: unknown[]) =>
+        (rest.at(-1) as (err: unknown) => void)({
           stderr:
             "GraphQL: Could not resolve to a Repository with the name 'acme/gone'.",
         })

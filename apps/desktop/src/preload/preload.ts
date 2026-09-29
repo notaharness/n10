@@ -53,7 +53,6 @@ const api: N10HostApi = {
     ipcRenderer.invoke(IPC.checkWorktreeRemoval, branch),
   openInEditor: (branch) => ipcRenderer.invoke(IPC.openInEditor, branch),
 
-  fetchPullRequests: () => ipcRenderer.invoke(IPC.fetchPullRequests),
   fetchCommentThreads: (prId) =>
     ipcRenderer.invoke(IPC.fetchCommentThreads, prId),
   replyToThread: (req) => ipcRenderer.invoke(IPC.replyToThread, req),

@@ -143,6 +143,7 @@
     "@inkjs/ui": "^2.0.0",
     "@n10/app-core": "*",
     "@n10/core": "*",
+    "@n10/engine": "*",
     "@n10/logger": "*",
     "@n10/terminal": "*",
     "@n10/terminal-pty": "*",

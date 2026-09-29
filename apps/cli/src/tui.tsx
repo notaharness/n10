@@ -5,9 +5,11 @@ import { azureDevOpsProvider } from '@n10/vcs-azure-devops';
 import { githubProvider } from '@n10/vcs-github';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal.js';
 import { OnboardingWizard } from './components/OnboardingWizard.js';
+import { createPullRequestList } from '@n10/engine';
 import {
   settlePendingRuns,
   ConfigProvider,
+  EngineProvider,
   useConfig,
   KeybindProvider,
   NavProvider,
@@ -33,6 +35,9 @@ import { MainTab } from './screens/main/MainTab.js';
 // ── Provider registry ──────────────────────────────────────────────
 
 const providers: VcsProvider[] = [azureDevOpsProvider, githubProvider];
+
+// The same pull request list the desktop host runs, in this process.
+const pullRequests = createPullRequestList({ providers });
 
 // Upper bound on how long 'q' waits for in-flight git ops to finish
 // before force-exiting. Real worktree/branch ops finish well under this;
@@ -143,25 +148,27 @@ export async function runTui(args: string[]): Promise<void> {
 
   render(
     <ConfigProvider providers={providers}>
-      <KeybindProvider>
-        <LayoutProvider>
-          <NavProvider>
-            <AsyncOpsProvider>
-              <PlanProvider>
-                <ModalProvider>
-                  <ToastProvider>
-                    <SessionProvider>
-                      <SidebarProvider>
-                        <App />
-                      </SidebarProvider>
-                    </SessionProvider>
-                  </ToastProvider>
-                </ModalProvider>
-              </PlanProvider>
-            </AsyncOpsProvider>
-          </NavProvider>
-        </LayoutProvider>
-      </KeybindProvider>
+      <EngineProvider pullRequests={pullRequests} repo={process.cwd()}>
+        <KeybindProvider>
+          <LayoutProvider>
+            <NavProvider>
+              <AsyncOpsProvider>
+                <PlanProvider>
+                  <ModalProvider>
+                    <ToastProvider>
+                      <SessionProvider>
+                        <SidebarProvider>
+                          <App />
+                        </SidebarProvider>
+                      </SessionProvider>
+                    </ToastProvider>
+                  </ModalProvider>
+                </PlanProvider>
+              </AsyncOpsProvider>
+            </NavProvider>
+          </LayoutProvider>
+        </KeybindProvider>
+      </EngineProvider>
     </ConfigProvider>
   );
 }

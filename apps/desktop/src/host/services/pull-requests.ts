@@ -1,6 +1,6 @@
 /**
- * The host's instance of `@n10/core`'s pull request cache, and the
- * provider it resolves through.
+ * The host's instance of `@n10/engine`'s pull request list, and the
+ * bridge from its changes to the renderer.
  *
  * Every host-side reader of the pull request list sits on this one
  * instance: the sidebar model, the babysitters (one row each, every
@@ -9,41 +9,39 @@
  * costing the provider a fetch of its own.
  */
 import {
-  createPullRequestCache,
-  type ProviderResolution,
-  type PullRequestLookup,
-} from '@n10/core';
-import { readConfig, type BranchPrMap, type VcsProvider } from '@n10/vcs-core';
+  EMPTY_PULL_REQUEST_LIST,
+  createPullRequestList,
+  providerResolver,
+  type PullRequestListSnapshot,
+} from '@n10/engine';
+import type { PullRequestLookup } from '@n10/core';
+import type { BranchPrMap, VcsProvider } from '@n10/vcs-core';
 import { PROVIDERS } from './repo.js';
 
-// Installed by main.ts. Fires when a background fetch has changed what
-// the sidebar would answer, so the renderer can refetch then rather
-// than on its next poll tick.
+export const resolveProvider = providerResolver(PROVIDERS);
+
+export const pullRequests = createPullRequestList({ providers: PROVIDERS });
+
+// Installed by main.ts. Fires when what the sidebar would answer has
+// moved, so the renderer refetches then rather than on its next poll
+// tick.
 let remoteUpdated: (() => void) | null = null;
 
 export function setRemoteUpdatedNotifier(fn: (() => void) | null): void {
   remoteUpdated = fn;
 }
 
-/** Tell the renderer the remote data it shows has moved. */
-export function notifyRemoteUpdated(): void {
+// The engine announces every change, a request starting included. The
+// renderer is told only about the ones it would paint — a list that
+// landed, an error that appeared or cleared — since each announcement
+// costs it a sidebar reload.
+const announced = new Map<string, PullRequestListSnapshot>();
+pullRequests.subscribe((cwd) => {
+  const next = pullRequests.getSnapshot(cwd);
+  const last = announced.get(cwd) ?? EMPTY_PULL_REQUEST_LIST;
+  announced.set(cwd, next);
+  if (next.prMap === last.prMap && next.error === last.error) return;
   remoteUpdated?.();
-}
-
-export function resolveProvider(cwd: string): ProviderResolution {
-  const config = readConfig(cwd);
-  const provider = config.vendor
-    ? PROVIDERS.find((p) => p.id === config.vendor) ?? null
-    : null;
-  const configured =
-    provider != null &&
-    provider.isConfigured(config.vendorAuth, config.vendorProject);
-  return { config, provider, configured };
-}
-
-export const pullRequests = createPullRequestCache({
-  resolveProvider,
-  onCommitted: notifyRemoteUpdated,
 });
 
 /** The provider the repository at `cwd` is configured for, if any. */
@@ -53,7 +51,7 @@ export function repoProvider(cwd: string): VcsProvider | null {
 }
 
 /**
- * One pull request as the cache has it, refreshed on the cache's own
+ * One pull request as the list has it, refreshed on the list's own
  * schedule — a babysitter asking every minute reads what the sidebar
  * reads, rather than costing the provider a fetch per watched row.
  */
@@ -64,7 +62,7 @@ export function lookupPullRequest(
   return pullRequests.lookupPullRequest(cwd, prId);
 }
 
-/** The list as cached for `cwd`, without waiting for anything. */
+/** The list as held for `cwd`, without waiting for anything. */
 export function cachedPullRequests(cwd: string): BranchPrMap {
-  return pullRequests.cached(cwd);
+  return pullRequests.getSnapshot(cwd).prMap;
 }
