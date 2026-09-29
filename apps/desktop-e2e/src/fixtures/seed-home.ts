@@ -12,7 +12,7 @@ import {
   fakeAdoGlobalConfig,
   fakeAdoProjectConfig,
   installFakeAdo,
-  type FakeAzure,
+  type FakeAzureDevOps,
 } from '../setup/fake-ado.js';
 import {
   addExternalWorktree,
@@ -97,7 +97,7 @@ export interface HomeSeed {
    * REST API in the app's main process (`setup/fake-ado.ts`), with the
    * matching config written for it.
    */
-  fakeAzure?: FakeAzure;
+  fakeAzureDevOps?: FakeAzureDevOps;
 }
 
 /**
@@ -123,7 +123,9 @@ export function seedHome(
     JSON.stringify(
       {
         aiCommand: fakeAgent(),
-        ...(opts.fakeAzure ? fakeAdoGlobalConfig(opts.fakeAzure) : {}),
+        ...(opts.fakeAzureDevOps
+          ? fakeAdoGlobalConfig(opts.fakeAzureDevOps)
+          : {}),
         ...opts.n10Config,
       },
       null,
@@ -145,19 +147,23 @@ export function seedHome(
 
   return {
     ...(opts.fakeGitHub ? installFakeGh(homeDir, opts.fakeGitHub) : {}),
-    ...(opts.fakeAzure ? installFakeAdo(homeDir, opts.fakeAzure) : {}),
+    ...(opts.fakeAzureDevOps
+      ? installFakeAdo(homeDir, opts.fakeAzureDevOps)
+      : {}),
   };
 }
 
 function seedProjectConfig(
   n10: string,
   repoPath: string,
-  opts: Pick<HomeSeed, 'projectConfig' | 'fakeGitHub' | 'fakeAzure'>
+  opts: Pick<HomeSeed, 'projectConfig' | 'fakeGitHub' | 'fakeAzureDevOps'>
 ): void {
   const projectConfig =
     opts.projectConfig ??
     (opts.fakeGitHub ? fakeGhProjectConfig(opts.fakeGitHub) : undefined) ??
-    (opts.fakeAzure ? fakeAdoProjectConfig(opts.fakeAzure) : undefined);
+    (opts.fakeAzureDevOps
+      ? fakeAdoProjectConfig(opts.fakeAzureDevOps)
+      : undefined);
   if (!projectConfig) return;
   // Per-project config lives under a hash of the repo path — see
   // projectKey() in @n10/vcs-core's config store.

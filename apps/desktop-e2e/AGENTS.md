@@ -22,10 +22,11 @@ build target pins production). Full notes: `docs/testing.md`.
 - `src/setup/fake-gh.ts` puts a fake `gh` on PATH answering from a JSON
   scenario (`fakeGitHub` option: PRs, review threads, comments, check
   rollup). Point `headRefName` at a real branch for a real diff. The replacement is isolated to the test PATH.
-- `src/setup/fake-ado.ts` (`fakeAzure` option) answers Azure DevOps's REST
-  API from a `-r` preload in the main process (`fixtures/fake-ado.cjs`);
-  Playwright drops `NODE_OPTIONS`, so the preload goes on the command line.
+- `src/setup/fake-ado.ts` (`fakeAzureDevOps` option) answers Azure DevOps's
+  REST API from a preload in the main process (`fixtures/fake-ado.cjs`).
   Never point a test at Azure without it: the fixture checks it loaded.
+- Playwright's Electron launcher drops `NODE_OPTIONS`, so a main-process
+  preload goes on the Electron command line (`-r`).
 - Provider config from a test: project fields go under `vendorProject`, or
   auto-detect overwrites them and the provider silently returns nothing.
 - Native menus: `src/setup/menu.ts` arms a one-shot `Menu.popup` interception

@@ -1,141 +1,176 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * A pull request on Azure DevOps, for `fixtures/fake-ado.mjs` to serve
- * the app offline. A test describes reviewers and policies in a few
- * words; this writes them out as the REST API returns them, so the
- * provider's own parsing is what the test drives.
+ * An Azure DevOps scenario as a test declares it, and the config that
+ * points the app at the fake serving it (`fixtures/fake-ado.cjs`).
+ *
+ * The counterpart of `fake-gh.ts`. The Azure provider reaches Azure
+ * through `fetch` with the host in every URL, so the fake is a preload
+ * in the app's main process that answers `dev.azure.com` and
+ * `vssps.dev.azure.com` itself. The scenario says what a test means,
+ * not how it is served, so another transport can serve it unchanged.
  */
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-/** The main-process preload that answers Azure DevOps's API; the
- *  fixture passes it to Electron as `-r`. */
-export const FAKE_ADO_PRELOAD = join(HERE, '..', 'fixtures', 'fake-ado.cjs');
-
+/** A reviewer row. `vote` is Azure's: 10 approved, 5 approved with
+ *  suggestions, 0 none, -5 waiting for author, -10 rejected. */
 export interface FakeAdoReviewer {
-  /** The account or group's id; a policy names reviewers by it. */
-  id: string;
   name: string;
-  /** Azure's vote: 10 approved, 5 with suggestions, -5 waiting, -10
-   *  rejected, 0 none. */
-  vote?: number;
-  required?: boolean;
-  /** A group or team rather than a person. */
-  group?: boolean;
+  vote?: 10 | 5 | 0 | -5 | -10;
+  /** A team (group) reviewer rather than a person. */
+  isContainer?: boolean;
+  isRequired?: boolean;
+  hasDeclined?: boolean;
+  /** Defaults to `<name>@example.com` for a person, and to Azure's
+   *  `vstfs:///…\<name>` path for a team. */
+  uniqueName?: string;
 }
 
-/** A Required reviewers policy, as its evaluation reads. */
+/** A Required reviewers policy's evaluation on the pull request. */
 export interface FakeAdoPolicy {
-  /** The policy's own display name; Azure's type name where unset. */
-  name?: string;
+  name: 'Required reviewers';
+  status: 'approved' | 'rejected' | 'running' | 'queued' | 'notApplicable';
+  isBlocking?: boolean;
+  /** The reviewers it names, by name. */
   reviewers: string[];
-  blocking?: boolean;
+  /** The policy's own name; Azure shows the type's where unset. */
+  displayName?: string;
   approvals?: number;
+  /** The file filters it applies to. */
   paths?: string[];
-  status?: 'approved' | 'queued' | 'rejected' | 'notApplicable';
 }
 
 export interface FakeAdoPr {
   id: number;
   title: string;
-  /** A branch in the test's repo: slash-free, as `git-repo.ts` seeds. */
-  branch: string;
-  author: { id: string; name: string; email: string };
-  reviewers: FakeAdoReviewer[];
-  policies?: FakeAdoPolicy[];
+  /** A branch that exists in the test repo: slash-free, as
+   *  `git-repo.ts` seeds. */
+  sourceBranch: string;
+  targetBranch?: string;
+  /** Display name. Defaults to the scenario's user — *your* PR. */
+  author?: string;
   description?: string;
+  reviewers?: FakeAdoReviewer[];
+  policies?: FakeAdoPolicy[];
 }
 
-export interface FakeAzure {
+export interface FakeAzureDevOps {
   org?: string;
   project?: string;
   repo?: string;
-  viewer: { id: string; name: string; email: string };
+  pat?: string;
+  /** Whose PAT it is — `/connectiondata`'s authenticated user. */
+  user: { displayName: string; uniqueName: string };
   prs: FakeAdoPr[];
 }
 
-const REPO_ID = '5b0c8e8a-1f3e-4c4e-9d3a-2f6b7c8d9e01';
-const PROJECT_ID = 'a9e2b3c4-5d6e-4f70-8a91-b2c3d4e5f601';
-const HEAD = '3333333333333333333333333333333333333333';
-const REQUIRED_REVIEWERS = 'fd2167ab-b0be-447a-8ec8-39368250530e';
+export const FAKE_ADO_PAT = 'fake-ado-pat';
 
-function names(s: FakeAzure) {
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+/** The main-process preload that answers Azure DevOps's API; the
+ *  fixture passes it to Electron as `-r`. */
+export const FAKE_ADO_PRELOAD = join(HERE, '..', 'fixtures', 'fake-ado.cjs');
+
+/** A stable GUID for a name, formatted the way Azure formats ids. */
+export function guid(name: string): string {
+  const h = createHash('sha1').update(name).digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(
+    17,
+    20
+  )}-${h.slice(20, 32)}`;
+}
+
+function coordinates(s: FakeAzureDevOps) {
   return {
-    org: s.org ?? 'contoso',
-    project: s.project ?? 'Fabrikam',
-    repo: s.repo ?? 'fabrikam-app',
+    org: s.org ?? 'n10-org',
+    project: s.project ?? 'n10-project',
+    repo: s.repo ?? 'fixture',
   };
 }
 
-function rawReviewer(r: FakeAdoReviewer) {
+/** `IdentityRef`: an email for a person, a project path for a team,
+ *  whose display name Azure prefixes with the project. */
+function identity(
+  project: string,
+  name: string,
+  opts: { uniqueName?: string; isContainer?: boolean } = {}
+) {
+  const uniqueName =
+    opts.uniqueName ??
+    (opts.isContainer
+      ? `vstfs:///Classification/TeamProject/${guid(project)}\\${name}`
+      : `${name.toLowerCase().replace(/\s+/g, '.')}@example.com`);
   return {
-    id: r.id,
-    displayName: r.name,
-    uniqueName: r.group ? `[Fabrikam]\\${r.name}` : `${r.id}@contoso.example`,
-    vote: r.vote ?? 0,
-    hasDeclined: false,
-    isRequired: r.required ?? false,
-    isContainer: r.group ?? false,
-    isFlagged: false,
+    id: guid(name),
+    displayName: opts.isContainer ? `[${project}]\\${name}` : name,
+    uniqueName,
+    ...(opts.isContainer ? { isContainer: true } : {}),
   };
 }
 
-function rawPr(s: FakeAzure, pr: FakeAdoPr) {
-  const { project, repo } = names(s);
+const head = (pr: FakeAdoPr) =>
+  createHash('sha1').update(`head-${pr.id}`).digest('hex');
+
+function pullRequest(s: FakeAzureDevOps, pr: FakeAdoPr) {
+  const { project, repo } = coordinates(s);
+  const author = pr.author ?? s.user.displayName;
   return {
     repository: {
-      id: REPO_ID,
+      id: guid(repo),
       name: repo,
-      project: { id: PROJECT_ID, name: project },
+      project: { id: guid(project), name: project },
     },
     pullRequestId: pr.id,
     codeReviewId: pr.id,
     status: 'active',
-    createdBy: {
-      id: pr.author.id,
-      displayName: pr.author.name,
-      uniqueName: pr.author.email,
-    },
+    createdBy: identity(project, author, {
+      uniqueName: pr.author ? undefined : s.user.uniqueName,
+    }),
     creationDate: '2026-09-22T09:30:00.000Z',
     title: pr.title,
     description: pr.description ?? '',
-    sourceRefName: `refs/heads/${pr.branch}`,
-    targetRefName: 'refs/heads/main',
+    sourceRefName: `refs/heads/${pr.sourceBranch}`,
+    targetRefName: `refs/heads/${pr.targetBranch ?? 'main'}`,
     mergeStatus: 'succeeded',
     isDraft: false,
-    lastMergeSourceCommit: { commitId: HEAD },
+    lastMergeSourceCommit: { commitId: head(pr) },
     lastMergeTargetCommit: { commitId: 'b'.repeat(40) },
-    reviewers: pr.reviewers.map(rawReviewer),
+    reviewers: (pr.reviewers ?? []).map((r) => ({
+      ...identity(project, r.name, r),
+      vote: r.vote ?? 0,
+      hasDeclined: r.hasDeclined ?? false,
+      isRequired: r.isRequired ?? false,
+      isFlagged: false,
+    })),
   };
 }
 
-function evaluation(pr: number, p: FakeAdoPolicy, n: number) {
+/** `PolicyEvaluationRecord` for a Required reviewers policy. */
+function evaluation(s: FakeAzureDevOps, pr: FakeAdoPr, p: FakeAdoPolicy) {
+  const { project, repo } = coordinates(s);
   return {
-    evaluationId: `00000000-0000-4000-9000-${String(pr * 100 + n).padStart(
-      12,
-      '0'
-    )}`,
-    artifactId: `vstfs:///CodeReview/CodeReviewId/${PROJECT_ID}/${pr}`,
-    status: p.status ?? 'queued',
+    evaluationId: guid(`evaluation-${pr.id}-${p.reviewers.join(',')}`),
+    artifactId: `vstfs:///CodeReview/CodeReviewId/${guid(project)}/${pr.id}`,
+    status: p.status,
     context: null,
     configuration: {
-      id: n + 1,
       isEnabled: true,
-      isBlocking: p.blocking ?? true,
-      type: { id: REQUIRED_REVIEWERS, displayName: 'Required reviewers' },
+      isBlocking: p.isBlocking ?? true,
+      type: { id: 'fd2167ab-b0be-447a-8ec8-39368250530e', displayName: p.name },
       settings: {
-        requiredReviewerIds: p.reviewers,
+        requiredReviewerIds: p.reviewers.map(guid),
         ...(p.approvals == null ? {} : { minimumApproverCount: p.approvals }),
         ...(p.paths ? { filenamePatterns: p.paths } : {}),
-        ...(p.name ? { displayName: p.name } : {}),
+        ...(p.displayName ? { displayName: p.displayName } : {}),
         creatorVoteCounts: false,
         scope: [
           {
             refName: 'refs/heads/main',
             matchKind: 'Exact',
-            repositoryId: REPO_ID,
+            repositoryId: guid(repo),
           },
         ],
       },
@@ -143,70 +178,47 @@ function evaluation(pr: number, p: FakeAdoPolicy, n: number) {
   };
 }
 
-/** The scenario as the shim reads it: Azure's own JSON. */
-function raw(s: FakeAzure) {
-  const { repo } = names(s);
+/** The scenario as the preload reads it: Azure's own JSON. */
+function served(s: FakeAzureDevOps) {
+  const { project, repo } = coordinates(s);
+  const byId = <T>(read: (pr: FakeAdoPr) => T) =>
+    Object.fromEntries(s.prs.map((pr) => [pr.id, read(pr)]));
   return {
     viewer: {
-      id: s.viewer.id,
-      providerDisplayName: s.viewer.name,
+      id: guid(s.user.displayName),
+      providerDisplayName: s.user.displayName,
       properties: {
-        Account: { $type: 'System.String', $value: s.viewer.email },
+        Account: { $type: 'System.String', $value: s.user.uniqueName },
       },
     },
     repository: {
-      id: REPO_ID,
+      id: guid(repo),
       name: repo,
       defaultBranch: 'refs/heads/main',
-      project: { id: PROJECT_ID },
+      project: { id: guid(project) },
     },
-    prs: s.prs.map((pr) => rawPr(s, pr)),
-    evaluations: Object.fromEntries(
-      s.prs.map((pr) => [
-        pr.id,
-        (pr.policies ?? []).map((p, n) => evaluation(pr.id, p, n)),
-      ])
+    prs: s.prs.map((pr) => pullRequest(s, pr)),
+    evaluations: byId((pr) =>
+      (pr.policies ?? []).map((p) => evaluation(s, pr, p))
     ),
-    iterations: Object.fromEntries(
-      s.prs.map((pr) => [
-        pr.id,
-        [{ id: 1, sourceRefCommit: { commitId: HEAD } }],
-      ])
-    ),
+    iterations: byId((pr) => [
+      { id: 1, sourceRefCommit: { commitId: head(pr) } },
+    ]),
   };
 }
 
 /**
  * Write the scenario and return the environment that points the
- * preload at it. The preload reads the scenario on every request, so a
- * test may rewrite it with `installFakeAdo` again mid-run.
+ * preload at it. The preload reads it on every request, so a test may
+ * write it again mid-run.
  */
 export function installFakeAdo(
   homeDir: string,
-  scenario: FakeAzure
+  scenario: FakeAzureDevOps
 ): { N10_FAKE_ADO: string } {
   const path = join(homeDir, 'fake-ado.json');
-  writeFileSync(path, JSON.stringify(raw(scenario), null, 2), 'utf8');
+  writeFileSync(path, JSON.stringify(served(scenario), null, 2), 'utf8');
   return { N10_FAKE_ADO: path };
-}
-
-/** The project config that points the app at the fake, with
- *  `vendorProject` set so the git remote is not detected over it. */
-export function fakeAdoProjectConfig(
-  scenario: FakeAzure
-): Record<string, unknown> {
-  return { vendor: 'azure-devops', vendorProject: names(scenario) };
-}
-
-/** The global config's side: a token, never a real one, and the
- *  viewer's email, which is how Azure DevOps names them. */
-export function fakeAdoGlobalConfig(
-  scenario: FakeAzure
-): Record<string, unknown> {
-  return {
-    email: scenario.viewer.email,
-    vendorAuth: { 'azure-devops': { pat: 'fake-ado-token' } },
-  };
 }
 
 /** The requests the fake had no answer for, as `METHOD url` lines. */
@@ -214,4 +226,30 @@ export function fakeAdoMisses(homeDir: string): string[] {
   const path = join(homeDir, 'fake-ado.json.misses');
   if (!existsSync(path)) return [];
   return readFileSync(path, 'utf8').split('\n').filter(Boolean);
+}
+
+/**
+ * The per-project config that points the app at the fake.
+ * `vendorProject` must be present or the host auto-detects from the git
+ * remote and overwrites it; `email` is who `matchesUser` takes you for.
+ */
+export function fakeAdoProjectConfig(
+  scenario: FakeAzureDevOps
+): Record<string, unknown> {
+  return {
+    vendor: 'azure-devops',
+    vendorProject: coordinates(scenario),
+    email: scenario.user.uniqueName,
+  };
+}
+
+/** The global config half: the PAT lives under `vendorAuth`. */
+export function fakeAdoGlobalConfig(
+  scenario: FakeAzureDevOps
+): Record<string, unknown> {
+  return {
+    vendorAuth: {
+      'azure-devops': { pat: scenario.pat ?? FAKE_ADO_PAT },
+    },
+  };
 }

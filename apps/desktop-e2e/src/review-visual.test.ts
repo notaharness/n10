@@ -152,7 +152,7 @@ test.describe('Visual (review) @visual', () => {
 test.describe('Visual (reviewers on Azure DevOps, dark theme) @visual', () => {
   test.use({
     fakeGitHub: undefined,
-    fakeAzure: AZURE_REVIEWERS,
+    fakeAzureDevOps: AZURE_REVIEWERS,
     desktopPrefs: { theme: 'dark', nativeFrame: false },
     repo: { name: 'n10-visual', worktrees: [{ branch: 'cancel-requests' }] },
   });
@@ -175,7 +175,8 @@ test.describe('Visual (reviewers on Azure DevOps, dark theme) @visual', () => {
       'No comments, reviews or activity yet.'
     );
     await reviewers
-      .locator('[data-reviewer^="[Fabrikam]"] [data-reviewer-standing]')
+      .locator('[data-reviewer]', { hasText: 'API reviewers' })
+      .locator('[data-reviewer-standing]')
       .hover();
     const tip = page.locator('[data-reviewer-rules]').filter({ visible: true });
     await expect(tip.locator('li')).toHaveCount(2);

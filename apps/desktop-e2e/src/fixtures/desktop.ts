@@ -119,7 +119,7 @@ export const test = base.extend<
   githubToken: [undefined, { option: true }],
   drafts: [undefined, { option: true }],
   fakeGitHub: [undefined, { option: true }],
-  fakeAzure: [undefined, { option: true }],
+  fakeAzureDevOps: [undefined, { option: true }],
   liveSessions: [undefined, { option: true }],
   env: [undefined, { option: true }],
   liveTerminals: [undefined, { option: true }],
@@ -135,7 +135,7 @@ export const test = base.extend<
       githubToken,
       drafts,
       fakeGitHub,
-      fakeAzure,
+      fakeAzureDevOps,
       liveSessions,
       env,
       liveTerminals,
@@ -156,7 +156,7 @@ export const test = base.extend<
       desktopPrefs,
       drafts,
       fakeGitHub,
-      fakeAzure,
+      fakeAzureDevOps,
     });
 
     seedTmux(repoPath, homeDir, liveSessions, liveTerminals);
@@ -164,7 +164,7 @@ export const test = base.extend<
     const app = await electron.launch({
       args: [
         // Before any of the app's code, so no request reaches Azure.
-        ...(fakeAzure ? ['-r', FAKE_ADO_PRELOAD] : []),
+        ...(fakeAzureDevOps ? ['-r', FAKE_ADO_PRELOAD] : []),
         APP_DIR,
         // CI runners have no user namespaces for the sandbox, and
         // software rendering is both available and deterministic.
@@ -185,7 +185,7 @@ export const test = base.extend<
     });
 
     const page = await app.firstWindow();
-    if (fakeAzure) {
+    if (fakeAzureDevOps) {
       const faked = await app.evaluate(
         () => (globalThis as { __n10FakeAzure?: boolean }).__n10FakeAzure
       );

@@ -1,8 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import {
-  AZURE_REVIEWERS,
-  REVIEWER_ID as ID,
-} from './fixtures/azure-reviewers.js';
+import { AZURE_REVIEWERS } from './fixtures/azure-reviewers.js';
 import { test, expect } from './fixtures/desktop.js';
 import { sidebarRow } from './setup/app.js';
 import { fakeAdoMisses } from './setup/fake-ado.js';
@@ -16,16 +13,9 @@ import { fakeAdoMisses } from './setup/fake-ado.js';
  */
 
 test.use({
-  fakeAzure: AZURE_REVIEWERS,
+  fakeAzureDevOps: AZURE_REVIEWERS,
   repo: { worktrees: [{ branch: 'cancel-requests' }] },
 });
-
-/** A reviewer's standing line, by their identifier: an Azure group's
- *  carries a backslash, which a CSS string must escape. */
-function standingOf(reviewers: Locator, id: string) {
-  const css = id.replaceAll('\\', '\\\\');
-  return reviewers.locator(`[data-reviewer="${css}"] [data-reviewer-standing]`);
-}
 
 async function openReviewers(page: Page) {
   await sidebarRow(page, /#4211/).first().click();
@@ -36,31 +26,33 @@ async function openReviewers(page: Page) {
   return reviewers;
 }
 
+/** A reviewer's row, by the name it shows. */
+const row = (reviewers: Locator, name: string) =>
+  reviewers.locator('[data-reviewer]', { hasText: name });
+
 test.describe('Reviewer groups on Azure DevOps', () => {
   test('lists the required first, then the optional under a heading', async ({
     desktop,
   }) => {
     const reviewers = await openReviewers(desktop.page);
-    const names = (group: string) =>
-      reviewers.locator(`[data-reviewer-group="${group}"] [data-reviewer]`);
-    await expect(names('required')).toHaveCount(2);
-    await expect(names('required').nth(0)).toContainText('API reviewers');
-    await expect(names('required').nth(1)).toContainText('Team DES');
+    const group = (name: string) =>
+      reviewers.locator(`[data-reviewer-group="${name}"] [data-reviewer]`);
+    await expect(group('required')).toHaveText([
+      /\[Fabrikam\]\\API reviewers/,
+      /\[Fabrikam\]\\Team DES/,
+    ]);
     await expect(
       reviewers
         .getByRole('list', { name: 'Optional' })
         .locator('[data-reviewer]')
-    ).toHaveCount(2);
-    await expect(names('Optional').nth(0)).toContainText('Harrie Essing');
-    await expect(names('Optional').nth(1)).toContainText('Daan Kerkhoff');
+    ).toHaveText([/Harrie Essing/, /Daan Kerkhoff/]);
     // The heading says required or optional; a row says only why.
-    const standing = (id: string) => standingOf(reviewers, id);
-    await expect(standing('[Fabrikam]\\API reviewers')).toHaveText('By policy');
-    await expect(standing('[Fabrikam]\\Team DES')).toHaveCount(0);
-    await expect(standing(`${ID.daan}@contoso.example`)).toHaveText(
-      'By policy'
-    );
-    await expect(standing(`${ID.harrie}@contoso.example`)).toHaveCount(0);
+    const standing = (name: string) =>
+      row(reviewers, name).locator('[data-reviewer-standing]');
+    await expect(standing('API reviewers')).toHaveText('By policy');
+    await expect(standing('Team DES')).toHaveCount(0);
+    await expect(standing('Daan Kerkhoff')).toHaveText('By policy');
+    await expect(standing('Harrie Essing')).toHaveCount(0);
     await expect(reviewers).not.toContainText('Required');
     await expect(reviewers).not.toContainText('Optional,');
   });
@@ -70,7 +62,9 @@ test.describe('Reviewer groups on Azure DevOps', () => {
   }) => {
     const { page } = desktop;
     const reviewers = await openReviewers(page);
-    await standingOf(reviewers, '[Fabrikam]\\API reviewers').hover();
+    await row(reviewers, 'API reviewers')
+      .locator('[data-reviewer-standing]')
+      .hover();
     const tip = page.locator('[data-reviewer-rules]').filter({ visible: true });
     await expect(tip).toContainText('Required reviewers');
     await expect(tip).toContainText('1 approval required');
