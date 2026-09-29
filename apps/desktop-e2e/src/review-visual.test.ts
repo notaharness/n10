@@ -112,6 +112,15 @@ test.describe('Visual (review) @visual', () => {
       .hover();
     const tip = page.locator('[data-reviewer-rules]').filter({ visible: true });
     await expect(tip.locator('li')).toHaveCount(2);
+    // Framed once it has zoomed in: its box is measured before the
+    // screenshot stops the animation.
+    await tip.evaluate((el) =>
+      Promise.all(
+        (el.closest('[data-slot="tooltip-content"]') ?? el)
+          .getAnimations({ subtree: true })
+          .map((a) => a.finished)
+      )
+    );
     await expect(page).toHaveScreenshot('reviewer-rules-hover.png', {
       ...shot,
       clip: await around(reviewers, tip),
