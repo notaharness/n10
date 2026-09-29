@@ -49,11 +49,16 @@ The registry owns local terminal rendering and activity. Launch preparation is
 asynchronous; callers await registration before installing relays or focusing
 terminals. Concurrent requests for one identity share preparation.
 
-Desktop creation runs `prepareTmuxSession` in an Electron utility process.
-Spawning a persistent tmux server directly from Electron on Linux leaks Chromium
-file descriptors into it, including profile locks. The supported utility-process
-boundary isolates those resources; attach and restart can run locally against
-an existing server. Build and development entry points include the worker.
+Desktop creates sessions from its session host, an Electron utility process.
+Spawning a persistent tmux server directly from the Electron main process on
+Linux leaks Chromium file descriptors into it, including profile locks. The
+supported utility-process boundary isolates those resources, but not the host's
+own: on Linux, node-pty's `forkpty` masters are not close-on-exec and tmux keeps
+the descriptors it inherits. A server the host creates while it holds a PTY
+master keeps that master open, and its attach client gets no hangup when the
+host lets go. The host creates a server only when none is running, and so while
+it holds no attach clients to one, which leaves a narrow race; nothing may rely
+on a server it created holding none of its descriptors.
 
 ```mermaid
 flowchart TD

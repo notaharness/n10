@@ -58,11 +58,11 @@ a real diff. Seeded worktree branches must be slash-free because the fixture and
 app construct paths differently.
 
 `src/setup/fake-ado.ts` (the `fakeAzureDevOps` option) does the same for Azure
-DevOps. The fixture preloads `fixtures/fake-ado.cjs` into the main process with
-Electron's `-r`, and it answers every request to an Azure host from the scenario,
+DevOps. The fixture loads `fixtures/fake-ado.cjs` into the session host, which
+makes the provider's requests, through `N10_HOST_REQUIRE`, and it answers every request to an Azure host from the scenario,
 written out as the REST API's own JSON, so nothing reaches Azure. The preload
 writes the token itself, so an app it is not in has none and asks Azure nothing;
-the fixture then stops. A request it does not model answers 404 and fails the test
+the fixture then stops. It marks that it loaded with `fake-ado.json.loaded`. A request it does not model answers 404 and fails the test
 at teardown. Seed no Azure DevOps token of your own alongside it. Provider project fields belong in `vendorProject`
 or auto-detection replaces them.
 
