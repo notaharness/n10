@@ -291,6 +291,11 @@ test.describe('Visual (plan, light theme) @visual', () => {
   });
 });
 
+/** Hours before the run, so the activity's "3d ago" reads the same on
+ *  every run; a fixed date's age moves a day at a time. */
+const hoursAgo = (h: number) =>
+  new Date(Date.now() - h * 3_600_000).toISOString();
+
 /**
  * The pull request Overview, for a pull request someone else opened —
  * which is where it opens. One column at the window's own size, two
@@ -307,7 +312,9 @@ const OVERVIEW_GITHUB: FakeGitHub = {
       headRefName: 'cancel-requests',
       author: 'alex',
       rollup: 'SUCCESS',
-      reviews: [{ author: 'bea', state: 'APPROVED' }],
+      reviews: [
+        { author: 'bea', state: 'APPROVED', submittedAt: hoursAgo(72) },
+      ],
       reviewRequests: ['n10-tester'],
       // GitHub's own word: green, and still waiting for a review.
       mergeStateStatus: 'BLOCKED',
