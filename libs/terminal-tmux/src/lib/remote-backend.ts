@@ -14,10 +14,9 @@ import { prepareRemoteTmuxSession } from './tmux-launch-remote.js';
 import type { TmuxLaunchPlan } from './tmux-launch.js';
 import type { RemoteSessionPoller } from './remote-poller.js';
 
-/** One remote pty stream's client contract — deliberately narrow, the
- *  same seam shape as `TmuxSessionPreparer`: the desktop supplies a
- *  concrete implementation over its beam transport; this package
- *  never imports beam or Electron. */
+/** One remote pty stream's client contract — deliberately narrow: the
+ *  desktop supplies a concrete implementation over its beam transport;
+ *  this package never imports beam or Electron. */
 export interface RemotePtyHandle {
   onData(cb: (data: string) => void): void;
   offData(cb: (data: string) => void): void;
