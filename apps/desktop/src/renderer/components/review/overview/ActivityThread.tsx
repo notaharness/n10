@@ -20,8 +20,8 @@ import { Button } from '../../ui/button.js';
 import { Tip } from '../../ui/tooltip.js';
 import { ThreadContext } from '../comments/ThreadContext.js';
 import { ActivityComment, ActorName } from './ActivityComment.js';
+import { threadOffers } from '../../../lib/review/thread-offers.js';
 import {
-  supported,
   ThreadActionsFor,
   useRemoteThread,
   type ActionsView,
@@ -101,14 +101,13 @@ export function ActivityThread({
     </article>
   );
   if (!remote) return card();
+  const offers = threadOffers(thread, remote.thread);
   return (
     <ThreadActionsFor
       remote={remote}
       open={open}
-      canReply={supported(thread.capabilities.reply)}
-      canResolve={
-        remote.thread.canResolve && supported(thread.capabilities.resolve)
-      }
+      canReply={offers.reply}
+      canResolve={offers.resolve}
       onUnfold={() => {
         if (!open) toggle();
       }}

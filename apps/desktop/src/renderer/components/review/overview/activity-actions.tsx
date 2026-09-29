@@ -1,8 +1,5 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import type {
-  Capability,
-  RemoteCommentThread,
-} from '../../../../host/contract.js';
+import type { RemoteCommentThread } from '../../../../host/contract.js';
 import { useThreads } from '../../../lib/data/queries.js';
 import { useRepo } from '../../../lib/repo-context.js';
 import { ThreadFooter } from '../comments/ThreadFooter.js';
@@ -49,9 +46,6 @@ export function useRemoteThread(
   const thread = ctx?.byId.get(id);
   return ctx && thread ? { prId: ctx.prId, thread } : null;
 }
-
-/** The provider lets the viewer do it. */
-export const supported = (c: Capability) => c.state === 'supported';
 
 /** A card's action controls: the plan's in its header, the note and
  *  the reply box and resolve button beneath it. */

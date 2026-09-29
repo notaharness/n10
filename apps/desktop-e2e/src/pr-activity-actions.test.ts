@@ -126,8 +126,11 @@ test.describe('Acting on the activity', () => {
     const card = activity.locator('article', {
       has: desktop.page.locator('[data-comment-id="general-1"]'),
     });
+    // Its actions have arrived once Reply is offered.
+    const reply = card.getByRole('button', { name: 'Reply…', exact: true });
+    await expect(reply).toBeVisible();
     await expect(card.getByRole('button', { name: 'Resolve' })).toHaveCount(0);
-    await card.getByRole('button', { name: 'Reply…', exact: true }).click();
+    await reply.click();
     await card.getByPlaceholder(/Write a reply/).fill('Thanks for the fix.');
     await card.getByRole('button', { name: 'Reply', exact: true }).click();
     // A new comment beside it, not nested: it is the viewer's own, so
@@ -156,12 +159,13 @@ test.describe('Acting on the activity', () => {
       /question\s*non-blocking/
     );
     await expect(comment.locator('> div').nth(1)).not.toContainText('question');
-    await expect(card.getByRole('button', { name: /^Reply/ })).toHaveCount(0);
-    await expect(card.getByRole('button', { name: 'Resolve' })).toHaveCount(0);
-    // Queueing it for the agent is n10's own, and stays.
+    // Queueing it for the agent is n10's own, and stays; once it shows,
+    // the card's actions have arrived.
     await card.hover();
     await expect(
       card.getByRole('button', { name: 'Add to plan', exact: true })
     ).toBeVisible();
+    await expect(card.getByRole('button', { name: /^Reply/ })).toHaveCount(0);
+    await expect(card.getByRole('button', { name: 'Resolve' })).toHaveCount(0);
   });
 });
