@@ -161,7 +161,10 @@ beforeEach(async () => {
 
   vi.resetModules();
   sessions = await import('./sessions.js');
-  sessions.setSessionBroadcaster(() => undefined);
+  sessions.setSessionBroadcaster(
+    () => undefined,
+    () => undefined
+  );
   discovery = await import('./discovery.js');
 });
 

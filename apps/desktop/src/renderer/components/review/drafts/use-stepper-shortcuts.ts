@@ -12,14 +12,12 @@ export interface StepperShortcuts {
 /**
  * Keyboard shortcuts for the review walkthrough.
  *
- * Ignored while editing the textarea, for keys already handled
- * (`defaultPrevented`), and while this tab is in the
- * background — `d` discards and `Enter` posts, so a stray keypress
- * elsewhere in the app must not reach them. The listener is on
- * `window` because the walkthrough has no single focused element to
- * hang it off, which is exactly why `enabled` has to be explicit: the
- * pane stays mounted behind other tabs (a live agent keeps its
- * terminal alive).
+ * Ignored while `enabled` is off (the card's textarea is being edited)
+ * and for keys already handled (`defaultPrevented`) — `d` discards and
+ * `Enter` posts, so a stray keypress must not reach them. The listener
+ * is on `window` because the walkthrough has no single focused element
+ * to hang it off; it is mounted only in the active tab, and only while
+ * it shows, so no other tab hears these keys.
  */
 export function useStepperShortcuts(
   enabled: boolean,

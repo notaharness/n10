@@ -10,18 +10,25 @@ import { useTheme } from '../../lib/theme.js';
 import { errorMessage } from '../../lib/utils.js';
 
 /**
- * One agent terminal bound to a host PTY. The component stays mounted
- * for as long as its tab is open (the editor hides inactive panes with
- * `visibility`), so the wterm instance keeps the full scrollback.
+ * The terminal of the session on screen, bound to its host PTY.
  *
- * On mount we replay the host's ring buffer for the session, then
- * stream live chunks — `seq` ordering lets us drop any live chunk that
- * was already part of the snapshot.
+ * Mounted only while it is shown: the editor mounts the active tab
+ * alone, and a review workspace only while its agent pane is up. A
+ * session nobody is looking at keeps running in tmux, and the host
+ * keeps its emulator, activity and ring buffer; the renderer holds no
+ * terminal for it and is sent none of its output.
+ *
+ * On mount the terminal watches the session (`watchSession`), which
+ * answers the host's ring buffer to start from and sends every chunk
+ * after it. That is all the scrollback a terminal has on arriving —
+ * under tmux, whose own history is the record, a screen or so. `seq`
+ * ordering drops any live chunk the snapshot already held. Watching
+ * also counts as seeing: while mounted, the session's output never
+ * asks for the user's attention.
  */
 export function SessionTerminal({
   name,
   epoch,
-  active,
   disabled,
 }: {
   name: string;
@@ -29,7 +36,6 @@ export function SessionTerminal({
    *  the name, so this is the only thing that changes when the process
    *  on the other end of this terminal is a new one. */
   epoch: number;
-  active: boolean;
   /** True while `connectionState === 'reconnecting'` (ux-machines.md
    *  §6): keystrokes stop reaching the host, and the pane refuses focus
    *  so they cannot land unseen either — a blocked prompt is better
@@ -65,31 +71,6 @@ export function SessionTerminal({
     [name, reportError]
   );
 
-  // Seen-tracking: while the user is looking at this terminal, keep
-  // the host's "last seen" fresh so the tab's attention blink never
-  // fires for output they watched happen. Throttled — data can arrive
-  // many times per second.
-  const lastSeenMarkRef = useRef(0);
-  const markSeen = useCallback(() => {
-    const t = Date.now();
-    if (t - lastSeenMarkRef.current < 1000) return;
-    lastSeenMarkRef.current = t;
-    void window.n10.markSessionSeen(name).catch(reportError);
-  }, [name, reportError]);
-
-  // Its own subscription, deliberately. The replay effect below must
-  // not depend on `active`: re-running it re-reads the host's ring
-  // buffer, so a tab switch would paste the entire scrollback in again.
-  // Listening, on the other hand, is free — `onSessionData` is a bare
-  // IPC event listener and the replay comes from `getSessionBuffer` —
-  // so this half can come and go with the active tab on its own.
-  useEffect(() => {
-    if (!active || !ready) return;
-    return window.n10.onSessionData(({ name: n }) => {
-      if (n === name) markSeen();
-    });
-  }, [active, ready, name, markSeen]);
-
   useEffect(() => {
     if (!ready) return;
     const term = termRef.current;
@@ -98,6 +79,8 @@ export function SessionTerminal({
     let snapshotSeq: number | null = null;
     const pending: { seq: number; data: string }[] = [];
 
+    // Listening before watching: a chunk pushed the moment the watch
+    // lands is queued until the snapshot it follows is written.
     const offData = window.n10.onSessionData(({ name: n, data, seq }) => {
       if (n !== name) return;
       if (snapshotSeq === null) {
@@ -107,13 +90,13 @@ export function SessionTerminal({
       }
     });
 
-    // The replay must not land after this effect is torn down: React
-    // StrictMode mounts twice in development, so a second replay would
-    // duplicate the whole scrollback, and a pane closing mid-fetch
-    // would write into a disposed terminal.
+    // The snapshot must not land after this effect is torn down: React
+    // StrictMode mounts twice in development, so a second one would
+    // duplicate the screen, and a pane closing mid-fetch would write
+    // into a disposed terminal.
     let cancelled = false;
     void window.n10
-      .getSessionBuffer(name)
+      .watchSession(name)
       .then(({ data, seq }) => {
         if (cancelled) return;
         if (data) term.write(data);
@@ -133,8 +116,10 @@ export function SessionTerminal({
     return () => {
       cancelled = true;
       offData();
+      // Every watch is counted; this one ends with the terminal.
+      void window.n10.unwatchSession(name).catch(reportError);
     };
-  }, [name, ready]);
+  }, [name, ready, reportError]);
 
   // Pasting a picture into the terminal.
   //
@@ -181,15 +166,11 @@ export function SessionTerminal({
     return () => el.removeEventListener('paste', onPaste, true);
   }, [ready, name]);
 
-  // Grab keyboard focus whenever this pane becomes the active tab, and
-  // mark the session seen (clears the tab's attention blink).
+  // wterm focuses its input when it starts; this covers a reconnect
+  // giving input back, and a terminal mounted while reconnecting.
   useEffect(() => {
-    if (active && ready && !disabled) {
-      termRef.current?.focus();
-      lastSeenMarkRef.current = 0; // force an immediate mark
-      markSeen();
-    }
-  }, [active, ready, disabled, markSeen]);
+    if (ready && !disabled) termRef.current?.focus();
+  }, [ready, disabled]);
 
   // Fit the terminal grid to its pane. autoResize stays ON (with it off
   // the react wrapper pins an inline height of rows*17px and keeps
@@ -199,11 +180,14 @@ export function SessionTerminal({
   // resize() from the wrapper's real box whenever it changes, using
   // wterm's measured cell metrics so the two observers agree.
   //
-  // When the pane becomes the active tab again, a same-size resize is a
-  // no-op all the way down (wterm repaints only dirty rows and the PTY
-  // skips a same-size SIGWINCH), so the terminal can come back stale or
-  // blank. Bouncing the grid one row forces the app to repaint the
-  // whole screen — the same thing a manual window resize did.
+  // The first fit always bounces the grid one row, which makes the app
+  // repaint its whole screen — the same thing a manual window resize
+  // does. A terminal arriving on a tab switch needs that: the snapshot
+  // it starts from was drawn for the PTY's grid, and can land before
+  // wterm has taken the pane's; once the ring buffer has dropped the
+  // attach's first full redraw, what is left repaints only the rows
+  // that changed. Fitting alone is not enough, because the PTY already
+  // has the pane's grid and skips a same-size SIGWINCH.
   //
   // The host is told the grid on every fit, not only when wterm's own
   // grid moved. A launch can only *estimate* the pane, so the PTY starts
@@ -219,32 +203,38 @@ export function SessionTerminal({
     const inst = term?.instance;
     if (!el || !term || !inst) return;
     let raf = 0;
-    const fit = (forceRepaint = false) => {
+    // Stays set until a fit has run with a box to measure, so the
+    // observer's first callback cannot cancel it.
+    let repaint = true;
+    const fit = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         const rect = el.getBoundingClientRect();
         if (rect.width < 2 || rect.height < 2) return;
         const grid =
           measureTerminalGrid(inst.element, rect) ?? estimateTerminalGrid(rect);
+        if (repaint) {
+          // Each step reaches the host through wterm's `onResize`.
+          repaint = false;
+          term.resize(grid.cols, grid.rows - 1);
+          raf = requestAnimationFrame(() => term.resize(grid.cols, grid.rows));
+          return;
+        }
         if (grid.cols !== inst.cols || grid.rows !== inst.rows) {
           term.resize(grid.cols, grid.rows);
           return;
         }
         resize(grid.cols, grid.rows);
-        if (forceRepaint) {
-          term.resize(grid.cols, grid.rows - 1);
-          raf = requestAnimationFrame(() => term.resize(grid.cols, grid.rows));
-        }
       });
     };
-    fit(active);
+    fit();
     const ro = new ResizeObserver(() => fit());
     ro.observe(el);
     return () => {
       ro.disconnect();
       cancelAnimationFrame(raf);
     };
-  }, [ready, active, resize, epoch]);
+  }, [ready, resize, epoch]);
 
   return (
     <div ref={wrapRef} className="absolute inset-0">
@@ -265,10 +255,7 @@ export function SessionTerminal({
         theme={resolved === 'light' ? 'light' : undefined}
         autoResize
         cursorBlink
-        onReady={(wt) => {
-          setReady(true);
-          if (active && !disabled) wt.focus();
-        }}
+        onReady={() => setReady(true)}
         onData={write}
         onResize={resize}
       />

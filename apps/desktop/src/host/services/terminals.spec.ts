@@ -168,8 +168,9 @@ beforeEach(async () => {
   vi.resetModules();
   terminals = await import('./terminals.js');
   const relay = await import('./session-relay.js');
-  relay.setSessionBroadcaster((channel, payload) =>
-    state.broadcasts.push({ channel, payload })
+  relay.setSessionBroadcaster(
+    (channel, payload) => state.broadcasts.push({ channel, payload }),
+    () => undefined
   );
 });
 

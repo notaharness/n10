@@ -54,16 +54,15 @@ export interface AgentPresence {
   hasSession: boolean;
   /** The host last reported that session's process as alive. */
   running: boolean;
-  /** This tab is the one on screen. */
-  active: boolean;
 }
 
 /**
- * Whether a change in the tab's agent hands the pane to the terminal.
+ * Whether a change in the tab's agent hands the pane to the terminal:
+ * an agent having been *launched*. (Coming back to a tab mounts it
+ * afresh, and `initialMode` opens it on a working agent's terminal.)
  *
- * Two things do: an agent having been *launched*, and the user coming
- * back to a tab whose agent is working. The first is the session
- * appearing, not the session being reported as running — `running` is
+ * Launched means the session appearing, or starting to run, not only
+ * the session being reported as running — `running` is
  * polled, and an agent that dies on startup (a command that is not on
  * PATH) can be gone before a poll ever sees it alive. Keyed on
  * `running` alone the pane then never leaves the diff, and the shell's
@@ -77,8 +76,7 @@ export function focusesAgent(
   next: AgentPresence
 ): boolean {
   if (next.hasSession && !prev.hasSession) return true;
-  if (next.running && !prev.running) return true;
-  return next.active && !prev.active && next.running;
+  return next.running && !prev.running;
 }
 
 /** Drafts the agent has written but not yet posted. */

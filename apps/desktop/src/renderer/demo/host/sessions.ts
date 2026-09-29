@@ -7,7 +7,7 @@ import { Channel } from './hub.js';
 
 /**
  * The demo's PTYs. Each session keeps everything it has written, which
- * is what `getSessionBuffer` replays into a terminal that mounts late,
+ * is what `watchSession` replays into a terminal that mounts late,
  * and hands keystrokes to the program running in it. Programs are
  * scripted (programs/); none of them execute anything.
  */
@@ -48,6 +48,8 @@ export class DemoSession implements Tty {
   running = true;
   active = false;
   flashing = false;
+  /** Terminals showing this session; output they show is seen. */
+  watchers = 0;
   cols = 100;
   rows = 30;
   readonly spawnedAt = Date.now();
@@ -75,7 +77,7 @@ export class DemoSession implements Tty {
   }
 
   setActive(active: boolean): void {
-    if (this.active && !active) this.flashing = true;
+    if (this.active && !active && this.watchers === 0) this.flashing = true;
     this.active = active;
   }
 

@@ -22,8 +22,7 @@ import { ReviewStepper } from './drafts/ReviewStepper.js';
 
 /**
  * One layer of the stack. Hidden rather than unmounted, so a pane's
- * scroll position — and a terminal's scrollback — survives a trip to
- * another mode and back.
+ * scroll position survives a trip to another mode and back.
  */
 function StackedPane({
   visible,
@@ -54,13 +53,11 @@ function useMountedOnce(on: boolean): boolean {
 function AgentPane({
   sessionName,
   sessionEpoch,
-  active,
   connectionBanner,
   inputDisabled,
 }: {
   sessionName: string;
   sessionEpoch: number;
-  active: boolean;
   connectionBanner?: PrConnectionBanner | null;
   inputDisabled?: boolean;
 }) {
@@ -76,9 +73,9 @@ function AgentPane({
       )}
       <div className="relative min-h-0 flex-1">
         <SessionTerminal
+          key={sessionName}
           name={sessionName}
           epoch={sessionEpoch}
-          active={active}
           disabled={inputDisabled}
         />
       </div>
@@ -88,9 +85,9 @@ function AgentPane({
 
 /**
  * The single content pane, with every mode's view stacked in it. The
- * terminal and the walkthrough stay mounted and are hidden rather than
- * unmounted, so switching modes never costs their scrollback or their
- * scroll position.
+ * diff, the Overview once shown and the walkthrough are hidden rather
+ * than unmounted, so switching modes keeps their scroll position. The
+ * agent's terminal is mounted only while it shows (`SessionTerminal`).
  */
 export function ContentPane({
   effMode,
@@ -100,7 +97,6 @@ export function ContentPane({
   baseBranch,
   sessionName,
   sessionEpoch,
-  active,
   connectionBanner,
   inputDisabled,
   files,
@@ -140,7 +136,6 @@ export function ContentPane({
   /** Changes when a new agent is spawned into this pane — see
    *  `SessionTerminal`, which re-fits its grid on it. */
   sessionEpoch: number;
-  active: boolean;
   /** Set only while the session's connection is reconnecting/failed
    *  (ux-machines.md §6). */
   connectionBanner?: PrConnectionBanner | null;
@@ -198,16 +193,15 @@ export function ContentPane({
       data-terminal-inset={terminalInset(effMode, pr != null)}
       className="relative h-full min-h-0"
     >
-      {sessionName && (
-        <StackedPane visible={effMode === 'agent'}>
+      {sessionName && effMode === 'agent' && (
+        <div className="absolute inset-0">
           <AgentPane
             sessionName={sessionName}
             sessionEpoch={sessionEpoch}
-            active={active && effMode === 'agent'}
             connectionBanner={connectionBanner}
             inputDisabled={inputDisabled}
           />
-        </StackedPane>
+        </div>
       )}
       {hasDrafts && (
         <StackedPane visible={effMode === 'review'}>
@@ -218,7 +212,6 @@ export function ContentPane({
               drafts={drafts}
               filesByName={filesByName}
               fileOrder={fileOrder}
-              active={active}
               onExit={onExitReview}
               onOpenInDiff={onOpenInDiff}
             />

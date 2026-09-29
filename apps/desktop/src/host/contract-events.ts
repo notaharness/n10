@@ -22,7 +22,7 @@ export interface SessionDataEvent {
   name: string;
   data: string;
   /** Monotonic per-session chunk counter; lets a late subscriber drop
-   *  chunks already covered by a `getSessionBuffer` snapshot. */
+   *  chunks already covered by a `watchSession` snapshot. */
   seq: number;
 }
 

@@ -45,7 +45,6 @@ export function StepCard({
   total,
   counts,
   snippet,
-  active,
   busy,
   atStart,
   atEnd,
@@ -65,7 +64,6 @@ export function StepCard({
   total: number;
   counts: Record<CommentSeverity, number>;
   snippet: { line: DiffLine; anchored: boolean }[];
-  active: boolean;
   busy: boolean;
   atStart: boolean;
   atEnd: boolean;
@@ -98,7 +96,7 @@ export function StepCard({
     refresh.begin();
   };
 
-  useStepperShortcuts(!editing && active, {
+  useStepperShortcuts(!editing, {
     onNext,
     onPrev,
     onEdit: startEditing,

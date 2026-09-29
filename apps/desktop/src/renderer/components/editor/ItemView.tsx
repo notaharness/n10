@@ -208,14 +208,12 @@ export function ItemView({
   item,
   items,
   itemKey,
-  active,
   menuActive,
   onPin,
 }: {
   item: SidebarItem | undefined;
   items: SidebarItem[];
   itemKey: string;
-  active: boolean;
   /** Whether the strip has this tab in front, before the pane switch
    *  (deferred) catches up — what a session menu request goes by. */
   menuActive: boolean;
@@ -312,7 +310,6 @@ export function ItemView({
           sessionName={sessionName}
           sessionEpoch={sessionEpoch}
           running={running}
-          active={active}
           busy={busy}
           onLaunch={onLaunchClick}
           onStop={stop}
@@ -336,7 +333,6 @@ export function ItemView({
           sessionName={sessionName}
           sessionEpoch={sessionEpoch}
           running={running}
-          active={active}
           busy={busy}
           onLaunch={onLaunchClick}
           onStop={stop}

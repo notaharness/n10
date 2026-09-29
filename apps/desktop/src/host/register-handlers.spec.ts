@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { IPC } from './contract.js';
-import { createHostApi, registerHostHandlers } from './register-handlers.js';
+import {
+  createHostApi,
+  createViewerApi,
+  registerHostHandlers,
+} from './register-handlers.js';
 
 function collect() {
   const registered = new Map<string, (...args: unknown[]) => unknown>();
@@ -69,5 +73,28 @@ describe('registerHostHandlers', () => {
     // Electron passes the IpcMainInvokeEvent as the first listener arg.
     await registered.get(IPC.openRepo)!({ senderFrame: 'x' }, '/some/repo');
     expect(seen).toEqual(['/some/repo']);
+  });
+
+  it('hands a window-scoped method the id of the window that asked', async () => {
+    const { registered, registrar } = collect();
+    const seen: unknown[] = [];
+    const viewerApi = {
+      ...createViewerApi(),
+      watchSession: (viewer: number, name: string) => {
+        seen.push([viewer, name]);
+        return Promise.resolve({ data: '', seq: 0 });
+      },
+    };
+    registerHostHandlers(registrar, createHostApi(), viewerApi);
+    await registered.get(IPC.watchSession)!({ sender: { id: 4 } }, 'a');
+    expect(seen).toEqual([[4, 'a']]);
+  });
+
+  it('refuses a window-scoped call it cannot attribute to a window', async () => {
+    const { registered, registrar } = collect();
+    registerHostHandlers(registrar);
+    await expect(
+      Promise.resolve().then(() => registered.get(IPC.watchSession)!({}, 'a'))
+    ).rejects.toThrow('Invoke without a sender');
   });
 });
