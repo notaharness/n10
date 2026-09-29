@@ -67,9 +67,7 @@ async function openPr(page: Page, row: RegExp): Promise<Locator> {
 }
 
 test.describe('Completion', () => {
-  test('names what blocks first, who can clear it, and one row per fact', async ({
-    desktop,
-  }) => {
+  test('names what blocks first, and one row per fact', async ({ desktop }) => {
     const completion = await openPr(desktop.page, /#214/);
     const headline = completion.locator('[data-readiness-headline]');
     await expect(headline).toHaveAttribute(
@@ -77,13 +75,15 @@ test.describe('Completion', () => {
       'blocked'
     );
     await expect(headline).toContainText('1 required check failing: build');
-    await expect(headline).toContainText('The author can fix this');
+    // The blocker says what is wrong; who is to fix it adds nothing.
+    await expect(headline).not.toContainText('can fix this');
     // Heard as a state, not only seen as a colour.
     await expect(headline.locator('.sr-only')).toHaveText(/^Blocked:/);
     const also = completion.getByRole('list', { name: 'Also blocking' });
     await expect(also).toContainText(
-      'Waiting for 2 required checks: lint, e2e · Clears when the checks finish'
+      'Waiting for 2 required checks: lint, e2e'
     );
+    await expect(also).not.toContainText('Clears when');
     await expect(also).toContainText('1 unresolved conversation');
     // A failed optional check is visible, never a blocker.
     await expect(also).not.toContainText('docs');
@@ -272,7 +272,6 @@ test.describe('Completion', () => {
     // What won't clear by waiting leads: the conversation, not the
     // checks still running.
     await expect(headline).toContainText('1 unresolved conversation');
-    await expect(headline).toContainText('The author can fix this');
     await expect(
       completion.locator('[data-readiness-row="checks"]')
     ).toContainText('Waiting for 2 required checks: lint, e2e');

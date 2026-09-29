@@ -121,6 +121,23 @@ describe('evaluateReadiness', () => {
     ]);
   });
 
+  it('says a review still to come is the viewer’s where they are asked', () => {
+    const r = evaluateReadiness(
+      inputs({
+        merge: { ...CLEAN, reviews: 'required', blocked: true },
+        viewerAsked: true,
+      })
+    );
+    expect(r.blockers).toEqual([
+      {
+        kind: 'reviews',
+        text: 'Waiting for your review',
+        resolvedBy: 'viewer',
+        pending: true,
+      },
+    ]);
+  });
+
   it('names conflicts on an approved pull request', () => {
     expect(
       kinds(

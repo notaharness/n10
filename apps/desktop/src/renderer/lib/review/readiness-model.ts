@@ -8,7 +8,6 @@ import type {
   CheckList,
   PullRequestReadiness,
   ReadinessAspect,
-  Resolver,
 } from '../../../host/contract.js';
 
 /**
@@ -24,15 +23,6 @@ export const ASPECT_LABEL: Record<ReadinessAspect['id'], string> = {
   checks: 'Checks',
   conflicts: 'Conflicts',
   conversations: 'Conversations',
-};
-
-/** Who can clear a blocker, said as what happens next. */
-export const RESOLVER_TEXT: Record<Resolver, string> = {
-  author: 'The author can fix this',
-  reviewers: 'Needs a reviewer',
-  viewer: 'Waiting for your review',
-  maintainers: 'Needs a maintainer',
-  checks: 'Clears when the checks finish',
 };
 
 /** GitHub merges; Azure DevOps completes. */

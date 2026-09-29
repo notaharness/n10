@@ -134,7 +134,11 @@ describe('the demo checks read', () => {
     expect(answer.readiness).toMatchObject({
       state: 'blocked',
       blockers: [
-        { kind: 'reviews', text: 'Waiting for review', resolvedBy: 'viewer' },
+        {
+          kind: 'reviews',
+          text: 'Waiting for your review',
+          resolvedBy: 'viewer',
+        },
       ],
     });
     // GitHub states the rule's count and marks no reviewer required.
