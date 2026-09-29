@@ -11,6 +11,7 @@ import { launchAgentFromRail, sidebarRow } from '../src/setup/app.js';
 import { launchApp, unthrottle } from './setup/launch.js';
 import { pace } from './setup/pace.js';
 import { collect, saveSamples, type Samples } from './setup/metrics.js';
+import { startMainLag, stopMainLag } from './setup/main-lag.js';
 
 /**
  * Many agent tabs open at once: what the renderer pays for the ones
@@ -125,29 +126,49 @@ async function timedSwitch(page: Page, branch: string): Promise<Switch> {
   );
 }
 
-/** Renderer and main-process CPU over `windowMs`, as Electron reports
- *  it (percent of one core, averaged since the previous reading). */
-async function cpuOver(
+/** Per-process CPU and memory over `windowMs`, as Electron reports it
+ *  (CPU in percent of one core, averaged since the previous reading),
+ *  with the main process's timer lag over the same window. A utility
+ *  process named `n10 host` is the session host when there is one;
+ *  others (the beam daemon's) are counted apart. */
+async function costOver(
   page: Page,
   app: ElectronApplication,
   windowMs: number
 ): Promise<Record<string, number>> {
   await app.evaluate(({ app: a }) => a.getAppMetrics());
+  await startMainLag(app);
   await pace(page, windowMs);
-  return app.evaluate(({ app: a }) => {
+  const lag = await stopMainLag(app);
+  const cost = await app.evaluate(({ app: a }) => {
     const m = a.getAppMetrics();
-    const sum = (type: string | null) =>
-      m
-        .filter((p) => type === null || p.type === type)
-        .reduce((s, p) => s + (p.cpu?.percentCPUUsage ?? 0), 0);
-    const renderer = m.find((p) => p.type === 'Tab');
+    const pick = (test: (p: (typeof m)[number]) => boolean) => m.filter(test);
+    const cpu = (ps: typeof m) =>
+      ps.reduce((s, p) => s + (p.cpu?.percentCPUUsage ?? 0), 0);
+    const rss = (ps: typeof m) =>
+      ps.reduce((s, p) => s + (p.memory?.workingSetSize ?? 0), 0) / 1024;
+    const isHost = (p: (typeof m)[number]) =>
+      p.type === 'Utility' && (p.serviceName ?? p.name) === 'n10 host';
+    const renderer = pick((p) => p.type === 'Tab');
+    const main = pick((p) => p.type === 'Browser');
+    const host = pick(isHost);
     return {
-      rendererCpuPct: sum('Tab'),
-      mainCpuPct: sum('Browser'),
-      totalCpuPct: sum(null),
-      rendererRssMb: (renderer?.memory.workingSetSize ?? NaN) / 1024,
+      rendererCpuPct: cpu(renderer),
+      mainCpuPct: cpu(main),
+      hostCpuPct: cpu(host),
+      totalCpuPct: cpu(m),
+      rendererRssMb: rss(renderer),
+      mainRssMb: rss(main),
+      hostRssMb: rss(host),
+      totalRssMb: rss(m),
     };
   });
+  return {
+    ...cost,
+    mainLagP50Ms: lag.p50,
+    mainLagP99Ms: lag.p99,
+    mainLagMaxMs: lag.max,
+  };
 }
 
 async function heapAfterGc(page: Page): Promise<number> {
@@ -230,7 +251,7 @@ async function measureOnce(repoPath: string, samples: Samples): Promise<void> {
     // Let every agent reach its steady state, and the polls theirs.
     await pace(page, 5000);
 
-    const steady = await cpuOver(page, app.app, IDLE_MS);
+    const steady = await costOver(page, app.app, IDLE_MS);
     collect(samples, {
       ...steady,
       jsHeapMb: await heapAfterGc(page),
@@ -243,7 +264,9 @@ async function measureOnce(repoPath: string, samples: Samples): Promise<void> {
       largestBufferKb: await largestBufferKb(page),
     });
 
-    // Plain switches across the ordinary agents.
+    // Plain switches across the ordinary agents, with the main
+    // process's lag while it serves them.
+    await startMainLag(app.app);
     const ordinary = branches.filter((b) => b !== BIG);
     let current = 'agent-0';
     for (let i = 0; i < SWITCHES; i++) {
@@ -257,6 +280,11 @@ async function measureOnce(repoPath: string, samples: Samples): Promise<void> {
       current = next;
       await pace(page, 400);
     }
+    const switching = await stopMainLag(app.app);
+    collect(samples, {
+      switchingLagP50Ms: switching.p50,
+      switchingLagP99Ms: switching.p99,
+    });
     // Into the tab whose scrollback is full, from an ordinary one.
     for (let i = 0; i < Math.ceil(SWITCHES / 2); i++) {
       const t = await timedSwitch(page, BIG);
