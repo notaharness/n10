@@ -1,5 +1,4 @@
 import { test, expect, fakeAgentCommand } from './fixtures/n10.js';
-import { wtermHost } from './setup/constants.js';
 import {
   createSession,
   pressUntil,
@@ -18,8 +17,9 @@ import {
  * The lib-level suites (libs/terminal-tmux) already cover the backend in
  * isolation against a real tmux binary. What only this file can prove is
  * that n10 *selects* tmux from config, composes the session name, and
- * routes its kill/quit paths to the right teardown — i.e. that the wiring
- * between the app and the backend is real.
+ * routes kill-agent to kill-session — i.e. that the wiring between the
+ * app and the backend is real. Quit's detach is covered by
+ * quit-with-active-agent.test.ts.
  *
  * Skipped when tmux is missing so the offline `nx e2e` leg still passes on
  * a machine without it. Ubuntu GitHub Actions runners ship tmux, so this
@@ -38,15 +38,6 @@ test.use({
     keybindPreset: 'vim',
   },
 });
-
-interface Status {
-  ptyAlive: boolean;
-}
-
-async function fetchStatus(baseURL: string): Promise<Status> {
-  const r = await fetch(`${baseURL}/status`);
-  return (await r.json()) as Status;
-}
 
 test.describe('Tmux backend (e2e)', () => {
   // Branches whose tmux sessions need reaping. Populated per test, since
@@ -119,43 +110,6 @@ test.describe('Tmux backend (e2e)', () => {
       'K',
       () => !n10SessionExists(branch, n10.homeDir)
     );
-  });
-
-  // The feature's whole reason to exist: quitting n10 must leave the
-  // tmux session running so the next launch reattaches. killAll() calls
-  // dispose() for exactly this reason.
-  test('quitting n10 leaves the tmux session alive for the next launch', async ({
-    n10,
-    baseURL,
-  }) => {
-    const host = wtermHost(baseURL);
-    const branch = uniqueTmuxBranch();
-    branches.push(branch);
-
-    await createSession(n10.term, branch, { start: true });
-    await expect(
-      n10.term.getByText('n10-fake-agent-ready').first()
-    ).toBeVisible({ timeout: 20_000 });
-    await expect
-      .poll(() => n10SessionExists(branch, n10.homeDir), {
-        timeout: 10_000,
-        intervals: [250],
-      })
-      .toBe(true);
-
-    await n10.term.write('\x00');
-    await waitForSidebarFocused(n10.term);
-
-    // 'q' quits. Wait for n10's own PTY to be gone before judging the
-    // tmux session, otherwise we might sample before teardown ran at all.
-    await pressUntil(
-      n10.term,
-      'q',
-      async () => !(await fetchStatus(host)).ptyAlive
-    );
-
-    // n10 is gone; the agent's tmux session is not.
-    expect(n10SessionExists(branch, n10.homeDir)).toBe(true);
   });
 
   test('Settings does not offer a terminal backend selector', async ({
