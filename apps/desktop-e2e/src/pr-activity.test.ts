@@ -210,16 +210,23 @@ test.describe('Pull request activity', () => {
   test('opens a thread in the diff at its place', async ({ desktop }) => {
     const { page } = desktop;
     const activity = await openOverview(page);
+    // A thread's header says who and where, not how many comments.
+    const COUNT = /\d+ comments?\b/;
+    const toggle = (card: Locator) =>
+      card.locator('button[aria-expanded]').first();
+    const overview = activity.locator('[data-thread-id="T-open"]');
+    await expect(toggle(overview)).toContainText('src/request.ts');
+    await expect(toggle(overview)).not.toContainText(COUNT);
     await activity
       .getByRole('button', {
         name: 'Show the thread on src/request.ts · new 3 in the diff',
       })
       .click();
+    const diff = page.locator('[data-thread="T-open"]');
     await expect(
-      page
-        .locator('[data-thread="T-open"]')
-        .getByText('Does an early return here skip')
+      diff.getByText('Does an early return here skip')
     ).toBeVisible();
+    await expect(toggle(diff)).not.toContainText(COUNT);
   });
 
   test('takes keyboard focus to the thread it opens', async ({ desktop }) => {

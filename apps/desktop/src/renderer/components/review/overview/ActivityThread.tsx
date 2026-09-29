@@ -134,7 +134,6 @@ function ThreadHeader({
 }) {
   const place = threadPlace(thread) ?? 'Conversation';
   const Chevron = open ? ChevronDownIcon : ChevronRightIcon;
-  const count = thread.comments.length;
   const root = thread.comments[0];
   const isNew = useIsNew();
   const arrived = thread.comments.filter((c) => isNew(c.id)).length;
@@ -168,12 +167,11 @@ function ThreadHeader({
             — {commentPreview(root)}
           </span>
         )}
-        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-          {count} comment{count === 1 ? '' : 's'}
-          {arrived > 0 && (
-            <span className="font-medium text-primary"> · {arrived} new</span>
-          )}
-        </span>
+        {arrived > 0 && (
+          <span className="ml-auto shrink-0 text-xs font-medium text-primary">
+            {arrived} new
+          </span>
+        )}
       </button>
       <span className="flex shrink-0 items-center gap-1">
         {plan}
