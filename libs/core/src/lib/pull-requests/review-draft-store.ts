@@ -143,7 +143,7 @@ function shortPath(path: string): string {
 /** Names the file, so a reviewer can keep its contents by hand. */
 function unreadable(path: string, why: string): Error {
   return new Error(
-    `Your saved drafts in ${shortPath(path)} could not be read: ${why}`
+    `Couldn't load your saved drafts from ${shortPath(path)}: ${why}`
   );
 }
 

@@ -190,6 +190,6 @@ test.describe('Selected pull request checks', () => {
   }) => {
     await expect(
       checks(desktop.page, REF.number, 'someone-else')
-    ).rejects.toThrow(/n10 acts as n10-tester now, not someone-else/);
+    ).rejects.toThrow(/The account changed from someone-else to n10-tester/);
   });
 });

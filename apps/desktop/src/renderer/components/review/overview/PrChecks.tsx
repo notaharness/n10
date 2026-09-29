@@ -138,12 +138,13 @@ function Row({ row }: { row: CheckRow }) {
 /** A list that stopped short says so, with how much it read. */
 function Partial({ list }: { list: CheckList }) {
   if (list.complete) return null;
-  const total =
-    list.total != null ? `${list.rows.length} of ${list.total}` : 'Not all';
+  const text =
+    list.total != null
+      ? `Showing ${list.rows.length} of ${list.total} checks. The rest are missing, so this isn't an all-clear.`
+      : "Some checks didn't load, so this isn't an all-clear.";
   return (
     <p role="status" className="mb-2 text-sm text-warning">
-      {total} checks read: the rest could not be, so none of this is an
-      all-clear.
+      {text}
     </p>
   );
 }
@@ -198,7 +199,7 @@ function NotRead({
       : null;
   return (
     <div role="status" className="space-y-2 text-sm">
-      <p>The checks could not be read{why ? `: ${why}` : '.'}</p>
+      <p>Couldn't load the checks{why ? `: ${why}` : '.'}</p>
       <RefreshButton
         variant="outline"
         retrying={retrying}
@@ -231,7 +232,7 @@ function Body({
   if (read.kind === 'failed') {
     return (
       <ReadFailure
-        title="Couldn't read the checks"
+        title="Couldn't load the checks"
         error={read.error}
         retrying={retrying}
         onRetry={onRetry}

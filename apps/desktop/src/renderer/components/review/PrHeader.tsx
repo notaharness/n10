@@ -85,7 +85,7 @@ async function runMoreMenu(pr: PullRequestInfo): Promise<void> {
   else if (chosen === 'copy-branch') {
     copyText(pr.sourceBranch, 'Branch name copied');
   } else if (chosen === 'copy-head' && pr.headSha) {
-    copyText(pr.headSha, 'Commit id copied');
+    copyText(pr.headSha, 'Commit hash copied');
   }
 }
 

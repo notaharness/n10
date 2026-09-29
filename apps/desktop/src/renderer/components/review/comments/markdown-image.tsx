@@ -149,16 +149,11 @@ function retryNews(
 }
 
 /** What n10 says in place of an image it does not fetch, or null for
- *  one it does. The sanitizer keeps only web and relative addresses. */
+ *  one it does. The sanitizer keeps only web and relative addresses,
+ *  and only web addresses are fetched. */
 function notShown(src: unknown, alt: string | undefined): string | null {
-  const quoted = alt ? ` “${alt}”` : '';
-  if (typeof src !== 'string' || src === '' || src.startsWith('//')) {
-    return `Image${quoted} isn't shown: only web addresses load`;
-  }
-  if (!/^https?:\/\//i.test(src)) {
-    return `Repository image${quoted} isn't shown yet`;
-  }
-  return null;
+  if (typeof src === 'string' && /^https?:\/\//i.test(src)) return null;
+  return `Image${alt ? ` “${alt}”` : ''} isn't shown here`;
 }
 
 export function CommentImage({ src, alt }: ComponentProps<'img'>) {

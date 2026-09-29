@@ -9,14 +9,20 @@ import { hunkTail, rangeLabel } from '../../../lib/review/thread-anchor.js';
  * This is the original context. An outdated thread's line numbers now
  * point at other code, so its excerpt is the only faithful picture of
  * what the comment was about; a current thread shows the same excerpt
- * so it reads without leaving the overview.
+ * so it reads without leaving the overview. Without an excerpt, the
+ * range and commit are all there is to say.
  */
 export function ThreadContext({ anchor }: { anchor: ThreadAnchor }) {
   const lines = anchor.diffHunk ? hunkTail(anchor.diffHunk) : [];
   const where = anchor.original ?? anchor.current;
   return (
     <figure className="overflow-hidden rounded-md border border-border">
-      <figcaption className="flex flex-wrap items-center gap-x-2 border-b border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
+      <figcaption
+        className={cn(
+          'flex flex-wrap items-center gap-x-2 bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground',
+          lines.length > 0 && 'border-b border-border'
+        )}
+      >
         <span className="font-medium text-foreground">
           {anchor.current ? 'Context' : 'Original context'}
         </span>
@@ -27,7 +33,7 @@ export function ThreadContext({ anchor }: { anchor: ThreadAnchor }) {
           </span>
         )}
       </figcaption>
-      {lines.length > 0 ? (
+      {lines.length > 0 && (
         <pre className="overflow-x-auto py-1 font-mono text-xs leading-5">
           {lines.map(({ key, text }) => (
             <div
@@ -42,10 +48,6 @@ export function ThreadContext({ anchor }: { anchor: ThreadAnchor }) {
             </div>
           ))}
         </pre>
-      ) : (
-        <p className="px-2.5 py-1.5 text-xs text-muted-foreground">
-          The provider kept no excerpt of the code this was written on.
-        </p>
       )}
     </figure>
   );

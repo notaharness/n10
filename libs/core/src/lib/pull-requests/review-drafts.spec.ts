@@ -147,7 +147,7 @@ describe('review drafts', () => {
     expect(() => listReviewDrafts(as('bea'), src())).toThrow(/malformed/);
     expect(() =>
       saveReviewDraft({ ...as('bea'), target: REPLY, body: 'x' }, src())
-    ).toThrow(/could not be read/);
+    ).toThrow(/Couldn't load your saved drafts/);
   });
 
   it('reports a save the disk refused', () => {
@@ -188,10 +188,10 @@ describe('review drafts', () => {
     withReply({ state: 'unknown', attempt: 'a1', since: 5 });
     expect(() =>
       saveReviewDraft({ ...as('bea'), target: REPLY, body: 'x' }, src())
-    ).toThrow(/may already have been posted/);
+    ).toThrow(/may already be posted/);
     expect(() =>
       discardReviewDraft({ ...as('bea'), target: REPLY }, src())
-    ).toThrow(/may already have been posted/);
+    ).toThrow(/may already be posted/);
     withReply({ state: 'publishing', attempt: 'a1', since: 5 });
     expect(() =>
       discardReviewDraft({ ...as('bea'), target: REPLY }, src())

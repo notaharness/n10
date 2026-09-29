@@ -65,13 +65,13 @@ export async function readPullRequestChecks(
     readAbout(
       req.ref,
       src.checks,
-      'This provider does not read checks and policies'
+      "Checks and policies aren't available for this repository"
     ),
     // Who is required, and so whether the viewer's review would count.
     readAbout(
       req.ref,
       src.detail,
-      'This provider does not read pull request detail'
+      "Pull request details aren't available for this repository"
     ),
   ]);
   assertSameContext({ ...req, viewer }, src);

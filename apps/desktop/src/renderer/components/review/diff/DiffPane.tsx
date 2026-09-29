@@ -140,7 +140,7 @@ export function DiffPane({
             title={
               read.stage === 'fetch'
                 ? "Couldn't load the diff"
-                : "Couldn't read the diff"
+                : "Couldn't show the diff"
             }
             error={read.error}
             retrying={retrying}

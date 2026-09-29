@@ -271,10 +271,10 @@ test.describe('Pull request description', () => {
   }) => {
     const description = await openDescription(desktop.page);
     const repository = description.getByText(
-      "Repository image “Architecture” isn't shown yet"
+      "Image “Architecture” isn't shown here"
     );
     const inline = description.getByText(
-      "Image “Inline sketch” isn't shown: only web addresses load"
+      "Image “Inline sketch” isn't shown here"
     );
     for (const note of [repository, inline]) {
       await expect(note).toBeVisible();

@@ -102,7 +102,7 @@ export async function submitReview(
 ): Promise<SubmittedReview> {
   const viewer = assertSameContext(req, src);
   if (!src.publish) {
-    throw new Error("This provider can't file a review from n10");
+    throw new Error("Reviews can't be posted from n10 for this repository");
   }
   const dir = src.dir ?? defaultDraftDir();
   const publish = src.publish;

@@ -15,11 +15,11 @@ const PARTS: [keyof PullRequestConversation['coverage'], string][] = [
 function partText(c: Coverage, noun: string): string {
   return c.total != null
     ? `${c.loaded.toLocaleString()} of ${c.total.toLocaleString()} ${noun}`
-    : `${c.loaded.toLocaleString()} ${noun} before the provider stopped`;
+    : `${c.loaded.toLocaleString()} ${noun}`;
 }
 
 /**
- * Said when the provider did not hand over the whole conversation. The
+ * Said when only part of the conversation loaded. The
  * counts and filters above it describe what loaded, so an empty "Open"
  * here is not the same as nothing left to answer.
  */
@@ -42,7 +42,7 @@ export function CoverageNotice({
         </span>{' '}
         Showing{' '}
         {missing.map(([key, noun]) => partText(coverage[key], noun)).join(', ')}
-        . Counts and filters cover only what loaded.
+        . Counts and filters leave out the rest.
       </p>
     </div>
   );

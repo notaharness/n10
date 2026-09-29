@@ -117,7 +117,7 @@ test.describe('Selected pull request detail', () => {
 
   test('refuses to answer as another account', async ({ desktop }) => {
     await expect(snapshot(desktop.page, 'carol')).rejects.toThrow(
-      'n10 acts as n10-tester now, not carol'
+      'The account changed from carol to n10-tester'
     );
   });
 });

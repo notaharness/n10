@@ -65,7 +65,7 @@ export function PrIdentity({
           <CopyChip
             label="Copy head commit"
             copy={pr.headSha}
-            copied="Commit id copied"
+            copied="Commit hash copied"
           >
             {pr.headSha.slice(0, 8)}
           </CopyChip>

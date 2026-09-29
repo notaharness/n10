@@ -12,7 +12,7 @@ import { useMachines, useTerminals } from '../../lib/data/queries.js';
 import { SessionTerminal } from '../terminal/SessionTerminal.js';
 import { ConnectionBanner } from '../terminal/ConnectionBanner.js';
 
-/** The exited-agent affordance ("Resume agent" / "Start new"). Gated
+/** The exited-agent affordance ("Resume agent" / "Start default agent"). Gated
  *  entirely on `processState` (via `!session.running`), never on
  *  `connectionState` — a dropped connection must not show this. */
 function ExitedAgentBar({ session }: { session: TerminalSummary }) {
@@ -46,7 +46,7 @@ function ExitedAgentBar({ session }: { session: TerminalSummary }) {
           })
         }
       >
-        Start new (directory default)
+        Start default agent
       </Button>
       {launch.error && <span role="alert">{errorMessage(launch.error)}</span>}
     </div>

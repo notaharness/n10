@@ -230,7 +230,7 @@ describe('readPullRequestChecks', () => {
     ).rejects.toBeInstanceOf(PullRequestIdentityError);
     await expect(
       readPullRequestChecks({ ref: REF, viewer: 'carol' }, sources())
-    ).rejects.toThrow('n10 acts as bob now, not carol');
+    ).rejects.toThrow('The account changed from carol to bob');
   });
 
   it('refuses an answer read after the account changed under it', async () => {

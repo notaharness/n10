@@ -149,7 +149,7 @@ describe('session launch boundary', () => {
   it('requires captured approval for a fresh live replacement', async () => {
     state.existing = found;
     await expect(openSession({ ...base, fresh: true })).rejects.toThrow(
-      'confirmation'
+      'reopen the launch dialog to replace it'
     );
     expect(state.create).not.toHaveBeenCalled();
   });

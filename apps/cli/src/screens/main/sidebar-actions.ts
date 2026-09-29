@@ -190,7 +190,7 @@ async function confirmOrDelete(
       ctx.deleteConfirm.setConfirmDelete({
         branch,
         sessionName,
-        reason: 'session is active — agent process will be killed',
+        reason: 'An agent is running here — deleting stops it',
         mode: 'yes-no',
         approved: check,
       });

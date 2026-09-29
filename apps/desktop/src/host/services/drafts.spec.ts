@@ -194,20 +194,20 @@ describe('postDraftComments', () => {
   it('refuses to post without a configured provider', async () => {
     state.config = {};
     await expect(postDraftComments({ prId: 1 })).rejects.toThrow(
-      'No VCS provider configured'
+      'No provider set up — open Settings'
     );
   });
 
   it('refuses an unsupported provider', async () => {
     state.config = { vendor: 'gitlab' };
     await expect(postDraftComments({ prId: 1 })).rejects.toThrow(
-      'Unsupported vendor: gitlab'
+      "Can't post comments for this repository"
     );
   });
 
   it('requires a head SHA on GitHub, where comments anchor to a commit', async () => {
     await expect(postDraftComments({ prId: 1 })).rejects.toThrow(
-      'Missing head SHA'
+      'Refresh pull requests and try again'
     );
   });
 

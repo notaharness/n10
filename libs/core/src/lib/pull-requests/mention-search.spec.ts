@@ -76,7 +76,7 @@ describe('searchMentions', () => {
   it('says so when the provider cannot search people', async () => {
     await expect(
       searchMentions({ ref: REF, query: 'al' }, sources({ search: undefined }))
-    ).rejects.toThrow("can't search for people to mention");
+    ).rejects.toThrow('Not available for this repository');
   });
 });
 

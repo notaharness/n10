@@ -60,7 +60,7 @@ describe('fresh agent terminal launch against a live pane', () => {
         name: terminalSessionKey('saved'),
         fresh: true,
       })
-    ).rejects.toThrow('confirmation');
+    ).rejects.toThrow('reopen the launch dialog to replace it');
     expect(state.create).not.toHaveBeenCalled();
     expect(state.register).not.toHaveBeenCalled();
   });

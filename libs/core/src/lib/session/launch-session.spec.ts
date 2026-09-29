@@ -196,7 +196,7 @@ describe('continuing a recorded "test" agent', () => {
   it("refuses to resume as `sh -c ''` when aiCommand is missing", () => {
     const config = {} as AppConfig;
     expect(() => buildAgentLaunch({ config, request }, 'test', true)).toThrow(
-      'no known agent metadata'
+      "doesn't know which agent ran this session"
     );
   });
 });

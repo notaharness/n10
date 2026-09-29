@@ -49,7 +49,7 @@ export async function searchMentions(
 ): Promise<MentionSearch> {
   const viewer = assertSameContext(req, src);
   if (!src.search) {
-    throw new Error("This provider can't search for people to mention");
+    throw new Error('Not available for this repository');
   }
   const candidates = await src.search(req.query);
   assertSameContext({ ...req, viewer }, src);

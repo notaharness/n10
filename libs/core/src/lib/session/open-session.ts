@@ -215,7 +215,7 @@ async function resolveOpenTarget(
     );
   if (params.fresh && existing && !existing.paneDead && !params.expected)
     throw new Error(
-      'Replacing a running session requires confirmation of its current incarnation.'
+      'This session is running; reopen the launch dialog to replace it.'
     );
   return existing;
 }

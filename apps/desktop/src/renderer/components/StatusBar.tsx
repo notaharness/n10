@@ -109,7 +109,7 @@ function ProviderSegment({
   if (!s.providerId) {
     return (
       <Segment
-        label="No VCS provider configured — open Settings"
+        label="No provider set up — open Settings"
         onClick={onOpenSettings}
       >
         <CloudOffIcon className="size-3" />

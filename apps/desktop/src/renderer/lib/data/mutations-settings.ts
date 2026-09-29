@@ -27,7 +27,7 @@ export function updateSettingOptions(qc: QueryClient, cwd: string) {
     onSettled: () =>
       Promise.all([
         refreshRepoInfo(qc).catch((e: unknown) =>
-          toast.error(`Could not re-read the repository: ${errorMessage(e)}`)
+          toast.error(`Couldn't reload the repository: ${errorMessage(e)}`)
         ),
         qc.invalidateQueries({ queryKey: keys.settings(cwd) }),
         // The picker's default row follows the configured agent.

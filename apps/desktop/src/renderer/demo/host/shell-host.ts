@@ -58,7 +58,7 @@ const SETTINGS: SettingsFieldView[] = [
       'Template for worktree placement ({session} = sanitized branch). Restart required.',
   },
   {
-    label: 'PR poll interval',
+    label: 'Refresh interval',
     key: 'prPollInterval',
     group: 'sync',
     kind: 'text',

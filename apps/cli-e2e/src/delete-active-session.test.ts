@@ -96,7 +96,7 @@ test.describe('Delete active session', () => {
         });
       }).toPass({ timeout: 20_000 });
       await expect(
-        n10.term.getByText(/session is active/i).first()
+        n10.term.getByText(/an agent is running here/i).first()
       ).toBeVisible();
 
       // Esc cancels — session must remain in the sidebar.
