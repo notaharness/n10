@@ -602,6 +602,14 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
     const name = Object.keys(all).find((n) => query.includes(`${n}(first:`));
     out({ data: { repository: { pullRequest: { [name]: all[name] } } } });
   }
+  if (query.includes('query MentionableUsers(')) {
+    const q = (vars.q ?? '').toLowerCase();
+    const nodes = (scenario.mentionable ?? [])
+      .filter((u) => `${u.login} ${u.name ?? ''}`.toLowerCase().includes(q))
+      .slice(0, 8)
+      .map((u) => ({ login: u.login, name: u.name ?? null }));
+    out({ data: { repository: { mentionableUsers: { nodes } } } });
+  }
   if (query.includes('query PullRequestThreadReplies(')) {
     for (const pr of prs) {
       const i = (pr.threads ?? []).findIndex(

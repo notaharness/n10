@@ -100,6 +100,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   per range, consecutive lines on screen only). Composers and the reviewer's inline drafts hang in the
   flat diff through `mineByFile` (`diff/use-diff-comments.ts`). The review agent's findings stay in
   `@n10/review-comments`, keyed by PR number.
+- A mention is the provider's token (`@login`, Azure's `@<id>`) from its
+  own search (core `pull-requests/mention-search.ts`,
+  `comments/MentionPicker.tsx`); a display name is only ever shown.
 - Diffs are whole-file (`-U99999`), folded client-side
   (`lib/diff/diff-model.ts`). A PR diffs commits; a bare worktree diffs its
   working tree, polled at 2 s only while the agent runs. `FileTree` collapse

@@ -1,3 +1,4 @@
+import type { MentionCandidate } from './mentions.js';
 import type { PullRequestChecks } from './pr-checks.js';
 import type { PullRequestConversation } from './pr-conversation.js';
 import type { PullRequestDetail, RepositoryRef } from './pr-details.js';
@@ -197,6 +198,18 @@ export interface VcsProvider {
     project: Record<string, string>,
     prId: number
   ): Promise<PullRequestConversation>;
+
+  /**
+   * People a comment on this repository can mention for `query`, as the
+   * provider's own search answers it; how much of a name it matches is
+   * the provider's. Each carries the token the provider stores for the
+   * mention, which is what a composer inserts.
+   */
+  searchMentionCandidates?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    query: string
+  ): Promise<MentionCandidate[]>;
 
   /** Reply to an existing comment thread. The thread is passed (not just
    *  the id) so providers can dispatch on `replyKind` — GitHub review

@@ -2,6 +2,8 @@ import { PencilIcon, Trash2Icon } from 'lucide-react';
 import type { ReactNode, Ref } from 'react';
 import { Badge } from '../../ui/badge.js';
 import { Button } from '../../ui/button.js';
+import { displayMentions } from '../../../lib/review/mention-query.js';
+import { mentionNames } from '../../../lib/review/mention-search.js';
 import { CommentBody } from './CommentBody.js';
 
 /** Where a draft goes, marked as the reader's own and private. */
@@ -70,7 +72,7 @@ export function OwnDraftCard({
       </header>
       {notice}
       <div className="px-3 py-2">
-        <CommentBody markdown={body} />
+        <CommentBody markdown={displayMentions(body, mentionNames)} />
       </div>
     </article>
   );

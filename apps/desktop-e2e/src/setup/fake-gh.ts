@@ -121,6 +121,9 @@ export interface FakeGitHub {
   /** The signed-in user. PRs they authored are "yours". */
   username?: string;
   prs: FakePr[];
+  /** Who `mentionableUsers` finds: a login or name containing the
+   *  query, ignoring case, first eight. */
+  mentionable?: { login: string; name?: string }[];
   /** Rule sets on every base branch: required checks (by name, from
    *  GitHub Actions) and whether conversations must be resolved.
    *  `failing` answers both rules reads with a 502. */
