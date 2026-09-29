@@ -13,6 +13,7 @@ import { pace } from './setup/pace.js';
 import { collect, saveSamples, type Samples } from './setup/metrics.js';
 import { startMainLag, stopMainLag } from './setup/main-lag.js';
 import { cpuMs } from './setup/proc-cpu.js';
+import { timedSwitch } from './setup/timed-switch.js';
 
 /**
  * Many agent tabs open at once: what the renderer pays for the ones
@@ -23,12 +24,13 @@ import { cpuMs } from './setup/proc-cpu.js';
  * host's ring buffer holds before it started, so its terminal is the
  * most expensive one to show.
  *
- * A switch is timed from the tab's click to the first animation frame
- * in which the new tab's terminal holds a line its agent printed no
- * earlier than one interval before the click — the screen as it is
- * now, not as it was when the tab was last looked at. The stamp agent
- * writes its checkout and the wall clock into every line so the text
- * alone says both.
+ * A switch is timed from the mouse press on the tab to the first
+ * animation frame in which the terminal on screen holds a line its
+ * agent printed no earlier than one interval before the press — the
+ * screen as it is now, not as it was when the tab was last looked at.
+ * The stamp agent writes its checkout and the wall clock into every
+ * line so the text alone says both. `N10_PERF_PREWARM=1` rests the
+ * pointer on the tab first, so the editor holds it ready.
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -45,6 +47,15 @@ const BIG = 'agent-big';
 const REDRAW_FPS = Number(process.env.N10_PERF_REDRAW_FPS ?? 0);
 /** KB the backlog agent prints at once every three seconds; 0 for none. */
 const BURST_KB = Number(process.env.N10_PERF_BURST_KB ?? 0);
+/** Rest the pointer on each tab before pressing it, so the editor
+ *  renders it ahead of the press. */
+const PREWARM = process.env.N10_PERF_PREWARM === '1';
+
+const SWITCH = {
+  prewarm: PREWARM,
+  // One interval, plus the PTY → tmux → host → renderer hop.
+  freshMs: INTERVAL_MS + 150,
+};
 
 const branches = [
   ...Array.from({ length: TABS - 1 }, (_, i) => `agent-${i}`),
@@ -63,72 +74,6 @@ async function openAgentTab(page: Page, branch: string): Promise<void> {
       ).some((r) => r.textContent?.includes(`@${b}`)),
     branch,
     { timeout: 60_000 }
-  );
-}
-
-interface Switch {
-  /** Click to the first frame with the tab's own terminal grid drawn. */
-  gridMs: number;
-  /** …with any line of the tab's agent in it, however old. */
-  ownMs: number;
-  /** …with a line its agent printed no earlier than one interval before
-   *  the click: the screen as it is now. */
-  currentMs: number;
-}
-
-/** Click the tab for `branch` and time it until its terminal shows its
- *  agent's current output. Runs in the page, so Playwright's own round
- *  trips are not in the number. */
-async function timedSwitch(page: Page, branch: string): Promise<Switch> {
-  return page.evaluate(
-    ({ branch: b, freshMs }) =>
-      new Promise<Switch>((resolve, reject) => {
-        const tabEl = Array.from(
-          document.querySelectorAll<HTMLElement>('[role="tab"]')
-        ).find((t) => t.textContent?.includes(b));
-        if (!tabEl) return reject(new Error(`no tab for ${b}`));
-        const pane = '[data-editor-panes] .wterm';
-        const before = document.querySelector(pane);
-        const tickRe = new RegExp(`tick (\\d+) \\d+ @${b}\\b`);
-        const clickedAt = Date.now();
-        const t0 = performance.now();
-        const at: Partial<Switch> = {};
-        tabEl.click();
-        const latestIn = (term: Element | null): number => {
-          let latest = 0;
-          for (const r of Array.from(
-            term?.querySelectorAll('.term-row') ?? []
-          )) {
-            const m = tickRe.exec(r.textContent ?? '');
-            if (m) latest = Math.max(latest, Number(m[1]));
-          }
-          return latest;
-        };
-        // The terminal the switch mounts is a new element.
-        const drawn = (term: Element | null): boolean =>
-          term !== before && !!term?.querySelector('.term-row');
-        const check = () => {
-          const now = performance.now() - t0;
-          const term = document.querySelector(pane);
-          const latest = latestIn(term);
-          if (at.gridMs === undefined && drawn(term)) at.gridMs = now;
-          if (at.ownMs === undefined && latest > 0) at.ownMs = now;
-          if (latest >= clickedAt - freshMs) {
-            resolve({
-              gridMs: at.gridMs ?? now,
-              ownMs: at.ownMs ?? now,
-              currentMs: now,
-            });
-          } else if (now > 15_000) {
-            reject(new Error(`${b} never showed current output`));
-          } else {
-            requestAnimationFrame(check);
-          }
-        };
-        requestAnimationFrame(check);
-      }),
-    // One interval, plus the PTY → tmux → host → renderer hop.
-    { branch, freshMs: INTERVAL_MS + 150 }
   );
 }
 
@@ -261,7 +206,7 @@ async function measureOnce(repoPath: string, samples: Samples): Promise<void> {
       .first()
       .waitFor({ state: 'visible', timeout: 30_000 });
     for (const b of branches) await openAgentTab(page, b);
-    await timedSwitch(page, 'agent-0');
+    await timedSwitch(page, SWITCH, 'agent-0');
     // Let every agent reach its steady state, and the polls theirs.
     await pace(page, 5000);
 
@@ -285,7 +230,7 @@ async function measureOnce(repoPath: string, samples: Samples): Promise<void> {
     let current = 'agent-0';
     for (let i = 0; i < SWITCHES; i++) {
       const next = ordinary[(ordinary.indexOf(current) + 1) % ordinary.length];
-      const t = await timedSwitch(page, next);
+      const t = await timedSwitch(page, SWITCH, next);
       collect(samples, {
         switchMs: t.currentMs,
         switchGridMs: t.gridMs,
@@ -299,9 +244,11 @@ async function measureOnce(repoPath: string, samples: Samples): Promise<void> {
       switchingLagP50Ms: switching.p50,
       switchingLagP99Ms: switching.p99,
     });
-    // Into the tab whose scrollback is full, from an ordinary one.
+    // Into the tab whose scrollback is full, from an ordinary one — by
+    // way of two, so it is never the tab left last, which the editor
+    // holds ready without any pre-warming.
     for (let i = 0; i < Math.ceil(SWITCHES / 2); i++) {
-      const t = await timedSwitch(page, BIG);
+      const t = await timedSwitch(page, SWITCH, BIG);
       collect(samples, {
         bigSwitchMs: t.currentMs,
         bigSwitchGridMs: t.gridMs,
@@ -309,7 +256,9 @@ async function measureOnce(repoPath: string, samples: Samples): Promise<void> {
       });
       await pace(page, 400);
       collect(samples, { bigLines: await activeLines(page) });
-      await timedSwitch(page, 'agent-0');
+      await timedSwitch(page, SWITCH, 'agent-0');
+      await pace(page, 400);
+      await timedSwitch(page, SWITCH, 'agent-1');
       await pace(page, 400);
     }
   } finally {
@@ -340,6 +289,7 @@ test('many agent tabs: steady-state cost and switch latency', async () => {
   const load = [
     REDRAW_FPS > 0 ? 'redraw' : '',
     BURST_KB > 0 ? 'burst' : '',
+    PREWARM ? 'prewarm' : '',
   ].filter(Boolean);
   saveSamples(['agent-tabs', ...load].join('-'), samples);
 });
