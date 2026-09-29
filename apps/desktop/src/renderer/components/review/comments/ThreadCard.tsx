@@ -9,6 +9,8 @@ import { snapshotRemote } from '@n10/core/plan';
 import { usePlan, usePlanControls } from '../../../lib/plan/plan.js';
 import { useRepo } from '../../../lib/repo-context.js';
 import { useReply, useSetResolved } from '../../../lib/data/mutations.js';
+import { pullRequestRefFor } from '../../../lib/data/pr-snapshot-query.js';
+import { useReviewDraft } from '../../../lib/review/review-drafts.js';
 import {
   threadExpanded,
   threadLocation,
@@ -52,7 +54,10 @@ export function ThreadCard({
   );
   const reply = useReply(repo.cwd);
   const resolve = useSetResolved(repo.cwd);
-  const [draft, setDraft] = useState('');
+  const draft = useReviewDraft(pullRequestRefFor(repo, prId), {
+    kind: 'reply',
+    threadId: thread.id,
+  });
   const [composing, setComposing] = useState(false);
   // Opening the box refetches the thread, so a reply is never written
   // against a conversation that has already moved on.
@@ -100,13 +105,13 @@ export function ThreadCard({
   const replies = thread.comments.slice(1);
 
   const send = (alsoResolve = false) => {
-    const body = draft.trim();
+    const body = draft.body.trim();
     if (!body) return;
     reply.mutate(
       { prId, thread, body },
       {
         onSuccess: () => {
-          setDraft('');
+          void draft.clear();
           openComposer(false);
           if (alsoResolve && thread.canResolve && !thread.isResolved) {
             resolve.mutate(
@@ -187,7 +192,6 @@ export function ThreadCard({
             setComposing={openComposer}
             notice={refresh.notice}
             draft={draft}
-            setDraft={setDraft}
             sending={reply.isPending}
             resolving={resolve.isPending}
             onSend={send}

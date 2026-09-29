@@ -80,6 +80,19 @@ export const keys = {
       ref.id ?? null,
       viewer,
     ] as const,
+  /** The reviewer's own drafts on one pull request, by identity. */
+  reviewDrafts: (
+    cwd: string,
+    ref: PullRequestRef | null,
+    viewer: string | null
+  ) =>
+    [
+      'review-drafts',
+      cwd,
+      ref ? pullRequestKey(ref) : null,
+      ref?.id ?? null,
+      viewer,
+    ] as const,
   activity: (cwd: string) => ['session-activity', cwd] as const,
   commentImage: (url: string) => ['comment-image', url] as const,
   drafts: (cwd: string, prId: number) => ['drafts', cwd, prId] as const,

@@ -88,6 +88,14 @@ Every rule below has its reasoning in `docs/decisions.md`.
   its check list too, so its place, filter and search survive both.
   Entries that arrive on a refresh wait behind "N new updates"; thread
   writes invalidate the conversation.
+- A reviewer's own unsent writing is a durable draft (core
+  `pull-requests/review-drafts.ts`, one file per account and pull request
+  under `~/.n10/review-drafts`), autosaved by `lib/review/review-drafts.ts`.
+  Unsaved text lives in `draft-edits.ts`, outside components, so an
+  unmount never drops it; leaving the window with a failed save asks
+  first (`main/unsaved-guard.ts`). Nothing there publishes. Focus that a
+  closing control drops goes through `lib/focus.ts`. The review agent's findings stay in
+  `@n10/review-comments`, keyed by PR number.
 - Diffs are whole-file (`-U99999`), folded client-side
   (`lib/diff/diff-model.ts`). A PR diffs commits; a bare worktree diffs its
   working tree, polled at 2 s only while the agent runs. `FileTree` collapse
