@@ -54,7 +54,12 @@ BEAM_TEST_BINARY=$HOME/beam/beamtest npx nx e2e:beam desktop-e2e
 
 `src/setup/fake-gh.ts` supplies offline PRs, threads, comments and checks through
 a fake executable on PATH. Set a PR's `headRefName` to a real fixture branch for
-a real diff. Seeded worktree branches must be slash-free because the fixture and
+a real diff. `src/setup/fake-ado.ts` (the `fakeAzure` option) does the same for
+Azure DevOps: the fixture preloads `fixtures/fake-ado.cjs` into the main process
+with Electron's `-r`, and it answers every request to an Azure host from the
+scenario, so nothing reaches Azure. It builds the REST API's own JSON from a few
+words per reviewer and policy; a route it does not know answers 404 and is listed
+by `fakeAdoMisses`. The fixture refuses to go on if the preload did not load. Seeded worktree branches must be slash-free because the fixture and
 app construct paths differently. Provider project fields belong in `vendorProject`
 or auto-detection replaces them.
 

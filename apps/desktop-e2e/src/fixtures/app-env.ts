@@ -14,7 +14,7 @@ export function appEnv(opts: {
   repoPath: string;
   startWithoutRepo: boolean | undefined;
   githubToken: string | undefined;
-  /** PATH additions that install the fake `gh`. */
+  /** What installs the fakes: `gh` on PATH, the Azure DevOps shim. */
   ghEnv: Record<string, string>;
   /** Extra knobs a test asked for. Applied before the isolation below. */
   extra: Record<string, string> | undefined;
@@ -60,7 +60,8 @@ export function appEnv(opts: {
     N10_START_DIR: opts.startWithoutRepo ? '' : opts.repoPath,
     N10_DESKTOP_VERSION: 'e2e',
     ...(opts.githubToken ? { GH_TOKEN: opts.githubToken } : {}),
-    // The fake `gh` has to win the PATH lookup.
+    // The fake `gh` has to win the PATH lookup, and the Azure DevOps
+    // shim has to load before the app does.
     ...opts.ghEnv,
     // Last, and not negotiable. A tmux server is identified by its
     // socket directory, and the default one is the developer's own —

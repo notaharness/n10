@@ -17,6 +17,7 @@ import {
 } from '../setup/git-repo.js';
 import { killFixtureSessions } from '../setup/tmux.js';
 import { appEnv } from './app-env.js';
+import { FAKE_ADO_PRELOAD } from '../setup/fake-ado.js';
 import { closeDesktopApp } from '../setup/app-close.js';
 import type { TerminalSeed } from '../setup/terminals.js';
 import {
@@ -118,6 +119,7 @@ export const test = base.extend<
   githubToken: [undefined, { option: true }],
   drafts: [undefined, { option: true }],
   fakeGitHub: [undefined, { option: true }],
+  fakeAzure: [undefined, { option: true }],
   liveSessions: [undefined, { option: true }],
   env: [undefined, { option: true }],
   liveTerminals: [undefined, { option: true }],
@@ -133,6 +135,7 @@ export const test = base.extend<
       githubToken,
       drafts,
       fakeGitHub,
+      fakeAzure,
       liveSessions,
       env,
       liveTerminals,
@@ -153,12 +156,15 @@ export const test = base.extend<
       desktopPrefs,
       drafts,
       fakeGitHub,
+      fakeAzure,
     });
 
     seedTmux(repoPath, homeDir, liveSessions, liveTerminals);
 
     const app = await electron.launch({
       args: [
+        // Before any of the app's code, so no request reaches Azure.
+        ...(fakeAzure ? ['-r', FAKE_ADO_PRELOAD] : []),
         APP_DIR,
         // CI runners have no user namespaces for the sandbox, and
         // software rendering is both available and deterministic.
@@ -179,6 +185,13 @@ export const test = base.extend<
     });
 
     const page = await app.firstWindow();
+    if (fakeAzure) {
+      const faked = await app.evaluate(
+        () => (globalThis as { __n10FakeAzure?: boolean }).__n10FakeAzure
+      );
+      // Without it the app would be talking to the real Azure DevOps.
+      if (faked !== true) throw new Error('the Azure DevOps fake did not load');
+    }
 
     // Chromium throttles requestAnimationFrame in a window it considers
     // hidden or occluded, and under xvfb (or behind another window on a

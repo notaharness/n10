@@ -9,6 +9,12 @@ import {
   type FakeGitHub,
 } from '../setup/fake-gh.js';
 import {
+  fakeAdoGlobalConfig,
+  fakeAdoProjectConfig,
+  installFakeAdo,
+  type FakeAzure,
+} from '../setup/fake-ado.js';
+import {
   addExternalWorktree,
   startExternalTmuxSession,
 } from '../setup/external.js';
@@ -86,6 +92,12 @@ export interface HomeSeed {
    * `githubToken` is set, which is the real thing.
    */
   fakeGitHub?: FakeGitHub;
+  /**
+   * Serve the app Azure DevOps pull requests from a stand-in for its
+   * REST API in the app's main process (`setup/fake-ado.ts`), with the
+   * matching config written for it.
+   */
+  fakeAzure?: FakeAzure;
 }
 
 /**
@@ -108,7 +120,15 @@ export function seedHome(
   writeFileSync(join(homeDir, '.zshrc'), '', 'utf8');
   writeFileSync(
     join(n10, 'config.json'),
-    JSON.stringify({ aiCommand: fakeAgent(), ...opts.n10Config }, null, 2),
+    JSON.stringify(
+      {
+        aiCommand: fakeAgent(),
+        ...(opts.fakeAzure ? fakeAdoGlobalConfig(opts.fakeAzure) : {}),
+        ...opts.n10Config,
+      },
+      null,
+      2
+    ),
     'utf8'
   );
 
@@ -123,17 +143,21 @@ export function seedHome(
     );
   }
 
-  return opts.fakeGitHub ? installFakeGh(homeDir, opts.fakeGitHub) : {};
+  return {
+    ...(opts.fakeGitHub ? installFakeGh(homeDir, opts.fakeGitHub) : {}),
+    ...(opts.fakeAzure ? installFakeAdo(homeDir, opts.fakeAzure) : {}),
+  };
 }
 
 function seedProjectConfig(
   n10: string,
   repoPath: string,
-  opts: Pick<HomeSeed, 'projectConfig' | 'fakeGitHub'>
+  opts: Pick<HomeSeed, 'projectConfig' | 'fakeGitHub' | 'fakeAzure'>
 ): void {
   const projectConfig =
     opts.projectConfig ??
-    (opts.fakeGitHub ? fakeGhProjectConfig(opts.fakeGitHub) : undefined);
+    (opts.fakeGitHub ? fakeGhProjectConfig(opts.fakeGitHub) : undefined) ??
+    (opts.fakeAzure ? fakeAdoProjectConfig(opts.fakeAzure) : undefined);
   if (!projectConfig) return;
   // Per-project config lives under a hash of the repo path — see
   // projectKey() in @n10/vcs-core's config store.

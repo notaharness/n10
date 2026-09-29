@@ -10,8 +10,8 @@ import type { FakeGitHub, FakePr } from './setup/fake-gh.js';
  * to a code owner. The Reviewers list names code owners, shows no one
  * as required, and shows the rules that name a reviewer on hover;
  * Completion's Reviews row is the verdict and the count.
- * Azure DevOps, which marks each reviewer, is covered by core's and the
- * provider's specs until it has a fake of its own.
+ * Azure DevOps, which marks each reviewer, is in
+ * `pr-reviewer-groups.test.ts`.
  */
 
 const PR: FakePr = {
