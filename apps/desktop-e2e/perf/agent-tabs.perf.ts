@@ -132,7 +132,9 @@ async function timedSwitch(page: Page, branch: string): Promise<Switch> {
 }
 
 /** Per-process CPU and memory over `windowMs`, as Electron reports it
- *  (CPU in percent of one core, averaged since the previous reading),
+ *  (CPU in percent of all cores together, averaged since the previous
+ *  reading; `mainCorePct` is main alone in percent of one core, from
+ *  `process.cpuUsage`),
  *  with the main process's timer lag over the same window. A utility
  *  process named `n10 host` is the session host when there is one;
  *  others (the beam daemon's) are counted apart. */
