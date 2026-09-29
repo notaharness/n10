@@ -311,11 +311,11 @@ The command surface was checked against Copilot CLI 1.0.87 (`--version`,
 No authenticated conversation, model request or real session restoration is
 exercised by the tests. Help-only probes do not establish live prompt parsing.
 
-The registry resolves `agentId: "copilot"` and legacy `copilot` / `gh copilot`
-commands to the standalone CLI. Blank launches use `copilot`; seeded/review
-launches use the documented `--interactive=PROMPT` form with guidance folded into
-the prompt. The short `-i PROMPT` form is valid too. Tests verify n10's argv and
-prompt delivery contract, not a defect in Copilot's short-option parser.
+`agentId: "copilot"` selects the standalone CLI. Blank launches use `copilot`;
+seeded/review launches use the documented `--interactive=PROMPT` form with
+guidance folded into the prompt. The short `-i PROMPT` form is valid too. Tests
+verify n10's argv and prompt delivery contract, not a defect in Copilot's
+short-option parser.
 
 Automatic continuation stays disabled: documented `--continue` prefers the
 current directory but can fall back to global history. n10 does not record a

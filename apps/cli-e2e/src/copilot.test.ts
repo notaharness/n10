@@ -8,7 +8,7 @@ const copilot = fakeCli('copilot');
 
 test.use({
   n10Config: {
-    aiCommand: 'copilot',
+    agentId: 'copilot',
     autoHideSidebar: false,
     keybindPreset: 'vim',
   },
