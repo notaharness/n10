@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { AZURE_REVIEWERS } from './fixtures/azure-reviewers.js';
 import { test, expect } from './fixtures/desktop.js';
 import { sidebarRow } from './setup/app.js';
 import type { FakeGitHub } from './setup/fake-gh.js';
@@ -7,7 +8,9 @@ import type { FakeGitHub } from './setup/fake-gh.js';
  * The Overview's reviewer rules and activity cards, pixel for pixel in
  * the pinned container (see `visual.test.ts`): the tip a required team's
  * standing opens, with the rule set's paths one a line, and a review
- * thread with its labels on the header row and its reply and resolve.
+ * thread with its labels on the header row and its reply and resolve;
+ * and, on Azure DevOps in the dark theme, the required reviewers above
+ * the optional with a policy's tip open over the list.
  */
 
 const shot = {
@@ -87,6 +90,18 @@ async function openOverview(page: Page) {
   });
 }
 
+/** A tip, once it has zoomed in: its box is measured before the
+ *  screenshot stops the animation. */
+async function settled(tip: Locator) {
+  await tip.evaluate((el) => {
+    const content = el.closest('[data-slot="tooltip-content"]');
+    if (!content) throw new Error('the tip is outside its tooltip content');
+    return Promise.all(
+      content.getAnimations({ subtree: true }).map((a) => a.finished)
+    );
+  });
+}
+
 /** The area two elements cover together: a section and the tip it
  *  opens, which a portal draws outside it. */
 async function around(a: Locator, b: Locator) {
@@ -112,15 +127,7 @@ test.describe('Visual (review) @visual', () => {
       .hover();
     const tip = page.locator('[data-reviewer-rules]').filter({ visible: true });
     await expect(tip.locator('li')).toHaveCount(2);
-    // Framed once it has zoomed in: its box is measured before the
-    // screenshot stops the animation.
-    await tip.evaluate((el) => {
-      const content = el.closest('[data-slot="tooltip-content"]');
-      if (!content) throw new Error('the tip is outside its tooltip content');
-      return Promise.all(
-        content.getAnimations({ subtree: true }).map((a) => a.finished)
-      );
-    });
+    await settled(tip);
     await expect(page).toHaveScreenshot('reviewer-rules-hover.png', {
       ...shot,
       clip: await around(reviewers, tip),
@@ -139,5 +146,43 @@ test.describe('Visual (review) @visual', () => {
     await expect(card.getByRole('button', { name: 'Resolve' })).toBeVisible();
     await card.scrollIntoViewIfNeeded();
     await expect(card).toHaveScreenshot('activity-thread-actions.png', shot);
+  });
+});
+
+test.describe('Visual (reviewers on Azure DevOps, dark theme) @visual', () => {
+  test.use({
+    fakeGitHub: undefined,
+    fakeAzureDevOps: AZURE_REVIEWERS,
+    desktopPrefs: { theme: 'dark', nativeFrame: false },
+    repo: { name: 'n10-visual', worktrees: [{ branch: 'cancel-requests' }] },
+  });
+
+  test('the required first, and a policy’s tip over the list', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await sidebarRow(page, /#4211/).first().click();
+    const reviewers = page.getByRole('region', { name: 'Reviewers' });
+    await expect(
+      reviewers.getByRole('heading', { name: 'Optional' })
+    ).toBeVisible({ timeout: 30_000 });
+    // Hovered once the Overview has settled: a read landing later moves
+    // the list under the pointer, and the tip closes.
+    await expect(
+      page.locator('[data-readiness-headline]').first()
+    ).toBeVisible();
+    await expect(page.getByRole('region', { name: /Activity/ })).toContainText(
+      'No comments, reviews or activity yet.'
+    );
+    await reviewers
+      .locator('[data-reviewer]', { hasText: 'API reviewers' })
+      .locator('[data-reviewer-standing]')
+      .hover();
+    const tip = page.locator('[data-reviewer-rules]').filter({ visible: true });
+    await expect(tip.locator('li')).toHaveCount(2);
+    await settled(tip);
+    // The whole window: a clip loses the tip, which a portal draws over
+    // the list inside the clipped area.
+    await expect(page).toHaveScreenshot('reviewer-groups-hover-dark.png', shot);
   });
 });

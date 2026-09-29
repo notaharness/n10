@@ -17,6 +17,11 @@ import {
 } from '../setup/git-repo.js';
 import { killFixtureSessions } from '../setup/tmux.js';
 import { appEnv } from './app-env.js';
+import {
+  FAKE_ADO_PRELOAD,
+  fakeAdoLoaded,
+  fakeAdoMisses,
+} from '../setup/fake-ado.js';
 import { closeDesktopApp } from '../setup/app-close.js';
 import type { TerminalSeed } from '../setup/terminals.js';
 import {
@@ -118,6 +123,7 @@ export const test = base.extend<
   githubToken: [undefined, { option: true }],
   drafts: [undefined, { option: true }],
   fakeGitHub: [undefined, { option: true }],
+  fakeAzureDevOps: [undefined, { option: true }],
   liveSessions: [undefined, { option: true }],
   env: [undefined, { option: true }],
   liveTerminals: [undefined, { option: true }],
@@ -133,6 +139,7 @@ export const test = base.extend<
       githubToken,
       drafts,
       fakeGitHub,
+      fakeAzureDevOps,
       liveSessions,
       env,
       liveTerminals,
@@ -153,19 +160,13 @@ export const test = base.extend<
       desktopPrefs,
       drafts,
       fakeGitHub,
+      fakeAzureDevOps,
     });
 
     seedTmux(repoPath, homeDir, liveSessions, liveTerminals);
 
     const app = await electron.launch({
-      args: [
-        APP_DIR,
-        // CI runners have no user namespaces for the sandbox, and
-        // software rendering is both available and deterministic.
-        '--no-sandbox',
-        '--disable-gpu',
-        '--ozone-platform=x11',
-      ],
+      args: launchArgs(!!fakeAzureDevOps),
       cwd: WORKSPACE_ROOT,
       env: appEnv({
         homeDir,
@@ -179,6 +180,9 @@ export const test = base.extend<
     });
 
     const page = await app.firstWindow();
+    if (fakeAzureDevOps) {
+      await requireFakeAdo(app, () => ownsRepo && cleanupTestRepo(repoPath));
+    }
 
     // Chromium throttles requestAnimationFrame in a window it considers
     // hidden or occluded, and under xvfb (or behind another window on a
@@ -244,17 +248,59 @@ export const test = base.extend<
       if (ownsRepo) cleanupTestRepo(repoPath);
     }
 
-    // An uncaught renderer exception blanks a pane behind the
-    // ErrorBoundary, which a passing assertion elsewhere would happily
-    // ignore. Surface it as a failure of the test that provoked it —
-    // but only when the test itself got that far, so a real assertion
+    // Only when the test itself got that far, so a real assertion
     // failure keeps priority.
-    if (used && pageErrors.length > 0) {
-      throw new Error(
-        `Renderer threw during the test:\n${pageErrors.join('\n---\n')}`
-      );
+    if (used) {
+      afterEffects(pageErrors, fakeAzureDevOps ? fakeAdoMisses(homeDir) : []);
     }
   },
 });
+
+/** Electron's arguments. The Azure DevOps preload goes first, before
+ *  any of the app's code, so no request can reach Azure. */
+function launchArgs(fakeAzureDevOps: boolean): string[] {
+  return [
+    ...(fakeAzureDevOps ? ['-r', FAKE_ADO_PRELOAD] : []),
+    APP_DIR,
+    // CI runners have no user namespaces for the sandbox, and
+    // software rendering is both available and deterministic.
+    '--no-sandbox',
+    '--disable-gpu',
+    '--ozone-platform=x11',
+  ];
+}
+
+/** Stop unless the Azure DevOps fake is in the main process. The
+ *  preload writes the token, so without it the app has no credentials
+ *  and has asked Azure nothing; it is stopped all the same. */
+async function requireFakeAdo(
+  app: ElectronApplication,
+  cleanup: () => void
+): Promise<void> {
+  if (await fakeAdoLoaded(app)) return;
+  await closeDesktopApp(app);
+  cleanup();
+  throw new Error('The Azure DevOps fake did not load');
+}
+
+/** What a test that passed must not have left behind. An uncaught
+ *  renderer exception blanks a pane behind the ErrorBoundary, which a
+ *  passing assertion elsewhere would happily ignore; a request the
+ *  Azure DevOps fake does not model was answered 404, a failure the
+ *  test did not ask for. */
+function afterEffects(pageErrors: string[], misses: string[]): void {
+  if (pageErrors.length > 0) {
+    throw new Error(
+      `Renderer threw during the test:\n${pageErrors.join('\n---\n')}`
+    );
+  }
+  if (misses.length > 0) {
+    throw new Error(
+      `The app made requests the Azure DevOps fake does not model:\n${misses.join(
+        '\n'
+      )}`
+    );
+  }
+}
 
 export { expect };

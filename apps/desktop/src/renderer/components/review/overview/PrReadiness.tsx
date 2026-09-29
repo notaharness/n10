@@ -12,7 +12,6 @@ import {
   failureText,
   headline,
   readingNote,
-  RESOLVER_TEXT,
   shortOid,
 } from '../../../lib/review/readiness-model.js';
 import { Button } from '../../ui/button.js';
@@ -55,19 +54,14 @@ function Headline({
       <StateIcon state={state} label={label} className="mt-0.5 size-4" />
       <div className="min-w-0">
         <p className="font-medium">{text}</p>
-        {first && (
-          <p className="text-sm text-muted-foreground">
-            {RESOLVER_TEXT[first.resolvedBy]}
-          </p>
-        )}
         {detail && <p className="text-sm text-muted-foreground">{detail}</p>}
       </div>
     </div>
   );
 }
 
-/** The blockers beneath the headline, each with who can clear it: the
- *  rest when blocked, and every one known where the verdict is not. */
+/** The blockers beneath the headline: the rest when blocked, and every
+ *  one known where the verdict is not. */
 function MoreBlockers({ readiness }: { readiness: PullRequestReadiness }) {
   const { state, blockers } = readiness;
   const shown =
@@ -85,10 +79,6 @@ function MoreBlockers({ readiness }: { readiness: PullRequestReadiness }) {
       {shown.map((b) => (
         <li key={`${b.kind}:${b.text}`} data-readiness-blocker={b.kind}>
           {b.text}
-          <span className="text-muted-foreground">
-            {' '}
-            · {RESOLVER_TEXT[b.resolvedBy]}
-          </span>
         </li>
       ))}
     </ul>

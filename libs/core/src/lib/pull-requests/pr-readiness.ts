@@ -224,10 +224,16 @@ const REVIEW_BLOCKERS: Partial<Record<MergeState['reviews'], ReadinessItem>> = {
  *  enforces is in the way: GitHub states none when none applies. */
 function reviewsTally({ merge, viewerAsked }: ReadinessInputs, t: Tally): void {
   const blocker = REVIEW_BLOCKERS[merge.reviews];
-  // A review still to come is the viewer's where they are asked for it.
+  // A review still to come is the viewer's where they are asked for it,
+  // and says so.
   const theirs = blocker?.resolvedBy === 'reviewers' && viewerAsked;
-  if (blocker)
-    t.blockers.push(theirs ? { ...blocker, resolvedBy: 'viewer' } : blocker);
+  if (blocker) {
+    t.blockers.push(
+      theirs
+        ? { ...blocker, text: 'Waiting for your review', resolvedBy: 'viewer' }
+        : blocker
+    );
+  }
   if (merge.reviews === 'unknown' && merge.blocked !== false) {
     t.unknowns.push('The review requirement');
   }

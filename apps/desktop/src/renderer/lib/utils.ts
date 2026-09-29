@@ -19,9 +19,12 @@ export function relativeTime(input: string | number): string {
   return `${Math.round(hours / 24)}d ago`;
 }
 
-/** Two-letter initials for an avatar chip. */
+/** Two-letter initials for an avatar chip. An Azure DevOps team's name
+ *  carries its project (`[Fabrikam]\API reviewers`); the team's own
+ *  name is what the chip stands for. */
 export function initials(name: string): string {
-  const parts = name.replace(/[-_.]/g, ' ').trim().split(/\s+/);
+  const own = name.replace(/^\[[^\]]*\]\\/, '');
+  const parts = own.replace(/[-_.]/g, ' ').trim().split(/\s+/);
   if (parts.length === 0 || !parts[0]) return '?';
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();

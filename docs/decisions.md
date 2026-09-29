@@ -271,7 +271,12 @@ reason from there is a follow-up. GitHub marks no one:
 its rules ask for a number of approvals, for code owners and for teams by id,
 and a request says only whether it went to a code owner. A GitHub reviewer's
 requirement is therefore unknown, never inferred from their being asked, and
-the Overview says GitHub does not mark reviewers. Completion's Reviews row is
+the Overview shows no one as required. The Reviewers list splits into the
+required and, under an Optional heading, the optional only where the provider
+states every reviewer's requirement and both kinds are asked
+(`lib/review/reviewer-model.ts`); a requirement left unstated is read as
+neither, so such a list stays whole. Grouped, a row adds only why they were
+asked. Completion's Reviews row is
 the provider's verdict and the approvals the rules ask for; GitHub's count is
 the strictest of classic protection, as enforced on this account, and every
 rule set. Who must approve, and why, is the Reviewers list's: hovering a

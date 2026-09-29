@@ -5,6 +5,7 @@ import {
   MinusCircleIcon,
   XCircleIcon,
 } from 'lucide-react';
+import { useId } from 'react';
 import type { PullRequestReviewer, ReviewDecision } from '@n10/vcs-core/types';
 import type {
   ReviewRequirements,
@@ -13,6 +14,7 @@ import type {
 import { DECISION_LABEL } from '../../../lib/review/overview-model.js';
 import {
   reviewerRows,
+  type ReviewerGroup,
   type ReviewerRow,
 } from '../../../lib/review/reviewer-model.js';
 import { cn } from '../../../lib/utils.js';
@@ -88,8 +90,8 @@ function RulesTip({ rules }: { rules: readonly StandingRule[] }) {
   );
 }
 
-/** Required or optional and why, under the name; a rule behind it shows
- *  on hover or focus. */
+/** What a row adds to its group, under the name: why they were asked,
+ *  or that they are required; a rule behind it shows on hover or focus. */
 function Standing({ row }: { row: ReviewerRow }) {
   if (!row.standing) return null;
   const text = 'block text-xs text-muted-foreground';
@@ -121,52 +123,73 @@ function Standing({ row }: { row: ReviewerRow }) {
   );
 }
 
+function ReviewerItem({ row, me }: { row: ReviewerRow; me?: string }) {
+  return (
+    <li data-reviewer={row.identifier} className="flex items-start gap-2">
+      <Avatar name={row.displayName} size="xs" className="mt-0.5" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate" title={row.displayName}>
+          {row.displayName}
+          {row.identifier.toLowerCase() === me && (
+            <span className="text-muted-foreground"> (you)</span>
+          )}
+        </span>
+        <Standing row={row} />
+      </span>
+      <Decision decision={row.decision} />
+    </li>
+  );
+}
+
+/** A group of reviewers: the optional ones under their own heading,
+ *  and the required above them named for a screen reader. */
+function Group({ group, me }: { group: ReviewerGroup; me?: string }) {
+  const id = useId();
+  return (
+    <div data-reviewer-group={group.kind}>
+      {group.title && (
+        <h3 id={id} className="mt-3 mb-1.5 text-xs text-muted-foreground">
+          {group.title}
+        </h3>
+      )}
+      <ul
+        aria-labelledby={group.title ? id : undefined}
+        aria-label={group.kind === 'required' ? 'Required' : undefined}
+        className="space-y-1.5 text-sm"
+      >
+        {group.rows.map((r) => (
+          <ReviewerItem key={r.identifier} row={r} me={me} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /**
- * Everyone asked to review, each with their verdict in words and, where
- * the provider says, whether their review is required and why. The rules
- * that name a reviewer, with their paths, show on the standing's hover.
- * The list row names them until the detail read, which also names
- * teams, answers.
+ * Everyone asked to review, each with their verdict in words: the
+ * required first, then the optional under a heading, where the provider
+ * says which is which. A row adds why they were asked, and the rules
+ * that name them, with their paths, show on its hover. The list row
+ * names them until the detail read, which also names teams, answers.
  */
 export function PrReviewers({
   reviewers,
   requirements,
-  provider,
   viewer,
 }: {
   reviewers: readonly PullRequestReviewer[];
   requirements: ReviewRequirements | null;
-  provider: string | null;
   viewer: string | null;
 }) {
   const me = viewer?.toLowerCase();
-  const { rows, notes } = reviewerRows(reviewers, requirements, provider);
+  const { groups, notes } = reviewerRows(reviewers, requirements);
+  const none = groups.every((g) => g.rows.length === 0);
   return (
     <Section title="Reviewers">
-      {rows.length === 0 ? (
+      {none ? (
         <p className="text-sm text-muted-foreground">No reviewers requested.</p>
       ) : (
-        <ul className="space-y-1.5 text-sm">
-          {rows.map((r) => (
-            <li
-              key={r.identifier}
-              data-reviewer={r.identifier}
-              className="flex items-start gap-2"
-            >
-              <Avatar name={r.displayName} size="xs" className="mt-0.5" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate" title={r.displayName}>
-                  {r.displayName}
-                  {r.identifier.toLowerCase() === me && (
-                    <span className="text-muted-foreground"> (you)</span>
-                  )}
-                </span>
-                <Standing row={r} />
-              </span>
-              <Decision decision={r.decision} />
-            </li>
-          ))}
-        </ul>
+        groups.map((g) => <Group key={g.kind} group={g} me={me} />)
       )}
       {notes.map((n) => (
         <p key={n} className="mt-2 text-xs text-muted-foreground">
