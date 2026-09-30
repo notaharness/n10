@@ -24,9 +24,15 @@ build target pins production). Full notes: `docs/testing.md`.
   rollup). Point `headRefName` at a real branch for a real diff. The replacement is isolated to the test PATH.
 - `src/setup/fake-ado.ts` (`fakeAzureDevOps` option) answers Azure DevOps's
   REST API from a preload in the session host (`fixtures/fake-ado.cjs`,
-  loaded by `N10_HOST_REQUIRE`).
+  loaded by `N10_HOST_REQUIRE` through `fixtures/host-preload.cjs`).
   The token comes from the preload alone, so an app without it asks Azure
-  nothing; seed no Azure DevOps token of your own beside it.
+  nothing; seed no Azure DevOps token of your own beside it. `acceptedPat`
+  models a revoked token (401).
+- No test reaches GitHub or Azure DevOps: `fixtures/network-guard.cjs`
+  refuses what gets past the fakes in the main process and the host
+  (sockets, `webRequest`, `shell.openExternal`), and a
+  refusal fails the test (`setup/network-guard.ts`). Only `githubToken`
+  (@integration) runs unguarded.
 - Playwright's Electron launcher drops `NODE_OPTIONS`, so a main-process
   preload goes on the Electron command line (`-r`). Host services are not
   in the main process: `app.evaluate` cannot reach them.

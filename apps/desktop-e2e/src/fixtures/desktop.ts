@@ -18,6 +18,12 @@ import {
 import { killFixtureSessions } from '../setup/tmux.js';
 import { appEnv } from './app-env.js';
 import { fakeAdoLoaded, fakeAdoMisses } from '../setup/fake-ado.js';
+import {
+  NETWORK_GUARD_PRELOAD,
+  networkGuardBase,
+  takeNetworkRefusals,
+  unguardedProcesses,
+} from '../setup/network-guard.js';
 import { closeDesktopApp } from '../setup/app-close.js';
 import type { TerminalSeed } from '../setup/terminals.js';
 import {
@@ -160,9 +166,11 @@ export const test = base.extend<
     });
 
     seedTmux(repoPath, homeDir, liveSessions, liveTerminals);
+    // A real token is the @integration suite reaching GitHub on purpose.
+    const networkGuard = githubToken ? undefined : networkGuardBase(homeDir);
 
     const app = await electron.launch({
-      args: launchArgs(),
+      args: launchArgs(networkGuard !== undefined),
       cwd: WORKSPACE_ROOT,
       env: appEnv({
         homeDir,
@@ -170,19 +178,21 @@ export const test = base.extend<
         startWithoutRepo,
         githubToken,
         ghEnv,
+        networkGuard,
         extra: env,
       }),
       timeout: 60_000,
     });
 
     const page = await app.firstWindow();
-    if (fakeAzureDevOps) {
-      await requireFakeAdo(
-        app,
-        homeDir,
-        () => ownsRepo && cleanupTestRepo(repoPath)
-      );
-    }
+    await requirePreloads(
+      app,
+      missingPreloads(homeDir, {
+        ado: fakeAzureDevOps !== undefined,
+        guard: networkGuard !== undefined,
+      }),
+      () => ownsRepo && cleanupTestRepo(repoPath)
+    );
 
     // Chromium throttles requestAnimationFrame in a window it considers
     // hidden or occluded, and under xvfb (or behind another window on a
@@ -219,6 +229,7 @@ export const test = base.extend<
     }
 
     let used = false;
+    let refusals: string[] = [];
     try {
       await provide({
         app,
@@ -246,19 +257,34 @@ export const test = base.extend<
         });
       }
       if (ownsRepo) cleanupTestRepo(repoPath);
+      // Attached whether or not the test got far enough to fail on
+      // them: a refused request is often why it failed.
+      if (networkGuard) refusals = takeNetworkRefusals(homeDir);
+      if (refusals.length) {
+        await testInfo.attach('network-refusals', {
+          body: refusals.join('\n'),
+          contentType: 'text/plain',
+        });
+      }
     }
 
     // Only when the test itself got that far, so a real assertion
     // failure keeps priority.
     if (used) {
-      afterEffects(pageErrors, fakeAzureDevOps ? fakeAdoMisses(homeDir) : []);
+      afterEffects(
+        pageErrors,
+        fakeAzureDevOps ? fakeAdoMisses(homeDir) : [],
+        refusals
+      );
     }
   },
 });
 
-/** Electron's arguments. */
-function launchArgs(): string[] {
+/** Electron's arguments. The network guard goes first, before any of
+ *  the app's code. */
+function launchArgs(guarded: boolean): string[] {
   return [
+    ...(guarded ? ['-r', NETWORK_GUARD_PRELOAD] : []),
     APP_DIR,
     // CI runners have no user namespaces for the sandbox, and
     // software rendering is both available and deterministic.
@@ -268,26 +294,45 @@ function launchArgs(): string[] {
   ];
 }
 
-/** Stop unless the Azure DevOps fake is in the session host. The
- *  preload writes the token, so without it the app has no credentials
- *  and has asked Azure nothing; it is stopped all the same. */
-async function requireFakeAdo(
-  app: ElectronApplication,
+/** The preloads a test needs that are not in place. */
+function missingPreloads(
   homeDir: string,
+  wanted: { ado: boolean; guard: boolean }
+): string[] {
+  const missing = wanted.guard
+    ? unguardedProcesses(homeDir).map((type) => `the network guard (${type})`)
+    : [];
+  if (wanted.ado && !fakeAdoLoaded(homeDir)) {
+    missing.push('the Azure DevOps fake');
+  }
+  return missing;
+}
+
+/** Stop unless every preload the test needs loaded. The Azure DevOps
+ *  fake writes the token, so without it the app has no credentials and
+ *  has asked Azure nothing; the network guard refuses what gets past
+ *  the fakes. A run without either is stopped all the same. */
+async function requirePreloads(
+  app: ElectronApplication,
+  missing: string[],
   cleanup: () => void
 ): Promise<void> {
-  if (fakeAdoLoaded(homeDir)) return;
+  if (missing.length === 0) return;
   await closeDesktopApp(app);
   cleanup();
-  throw new Error('The Azure DevOps fake did not load');
+  throw new Error(`Did not load: ${missing.join(', ')}`);
 }
 
 /** What a test that passed must not have left behind. An uncaught
  *  renderer exception blanks a pane behind the ErrorBoundary, which a
  *  passing assertion elsewhere would happily ignore; a request the
- *  Azure DevOps fake does not model was answered 404, a failure the
- *  test did not ask for. */
-function afterEffects(pageErrors: string[], misses: string[]): void {
+ *  Azure DevOps fake does not model was answered 404, and one to a
+ *  provider's servers was refused — failures the test did not ask for. */
+function afterEffects(
+  pageErrors: string[],
+  misses: string[],
+  refusals: string[]
+): void {
   if (pageErrors.length > 0) {
     throw new Error(
       `Renderer threw during the test:\n${pageErrors.join('\n---\n')}`
@@ -296,6 +341,13 @@ function afterEffects(pageErrors: string[], misses: string[]): void {
   if (misses.length > 0) {
     throw new Error(
       `The app made requests the Azure DevOps fake does not model:\n${misses.join(
+        '\n'
+      )}`
+    );
+  }
+  if (refusals.length > 0) {
+    throw new Error(
+      `The app reached for a provider's servers outside the fakes:\n${refusals.join(
         '\n'
       )}`
     );

@@ -59,12 +59,24 @@ app construct paths differently.
 
 `src/setup/fake-ado.ts` (the `fakeAzureDevOps` option) does the same for Azure
 DevOps. The fixture loads `fixtures/fake-ado.cjs` into the session host, which
-makes the provider's requests, through `N10_HOST_REQUIRE`, and it answers every request to an Azure host from the scenario,
+makes the provider's requests, through `N10_HOST_REQUIRE` (`fixtures/host-preload.cjs`), and it answers every request to an Azure host from the scenario,
 written out as the REST API's own JSON, so nothing reaches Azure. The preload
 writes the token itself, so an app it is not in has none and asks Azure nothing;
 the fixture then stops. It marks that it loaded with `fake-ado.json.loaded`. A request it does not model answers 404 and fails the test
 at teardown. Seed no Azure DevOps token of your own alongside it. Provider project fields belong in `vendorProject`
 or auto-detection replaces them.
+
+The suite is offline. `fixtures/network-guard.cjs`, loaded into the main
+process (`-r`) and the session host, refuses every connection to GitHub or
+Azure DevOps that gets past the fakes: Node sockets in both processes,
+Chromium's requests through each session's `webRequest`, and provider URLs
+handed to `shell.openExternal`, which would start the system browser. A refusal fails the
+test at teardown and is attached as `network-refusals`; a test that provokes
+one on purpose takes it with `takeNetworkRefusals`. The fixture runs no test
+without the guard in both processes. A test given `githubToken` runs unguarded,
+since it reaches GitHub on purpose. The fake Azure DevOps answers 401 to any
+token but `acceptedPat` (by default the one it hands the app), as Azure does
+for a revoked one.
 
 Tests run under Xvfb on Linux, even with DISPLAY set. The fixture drops
 `WAYLAND_DISPLAY` and selects X11. Use `N10_E2E_HEADED=1` to watch a run.

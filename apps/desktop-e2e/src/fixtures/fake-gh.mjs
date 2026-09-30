@@ -25,6 +25,17 @@ const scenarioPath = process.env.N10_FAKE_GH;
 const scenario = JSON.parse(readFileSync(scenarioPath, 'utf8'));
 
 /**
+ * When whatever the scenario leaves undated happened: 72 hours before
+ * the run, so its age reads "3d ago" every day rather than growing with
+ * the calendar. Measured from the clock the fixture stamped into the
+ * scenario, not this process's, so every call dates it alike.
+ */
+const UNDATED = (scenario.now ?? Date.now()) - 72 * 3_600_000;
+/** `minutes` after the undated moment, as GitHub writes a time. */
+const undated = (minutes = 0) =>
+  new Date(UNDATED + minutes * 60_000).toISOString();
+
+/**
  * Optional stand-in for the round trip to GitHub (N10_FAKE_GH_LATENCY_MS).
  *
  * Off by default, so the e2e suite stays as fast as it was. The perf
@@ -238,8 +249,8 @@ function detailNode(pr) {
       url: list.url,
       state: pr.state ?? 'OPEN',
       isDraft: list.isDraft,
-      createdAt: '2026-01-01T00:00:00Z',
-      updatedAt: '2026-01-02T00:00:00Z',
+      createdAt: undated(),
+      updatedAt: undated(24 * 60),
       viewerCanUpdate: pr.canUpdate ?? true,
       author: list.author,
       headRefName: pr.headRefName,
@@ -294,7 +305,7 @@ function contextNode(c, index) {
       context: c.name,
       state: c.state,
       targetUrl: null,
-      createdAt: '2026-01-01T00:00:00Z',
+      createdAt: undated(),
       creator: { login: c.app ?? 'ci-bot' },
       isRequired,
     };
@@ -308,8 +319,8 @@ function contextNode(c, index) {
     name: c.name,
     status: done ? 'COMPLETED' : c.state,
     conclusion: done ? c.state : null,
-    startedAt: '2026-01-01T00:00:00Z',
-    completedAt: done ? '2026-01-01T00:05:00Z' : null,
+    startedAt: undated(),
+    completedAt: done ? undated(5) : null,
     detailsUrl: `https://github.com/n10/fixture/actions/runs/${c.name.length}`,
     isRequired,
     checkSuite: {
@@ -444,7 +455,7 @@ function threadNode(t, i) {
         id: `${t.id ?? `thread-${i + 1}`}-c${j + 1}`,
         author: { login: c.author },
         body: c.body,
-        createdAt: c.createdAt ?? '2026-01-01T00:00:00Z',
+        createdAt: c.createdAt ?? undated(),
         isMinimized: false,
       })),
     },
@@ -478,7 +489,7 @@ function conversationComment(c, id) {
     id,
     author: actor(c.author),
     body: c.body,
-    createdAt: c.createdAt ?? '2026-01-01T00:00:00Z',
+    createdAt: c.createdAt ?? undated(),
     lastEditedAt: null,
     isMinimized: false,
     minimizedReason: null,
@@ -535,7 +546,7 @@ function conversationConnections(pr, after) {
         author: actor(r.author),
         state: r.state,
         body: r.body ?? '',
-        submittedAt: r.submittedAt ?? '2026-01-01T00:00:00Z',
+        submittedAt: r.submittedAt ?? undated(),
         url: `https://github.com/n10/fixture/pull/1#review-${i + 1}`,
         commit: null,
         comments: { totalCount: r.commentCount ?? 0 },
@@ -642,7 +653,7 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
                 id: `general-${i + 1}`,
                 author: { login: c.author },
                 body: c.body,
-                createdAt: c.createdAt ?? '2026-01-01T00:00:00Z',
+                createdAt: c.createdAt ?? undated(),
               })),
             },
           },

@@ -4,9 +4,10 @@
  *
  * The provider reaches Azure through `fetch`, with the host written
  * into every URL, so there is no PATH to put a fake on as `gh` has.
- * The fixture names this file in `N10_HOST_REQUIRE`, which the app
- * forks its host with as a `--require` in `NODE_OPTIONS`, so it is in
- * place before any of the host's code runs. It answers every
+ * The fixture's host preload (`host-preload.cjs`, named in
+ * `N10_HOST_REQUIRE`, which the app forks its host with as a
+ * `--require` in `NODE_OPTIONS`) loads it, so it is in place before
+ * any of the host's code runs. It answers every
  * request to an Azure host from the scenario at `$N10_FAKE_ADO` (see
  * `setup/fake-ado.ts`), read afresh each time, and passes anything else
  * through. Nothing reaches Azure: a request it does not model answers
@@ -90,6 +91,25 @@ function route(s, url) {
   return null;
 }
 
+/** Azure's answer to a token it does not take: a revoked, expired or
+ *  mistyped PAT. Not a miss — the app asked the right question. */
+function unauthorized(s, request, init) {
+  const auth = new Headers(init?.headers ?? request?.headers).get(
+    'authorization'
+  );
+  const expected = `Basic ${Buffer.from(`:${s.acceptedPat}`).toString(
+    'base64'
+  )}`;
+  if (auth === expected) return null;
+  return json(
+    {
+      message:
+        "TF400813: The user '' is not authorized to access this resource.",
+    },
+    401
+  );
+}
+
 const passThrough = globalThis.fetch;
 
 globalThis.fetch = async (input, init) => {
@@ -98,6 +118,8 @@ globalThis.fetch = async (input, init) => {
   if (!AZURE.test(url.hostname)) return passThrough(input, init);
   const method = (init?.method ?? request?.method ?? 'GET').toUpperCase();
   const s = JSON.parse(readFileSync(SCENARIO, 'utf8'));
+  const refused = unauthorized(s, request, init);
+  if (refused) return refused;
   // Reads only: a write it does not model must not pass for done.
   const answer = method === 'GET' ? route(s, url) : null;
   if (answer) return answer;
