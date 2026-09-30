@@ -11,23 +11,27 @@ const shellOperationPaths = [
   {
     name: '@n10/vcs-core',
     allowTypeImports: true,
-    importNames: [
-      'writeGlobalConfig',
-      'writeProjectConfig',
-      'autoDetectProjectConfig',
-    ],
+    importNames: ['writeGlobalConfig', 'writeProjectConfig'],
     message: 'Config writes belong to the engine config service.',
   },
   {
     name: '@n10/core',
     allowTypeImports: true,
-    importNames: [
-      'persistConfigField',
-      'persistKeybindFields',
-      'configureWorktreePath',
-    ],
+    importNames: ['persistConfigField', 'persistKeybindFields'],
     message:
       'Only the engine config service dispatches persistence and effects.',
+  },
+  {
+    name: '@n10/vcs-core',
+    allowTypeImports: true,
+    importNames: ['autoDetectProjectConfig'],
+    message: 'Repository opening belongs to the engine repository service.',
+  },
+  {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: ['configureWorktreePath'],
+    message: 'Repository opening belongs to the engine repository service.',
   },
   {
     name: '@n10/worktree-manager',
@@ -37,7 +41,7 @@ const shellOperationPaths = [
       'resetWorktreeResolver',
       'createTemplateResolver',
     ],
-    message: 'Repository worktree setup belongs to the engine.',
+    message: 'Repository opening belongs to the engine repository service.',
   },
 ];
 

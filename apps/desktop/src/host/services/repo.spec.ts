@@ -19,6 +19,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  setRepoOpenedListener,
   activeRepoIs,
   activeConfigService,
   refreshRepo,
@@ -57,6 +58,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  setRepoOpenedListener(() => undefined);
   process.chdir(originalCwd);
   rmSync(join(gitDir, '..'), { recursive: true, force: true });
 });
@@ -92,6 +94,19 @@ describe('openStartupRepo', () => {
 });
 
 describe('opening a repository', () => {
+  it('starts repository observers only when the handle changes', () => {
+    const opened = vi.fn();
+    setRepoOpenedListener(opened);
+    openRepo(gitDir);
+    openRepo(gitDir);
+    expect(opened).toHaveBeenCalledExactlyOnceWith(gitDir);
+    const other = join(gitDir, '..', 'other');
+    execFileSync('git', ['init', '--quiet', other]);
+    openRepo(other);
+    expect(opened).toHaveBeenCalledTimes(2);
+    expect(opened).toHaveBeenLastCalledWith(other);
+  });
+
   it('refuses a directory that is not a repository', () => {
     // The picker relies on this to keep the user on the picker with an
     // error, rather than opening an empty workspace over nothing.

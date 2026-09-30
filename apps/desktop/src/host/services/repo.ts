@@ -45,6 +45,7 @@ export function activeRepoIs(cwd: string): boolean {
 }
 
 export function openRepo(path: string): RepoInfo {
+  const previous = repositories.getSnapshot();
   const opened = repositories.open(path);
   // Session primitives still use the process repo root; the session-domain
   // migration removes this shell-owned ambient state. Resetting the cached root
@@ -56,7 +57,7 @@ export function openRepo(path: string): RepoInfo {
   } catch {
     // Recent-repos bookkeeping must never block opening a repo.
   }
-  repoOpenedListener?.(opened.cwd);
+  if (opened !== previous) repoOpenedListener?.(opened.cwd);
   return repoInfo(opened);
 }
 
