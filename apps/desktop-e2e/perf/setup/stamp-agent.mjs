@@ -13,6 +13,12 @@
 //   --interval-ms=<n>      tick interval (default 250)
 //   --backlog-kb=<n>       filler to print before the first tick
 //   --backlog-match=<str>  only a cwd containing this prints the filler
+//   --burst-kb=<n>         the backlog agent also prints this much at once
+//   --burst-every-ms=<n>   …this often (default 3000): a build log, a
+//                          file dumped to the screen
+//   --redraw-fps=<n>       instead of a line per interval, repaint every
+//                          cell of the screen n times a second, ending
+//                          on the tick line
 
 import { basename } from 'node:path';
 
@@ -32,20 +38,51 @@ const match = args['backlog-match'];
 
 process.stdout.write('n10-perf-agent-ready\r\n');
 
-if (backlogKb > 0 && (!match || process.cwd().includes(match))) {
+const filler = (kb) => {
   const line = `${'backlog '.repeat(9)}`;
-  const lines = Math.ceil((backlogKb * 1024) / (line.length + 10));
+  const lines = Math.ceil((kb * 1024) / (line.length + 10));
   let out = '';
   for (let i = 0; i < lines; i++) out += `${line}${i}\r\n`;
-  process.stdout.write(out);
+  return out;
+};
+const isBacklogAgent = !match || process.cwd().includes(match);
+if (backlogKb > 0 && isBacklogAgent) process.stdout.write(filler(backlogKb));
+const burstKb = parseInt(args['burst-kb'] ?? '0', 10);
+if (burstKb > 0 && isBacklogAgent) {
+  const burst = filler(burstKb);
+  setInterval(
+    () => process.stdout.write(burst),
+    parseInt(args['burst-every-ms'] ?? '3000', 10)
+  );
 }
 
 const checkout = basename(process.cwd());
+const redrawFps = parseInt(args['redraw-fps'] ?? '0', 10);
 let n = 0;
-const ticker = setInterval(() => {
-  n += 1;
-  process.stdout.write(`tick ${Date.now()} ${n} @${checkout}\r\n`);
-}, intervalMs);
+const frame = () => {
+  const rows = Math.max(5, (process.stdout.rows ?? 24) - 1);
+  const cols = Math.max(20, process.stdout.columns ?? 80);
+  let out = '\x1b[H';
+  // Every cell changes every frame, so tmux, which forwards only what
+  // changed, has to send the whole screen: the worst case for the host.
+  for (let r = 0; r < rows - 1; r++) {
+    let line = '';
+    for (let c = 0; c < cols - 1; c++) {
+      line += String.fromCharCode(33 + ((n + r + c) % 90));
+    }
+    out += `\x1b[2K${line}\r\n`;
+  }
+  return `${out}\x1b[2Ktick ${Date.now()} ${n} @${checkout}\x1b[J`;
+};
+const ticker = setInterval(
+  () => {
+    n += 1;
+    process.stdout.write(
+      redrawFps > 0 ? frame() : `tick ${Date.now()} ${n} @${checkout}\r\n`
+    );
+  },
+  redrawFps > 0 ? Math.round(1000 / redrawFps) : intervalMs
+);
 
 const shutdown = () => {
   clearInterval(ticker);

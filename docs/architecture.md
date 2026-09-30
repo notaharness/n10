@@ -31,13 +31,14 @@ apps/cli/                        — The published `n10` package: the command, t
   src/hooks/                     — Ink-coupled hooks (useTerminal, useScrollWheel, useRawStdinForward, useDiffListScrollSync)
   scripts/prepare-publish.mjs    — Assembles dist/ into the package: the CLI bundle, the desktop build under desktop/, the manifest
 apps/desktop/                    — Electron GUI shell, shipped inside `@notaharness/n10`: host services over @n10/engine and @n10/core, a renderer over its own query layer
-  src/main/tmux-session-preparer.ts — Utility-process boundary for isolated tmux server creation
   src/main/                      — Electron main: window chrome + security posture (window.ts), N10_QA_STEPS hook
+  src/main/host-worker.ts        — The session host: a utility process running every host service and PTY client
+  src/main/host-process.ts       — Forks the host, forwards the contract to it, answers its ShellCalls, respawns it
   src/main/beam/                 — Client of the beam daemon's control socket: machines, remote exec/pty, ceremonies, mail relay, and the daemon the app starts
   src/preload/preload.ts         — Typed contextBridge → window.n10
   src/host/menu-template.ts      — Pure native app menu template, used by main and the web demo
   src/host/contract.ts           — Single source of truth for the bridge API + IPC channel names (incl. MenuCommand, ContextMenuItem, DesktopPrefs)
-  src/host/services/             — Main-process services (sidebar w/ remote PR cache, sessions w/ scrollback buffer, settings, desktop-prefs…)
+  src/host/services/             — Session-host services (sidebar w/ remote PR cache, sessions w/ scrollback buffer, settings, desktop-prefs…)
   src/renderer/                  — Vite + React 19 + Tailwind v4 web app (no Node access)
     styles.css                   — Design tokens (VS Code-style light/dark palette, type scale) — components use tokens only
     components/ui/               — shadcn-style primitives (radix-ui + cva + lucide): button, dialog, command, select…

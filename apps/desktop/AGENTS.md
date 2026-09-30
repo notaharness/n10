@@ -2,7 +2,7 @@
 
 `src/main` owns the window and native menu; `src/preload` exposes a typed
 `window.n10`; `src/host/contract.ts` is the single source of truth for the
-bridge API and IPC names; `src/host/services` are main-process services;
+bridge API and IPC names; `src/host/services` run in the session host;
 `src/renderer` is Vite + React 19 + Tailwind v4 with no Node access, its
 `lib/` grouped by subsystem (`data`, `diff`, `tabs`, `plan`, `review`,
 `sidebar`). Dev: `scripts/dev.mjs`. Headless visual QA: `scripts/qa-shots.mjs`.
@@ -10,13 +10,26 @@ Every rule below has its reasoning in `docs/decisions.md`.
 
 ## Host
 
+- The session host is `main/host-worker.ts`, an Electron utility process
+  named `n10 host`: every host service, the PTY attach clients with their
+  emulators, ring buffers and relay, discovery, babysitters and the beam
+  client. `main/host-process.ts` forks it, forwards every `IPC` channel by
+  name and carries its pushes (`host/host-pushes.ts`) to the windows
+  (`main/host-events.ts`). What only the main process can do (dialogs,
+  menus, `openExternal`, prefs, forking the beam daemon) the host asks
+  for as `ShellCalls` (`main/host-protocol.ts`). Nothing the host imports
+  may import `electron`. A host that dies is forked again, backing off
+  and giving up after repeated failures (`main/host-restarts.ts`): its
+  tmux sessions survive, discovery re-attaches them, windows reload to
+  watch again. Calls wait out a restart; after giving up they fail and
+  the user is told. Tests load a module into the host first with `N10_HOST_REQUIRE`.
+- The host creates tmux servers itself: a utility process does not hand
+  Chromium's descriptors to the persistent server, as spawning straight
+  from the main process on Linux would.
 - `services/repo.ts` `openRepo` does what the TUI's `useSessionManager` mount
-  does: detect project config and set the worktree resolver. `main.ts`
-  awaits the tmux probe and validates the requirement before opening a repo.
-  Missing tmux is a startup error with an installation hint. New tmux sessions
-  are prepared in `main/tmux-session-worker.ts`, an Electron utility process:
-  direct Node child-process spawning on Linux inherits Chromium descriptors
-  into the persistent server. The main process only attaches local clients.
+  does: detect project config and set the worktree resolver. The host
+  awaits the tmux probe and validates the requirement before opening a
+  repo; missing tmux is a startup error with an installation hint.
 - `main/beam/` is a client of the beam daemon's control socket (beam's
   docs/06) and installs the three machine ports: `MachinesPort`,
   `RemoteMachinePort` and `InboundMailPort`. Nothing above them knows beam.
@@ -25,7 +38,7 @@ Every rule below has its reasoning in `docs/decisions.md`.
   session only for a sender granted `all` (D17).
 - Start the beam daemon only through `spawnOwnedDaemon`, which runs it
   under `main/beam-daemon-worker.ts`, a utility process, for the same
-  descriptor reason as the tmux worker. Keep `@notaharness/beam` external
+  descriptor reason as the host. The main process forks it for the host. Keep `@notaharness/beam` external
   in both `build-main` and `scripts/dev.mjs`. Ownership rules: D15.
 - `main/n10-shim.ts` is an entry point in both `build-main` and
   `scripts/dev.mjs`. The shim gets no `beam` subcommand (D16).

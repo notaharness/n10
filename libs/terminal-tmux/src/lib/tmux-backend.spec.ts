@@ -101,11 +101,7 @@ vi.mock('./tmux-cli.js', async (original) => {
     },
   };
 });
-import {
-  createTmuxBackend,
-  setTmuxSessionPreparer,
-  type TmuxLaunchPlan,
-} from './tmux-backend.js';
+import { createTmuxBackend, type TmuxLaunchPlan } from './tmux-backend.js';
 
 const spec: SessionSpec = {
   cmd: '/bin/sh',
@@ -124,7 +120,6 @@ async function launch(
   return backend;
 }
 beforeEach(() => {
-  setTmuxSessionPreparer();
   vi.useFakeTimers();
   mock.calls.length = 0;
   mock.taken.clear();
@@ -185,21 +180,6 @@ describe('explicit tmux launch plans', () => {
       /^set-option -t =test: remain-on-exit off ; set-option -t =test: status off ; respawn-pane -k -t =test: -c \/tmp( -e \S+=\S+)* -- \/bin\/sh -c agent$/
     );
     expect(mock.calls[2]).toBe('attach');
-  });
-  it('awaits isolated preparation and attaches to its returned name without rewriting metadata', async () => {
-    let prepared!: (name: string) => void;
-    setTmuxSessionPreparer(
-      () =>
-        new Promise((resolve) => {
-          prepared = resolve;
-        })
-    );
-    const pending = launch();
-    expect(mock.spawn).not.toHaveBeenCalled();
-    prepared('isolated-result');
-    const backend = await pending;
-    expect(backend.name).toBe('isolated-result');
-    expect(mock.calls).toEqual(['attach']);
   });
   it('attaches without changing metadata or restarting the process', async () => {
     await launch({ mode: 'attach', target: 'existing' });

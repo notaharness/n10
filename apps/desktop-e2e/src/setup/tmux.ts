@@ -189,6 +189,18 @@ export function detachTmuxClients(name: string, tmuxTmpdir: string): void {
   });
 }
 
+/** The pids of the clients attached to one session on the test's
+ *  server. */
+export function tmuxClients(name: string, tmuxTmpdir: string): string[] {
+  return execFileSync(
+    'tmux',
+    ['list-clients', '-t', `=${name}:`, '-F', '#{client_pid}'],
+    { encoding: 'utf8', env: socketEnv(tmuxTmpdir) }
+  )
+    .split('\n')
+    .filter(Boolean);
+}
+
 /**
  * Teardown for tmux-backed tests. Closing the app deliberately only
  * *detaches*, so a tmux-backed test would otherwise leave a live

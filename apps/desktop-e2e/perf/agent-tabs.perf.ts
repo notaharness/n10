@@ -11,6 +11,8 @@ import { launchAgentFromRail, sidebarRow } from '../src/setup/app.js';
 import { launchApp, unthrottle } from './setup/launch.js';
 import { pace } from './setup/pace.js';
 import { collect, saveSamples, type Samples } from './setup/metrics.js';
+import { startMainLag, stopMainLag } from './setup/main-lag.js';
+import { cpuMs } from './setup/proc-cpu.js';
 
 /**
  * Many agent tabs open at once: what the renderer pays for the ones
@@ -38,6 +40,11 @@ const BACKLOG_KB = 640;
 const IDLE_MS = Number(process.env.N10_PERF_IDLE_MS ?? 15_000);
 const SWITCHES = Number(process.env.N10_PERF_SWITCHES ?? 20);
 const BIG = 'agent-big';
+/** Full-screen repaints per second per agent; 0 streams a line per
+ *  interval instead. */
+const REDRAW_FPS = Number(process.env.N10_PERF_REDRAW_FPS ?? 0);
+/** KB the backlog agent prints at once every three seconds; 0 for none. */
+const BURST_KB = Number(process.env.N10_PERF_BURST_KB ?? 0);
 
 const branches = [
   ...Array.from({ length: TABS - 1 }, (_, i) => `agent-${i}`),
@@ -125,29 +132,55 @@ async function timedSwitch(page: Page, branch: string): Promise<Switch> {
   );
 }
 
-/** Renderer and main-process CPU over `windowMs`, as Electron reports
- *  it (percent of one core, averaged since the previous reading). */
-async function cpuOver(
+/** Per-process CPU and memory over `windowMs`, with the main
+ *  process's timer lag over the same window. CPU is each process's own
+ *  clock from `/proc`, in percent of one core. A utility process named
+ *  `n10 host` is the session host when there is one; others (the beam
+ *  daemon's) count only in the total. */
+async function costOver(
   page: Page,
   app: ElectronApplication,
   windowMs: number
 ): Promise<Record<string, number>> {
-  await app.evaluate(({ app: a }) => a.getAppMetrics());
+  const processes = () =>
+    app.evaluate(({ app: a }) =>
+      a.getAppMetrics().map((p) => ({
+        pid: p.pid,
+        role:
+          p.type === 'Tab'
+            ? 'renderer'
+            : p.type === 'Browser'
+            ? 'main'
+            : p.type === 'Utility' && p.name === 'n10 host'
+            ? 'host'
+            : 'other',
+        rssMb: (p.memory?.workingSetSize ?? 0) / 1024,
+      }))
+    );
+  const before = await processes();
+  const cpuBefore = new Map(before.map((p) => [p.pid, cpuMs(p.pid)]));
+  const t0 = Date.now();
+  await startMainLag(app);
   await pace(page, windowMs);
-  return app.evaluate(({ app: a }) => {
-    const m = a.getAppMetrics();
-    const sum = (type: string | null) =>
-      m
-        .filter((p) => type === null || p.type === type)
-        .reduce((s, p) => s + (p.cpu?.percentCPUUsage ?? 0), 0);
-    const renderer = m.find((p) => p.type === 'Tab');
-    return {
-      rendererCpuPct: sum('Tab'),
-      mainCpuPct: sum('Browser'),
-      totalCpuPct: sum(null),
-      rendererRssMb: (renderer?.memory.workingSetSize ?? NaN) / 1024,
-    };
-  });
+  const lag = await stopMainLag(app);
+  const after = await processes();
+  const elapsed = Date.now() - t0;
+  const cost: Record<string, number> = {};
+  for (const role of ['renderer', 'main', 'host', 'total']) {
+    const ps = after.filter((p) => role === 'total' || p.role === role);
+    const used = ps.reduce(
+      (s, p) => s + cpuMs(p.pid) - (cpuBefore.get(p.pid) ?? cpuMs(p.pid)),
+      0
+    );
+    cost[`${role}CorePct`] = (used / elapsed) * 100;
+    cost[`${role}RssMb`] = ps.reduce((s, p) => s + p.rssMb, 0);
+  }
+  return {
+    ...cost,
+    mainLagP50Ms: lag.p50,
+    mainLagP99Ms: lag.p99,
+    mainLagMaxMs: lag.max,
+  };
 }
 
 async function heapAfterGc(page: Page): Promise<number> {
@@ -216,6 +249,8 @@ async function measureOnce(repoPath: string, samples: Samples): Promise<void> {
         `--interval-ms=${INTERVAL_MS}`,
         `--backlog-kb=${BACKLOG_KB}`,
         `--backlog-match=${BIG}`,
+        `--redraw-fps=${REDRAW_FPS}`,
+        `--burst-kb=${BURST_KB}`,
       ].join(' '),
     },
   });
@@ -230,7 +265,7 @@ async function measureOnce(repoPath: string, samples: Samples): Promise<void> {
     // Let every agent reach its steady state, and the polls theirs.
     await pace(page, 5000);
 
-    const steady = await cpuOver(page, app.app, IDLE_MS);
+    const steady = await costOver(page, app.app, IDLE_MS);
     collect(samples, {
       ...steady,
       jsHeapMb: await heapAfterGc(page),
@@ -243,7 +278,9 @@ async function measureOnce(repoPath: string, samples: Samples): Promise<void> {
       largestBufferKb: await largestBufferKb(page),
     });
 
-    // Plain switches across the ordinary agents.
+    // Plain switches across the ordinary agents, with the main
+    // process's lag while it serves them.
+    await startMainLag(app.app);
     const ordinary = branches.filter((b) => b !== BIG);
     let current = 'agent-0';
     for (let i = 0; i < SWITCHES; i++) {
@@ -257,6 +294,11 @@ async function measureOnce(repoPath: string, samples: Samples): Promise<void> {
       current = next;
       await pace(page, 400);
     }
+    const switching = await stopMainLag(app.app);
+    collect(samples, {
+      switchingLagP50Ms: switching.p50,
+      switchingLagP99Ms: switching.p99,
+    });
     // Into the tab whose scrollback is full, from an ordinary one.
     for (let i = 0; i < Math.ceil(SWITCHES / 2); i++) {
       const t = await timedSwitch(page, BIG);
@@ -295,5 +337,9 @@ test('many agent tabs: steady-state cost and switch latency', async () => {
   expect(samples.switchMs, 'never recorded').toHaveLength(
     SWITCHES * ITERATIONS
   );
-  saveSamples('agent-tabs', samples);
+  const load = [
+    REDRAW_FPS > 0 ? 'redraw' : '',
+    BURST_KB > 0 ? 'burst' : '',
+  ].filter(Boolean);
+  saveSamples(['agent-tabs', ...load].join('-'), samples);
 });

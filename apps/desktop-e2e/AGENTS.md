@@ -23,11 +23,13 @@ build target pins production). Full notes: `docs/testing.md`.
   scenario (`fakeGitHub` option: PRs, review threads, comments, check
   rollup). Point `headRefName` at a real branch for a real diff. The replacement is isolated to the test PATH.
 - `src/setup/fake-ado.ts` (`fakeAzureDevOps` option) answers Azure DevOps's
-  REST API from a preload in the main process (`fixtures/fake-ado.cjs`).
+  REST API from a preload in the session host (`fixtures/fake-ado.cjs`,
+  loaded by `N10_HOST_REQUIRE`).
   The token comes from the preload alone, so an app without it asks Azure
   nothing; seed no Azure DevOps token of your own beside it.
 - Playwright's Electron launcher drops `NODE_OPTIONS`, so a main-process
-  preload goes on the Electron command line (`-r`).
+  preload goes on the Electron command line (`-r`). Host services are not
+  in the main process: `app.evaluate` cannot reach them.
 - Provider config from a test: project fields go under `vendorProject`, or
   auto-detect overwrites them and the provider silently returns nothing.
 - Native menus: `src/setup/menu.ts` arms a one-shot `Menu.popup` interception

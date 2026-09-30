@@ -1,11 +1,12 @@
 /**
- * Azure DevOps's REST API, answered in the app's own main process.
+ * Azure DevOps's REST API, answered in the app's session host, the
+ * utility process that makes the provider's requests.
  *
  * The provider reaches Azure through `fetch`, with the host written
  * into every URL, so there is no PATH to put a fake on as `gh` has.
- * The fixture preloads this file with Electron's `-r` (Playwright drops
- * `NODE_OPTIONS`, and Electron takes no `--import` on its command line),
- * so it is in place before any of the app's code runs. It answers every
+ * The fixture names this file in `N10_HOST_REQUIRE`, which the app
+ * forks its host with as a `--require` in `NODE_OPTIONS`, so it is in
+ * place before any of the host's code runs. It answers every
  * request to an Azure host from the scenario at `$N10_FAKE_ADO` (see
  * `setup/fake-ado.ts`), read afresh each time, and passes anything else
  * through. Nothing reaches Azure: a request it does not model answers
@@ -21,7 +22,8 @@ const { appendFileSync, existsSync, readFileSync, writeFileSync } =
 const { join } = process.getBuiltinModule('node:path');
 
 const SCENARIO = process.env.N10_FAKE_ADO;
-// The app's own children (tmux, shells, agents) are not Azure clients.
+// The host's own children (tmux, shells, agents) are not Azure clients.
+// The host takes this module back out of their NODE_OPTIONS itself.
 delete process.env.N10_FAKE_ADO;
 
 const AZURE = /(^|\.)(dev\.azure\.com|visualstudio\.com)$/;
@@ -122,4 +124,4 @@ try {
   console.error('[fake-ado] could not write the token:', error);
   process.exit(1);
 }
-globalThis.__n10FakeAzure = true;
+writeFileSync(`${SCENARIO}.loaded`, '', 'utf8');
