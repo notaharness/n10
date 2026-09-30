@@ -38,6 +38,17 @@ test.use({
         status: 'draft',
         createdAt: '2026-01-01T00:00:00Z',
       },
+      {
+        id: 'second',
+        file: FILE,
+        lineStart: 1,
+        lineEnd: 2,
+        side: 'LEFT',
+        severity: 'major',
+        body: 'Keep the last confirmed result.',
+        status: 'draft',
+        createdAt: '2026-01-01T00:00:00Z',
+      },
     ],
   },
 });
@@ -56,7 +67,7 @@ function post(page: Page, head: string) {
   return page.evaluate(
     (headSha) =>
       window.n10
-        .postDraftComments({ prId: 321, ids: ['finding'], headSha })
+        .postDraftComments({ prId: 321, ids: ['finding', 'second'], headSha })
         .then(
           (count) => ({ count }),
           (error: Error) => ({ error: error.message })
@@ -66,13 +77,16 @@ function post(page: Page, head: string) {
 }
 async function expectPublished(page: Page, homeDir: string, head: string) {
   const findings = await page.evaluate(() => window.n10.listDraftComments(321));
-  expect(findings[0].status).toBe('posted');
+  expect(findings.map((finding) => finding.status)).toEqual([
+    'posted',
+    'posted',
+  ]);
   const scenario = JSON.parse(
     readFileSync(fakeGhScenarioPath(homeDir), 'utf8')
   ) as FakeGitHub;
   expect(scenario.reviewWrites).toEqual({
     StartReview: 1,
-    AddReviewThread: 1,
+    AddReviewThread: 2,
     SubmitReview: 1,
   });
   expect(scenario.prs[0].reviews).toMatchObject([
@@ -86,13 +100,18 @@ async function expectPublished(page: Page, homeDir: string, head: string) {
       line: 2,
       comments: [{ body: expect.stringContaining('Check the retry limit.') }],
     },
+    {
+      comments: [
+        { body: expect.stringContaining('Keep the last confirmed result.') },
+      ],
+    },
   ]);
 }
 
 test('agent findings use the native review publisher', async ({ desktop }) => {
   const { page, homeDir } = desktop;
   const head = await prepare(page, homeDir);
-  expect(await post(page, head)).toEqual({ count: 1 });
+  expect(await post(page, head)).toEqual({ count: 2 });
   await expectPublished(page, homeDir, head);
 });
 
@@ -113,6 +132,6 @@ test('agent findings reconcile a lost answer without another write', async ({
       )
     )
   ).toContain('may already be posted');
-  expect(await post(page, head)).toEqual({ count: 1 });
+  expect(await post(page, head)).toEqual({ count: 2 });
   await expectPublished(page, homeDir, head);
 });

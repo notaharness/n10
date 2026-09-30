@@ -32,6 +32,16 @@ export interface PostAgentCommentsRequest {
   event?: ReviewEvent;
 }
 
+function validatePostRequest(req: PostAgentCommentsRequest): void {
+  if (req.event !== undefined && !REVIEW_EVENTS.includes(req.event))
+    throw new TypeError('Invalid review event');
+  if (
+    req.ids !== undefined &&
+    (!Array.isArray(req.ids) || !req.ids.every((id) => typeof id === 'string'))
+  )
+    throw new TypeError('Invalid draft ids');
+}
+
 /** Reuses core's durable submission ledger; VCS publishers own every network write. */
 export function createAgentPublication(
   options: ReviewContextOptions,
@@ -101,13 +111,12 @@ export function createAgentPublication(
       throw new Error('Refresh pull requests and try again');
     return { ...captured, publish, head: req.headSha };
   }
-  async function postOne(
+  function prepareDraft(
     req: PostAgentCommentsRequest,
     comment: ReviewComment,
-    first: boolean
-  ) {
-    assertPublicationScope(req.prId, comment);
-    const { start, ref, viewer, publish, head } = publicationContext(req);
+    captured: ReturnType<typeof publicationContext>
+  ): string | null {
+    const { ref, viewer, head } = captured;
     const target: DraftTarget = {
       kind: 'inline',
       key: `agent-${comment.id}`,
@@ -125,7 +134,7 @@ export function createAgentPublication(
       },
     };
     const existing = draftState(req.prId, comment.id);
-    if (existing?.publication.state === 'published') return;
+    if (existing?.publication.state === 'published') return null;
     if (
       !existing ||
       existing.publication.state === 'unpublished' ||
@@ -136,32 +145,7 @@ export function createAgentPublication(
         sources
       );
     }
-    const result = await submitReview(
-      {
-        ref,
-        viewer,
-        head,
-        event: first ? req.event ?? 'COMMENT' : 'COMMENT',
-        draftIds: [`inline:agent-${comment.id}`],
-      },
-      {
-        ...sources,
-        publish: (submission, ledger) => {
-          context.assertUnchanged(start);
-          return publish(
-            start.config.vendorAuth,
-            start.config.vendorProject,
-            submission,
-            ledger
-          );
-        },
-      }
-    );
-    const published = result.drafts.find(
-      (draft) => draft.id === `inline:agent-${comment.id}`
-    );
-    if (published?.publication.state !== 'published')
-      throw new Error('The provider did not confirm this comment was posted');
+    return `inline:agent-${comment.id}`;
   }
   function recover(
     prId: number,
@@ -185,17 +169,11 @@ export function createAgentPublication(
         ? {}
         : { publication: undefined }),
     });
+    return state === 'published';
   }
   async function post(req: PostAgentCommentsRequest) {
     identity(req.prId);
-    if (req.event !== undefined && !REVIEW_EVENTS.includes(req.event))
-      throw new TypeError('Invalid review event');
-    if (
-      req.ids !== undefined &&
-      (!Array.isArray(req.ids) ||
-        !req.ids.every((id) => typeof id === 'string'))
-    )
-      throw new TypeError('Invalid draft ids');
+    validatePostRequest(req);
     if (pending.has(req.prId))
       throw new Error('These comments are already being posted');
     const repo = repository();
@@ -211,27 +189,64 @@ export function createAgentPublication(
       )
     )
       throw new Error('Cannot post a comment with an empty body');
+    if (!comments.length) return 0;
+    const captured = publicationContext(req);
+    for (const comment of comments) assertPublicationScope(req.prId, comment);
     pending.add(req.prId);
-    let posted = 0;
+    const reconcile = () =>
+      comments.reduce(
+        (posted, comment) =>
+          posted + Number(recover(req.prId, comment, captured, repo)),
+        0
+      );
     try {
+      const draftIds = comments.flatMap((comment) => {
+        const id = prepareDraft(req, comment, captured);
+        return id ? [id] : [];
+      });
       for (const comment of comments) {
-        assertPublicationScope(req.prId, comment);
-        const captured = identity(req.prId);
         updateComment(repo, req.prId, comment.id, {
           status: 'posting',
           publication: { ...captured.ref, viewer: captured.viewer },
         });
-        changed(req.prId);
-        try {
-          await postOne(req, comment, posted === 0);
-          updateComment(repo, req.prId, comment.id, { status: 'posted' });
-          posted += 1;
-        } catch (error) {
-          recover(req.prId, comment, captured, repo);
-          throw error;
-        }
       }
+      changed(req.prId);
+      if (draftIds.length) {
+        await submitReview(
+          {
+            ref: captured.ref,
+            viewer: captured.viewer,
+            head: captured.head,
+            event: req.event ?? 'COMMENT',
+            draftIds,
+          },
+          {
+            ...sources,
+            publish: (submission, ledger) => {
+              context.assertUnchanged(captured.start);
+              return captured.publish(
+                captured.start.config.vendorAuth,
+                captured.start.config.vendorProject,
+                submission,
+                ledger
+              );
+            },
+          }
+        );
+      }
+      const posted = reconcile();
+      if (posted !== comments.length)
+        throw new Error(
+          'The provider did not confirm all comments were posted'
+        );
       return posted;
+    } catch (error) {
+      const posted = reconcile();
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Posted ${posted} of ${comments.length}, then failed: ${reason}`,
+        { cause: error }
+      );
     } finally {
       pending.delete(req.prId);
       changed(req.prId);

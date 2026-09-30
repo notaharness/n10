@@ -207,17 +207,14 @@ test.describe('Settings form, with a pull request provider', () => {
 
     await user.fill('carol');
     await user.press('Enter');
-    await expect
-      .poll(
-        () =>
-          (
-            projectConfig(homeDir, repoPath).vendorProject as {
-              username?: string;
-            }
-          ).username,
-        { timeout: 15_000 }
-      )
-      .toBe('carol');
+    // A reader in another process can observe the config during a write.
+    // Retry the complete assertion, including JSON parsing.
+    await expect(() => {
+      const project = projectConfig(homeDir, repoPath).vendorProject as {
+        username?: string;
+      };
+      expect(project.username).toBe('carol');
+    }).toPass({ timeout: 15_000 });
     // The toast comes after the save's follow-up, the repository re-read
     // included.
     await expect(page.getByText('GitHub Username saved')).toBeVisible();

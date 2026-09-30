@@ -521,7 +521,9 @@ Agent publication uses core’s draft submission machinery in the separate
 `~/.n10/agent-review-publications` store, keyed by provider repository, PR and
 account. Human writing stays in `review-drafts`. Every network write goes through
 `VcsProvider.publishReview`; review-comments contains storage and formatting only.
-Comments are submitted singly, with a chosen verdict on the first submission.
+Selected findings are submitted as one native review with one verdict. A partial
+retry resumes the same durable submission and skips confirmed findings; the
+error reports how many findings were posted.
 Completed findings stay posted after a later failure. An uncertain outcome retains
 its ledger and account binding, blocks edits, and is reconciled on retry. Restarted
 processes can retry findings left posting without inventing a second write path.

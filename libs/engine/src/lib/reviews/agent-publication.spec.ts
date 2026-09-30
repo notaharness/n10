@@ -7,6 +7,7 @@ import { freshLedger, ReviewPublishError } from '@n10/vcs-core';
 import {
   appendComment,
   readComments,
+  updateComment,
   type ReviewComment,
 } from '@n10/review-comments';
 import { reviewReadFixture } from './review-read-fixture.js';
@@ -138,27 +139,52 @@ it('resumes an unanswered publication with its durable ledger and refuses editin
   expect(await f.service.post({ prId: 7, headSha: head })).toBe(1);
   expect(readComments('/repo/.git', 7)[0].status).toBe('posted');
 });
-it('keeps completed comments posted when a later comment fails, and applies a verdict once', async () => {
+it('submits findings as one native review and resumes the batch after a partial failure', async () => {
   const f = setup();
   appendComment('/repo/.git', 7, { ...comment, id: 'two' });
-  f.publish
-    .mockImplementationOnce(async (submission) => ({
-      reviewId: 'r',
-      items: { [submission.items[0].key]: 'first' },
-      resumed: null,
-    }))
-    .mockRejectedValueOnce(new Error('Refused'));
+  f.publish.mockImplementationOnce(async (submission, ledger) => {
+    expect(submission.items).toHaveLength(2);
+    ledger.write({ ...freshLedger(head), inFlight: 'review' });
+    throw new ReviewPublishError('refused', 'Refused', {
+      posted: { [submission.items[0].key]: 'first' },
+    });
+  });
   await expect(
     f.service.post({ prId: 7, headSha: head, event: 'APPROVE' })
-  ).rejects.toThrow('Refused');
-  expect(readComments('/repo/.git', 7).map((item) => item.status)).toEqual([
+  ).rejects.toThrow('Posted 1 of 2, then failed: Refused');
+  expect(f.service.read(7).map((item) => item.status)).toEqual([
     'posted',
     'draft',
   ]);
-  expect(f.publish.mock.calls.map(([submission]) => submission.event)).toEqual([
-    'APPROVE',
-    'COMMENT',
+  f.publish.mockImplementationOnce(async (submission, ledger) => {
+    expect(ledger.read()?.inFlight).toBe('review');
+    expect(submission.items.map((item) => item.key)).toEqual([
+      'inline:agent-two',
+    ]);
+    return {
+      reviewId: 'review',
+      items: { 'inline:agent-two': 'second' },
+      resumed: null,
+    };
+  });
+  expect(
+    await f.service.post({ prId: 7, headSha: head, event: 'APPROVE' })
+  ).toBe(1);
+  expect(f.publish).toHaveBeenCalledTimes(2);
+  expect(f.service.read(7).map((item) => item.status)).toEqual([
+    'posted',
+    'posted',
   ]);
+});
+it('recovers a finding whose published ledger was saved before its store status', async () => {
+  const f = setup();
+  await f.service.post({ prId: 7, headSha: head, event: 'APPROVE' });
+  updateComment('/repo/.git', 7, 'one', { status: 'draft' });
+  expect(
+    await f.service.post({ prId: 7, headSha: head, event: 'APPROVE' })
+  ).toBe(1);
+  expect(f.publish).toHaveBeenCalledOnce();
+  expect(f.service.read(7)[0].status).toBe('posted');
 });
 it('validates head and empty findings before publishing', async () => {
   const f = setup();
