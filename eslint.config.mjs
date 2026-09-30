@@ -9,6 +9,13 @@ import ink from './tools/eslint-plugin-ink.mjs';
 
 const shellOperationPaths = [
   {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: ['startPrBabysitter', 'observePullRequest'],
+    message:
+      'Babysitter coordination belongs to the engine babysitter service.',
+  },
+  {
     name: '@n10/vcs-core',
     allowTypeImports: true,
     importNames: ['writeGlobalConfig', 'writeProjectConfig'],
@@ -18,8 +25,7 @@ const shellOperationPaths = [
     name: '@n10/vcs-core',
     allowTypeImports: true,
     importNames: ['autoDetectProjectConfig'],
-    message:
-      'Repository opening belongs to the engine repository service.',
+    message: 'Repository opening belongs to the engine repository service.',
   },
   {
     name: '@n10/core',

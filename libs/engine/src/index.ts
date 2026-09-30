@@ -57,3 +57,9 @@ export type {
   TerminalPorts,
 } from './lib/sessions/terminal-service.js';
 export type { TerminalFacts } from './lib/sessions/terminal-facts.js';
+
+export { createBabysitterService } from './lib/babysitters/babysitter-service.js';
+export type {
+  BabysitterEvent,
+  BabysitterPorts,
+} from './lib/babysitters/babysitter-service.js';

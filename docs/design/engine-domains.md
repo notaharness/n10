@@ -88,7 +88,7 @@ propagated through the stack before merging.
 6. **Review commands and drafts**: shared reply/resolve/draft/publication commands,
    scoped stores and publication reconciliation. Both agent-comment posting paths
    use vcs publishers; delete review-comments' independent poster.
-7. **Sessions**: discovery, adoption, launch/restart/stop and connection/exit
+7. **Sessions and babysitters**: discovery, adoption, launch/restart/stop and connection/exit
    facts shared by both shells. Follow with process-wide terminal lifecycle and
    babysitter coordination as separate reviewable parts of this domain. PTY
    activity classification remains a primitive; shell seen/focus state remains UI. Delete shell orchestration; preserve retained connections across

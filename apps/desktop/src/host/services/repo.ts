@@ -58,7 +58,7 @@ export function openRepo(path: string): RepoInfo {
       isCurrent: activeRepoIs,
     },
   });
-  // Plan delivery and babysitters still resolve the process repo root.
+  // Plan delivery still resolves the process repo root.
   // Keep their ambient scope aligned until those domains take explicit handles.
   process.chdir(opened.cwd);
   resetRepoRoot();

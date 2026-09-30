@@ -1,5 +1,6 @@
+import type * as Core from '@n10/core';
 import type * as WorktreeManager from '@n10/worktree-manager';
-import { worktreeSessionKey } from '../session-key.js';
+import { worktreeSessionKey } from '@n10/core';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type {
   AppConfig,
@@ -7,8 +8,8 @@ import type {
   PullRequestInfo,
   VcsProvider,
 } from '@n10/vcs-core';
-import type { BabysitStatus } from './babysit-model.js';
-import type { PullRequestLookup } from '../pull-requests/pull-request-lookup.js';
+import type { BabysitStatus } from '@n10/core';
+import type { PullRequestLookup } from '@n10/core';
 
 const mocks = vi.hoisted(() => ({
   fetchRefs:
@@ -48,16 +49,12 @@ vi.mock('@n10/worktree-manager', async (original) => ({
   listWorktrees: () =>
     Promise.resolve([{ branch: 'feat/thing', path: '/wt/feat-thing' }]),
 }));
-// The fetch line is shared with the sync pass; here it is the fetch.
-vi.mock('../sync/fetch-queue.js', () => ({
+vi.mock('@n10/core', async (original) => ({
+  ...(await original<typeof Core>()),
   fetchRefs: (req: Parameters<typeof mocks.fetchRefs>[0]) =>
     mocks.fetchRefs(req),
-}));
-vi.mock('../pty-registry.js', () => ({
   isSessionAlive: () => mocks.isSessionAlive(),
-}));
-vi.mock('../activity.js', () => ({ idleFor: () => mocks.idleFor() }));
-vi.mock('../session/launch-session.js', () => ({
+  idleFor: () => mocks.idleFor(),
   deliverToRunningSession: (name: string, prompt: string) =>
     mocks.deliverToRunningSession(name, prompt),
   launchSession: (params: unknown) => mocks.launchSession(params),
@@ -595,6 +592,23 @@ describe('startPrBabysitter', () => {
       lastError: 'gh: rate limited',
       lastPolledAt: null,
     });
+    sitter.stop();
+  });
+
+  it('skips busy timer ticks rather than accumulating delayed polls', async () => {
+    let release!: (value: PullRequestLookup) => void;
+    const read = vi.fn(
+      () =>
+        new Promise<PullRequestLookup>((resolve) => {
+          release = resolve;
+        })
+    );
+    const sitter = start({ readPullRequest: read });
+    await vi.advanceTimersByTimeAsync(10 * MIN);
+    expect(read).toHaveBeenCalledOnce();
+    release({ kind: 'found', pr });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(read).toHaveBeenCalledOnce();
     sitter.stop();
   });
 

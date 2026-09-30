@@ -53,8 +53,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `services/pull-requests.ts`; `services/sidebar.ts`, babysitters, the sync
   loop and settings effects all go through it. The renderer is told only of
   changes it would paint. Do not call the provider's list from a second place.
-- Babysitters (`services/babysit.ts`) live per repo in memory, sit out while
-  another repo is open, stop when their worktree is removed, and push only
+- Engine babysitters (`services/babysit.ts` adapts their events) live per repo in
+  memory, sit out while another repo is open, stop when their worktree is removed, and push only
   `spawned` and `ended`; everything else rides on the sidebar poll.
 - `libs/engine/src/lib/sessions/terminal-service.ts` owns process-wide terminal lifecycle;
   `services/terminals.ts` supplies output relays, recents and tab grouping.

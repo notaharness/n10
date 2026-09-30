@@ -35,15 +35,6 @@ export function adoptSession(name: string, repoCwd: string): void {
   attachRelay(name, entry);
 }
 
-/**
- * Adopt a session another service had `@n10/core` spawn — the
- * babysitter's, started to receive an update when no agent was
- * running. Same bookkeeping as a launch from the renderer.
- */
-export function adoptSpawnedSession(name: string): void {
-  adoptSession(name, requireRepo());
-}
-
 /** The session under `name`, but only when it belongs to the repo
  *  that's open now. Entries for other repos stay in the map (their
  *  agents are still running and are restored on switching back) but are

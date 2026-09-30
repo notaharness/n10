@@ -84,14 +84,9 @@ The reasoning behind each rule is in `docs/decisions.md`.
   `composePlanPrompt` numbers items in `planRows` order. Checkout is
   three-state: inject into a live agent, respawn, or create the worktree and
   spawn.
-- **Babysit** (`babysit/`): the baseline is what the agent was told, not what
-  was last seen. Send after ten minutes of quiet or thirty at most, only while
-  the agent has been idle thirty seconds (`idleFor`). Spawn only through
-  `checkoutWorktree` (existing branch) with `seed`, never `continue-or-seed`.
-  Every Git call takes `cwd`; ask `live()` after each await. Fetches go through
-  `sync/fetch-queue.ts`; the merge check is `sync/conflicts.ts` so badge and
-  briefing agree. `onStatus` fires on transitions only. Timing overrides:
-  `babysitTimingFromEnv`.
+- **Babysit** (`babysit/`): pure baseline/observation model and prompt composition.
+  The engine owns watch lifetime, freshness, polling and delivery coordination.
+  The baseline records what the agent was told, not merely what was observed.
 - **Pull request lookup** (`pull-requests/pull-request-lookup.ts`): the
   `found`/`gone`/`unknown` answer a babysitter reads. The list behind it is
   `@n10/engine`'s.

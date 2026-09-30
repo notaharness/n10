@@ -12,9 +12,8 @@ import {
   EMPTY_PULL_REQUEST_LIST,
   type PullRequestListSnapshot,
 } from '@n10/engine';
-import type { PullRequestLookup } from '@n10/core';
-import type { BranchPrMap, VcsProvider } from '@n10/vcs-core';
-import { resolveProvider, pullRequests } from './program.js';
+import type { BranchPrMap } from '@n10/vcs-core';
+import { pullRequests } from './program.js';
 
 // Installed by main.ts. Fires when what the sidebar would answer has
 // moved, so the renderer refetches then rather than on its next poll
@@ -37,24 +36,6 @@ pullRequests.subscribe((cwd) => {
   if (next.prMap === last.prMap && next.error === last.error) return;
   remoteUpdated?.();
 });
-
-/** The provider the repository at `cwd` is configured for, if any. */
-export function repoProvider(cwd: string): VcsProvider | null {
-  const { provider, configured } = resolveProvider(cwd);
-  return configured ? provider : null;
-}
-
-/**
- * One pull request as the list has it, refreshed on the list's own
- * schedule — a babysitter asking every minute reads what the sidebar
- * reads, rather than costing the provider a fetch per watched row.
- */
-export function lookupPullRequest(
-  cwd: string,
-  prId: number
-): Promise<PullRequestLookup> {
-  return pullRequests.lookupPullRequest(cwd, prId);
-}
 
 /** The list as held for `cwd`, without waiting for anything. */
 export function cachedPullRequests(cwd: string): BranchPrMap {

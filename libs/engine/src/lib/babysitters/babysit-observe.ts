@@ -8,14 +8,14 @@
  * and judge conflicts, in whichever checkout happened to be open.
  */
 import type { AppConfig, PullRequestInfo, VcsProvider } from '@n10/vcs-core';
-import { countPullRequestConflicts } from '../sync/conflicts.js';
-import { fetchRefs } from '../sync/fetch-queue.js';
+import { countPullRequestConflicts } from '@n10/core';
+import { fetchRefs } from '@n10/core';
 import {
   BABYSIT_REMOTE_REFRESH_MS,
   observeThread,
   type BabysitObservation,
   type BabysitThread,
-} from './babysit-model.js';
+} from '@n10/core';
 
 /** The expensive half of an observation, reused between refreshes. */
 export interface RemoteSnapshot {

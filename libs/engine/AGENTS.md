@@ -72,3 +72,10 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   takes its machine from the qualified key. Never stat a remote directory locally.
   An old client's exit cannot drop its successor; agent panes remain while their
   native target exists. Shells adapt started/ended callbacks to output delivery.
+
+- **Babysitters** (`babysitters/`): one retained watch per repository/PR. Coalesce
+  starts; stop and worktree removal cancel pending lookups before watch creation.
+  Park inactive repositories without forgetting the delivered baseline. Skip busy
+  ticks and bound explicit follow-ups. Check liveness after awaits; use captured
+  repository identity when adopting a completed launch. Core supplies pure models,
+  prompts and primitive operations; shells supply config, dimensions and relays.

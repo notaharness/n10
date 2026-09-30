@@ -433,6 +433,17 @@ item numbers match what the user sees. The renderer composes the delivered text
 because it previews that exact prompt. Checkout injects into a live agent,
 respawns an ended one, or creates a worktree and launches an agent.
 
+`engine/babysitters` owns watches keyed by repository and PR, their polling,
+remote-read freshness and delivery coordination. Core keeps the pure baseline
+model, prompt composition and Git/session primitives. Desktop supplies the active
+config handle, pane dimensions and output adoption; it holds no watcher registry.
+The TUI has no babysitting controls. A parked repository retains its watch baseline
+but cannot poll or deliver until selected again. Concurrent starts share one lookup;
+stop, shutdown and worktree removal cancel pending starts before they create a watch.
+Busy timer ticks are skipped; explicit polls share at most one queued follow-up.
+Spawn completion names its captured repository even if selection changed while
+launching. Shutdown stops watchers and detaches clients without killing agents.
+
 The babysitter baseline is what the agent was told, not the latest observation.
 Hold or delivery failures leave it unchanged. A new head or thread reply can be
 news; the user's own latest comment is not relayed. Recovery from a reported CI
@@ -446,8 +457,9 @@ an existing branch: inventing one from HEAD would send work to the wrong commit.
 
 Pass `cwd` to every Git operation and check `live()` after awaits. Serialize
 fetches through `sync/fetch-queue.ts`; invalidate reused refs when the head moves.
-Use `sync/conflicts.ts` for both the badge and briefing. The worktree resolver is
-process-global, so check liveness immediately before checkout as well.
+Use `sync/conflicts.ts` for both the badge and briefing. Checkout receives the
+captured repository and configured worktree path. Check liveness immediately
+before checkout as well.
 
 Babysitters read the shared PR cache, distinguish unknown from gone, and require
 consecutive absences before ending a watch. Resolve the provider per poll so
@@ -667,7 +679,7 @@ changes; repository selection has no second metadata store. Core supplies
 filesystem validation and resolver operations. Desktop chooses its startup repo
 and keeps recents; the TUI opens its requested checkout before mounting React.
 
-The desktop still changes process cwd for plan delivery and babysitters.
+The desktop still changes process cwd for plan delivery.
 Repository detection, worktree operations and session commands receive captured
 paths. The remaining domains take explicit handles in the
 [domain plan](design/engine-domains.md).

@@ -289,17 +289,18 @@ describe('lookupPullRequest', () => {
     await flush();
     settle(0, { feature: { id: 7 } });
     await model;
-    const found = await pullRequests.lookupPullRequest('/repo-a', 7);
+    const found = await program.pullRequests.lookupPullRequest('/repo-a', 7);
     expect(found).toMatchObject({ kind: 'found', pr: { id: 7 } });
     expect(env.fetchCount).toBe(1);
   });
 
   it('cannot say when no provider is configured', async () => {
     env.configured = false;
-    expect(await pullRequests.lookupPullRequest('/repo-a', 7)).toMatchObject({
+    expect(
+      await program.pullRequests.lookupPullRequest('/repo-a', 7)
+    ).toMatchObject({
       kind: 'unknown',
     });
-    expect(pullRequests.repoProvider('/repo-a')).toBeNull();
   });
 });
 

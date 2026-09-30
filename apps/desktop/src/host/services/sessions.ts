@@ -32,11 +32,7 @@ import type {
 } from '../contract.js';
 
 export type { SessionLaunchRequest, SessionSummary };
-export {
-  adoptSpawnedSession,
-  isForeignSession,
-  isOwnSessionAlive,
-} from './session-registry.js';
+export { isForeignSession, isOwnSessionAlive } from './session-registry.js';
 
 /** What launching or reattaching an agent hands back to the caller. */
 interface LaunchResult {
