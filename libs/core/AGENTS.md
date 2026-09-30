@@ -101,6 +101,13 @@ The reasoning behind each rule is in `docs/decisions.md`.
   the clone lacks is an error, never the local branch. The manifest lists
   every file; the patch reports truncation as data, not a placeholder file.
   The engine's review reads own their caching and freshness.
+- **Revision history** (`pull-requests/pr-history.ts`, `review-checkpoints.ts`,
+  `pr-revision-range.ts`): a range resolves to exact commits or names the
+  revision it lacks; nothing stands in for it. Visits live per account and
+  pull request under `~/.n10/review-checkpoints` (`pr-store-file.ts`); the
+  last visit is fixed per visit, which the caller names. Recorded heads are
+  kept under `refs/n10/retained/`. The engine owns the history
+  resource and the baselines' lifetime.
 - `asyncOps.run` never rejects; errors go through `setOperationErrorHandler`.
 - `keybindings/registry.ts` is the action catalog and carries a 900-line
   ceiling on purpose. Presets: Normie, Vim.

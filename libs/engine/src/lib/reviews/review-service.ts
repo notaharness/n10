@@ -1,9 +1,11 @@
 import { createAgentComments } from './agent-comments.js';
 import { isDeepStrictEqual } from 'node:util';
+import type { VisitBaselines } from '@n10/core';
 import { configEffects } from '../config/api.js';
 import type { WorktreeService } from '../worktrees/api.js';
 import { createProviderReads } from './provider-reads.js';
 import { createDiffReads } from './diff-reads.js';
+import { createHistoryReads } from './history-reads.js';
 import {
   createReviewCommands,
   type ReviewCommandOptions,
@@ -12,9 +14,14 @@ import { createReviewDraftCommands } from './review-draft-commands.js';
 
 /** Repository lifetime, with separate invalidation for identity and local paths. */
 export function createReviewService(
-  options: ReviewCommandOptions & { worktrees: WorktreeService }
+  options: ReviewCommandOptions & {
+    worktrees: WorktreeService;
+    /** Visit baselines outlive a repository handle; see `history-reads.ts`. */
+    baselines: VisitBaselines;
+  }
 ) {
   const provider = createProviderReads(options);
+  const history = createHistoryReads(options);
   const agentComments = createAgentComments(options, provider.invalidate);
   const diff = createDiffReads(
     options.config.repo,
@@ -28,6 +35,7 @@ export function createReviewService(
     if (isDeepStrictEqual(rows, next)) return;
     rows = next;
     provider.invalidate();
+    history.invalidate();
     diff.invalidate();
   });
   let snapshot = options.config.getSnapshot();
@@ -38,7 +46,10 @@ export function createReviewService(
       snapshot.viewer !== next.viewer;
     const path = snapshot.config.worktreePath !== next.config.worktreePath;
     snapshot = next;
-    if (credentials) provider.reset();
+    if (credentials) {
+      provider.reset();
+      history.reset();
+    }
     if (credentials || path) diff.reset();
   });
   return {
@@ -52,6 +63,8 @@ export function createReviewService(
     checks: provider.checks,
     conversation: provider.conversation,
     diff,
+    history: history.history,
+    recordVisit: history.recordVisit,
     invalidateProvider() {
       provider.invalidate();
     },
@@ -60,6 +73,7 @@ export function createReviewService(
       unsubscribeRows();
       unsubscribe();
       provider.dispose();
+      history.dispose();
       diff.dispose();
     },
   };

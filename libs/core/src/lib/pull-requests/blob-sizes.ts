@@ -1,5 +1,5 @@
+import { isOid } from '@n10/vcs-core';
 import { runGit } from '../utils/git-run.js';
-import { OBJECT_ID } from './pr-comparison.js';
 
 /**
  * Sizes of objects, in bytes, from one `git cat-file --batch-check`.
@@ -14,7 +14,7 @@ export async function readBlobSizes(
   cwd: string,
   oids: Iterable<string>
 ): Promise<Map<string, number>> {
-  const unique = [...new Set(oids)].filter((oid) => OBJECT_ID.test(oid));
+  const unique = [...new Set(oids)].filter(isOid);
   const sizes = new Map<string, number>();
   if (unique.length === 0) return sizes;
   const { text } = await runGit(

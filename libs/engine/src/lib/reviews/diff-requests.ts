@@ -1,4 +1,5 @@
 import { WHOLE_FILE_CONTEXT } from '@n10/core';
+import { isOid } from '@n10/vcs-core';
 
 /**
  * Diff requests from untrusted input: a renderer that displays remote
@@ -30,6 +31,16 @@ export interface PrDiffPatchRequest {
   paths?: string[];
   /** Lines of context around each change; whole files when absent. */
   context?: number;
+}
+
+/** Two revisions to compare, in the repository the caller shows. */
+export interface PrRevisionRangeRequest {
+  repo: string;
+  /** The earlier revision: the diff's old side. */
+  from: string;
+  to: string;
+  /** The target branch's commit now; null when not known. */
+  target: string | null;
 }
 
 /**
@@ -113,5 +124,20 @@ export function parsePatchRequest(value: unknown): PrDiffPatchRequest {
     headOid: requireString(req.headOid, 'headOid'),
     ...(paths ? { paths } : {}),
     ...(context === undefined ? {} : { context }),
+  };
+}
+
+function requireOid(value: unknown, name: string): string {
+  if (!isOid(value)) throw new Error(`${name} must be an object id`);
+  return value;
+}
+
+export function parseRangeRequest(value: unknown): PrRevisionRangeRequest {
+  const req = fields(value);
+  return {
+    repo: requireString(req.repo, 'repo'),
+    from: requireOid(req.from, 'from'),
+    to: requireOid(req.to, 'to'),
+    target: req.target === null ? null : requireOid(req.target, 'target'),
   };
 }

@@ -5,6 +5,7 @@ import {
   readPrDiffManifest,
   readPrDiffPatch,
   resolvePrComparison,
+  resolveRevisionRange,
 } from '@n10/core';
 import type { PrComparison } from '@n10/core';
 import { createDiffReads } from './diff-reads.js';
@@ -24,6 +25,7 @@ vi.mock('@n10/core', () => ({
   readPrDiffManifest: vi.fn(),
   readPrDiffPatch: vi.fn(),
   resolvePrComparison: vi.fn(),
+  resolveRevisionRange: vi.fn(),
 }));
 
 const HEAD = 'b'.repeat(40);
@@ -277,6 +279,65 @@ describe('patch', () => {
     expect(() => reads().patch({ ...patchRequest, headOid: 5 })).toThrow(
       'headOid must be a string'
     );
+  });
+});
+
+describe('range', () => {
+  const range = { repo: '/repo/a', from: BASE, to: HEAD, target: null };
+  beforeEach(() => {
+    vi.mocked(resolveRevisionRange).mockResolvedValue({
+      ok: true,
+      range: {
+        fromOid: BASE,
+        toOid: HEAD,
+        linear: true,
+        base: { state: 'unknown', reason: 'no-target' },
+      },
+    });
+  });
+
+  it.each(['from', 'to', 'target'] as const)(
+    'refuses a %s that is not an object id',
+    (key) => {
+      expect(() => reads().range({ ...range, [key]: 'main' })).toThrow(
+        `${key} must be an object id`
+      );
+      expect(resolveRevisionRange).not.toHaveBeenCalled();
+    }
+  );
+
+  it('answers only for its own repository', async () => {
+    expect(
+      await readResourceValue(reads().range({ ...range, repo: '/repo/b' }))
+    ).toMatchObject({ ok: false, error: { code: 'repo-changed' } });
+    expect(resolveRevisionRange).not.toHaveBeenCalled();
+  });
+
+  it('drops an answer when the repository closes during the read', async () => {
+    vi.mocked(resolveRevisionRange).mockImplementationOnce(async () => {
+      current = false;
+      return { ok: false, error: { code: 'to-unavailable', message: 'x' } };
+    });
+    expect(await readResourceValue(reads().range(range))).toMatchObject({
+      ok: false,
+      error: { code: 'repo-changed' },
+    });
+  });
+
+  it('resolves in its repository, once', async () => {
+    const diff = reads();
+    expect(await readResourceValue(diff.range(range))).toMatchObject({
+      ok: true,
+      range: { linear: true },
+    });
+    diff.invalidate();
+    await readResourceValue(diff.range(range));
+    expect(resolveRevisionRange).toHaveBeenCalledExactlyOnceWith({
+      cwd: '/repo/a',
+      from: BASE,
+      to: HEAD,
+      target: null,
+    });
   });
 });
 

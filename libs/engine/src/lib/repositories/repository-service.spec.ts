@@ -6,7 +6,14 @@ import type * as Os from 'node:os';
 import { readConfig, writeGlobalConfig } from '@n10/vcs-core';
 import type { VcsProvider } from '@n10/vcs-core';
 import { EMPTY_PULL_REQUEST_LIST } from '../pull-requests/api.js';
+import type * as Reviews from '../reviews/api.js';
+import { createReviewService } from '../reviews/api.js';
 import { createRepositoryService } from './repository-service.js';
+
+vi.mock('../reviews/api.js', async (original) => {
+  const actual = await original<typeof Reviews>();
+  return { ...actual, createReviewService: vi.fn(actual.createReviewService) };
+});
 
 const fixture = vi.hoisted(() => ({ home: '' }));
 vi.mock('node:os', async (original) => {
@@ -100,6 +107,19 @@ describe('repository scope', () => {
     expect(dispose).toHaveBeenCalledOnce();
     expect(next).not.toBe(current);
     expect(next.config).not.toBe(current.config);
+  });
+
+  it('keeps one visit record across repository switches', () => {
+    const { service } = harness([]);
+    service.open(repo('first'));
+    service.open(repo('second'));
+    service.open(repo('first'));
+    const baselines = vi
+      .mocked(createReviewService)
+      .mock.calls.slice(-3)
+      .map(([options]) => options.baselines);
+    // A visit begun before a switch is the same visit after it.
+    expect(new Set(baselines).size).toBe(1);
   });
 
   it('keeps the active scope when another checkout fails validation', () => {

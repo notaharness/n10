@@ -82,6 +82,8 @@ import type {
   PrDiffManifestResult,
   PrDiffPatchRequest,
   PrDiffPatchResult,
+  PrRevisionRangeRequest,
+  PrRevisionRangeResult,
 } from '@n10/engine/contract';
 // Review requests — replies, resolutions, review launches, drafts.
 export type * from './contract-reviews.js';
@@ -97,6 +99,8 @@ import type {
 // Pull request reads addressed by identity and exact commits.
 export type * from './contract-pull-requests.js';
 import type {
+  HistoryRequest,
+  PullRequestHistory,
   DiscardDraftRequest,
   DraftsRequest,
   MentionSearch,
@@ -111,6 +115,7 @@ import type {
   ReviewDrafts,
   SaveDraftRequest,
   SnapshotRequest,
+  VisitRequest,
 } from './contract-pull-requests.js';
 import type {
   BabysitChangedEvent,
@@ -404,6 +409,18 @@ export interface N10HostApi {
    *  and the exact commits its review compares. Rejects a ref from
    *  another repository or a caller that last saw another account. */
   getPullRequestSnapshot(req: SnapshotRequest): Promise<PullRequestSnapshot>;
+  /** What the pull request's history offers to compare against: the
+   *  provider's record of its heads and the viewer's latest review, and
+   *  the viewer's last visit before the one `visitId` names — the same
+   *  for every read that names it. */
+  getPullRequestHistory(req: HistoryRequest): Promise<PullRequestHistory>;
+  /** Record the commits the reader was shown in a visit, kept outside
+   *  the repository per account and pull request. Call once
+   *  `getPullRequestHistory` for the same `visitId` has resolved, in
+   *  this run of the app; it rejects otherwise. The record is kept
+   *  under the pull request that read confirmed: the id on `req.ref`
+   *  is not used. */
+  recordPullRequestVisit(req: VisitRequest): Promise<void>;
   /** What stands between one pull request and completion: its checks,
    *  the target's rules and the provider's merge state, with n10's
    *  reading of them. Identity-checked like the snapshot. */
@@ -531,6 +548,11 @@ export interface N10HostApi {
   ): Promise<PrDiffManifestResult>;
   /** The patch between a resolved comparison's commits. */
   fetchPrDiffPatch(req: PrDiffPatchRequest): Promise<PrDiffPatchResult>;
+  /** Two revisions resolved to exact commits, fetched by id when the
+   *  clone lacks one; a revision nowhere to be had is data. */
+  resolvePrRevisionRange(
+    req: PrRevisionRangeRequest
+  ): Promise<PrRevisionRangeResult>;
 
   // ── Shell ────────────────────────────────────────────────────
   /** Open a URL in the user's default browser. */
@@ -641,6 +663,8 @@ export const IPC = {
   setThreadResolved: 'n10/reviews/resolve',
   fetchPrDescription: 'n10/reviews/pr-description',
   getPullRequestSnapshot: 'n10/pull-requests/snapshot',
+  getPullRequestHistory: 'n10/pull-requests/history',
+  recordPullRequestVisit: 'n10/pull-requests/visit',
   getPullRequestChecks: 'n10/pull-requests/checks',
   getPullRequestConversation: 'n10/pull-requests/conversation',
   listReviewDrafts: 'n10/review-drafts/list',
@@ -662,6 +686,7 @@ export const IPC = {
   fetchWorktreeDiffText: 'n10/diff/worktree-text',
   fetchPrDiffManifest: 'n10/diff/pr-manifest',
   fetchPrDiffPatch: 'n10/diff/pr-patch',
+  resolvePrRevisionRange: 'n10/diff/pr-revision-range',
   openExternal: 'n10/shell/open-external',
   showContextMenu: 'n10/shell/context-menu',
   showAppMenu: 'n10/shell/app-menu',

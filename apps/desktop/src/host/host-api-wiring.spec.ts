@@ -116,6 +116,13 @@ vi.mock('./services/pr-checks.js', () =>
 vi.mock('./services/pr-details.js', () =>
   recorder('prDetails', ['getPullRequestSnapshot'])
 );
+vi.mock('./services/pr-history.js', () =>
+  recorder('prHistory', [
+    'getPullRequestHistory',
+    'recordPullRequestVisit',
+    'resolvePrRevisionRange',
+  ])
+);
 vi.mock('./services/pr-conversation.js', () =>
   recorder('prConversation', ['getPullRequestConversation'])
 );
@@ -217,6 +224,16 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     'prDetails.getPullRequestSnapshot',
   ],
   [
+    'getPullRequestHistory',
+    [{ ref: { number: 7 }, visitId: 'v1' }],
+    'prHistory.getPullRequestHistory',
+  ],
+  [
+    'recordPullRequestVisit',
+    [{ ref: { number: 7 }, visit: {} }],
+    'prHistory.recordPullRequestVisit',
+  ],
+  [
     'getPullRequestChecks',
     [{ ref: { number: 7 } }],
     'prChecks.getPullRequestChecks',
@@ -256,6 +273,11 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     'fetchPrDiffPatch',
     [{ repo: '/r', mergeBaseOid: 'a', headOid: 'b' }],
     'reviews.getPrDiffPatch',
+  ],
+  [
+    'resolvePrRevisionRange',
+    [{ repo: '/r', from: 'a', to: 'b', target: null }],
+    'prHistory.resolvePrRevisionRange',
   ],
   [
     'fetchWorktreeDiffText',

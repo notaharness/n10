@@ -4,12 +4,14 @@ import {
   readPrDiffManifest,
   readPrDiffPatch,
   resolvePrComparison,
+  resolveRevisionRange,
 } from '@n10/core';
 import type {
   PrComparison,
   PrComparisonError,
   PrDiffManifest,
   PrDiffPatch,
+  RevisionRangeResult,
 } from '@n10/core';
 import type { WorktreeService } from '../worktrees/api.js';
 import { createResourceCache } from './resource-cache.js';
@@ -17,11 +19,17 @@ import { readResourceValue } from './read-resource.js';
 import {
   parseManifestRequest,
   parsePatchRequest,
+  parseRangeRequest,
   type PrDiffManifestRequest,
   type PrDiffPatchRequest,
+  type PrRevisionRangeRequest,
 } from './diff-requests.js';
 
-export type { PrDiffManifestRequest, PrDiffPatchRequest };
+export type {
+  PrDiffManifestRequest,
+  PrDiffPatchRequest,
+  PrRevisionRangeRequest,
+};
 
 /** The repository changed between the request and the answer. */
 export interface RepoChangedError {
@@ -32,6 +40,9 @@ export type PrDiffError = PrComparisonError | RepoChangedError;
 export type PrDiffManifestResult =
   | { ok: true; manifest: PrDiffManifest }
   | { ok: false; error: PrDiffError };
+export type PrRevisionRangeResult =
+  | RevisionRangeResult
+  | { ok: false; error: RepoChangedError };
 export type PrDiffPatchResult =
   | { ok: true; patch: PrDiffPatch }
   | { ok: false; error: RepoChangedError };
@@ -81,6 +92,11 @@ export function createDiffReads(
     PATCHES_KEPT,
     (result) => result.ok
   );
+  const ranges = createResourceCache<PrRevisionRangeResult>(
+    Infinity,
+    16,
+    (result) => result.ok
+  );
   const live = createResourceCache<string>(1_000, 2);
   const changed = (asked: string): RepoChangedError | null =>
     asked === repo && isCurrent()
@@ -113,7 +129,7 @@ export function createDiffReads(
       }
     );
   }
-  const caches = [manifests, listings, patches, live];
+  const caches = [manifests, listings, patches, ranges, live];
   return {
     /** Resolve a pull request to commits and list every changed file.
      *  Failures that describe the pull request are data. Branches are
@@ -151,6 +167,21 @@ export function createDiffReads(
           });
           const after = changed(asked);
           return after ? { ok: false, error: after } : { ok: true, patch };
+        }
+      );
+    },
+    /** Two revisions resolved to exact commits, fetched by id when the
+     *  clone lacks one; a revision nowhere to be had is data. */
+    range(value: unknown) {
+      const { repo: asked, ...req } = parseRangeRequest(value);
+      return ranges.get(
+        JSON.stringify([asked, req]),
+        async (): Promise<PrRevisionRangeResult> => {
+          const before = changed(asked);
+          if (before) return { ok: false, error: before };
+          const result = await resolveRevisionRange({ cwd: repo, ...req });
+          const after = changed(asked);
+          return after ? { ok: false, error: after } : result;
         }
       );
     },

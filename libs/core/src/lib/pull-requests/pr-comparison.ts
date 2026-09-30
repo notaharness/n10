@@ -1,3 +1,4 @@
+import { isOid } from '@n10/vcs-core';
 import { fetchRefs } from '../sync/fetch-queue.js';
 import { gitLine } from '../utils/git-run.js';
 
@@ -78,9 +79,6 @@ export interface PrComparisonRequest {
    *  On by default. */
   fetch?: boolean;
 }
-
-/** A full SHA-1 or SHA-256 object id. */
-export const OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 
 /**
  * Whether `name` can be a branch. A name git would parse as an option
@@ -164,7 +162,7 @@ function invalid(req: PrComparisonRequest): PrComparisonError | null {
     };
   }
   for (const oid of [req.expectedHeadOid, req.expectedTargetOid]) {
-    if (oid !== undefined && !OBJECT_ID.test(oid)) {
+    if (oid !== undefined && !isOid(oid)) {
       return {
         code: 'invalid-request',
         message: `"${oid}" is not an object id`,

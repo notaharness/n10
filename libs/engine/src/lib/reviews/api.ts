@@ -6,6 +6,8 @@ export type { ReadResource, ReadSnapshot } from './read-resource.js';
 export type {
   PrDiffManifestRequest,
   PrDiffPatchRequest,
+  PrRevisionRangeRequest,
+  PrRevisionRangeResult,
   PrDiffManifestResult,
   PrDiffPatchResult,
   PrDiffError,

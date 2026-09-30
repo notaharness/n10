@@ -12,6 +12,7 @@ import type {
   RemoteCommentReply,
   ReviewVerdict,
   BuildStatusState,
+  PullRequestRevisions,
   RepositoryRef,
   MentionCandidate,
   LedgerStore,
@@ -30,6 +31,7 @@ import { mapReviewState } from './gh-reviews.js';
 import { fetchPullRequestChecksGitHub } from './pr-checks.js';
 import { fetchGitHubConversation } from './pr-conversation.js';
 import { fetchPullRequestDetailGitHub } from './pr-details.js';
+import { readGitHubRevisions } from './pr-revisions.js';
 
 // ── gh CLI transport ──────────────────────────────────────────────
 
@@ -898,6 +900,16 @@ export const githubProvider: VcsProvider = {
     } catch (err: unknown) {
       throw classifyGhError(err);
     }
+  },
+
+  async fetchPullRequestRevisions(
+    _auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestRevisions> {
+    const { owner, repo } = project;
+    if (!owner || !repo) throw new Error('GitHub project not configured');
+    return readGitHubRevisions(ghGraphQL, { owner, repo }, prId);
   },
 
   async submitReviewVerdict(

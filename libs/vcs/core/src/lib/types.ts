@@ -7,6 +7,7 @@ import type {
 import type { PullRequestChecks } from './pr-checks.js';
 import type { PullRequestConversation } from './pr-conversation.js';
 import type { PullRequestDetail, RepositoryRef } from './pr-details.js';
+import type { PullRequestRevisions } from './pr-revisions.js';
 
 export type ReviewDecision =
   | 'approved'
@@ -285,6 +286,14 @@ export interface VcsProvider {
     project: Record<string, string>,
     prId: number
   ): Promise<PullRequestDetail>;
+
+  /** The pull request's heads over time and the viewer's latest
+   *  submitted review, read on demand for one pull request. */
+  fetchPullRequestRevisions?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestRevisions>;
 
   /**
    * File the reviewer's drafts as one native review (see

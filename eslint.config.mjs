@@ -62,6 +62,10 @@ const shellOperationPaths = [
       'resolvePrComparison',
       'readPrDiffManifest',
       'readPrDiffPatch',
+      'readRevisionRangeManifest',
+      'readPullRequestHistory',
+      'recordPullRequestVisit',
+      'VisitBaselines',
     ],
     message:
       'Review resources and diff freshness belong to the engine review service.',
@@ -592,8 +596,11 @@ export default tseslint.config(
       '@typescript-eslint/no-restricted-imports': [
         'error',
         {
+          // ...and gives the review service it builds its own visit record.
           paths: shellOperationPaths.filter(
-            (entry) => !entry.importNames.includes('readConfig')
+            (entry) =>
+              !entry.importNames.includes('readConfig') &&
+              !entry.importNames.includes('VisitBaselines')
           ),
         },
       ],

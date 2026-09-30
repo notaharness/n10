@@ -1,8 +1,9 @@
 import type { DiffChangeStatus } from '@n10/diff';
+import { isOid } from '@n10/vcs-core';
 import { trimToFileBoundary } from '../utils/diff-patch.js';
 import { runGit } from '../utils/git-run.js';
 import { readBlobSizes } from './blob-sizes.js';
-import { OBJECT_ID, type PrComparison } from './pr-comparison.js';
+import type { PrComparison } from './pr-comparison.js';
 
 /**
  * What changed in a pull request, file by file, independent of the
@@ -122,7 +123,7 @@ const STATUS: Record<string, PrDiffManifestFile['status']> = {
 
 function requireBounds(bounds: PrDiffBounds): void {
   for (const oid of [bounds.mergeBaseOid, bounds.headOid]) {
-    if (!OBJECT_ID.test(oid)) throw new Error(`Not an object id: ${oid}`);
+    if (!isOid(oid)) throw new Error(`Not an object id: ${oid}`);
   }
 }
 

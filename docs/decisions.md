@@ -698,6 +698,32 @@ screen. It still virtualizes its section, so it is not yet the unvirtualized
 reading surface assistive technology needs; that belongs to keyboard and
 navigation work (I11).
 
+A pull request's history is compared at exact commits, never at whatever a
+branch holds now. The provider's record — GitHub's commits and force-pushes,
+and the latest review the account it answers as submitted — is read from the
+recent end; a history longer than one page, or with an event GitHub would not
+resolve, says it is incomplete, and a review read as another account than the
+one n10 acts as is not offered as the viewer's. GitHub sends each reply to a
+thread as a review of its own, with one comment, so a `COMMENTED` review with
+no summary and one reply is not counted as a review; one reply submitted as a
+whole review looks the same and is not counted either. When the newest review
+names no commit, or the reviews read do not reach it, the last review is
+unknown: an older one never stands in. A range between two revisions fetches
+each missing one by id and otherwise names it as unavailable. It reports
+whether the later revision builds on the earlier, and whether the target's own
+changes came in between, since a rebase or a merge of the target makes "since
+your last review" include them; when either revision shares no history with
+the target, it says it cannot tell. The reader's visits are kept outside the repository per account and pull
+request. "Since your last visit" is the last visit before the current one, and
+the renderer names the visit: looking again or refreshing within it must not
+move the baseline, a new visit must, and a first visit has none rather than
+one made up. A force-push can leave a reviewed head reachable from nothing, so
+the kept visits, the frozen baseline and the last reviewed head are held by
+refs under `refs/n10/retained/`, one set per account and pull request,
+replaced whole on each visit. Refs there are real refs: `git log --all` shows
+their commits and `git push --mirror` publishes them. Nothing yet lets them go
+when a pull request closes.
+
 File-tree collapse state follows each file's content revision, not poll timing
 or churn counts. Ignore temporary empty snapshots; unchanged snapshots preserve
 state. Open ancestors only for new or changed files.

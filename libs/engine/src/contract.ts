@@ -13,6 +13,8 @@ export type {
   SessionService,
   PrDiffManifestRequest,
   PrDiffPatchRequest,
+  PrRevisionRangeRequest,
+  PrRevisionRangeResult,
   PrDiffManifestResult,
   PrDiffPatchResult,
   PrDiffError,

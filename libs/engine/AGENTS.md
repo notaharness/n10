@@ -53,6 +53,8 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   through core's `resolvePrComparison` and own the manifest and patches read
   between them: commit-keyed reads never expire, branch resolution does. A
   request names its repository and is answered `repo-changed` for any other.
+  History reads (`history-reads.ts`) share one `VisitBaselines` per repository
+  service, so a visit begun before a repository switch is the same visit after.
   Parsing Git output stays a core primitive, rendering stays shell-specific.
 
 - **Review commands**: capture repo/account before awaiting, resolve thread ids

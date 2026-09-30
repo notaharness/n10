@@ -23,6 +23,7 @@ import * as mentions from './services/mentions.js';
 import * as prChecks from './services/pr-checks.js';
 import * as prConversation from './services/pr-conversation.js';
 import * as prDetails from './services/pr-details.js';
+import * as prHistory from './services/pr-history.js';
 import * as reviewDrafts from './services/review-drafts.js';
 import * as babysit from './services/babysit.js';
 import * as machines from './services/machines.js';
@@ -85,6 +86,8 @@ export function createHostApi(): HostApi {
     setThreadResolved: (req: ResolveRequest) => reviews.setThreadResolved(req),
     fetchPrDescription: (prId) => reviews.fetchPrDescription(prId),
     getPullRequestSnapshot: (req) => prDetails.getPullRequestSnapshot(req),
+    getPullRequestHistory: (req) => prHistory.getPullRequestHistory(req),
+    recordPullRequestVisit: (req) => prHistory.recordPullRequestVisit(req),
     getPullRequestChecks: (req) => prChecks.getPullRequestChecks(req),
     getPullRequestConversation: (req) =>
       prConversation.getPullRequestConversation(req),
@@ -142,6 +145,7 @@ export function createHostApi(): HostApi {
       worktrees.getWorktreeDiffText(branch, targetBranch),
     fetchPrDiffManifest: (req) => reviews.getPrDiffManifest(req),
     fetchPrDiffPatch: (req) => reviews.getPrDiffPatch(req),
+    resolvePrRevisionRange: (req) => prHistory.resolvePrRevisionRange(req),
 
     openExternal: (url) => externalOpener(url),
     showContextMenu: (items) => contextMenu(items),
@@ -280,6 +284,8 @@ export function registerHostHandlers(
     [IPC.setThreadResolved]: api.setThreadResolved as HostMethod,
     [IPC.fetchPrDescription]: api.fetchPrDescription as HostMethod,
     [IPC.getPullRequestSnapshot]: api.getPullRequestSnapshot as HostMethod,
+    [IPC.getPullRequestHistory]: api.getPullRequestHistory as HostMethod,
+    [IPC.recordPullRequestVisit]: api.recordPullRequestVisit as HostMethod,
     [IPC.getPullRequestChecks]: api.getPullRequestChecks as HostMethod,
     [IPC.getPullRequestConversation]:
       api.getPullRequestConversation as HostMethod,
@@ -302,6 +308,7 @@ export function registerHostHandlers(
     [IPC.fetchWorktreeDiffText]: api.fetchWorktreeDiffText as HostMethod,
     [IPC.fetchPrDiffManifest]: api.fetchPrDiffManifest as HostMethod,
     [IPC.fetchPrDiffPatch]: api.fetchPrDiffPatch as HostMethod,
+    [IPC.resolvePrRevisionRange]: api.resolvePrRevisionRange as HostMethod,
     [IPC.openExternal]: api.openExternal as HostMethod,
     [IPC.showContextMenu]: api.showContextMenu as HostMethod,
     [IPC.showAppMenu]: api.showAppMenu as HostMethod,
