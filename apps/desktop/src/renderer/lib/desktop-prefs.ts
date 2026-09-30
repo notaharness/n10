@@ -2,7 +2,11 @@ import { useSyncExternalStore } from 'react';
 import type { DesktopPrefs } from '../../host/contract.js';
 
 /** Renderer mirror of the host's desktop prefs (loaded once at boot). */
-let prefs: DesktopPrefs = { theme: 'system', nativeFrame: false };
+let prefs: DesktopPrefs = {
+  theme: 'system',
+  nativeFrame: false,
+  tabOverflow: 'wrap',
+};
 const listeners = new Set<() => void>();
 
 export async function loadDesktopPrefs(): Promise<DesktopPrefs> {

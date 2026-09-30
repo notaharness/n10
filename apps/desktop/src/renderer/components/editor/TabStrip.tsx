@@ -12,13 +12,16 @@ import {
 import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
 import {
   horizontalListSortingStrategy,
+  rectSortingStrategy,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
+import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { usePrefersReducedMotion } from '../../lib/reduced-motion.js';
+import { cn } from '../../lib/utils.js';
 import {
   ChordKeyboardSensor,
   handleTabKey,
@@ -54,6 +57,11 @@ const announcements: Announcements = {
  * `tab-keyboard.ts`: a chord lifts, so Enter and Space still activate).
  * The other tabs slide aside while one is dragged; the order only
  * changes in the model on drop.
+ *
+ * More tabs than fit wrap onto more rows, or, as the desktop prefs say
+ * (`tabOverflow`, chosen from a tab's menu), scroll the one row
+ * sideways. Wrapped, the tabs are a grid to dnd-kit — its rect
+ * strategy, free to move across rows; in one row, a horizontal list.
  */
 export function TabStrip({
   ids,
@@ -64,6 +72,7 @@ export function TabStrip({
   onMove: (id: string, targetId: string, side: 'before' | 'after') => void;
   children: ReactNode;
 }) {
+  const wrap = useDesktopPrefs().tabOverflow === 'wrap';
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: DRAG_THRESHOLD_PX },
@@ -86,18 +95,25 @@ export function TabStrip({
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
-      modifiers={[restrictToHorizontalAxis]}
+      modifiers={wrap ? [] : [restrictToHorizontalAxis]}
       accessibility={{ announcements, screenReaderInstructions }}
       onDragEnd={onDragEnd}
     >
       <SortableContext
         items={[...ids]}
-        strategy={horizontalListSortingStrategy}
+        strategy={wrap ? rectSortingStrategy : horizontalListSortingStrategy}
       >
         <div
           role="tablist"
           aria-label="Open tabs"
-          className="flex h-9 shrink-0 items-stretch overflow-x-auto border-b border-border bg-tab [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          data-overflow={wrap ? 'wrap' : 'scroll'}
+          className={cn(
+            'flex shrink-0 items-stretch border-b border-border bg-tab',
+            wrap
+              ? // Every row but the last is ruled off from the one below.
+                'flex-wrap [&>[role=tab]]:-mb-px [&>[role=tab]]:border-b'
+              : 'h-9 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          )}
         >
           {children}
           <div className="flex-1" aria-hidden />

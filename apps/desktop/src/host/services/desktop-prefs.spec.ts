@@ -44,36 +44,63 @@ afterEach(() => {
 
 describe('loadDesktopPrefs', () => {
   it('falls back to defaults when nothing has been saved', () => {
-    expect(loadDesktopPrefs()).toEqual({ theme: 'system', nativeFrame: false });
+    expect(loadDesktopPrefs()).toEqual({
+      theme: 'system',
+      nativeFrame: false,
+      tabOverflow: 'wrap',
+    });
   });
 
   it('survives a corrupt file instead of failing to start', () => {
     // This is read before the first window; throwing here means no
     // window at all, with no way to tell the user why.
     writePrefs('{ not json at all');
-    expect(loadDesktopPrefs()).toEqual({ theme: 'system', nativeFrame: false });
+    expect(loadDesktopPrefs()).toEqual({
+      theme: 'system',
+      nativeFrame: false,
+      tabOverflow: 'wrap',
+    });
   });
 
   it('fills in keys a saved file does not have', () => {
     // Older installs, and anything added since, must not come back
     // undefined into the window chrome.
     writePrefs(JSON.stringify({ theme: 'dark' }));
-    expect(loadDesktopPrefs()).toEqual({ theme: 'dark', nativeFrame: false });
+    expect(loadDesktopPrefs()).toEqual({
+      theme: 'dark',
+      nativeFrame: false,
+      tabOverflow: 'wrap',
+    });
   });
 
   it('reads a full file back', () => {
-    writePrefs(JSON.stringify({ theme: 'light', nativeFrame: true }));
-    expect(loadDesktopPrefs()).toEqual({ theme: 'light', nativeFrame: true });
+    writePrefs(
+      JSON.stringify({
+        theme: 'light',
+        nativeFrame: true,
+        tabOverflow: 'scroll',
+      })
+    );
+    expect(loadDesktopPrefs()).toEqual({
+      theme: 'light',
+      nativeFrame: true,
+      tabOverflow: 'scroll',
+    });
   });
 });
 
 describe('saveDesktopPrefs', () => {
   it('creates the directory on a first-ever save', () => {
     const next = saveDesktopPrefs({ theme: 'dark' });
-    expect(next).toEqual({ theme: 'dark', nativeFrame: false });
+    expect(next).toEqual({
+      theme: 'dark',
+      nativeFrame: false,
+      tabOverflow: 'wrap',
+    });
     expect(JSON.parse(readFileSync(prefsPath(), 'utf8'))).toEqual({
       theme: 'dark',
       nativeFrame: false,
+      tabOverflow: 'wrap',
     });
   });
 
@@ -81,7 +108,11 @@ describe('saveDesktopPrefs', () => {
     saveDesktopPrefs({ theme: 'dark', nativeFrame: true });
     const next = saveDesktopPrefs({ theme: 'light' });
     // Saving the theme from the menu must not reset the frame choice.
-    expect(next).toEqual({ theme: 'light', nativeFrame: true });
+    expect(next).toEqual({
+      theme: 'light',
+      nativeFrame: true,
+      tabOverflow: 'wrap',
+    });
   });
 
   it('returns the merged result the caller then broadcasts', () => {
@@ -90,6 +121,7 @@ describe('saveDesktopPrefs', () => {
     expect(saveDesktopPrefs({ nativeFrame: true })).toEqual({
       theme: 'system',
       nativeFrame: true,
+      tabOverflow: 'wrap',
     });
   });
 
@@ -98,6 +130,7 @@ describe('saveDesktopPrefs', () => {
     expect(saveDesktopPrefs({ theme: 'dark' })).toEqual({
       theme: 'dark',
       nativeFrame: false,
+      tabOverflow: 'wrap',
     });
     expect(loadDesktopPrefs().theme).toBe('dark');
   });

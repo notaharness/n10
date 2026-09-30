@@ -61,11 +61,13 @@ function Gate() {
   const qc = useQueryClient();
   const { data: repo, isPending } = useRepoGate();
 
-  /** Adopt a repository the host has already switched to. */
+  /** Adopt a repository the host has already switched to. Opening it
+   *  put it on the recents list, with its colour if it is new there. */
   const adoptRepo = useCallback(
     (r: RepoInfo) => {
       resetRepoScopedCache(qc);
       qc.setQueryData(keys.repo, r);
+      void qc.invalidateQueries({ queryKey: keys.recents });
     },
     [qc]
   );

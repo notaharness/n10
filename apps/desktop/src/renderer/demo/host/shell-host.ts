@@ -99,6 +99,7 @@ export function createShellHost(state: DemoState): ShellHost {
   let prefs: DesktopPrefs = {
     theme: requestedTheme() ?? 'system',
     nativeFrame: false,
+    tabOverflow: 'wrap',
   };
   const menuCommands = new Channel<MenuCommandEvent>();
   return {
@@ -116,6 +117,7 @@ export function createShellHost(state: DemoState): ShellHost {
           cwd,
           lastOpenedAt: Date.now() - i * 3_600_000,
           valid: true,
+          color: i,
         }))
       ),
     selectRepoDirectory: () => pickFolder('Open a repository'),

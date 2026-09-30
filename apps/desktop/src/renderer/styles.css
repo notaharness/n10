@@ -44,6 +44,18 @@
   --statusbar-foreground: #3b3b3b;
   --tab: #f8f8f8;
   --tab-active: #ffffff;
+  /* Opaque, so the close button can cover a tab's end in its colour. */
+  --tab-hover: color-mix(in srgb, var(--accent) 60%, var(--tab));
+
+  /* Repositories, in the order they take them (lib/tabs/repo-colors.ts). */
+  --repo-1: #0d9488;
+  --repo-2: #ea580c;
+  --repo-3: #7c3aed;
+  --repo-4: #db2777;
+  --repo-5: #16a34a;
+  --repo-6: #ca8a04;
+  --repo-7: #0284c7;
+  --repo-8: #dc2626;
 
   --success: #1a7f37;
   --warning: #9a6700;
@@ -92,6 +104,16 @@
   --statusbar-foreground: #cccccc;
   --tab: #181818;
   --tab-active: #1f1f1f;
+  --tab-hover: color-mix(in srgb, var(--accent) 60%, var(--tab));
+
+  --repo-1: #2dd4bf;
+  --repo-2: #fb923c;
+  --repo-3: #a78bfa;
+  --repo-4: #f472b6;
+  --repo-5: #4ade80;
+  --repo-6: #facc15;
+  --repo-7: #38bdf8;
+  --repo-8: #f87171;
 
   --success: #3fb950;
   --warning: #d29922;
@@ -140,6 +162,7 @@
   --color-statusbar-foreground: var(--statusbar-foreground);
   --color-tab: var(--tab);
   --color-tab-active: var(--tab-active);
+  --color-tab-hover: var(--tab-hover);
 
   --color-success: var(--success);
   --color-warning: var(--warning);

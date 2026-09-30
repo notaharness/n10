@@ -129,6 +129,9 @@ export const keys = {
 /** Keys that survive a repository switch. */
 const CROSS_REPO_KEYS: ReadonlySet<string> = new Set([
   keys.repo[0],
+  // The app's repositories, whatever one is open; the tab strip
+  // colours every tab by them.
+  keys.recents[0],
   keys.terminals[0],
   keys.foreignSessions[0],
   keys.machines[0],

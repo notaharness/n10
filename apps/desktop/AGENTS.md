@@ -149,6 +149,14 @@ Every rule below has its reasoning in `docs/decisions.md`.
   (`watchSession`, counted per window in `services/session-watch.ts`) and
   the host sends PTY output only to watching windows; only one on screen
   shows it (`showSession`), which is what marks output seen.
+- The tab strip wraps or scrolls as the `tabOverflow` desktop pref says,
+  chosen from a tab's menu (radio items). Wrapped, dnd-kit sorts it with
+  `rectSortingStrategy` and no axis lock. Labels are cut from the front by
+  measurement (`TabLabel.tsx`, `lib/tabs/front-truncate.ts`): Chromium has no
+  start-side `text-overflow`. A repository's colour is its recents entry's
+  `color`, taken as it is added (`recent-repos.ts`), indexing the `--repo-*`
+  tokens (`lib/tabs/repo-colors.ts`). The close button overlays the tab's end
+  in the tab's own opaque background.
 - Each tab's view (picked pane, picked file, diff anchor, walkthrough step)
   lives beside the tabs in `TabViewsHost` (`lib/tabs/tab-views.tsx`) for this
   run, across repository switches: read once as initial state, written on
