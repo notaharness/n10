@@ -315,6 +315,7 @@ export interface N10HostApi {
   /** Validate + open a directory as the active repo. */
   openRepo(cwd: string): Promise<RepoInfo>;
   getRepo(): Promise<RepoInfo | null>;
+  refreshRepo(): Promise<RepoInfo | null>;
 
   // ── Recent repos ─────────────────────────────────────────────
   listRecentRepos(): Promise<RecentRepoEntry[]>;
@@ -577,6 +578,7 @@ export const IPC = {
   selectFolder: 'n10/shell/select-folder',
   forgetRecent: 'n10/repo/forget',
   getRepo: 'n10/repo/get',
+  refreshRepo: 'n10/repo/refresh',
   getSettingsView: 'n10/settings/view',
   updateSettingsField: 'n10/config/update-field',
   getSidebarModel: 'n10/sidebar/model',

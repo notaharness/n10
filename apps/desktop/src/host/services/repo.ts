@@ -66,6 +66,13 @@ export function getRepo(): RepoInfo | null {
   return repoInfo(current);
 }
 
+/** Explicit refresh at renderer boot: disk edits must update account identity
+ * before identity-scoped queries run. Snapshot reads themselves remain pure. */
+export function refreshRepo(): RepoInfo | null {
+  repositories.getSnapshot()?.config.reload();
+  return getRepo();
+}
+
 function repoInfo(current: RepositoryHandle): RepoInfo {
   const { provider, vcsConfigured, repository, viewer } =
     current.config.getSnapshot();

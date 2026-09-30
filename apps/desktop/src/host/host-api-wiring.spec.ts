@@ -37,6 +37,7 @@ vi.mock('./services/repo.js', () =>
   recorder('repo', [
     'openRepo',
     'getRepo',
+    'refreshRepo',
     'listRecentRepos',
     'forgetRecentRepo',
   ])
@@ -166,6 +167,7 @@ beforeEach(() => {
 const WIRING: [keyof HostApi, unknown[], string][] = [
   ['openRepo', ['/repo'], 'repo.openRepo'],
   ['getRepo', [], 'repo.getRepo'],
+  ['refreshRepo', [], 'repo.refreshRepo'],
   ['listRecentRepos', [], 'repo.listRecentRepos'],
   ['forgetRecent', ['/repo'], 'repo.forgetRecentRepo'],
 

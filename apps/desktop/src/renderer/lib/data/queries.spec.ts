@@ -62,7 +62,7 @@ function deferred<T>() {
 describe('loadRepoGate', () => {
   it('reports no repository when the host cannot name one', async () => {
     stubHost({
-      getRepo: () => Promise.reject(new Error('host is not ready')),
+      refreshRepo: () => Promise.reject(new Error('host is not ready')),
       getDesktopPrefs: () =>
         Promise.resolve({ theme: 'system' as const, nativeFrame: false }),
     });
@@ -76,7 +76,7 @@ describe('loadRepoGate', () => {
   it('waits for the desktop prefs before reporting the repository', async () => {
     const prefs = deferred<{ theme: 'system'; nativeFrame: boolean }>();
     stubHost({
-      getRepo: () => Promise.resolve(REPO),
+      refreshRepo: () => Promise.resolve(REPO),
       getDesktopPrefs: () => prefs.promise,
     });
 
@@ -92,7 +92,7 @@ describe('loadRepoGate', () => {
 
   it('reports the repository even when the prefs cannot be read', async () => {
     stubHost({
-      getRepo: () => Promise.resolve(REPO),
+      refreshRepo: () => Promise.resolve(REPO),
       getDesktopPrefs: () => Promise.reject(new Error('no prefs file')),
     });
 

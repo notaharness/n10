@@ -20,6 +20,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   activeRepoIs,
+  activeConfigService,
+  refreshRepo,
   forgetRecentRepo,
   getRepo,
   listRecentRepos,
@@ -193,4 +195,14 @@ describe('recent repositories', () => {
     saveRecents(recents(Array.from({ length: 25 }, (_, i) => `/repo-${i}`)));
     expect(listRecentRepos().length).toBeLessThanOrEqual(10);
   });
+});
+
+it('refreshes config explicitly without making snapshot reads publish', () => {
+  openRepo(gitDir);
+  const service = activeConfigService();
+  const reload = vi.spyOn(service, 'reload');
+  getRepo();
+  expect(reload).not.toHaveBeenCalled();
+  expect(refreshRepo()?.cwd).toBe(gitDir);
+  expect(reload).toHaveBeenCalledOnce();
 });

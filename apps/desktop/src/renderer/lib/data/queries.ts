@@ -43,7 +43,7 @@ import type {
  */
 export async function loadRepoGate(): Promise<RepoInfo | null> {
   const [repo] = await Promise.all([
-    window.n10.getRepo().catch(() => null),
+    window.n10.refreshRepo().catch(() => null),
     loadDesktopPrefs(),
   ]);
   return repo;
