@@ -68,11 +68,11 @@ export function dropChars(
     kept.push({ ...part, text: rest.join('') });
     left = 0;
   }
-  // No space between the ellipsis and the word it stands against.
-  const edge = side === 'start' ? 0 : kept.length - 1;
-  const at = kept[edge];
+  // No space between the ellipsis and the word it stands against:
+  // `kept` is in cut order from either side, so that run comes first.
+  const at = kept[0];
   if (at) {
-    kept[edge] = {
+    kept[0] = {
       ...at,
       text: side === 'start' ? at.text.trimStart() : at.text.trimEnd(),
     };

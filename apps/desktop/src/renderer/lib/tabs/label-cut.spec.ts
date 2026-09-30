@@ -80,6 +80,23 @@ describe('dropChars', () => {
     ]);
   });
 
+  it('trims the run beside the ellipsis, not the prefix, on an end cut', () => {
+    expect(
+      dropChars(
+        [
+          { key: 'repo', text: 'n10/', className: 'muted' },
+          { key: 'label', text: 'Handle cancelled requests' },
+        ],
+        8,
+        'end'
+      )
+    ).toEqual([
+      { key: 'repo', text: 'n10/', className: 'muted' },
+      { key: 'label', text: 'Handle cancelled' },
+      { key: 'ellipsis', text: ELLIPSIS },
+    ]);
+  });
+
   it('leaves the runs alone with nothing to cut', () => {
     expect(dropChars(parts, 0, 'end')).toBe(parts);
   });
