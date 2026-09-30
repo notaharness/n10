@@ -58,3 +58,11 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   agent findings have a separate ledger store over the same primitives. Publish
   only through the configured VCS publisher. Keep uncertain outcomes bound to
   their original account, reconcile on retry, and never reset posted findings.
+
+- **Sessions** (`sessions/`): the repository handle owns observation, rows and
+  launch/stop commands. Discovery uses `worktrees.scope()` live; tmux observation
+  takes the captured repository. Launches capture config before awaiting, reject
+  a repository switch before spawning, and serialize by request and resolved key.
+  Repository disposal stops observation, never the connected agents. Shells supply
+  dimensions, relays and terminal-tab presentation. Core keeps pure observations,
+  tags, PTY activity classification and native guarded launch/removal operations.

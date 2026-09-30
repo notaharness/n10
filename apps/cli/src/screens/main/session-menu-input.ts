@@ -1,9 +1,6 @@
 import {
   handleTextInput,
   type KeyPress,
-  isSessionAlive,
-  launchSession,
-  worktreeSessionKey,
   buildReviewLaunchRequest,
   buildAgentOptions,
   sessionMenuOptions,
@@ -42,8 +39,7 @@ function runStart(
   launch: () => Promise<string | null>
 ): void {
   void ctx.asyncOps.run('start-session', async () => {
-    const current = ctx.sessionNameForTerminal;
-    const name = current && isSessionAlive(current) ? current : await launch();
+    const name = await launch();
     if (!name) return;
     await ctx.sessions.refreshSessions();
     if (ctx.selectedItem?.kind !== 'review-pr') {
@@ -66,30 +62,19 @@ async function launchSelectedAgent(
   ctx: SessionMenuHandlerCtx
 ): Promise<string | null> {
   const item = ctx.selectedItem;
-  const worktreePath = item
-    ? await ctx.sessions.worktrees.resolve(worktreeTarget(item))
-    : null;
-  if (!worktreePath) {
-    ctx.sessions.flashStatus('No worktree found for selected session');
-    return null;
-  }
+  if (!item) return null;
   const options = buildAgentOptions(ctx.config.config);
   const wanted = ctx.pane.sessionMenu?.agentIndex ?? 0;
   const idx = Math.min(Math.max(wanted, 0), options.length);
   // Automatic uses the recorded agent; every named choice starts fresh.
-  const name = worktreeSessionKey(worktreePath);
-  await launchSession({
-    name,
-    cwd: worktreePath,
-    ...(item?.kind === 'session' ? {} : { branch: item?.pr.sourceBranch }),
+  return ctx.sessions.commands.launch({
+    target: worktreeTarget(item),
     cols: ctx.terminal.paneCols,
     rows: ctx.terminal.paneRows,
-    config: ctx.config.config,
-    agent: idx === 0 ? undefined : options[idx - 1]!.agent,
+    agentId: idx === 0 ? undefined : options[idx - 1]!.agent.id,
     request: { intent: idx === 0 ? 'continue-or-blank' : 'blank' },
     fresh: idx !== 0,
   });
-  return name;
 }
 
 /**
@@ -103,18 +88,12 @@ async function launchReview(
 ): Promise<string | null> {
   const pr = ctx.pane.sessionMenu?.pr;
   if (!pr) return null;
-  const worktreePath = await ctx.sessions.worktrees.create(pr.sourceBranch);
-  const name = worktreeSessionKey(worktreePath);
-  await launchSession({
-    name,
-    cwd: worktreePath,
-    branch: pr.sourceBranch,
+  return ctx.sessions.commands.launch({
+    target: { branch: pr.sourceBranch },
     cols: ctx.terminal.paneCols,
     rows: ctx.terminal.paneRows,
-    config: ctx.config.config,
     request: buildReviewLaunchRequest(pr, instruction),
   });
-  return name;
 }
 
 // Updater form throughout: arrow presses bunched into one stdin chunk

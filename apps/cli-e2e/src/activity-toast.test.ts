@@ -8,6 +8,7 @@ test.use({
     // session becomes flash-eligible. After the burst ends, the watcher
     // detects the active→idle transition (~ACTIVITY_IDLE_MS=2s later)
     // and fires the info toast.
+    agentId: 'test',
     aiCommand: fakeAgentCommand({ bursts: 1, burstMs: 4_000 }),
     autoHideSidebar: false,
     keybindPreset: 'vim',

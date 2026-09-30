@@ -1,10 +1,8 @@
-import { worktreeSessionKey, terminalSessionKey } from '../session-key.js';
+import type * as Primitive from '@n10/core';
+import { worktreeSessionKey, terminalSessionKey } from '@n10/core';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { WorktreeInfo, WorktreeScope } from '@n10/worktree-manager';
-import type {
-  DiscoveredTerminal,
-  DiscoveredWorktree,
-} from './discovery-model.js';
+import type { DiscoveredTerminal, DiscoveredWorktree } from '@n10/core';
 
 const {
   listWorktreesMock,
@@ -34,34 +32,22 @@ vi.mock('@n10/logger', () => ({
 vi.mock('@n10/worktree-manager', () => ({
   listWorktrees: (scope: WorktreeScope) => listWorktreesMock(scope),
 }));
-vi.mock('../worktree-scope.js', () => ({
-  repositoryWorktreeScope: (repo: string) => ({
-    cwd: repo,
-    resolver: { base: () => basePathMock() },
-  }),
-}));
-vi.mock('../pty-registry.js', () => ({
+vi.mock('@n10/core', async (original) => ({
+  ...(await original<typeof Primitive>()),
   sessionNames: () => sessionNamesMock(),
   hasSessionConnection: (name: string) => isSessionAliveMock(name),
   isSessionAlive: (name: string) => isSessionAliveMock(name),
-}));
-vi.mock('../session-backend.js', () => ({
   observeTmuxSessions: () => ({
     persisted: listPersistedMock(),
     terminals: listTerminalsMock(),
   }),
 }));
 
-vi.mock('../repo-root.js', () => ({ getRepoRoot: () => '/repo' }));
-
-import {
-  rescanSessionDiscovery,
-  startSessionDiscovery,
-} from './session-discovery.js';
+import { startSessionDiscovery } from './session-discovery.js';
 
 /** The registry key of the worktree checked out in directory `dir`. */
 const wtKey = (dir: string) =>
-  worktreeSessionKey(`/repo/.claude/worktrees/${dir}`);
+  worktreeSessionKey(`/repo/.claude/worktrees/${dir}`, '/repo');
 
 function worktrees(...branches: string[]): WorktreeInfo[] {
   return branches.map((branch) => ({
@@ -127,6 +113,11 @@ function start(
   const onChanged = vi.fn();
   const discovery = startSessionDiscovery({
     repo: '/repo',
+    scope: () =>
+      ({
+        cwd: '/repo',
+        resolver: { base: () => basePathMock() },
+      } as WorktreeScope),
     adopt,
     adoptTerminal,
     onChanged,
@@ -464,14 +455,14 @@ describe('startSessionDiscovery', () => {
     });
   });
 
-  describe('rescanSessionDiscovery', () => {
-    it('reports a change to every running scanner before it resolves', async () => {
+  describe('explicit rescans', () => {
+    it('reports a change before a requested scan resolves', async () => {
       listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
       const { discovery, onChanged } = start();
       await discovery.scanNow();
 
       listWorktreesMock.mockResolvedValue([]);
-      await rescanSessionDiscovery();
+      await discovery.scanNow();
       expect(onChanged).toHaveBeenCalledTimes(1);
       expect(onChanged.mock.calls[0]![0]).toMatchObject({
         disappeared: [expect.objectContaining({ name: wtKey('feature-a') })],
@@ -484,7 +475,7 @@ describe('startSessionDiscovery', () => {
       discovery.stop();
       const before = listWorktreesMock.mock.calls.length;
 
-      await rescanSessionDiscovery();
+      await discovery.scanNow();
       expect(listWorktreesMock.mock.calls.length).toBe(before);
     });
   });

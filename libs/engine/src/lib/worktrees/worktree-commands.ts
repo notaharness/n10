@@ -53,6 +53,7 @@ export function createWorktreeCommands(options: {
   config: Pick<WorktreeConfig, 'repo' | 'getSnapshot'>;
   watchers?: WorktreeWatchers;
   changed(): Promise<unknown>;
+  rescanSessions?(): Promise<void>;
 }): WorktreeCommands {
   const { config, watchers, changed } = options;
   const repo = config.repo;
@@ -104,8 +105,10 @@ export function createWorktreeCommands(options: {
       const stopped = watchers?.suspend(repo, branch) ?? [];
       let gone = false;
       try {
+        await options.rescanSessions?.();
         const outcome = await removeWorktreeSession(branch, approved, at);
         gone = outcome === 'removed' || outcome === 'kept-branch';
+        await options.rescanSessions?.();
         await changed();
         return outcome;
       } finally {

@@ -89,7 +89,7 @@ const dirOf = (dir: string) => `/repo/.claude/worktrees/${dir}`;
 
 function wt(name: string, branch: string, dir = name): DiscoveredWorktree {
   return {
-    name: worktreeSessionKey(dirOf(dir)),
+    name: worktreeSessionKey(dirOf(dir), '/repo'),
     branch,
     path: dirOf(dir),
   };
@@ -362,7 +362,7 @@ describe('observeTmuxSessions', () => {
       ours('whatever', 'worktree', '/repo', 'feat/a', dirOf('feat-a')),
       ours('repo-feat-b', 'worktree', '/repo', 'feat-b', dirOf('feat-b')),
     ]);
-    const seen = observeTmuxSessions([
+    const seen = observeTmuxSessions('/repo', [
       wt('feat-a', 'feat/a'),
       wt('feat-b', 'feat-b'),
       wt('gone', 'gone'),
@@ -383,7 +383,7 @@ describe('observeTmuxSessions', () => {
       foreign('repo-feat-a', dirOf('feat-a')),
       foreign('repo-shell', '/repo'),
     ]);
-    expect(observeTmuxSessions([wt('feat-a', 'feat-a')])).toEqual({
+    expect(observeTmuxSessions('/repo', [wt('feat-a', 'feat-a')])).toEqual({
       persisted: new Set(),
       terminals: [],
     });
@@ -393,7 +393,7 @@ describe('observeTmuxSessions', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('feat-a', 'worktree', '/other', 'feat-a', '/other/wt/feat-a'),
     ]);
-    expect(observeTmuxSessions([wt('feat-a', 'feat-a')])).toEqual({
+    expect(observeTmuxSessions('/repo', [wt('feat-a', 'feat-a')])).toEqual({
       persisted: new Set(),
       terminals: [],
     });
@@ -406,7 +406,7 @@ describe('observeTmuxSessions', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('repo-hotfix', 'worktree', '/repo', 'hotfix-dir', dirOf('hotfix')),
     ]);
-    const seen = observeTmuxSessions([wt('hotfix', '')]);
+    const seen = observeTmuxSessions('/repo', [wt('hotfix', '')]);
     expect(seen.persisted).toEqual(
       new Set([worktreeSessionKey(dirOf('hotfix'))])
     );
@@ -422,7 +422,7 @@ describe('observeTmuxSessions', () => {
       ours('repo-agent-2', 'agent', '/repo', null, '/repo'),
       ours('odd-name', 'shell', '/repo', null, '/repo'),
     ]);
-    expect(observeTmuxSessions([]).terminals).toEqual([
+    expect(observeTmuxSessions('/repo', []).terminals).toEqual([
       {
         name: terminalSessionKey('notes-shell'),
         kind: 'shell',
@@ -455,7 +455,9 @@ describe('observeTmuxSessions', () => {
       ours('repo-old-branch', 'worktree', '/repo', 'old-branch', dirOf('dir')),
       ours('repo-stray', 'worktree', '/repo', 'new-branch', '/wt/gone'),
     ]);
-    const seen = observeTmuxSessions([wt('new-branch', 'new-branch', 'dir')]);
+    const seen = observeTmuxSessions('/repo', [
+      wt('new-branch', 'new-branch', 'dir'),
+    ]);
     expect(seen.persisted).toEqual(new Set([worktreeSessionKey(dirOf('dir'))]));
     expect(seen.terminals).toEqual([
       {
@@ -477,7 +479,9 @@ describe('observeTmuxSessions', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('repo-old-branch', 'worktree', '/repo', 'old/branch', '/wt/dir'),
     ]);
-    const seen = observeTmuxSessions([wt('new-branch', 'new-branch', 'dir')]);
+    const seen = observeTmuxSessions('/repo', [
+      wt('new-branch', 'new-branch', 'dir'),
+    ]);
     expect(seen.terminals).toEqual([]);
   });
 
@@ -488,7 +492,7 @@ describe('observeTmuxSessions', () => {
         paneDead: true,
       },
     ]);
-    expect(observeTmuxSessions([wt('done', 'done')])).toEqual({
+    expect(observeTmuxSessions('/repo', [wt('done', 'done')])).toEqual({
       persisted: new Set(),
       terminals: [],
     });
@@ -499,7 +503,7 @@ describe('observeTmuxSessions', () => {
     session.paneDead = true;
     session.options!['@orchestra-agent'] = 'codex';
     tmuxListSessionsMock.mockReturnValue([session]);
-    expect(observeTmuxSessions([]).terminals).toEqual([
+    expect(observeTmuxSessions('/repo', []).terminals).toEqual([
       {
         name: terminalSessionKey('repo-agent'),
         kind: 'agent',
@@ -511,7 +515,7 @@ describe('observeTmuxSessions', () => {
   });
 
   it('costs one fork for both answers', () => {
-    observeTmuxSessions([wt('a', 'a'), wt('b', 'b')]);
+    observeTmuxSessions('/repo', [wt('a', 'a'), wt('b', 'b')]);
     expect(tmuxListSessionsMock).toHaveBeenCalledTimes(1);
   });
 
@@ -525,19 +529,19 @@ describe('observeTmuxSessions', () => {
       ours('repo-shell', 'shell', '/repo', null, ''),
       ours('repo-old', 'worktree', '/repo', 'old', ''),
     ]);
-    expect(observeTmuxSessions([]).terminals).toEqual([]);
+    expect(observeTmuxSessions('/repo', []).terminals).toEqual([]);
   });
 
-  it('is empty outside a git working tree', () => {
+  it('observes the explicit repository even when process cwd is outside Git', () => {
     resetRepoRoot();
     execFileSyncMock.mockImplementation(() => {
       throw new Error('fatal: not a git repository');
     });
     tmuxListSessionsMock.mockReturnValue([
-      ours('x', 'worktree', '/repo', 'feat-a', '/wt/feat-a'),
+      ours('x', 'worktree', '/repo', 'feat-a', dirOf('feat-a')),
     ]);
-    expect(observeTmuxSessions([wt('feat-a', 'feat-a')])).toEqual({
-      persisted: new Set(),
+    expect(observeTmuxSessions('/repo', [wt('feat-a', 'feat-a')])).toEqual({
+      persisted: new Set([worktreeSessionKey(dirOf('feat-a'), '/repo')]),
       terminals: [],
     });
   });

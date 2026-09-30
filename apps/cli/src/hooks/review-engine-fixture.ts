@@ -6,6 +6,7 @@ import {
   createRemoteSync,
   createReviewService,
   createWorktreeService,
+  createSessionService,
 } from '@n10/engine';
 import type {
   ConfigService,
@@ -51,5 +52,10 @@ export function reviewEngineFixture(
     worktrees,
     isCurrent: () => true,
   });
-  return { repo: '/repo', pullRequests, worktrees, sync, reviews };
+  const sessions = createSessionService({
+    config,
+    worktrees,
+    isCurrent: () => true,
+  });
+  return { repo: '/repo', pullRequests, worktrees, sync, reviews, sessions };
 }

@@ -40,7 +40,6 @@ vi.mock('@n10/core', async (importOriginal) => ({
   hasSession: (name: string) =>
     liveSessions.has(name) || exitedSessions.has(name),
   isSessionAlive: (name: string) => liveSessions.has(name),
-  stopSession: (name: string) => killSessionMock(name),
 }));
 
 vi.mock('node:child_process', async (importOriginal) => ({
@@ -204,6 +203,7 @@ function makeCtx(opts: CtxOpts = {}) {
   };
   const nav = { focus: opts.focus ?? 'sidebar', setFocus: vi.fn() };
   const sessions = {
+    commands: { stop: killSessionMock },
     flashStatus: vi.fn(),
     refreshSessions: vi.fn().mockResolvedValue([]),
     worktrees: {

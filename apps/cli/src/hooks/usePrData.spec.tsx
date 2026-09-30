@@ -94,7 +94,7 @@ function mount() {
     pullRequests: list,
     worktrees,
   });
-  const reviews = reviewEngineFixture(null, list).reviews;
+  const { reviews, sessions } = reviewEngineFixture(null, list);
   const tree = () => (
     <EngineProvider
       pullRequests={list}
@@ -102,6 +102,7 @@ function mount() {
       sync={sync}
       worktrees={worktrees}
       reviews={reviews}
+      sessions={sessions}
     >
       <Probe />
     </EngineProvider>

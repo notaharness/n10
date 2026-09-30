@@ -46,6 +46,7 @@ async function startBusyThenSecond(term: N10Term): Promise<void> {
 test.describe('Activity queue (Ctrl+Space, setting on)', () => {
   test.use({
     n10Config: {
+      agentId: 'test',
       aiCommand,
       autoHideSidebar: false,
       keybindPreset: 'vim',
@@ -75,6 +76,7 @@ test.describe('Activity queue (Ctrl+Space, setting on)', () => {
 test.describe('Activity queue (Ctrl+Space, setting off)', () => {
   test.use({
     n10Config: {
+      agentId: 'test',
       aiCommand,
       autoHideSidebar: false,
       jumpToInactiveOnEscape: false,
@@ -111,6 +113,7 @@ test.describe('Activity queue (Ctrl+Space, setting off)', () => {
 test.describe('Activity queue (auto-hidden sidebar)', () => {
   test.use({
     n10Config: {
+      agentId: 'test',
       aiCommand: fakeAgentCommand({
         silent: true,
         echo: true,

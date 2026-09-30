@@ -1,98 +1,36 @@
+import { useEffect, useEffectEvent, useSyncExternalStore } from 'react';
 import { useEngine } from '../context/EngineContext.js';
-import {
-  useState,
-  useMemo,
-  useEffect,
-  useCallback,
-  useEffectEvent,
-  useSyncExternalStore,
-} from 'react';
-import {
-  worktreeSessionRow,
-  isSessionAlive,
-  sessionNames,
-  launchSession,
-  onSessionExit,
-  startSessionDiscovery,
-} from '@n10/core';
-import type { AgentSession, DiscoveredWorktree } from '@n10/core';
-import { readConfig } from '@n10/vcs-core';
 import { useLayout } from '../context/LayoutContext.js';
 import { useToastActions } from '../context/ToastContext.js';
 
-const runningSessions = () => new Set(sessionNames().filter(isSessionAlive));
-
-export function useSessionManager(
-  repo: string,
-  setBranches: (v: string[]) => void
-) {
+/** Adapt the engine's session observation to React and the current terminal size. */
+export function useSessionManager(setBranches: (v: string[]) => void) {
   const { terminal } = useLayout();
-  const { worktrees } = useEngine();
+  const { sessions, worktrees } = useEngine();
   const { flash } = useToastActions();
   const snapshot = useSyncExternalStore(
-    worktrees.subscribe,
-    worktrees.getSnapshot
-  );
-  // Registry events change running flags without changing the checkout snapshot.
-  const [running, setRunning] = useState(runningSessions);
-  const sessions = useMemo<AgentSession[]>(
-    () =>
-      snapshot.worktrees.map((wt) =>
-        worktreeSessionRow(wt, (name) => running.has(name), repo)
-      ),
-    [snapshot.worktrees, repo, running]
+    sessions.subscribe,
+    sessions.getSnapshot
   );
   const reportError = useEffectEvent(() => {
     if (snapshot.error) flash(snapshot.error, 'warning');
   });
   useEffect(() => reportError(), [snapshot.error]);
-
-  const refreshSessions = useCallback(async () => {
-    const next = await worktrees.refresh();
-    setRunning(runningSessions());
-    return next.worktrees.map((wt) =>
-      worktreeSessionRow(wt, isSessionAlive, repo)
-    );
-  }, [worktrees, repo]);
-
-  // Discovery passes the actual checkout. Attaching never creates a new worktree.
-  // The effect event reads the current terminal size at the moment of adoption.
-  const adoptExternalSession = useEffectEvent(
-    async (wt: DiscoveredWorktree) => {
-      await launchSession({
-        name: wt.name,
-        mode: 'attach',
-        cwd: wt.path,
-        cols: terminal.paneCols,
-        rows: terminal.paneRows,
-        config: readConfig(repo),
-        request: { intent: 'continue-or-blank' },
-      });
-    }
-  );
-  const onDiscovered = useEffectEvent(() => {
-    void refreshSessions();
-  });
-  const startSessionManager = useEffectEvent(() => {
-    let cancelled = false;
-    void worktrees.refresh().then((next) => {
-      if (!cancelled) setBranches(next.allBranches);
-    });
-    const discovery = startSessionDiscovery({
-      repo,
-      isCurrent: () => !cancelled,
-      adopt: (wt) => adoptExternalSession(wt),
-      onChanged: () => onDiscovered(),
-    });
-    const unsubscribe = onSessionExit(() => {
-      if (!cancelled) setRunning(runningSessions());
+  const size = useEffectEvent(() => ({
+    cols: terminal.paneCols,
+    rows: terminal.paneRows,
+  }));
+  const start = useEffectEvent(() => {
+    let stopped = false;
+    const unwatch = sessions.watch({ size: () => size() });
+    void worktrees.read().then((next) => {
+      if (!stopped) setBranches(next.allBranches);
     });
     return () => {
-      cancelled = true;
-      discovery.stop();
-      unsubscribe();
+      stopped = true;
+      unwatch();
     };
   });
-  useEffect(() => startSessionManager(), []);
-  return { sessions, refreshSessions };
+  useEffect(() => start(), []);
+  return { sessions: snapshot.sessions, refreshSessions: sessions.refresh };
 }

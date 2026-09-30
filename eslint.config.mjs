@@ -75,6 +75,18 @@ const shellOperationPaths = [
     message: 'Review commands belong to the engine review service.',
   },
   {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: [
+      'launchSession',
+      'stopSession',
+      'observeTmuxSessions',
+      'getSessionLaunchContext',
+    ],
+    message:
+      'Session observation and commands belong to the engine session service.',
+  },
+  {
     name: '@n10/review-comments',
     allowTypeImports: true,
     importNames: [

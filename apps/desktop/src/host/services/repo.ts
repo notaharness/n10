@@ -32,10 +32,14 @@ function canonicalRecents(recents: RecentRepo[]): RecentRepo[] {
   return out;
 }
 
-export function requireRepo(): string {
+export function activeRepository(): RepositoryHandle {
   const current = repositories.getSnapshot();
   if (!current) throw new NoActiveRepoError();
-  return current.cwd;
+  return current;
+}
+
+export function requireRepo(): string {
+  return activeRepository().cwd;
 }
 
 /** Whether `cwd` is still the open repository. Long, awaiting host work
@@ -54,9 +58,8 @@ export function openRepo(path: string): RepoInfo {
       isCurrent: activeRepoIs,
     },
   });
-  // Session primitives still use the process repo root; the session-domain
-  // migration removes this shell-owned ambient state. Resetting the cached root
-  // is essential: otherwise removal in one repo can address another repo’s agent.
+  // Plan delivery and babysitters still resolve the process repo root.
+  // Keep their ambient scope aligned until those domains take explicit handles.
   process.chdir(opened.cwd);
   resetRepoRoot();
   try {

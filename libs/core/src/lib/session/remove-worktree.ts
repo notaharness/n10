@@ -9,7 +9,6 @@ import {
   type WorktreeInfo,
   type WorktreeScope,
 } from '@n10/worktree-manager';
-import { rescanSessionDiscovery } from '../discovery/session-discovery.js';
 import { isSessionAlive } from '../pty-registry.js';
 import { stopSession } from './stop-session.js';
 import { canonicalWorktreePath, keyForWorktree } from '../session-key.js';
@@ -176,11 +175,7 @@ async function judgedCheckout(
  *  branch it was created for, which another worktree may have checked
  *  out since.
  *
- *  Resolves once session discovery has seen the result, so the shells
- *  learn of this removal the way they learn of one made outside n10.
- *  Discovery reports only the removal of a worktree it has seen, and a
- *  worktree made moments ago may not have had a scan yet — so it looks
- *  once before the removal as well as after. */
+ */
 export async function removeWorktreeSession(
   branch: string,
   approved: WorktreeRemovalCheck,
@@ -188,14 +183,12 @@ export async function removeWorktreeSession(
 ): Promise<WorktreeRemovalOutcome> {
   if (approved.verdict === 'refused') return 'refused';
   const { cwd } = scope;
-  await rescanSessionDiscovery();
   const checkout = await judgedCheckout(branch, approved, scope);
   if (!checkout) return 'changed';
   stopSession(keyForWorktree(checkout, cwd));
   const outcome = (await judgedCheckout(branch, approved, scope))
     ? await removeJudged(branch, approved, scope)
     : 'changed';
-  await rescanSessionDiscovery();
   return outcome;
 }
 

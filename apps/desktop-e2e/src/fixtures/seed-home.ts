@@ -133,6 +133,7 @@ export function seedHome(
     join(n10, 'config.json'),
     JSON.stringify(
       {
+        agentId: 'test',
         aiCommand: fakeAgent(),
         ...opts.n10Config,
       },

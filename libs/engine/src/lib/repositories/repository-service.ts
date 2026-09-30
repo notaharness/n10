@@ -1,3 +1,8 @@
+import { createSessionConnections } from '../sessions/session-connections.js';
+import {
+  createSessionService,
+  type SessionService,
+} from '../sessions/session-service.js';
 import {
   createReviewService,
   type ReviewService,
@@ -21,6 +26,7 @@ export interface RepositoryHandle {
   readonly config: ConfigService;
   readonly worktrees: WorktreeService;
   readonly reviews: ReviewService;
+  readonly sessions: SessionService;
 }
 
 /** Selection owns a captured-repo config service; metadata comes from that
@@ -38,6 +44,7 @@ export function createRepositoryService(
   }
 ) {
   let current: RepositoryHandle | null = null;
+  const connections = createSessionConnections();
   return {
     getSnapshot: () => current,
     open(
@@ -61,6 +68,9 @@ export function createRepositoryService(
         const worktrees = createWorktreeService({
           config,
           watchers: ports.worktreeWatchers,
+          rescanSessions: async () => {
+            await sessions.scanNow();
+          },
         });
         const reviews = createReviewService({
           config,
@@ -68,9 +78,16 @@ export function createRepositoryService(
           pullRequests: options.pullRequests,
           isCurrent: () => current?.cwd === cwd,
         });
+        const sessions = createSessionService({
+          connections,
+          config,
+          worktrees,
+          isCurrent: () => current?.sessions === sessions,
+        });
+        current?.sessions.dispose();
         current?.reviews.dispose();
         current?.worktrees.dispose();
-        current = { cwd, config, worktrees, reviews };
+        current = { cwd, config, worktrees, reviews, sessions };
       }
       return current;
     },

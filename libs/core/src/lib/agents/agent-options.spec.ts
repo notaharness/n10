@@ -37,15 +37,15 @@ describe('buildAgentOptions', () => {
     ]);
   });
 
-  it('resolves a legacy aiCommand to its agent', () => {
-    const opts = buildAgentOptions(config({ aiCommand: 'gemini' }));
+  it('lists the explicitly configured Gemini agent first', () => {
+    const opts = buildAgentOptions(config({ agentId: 'gemini' }));
     expect(opts[0]?.name).toBe('Gemini (default)');
     expect(opts[0]?.agent.id).toBe('gemini');
   });
 
-  it('labels an unrecognized aiCommand as Custom and keeps it launchable', () => {
+  it('lists an explicitly configured test agent as Custom', () => {
     const opts = buildAgentOptions(
-      config({ aiCommand: 'my-special-cli --foo' })
+      config({ agentId: 'test', aiCommand: 'my-special-cli --foo' })
     );
     expect(opts[0]?.name).toBe('Custom (default)');
     expect(opts[0]?.agent.blank()).toEqual({

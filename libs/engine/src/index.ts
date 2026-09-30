@@ -40,3 +40,14 @@ export type {
   ResolveReviewThread,
 } from './lib/reviews/review-commands.js';
 export type { PostAgentCommentsRequest } from './lib/reviews/agent-publication.js';
+
+export {
+  createSessionService,
+  type SessionService,
+  type SessionSnapshot,
+  type SessionWatchPorts,
+} from './lib/sessions/session-service.js';
+export type {
+  SessionLaunch,
+  SessionLaunchPorts,
+} from './lib/sessions/session-commands.js';

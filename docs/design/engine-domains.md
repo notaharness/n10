@@ -56,9 +56,8 @@ sync policy or terminal lifetime. Sync is higher risk: core safety checks must
 remain authoritative during repo switches and auto-deletion. Reviews then benefit
 from the established config/account scope and command invalidation model.
 
-The agent registry's `agentIdFromCommand` legacy inference is a separate cleanup
-alongside session extraction. Use explicit agent identity, including fixture agents;
-do not introduce a replacement compatibility path. Config storage reads the current nested format; flat Azure credential/project
+Session extraction deletes `agentIdFromCommand`; agent identity is explicit,
+including fixture agents, without a replacement compatibility path. Config storage reads the current nested format; flat Azure credential/project
 format has no migration or fallback path.
 
 ## Delivery stack
@@ -89,9 +88,10 @@ propagated through the stack before merging.
 6. **Review commands and drafts**: shared reply/resolve/draft/publication commands,
    scoped stores and publication reconciliation. Both agent-comment posting paths
    use vcs publishers; delete review-comments' independent poster.
-7. **Sessions**: discovery, adoption, launch/restart/stop, lifecycle and attention
-   facts shared by both shells, then babysitter coordination if its size warrants
-   a separate PR. Delete shell orchestration; preserve retained connections across
+7. **Sessions**: discovery, adoption, launch/restart/stop and connection/exit
+   facts shared by both shells. Follow with process-wide terminal lifecycle and
+   babysitter coordination as separate reviewable parts of this domain. PTY
+   activity classification remains a primitive; shell seen/focus state remains UI. Delete shell orchestration; preserve retained connections across
    repo switches. Remove legacy command-to-agent inference and use explicit
    fixture-agent identity. Discovery receives the repository handle’s live scope
    port; launch captures one handle for both cwd and domain services before any

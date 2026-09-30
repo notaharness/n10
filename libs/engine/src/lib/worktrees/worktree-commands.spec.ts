@@ -28,7 +28,7 @@ beforeEach(() => {
   state.outcome = 'removed';
 });
 
-function harness() {
+function harness(rescanSessions?: () => Promise<void>) {
   const watchers = {
     suspend: vi.fn(() => [42]),
     resume: vi.fn(async () => undefined),
@@ -42,6 +42,7 @@ function harness() {
     },
     watchers,
     changed,
+    rescanSessions,
   });
   return { commands, watchers, changed };
 }
@@ -104,3 +105,19 @@ describe('worktree removal command', () => {
     await expect(commands.remove('topic', approved)).resolves.toBe('changed');
   });
 });
+
+it.each(['removed', 'git-refused'] as const)(
+  'scans the captured repository before and after removal: %s',
+  async (outcome) => {
+    state.outcome = outcome;
+    const { commands } = harness(async () => {
+      state.calls.push(['scan']);
+    });
+    await commands.remove('topic', approved);
+    expect(state.calls.map((call) => call[0])).toEqual([
+      'scan',
+      'topic',
+      'scan',
+    ]);
+  }
+);

@@ -1,17 +1,19 @@
-import { listWorktrees } from './worktrees.js';
 import {
   buildSidebarItems,
   buildSessionPrMap,
   categorizeReviews,
   findOrphanPrs,
   sortSessionsByPrId,
-  worktreeSessionRow,
   type SidebarItem,
 } from '@n10/core';
 import { pullRequestPollIntervalMs } from '@n10/engine';
-import { activeRepoIs, activeReviewService, requireRepo } from './repo.js';
+import {
+  activeRepository,
+  activeRepoIs,
+  activeReviewService,
+  requireRepo,
+} from './repo.js';
 import { babysatStatuses } from './babysit.js';
-import { isOwnSessionAlive } from './sessions.js';
 import { getSyncDecorations, refreshRemoteSync } from './remote-sync.js';
 import { pullRequests, resolveProvider } from './program.js';
 import type { SidebarModel, SyncState } from '../contract.js';
@@ -23,7 +25,7 @@ import type { SidebarModel, SyncState } from '../contract.js';
  * the host process where Git and provider access are available; the
  * result is plain data streamed to the renderer.
  *
- * Worktrees come from the engine resource and PTY state from the registry.
+ * Worktree session rows and liveness come from the captured engine handle.
  * Remote pull request data comes from the host's one instance
  * of `@n10/engine`'s pull request list (`services/pull-requests.ts`),
  * so the renderer can poll the model frequently without hammering the
@@ -49,20 +51,16 @@ import type { SidebarModel, SyncState } from '../contract.js';
 /** The rows alone. Exported for its tests; the bridge serves
  *  `getSidebarSnapshot`, which says which repository they are of. */
 export async function listSidebarItems(): Promise<SidebarItem[]> {
-  const cwd = requireRepo();
+  const repo = activeRepository();
+  const cwd = repo.cwd;
   const { config, provider } = resolveProvider(cwd);
 
   // Local git first and on its own: worktrees are the rows the user is
   // most likely looking for, and they must not queue behind a provider
   // call that may be a network round trip away.
   pullRequests.refreshInBackground(cwd);
-  const worktrees = await listWorktrees();
+  const sessions = await repo.sessions.read();
   const prMap = pullRequests.getSnapshot(cwd).prMap;
-  // Rows are keyed by checkout, so the agent in a worktree stays that
-  // worktree's whichever branch it is on now (`worktreeSessionRow`).
-  const sessions = worktrees.map((wt) =>
-    worktreeSessionRow(wt, isOwnSessionAlive, cwd)
-  );
 
   const checkedOut = new Set(
     sessions.flatMap((s) => (s.branch ? [s.branch] : []))
@@ -94,14 +92,8 @@ export async function listSidebarItems(): Promise<SidebarItem[]> {
  * The sidebar stamped with the repository it describes — what the
  * renderer is handed.
  *
- * `listSidebarItems` reads the open repository more than once over its
- * awaits (the worktree list, then which sessions are this repo's), so a
- * switch landing in between yields rows of one repository with the
- * live state of another. Rather than stamp that, it is computed again
- * for the repository the host is on now, and stamped with that one; the
- * renderer then knows exactly which workspace the answer is for. Bounded,
- * because a host that keeps switching under the call has a bigger
- * problem than a stale sidebar.
+ * A repository switch can land while the captured engine handle reads local
+ * state. Recompute for the selected handle before stamping a response.
  */
 export async function getSidebarSnapshot(): Promise<SidebarModel> {
   for (let attempt = 0; attempt < 3; attempt++) {

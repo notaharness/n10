@@ -1,3 +1,5 @@
+import type * as EngineModule from '@n10/engine';
+import type { AppConfig } from '@n10/vcs-core';
 import type * as CoreModule from '@n10/core';
 import { worktreeSessionKey } from '@n10/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,6 +11,7 @@ import type { TaggedSession } from '@n10/core';
 
 const state = vi.hoisted(() => ({
   cwd: '/repo-a',
+  handles: new Map<string, EngineModule.SessionService>(),
   alive: new Set<string>(),
   spawns: [] as {
     name: string;
@@ -71,13 +74,16 @@ function addCheckout(branch: string, repo = state.cwd): string {
   return path;
 }
 
-vi.mock('./repo.js', () => ({
-  requireRepo: () => state.cwd,
-  activeRepoIs: (cwd: string) => cwd === state.cwd,
-  activeWorktreeService: () => {
+vi.mock('./repo.js', async () => {
+  const { createSessionService } = await vi.importActual<typeof EngineModule>(
+    '@n10/engine'
+  );
+  const handles = state.handles;
+  function activeRepository() {
     const repo = state.cwd;
-    return {
-      create: (
+    let sessions = handles.get(repo);
+    if (!sessions) {
+      const create = (
         branch: string,
         remote?: { cwd: string; machine: { id: string } }
       ) => {
@@ -90,10 +96,46 @@ vi.mock('./repo.js', () => ({
         if (state.createFails.has(branch))
           return Promise.reject(new Error(`git refused ${branch}`));
         return Promise.resolve(addCheckout(branch, cwd));
+      };
+      const worktrees = {
+        create,
+        find: async (target: { branch: string }) => {
+          const path = state.worktrees.get(`${repo}\0${target.branch}`);
+          return path ? { path, branch: target.branch } : null;
+        },
+        resolve: (target: { branch: string }) => create(target.branch),
+        subscribe: () => () => undefined,
+        getSnapshot: () => ({ worktrees: [], error: null }),
+      } as unknown as EngineModule.WorktreeService;
+      sessions = createSessionService({
+        config: {
+          repo,
+          getSnapshot: () => ({
+            config: (state.configByCwd[repo] ?? {
+              fromCwd: repo,
+            }) as AppConfig,
+          }),
+          subscribe: () => () => undefined,
+        },
+        worktrees,
+        isCurrent: () => state.cwd === repo,
+      });
+      handles.set(repo, sessions);
+    }
+    return {
+      cwd: repo,
+      sessions,
+      config: {
+        getSnapshot: () => ({ config: state.configByCwd[repo] ?? {} }),
       },
     };
-  },
-}));
+  }
+  return {
+    requireRepo: () => state.cwd,
+    activeRepoIs: (cwd: string) => cwd === state.cwd,
+    activeRepository,
+  };
+});
 
 vi.mock('@n10/vcs-core', () => ({
   readConfig: (cwd: string) => state.configByCwd[cwd] ?? { fromCwd: cwd },
@@ -134,6 +176,25 @@ vi.mock('@n10/core', async (importOriginal) => {
     sessionIdentity: actual.sessionIdentity,
     LOCAL_MACHINE: actual.LOCAL_MACHINE,
     resolveAgent: actual.resolveAgent,
+    sessionIncarnationMatches: (
+      name: string,
+      expected: CoreModule.SessionIncarnation
+    ) => {
+      if (actual.sessionIdentity(name)?.machine !== actual.LOCAL_MACHINE)
+        return false;
+      const native = state.ptyNames.get(name) ?? name;
+      const live = state.tmuxSnapshots.get(native)?.incarnation as
+        | CoreModule.SessionIncarnation
+        | undefined;
+      return (
+        !!live &&
+        ['name', 'sessionId', 'paneId', 'panePid', 'serverPid'].every(
+          (key) =>
+            live[key as keyof CoreModule.SessionIncarnation] ===
+            expected[key as keyof CoreModule.SessionIncarnation]
+        )
+      );
+    },
     // The checkout that has the branch, as core reads it from git.
     sessionKeyForBranch: (branch: string, repo: string) => {
       const path = state.worktrees.get(`${repo}\0${branch}`);
@@ -251,6 +312,7 @@ vi.mock('@n10/core', async (importOriginal) => {
     hasSessionConnection: (name: string) => state.alive.has(name),
     hasLiveTmuxSession: (name: string) => state.persisted.has(name),
     getSpawnedAt: () => 1000,
+    sessionNames: () => [...state.entries.keys()],
     noteInput: () => undefined,
     noteResize: () => undefined,
     noteSeen: () => undefined,
@@ -276,6 +338,7 @@ let reconnectSession: typeof sessions.reconnectSession;
 
 beforeEach(async () => {
   state.cwd = '/repo-a';
+  state.handles.clear();
   state.alive = new Set();
   state.spawns = [];
   state.killed = [];
@@ -781,53 +844,9 @@ describe('another repository owns the name', () => {
     });
   });
 
-  it('skips it during worktree removal instead of killing it', async () => {
-    await launchInAThenSwitch();
-    // Housekeeping inside a legitimate operation: removing this repo's
-    // `shared` worktree must not reach the other repo's agent, and must
-    // not abort the removal either.
-    expect(() =>
-      sessions.killOwnSession(keyFor('shared', '/repo-a'))
-    ).not.toThrow();
-    expect(state.killed).toEqual([]);
-    state.cwd = '/repo-a';
-    sessions.killOwnSession(keyFor('shared', '/repo-a'));
-    expect(state.killed).toEqual([keyFor('shared', '/repo-a')]);
-  });
-
-  it('treats a discovered session as the repo that discovered it', async () => {
-    // Discovery attaches by calling `launchAgent` with the checkout git
-    // reported, so a session it picks up is recorded like any other —
-    // under whichever repo was open at the time. The ownership guards
-    // read that record, so the two have to agree: a worktree found in
-    // this repo counts as ours, and one found over there does not
-    // become ours by sharing a branch name.
-    const discovered = worktreeSessionKey(
-      '/repo-a/elsewhere/shared',
-      '/repo-a'
-    );
-    state.cwd = '/repo-a';
-    await launchAgent(
-      { branch: 'shared', intent: 'continue-or-blank' },
-      '/repo-a/elsewhere/shared'
-    );
-    expect(sessions.isOwnSessionAlive(discovered)).toBe(true);
-
-    state.cwd = '/repo-b';
-    expect(sessions.isOwnSessionAlive(discovered)).toBe(false);
-    await launchAgent(
-      { branch: 'shared', intent: 'continue-or-blank' },
-      '/repo-b/elsewhere/shared'
-    );
-    expect(state.spawns).toHaveLength(2);
-    sessions.killOwnSession(discovered);
-    expect(state.killed).toEqual([]);
-  });
-
   it('ignores names without a worktree identity', () => {
-    // No entry means no ownership claim — killing is a no-op there
-    // rather than an error, matching the registry's own behaviour.
-    expect(() => killSession('never-seen')).not.toThrow();
+    // A name without an explicit worktree identity never authorizes a stop.
+    expect(() => killSession('never-seen')).toThrow('another repository');
     expect(state.killed).toEqual([]);
     expect(state.persistedKilled).toEqual([]);
   });
@@ -1153,7 +1172,9 @@ describe('stopping persisted sessions', () => {
   });
 
   it('does not stop an unregistered session from another repository', () => {
-    killSession(keyFor('retained', '/repo-b'));
+    expect(() => killSession(keyFor('retained', '/repo-b'))).toThrow(
+      'another repository'
+    );
     expect(state.persistedKilled).toEqual([]);
     expect(state.killed).toEqual([]);
   });
@@ -1161,8 +1182,7 @@ describe('stopping persisted sessions', () => {
   it('does not stop a foreign registry entry that was never adopted by this host', () => {
     const name = keyFor('retained', '/repo-b');
     state.alive.add(name);
-    killSession(name);
-    sessions.killOwnSession(name);
+    expect(() => killSession(name)).toThrow('another repository');
     expect(state.alive.has(name)).toBe(true);
     expect(state.killed).toEqual([]);
     expect(state.persistedKilled).toEqual([]);

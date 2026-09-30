@@ -63,21 +63,17 @@ The reasoning behind each rule is in `docs/decisions.md`.
   guarded removal. `repositoryWorktreeScope(repo)` captures persisted settings
   for standalone operations; engine commands use their config snapshot. Never
   select a process-wide path resolver.
-- **Discovery** (`discovery/`): capture the repository, replace the filesystem
-  watch when its configured worktree base changes, poll and use pure `diffScans`; attach through the
-  shared launcher, rechecking connection state between awaits. Retired names
-  are suppressed. Observe worktree processes, orphaned sessions and standalone
-  terminals in one listing. Retained agent panes are not running processes.
-  `removeWorktreeSession` rescans before it resolves, so shells learn of
-  every removal, n10's or not, through `onChanged`.
+- **Observation** (`discovery/`, `session-backend.ts`): pure scan differences,
+  tagged observations and live-worktree lookups. `observeTmuxSessions` receives
+  the repository explicitly. The engine owns polling, adoption and removal rescans.
+  Retained agent panes are not running processes.
 - **Terminal sessions** (`terminal/launch-terminal.ts`): explicit shell/agent
   requests use the same launcher as worktrees. Allocate the final tmux name
   before creating the registry key. Agent panes retain final output; shell
   exits close their tabs. Native pane state controls exit, not client disconnect.
 
-- **Session launch** (`session/`) resolves the worktree via `createWorktree`
-  (exact branch match, rejecting a derived path occupied by another branch), reads config from the
-  repo root, and only replaces a live session with explicit incarnation approval. Force-remove is offered only
+- **Session launch** (`session/`) receives the resolved checkout and explicit
+  config; it replaces a live session only with native incarnation approval. Force-remove is offered only
   for uncommitted changes, unpushed commits and submodules. `removeWorktreeSession`
   takes the confirmed verdict, never a bare `force`. It forces only past risks
   the verdict named, and keeps everything if the checkout changed in any way the

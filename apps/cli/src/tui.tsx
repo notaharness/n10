@@ -177,6 +177,7 @@ export async function runTui(args: string[]): Promise<void> {
         sync={sync}
         worktrees={worktrees}
         reviews={repo.reviews}
+        sessions={repo.sessions}
       >
         <KeybindProvider>
           <LayoutProvider>

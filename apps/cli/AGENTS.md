@@ -3,7 +3,7 @@
 This project is the published `@notaharness/n10` package. `src/main.ts` is the
 `n10` executable: plain `n10` runs Electron on the desktop build shipped beside
 it (`commands/launch-desktop.ts`), `--tui` loads `src/tui.tsx`, and `util`
-loads `commands/util.ts`, which is `@n10/review-comments` alone. Those two are
+loads `commands/util.ts`, which delegates to core’s scoped review utility. Those two are
 dynamic imports of local modules (Nx forbids lazy-loading a library imported
 statically elsewhere), which esbuild splits into chunks. Keep Ink, React and
 Electron out of `main.ts`'s static imports so `util`, `--help` and `--version`
@@ -32,7 +32,8 @@ holds the keybind-driven state transitions; screens under `src/screens/main`
   without it every file needs `import React`.
 - Ink paints nothing when `CI`, `CONTINUOUS_INTEGRATION` or `GITHUB_ACTIONS`
   is set. Strip them from any env that spawns n10.
-- Worktree removal uses core's shared stop → remove → delete sequence.
+- Session launch/stop and discovery use the engine repository handle. Worktree
+  removal uses the engine command over core’s guarded stop → remove → delete sequence.
   `stopSession` terminates one held target or one persisted target, never both.
 - The pull request list is `@n10/engine`'s, created in `tui.tsx` and provided
   by `EngineProvider`. `usePrData` observes it and holds a watch; nothing here

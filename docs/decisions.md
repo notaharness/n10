@@ -156,15 +156,35 @@ Core registry keys are JSON tuples: `["worktree", repo, canonicalCheckout]` or
 
 ## Discovery, restart and terminal lifecycle
 
-Discovery polls worktrees and tmux, diffs observations with `diffScans`, and
-attaches through the shared launcher. Recheck local connection state between
+The repository handle's engine session service owns discovery, adoption, session
+rows, connection facts and launch/stop commands. Discovery reads the handle's live
+worktree scope and supplies its explicit repository to tmux observation; core
+never reads process cwd for this scan. Pure observation differences (`diffScans`),
+tag identity, PTY activity classification and native launch/incarnation checks
+remain core primitives. Output relays, pane dimensions and terminal-tab UI stay
+in the shell.
+
+Discovery polls worktrees and tmux and attaches through the shared launcher. Recheck local connection state between
 awaits so concurrent user actions cannot create duplicate connections. Failed
 attaches have bounded retries. Failed local clients become eligible for
 rediscovery without pretending their hosted agents exited.
 
+A launch captures one repository handle and its config before awaiting worktree
+resolution or fleet checks. A repository change before launch refuses the request.
+Identical requests join; incompatible requests resolving to one checkout cannot
+replace each other's PTY. Stopping observation on a repo switch disposes timers
+and listeners but preserves every connected agent. Exit notifications update
+session facts without spawning or reattaching. The process-level repository service
+retains observed connection identities after an explicit stop, so an existing
+pane remains a relaunch target even after switching away and back.
+
+Agent selection uses explicit `agentId`, defaulting to Claude. The hidden fixture
+runner requires `agentId: 'test'`; only that runner interprets `aiCommand`. No
+command-prefix inference or migration fallback exists.
+
 A tagged worktree process is running only while its pane is alive. Standalone
 terminal tabs are found globally by their session type and tmux `session_path`.
-An orphaned worktree session appears as an agent terminal when its tagged branch
+An orphaned worktree session appears as an agent terminal when its tagged checkout
 no longer matches a listed worktree; attachment preserves its original tags.
 Terminal grouping is derived from its directory. Restoring tabs does not move
 focus. Discovery also removes retained tabs whose sessions were deleted outside
@@ -213,8 +233,8 @@ verdict did not name, such as a file written into a checkout judged clean. Any
 of them keeps everything. A branch that moves during the removal itself, or
 that git will not delete, keeps the branch. `removeWorktreeSession`
 returns what it did, and each shell says what was kept and why. The
-merged-branch sweep uses the same guard. `removeWorktreeSession`
-scans discovery before and after removing, so the shells learn of n10's
+merged-branch sweep uses the same guard. The engine worktree command
+scans its repository’s discovery before and after core removal, so the shells learn of n10's
 removals through `onChanged`, as they learn of `git worktree remove`: discovery
 can only report the removal of a worktree it has seen.
 
@@ -625,10 +645,10 @@ changes; repository selection has no second metadata store. Core supplies
 filesystem validation and resolver operations. Desktop chooses its startup repo
 and keeps recents; the TUI opens its requested checkout before mounting React.
 
-The desktop still changes process cwd for the session primitives that require it.
-This is a shell adapter constraint, not an engine input: repository detection and
-snapshots always receive a captured path. Session and worktree migrations remove
-the remaining ambient ownership in the order in the [domain plan](design/engine-domains.md).
+The desktop still changes process cwd for plan delivery and babysitters.
+Repository detection, worktree operations and session commands receive captured
+paths. The remaining domains take explicit handles in the
+[domain plan](design/engine-domains.md).
 
 ## Shared remote sync
 

@@ -1,4 +1,4 @@
-import { worktreeSessionKey } from '@n10/core';
+import { worktreeSessionKey, worktreeSessionRow } from '@n10/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as SidebarModule from './sidebar.js';
 import type * as PullRequestsModule from './pull-requests.js';
@@ -56,6 +56,31 @@ const env = vi.hoisted(() => ({
 
 vi.mock('./repo.js', () => ({
   requireRepo: () => env.cwd,
+  activeRepository: () => {
+    const cwd = env.cwd;
+    return {
+      cwd,
+      sessions: {
+        read: async () => {
+          const worktrees = env.holdWorktrees
+            ? await new Promise<typeof env.worktrees>((resolve) => {
+                env.holdWorktrees = false;
+                env.releaseWorktrees = (list) => resolve(list ?? env.worktrees);
+              })
+            : env.worktrees;
+          return worktrees.map((wt) =>
+            worktreeSessionRow(
+              { ...wt, branch: wt.branch ?? '' } as Parameters<
+                typeof worktreeSessionRow
+              >[0],
+              () => false,
+              cwd
+            )
+          );
+        },
+      },
+    };
+  },
   activeReviewService: () => ({ invalidateProvider: vi.fn() }),
   activeRepoIs: (cwd: string) => cwd === env.cwd,
 }));
@@ -77,16 +102,6 @@ vi.mock('./remote-sync.js', () => ({
 
 vi.mock('@n10/vcs-core', () => ({
   readConfig: () => ({ vendor: 'github', ...env.config }),
-}));
-
-vi.mock('./worktrees.js', () => ({
-  listWorktrees: () =>
-    env.holdWorktrees
-      ? new Promise<typeof env.worktrees>((resolve) => {
-          env.holdWorktrees = false;
-          env.releaseWorktrees = (list) => resolve(list ?? env.worktrees);
-        })
-      : Promise.resolve(env.worktrees),
 }));
 
 vi.mock('@n10/core', async (importOriginal) => ({

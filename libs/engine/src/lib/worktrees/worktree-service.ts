@@ -5,7 +5,7 @@ import {
   listAllBranches,
   worktreeScope,
 } from '@n10/worktree-manager';
-import type { WorktreeInfo } from '@n10/worktree-manager';
+import type { WorktreeInfo, WorktreeScope } from '@n10/worktree-manager';
 import { logError } from '@n10/logger';
 import { createWorktreeCommands } from './worktree-commands.js';
 import type {
@@ -22,6 +22,7 @@ export interface WorktreeSnapshot {
   error: string | null;
 }
 export interface WorktreeService extends WorktreeCommands {
+  scope(): WorktreeScope;
   getSnapshot(): WorktreeSnapshot;
   subscribe(listener: () => void): () => void;
   /** Cached for one second; reads never reject and failures preserve known data. */
@@ -44,6 +45,7 @@ function readError(error: unknown): string {
 export function createWorktreeService(options: {
   config: WorktreeConfig;
   watchers?: WorktreeWatchers;
+  rescanSessions?(): Promise<void>;
 }): WorktreeService {
   const { config } = options;
   let snapshot: WorktreeSnapshot = {
@@ -119,6 +121,7 @@ export function createWorktreeService(options: {
   });
   return {
     ...createWorktreeCommands({ ...options, changed: refresh }),
+    scope: () => worktreeScope(config.repo, { template }),
     getSnapshot: () => snapshot,
     subscribe(listener) {
       listeners.add(listener);

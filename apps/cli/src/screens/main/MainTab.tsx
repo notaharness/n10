@@ -213,7 +213,6 @@ function MainTabBody({
     controlsOpen: settings.controlsOpen,
     sessionMenuActive: pane.sessionMenu !== null,
     agentId: configCtx.config.agentId,
-    aiCommand: configCtx.config.aiCommand,
     prTitle: sidebar.selectedPr?.title,
     sessionName: sidebar.sessionNameForTerminal,
     rowLabel: sidebar.selectedRowLabel,

@@ -20,9 +20,6 @@ vi.mock('../pty-registry.js', () => ({
   isSessionAlive: (key: string) => state.alive.has(key),
   killSession: (key: string) => state.calls.push(['kill', key]),
 }));
-vi.mock('../discovery/session-discovery.js', () => ({
-  rescanSessionDiscovery: async () => state.calls.push(['rescan']),
-}));
 vi.mock('../session-backend.js', () => ({
   killPersistedTmuxSession: (key: string) =>
     state.calls.push(['persisted', key]),
@@ -115,24 +112,10 @@ describe('removeWorktreeSession', () => {
       )
     ).toBe('removed');
     expect(effects()).toEqual([
-      ['rescan'],
       ['kill', LOGIN_KEY],
       ['remove', 'feature/login', { force: true, cwd: '/repo-a' }],
       ['delete', 'feature/login', true, '/repo-a'],
-      ['rescan'],
     ]);
-  });
-
-  // The shells learn of this removal through discovery, as they do of
-  // one made outside n10; a failed removal still stopped the agent.
-  it('has discovery look again whether or not git removed the checkout', async () => {
-    state.removed = false;
-    await removeWorktreeSession(
-      'feature/login',
-      CLEAR,
-      worktreeScope('/repo-a')
-    );
-    expect(state.calls.at(-1)).toEqual(['rescan']);
   });
 
   it('keeps the branch, and says git refused, if checkout removal fails', async () => {
@@ -198,7 +181,7 @@ describe('removeWorktreeSession', () => {
         worktreeScope('/repo-a')
       )
     ).toBe('changed');
-    expect(kinds()).toEqual(['rescan']);
+    expect(kinds()).toEqual([]);
   });
 
   // A rebase leaves the branch ref alone until it finishes.
@@ -211,7 +194,7 @@ describe('removeWorktreeSession', () => {
         worktreeScope('/repo-a')
       )
     ).toBe('changed');
-    expect(kinds()).toEqual(['rescan']);
+    expect(kinds()).toEqual([]);
   });
 
   // `--force` is all or nothing: past a submodule it also takes a file
@@ -231,7 +214,7 @@ describe('removeWorktreeSession', () => {
           worktreeScope('/repo-a')
         )
       ).toBe('changed');
-      expect(kinds()).toEqual(['rescan']);
+      expect(kinds()).toEqual([]);
     }
   );
 
@@ -256,7 +239,7 @@ describe('removeWorktreeSession', () => {
         worktreeScope('/repo-a')
       )
     ).toBe('changed');
-    expect(kinds()).toEqual(['rescan', 'kill', 'rescan']);
+    expect(kinds()).toEqual(['kill']);
   });
 
   it('keeps the branch when it moved during the removal', async () => {
@@ -282,7 +265,7 @@ describe('removeWorktreeSession', () => {
         worktreeScope('/repo-a')
       )
     ).toBe('changed');
-    expect(kinds()).toEqual(['rescan']);
+    expect(kinds()).toEqual([]);
   });
 
   it('leaves everything when the verdict came from another repository', async () => {
@@ -294,7 +277,7 @@ describe('removeWorktreeSession', () => {
         worktreeScope('/repo-a')
       )
     ).toBe('changed');
-    expect(kinds()).toEqual(['rescan']);
+    expect(kinds()).toEqual([]);
   });
 
   it('says the branch was kept when git would not delete it', async () => {
@@ -318,7 +301,7 @@ describe('removeWorktreeSession', () => {
         worktreeScope('/repo-a')
       )
     ).toBe('changed');
-    expect(kinds()).toEqual(['rescan']);
+    expect(kinds()).toEqual([]);
   });
 });
 

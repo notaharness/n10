@@ -47,7 +47,7 @@ function writeJsonFile<T>(path: string, data: T): void {
 interface RawGlobalConfig {
   prPollInterval?: number;
   aiCommand?: string;
-  agentId?: AgentId;
+  agentId?: AgentId | 'test';
   vendorAuth?: Record<string, Record<string, string>>;
   autoDeleteOnMerge?: boolean;
   autoRebase?: boolean;

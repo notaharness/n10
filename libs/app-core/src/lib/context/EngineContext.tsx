@@ -5,6 +5,7 @@ import type {
   RemoteSync,
   WorktreeService,
   ReviewService,
+  SessionService,
 } from '@n10/engine';
 
 /**
@@ -18,6 +19,7 @@ export interface EngineContextValue {
   sync: RemoteSync;
   worktrees: WorktreeService;
   reviews: ReviewService;
+  sessions: SessionService;
 }
 
 const EngineContext = createContext<EngineContextValue | null>(null);
@@ -28,11 +30,12 @@ export function EngineProvider({
   sync,
   worktrees,
   reviews,
+  sessions,
   children,
 }: EngineContextValue & { children: ReactNode }) {
   const value = useMemo(
-    () => ({ pullRequests, repo, sync, worktrees, reviews }),
-    [pullRequests, repo, sync, worktrees, reviews]
+    () => ({ pullRequests, repo, sync, worktrees, reviews, sessions }),
+    [pullRequests, repo, sync, worktrees, reviews, sessions]
   );
   return (
     <EngineContext.Provider value={value}>{children}</EngineContext.Provider>

@@ -11,7 +11,7 @@
 
 import type { Focus, PaneMode } from '@n10/core';
 import { AGENTS, resolveAgent, sessionLabel } from '@n10/core';
-import type { AgentId, AppConfig } from '@n10/vcs-core';
+import type { AppConfig } from '@n10/vcs-core';
 
 export interface FocusState {
   navFocus: Focus;
@@ -62,10 +62,9 @@ export interface PaneTitleState {
   settingsOpen: boolean;
   controlsOpen: boolean;
   sessionMenuActive: boolean;
-  agentId: AgentId | undefined;
+  agentId: AppConfig['agentId'];
   sessionAgent?: string;
   hasAttachedSession?: boolean;
-  aiCommand: string | undefined;
   prTitle: string | undefined;
   sessionName: string | null;
   /** The selected worktree row's label — its branch as checked out
@@ -112,13 +111,11 @@ export function getPaneTitle(s: PaneTitleState): string {
   const named = overlayTitle(s) ?? PANE_MODE_TITLES[s.paneMode];
   if (named) return named;
 
-  // Resolve the display name through the agent registry so it honors an
-  // explicit agentId or a legacy aiCommand. The hidden test runner (and
-  // any unrecognized command) shows the generic "Agent".
   const resolved = resolveAgent({
     agentId: s.agentId,
-    aiCommand: s.aiCommand,
-  } as AppConfig);
+    vendorAuth: {},
+    vendorProject: {},
+  });
   const agent = s.hasAttachedSession
     ? AGENTS.find((a) => a.id === s.sessionAgent)?.name ?? 'Agent'
     : resolved.hidden

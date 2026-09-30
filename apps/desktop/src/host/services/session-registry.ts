@@ -1,9 +1,4 @@
-import {
-  sessionIdentity,
-  sessionLabel,
-  stopSession,
-  isSessionAlive,
-} from '@n10/core';
+import { sessionLabel, isSessionAlive } from '@n10/core';
 import { requireRepo } from './repo.js';
 import {
   attachRelay,
@@ -11,17 +6,7 @@ import {
   type RelayEntry,
 } from './session-relay.js';
 
-/**
- * Which sessions this host has launched, and the single-repository
- * ownership guard every launch and stop path shares. Split out of
- * `sessions.ts` to keep that file focused on the launch sequence
- * itself; this half is pure bookkeeping over one shared map.
- *
- * The pty-registry has no iteration API (the CLI enumerates via its
- * own React state), so the desktop host tracks the sessions it
- * launched. Entries persist after exit so the final frame stays
- * viewable — matching TUI behavior.
- */
+/** Output relays for connections across repositories, retained with final frames. */
 export interface KnownSession extends RelayEntry {
   /** Repository displayed by this relay. Qualified keys let other repos stay live. */
   repoCwd: string;
@@ -80,32 +65,6 @@ export function ownSessionNames(): string[] {
 /** Whether this host holds a live session for the open repository. */
 export function isOwnSessionAlive(name: string): boolean {
   return isSessionAlive(name) && ownSession(name) !== undefined;
-}
-
-/**
- * Stop `name`, unless it belongs to another repository — in which case
- * this repo has no agent under that name to stop (the guard in
- * `doLaunchAgent` makes a second one impossible), and killing it would
- * reach into the other repo's.
- *
- * Distinct from `killSession`, which throws: that one answers a user
- * pointing at a specific agent, where silence would be a lie. This one
- * is housekeeping inside a larger operation that is legitimate either
- * way, so it skips rather than aborting it.
- */
-export function killOwnSession(name: string): void {
-  if (known.has(name) && !ownSession(name)) return;
-  stopOwnWorktreeSession(name);
-}
-
-/** Shared by {@link killOwnSession} and `sessions.ts`'s `killSession`:
- *  stop `name` only when it is a worktree session this repository
- *  actually owns. */
-export function stopOwnWorktreeSession(name: string): void {
-  const identity = sessionIdentity(name);
-  if (identity?.kind === 'worktree' && identity.repo === requireRepo()) {
-    stopSession(name);
-  }
 }
 
 /** Whether a session under `name` is another repository's — known to

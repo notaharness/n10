@@ -97,7 +97,6 @@ export * from './lib/pull-requests/review-draft-store.js';
 export * from './lib/pull-requests/review-draft-types.js';
 export * from './lib/pull-requests/review-drafts.js';
 export * from './lib/discovery/discovery-model.js';
-export * from './lib/discovery/session-discovery.js';
 export * from './lib/babysit/babysit-model.js';
 export * from './lib/babysit/babysit-prompt.js';
 export * from './lib/babysit/babysit-observe.js';

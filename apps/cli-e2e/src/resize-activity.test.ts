@@ -6,6 +6,7 @@ import { settleFor } from './setup/waits.js';
 // PTY output should come from the resize redraw.
 test.use({
   n10Config: {
+    agentId: 'test',
     aiCommand: fakeAgentCommand({ silent: true }),
     autoHideSidebar: false,
     keybindPreset: 'vim',

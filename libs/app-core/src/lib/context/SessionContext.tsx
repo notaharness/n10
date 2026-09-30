@@ -1,4 +1,4 @@
-import type { WorktreeService } from '@n10/engine';
+import type { WorktreeService, SessionService } from '@n10/engine';
 import { useEngine } from './EngineContext.js';
 import { createContext, useContext, useMemo, useEffect } from 'react';
 import type { ReactNode } from 'react';
@@ -49,6 +49,7 @@ export interface SessionActionsContextValue {
    */
   flashStatus: (msg: string, variant?: ToastVariant) => void;
   worktrees: WorktreeService;
+  commands: SessionService;
   refreshSessions: () => Promise<AgentSession[]>;
   refreshPr: () => Promise<void>;
   triggerSync: () => Promise<void>;
@@ -64,12 +65,12 @@ function describeError(err: unknown): string {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const { config, provider, repo } = useConfig();
+  const { config, provider } = useConfig();
   const { setBranches } = useBranchPickerActions();
   const { flash } = useToastActions();
-  const { worktrees } = useEngine();
+  const { worktrees, sessions: commands } = useEngine();
 
-  const sessionMgr = useSessionManager(repo, setBranches);
+  const sessionMgr = useSessionManager(setBranches);
 
   const { prMap, error: prError, refresh: refreshPr } = usePrData();
   const {
@@ -152,10 +153,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       flashStatus: flash,
       refreshSessions,
       worktrees,
+      commands,
       refreshPr,
       triggerSync,
     }),
-    [flash, refreshSessions, worktrees, refreshPr, triggerSync]
+    [flash, refreshSessions, worktrees, commands, refreshPr, triggerSync]
   );
 
   return (

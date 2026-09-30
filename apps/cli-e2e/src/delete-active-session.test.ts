@@ -8,6 +8,7 @@ import { settleFor } from './setup/waits.js';
 
 test.use({
   n10Config: {
+    agentId: 'test',
     aiCommand: 'echo n10-session-active && sleep 300',
     keybindPreset: 'vim',
   },

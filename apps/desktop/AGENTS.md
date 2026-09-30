@@ -26,8 +26,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - The host creates tmux servers itself: a utility process does not hand
   Chromium's descriptors to the persistent server, as spawning straight
   from the main process on Linux would.
-- `services/repo.ts` `openRepo` does what the TUI's `useSessionManager` mount
-  does: detect project config and set the worktree resolver. The host
+- `services/repo.ts` opens an engine repository handle; session and worktree
+  commands capture that handle before awaiting. Discovery observes its live scope. The host
   awaits the tmux probe and validates the requirement before opening a
   repo; missing tmux is a startup error with an installation hint.
 - `main/beam/` is a client of the beam daemon's control socket (beam's

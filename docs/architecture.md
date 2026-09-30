@@ -13,9 +13,9 @@ below it, and the ESLint module boundaries enforce the direction.
 | `apps/cli`, `apps/desktop` | Rendering and input. The TUI runs the engine in its own process; the desktop runs it in the `n10 host` utility process, behind the host bridge. Two open shells share the implementation, not the state. |
 
 The engine owns config, repository selection, worktrees, remote sync, the PR
-list and review reads/commands. Each repository handle owns its config, worktree, sync
-and review resource lifetimes. Session orchestration, machines
-and plan checkout follow the [domain plan](design/engine-domains.md), which
+list, review reads/commands and worktree sessions. Repository handles own config,
+worktree, review and session observation lifetimes; shells bind sync lifetime.
+Babysitter coordination, machines and plan checkout follow the [domain plan](design/engine-domains.md), which
 records the survey, migration order, target diagram and worker evidence.
 
 ## Directory map
@@ -85,6 +85,7 @@ libs/engine/                     — The program both shells run: state, schedul
   src/lib/worktrees/             — Checkout/branch resources and scoped commands
   src/lib/sync/                  — Remote sync schedule, passes and notices
   src/lib/reviews/               — Review resources, commands, scoped findings, draft publication and pinned Git diffs
+  src/lib/sessions/              — Repository-scoped discovery, adoption, launch/stop, connection facts and session rows
 libs/core/                       — Shell-agnostic operations. No React, Ink, Electron or engine (lint-enforced)
   src/lib/session/               — Session launch + plan checkout flows
   src/lib/plan/                  — Plan store (external store) + prompt composition
@@ -98,7 +99,7 @@ libs/core/                       — Shell-agnostic operations. No React, Ink, E
   src/lib/session-identity.ts    — `@orchestra-*` tag names, session labels and matching rules shared with Orchestra
   src/lib/session-resolver.ts    — The one `list-sessions` fork every tmux lookup goes through
   src/lib/session/open-session.ts — Explicit session requests → create, attach or restart plans
-  src/lib/discovery/             — Session discovery: scan/diff, live worktree sessions, worktree HEAD reader
+  src/lib/discovery/             — Pure observation diff, live worktree lookup and worktree HEAD reader
   src/lib/keybindings/           — Customizable keybinding system
     registry.ts                  — Action catalog, presets (Normie/Vim), ActionId type
     resolver.ts                  — matchesKey, resolveAction, findConflict, descriptorFromKeypress

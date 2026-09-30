@@ -15,6 +15,7 @@ const MARKER = 'n10-branch-switch-agent';
 
 test.use({
   n10Config: {
+    agentId: 'test',
     aiCommand: `echo ${MARKER} && sleep 300`,
     keybindPreset: 'vim',
   },
