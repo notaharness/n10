@@ -45,7 +45,7 @@ function harness(
       provider: null,
       providers: [],
       updateField,
-      reloadFromDisk: vi.fn(),
+      reload: vi.fn(),
     },
     sessions: { flashStatus },
     keybinds: { resolve: () => action, setPreset },
@@ -104,3 +104,15 @@ it('passes a credential edit to the config command', () => {
     'rotated'
   );
 });
+
+it.each(WRITE_ACTIONS)(
+  '%s reports a failed write without closing n10',
+  (action) => {
+    const h = harness(action);
+    h.updateField.mockImplementation(() => {
+      throw new Error('Read-only config');
+    });
+    expect(() => handleSettingsInput('', NO_KEY, h.ctx)).not.toThrow();
+    expect(h.flashStatus).toHaveBeenCalledWith('Read-only config');
+  }
+);

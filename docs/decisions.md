@@ -24,7 +24,7 @@ and a desktop open on one repository poll independently.
 Domain ownership and execution boundaries are specified in
 [the engine plan](design/engine-domains.md). Config commands persist and re-read
 before dispatching effects; React observes stable snapshots. The host cannot
-import React bindings. No new worker or generic kernel is justified by this slice.
+import React bindings. No new worker or generic kernel is needed by these domains.
 
 When changing shared behavior, compare both shells. Worktree removal is
 implemented in the TUI's `performDelete` and desktop's `services/worktrees.ts`;

@@ -1,12 +1,9 @@
-import { createConfigService, type ConfigService } from '@n10/engine';
 import {
   buildSettingsFields,
   resolveValue,
   type SettingsField,
 } from '@n10/core';
-import { PROVIDERS, requireRepo } from './repo.js';
-import { pullRequests } from './pull-requests.js';
-import { startRemoteSyncLoop } from './remote-sync.js';
+import { activeConfigService } from './config-scope.js';
 import { SECRET_PLACEHOLDER } from '../contract.js';
 import type { SettingsFieldView, SettingsGroup } from '../contract.js';
 
@@ -49,24 +46,8 @@ function kindFor(field: SettingsField): SettingsFieldView['kind'] {
   return 'select';
 }
 
-let service: ConfigService | undefined;
-
-function activeConfig(): ConfigService {
-  const repo = requireRepo();
-  if (service?.repo !== repo) {
-    service = createConfigService({
-      repo,
-      providers: PROVIDERS,
-      pullRequests,
-      restartSync: startRemoteSyncLoop,
-    });
-  }
-  service.reload();
-  return service;
-}
-
 function activeFields() {
-  const current = activeConfig();
+  const current = activeConfigService();
   const { config, provider } = current.getSnapshot();
   return {
     config,

@@ -19,17 +19,8 @@ const state = vi.hoisted(() => ({
   resolved: {} as Record<string, string>,
 }));
 
-vi.mock('./repo.js', () => ({
-  requireRepo: () => '/repo',
-  PROVIDERS: [{ id: 'azure-devops' }, { id: 'github' }],
-}));
-
-vi.mock('./pull-requests.js', () => ({ pullRequests: {} }));
-vi.mock('./remote-sync.js', () => ({ startRemoteSyncLoop: vi.fn() }));
-vi.mock('@n10/engine', () => ({
-  createConfigService: ({ repo }: { repo: string }) => ({
-    repo,
-    reload: vi.fn(),
+vi.mock('./config-scope.js', () => ({
+  activeConfigService: () => ({
     getSnapshot: () => ({ config: state.config, provider: null }),
     updateField: (field: SettingsField, value: string | undefined) => {
       state.persisted.push({ key: field.key, value });

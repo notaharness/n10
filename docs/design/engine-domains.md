@@ -20,6 +20,7 @@ flowchart TB
   Main --> Host[Utility process: host adapters]
   React --> Engine[engine: domain services]
   Host --> Engine
+  Engine --> Providers
   Engine --> Core[core: operations and identity]
   Core --> Providers[vcs: provider protocols and storage]
   Core --> Git[worktree-manager: Git operations]
@@ -36,20 +37,20 @@ visibility, focus, toast text and terminal presentation remain shell concerns.
 
 ## Survey and migration order
 
-| Area             | Implementation at the survey baseline                                                                                                                       | Destination and sequence                                                                                                                                                                                                                                                                                |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PR list          | `engine/src/lib/pull-requests`, TUI `usePrData`, host `pull-requests`                                                                                       | Already engine-owned. Preserve scoped snapshots, single-flight reads, deadlines and memo invalidation.                                                                                                                                                                                                  |
-| Settings         | `app-core/ConfigContext` owns persistence/state; CLI `input-handlers` and host `settings` dispatch effects; unused host `config` exposes another write path | **First slice:** engine config service owns snapshots, persistence ordering and effects. Core owns coercion/bag writes; React observes; host filters and masks the form.                                                                                                                                |
-| Repository setup | `useSessionManager` and host `repo` detect config, configure resolver and discover sessions; host changes process cwd                                       | Follow config with explicit repo handles. Capture cwd through every operation before enabling concurrent repos. Auto-detection remains a primitive; its updates enter the config service through reload.                                                                                                |
-| Sync             | TUI `useRemoteSync`, `useMergedBranches`, `useConflictCounts`; host `remote-sync` serializes a promise chain; core `sync` supplies passes                   | Next domain: one bounded coordinator with skipped busy ticks, one explicit refresh, generation cancellation, success/error/last-success state and captured repo. Delete all three TUI policy hooks and host loop.                                                                                       |
-| Worktrees        | `worktree-manager`, core `session/remove-worktree`, TUI `useSessionManager`, host `worktrees`                                                               | Keep guarded stop/remove/delete operation and outcomes in core. Engine commands orchestrate it and invalidate worktree/session resources; sync uses that command. No duplicate removal sequence.                                                                                                        |
-| Review reads     | TUI `useRemoteComments`/`useDiffData`, host `reviews`, `pr-details`, `pr-checks`, `pr-conversation`; core PR snapshot/identity helpers                      | Scoped engine resources, keyed by repository/provider/account/PR and revisions. Keep provider parsing and wire protocols in vcs. Move reads before publication.                                                                                                                                         |
-| Review writes    | TUI `useReviewComments`, host `drafts`/`review-drafts`; review-comments poster plus vcs publishers                                                          | One engine command surface over scoped durable stores. Route both agent-comment publication paths through vcs publishers and delete review-comments' poster. Preserve partial/unknown outcomes; never automatically replay an uncertain mutation. Separate reviewable slice.                            |
-| Sessions         | core discovery/launch/registry/babysit; TUI `useSessionManager`; host `discovery`, `sessions`, `terminals`, `babysit`                                       | Engine owns observation, adoption, launch policy, attention facts and babysitter lifetime. Core keeps identity/launch/removal operations; terminal libs execute opaque plans. Shells supply view size and output transports. Preserve clients across repo switches and detach, never kill, on shutdown. |
-| Machines         | host `remote-machines`, main/beam ports and daemon owner                                                                                                    | Engine owns fleet state and remote command policy once session scope includes machine identity. Beam remains a transport adapter; Electron retains utility-process spawning. Preserve external daemon ownership.                                                                                        |
-| Plans            | core browser-safe plan store and checkout operations, app-core plan hook, desktop plan presentation                                                         | Keep the cart local to each frontend for now. Checkout becomes an engine command with session work. No new global cart or persistence without a product need.                                                                                                                                           |
+| Area             | Implementation at the survey baseline                                                                                                     | Destination and sequence                                                                                                                                                                                                                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PR list          | `engine/src/lib/pull-requests`, TUI `usePrData`, host `pull-requests`                                                                     | Already engine-owned. Preserve scoped snapshots, single-flight reads, deadlines and memo invalidation.                                                                                                                                                                                                  |
+| Settings         | `engine/config` owns scoped state and persistence effects; `ConfigContext` observes; host `config-scope` binds lifetime to repo opening   | Engine config service owns snapshots, persistence ordering and effects. Core owns coercion/bag writes; React observes; host filters and masks the form.                                                                                                                                                 |
+| Repository setup | `useSessionManager` and host `repo` detect config, configure resolver and discover sessions; host changes process cwd                     | Follow config with explicit repo handles. Capture cwd through every operation before enabling concurrent repos. Auto-detection remains a primitive; its updates enter the config service through reload.                                                                                                |
+| Sync             | TUI `useRemoteSync`, `useMergedBranches`, `useConflictCounts`; host `remote-sync` serializes a promise chain; core `sync` supplies passes | One bounded coordinator with skipped busy ticks, one explicit refresh, generation cancellation, success/error/last-success state and captured repo. Delete all three TUI policy hooks and host loop.                                                                                                    |
+| Worktrees        | `worktree-manager`, core `session/remove-worktree`, TUI `useSessionManager`, host `worktrees`                                             | Keep guarded stop/remove/delete operation and outcomes in core. Engine commands orchestrate it and invalidate worktree/session resources; sync uses that command. No duplicate removal sequence.                                                                                                        |
+| Review reads     | TUI `useRemoteComments`/`useDiffData`, host `reviews`, `pr-details`, `pr-checks`, `pr-conversation`; core PR snapshot/identity helpers    | Scoped engine resources, keyed by repository/provider/account/PR and revisions. Keep provider parsing and wire protocols in vcs. Move reads before publication.                                                                                                                                         |
+| Review writes    | TUI `useReviewComments`, host `drafts`/`review-drafts`; review-comments poster plus vcs publishers                                        | One engine command surface over scoped durable stores. Route both agent-comment publication paths through vcs publishers and delete review-comments' poster. Preserve partial/unknown outcomes; never automatically replay an uncertain mutation. Separate reviewable slice.                            |
+| Sessions         | core discovery/launch/registry/babysit; TUI `useSessionManager`; host `discovery`, `sessions`, `terminals`, `babysit`                     | Engine owns observation, adoption, launch policy, attention facts and babysitter lifetime. Core keeps identity/launch/removal operations; terminal libs execute opaque plans. Shells supply view size and output transports. Preserve clients across repo switches and detach, never kill, on shutdown. |
+| Machines         | host `remote-machines`, main/beam ports and daemon owner                                                                                  | Engine owns fleet state and remote command policy once session scope includes machine identity. Beam remains a transport adapter; Electron retains utility-process spawning. Preserve external daemon ownership.                                                                                        |
+| Plans            | core browser-safe plan store and checkout operations, app-core plan hook, desktop plan presentation                                       | Keep the cart local to each frontend for now. Checkout becomes an engine command with session work. No new global cart or persistence without a product need.                                                                                                                                           |
 
-Config is first because it removes a backend-to-React dependency, fixes implicit
+The numbered delivery stack below is authoritative. Config comes first because it removes a backend-to-React dependency, fixes implicit
 repo writes and eliminates duplicate effect dispatch without changing destructive
 sync policy or terminal lifetime. Sync is higher risk: core safety checks must
 remain authoritative during repo switches and auto-deletion. Reviews then benefit
@@ -58,7 +59,7 @@ from the established config/account scope and command invalidation model.
 The agent registry's `agentIdFromCommand` legacy inference is a separate cleanup
 alongside session extraction. Use explicit agent identity, including fixture agents;
 do not introduce a replacement compatibility path. Config storage reads the current nested format; flat Azure credential/project
-format migrations are removed with this slice.
+format has no migration or fallback path.
 
 ## Delivery stack
 
@@ -74,8 +75,10 @@ propagated through the stack before merging.
    it; desktop retains recent-repo UI and selection. Engine operations receive
    captured repo paths; shell cwd changes survive only until their remaining
    core callers are migrated, without adding a second compatibility API.
-3. **Sync**: one owned schedule and complete fetch/merged/conflict pass, bounded
-   refreshes, cancellation, snapshots and typed notices. Both shell coordinators
+3. **Sync**: the captured-repo worktree-removal command and one owned schedule and complete fetch/merged/conflict pass, bounded
+   refreshes, cancellation, snapshots and typed notices. Auto-delete calls this
+   engine command over core’s guarded removal; the following worktree slice adds
+   resources and the remaining commands. Both shell coordinators
    disappear. Preserve removal verdicts and repo-switch safety.
 4. **Worktrees**: list/branch resources and create/check/remove commands over
    core's guarded operations. Both shells consume the same state/invalidation;
@@ -130,8 +133,8 @@ Secrets stay in the Node service: the existing host form masks them and does not
 expose the service snapshot over IPC. Subscription payloads contain no credentials.
 
 This does not promise external-file watching or cross-process coherence. Desktop
-refreshes its config service when reading settings, and TUI explicitly reloads after
-auto-detection. PR reads continue to resolve persisted config.
+creates or reloads its config service after repository detection, before background
+work starts. Settings queries only read it. TUI explicitly reloads after detection. PR reads continue to resolve persisted config.
 
 ## Kernel: extract from evidence
 
@@ -143,7 +146,7 @@ Extract shared scope/store/scheduling mechanics only when another domain needs t
 same semantics. Keep a future kernel domain-free. Prefer direct typed commands and
 subscriptions until transport/reconnect needs justify a command bus and revisioned
 event stream. Do not add `@n10/react`, a universal `useResource`, TanStack query-core,
-or a second IPC contract as part of this slice. The desktop query cache remains a
+or a second IPC contract without a demonstrated consumer. The desktop query cache remains a
 presentation cache; it must not become a second owner of migrated domain policy.
 
 ## Dependency enforcement
@@ -153,13 +156,13 @@ or app-core; engine cannot depend on app-core) and forbids React/Ink/Electron in
 Node domain code. Restrict package subpaths as well as bare imports. Host/main
 backend files cannot import app-core. Host files cannot import Electron.
 
-Renderer value imports are limited to the host bridge and explicitly browser-safe
+Renderer rules deny Node builtins and Node-only packages, allowing browser-safe
 entries; Node types may be imported as types. Extend the existing rule to Node
 builtins and every provider. Preserve the plan/readiness exceptions.
 
 During migration, unmigrated hooks may still import core/provider operations.
-For migrated config bindings and shell settings handlers, restricted imports prevent
-raw config persistence and effect-policy helpers from returning. When all domains
+Across shell directories and app-core, restricted imports prevent raw config
+persistence. Unmigrated domains may still read config directly. When all domains
 move, tighten app-core globally to browser-safe bindings and split the contract
 into an engine-owned browser entry. Do not declare that end state enforced today.
 
@@ -182,7 +185,7 @@ scheduling measurement is 1288 ms versus 38 ms to make the flicked-to file reada
 This is presentation work already off the renderer loop; routing it through the
 host would add transport and ownership complexity without demonstrated benefit.
 
-Do **not** add host worker_threads in this slice. Git reads use child processes
+Do **not** add host worker_threads without a measured host bottleneck. Git reads use child processes
 (`core/utils/git-run.ts`), provider I/O is asynchronous, and remote sync mostly
 waits on subprocesses/network. Another worker does not accelerate that waiting.
 Small config reads/writes do not have a measured event-loop problem. Keep mutations,
@@ -196,3 +199,9 @@ I/O over moving synchronous I/O wholesale. Only measured sustained CPU work shou
 get a bounded worker_threads pool, with plain inputs, stale-result rejection,
 queue limits and explicit error/disposal behavior. Use another utility process
 only for demonstrated crash/native-resource isolation, not one process per domain.
+
+Repo-bound services use one instance per captured checkout, as config does. A
+shell selects the active instance and stops its schedules when selection changes;
+retained session clients have their own lifetime. The PR list is a multi-repository
+cache because readers and watchers share entries across scopes. Do not impose a
+single global store shape on both lifetimes.

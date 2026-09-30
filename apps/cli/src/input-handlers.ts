@@ -129,7 +129,7 @@ function autoDetect({ ctx }: SettingsActionCtx): void {
     );
     return;
   }
-  ctx.config.reloadFromDisk();
+  ctx.config.reload();
   ctx.sessions.flashStatus(
     `Auto-detected: ${Object.keys(detected).join(', ')}`
   );
@@ -179,14 +179,20 @@ export function handleSettingsInput(
   const fields = buildSettingsFields(ctx.config.provider);
   const field = fields[ctx.settings.settingsFieldIndex]!;
 
-  if (ctx.settings.editingField) {
-    handleFieldEditMode(input, key, ctx, field);
-    return;
-  }
+  try {
+    if (ctx.settings.editingField) {
+      handleFieldEditMode(input, key, ctx, field);
+      return;
+    }
 
-  const action = ctx.keybinds.resolve(input, key, 'settings');
-  if (!action) return;
-  SETTINGS_ACTIONS[action]?.({ ctx, fields, field });
+    const action = ctx.keybinds.resolve(input, key, 'settings');
+    if (!action) return;
+    SETTINGS_ACTIONS[action]?.({ ctx, fields, field });
+  } catch (error) {
+    ctx.sessions.flashStatus(
+      error instanceof Error ? error.message : String(error)
+    );
+  }
 }
 
 // ── Controls sub-screen input handler ─────────────────────────────

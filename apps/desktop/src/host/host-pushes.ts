@@ -11,6 +11,7 @@ import {
   MACHINES_EVENTS,
   SYNC_EVENTS,
 } from './contract.js';
+import { openConfigService } from './services/config-scope.js';
 import { setRepoOpenedListener } from './services/repo.js';
 import {
   setSyncNotifier,
@@ -49,6 +50,7 @@ export function installHostPushes({ broadcast, sendTo }: HostPushes): void {
   // process did not start — including the ones that survived a previous
   // run, which is what makes them show as running straight away.
   setRepoOpenedListener((cwd) => {
+    openConfigService(cwd);
     startRemoteSyncLoop(cwd);
     startDiscoveryForRepo(cwd);
   });

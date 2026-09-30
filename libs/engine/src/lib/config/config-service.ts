@@ -85,7 +85,7 @@ export function createConfigService(
     updateField(field, value) {
       // Read current disk state so a second field write preserves other edits.
       // Re-read after persistence to apply provider selection and global fallbacks.
-      persistConfigField(field, value, readConfig(repo), repo);
+      persistConfigField(field, value, readConfig(repo).vendor, repo);
       reload();
     },
     updateKeybindFields(updater) {

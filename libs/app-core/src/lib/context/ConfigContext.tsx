@@ -13,7 +13,7 @@ export interface ConfigContextValue extends ConfigSnapshot {
   providers: VcsProvider[];
   updateField: ConfigService['updateField'];
   updateKeybindFields: ConfigService['updateKeybindFields'];
-  reloadFromDisk: ConfigService['reload'];
+  reload: ConfigService['reload'];
 }
 
 const ConfigContext = createContext<ConfigContextValue | null>(null);
@@ -34,7 +34,7 @@ export function ConfigProvider({
       providers: service.providers,
       updateField: service.updateField,
       updateKeybindFields: service.updateKeybindFields,
-      reloadFromDisk: service.reload,
+      reload: service.reload,
     }),
     [service, snapshot]
   );

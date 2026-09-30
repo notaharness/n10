@@ -33,7 +33,7 @@ function coerceConfigValue(
 export function persistConfigField(
   field: SettingsField,
   value: string | undefined,
-  config: AppConfig,
+  vendor: string | undefined,
   cwd: string
 ): void {
   switch (field.configBag) {
@@ -56,14 +56,13 @@ export function persistConfigField(
       break;
     }
     case 'vendorAuth': {
+      if (!vendor)
+        throw new Error('Cannot persist provider credentials without a vendor');
       const g = readGlobalConfig();
-      const vendor = config.vendor;
-      if (vendor) {
-        if (!g.vendorAuth) g.vendorAuth = {};
-        if (!g.vendorAuth[vendor]) g.vendorAuth[vendor] = {};
-        g.vendorAuth[vendor]![field.key] = value ?? '';
-        writeGlobalConfig(g);
-      }
+      g.vendorAuth ??= {};
+      g.vendorAuth[vendor] ??= {};
+      g.vendorAuth[vendor][field.key] = value ?? '';
+      writeGlobalConfig(g);
       break;
     }
     case 'vendorProject': {

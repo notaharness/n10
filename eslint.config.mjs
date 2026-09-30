@@ -7,6 +7,22 @@ import importPlugin from 'eslint-plugin-import';
 import vitest from '@vitest/eslint-plugin';
 import ink from './tools/eslint-plugin-ink.mjs';
 
+const configPersistencePaths = [
+  {
+    name: '@n10/vcs-core',
+    allowTypeImports: true,
+    importNames: ['writeGlobalConfig', 'writeProjectConfig'],
+    message: 'Config writes belong to the engine config service.',
+  },
+  {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: ['persistConfigField', 'persistKeybindFields'],
+    message:
+      'Only the engine config service dispatches persistence and effects.',
+  },
+];
+
 export default tseslint.config(
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
@@ -364,6 +380,15 @@ export default tseslint.config(
     },
   },
   {
+    files: ['apps/**/*.{ts,tsx}', 'libs/app-core/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { paths: configPersistencePaths },
+      ],
+    },
+  },
+  {
     files: ['apps/desktop/src/{host,main}/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
@@ -396,74 +421,12 @@ export default tseslint.config(
       '@typescript-eslint/no-restricted-imports': [
         'error',
         {
+          paths: configPersistencePaths,
           patterns: [
             {
               group: ['electron', 'electron/*'],
               allowTypeImports: true,
               message: 'Host code uses ShellCalls for Electron operations.',
-            },
-          ],
-        },
-      ],
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: [
-                '@n10/app-core',
-                '@n10/app-core/*',
-                'react',
-                'react/*',
-                'react-dom',
-                'react-dom/*',
-                'ink',
-                'ink/*',
-              ],
-              message:
-                'The utility-process host uses engine/core and ShellCalls, never React or Electron.',
-            },
-            { group: ['**/index'], message: 'Import from the concrete file.' },
-          ],
-        },
-      ],
-    },
-  },
-  {
-    files: [
-      'libs/app-core/src/lib/context/ConfigContext.tsx',
-      'apps/cli/src/input-handlers.ts',
-      'apps/desktop/src/host/services/settings.ts',
-    ],
-    rules: {
-      '@typescript-eslint/no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['electron', 'electron/*'],
-              allowTypeImports: true,
-              message: 'Host code uses ShellCalls for Electron operations.',
-            },
-          ],
-          paths: [
-            {
-              name: '@n10/vcs-core',
-              importNames: [
-                'readConfig',
-                'readGlobalConfig',
-                'writeGlobalConfig',
-                'readProjectConfig',
-                'writeProjectConfig',
-              ],
-              message:
-                'Config state and writes belong to the engine config service.',
-            },
-            {
-              name: '@n10/core',
-              importNames: ['persistConfigField', 'persistKeybindFields'],
-              message:
-                'Only the engine config service dispatches persistence and effects.',
             },
           ],
         },
@@ -567,10 +530,14 @@ export default tseslint.config(
         'error',
         {
           paths: [
+            ...builtinModules,
             '@n10/app-core',
             '@n10/core',
             '@n10/engine',
             '@n10/logger',
+            '@n10/terminal',
+            '@n10/kitty-graphics',
+            '@n10/image-loader',
             '@n10/review-comments',
             '@n10/terminal-pty',
             '@n10/terminal-tmux',
@@ -588,7 +555,7 @@ export default tseslint.config(
           })),
           patterns: [
             {
-              group: ['node:*', ...builtinModules],
+              group: ['node:*'],
               allowTypeImports: true,
               message: 'Node runtime APIs belong behind the host bridge.',
             },

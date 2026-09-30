@@ -179,6 +179,16 @@ describe('config commands', () => {
     expect(events).toEqual([]);
   });
 
+  it('rejects a provider credential write without a selected vendor', () => {
+    const { service, events } = harness('/unconfigured');
+    const before = service.getSnapshot();
+    expect(() =>
+      service.updateField(field('token', 'vendorAuth'), 'secret')
+    ).toThrow('without a vendor');
+    expect(service.getSnapshot()).toBe(before);
+    expect(events).toEqual([]);
+  });
+
   it('does not publish state or effects when persistence fails', () => {
     const { service, events } = harness();
     const before = service.getSnapshot();
