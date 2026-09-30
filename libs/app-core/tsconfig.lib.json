@@ -12,9 +12,6 @@
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [
     {
-      "path": "../logger/tsconfig.lib.json"
-    },
-    {
       "path": "../terminal/tsconfig.lib.json"
     },
     {
