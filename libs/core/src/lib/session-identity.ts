@@ -270,10 +270,10 @@ export function worktreeSessionLabel(repoRoot: string, branch: string): string {
   return sessionLabel(repoRoot, branch);
 }
 
-/** `<repo basename>-shell` or `<repo basename>-agent`. */
+/** `<directory basename>-shell` or `<directory basename>-agent`. */
 export function terminalSessionLabel(
-  repoRoot: string,
+  directory: string,
   kind: 'shell' | 'agent'
 ): string {
-  return sessionLabel(repoRoot, kind);
+  return sessionLabel(directory, kind);
 }

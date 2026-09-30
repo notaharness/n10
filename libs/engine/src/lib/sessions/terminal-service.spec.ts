@@ -7,10 +7,19 @@ import { createTerminalService } from './terminal-service.js';
 
 const state = vi.hoisted(() => ({
   launch: vi.fn(),
-  stat: vi.fn(() => ({ isDirectory: () => true })),
+  stat: vi.fn<(path: string) => { isDirectory(): boolean }>(),
   config: vi.fn((cwd: string) => ({ cwd })),
   persisted: new Set<string>(),
-  entries: new Map<string, { pty: { onExit: (cb: () => void) => void } }>(),
+  entries: new Map<
+    string,
+    {
+      pty: {
+        onExit: (cb: () => void) => void;
+        connectionState?: 'connected' | 'reconnecting' | 'failed';
+      };
+    }
+  >(),
+  next: 0,
   exits: [] as (() => void)[],
   kill: vi.fn(),
   release: vi.fn(),
@@ -57,10 +66,28 @@ beforeEach(() => {
   state.entries.clear();
   state.persisted.clear();
   state.exits = [];
+  state.next = 0;
+  state.stat.mockReset().mockReturnValue({ isDirectory: () => true });
+  state.kill
+    .mockReset()
+    .mockImplementation((name: string) => state.entries.delete(name));
+  state.release
+    .mockReset()
+    .mockImplementation((name: string) => state.entries.delete(name));
+  state.detach
+    .mockReset()
+    .mockImplementation((name: string) => state.entries.delete(name));
   state.launch
     .mockReset()
-    .mockImplementation(async ({ name }: { name?: string }) =>
-      register(name ?? local)
+    .mockImplementation(
+      async ({ name, machine }: { name?: string; machine?: string }) =>
+        register(
+          name ??
+            terminalSessionKey(
+              state.next++ === 0 ? 'terminal' : `terminal-${state.next}`,
+              machine
+            )
+        )
     );
 });
 
@@ -135,4 +162,122 @@ it('ignores an old client’s exit after replacing the same terminal', async () 
   state.exits[1]();
   expect(service.has(local)).toBe(false);
   expect(state.release).toHaveBeenCalledExactlyOnceWith(local);
+});
+
+it('rejects relative and unavailable directories before spawning', async () => {
+  const { service } = fixture();
+  await expect(
+    service.launch({ kind: 'shell', cwd: 'relative' })
+  ).rejects.toThrow('absolute');
+  state.stat.mockImplementationOnce(() => {
+    throw new Error('ENOENT');
+  });
+  await expect(
+    service.launch({ kind: 'shell', cwd: '/missing' })
+  ).rejects.toThrow('does not exist');
+  state.stat.mockReturnValueOnce({ isDirectory: () => false });
+  await expect(service.launch({ kind: 'shell', cwd: '/file' })).rejects.toThrow(
+    'does not exist'
+  );
+  expect(state.launch).not.toHaveBeenCalled();
+});
+it('reads config from each directory and bounds initial pane dimensions', async () => {
+  const { service } = fixture();
+  await service.launch({ kind: 'agent', cwd: '/project', cols: 1, rows: 900 });
+  expect(state.config).toHaveBeenCalledWith('/project');
+  expect(state.launch).toHaveBeenCalledWith(
+    expect.objectContaining({
+      cwd: '/project',
+      config: { cwd: '/project' },
+      cols: 120,
+      rows: 500,
+    })
+  );
+});
+it('creates independent terminals for concurrent requests without a retained identity', async () => {
+  const { service } = fixture();
+  const results = await Promise.all([
+    service.launch({ kind: 'shell', cwd: '/project' }),
+    service.launch({ kind: 'shell', cwd: '/project' }),
+  ]);
+  expect(new Set(results.map((result) => result.name)).size).toBe(2);
+  expect(state.launch).toHaveBeenCalledTimes(2);
+});
+it('refuses an unknown retained identity instead of launching it', async () => {
+  const { service } = fixture();
+  await expect(
+    service.launch({ sessionName: local, kind: 'shell', cwd: '/project' })
+  ).rejects.toThrow('Unknown terminal');
+  expect(state.launch).not.toHaveBeenCalled();
+});
+it('validates the retained local directory and never substitutes a request directory', async () => {
+  const { service } = fixture();
+  await service.adopt({ name: local, kind: 'agent', path: '/recorded' });
+  state.stat.mockClear();
+  await service.launch({
+    sessionName: local,
+    kind: 'shell',
+    cwd: '/unrelated',
+  });
+  expect(state.stat).toHaveBeenCalledExactlyOnceWith('/recorded');
+  expect(state.launch).toHaveBeenLastCalledWith(
+    expect.objectContaining({ cwd: '/recorded', kind: 'agent' })
+  );
+  state.stat.mockImplementationOnce(() => {
+    throw new Error('ENOENT');
+  });
+  await expect(
+    service.launch({ sessionName: local, kind: 'shell', cwd: '/valid' })
+  ).rejects.toThrow('/recorded');
+});
+it('refuses a concurrent restart with different intent', async () => {
+  const { service } = fixture();
+  await service.adopt({ name: local, kind: 'agent', path: '/project' });
+  const first = service.launch({
+    sessionName: local,
+    kind: 'agent',
+    cwd: '/project',
+  });
+  await expect(
+    service.launch({
+      sessionName: local,
+      kind: 'agent',
+      cwd: '/project',
+      fresh: true,
+    })
+  ).rejects.toThrow('Another launch');
+  await first;
+});
+it('never kills or detaches a terminal this service does not own', () => {
+  const { service, ports } = fixture();
+  service.stop(local);
+  service.forget(local);
+  expect(state.kill).not.toHaveBeenCalled();
+  expect(state.detach).not.toHaveBeenCalled();
+  expect(ports.ended).not.toHaveBeenCalled();
+});
+it('forgets a stopped terminal and ignores its late client exit', async () => {
+  const { service, ports } = fixture();
+  await service.adopt({ name: local, kind: 'shell', path: '/project' });
+  const exit = state.exits[0];
+  service.stop(local);
+  exit();
+  expect(service.has(local)).toBe(false);
+  expect(service.names()).toEqual([]);
+  expect(state.kill).toHaveBeenCalledExactlyOnceWith(local);
+  expect(ports.ended).toHaveBeenCalledExactlyOnceWith(local);
+  expect(state.release).not.toHaveBeenCalled();
+});
+it('exposes connection health only for remote terminals', async () => {
+  const { service } = fixture();
+  await service.adopt({ name: local, kind: 'shell', path: '/project' });
+  await service.adopt({ name: remote, kind: 'agent', path: '/remote' });
+  state.entries.get(local)!.pty.connectionState = 'reconnecting';
+  state.entries.get(remote)!.pty.connectionState = 'failed';
+  const [localFacts, remoteFacts] = service.list();
+  expect(localFacts).not.toHaveProperty('connectionState');
+  expect(remoteFacts).toMatchObject({
+    machine: 'peer',
+    connectionState: 'failed',
+  });
 });
