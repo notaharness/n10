@@ -36,14 +36,6 @@ export function worktreeSessionRow(
   };
 }
 
-/** The row of the worktree that has `branch` checked out, if any. */
-export function sessionForBranch(
-  sessions: readonly AgentSession[],
-  branch: string
-): AgentSession | undefined {
-  return sessions.find((s) => s.branch === branch);
-}
-
 /**
  * The session key of the checkout that has `branch` checked out, or
  * `null` when none has — for the callers that start from a pull
