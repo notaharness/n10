@@ -84,7 +84,7 @@ export const PlanCheckoutPane = memo(function PlanCheckoutPane({
           <Text>
             <Text dimColor>An agent is already running. </Text>
             <Text color={target === 'inject' ? 'cyan' : undefined}>
-              {target === 'inject' ? '› ' : '  '}Inject into it
+              {target === 'inject' ? '› ' : '  '}Send to it
             </Text>
             <Text dimColor>{'   '}</Text>
             <Text color={target === 'new-session' ? 'cyan' : undefined}>

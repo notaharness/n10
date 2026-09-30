@@ -140,23 +140,56 @@ describe('agent registry', () => {
       });
     });
 
-    it('copilot seeds with -i and has no continue', () => {
+    it('copilot seeds interactively and has no continue', () => {
       expect(copilot.seed!('hi')).toEqual({
         cmd: 'copilot',
-        args: ['-i', 'hi'],
+        args: ['--interactive=hi'],
       });
       expect(copilot.continueOrBlank).toBeUndefined();
       expect(copilot.continueOrSeed).toBeUndefined();
     });
 
     it('codex/gemini/opencode seed with their respective flags', () => {
-      expect(codex.seed!('p')).toEqual({ cmd: 'codex', args: ['p'] });
-      expect(gemini.seed!('p')).toEqual({ cmd: 'gemini', args: ['-i', 'p'] });
+      expect(codex.seed!('p')).toEqual({ cmd: 'codex', args: ['--', 'p'] });
+      expect(gemini.seed!('p')).toEqual({
+        cmd: 'gemini',
+        args: ['--prompt-interactive=p'],
+      });
       expect(opencode.seed!('p')).toEqual({
         cmd: 'opencode',
         args: ['--prompt', 'p'],
       });
     });
+
+    it.each([
+      'review',
+      '--help',
+      '- fix the bug',
+      'quotes " \' $HOME\nnext line',
+    ])('protects the Codex prompt %j from CLI argument parsing', (prompt) => {
+      expect(codex.seed!(prompt)).toEqual({
+        cmd: 'codex',
+        args: ['--', prompt],
+      });
+      expect(codex.resume!(prompt)).toEqual({
+        cmd: 'codex',
+        args: ['resume', '--last', '--', prompt],
+      });
+      expect(codex.resume!()).toEqual({
+        cmd: 'codex',
+        args: ['resume', '--last'],
+      });
+    });
+
+    it.each(['--help', '-p do not run headlessly', 'quotes " \nnext line'])(
+      'attaches Gemini prompt %j as one literal argument',
+      (prompt) => {
+        expect(gemini.seed!(prompt)).toEqual({
+          cmd: 'gemini',
+          args: [`--prompt-interactive=${prompt}`],
+        });
+      }
+    );
 
     it('runs the continue path through /bin/sh', () => {
       const script = 'claude --continue || claude';

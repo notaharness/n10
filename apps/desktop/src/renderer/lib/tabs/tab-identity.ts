@@ -119,6 +119,27 @@ export function tabIdFor(
   return id;
 }
 
+/**
+ * The tab a single click on `itemKey` shows: the one already standing
+ * for it, or the preview tab `open-item` would make, id and all — so a
+ * pane rendered for it ahead of the click is the pane the click shows.
+ */
+export function tabOpening(
+  tabs: readonly Tab[],
+  repo: string,
+  itemKey: string
+): Tab {
+  return (
+    tabs.find((t) => standsFor(t, repo, itemKey)) ?? {
+      id: tabIdFor(tabs, repo, itemKey),
+      kind: 'item',
+      repo,
+      itemKey,
+      preview: true,
+    }
+  );
+}
+
 /** The id of the tab for a terminal session. Session names are unique
  *  across directories and repositories, so the name alone is the key. */
 export function terminalTabId(name: string): string {

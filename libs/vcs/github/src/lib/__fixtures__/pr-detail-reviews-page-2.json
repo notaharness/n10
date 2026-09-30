@@ -1,0 +1,35 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "latestReviews": {
+          "totalCount": 3,
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "rev-2"
+          },
+          "nodes": [
+            {
+              "author": {
+                "__typename": "User",
+                "login": "dee",
+                "id": "U_dee",
+                "name": "Dee"
+              },
+              "state": "COMMENTED"
+            },
+            {
+              "author": {
+                "__typename": "User",
+                "login": "fay",
+                "id": "U_fay",
+                "name": "Fay"
+              },
+              "state": "COMMENTED"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

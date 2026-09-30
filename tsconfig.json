@@ -59,6 +59,12 @@
     },
     {
       "path": "./libs/image-loader"
+    },
+    {
+      "path": "./apps/website"
+    },
+    {
+      "path": "./libs/engine"
     }
   ]
 }

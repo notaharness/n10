@@ -13,6 +13,7 @@ import {
   useState,
   type Ref,
   type RefObject,
+  type ReactNode,
 } from 'react';
 import type { DiffLine } from '@n10/diff';
 import type {
@@ -27,6 +28,8 @@ import { cn } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { Skeleton } from '../../ui/skeleton.js';
 import { Tip } from '../../ui/tooltip.js';
+import type { DiffReadState } from '../../../lib/data/read-state.js';
+import { ReadFailure, StaleNotice } from '../ReadNotice.js';
 import { VirtualDiffList, type DiffJumpHandle } from './VirtualDiffList.js';
 
 /**
@@ -42,12 +45,15 @@ export function DiffPane({
   sourceBranch,
   targetBranch,
   files,
+  diffHead,
   threadsByFile,
   draftsByFile,
   generalThreads,
   commentsLoading,
-  diffLoading,
-  diffError,
+  threadsNotice,
+  read,
+  retrying,
+  onRetry,
   focusThreadId,
   scrollRef,
   jumpRef,
@@ -61,12 +67,18 @@ export function DiffPane({
   sourceBranch: string;
   targetBranch: string;
   files: [string, DiffLine[]][];
+  /** The commit the diff was read at; what new comments anchor to. */
+  diffHead: string | null;
   threadsByFile: Map<string, RemoteCommentThread[]>;
   draftsByFile: Map<string, ReviewComment[]>;
   generalThreads: RemoteCommentThread[];
   commentsLoading: boolean;
-  diffLoading: boolean;
-  diffError: string | null;
+  /** Why the threads are missing or out of date, above the changes. */
+  threadsNotice?: ReactNode;
+  /** What the patch and its parse amount to — see `diffReadState`. */
+  read: DiffReadState;
+  retrying: boolean;
+  onRetry: () => void;
   focusThreadId: string | null;
   scrollRef: RefObject<HTMLDivElement | null>;
   jumpRef?: Ref<DiffJumpHandle>;
@@ -86,7 +98,8 @@ export function DiffPane({
     );
     return () => cancelAnimationFrame(id);
   }, []);
-  const loading = diffLoading || !warm;
+  const loading = read.kind === 'loading' || !warm;
+  const stale = 'stale' in read ? read.stale : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -96,10 +109,23 @@ export function DiffPane({
         onPrev={onPrev}
         onNext={onNext}
       />
+      {stale && (
+        <StaleNotice
+          what="diff"
+          stale={stale}
+          retrying={retrying}
+          onRetry={onRetry}
+          className="mx-2 mt-2 shrink-0"
+        />
+      )}
+      {threadsNotice}
       <div
         ref={scrollRef}
         data-diff-scroll
-        className="min-h-0 flex-1 overflow-auto"
+        tabIndex={-1}
+        role="region"
+        aria-label="Changes"
+        className="min-h-0 flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
       >
         {loading && (
           <div className="space-y-2 p-4">
@@ -109,12 +135,20 @@ export function DiffPane({
             <Skeleton className="h-3 w-4/5" />
           </div>
         )}
-        {diffError && (
-          <div className="m-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {diffError}
-          </div>
+        {read.kind === 'failed' && (
+          <ReadFailure
+            title={
+              read.stage === 'fetch'
+                ? "Couldn't load the diff"
+                : "Couldn't show the diff"
+            }
+            error={read.error}
+            retrying={retrying}
+            onRetry={onRetry}
+            className="m-4"
+          />
         )}
-        {!loading && !diffError && files.length === 0 && (
+        {!loading && read.kind === 'empty' && (
           <div className="p-6 text-center text-sm text-muted-foreground">
             No changes between <span className="font-mono">{targetBranch}</span>{' '}
             and <span className="font-mono">{sourceBranch}</span>.
@@ -123,6 +157,7 @@ export function DiffPane({
         {!loading && (
           <VirtualDiffList
             files={files}
+            diffHead={diffHead}
             threadsByFile={threadsByFile}
             draftsByFile={draftsByFile}
             generalThreads={generalThreads}

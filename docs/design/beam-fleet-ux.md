@@ -8,146 +8,104 @@ Protocol baseline: beam commit `2773502`, `docs/02-identity.md`, `docs/06-contro
 
 A fleet has one passkey. Each machine has a separate node key. Creating a fleet requires **two passkey prompts**: registration, then an assertion that authorizes this machine and yields the PRF directory secret. Joining and revoking each require one assertion. A successful slot POST is delivery of a browser result, not proof that enrolment or revocation succeeded. Only the daemon's wait result establishes completion.
 
-## 1. Fleet lives in the sidebar
+## 1. Fleet in the sidebar
 
-Fleet is a collapsible **Fleet** section at the bottom of the workspace sidebar, and the same section beside the repository picker before a repository is open. A fleet belongs to the machine, so the section is repository-independent. It never opens a page of its own: every fleet task runs beside the workspace, which stays visible and usable, including while a passkey step waits on a browser or phone.
+Fleet is a collapsible section in the workspace sidebar and beside the repository
+picker. Its controller lives above the repository gate: forms, passkey requests,
+fingerprint checks and add-machine tracking survive collapsing, hiding the sidebar
+and switching repositories. The status bar and Settings reveal and focus the section.
 
-The section header stays readable while collapsed: “Passkey step” while a ceremony holds a link for the owner, otherwise “Not set up”, “Unavailable”, “This machine” or the machine summary the status bar shows (“3 machines · 1 offline”). The body holds, in order of precedence: the reset confirmation when asked for; an enrolment under way or just ended; the first-run choices until this machine is enrolled; then the fleet fingerprint, **Add a machine**, the machine rows and **Reset fleet on this machine…**. Add-a-machine instructions replace the rows inline until **Done**. The section scrolls within at most 70% of the sidebar height so the repository rows stay reachable.
+The header shows a concise state. An enrolled fleet has a small **+** at its right
+edge, with **Add a machine** as its accessible label and tooltip. It opens and expands
+the instructions. It is disabled while reconnecting, resetting or completing a passkey
+flow. Beside it, **Fleet actions** (“…”) opens a menu headed by the grouped fleet
+fingerprint, with **Copy fleet fingerprint** and **Reset fleet…**; a right-click on the
+header opens the same two entries as a native context menu. Choosing reset expands the
+section and focuses its confirmation. Reset is disabled while the machines have not
+loaded, while reconnecting, completing a passkey flow or already confirming. Both
+buttons are siblings of the collapse trigger.
 
-The status bar's machine summary and Settings → Machines (“Manage your machines, passkeys and fleet recovery in the sidebar’s Fleet section.”, button **Show Fleet**) reveal the section: they show a hidden sidebar, expand the section and focus its header. Do not render a second enrolment controller in Settings. Section state, the fleet data subscriptions and the active ceremonies live above the repository gate: collapsing the section, hiding the sidebar or switching repositories keeps the form values and a running ceremony. The section starts expanded, so the first run is in view without looking for it; a collapse persists per machine.
+The overview shows compact machine rows, local first. The fleet fingerprint is not
+part of it. It appears where it is compared: **Add a machine**, the post-join check,
+and the Fleet actions menu, which is where a joining machine's owner finds it on a
+machine already in the fleet once the add instructions have closed.
+Rows show name, connection state and fingerprint; queue and access
+badges appear when relevant. Offline and revoked states use text and colour.
+An otherwise empty fleet says
+“Your other machines will appear here.” Shared primitives and colour tokens serve both
+themes. Fleet stays within the sidebar’s scroll area.
 
-### Modals
+## 2. Create, join and add
 
-One flow uses a modal: **revoke**. It is the only destructive passkey ceremony, and it acts on a machine other than the one the owner is looking at. The modal pins the target's name and machine fingerprint beside the confirmation, the passkey link and the result, and cannot be dismissed while the ceremony runs (**Cancel** cancels explicitly). It is rendered above the repository gate, so it outlives a repository switch or a hidden sidebar.
+First run is centred: **Your machines, connected anywhere**; a small isometric laptop
+and tower from the website's beam mesh, level with each other and joined by one straight
+animated beam (still under reduced motion), with “Powered by” over Tailscale’s wordmark
+(its black or white file by theme, bundled locally) directly under it; one sentence on
+the passkey and reach, with “No VPN or SSH required.” on its own line; **Create a
+fleet** and **Join a fleet**; and a **More information** link to beam.n10.is that opens
+in the system browser. Forms ask for **Machine name**, and for creation **Fleet name**
+(“Shown in your passkey manager.”). Blank names use daemon defaults; invalid names stay
+intact. Creation explains only “Save a passkey, then use it to add this machine.”
 
-Everything else is inline. Create and join are the owner's first contact with fleet and spend most of their time waiting on another device; blocking the workspace for up to five minutes buys nothing. Add a machine runs nothing locally. Reset has no passkey step; its typed `reset` confirmation already demands attention.
+Creation shows **1 of 2 · Save a passkey**, then **2 of 2 · Add this machine**.
+Each step replaces the previous link and QR. The browser comparison shows action,
+machine and fingerprint, with “Check the action, machine and fingerprint on the page.”
+The privacy line is “Keep this link private. It expires in 5 minutes.” **Open in
+browser**, **Copy link** and explicit **Cancel** are available while waiting.
+Post-passkey progress says “Finding machines…”, “Updating machines…” or “Finishing
+setup…”, without protocol explanations.
 
-### Overview
+Successful creation returns directly to the overview and announces **Fleet created**.
+A successful join keeps **Check fleet fingerprint**, the grouped fingerprint and
+“Compare with a machine already in your fleet: its Fleet … menu shows the
+fingerprint.” **Matches** and **Doesn’t match**
+record a human security decision. A mismatch says “Stop using remote connections.
+Reset here, then join with your fleet’s passkey.” This is advice, not a transport gate;
+membership is already established by the daemon.
 
-Header: fleet fingerprint, **Copy fleet fingerprint**, **Add a machine**, **Reset fleet on this machine…**. Persistently obtain `fleetId` from daemon `status`, not just the last ceremony response. Display first 16 hex digits in groups of four, retain full IDs for identity comparisons. The copied fingerprint matches the displayed 64-bit value used by `beam status`; technical IDs may be shown separately, labelled in full.
+**Add a machine** has two short paths:
 
-This machine comes first, marked “This machine”. Other rows show label/alias, machine fingerprint, connection state, route, and queue badges. Duplicate labels remain separate rows keyed by full peer ID. No peer names serve as identities.
+- **Desktop:** “On the other machine, open Fleet → Join a fleet. Use your fleet’s passkey.”
+- **Terminal:** `beam join --label my-server`, a copy icon, and “Run there, then open the link or scan the QR.”
 
-| State                    | Exact row copy and behavior                                                      |
-| ------------------------ | -------------------------------------------------------------------------------- |
-| Local                    | “This machine”; no invented network path                                         |
-| Connected, direct        | “Connected” · “Direct”                                                           |
-| Connected, relay         | “Connected” · “Relay {region}”                                                   |
-| Connected, unknown route | “Connected” · “Path unknown”                                                     |
-| Offline                  | “Offline” · “Last seen {relative time}”, or “Not connected yet”                  |
-| Revoked locally          | “Revoked” · disable remote actions                                               |
-| Revoked by fleet         | “Refuses this machine” · “This machine was revoked from that peer’s fleet view.” |
-| No other machines        | “No other machines yet. Add a desktop or a headless machine.”                    |
-| Outbound count > 0       | “{n} queued” · “Waiting to deliver when this machine connects.”                  |
-| Inbound waiting          | “{n} waiting” · existing expandable report target/time list                      |
-| Inbound refused          | “{n} refused” · existing reason and Dismiss controls                             |
-
-Counts in Desktop are the existing outgoing beam count and n10's local inbound-report overlay; do not mislabel these as every beam mailbox item or add the same counts twice. Retain alias, grant, remote terminal and report controls. Grant copy explains direction: “Access this machine allows from {label}”; choices **Shells and messages**, **Messages only**, **No access**. Default `all` permits commands as the local user. Revocation is separate from a local grant.
-
-### Loading, availability and recovery
-
-| State                             | Copy / controls                                                                                                                      |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| First load                        | “Connecting to beam…”; labelled skeleton, no create buttons yet                                                                      |
-| Starting/preparing transport      | “Preparing network…”; do not label this a passkey prompt                                                                             |
-| Reconnecting                      | “Reconnecting to beam… Machine information may be out of date.”; preserve rows, disable mutations                                    |
-| Unavailable                       | “Cannot connect to beam.”; show escaped `detail`; **Retry connection** refetches machine/status data; background reconnect continues |
-| Query failure                     | “Could not load machines.”; escaped detail and **Retry**                                                                             |
-| Unenrolled                        | “Connect your first machine”; **Create a fleet** / **Join an existing fleet**                                                        |
-| Enrolled with delayed publication | “Saved on this machine. Directory publication is pending; beam will retry while it runs.”                                            |
-
-`directory.published {kind, peerId}` updates a pending result to “Published to directory” only when it matches that operation and machine. A later restart cannot reconstruct pending state from `status`; do not claim publication succeeded merely because the daemon is ready. Keep an observed pending result until a matching event or a new operation replaces it. Directory writes rejected permanently are logged by beam, not exposed as a dedicated UI event: the UI cannot promise perpetual retry or exact completion in that case.
-
-## 2. First-run guided flow
-
-### Choose intent and name
-
-Intro: “Create a fleet once. On your other machines, join it with the same passkey. Members can run commands as your user unless you restrict their access.” Two explicit choices precede the form. **Back** returns to the choices when idle. Preserve typed values after an error.
-
-Create heading: “Create a fleet”. Fields: **This machine’s name** (placeholder “Host name”), **Fleet name** (placeholder “beam”). Empty values use beam defaults. Helper: “The fleet name appears in your passkey manager.” Before starting, display:
-
-1. “Create your fleet passkey — save a new passkey for beam.n10.is.”
-2. “Authorize this machine — use that same passkey to sign its membership and unlock the encrypted directory.”
-
-“Two passkey prompts, once per fleet. Each prompt has its own link and QR code.” Primary **Create fleet**. Joining displays only the machine field, heading “Join an existing fleet”, body “Use the passkey you created for this fleet. One passkey prompt authorizes this machine.” Primary **Join fleet**.
-
-Both forms show **Passkey compatibility** (section 7) before starting. Desktop cannot inspect the external browser or the provider on a phone. Never use Electron's capability result to gate the external ceremony.
-
-Validate nonempty names as 1–64 Unicode scalar values, excluding `/`, `\`, `{`, `}` and C0/C1 controls; no silent truncation or rewriting. Copy: “Use 1–64 characters without /, \\, {, }, or control characters. Leave blank to use the default.” Validation is also enforced by beam. Double clicks must issue one start only. Disable mode changes and input while running.
-
-### Progress, create
-
-Always show the two step labels; distinguish pending, active, completed and failed. Never put a success check on the failed/cancelled current step. Do not fabricate a completion percentage.
-
-| Signal                              | Heading                                   | Explanation                                                                                                               |
-| ----------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Before start response               | “Preparing network…”                      | “beam is preparing this machine before opening the passkey steps.”                                                        |
-| Initial `init.start` URL            | “Step 1 of 2 · Create your fleet passkey” | “Save a new passkey for beam.n10.is. Then return here for the second prompt.”                                             |
-| `ceremony` event during `init.wait` | “Step 2 of 2 · Authorize this machine”    | “Use the passkey you just created. This signs this machine’s membership and derives the key for the encrypted directory.” |
-| `stage: publishing`                 | “Publishing membership…”                  | “The passkey steps are complete. beam is saving this machine’s membership.”                                               |
-| `init.wait` success                 | “Fleet created”                           | “This machine is enrolled. Use this fleet’s passkey to add your other machines.”                                          |
-
-During each passkey step show the action, target machine and machine fingerprint from the ceremony URL, next to its QR. Copy: “Compare the action, machine name and machine fingerprint with the browser page. Continue only if you started this request.” Buttons **Open in browser**, **Copy link**, **Cancel setup**. Do not auto-open tabs twice. Link remains selectable; QR has an accessible label. “Each passkey request expires after five minutes.” A phone must scan the **new** QR for step 2; step 1 cannot discover its URL. Replace and remove the old QR/link atomically. Do not keep a stale link visible during directory work or after completion.
-
-Collapsing the section, hiding the sidebar or switching repositories keeps the operation alive; expanding the section shows the current step. **Cancel setup** waits for cancellation; “Cancelling…” then final outcome. App exit may interrupt the flow; on reopening, read daemon state, do not resume a stale URL. A passkey created before step 2 failed may remain in the provider. Copy on create failure: “If you saved a passkey before this stopped, it may still be in your passkey manager. It does not mean a fleet was created. Check this machine’s status before trying again.” No automatic credential deletion.
-
-### Join from another desktop
-
-On the joining desktop: the sidebar's Fleet section → **Join an existing fleet** → name → **Join fleet**. Active heading “Authorize this machine”; body “Choose this fleet’s existing passkey. Do not create another passkey.” `reading directory` becomes “Reading fleet directory…”; `publishing` becomes “Publishing membership…”. Success: “Joined fleet {fingerprint}. {n} other machines known; connecting…” plus publication status.
-
-After success show **Check the fleet fingerprint**, the grouped fingerprint, and: “Compare this with Fleet on a machine already in your fleet, or run beam status there. Matching names are not enough.” Actions **Fingerprints match** and **They don’t match**. The check records acknowledgement only in the current UI, never claims cryptographic verification. beam has already enrolled and may have connected; this is not an admission gate. Until acknowledged, keep this result when the section is collapsed and expanded again during the app session.
-
-Mismatch heading: “Fleet fingerprints do not match”. Body: “This machine joined a different fleet. Stop using its remote connections. Reset the fleet on this machine, then join again using your known fleet passkey and a fresh link.” **Reset fleet on this machine…** opens the explicit reset confirmation. Never compare fleet fingerprint with machine fingerprint, and never automatically reset or claim revocation elsewhere.
-
-### Add another desktop or a headless machine
-
-**Add a machine** opens instructions, never runs join on the already-enrolled local machine.
-
-- **Another desktop**: “Open n10 Desktop on the machine you want to add. In the sidebar’s Fleet section choose Join an existing fleet, then use this fleet’s passkey. Compare its fleet fingerprint with {fingerprint}.”
-- **Headless machine**: “On the machine you want to add, run:” `beam join --label buildbox`. “Use your installed beam CLI. In an interactive terminal it draws a braille QR code and prints the URL below it. Over SSH it does not open a browser. Scan the QR with a compatible phone or open the printed URL on a device with your fleet passkey.”
-- “Compare the page’s action, machine name and machine fingerprint with the command you ran. After joining, run beam status on that machine and compare its fleet fingerprint with {fingerprint}.”
-- For a piped command there is no QR; URL still prints. A narrow/broken terminal QR uses that URL. No invitation token, desktop-local QR, `n10 beam` command or unnecessary new passkey.
+A fingerprint block says “Check that its fleet fingerprint matches:” above the grouped
+value and a copy icon. “Waiting for a new machine…” reflects the waiting state. A new member identity from a push or fallback poll
+closes the panel, including while collapsed. Renames and reconnects cannot complete
+adding. **Close instructions** lets the owner leave early; there is no Done button.
 
 ## 3. Revoke and reset
 
-**Revoke {label}…** shows the target's machine fingerprint and: “Permanently remove {label} from this fleet. Your passkey signs the revocation. Connections to this machine close; offline peers learn when they reconnect. This does not erase files or guarantee that programs on that machine stop. A revoked machine needs a new node identity to return; fleet reset alone keeps its identity.” **Cancel** / **Continue to passkey**. Passkey heading “Authorize revocation”; browser action is Remove, not Add.
+Revocation uses a modal with target name and fingerprint. It explains permanence,
+offline propagation, that files and programs remain, and that reset cannot restore
+revoked access. **Revoke access** starts the passkey request; **Cancel** is explicit
+while running. Success closes the modal, updates the row and announces **Access
+revoked**, with the offline propagation reminder.
 
-Success: “Revoked {label} on this machine.” Then “Published to directory” or pending copy; “Acknowledged by {n} peers. Offline peers learn when they connect.” Use the count beam returns, without promising all peers have received it. Pending publication is not failure. Failed ceremony leaves the final state to the next daemon refresh; offer **Try again** and **Close**, never automatically replay a destructive action. Closing an active revoke dialog is disabled; **Cancel** cancels explicitly.
+**Reset fleet here?** stays inline. It explains disconnection and queued-message loss,
+that other machines and the passkey are unchanged, and that reset cannot recover a
+lost passkey or undo revocation. The owner types `reset` exactly. Success returns to
+first-run choices. Failure keeps the typed value and offers retry or cancel.
 
-Reset heading: “Reset fleet on this machine?” Body: “Disconnect this machine and remove its local fleet membership, known peers, revocations and pending directory writes. Queued messages to those peers are removed. Its machine identity is kept. Other machines and the fleet passkey are not reset or revoked.” Label **Type reset to confirm**. **Cancel** / destructive **Reset fleet** (enabled only for exact `reset`). Call daemon `fleet.reset {confirm: "reset"}`. Busy “Resetting fleet…”; success “Fleet reset on this machine. Create a fleet or join one to continue.” Refresh status/rows; clear stale ceremony results. Failure “Could not reset this machine’s fleet. {detail}” with confirmation retained. Never delete beam files from Electron. Lost passkey: “Existing connections may still work, but adding or revoking machines needs the original passkey. Resetting here does not recover it.”
+## 4. Pending and error states
 
-## 4. Desktop result/error catalogue
+Only the daemon’s final result establishes success. A saved change awaiting publication
+says **Saved here. Waiting to sync…**, remaining until its matching publication event.
+Automatic completion does not discard this notice.
 
-Render a readable explanation, exact error code in selectable monospace, and escaped daemon detail when distinct. Only show a next action that can actually run: **Try again** repeats the user's selected flow with a fresh start/URL; **Back** preserves form values. Hide all expired links on terminal results. Refresh status after failures too: an operation may have committed locally before publication or transport failed.
+Connection states say **Starting Fleet…**, **Connecting…**, **Reconnecting… Status may
+be out of date.**, or **Fleet is unavailable.** with **Retry**. Machine loading errors
+have their own retry. Technical details are in a collapsed **Details** disclosure.
 
-| Wire code / event       | Exact copy                                                                                                                                                                                             | Next action                                                                                                   |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `ok`, published true    | Operation-specific success above; “Published to directory”                                                                                                                                             | Overview / fingerprint check                                                                                  |
-| `ok`, published pending | “Saved on this machine. Directory publication is pending; beam will retry while it runs.”                                                                                                              | Overview; no retry ceremony                                                                                   |
-| `prf-unsupported`       | “The selected passkey did not provide WebAuthn PRF. beam needs this extension to derive the encrypted fleet directory key. Browser, operating system and passkey provider must all support it.”        | Compatibility details; fresh retry with a supported combination; join/revoke must keep the same fleet passkey |
-| `ceremony-cancelled`    | “Passkey request cancelled. No further approval is pending for this request.”                                                                                                                          | Retry or Back                                                                                                 |
-| `ceremony-timeout`      | “This passkey request expired after five minutes. Start again to get a new link and QR code.”                                                                                                          | Retry                                                                                                         |
-| `ceremony-state`        | “beam could not use this ceremony result. The request may be stale, already consumed, or answered with data it cannot decrypt. Check this machine’s fleet status, then start again with a fresh link.” | Overview / Retry                                                                                              |
-| `bad-assertion`         | “The passkey request failed or its answer could not be verified. Check the browser’s message, then start again.”                                                                                       | Retry; details                                                                                                |
-| `directory-unavailable` | “Cannot read the fleet directory. Check the connection to beam.n10.is and try joining again.”                                                                                                          | Retry; do not label joined                                                                                    |
-| `wrong-passkey`         | “This passkey does not unlock the expected fleet. Choose the original fleet passkey using a compatible browser and provider.”                                                                          | Retry; keep pinned root                                                                                       |
-| `busy`                  | “Another passkey request is already running. Finish or cancel it where you started it, then try again.”                                                                                                | Back; never cancel another client's ceremony                                                                  |
-| `already-enrolled`      | “This machine already belongs to a fleet. Close this to see its machines.”                                                                                                                             | Overview; refresh                                                                                             |
-| `not-enrolled`          | “This machine is not in a fleet. Create or join a fleet first.”                                                                                                                                        | Setup                                                                                                         |
-| `revoked-peer`          | “This machine identity has been revoked. Resetting its fleet will not make that identity eligible to rejoin.”                                                                                          | Close; no retry loop                                                                                          |
-| `unknown-peer`          | “This machine is no longer in the local peer list. Refresh Fleet before trying again.”                                                                                                                 | Refresh                                                                                                       |
-| `ambiguous-peer`        | “More than one machine matches. Select a machine by its fingerprint.”                                                                                                                                  | Overview; full IDs in requests                                                                                |
-| `params`                | “beam rejected these details. Check the machine and fleet names.”                                                                                                                                      | Edit; retain daemon detail                                                                                    |
-| `bad-entry`             | “beam rejected an invalid membership record. Check the details before trying again.”                                                                                                                   | Details / Back                                                                                                |
-| `storage-failure`       | “beam could not save fleet data. Check available disk space and permissions, then retry.”                                                                                                              | Details / Retry                                                                                               |
-| `offline`               | “The machine is offline. Try again after it reconnects.”                                                                                                                                               | Overview                                                                                                      |
-| `grant`                 | “This machine does not allow that operation.”                                                                                                                                                          | Review access                                                                                                 |
-| `limit` / `queue-full`  | “beam reached a capacity limit. Check the details before retrying.”                                                                                                                                    | Details                                                                                                       |
-| `spawn`                 | “beam could not start the requested process. Check the details.”                                                                                                                                       | Details / Back                                                                                                |
-| `internal` or unknown   | “beam could not complete this request. Check the details and this machine’s fleet status before retrying.”                                                                                             | Details / Overview                                                                                            |
-| Connection lost         | “The connection to beam was interrupted. Check Fleet before retrying; the request may have completed.”                                                                                                 | Overview; reconnect                                                                                           |
+`lib/fleet/ceremony-errors.ts` owns concise error copy and actions. Failures distinguish
+wrong or unsupported passkeys, cancellation, expiry, storage, revoked access and
+uncertain completion. **Passkey help** advises an updated browser/provider or another
+device with the same passkey. A new passkey is never a way to join an existing fleet.
+Failed creation warns that a passkey may already have been saved. Codes and daemon
+text remain selectable plain text in **Details**; stale links disappear and retries
+start a fresh request.
 
-The browser has exactly `ok`, `prf-unsupported`, `cancelled`, `failed`. `cancelled` maps to `ceremony-cancelled`; **`failed` maps to `bad-assertion` via `ceremonyErr`**, not a fictional `ceremony-failed` code. Malformed or undecryptable slot state maps to `ceremony-state`; malformed `ok` payload can map to `bad-assertion`. The page's 409 and a user's fleet-fingerprint mismatch have no dedicated daemon event. Desktop must not pretend it observed either remotely.
+The browser handoff and source evidence below are beam reference material; Desktop
+does not reproduce the compatibility matrix or protocol copy.
 
 ## 5. beam.n10.is page: implementation handoff
 
@@ -256,10 +214,13 @@ For the reported iPhone failure, do not infer the selected provider, iOS version
 - [S9: 1Password PRF announcement](https://1password.com/blog/encrypt-data-saved-passkeys).
 - [S10: Yubico developer PRF guide](https://developers.yubico.com/WebAuthn/Concepts/PRF_Extension/Developers_Guide_to_PRF.html).
 
-## 8. Implementation slices and acceptance
+## 8. Verification
 
-1. Design-only draft PR, including this browser handoff.
-2. Desktop Fleet destination, first-run flow, explicit passkey steps, diagnostic copy and compatibility help. Prove the existing renderer can display and interact with these surfaces using a mocked host before introducing additional IPC.
-3. Daemon fleet identity/publication state, explicit reset IPC, fingerprint comparison and recovery, and add-machine instructions. Keep transport behind MachinesPort and use beam's native operations.
+Desktop e2e covers both passkey steps, automatic create/revoke/reset completion,
+persistent fingerprint comparison, new-member detection across collapse, retry and
+pending publication. Fleet screenshots cover both themes in the pinned Playwright
+container alongside full-workspace baselines. The website demo uses the same renderer
+with a mock host; no machine joins it on its own.
 
-Targeted verification: lint/typecheck desktop; tests for ceremony step transitions (fresh step-2 URL, no stale QR), errors, label boundaries, native reset confirmation, status identity and matching publication events. Demonstrate added tests fail when the behavior is broken and restore it. No full e2e suites. Manual review scenarios: no-repo entry, hidden sidebar and collapsed section, create both steps on desktop/phone, failure at each step, join fingerprint match/mismatch, headless instructions, pending publication, offline/revoked peer, reset cancel/confirm, daemon reconnect and narrow-window keyboard navigation. Browser-player verification includes all preflight branches, four result codes × 201/409/delivery failure, CSP hash checks, and no prompt before explicit click. Real provider/device compatibility remains manual verification; mocked WebAuthn is not evidence of device support.
+Real browser/provider compatibility remains manual; mocked passkeys do not establish
+device support. Tests isolate HOME and tmux sockets and never touch user sessions.

@@ -6,6 +6,8 @@ import {
   latestReviewPerUser,
   mapRollupState,
   ghGraphQL,
+  ghQuery,
+  checkGhAuth,
   githubProvider,
 } from './provider.js';
 
@@ -17,24 +19,28 @@ vi.mock('node:child_process', () => ({
   execSync: (...args: unknown[]) => mockExecSync(...args),
 }));
 
+type ExecCallback = (err: unknown, result?: { stdout: string }) => void;
+
+/** The callback promisify appends: last, after the optional options. */
+function callbackOf(args: unknown[]): ExecCallback {
+  return args.at(-1) as ExecCallback;
+}
+
+/** The options `execFile` was called with, if any. */
+function execOptionsOf(call: unknown[]): unknown {
+  return call.length > 3 ? call[2] : undefined;
+}
+
 function ghSuccess(data: unknown) {
-  mockExecFile.mockImplementationOnce(
-    (
-      _cmd: string,
-      _args: string[],
-      cb: (err: null, result: { stdout: string }) => void
-    ) => {
-      cb(null, { stdout: JSON.stringify(data) });
-    }
-  );
+  mockExecFile.mockImplementationOnce((...args: unknown[]) => {
+    callbackOf(args)(null, { stdout: JSON.stringify(data) });
+  });
 }
 
 function ghError(message: string) {
-  mockExecFile.mockImplementationOnce(
-    (_cmd: string, _args: string[], cb: (err: { stderr: string }) => void) => {
-      cb({ stderr: message });
-    }
-  );
+  mockExecFile.mockImplementationOnce((...args: unknown[]) => {
+    callbackOf(args)({ stderr: message });
+  });
 }
 
 // ── URL parsing ────────────────────────────────────────────────────
@@ -85,8 +91,9 @@ describe('mapReviewState', () => {
     expect(mapReviewState('CHANGES_REQUESTED')).toBe('changes-requested');
   });
 
-  it('maps DISMISSED to declined', () => {
-    expect(mapReviewState('DISMISSED')).toBe('declined');
+  // Someone else set the verdict aside; the reviewer declined nothing.
+  it('maps DISMISSED to no-response', () => {
+    expect(mapReviewState('DISMISSED')).toBe('no-response');
   });
 
   it('maps COMMENTED to no-response', () => {
@@ -117,6 +124,29 @@ describe('latestReviewPerUser', () => {
     expect(alice?.decision).toBe('approved');
     const bob = result.find((r) => r.identifier === 'bob');
     expect(bob?.decision).toBe('changes-requested');
+  });
+
+  // A reply in a review thread is filed as a COMMENTED review.
+  it('keeps a verdict standing through later comments', () => {
+    const result = latestReviewPerUser([
+      { author: { login: 'alice' }, state: 'APPROVED' },
+      { author: { login: 'alice' }, state: 'COMMENTED' },
+      { author: { login: 'bob' }, state: 'CHANGES_REQUESTED' },
+      { author: { login: 'bob' }, state: 'PENDING' },
+    ]);
+    expect(result.map((r) => [r.identifier, r.decision])).toEqual([
+      ['alice', 'approved'],
+      ['bob', 'changes-requested'],
+    ]);
+  });
+
+  it('lets a dismissal set the verdict aside', () => {
+    const result = latestReviewPerUser([
+      { author: { login: 'alice' }, state: 'APPROVED' },
+      { author: { login: 'alice' }, state: 'DISMISSED' },
+      { author: { login: 'alice' }, state: 'COMMENTED' },
+    ]);
+    expect(result[0]?.decision).toBe('no-response');
   });
 
   it('returns empty array for no reviews', () => {
@@ -239,12 +269,8 @@ describe('ghGraphQL', () => {
     }
 
     it('reads a missing gh binary as an unavailable transport', async () => {
-      mockExecFile.mockImplementationOnce(
-        (
-          _cmd: string,
-          _args: string[],
-          cb: (err: { code: string; message: string }) => void
-        ) => cb({ code: 'ENOENT', message: 'spawn gh ENOENT' })
+      mockExecFile.mockImplementationOnce((...args: unknown[]) =>
+        callbackOf(args)({ code: 'ENOENT', message: 'spawn gh ENOENT' })
       );
       const err = await failure();
       expect(isVcsError(err) && err.kind).toBe('unavailable');
@@ -284,12 +310,8 @@ describe('ghGraphQL', () => {
   it('reports output that is not JSON as an unexpected response', async () => {
     // A shell wrapper or an update notice on stdout used to surface as
     // a SyntaxError naming a character position nobody can see.
-    mockExecFile.mockImplementationOnce(
-      (
-        _cmd: string,
-        _args: string[],
-        cb: (err: null, result: { stdout: string }) => void
-      ) => cb(null, { stdout: 'A new release of gh is available!' })
+    mockExecFile.mockImplementationOnce((...args: unknown[]) =>
+      callbackOf(args)(null, { stdout: 'A new release of gh is available!' })
     );
     await expect(ghGraphQL('{ viewer { login } }', {})).rejects.toThrow(
       'Unexpected output from the GitHub CLI'
@@ -315,6 +337,138 @@ describe('ghGraphQL', () => {
 });
 
 // ── Provider interface ─────────────────────────────────────────────
+
+/**
+ * A read that hangs holds its caller forever, and the engine runs one
+ * list request per repository at a time. Reads are killed at a
+ * deadline; a mutation never is, since a killed mutation may or may not
+ * have reached GitHub.
+ */
+describe('the read deadline', () => {
+  beforeEach(() => {
+    mockExecFile.mockReset();
+  });
+
+  const READ = { timeout: 30_000, killSignal: 'SIGKILL' };
+  const project = { owner: 'octocat', repo: 'hello', username: 'octocat' };
+  const thread = {
+    id: 'T1',
+    canResolve: true,
+    replyKind: 'github-review-thread',
+  } as unknown as RemoteCommentThread;
+
+  it('kills a query at the deadline', async () => {
+    ghSuccess({ data: {} });
+    await ghQuery('query { viewer { login } }', {});
+    expect(execOptionsOf(mockExecFile.mock.calls[0]!)).toEqual(READ);
+  });
+
+  it('puts every read under it', async () => {
+    ghSuccess({
+      data: { search: { nodes: [], pageInfo: { hasNextPage: false } } },
+    });
+    await githubProvider.fetchPullRequests({}, project);
+    ghSuccess({
+      data: { search: { nodes: [], pageInfo: { hasNextPage: false } } },
+    });
+    await githubProvider.fetchMergedBranches!({}, project, ['feature']);
+    ghSuccess({
+      data: {
+        repository: {
+          pullRequest: {
+            reviewThreads: { nodes: [], pageInfo: { hasNextPage: false } },
+            comments: { nodes: [], pageInfo: { hasNextPage: false } },
+          },
+        },
+      },
+    });
+    await githubProvider.fetchCommentThreads!({}, project, 1);
+    mockExecFile.mockImplementationOnce((...args: unknown[]) =>
+      callbackOf(args)(null, { stdout: 'body' })
+    );
+    await githubProvider.fetchPullRequestDescription!({}, project, 1);
+    mockExecFile.mockImplementationOnce((...args: unknown[]) =>
+      callbackOf(args)(null, { stdout: 'Logged in to github.com account a' })
+    );
+    await checkGhAuth();
+    expect(mockExecFile).toHaveBeenCalledTimes(5);
+    for (const call of mockExecFile.mock.calls) {
+      expect(execOptionsOf(call)).toEqual(READ);
+    }
+
+    mockExecSync.mockReset();
+    mockExecSync.mockReturnValueOnce('{"login":"a"}');
+    githubProvider.autoDetectFields!({ owner: 'o', repo: 'r' });
+    expect(mockExecSync.mock.calls[0]![1]).toMatchObject(READ);
+  });
+
+  it("puts the overview's detail, checks, conversation and mentions under it", async () => {
+    mockExecFile.mockImplementation((...args: unknown[]) =>
+      callbackOf(args)({ stderr: 'HTTP 502' })
+    );
+    const reads = [
+      () => githubProvider.fetchPullRequestDetail!({}, project, 1),
+      () => githubProvider.fetchPullRequestChecks!({}, project, 1),
+      () => githubProvider.fetchPullRequestConversation!({}, project, 1),
+      () => githubProvider.searchMentionCandidates!({}, project, 'oct'),
+    ];
+    for (const read of reads) await read().catch(() => undefined);
+    expect(mockExecFile.mock.calls.length).toBeGreaterThanOrEqual(reads.length);
+    for (const call of mockExecFile.mock.calls) {
+      expect(execOptionsOf(call)).toEqual(READ);
+    }
+  });
+
+  it('never puts a mutation under it', async () => {
+    ghSuccess({
+      data: {
+        addComment: {
+          commentEdge: {
+            node: { id: 'C', author: null, body: 'ok', createdAt: '' },
+          },
+        },
+      },
+    });
+    await githubProvider.replyToThread!(
+      {},
+      project,
+      1,
+      {
+        ...thread,
+        replyKind: 'github-issue-comment',
+        replySubjectId: 'PR1',
+      } as RemoteCommentThread,
+      'ok'
+    );
+    ghSuccess({
+      data: {
+        addPullRequestReviewThreadReply: {
+          comment: { id: 'C', author: null, body: 'ok', createdAt: '' },
+        },
+      },
+    });
+    await githubProvider.replyToThread!({}, project, 1, thread, 'ok');
+    ghSuccess({ data: {} });
+    await githubProvider.setThreadResolved!({}, project, 1, thread, true);
+    ghSuccess({});
+    await githubProvider.submitReviewVerdict!({}, project, 1, 'approve');
+    expect(mockExecFile).toHaveBeenCalledTimes(4);
+    for (const call of mockExecFile.mock.calls) {
+      expect(execOptionsOf(call)).toBeUndefined();
+    }
+  });
+
+  it('reports a killed read as GitHub not answering in time', async () => {
+    mockExecFile.mockImplementationOnce((...args: unknown[]) =>
+      callbackOf(args)({ killed: true, signal: 'SIGKILL', code: null })
+    );
+    const err = await ghQuery('query { viewer { login } }', {}).catch(
+      (e: unknown) => e
+    );
+    expect(isVcsError(err) && err.kind).toBe('network');
+    expect((err as Error).message).toBe('GitHub did not answer within 30s');
+  });
+});
 
 describe('githubProvider', () => {
   it('has correct id and displayName', () => {
@@ -378,6 +532,17 @@ describe('githubProvider', () => {
     ).toBe('https://github.com/octocat/hello-world/pull/42');
   });
 
+  it('names the repository a pull request ref belongs to', () => {
+    expect(
+      githubProvider.repositoryRef?.({ owner: 'octocat', repo: 'hello-world' })
+    ).toEqual({
+      provider: 'github',
+      host: 'github.com',
+      repository: 'octocat/hello-world',
+    });
+    expect(githubProvider.repositoryRef?.({ owner: 'octocat' })).toBeNull();
+  });
+
   describe('fetchPullRequests', () => {
     beforeEach(() => mockExecFile.mockReset());
 
@@ -405,9 +570,19 @@ describe('githubProvider', () => {
                 author: { login: 'octocat' },
                 isDraft: false,
                 reviews: {
-                  nodes: [{ author: { login: 'bob' }, state: 'APPROVED' }],
+                  nodes: [
+                    { author: { login: 'bob' }, state: 'APPROVED' },
+                    { author: { login: 'dan' }, state: 'COMMENTED' },
+                  ],
                 },
-                reviewRequests: { nodes: [] },
+                // Bob is asked again after approving; carol for the
+                // first time. Dan only commented, and nobody asked him.
+                reviewRequests: {
+                  nodes: [
+                    { requestedReviewer: { login: 'Bob' } },
+                    { requestedReviewer: { login: 'carol' } },
+                  ],
+                },
                 reviewThreads: {
                   nodes: [
                     { isResolved: false },
@@ -470,6 +645,19 @@ describe('githubProvider', () => {
             displayName: 'bob',
             identifier: 'bob',
             decision: 'approved',
+            requested: true,
+          },
+          {
+            displayName: 'dan',
+            identifier: 'dan',
+            decision: 'no-response',
+            requested: false,
+          },
+          {
+            displayName: 'carol',
+            identifier: 'carol',
+            decision: 'no-response',
+            requested: true,
           },
         ],
         buildStatus: 'succeeded',
@@ -499,6 +687,10 @@ describe('githubProvider', () => {
       expect(searchQueryArg).toContain('repo:octocat/hello-world');
       expect(searchQueryArg).toContain('is:pr');
       expect(searchQueryArg).toContain('is:open');
+
+      // One search for the whole list: no pull request's detail is read
+      // per row, however many rows there are.
+      expect(mockExecFile).toHaveBeenCalledTimes(1);
     });
 
     it('handles null author, null review author, and null requestedReviewer', async () => {

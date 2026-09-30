@@ -150,15 +150,17 @@ function actionPostComment(a: DiffViewerActionCtx): void {
   const pr = commentCtx.selectedReviewPr;
   const vendor = ctx.config.config.vendor;
   if (!vendor) {
-    ctx.sessions.flashStatus('No VCS configured');
+    ctx.sessions.flashStatus('No provider set up — open settings');
     return;
   }
   if (vendor !== 'github' && vendor !== 'azure-devops') {
-    ctx.sessions.flashStatus(`Unsupported vendor: ${vendor}`);
+    ctx.sessions.flashStatus("Can't post comments for this repository");
     return;
   }
   if (vendor === 'github' && !pr.headSha) {
-    ctx.sessions.flashStatus('Missing head SHA — try refreshing PR data');
+    ctx.sessions.flashStatus(
+      "Couldn't post: refresh pull requests and try again"
+    );
     return;
   }
 

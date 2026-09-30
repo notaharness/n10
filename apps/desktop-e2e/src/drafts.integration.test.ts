@@ -92,12 +92,15 @@ test.describe('@integration Agent draft comments', () => {
     await openPr(page);
 
     // The rail advertises a finished review rather than making you go
-    // looking for it in the diff.
+    // looking for it in the diff, and opens its walkthrough.
+    const review = page.getByRole('button', { name: /Review ready/ }).first();
+    await expect(review).toBeVisible({ timeout: 60_000 });
+    await review.click();
     await expect(
-      page.getByRole('button', { name: /Review ready|Review/ }).first()
-    ).toBeVisible({ timeout: 60_000 });
-    await expect(
-      page.getByText('The undo stack is never bounded.')
+      page
+        .getByText('The undo stack is never bounded.')
+        .filter({ visible: true })
+        .first()
     ).toBeVisible({ timeout: 60_000 });
   });
 

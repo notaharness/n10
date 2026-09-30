@@ -55,7 +55,9 @@ describe('reusableStatus', () => {
 
   it('declines when there is no merge identity to compare', () => {
     // Two rows that both report nothing are not the same row unchanged.
-    expect(reusableStatus(remembered(undefined), undefined, 1, TTLS)).toBeNull();
+    expect(
+      reusableStatus(remembered(undefined), undefined, 1, TTLS)
+    ).toBeNull();
     expect(reusableStatus(remembered(''), '', 1, TTLS)).toBeNull();
   });
 
@@ -272,7 +274,9 @@ describe('the store', () => {
     rememberPrDetails(REPO, 2, { mergeKey: 'xyz', now: 0, status: 'failed' });
     forgetPrDetails(REPO, 1);
     expect(prDetailMemo(REPO, 1)).toBeUndefined();
-    expect(reusableStatus(prDetailMemo(REPO, 2), 'xyz', 1, TTLS)).toBe('failed');
+    expect(reusableStatus(prDetailMemo(REPO, 2), 'xyz', 1, TTLS)).toBe(
+      'failed'
+    );
   });
 });
 

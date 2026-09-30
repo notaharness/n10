@@ -116,7 +116,7 @@ function LaunchStatus({
 }) {
   return (
     <>
-      {fetching && <p className="text-muted-foreground">Reading session…</p>}
+      {fetching && <p className="text-muted-foreground">Loading session…</p>}
       {error && <p role="alert">{errorMessage(error)}</p>}
       {agentError && <p role="alert">{errorMessage(agentError)}</p>}
     </>

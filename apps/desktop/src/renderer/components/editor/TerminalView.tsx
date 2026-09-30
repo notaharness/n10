@@ -12,7 +12,7 @@ import { useMachines, useTerminals } from '../../lib/data/queries.js';
 import { SessionTerminal } from '../terminal/SessionTerminal.js';
 import { ConnectionBanner } from '../terminal/ConnectionBanner.js';
 
-/** The exited-agent affordance ("Resume agent" / "Start new"). Gated
+/** The exited-agent affordance ("Resume agent" / "Start default agent"). Gated
  *  entirely on `processState` (via `!session.running`), never on
  *  `connectionState` — a dropped connection must not show this. */
 function ExitedAgentBar({ session }: { session: TerminalSummary }) {
@@ -46,7 +46,7 @@ function ExitedAgentBar({ session }: { session: TerminalSummary }) {
           })
         }
       >
-        Start new (directory default)
+        Start default agent
       </Button>
       {launch.error && <span role="alert">{errorMessage(launch.error)}</span>}
     </div>
@@ -60,13 +60,7 @@ function ExitedAgentBar({ session }: { session: TerminalSummary }) {
  * `epoch` is the session's spawn time from the host's listing, which is
  * what makes the pane re-fit when the process behind the name changes.
  */
-export function TerminalView({
-  tab,
-  active,
-}: {
-  tab: TerminalTab;
-  active: boolean;
-}) {
+export function TerminalView({ tab }: { tab: TerminalTab }) {
   const terminals = useTerminals();
   const session = terminals.data?.find((t) => t.name === tab.name);
   const machines = useMachines();
@@ -95,9 +89,9 @@ export function TerminalView({
       {pane.showExitedBar && session && <ExitedAgentBar session={session} />}
       <div className="relative min-h-0 flex-1">
         <SessionTerminal
+          key={tab.name}
           name={tab.name}
           epoch={epoch}
-          active={active}
           disabled={pane.inputDisabled}
         />
       </div>

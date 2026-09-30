@@ -43,6 +43,9 @@ export interface VcsErrorDetails {
   contentType?: string;
   /** The underlying failure, when this wraps one. */
   cause?: unknown;
+  /** The server answered and refused the request: nothing was written.
+   *  Otherwise a failed write may still have taken effect. */
+  refused?: boolean;
 }
 
 /**
@@ -60,6 +63,7 @@ export class VcsError extends Error {
   readonly status?: number;
   readonly retryAfterMs?: number;
   readonly contentType?: string;
+  readonly refused: boolean;
 
   constructor(
     kind: VcsErrorKind,
@@ -75,6 +79,7 @@ export class VcsError extends Error {
     this.status = details.status;
     this.retryAfterMs = details.retryAfterMs;
     this.contentType = details.contentType;
+    this.refused = details.refused ?? false;
   }
 }
 

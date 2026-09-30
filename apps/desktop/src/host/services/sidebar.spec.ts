@@ -6,12 +6,12 @@ import type * as Core from '@n10/core';
 
 /**
  * The renderer polls the sidebar model continuously; the pull request
- * list behind it comes from `@n10/core`'s per-repository cache,
- * whose semantics (TTL, joining, retiring, eviction, credentials) are
- * its own spec's. What is asserted here is the sidebar's use of it:
- * that the model never waits for the provider, that a landed fetch is
- * announced, what the sync state reports for the open repository, and
- * what a refresh tells the provider.
+ * list behind it is `@n10/engine`'s, whose semantics (TTL, joining,
+ * queueing, scopes, credentials) are its own spec's. What is asserted
+ * here is the host's use of it: that the model never waits for the
+ * provider, that a landed fetch is announced, what the sync state
+ * reports for the open repository, and what a refresh tells the
+ * provider, and when.
  */
 
 interface Worktree {
@@ -44,6 +44,8 @@ const env = vi.hoisted(() => ({
   }[],
   fetchCount: 0,
   forgetCount: 0,
+  /** The provider's side, in order: `start`, `end`, `forget`. */
+  events: [] as string[],
   now: 1_000_000,
   /** Last babysat map handed to buildSidebarItems. */
   lastBabysat: null as ReadonlyMap<number, unknown> | null,
@@ -60,12 +62,17 @@ vi.mock('./repo.js', () => ({
       isConfigured: () => env.configured,
       forgetPullRequestCache: () => {
         env.forgetCount += 1;
+        env.events.push('forget');
       },
       fetchPullRequests: () => {
         env.fetchCount += 1;
+        env.events.push('start');
         return new Promise((resolve, reject) => {
           env.pending.push({
-            resolve: resolve as (v: Record<string, unknown>) => void,
+            resolve: (v: Record<string, unknown>) => {
+              env.events.push('end');
+              resolve(v);
+            },
             reject,
           });
         });
@@ -103,8 +110,8 @@ vi.mock('@n10/worktree-manager', () => ({
 }));
 
 vi.mock('@n10/core', async (importOriginal) => ({
-  // The cache is the real one: this spec is about what the sidebar
-  // does with it, and a fake would only prove the fake.
+  // The pull request list is the engine's real one: this spec is about
+  // what the sidebar does with it, and a fake would only prove the fake.
   ...(await importOriginal<typeof Core>()),
   isSessionAlive: () => false,
   findOrphanPrs: () => [],
@@ -131,9 +138,10 @@ vi.mock('@n10/core', async (importOriginal) => ({
 let sidebar: typeof SidebarModule;
 let pullRequests: typeof PullRequestsModule;
 
-/** Settle the promise chain without advancing the clock. */
-async function flush(times = 4) {
-  for (let i = 0; i < times; i++) await Promise.resolve();
+/** Settle every pending promise without advancing the clock: the
+ *  microtask queue drains before an immediate runs. */
+async function flush() {
+  await new Promise((resolve) => setImmediate(resolve));
 }
 
 beforeEach(async () => {
@@ -146,6 +154,7 @@ beforeEach(async () => {
   env.pending = [];
   env.fetchCount = 0;
   env.forgetCount = 0;
+  env.events = [];
   env.now = 1_000_000;
   env.lastBabysat = null;
   env.babysat = new Map();
@@ -219,6 +228,22 @@ describe('refreshing', () => {
     expect(env.forgetCount).toBe(1);
   });
 
+  it('has the provider forget when the refresh’s own request starts, after a read already out', async () => {
+    // The sidebar's background read is out when the user presses
+    // refresh. Forgetting at the press lets that read write its per-row
+    // answers straight back into the provider's memo, and the refresh
+    // then answers from them.
+    await sidebar.listSidebarItems();
+    const refreshed = sidebar.refreshRemote();
+    expect(env.events).toEqual(['start']);
+
+    settle(0);
+    await flush();
+    expect(env.events).toEqual(['start', 'end', 'forget', 'start']);
+    settle(1);
+    await refreshed;
+  });
+
   it('does not, for a re-read the app asked for itself', async () => {
     // Submitting a review verdict changes the reviewer votes, which
     // come from the list. It changes no CI verdict and no comment
@@ -235,11 +260,11 @@ describe('refreshing', () => {
 
 /**
  * Replacing a rejected access token has to look like it worked: the
- * cache is dropped and refetched (its spec), and the renderer is told
- * at once.
+ * list starts a new, empty scope (its spec), and the renderer is told
+ * at once rather than when the next fetch lands.
  */
 describe('after the credentials change', () => {
-  it('tells the renderer straight away and fetches again', async () => {
+  it('tells the renderer straight away', async () => {
     const first = sidebar.refreshRemote();
     await flush();
     settle(0, { a: 1 });
@@ -247,19 +272,17 @@ describe('after the credentials change', () => {
 
     let announced = 0;
     pullRequests.setRemoteUpdatedNotifier(() => announced++);
-    sidebar.onCredentialsChanged();
-    // The cleared error is itself a change worth painting, before
-    // the fetch it started has landed.
+    pullRequests.pullRequests.credentialsChanged();
+    // The cleared list and error are themselves a change worth
+    // painting, before any fetch has landed.
     expect(announced).toBe(1);
-    await flush();
-    expect(env.fetchCount).toBe(2);
-    settle(1, {});
+    expect(sidebar.getSyncState().lastRemoteSyncAt).toBeNull();
     pullRequests.setRemoteUpdatedNotifier(null);
   });
 });
 
 /**
- * A babysitter reads its pull request through the sidebar's cache, so
+ * A babysitter reads its pull request through the sidebar's list, so
  * a watched row costs the provider nothing beyond the list the sidebar
  * fetches anyway.
  */

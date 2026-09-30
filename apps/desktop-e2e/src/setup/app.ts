@@ -91,6 +91,26 @@ export async function openPalette(page: Page): Promise<Locator> {
 }
 
 /**
+ * Leave the current repository and open `cwd` through the palette's
+ * picker, as a user does. `window.n10.openRepo` would switch only the
+ * host, and the renderer would never learn about it.
+ */
+export async function switchRepo(page: Page, cwd: string): Promise<void> {
+  // No filter typed: the palette's own `value` for this entry is
+  // "command switch open repository", so searching for the words on
+  // screen scores it out of the list.
+  await openPalette(page);
+  await page.getByRole('option', { name: /Open another repository/ }).click();
+  await page.getByPlaceholder('/path/to/repository').fill(cwd);
+  await page.getByRole('button', { name: 'Open', exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => window.n10.getRepo()), {
+      timeout: 30_000,
+    })
+    .toMatchObject({ cwd });
+}
+
+/**
  * Open a worktree for `branch` through the command palette, and wait
  * for the sidebar to show it.
  *
@@ -162,6 +182,66 @@ export async function dismissSessionMenu(page: Page): Promise<void> {
   await menu.waitFor({ state: 'visible', timeout: 15_000 });
   await page.keyboard.press('Escape');
   await menu.waitFor({ state: 'hidden' });
+}
+
+/**
+ * Bring a pull request tab's Overview into view the way a reader does:
+ * the rail has no Overview entry, so Back, up from whichever pane
+ * shows, until the Overview's own heading does. At most two steps: the
+ * terminal, plan and walkthrough go up to the review pane last shown,
+ * the changes to the Overview.
+ */
+export async function showOverview(page: Page): Promise<void> {
+  // An Overview stays mounted once shown, hidden while another pane is up.
+  const heading = page
+    .locator('h1[data-overview-heading]')
+    .filter({ visible: true });
+  const back = page.getByRole('button', { name: 'Back to review' });
+  for (let step = 0; step < 3; step++) {
+    await expect(heading.or(back).first()).toBeVisible({ timeout: 30_000 });
+    if (await heading.isVisible()) return;
+    await back.click();
+  }
+  await expect(heading).toBeVisible();
+}
+
+/**
+ * From a pull request's Overview, where it opens with no agent running,
+ * on to its changes the way a reader goes: the next step's button,
+ * which reads Review changes, View changes or Respond to feedback, and
+ * leads to the diff whichever it is.
+ */
+export async function showChanges(page: Page): Promise<void> {
+  await page
+    .getByRole('region', { name: 'Next step' })
+    .getByRole('button', {
+      name: /^(Review changes|View changes|Respond to feedback)$/,
+    })
+    .filter({ visible: true })
+    .first()
+    .click({ timeout: 30_000 });
+  await expect(
+    page.getByRole('button', { name: 'Back to review' })
+  ).toBeVisible();
+}
+
+/**
+ * From a pull request's Overview to its diff by a file in the rail,
+ * for a test that must not take the next step's button — for an author
+ * with open threads that is Respond to feedback, which goes to the
+ * first of them.
+ */
+export async function showFile(page: Page): Promise<void> {
+  // A file row carries its path as its title; the section's own
+  // toggle and the folders do not.
+  await fileTree(page)
+    .filter({ visible: true })
+    .locator('button[title]')
+    .first()
+    .click({ timeout: 30_000 });
+  await expect(
+    page.getByRole('button', { name: 'Back to review' })
+  ).toBeVisible();
 }
 
 /**

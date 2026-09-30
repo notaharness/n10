@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import { keys } from './query-keys.js';
 import { verdictDecision } from '../review/review-verdict.js';
 import { errorMessage } from '../utils.js';
+import { useTabs } from '../tabs/tabs.js';
+import { keptNotice } from './removal-notice.js';
 import type {
   PlanCheckoutRequest,
   PostDraftsRequest,
@@ -19,6 +21,7 @@ import type {
   ReviewVerdict,
   SessionLaunchRequest,
   SidebarItem,
+  WorktreeRemovalCheck,
 } from '../../../host/contract.js';
 
 /**
@@ -35,14 +38,14 @@ function useInvalidator(cwd: string) {
     sync: () => qc.invalidateQueries({ queryKey: keys.sync(cwd) }),
     branches: () => qc.invalidateQueries({ queryKey: keys.branches(cwd) }),
     sessions: () => qc.invalidateQueries({ queryKey: keys.sessions(cwd) }),
-    settings: () =>
-      Promise.all([
-        qc.invalidateQueries({ queryKey: keys.settings(cwd) }),
-        // The picker's default row follows the configured agent.
-        qc.invalidateQueries({ queryKey: keys.agentOptions(cwd) }),
-      ]),
+    // A write to a thread changes the conversation the Overview reads
+    // too; its entries are keyed by ref, so every one in this
+    // repository goes, which is the pull request on screen.
     threads: (prId: number) =>
-      qc.invalidateQueries({ queryKey: keys.threads(cwd, prId) }),
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.threads(cwd, prId) }),
+        qc.invalidateQueries({ queryKey: keys.prConversations(cwd) }),
+      ]),
     drafts: (prId: number) =>
       qc.invalidateQueries({ queryKey: keys.drafts(cwd, prId) }),
   };
@@ -133,15 +136,30 @@ const REMOVE_WORKTREE_KEY = ['remove-worktree'] as const;
 
 export function useRemoveWorktree(cwd: string) {
   const inv = useInvalidator(cwd);
+  const tabs = useTabs();
   return useMutation({
     mutationKey: REMOVE_WORKTREE_KEY,
-    mutationFn: ({ branch, force }: { branch: string; force: boolean }) =>
-      window.n10.removeWorktree(branch, force),
+    mutationFn: ({
+      branch,
+      approved,
+    }: {
+      branch: string;
+      approved: WorktreeRemovalCheck;
+      /** The worktree's tab, closed once the worktree is gone. */
+      tabId?: string;
+    }) => window.n10.removeWorktree(branch, approved),
     // Reported here rather than through `mutate`'s own callbacks: the
     // confirm dialog closes as soon as it fires, and per-call callbacks
     // are dropped when their component unmounts. Mutation-level ones run
     // either way, so the outcome is never swallowed.
-    onSuccess: (_r, { branch }) => toast.success(`Removed worktree ${branch}`),
+    onSuccess: (outcome, { branch, tabId }) => {
+      // A kept worktree keeps its tab: its agent may still be running.
+      const gone = outcome === 'removed' || outcome === 'kept-branch';
+      if (gone && tabId) tabs.close(tabId, cwd);
+      const notice = keptNotice(branch, outcome);
+      if (notice) toast.warning(notice);
+      else toast.success(`Removed worktree ${branch}`);
+    },
     onError: (err) => toast.error(errorMessage(err)),
     onSettled: () => {
       void inv.sidebar();
@@ -336,19 +354,5 @@ export function useSetResolved(cwd: string) {
       if (ctx?.prev) qc.setQueryData(keys.threads(cwd, req.prId), ctx.prev);
     },
     onSettled: (_r, _e, req) => void inv.threads(req.prId),
-  });
-}
-
-export function useUpdateSetting(cwd: string) {
-  const inv = useInvalidator(cwd);
-  return useMutation({
-    mutationFn: ({
-      ref,
-      value,
-    }: {
-      ref: { label: string; key: string };
-      value: string;
-    }) => window.n10.updateSettingsField(ref, value),
-    onSettled: () => void inv.settings(),
   });
 }

@@ -83,6 +83,14 @@ export default tseslint.config(
             // hold.
             {
               sourceTag: 'scope:core',
+              notDependOnLibsWithTags: ['scope:app-core', 'scope:engine'],
+            },
+            // @n10/engine is the program both shells run: state,
+            // scheduling, caching. It sits on core and under the React
+            // layer, so neither a git call nor a hook can reach back
+            // into it from the wrong side.
+            {
+              sourceTag: 'scope:engine',
               notDependOnLibsWithTags: ['scope:app-core'],
             },
           ],
@@ -277,16 +285,58 @@ export default tseslint.config(
           ],
           patterns: [
             {
-              group: ['react-dom', 'ink', 'electron', '@n10/app-core'],
+              group: [
+                'react-dom',
+                'ink',
+                'electron',
+                '@n10/app-core',
+                '@n10/engine',
+              ],
               message:
-                '@n10/core must not depend on a shell or on the React ' +
-                'layer. Invert the dependency: the shell calls core.',
+                '@n10/core must not depend on a shell, the engine or the ' +
+                'React layer. Invert the dependency: the caller calls core.',
             },
             // Restated from the workspace block, not inherited: flat
             // config replaces a rule's options rather than merging
             // them, so declaring no-restricted-imports here drops
             // whatever the outer block set. Anything added there has
             // to be added here too.
+            {
+              group: ['**/index'],
+              message: 'No barrel imports — import from the concrete file.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // @n10/engine owns what both shells used to own twice: when to
+    // read, what to keep and who hears about it. A frontend renders it;
+    // the engine never renders, so it cannot import a renderer, a
+    // shell or the React layer that binds it. Same shape as core's
+    // block above, one layer up.
+    files: ['libs/engine/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react',
+              message:
+                '@n10/engine is shell-agnostic and must not import React. ' +
+                'Bind it with a hook in @n10/app-core instead.',
+            },
+          ],
+          patterns: [
+            {
+              group: ['react-dom', 'ink', 'electron', '@n10/app-core'],
+              message:
+                '@n10/engine must not depend on a shell or on the React ' +
+                'layer. The shell subscribes to the engine.',
+            },
+            // Restated for the same reason as core's block above.
             {
               group: ['**/index'],
               message: 'No barrel imports — import from the concrete file.',
@@ -395,6 +445,7 @@ export default tseslint.config(
           paths: [
             '@n10/app-core',
             '@n10/core',
+            '@n10/engine',
             '@n10/logger',
             '@n10/review-comments',
             '@n10/terminal-pty',
@@ -416,8 +467,10 @@ export default tseslint.config(
                 '@n10/*/*',
                 // Browser-safe by construction, and tested as such.
                 '!@n10/core/plan',
+                '!@n10/core/readiness',
                 '!@n10/app-core/plan',
                 '!@n10/vcs-core/types',
+                '!@n10/vcs-core/pr-details',
                 '!@n10/review-comments/conventional',
               ],
               allowTypeImports: true,
@@ -441,6 +494,12 @@ export default tseslint.config(
       '.claude/worktrees',
       '**/.tui-test',
       '**/eslint.config.mjs',
+      // apps/website (Next.js + Fumadocs) build and generated dirs.
+      '**/.next',
+      '**/.source',
+      '**/.open-next',
+      '**/.wrangler',
+      '**/next-env.d.ts',
     ],
   }
 );

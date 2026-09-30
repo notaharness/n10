@@ -8,6 +8,12 @@
  * up or assert on host state are declared. Whether the bridge and the
  * contract still agree is the contract unit test's job, not this file's.
  */
+interface FakeReviewDraft {
+  id: string;
+  body: string;
+  publication: { state: string };
+}
+
 interface N10Bridge {
   getVersion(): Promise<{
     app: string;
@@ -44,13 +50,21 @@ interface N10Bridge {
     remoteFetches: number;
   }>;
   openRepo(cwd: string): Promise<{ cwd: string }>;
-  getRepo(): Promise<{ cwd: string } | null>;
+  getRepo(): Promise<{
+    cwd: string;
+    repository?: { provider: string; host: string; repository: string } | null;
+    viewer?: string | null;
+  } | null>;
   launchAgent(req: {
     branch: string;
     intent: string;
   }): Promise<{ name: string }>;
   killSession(name: string): Promise<void>;
-  getSessionBuffer(name: string): Promise<{ data: string; seq: number }>;
+  watchSession(name: string): Promise<{ data: string; seq: number }>;
+  onSessionData(
+    cb: (event: { name: string; data: string; seq: number }) => void
+  ): () => void;
+  unwatchSession(name: string): Promise<void>;
   listRecentRepos(): Promise<{ cwd: string; valid: boolean }[]>;
   listTerminals(): Promise<
     {
@@ -66,8 +80,66 @@ interface N10Bridge {
   listForeignSessions(): Promise<
     { repo: string; branch: string; sessionName: string }[]
   >;
+  listReviewDrafts(req: {
+    ref: Record<string, unknown>;
+    viewer?: string | null;
+  }): Promise<{ drafts: FakeReviewDraft[] }>;
+  fetchDiffText(
+    sourceBranch: string,
+    targetBranch: string
+  ): Promise<{ text: string; head: string }>;
+  /** What the Finish review form calls (its UI is a later slice). */
+  submitReview(req: {
+    ref: Record<string, unknown>;
+    viewer?: string | null;
+    head: string;
+    event:
+      | 'COMMENT'
+      | 'APPROVE'
+      | 'REQUEST_CHANGES'
+      | 'APPROVE_WITH_SUGGESTIONS'
+      | 'WAIT_FOR_AUTHOR'
+      | 'REJECT'
+      | 'RESET_VOTE';
+    draftIds: string[];
+  }): Promise<{ drafts: FakeReviewDraft[]; resumed: { state: string } | null }>;
+  /** Asserted on for completeness: the conversation has no UI yet. */
+  getPullRequestConversation(req: {
+    ref: Record<string, unknown>;
+    viewer?: string;
+  }): Promise<{
+    ref: { number: number };
+    conversation:
+      | { state: 'read'; value: FakeConversation }
+      | { state: 'failed'; kind: string; reason: string }
+      | { state: 'unsupported'; reason: string };
+  }>;
   /** Used by the perf probes to time the host half of a tab open. */
   fetchWorktreeDiffText(branch: string, target: string): Promise<string>;
+}
+
+interface FakeConversationCoverage {
+  loaded: number;
+  total: number | null;
+  complete: boolean;
+}
+
+interface FakeConversation {
+  threads: {
+    id: string;
+    scope: string;
+    isOutdated: boolean;
+    anchor: unknown;
+    comments: { id: string; body: string }[];
+    status: { resolved: boolean; resolvedBy: { identifier: string } | null };
+  }[];
+  events: { kind: string }[];
+  comments: { id: string; body: string; author: { kind: string } | null }[];
+  reviews: { state: string; body: string; commentCount: number }[];
+  coverage: Record<
+    'threads' | 'threadComments' | 'comments' | 'reviews' | 'events',
+    FakeConversationCoverage
+  >;
 }
 
 interface Window {

@@ -19,10 +19,12 @@ import {
   fetchAuthenticatedUserEmail,
   fetchMyTeamIds,
   enrichReviewersWithTeamMembership,
+} from './provider.js';
+import {
   extractMentionGuids,
   rewriteMentions,
   _clearMentionCacheForTests,
-} from './provider.js';
+} from './mentions.js';
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -1154,6 +1156,23 @@ describe('azureDevOpsProvider', () => {
     ).toBe('https://dev.azure.com/myorg/myproject/_git/myrepo/pullrequest/42');
   });
 
+  it('names the repository a pull request ref belongs to', () => {
+    expect(
+      azureDevOpsProvider.repositoryRef?.({
+        org: 'myorg',
+        project: 'myproject',
+        repo: 'myrepo',
+      })
+    ).toEqual({
+      provider: 'azure-devops',
+      host: 'dev.azure.com/myorg',
+      repository: 'myproject/myrepo',
+    });
+    expect(
+      azureDevOpsProvider.repositoryRef?.({ org: 'myorg', repo: 'myrepo' })
+    ).toBeNull();
+  });
+
   describe('fetchPullRequests', () => {
     beforeEach(() => {
       // Block body on purpose: an arrow returning the mock hands vitest
@@ -1463,6 +1482,43 @@ describe('azureDevOpsProvider', () => {
       expect(identityCall).toContain('/identities?identityIds=');
       expect(identityCall).toContain(alice);
       expect(identityCall).toContain(bob);
+    });
+
+    it('resolves mentions for the conversation while keeping the raw source', async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          value: [
+            {
+              id: 1,
+              status: 'active',
+              comments: [
+                {
+                  id: 11,
+                  commentType: 'text',
+                  content: `hi @<${alice}>`,
+                  author: { displayName: 'Me', uniqueName: 'me@example.com' },
+                  publishedDate: '2026-04-24T00:00:00Z',
+                },
+              ],
+            },
+          ],
+        })
+      );
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({ value: [{ id: alice, providerDisplayName: 'Alice' }] })
+      );
+
+      const result = await azureDevOpsProvider.fetchPullRequestConversation!(
+        { pat: 't' },
+        testProject,
+        1
+      );
+
+      expect(result.ref).toMatchObject({ provider: 'azure-devops', number: 1 });
+      expect(result.threads[0]!.comments[0]).toMatchObject({
+        source: `hi @<${alice}>`,
+        body: 'hi @Alice',
+      });
     });
 
     it('leaves original @<guid> intact when the Identities API fails', async () => {

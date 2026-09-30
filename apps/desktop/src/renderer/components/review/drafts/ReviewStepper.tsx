@@ -1,5 +1,5 @@
 import { CheckIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { DiffLine } from '@n10/diff';
 import type { ReviewComment } from '../../../../host/contract.js';
@@ -14,6 +14,7 @@ import {
   useUpdateDraft,
 } from '../../../lib/data/mutations.js';
 import { useRepo } from '../../../lib/repo-context.js';
+import { useTabView } from '../../../lib/tabs/tab-views.js';
 import { errorMessage } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { StepCard } from './ReviewStepCard.js';
@@ -30,7 +31,6 @@ export function ReviewStepper({
   drafts,
   filesByName,
   fileOrder,
-  active,
   onExit,
   onOpenInDiff,
 }: {
@@ -39,12 +39,6 @@ export function ReviewStepper({
   drafts: ReviewComment[];
   filesByName: Map<string, DiffLine[]>;
   fileOrder: Map<string, number>;
-  /** Whether this stepper's tab is the visible one. Its shortcuts are
-   *  bound on `window`, and the pane stays mounted while the tab is in
-   *  the background (a live agent keeps its terminal alive), so without
-   *  this a keypress meant for another tab would post or discard a
-   *  draft here. */
-  active: boolean;
   onExit: () => void;
   onOpenInDiff: (file: string) => void;
 }) {
@@ -57,9 +51,12 @@ export function ReviewStepper({
     () => orderDraftsForReview(drafts, fileOrder),
     [drafts, fileOrder]
   );
-  const [index, setIndex] = useState(0);
+  // The step the reader was on when they left the tab.
+  const { saved, save } = useTabView();
+  const [index, setIndex] = useState(saved.step ?? 0);
   const clamped = Math.min(index, Math.max(0, ordered.length - 1));
   if (clamped !== index) setIndex(clamped);
+  useEffect(() => save({ step: clamped }), [clamped, save]);
 
   const current = ordered[clamped];
   const done = ordered.length === 0;
@@ -82,7 +79,6 @@ export function ReviewStepper({
         current.lineStart,
         current.lineEnd
       )}
-      active={active}
       busy={post.isPending || update.isPending || remove.isPending}
       atStart={clamped === 0}
       atEnd={clamped >= ordered.length - 1}

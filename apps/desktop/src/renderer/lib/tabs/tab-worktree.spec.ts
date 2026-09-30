@@ -56,7 +56,10 @@ describe('a worktree that switches branch', () => {
       worktree('other'),
     ]);
     expect(s.tabs).toEqual([
-      expect.objectContaining({ itemKey: 'branch:other', originBranch: 'feature' }),
+      expect.objectContaining({
+        itemKey: 'branch:other',
+        originBranch: 'feature',
+      }),
     ]);
   });
 
@@ -83,7 +86,10 @@ describe('a worktree that switches branch', () => {
     let s = sync(EMPTY_TABS, [entry]);
     s = sync(s, [entry]);
     expect(s.tabs).toEqual([
-      expect.objectContaining({ itemKey: 'branch:other', originBranch: 'feature' }),
+      expect.objectContaining({
+        itemKey: 'branch:other',
+        originBranch: 'feature',
+      }),
     ]);
   });
 

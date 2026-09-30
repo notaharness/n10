@@ -37,9 +37,6 @@ status drive lifecycle information; no global tmux hooks are installed.
   column separators. Detailed discovery reads creation time, native pane state,
   requested user options and working directory in one command.
 
-Desktop installs a `setTmuxSessionPreparer` callback that runs new-session
-preparation in an Electron utility process. Node applications use the default
-native preparer. Plans carry excluded names as data; callbacks do not cross the
-process boundary. The returned target is attached directly without preparing
-or rewriting it again. Preparation owns cleanup on failure, so callers must
-not terminate its worker midway through creating a session.
+Plans carry excluded names as data. The target preparation returns is attached
+directly, without preparing or rewriting it again. Preparation owns cleanup on
+failure, so nothing may interrupt it midway through creating a session.

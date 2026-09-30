@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo } from 'react';
+import { useMemo } from 'react';
 import type { SidebarItem } from '../../../host/contract.js';
 import { useRepo } from '../../lib/repo-context.js';
 import {
@@ -17,6 +17,8 @@ import {
   itemSessionName,
   itemWorktree,
 } from '../../lib/sidebar/sidebar-model.js';
+import { PaneShownContext } from '../../lib/tabs/pane-shown.js';
+import { TabViewScope } from '../../lib/tabs/tab-views.js';
 import { foreignRepoOf, useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { cn } from '../../lib/utils.js';
@@ -29,6 +31,7 @@ import { ForeignRepoPane } from './ForeignRepoPane.js';
 import { TabButton } from './TabButton.js';
 import { TabStrip } from './TabStrip.js';
 import { TerminalView } from './TerminalView.js';
+import { useEditorPanes } from './use-editor-panes.js';
 
 /** The pane body for a tab. Each kind renders its own placeholder
  *  while its module lands; nothing here suspends. */
@@ -36,37 +39,100 @@ function PaneBody({
   tab,
   item,
   items,
-  active,
   menuActive,
   onPin,
 }: {
   tab: Tab;
   item: SidebarItem | undefined;
   items: SidebarItem[];
-  active: boolean;
   menuActive: boolean;
   onPin: () => void;
 }) {
   if (tab.kind === 'settings') return <SettingsView />;
-  if (tab.kind === 'terminal')
-    return <TerminalView tab={tab} active={active} />;
+  if (tab.kind === 'terminal') return <TerminalView tab={tab} />;
   return (
     <ItemView
       item={item}
       items={items}
       itemKey={tab.itemKey}
-      active={active}
       menuActive={menuActive}
       onPin={onPin}
     />
   );
 }
 
+/** A tab's pane: its branch banner and body. The spare is rendered
+ *  off screen and `inert`, so nothing in it takes focus or events. */
+function Pane({
+  tab,
+  item,
+  items,
+  shown,
+  menuActive,
+  onPin,
+}: {
+  tab: Tab;
+  item: SidebarItem | undefined;
+  items: SidebarItem[];
+  shown: boolean;
+  menuActive: boolean;
+  onPin: () => void;
+}) {
+  const switched =
+    tab.kind === 'item' &&
+    tab.originBranch &&
+    item &&
+    itemBranch(item) !== tab.originBranch
+      ? { current: itemBranch(item), original: tab.originBranch }
+      : null;
+  return (
+    <div
+      className={cn(
+        'absolute inset-0 flex min-h-0 flex-col',
+        !shown && 'invisible'
+      )}
+      inert={!shown}
+      aria-hidden={!shown || undefined}
+      data-spare-pane={!shown || undefined}
+    >
+      <TabViewScope value={tab.id}>
+        <PaneShownContext.Provider value={shown}>
+          {switched && <BranchSwitchBanner {...switched} />}
+          <div className="flex min-h-0 flex-1 flex-col">
+            <ErrorBoundary resetKey={tab.id}>
+              {/* The pane bodies are code-split (see lazy-panes), but none
+              suspends — each renders its own placeholder until its
+              module lands, so there is no Suspense boundary here to
+              throttle the swap. */}
+              <PaneBody
+                tab={tab}
+                item={item}
+                items={items}
+                menuActive={menuActive}
+                onPin={onPin}
+              />
+            </ErrorBoundary>
+          </div>
+        </PaneShownContext.Provider>
+      </TabViewScope>
+    </div>
+  );
+}
+
 /**
- * Tab strip + stacked panes. Every open tab stays mounted (panes are
- * absolutely positioned and hidden with `visibility`, not unmounted)
- * so running terminals keep their scrollback and PR views keep their
- * scroll position when you switch away and back.
+ * Tab strip + the active tab's pane, and at most one spare.
+ *
+ * A pane is expensive to keep — a diff can hold tens of thousands of
+ * nodes and a terminal a wterm instance fed by its session's output —
+ * so the editor keeps two at most: the one on screen and one spare,
+ * rendered off screen. The spare is the tab the pointer rests on
+ * (`usePrewarm`, from a tab or a sidebar row), or else the one on
+ * screen before the last switch. Switching to the spare is a swap: the
+ * panes are keyed by tab id, so the same pane is shown, not a new one
+ * mounted, and the pane it replaces becomes the spare. Switching to
+ * anything else mounts that tab from scratch — its terminal from the
+ * host's ring buffer (`SessionTerminal`), its review from the query
+ * cache — and a hover in progress is dropped for it.
  */
 export function EditorArea({
   items,
@@ -116,9 +182,8 @@ export function EditorArea({
    * an item re-keys the moment a PR appears (`branch:x` → `pr:42`), and
    * `sync-items` only catches up in an effect — one render happens
    * first. Looking up by key alone would make that render treat the tab
-   * as itemless, which unmounts the pane and destroys a live agent's
-   * terminal (its scrollback only partly recoverable from the host's
-   * ring buffer) twice over a PR's life. The worktree is asked first,
+   * as itemless, which swaps the pane out and remounts a live agent's
+   * terminal under the user twice over a PR's life. The worktree is asked first,
    * for the same reason: `git switch` inside it moves its item to
    * another key, and can leave its old PR behind under the old one.
    */
@@ -136,8 +201,7 @@ export function EditorArea({
   };
 
   const sessionNameFor = (tab: Tab): string | undefined => {
-    // A terminal's session is the tab itself — always mounted, so its
-    // scrollback survives switching away.
+    // A terminal's session is the tab itself.
     if (tab.kind === 'terminal') return tab.name;
     const item = itemFor(tab);
     if (!item) return undefined;
@@ -163,31 +227,17 @@ export function EditorArea({
     return resolveMachineLabel(machineId, machines.data);
   };
 
-  // The tab strip tracks the live state so clicks feel instant; the
-  // panes below follow a *deferred* copy, so mounting/unmounting a
-  // pane runs as an interruptible background render instead of
-  // blocking the click. No blanket overlay: the virtualized diff and
+  // No blanket overlay while a pane mounts: the virtualized diff and
   // the rail each show their own skeletons, and the terminal renders
   // in the first frame.
-  const paneTabs = useDeferredValue(tabs.tabs);
-  const paneActiveId = useDeferredValue(tabs.activeId);
   const tabStopId = tabs.tabs.some((t) => t.id === tabs.activeId)
     ? tabs.activeId
     : tabs.tabs[0]?.id;
-
-  // The active tab's repository, when it is not the open one. Its pane
-  // cannot be rendered from here — every query and every host call is
-  // scoped to the open repo — so the notice stands in until the repo
-  // switch that activating it kicked off lands.
-  const activePane = paneTabs.find((t) => t.id === paneActiveId);
-  const foreignCwd = activePane ? foreignRepoOf(activePane, repo.cwd) : null;
-
-  // Mount policy: the active tab plus any tab whose branch has a PTY
-  // session (its terminal must stay mounted to keep scrollback). Other
-  // panes unmount while inactive — a diff pane can hold tens of
-  // thousands of nodes, and keeping several alive made every
-  // interaction (typing, closing tabs) pay for all of them.
-  const hasSession = (tab: Tab): boolean => sessionNameFor(tab) != null;
+  const { activePane, paneActiveId, foreignCwd, panes } = useEditorPanes(
+    tabs.tabs,
+    tabs.activeId,
+    repo.cwd
+  );
 
   if (tabs.tabs.length === 0) {
     return (
@@ -220,49 +270,19 @@ export function EditorArea({
         })}
       </TabStrip>
       <div className="relative min-h-0 flex-1" data-editor-panes>
-        {paneTabs.map((tab) => {
-          // A foreign tab has no pane here: its data lives in a
-          // repository this window is not pointing at.
-          if (foreignRepoOf(tab, repo.cwd) !== null) return null;
-          const active = tab.id === paneActiveId;
-          if (!active && !hasSession(tab)) return null;
-          const item = itemFor(tab);
-          const switched =
-            tab.kind === 'item' &&
-            tab.originBranch &&
-            item &&
-            itemBranch(item) !== tab.originBranch
-              ? { current: itemBranch(item), original: tab.originBranch }
-              : null;
-          return (
-            <div
-              key={tab.id}
-              aria-hidden={!active}
-              className={cn(
-                'absolute inset-0 flex min-h-0 flex-col',
-                !active && 'invisible'
-              )}
-            >
-              {switched && <BranchSwitchBanner {...switched} />}
-              <div className="flex min-h-0 flex-1 flex-col">
-                <ErrorBoundary resetKey={tab.id}>
-                  {/* The pane bodies are code-split (see lazy-panes), but
-                      none suspends — each renders its own placeholder
-                      until its module lands, so there is no Suspense
-                      boundary here to throttle the swap. */}
-                  <PaneBody
-                    tab={tab}
-                    item={item}
-                    items={items}
-                    active={active}
-                    menuActive={tab.id === tabs.activeId}
-                    onPin={() => tabs.pin(tab.id)}
-                  />
-                </ErrorBoundary>
-              </div>
-            </div>
-          );
-        })}
+        {/* A foreign tab has no pane here: its data lives in a
+            repository this window is not pointing at. */}
+        {panes.map((tab) => (
+          <Pane
+            key={tab.id}
+            tab={tab}
+            item={itemFor(tab)}
+            items={items}
+            shown={tab.id === activePane?.id}
+            menuActive={tab.id === activePane?.id && tab.id === tabs.activeId}
+            onPin={() => tabs.pin(tab.id)}
+          />
+        ))}
         {foreignCwd && (
           <div className="absolute inset-0 flex min-h-0 flex-col">
             <ForeignRepoPane cwd={foreignCwd} />

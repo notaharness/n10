@@ -13,7 +13,7 @@ const SELECTED = '◉◎';
 const RUNNING = '◉●';
 const ANY = '◉◎●○';
 
-function escapeRegExp(s: string): string {
+export function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
@@ -193,8 +193,8 @@ async function selectionAtTop(page: Page): Promise<boolean> {
  * index 0, but `reconcileSelection` (SidebarContext.tsx) ADOPTS the row
  * the cursor resolved onto as the new anchor key, and from then on the
  * cursor follows that row rather than the index. The review list is
- * served cache-first and refreshed in the background
- * (`pull-request-cache.ts`), so the refresh can insert rows ABOVE the
+ * served cache-first and refreshed in the background (the engine's
+ * `pull-request-list.ts`), so the refresh can insert rows ABOVE the
  * adopted row and carry the cursor down with them. A target that sat
  * above the cursor is then unreachable: the walk travels one way and
  * the selection clamps.

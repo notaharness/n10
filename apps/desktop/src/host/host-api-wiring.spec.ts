@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { N10HostApi } from './contract.js';
+import type { HostApi } from './register-handlers.js';
 
 /**
  * Which service each bridge method reaches, asserted rather than
@@ -54,14 +54,13 @@ vi.mock('./services/worktrees.js', () =>
     'listAllBranches',
     'createWorktree',
     'removeWorktree',
-    'canRemoveBranch',
+    'checkWorktreeRemoval',
     'openInEditor',
     'getWorktreeDiffText',
   ])
 );
 vi.mock('./services/reviews.js', () =>
   recorder('reviews', [
-    'fetchPullRequests',
     'fetchCommentThreads',
     'replyToThread',
     'setThreadResolved',
@@ -81,8 +80,10 @@ vi.mock('./services/sessions.js', () =>
     'checkoutPlan',
     'listSessions',
     'getSessionActivity',
-    'markSessionSeen',
-    'getSessionBuffer',
+    'watchSession',
+    'unwatchSession',
+    'showSession',
+    'hideSession',
     'writeSession',
     'resizeSession',
     'killSession',
@@ -100,6 +101,26 @@ vi.mock('./services/comment-images.js', () =>
 );
 vi.mock('./services/clipboard-image.js', () =>
   recorder('clipboardImage', ['saveClipboardImage'])
+);
+vi.mock('./services/pr-checks.js', () =>
+  recorder('prChecks', ['getPullRequestChecks'])
+);
+vi.mock('./services/pr-details.js', () =>
+  recorder('prDetails', ['getPullRequestSnapshot'])
+);
+vi.mock('./services/pr-conversation.js', () =>
+  recorder('prConversation', ['getPullRequestConversation'])
+);
+vi.mock('./services/review-drafts.js', () =>
+  recorder('reviewDrafts', [
+    'listDrafts',
+    'saveDraft',
+    'discardDraft',
+    'submitReview',
+  ])
+);
+vi.mock('./services/mentions.js', () =>
+  recorder('mentions', ['searchMentionCandidates'])
 );
 vi.mock('./services/drafts.js', () =>
   recorder('drafts', [
@@ -130,9 +151,11 @@ vi.mock('./services/inbound-mail.js', () =>
   recorder('inboundMail', ['dismissInboundMail'])
 );
 
-const { createHostApi } = await import('./register-handlers.js');
+const { createHostApi, createViewerApi } = await import(
+  './register-handlers.js'
+);
 
-let api: N10HostApi;
+let api: HostApi;
 
 beforeEach(() => {
   calls.length = 0;
@@ -140,7 +163,7 @@ beforeEach(() => {
 });
 
 /** method → the service call it must make, given these arguments. */
-const WIRING: [keyof N10HostApi, unknown[], string][] = [
+const WIRING: [keyof HostApi, unknown[], string][] = [
   ['openRepo', ['/repo'], 'repo.openRepo'],
   ['getRepo', [], 'repo.getRepo'],
   ['listRecentRepos', [], 'repo.listRecentRepos'],
@@ -161,13 +184,48 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
   ['listBranches', [], 'worktrees.listBranches'],
   ['listAllBranches', [], 'worktrees.listAllBranches'],
   ['createWorktree', ['feature'], 'worktrees.createWorktree'],
-  ['removeWorktree', ['feature', true], 'worktrees.removeWorktree'],
-  ['canRemoveBranch', ['feature'], 'worktrees.canRemoveBranch'],
+  [
+    'removeWorktree',
+    [
+      'feature',
+      {
+        verdict: 'clear',
+        tip: 'abc123',
+        repo: '/repo/.git',
+        checkout: '/repo/wt',
+      },
+    ],
+    'worktrees.removeWorktree',
+  ],
+  ['checkWorktreeRemoval', ['feature'], 'worktrees.checkWorktreeRemoval'],
   ['openInEditor', ['feature'], 'worktrees.openInEditor'],
 
-  ['fetchPullRequests', [], 'reviews.fetchPullRequests'],
   ['fetchCommentThreads', [7], 'reviews.fetchCommentThreads'],
   ['fetchPrDescription', [7], 'reviews.fetchPrDescription'],
+  [
+    'getPullRequestSnapshot',
+    [{ ref: { number: 7 } }],
+    'prDetails.getPullRequestSnapshot',
+  ],
+  [
+    'getPullRequestChecks',
+    [{ ref: { number: 7 } }],
+    'prChecks.getPullRequestChecks',
+  ],
+  [
+    'getPullRequestConversation',
+    [{ ref: { number: 7 } }],
+    'prConversation.getPullRequestConversation',
+  ],
+  ['listReviewDrafts', [{ ref: { number: 7 } }], 'reviewDrafts.listDrafts'],
+  ['saveReviewDraft', [{ ref: { number: 7 } }], 'reviewDrafts.saveDraft'],
+  ['discardReviewDraft', [{ ref: { number: 7 } }], 'reviewDrafts.discardDraft'],
+  ['submitReview', [{ ref: { number: 7 } }], 'reviewDrafts.submitReview'],
+  [
+    'searchMentionCandidates',
+    [{ ref: { number: 7 }, query: 'al' }],
+    'mentions.searchMentionCandidates',
+  ],
   [
     'replyToThread',
     [{ prId: 7, thread: { id: 't' }, body: 'hi' }],
@@ -212,8 +270,6 @@ const WIRING: [keyof N10HostApi, unknown[], string][] = [
   ['listSessions', [], 'sessions.listSessions'],
   ['listForeignSessions', [], 'foreignSessions.listForeignSessions'],
   ['getSessionActivity', [], 'sessions.getSessionActivity'],
-  ['markSessionSeen', ['b'], 'sessions.markSessionSeen'],
-  ['getSessionBuffer', ['b'], 'sessions.getSessionBuffer'],
   ['writeSession', ['b', 'ls\n'], 'sessions.writeSession'],
   ['resizeSession', ['b', 120, 40], 'sessions.resizeSession'],
   ['killSession', ['b'], 'sessions.killSession'],
@@ -283,10 +339,23 @@ describe('host API wiring', () => {
     ]);
     const covered = new Set(WIRING.map(([m]) => m));
     const missing = Object.keys(api).filter(
-      (m) => !covered.has(m as keyof N10HostApi) && !notDelegating.has(m)
+      (m) => !covered.has(m as keyof HostApi) && !notDelegating.has(m)
     );
     expect(missing).toEqual([]);
   });
+
+  it.each([
+    ['watchSession', 'sessions.watchSession'],
+    ['unwatchSession', 'sessions.unwatchSession'],
+    ['showSession', 'sessions.showSession'],
+    ['hideSession', 'sessions.hideSession'],
+  ] as const)(
+    '%s reaches %s with the asking window',
+    async (method, expected) => {
+      await createViewerApi()[method](7, 'b');
+      expect(calls).toEqual([{ fn: expected, args: [7, 'b'] }]);
+    }
+  );
 
   it('reports the running versions rather than a service call', () => {
     // getVersion is the one method that answers from the process

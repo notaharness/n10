@@ -143,12 +143,11 @@ const COPILOT: AgentDefinition = {
   name: 'Copilot',
   supportsAppendSystemPrompt: false,
   blank: () => ({ cmd: 'copilot', args: [] }),
-  // `-i` starts an interactive session seeded with the prompt (verified
-  // empirically). `-p` is the one-shot programmatic mode that exits, so
-  // we deliberately don't use it for a live pane.
-  seed: (prompt) => ({ cmd: 'copilot', args: ['-i', prompt] }),
-  // `copilot --continue` resumes the most-recently-closed session
-  // globally, not the one for this worktree — unsafe, so no continue.
+  // Use the documented attached form; the short `-i PROMPT` is valid too.
+  // `-p` is programmatic mode and exits after completion.
+  seed: (prompt) => ({ cmd: 'copilot', args: [`--interactive=${prompt}`] }),
+  // `--continue` prefers this cwd but falls back to global history.
+  // No automatic resume until n10 can target a recorded conversation ID.
 };
 
 const CODEX: AgentDefinition = {
@@ -158,9 +157,10 @@ const CODEX: AgentDefinition = {
   blank: () => ({ cmd: 'codex', args: [] }),
   resume: (prompt) => ({
     cmd: 'codex',
-    args: ['resume', '--last', ...(prompt ? [prompt] : [])],
+    args: ['resume', '--last', ...(prompt ? ['--', prompt] : [])],
   }),
-  seed: (prompt) => ({ cmd: 'codex', args: [prompt] }),
+  // Protect prompts beginning with a flag or a Codex subcommand name.
+  seed: (prompt) => ({ cmd: 'codex', args: ['--', prompt] }),
 };
 
 const GEMINI: AgentDefinition = {
@@ -170,7 +170,13 @@ const GEMINI: AgentDefinition = {
   blank: () => ({ cmd: 'gemini', args: [] }),
   // `-i`/`--prompt-interactive` seeds an interactive session; `-p` is
   // the headless mode that exits.
-  seed: (prompt) => ({ cmd: 'gemini', args: ['-i', prompt] }),
+  // Attach the value so option-like prompts remain literal under yargs.
+  seed: (prompt) => ({
+    cmd: 'gemini',
+    args: [`--prompt-interactive=${prompt}`],
+  }),
+  // `--resume latest` starts fresh if project history is missing (v0.61.0).
+  // No automatic resume until n10 can target a recorded conversation ID.
 };
 
 const OPENCODE: AgentDefinition = {

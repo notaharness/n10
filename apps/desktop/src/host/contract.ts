@@ -20,6 +20,8 @@ import type {
   BabysitStatus,
   LaunchIntent,
   SidebarItem,
+  WorktreeRemovalCheck,
+  WorktreeRemovalOutcome,
 } from '@n10/core';
 import type { CommentSeverity, ReviewComment } from '@n10/review-comments';
 export type { CommentSeverity, ReviewComment };
@@ -36,7 +38,13 @@ export type {
   RemoteCommentReply,
   RemoteCommentThread,
 };
-export type { BabysitStatus, PullRequestLookup, SidebarItem } from '@n10/core';
+export type {
+  BabysitStatus,
+  PullRequestLookup,
+  SidebarItem,
+  WorktreeRemovalCheck,
+  WorktreeRemovalOutcome,
+} from '@n10/core';
 
 // The push half of the contract — channel names and their payloads.
 export * from './contract-events.js';
@@ -76,6 +84,25 @@ import type {
   ResolveRequest,
   ReviewLaunchRequest,
 } from './contract-reviews.js';
+// Pull request reads addressed by identity and exact commits.
+export type * from './contract-pull-requests.js';
+import type {
+  DiscardDraftRequest,
+  DraftsRequest,
+  MentionSearch,
+  MentionSearchRequest,
+  SubmitReviewRequest,
+  SubmittedReview,
+  PullRequestChecksAnswer,
+  PullRequestConversationRead,
+  PullRequestSnapshot,
+  RepositoryRef,
+  ReviewDraft,
+  ReviewDiffText,
+  ReviewDrafts,
+  SaveDraftRequest,
+  SnapshotRequest,
+} from './contract-pull-requests.js';
 import type {
   BabysitChangedEvent,
   LaunchStepEvent,
@@ -100,6 +127,13 @@ export interface RepoInfo {
   cwd: string;
   providerId: string | null;
   vcsConfigured: boolean;
+  /** The repository as its provider names it; the repository half of
+   *  every pull request ref the renderer asks about. Null while no
+   *  provider is configured. */
+  repository: RepositoryRef | null;
+  /** The account n10 acts as (GitHub login, Azure DevOps email): what
+   *  per-account reads are keyed by and checked against. */
+  viewer: string | null;
 }
 
 // ── Sessions (agent terminals) ───────────────────────────────────
@@ -153,6 +187,10 @@ export interface SessionBuffer {
   data: string;
   /** seq of the last chunk included in `data`. */
   seq: number;
+  /** The buffer has dropped its oldest output, so `data` starts part
+   *  way through the stream: without the attach's full redraw, it only
+   *  repaints what changed after it. */
+  truncated: boolean;
 }
 
 // ── Settings ─────────────────────────────────────────────────────
@@ -316,10 +354,15 @@ export interface N10HostApi {
   /** All local + remote branch names (checkout candidates). */
   listAllBranches(): Promise<string[]>;
   createWorktree(branch: string): Promise<string | null>;
-  removeWorktree(branch: string, force: boolean): Promise<boolean>;
-  canRemoveBranch(
-    branch: string
-  ): Promise<{ safe: true } | { safe: false; reason: string }>;
+  /** Remove with the verdict the user confirmed; core's outcome says
+   *  what was kept, if anything. */
+  removeWorktree(
+    branch: string,
+    approved: WorktreeRemovalCheck
+  ): Promise<WorktreeRemovalOutcome>;
+  /** What removing the branch's worktree would cost — core's verdict,
+   *  shared with the TUI. */
+  checkWorktreeRemoval(branch: string): Promise<WorktreeRemovalCheck>;
   /** Open the branch's worktree in the configured external editor
    *  (config.editor, falling back to $VISUAL / $EDITOR — same as the
    *  TUI). Creates the worktree if needed. Resolves to the editor
@@ -327,12 +370,39 @@ export interface N10HostApi {
   openInEditor(branch: string): Promise<{ editor: string }>;
 
   // ── Reviews ──────────────────────────────────────────────────
-  fetchPullRequests(): Promise<BranchPrMap>;
   fetchCommentThreads(prId: number): Promise<PullRequestComments>;
   replyToThread(req: ReplyRequest): Promise<void>;
   setThreadResolved(req: ResolveRequest): Promise<void>;
   /** Full PR description (list payloads truncate or omit it). */
   fetchPrDescription(prId: number): Promise<string>;
+  /** One pull request by identity: the list row, the provider's detail
+   *  and the exact commits its review compares. Rejects a ref from
+   *  another repository or a caller that last saw another account. */
+  getPullRequestSnapshot(req: SnapshotRequest): Promise<PullRequestSnapshot>;
+  /** What stands between one pull request and completion: its checks,
+   *  the target's rules and the provider's merge state, with n10's
+   *  reading of them. Identity-checked like the snapshot. */
+  getPullRequestChecks(req: SnapshotRequest): Promise<PullRequestChecksAnswer>;
+  /** One pull request's whole conversation by identity: threads with
+   *  every reply, conversation comments, reviews and events, with how
+   *  much of each was read. Refused like the snapshot. */
+  getPullRequestConversation(
+    req: SnapshotRequest
+  ): Promise<PullRequestConversationRead>;
+  /** The reviewer's own unpublished drafts on one pull request, kept on
+   *  this machine for the configured account. Refused like the snapshot. */
+  listReviewDrafts(req: DraftsRequest): Promise<ReviewDrafts>;
+  /** Store the draft for a target; an empty body removes it. Resolves
+   *  to the stored draft, or null when it was removed. */
+  saveReviewDraft(req: SaveDraftRequest): Promise<ReviewDraft | null>;
+  discardReviewDraft(req: DiscardDraftRequest): Promise<void>;
+  /** People a comment on one pull request can mention, found by the
+   *  provider's own search. Refused like the snapshot. */
+  searchMentionCandidates(req: MentionSearchRequest): Promise<MentionSearch>;
+  /** File the chosen drafts as one native review on the head the
+   *  reviewer read. Resolves to the drafts as they now stand; a failure
+   *  leaves each draft saying where it got to. Refused like the snapshot. */
+  submitReview(req: SubmitReviewRequest): Promise<SubmittedReview>;
   /** Cast the current user's review verdict on a PR. */
   submitReviewVerdict(prId: number, verdict: ReviewVerdict): Promise<void>;
   /** The reviewer-list identifier of the authenticated user (GitHub
@@ -374,11 +444,17 @@ export interface N10HostApi {
    *  sidebar spinner): `active` = producing output now, `flashing` =
    *  went idle after a real work streak and the user hasn't looked. */
   getSessionActivity(): Promise<Record<string, SessionActivitySnapshot>>;
-  /** The user is looking at this session — clears its flashing state. */
-  markSessionSeen(name: string): Promise<void>;
-  /** Recent output for a session so a (re)mounted terminal can replay
-   *  what it missed before subscribing to live data. */
-  getSessionBuffer(name: string): Promise<SessionBuffer>;
+  /** This window holds a terminal for the session: send it the
+   *  session's output from now on, and answer the host's ring buffer
+   *  for the terminal to start from. Counted per window — each call
+   *  needs its `unwatch`. */
+  watchSession(name: string): Promise<SessionBuffer>;
+  unwatchSession(name: string): Promise<void>;
+  /** The session's terminal is on screen in this window: its output
+   *  counts as seen. A terminal held ready off screen watches without
+   *  showing. Counted per window — each call needs its `hide`. */
+  showSession(name: string): Promise<void>;
+  hideSession(name: string): Promise<void>;
   writeSession(name: string, data: string): Promise<void>;
   resizeSession(name: string, cols: number, rows: number): Promise<void>;
   killSession(name: string): Promise<void>;
@@ -401,7 +477,8 @@ export interface N10HostApi {
   listTerminals(): Promise<TerminalSummary[]>;
   /** Kill the terminal's session, on either backend, and forget it. */
   killTerminal(name: string): Promise<void>;
-  /** Subscribe to PTY output. Returns an unsubscribe function. */
+  /** PTY output of the sessions this window watches (`watchSession`).
+   *  Returns an unsubscribe function. */
   onSessionData(cb: (payload: SessionDataEvent) => void): () => void;
   onSessionExit(cb: (payload: SessionExitEvent) => void): () => void;
   /** Named launch progress for a remote launch (ux-machines.md §5) —
@@ -410,7 +487,12 @@ export interface N10HostApi {
   onLaunchStep(cb: (payload: LaunchStepEvent) => void): () => void;
 
   // ── Diff ─────────────────────────────────────────────────────
-  fetchDiffText(sourceBranch: string, targetBranch: string): Promise<string>;
+  /** A pull request's diff, with the commit its new side was read at:
+   *  what a comment's line numbers belong to. */
+  fetchDiffText(
+    sourceBranch: string,
+    targetBranch: string
+  ): Promise<ReviewDiffText>;
   /** Diff of a branch's worktree against its base including uncommitted
    *  and untracked work — what an agent has done so far, as opposed to
    *  what it has committed. Empty string when the branch has no
@@ -505,14 +587,16 @@ export const IPC = {
   listAllBranches: 'n10/worktree/all-branches',
   createWorktree: 'n10/worktree/create',
   removeWorktree: 'n10/worktree/remove',
-  canRemoveBranch: 'n10/worktree/can-remove',
+  checkWorktreeRemoval: 'n10/worktree/check-removal',
   openInEditor: 'n10/worktree/open-in-editor',
   launchAgent: 'n10/session/launch',
   listSessions: 'n10/session/list',
   listForeignSessions: 'n10/session/list-foreign',
   getSessionActivity: 'n10/session/activity',
-  markSessionSeen: 'n10/session/seen',
-  getSessionBuffer: 'n10/session/buffer',
+  watchSession: 'n10/session/watch',
+  unwatchSession: 'n10/session/unwatch',
+  showSession: 'n10/session/show',
+  hideSession: 'n10/session/hide',
   writeSession: 'n10/session/write',
   resizeSession: 'n10/session/resize',
   killSession: 'n10/session/kill',
@@ -521,11 +605,18 @@ export const IPC = {
   launchTerminal: 'n10/terminal/launch',
   listTerminals: 'n10/terminal/list',
   killTerminal: 'n10/terminal/kill',
-  fetchPullRequests: 'n10/reviews/prs',
   fetchCommentThreads: 'n10/reviews/comments',
   replyToThread: 'n10/reviews/reply',
   setThreadResolved: 'n10/reviews/resolve',
   fetchPrDescription: 'n10/reviews/pr-description',
+  getPullRequestSnapshot: 'n10/pull-requests/snapshot',
+  getPullRequestChecks: 'n10/pull-requests/checks',
+  getPullRequestConversation: 'n10/pull-requests/conversation',
+  listReviewDrafts: 'n10/review-drafts/list',
+  saveReviewDraft: 'n10/review-drafts/save',
+  discardReviewDraft: 'n10/review-drafts/discard',
+  searchMentionCandidates: 'n10/pull-requests/mentions',
+  submitReview: 'n10/review-drafts/submit',
   submitReviewVerdict: 'n10/reviews/submit-verdict',
   getReviewViewer: 'n10/reviews/viewer',
   fetchCommentImage: 'n10/reviews/comment-image',

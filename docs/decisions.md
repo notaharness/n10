@@ -5,10 +5,21 @@ working rules; this document explains constraints that are easy to miss.
 
 ## Shared operations and entry points
 
-Core owns sequences of git, filesystem, PTY, config and provider calls.
-App-core supplies React bindings; shells own presentation. The desktop renderer
-cannot use Node APIs and accesses core's plan through `@n10/core/plan`.
-Keep that entry browser-safe and the core/app-core barrels separate.
+Core owns sequences of Git, filesystem, PTY, config and provider calls. The
+engine owns what both shells do with them: what to read and when, what to keep,
+and who hears about it. App-core supplies React bindings; shells own rendering
+and input. The desktop renderer cannot use Node APIs and accesses core's plan
+through `@n10/core/plan`. Keep that entry browser-safe and the core/app-core
+barrels separate.
+
+The engine is a layer of its own because shared primitives did not keep the
+shells converged. Both called the same provider, yet the TUI polled it from a
+hook while the desktop read core's cache, with different refresh, overlap and
+error semantics. Coordination written twice drifts however much it shares, so
+it is written once, below React: `@n10/engine` depends on core, core may not
+import it, and neither imports a shell or the React layer (enforced in
+`eslint.config.mjs`). Each process creates its own engine services, so a TUI
+and a desktop open on one repository poll independently.
 
 When changing shared behavior, compare both shells. Worktree removal is
 implemented in the TUI's `performDelete` and desktop's `services/worktrees.ts`;
@@ -38,11 +49,16 @@ The registry owns local terminal rendering and activity. Launch preparation is
 asynchronous; callers await registration before installing relays or focusing
 terminals. Concurrent requests for one identity share preparation.
 
-Desktop creation runs `prepareTmuxSession` in an Electron utility process.
-Spawning a persistent tmux server directly from Electron on Linux leaks Chromium
-file descriptors into it, including profile locks. The supported utility-process
-boundary isolates those resources; attach and restart can run locally against
-an existing server. Build and development entry points include the worker.
+Desktop creates sessions from its session host, an Electron utility process.
+Spawning a persistent tmux server directly from the Electron main process on
+Linux leaks Chromium file descriptors into it, including profile locks. The
+supported utility-process boundary isolates those resources, but not the host's
+own: on Linux, node-pty's `forkpty` masters are not close-on-exec and tmux keeps
+the descriptors it inherits. A server the host creates while it holds a PTY
+master keeps that master open, and its attach client gets no hangup when the
+host lets go. The host creates a server only when none is running, and so while
+it holds no attach clients to one, which leaves a narrow race; nothing may rely
+on a server it created holding none of its descriptors.
 
 ```mermaid
 flowchart TD
@@ -167,6 +183,35 @@ Stop, terminal close and worktree removal terminate the matching session,
 including when no local connection exists. `removeWorktreeSession` owns shared
 stop/remove/delete operations with the captured repository.
 
+Worktree removal is one flow in core. `checkWorktreeRemoval` decides what the
+user must confirm (clear, a live agent, work only `force` removes, or a refusal)
+and each shell renders its own prompt from that verdict. The shell hands the
+confirmed verdict back to `removeWorktreeSession`, which enforces it at
+execution time: the prompt can stay open while an agent writes or commits, and
+nothing it did after the check was judged. A `force` verdict names every risk
+that applies, not the first, because the prompt is the user's whole picture of
+what they agree to lose. `--force` is all or nothing, so removal forces only when
+the verdict named a risk git guards with it (uncommitted changes, submodules),
+and git's own test for submodules is the one n10 applies. Unpushed commits go
+with the branch and never need it. A force prompt that runs `--force` says it
+discards whatever is uncommitted when it runs, which is what `--force` does. The
+checks fail closed: status is read whole, untracked files included whatever the
+repository's settings, and a checkout git cannot answer for has `unknown
+changes`, which only force takes. The verdict carries the repository (by its
+common git directory), the checkout's canonical path and the branch's tip when
+it was judged. Before the agent is stopped and again once it has, removal looks
+for anything the verdict did not cover: another repository or checkout, a moved
+branch, a rebase (which leaves the branch where it was until it finishes), a
+checkout that left the branch, or a risk git guards with `--force` that the
+verdict did not name, such as a file written into a checkout judged clean. Any
+of them keeps everything. A branch that moves during the removal itself, or
+that git will not delete, keeps the branch. `removeWorktreeSession`
+returns what it did, and each shell says what was kept and why. The
+merged-branch sweep uses the same guard. `removeWorktreeSession`
+scans discovery before and after removing, so the shells learn of n10's
+removals through `onChanged`, as they learn of `git worktree remove`: discovery
+can only report the removal of a worktree it has seen.
+
 Carry output sequence numbers across reattachment and restart so mounted
 terminals accept subsequent chunks. Resize on fit and when `spawnedAt` changes,
 even if the session name and dimensions are unchanged. `paneTerminalGrid`
@@ -177,7 +222,7 @@ measures the actual font and padding; the first fit corrects startup estimates.
 The host serves one repository at a time; the tab strip can contain several.
 Activating a foreign tab opens its repository through `useRepoFollowsTabs`.
 Use canonical real paths for repository identity so symlinked paths cannot
-produce duplicate tabs or disagree with git and tmux names.
+produce duplicate tabs or disagree with Git and tmux names.
 
 `TabsProvider` lives above the repository gate because `Workspace` remounts on
 switch. Keep one reconciliation step: `Workspace` sends `sync-items` to the pure
@@ -191,10 +236,141 @@ the renderer, and recheck identity between host awaits, to prevent rows from a
 new repository entering the previous repository's tab state.
 
 Use native menus and dialogs where the OS supports the interaction. The review
-workspace has a navigation rail and one content pane; keep the terminal mounted
-when switching to the diff so scrollback survives. The diff owns its toolbar.
+workspace has a navigation rail and one content pane. The diff owns its toolbar.
+
+The editor renders two panes at most: the active tab's and one spare, hidden
+and `inert`. A hidden wterm per open agent cost the renderer a terminal write
+for every chunk every agent printed, and bought nothing under tmux: the
+client's terminal accumulates no scrollback of its own, since tmux keeps the
+history. One spare buys an instant switch for the tab the user is about to
+open: the tab the pointer has settled on (a tab or a sidebar row), or else the
+tab left last. Settled is decided as the hoverIntent jQuery plugin decides it
+(`lib/tabs/hover-intent.ts`): the position is sampled every 100 ms, and a
+pointer that moved under 6 px since the last sample has settled, so a hand
+still drifting a pixel or two on the row counts, where it would keep
+restarting a fixed wait. Panes are keyed by tab id, so pressing the spare's tab
+shows the pane already rendered, and the pane it replaces becomes the
+spare. A new hover replaces the spare rather than queueing behind it, and a
+press on any other tab mounts that tab straight away; missing a pre-warm is
+fine, a press that waits behind one is not. A pane let go of before its reads
+came back leaves them running on the host, which cannot take a call back, so
+until they have landed a new hover warms nothing: it is dropped, not queued,
+and reads for panes nobody looks at never stack up. Leaving an element, or its
+going away (a closed tab), lets its pane go. Tabs and sidebar rows are chosen
+on the primary button's press, as browser and editor tabs are, so the swap
+starts before the release; the drag sensor still waits for the pointer to
+travel. A terminal watches its session while it is mounted
+(`watchSession`): the host answers the ring buffer and then sends that window
+the session's output, and nothing for sessions no window watches. Only a
+terminal on screen shows its session (`showSession`), which holds core's
+`showTerminal`, the same seen-signal the TUI's pane holds; a spare sees
+nothing. Tab switches never detach or kill sessions.
+
+A tab that mounts again opens where the user left it: the pane they picked,
+the diff's picked file and top line, and the walkthrough step. A pane they
+never picked follows the landing rule again, so an agent started since shows.
+The views are held per tab id in memory for this run, beside the tabs
+(`TabViewsHost` in `lib/tabs/tab-views.tsx`), so they outlive a repository
+switch, and dropped when the tab closes. Nothing is written to disk or to tmux:
+a reload starts every tab fresh. A saved file or line no longer in the diff is
+not guessed at: the view starts from the top.
+
 Each tab has an ErrorBoundary. Markdown paragraphs render as `div` when they may
 contain block images; the host fetches protected images with provider auth.
+
+A pull request tab opens on its Overview, whoever wrote it (`initialMode`): the
+Overview is the pull request's main page, and Review changes leads on to the
+diff. A running agent takes the pane instead, and a worktree without a pull
+request has no Overview and opens on its diff. The Overview never calls a pull request ready: the list row has
+no policies, required reviewers, conflicts or merge permission, so readiness
+stays "not fully known" until those are read. Until a native requirement signal
+is read, an approval or a passing check is an observation, and a failing check
+or a holding verdict is a concern, not a block; only the provider's own
+lifecycle (open, draft) is a verdict. The next step's button is the Overview's
+one way into a review: there are no instant verdict buttons, so a verdict is
+given from the changes, where the reviewer has read them.
+
+The Overview has no header bar; its heading carries the pull request's identity
+and actions. Every other pane keeps the bar across the rail and the pane, so the
+rail sits 40 px lower there than on the Overview: beside the rail, the bar would
+lose the rail's width and its title or its details. Every other pane's bar has
+"← Review", which goes up, never back through history: from the changes to the
+Overview, and from the terminal, plan or walkthrough to the review pane last
+shown (`backTarget`). The Overview is the top of the review, where Back leads,
+so the rail lists neither it nor the comments: the conversation is the
+Overview's, below the description, and the threads are the diff's. Its context
+column leads with the reviewers, then completion. Below 720 px of workspace width
+the rail folds with its own collapse control, and it comes back once there is
+room unless the reader chose since (`rail-model.ts`).
+
+The activity keeps resolved threads out of view until the reader shows them, by
+the provider's own resolved state. What is hidden is fixed when the reader
+arrives or hides them again: a thread resolved while in view stays there with
+its new status, since the list never moves under the reader. A reopened thread
+leaves the hidden set (`pruneHidden`), so resolved again, it stays in view.
+
+Who must review is said only in the providers' own terms
+(`pr-review-requirements.ts`). Azure DevOps marks each reviewer required or
+optional, and its required-reviewer policies name identities. A reviewer is
+listed by policy only where a policy that applies to these changes names them
+and adds them as they are listed, required by a blocking one or optional by
+another: Azure lists them because of that policy now. Anything else would be
+reconstructed from overlapping ids. A policy that no longer applies may or may
+not be what added someone, and a required reviewer no policy names may have
+been added by hand or by a policy since disabled, so neither gets a reason.
+Azure records who added each reviewer in the pull request's `ReviewersUpdate`
+history threads, which the conversation read already fetches; reading the
+reason from there is a follow-up. GitHub marks no one:
+its rules ask for a number of approvals, for code owners and for teams by id,
+and a request says only whether it went to a code owner. A GitHub reviewer's
+requirement is therefore unknown, never inferred from their being asked, and
+the Overview shows no one as required. The Reviewers list splits into the
+required and, under an Optional heading, the optional only where the provider
+states every reviewer's requirement and both kinds are asked
+(`lib/review/reviewer-model.ts`); a requirement left unstated is read as
+neither, so such a list stays whole. Grouped, a row adds only why they were
+asked. Completion's Reviews row is
+the provider's verdict and the approvals the rules ask for; GitHub's count is
+the strictest of classic protection, as enforced on this account, and every
+rule set. Who must approve, and why, is the Reviewers list's: hovering a
+reviewer's standing shows every rule read that names them (`StandingRule`),
+with its paths and whether the provider says it applies here. A rule naming
+someone is the provider's own statement even where it is not why they are
+listed, so the hover shows it while the reason stays unset. GitHub's rulesets
+name teams by database id, which the detail read carries as `ruleId`. Its rules
+read gives a ruleset's id but not its name, so the hover calls one "Ruleset".
+
+Completion says "Waiting for your review" where the provider asks the viewer
+for a review that would count (`asksViewer`). The checks read also reads the
+detail for this: where it names the viewer, an optional reviewer's approval
+counts only while a rule that counts anyone's is not met (Azure's minimum
+reviewers, by its own evaluation), or while a required group has not approved.
+Group membership is not read, so an optional viewer is kept for any waiting
+group. Where the detail or the rules were not read, the request stands. On Azure the
+detail shares the checks read's cached requests; on GitHub it adds the detail
+query to each checks read.
+
+The checks read (`getPullRequestChecks`) takes readiness from the provider's own
+verdict, GitHub's `mergeStateStatus`, and explains it with the provider's facts:
+`mergeable`, `reviewDecision`, each check's `isRequired`, and the base branch's
+protection and rule sets. Core (`pr-readiness.ts`) adds no verdict of its own.
+It is ready only where the provider says so and none of its details disagree,
+and blocked where the provider says so or the pull request is a draft (its own
+lifecycle). Anything else is unknown. A block that nothing read explains reads "Blocked by a
+branch rule". The unresolved-thread count comes from the list, older
+than the verdict, so it explains a block but never overturns a clear one. Anything that could not be
+read is listed beside the verdict and does not override it.
+
+Azure DevOps has no single verdict field. Its completion gate, in its own
+words, is that "all required reviewers approved it and all required branch
+policies are met", so the adapter (`pr-checks.ts`, `pr-policies.ts`) reads
+exactly that: the required reviewers' votes, each blocking policy's evaluation
+(an expired build's approval is not met) and `mergeStatus`. Blocked where any
+of them stops it; clear only where every blocking policy is met on a merge that
+succeeded; undecided otherwise. A draft is blocked by its lifecycle, as on
+GitHub. Reviewer and comment policies are not listed as items, since the review
+requirement and `MergeState.conversations` carry their verdicts; other
+policies, such as work item linking, are listed with `kind: 'policy'`.
 
 Optimistic removal drops a session row but retains a PR row with its session
 fields cleared: the PR outlives its checkout. Status indicators combine CI and
@@ -220,7 +396,7 @@ only after the agent has been idle for thirty seconds. Start agents with `seed`,
 not `continue-or-seed`, which may discard the prompt. Use `checkoutWorktree` for
 an existing branch: inventing one from HEAD would send work to the wrong commit.
 
-Pass `cwd` to every git operation and check `live()` after awaits. Serialize
+Pass `cwd` to every Git operation and check `live()` after awaits. Serialize
 fetches through `sync/fetch-queue.ts`; invalidate reused refs when the head moves.
 Use `sync/conflicts.ts` for both the badge and briefing. The worktree resolver is
 process-global, so check liveness immediately before checkout as well.
@@ -235,12 +411,33 @@ assert the actual prompt received by a fake agent.
 
 ## Pull request caching and providers
 
-The desktop sidebar, babysitters and sync loop share core's per-repo PR cache.
-Key cache entries, in-flight requests and sequence guards by cwd. Only the newest
-fetch for a repo commits. Failures retain the last good list and retry on the
-interval. Changing global credentials clears entries and invalidates in-flight
-results. `cached`/`refreshInBackground` support polling; explicit reads can await
-refresh. The TUI's `usePrData` is its process's single list reader.
+Both shells read pull requests through the engine's list
+(`createPullRequestList`): the TUI's `usePrData`, and the desktop host's
+sidebar, babysitters and sync loop. The TUI holds a `watch`; the desktop's
+demand is its renderer's sidebar poll.
+
+- An answer is keyed by scope: repo path, provider, project and a credentials
+  generation. Replacing any of them at the same path starts an empty scope, and
+  a request out under the old one commits only there. Secrets never enter a key;
+  `credentialsChanged` resets every provider's caches and bumps the generation.
+- One request per scope. Reads join the request out; a forced read queues
+  exactly one request behind it, which forced reads meanwhile share, so a slow
+  answer never overwrites a newer one. A watch tick that finds a request out is
+  skipped, not queued.
+- `refresh` has the provider forget its per-row memo when that refresh's own
+  request starts. Forgetting when the user asks lets a request already out
+  write its answers straight back.
+- A failure keeps the last good list with the error beside it and waits out the
+  interval before retrying.
+- A `gh` read is killed at `GH_READ_DEADLINE_MS` (30s; `execFile`'s
+  `timeout`), so a hung read cannot hold the queue: the engine sees an ordinary
+  failure. Mutations run without one; a killed mutation may or may not have
+  reached GitHub.
+- The engine resolves providers from the persisted config. The TUI persists a
+  settings edit in a microtask, so its settings effects are queued behind that
+  write. A settings edit's `refresh-remote` is a forced read, not `refresh()`:
+  a credential change has already reset every provider, and an interval edit
+  should not cost a cycle of per-row reads.
 
 GitHub uses authenticated `gh`; offline tests replace that executable on PATH.
 Azure DevOps uses REST and a PAT, with recorded anonymized fixtures rather than
@@ -274,12 +471,12 @@ include index, working tree and untracked files. Build untracked patches without
 worktrees; do not recursively watch a checkout and exhaust inotify on dependencies.
 
 Whole-file context (`-U99999`) supports comments on unchanged lines; fold it in
-the viewer. Stream git output with `runGit`, which preserves partial output and
+the viewer. Stream Git output with `runGit`, which preserves partial output and
 reports truncation rather than discarding the entire buffer on overflow.
 
 Bound worktree diffs before expensive reads. Use `lstat` for symlinks, churn to
 bound deleted files, and exclude both paths of an oversized rename. A content-free
-rename only needs headers. Size untracked files before reading, respect git ignores,
+rename only needs headers. Size untracked files before reading, respect Git ignores,
 and render symlinks as mode-120000 patches without following them. Trim total-output
 overruns at complete file boundaries. The PR path retains files because review
 comments depend on them. Git-backed regression cases live in
@@ -294,6 +491,13 @@ state. Open ancestors only for new or changed files.
 Ink passes `TerminalEmulator` ANSI through `<Text>`; raw stdin forwards to the
 PTY. Strip CI-related variables when spawning the interactive TUI. The serve
 target sets `TSX_TSCONFIG_PATH` for automatic JSX transformation.
+
+Selecting a sidebar row remounts `MainTabBody`, which is keyed by the selected
+item, and Ink subscribes `useInput` in a passive effect. Until that effect runs,
+a key still reaches the previous body's handler and acts on the old selection.
+Ink 7's `useEffectEvent`-based `useInput` closes that window for re-renders but
+not for a remount. Tests that act on a new selection wait for the remounted
+pane's `(loading...)` placeholder to clear first (`active-tabs.test.ts`).
 
 The wterm host keeps the PTY alive across WebSocket reconnects and replays a ring
 buffer. Use one build script for server and client to avoid output-directory

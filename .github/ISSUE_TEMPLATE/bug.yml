@@ -22,7 +22,38 @@ body:
         - [ ] ...
   - type: input
     attributes:
-      label: Environment
-      description: n10 version, desktop or TUI, OS, agent and version control provider.
+      label: n10 version
+      description: The output of `n10 --version`.
     validations:
       required: true
+  - type: dropdown
+    attributes:
+      label: App
+      options:
+        - n10 Desktop
+        - TUI (n10 --tui)
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: OS
+      placeholder: Ubuntu 24.04, macOS 15.3
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Terminal
+      description: Terminal emulator and tmux version (`tmux -V`), if relevant.
+      placeholder: Ghostty 1.2, tmux 3.4
+  - type: input
+    attributes:
+      label: Agent and provider
+      description: Coding agent and version, and GitHub or Azure DevOps.
+      placeholder: Claude Code 2.1, GitHub
+  - type: textarea
+    attributes:
+      label: Logs
+      description: >-
+        Run n10 with `N10_LOG=/tmp/n10.log N10_LOG_LEVEL=debug`, reproduce the
+        bug and paste the relevant lines. Remove anything private first.
+      render: text

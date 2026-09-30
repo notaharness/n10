@@ -1,16 +1,22 @@
 import { useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import type { DiffLine } from '@n10/diff';
 import { contentKey } from '../content-key.js';
 import { loadDesktopPrefs } from '../desktop-prefs.js';
 import { parseDiffInWorker } from '../diff/diff-worker-client.js';
 import { measured } from '../perf.js';
-import { keys } from './query-keys.js';
+import { keys, resetProviderScopedCache } from './query-keys.js';
 import { errorMessage } from '../utils.js';
+import { repositoryKey } from '@n10/vcs-core/pr-details';
 import type {
   MachineView,
   RepoInfo,
   SidebarItem,
+  WorktreeRemovalCheck,
 } from '../../../host/contract.js';
 
 /**
@@ -41,6 +47,37 @@ export async function loadRepoGate(): Promise<RepoInfo | null> {
     loadDesktopPrefs(),
   ]);
   return repo;
+}
+
+/** Whether two answers about the open repository name the same
+ *  provider, repository and account — what every pull request entry in
+ *  the cache was read for. */
+function sameRepoIdentity(a: RepoInfo, b: RepoInfo): boolean {
+  const repo = (r: RepoInfo) => r.repository && repositoryKey(r.repository);
+  return (
+    a.providerId === b.providerId &&
+    repo(a) === repo(b) &&
+    a.viewer?.toLowerCase() === b.viewer?.toLowerCase()
+  );
+}
+
+/**
+ * Re-read the open repository's info after its settings change.
+ *
+ * The provider, the repository it names and the account n10 acts as
+ * all come from config, and the gate's entry is otherwise only written
+ * when a repository is opened. When any of the three differs, what the
+ * provider answered was read somewhere else or as someone else, so it
+ * goes; the rest of the repository's cache stays.
+ */
+export async function refreshRepoInfo(qc: QueryClient): Promise<void> {
+  const next = await window.n10.getRepo();
+  const prev = qc.getQueryData<RepoInfo | null>(keys.repo);
+  // The host moved to another repository meanwhile: that is the
+  // gate's switch to adopt, not this.
+  if (!prev || !next || prev.cwd !== next.cwd) return;
+  if (!sameRepoIdentity(prev, next)) resetProviderScopedCache(qc);
+  qc.setQueryData(keys.repo, next);
 }
 
 export function useRepoGate() {
@@ -122,23 +159,22 @@ export function useAllBranches(cwd: string, enabled = true) {
   });
 }
 
-export type BranchRemovalSafety =
-  | { safe: true }
-  | { safe: false; reason: string };
-
 /**
- * Whether git will let this branch and its worktree go. A refusal is a
- * verdict, not a failure, so a host call that throws is folded into an
- * unsafe answer: the dialog reads one value and defaults to refusing
- * when it cannot tell, rather than offering a confirm button behind an
- * error state nobody renders.
+ * What removing this branch's worktree would cost, as core decides it
+ * for both shells. A refusal is a verdict, not a failure, so a host
+ * call that throws is folded into one: the dialog reads one value and
+ * defaults to refusing when it cannot tell, rather than offering a
+ * confirm button behind an error state nobody renders.
  */
-export function loadBranchRemovalSafety(
+export function loadWorktreeRemovalCheck(
   branch: string
-): Promise<BranchRemovalSafety> {
-  return window.n10.canRemoveBranch(branch).catch((err: unknown) => ({
-    safe: false as const,
+): Promise<WorktreeRemovalCheck> {
+  return window.n10.checkWorktreeRemoval(branch).catch((err: unknown) => ({
+    verdict: 'refused' as const,
     reason: errorMessage(err),
+    tip: null,
+    repo: null,
+    checkout: null,
   }));
 }
 
@@ -147,10 +183,10 @@ export function loadBranchRemovalSafety(
  * the dialog that asked for it (`gcTime: 0`) — reopening after a commit
  * or a push has to ask again instead of replaying the old answer.
  */
-export function useBranchRemovalSafety(cwd: string, branch: string) {
+export function useWorktreeRemovalCheck(cwd: string, branch: string) {
   return useQuery({
     queryKey: keys.branchRemoval(cwd, branch),
-    queryFn: () => loadBranchRemovalSafety(branch),
+    queryFn: () => loadWorktreeRemovalCheck(branch),
     staleTime: 0,
     gcTime: 0,
   });
@@ -233,10 +269,10 @@ export function useParsedDiff(text: string | undefined) {
   const content = useMemo(() => (text == null ? '' : contentKey(text)), [text]);
   return useQuery({
     queryKey: keys.parsedDiff(content),
-    // A patch that cannot be parsed is an empty one: the viewer says
-    // "no changes" instead of hanging on a spinner forever.
+    // A patch that cannot be parsed is a failed read, not an empty one:
+    // the viewer says it could not read the diff, never "no changes".
     queryFn: (): Promise<[string, DiffLine[]][]> =>
-      parseDiffInWorker(text ?? '').catch(() => []),
+      parseDiffInWorker(text ?? ''),
     enabled: text != null,
     staleTime: Infinity,
     gcTime: 0,

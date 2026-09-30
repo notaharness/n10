@@ -3,6 +3,12 @@ import type { Page } from '@playwright/test';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import { killN10Sessions, tmuxAvailable } from './setup/tmux.js';
 import {
+  currentPid,
+  expectAgentFillsPane,
+  paneGrid,
+  reportedGrids,
+} from './setup/terminal-grid.js';
+import {
   createWorktree,
   focusTerminal,
   launchAgentFromRail,
@@ -89,8 +95,8 @@ test.describe('Two agents at once', () => {
       page.getByText(/echo:from-alpha/).filter({ visible: true })
     ).toHaveCount(0);
 
-    // Back to the first: its scrollback survived, because the pane of a
-    // tab with a live session stays mounted.
+    // Back to the first: its terminal mounts again and starts from the
+    // host's ring buffer, which still holds the exchange.
     await tab(page, /alpha/).click();
     await expect(visibleText(page, /echo:from-alpha/)).toBeVisible();
     await expect(
@@ -115,20 +121,19 @@ test.describe('Two agents at once', () => {
     await typeAndExpectEcho(page, 'from-alpha');
     await launch(page, 'beta');
 
-    // The pane replays the host's ring buffer once, when it mounts.
-    // Anything that makes that run again on a tab switch — reading the
-    // active tab inside the subscription rather than beside it is the
-    // easy way in — writes the entire history into the terminal a
-    // second time, under the copy already there.
+    // The terminal replays the host's ring buffer once, when it mounts.
+    // Anything that makes that run again while it stays mounted — a
+    // re-render re-watching the session is the easy way in — writes the
+    // history into the terminal a second time, under the copy already
+    // there.
     await tab(page, /alpha/).click();
     await expect(visibleText(page, /echo:from-alpha/)).toBeVisible();
-    // The pane asks for the buffer as it re-renders, so this read is
-    // queued behind any the switch provoked: once it answers, a second
-    // replay would already have been written.
-    await page.evaluate(
-      (name) => window.n10.getSessionBuffer(name),
-      await sessionKey(page, 'alpha')
-    );
+    // A watch of our own is queued behind any the switch provoked: once
+    // it answers, a second replay would already have been written.
+    await page.evaluate(async (name) => {
+      await window.n10.watchSession(name);
+      await window.n10.unwatchSession(name);
+    }, await sessionKey(page, 'alpha'));
 
     await expect(page.getByText(BANNER).filter({ visible: true })).toHaveCount(
       1
@@ -274,99 +279,6 @@ async function finishAgentClose(page: Page): Promise<void> {
 test.describe('Terminal fit', () => {
   test.use({ n10Config: { aiCommand: fakeAgent({ printSize: true }) } });
 
-  interface Grid {
-    cols: number;
-    rows: number;
-  }
-  interface Report extends Grid {
-    /** Which agent said so. */
-    pid: string;
-  }
-
-  /** Every grid an agent has reported, oldest first. */
-  async function reportedGrids(page: Page): Promise<Report[]> {
-    const text = await page.evaluate(() => document.body.innerText);
-    return [...text.matchAll(/size:(\d+)x(\d+)#(\d+)/g)].map((m) => ({
-      cols: Number(m[1]),
-      rows: Number(m[2]),
-      pid: m[3],
-    }));
-  }
-
-  /** The agent currently reporting, once it has said anything. */
-  async function currentPid(page: Page): Promise<string> {
-    await expect
-      .poll(async () => (await reportedGrids(page)).length, {
-        timeout: 30_000,
-      })
-      .toBeGreaterThan(0);
-    return (await reportedGrids(page)).at(-1)!.pid;
-  }
-
-  /**
-   * The grid that fills the terminal on screen, measured off its own
-   * box and cell metrics — so this says nothing about how the app
-   * computes a grid, only how much of the pane the agent covers.
-   */
-  async function paneGrid(page: Page): Promise<Grid> {
-    return page.evaluate(() => {
-      const el = document.querySelector<HTMLElement>('.wterm');
-      const row = el?.querySelector<HTMLElement>('.term-row');
-      if (!el || !row) throw new Error('no terminal on screen');
-      const style = getComputedStyle(el);
-      const probe = document.createElement('div');
-      probe.className = 'term-row';
-      probe.style.position = 'absolute';
-      probe.style.visibility = 'hidden';
-      const span = document.createElement('span');
-      span.textContent = 'W'.repeat(40);
-      probe.appendChild(span);
-      el.appendChild(probe);
-      const charWidth = span.getBoundingClientRect().width / 40;
-      probe.remove();
-      const box = el.getBoundingClientRect();
-      const inner = {
-        width:
-          box.width -
-          parseFloat(style.paddingLeft) -
-          parseFloat(style.paddingRight),
-        height:
-          box.height -
-          parseFloat(style.paddingTop) -
-          parseFloat(style.paddingBottom),
-      };
-      return {
-        cols: Math.floor(inner.width / charWidth),
-        rows: Math.floor(inner.height / row.getBoundingClientRect().height),
-      };
-    });
-  }
-
-  /**
-   * Wait for the agent to settle on the grid that fills its pane.
-   *
-   * `notPid` is the agent that was there before. Without it a restart
-   * reads the *previous* agent's last line — still on screen, and still
-   * correct — and passes on a terminal that never resized at all.
-   */
-  async function expectAgentFillsPane(
-    page: Page,
-    notPid?: string
-  ): Promise<void> {
-    const expected = await paneGrid(page);
-    await expect
-      .poll(
-        async () => {
-          const last = (await reportedGrids(page))
-            .filter((g) => g.pid !== notPid)
-            .at(-1);
-          return last ? { cols: last.cols, rows: last.rows } : null;
-        },
-        { timeout: 20_000 }
-      )
-      .toEqual(expected);
-  }
-
   test('an agent restarted in place is given the pane it is drawn in', async ({
     desktop,
   }) => {
@@ -464,6 +376,54 @@ test.describe('Terminal fit', () => {
       await expect(visibleText(page, BANNER)).toBeVisible({ timeout: 30_000 });
 
       await expectAgentFillsPane(page);
+    });
+  });
+
+  /**
+   * An agent launched from someone else's pull request, on its Overview.
+   * The Overview has no header bar and the terminal has one, so the
+   * grid the agent is spawned with leaves the bar's rows out: its first
+   * frame is the one the reader sees.
+   */
+  test.describe('from a pull request Overview', () => {
+    test.use({
+      repo: {
+        worktrees: [
+          { branch: 'cancel-requests', files: { 'request.ts': 'close();\n' } },
+        ],
+      },
+      n10Config: { aiCommand: fakeAgent({ printSize: true }) },
+      fakeGitHub: {
+        username: 'n10-tester',
+        prs: [
+          {
+            number: 214,
+            title: 'Handle cancelled requests',
+            headRefName: 'cancel-requests',
+            author: 'alex',
+            reviewRequests: ['n10-tester'],
+            rollup: 'SUCCESS',
+          },
+        ],
+      },
+    });
+
+    test('spawns the agent on the grid it gets under the bar', async ({
+      desktop,
+    }) => {
+      const { page } = desktop;
+      await sidebarRow(page, /#214/).first().click();
+      await expect(
+        page.getByRole('heading', { level: 1, name: /Handle cancelled/ })
+      ).toBeVisible({ timeout: 30_000 });
+      await launchAgentFromRail(page);
+      await expect(visibleText(page, BANNER)).toBeVisible({ timeout: 30_000 });
+
+      await expectAgentFillsPane(page);
+      const [spawned] = await reportedGrids(page);
+      expect({ cols: spawned.cols, rows: spawned.rows }).toEqual(
+        await paneGrid(page)
+      );
     });
   });
 

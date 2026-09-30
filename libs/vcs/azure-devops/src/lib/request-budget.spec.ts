@@ -212,6 +212,105 @@ describe('a cycle over pull requests that have not moved', () => {
     expect(await cycleCost()).toBe(1);
   });
 
+  it('stays at the list after one pull request is opened', async () => {
+    await syncCycle();
+    afterMinutes(1);
+    // The selected pull request is two reads of its own — itself and
+    // its iterations — and touches none of the cycle's memos.
+    const answer = mockFetch.getMockImplementation();
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (/\/pullrequests\/105\/iterations\?/.test(url)) {
+        return Promise.resolve(json({ value: [] }));
+      }
+      if (/\/pullrequests\/105\?/.test(url)) {
+        return Promise.resolve(
+          json({
+            ...prs[5],
+            status: 'active',
+            lastMergeSourceCommit: { commitId: '5'.repeat(40) },
+          })
+        );
+      }
+      return answer?.(url, init);
+    });
+    resetRequestCounters('azure-devops');
+    await azureDevOpsProvider.fetchPullRequestDetail?.(AUTH, PROJECT, 105);
+    expect(counts().network).toBe(2);
+
+    expect(await cycleCost()).toBe(1);
+  });
+
+  it('reads the selected pull request’s checks with one request of its own', async () => {
+    await syncCycle();
+    // Opened: the pull request and its iterations are the detail's.
+    const answer = mockFetch.getMockImplementation();
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (/\/pullrequests\/105\/iterations\?/.test(url)) {
+        return Promise.resolve(json({ value: [] }));
+      }
+      if (/\/pullrequests\/105\?/.test(url)) {
+        return Promise.resolve(
+          json({
+            ...prs[5],
+            status: 'active',
+            repository: { id: 'repo-guid', project: { id: 'project-guid' } },
+            lastMergeSourceCommit: { commitId: '5'.repeat(40) },
+          })
+        );
+      }
+      return answer?.(url, init);
+    });
+    await azureDevOpsProvider.fetchPullRequestDetail?.(AUTH, PROJECT, 105);
+    resetRequestCounters('azure-devops');
+    // Its statuses are the cycle's; its policies are the one new read.
+    await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 105);
+    expect(counts().network).toBe(1);
+
+    afterMinutes(1);
+    expect(await cycleCost()).toBe(1);
+  });
+
+  it('reads the checks again after the user wrote to the pull request', async () => {
+    const answer = mockFetch.getMockImplementation();
+    mockFetch.mockImplementation((url: string, init?: RequestInit) =>
+      /\/pullrequests\/100\?/.test(url)
+        ? Promise.resolve(
+            json({
+              ...prs[0],
+              status: 'active',
+              repository: { id: 'repo-guid', project: { id: 'project-guid' } },
+              lastMergeSourceCommit: { commitId: '0'.repeat(40) },
+            })
+          )
+        : answer?.(url, init)
+    );
+    const policies = () =>
+      mockFetch.mock.calls.filter(([url]) =>
+        String(url).includes('/policy/evaluations?')
+      ).length;
+    await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 100);
+    await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 100);
+    expect(policies()).toBe(1);
+    await azureDevOpsProvider.replyToThread!(
+      AUTH,
+      PROJECT,
+      100,
+      { id: '5' } as never,
+      'a reply'
+    );
+    await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 100);
+    expect(policies()).toBe(2);
+    // A vote is a write too: the reviewer policies' verdict moves with it.
+    await azureDevOpsProvider.submitReviewVerdict!(
+      AUTH,
+      PROJECT,
+      100,
+      'approve'
+    );
+    await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 100);
+    expect(policies()).toBe(3);
+  });
+
   it('pays again only for the pull request whose head commit moved', async () => {
     await syncCycle();
     afterMinutes(1);
@@ -589,6 +688,13 @@ describe('the same data asked for twice', () => {
     await azureDevOpsProvider.fetchCommentThreads!(AUTH, PROJECT, 101);
     expect(counts().network).toBe(afterCycle);
     expect(counts().cached).toBeGreaterThanOrEqual(2);
+  });
+
+  it('reads the conversation from the threads the sidebar already counted', async () => {
+    await syncCycle();
+    const afterCycle = counts().network;
+    await azureDevOpsProvider.fetchPullRequestConversation!(AUTH, PROJECT, 100);
+    expect(counts().network).toBe(afterCycle);
   });
 
   it('collapses two cycles that overlap into one', async () => {

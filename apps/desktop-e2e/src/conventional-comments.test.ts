@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { AGENT_FOOTER } from '@n10/review-comments/conventional';
 import { test, expect } from './fixtures/desktop.js';
-import { sidebarRow, visibleText } from './setup/app.js';
+import { showChanges, sidebarRow, visibleText } from './setup/app.js';
 import type { FakeGitHub } from './setup/fake-gh.js';
 
 /**
@@ -68,6 +68,7 @@ async function openPr(page: Page) {
   await sidebarRow(page, /Add undo support|#42/)
     .first()
     .click();
+  await showChanges(page);
   await expect(visibleText(page, SUBJECT)).toBeVisible({ timeout: 30_000 });
 }
 

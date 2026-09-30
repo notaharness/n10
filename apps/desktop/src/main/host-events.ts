@@ -1,39 +1,11 @@
 /**
- * The main process's outbound half: everything the host pushes to the
- * renderer without being asked, plus the per-repo background work that
- * produces most of it.
- *
- * Each service exposes a setter rather than reaching for Electron
- * itself — none of them may import `electron` and stay testable — so
- * this is where the two meet. It lives beside `main.ts` rather than in
- * it because it is one subject, and because every window-broadcast in
- * the app should be findable in one place.
+ * How a host push reaches the windows, and the window lifecycle the
+ * host needs to hear about. Every window-broadcast in the app goes
+ * through here.
  */
-import { BrowserWindow } from 'electron';
-import {
-  BABYSIT_EVENTS,
-  DISCOVERY_EVENTS,
-  MACHINES_EVENTS,
-  SYNC_EVENTS,
-} from '../host/contract.js';
-import { setRepoOpenedListener } from '../host/services/repo.js';
-import {
-  setSyncNotifier,
-  startRemoteSyncLoop,
-} from '../host/services/remote-sync.js';
-import { setRemoteUpdatedNotifier } from '../host/services/pull-requests.js';
-import {
-  setDiscoveryNotifier,
-  startDiscoveryForRepo,
-} from '../host/services/discovery.js';
-import { setSessionBroadcaster } from '../host/services/sessions.js';
-import { setBabysitNotifier } from '../host/services/babysit.js';
-import {
-  setBeamStatusNotifier,
-  setCeremonyProgressNotifier,
-  setDirectoryPublishedNotifier,
-  setMachinesNotifier,
-} from '../host/services/machines.js';
+import { app, BrowserWindow, webContents } from 'electron';
+import type { HostPushes } from '../host/host-pushes.js';
+import type { Viewer } from '../host/services/session-watch.js';
 
 // A window whose renderer died has no frame to deliver to, and stays
 // that way while the app asks what to do (renderer-recovery.ts): a
@@ -46,51 +18,25 @@ function broadcast(channel: string, payload?: unknown): void {
   }
 }
 
-/** Wire every host → renderer push, and the per-repo loops behind
- *  them. Call once at startup, before the first repo is opened. */
-export function installHostEventBridge(): void {
-  setSessionBroadcaster(broadcast);
+function sendTo(viewer: Viewer, channel: string, payload: unknown): void {
+  const contents = webContents.fromId(viewer);
+  if (!contents || contents.isDestroyed() || contents.isCrashed()) return;
+  contents.send(channel, payload);
+}
 
-  // Per-repo background work, (re)started whenever a repo is opened.
-  // The sync loop's user-facing events (auto-deleted merged branch, …)
-  // toast in the renderer; discovery attaches to agent sessions this
-  // process did not start — including the ones that survived a previous
-  // run, which is what makes them show as running straight away.
-  setRepoOpenedListener((cwd) => {
-    startRemoteSyncLoop(cwd);
-    startDiscoveryForRepo(cwd);
+export const windowPushes: HostPushes = { broadcast, sendTo };
+
+/** A window's watches end with the page that made them: closing it,
+ *  reloading it (the renderer-crash recovery does) or losing its
+ *  renderer. The next page watches again as its terminals mount. A
+ *  navigation counts once committed: `main.ts` cancels the ones that
+ *  would leave the app, and the page stays. */
+export function onPageGone(drop: (viewer: Viewer) => void): void {
+  app.on('web-contents-created', (_event, contents) => {
+    const viewer = contents.id;
+    const gone = () => drop(viewer);
+    contents.on('destroyed', gone);
+    contents.on('render-process-gone', gone);
+    contents.on('did-navigate', gone);
   });
-
-  setSyncNotifier((notice) => broadcast(SYNC_EVENTS.notice, notice));
-
-  // The sidebar model answers from local git without waiting for the
-  // provider, so the renderer needs telling when the pull requests
-  // finally arrive — otherwise they wait out its poll interval.
-  setRemoteUpdatedNotifier(() => broadcast(SYNC_EVENTS.remote));
-
-  // Same idea for the local half: a worktree or session that appeared
-  // outside this process changes what the sidebar should show, and the
-  // renderer is serving it from a query cache.
-  setDiscoveryNotifier(() => broadcast(DISCOVERY_EVENTS.changed));
-
-  // A babysitter started an agent (a row and a session) or ended; its
-  // status otherwise rides on the sidebar item.
-  setBabysitNotifier((event) => broadcast(BABYSIT_EVENTS.changed, event));
-
-  // The machines list is pushed whole on every change the beam daemon
-  // reports, so the renderer writes it straight into the query cache
-  // with no round trip; the daemon's status and a running ceremony's
-  // progress likewise. Repo-independent, like the bridges above.
-  setMachinesNotifier((machines) =>
-    broadcast(MACHINES_EVENTS.changed, machines)
-  );
-  setBeamStatusNotifier((status) =>
-    broadcast(MACHINES_EVENTS.beamStatus, status)
-  );
-  setCeremonyProgressNotifier((progress) =>
-    broadcast(MACHINES_EVENTS.ceremony, progress)
-  );
-  setDirectoryPublishedNotifier((landed) =>
-    broadcast(MACHINES_EVENTS.published, landed)
-  );
 }

@@ -17,6 +17,9 @@
 //   --banner=<str>       first line (default "n10-fake-agent-ready")
 //   --stream             emit a line every --interval-ms, forever
 //   --interval-ms=<n>    stream interval (default 150)
+//   --tag                end each streamed line with `@<checkout>`, the
+//                        name of the directory it runs in, so a test can
+//                        tell whose output a terminal shows
 //   --stream-ms=<n>      stop streaming after N ms but stay alive — an
 //                        agent that finished a piece of work and is now
 //                        waiting at its prompt
@@ -104,7 +107,8 @@ if (args.stream) {
   let n = 0;
   const ticker = setInterval(() => {
     n += 1;
-    process.stdout.write(`working ${n}\r\n`);
+    const tag = args.tag ? ` @${process.cwd().split('/').pop()}` : '';
+    process.stdout.write(`working ${n}${tag}\r\n`);
   }, intervalMs);
   timers.add(ticker);
   if (args['stream-ms']) {

@@ -7,6 +7,13 @@ import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 
 const BRANCH = 'shared-name';
 
+/** What a terminal mounting on `name` would start from. */
+async function readBuffer(name: string) {
+  const buffer = await window.n10.watchSession(name);
+  await window.n10.unwatchSession(name);
+  return buffer;
+}
+
 test.describe('Switching repository with an agent running', () => {
   let otherRepo: string;
 
@@ -47,10 +54,7 @@ test.describe('Switching repository with an agent running', () => {
       {}
     );
     // …its scrollback is not handed over…
-    const buffer = await page.evaluate(
-      (name) => window.n10.getSessionBuffer(name),
-      firstKey
-    );
+    const buffer = await page.evaluate(readBuffer, firstKey);
     expect(buffer.data).toBe('');
 
     const second = await page.evaluate(
@@ -92,7 +96,7 @@ test.describe('Switching repository with an agent running', () => {
       sessions.find((s) => sessionBranch(s.name) === BRANCH)?.running
     ).toBe(true);
     const buffer = await page.evaluate(
-      (name) => window.n10.getSessionBuffer(name),
+      readBuffer,
       await sessionKey(page, BRANCH)
     );
     expect(buffer.data).toContain('n10-fake-agent-ready');

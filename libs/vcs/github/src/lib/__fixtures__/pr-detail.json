@@ -1,0 +1,120 @@
+{
+  "data": {
+    "repository": {
+      "databaseId": 11223344,
+      "nameWithOwner": "acme/app",
+      "pullRequest": {
+        "number": 214,
+        "title": "Handle cancelled requests",
+        "url": "https://github.com/acme/app/pull/214",
+        "state": "OPEN",
+        "isDraft": false,
+        "createdAt": "2026-09-22T09:30:00Z",
+        "updatedAt": "2026-09-26T14:02:11Z",
+        "viewerCanUpdate": true,
+        "author": {
+          "__typename": "User",
+          "login": "alex",
+          "name": "Alex Doe"
+        },
+        "headRefName": "cancel-requests",
+        "headRefOid": "1111111111111111111111111111111111111111",
+        "headRepository": {
+          "databaseId": 11223344,
+          "nameWithOwner": "acme/app"
+        },
+        "baseRefName": "main",
+        "baseRefOid": "2222222222222222222222222222222222222222",
+        "latestOpinionatedReviews": {
+          "totalCount": 3,
+          "pageInfo": {
+            "hasNextPage": true,
+            "endCursor": "op-1"
+          },
+          "nodes": [
+            {
+              "author": {
+                "__typename": "User",
+                "login": "Bea",
+                "id": "U_bea",
+                "name": "Bea"
+              },
+              "state": "APPROVED",
+              "commit": {
+                "oid": "0000000000000000000000000000000000000001"
+              },
+              "onBehalfOf": {
+                "nodes": []
+              }
+            },
+            {
+              "author": {
+                "__typename": "User",
+                "login": "cy",
+                "id": "U_cy",
+                "name": null
+              },
+              "state": "CHANGES_REQUESTED",
+              "commit": {
+                "oid": "1111111111111111111111111111111111111111"
+              },
+              "onBehalfOf": {
+                "nodes": [
+                  {
+                    "combinedSlug": "acme/web"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "latestReviews": {
+          "totalCount": 3,
+          "pageInfo": {
+            "hasNextPage": true,
+            "endCursor": "rev-1"
+          },
+          "nodes": [
+            {
+              "author": {
+                "__typename": "User",
+                "login": "cy",
+                "id": "U_cy",
+                "name": null
+              },
+              "state": "CHANGES_REQUESTED"
+            }
+          ]
+        },
+        "reviewRequests": {
+          "totalCount": 4,
+          "pageInfo": {
+            "hasNextPage": true,
+            "endCursor": "req-1"
+          },
+          "nodes": [
+            {
+              "asCodeOwner": false,
+              "requestedReviewer": {
+                "__typename": "User",
+                "id": "U_bea",
+                "login": "bea",
+                "name": "Bea"
+              }
+            },
+            {
+              "asCodeOwner": true,
+              "requestedReviewer": {
+                "__typename": "Team",
+                "id": "T_core",
+                "combinedSlug": "acme/core",
+                "name": "Core team",
+                "databaseId": 777
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

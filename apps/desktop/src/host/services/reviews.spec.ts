@@ -30,14 +30,9 @@ const env = vi.hoisted(() => ({
 }));
 
 vi.mock('@n10/core', () => ({
-  // `./sidebar.js` (imported for refreshPrList) stands its cache up at
-  // load, and a verdict re-reads the list through it.
-  createPullRequestCache: () => ({
-    readPullRequests: () => Promise.resolve({}),
-  }),
-  fetchDiffText: (...args: unknown[]) => {
-    env.calls.push({ method: 'fetchDiffText', args });
-    return Promise.resolve('diff');
+  fetchReviewDiff: (...args: unknown[]) => {
+    env.calls.push({ method: 'fetchReviewDiff', args });
+    return Promise.resolve({ text: 'diff', head: 'a'.repeat(40) });
   },
   fetchFileDiffText: (...args: unknown[]) => {
     env.calls.push({ method: 'fetchFileDiffText', args });
@@ -83,7 +78,6 @@ vi.mock('./repo.js', () => {
 const {
   fetchCommentThreads,
   fetchPrDescription,
-  fetchPullRequests,
   getDiffText,
   getFileDiffText,
   getReviewViewer,
@@ -182,7 +176,6 @@ describe('degrading without a provider', () => {
   it('returns nothing rather than erroring on reads', async () => {
     // A repo with no remote is first-class; review features just go
     // quiet, the way the TUI's usePrData does.
-    expect(await fetchPullRequests()).toEqual({});
     expect(await fetchCommentThreads(1)).toEqual({
       threads: [],
       generalComments: [],
@@ -200,7 +193,8 @@ describe('degrading without a provider', () => {
   it('also goes quiet when a provider exists but is not authenticated', async () => {
     env.config = { vendor: 'github' };
     env.configured = false;
-    expect(await fetchPullRequests()).toEqual({});
+    expect(await fetchPrDescription(1)).toBe('');
+    expect(env.calls).toEqual([]);
   });
 });
 
@@ -264,9 +258,12 @@ describe('getReviewViewer', () => {
 describe('diffs', () => {
   it('reads from git without needing a provider at all', async () => {
     env.config = {};
-    expect(await getDiffText('feature', 'main')).toBe('diff');
+    expect(await getDiffText('feature', 'main')).toEqual({
+      text: 'diff',
+      head: 'a'.repeat(40),
+    });
     expect(await getFileDiffText('feature', 'main', 'a.ts')).toBe('file diff');
-    expect(called('fetchDiffText')[0].args).toEqual(['feature', 'main']);
+    expect(called('fetchReviewDiff')[0].args).toEqual(['feature', 'main']);
     expect(called('fetchFileDiffText')[0].args).toEqual([
       'feature',
       'main',

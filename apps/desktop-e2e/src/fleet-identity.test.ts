@@ -1,7 +1,13 @@
 import type { Page } from '@playwright/test';
+import { armContextMenuChoice } from './setup/menu.js';
 import { test, expect } from './fixtures/fake-beam.js';
 import { SELF_PEER_ID, WORKBOX, type FakeBeam } from './setup/fake-beam.js';
-import { fleetView, collapseFleet, openFleet } from './setup/machines.js';
+import {
+  fleetView,
+  fleetToggle,
+  collapseFleet,
+  openFleet,
+} from './setup/machines.js';
 
 /**
  * This machine's fleet identity and what hangs off it
@@ -12,7 +18,7 @@ import { fleetView, collapseFleet, openFleet } from './setup/machines.js';
 
 async function finishJoin(page: Page, beam: FakeBeam) {
   const view = fleetView(page);
-  await view.getByRole('button', { name: 'Join an existing fleet' }).click();
+  await view.getByRole('button', { name: 'Join a fleet' }).click();
   await view.getByRole('button', { name: 'Join fleet' }).click();
   await expect(view.getByTestId('ceremony-url')).toBeVisible();
   beam.finishCeremony();
@@ -36,11 +42,18 @@ test.describe('An enrolled machine', () => {
     },
   });
 
-  test('shows and copies the fleet fingerprint beam status reports', async ({
+  test('shows and copies the fleet fingerprint while adding a machine', async ({
     desktop,
   }) => {
     const { page } = desktop;
     await openFleet(desktop);
+    await expect(page.getByTestId('machine-row')).toHaveCount(2);
+    await expect(fleetView(page).getByTestId('fleet-fingerprint')).toHaveCount(
+      0
+    );
+    await page
+      .getByRole('button', { name: 'Add a machine', exact: true })
+      .click();
     await expect(fleetView(page).getByTestId('fleet-fingerprint')).toHaveText(
       '3f9a 0c4e 7d12 e805'
     );
@@ -49,6 +62,33 @@ test.describe('An enrolled machine', () => {
       .click();
     await expect
       .poll(() => desktop.app.evaluate(({ clipboard }) => clipboard.readText()))
+      .toBe('3f9a 0c4e 7d12 e805');
+  });
+
+  test('the header menu shows and copies the fleet fingerprint', async ({
+    desktop,
+  }) => {
+    const { page, app } = desktop;
+    await openFleet(desktop);
+    await page
+      .getByRole('complementary')
+      .getByRole('button', { name: 'Fleet actions' })
+      .click();
+    await expect(page.getByTestId('fleet-menu-fingerprint')).toHaveText(
+      '3f9a 0c4e 7d12 e805'
+    );
+    await page
+      .getByRole('menuitem', { name: 'Copy fleet fingerprint' })
+      .click();
+    await expect
+      .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+      .toBe('3f9a 0c4e 7d12 e805');
+
+    await app.evaluate(({ clipboard }) => clipboard.writeText(''));
+    await armContextMenuChoice(app, 'Copy fleet fingerprint');
+    await fleetToggle(page).click({ button: 'right' });
+    await expect
+      .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
       .toBe('3f9a 0c4e 7d12 e805');
   });
 
@@ -69,20 +109,75 @@ test.describe('An enrolled machine', () => {
   }) => {
     const { page } = desktop;
     await openFleet(desktop);
-    await fleetView(page)
-      .getByRole('button', { name: 'Add a machine' })
-      .click();
+    await page.getByRole('button', { name: 'Add a machine' }).click();
     const panel = fleetView(page);
     await expect(
-      panel.getByText(
-        /Fleet section choose Join an existing fleet.*with 3f9a 0c4e 7d12 e805\./
-      )
+      panel.getByText(/On the other machine, open Fleet → Join a fleet/)
     ).toBeVisible();
-    await expect(panel.getByText('beam join --label buildbox')).toBeVisible();
-    await expect(
-      panel.getByText(/Over SSH it does not open a browser\./)
-    ).toBeVisible();
+    await expect(panel.getByText('beam join --label my-server')).toBeVisible();
+    await expect(panel.getByText('3f9a 0c4e 7d12 e805')).toBeVisible();
     expect(beam!.ops('join.start')).toHaveLength(0);
+  });
+  test('adding tracks new identities even while collapsed', async ({
+    desktop,
+    beam,
+  }) => {
+    const { page } = desktop;
+    const add = page.getByRole('button', {
+      name: 'Add a machine',
+      exact: true,
+    });
+    await expect(add).toBeVisible();
+    await add.hover();
+    await expect(
+      page.getByRole('tooltip', { name: 'Add a machine' })
+    ).toBeVisible();
+    await add.click();
+    await expect(
+      fleetView(page).getByTestId('add-machine-panel')
+    ).toBeVisible();
+    beam!.peerChanged({ peerId: WORKBOX, label: 'renamed', state: 'offline' });
+    await expect(fleetToggle(page)).toContainText('1 offline');
+    await expect(page.getByText('renamed joined', { exact: true })).toHaveCount(
+      0
+    );
+    await expect(
+      fleetView(page).getByTestId('add-machine-panel')
+    ).toBeVisible();
+    await collapseFleet(page);
+    beam!.peerChanged({ peerId: 'b'.repeat(32), label: 'newbox' });
+    await openFleet(desktop);
+    await expect(fleetView(page).getByTestId('add-machine-panel')).toHaveCount(
+      0
+    );
+    await expect(
+      page.getByTestId('machine-row').filter({ hasText: 'newbox' })
+    ).toBeVisible();
+    await expect(
+      fleetView(page).getByRole('button', { name: 'Done' })
+    ).toHaveCount(0);
+  });
+  test('adding completes from the fallback poll without a push', async ({
+    desktop,
+    beam,
+  }) => {
+    const { page } = desktop;
+    await page.clock.install();
+    await page.reload();
+    await page
+      .getByRole('button', { name: 'Add a machine', exact: true })
+      .click();
+    await expect(
+      fleetView(page).getByTestId('add-machine-panel')
+    ).toBeVisible();
+    beam!.peerChanged({ peerId: 'b'.repeat(32), label: 'polledbox' }, false);
+    await page.clock.fastForward('05:01');
+    await expect(fleetView(page).getByTestId('add-machine-panel')).toHaveCount(
+      0
+    );
+    await expect(
+      page.getByTestId('machine-row').filter({ hasText: 'polledbox' })
+    ).toBeVisible();
   });
 });
 
@@ -98,15 +193,15 @@ test.describe('Joining a fleet', () => {
     await finishJoin(page, beam!);
     const view = fleetView(page);
     await expect(
-      view.getByRole('heading', { name: 'Check the fleet fingerprint' })
+      view.getByRole('heading', { name: 'Check fleet fingerprint' })
     ).toBeVisible();
     await expect(view.getByRole('button', { name: 'Close' })).toHaveCount(0);
 
     await collapseFleet(page);
     await openFleet(desktop);
-    await view.getByRole('button', { name: 'Fingerprints match' }).click();
+    await view.getByRole('button', { name: 'Matches' }).click();
     await expect(
-      view.getByRole('heading', { name: 'Check the fleet fingerprint' })
+      view.getByRole('heading', { name: 'Check fleet fingerprint' })
     ).toHaveCount(0);
   });
 
@@ -118,20 +213,20 @@ test.describe('Joining a fleet', () => {
     await openFleet(desktop);
     await finishJoin(page, beam!);
     const view = fleetView(page);
-    await view.getByRole('button', { name: 'They don’t match' }).click();
+    await view.getByRole('button', { name: 'Doesn’t match' }).click();
     await expect(
-      view.getByRole('heading', { name: 'Fleet fingerprints do not match' })
+      view.getByRole('heading', { name: 'Different fleet' })
     ).toBeVisible();
     await expect(
-      view.getByText(/Stop using its remote connections\./)
+      view.getByText(/Stop using remote connections\./)
     ).toBeVisible();
     await view
       .getByRole('alert')
-      .getByRole('button', { name: 'Reset fleet on this machine…' })
+      .getByRole('button', { name: 'Reset fleet…' })
       .click();
     await expect(
       view.getByRole('heading', {
-        name: 'Reset fleet on this machine?',
+        name: 'Reset fleet here?',
       })
     ).toBeVisible();
     expect(beam!.ops('fleet.reset')).toHaveLength(0);
@@ -149,12 +244,10 @@ test.describe('A pending directory write', () => {
     await openFleet(desktop);
     await finishCreatePending(page, beam!);
     const view = fleetView(page);
-    const pending = view.getByText(
-      'Saved on this machine. Directory publication is pending; beam will retry while it runs.'
-    );
+    const pending = view.getByText('Saved here. Waiting to sync…');
     await expect(pending).toBeVisible();
 
-    await view.getByRole('button', { name: 'Close' }).click();
+    await expect(view.getByRole('button', { name: 'Close' })).toHaveCount(0);
     await expect(pending).toBeVisible();
     beam!.published('member', SELF_PEER_ID);
     await expect(pending).toHaveCount(0);
@@ -165,11 +258,9 @@ test.describe('A pending directory write', () => {
     await openFleet(desktop);
     await finishCreatePending(page, beam!);
     const view = fleetView(page);
-    await expect(
-      view.getByText(/Directory publication is pending/)
-    ).toBeVisible();
+    await expect(view.getByText(/Waiting to sync/)).toBeVisible();
     beam!.published('member', SELF_PEER_ID);
-    await expect(view.getByText('Published to directory')).toBeVisible();
+    await expect(view.getByText(/Waiting to sync/)).toHaveCount(0);
   });
 });
 
@@ -183,7 +274,7 @@ test.describe('beam still starting', () => {
     const { page } = desktop;
     await openFleet(desktop);
     const view = fleetView(page);
-    const notice = view.getByText('Preparing network…');
+    const notice = view.getByText('Starting Fleet…');
     await expect(notice).toBeVisible();
     await expect(
       view.getByRole('button', { name: 'Create a fleet' })

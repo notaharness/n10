@@ -1,10 +1,9 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DiffLine } from '@n10/diff';
 import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
-import type { CommentListItem } from '../../components/review/comments/CommentsList.js';
 import type { DiffJumpHandle } from '../../components/review/diff/VirtualDiffList.js';
 import {
   buildCommentRows,
@@ -13,16 +12,17 @@ import {
   visibleComments,
   type CommentRow,
 } from './review-model.js';
+import { useTabView } from '../tabs/tab-views.js';
 
 /**
  * Walking the comments on a pull request: one document-ordered list,
  * where the viewer is in it, and how to get the diff to show any of
  * them.
  *
- * It is one hook because the rail's comment list and the diff toolbar's
- * prev/next both read it, and they used to disagree about what "the
- * next comment" meant — the list is filtered once, here, and both take
- * the result.
+ * It is one hook because the diff toolbar's prev/next and the header's
+ * unresolved count both read it, and must agree about what "the next
+ * comment" is: the list is filtered once, here, and both take the
+ * result.
  */
 export function useCommentNavigator({
   files,
@@ -42,7 +42,20 @@ export function useCommentNavigator({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const jumpRef = useRef<DiffJumpHandle | null>(null);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  // The file picked when the reader left the tab, while the diff still
+  // has it; gone from the diff, nothing is picked.
+  const { saved, save } = useTabView();
+  const [selectedFile, setSelectedFile] = useState<string | null>(
+    saved.file ?? null
+  );
+  if (
+    selectedFile !== null &&
+    files.length > 0 &&
+    !files.some(([f]) => f === selectedFile)
+  ) {
+    setSelectedFile(null);
+  }
+  useEffect(() => save({ file: selectedFile }), [selectedFile, save]);
   const [focusId, setFocusId] = useState<string | null>(null);
 
   // General (Conversation) comments first, then per file the remote
@@ -84,14 +97,6 @@ export function useCommentNavigator({
     [onShowDiff]
   );
 
-  const jumpToItem = useCallback(
-    (item: CommentListItem) => {
-      const row = items.find((r) => r.id === item.id);
-      jumpToId(item.id, row?.file ?? null);
-    },
-    [items, jumpToId]
-  );
-
   const step = useCallback(
     (delta: number) => {
       const target: CommentRow | null = stepComment(items, navIndex, delta);
@@ -110,7 +115,6 @@ export function useCommentNavigator({
     selectedFile,
     jumpToFile,
     jumpToId,
-    jumpToItem,
     step,
   };
 }

@@ -9,6 +9,11 @@ import {
   type FakeGitHub,
 } from '../setup/fake-gh.js';
 import {
+  fakeAdoProjectConfig,
+  installFakeAdo,
+  type FakeAzureDevOps,
+} from '../setup/fake-ado.js';
+import {
   addExternalWorktree,
   startExternalTmuxSession,
 } from '../setup/external.js';
@@ -46,10 +51,13 @@ export function fakeAgent(
     printSeed?: boolean;
     /** Print the PTY grid as `size:<cols>x<rows>`, and again on resize. */
     printSize?: boolean;
+    /** End each streamed line with `@<checkout directory>`. */
+    tag?: boolean;
   } = {}
 ): string {
   const flags = [`--banner=n10-fake-agent-ready`];
   if (opts.stream) flags.push('--stream');
+  if (opts.tag) flags.push('--tag');
   if (opts.echo) flags.push('--echo');
   if (opts.printSeed) flags.push('--print-seed');
   if (opts.printSize) flags.push('--print-size');
@@ -86,6 +94,12 @@ export interface HomeSeed {
    * `githubToken` is set, which is the real thing.
    */
   fakeGitHub?: FakeGitHub;
+  /**
+   * Serve the app Azure DevOps pull requests from a stand-in for its
+   * REST API in the app's main process (`setup/fake-ado.ts`), with the
+   * matching config written for it.
+   */
+  fakeAzureDevOps?: FakeAzureDevOps;
 }
 
 /**
@@ -99,6 +113,14 @@ export function seedHome(
   repoPath: string,
   opts: HomeSeed
 ): Record<string, string> {
+  // The Azure DevOps fake's preload writes the only token, so an app it
+  // is not in has none; one seeded here would undo that.
+  const auth = opts.n10Config?.vendorAuth as
+    | Record<string, unknown>
+    | undefined;
+  if (opts.fakeAzureDevOps && auth?.['azure-devops']) {
+    throw new Error('fakeAzureDevOps brings its own token; seed none');
+  }
   const n10 = join(homeDir, '.n10');
   mkdirSync(n10, { recursive: true });
   // A terminal tab runs the developer's login shell in this home. zsh
@@ -108,7 +130,14 @@ export function seedHome(
   writeFileSync(join(homeDir, '.zshrc'), '', 'utf8');
   writeFileSync(
     join(n10, 'config.json'),
-    JSON.stringify({ aiCommand: fakeAgent(), ...opts.n10Config }, null, 2),
+    JSON.stringify(
+      {
+        aiCommand: fakeAgent(),
+        ...opts.n10Config,
+      },
+      null,
+      2
+    ),
     'utf8'
   );
 
@@ -123,17 +152,25 @@ export function seedHome(
     );
   }
 
-  return opts.fakeGitHub ? installFakeGh(homeDir, opts.fakeGitHub) : {};
+  return {
+    ...(opts.fakeGitHub ? installFakeGh(homeDir, opts.fakeGitHub) : {}),
+    ...(opts.fakeAzureDevOps
+      ? installFakeAdo(homeDir, opts.fakeAzureDevOps)
+      : {}),
+  };
 }
 
 function seedProjectConfig(
   n10: string,
   repoPath: string,
-  opts: Pick<HomeSeed, 'projectConfig' | 'fakeGitHub'>
+  opts: Pick<HomeSeed, 'projectConfig' | 'fakeGitHub' | 'fakeAzureDevOps'>
 ): void {
   const projectConfig =
     opts.projectConfig ??
-    (opts.fakeGitHub ? fakeGhProjectConfig(opts.fakeGitHub) : undefined);
+    (opts.fakeGitHub ? fakeGhProjectConfig(opts.fakeGitHub) : undefined) ??
+    (opts.fakeAzureDevOps
+      ? fakeAdoProjectConfig(opts.fakeAzureDevOps)
+      : undefined);
   if (!projectConfig) return;
   // Per-project config lives under a hash of the repo path — see
   // projectKey() in @n10/vcs-core's config store.

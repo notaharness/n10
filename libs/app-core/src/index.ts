@@ -17,6 +17,7 @@ export * from './lib/controllers/diff-file-viewer.js';
 
 // ── React contexts ───────────────────────────────────────────────
 export * from './lib/context/ConfigContext.js';
+export * from './lib/context/EngineContext.js';
 export * from './lib/context/KeybindContext.js';
 export * from './lib/context/LayoutContext.js';
 export * from './lib/context/NavContext.js';

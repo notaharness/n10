@@ -18,17 +18,33 @@ import * as terminals from './services/terminals.js';
 import * as commentImages from './services/comment-images.js';
 import * as clipboardImage from './services/clipboard-image.js';
 import * as drafts from './services/drafts.js';
+import * as mentions from './services/mentions.js';
+import * as prChecks from './services/pr-checks.js';
+import * as prConversation from './services/pr-conversation.js';
+import * as prDetails from './services/pr-details.js';
+import * as reviewDrafts from './services/review-drafts.js';
 import * as babysit from './services/babysit.js';
 import * as machines from './services/machines.js';
 import * as inboundMail from './services/inbound-mail.js';
 import { resolvePickedFolder } from './services/terminal-home.js';
+import {
+  createViewerApi,
+  viewerHandlers,
+  viewerOf,
+  type ViewerApi,
+  type ViewerScoped,
+} from './viewer-api.js';
 
 /**
  * The main-process implementation of the host contract. Pure data
  * plumbing — every method delegates to a service module so business
  * logic stays testable without Electron.
  */
-export function createHostApi(): N10HostApi {
+export type HostApi = Omit<N10HostApi, ViewerScoped>;
+
+export { createViewerApi, type ViewerApi };
+
+export function createHostApi(): HostApi {
   return {
     getVersion: () =>
       Promise.resolve({
@@ -56,15 +72,24 @@ export function createHostApi(): N10HostApi {
     listBranches: () => worktrees.listBranches(),
     listAllBranches: () => worktrees.listAllBranches(),
     createWorktree: (branch) => worktrees.createWorktree(branch),
-    removeWorktree: (branch, force) => worktrees.removeWorktree(branch, force),
-    canRemoveBranch: (branch) => worktrees.canRemoveBranch(branch),
+    removeWorktree: (branch, approved) =>
+      worktrees.removeWorktree(branch, approved),
+    checkWorktreeRemoval: (branch) => worktrees.checkWorktreeRemoval(branch),
     openInEditor: (branch) => worktrees.openInEditor(branch),
 
-    fetchPullRequests: () => reviews.fetchPullRequests(),
     fetchCommentThreads: (prId) => reviews.fetchCommentThreads(prId),
     replyToThread: (req: ReplyRequest) => reviews.replyToThread(req),
     setThreadResolved: (req: ResolveRequest) => reviews.setThreadResolved(req),
     fetchPrDescription: (prId) => reviews.fetchPrDescription(prId),
+    getPullRequestSnapshot: (req) => prDetails.getPullRequestSnapshot(req),
+    getPullRequestChecks: (req) => prChecks.getPullRequestChecks(req),
+    getPullRequestConversation: (req) =>
+      prConversation.getPullRequestConversation(req),
+    listReviewDrafts: (req) => reviewDrafts.listDrafts(req),
+    saveReviewDraft: (req) => reviewDrafts.saveDraft(req),
+    discardReviewDraft: (req) => reviewDrafts.discardDraft(req),
+    searchMentionCandidates: (req) => mentions.searchMentionCandidates(req),
+    submitReview: (req) => reviewDrafts.submitReview(req),
     submitReviewVerdict: (prId, verdict) =>
       reviews.submitReviewVerdict(prId, verdict),
     getReviewViewer: () => Promise.resolve(reviews.getReviewViewer()),
@@ -87,9 +112,6 @@ export function createHostApi(): N10HostApi {
     listForeignSessions: () =>
       Promise.resolve(foreignSessions.listForeignSessions()),
     getSessionActivity: () => Promise.resolve(sessions.getSessionActivity()),
-    markSessionSeen: (name) => Promise.resolve(sessions.markSessionSeen(name)),
-    getSessionBuffer: (name) =>
-      Promise.resolve(sessions.getSessionBuffer(name)),
     writeSession: (name, data) =>
       Promise.resolve(sessions.writeSession(name, data)),
     resizeSession: (name, cols, rows) =>
@@ -211,7 +233,8 @@ export function setShellGlue(glue: {
  */
 export function registerHostHandlers(
   register: IpcRegistrar,
-  api: N10HostApi = createHostApi()
+  api: HostApi = createHostApi(),
+  viewerApi: ViewerApi = createViewerApi()
 ): void {
   const handlers: Record<string, HostMethod | undefined> = {
     [IPC.getVersion]: api.getVersion as HostMethod,
@@ -231,14 +254,12 @@ export function registerHostHandlers(
     [IPC.listAllBranches]: api.listAllBranches as HostMethod,
     [IPC.createWorktree]: api.createWorktree as HostMethod,
     [IPC.removeWorktree]: api.removeWorktree as HostMethod,
-    [IPC.canRemoveBranch]: api.canRemoveBranch as HostMethod,
+    [IPC.checkWorktreeRemoval]: api.checkWorktreeRemoval as HostMethod,
     [IPC.openInEditor]: api.openInEditor as HostMethod,
     [IPC.launchAgent]: api.launchAgent as HostMethod,
     [IPC.listSessions]: api.listSessions as HostMethod,
     [IPC.listForeignSessions]: api.listForeignSessions as HostMethod,
     [IPC.getSessionActivity]: api.getSessionActivity as HostMethod,
-    [IPC.markSessionSeen]: api.markSessionSeen as HostMethod,
-    [IPC.getSessionBuffer]: api.getSessionBuffer as HostMethod,
     [IPC.writeSession]: api.writeSession as HostMethod,
     [IPC.resizeSession]: api.resizeSession as HostMethod,
     [IPC.killSession]: api.killSession as HostMethod,
@@ -247,11 +268,19 @@ export function registerHostHandlers(
     [IPC.launchTerminal]: api.launchTerminal as HostMethod,
     [IPC.listTerminals]: api.listTerminals as HostMethod,
     [IPC.killTerminal]: api.killTerminal as HostMethod,
-    [IPC.fetchPullRequests]: api.fetchPullRequests as HostMethod,
     [IPC.fetchCommentThreads]: api.fetchCommentThreads as HostMethod,
     [IPC.replyToThread]: api.replyToThread as HostMethod,
     [IPC.setThreadResolved]: api.setThreadResolved as HostMethod,
     [IPC.fetchPrDescription]: api.fetchPrDescription as HostMethod,
+    [IPC.getPullRequestSnapshot]: api.getPullRequestSnapshot as HostMethod,
+    [IPC.getPullRequestChecks]: api.getPullRequestChecks as HostMethod,
+    [IPC.getPullRequestConversation]:
+      api.getPullRequestConversation as HostMethod,
+    [IPC.listReviewDrafts]: api.listReviewDrafts as HostMethod,
+    [IPC.saveReviewDraft]: api.saveReviewDraft as HostMethod,
+    [IPC.discardReviewDraft]: api.discardReviewDraft as HostMethod,
+    [IPC.searchMentionCandidates]: api.searchMentionCandidates as HostMethod,
+    [IPC.submitReview]: api.submitReview as HostMethod,
     [IPC.submitReviewVerdict]: api.submitReviewVerdict as HostMethod,
     [IPC.getReviewViewer]: api.getReviewViewer as HostMethod,
     [IPC.fetchCommentImage]: api.fetchCommentImage as HostMethod,
@@ -288,13 +317,23 @@ export function registerHostHandlers(
     if (!fn) throw new Error(`No host implementation for ${channel}`);
     // Electron's ipcMain.handle passes the IpcMainInvokeEvent as the
     // first listener arg; the contract methods only want the payload.
-    register.handle(channel, async (event, ...args: unknown[]) => {
-      try {
-        return await (fn as (...a: unknown[]) => unknown)(...args);
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        throw new Error(message);
-      }
-    });
+    register.handle(channel, (_event, ...args: unknown[]) =>
+      relayErrors(fn, args)
+    );
+  }
+
+  for (const [channel, fn] of Object.entries(viewerHandlers(viewerApi))) {
+    register.handle(channel, (event, ...args: unknown[]) =>
+      relayErrors(fn, [viewerOf(event), ...args])
+    );
+  }
+}
+
+async function relayErrors(fn: HostMethod, args: unknown[]): Promise<unknown> {
+  try {
+    return await (fn as (...a: unknown[]) => unknown)(...args);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(message);
   }
 }

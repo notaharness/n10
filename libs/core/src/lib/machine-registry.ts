@@ -1,9 +1,8 @@
 /**
  * Where `libs/core` learns about remote machines, without depending on
- * beam or Electron. Mirrors `@n10/terminal-tmux`'s own
- * `setTmuxSessionPreparer` seam: a callback the desktop installs at
- * startup (`apps/desktop/src/main/main.ts`), never called by the TUI or
- * the CLI, which have no remote-machine capability.
+ * beam or Electron: a callback the desktop's session host installs at
+ * startup (`apps/desktop/src/main/host-worker.ts`), never called by the
+ * TUI or the CLI, which have no remote-machine capability.
  *
  * `open-session.ts` is the one place this is consulted, branching on
  * the machine in a `SessionRequest` — see decisions.md D4/D5.

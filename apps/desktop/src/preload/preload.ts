@@ -47,12 +47,12 @@ const api: N10HostApi = {
   listBranches: () => ipcRenderer.invoke(IPC.listBranches),
   listAllBranches: () => ipcRenderer.invoke(IPC.listAllBranches),
   createWorktree: (branch) => ipcRenderer.invoke(IPC.createWorktree, branch),
-  removeWorktree: (branch, force) =>
-    ipcRenderer.invoke(IPC.removeWorktree, branch, force),
-  canRemoveBranch: (branch) => ipcRenderer.invoke(IPC.canRemoveBranch, branch),
+  removeWorktree: (branch, approved) =>
+    ipcRenderer.invoke(IPC.removeWorktree, branch, approved),
+  checkWorktreeRemoval: (branch) =>
+    ipcRenderer.invoke(IPC.checkWorktreeRemoval, branch),
   openInEditor: (branch) => ipcRenderer.invoke(IPC.openInEditor, branch),
 
-  fetchPullRequests: () => ipcRenderer.invoke(IPC.fetchPullRequests),
   fetchCommentThreads: (prId) =>
     ipcRenderer.invoke(IPC.fetchCommentThreads, prId),
   replyToThread: (req) => ipcRenderer.invoke(IPC.replyToThread, req),
@@ -74,8 +74,10 @@ const api: N10HostApi = {
   listSessions: () => ipcRenderer.invoke(IPC.listSessions),
   listForeignSessions: () => ipcRenderer.invoke(IPC.listForeignSessions),
   getSessionActivity: () => ipcRenderer.invoke(IPC.getSessionActivity),
-  markSessionSeen: (name) => ipcRenderer.invoke(IPC.markSessionSeen, name),
-  getSessionBuffer: (name) => ipcRenderer.invoke(IPC.getSessionBuffer, name),
+  watchSession: (name) => ipcRenderer.invoke(IPC.watchSession, name),
+  unwatchSession: (name) => ipcRenderer.invoke(IPC.unwatchSession, name),
+  showSession: (name) => ipcRenderer.invoke(IPC.showSession, name),
+  hideSession: (name) => ipcRenderer.invoke(IPC.hideSession, name),
   writeSession: (name, data) =>
     ipcRenderer.invoke(IPC.writeSession, name, data),
   resizeSession: (name, cols, rows) =>
@@ -89,6 +91,18 @@ const api: N10HostApi = {
   killTerminal: (name) => ipcRenderer.invoke(IPC.killTerminal, name),
   fetchPrDescription: (prId) =>
     ipcRenderer.invoke(IPC.fetchPrDescription, prId),
+  getPullRequestSnapshot: (req) =>
+    ipcRenderer.invoke(IPC.getPullRequestSnapshot, req),
+  getPullRequestChecks: (req) =>
+    ipcRenderer.invoke(IPC.getPullRequestChecks, req),
+  getPullRequestConversation: (req) =>
+    ipcRenderer.invoke(IPC.getPullRequestConversation, req),
+  listReviewDrafts: (req) => ipcRenderer.invoke(IPC.listReviewDrafts, req),
+  saveReviewDraft: (req) => ipcRenderer.invoke(IPC.saveReviewDraft, req),
+  discardReviewDraft: (req) => ipcRenderer.invoke(IPC.discardReviewDraft, req),
+  searchMentionCandidates: (req) =>
+    ipcRenderer.invoke(IPC.searchMentionCandidates, req),
+  submitReview: (req) => ipcRenderer.invoke(IPC.submitReview, req),
   submitReviewVerdict: (prId, verdict) =>
     ipcRenderer.invoke(IPC.submitReviewVerdict, prId, verdict),
   getReviewViewer: () => ipcRenderer.invoke(IPC.getReviewViewer),

@@ -12,6 +12,9 @@
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [
     {
+      "path": "../worktree-manager/tsconfig.lib.json"
+    },
+    {
       "path": "../logger/tsconfig.lib.json"
     },
     {
@@ -24,10 +27,10 @@
       "path": "../diff/tsconfig.lib.json"
     },
     {
-      "path": "../worktree-manager/tsconfig.lib.json"
+      "path": "../vcs/core/tsconfig.lib.json"
     },
     {
-      "path": "../vcs/core/tsconfig.lib.json"
+      "path": "../engine/tsconfig.lib.json"
     },
     {
       "path": "../core/tsconfig.lib.json"

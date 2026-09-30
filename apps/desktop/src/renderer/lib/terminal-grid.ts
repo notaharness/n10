@@ -16,10 +16,12 @@ export interface Grid {
 
 /**
  * Compute the grid for a pane from the wterm element's *measured* cell
- * metrics — the same probe technique wterm's own observer uses, so the
- * two never disagree (the 7.8px estimate overflowed the pane whenever
- * the real glyph was wider). Returns null when the element isn't
- * measurable yet (hidden, not laid out); fall back to the estimate.
+ * metrics — the same probe wterm's own observer uses, one `W` wide, so
+ * the two never disagree (the 7.8px estimate overflowed the pane
+ * whenever the real glyph was wider, and an average over many glyphs
+ * rounds a column differently from wterm, which then resizes the PTY
+ * back and forth). Returns null when the element isn't measurable yet
+ * (hidden, not laid out); fall back to the estimate.
  */
 export function measureTerminalGrid(
   termEl: HTMLElement,
@@ -30,10 +32,10 @@ export function measureTerminalGrid(
   row.style.position = 'absolute';
   row.style.visibility = 'hidden';
   const probe = document.createElement('span');
-  probe.textContent = 'W'.repeat(40);
+  probe.textContent = 'W';
   row.appendChild(probe);
   termEl.appendChild(row);
-  const charWidth = probe.getBoundingClientRect().width / 40;
+  const charWidth = probe.getBoundingClientRect().width;
   const rowHeight = row.getBoundingClientRect().height;
   row.remove();
   if (charWidth <= 0 || rowHeight <= 0) return null;
@@ -45,6 +47,38 @@ export function measureTerminalGrid(
   return {
     cols: Math.max(20, Math.floor((pane.width - padX) / charWidth)),
     rows: Math.max(5, Math.floor((pane.height - padY) / rowHeight)),
+  };
+}
+
+/**
+ * The box wterm's own observer sizes its grid by — its element's
+ * `contentRect`, plus the padding `measureTerminalGrid` takes off —
+ * read without waiting for an observer: the border box, less borders
+ * and any scrollbar. Fractional, like `contentRect`: `clientWidth`
+ * rounds to whole pixels, and near a column boundary lands a column
+ * away from wterm, which then resizes the PTY back to its own answer.
+ */
+export function terminalBox(termEl: HTMLElement): {
+  width: number;
+  height: number;
+} {
+  const rect = termEl.getBoundingClientRect();
+  const cs = getComputedStyle(termEl);
+  const px = (v: string) => parseFloat(v) || 0;
+  const bordersX = px(cs.borderLeftWidth) + px(cs.borderRightWidth);
+  const bordersY = px(cs.borderTopWidth) + px(cs.borderBottomWidth);
+  // Scrollbars are whole pixels; what is left is rounding.
+  const scrollbarX = Math.max(
+    0,
+    Math.round(termEl.offsetWidth - termEl.clientWidth - bordersX)
+  );
+  const scrollbarY = Math.max(
+    0,
+    Math.round(termEl.offsetHeight - termEl.clientHeight - bordersY)
+  );
+  return {
+    width: rect.width - bordersX - scrollbarX,
+    height: rect.height - bordersY - scrollbarY,
   };
 }
 
@@ -74,10 +108,13 @@ export function estimateTerminalGrid(
  *
  * A pane with no box yet answers `null`: the minimums above would
  * otherwise turn an unlaid-out pane into a plausible-looking 20x5 and
- * spawn an agent in it.
+ * spawn an agent in it. A pane measured without a bar the terminal will
+ * sit under says how tall it is in `data-terminal-inset`.
  */
 export function paneTerminalGrid(paneEl: HTMLElement): Grid | null {
-  const box = paneEl.getBoundingClientRect();
+  const rect = paneEl.getBoundingClientRect();
+  const inset = Number(paneEl.dataset.terminalInset) || 0;
+  const box = { width: rect.width, height: rect.height - inset };
   if (box.width < 2 || box.height < 2) return null;
   const probe = document.createElement('div');
   probe.className = 'wterm';

@@ -1,40 +1,45 @@
-import { useCallback, useEffect, useRef } from 'react';
-import type { BranchPrMap } from '@n10/vcs-core';
-import { logError } from '@n10/logger';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useConfig } from '../context/ConfigContext.js';
+import { useEngine } from '../context/EngineContext.js';
 import { useToastActions } from '../context/ToastContext.js';
-import { usePolling } from './usePolling.js';
 
-export function usePrData(refreshInterval = 60000) {
-  const { config, provider } = useConfig();
+/**
+ * The open repository's pull request list, as the engine holds it.
+ *
+ * Reading, scheduling, joining and the refresh's provider-memo reset
+ * are the engine's (`@n10/engine` `pull-request-list.ts`), shared with
+ * the desktop. What is left here is the TUI's: holding a watch while
+ * mounted, and toasting an error.
+ */
+export function usePrData() {
+  const { pullRequests, repo } = useEngine();
+  const { config } = useConfig();
   const { flash } = useToastActions();
-  const { vendorAuth, vendorProject, prPollInterval } = config;
 
-  const enabled =
-    provider != null && provider.isConfigured(vendorAuth, vendorProject);
-
-  const fetchPrs = useCallback(async (): Promise<BranchPrMap> => {
-    if (!enabled || !provider) return {};
-    try {
-      return await provider.fetchPullRequests(vendorAuth, vendorProject);
-    } catch (err: unknown) {
-      logError(`fetchPullRequests [${provider.id}]`, err as Error);
-      throw err;
-    }
-  }, [enabled, provider, vendorAuth, vendorProject]);
-
-  const polling = usePolling<BranchPrMap>(
-    fetchPrs,
-    prPollInterval ?? refreshInterval,
-    enabled
+  const subscribe = useCallback(
+    (onChange: () => void) =>
+      pullRequests.subscribe((cwd) => {
+        if (cwd === repo) onChange();
+      }),
+    [pullRequests, repo]
   );
+  const getSnapshot = useCallback(
+    () => pullRequests.getSnapshot(repo),
+    [pullRequests, repo]
+  );
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot);
 
-  // Toast on new error messages only — the poll fires the same
-  // callback every interval, so without this guard a persistent
-  // failure would re-flash forever.
+  // Taken again whenever the config changes: the engine resolves the
+  // provider from the persisted config, and a new provider, project or
+  // credentials is a new scope, to be read now rather than an interval
+  // later. An unchanged scope is fresh, so re-taking costs nothing.
+  useEffect(() => pullRequests.watch(repo), [pullRequests, repo, config]);
+
+  // Toast on new error messages only — every poll that fails reports
+  // the same error, and a persistent failure must not re-flash forever.
   const lastFlashedErrorRef = useRef<string | null>(null);
   useEffect(() => {
-    const message = polling.error?.message ?? null;
+    const message = snapshot.error;
     if (message === null) {
       lastFlashedErrorRef.current = null;
       return;
@@ -43,26 +48,18 @@ export function usePrData(refreshInterval = 60000) {
       lastFlashedErrorRef.current = message;
       flash(`PR error: ${message}`, 'error');
     }
-  }, [polling.error, flash]);
+  }, [snapshot.error, flash]);
 
-  /**
-   * The user asked, so go and look.
-   *
-   * A provider may hold per-row answers well past one response — Azure
-   * remembers a settled CI verdict for ten minutes so a poll does not
-   * spend a request per row on it — and answering a keypress from
-   * memory is what makes the key look broken. The desktop's refresh
-   * does the same thing through its host (`services/sidebar.ts`).
-   */
-  const refresh = useCallback(() => {
-    provider?.forgetPullRequestCache?.(vendorProject);
-    return polling.refresh();
-  }, [provider, vendorProject, polling]);
+  /** The user asked, so go and look — the provider forgets its per-row
+   *  answers when this refresh's own request starts. */
+  const refresh = useCallback(async (): Promise<void> => {
+    await pullRequests.refresh(repo);
+  }, [pullRequests, repo]);
 
   return {
-    prMap: polling.value ?? {},
-    loading: polling.loading,
-    error: polling.error?.message ?? null,
+    prMap: snapshot.prMap,
+    loading: snapshot.refreshing,
+    error: snapshot.error,
     refresh,
   };
 }

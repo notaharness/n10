@@ -1,11 +1,13 @@
 import type { DiffLine } from '@n10/diff';
 import type { PullRequestInfo } from '@n10/vcs-core';
-import type { ReactNode, Ref, RefObject } from 'react';
+import { useState, type ReactNode, type Ref, type RefObject } from 'react';
 import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
 import type { PlanItem } from '@n10/core/plan';
+import type { DiffReadState } from '../../lib/data/read-state.js';
+import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { type Mode } from '../../lib/review/review-model.js';
 import { cn } from '../../lib/utils.js';
 import { SessionTerminal } from '../terminal/SessionTerminal.js';
@@ -14,13 +16,13 @@ import type { PrConnectionBanner } from './PrWorkspace.js';
 import { DiffPane } from './diff/DiffPane.js';
 import { type DiffJumpHandle } from './diff/VirtualDiffList.js';
 import { OverviewPane } from './OverviewPane.js';
+import { terminalInset } from './PrHeader.js';
 import { PlanPane } from './PlanPane.js';
 import { ReviewStepper } from './drafts/ReviewStepper.js';
 
 /**
  * One layer of the stack. Hidden rather than unmounted, so a pane's
- * scroll position — and a terminal's scrollback — survives a trip to
- * another mode and back.
+ * scroll position survives a trip to another mode and back.
  */
 function StackedPane({
   visible,
@@ -36,19 +38,26 @@ function StackedPane({
   );
 }
 
+/** True from the first render where `on` is, onwards: a pane mounted
+ *  on first visit and kept, so a pull request nobody opens the Overview
+ *  of never fetches its description. */
+function useMountedOnce(on: boolean): boolean {
+  const [seen, setSeen] = useState(on);
+  if (on && !seen) setSeen(true);
+  return seen || on;
+}
+
 /** The agent's terminal, plus its connection banner (ux-machines.md
  *  §6) when the session's connection is reconnecting/failed. Split out
  *  of `ContentPane` to keep its own complexity down. */
 function AgentPane({
   sessionName,
   sessionEpoch,
-  active,
   connectionBanner,
   inputDisabled,
 }: {
   sessionName: string;
   sessionEpoch: number;
-  active: boolean;
   connectionBanner?: PrConnectionBanner | null;
   inputDisabled?: boolean;
 }) {
@@ -64,9 +73,9 @@ function AgentPane({
       )}
       <div className="relative min-h-0 flex-1">
         <SessionTerminal
+          key={sessionName}
           name={sessionName}
           epoch={sessionEpoch}
-          active={active}
           disabled={inputDisabled}
         />
       </div>
@@ -76,9 +85,9 @@ function AgentPane({
 
 /**
  * The single content pane, with every mode's view stacked in it. The
- * terminal and the walkthrough stay mounted and are hidden rather than
- * unmounted, so switching modes never costs their scrollback or their
- * scroll position.
+ * diff, the Overview once shown and the walkthrough are hidden rather
+ * than unmounted, so switching modes keeps their scroll position. The
+ * agent's terminal is mounted only while it shows (`SessionTerminal`).
  */
 export function ContentPane({
   effMode,
@@ -88,10 +97,10 @@ export function ContentPane({
   baseBranch,
   sessionName,
   sessionEpoch,
-  active,
   connectionBanner,
   inputDisabled,
   files,
+  diffHead,
   filesByName,
   fileOrder,
   threadsByFile,
@@ -101,8 +110,10 @@ export function ContentPane({
   drafts,
   hasDrafts,
   commentsLoading,
-  diffPending,
-  diffError,
+  threadsNotice,
+  diffRead,
+  diffRetrying,
+  onRetryDiff,
   focusThreadId,
   scrollRef,
   jumpRef,
@@ -112,6 +123,8 @@ export function ContentPane({
   onNext,
   onExitReview,
   onOpenInDiff,
+  onOverviewAction,
+  onOpenThread,
   plan,
 }: {
   effMode: Mode;
@@ -123,12 +136,13 @@ export function ContentPane({
   /** Changes when a new agent is spawned into this pane — see
    *  `SessionTerminal`, which re-fits its grid on it. */
   sessionEpoch: number;
-  active: boolean;
   /** Set only while the session's connection is reconnecting/failed
    *  (ux-machines.md §6). */
   connectionBanner?: PrConnectionBanner | null;
   inputDisabled?: boolean;
   files: [string, DiffLine[]][];
+  /** The commit the diff was read at; what new comments anchor to. */
+  diffHead: string | null;
   filesByName: Map<string, DiffLine[]>;
   fileOrder: Map<string, number>;
   threadsByFile: Map<string, RemoteCommentThread[]>;
@@ -138,8 +152,11 @@ export function ContentPane({
   drafts: ReviewComment[];
   hasDrafts: boolean;
   commentsLoading: boolean;
-  diffPending: boolean;
-  diffError: Error | null;
+  /** Why the diff's threads are missing or out of date. */
+  threadsNotice?: ReactNode;
+  diffRead: DiffReadState;
+  diffRetrying: boolean;
+  onRetryDiff: () => void;
   focusThreadId: string | null;
   scrollRef: RefObject<HTMLDivElement | null>;
   jumpRef: Ref<DiffJumpHandle>;
@@ -149,6 +166,10 @@ export function ContentPane({
   onNext: () => void;
   onExitReview: () => void;
   onOpenInDiff: (file: string) => void;
+  /** The Overview's next-step button. */
+  onOverviewAction: (action: AttentionAction) => void;
+  /** Show a remote thread in the diff, from the Overview's activity. */
+  onOpenThread: (id: string, path: string | null) => void;
   /** Everything the plan pane needs; absent on a bare worktree tab. */
   plan?: {
     items: PlanItem[];
@@ -159,25 +180,28 @@ export function ContentPane({
     onShowInDiff: (item: PlanItem) => void;
     onClear: () => void;
     onSend: (mode: 'inject' | 'new-session') => void;
-    openNoteFor: { key: string } | null;
   };
 }) {
   const headSha = pr?.headSha;
+  const overviewMounted = useMountedOnce(effMode === 'overview');
   const generalThreads = hideResolved
     ? general.filter((t) => !t.isResolved)
     : general;
   return (
-    <div data-terminal-pane className="relative h-full min-h-0">
-      {sessionName && (
-        <StackedPane visible={effMode === 'agent'}>
+    <div
+      data-terminal-pane
+      data-terminal-inset={terminalInset(effMode, pr != null)}
+      className="relative h-full min-h-0"
+    >
+      {sessionName && effMode === 'agent' && (
+        <div className="absolute inset-0">
           <AgentPane
             sessionName={sessionName}
             sessionEpoch={sessionEpoch}
-            active={active && effMode === 'agent'}
             connectionBanner={connectionBanner}
             inputDisabled={inputDisabled}
           />
-        </StackedPane>
+        </div>
       )}
       {hasDrafts && (
         <StackedPane visible={effMode === 'review'}>
@@ -188,7 +212,6 @@ export function ContentPane({
               drafts={drafts}
               filesByName={filesByName}
               fileOrder={fileOrder}
-              active={active}
               onExit={onExitReview}
               onOpenInDiff={onOpenInDiff}
             />
@@ -207,14 +230,21 @@ export function ContentPane({
             onShowInDiff={plan.onShowInDiff}
             onClear={plan.onClear}
             onSend={plan.onSend}
-            openNoteFor={plan.openNoteFor}
           />
         </div>
       )}
-      {pr && effMode === 'overview' && (
-        <div className="absolute inset-0">
-          <OverviewPane pr={pr} />
-        </div>
+      {pr && overviewMounted && (
+        // Kept mounted like the diff once it has been shown: the
+        // reader's place in the activity, its filter and search survive
+        // a trip to the diff. Not before, so a tab that never shows it
+        // never reads its conversation.
+        <StackedPane visible={effMode === 'overview'}>
+          <OverviewPane
+            pr={pr}
+            onAction={onOverviewAction}
+            onOpenThread={onOpenThread}
+          />
+        </StackedPane>
       )}
       <StackedPane visible={effMode === 'diff'}>
         <DiffPane
@@ -223,12 +253,15 @@ export function ContentPane({
           sourceBranch={branch}
           targetBranch={baseBranch}
           files={files}
+          diffHead={diffHead}
           threadsByFile={threadsByFile}
           draftsByFile={draftsByFile}
           generalThreads={generalThreads}
           commentsLoading={commentsLoading}
-          diffLoading={diffPending}
-          diffError={diffError ? String(diffError.message) : null}
+          threadsNotice={threadsNotice}
+          read={diffRead}
+          retrying={diffRetrying}
+          onRetry={onRetryDiff}
           focusThreadId={focusThreadId}
           scrollRef={scrollRef}
           jumpRef={jumpRef}

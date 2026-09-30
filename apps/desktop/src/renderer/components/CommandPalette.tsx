@@ -116,8 +116,7 @@ export function CommandPalette({
     // about to add.
     const tabId = tabIdFor(tabs.tabs, repo.cwd, key);
     const wasOpen =
-      existing != null ||
-      tabs.tabs.some((t) => standsFor(t, repo.cwd, key));
+      existing != null || tabs.tabs.some((t) => standsFor(t, repo.cwd, key));
     tabs.openItem(key);
     create.mutate(branch, {
       onSuccess: () => {

@@ -88,6 +88,10 @@ async function request(
 export async function parseDiffInWorker(
   text: string
 ): Promise<[string, DiffLine[]][]> {
+  return requireFiles(text, await parseEntries(text));
+}
+
+async function parseEntries(text: string): Promise<[string, DiffLine[]][]> {
   try {
     const r = await request({ type: 'parse', text });
     if (r.type === 'parse') return r.entries;
@@ -98,6 +102,30 @@ export async function parseDiffInWorker(
   // file:// quirks) must still show the diff — highlights can degrade,
   // the parse cannot. The parser itself is tiny.
   return [...parseUnifiedDiff(text).entries()];
+}
+
+/**
+ * A patch with content that yields no files was not understood, which
+ * is not the same as there being no changes. Git starts every file of a
+ * non-empty diff with a header, so nothing parsed out of something is
+ * the parser failing — a header form it does not read, say — and the
+ * viewer has to say that rather than "No changes".
+ */
+export function requireFiles(
+  text: string,
+  entries: [string, DiffLine[]][]
+): [string, DiffLine[]][] {
+  if (entries.length === 0 && text.trim() !== '') {
+    throw new Error(
+      `No files could be shown from this ${patchSize(text)} diff`
+    );
+  }
+  return entries;
+}
+
+function patchSize(text: string): string {
+  const kib = text.length / 1024;
+  return kib < 1 ? `${text.length} characters` : `${Math.round(kib)} KiB`;
 }
 
 export interface FileAnalysis {

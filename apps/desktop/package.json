@@ -53,7 +53,7 @@
             }
           },
           "additionalEntryPoints": [
-            "apps/desktop/src/main/tmux-session-worker.ts",
+            "apps/desktop/src/main/host-worker.ts",
             "apps/desktop/src/main/beam-daemon-worker.ts",
             "apps/desktop/src/main/n10-shim.ts"
           ]
@@ -124,6 +124,31 @@
           }
         }
       },
+      "build-demo": {
+        "executor": "nx:run-commands",
+        "cache": true,
+        "inputs": [
+          "production",
+          "^production",
+          {
+            "externalDependencies": [
+              "vite",
+              "@vitejs/plugin-react",
+              "@tailwindcss/vite"
+            ]
+          }
+        ],
+        "outputs": [
+          "{workspaceRoot}/apps/desktop/dist/demo"
+        ],
+        "options": {
+          "command": "npx vite build --config vite.demo.config.ts",
+          "cwd": "apps/desktop",
+          "env": {
+            "NODE_ENV": "production"
+          }
+        }
+      },
       "build": {
         "executor": "nx:noop",
         "dependsOn": [
@@ -151,6 +176,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@n10/app-core": "*",
     "@n10/core": "*",
+    "@n10/engine": "*",
     "@notaharness/beam": "0.1.0-beta.3",
     "@tailwindcss/typography": "^0.5.20",
     "@tanstack/react-query": "^5.101.4",
@@ -160,6 +186,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "html-tag-names": "^2.1.0",
     "lucide-react": "^1.31.0",
     "node-pty": "^1.1.0",
     "radix-ui": "^1.6.7",
@@ -167,6 +194,8 @@
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4.12.2",
+    "rehype-raw": "^7.0.0",
+    "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
     "shiki": "^4.4.3",
     "sonner": "^2.0.8",

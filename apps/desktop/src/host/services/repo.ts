@@ -14,8 +14,9 @@ import {
 import { resetRepoRoot } from '@n10/core';
 import { githubProvider } from '@n10/vcs-github';
 import { azureDevOpsProvider } from '@n10/vcs-azure-devops';
-import type { VcsProvider } from '@n10/vcs-core';
+import type { RepositoryRef, VcsProvider } from '@n10/vcs-core';
 import { NoActiveRepoError, type RepoInfo } from '../contract.js';
+import { configuredViewer } from './viewer.js';
 import {
   loadRecents,
   forgetRecent,
@@ -135,22 +136,30 @@ export function openRepo(path: string): RepoInfo {
     resetWorktreeResolver();
   }
   repoOpenedListener?.(cwd);
+  return repoInfo(cwd, config);
+}
+
+export function getRepo(): RepoInfo | null {
+  if (activeCwd === null) return null;
+  return repoInfo(activeCwd, readConfig(activeCwd));
+}
+
+/** The open repository as its provider names it, or null while no
+ *  provider is configured for it. */
+export function configuredRepository(config: AppConfig): RepositoryRef | null {
+  const provider = PROVIDERS.find((p) => p.id === config.vendor) ?? null;
+  if (!provider || !isVcsConfigured(config, provider)) return null;
+  return provider.repositoryRef?.(config.vendorProject) ?? null;
+}
+
+function repoInfo(cwd: string, config: AppConfig): RepoInfo {
   const provider = PROVIDERS.find((p) => p.id === config.vendor) ?? null;
   return {
     cwd,
     providerId: provider?.id ?? null,
     vcsConfigured: provider ? isVcsConfigured(config, provider) : false,
-  };
-}
-
-export function getRepo(): RepoInfo | null {
-  if (activeCwd === null) return null;
-  const config: AppConfig = readConfig(activeCwd);
-  const provider = PROVIDERS.find((p) => p.id === config.vendor) ?? null;
-  return {
-    cwd: activeCwd,
-    providerId: provider?.id ?? null,
-    vcsConfigured: provider ? isVcsConfigured(config, provider) : false,
+    repository: configuredRepository(config),
+    viewer: configuredViewer(config),
   };
 }
 

@@ -54,6 +54,10 @@ export const TTL = {
   mergedPrs: 60_000,
   /** Pull request description. */
   description: 5 * 60_000,
+  /** The selected pull request and its iterations, read on demand: long
+   *  enough to answer a burst of asks once, short enough to follow a
+   *  push. */
+  detail: 15_000,
   /** Who we are, which teams we are in, and the repository's id. */
   identity: 30 * 60_000,
 } as const;

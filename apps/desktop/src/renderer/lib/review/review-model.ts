@@ -1,10 +1,8 @@
 import type { DiffLine } from '@n10/diff';
-import { commentBodyParts } from '@n10/review-comments/conventional';
 import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
-import type { CommentListItem } from '../../components/review/comments/CommentsList.js';
 import { contentKey } from '../content-key.js';
 import type { FileEntry } from '../../components/review/diff/FileTree.js';
 
@@ -56,16 +54,15 @@ export interface AgentPresence {
   hasSession: boolean;
   /** The host last reported that session's process as alive. */
   running: boolean;
-  /** This tab is the one on screen. */
-  active: boolean;
 }
 
 /**
- * Whether a change in the tab's agent hands the pane to the terminal.
+ * Whether a change in the tab's agent hands the pane to the terminal:
+ * an agent having been *launched*. (Coming back to a tab mounts it
+ * afresh, and `initialMode` opens it on a working agent's terminal.)
  *
- * Two things do: an agent having been *launched*, and the user coming
- * back to a tab whose agent is working. The first is the session
- * appearing, not the session being reported as running — `running` is
+ * Launched means the session appearing, or starting to run, not only
+ * the session being reported as running — `running` is
  * polled, and an agent that dies on startup (a command that is not on
  * PATH) can be gone before a poll ever sees it alive. Keyed on
  * `running` alone the pane then never leaves the diff, and the shell's
@@ -79,24 +76,7 @@ export function focusesAgent(
   next: AgentPresence
 ): boolean {
   if (next.hasSession && !prev.hasSession) return true;
-  if (next.running && !prev.running) return true;
-  return next.active && !prev.active && next.running;
-}
-
-/**
- * Whether the viewer should show its loading state: either the patch
- * itself is still in flight, or a patch has arrived and the worker has
- * not finished parsing *that* patch yet. The parse query is keyed on
- * the patch content, so while a newer patch is parsing there is no data
- * for its key — without the second clause the viewer would report "no
- * files" for the new patch instead of "still working".
- */
-export function diffIsPending(
-  isLoading: boolean,
-  patch: string | undefined,
-  parsed: [string, DiffLine[]][] | undefined
-): boolean {
-  return isLoading || (patch != null && parsed === undefined);
+  return next.running && !prev.running;
 }
 
 /** Drafts the agent has written but not yet posted. */
@@ -164,15 +144,22 @@ export function buildFileEntries(
   }));
 }
 
-// ── The unified comment list ─────────────────────────────────────
+// ── The comment rows ─────────────────────────────────────────────
 
 /**
- * A `CommentListItem` plus where it sits in the document, which is what
- * orders the list and what the diff pane needs in order to scroll to
- * it. The extra fields are carried on the same row rather than in a
- * side table so a row can never be separated from its anchor.
+ * One comment the diff's navigator steps through — a remote thread
+ * (inline or general) or an agent draft — with where it sits in the
+ * document, which orders the list and is what the diff pane needs in
+ * order to scroll to it.
  */
-export interface CommentRow extends CommentListItem {
+export interface CommentRow {
+  id: string;
+  /** 'thread' = a real (remote) comment; 'draft' = an agent draft. */
+  kind: 'thread' | 'draft';
+  resolved: boolean;
+  /** Whether it can be resolved at all: a general comment on GitHub
+   *  cannot, and is never counted as open. */
+  resolvable: boolean;
   /** null for general PR comments, which belong to no file. */
   file: string | null;
   line: number;
@@ -184,10 +171,9 @@ export interface CommentRow extends CommentListItem {
 /**
  * Every comment on the PR as one document-ordered list: general
  * (Conversation) comments first, then per file the remote threads and
- * the agent's drafts interleaved by line. Both the rail's Comments list
- * and the diff toolbar's prev/next walk this list, which is why it has
- * to be one list — they used to disagree about what "the next comment"
- * meant.
+ * the agent's drafts interleaved by line. The diff toolbar's prev/next
+ * and the header's "N unresolved" both walk this list, so they agree on
+ * what "the next comment" is.
  *
  * The sort is by (has-a-file, file position, line) and nothing else, so
  * it is deliberately not a total order: a thread and a draft on the
@@ -209,29 +195,13 @@ export function buildCommentRows(
   return rows;
 }
 
-/**
- * The one line the rail has to say what a comment is about.
- *
- * A Conventional Comments header is drawn as a badge on the card, so
- * spending the rail's only line repeating "issue (blocking):" says
- * nothing the reader cannot already see and pushes out the part that
- * identifies which comment this is. The signature goes for the same
- * reason: every agent comment ends with the same words.
- */
-function commentPreview(body: string): string {
-  return commentBodyParts(body).body;
-}
-
 /** A general PR comment: no file, and ahead of every inline row. */
 function generalRow(t: RemoteCommentThread): CommentRow {
-  const root = t.comments[0];
   return {
     id: t.id,
     kind: 'thread',
-    author: root?.author ?? '',
-    where: 'Conversation',
-    preview: commentPreview(root?.body ?? ''),
     resolved: t.isResolved,
+    resolvable: t.canResolve,
     file: null,
     line: 0,
     fileRank: -1,
@@ -242,16 +212,11 @@ function inlineRow(
   t: RemoteCommentThread,
   order: Map<string, number>
 ): CommentRow {
-  const root = t.comments[0];
   return {
     id: t.id,
     kind: 'thread',
-    author: root?.author ?? '',
-    where: `${t.file?.split('/').pop() ?? ''}${
-      t.lineStart != null ? `:${t.lineStart}` : ''
-    }`,
-    preview: commentPreview(root?.body ?? ''),
     resolved: t.isResolved,
+    resolvable: t.canResolve,
     file: t.file,
     line: t.lineStart ?? 0,
     fileRank: order.get(t.file ?? '') ?? Number.MAX_SAFE_INTEGER,
@@ -262,11 +227,8 @@ function draftRow(d: ReviewComment, order: Map<string, number>): CommentRow {
   return {
     id: d.id,
     kind: 'draft',
-    author: 'Draft',
-    where: `${d.file.split('/').pop()}:${d.lineStart}`,
-    preview: commentPreview(d.body),
     resolved: false,
-    severity: d.severity,
+    resolvable: false,
     file: d.file,
     line: d.lineStart,
     fileRank: order.get(d.file) ?? Number.MAX_SAFE_INTEGER,
@@ -288,10 +250,9 @@ export function compareCommentRows(a: CommentRow, b: CommentRow): number {
 }
 
 /**
- * The one list everything that walks comments sees. Listing a resolved
- * thread in the rail while the diff hides it — and letting prev/next
- * jump to a row that is not rendered — was the inconsistency here, so
- * the filter happens once and both readers take the result.
+ * The one list everything that walks comments sees: prev/next never
+ * jumps to a row the diff does not render, so the filter happens once
+ * and every reader takes the result.
  *
  * Returns the input array unchanged when nothing is hidden, so the
  * memoized identity of the full list survives.
@@ -311,7 +272,9 @@ export function visibleComments(
 export function firstUnresolvedThread(
   rows: readonly CommentRow[]
 ): CommentRow | null {
-  return rows.find((r) => r.kind === 'thread' && !r.resolved) ?? null;
+  return (
+    rows.find((r) => r.kind === 'thread' && r.resolvable && !r.resolved) ?? null
+  );
 }
 
 /** Position of the focused comment in the visible list, or -1. */

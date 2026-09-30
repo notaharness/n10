@@ -1,5 +1,23 @@
 # Project structure
 
+## Layers
+
+n10 is one program with two frontends. Each layer depends only on the ones
+below it, and the ESLint module boundaries enforce the direction.
+
+| Layer                      | Role                                                                                                                                                                                                                   |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@n10/core`                | Primitive operations: Git, filesystem, tmux and PTY, config, providers, pure helpers. Node only.                                                                                                                       |
+| `@n10/engine`              | The program: state, scheduling, caching and the events that announce them, over core. Node only; never React, Ink or Electron.                                                                                         |
+| `@n10/app-core`            | React bindings. The TUI's contexts and hooks, and the plan binding the desktop renderer also uses; the desktop host imports its config write helpers. Its end state is thin, browser-safe hooks over an engine client. |
+| `apps/cli`, `apps/desktop` | Rendering and input. The TUI runs the engine in its own process; the desktop runs it in the Electron main process, behind the host bridge. Two open shells share the implementation, not the state.                    |
+
+Behavior moves into the engine one resource at a time. The pull request list
+is there (`libs/engine/src/lib/pull-requests/`); remote sync, review threads,
+config effects and session orchestration are still coordinated by each shell.
+
+## Directory map
+
 ```
 apps/cli/                        — The published `n10` package: the command, the Ink TUI (ESM, React 19) — thin render layer over @n10/app-core
   src/main.ts                    — `n10` entry: routes to the desktop, `--tui` or `util`, loading only that path
@@ -12,19 +30,21 @@ apps/cli/                        — The published `n10` package: the command, t
   src/screens/reviews/           — Reviews tab (DiffFileList, DiffViewer, ReviewDetailPane)
   src/hooks/                     — Ink-coupled hooks (useTerminal, useScrollWheel, useRawStdinForward, useDiffListScrollSync)
   scripts/prepare-publish.mjs    — Assembles dist/ into the package: the CLI bundle, the desktop build under desktop/, the manifest
-apps/desktop/                    — Electron GUI shell over @n10/app-core, shipped inside `@notaharness/n10`
-  src/main/tmux-session-preparer.ts — Utility-process boundary for isolated tmux server creation
-  src/main/                      — Electron main: window chrome + security posture (window.ts), native app menu (menu.ts), N10_QA_STEPS hook
+apps/desktop/                    — Electron GUI shell, shipped inside `@notaharness/n10`: host services over @n10/engine and @n10/core, a renderer over its own query layer
+  src/main/                      — Electron main: window chrome + security posture (window.ts), N10_QA_STEPS hook
+  src/main/host-worker.ts        — The session host: a utility process running every host service and PTY client
+  src/main/host-process.ts       — Forks the host, forwards the contract to it, answers its ShellCalls, respawns it
   src/main/beam/                 — Client of the beam daemon's control socket: machines, remote exec/pty, ceremonies, mail relay, and the daemon the app starts
   src/preload/preload.ts         — Typed contextBridge → window.n10
+  src/host/menu-template.ts      — Pure native app menu template, used by main and the web demo
   src/host/contract.ts           — Single source of truth for the bridge API + IPC channel names (incl. MenuCommand, ContextMenuItem, DesktopPrefs)
-  src/host/services/             — Main-process services (sidebar w/ remote PR cache, sessions w/ scrollback buffer, settings, desktop-prefs…)
+  src/host/services/             — Session-host services (sidebar w/ remote PR cache, sessions w/ scrollback buffer, settings, desktop-prefs…)
   src/renderer/                  — Vite + React 19 + Tailwind v4 web app (no Node access)
     styles.css                   — Design tokens (VS Code-style light/dark palette, type scale) — components use tokens only
     components/ui/               — shadcn-style primitives (radix-ui + cva + lucide): button, dialog, command, select…
     components/                  — TitleBar, StatusBar, CommandPalette, sidebar/, editor/ (tabs), settings/, terminal/
     components/review/           — the review workspace shell: PrWorkspace, PrHeader, ReviewRail(+Sections), ContentPane, OverviewPane, PlanPane/PlanControls
-    components/review/comments/  — reviewer threads: ThreadCard, CommentsList, CommentMarkdown, ConversationPanel…
+    components/review/comments/  — reviewer threads: ThreadCard, CommentMarkdown, ConversationPanel…
     components/review/diff/      — the viewer: DiffPane, VirtualDiffList, diff-rows, FileTree, SnippetView…
     components/review/drafts/    — the agent's drafts + walkthrough: DraftCard, DraftEditor, ReviewStepper…
     lib/                         — grouped by subsystem, not one flat folder (see below)
@@ -49,7 +69,16 @@ apps/cli-e2e/                    — E2E tests (@playwright/test)
   src/setup/                     — git-repo.ts, sidebar.ts, constants.ts, github.ts
   src/*.test.ts                  — Test files (one per feature area)
   playwright.config.ts           — chromium-only, workers: 1, webServer: nx serve cli-wterm-host
-libs/core/                       — Shell-agnostic core. No React, Ink or Electron (lint-enforced)
+apps/website/                    — Next.js 16 + Fumadocs site at n10.is, deployed to Cloudflare via OpenNext
+  content/docs/                  — MDX docs content, compiled by fumadocs-mdx into the generated .source/
+  src/app/(home)/                — Landing page (HomeLayout)
+  src/app/docs/                  — Docs layout + catch-all page (DocsLayout, source loader)
+  src/app/llms.txt, llms-full.txt — Agent-facing page index and full content (see src/lib/llms.ts)
+  src/components/landing/        — Marketing page sections, data-driven where repeated (Features)
+  Own tsconfig/eslint/import conventions — see apps/website/README.md, not this file
+libs/engine/                     — The program both shells run: state, scheduling, caching. No React, Ink, Electron or app-core (lint-enforced)
+  src/lib/pull-requests/         — The pull request list: scoped reads, one request per scope, queued refreshes, snapshots and subscriptions, watch schedule
+libs/core/                       — Shell-agnostic operations. No React, Ink, Electron or engine (lint-enforced)
   src/lib/session/               — Session launch + plan checkout flows
   src/lib/plan/                  — Plan store (external store) + prompt composition
   src/plan.ts                    — Browser-safe entry (`@n10/core/plan`) for the renderer
@@ -69,8 +98,8 @@ libs/core/                       — Shell-agnostic core. No React, Ink or Elect
     hints.ts                     — Human-readable key display strings
     controls-data.ts             — Controls panel data logic (buildControlsRows, getBindingRows)
   src/lib/input/                 — KeyPress type (shell-agnostic ink-Key shape) + text-input handling
-libs/app-core/                   — The React layer over @n10/core, shared by both shells
-  src/lib/context/               — React state contexts (Config, Session, Sidebar, Nav, Modal, Toast, Layout…)
+libs/app-core/                   — React bindings: the TUI's contexts and hooks, the plan binding the desktop renderer uses, and the config write helpers the desktop host imports
+  src/lib/context/               — React state contexts (Config, Engine, Session, Sidebar, Nav, Modal, Toast, Layout…)
   src/lib/hooks/                 — Shell-agnostic hooks (useSessionManager, useDiffData, useRemoteComments…)
   src/lib/controllers/           — Headless screen controllers (diff file list / viewer view-models)
   src/lib/plan/use-plan-store.ts — useSyncExternalStore binding for core's plan store

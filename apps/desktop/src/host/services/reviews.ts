@@ -1,16 +1,12 @@
 import { readConfig } from '@n10/vcs-core';
-import type {
-  BranchPrMap,
-  PullRequestComments,
-  ReviewVerdict,
-} from '@n10/vcs-core';
-import { fetchDiffText, fetchFileDiffText } from '@n10/core';
+import type { PullRequestComments, ReviewVerdict } from '@n10/vcs-core';
+import { fetchFileDiffText, fetchReviewDiff } from '@n10/core';
 import { PROVIDERS, requireRepo } from './repo.js';
+import { configuredViewer } from './viewer.js';
 import { refreshPrList } from './sidebar.js';
 import type { ReplyRequest, ResolveRequest } from '../contract.js';
 
 interface ActiveProvider {
-  fetchPullRequests(): Promise<BranchPrMap>;
   fetchCommentThreads(prId: number): Promise<PullRequestComments>;
   replyToThread(req: ReplyRequest): Promise<void>;
   setThreadResolved(req: ResolveRequest): Promise<void>;
@@ -37,7 +33,6 @@ function resolveProvider(): ActiveProvider | null {
   }
   const { vendorAuth: auth, vendorProject: project } = config;
   return {
-    fetchPullRequests: () => provider.fetchPullRequests(auth, project),
     fetchCommentThreads: (prId) => {
       if (!provider.fetchCommentThreads) {
         throw new Error(`Provider ${provider.id} does not support comments`);
@@ -75,23 +70,12 @@ function resolveProvider(): ActiveProvider | null {
   };
 }
 
-export async function fetchPullRequests(): Promise<BranchPrMap> {
-  // No provider / unconfigured auth → no reviews. Not an error: bare
-  // repos are first-class, mirroring the TUI's usePrData.
-  const provider = resolveProvider();
-  if (!provider) return {};
-  return provider.fetchPullRequests();
-}
-
 /** The identifier the provider uses for the authenticated user in
  *  reviewer lists — GitHub's login, ADO's email (each provider's
  *  `matchesUser` compares exactly this). Lets the renderer patch the
  *  viewer's reviewer entry optimistically after a verdict. */
 export function getReviewViewer(): { identifier: string } | null {
-  const cwd = requireRepo();
-  const config = readConfig(cwd);
-  const identifier =
-    config.vendor === 'github' ? config.vendorProject?.username : config.email;
+  const identifier = configuredViewer(readConfig(requireRepo()));
   return identifier ? { identifier } : null;
 }
 
@@ -163,7 +147,7 @@ export async function submitReviewVerdict(
 
 export function getDiffText(sourceBranch: string, targetBranch: string) {
   requireRepo();
-  return fetchDiffText(sourceBranch, targetBranch);
+  return fetchReviewDiff(sourceBranch, targetBranch);
 }
 
 export function getFileDiffText(

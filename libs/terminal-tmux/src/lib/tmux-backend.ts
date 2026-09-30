@@ -12,25 +12,12 @@ export type { TmuxLaunchPlan } from './tmux-launch.js';
 
 type ExitCallback = (code: number, signal?: number) => void;
 
-export type TmuxSessionPreparer = (
-  spec: SessionSpec,
-  plan: TmuxLaunchPlan
-) => string | Promise<string>;
-let prepare: TmuxSessionPreparer = prepareTmuxSession;
-
-/** Desktop supplies an isolated process for server creation; Node callers use native tmux. */
-export function setTmuxSessionPreparer(
-  preparer: TmuxSessionPreparer = prepareTmuxSession
-): void {
-  prepare = preparer;
-}
-
 /** Explicit create, attach or restart; no identity interpretation in the transport. */
 export async function createTmuxBackend(
   spec: SessionSpec,
   plan: TmuxLaunchPlan
 ): Promise<SessionBackend> {
-  const name = await prepare(spec, plan);
+  const name = prepareTmuxSession(spec, plan);
   return new TmuxBackend(spec, name, plan.mode === 'create');
 }
 

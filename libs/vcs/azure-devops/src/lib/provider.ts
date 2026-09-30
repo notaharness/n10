@@ -5,11 +5,17 @@ import type {
   PullRequestInfo,
   PullRequestReviewer,
   PullRequestComments,
+  PullRequestConversation,
+  PullRequestRef,
   RemoteCommentThread,
   RemoteCommentReply,
-  ReviewDecision,
   ReviewVerdict,
   BuildStatusState,
+  RepositoryRef,
+  MentionCandidate,
+  LedgerStore,
+  PublishedReview,
+  ReviewSubmission,
 } from '@n10/vcs-core';
 import { sanitizeBody } from '@n10/vcs-core';
 import { log } from '@n10/logger';
@@ -26,7 +32,24 @@ import {
   TTL,
 } from './request.js';
 import { fetchPrBuildStatus } from './build-status.js';
+import { fetchPullRequestChecksAzure } from './pr-checks.js';
+import { parseAdoRemoteUrl } from './remote-url.js';
+import { fetchPullRequestDetailAzure } from './pr-overview-details.js';
+import { voteToDecision } from './votes.js';
+import {
+  extractMentionGuids,
+  mentionCache,
+  resolveMentionNames,
+  rewriteMentions,
+  searchAdoMentions,
+} from './mentions.js';
+import {
+  commentSources,
+  toAdoConversation,
+  type RawAdoThread,
+} from './pr-conversation.js';
 import { fetchPrBuildRunsBatch } from './builds.js';
+import { publishAzureReview } from './pr-review-publisher.js';
 import {
   forgetPrDetails,
   forgetRepoDetails,
@@ -39,6 +62,8 @@ import {
   rowsReadingStatus,
   type RowReaders,
 } from './pr-cycle.js';
+
+export { parseAdoRemoteUrl };
 
 // ── Internal ADO types ─────────────────────────────────────────────
 
@@ -82,15 +107,10 @@ function invalidatePr(config: AdoConfig, prId: number): void {
   invalidateAdoKey(`${repo}/threads/${prId}`);
   invalidateAdoKey(`${repo}/statuses/${prId}`);
   invalidateAdoKey(`${repo}/description/${prId}`);
+  invalidateAdoKey(`${repo}/detail/${prId}`);
+  invalidateAdoKey(`${repo}/iterations/${prId}`);
+  invalidateAdoKey(`${repo}/policies/${prId}`);
   invalidateAdoCache(`${repo}/thread/${prId}/`);
-}
-
-function voteToDecision(vote: number, hasDeclined: boolean): ReviewDecision {
-  if (hasDeclined) return 'declined';
-  if (vote === 10 || vote === 5) return 'approved';
-  if (vote === -5) return 'waiting-for-author';
-  if (vote === -10) return 'rejected';
-  return 'no-response';
 }
 
 export function parseReviewer(raw: RawReviewer): PullRequestReviewer {
@@ -345,38 +365,6 @@ export async function fetchActiveCommentCount(
   return countActiveThreads(data.value ?? []);
 }
 
-/**
- * Parse org, project, and repo from an Azure DevOps git remote URL.
- * Supports both SSH and HTTPS formats.
- */
-export function parseAdoRemoteUrl(
-  url: string
-): { org: string; project: string; repo: string } | null {
-  const httpsMatch = url.match(
-    /dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/\s]+)/
-  );
-  if (httpsMatch) {
-    return {
-      org: httpsMatch[1]!,
-      project: httpsMatch[2]!,
-      repo: httpsMatch[3]!.replace(/\.git$/, ''),
-    };
-  }
-
-  const sshMatch = url.match(
-    /ssh\.dev\.azure\.com:v3\/([^/]+)\/([^/]+)\/([^/\s]+)/
-  );
-  if (sshMatch) {
-    return {
-      org: sshMatch[1]!,
-      project: sshMatch[2]!,
-      repo: sshMatch[3]!.replace(/\.git$/, ''),
-    };
-  }
-
-  return null;
-}
-
 // ── Identity ────────────────────────────────────────────────────────
 
 /** Who we are and which teams we are in. Both reads are cached by the
@@ -390,114 +378,6 @@ async function getCachedIdentity(
     fetchMyTeamIds(config),
   ]);
   return { userEmail, myTeamIds };
-}
-
-// ── @mention resolution (GUID → display name) ──────────────────────
-//
-// ADO's REST API returns comment bodies with raw `@<GUID>` tokens
-// where the web UI renders `@<Display Name>`. n10 post-processes
-// fetched comment bodies: extracts mention GUIDs, batch-resolves them
-// against the ADO Identities API, caches the results, and substitutes
-// the tokens inline before handing off to the renderer.
-//
-// Fallback: if the API call fails OR a specific GUID doesn't resolve,
-// the original `@<GUID>` stays put. Better to show the UUID than to
-// silently drop the reference.
-
-const MENTION_GUID_RE =
-  /@<([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})>/gi;
-
-/** Extract unique mention GUIDs from a comment body, lowercased. */
-export function extractMentionGuids(text: string): string[] {
-  const seen = new Set<string>();
-  for (const m of text.matchAll(MENTION_GUID_RE)) {
-    seen.add(m[1]!.toLowerCase());
-  }
-  return [...seen];
-}
-
-/**
- * Substitute `@<guid>` tokens with `@<displayName>` using the provided
- * cache. Unresolved GUIDs stay intact (the whole `@<GUID>` token,
- * including the angle brackets) so no reference silently disappears.
- */
-export function rewriteMentions(
-  text: string,
-  cache: Map<string, string>
-): string {
-  return text.replace(MENTION_GUID_RE, (orig, guid: string) => {
-    const name = cache.get(guid.toLowerCase());
-    return name ? `@${name}` : orig;
-  });
-}
-
-// Module-level cache shared across provider calls. TTL matches the
-// identity cache above — identities change rarely and a stale name is
-// a better failure mode than a rate-limited API.
-const mentionCache = new Map<string, string>();
-let mentionCacheFetchedAt = 0;
-const MENTION_CACHE_TTL_MS = 30 * 60 * 1000;
-
-/** Test helper — resets the module-level cache. */
-export function _clearMentionCacheForTests(): void {
-  mentionCache.clear();
-  mentionCacheFetchedAt = 0;
-}
-
-interface AdoIdentity {
-  id?: string;
-  providerDisplayName?: string;
-  customDisplayName?: string;
-}
-
-/**
- * Batch-resolve GUIDs via ADO's Identities API
- * (https://vssps.dev.azure.com/{org}/_apis/identities). Updates the
- * module-level cache in place. Unresolved GUIDs are NOT cached, so a
- * later retry has a chance to pick them up.
- */
-/**
- * Fold an identities response into the cache. An entry with no id or
- * no usable display name is skipped rather than cached blank, so a
- * later fetch can still resolve it.
- */
-function cacheIdentities(identities: AdoIdentity[]): void {
-  for (const identity of identities) {
-    const id = identity.id?.toLowerCase();
-    const name =
-      identity.providerDisplayName ?? identity.customDisplayName ?? '';
-    if (id && name) mentionCache.set(id, name);
-  }
-}
-
-async function resolveMentionNames(
-  config: AdoConfig,
-  guids: string[]
-): Promise<void> {
-  if (guids.length === 0) return;
-  if (Date.now() - mentionCacheFetchedAt > MENTION_CACHE_TTL_MS) {
-    mentionCache.clear();
-    mentionCacheFetchedAt = Date.now();
-  }
-  const uncached = guids.filter((g) => !mentionCache.has(g));
-  if (uncached.length === 0) return;
-
-  const ids = uncached.join(',');
-  try {
-    const data = await adoGet<{ value?: AdoIdentity[] }>(
-      'resolveMentionNames',
-      `${config.org}/identities/${ids}`,
-      TTL.identity,
-      `https://vssps.dev.azure.com/${config.org}/_apis/identities?identityIds=${ids}&api-version=7.1`,
-      authHeaders(config.pat),
-      'those identities'
-    );
-    cacheIdentities(data.value ?? []);
-    if (mentionCacheFetchedAt === 0) mentionCacheFetchedAt = Date.now();
-  } catch {
-    // Network failure — leave cache as-is. `rewriteMentions` falls back
-    // to the original `@<GUID>` for anything it can't resolve.
-  }
 }
 
 // ── Comment thread helpers ──────────────────────────────────────────
@@ -834,6 +714,21 @@ async function fetchAdoCommentThreads(
   return { threads, generalComments };
 }
 
+/** A pull request's whole conversation, from the same cached threads
+ *  read the sidebar's comment count uses — no request of its own. */
+async function fetchAdoConversation(
+  config: AdoConfig,
+  ref: PullRequestRef
+): Promise<PullRequestConversation> {
+  const data = await fetchRawThreads(config, ref.number);
+  const raw = (data.value ?? []) as RawAdoThread[];
+  const guids = new Set(commentSources(raw).flatMap(extractMentionGuids));
+  await resolveMentionNames(config, [...guids]);
+  return toAdoConversation(ref, raw, (source) =>
+    rewriteMentions(sanitizeBody(source), mentionCache)
+  );
+}
+
 /**
  * The comment id a reply should hang under. ADO renders threading from
  * `parentCommentId`, where `0` means "this IS the thread root" — so
@@ -1033,6 +928,16 @@ export const azureDevOpsProvider: VcsProvider = {
     return `https://dev.azure.com/${project.org}/${project.project}/_git/${project.repo}/pullrequest/${prId}`;
   },
 
+  repositoryRef(project: Record<string, string>): RepositoryRef | null {
+    const { org, project: name, repo } = project;
+    if (!org || !name || !repo) return null;
+    return {
+      provider: 'azure-devops',
+      host: `dev.azure.com/${org}`,
+      repository: `${name}/${repo}`,
+    };
+  },
+
   async fetchMergedBranches(
     auth: Record<string, string>,
     project: Record<string, string>,
@@ -1079,6 +984,17 @@ export const azureDevOpsProvider: VcsProvider = {
     return fetchAdoCommentThreads(config, prId);
   },
 
+  async fetchPullRequestConversation(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestConversation> {
+    const repository = this.repositoryRef?.(project);
+    if (!repository) throw new Error('Azure DevOps project not configured');
+    const config = toAdoConfig(auth, project);
+    return fetchAdoConversation(config, { ...repository, number: prId });
+  },
+
   async replyToThread(
     auth: Record<string, string>,
     project: Record<string, string>,
@@ -1119,6 +1035,68 @@ export const azureDevOpsProvider: VcsProvider = {
     return sanitizeBody(data.description ?? '');
   },
 
+  async searchMentionCandidates(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    query: string
+  ): Promise<MentionCandidate[]> {
+    return searchAdoMentions(toAdoConfig(auth, project), query);
+  },
+
+  async publishReview(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    submission: ReviewSubmission,
+    ledger: LedgerStore
+  ): Promise<PublishedReview> {
+    const config = toAdoConfig(auth, project);
+    const base = baseUrl(config);
+    const headers = authHeaders(config.pat);
+    try {
+      return await publishAzureReview(
+        {
+          // Uncached: each read is what the publication acts on.
+          get: (path) =>
+            adoGet(
+              'publishReview',
+              `publish/${path}`,
+              0,
+              `${base}/${path}`,
+              headers
+            ),
+          send: (method, path, body) =>
+            adoSend('publishReview', `${base}/${path}`, {
+              method,
+              headers,
+              body: JSON.stringify(body),
+              bodyForLog: { path },
+            }),
+          me: () => fetchAuthenticatedUserId(config),
+        },
+        submission,
+        ledger
+      );
+    } finally {
+      invalidatePr(config, submission.prId);
+    }
+  },
+
+  fetchPullRequestDetail(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ) {
+    return fetchPullRequestDetailAzure(toAdoConfig(auth, project), prId);
+  },
+
+  fetchPullRequestChecks(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ) {
+    return fetchPullRequestChecksAzure(toAdoConfig(auth, project), prId);
+  },
+
   async submitReviewVerdict(
     auth: Record<string, string>,
     project: Record<string, string>,
@@ -1143,11 +1121,15 @@ export const azureDevOpsProvider: VcsProvider = {
       body: JSON.stringify({ id: userId, vote }),
       bodyForLog: { vote },
     });
-    // Nothing cached here carries a reviewer vote: the list that does
-    // is fetched with a zero TTL, so it is deduped and never stored.
-    // Wiping the repository prefix would therefore drop threads,
-    // statuses and descriptions to fix something they do not hold.
-    // The vote a user might still see is in the shell's own model —
-    // the desktop refreshes it from services/reviews.ts.
+    // The selected pull request's detail carries votes, and its policy
+    // evaluations the reviewer policies' verdict on them; the list is
+    // fetched with a zero TTL, so it is deduped and never stored.
+    // Wiping the repository prefix would drop threads, statuses and
+    // descriptions to fix something they do not hold. The vote a user
+    // might still see is in the shell's own model — the desktop
+    // refreshes it from services/reviews.ts.
+    const repo = `${config.org}/${config.project}/${config.repo}`;
+    invalidateAdoKey(`${repo}/detail/${prId}`);
+    invalidateAdoKey(`${repo}/policies/${prId}`);
   },
 };

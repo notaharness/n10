@@ -2,7 +2,7 @@
 
 `src/main` owns the window and native menu; `src/preload` exposes a typed
 `window.n10`; `src/host/contract.ts` is the single source of truth for the
-bridge API and IPC names; `src/host/services` are main-process services;
+bridge API and IPC names; `src/host/services` run in the session host;
 `src/renderer` is Vite + React 19 + Tailwind v4 with no Node access, its
 `lib/` grouped by subsystem (`data`, `diff`, `tabs`, `plan`, `review`,
 `sidebar`). Dev: `scripts/dev.mjs`. Headless visual QA: `scripts/qa-shots.mjs`.
@@ -10,13 +10,26 @@ Every rule below has its reasoning in `docs/decisions.md`.
 
 ## Host
 
+- The session host is `main/host-worker.ts`, an Electron utility process
+  named `n10 host`: every host service, the PTY attach clients with their
+  emulators, ring buffers and relay, discovery, babysitters and the beam
+  client. `main/host-process.ts` forks it, forwards every `IPC` channel by
+  name and carries its pushes (`host/host-pushes.ts`) to the windows
+  (`main/host-events.ts`). What only the main process can do (dialogs,
+  menus, `openExternal`, prefs, forking the beam daemon) the host asks
+  for as `ShellCalls` (`main/host-protocol.ts`). Nothing the host imports
+  may import `electron`. A host that dies is forked again, backing off
+  and giving up after repeated failures (`main/host-restarts.ts`): its
+  tmux sessions survive, discovery re-attaches them, windows reload to
+  watch again. Calls wait out a restart; after giving up they fail and
+  the user is told. Tests load a module into the host first with `N10_HOST_REQUIRE`.
+- The host creates tmux servers itself: a utility process does not hand
+  Chromium's descriptors to the persistent server, as spawning straight
+  from the main process on Linux would.
 - `services/repo.ts` `openRepo` does what the TUI's `useSessionManager` mount
-  does: detect project config and set the worktree resolver. `main.ts`
-  awaits the tmux probe and validates the requirement before opening a repo.
-  Missing tmux is a startup error with an installation hint. New tmux sessions
-  are prepared in `main/tmux-session-worker.ts`, an Electron utility process:
-  direct Node child-process spawning on Linux inherits Chromium descriptors
-  into the persistent server. The main process only attaches local clients.
+  does: detect project config and set the worktree resolver. The host
+  awaits the tmux probe and validates the requirement before opening a
+  repo; missing tmux is a startup error with an installation hint.
 - `main/beam/` is a client of the beam daemon's control socket (beam's
   docs/06) and installs the three machine ports: `MachinesPort`,
   `RemoteMachinePort` and `InboundMailPort`. Nothing above them knows beam.
@@ -25,7 +38,7 @@ Every rule below has its reasoning in `docs/decisions.md`.
   session only for a sender granted `all` (D17).
 - Start the beam daemon only through `spawnOwnedDaemon`, which runs it
   under `main/beam-daemon-worker.ts`, a utility process, for the same
-  descriptor reason as the tmux worker. Keep `@notaharness/beam` external
+  descriptor reason as the host. The main process forks it for the host. Keep `@notaharness/beam` external
   in both `build-main` and `scripts/dev.mjs`. Ownership rules: D15.
 - `main/n10-shim.ts` is an entry point in both `build-main` and
   `scripts/dev.mjs`. The shim gets no `beam` subcommand (D16).
@@ -36,9 +49,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - Sidebar answers are stamped with the repo they describe
   (`getSidebarSnapshot`) and the renderer drops answers for a repo it is not
   showing (`loadSidebarModel`). A switch is in flight for several awaits.
-- The pull request list is fetched once per interval in core's cache
-  (`services/pull-requests.ts`); `services/sidebar.ts`, babysitters and the
-  sync loop all read it there. Do not call the provider from a second place.
+- The pull request list is `@n10/engine`'s, one instance in
+  `services/pull-requests.ts`; `services/sidebar.ts`, babysitters, the sync
+  loop and settings effects all go through it. The renderer is told only of
+  changes it would paint. Do not call the provider's list from a second place.
 - Babysitters (`services/babysit.ts`) live per repo in memory, sit out while
   another repo is open, stop when their worktree is removed, and push only
   `spawned` and `ended`; everything else rides on the sidebar poll.
@@ -57,9 +71,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
 
 ## Renderer
 
-- Native OS elements where they exist: application menu (`main/menu.ts`),
-  context menus (`showContextMenu` → `Menu.popup`), native dialogs, optional
-  native frame. Web-rendered menus only for what the OS cannot express.
+- Native OS elements where they exist: application menu
+  (`host/menu-template.ts`, also built by the web demo), context menus
+  (`showContextMenu` → `Menu.popup`), native dialogs, optional native frame.
+  Web-rendered menus only for what the OS cannot express.
 - Tabs have exactly one reconciliation point: `Workspace` hands the item list
   to `sync-items` in `lib/tabs/tabs-model.ts`, a pure reducer that re-keys
   stale tabs, opens a tab per newly running agent (`autoOpened`,
@@ -75,9 +90,40 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `TabsProvider` sits above the repo gate in `App.tsx`.
   `tabs.properties.spec.ts` holds the invariants.
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
-  collapsible rail (Agent · Files · Comments) beside one content pane that
-  swaps between diff, agent terminal (kept mounted) and `ReviewStepper`. The
-  diff toolbar lives in `DiffPane`, not the tab header.
+  collapsible rail (Agent · Files) beside one content pane that
+  swaps between Overview, diff, agent terminal (mounted only while shown) and
+  `ReviewStepper`. It opens on a running agent's terminal, else on the PR's
+  Overview, whoever wrote it (`lib/review/overview-model.ts`). The diff toolbar lives in
+  `DiffPane`, not the tab header. Overview and header lay out by container
+  width (`@container`), not viewport.
+- The Overview's activity reads the whole conversation by identity
+  (`lib/data/pr-conversation-query.ts`, `lib/review/activity-model.ts`).
+  The Overview mounts on first show and then stays mounted, hidden under
+  its check list too, so its place, filter and search survive both.
+  Entries that arrive on a refresh wait behind "N new updates"; thread
+  writes invalidate the conversation.
+- A reviewer's own unsent writing is a durable draft (core
+  `pull-requests/review-drafts.ts`, one file per account and pull request
+  under `~/.n10/review-drafts`), autosaved by `lib/review/review-drafts.ts`.
+  Unsaved text lives in `draft-edits.ts`, outside components, so an
+  unmount never drops it; leaving the window with a failed save asks
+  first (`main/unsaved-guard.ts`). Nothing there publishes. Focus that a
+  closing control drops goes through `lib/focus.ts`.
+- New comments on code: the line number is the selection control
+  (`diff/LineGutter.tsx`, one tab stop per file, one file and one side
+  per range, consecutive lines on screen only). Composers and the reviewer's inline drafts hang in the
+  flat diff through `mineByFile` (`diff/use-diff-comments.ts`). The review agent's findings stay in
+  `@n10/review-comments`, keyed by PR number.
+- A mention is the provider's token (`@login`, Azure's `@<id>`) from its
+  own search (core `pull-requests/mention-search.ts`,
+  `comments/MentionPicker.tsx`); a display name is only ever shown.
+- Drafts are filed as one native review through core's
+  `pull-requests/submit-review.ts`; the provider's ledger lives in the
+  drafts file, so an unanswered step is looked for, never re-sent. Azure
+  DevOps has no grouped review: each comment posts as it goes and the
+  vote is cast last, so a failure leaves what posted as posted. An
+  inline draft being posted or maybe posted is shown, locked; a reply
+  draft in that state is not yet shown in its thread.
 - Diffs are whole-file (`-U99999`), folded client-side
   (`lib/diff/diff-model.ts`). A PR diffs commits; a bare worktree diffs its
   working tree, polled at 2 s only while the agent runs. `FileTree` collapse
@@ -87,9 +133,30 @@ Every rule below has its reasoning in `docs/decisions.md`.
   composed in the renderer so the preview is the delivery; `plan-model.spec.ts`
   asserts numbering against `planRows`. Adopting a respawned session carries
   the chunk `seq` forward.
+- `EditorArea` renders the active tab's pane and at most one spare, hidden
+  and `inert` (`use-editor-panes.ts`, `lib/tabs/editor-panes.ts`): the tab a
+  hover settled on (`lib/tabs/prewarm.tsx`, by hoverIntent's rule in
+  `hover-intent.ts`; one at a time, superseded rather than queued, and
+  dropped while a pane let go of is still reading,
+  `lib/tabs/orphaned-fetch.ts`), else the tab left last. Pressing the
+  spare's tab shows the same pane; anything that acts without an event on it
+  asks `usePaneShown`. Tabs and sidebar rows are chosen on a plain primary
+  press (`useSortableTab` composes it after the drag sensor's own
+  `onPointerDown`). A mounted `SessionTerminal` watches its session
+  (`watchSession`, counted per window in `services/session-watch.ts`) and
+  the host sends PTY output only to watching windows; only one on screen
+  shows it (`showSession`), which is what marks output seen.
+- Each tab's view (picked pane, picked file, diff anchor, walkthrough step)
+  lives beside the tabs in `TabViewsHost` (`lib/tabs/tab-views.tsx`) for this
+  run, across repository switches: read once as initial state, written on
+  change, dropped on close. Nothing persists it.
 - `SessionTerminal` sends `resizeSession` on every fit and refits on the
-  session's `spawnedAt` epoch. `paneTerminalGrid` measures a hidden `.wterm`
-  inside `[data-terminal-pane]` for the launch estimate.
+  session's `spawnedAt` epoch. It reckons the grid exactly as wterm's own
+  observer does (`terminalBox`, `measureTerminalGrid`); any other answer
+  makes the two resize the PTY back and forth. It bounces the grid for a
+  full repaint only when the snapshot is `truncated`. `paneTerminalGrid`
+  measures a hidden `.wterm` inside `[data-terminal-pane]` for the launch
+  estimate.
 - A terminal exit event carries `retained`: retained agent tabs stay open
   for viewing and restart. `dropEnded` closes a terminal tab a defined
   listing omits; `undefined` means not asked yet.

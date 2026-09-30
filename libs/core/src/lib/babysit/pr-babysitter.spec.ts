@@ -7,7 +7,7 @@ import type {
   VcsProvider,
 } from '@n10/vcs-core';
 import type { BabysitStatus } from './babysit-model.js';
-import type { PullRequestLookup } from '../pull-requests/pull-request-cache.js';
+import type { PullRequestLookup } from '../pull-requests/pull-request-lookup.js';
 
 const mocks = vi.hoisted(() => ({
   fetchRefs:

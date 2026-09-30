@@ -21,7 +21,7 @@ appearing exactly once.
 The `desktop-e2e` targets build Electron before testing. Directly invoking
 `run-e2e.mjs` or `run-visual.mjs` does not; run `npx nx build desktop` first.
 
-`src/fixtures/desktop.ts` creates a repo and isolated HOME, seeds optional git
+`src/fixtures/desktop.ts` creates a repo and isolated HOME, seeds optional Git
 states, supplies a scriptable fake agent and fails on renderer exceptions.
 Every test uses a private tmux socket inside its fixture HOME and kills only
 that fixture's sessions at teardown. It drops `N10_VITE_URL` to ensure tests
@@ -55,7 +55,15 @@ BEAM_TEST_BINARY=$HOME/beam/beamtest npx nx e2e:beam desktop-e2e
 `src/setup/fake-gh.ts` supplies offline PRs, threads, comments and checks through
 a fake executable on PATH. Set a PR's `headRefName` to a real fixture branch for
 a real diff. Seeded worktree branches must be slash-free because the fixture and
-app construct paths differently. Provider project fields belong in `vendorProject`
+app construct paths differently.
+
+`src/setup/fake-ado.ts` (the `fakeAzureDevOps` option) does the same for Azure
+DevOps. The fixture loads `fixtures/fake-ado.cjs` into the session host, which
+makes the provider's requests, through `N10_HOST_REQUIRE`, and it answers every request to an Azure host from the scenario,
+written out as the REST API's own JSON, so nothing reaches Azure. The preload
+writes the token itself, so an app it is not in has none and asks Azure nothing;
+the fixture then stops. It marks that it loaded with `fake-ado.json.loaded`. A request it does not model answers 404 and fails the test
+at teardown. Seed no Azure DevOps token of your own alongside it. Provider project fields belong in `vendorProject`
 or auto-detection replaces them.
 
 Tests run under Xvfb on Linux, even with DISPLAY set. The fixture drops
@@ -131,10 +139,11 @@ starting another. Browser launch may require the agent environment's approval.
 ## README media
 
 `apps/desktop-e2e/demo/capture.mjs` drives the built app under Xvfb with fake gh
-and a paced demo agent, then records GIFs and stills into `docs/media/`.
-The TUI capture uses the wterm bridge. `theme-slider.py` makes the light/dark
-hero wipe. Raw captures are ignored under `docs/media/raw/`.
-Read the demo directory's README before recording.
+and a paced demo agent, then records GIFs into `docs/media/`. The TUI capture
+uses the wterm bridge. Raw captures are ignored under `docs/media/raw/`.
+Read the demo directory's README before recording. The hero stills are
+screenshots of the website's desktop demo: `record-media/record.mjs hero` in
+`apps/website/scripts`.
 
 ## Integration Tests
 
@@ -209,3 +218,122 @@ The archive, provenance, checksum and update instructions live in
 tmux is installed in CI, and the live suites skip locally when it is absent.
 `terminal-allocation.integration.spec.ts` exercises names becoming occupied or
 free between a tab's preliminary name probe and the backend's allocation.
+
+## Codex CLI
+
+Codex support is verified offline against the interactive command contract from
+`codex-cli 0.154.0` (`codex --help`, `codex resume --help`, `codex exec --help`
+and `codex queue --help`). The agent registry launches `codex`, seeds with
+`codex -- PROMPT`, and continues with `codex resume --last [-- PROMPT]` in the
+worktree directory. It does not use `exec`, `--all`, global continuation or
+approval/sandbox bypass flags. The separator keeps option-like prompts and
+subcommand names such as `review` literal. Codex receives review guidance in
+its user prompt because it has no Claude-style `--append-system-prompt` flag.
+
+The CLI's [resume parser](https://github.com/openai/codex/blob/main/codex-rs/cli/src/main.rs)
+accepts a single positional prompt with `--last`; selection is cwd-filtered.
+Continuation uses the retained session's recorded agent. With several Codex
+conversations in one checkout, `--last` selects the most recent eligible one;
+n10 does not store a Codex thread ID.
+
+`apps/cli-e2e/src/codex.test.ts` and
+`apps/desktop-e2e/src/codex.test.ts` install a fake `codex` on the fixture PATH,
+record argv/cwd, resume only in a cwd with a prior launch, and produce changing
+ANSI output before becoming quiet. They exercise both shells' launch/resume
+flows and busy/idle indicators, plus Desktop standalone agent terminals.
+`launch-dialog.test.ts` verifies the selected Codex review agent receives its
+instructions and review guidance intact. Both shells use the shared
+`libs/core/tests/fixtures/fake-vendor-cli.mjs` through their `setup/fake-cli.ts`
+helpers. Every fake runs in an isolated HOME and tmux socket; no real Codex session or account is used.
+
+Activity is inferred from terminal output, not Codex model/tool events. Quiet
+network or tool work can appear idle. These tests verify n10's integration,
+not model responses, authentication, or exact Codex screen rendering.
+
+Reporting uses Orchestra's `codex queue --thread ID --message TEXT` adapter;
+`orchestra.integration.spec.ts` runs the pinned Orchestra 1.6.0 report scripts
+with a fake queue and checks success, failure and retained reporting metadata.
+n10 reads `@orchestra-last-report` only in Orchestra's `KIND TIMESTAMP OUTCOME`
+form; unit tests cover each outcome, including `delivered` for a direct `codex:`
+target and `queue` for a tmux-hosted Codex TUI. Claude's inbox is a separate
+transport. Desktop's inbound relay deliberately refuses `codex:` targets
+(covered by `relay-target.spec.ts`); it does not silently route them to a
+guessed session. Local n10-managed agent panes can receive messages through
+their `tmux:` target.
+
+Run the offline checks (choose an unused `PORT` when other worktrees are running
+the TUI browser bridge):
+
+```sh
+npx nx test core
+PORT=5198 npx nx e2e cli-e2e -- codex.test.ts
+npx nx e2e desktop-e2e -- codex.test.ts launch-dialog.test.ts
+```
+
+## Gemini CLI
+
+Verified offline against the official [CLI reference](https://geminicli.com/docs/cli/cli-reference/)
+and v0.61.0 [argument parser](https://github.com/google-gemini/gemini-cli/blob/v0.61.0/packages/cli/src/config/config.ts)
+and [session entry point](https://github.com/google-gemini/gemini-cli/blob/v0.61.0/packages/cli/src/gemini.tsx).
+No real Gemini binary, authentication or model session is exercised by the tests.
+
+`agentId: "gemini"` selects the agent. Blank launches use `gemini`; seeds use
+one `--prompt-interactive=PROMPT` argument so yargs does not treat option-like
+text as flags. Review guidance is folded into the prompt. Headless `-p` is not
+used.
+
+Automatic resume is refused: native `--resume latest` can create a fresh
+conversation when project history is missing, and n10 does not record Gemini
+conversation IDs. Both shells offer an explicit fresh start in the retained pane;
+a surviving process can still be attached without launching another one.
+
+Both e2e shells use `libs/core/tests/fixtures/fake-vendor-cli.mjs` through their
+`setup/fake-cli.ts` helpers. The fake accepts blank/attached-prompt launches and
+rejects resume. Tests cover launch, refusal, fresh starts, report-tag clearing,
+selected-agent review prompts and busy/idle transitions in isolated fixture HOME
+and tmux sockets. Activity measures changing terminal output, not internal model
+turns. Local managed panes use `tmux:` message targets; no Gemini-specific inbox
+or queue adapter is used.
+
+Choose an unused `PORT` when another worktree runs the TUI browser bridge:
+
+```sh
+npx nx test core
+PORT=5198 npx nx e2e cli-e2e -- gemini.test.ts
+npx nx e2e desktop-e2e -- gemini.test.ts gemini-review.test.ts
+```
+
+## Copilot CLI
+
+The command surface was checked against Copilot CLI 1.0.87 (`--version`,
+`--help`, `sessions --help`, `help commands`) and the official
+[command reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference).
+No authenticated conversation, model request or real session restoration is
+exercised by the tests. Help-only probes do not establish live prompt parsing.
+
+`agentId: "copilot"` selects the standalone CLI. Blank launches use `copilot`;
+seeded/review launches use the documented `--interactive=PROMPT` form with
+guidance folded into the prompt. The short `-i PROMPT` form is valid too. Tests
+verify n10's argv and prompt delivery contract, not a defect in Copilot's
+short-option parser.
+
+Automatic continuation stays disabled: documented `--continue` prefers the
+current directory but can fall back to global history. n10 does not record a
+conversation ID. Both shells cover refusal and explicit fresh starts; surviving
+processes can be attached without launching another one.
+
+Both e2e shells install `libs/core/tests/fixtures/fake-vendor-cli.mjs` through
+`setup/fake-cli.ts`. The fake accepts blank/attached-prompt launches and rejects
+`--continue`; it does not model upstream history. Coverage includes TUI/Desktop
+launch, refusal, fresh starts, report-tag clearing, selected-agent review prompts
+and busy/idle transitions. Activity measures changing terminal output, not
+internal model turns. Local managed panes use `tmux:` message targets; Copilot
+has no separate n10 inbox/queue adapter.
+
+Choose an unused `PORT` when another worktree runs the TUI browser bridge:
+
+```sh
+npx nx test core
+PORT=5198 npx nx e2e cli-e2e -- copilot.test.ts
+npx nx e2e desktop-e2e -- copilot.test.ts copilot-review.test.ts
+```

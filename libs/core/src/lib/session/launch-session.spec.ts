@@ -46,7 +46,7 @@ const copilot: AgentDefinition = {
   name: 'Copilot',
   supportsAppendSystemPrompt: false,
   blank: () => ({ cmd: 'copilot', args: [] }),
-  seed: (p) => ({ cmd: 'copilot', args: ['-i', p] }),
+  seed: (p) => ({ cmd: 'copilot', args: [`--interactive=${p}`] }),
 };
 
 // An agent that can't seed at all — exercises the blank fallback.
@@ -82,7 +82,7 @@ describe('buildLaunchSpec', () => {
   it('seed passes the prompt through', () => {
     expect(
       buildLaunchSpec(copilot, { intent: 'seed', prompt: 'do it' })
-    ).toEqual({ cmd: 'copilot', args: ['-i', 'do it'] });
+    ).toEqual({ cmd: 'copilot', args: ['--interactive=do it'] });
   });
 
   it('seed degrades to blank when the agent cannot seed', () => {
@@ -94,7 +94,7 @@ describe('buildLaunchSpec', () => {
   it('continue-or-seed degrades to seed when the agent has no continue', () => {
     expect(
       buildLaunchSpec(copilot, { intent: 'continue-or-seed', prompt: 'do it' })
-    ).toEqual({ cmd: 'copilot', args: ['-i', 'do it'] });
+    ).toEqual({ cmd: 'copilot', args: ['--interactive=do it'] });
   });
 
   describe('system guidance', () => {
@@ -118,7 +118,7 @@ describe('buildLaunchSpec', () => {
       });
       expect(spec).toEqual({
         cmd: 'copilot',
-        args: ['-i', 'use add-comment\n\nreview this'],
+        args: ['--interactive=use add-comment\n\nreview this'],
       });
     });
 
@@ -171,15 +171,21 @@ describe('fresh launches of retained agents', () => {
       });
     }
   );
-  it('still refuses automatic resume without a supported adapter', () => {
-    expect(() =>
-      buildAgentLaunch(
-        { config, request: { intent: 'continue-or-blank' } },
-        'gemini',
-        true
-      )
-    ).toThrow('does not support automatic resume');
-  });
+  it.each(['gemini', 'claude'])(
+    'refuses unsupported recorded Gemini resume with default %s',
+    (agentId) => {
+      expect(() =>
+        buildAgentLaunch(
+          {
+            config: { ...config, agentId } as AppConfig,
+            request: { intent: 'continue-or-blank' },
+          },
+          'gemini',
+          true
+        )
+      ).toThrow('does not support automatic resume');
+    }
+  );
 });
 
 describe('continuing a recorded "test" agent', () => {
@@ -196,7 +202,7 @@ describe('continuing a recorded "test" agent', () => {
   it("refuses to resume as `sh -c ''` when aiCommand is missing", () => {
     const config = {} as AppConfig;
     expect(() => buildAgentLaunch({ config, request }, 'test', true)).toThrow(
-      'no known agent metadata'
+      "doesn't know which agent ran this session"
     );
   });
 });
@@ -234,6 +240,7 @@ describe('retained review guidance', () => {
       args: [
         'resume',
         '--last',
+        '--',
         `${request.systemGuidance}\n\n${request.prompt}`,
       ],
     });

@@ -68,6 +68,38 @@ export async function fetchDiffText(
   return completePatch(text, truncated, MAX_DIFF_BYTES);
 }
 
+/** A pull request's diff and the commit its new side is: the
+ *  numbers its lines carry belong to that commit and no other. */
+export interface ReviewDiffText {
+  text: string;
+  head: string;
+}
+
+/**
+ * {@link fetchDiffText} pinned to one commit. The branch is resolved to
+ * its commit id first and the diff read at that id, so a fetch landing
+ * in between cannot give a diff of one commit named as another.
+ */
+export async function fetchReviewDiff(
+  sourceBranch: string,
+  targetBranch: string
+): Promise<ReviewDiffText> {
+  const { sourceRef, targetRef } = await resolveBoth(
+    sourceBranch,
+    targetBranch
+  );
+  const head = await gitLine([
+    'rev-parse',
+    '--verify',
+    `${sourceRef}^{commit}`,
+  ]);
+  const text = await fetchDiffText(sourceBranch, targetBranch, {
+    sourceRef: head,
+    targetRef,
+  });
+  return { text, head };
+}
+
 // Per-file diff — used by the diff viewer on file open. Scoping to a
 // single file drops the payload from whole-PR (multi-MB) to kilobytes,
 // so the viewer renders immediately instead of waiting on git to

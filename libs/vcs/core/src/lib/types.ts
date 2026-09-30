@@ -1,3 +1,13 @@
+import type { MentionCandidate } from './mentions.js';
+import type {
+  LedgerStore,
+  PublishedReview,
+  ReviewSubmission,
+} from './review-publication.js';
+import type { PullRequestChecks } from './pr-checks.js';
+import type { PullRequestConversation } from './pr-conversation.js';
+import type { PullRequestDetail, RepositoryRef } from './pr-details.js';
+
 export type ReviewDecision =
   | 'approved'
   | 'changes-requested'
@@ -15,6 +25,27 @@ export function isBlockingDecision(d: ReviewDecision): boolean {
     d === 'changes-requested' || d === 'waiting-for-author' || d === 'rejected'
   );
 }
+
+/** The blocking decisions, most severe first: Azure's −10, its −5,
+ *  then GitHub's changes requested. */
+export const HOLDING_DECISIONS = [
+  'rejected',
+  'waiting-for-author',
+  'changes-requested',
+] as const satisfies readonly ReviewDecision[];
+
+/** The most severe verdict holding a pull request back, with everyone
+ *  who gave it; null where none does. Every frontend words the same
+ *  verdict. */
+export function holdingVerdict<R extends { decision: ReviewDecision }>(
+  reviewers: readonly R[]
+): { decision: (typeof HOLDING_DECISIONS)[number]; by: R[] } | null {
+  for (const decision of HOLDING_DECISIONS) {
+    const by = reviewers.filter((r) => r.decision === decision);
+    if (by.length > 0) return { decision, by };
+  }
+  return null;
+}
 export type BuildStatusState = 'succeeded' | 'failed' | 'pending' | 'none';
 
 /** The current user's review verdict on a PR, in ADO's vocabulary
@@ -31,6 +62,20 @@ export interface PullRequestReviewer {
   displayName: string;
   identifier: string;
   decision: ReviewDecision;
+  /** The provider holds an open request for their review — asked again
+   *  after a verdict, where `decision` still holds that verdict. Absent
+   *  where the list does not say. */
+  requested?: boolean;
+}
+
+/** The provider holds a request for this reviewer's verdict. Where the
+ *  list says (GitHub's review requests, including one asked again after
+ *  a verdict), that is the answer; a comment is not a request. Where it
+ *  does not (Azure DevOps keeps no request apart from its list), a
+ *  listed reviewer who has neither voted nor declined is asked. */
+export function asksForReview(reviewer: PullRequestReviewer): boolean {
+  if (reviewer.decision === 'declined') return false;
+  return reviewer.requested ?? reviewer.decision === 'no-response';
 }
 
 export interface PullRequestInfo {
@@ -125,6 +170,14 @@ export interface VcsProvider {
   /** Web URL for a specific PR */
   getPullRequestUrl(project: Record<string, string>, prId: number): string;
 
+  /**
+   * The repository this project config addresses, as a pull request
+   * ref's repository half — or null while the config is incomplete.
+   * What a cached answer, a draft or a write is checked against before
+   * it is trusted to belong to the repository that is open.
+   */
+  repositoryRef?(project: Record<string, string>): RepositoryRef | null;
+
   /** Return branch names (from the provided list) whose PRs have been merged */
   fetchMergedBranches?(
     auth: Record<string, string>,
@@ -138,6 +191,30 @@ export interface VcsProvider {
     project: Record<string, string>,
     prId: number
   ): Promise<PullRequestComments>;
+
+  /**
+   * Everything said and done on a pull request — threads with every
+   * reply, conversation comments, submitted reviews and events — read
+   * to the end of every page. Read on demand for the selected pull
+   * request, never per sidebar row.
+   */
+  fetchPullRequestConversation?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestConversation>;
+
+  /**
+   * People a comment on this repository can mention for `query`, as the
+   * provider's own search answers it; how much of a name it matches is
+   * the provider's. Each carries the token the provider stores for the
+   * mention, which is what a composer inserts.
+   */
+  searchMentionCandidates?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    query: string
+  ): Promise<MentionCandidate[]>;
 
   /** Reply to an existing comment thread. The thread is passed (not just
    *  the id) so providers can dispatch on `replyKind` — GitHub review
@@ -169,6 +246,35 @@ export interface VcsProvider {
     project: Record<string, string>,
     prId: number
   ): Promise<string>;
+
+  /** The selected pull request in full: lifecycle, source and target
+   *  commits, fork identity. Read on demand for one pull request, never
+   *  per sidebar row. */
+  fetchPullRequestDetail?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestDetail>;
+
+  /**
+   * File the reviewer's drafts as one native review (see
+   * review-publication.ts). Progress goes to `ledger` step by step, so
+   * an attempt that stops part-way is resumed, never repeated.
+   */
+  publishReview?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    submission: ReviewSubmission,
+    ledger: LedgerStore
+  ): Promise<PublishedReview>;
+  /** What stands between one pull request and completion, read on
+   *  demand: its head's checks, the target's rules, and the provider's
+   *  reading of mergeability and reviews. */
+  fetchPullRequestChecks?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestChecks>;
 
   /** Cast the current user's review verdict on a PR. */
   submitReviewVerdict?(

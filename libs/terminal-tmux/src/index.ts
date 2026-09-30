@@ -1,10 +1,5 @@
 export { prepareTmuxSession } from './lib/tmux-launch.js';
-export {
-  createTmuxBackend,
-  setTmuxSessionPreparer,
-  type TmuxSessionPreparer,
-  type TmuxLaunchPlan,
-} from './lib/tmux-backend.js';
+export { createTmuxBackend, type TmuxLaunchPlan } from './lib/tmux-backend.js';
 export { sanitizeTmuxSessionName } from './lib/sanitize-tmux-session-name.js';
 export {
   isDuplicateSession,

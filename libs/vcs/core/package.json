@@ -16,6 +16,11 @@
       "import": "./src/lib/types.ts",
       "default": "./src/lib/types.ts"
     },
+    "./pr-details": {
+      "types": "./src/lib/pr-details.ts",
+      "import": "./src/lib/pr-details.ts",
+      "default": "./src/lib/pr-details.ts"
+    },
     "./package.json": "./package.json"
   },
   "nx": {
