@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { RemoteCommentThread } from '@n10/vcs-core';
 
 /**
- * Review calls have two jobs beyond forwarding to a provider.
+ * Verdict commands validate renderer inputs and fail loudly when unavailable.
  *
  * They validate: a PR id arrives from the sandboxed renderer — which
  * renders pull request markdown and provider-hosted images — and ends
@@ -27,17 +26,6 @@ const env = vi.hoisted(() => ({
     verdicts: true,
   },
   calls: [] as { method: string; args: unknown[] }[],
-}));
-
-vi.mock('@n10/core', () => ({
-  fetchReviewDiff: (...args: unknown[]) => {
-    env.calls.push({ method: 'fetchReviewDiff', args });
-    return Promise.resolve({ text: 'diff', head: 'a'.repeat(40) });
-  },
-  fetchFileDiffText: (...args: unknown[]) => {
-    env.calls.push({ method: 'fetchFileDiffText', args });
-    return Promise.resolve('file diff');
-  },
 }));
 
 vi.mock('@n10/vcs-core', async (original) => ({
@@ -78,10 +66,6 @@ vi.mock('./providers.js', () => {
 });
 
 const {
-  fetchCommentThreads,
-  fetchPrDescription,
-  getDiffText,
-  getFileDiffText,
   getReviewViewer,
   replyToThread,
   setThreadResolved,
@@ -107,9 +91,6 @@ beforeEach(() => {
 
 const called = (method: string) => env.calls.filter((c) => c.method === method);
 
-/** Only the identity matters here; the provider mock records it verbatim. */
-const THREAD = { id: 't' } as unknown as RemoteCommentThread;
-
 describe('PR id validation', () => {
   it.each([
     ['a string', '7 OR 1=1'],
@@ -118,9 +99,6 @@ describe('PR id validation', () => {
     ['zero', 0],
     ['a negative', -1],
   ])('refuses %s before it reaches the provider', async (_label, value) => {
-    await expect(fetchPrDescription(value as number)).rejects.toThrow(
-      'Invalid PR id'
-    );
     await expect(
       submitReviewVerdict(value as number, 'approve')
     ).rejects.toThrow('Invalid PR id');
@@ -170,75 +148,6 @@ describe('verdicts', () => {
   });
 });
 
-describe('degrading without a provider', () => {
-  beforeEach(() => {
-    env.config = {};
-  });
-
-  it('returns nothing rather than erroring on reads', async () => {
-    // A repo with no remote is first-class; review features just go
-    // quiet, the way the TUI's usePrData does.
-    expect(await fetchCommentThreads(1)).toEqual({
-      threads: [],
-      generalComments: [],
-    });
-    expect(await fetchPrDescription(1)).toBe('');
-    expect(env.calls).toEqual([]);
-  });
-
-  it('quietly no-ops writes to threads', async () => {
-    await replyToThread({ prId: 1, thread: THREAD, body: 'hi' });
-    await setThreadResolved({ prId: 1, thread: THREAD, resolved: true });
-    expect(env.calls).toEqual([]);
-  });
-
-  it('also goes quiet when a provider exists but is not authenticated', async () => {
-    env.config = { vendor: 'github' };
-    env.configured = false;
-    expect(await fetchPrDescription(1)).toBe('');
-    expect(env.calls).toEqual([]);
-  });
-});
-
-describe('provider capability gaps', () => {
-  it('names the missing capability instead of throwing a type error', async () => {
-    env.capabilities = {
-      comments: false,
-      replies: false,
-      resolve: false,
-      description: false,
-      verdicts: true,
-    };
-    await expect(fetchCommentThreads(1)).rejects.toThrow(
-      'does not support comments'
-    );
-    await expect(
-      replyToThread({ prId: 1, thread: THREAD, body: 'hi' })
-    ).rejects.toThrow('does not support replies');
-    await expect(
-      setThreadResolved({ prId: 1, thread: THREAD, resolved: true })
-    ).rejects.toThrow('does not support thread resolution');
-  });
-
-  it('treats a missing description as empty, not as a failure', async () => {
-    // Descriptions are decoration — a provider without them should
-    // render an empty overview, not break the pull request tab.
-    env.capabilities.description = false;
-    expect(await fetchPrDescription(1)).toBe('');
-  });
-});
-
-describe('credentials', () => {
-  it('passes the configured auth and project through to the provider', async () => {
-    await fetchCommentThreads(7);
-    expect(called('fetchCommentThreads')[0].args).toEqual([
-      { token: 'tok' },
-      { repo: 'n10', username: 'hermann' },
-      7,
-    ]);
-  });
-});
-
 describe('getReviewViewer', () => {
   it('uses the GitHub username, which is what its reviewer lists carry', () => {
     expect(getReviewViewer()).toEqual({ identifier: 'hermann' });
@@ -257,21 +166,36 @@ describe('getReviewViewer', () => {
   });
 });
 
-describe('diffs', () => {
-  it('reads from git without needing a provider at all', async () => {
-    env.config = {};
-    expect(await getDiffText('feature', 'main')).toEqual({
-      text: 'diff',
-      head: 'a'.repeat(40),
-    });
-    expect(await getFileDiffText('feature', 'main', 'a.ts')).toBe('file diff');
-    expect(called('fetchReviewDiff')[0].args).toEqual(['feature', 'main']);
-    expect(called('fetchFileDiffText')[0].args).toEqual([
-      'feature',
-      'main',
-      'a.ts',
-    ]);
-  });
+vi.mock('./repo.js', () => ({
+  requireRepo: () => '/repo',
+  activeReviewService: () => ({ invalidateProvider: vi.fn() }),
+}));
+vi.mock('./sidebar.js', () => ({ refreshPrList: vi.fn() }));
+
+it('reports unavailable thread capabilities and passes authenticated requests through', async () => {
+  const thread = { id: 'thread' } as never;
+  await replyToThread({ prId: 7, thread, body: 'reply' });
+  expect(called('replyToThread')[0].args).toEqual([
+    { token: 'tok' },
+    { repo: 'n10', username: 'hermann' },
+    7,
+    thread,
+    'reply',
+  ]);
+  env.capabilities.replies = false;
+  env.capabilities.resolve = false;
+  await expect(
+    replyToThread({ prId: 7, thread, body: 'reply' })
+  ).rejects.toThrow('does not support replies');
+  await expect(
+    setThreadResolved({ prId: 7, thread, resolved: true })
+  ).rejects.toThrow('does not support thread resolution');
 });
 
-vi.mock('./repo.js', () => ({ requireRepo: () => '/repo' }));
+it('does not call a provider for thread writes in an unconfigured repository', async () => {
+  env.config = {};
+  const thread = { id: 'thread' } as never;
+  await replyToThread({ prId: 7, thread, body: 'reply' });
+  await setThreadResolved({ prId: 7, thread, resolved: true });
+  expect(env.calls).toEqual([]);
+});

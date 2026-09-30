@@ -29,7 +29,8 @@ vi.mock('./repo.js', () => ({
   }),
 }));
 
-vi.mock('node:child_process', () => ({
+vi.mock('node:child_process', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
   spawn: (cmd: string, args: string[], opts: { detached: boolean }) => {
     calls.spawned.push({ cmd, args, detached: opts.detached });
     return { unref: () => undefined };

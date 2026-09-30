@@ -47,6 +47,22 @@ const shellOperationPaths = [
     message: 'Worktree removal belongs to engine worktree commands.',
   },
   {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: [
+      'readPullRequestSnapshot',
+      'readPullRequestChecks',
+      'readPullRequestConversation',
+      'fetchDiffText',
+      'fetchFileDiffText',
+      'fetchWorktreeDiffText',
+      'readDiffFiles',
+      'resolveRef',
+    ],
+    message:
+      'Review resources and diff freshness belong to the engine review service.',
+  },
+  {
     name: '@n10/worktree-manager',
     allowTypeImports: true,
     importNames: [
@@ -297,10 +313,10 @@ export default tseslint.config(
     // It cannot lower `try/finally` (nor a conditional inside
     // `try/catch`, nor some member-expression reorders), and when it
     // gives up on a function every react-hooks rule gives up with it.
-    // These six files are therefore unanalysed: `refs`,
+    // These files are therefore unanalysed: `refs`,
     // `set-state-in-render`, `purity` and the rest report nothing
-    // here no matter what the code does. Two render-phase ref writes
-    // in usePolling and useRemoteComments are live examples.
+    // here no matter what the code does. The render-phase ref write
+    // in usePolling is one example.
     //
     // The code is right as written — `finally` is the correct way to
     // release a loading flag — so the list is the honest artifact,
@@ -311,9 +327,7 @@ export default tseslint.config(
       'apps/desktop/src/renderer/components/settings/FieldRow.tsx',
       'apps/desktop/src/renderer/components/terminal/SessionTerminal.tsx',
       'apps/desktop/src/renderer/screens/RepoOpen.tsx',
-      'libs/app-core/src/lib/hooks/useDiffData.ts',
       'libs/app-core/src/lib/hooks/usePolling.ts',
-      'libs/app-core/src/lib/hooks/useRemoteComments.ts',
     ],
     rules: {
       'react-hooks/todo': 'off',

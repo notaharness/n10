@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type * as Os from 'node:os';
 import { readConfig, writeGlobalConfig } from '@n10/vcs-core';
 import type { VcsProvider } from '@n10/vcs-core';
+import { EMPTY_PULL_REQUEST_LIST } from '../pull-requests/pull-request-snapshot.js';
 import { createRepositoryService } from './repository-service.js';
 
 const fixture = vi.hoisted(() => ({ home: '' }));
@@ -50,6 +51,9 @@ const providers: VcsProvider[] = [
 
 function harness(registry = providers) {
   const pullRequests = {
+    subscribe: () => () => undefined,
+    getSnapshot: () => EMPTY_PULL_REQUEST_LIST,
+    lookupPullRequest: vi.fn(async () => ({ kind: 'gone' as const })),
     credentialsChanged: vi.fn(),
     read: vi.fn(async () => ({})),
   };

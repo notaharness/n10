@@ -66,14 +66,16 @@ const MAX_EXCLUDE_PATHSPECS = 500;
 const MAX_LISTING_BYTES = 8 * 1024 * 1024;
 
 export function tooManyLinesNote(lines: number): string {
-  return `file too large to diff, ${lines.toLocaleString('en-US')} changed lines`;
+  return `file too large to diff, ${lines.toLocaleString(
+    'en-US'
+  )} changed lines`;
 }
 
 async function mergeBase(
   worktreePath: string,
   targetBranch: string
 ): Promise<string> {
-  const targetRef = await resolveRef(targetBranch);
+  const targetRef = await resolveRef(worktreePath, targetBranch);
   return gitLine(['merge-base', targetRef, 'HEAD'], { cwd: worktreePath });
 }
 

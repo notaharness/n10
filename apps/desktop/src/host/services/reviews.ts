@@ -1,24 +1,18 @@
 import { readConfig } from '@n10/vcs-core';
 import type { PullRequestComments, ReviewVerdict } from '@n10/vcs-core';
-import { fetchFileDiffText, fetchReviewDiff } from '@n10/core';
+import { readResourceValue } from '@n10/engine';
 import { PROVIDERS } from './providers.js';
-import { requireRepo } from './repo.js';
+import { activeReviewService, requireRepo } from './repo.js';
 import { configuredViewer } from '@n10/vcs-core';
 import { refreshPrList } from './sidebar.js';
 import type { ReplyRequest, ResolveRequest } from '../contract.js';
 
 interface ActiveProvider {
-  fetchCommentThreads(prId: number): Promise<PullRequestComments>;
   replyToThread(req: ReplyRequest): Promise<void>;
   setThreadResolved(req: ResolveRequest): Promise<void>;
-  fetchPrDescription(prId: number): Promise<string>;
   submitReviewVerdict(prId: number, verdict: ReviewVerdict): Promise<void>;
 }
 
-/**
- * Resolve the configured VCS provider for the active repo and check
- * it is fully authenticated before doing any network work.
- */
 /**
  * Resolves the configured provider, or null when the repo has none /
  * it isn't fully authenticated. Bare repos are first-class: review
@@ -34,12 +28,6 @@ function resolveProvider(): ActiveProvider | null {
   }
   const { vendorAuth: auth, vendorProject: project } = config;
   return {
-    fetchCommentThreads: (prId) => {
-      if (!provider.fetchCommentThreads) {
-        throw new Error(`Provider ${provider.id} does not support comments`);
-      }
-      return provider.fetchCommentThreads(auth, project, prId);
-    },
     replyToThread: ({ prId, thread, body }) => {
       if (!provider.replyToThread) {
         throw new Error(`Provider ${provider.id} does not support replies`);
@@ -55,10 +43,6 @@ function resolveProvider(): ActiveProvider | null {
         );
       }
       return provider.setThreadResolved(auth, project, prId, thread, resolved);
-    },
-    fetchPrDescription: (prId) => {
-      if (!provider.fetchPullRequestDescription) return Promise.resolve('');
-      return provider.fetchPullRequestDescription(auth, project, prId);
     },
     submitReviewVerdict: (prId, verdict) => {
       if (!provider.submitReviewVerdict) {
@@ -83,21 +67,23 @@ export function getReviewViewer(): { identifier: string } | null {
 export async function fetchCommentThreads(
   prId: number
 ): Promise<PullRequestComments> {
-  const provider = resolveProvider();
-  if (!provider) return { threads: [], generalComments: [] };
-  return provider.fetchCommentThreads(prId);
+  return readResourceValue(activeReviewService().comments(prId));
 }
 
 export async function replyToThread(req: ReplyRequest): Promise<void> {
   const provider = resolveProvider();
   if (!provider) return;
+  const reviews = activeReviewService();
   await provider.replyToThread(req);
+  reviews.invalidateProvider();
 }
 
 export async function setThreadResolved(req: ResolveRequest): Promise<void> {
   const provider = resolveProvider();
   if (!provider) return;
+  const reviews = activeReviewService();
   await provider.setThreadResolved(req);
+  reviews.invalidateProvider();
 }
 
 // IPC-boundary validation: these values arrive from the (sandboxed,
@@ -118,10 +104,7 @@ const VERDICTS: readonly ReviewVerdict[] = [
 ];
 
 export async function fetchPrDescription(prId: number): Promise<string> {
-  const id = requirePrId(prId);
-  const provider = resolveProvider();
-  if (!provider) return '';
-  return provider.fetchPrDescription(id);
+  return readResourceValue(activeReviewService().description(prId));
 }
 
 export async function submitReviewVerdict(
@@ -134,7 +117,9 @@ export async function submitReviewVerdict(
   }
   const provider = resolveProvider();
   if (!provider) throw new Error('No review provider is configured');
+  const reviews = activeReviewService();
   await provider.submitReviewVerdict(id, verdict);
+  reviews.invalidateProvider();
   // The reviewer votes a row shows come from the cached pull request
   // list, which is this process's and outlives the vote by a poll
   // interval. Nothing the provider caches carries them, so re-reading
@@ -147,8 +132,9 @@ export async function submitReviewVerdict(
 // ── Diff (git-side, no provider needed) ──────────────────────────
 
 export function getDiffText(sourceBranch: string, targetBranch: string) {
-  requireRepo();
-  return fetchReviewDiff(sourceBranch, targetBranch);
+  return readResourceValue(
+    activeReviewService().diff.full({ sourceBranch, targetBranch })
+  );
 }
 
 export function getFileDiffText(
@@ -156,6 +142,7 @@ export function getFileDiffText(
   targetBranch: string,
   file: string
 ) {
-  requireRepo();
-  return fetchFileDiffText(sourceBranch, targetBranch, file);
+  return readResourceValue(
+    activeReviewService().diff.file({ sourceBranch, targetBranch }, file)
+  );
 }

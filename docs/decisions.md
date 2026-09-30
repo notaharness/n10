@@ -469,6 +469,37 @@ Babysitter thread reads use the provider throttle and TTL outside the list-cycle
 budget. GitHub gets rollup and counts with its list query and needs no equivalent
 per-row cache-reset methods. `request-budget.spec.ts` checks request counts.
 
+## Review read ownership
+
+The repository handle owns `engine/reviews`: thread, description, detail, checks,
+conversation and Git diff resources. Reads coalesce, ordinary callers reuse fresh
+answers, and a forced read queues one follow-up. Provider data and committed diffs
+are fresh for 30 seconds; live checkout diffs for one second. A failed read retains
+same-scope data and backs off for that interval. Account/config changes clear data
+and reject obsolete publication; disposing a repository prevents late publication.
+The desktop RPC rejects a failed answer and its query cache retains the last good
+view. TUI hooks subscribe directly. Frontends own visibility and error presentation,
+not another freshness policy.
+
+PR list changes expire the repository’s review reads so a new head, check or
+review cannot remain hidden behind their TTL. Same-scope invalidation retains the
+last successful answer. Manual remote refresh invalidates provider reads after
+the provider memo is cleared.
+Confirmed desktop thread/verdict writes invalidate the captured repository's reads;
+the TUI's confirmed thread edits update only their unchanged base snapshot. Review
+commands and publication reconciliation are the following domain slice.
+
+Git metadata parsing is a core operation with explicit cwd. The engine refreshes
+source refs when the PR head differs, shares the core target-fetch queue's five-minute
+freshness, and pins both commit IDs before reading file lists or patches. Full patches
+and per-file patches use the same comparison. Metadata overflow is an error, never
+an incomplete file list. Resource maps evict idle entries without evicting observed
+or active reads. Patch maps have smaller capacities than provider records.
+
+No worker is added for orchestration or subprocess waits. Desktop diff parsing and
+syntax highlighting remain in their existing renderer workers; the final profiling
+slice determines whether host CPU work warrants another boundary.
+
 ## Diff generation and rendering
 
 PR diffs compare commits so review anchors remain stable. Bare worktree diffs
@@ -478,7 +509,9 @@ worktrees; do not recursively watch a checkout and exhaust inotify on dependenci
 
 Whole-file context (`-U99999`) supports comments on unchanged lines; fold it in
 the viewer. Stream Git output with `runGit`, which preserves partial output and
-reports truncation rather than discarding the entire buffer on overflow.
+reports truncation rather than discarding the entire buffer on overflow. This
+read transport kills a child after 30 seconds and rejects, releasing its resource
+lane; mutations use a separate transport and do not inherit this deadline.
 
 Bound worktree diffs before expensive reads. Use `lstat` for symlinks, churn to
 bound deleted files, and exclude both paths of an oversized rename. A content-free

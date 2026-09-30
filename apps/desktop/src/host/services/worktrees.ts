@@ -1,7 +1,11 @@
 import { spawn } from 'node:child_process';
-import { fetchWorktreeDiffText } from '@n10/core';
+import { readResourceValue } from '@n10/engine';
 import type { WorktreeRemovalCheck } from '@n10/core';
-import { activeConfigService, activeWorktreeService } from './repo.js';
+import {
+  activeConfigService,
+  activeReviewService,
+  activeWorktreeService,
+} from './repo.js';
 
 async function read() {
   const snapshot = await activeWorktreeService().read();
@@ -38,9 +42,9 @@ export async function getWorktreeDiffText(
   branch: string,
   targetBranch: string
 ): Promise<string> {
-  const wt = (await listWorktrees()).find((w) => w.branch === branch);
-  if (!wt) return '';
-  return fetchWorktreeDiffText(wt.path, targetBranch);
+  return readResourceValue(
+    activeReviewService().diff.worktree(branch, targetBranch)
+  );
 }
 
 /** Open the branch's worktree in the configured editor — the TUI's

@@ -1,3 +1,4 @@
+import { reviewEngineFixture } from './review-engine-fixture.js';
 // usePrData reads its repository's list from the engine and reports
 // through useConfig/useToastActions; the last two are stubbed at their
 // module boundary, as in useSidebar.spec.tsx, because usePrData imports
@@ -93,12 +94,14 @@ function mount() {
     pullRequests: list,
     worktrees,
   });
+  const reviews = reviewEngineFixture(null, list).reviews;
   const tree = () => (
     <EngineProvider
       pullRequests={list}
       repo="/repo"
       sync={sync}
       worktrees={worktrees}
+      reviews={reviews}
     >
       <Probe />
     </EngineProvider>

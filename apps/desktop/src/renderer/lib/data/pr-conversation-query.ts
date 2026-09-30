@@ -68,7 +68,7 @@ export function usePullRequestConversation(
     queryKey: keys.prConversation(cwd, ref ?? NO_REF, viewer),
     queryFn: () => loadPullRequestConversation(ref!, viewer),
     enabled: ref != null,
-    staleTime: 60_000,
+    staleTime: 0,
     retry: retryRead,
   });
 }

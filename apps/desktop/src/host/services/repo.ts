@@ -161,3 +161,9 @@ export function forgetRecentRepo(cwd: string): void {
     if (canonicalRepoPath(r.cwd) === target) forgetRecent(r.cwd);
   }
 }
+
+export function activeReviewService() {
+  const current = repositories.getSnapshot();
+  if (!current) throw new NoActiveRepoError();
+  return current.reviews;
+}

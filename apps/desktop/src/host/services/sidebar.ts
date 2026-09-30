@@ -9,7 +9,7 @@ import {
   type SidebarItem,
 } from '@n10/core';
 import { pullRequestPollIntervalMs } from '@n10/engine';
-import { activeRepoIs, requireRepo } from './repo.js';
+import { activeRepoIs, activeReviewService, requireRepo } from './repo.js';
 import { babysatStatuses } from './babysit.js';
 import { isOwnSessionAlive } from './sessions.js';
 import { getSyncDecorations, refreshRemoteSync } from './remote-sync.js';
@@ -138,7 +138,9 @@ export function getSyncState(): SyncState {
  * refresh's own request starts.
  */
 export async function refreshRemote(): Promise<void> {
+  const reviews = activeReviewService();
   await Promise.all([pullRequests.refresh(requireRepo()), refreshRemoteSync()]);
+  reviews.invalidateProvider();
 }
 
 /**

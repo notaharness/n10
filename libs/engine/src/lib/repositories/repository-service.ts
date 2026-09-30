@@ -1,4 +1,9 @@
 import {
+  createReviewService,
+  type ReviewService,
+} from '../reviews/review-service.js';
+import type { PullRequestList } from '../pull-requests/pull-request-list.js';
+import {
   createWorktreeService,
   type WorktreeService,
 } from '../worktrees/worktree-service.js';
@@ -15,12 +20,22 @@ export interface RepositoryHandle {
   readonly cwd: string;
   readonly config: ConfigService;
   readonly worktrees: WorktreeService;
+  readonly reviews: ReviewService;
 }
 
 /** Selection owns a captured-repo config service; metadata comes from that
  * service's snapshot and changes through its subscription, never a second store. */
 export function createRepositoryService(
-  options: Omit<ConfigServiceOptions, 'repo'>
+  options: Omit<ConfigServiceOptions, 'repo' | 'pullRequests'> & {
+    pullRequests: Pick<
+      PullRequestList,
+      | 'credentialsChanged'
+      | 'read'
+      | 'lookupPullRequest'
+      | 'subscribe'
+      | 'getSnapshot'
+    >;
+  }
 ) {
   let current: RepositoryHandle | null = null;
   return {
@@ -47,8 +62,15 @@ export function createRepositoryService(
           config,
           watchers: ports.worktreeWatchers,
         });
+        const reviews = createReviewService({
+          config,
+          worktrees,
+          pullRequests: options.pullRequests,
+          isCurrent: () => current?.cwd === cwd,
+        });
+        current?.reviews.dispose();
         current?.worktrees.dispose();
-        current = { cwd, config, worktrees };
+        current = { cwd, config, worktrees, reviews };
       }
       return current;
     },

@@ -115,6 +115,8 @@ export * from './lib/utils/virtual-viewport.js';
 export * from './lib/utils/diff-scroll.js';
 export * from './lib/utils/pr-utils.js';
 export * from './lib/utils/diff-fetcher.js';
+export { readDiffFiles } from './lib/utils/diff-files.js';
+export { gitLine } from './lib/utils/git-run.js';
 export * from './lib/utils/worktree-diff.js';
 export * from './lib/utils/language.js';
 export * from './lib/utils/resolve-preset-name.js';

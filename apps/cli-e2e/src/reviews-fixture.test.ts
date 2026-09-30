@@ -40,7 +40,17 @@ test.describe('@integration Reviews Fixture', () => {
 
   test.use({
     n10RepoPath: cloneDir,
-    n10Config: { keybindPreset: 'vim' },
+    n10Config: {
+      keybindPreset: 'vim',
+      vendor: 'github',
+      // Categories describe this fixture reviewer, regardless of the token used
+      // to read the repository locally or in CI.
+      vendorProject: {
+        owner: 'kirby-test-runner',
+        repo: 'kirby-integration-test-repository',
+        username: 'kirby-test-runner',
+      },
+    },
     rows: 60,
     cols: 120,
   });

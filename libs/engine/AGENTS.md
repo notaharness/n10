@@ -45,3 +45,9 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   immutable WorktreeScope before awaiting Git. Session targets resolve by
   checkout identity, never branch labels. Core guards removal; resume suspended
   watchers only if the checkout remains and its repository is selected.
+
+- **Reviews** (`reviews/`): repository/account-scoped resources own freshness,
+  coalescing and invalidation. Failures retain same-scope answers; identity changes
+  reset them. Parse untrusted PR identity before provider work and check it again
+  after awaits. Diff resources pin source and target commits with explicit cwd;
+  parsing Git metadata stays a core primitive, rendering stays shell-specific.

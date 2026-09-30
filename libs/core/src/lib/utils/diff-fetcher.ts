@@ -16,19 +16,19 @@ import { gitLine, runGit } from './git-run.js';
  * Unlike the worktree diff this does not drop oversized *files*. A pull
  * request is a document under review and its comments anchor into it;
  * quietly leaving a file out of what a reviewer is reading is worse
- * than a long parse. It is still bounded overall, because the main
- * process holds the chunks, their concatenation and the JS string at
+ * than a long parse. It is still bounded overall, because the host
+ * holds the chunks, their concatenation and the JS string at
  * once: past the ceiling the patch is cut back to a file boundary and
  * carries a notice saying so, which is the one thing a reviewer must
  * not be left to guess at.
  */
 const MAX_DIFF_BYTES = 64 * 1024 * 1024;
 
-export async function resolveRef(branch: string): Promise<string> {
+export async function resolveRef(cwd: string, branch: string): Promise<string> {
   // Prefer remote tracking ref, fall back to local branch
   for (const candidate of [`origin/${branch}`, branch]) {
     try {
-      await gitLine(['rev-parse', '--verify', candidate]);
+      await gitLine(['rev-parse', '--verify', candidate], { cwd });
       return candidate;
     } catch {
       // try next
@@ -38,24 +38,27 @@ export async function resolveRef(branch: string): Promise<string> {
 }
 
 async function resolveBoth(
+  cwd: string,
   sourceBranch: string,
   targetBranch: string,
   preResolved?: { sourceRef: string; targetRef: string }
 ): Promise<{ sourceRef: string; targetRef: string }> {
   if (preResolved) return preResolved;
   const [sourceRef, targetRef] = await Promise.all([
-    resolveRef(sourceBranch),
-    resolveRef(targetBranch),
+    resolveRef(cwd, sourceBranch),
+    resolveRef(cwd, targetBranch),
   ]);
   return { sourceRef, targetRef };
 }
 
 export async function fetchDiffText(
+  cwd: string,
   sourceBranch: string,
   targetBranch: string,
   preResolved?: { sourceRef: string; targetRef: string }
 ): Promise<string> {
   const { sourceRef, targetRef } = await resolveBoth(
+    cwd,
     sourceBranch,
     targetBranch,
     preResolved
@@ -63,7 +66,7 @@ export async function fetchDiffText(
 
   const { text, truncated } = await runGit(
     ['diff', '-U99999', `${targetRef}...${sourceRef}`],
-    { maxBytes: MAX_DIFF_BYTES }
+    { cwd, maxBytes: MAX_DIFF_BYTES }
   );
   return completePatch(text, truncated, MAX_DIFF_BYTES);
 }
@@ -75,50 +78,27 @@ export interface ReviewDiffText {
   head: string;
 }
 
-/**
- * {@link fetchDiffText} pinned to one commit. The branch is resolved to
- * its commit id first and the diff read at that id, so a fetch landing
- * in between cannot give a diff of one commit named as another.
- */
-export async function fetchReviewDiff(
-  sourceBranch: string,
-  targetBranch: string
-): Promise<ReviewDiffText> {
-  const { sourceRef, targetRef } = await resolveBoth(
-    sourceBranch,
-    targetBranch
-  );
-  const head = await gitLine([
-    'rev-parse',
-    '--verify',
-    `${sourceRef}^{commit}`,
-  ]);
-  const text = await fetchDiffText(sourceBranch, targetBranch, {
-    sourceRef: head,
-    targetRef,
-  });
-  return { text, head };
-}
-
 // Per-file diff — used by the diff viewer on file open. Scoping to a
 // single file drops the payload from whole-PR (multi-MB) to kilobytes,
 // so the viewer renders immediately instead of waiting on git to
 // stream the full PR. `-U99999` still gives whole-file context so
 // comments placed on unchanged lines resolve correctly.
 export async function fetchFileDiffText(
+  cwd: string,
   sourceBranch: string,
   targetBranch: string,
   filename: string,
   preResolved?: { sourceRef: string; targetRef: string }
 ): Promise<string> {
   const { sourceRef, targetRef } = await resolveBoth(
+    cwd,
     sourceBranch,
     targetBranch,
     preResolved
   );
   const { text, truncated } = await runGit(
     ['diff', '-U99999', `${targetRef}...${sourceRef}`, '--', filename],
-    { maxBytes: MAX_DIFF_BYTES }
+    { cwd, maxBytes: MAX_DIFF_BYTES }
   );
   return completePatch(text, truncated, MAX_DIFF_BYTES);
 }

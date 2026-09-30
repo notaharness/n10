@@ -56,6 +56,7 @@ const env = vi.hoisted(() => ({
 
 vi.mock('./repo.js', () => ({
   requireRepo: () => env.cwd,
+  activeReviewService: () => ({ invalidateProvider: vi.fn() }),
   activeRepoIs: (cwd: string) => cwd === env.cwd,
 }));
 

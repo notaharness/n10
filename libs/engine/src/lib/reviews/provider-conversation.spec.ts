@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * The conversation bridge's own jobs: parse what the renderer sends as
- * untrusted, read through the configured provider, and answer only for
- * the repository that is open. Core's identity checks run for real.
- */
+import { reviewReadFixture } from './review-read-fixture.js';
+import { readResourceValue } from './read-resource.js';
 
 const REF = {
   provider: 'github',
@@ -23,31 +20,15 @@ const env = vi.hoisted(() => ({
   supported: true,
 }));
 
-vi.mock('@n10/vcs-core', async (original) => ({
-  ...(await original<Record<string, unknown>>()),
-  configuredRepository: () => ({
-    provider: 'github',
-    host: 'github.com',
-    repository: 'acme/app',
-  }),
-  readConfig: () => ({
-    vendor: 'github',
-    vendorProject: { owner: 'acme', repo: 'app', username: 'bob' },
-  }),
-}));
-vi.mock('./repo.js', () => ({
-  requireRepo: () => '/repo',
-  activeRepoIs: (cwd: string) => env.open && cwd === '/repo',
-}));
-
-vi.mock('./program.js', () => ({
-  resolveProvider: () => ({
-    config: {
-      vendor: 'github',
-      vendorAuth: {},
-      vendorProject: { owner: 'acme', repo: 'app' },
+const { service } = reviewReadFixture(
+  () => ({
+    repository: {
+      provider: 'github',
+      host: 'github.com',
+      repository: 'acme/app',
     },
-    configured: env.configured,
+    viewer: 'bob',
+    vcsConfigured: env.configured,
     provider: {
       id: 'github',
       fetchPullRequestConversation: env.supported
@@ -72,11 +53,14 @@ vi.mock('./program.js', () => ({
         : undefined,
     },
   }),
-}));
-
-const { getPullRequestConversation } = await import('./pr-conversation.js');
+  () => env.open
+);
+async function getPullRequestConversation(request: unknown) {
+  return readResourceValue(service.conversation(request));
+}
 
 beforeEach(() => {
+  service.reset();
   env.configured = true;
   env.open = true;
   env.reads = [];
@@ -112,7 +96,7 @@ describe('getPullRequestConversation', () => {
       env.open = false;
     };
     await expect(getPullRequestConversation({ ref: REF })).rejects.toThrow(
-      /no longer the repository open/
+      /no longer open/
     );
   });
 

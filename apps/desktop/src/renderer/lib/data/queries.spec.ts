@@ -176,7 +176,7 @@ describe('pull request snapshots', () => {
       qc.fetchQuery({
         queryKey: keys.prSnapshot('/repo', ref, 'alice'),
         queryFn: () => Promise.resolve({ ref }),
-        staleTime: 60_000,
+        staleTime: 0,
       });
     await read({ ...REF, id: 'R_OLD' });
     await expect(read({ ...REF, id: 'R_NEW' })).resolves.toEqual({

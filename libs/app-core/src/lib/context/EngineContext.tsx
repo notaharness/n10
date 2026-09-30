@@ -1,6 +1,11 @@
 import { createContext, useContext, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import type { PullRequestList, RemoteSync, WorktreeService } from '@n10/engine';
+import type {
+  PullRequestList,
+  RemoteSync,
+  WorktreeService,
+  ReviewService,
+} from '@n10/engine';
 
 /**
  * The engine services a shell created, and the repository this
@@ -12,6 +17,7 @@ export interface EngineContextValue {
   repo: string;
   sync: RemoteSync;
   worktrees: WorktreeService;
+  reviews: ReviewService;
 }
 
 const EngineContext = createContext<EngineContextValue | null>(null);
@@ -21,11 +27,12 @@ export function EngineProvider({
   repo,
   sync,
   worktrees,
+  reviews,
   children,
 }: EngineContextValue & { children: ReactNode }) {
   const value = useMemo(
-    () => ({ pullRequests, repo, sync, worktrees }),
-    [pullRequests, repo, sync, worktrees]
+    () => ({ pullRequests, repo, sync, worktrees, reviews }),
+    [pullRequests, repo, sync, worktrees, reviews]
   );
   return (
     <EngineContext.Provider value={value}>{children}</EngineContext.Provider>

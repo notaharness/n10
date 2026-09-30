@@ -1,3 +1,4 @@
+import { reviewEngineFixture } from './review-engine-fixture.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useEffect } from 'react';
 import { Box } from 'ink';
@@ -8,7 +9,7 @@ import type {
   RemoteCommentThread,
   RemoteCommentReply,
 } from '@n10/vcs-core';
-import { useRemoteComments } from '@n10/app-core';
+import { EngineProvider, useRemoteComments } from '@n10/app-core';
 
 // ── Test helpers ────────────────────────────────────────────────
 
@@ -73,11 +74,17 @@ function mountProbe(
     return <Box />;
   }
 
-  const { unmount, rerender } = render(<Probe prId={prId} />);
+  const engine = reviewEngineFixture(provider);
+  const tree = (id: number | null) => (
+    <EngineProvider {...engine}>
+      <Probe prId={id} />
+    </EngineProvider>
+  );
+  const { unmount, rerender } = render(tree(prId));
   return {
     outRef,
     unmount,
-    setPrId: (next) => rerender(<Probe prId={next} />),
+    setPrId: (next) => rerender(tree(next)),
   };
 }
 

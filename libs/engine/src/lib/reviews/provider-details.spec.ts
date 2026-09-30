@@ -1,12 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PullRequestChecks, PullRequestDetail } from '@n10/vcs-core';
 
-/**
- * The snapshot and checks bridges' own jobs: parse what the renderer
- * sends as untrusted, and answer only for the repository and account
- * that are open. Core's sequences are exercised for real; the provider,
- * the list cache and the open repository are this file's stand-ins.
- */
+import { reviewReadFixture } from './review-read-fixture.js';
+import { readResourceValue } from './read-resource.js';
 
 const REF = {
   provider: 'github',
@@ -35,54 +31,44 @@ const env = vi.hoisted(() => ({
   onLookup: (() => undefined) as () => void,
 }));
 
-vi.mock('@n10/vcs-core', async (original) => ({
-  ...(await original<Record<string, unknown>>()),
-  configuredRepository: (config: {
-    vendorProject: { owner: string; repo: string };
-  }) =>
-    env.configured
+const { service } = reviewReadFixture(
+  () => ({
+    repository: env.configured
       ? {
           provider: 'github',
           host: 'github.com',
-          repository: `${config.vendorProject.owner}/${config.vendorProject.repo}`,
+          repository: `acme/${env.project.repo}`,
         }
       : null,
-  readConfig: () => ({ vendor: 'github', vendorProject: { ...env.project } }),
-}));
-// Both answer from the config they are handed, so a closure that read
-// config once would miss every change below.
-vi.mock('./repo.js', () => ({
-  requireRepo: () => '/repo',
-  activeRepoIs: (cwd: string) => env.open && cwd === '/repo',
-}));
-
-vi.mock('./pull-requests.js', () => ({
-  lookupPullRequest: (cwd: string, prId: number) => {
-    env.lookups.push([cwd, prId]);
-    env.onLookup();
-    return Promise.resolve({ kind: 'gone' });
-  },
-}));
-vi.mock('./program.js', () => ({
-  resolveProvider: () => ({
+    viewer: env.project.username ?? null,
+    vcsConfigured: env.configured,
     config: {
       vendor: 'github',
       vendorAuth: { token: 't' },
-      vendorProject: { owner: 'acme', repo: 'app' },
+      vendorProject: { owner: 'acme', repo: env.project.repo },
     },
-    configured: env.configured,
     provider: {
       id: 'github',
       fetchPullRequestDetail: env.detail,
       fetchPullRequestChecks: env.checks,
     },
   }),
-}));
-
-const { getPullRequestSnapshot } = await import('./pr-details.js');
-const { getPullRequestChecks } = await import('./pr-checks.js');
+  () => env.open,
+  (cwd, id) => {
+    env.lookups.push([cwd, id]);
+    env.onLookup();
+    return Promise.resolve({ kind: 'gone' });
+  }
+);
+async function getPullRequestSnapshot(request: unknown) {
+  return readResourceValue(service.snapshot(request));
+}
+async function getPullRequestChecks(request: unknown) {
+  return readResourceValue(service.checks(request));
+}
 
 beforeEach(() => {
+  service.reset();
   env.configured = true;
   env.open = true;
   env.onLookup = () => undefined;
@@ -121,7 +107,7 @@ describe('getPullRequestSnapshot', () => {
       env.open = false;
     };
     await expect(getPullRequestSnapshot({ ref: REF })).rejects.toThrow(
-      '/repo is no longer the repository open in n10'
+      'This repository is no longer open'
     );
   });
 
@@ -192,7 +178,7 @@ describe('getPullRequestChecks', () => {
       env.open = false;
     };
     await expect(getPullRequestChecks({ ref: REF })).rejects.toThrow(
-      '/repo is no longer the repository open in n10'
+      'This repository is no longer open'
     );
   });
 

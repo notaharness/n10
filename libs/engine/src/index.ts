@@ -19,3 +19,14 @@ export type {
   WorktreeWatchers,
   WorktreeTarget,
 } from './lib/worktrees/worktree-commands.js';
+
+export {
+  createReviewService,
+  type ReviewService,
+} from './lib/reviews/review-service.js';
+export {
+  readResourceValue,
+  type ReadResource,
+  type ReadSnapshot,
+} from './lib/reviews/read-resource.js';
+export type { DiffRequest, DiffFiles } from './lib/reviews/diff-reads.js';
