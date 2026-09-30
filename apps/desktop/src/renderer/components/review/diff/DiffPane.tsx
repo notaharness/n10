@@ -125,7 +125,7 @@ export function DiffPane({
         tabIndex={-1}
         role="region"
         aria-label="Changes"
-        className="min-h-0 flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
+        className="relative min-h-0 flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
       >
         {loading && (
           <div className="space-y-2 p-4">

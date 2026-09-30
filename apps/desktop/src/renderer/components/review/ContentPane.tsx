@@ -23,6 +23,12 @@ import { ReviewStepper } from './drafts/ReviewStepper.js';
 /**
  * One layer of the stack. Hidden rather than unmounted, so a pane's
  * scroll position survives a trip to another mode and back.
+ *
+ * A pane's own scroller is `relative`: the containing block of what is
+ * absolutely positioned in it, an `sr-only` label or live region say.
+ * Otherwise that escapes the scroller at its place in the content, the
+ * layer overflows, and the panel around the stack scrolls instead of a
+ * pane with nothing left to scroll.
  */
 function StackedPane({
   visible,

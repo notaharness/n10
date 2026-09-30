@@ -168,7 +168,7 @@ export function StepCard({
         />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="relative min-h-0 flex-1 overflow-auto">
         <div className="mx-auto max-w-3xl space-y-3 p-4">
           {/* Location */}
           <button
