@@ -36,7 +36,7 @@ function present(notice: SyncNotice): SyncNoticeEvent {
         kind: 'warning',
       };
     case 'failed':
-      return { message: `Sync failed: ${notice.error}`, kind: 'warning' };
+      return { message: notice.error, kind: 'warning' };
   }
 }
 

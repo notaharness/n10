@@ -30,7 +30,7 @@ export function useRemoteSync() {
         );
         break;
       case 'failed':
-        flash(`Sync failed: ${notice.error}`, 'warning');
+        flash(notice.error, 'warning');
     }
   });
   useEffect(() => {

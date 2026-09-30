@@ -264,7 +264,7 @@ describe('scoped state and cancellation', () => {
       conflicts: env.conflicts,
       lastGitSyncAt: 1_000,
       error:
-        'Could not fetch from origin; checking pull requests using local Git data',
+        "Couldn't fetch from origin; checking merge status with the provider",
       loading: false,
     });
     expect(env.swept).toEqual(['/repo-a', '/repo-a']);
@@ -273,7 +273,7 @@ describe('scoped state and cancellation', () => {
       type: 'failed',
       repo: '/repo-a',
       error:
-        'Could not fetch from origin; checking pull requests using local Git data',
+        "Couldn't fetch from origin; checking merge status with the provider",
     });
     const recovery = sync.refresh();
     await complete(2, 2_000);
@@ -323,7 +323,7 @@ describe('scoped state and cancellation', () => {
     env.pending[0].reject(new Error('Offline'));
     await expect(request).resolves.toBeUndefined();
     expect(sync.getSnapshot().error).toBe(
-      'Could not fetch from origin; checking pull requests using local Git data'
+      "Couldn't fetch from origin; checking merge status with the provider"
     );
   });
 });

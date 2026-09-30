@@ -30,7 +30,7 @@ export async function runSyncPass(options: {
   } catch (cause) {
     logError('sync fetch', cause);
     error =
-      'Could not fetch from origin; checking pull requests using local Git data';
+      "Couldn't fetch from origin; checking merge status with the provider";
   }
   if (cancelled()) return null;
   if (error) notice({ type: 'failed', repo, error });

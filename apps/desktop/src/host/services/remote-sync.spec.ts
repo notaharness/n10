@@ -63,6 +63,10 @@ it('composes the selected config/cache/removal services and adapts notices', asy
     message: 'Auto-deleted merged branch: topic',
     kind: 'success',
   });
+  const error =
+    "Couldn't fetch from origin; checking merge status with the provider";
+  state.instances[0].notify({ type: 'failed', repo: '/repo-a', error });
+  expect(notify).toHaveBeenLastCalledWith({ message: error, kind: 'warning' });
   expect(host.getSyncDecorations().lastGitSyncAt).toBe(42);
 });
 
