@@ -248,21 +248,32 @@ describe('scoped state and cancellation', () => {
     expect(second.sync.getSnapshot().lastGitSyncAt).toBe(1_000);
   });
 
-  it('keeps the last good state across fetch failures and recovers on the next pass', async () => {
-    const { sync } = harness();
+  it('continues the guarded provider sweep after a failed fetch and recovers', async () => {
+    const { sync, remove, notices } = harness();
     env.merged = new Set(['feature/a']);
     sync.start();
     await complete();
-    const before = sync.getSnapshot();
+    env.merged = new Set(['feature/b']);
+    env.conflicts = new Map([['feature/a', 2]]);
+    env.autoDelete = true;
     const request = sync.refresh();
     env.pending[1].reject(new Error('Offline'));
     await expect(request).resolves.toBeUndefined();
     expect(sync.getSnapshot()).toMatchObject({
-      merged: before.merged,
-      conflicts: before.conflicts,
+      merged: env.merged,
+      conflicts: env.conflicts,
       lastGitSyncAt: 1_000,
-      error: 'Offline',
+      error:
+        'Could not fetch from origin; checking pull requests using local Git data',
       loading: false,
+    });
+    expect(env.swept).toEqual(['/repo-a', '/repo-a']);
+    expect(remove).toHaveBeenCalledExactlyOnceWith('feature/a', verdict);
+    expect(notices).toContainEqual({
+      type: 'failed',
+      repo: '/repo-a',
+      error:
+        'Could not fetch from origin; checking pull requests using local Git data',
     });
     const recovery = sync.refresh();
     await complete(2, 2_000);
@@ -311,7 +322,9 @@ describe('scoped state and cancellation', () => {
     const request = sync.refresh();
     env.pending[0].reject(new Error('Offline'));
     await expect(request).resolves.toBeUndefined();
-    expect(sync.getSnapshot().error).toBe('Offline');
+    expect(sync.getSnapshot().error).toBe(
+      'Could not fetch from origin; checking pull requests using local Git data'
+    );
   });
 });
 

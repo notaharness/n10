@@ -576,12 +576,13 @@ read for a captured repository. Config’s sync revision invalidates an active
 pass and rearms its timer; auto-delete changes count as a revision so disabling
 it cancels a pending sweep. Timer ticks skip busy work. Explicit refreshes join
 one queued follow-up, and repeated start calls preserve the existing schedule.
-Fetch or provider errors retain the last successful badges and timestamp while
+Provider errors retain the last successful badges and timestamp while
 publishing an error. Shells render typed notices and observe loading state.
 
-A failed fetch aborts the pass: badges and automatic deletion use the last
-complete pass until Git transport recovers. This conservative policy avoids
-combining fresh provider results with stale local refs. Worktree changes alone
+A failed fetch preserves the last successful fetch timestamp and publishes a
+plain-language error. Provider-based merged detection and conflict reads continue
+using local Git data. Automatic deletion still requires core’s guarded local
+verdict, which refuses removal when it cannot establish safety. Worktree changes alone
 do not trigger a fetch; both shells refresh badges on the configured sync
 interval or explicit refresh.
 
@@ -590,7 +591,10 @@ removal always emits its repository-qualified notice, even after cancellation.
 Repository switches can start another service immediately; stale reads cannot
 publish or start removal. Shutdown cancels future work and awaits removals
 already underway. It does not put a deadline on a Git mutation. Desktop detaches terminal clients
-and stops its daemon while removals finish; the TUI announces its shutdown wait. Both manual and
+and stops its daemon while removals finish. The TUI announces a shared three-second
+grace period for automatic removals and manual operations, then detaches and exits
+even if an operation is still pending; this shell exit bound does not cancel or
+retry a mutation. Both manual and
 automatic removals go through captured-repo engine commands, with core retaining
 the stop/remove/delete safety checks. Desktop supplies repo-qualified babysitter
 ports; a retained checkout resumes watchers only while its repo is selected.

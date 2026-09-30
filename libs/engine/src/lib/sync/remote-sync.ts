@@ -95,7 +95,8 @@ export function createRemoteSync(options: RemoteSyncOptions): RemoteSync {
       publish({
         merged: result.merged,
         conflicts: result.conflicts,
-        lastGitSyncAt: result.lastGitSyncAt,
+        lastGitSyncAt: result.lastGitSyncAt ?? snapshot.lastGitSyncAt,
+        error: result.error,
       });
     } catch (error) {
       if (gen !== generation) return;
