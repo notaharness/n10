@@ -1,4 +1,5 @@
 import { delimiter, join } from 'node:path';
+import { HOST_PRELOAD } from '../setup/network-guard.js';
 
 /**
  * The environment the app under test is launched with: the developer's
@@ -16,6 +17,8 @@ export function appEnv(opts: {
   githubToken: string | undefined;
   /** What installs the fakes: `gh` on PATH, the Azure DevOps shim. */
   ghEnv: Record<string, string>;
+  /** `N10_NETWORK_GUARD` (`setup/network-guard.ts`); none, unguarded. */
+  networkGuard?: string;
   /** Extra knobs a test asked for. Applied before the isolation below. */
   extra: Record<string, string> | undefined;
 }): Record<string, string> {
@@ -63,6 +66,10 @@ export function appEnv(opts: {
     // The fake `gh` has to win the PATH lookup; the Azure DevOps
     // preload finds its scenario here.
     ...opts.ghEnv,
+    // The session host's preload: the network guard, and the Azure
+    // DevOps fake when `ghEnv` names a scenario for it.
+    N10_HOST_REQUIRE: HOST_PRELOAD,
+    ...(opts.networkGuard ? { N10_NETWORK_GUARD: opts.networkGuard } : {}),
     PATH: [opts.ghEnv.PATH, env.PATH].filter(Boolean).join(delimiter),
     // Last, and not negotiable. A tmux server is identified by its
     // socket directory, and the default one is the developer's own —

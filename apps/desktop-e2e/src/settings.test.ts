@@ -2,10 +2,22 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
 import { tab } from './setup/app.js';
+import type { FakeAzureDevOps } from './setup/fake-ado.js';
 import { clickAppMenuItem } from './setup/menu.js';
 
 const PAT = 'ado_e2e_super_secret_value';
+const ROTATED = 'ado_rotated';
 const PLACEHOLDER = '••••••••';
+
+/** An Azure DevOps project with no pull requests, whose token the app
+ *  holds as `PAT`. Selecting the vendor is what puts its auth fields in
+ *  the settings model, and the vendor is per-project config the fake
+ *  writes. */
+const AZURE: FakeAzureDevOps = {
+  pat: PAT,
+  user: { displayName: 'n10 tester', uniqueName: 'n10-tester@example.com' },
+  prs: [],
+};
 
 function storedPat(homeDir: string): string | undefined {
   const raw = readFileSync(join(homeDir, '.n10', 'config.json'), 'utf8');
@@ -17,21 +29,13 @@ function storedPat(homeDir: string): string | undefined {
 
 test.describe('Settings', () => {
   test.use({
+    fakeAzureDevOps: AZURE,
     n10Config: {
-      vendorAuth: { 'azure-devops': { pat: PAT } },
       // Long enough that nothing in these tests can be explained by a
       // poll happening to fire: a refetch inside them is one something
       // asked for.
       prPollInterval: 3_600_000,
       mergePollInterval: 3_600_000,
-    },
-    // A provider's auth fields only appear in the settings model once a
-    // vendor is selected, and the vendor is per-project config.
-    projectConfig: {
-      vendor: 'azure-devops',
-      org: 'acme',
-      project: 'widgets',
-      repo: 'widgets',
     },
   });
 
@@ -75,61 +79,65 @@ test.describe('Settings', () => {
   test('a real edit replaces the secret', async ({ desktop }) => {
     const { page, homeDir } = desktop;
 
-    await page.evaluate(async () => {
+    await page.evaluate(async (rotated) => {
       const view = await window.n10.getSettingsView();
       const field = view.find((f) => f.masked);
       if (!field) throw new Error('no masked field in the settings view');
       await window.n10.updateSettingsField(
         { label: field.label, key: field.key },
-        'ado_rotated'
+        rotated
       );
-    });
+    }, ROTATED);
 
-    expect(storedPat(homeDir)).toBe('ado_rotated');
+    expect(storedPat(homeDir)).toBe(ROTATED);
   });
 
-  /**
-   * Replacing a rejected access token has to take effect now.
-   *
-   * There is no Azure organization behind `acme/widgets`, so the
-   * provider fails here exactly as it does against a revoked token —
-   * which is the situation being tested. What the assertion turns on
-   * is not whether the fetch succeeds but whether one was *started*:
-   * `remoteFetches` is monotonic, and with the poll interval set to an
-   * hour nothing else in the test can move it.
-   */
-  test('saving a token refetches immediately instead of waiting for the poll', async ({
-    desktop,
-  }) => {
-    const { page } = desktop;
-    const syncState = () => page.evaluate(() => window.n10.getSyncState());
+  test.describe('with a revoked token', () => {
+    // Azure takes only the replacement: the launch fetch is refused as
+    // a revoked token is, 401.
+    test.use({ fakeAzureDevOps: { ...AZURE, acceptedPat: ROTATED } });
 
-    // Let the launch fetch finish and record a failure, so there is a
-    // stale error to clear.
-    await expect
-      .poll(async () => (await syncState()).remoteError, { timeout: 20_000 })
-      .not.toBeNull();
-    const before = (await syncState()).remoteFetches;
+    /**
+     * Replacing a rejected access token has to take effect now.
+     *
+     * `remoteFetches` is monotonic, and with the poll interval set to
+     * an hour nothing else in the test can move it, so a fetch counted
+     * straight after the save is one the save started.
+     */
+    test('saving a token refetches immediately instead of waiting for the poll', async ({
+      desktop,
+    }) => {
+      const { page } = desktop;
+      const syncState = () => page.evaluate(() => window.n10.getSyncState());
 
-    const after = await page.evaluate(async () => {
-      const view = await window.n10.getSettingsView();
-      const field = view.find((f) => f.masked);
-      if (!field) throw new Error('no masked field in the settings view');
-      await window.n10.updateSettingsField(
-        { label: field.label, key: field.key },
-        'ado_rotated'
-      );
-      // Read straight after the save. What is asserted below is that
-      // a fetch was *started* — the clearing of the stale error is a
-      // unit-level concern (host/services/sidebar.spec.ts), because
-      // the new attempt may already have failed again by the time this
-      // second round trip lands.
-      return window.n10.getSyncState();
+      // Let the launch fetch finish and record a failure, so there is a
+      // stale error to clear.
+      await expect
+        .poll(async () => (await syncState()).remoteError, {
+          timeout: 20_000,
+        })
+        .not.toBeNull();
+      const before = (await syncState()).remoteFetches;
+
+      const after = await page.evaluate(async (rotated) => {
+        const view = await window.n10.getSettingsView();
+        const field = view.find((f) => f.masked);
+        if (!field) throw new Error('no masked field in the settings view');
+        await window.n10.updateSettingsField(
+          { label: field.label, key: field.key },
+          rotated
+        );
+        // Read straight after the save, before the fetch it started
+        // has had time to land.
+        return window.n10.getSyncState();
+      }, ROTATED);
+
+      expect(after.remoteFetches).toBeGreaterThan(before);
+      // A poll is an hour away, so the fetch above came from the write.
+      expect(after.remoteIntervalMs).toBe(3_600_000);
+      // And it went out with the new token, which Azure takes.
+      await expect.poll(async () => (await syncState()).remoteError).toBeNull();
     });
-
-    expect(after.remoteFetches).toBeGreaterThan(before);
-    // A poll is an hour away, so the fetch above came from the write.
-    expect(after.remoteIntervalMs).toBe(3_600_000);
   });
 
   test('the settings page renders the secret as dots', async ({ desktop }) => {

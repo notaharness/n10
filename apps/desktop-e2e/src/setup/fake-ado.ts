@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
 /**
  * An Azure DevOps scenario as a test declares it, and the config that
@@ -60,19 +59,17 @@ export interface FakeAzureDevOps {
   org?: string;
   project?: string;
   repo?: string;
+  /** The token the app is given. */
   pat?: string;
+  /** The token Azure takes, where it is not `pat`: the state after the
+   *  app's was revoked. A request with any other answers 401. */
+  acceptedPat?: string;
   /** Whose PAT it is — `/connectiondata`'s authenticated user. */
   user: { displayName: string; uniqueName: string };
   prs: FakeAdoPr[];
 }
 
 export const FAKE_ADO_PAT = 'fake-ado-pat';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-
-/** The main-process preload that answers Azure DevOps's API; the
- *  fixture passes it to Electron as `-r`. */
-export const FAKE_ADO_PRELOAD = join(HERE, '..', 'fixtures', 'fake-ado.cjs');
 
 /** A stable GUID for a name, formatted the way Azure formats ids. */
 export function guid(name: string): string {
@@ -213,6 +210,7 @@ function served(s: FakeAzureDevOps) {
         },
       ];
     }),
+    acceptedPat: s.acceptedPat ?? s.pat ?? FAKE_ADO_PAT,
     // Written into the app's config by the preload itself, so a run
     // whose preload did not load has no token and asks Azure nothing.
     globalConfig: fakeAdoGlobalConfig(s),
@@ -228,10 +226,10 @@ function served(s: FakeAzureDevOps) {
 export function installFakeAdo(
   homeDir: string,
   scenario: FakeAzureDevOps
-): { N10_FAKE_ADO: string; N10_HOST_REQUIRE: string } {
+): { N10_FAKE_ADO: string } {
   const path = join(homeDir, 'fake-ado.json');
   writeFileSync(path, JSON.stringify(served(scenario), null, 2), 'utf8');
-  return { N10_FAKE_ADO: path, N10_HOST_REQUIRE: FAKE_ADO_PRELOAD };
+  return { N10_FAKE_ADO: path };
 }
 
 /** Whether the preload is in the app's session host, which makes the
