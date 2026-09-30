@@ -1,42 +1,64 @@
-const membership = [
-  {
-    title: 'Machine identity',
-    description:
-      'Each machine generates a node key and keeps the private key on disk. The public key identifies that machine to the fleet.',
-  },
-  {
-    title: 'Passkey approval',
-    description:
-      'The passkey signs a WebAuthn assertion whose challenge commits to one membership or revocation statement. The passkey provider keeps the signing key. A membership statement includes the machine’s public key, address and label.',
-  },
-  {
-    title: 'Directory encryption',
-    description:
-      'The passkey’s PRF extension produces a secret. Machines derive a directory key and read token from it, then encrypt signed records with XChaCha20-Poly1305 before uploading them.',
-  },
-  {
-    title: 'Peer verification',
-    description:
-      'Before accepting streams, each receiver checks the signed membership, proof of node-key possession and its stored revocations. It pins verified members locally. Connections need no directory lookup.',
-  },
-];
+import Link from 'next/link';
+import { BeamFigure } from './beam-figure';
+import { Browser, Key, Label, Track } from './beam-drawing';
+import { Laptop } from './mesh/machines';
+import { BEAM_COLORS } from './mesh/palette';
 
 export function BeamHow() {
   return (
-    <section className="mx-auto w-full max-w-5xl px-6 py-16">
-      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-        How membership works
-      </h2>
-      <div className="mt-10 grid gap-x-16 gap-y-10 sm:grid-cols-2">
-        {membership.map((item) => (
-          <div key={item.title} className="border-fd-border border-t pt-5">
-            <h3 className="font-semibold">{item.title}</h3>
-            <p className="text-fd-muted-foreground mt-3 leading-relaxed">
-              {item.description}
-            </p>
-          </div>
-        ))}
+    <section className="mx-auto grid w-full max-w-5xl items-center gap-10 px-6 py-12 md:grid-cols-[1fr_1.2fr]">
+      <div>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          How a machine joins
+        </h2>
+        <p className="text-fd-muted-foreground mt-5 leading-relaxed">
+          Your passkey signs the machine’s membership. The approval page
+          receives that assertion and the PRF secret used to derive the
+          directory key.
+        </p>
+        <p className="text-fd-muted-foreground mt-4 leading-relaxed">
+          Peers check the signature, node-key possession and known revocations
+          before accepting a connection. The signing key stays with your passkey
+          provider. Each machine keeps its own node key.
+        </p>
+        <Link
+          href="/docs/beam#how-membership-works"
+          className="text-fd-primary mt-5 inline-block text-sm underline underline-offset-4"
+        >
+          Membership details
+        </Link>
       </div>
+      <BeamFigure label="Passkey approval sends a signed membership and directory secret to the joining machine">
+        <Track d="M85 95H160" color={BEAM_COLORS.sand} />
+        <Track d="M232 95H310" color={BEAM_COLORS.blue} />
+        <Key x={48} y={95} />
+        <Browser x={200} y={95} />
+        <g transform="translate(337 112) scale(.85)">
+          <Laptop cx={0} cy={0} />
+        </g>
+        <Key x={321} y={151} color={BEAM_COLORS.blue} />
+        <Label x={65} y={48}>
+          Passkey
+        </Label>
+        <Label x={200} y={48}>
+          beam.n10.is
+        </Label>
+        <Label x={335} y={48}>
+          Machine
+        </Label>
+        <Label x={65} y={151} muted>
+          Signing key
+        </Label>
+        <Label x={200} y={151} muted>
+          Approval page
+        </Label>
+        <Label x={335} y={190} muted>
+          Node key
+        </Label>
+        <Label x={200} y={222} muted>
+          One signature per statement
+        </Label>
+      </BeamFigure>
     </section>
   );
 }

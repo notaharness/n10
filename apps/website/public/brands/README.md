@@ -1,12 +1,15 @@
 # Tailscale assets
 
-The two icon SVGs are unmodified files from [Tailscale’s official media kit](https://tailscale.com/press), downloaded from:
-https://cdn.sanity.io/files/w77i7m8x/production/a426ba5f63316745e108a18a6dbbfed6970752fd.zip
+These official wordmarks are copied byte-for-byte from the desktop app:
 
-Archive paths: `Tailscale Logo/svg/Blk/Tailscale_icon_blk_rgb.svg` and
-`Tailscale Logo/svg/Wht/Tailscale_icon_wht_rgb.svg`.
+- `apps/desktop/src/renderer/assets/tailscale-logo-black.svg`
+- `apps/desktop/src/renderer/assets/tailscale-logo-white.svg`
 
-The included `Tailscale_BrandToolkit_10-2025.pdf`, pages 3–4, specifies dark/light
-variants, contrast, clear space of two dot diameters and a 48×48px minimum. The
-Beam credit uses the appropriate variant at 48×48px with 24px clear space, on a
-plain background. The toolkit does not prohibit a factual “Powered by” credit.
+The [Tailscale media kit](https://tailscale.com/press) contains the originals as
+`Tailscale Logo/svg/Blk/Tailscale_logo_blk_rgb.svg` and
+`Tailscale Logo/svg/Wht/Tailscale_logo_wht_rgb.svg`.
+
+Its `Tailscale_BrandToolkit_10-2025.pdf`, pages 3–4, specifies dark/light variants,
+contrast and clear space. The credit uses the appropriate unmodified wordmark
+at 48px high, on a plain background, with a separate “Powered by” label. The
+wordmark starts at the same left edge as the hero heading.

@@ -3,25 +3,25 @@ const streams = [
     command: 'beam connect buildbox',
     title: 'Interactive shells',
     description:
-      'Opens a terminal on buildbox. The remote terminal follows your window size. Run long-lived sessions in tmux so the work survives a disconnected shell.',
+      'Opens a terminal on buildbox. Use tmux to keep work running after disconnecting.',
   },
   {
     command: 'beam exec buildbox -- uname -a',
     title: 'Remote commands',
     description:
-      'Runs a command with input and output piped through the connection. The local command exits with the remote exit code.',
+      'Pipes input and output through the tunnel and returns the remote exit code.',
   },
   {
     command: "beam msg send buildbox --topic jobs 'ready'",
     title: 'Message delivery',
     description:
-      'Stores the message on the sender’s disk until the recipient acknowledges storing it. The sender retries on the tunnel it dials to the recipient. Both daemons must be connected for delivery; the directory stores no messages.',
+      'Keeps the message on the sender’s disk until the recipient stores it. Delivery needs both daemons connected.',
   },
 ];
 
 export function BeamStreams() {
   return (
-    <section className="mx-auto w-full max-w-5xl px-6 py-16">
+    <section className="mx-auto w-full max-w-5xl px-6 py-12">
       <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
         Connections and commands
       </h2>
