@@ -19,12 +19,12 @@ import type { SidebarModel, SyncState } from '../contract.js';
 /**
  * Assemble the unified, ordered sidebar model exactly like the TUI's
  * SidebarProvider — worktrees, then draft PRs, then PRs, then the
- * three review buckets — by reusing app-core's pure builders. Runs in
- * the main process where git + provider access is available; the
+ * three review buckets — by reusing core's pure builders. Runs in
+ * the host process where Git and provider access are available; the
  * result is plain data streamed to the renderer.
  *
- * Local state (worktrees, alive PTYs) is cheap and re-read on every
- * call; remote pull request data comes from the host's one instance
+ * Worktrees come from the engine resource and PTY state from the registry.
+ * Remote pull request data comes from the host's one instance
  * of `@n10/engine`'s pull request list (`services/pull-requests.ts`),
  * so the renderer can poll the model frequently without hammering the
  * provider API. The renderer's poll is also the list's demand: each
@@ -77,7 +77,7 @@ export async function listSidebarItems(): Promise<SidebarItem[]> {
   const sortedSessions = sortSessionsByPrId(sessions, sessionPrMap);
 
   // Merged/conflict decorations come from the host's remote sync loop
-  // (same shared passes the TUI's hooks drive).
+  // (the same engine service the TUI observes).
   const sync = getSyncDecorations();
   return buildSidebarItems(
     sortedSessions,

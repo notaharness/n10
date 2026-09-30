@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { execSync } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -40,19 +42,31 @@ test.describe('@integration Reviews Fixture', () => {
 
   test.use({
     n10RepoPath: cloneDir,
-    n10Config: {
-      keybindPreset: 'vim',
-      vendor: 'github',
-      // Categories describe this fixture reviewer, regardless of the token used
-      // to read the repository locally or in CI.
-      vendorProject: {
-        owner: 'kirby-test-runner',
-        repo: 'kirby-integration-test-repository',
-        username: 'kirby-test-runner',
-      },
-    },
+    n10Config: { keybindPreset: 'vim' },
     rows: 60,
     cols: 120,
+  });
+
+  test.beforeEach(async ({ fixtureHome }) => {
+    // Categories describe the fixture reviewer, independent of the read token.
+    // Provider/project identity is repository config, not global preferences.
+    const key = createHash('sha256')
+      .update(cloneDir)
+      .digest('hex')
+      .slice(0, 16);
+    const dir = join(fixtureHome, '.n10', 'projects', key);
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      join(dir, 'config.json'),
+      JSON.stringify({
+        vendor: 'github',
+        vendorProject: {
+          owner: 'kirby-test-runner',
+          repo: 'kirby-integration-test-repository',
+          username: 'kirby-test-runner',
+        },
+      })
+    );
   });
 
   test('Unified sidebar shows fixture PRs in correct categories', async ({

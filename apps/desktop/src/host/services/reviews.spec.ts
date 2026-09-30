@@ -1,28 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Verdict commands validate renderer inputs and fail loudly when unavailable.
- *
- * They validate: a PR id arrives from the sandboxed renderer — which
- * renders pull request markdown and provider-hosted images — and ends
- * up interpolated into a provider API path, so it is checked
- * structurally rather than trusted.
- *
- * And they degrade: a repo with no provider, or one that isn't
- * authenticated, is first-class. Reading returns nothing instead of
- * erroring (the TUI's usePrData does the same), while an action the
- * user explicitly took has to fail loudly rather than vanish.
- */
+/** Thread/verdict commands validate input and report missing capabilities. */
 
 const env = vi.hoisted(() => ({
   config: {} as Record<string, unknown>,
   configured: true,
   /** Provider capabilities present on the object. */
   capabilities: {
-    comments: true,
     replies: true,
     resolve: true,
-    description: true,
     verdicts: true,
   },
   calls: [] as { method: string; args: unknown[] }[],
@@ -38,24 +24,17 @@ vi.mock('./providers.js', () => {
     (method: string) =>
     (...args: unknown[]) => {
       env.calls.push({ method, args });
-      return Promise.resolve(method === 'fetchPullRequests' ? {} : undefined);
+      return Promise.resolve();
     };
   return {
     get PROVIDERS() {
       const p: Record<string, unknown> = {
         id: 'github',
         isConfigured: () => env.configured,
-        fetchPullRequests: record('fetchPullRequests'),
       };
-      if (env.capabilities.comments) {
-        p.fetchCommentThreads = record('fetchCommentThreads');
-      }
       if (env.capabilities.replies) p.replyToThread = record('replyToThread');
       if (env.capabilities.resolve) {
         p.setThreadResolved = record('setThreadResolved');
-      }
-      if (env.capabilities.description) {
-        p.fetchPullRequestDescription = record('fetchPullRequestDescription');
       }
       if (env.capabilities.verdicts) {
         p.submitReviewVerdict = record('submitReviewVerdict');
@@ -80,10 +59,8 @@ beforeEach(() => {
   };
   env.configured = true;
   env.capabilities = {
-    comments: true,
     replies: true,
     resolve: true,
-    description: true,
     verdicts: true,
   };
   env.calls = [];
