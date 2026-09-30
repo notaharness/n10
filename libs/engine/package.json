@@ -24,6 +24,6 @@
     "@n10/core": "*",
     "@n10/logger": "*",
     "@n10/vcs-core": "*",
-    "@n10/worktree-manager": "^0.0.1"
+    "@n10/worktree-manager": "*"
   }
 }
