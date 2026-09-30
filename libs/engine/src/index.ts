@@ -77,3 +77,5 @@ export type {
   RemoteMachinePort,
   StreamEventPayload,
 } from './lib/machines/remote-machines.js';
+export { createPlanCommands } from './lib/plans/plan-commands.js';
+export type * from './lib/plans/plan-types.js';

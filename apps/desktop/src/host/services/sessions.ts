@@ -1,13 +1,10 @@
-import { sessionKeyForBranch } from '@n10/core';
 import {
   buildReviewLaunchRequest,
-  checkoutPlan as checkoutPlanCore,
   getSession,
   noteInput,
   noteResize,
   snapshot as activitySnapshot,
 } from '@n10/core';
-import { readConfig } from '@n10/vcs-core';
 import { activeRepository, requireRepo } from './repo.js';
 import { machines } from './machines.js';
 import { machineFor } from './remote-machines.js';
@@ -121,85 +118,19 @@ export async function launchReviewAgent(req: ReviewLaunchRequest): Promise<{
   });
 }
 
-// Double-sends land here the way double-clicks land on launch: the
-// renderer disables the button while a send is in flight, but the
-// second click can beat the state update. Joining the in-flight
-// promise makes the second one a no-op instead of a second spawn.
-// (A checkout racing a plain launch of the same branch is not
-// serialized — the loser's PTY is disposed by the winner's spawn,
-// which is the same outcome as two launches racing.)
-const inflightCheckouts = new Map<string, Promise<PlanCheckoutResult>>();
-
-/**
- * Send a composed plan to the agent for `req.pr`.
- *
- * The three-state decision — inject into a live agent, respawn it, or
- * create the worktree and start one — lives in @n10/core and is
- * shared with the TUI. What the desktop adds is its own bookkeeping:
- * the ownership guard, and adopting whatever PTY comes out so its
- * output reaches the renderer.
- */
-export function checkoutPlan(
+export async function checkoutPlan(
   req: PlanCheckoutRequest
 ): Promise<PlanCheckoutResult> {
-  const repoCwd = requireRepo();
-  // Keyed by the PR's branch: which checkout (and so which session) it
-  // lands in is only known once core has resolved or created it.
-  const key = JSON.stringify([repoCwd, req.pr.sourceBranch]);
-  const existing = inflightCheckouts.get(key);
-  if (existing) return existing;
-  const promise = doCheckoutPlan(req, repoCwd).finally(() =>
-    inflightCheckouts.delete(key)
-  );
-  inflightCheckouts.set(key, promise);
-  return promise;
-}
-
-async function doCheckoutPlan(
-  req: PlanCheckoutRequest,
-  repoCwd: string
-): Promise<PlanCheckoutResult> {
-  const branch = req.pr.sourceBranch;
-  const scope = activeRepository().worktrees.scope();
-  const current = await sessionKeyForBranch(branch, scope);
-  // Reject a stale request aimed at another repository's relay.
-  if (current && known.has(current) && !ownSession(current))
-    throw foreignSessionError(current);
-  await machines.refuseIfRemoteOwns(repoCwd, branch, current);
-  const config = readConfig(repoCwd);
-  // core reports failures by flashing a status line, which the TUI has
-  // and the host does not. Capture the message and reject with it: the
-  // renderer toasts it and leaves the plan intact for a retry.
-  let failure: string | null = null;
-  const before = current ? getSession(current) : undefined;
-  const result = await checkoutPlanCore({
-    repo: repoCwd,
-    pr: req.pr,
-    prompt: req.prompt,
-    paneCols: clampDim(req.cols, DEFAULT_COLS),
-    paneRows: clampDim(req.rows, DEFAULT_ROWS),
-    mode: req.mode,
-    config,
-    flashStatus: (msg) => {
-      failure ??= msg;
+  const repo = activeRepository();
+  const result = await repo.sessions.checkoutPlan(req, {
+    beforeLaunch: async (branch, current) => {
+      if (current && known.has(current) && !ownSession(current))
+        throw foreignSessionError(current);
+      await machines.refuseIfRemoteOwns(repo.cwd, branch, current);
     },
+    started: adoptSession,
   });
-  if (result === 'failed') {
-    throw new Error(failure ?? 'Could not send the plan to the agent');
-  }
-  const name = await sessionKeyForBranch(branch, scope);
-  if (
-    name &&
-    (result === 'spawned' || (getSession(name) && getSession(name) !== before))
-  ) {
-    adoptSession(name, repoCwd);
-  }
-  return result;
-}
-
-function clampDim(value: number | undefined, fallback: number): number {
-  if (!value || !Number.isFinite(value) || value < 2) return fallback;
-  return Math.min(500, Math.floor(value));
+  return result.outcome;
 }
 
 export function listSessions(): SessionSummary[] {

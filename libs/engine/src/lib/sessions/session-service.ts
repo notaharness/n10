@@ -1,3 +1,4 @@
+import { createPlanCommands } from '../plans/plan-commands.js';
 import { createSessionConnections } from './session-connections.js';
 import { isDeepStrictEqual } from 'node:util';
 import {
@@ -96,6 +97,11 @@ export function createSessionService(options: {
     if (entry !== before) ports.started?.(wt.name, config.repo);
   }
   return {
+    ...createPlanCommands({
+      config,
+      isCurrent: () => !disposed && isCurrent(),
+      changed: refresh,
+    }),
     ...createSessionCommands({
       ...options,
       changed: publish,

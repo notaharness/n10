@@ -11,7 +11,6 @@ import {
   useNavActions,
   useAsyncOps,
   usePlan,
-  useConfig,
 } from '@n10/app-core';
 import { handlePlanCheckoutInput } from './main-input.js';
 
@@ -23,7 +22,7 @@ interface PlanCheckoutContainerProps {
 }
 
 // Interactive checkout pane: review the per-PR plan as a checklist,
-// prune items, edit notes, then forward the composed prompt to a Claude
+// prune items, edit notes, then forward the composed prompt to the configured
 // agent in the PR's worktree. Mounted by MainContent when
 // paneMode === 'plan-checkout'.
 export function PlanCheckoutContainer({
@@ -43,7 +42,6 @@ export function PlanCheckoutContainer({
   );
   const asyncOps = useAsyncOps();
   const plan = usePlan();
-  const config = useConfig();
 
   const prId = selectedPr?.id;
   const items = prId != null ? plan.list(prId) : [];
@@ -60,7 +58,6 @@ export function PlanCheckoutContainer({
         sidebar,
         nav,
         keybinds,
-        config,
       });
     },
     { isActive: !terminalFocused }

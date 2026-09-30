@@ -80,9 +80,8 @@ The reasoning behind each rule is in `docs/decisions.md`.
   verdict did not cover, checked before and after the agent stops. It returns
   what it did.
 - **Plan** (`plan/`): items are value snapshots taken at add time.
-  `composePlanPrompt` numbers items in `planRows` order. Checkout is
-  three-state: inject into a live agent, respawn, or create the worktree and
-  spawn.
+  `composePlanPrompt` numbers items in `planRows` order. The engine owns
+  checkout and session delivery; carts stay in each frontend.
 - **Babysit** (`babysit/`): pure baseline/observation model and prompt composition.
   The engine owns watch lifetime, freshness, polling and delivery coordination.
   The baseline records what the agent was told, not merely what was observed.

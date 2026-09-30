@@ -88,3 +88,8 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   `refresh` retains last-good rows and an error; `listMachines` rejects that
   error for callers that require a successful read, including IPC and ownership
   checks. Machine data types are exported by browser-safe `@n10/engine/contract`.
+
+- **Plans** (`plans/`): `sessions.checkoutPlan` captures config and scope before
+  lookup, checks repository lifetime before mutation, coalesces identical sends
+  and rejects differing in-flight prompts. Refresh after partial failure; adopt
+  completed launches under their captured repository. The cart stays in the UI.

@@ -99,7 +99,8 @@ propagated through the stack before merging.
 8. **Machines**: fleet snapshots, stale-read rejection and remote command policy with injected machine
    ports. Beam socket/native-process ownership stays in desktop adapters; an
    unsupported shell observes an unavailable capability without a fake backend.
-9. **Plans**: shared checkout command and session invalidation. Keep each
+9. **Plans**: shared `sessions.checkoutPlan` command, captured scope and config,
+   coalesced delivery and session invalidation. Keep each
    frontend's browser-safe cart and presentation local; delete duplicated
    checkout coordination, not the intentionally local cart.
 10. **Contract and dependency closure**: extract the browser-safe engine contract

@@ -1,3 +1,4 @@
+import type * as WorktreeModule from '@n10/worktree-manager';
 import type * as EngineModule from '@n10/engine';
 import type { AppConfig } from '@n10/vcs-core';
 import type * as CoreModule from '@n10/core';
@@ -35,7 +36,7 @@ const state = vi.hoisted(() => ({
   onData: new Map<string, (data: string) => void>(),
   configByCwd: {} as Record<string, unknown>,
   createFails: new Set<string>(),
-  /** Prompts core's checkoutPlan delivered into a live agent. */
+  /** Prompts the engine plan command delivered into a live agent. */
   injected: [] as { name: string; prompt: string }[],
   /** Branch names whose checkout core should report as failed. */
   checkoutFails: new Set<string>(),
@@ -104,6 +105,7 @@ vi.mock('./repo.js', async () => {
           return path ? { path, branch: target.branch } : null;
         },
         resolve: (target: { branch: string }) => create(target.branch),
+        refresh: async () => undefined,
         subscribe: () => () => undefined,
         getSnapshot: () => ({ worktrees: [], error: null }),
       } as unknown as EngineModule.WorktreeService;
@@ -153,8 +155,12 @@ vi.mock('@n10/terminal-tmux', () => ({
     ),
 }));
 
-vi.mock('@n10/worktree-manager', () => ({
-  branchToSessionName: (branch: string) => branch.replace(/\//g, '-'),
+vi.mock('@n10/worktree-manager', async (original) => ({
+  ...(await original<typeof WorktreeModule>()),
+  createWorktree: async (branch: string, scope: { cwd: string }) => {
+    if (state.checkoutFails.has(branch)) return null;
+    return addCheckout(branch, scope.cwd);
+  },
 }));
 
 vi.mock('./remote-machines.js', () => ({
@@ -220,41 +226,9 @@ vi.mock('@n10/core', async (importOriginal) => {
       running: false,
       canResume: false,
     }),
-    // Stands in for the real orchestrator, whose own branching is tested
-    // in libs/core. What matters here is what the *desktop* does with
-    // each outcome: inject changes nothing it tracks, a spawn has to be
-    // adopted so its output reaches the renderer.
-    checkoutPlan: (deps: {
-      pr: { sourceBranch: string };
-      prompt: string;
-      mode: 'inject' | 'new-session';
-      flashStatus: (msg: string) => void;
-    }) => {
-      if (state.checkoutFails.has(deps.pr.sourceBranch)) {
-        deps.flashStatus(
-          `Failed to create worktree for ${deps.pr.sourceBranch}`
-        );
-        return Promise.resolve('failed');
-      }
-      // Resolves the branch's checkout, creating it when there is none.
-      const cwd = addCheckout(deps.pr.sourceBranch);
-      const name = actual.worktreeSessionKey(cwd, state.cwd);
-      if (
-        (state.alive.has(name) || state.persisted.has(name)) &&
-        deps.mode === 'inject'
-      ) {
-        state.alive.add(name);
-        state.injected.push({ name, prompt: deps.prompt });
-        return Promise.resolve('injected');
-      }
-      state.alive.add(name);
-      state.spawns.push({
-        name,
-        cwd,
-        config: null,
-        request: { intent: 'seed', prompt: deps.prompt },
-      });
-      return Promise.resolve('spawned');
+    deliverToRunningSession: (name: string, prompt: string) => {
+      state.injected.push({ name, prompt });
+      return state.alive.has(name);
     },
     buildAgentOptions: actual.buildAgentOptions,
     buildReviewLaunchRequest: (pr: { id: number }, instruction?: string) => ({
@@ -975,7 +949,7 @@ describe('checkoutPlan', () => {
   });
 
   it('adopts a spawned session so its output reaches the renderer', async () => {
-    // core does the spawning; without the host adopting it, the PTY
+    // The engine owns the launch; without the host adopting it, the PTY
     // runs with nothing relaying it and the terminal pane stays blank.
     await expect(checkoutPlan(req())).resolves.toBe('spawned');
     emit(keyFor('feature/x', '/repo-a'), 'agent says hello');
@@ -1067,13 +1041,6 @@ describe('checkoutPlan', () => {
   });
 
   // ── Cross-machine duplicate agent (Phase 8's closed hole) ─────────
-  //
-  // checkoutPlan used to resolve a branch's session by *local* state
-  // only, so a branch whose agent runs on another fleet member found
-  // nothing here and spawned a second, local agent for it — the exact
-  // duplicate-agent shape a whole review round closed on the launch
-  // path (open-session.ts's findSession), just left open on this one.
-
   it('refuses, naming the machine, when the branch already has an agent running elsewhere', async () => {
     state.knownMachines.add('bbbbbbbbbbbbbbbb');
     state.machines = [connectedMachine('bbbbbbbbbbbbbbbb', 'workbox')];
@@ -1122,14 +1089,6 @@ describe('checkoutPlan', () => {
     await expect(checkoutPlan(req())).resolves.toBe('spawned');
   });
 
-  // ── Finding 1 (HIGH): a live local agent must always be injectable ──
-  //
-  // The cross-machine check above used to run before core's own State A
-  // (a live local agent) was ever considered, so a peer merely *also*
-  // having a session tagged with this repo path and branch — the normal
-  // case once the same branch is launched on a second machine — made
-  // "Send plan to agent" refuse forever, even though the agent it should
-  // inject into was sitting right there in the pane.
   it('injects into a live local agent even when a peer also has a session for this branch', async () => {
     await launchAgent({ branch: 'feature/x', intent: 'continue-or-blank' });
     state.spawns = [];

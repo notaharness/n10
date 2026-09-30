@@ -759,3 +759,19 @@ live in the browser-safe `@n10/engine/contract` entry. Desktop only adapts engin
 events to IPC and installs Beam ports; Beam sockets, reconnection, enrolment
 protocols, the mail relay and utility-process daemon ownership remain adapters.
 D15's external-versus-app-owned daemon shutdown rule is unchanged.
+
+### Engine plan delivery
+
+`plans/plan-commands.ts` supplies `sessions.checkoutPlan` to both shells. The
+command captures config and path policy before its first await and checks the
+repository lifetime before checkout, delivery or process replacement. Identical
+in-flight sends coalesce; a different prompt or delivery mode is rejected so no
+plan is silently dropped. Delivery returns the actual checkout's session key.
+Completed launches are adopted under the captured repository even if selection
+changes during launch; worktree/session observation refreshes after success or
+failure. Mutations have no automatic replay or timeout.
+
+The frontend retains its cart and composed preview. Core retains launch, attach,
+stop and inject primitives; its plan checkout orchestrator and the desktop's
+coalescing/adoption coordinator are deleted. The browser-safe engine contract
+owns the plan request/result types.

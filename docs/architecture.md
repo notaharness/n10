@@ -13,9 +13,9 @@ below it, and the ESLint module boundaries enforce the direction.
 | `apps/cli`, `apps/desktop` | Rendering and input. The TUI runs the engine in its own process; the desktop runs it in the `n10 host` utility process, behind the host bridge. Two open shells share the implementation, not the state. |
 
 The engine owns config, repository selection, worktrees, remote sync, the PR
-list, review reads/commands, worktree sessions, directory terminals, babysitters and fleet state. Repository handles own config,
+list, review reads/commands, worktree sessions, directory terminals, babysitters, fleet state and plan delivery. Repository handles own config,
 worktree, review and session observation lifetimes; shells bind sync lifetime.
-Plan checkout follows the [domain plan](design/engine-domains.md), which
+The [domain plan](design/engine-domains.md)
 records the survey, migration order, target diagram and worker evidence.
 
 ## Directory map
@@ -88,9 +88,10 @@ libs/engine/                     — The program both shells run: state, schedul
   src/lib/sessions/              — Repository-scoped worktree sessions; process-wide directory terminal lifecycle
   src/lib/babysitters/           — Per-repository PR watches, observation freshness, bounded polling and delivery coordination
   src/lib/machines/              — Fleet snapshots, remote ownership policy and injected command/PTY/mail ports
+  src/lib/plans/                 — Captured-repository plan checkout, delivery, coalescing and invalidation
   src/contract.ts                — Browser-safe engine data contracts
 libs/core/                       — Shell-agnostic operations. No React, Ink, Electron or engine (lint-enforced)
-  src/lib/session/               — Session launch + plan checkout flows
+  src/lib/session/               — Session launch and delivery primitives
   src/lib/plan/                  — Plan store (external store) + prompt composition
   src/lib/babysit/               — Pure observation model and briefing composition
   src/plan.ts                    — Browser-safe entry (`@n10/core/plan`) for the renderer
