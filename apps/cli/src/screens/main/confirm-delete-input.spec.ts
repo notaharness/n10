@@ -37,7 +37,6 @@ const ENTER: KeyPress = {
 
 const FORCED: DeleteConfirmState = {
   branch: 'alpha',
-  sessionName: 'wt:alpha',
   reason: 'uncommitted changes',
   mode: 'type-branch',
   approved: {
@@ -53,7 +52,6 @@ const FORCED: DeleteConfirmState = {
 
 const RUNNING: DeleteConfirmState = {
   branch: 'alpha',
-  sessionName: 'wt:alpha',
   reason: 'An agent is running here — deleting stops it',
   mode: 'yes-no',
   approved: {
@@ -102,7 +100,6 @@ describe('confirming a typed branch name', () => {
     await t.settle();
 
     expect(t.ctx.sessions.performDelete).toHaveBeenCalledExactlyOnceWith(
-      'wt:alpha',
       'alpha',
       FORCED.approved
     );
@@ -130,7 +127,6 @@ describe('confirming a running agent’s removal', () => {
     await t.settle();
 
     expect(t.ctx.sessions.performDelete).toHaveBeenCalledExactlyOnceWith(
-      'wt:alpha',
       'alpha',
       RUNNING.approved
     );

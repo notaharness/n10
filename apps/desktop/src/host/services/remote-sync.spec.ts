@@ -1,364 +1,112 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type * as RemoteSyncModule from './remote-sync.js';
+import { beforeEach, expect, it, vi } from 'vitest';
+import type { RemoteSyncOptions, SyncNotice } from '@n10/engine';
 
-/**
- * A pass names its repository in every git call, but the removal goes
- * through the worktrees service, which acts on whichever repository is
- * open. A pass that keeps going after a repo switch must therefore stop
- * before removing anything, and a pass that keeps going after quit can
- * exit between removing a worktree and deleting its branch.
- *
- * Both are prevented by a generation counter, and both are what these
- * tests are about, along with each call naming the pass's repository.
- */
-
-/** The verdict core's sweep hands over with a branch to remove. */
-const SWEPT = vi.hoisted(
-  () =>
-    ({
-      verdict: 'clear',
-      tip: 'abc123',
-      repo: '/repo/.git',
-      checkout: '/repo/wt',
-    } as const)
-);
-
-const env = vi.hoisted(() => ({
-  configured: true,
-  branches: ['feature/a'] as string[],
-  merged: new Set<string>(),
-  conflicts: new Map<string, number>(),
-  prMap: {} as Record<string, unknown>,
-  /** Arguments of every computeConflictCounts call. */
-  conflictCalls: [] as unknown[][],
-  synced: [] as unknown[],
-  /** The repository each worktree listing and sweep was asked about. */
-  listed: [] as unknown[],
-  swept: [] as unknown[],
-  sweeps: 0,
-  removed: [] as { branch: string; approved: unknown }[],
-  /** What core's removal answers. */
-  removes: 'removed' as string,
-  notices: [] as { message: string; kind: string }[],
-  /** Resolvers for each syncRemote() call, in order. */
-  pending: [] as ((ts: number) => void)[],
-  rejects: [] as ((e: Error) => void)[],
-  sweepThrows: false,
-  autoDelete: null as string | null,
+const state = vi.hoisted(() => ({
+  config: { repo: '/repo-a' },
+  instances: [] as {
+    start: ReturnType<typeof vi.fn>;
+    stop: ReturnType<typeof vi.fn>;
+    refresh: ReturnType<typeof vi.fn>;
+    notify: (notice: SyncNotice) => void;
+  }[],
+  options: [] as RemoteSyncOptions[],
+  pullRequests: {},
+  worktrees: {},
 }));
-
-function nextSync(): Promise<number> {
-  return new Promise<number>((resolve, reject) => {
-    env.pending.push(resolve);
-    env.rejects.push(reject);
-  });
-}
-
-vi.mock('./repo.js', () => ({
-  requireRepo: () => '/repo-a',
-}));
-
-vi.mock('./pull-requests.js', () => ({
-  cachedPullRequests: () => env.prMap,
-}));
-
-vi.mock('./worktrees.js', () => ({
-  removeWorktree: (branch: string, approved: unknown) => {
-    env.removed.push({ branch, approved });
-    return Promise.resolve(env.removes);
-  },
-}));
-
-vi.mock('@n10/vcs-core', () => ({
-  readConfig: () => ({ vendor: 'github', mergePollInterval: 999 }),
-}));
-
-vi.mock('@n10/worktree-manager', () => ({
-  listWorktrees: (cwd: unknown) => {
-    env.listed.push(cwd);
-    return Promise.resolve(env.branches.map((branch) => ({ branch })));
-  },
-}));
-
-vi.mock('@n10/core', () => ({
-  remoteSyncIntervalMs: () => 3_600_000,
-  syncRemote: (cwd: string) => {
-    env.synced.push(cwd);
-    return nextSync();
-  },
-  sweepMergedBranches: async (opts: {
-    isCancelled: () => boolean;
-    onAutoDelete: (
-      session: string,
-      branch: string,
-      approved: unknown
-    ) => Promise<void>;
-    cwd?: string;
-  }) => {
-    env.sweeps += 1;
-    env.swept.push(opts.cwd);
-    if (env.sweepThrows) throw new Error('provider unreachable');
-    if (env.autoDelete) {
-      await opts.onAutoDelete(env.autoDelete, env.autoDelete, SWEPT);
-    }
-    return { merged: env.merged, nextWarned: new Set<string>() };
-  },
-  computeConflictCounts: (...args: unknown[]) => {
-    env.conflictCalls.push(args);
-    return Promise.resolve(env.conflicts);
-  },
-}));
-
-let sync: typeof RemoteSyncModule;
-
-/** Let queued microtasks (the pass chain) run to completion. */
-async function flush(times = 6) {
-  for (let i = 0; i < times; i++) await Promise.resolve();
-  await new Promise((r) => setImmediate(r));
-}
-
-beforeEach(async () => {
-  env.configured = true;
-  env.branches = ['feature/a'];
-  env.merged = new Set();
-  env.conflicts = new Map();
-  env.prMap = {};
-  env.conflictCalls = [];
-  env.synced = [];
-  env.listed = [];
-  env.swept = [];
-  env.sweeps = 0;
-  env.removed = [];
-  env.removes = 'removed';
-  env.notices = [];
-  env.pending = [];
-  env.rejects = [];
-  env.sweepThrows = false;
-  env.autoDelete = null;
-
-  vi.resetModules();
-  sync = await import('./remote-sync.js');
-  sync.setSyncNotifier((n) => env.notices.push(n));
-});
-
-afterEach(() => {
-  sync.stopRemoteSyncLoop();
-});
-
-describe('cancellation', () => {
-  it('abandons an in-flight pass when the loop is stopped', async () => {
-    sync.startRemoteSyncLoop('/repo-a');
-    await flush();
-    expect(env.pending).toHaveLength(1); // the pass is awaiting git
-
-    sync.stopRemoteSyncLoop();
-    env.pending[0](Date.now());
-    await flush();
-
-    // Quitting mid-pass must not let the sweep — and its auto-delete —
-    // continue into a process that is about to exit.
-    expect(env.sweeps).toBe(0);
-  });
-
-  it('abandons the previous repo pass when another repo is opened', async () => {
-    sync.startRemoteSyncLoop('/repo-a');
-    await flush();
-    expect(env.pending).toHaveLength(1);
-
-    sync.startRemoteSyncLoop('/repo-b');
-    // Passes are serialized, so B waits for A's chain to unwind.
-    env.pending[0](Date.now());
-    await flush();
-
-    // A resumed, saw a newer generation and returned before running any
-    // git against what is now a different checkout.
-    expect(env.sweeps).toBe(0);
-    // B is the one now waiting on git.
-    expect(env.pending).toHaveLength(2);
-  });
-
-  it('runs the pass through when nothing interrupts it', async () => {
-    sync.startRemoteSyncLoop('/repo-a');
-    await flush();
-    env.pending[0](1234);
-    await flush();
-
-    expect(env.sweeps).toBe(1);
-    expect(sync.getSyncDecorations().lastGitSyncAt).toBe(1234);
-  });
-
-  it('fetches in the repository it is for, and judges conflicts by the cached pull requests', async () => {
-    // The conflict predicate needs each branch's target, which only
-    // the pull request list knows; the fetch goes through the line the
-    // babysitters share, keyed by repository.
-    env.prMap = { 'feature/a': { id: 1, targetBranch: 'release' } };
-    sync.startRemoteSyncLoop('/repo-a');
-    await flush();
-    env.pending[0](1234);
-    await flush();
-    expect(env.synced).toEqual(['/repo-a']);
-    expect(env.conflictCalls).toEqual([[['feature/a'], env.prMap, '/repo-a']]);
-  });
-
-  // The process's directory follows whichever repository is open; the
-  // listing and the sweep must not.
-  it('lists and sweeps the repository the pass is for', async () => {
-    sync.startRemoteSyncLoop('/repo-b');
-    await flush();
-    env.pending[0](1234);
-    await flush();
-    expect(env.listed).toEqual(['/repo-b']);
-    expect(env.swept).toEqual(['/repo-b']);
-  });
-});
-
-describe('decorations across repo changes', () => {
-  async function completeAPass(cwd: string) {
-    sync.startRemoteSyncLoop(cwd);
-    await flush();
-    env.pending[env.pending.length - 1](1000);
-    await flush();
-  }
-
-  it('drops the previous repo badges when switching repository', async () => {
-    env.merged = new Set(['feature/a']);
-    await completeAPass('/repo-a');
-    expect(sync.getSyncDecorations().merged.size).toBe(1);
-
-    sync.startRemoteSyncLoop('/repo-b');
-    // Stale "merged" badges from another checkout would be wrong, not
-    // merely out of date.
-    expect(sync.getSyncDecorations().merged.size).toBe(0);
-  });
-
-  it('keeps them when the same repo restarts for a new interval', async () => {
-    env.merged = new Set(['feature/a']);
-    await completeAPass('/repo-a');
-
-    sync.startRemoteSyncLoop('/repo-a');
-    // Same checkout, so the badges are still true — blinking them out
-    // until the next pass would just look like a glitch.
-    expect(sync.getSyncDecorations().merged.size).toBe(1);
-  });
-});
-
-describe('gating and effects', () => {
-  it('does no git work when the provider is not configured', async () => {
-    env.configured = false;
-    sync.startRemoteSyncLoop('/repo-a');
-    await flush();
-
-    // Matches the TUI, which gates its polling the same way.
-    expect(env.pending).toHaveLength(0);
-    expect(env.sweeps).toBe(0);
-  });
-
-  it('removes an auto-deleted merged branch as the sweep judged it, and says so', async () => {
-    env.autoDelete = 'feature/a';
-    sync.startRemoteSyncLoop('/repo-a');
-    await flush();
-    env.pending[0](1000);
-    await flush();
-
-    expect(env.removed).toEqual([{ branch: 'feature/a', approved: SWEPT }]);
-    expect(env.notices).toEqual([
-      { message: 'Auto-deleted merged branch: feature/a', kind: 'success' },
-    ]);
-  });
-
-  it('says nothing when core kept the worktree', async () => {
-    env.autoDelete = 'feature/a';
-    env.removes = 'changed';
-    sync.startRemoteSyncLoop('/repo-a');
-    await flush();
-    env.pending[0](1000);
-    await flush();
-
-    expect(env.notices).toEqual([]);
-  });
-
-  it('warns when core removed the worktree but kept the branch', async () => {
-    env.autoDelete = 'feature/a';
-    env.removes = 'kept-branch';
-    sync.startRemoteSyncLoop('/repo-a');
-    await flush();
-    env.pending[0](1000);
-    await flush();
-
-    expect(env.notices).toEqual([
-      {
-        message:
-          'Auto-deleted the worktree of merged branch feature/a; kept the branch: it has commits made after the check',
-        kind: 'warning',
+vi.mock('./repo.js', () => ({ activeConfigService: () => state.config }));
+vi.mock('./program.js', () => ({ pullRequests: state.pullRequests }));
+vi.mock('./worktrees.js', () => ({ worktreeCommands: () => state.worktrees }));
+vi.mock('@n10/engine', () => ({
+  EMPTY_SYNC_SNAPSHOT: { lastGitSyncAt: null },
+  createRemoteSync: (options: RemoteSyncOptions) => {
+    state.options.push(options);
+    const instance = {
+      start: vi.fn(),
+      stop: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined),
+      notify: vi.fn() as (notice: SyncNotice) => void,
+      getSnapshot: () => ({ lastGitSyncAt: 42 }),
+      subscribeNotices(listener: (notice: SyncNotice) => void) {
+        instance.notify = listener;
+        return () => undefined;
       },
-    ]);
-  });
-
-  it('does not auto-delete after the loop was stopped', async () => {
-    env.autoDelete = 'feature/a';
-    sync.startRemoteSyncLoop('/repo-a');
-    await flush();
-    sync.stopRemoteSyncLoop();
-    env.pending[0](1000);
-    await flush();
-
-    expect(env.removed).toEqual([]);
-  });
-});
-
-describe('when git or the provider is unreachable', () => {
-  async function completeAPass(ts = 1000) {
-    await flush();
-    env.pending[env.pending.length - 1](ts);
-    await flush();
-  }
-
-  it('keeps the badges from the last good pass when a fetch fails', async () => {
-    env.merged = new Set(['feature/a']);
-    sync.startRemoteSyncLoop('/repo-a');
-    await completeAPass(1000);
-    expect(sync.getSyncDecorations().merged.size).toBe(1);
-
-    // Second pass: the fetch fails, as it does on a dropped network or
-    // an upstream that has gone away.
-    sync.startRemoteSyncLoop('/repo-a');
-    await flush();
-    env.rejects[env.rejects.length - 1](new Error('could not resolve host'));
-    await flush();
-
-    // Badges are still true as of the last successful pass; blanking
-    // them would report every branch as unmerged and conflict-free.
-    expect(sync.getSyncDecorations().merged.size).toBe(1);
-    expect(sync.getSyncDecorations().lastGitSyncAt).toBe(1000);
-  });
-
-  it('survives the sweep itself failing', async () => {
-    env.sweepThrows = true;
-    sync.startRemoteSyncLoop('/repo-a');
-    await completeAPass();
-
-    // A provider error mid-pass is caught; nothing is auto-deleted on
-    // the strength of a half-finished answer.
-    expect(env.removed).toEqual([]);
-    expect(sync.getSyncDecorations().lastGitSyncAt).toBeNull();
-  });
-
-  it('runs again after a failure rather than giving up', async () => {
-    sync.startRemoteSyncLoop('/repo-a');
-    await flush();
-    env.rejects[0](new Error('offline'));
-    await flush();
-
-    // A transient failure must not leave the app permanently stale;
-    // the next pass has to go out.
-    env.sweepThrows = false;
-    sync.startRemoteSyncLoop('/repo-a');
-    await completeAPass(2000);
-    expect(env.sweeps).toBe(1);
-    expect(sync.getSyncDecorations().lastGitSyncAt).toBe(2000);
-  });
-});
-
-vi.mock('./providers.js', () => ({
-  PROVIDERS: [{ id: 'github', isConfigured: () => env.configured }],
+    };
+    state.instances.push(instance);
+    return instance;
+  },
 }));
+
+beforeEach(() => {
+  vi.resetModules();
+  state.config = { repo: '/repo-a' };
+  state.instances = [];
+  state.options = [];
+});
+
+it('composes the selected config/cache/removal services and adapts notices', async () => {
+  const host = await import('./remote-sync.js');
+  const notify = vi.fn();
+  host.setSyncNotifier(notify);
+  host.startRemoteSyncLoop('/repo-a');
+  expect(state.options[0]).toEqual({
+    config: state.config,
+    pullRequests: state.pullRequests,
+    worktrees: state.worktrees,
+  });
+  expect(state.instances[0].start).toHaveBeenCalledOnce();
+  state.instances[0].notify({
+    type: 'removed',
+    repo: '/repo-a',
+    branch: 'topic',
+  });
+  expect(notify).toHaveBeenCalledWith({
+    message: 'Auto-deleted merged branch: topic',
+    kind: 'success',
+  });
+  expect(host.getSyncDecorations().lastGitSyncAt).toBe(42);
+});
+
+it('reuses the same scope and stops it when selecting another config handle', async () => {
+  const host = await import('./remote-sync.js');
+  host.startRemoteSyncLoop('/repo-a');
+  host.startRemoteSyncLoop('/repo-a');
+  expect(state.instances).toHaveLength(1);
+  expect(state.instances[0].start).toHaveBeenCalledTimes(2);
+  state.config = { repo: '/repo-b' };
+  host.startRemoteSyncLoop('/repo-b');
+  expect(state.instances[0].stop).toHaveBeenCalledOnce();
+  expect(state.instances).toHaveLength(2);
+  await host.refreshRemoteSync();
+  expect(state.instances[1].refresh).toHaveBeenCalledOnce();
+  await host.stopRemoteSyncLoop();
+  expect(state.instances[1].stop).toHaveBeenCalledOnce();
+});
+
+it('ignores a request for a repository that is no longer selected', async () => {
+  const host = await import('./remote-sync.js');
+  host.startRemoteSyncLoop('/repo-b');
+  expect(state.instances).toHaveLength(0);
+});
+
+it('waits for retiring scopes on shutdown as well as the current one', async () => {
+  const host = await import('./remote-sync.js');
+  host.startRemoteSyncLoop('/repo-a');
+  let finish!: () => void;
+  state.instances[0].stop.mockReturnValue(
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    })
+  );
+  state.config = { repo: '/repo-b' };
+  host.startRemoteSyncLoop('/repo-b');
+  let stopped = false;
+  const shutdown = host.stopRemoteSyncLoop().then(() => {
+    stopped = true;
+  });
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(stopped).toBe(false);
+  finish();
+  await shutdown;
+  expect(stopped).toBe(true);
+});

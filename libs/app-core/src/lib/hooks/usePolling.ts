@@ -8,13 +8,11 @@ export interface PollingState<T> {
   refresh: () => Promise<void>;
 }
 
-/** Polling adapter for resources awaiting engine migration. A changed restart
- * revision replaces the schedule even when the interval stays the same. */
+/** Polling adapter for resources awaiting engine migration. */
 export function usePolling<T>(
   fn: () => Promise<T>,
   intervalMs: number,
-  enabled = true,
-  restartRevision = 0
+  enabled = true
 ): PollingState<T> {
   const [value, setValue] = useState<T | undefined>(undefined);
   const [error, setError] = useState<Error | null>(null);
@@ -51,7 +49,7 @@ export function usePolling<T>(
       mountedRef.current = false;
       clearInterval(timer);
     };
-  }, [enabled, intervalMs, refresh, restartRevision]);
+  }, [enabled, intervalMs, refresh]);
 
   return { value, error, loading, refresh };
 }

@@ -11,7 +11,6 @@ import {
   MACHINES_EVENTS,
   SYNC_EVENTS,
 } from './contract.js';
-import { setSyncRestarter } from './services/program.js';
 import { setRepoOpenedListener } from './services/repo.js';
 import {
   setSyncNotifier,
@@ -49,7 +48,6 @@ export function installHostPushes({ broadcast, sendTo }: HostPushes): void {
   // toast in the renderer; discovery attaches to agent sessions this
   // process did not start — including the ones that survived a previous
   // run, which is what makes them show as running straight away.
-  setSyncRestarter(startRemoteSyncLoop);
   setRepoOpenedListener((cwd) => {
     startRemoteSyncLoop(cwd);
     startDiscoveryForRepo(cwd);

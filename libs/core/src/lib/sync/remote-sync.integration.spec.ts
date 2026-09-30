@@ -116,6 +116,14 @@ describe('syncRemote', () => {
     expect(git(b.clone, 'rev-parse', 'master')).toBe(pushed);
   });
 
+  it('reports a failed fetch instead of a successful sync timestamp', async () => {
+    const b = remoteWithClone('unreachable', 'main');
+    git(b.clone, 'remote', 'set-url', 'origin', join(root, 'missing-remote'));
+    await expect(syncRemote(b.clone)).rejects.toThrow(
+      'Failed to fetch repository refs'
+    );
+  });
+
   it('never moves a diverged main off commits origin does not have', async () => {
     const b = remoteWithClone('b', 'main');
     git(b.clone, 'switch', '-q', 'main');

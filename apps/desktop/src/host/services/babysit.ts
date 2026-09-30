@@ -63,8 +63,14 @@ function forRepo(cwd: string): Map<number, Sitter> {
  * one that is already babysat is a no-op that answers with its status,
  * so a double click cannot stand up two watchers on one agent.
  */
-export async function startBabysit(prId: number): Promise<BabysitStatus> {
-  const cwd = requireRepo();
+export function startBabysit(prId: number): Promise<BabysitStatus> {
+  return startBabysitForRepo(requireRepo(), prId);
+}
+
+export async function startBabysitForRepo(
+  cwd: string,
+  prId: number
+): Promise<BabysitStatus> {
   const existing = forRepo(cwd).get(prId);
   if (existing) return existing.handle.status();
   const lookup = await lookupPullRequest(cwd, prId);
@@ -114,8 +120,8 @@ export function stopBabysit(prId: number): void {
  * removal calls this first: a watcher left behind would start a fresh
  * agent in a fresh checkout at its next update, undoing the removal.
  */
-export function stopBabysitForBranch(branch: string): number[] {
-  const byId = forRepo(requireRepo());
+export function stopBabysitForBranch(repo: string, branch: string): number[] {
+  const byId = forRepo(repo);
   const stopped: number[] = [];
   for (const [prId, sitter] of byId) {
     if (sitter.sourceBranch !== branch) continue;

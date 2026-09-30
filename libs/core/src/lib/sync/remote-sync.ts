@@ -16,14 +16,7 @@ import {
 import { countBranchConflicts } from './conflicts.js';
 import { fetchRefs } from './fetch-queue.js';
 
-// ── Remote sync core ─────────────────────────────────────────────
-//
-// The shell-agnostic heart of the remote sync loop: fetch + fast-
-// forward, the merged-branch sweep (with auto-delete-on-merge), and
-// batch conflict counting. The TUI drives these from its hooks
-// (useRemoteSync / useMergedBranches / useConflictCounts); the desktop
-// host drives them from a timer. Behavior lives here exactly once —
-// the shells only own scheduling and how results are displayed.
+// Operations in a sync pass. The engine owns scheduling, state and notices.
 
 export const REMOTE_SYNC_DEFAULT_MS = 3_600_000; // 1 hour
 export const REMOTE_SYNC_MIN_MS = 300_000; // 5 minutes
@@ -33,23 +26,22 @@ export function remoteSyncIntervalMs(
 ): number {
   return Math.max(
     REMOTE_SYNC_MIN_MS,
-    mergePollInterval ?? REMOTE_SYNC_DEFAULT_MS
+    typeof mergePollInterval === 'number' && Number.isFinite(mergePollInterval)
+      ? mergePollInterval
+      : REMOTE_SYNC_DEFAULT_MS
   );
 }
 
 /** One sync pass over the repository at `cwd`: fetch all remotes
  *  (pruning), through the fetch line every other fetch of the
  *  repository waits in, then fast-forward its main branch to what was
- *  fetched. Every step names `cwd`; the process's directory may be
- *  another repository by the time one runs. Never throws; returns the
- *  completion timestamp. */
-export async function syncRemote(cwd = process.cwd()): Promise<number> {
-  try {
-    await fetchRefs({ cwd, refs: 'all' });
-    await fastForwardMainBranch(cwd);
-  } catch (err: unknown) {
-    logError('remote-sync', err);
+ *  fetched. Every step names cwd. A failed fetch rejects so the engine keeps
+ *  the last successful state rather than publishing a false success time. */
+export async function syncRemote(cwd: string): Promise<number> {
+  if (!(await fetchRefs({ cwd, refs: 'all' }))) {
+    throw new Error(`Failed to fetch repository refs: ${cwd}`);
   }
+  await fastForwardMainBranch(cwd);
   return Date.now();
 }
 
@@ -191,17 +183,11 @@ export async function sweepMergedBranches(opts: {
     return { merged: new Set(), nextWarned: keepWarned };
   }
 
-  let merged: Set<string>;
-  try {
-    merged = await fetchMerged(
-      config.vendorAuth,
-      config.vendorProject,
-      branches
-    );
-  } catch (err: unknown) {
-    logError('fetchMergedBranches', err);
-    merged = new Set<string>();
-  }
+  const merged = await fetchMerged(
+    config.vendorAuth,
+    config.vendorProject,
+    branches
+  );
   if (isCancelled()) return { merged, nextWarned: keepWarned };
   onMerged?.(merged);
   if (!config.autoDeleteOnMerge) {

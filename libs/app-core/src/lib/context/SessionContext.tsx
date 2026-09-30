@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useMemo,
-  useCallback,
-  useEffect,
-} from 'react';
+import { createContext, useContext, useMemo, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type {
   PullRequestInfo,
@@ -20,8 +14,6 @@ import { setOperationErrorHandler } from '../hooks/useAsyncOperation.js';
 import { useSessionManager } from '../hooks/useSessionManager.js';
 import { usePrData } from '../hooks/usePrData.js';
 import { useRemoteSync } from '../hooks/useRemoteSync.js';
-import { useMergedBranches } from '../hooks/useMergedBranches.js';
-import { useConflictCounts } from '../hooks/useConflictCounts.js';
 import { useConfig } from './ConfigContext.js';
 import { useBranchPickerActions } from './ModalContext.js';
 import { useToastActions } from './ToastContext.js';
@@ -59,11 +51,11 @@ export interface SessionActionsContextValue {
    * top-right toast stack.
    */
   flashStatus: (msg: string, variant?: ToastVariant) => void;
+  checkRemoval: (branch: string) => Promise<WorktreeRemovalCheck>;
   refreshSessions: () => Promise<AgentSession[]>;
   /** Resolves with what was removed: anything but `removed` kept
    *  something, and the caller says why. */
   performDelete: (
-    sessionName: string,
     branch: string,
     approved: WorktreeRemovalCheck
   ) => Promise<WorktreeRemovalOutcome>;
@@ -88,7 +80,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const sessionMgr = useSessionManager(repo, setBranches);
 
   const { prMap, error: prError, refresh: refreshPr } = usePrData();
-  const { lastSynced, triggerSync } = useRemoteSync();
+  const {
+    lastSynced,
+    triggerSync,
+    mergedBranches,
+    conflictCounts,
+    isSyncing: conflictsLoading,
+  } = useRemoteSync();
 
   // An async op has no caller to report to — every `run` is fired and
   // forgotten — so a failure lands on the toast rail. Without this a
@@ -101,54 +99,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ),
     [flash]
   );
-
-  // The sweep runs unattended, so the toast has to wait for the delete
-  // to actually land — announcing it up front reported success for a
-  // branch that is still on disk.
-  const onMergedDelete = useCallback(
-    (sessionName: string, branch: string, approved: WorktreeRemovalCheck) => {
-      void sessionMgr
-        .performDelete(sessionName, branch, approved)
-        .then((outcome) => {
-          if (outcome === 'removed') {
-            flash(`Auto-deleted merged branch: ${branch}`, 'success');
-          } else if (outcome === 'kept-branch') {
-            flash(
-              `Auto-deleted the worktree of merged branch ${branch}; kept the branch: it has commits made after the check`,
-              'warning'
-            );
-          }
-        })
-        .catch((err: unknown) =>
-          flash(
-            `Auto-delete of ${branch} failed: ${describeError(err)}`,
-            'warning'
-          )
-        );
-    },
-    [sessionMgr, flash]
-  );
-
-  const onRebaseInProgress = useCallback(
-    (branch: string) => {
-      flash(`Auto-delete of ${branch} skipped: rebase in progress`, 'warning');
-    },
-    [flash]
-  );
-
-  const { mergedBranches } = useMergedBranches(
-    sessionMgr.worktreeBranches,
-    lastSynced,
-    onMergedDelete,
-    onRebaseInProgress
-  );
-
-  const conflictBranches = useMemo(
-    () => sessionMgr.worktreeBranches.filter((b) => !mergedBranches.has(b)),
-    [sessionMgr.worktreeBranches, mergedBranches]
-  );
-  const { counts: conflictCounts, loading: conflictsLoading } =
-    useConflictCounts(conflictBranches, lastSynced, prMap);
 
   const orphanPrs = useMemo(() => {
     if (!provider) return [];
@@ -205,17 +155,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  const { refreshSessions, performDelete } = sessionMgr;
+  const { refreshSessions, performDelete, checkRemoval } = sessionMgr;
 
   const actionsValue = useMemo<SessionActionsContextValue>(
     () => ({
       flashStatus: flash,
       refreshSessions,
       performDelete,
+      checkRemoval,
       refreshPr,
       triggerSync,
     }),
-    [flash, refreshSessions, performDelete, refreshPr, triggerSync]
+    [
+      flash,
+      refreshSessions,
+      performDelete,
+      checkRemoval,
+      refreshPr,
+      triggerSync,
+    ]
   );
 
   return (

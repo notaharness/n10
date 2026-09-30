@@ -53,13 +53,11 @@ function harness(registry = providers) {
     credentialsChanged: vi.fn(),
     read: vi.fn(async () => ({})),
   };
-  const restartSync = vi.fn();
   const service = createRepositoryService({
     providers: registry,
     pullRequests,
-    restartSync,
   });
-  return { service, pullRequests, restartSync };
+  return { service, pullRequests };
 }
 
 describe('repository scope', () => {
@@ -109,7 +107,7 @@ describe('repository scope', () => {
   });
 
   it('publishes config-derived identity and effects through one subscription', () => {
-    const { service, restartSync, pullRequests } = harness();
+    const { service, pullRequests } = harness();
     const cwd = repo('identity');
     const current = service.open(cwd);
     const changed = vi.fn();
@@ -127,7 +125,7 @@ describe('repository scope', () => {
       'acme/app'
     );
     expect(changed).toHaveBeenCalledTimes(2);
-    expect(restartSync).toHaveBeenLastCalledWith(cwd);
+    expect(current.config.getSnapshot().syncRevision).toBe(2);
     expect(pullRequests.credentialsChanged).toHaveBeenCalledTimes(2);
     expect(service.getSnapshot()).toBe(current);
     expect(changed).toHaveBeenCalledTimes(2);

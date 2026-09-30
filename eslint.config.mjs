@@ -15,23 +15,40 @@ const shellOperationPaths = [
     message: 'Config writes belong to the engine config service.',
   },
   {
-    name: '@n10/core',
-    allowTypeImports: true,
-    importNames: ['persistConfigField', 'persistKeybindFields'],
-    message:
-      'Only the engine config service dispatches persistence and effects.',
-  },
-  {
     name: '@n10/vcs-core',
     allowTypeImports: true,
     importNames: ['autoDetectProjectConfig'],
-    message: 'Repository opening belongs to the engine repository service.',
+    message:
+      'Repository opening belongs to the engine repository service.',
+  },
+  {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: ['persistConfigField', 'persistKeybindFields'],
+    message: 'Config writes belong to the engine config service.',
   },
   {
     name: '@n10/core',
     allowTypeImports: true,
     importNames: ['configureWorktreePath'],
     message: 'Repository opening belongs to the engine repository service.',
+  },
+  {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: [
+      'syncRemote',
+      'sweepMergedBranches',
+      'computeConflictCounts',
+      'remoteSyncIntervalMs',
+    ],
+    message: 'Sync scheduling and passes belong to the engine sync service.',
+  },
+  {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: ['checkWorktreeRemoval', 'removeWorktreeSession'],
+    message: 'Worktree removal belongs to engine worktree commands.',
   },
   {
     name: '@n10/worktree-manager',

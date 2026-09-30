@@ -24,8 +24,7 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
 - **Config** (`config/`): one explicit repo per service, stable snapshots and
   synchronous commands. Persist and re-read effective config before invalidating
   PR caches or notifying subscribers. A no-op reload preserves snapshot identity;
-  a failed write publishes nothing. Sync adapters consume a revision or the
-  restart callback. Keep secrets in Node; only the host's masked form crosses IPC.
+  a failed write publishes nothing. The sync service observes syncRevision directly. Keep secrets in Node; only the host's masked form crosses IPC.
 
 - **Repositories** (`repositories/`): canonicalize Git’s root before replacing
   the selected handle. Each handle owns one config service; its subscription is
@@ -33,3 +32,12 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   synchronously and does not keep another metadata store. Detection and config reads use that path, never process cwd.
   Shells select startup repositories and own recents; opening must not detach
   sessions belonging to the previously selected repository.
+
+- **Sync** (`sync/`): one captured repository, one active pass and at most one
+  queued manual refresh. Skip busy timer ticks. Config revisions cancel stale
+  reads before removal; errors preserve the last successful snapshot. Stop
+  cancels reads and awaits removals already underway, without timing out mutations.
+  Notices are typed facts; shells own their wording and presentation.
+- **Worktree commands** (`worktrees/`): pass the captured repository to core’s
+  guarded removal and babysitter ports. Resume suspended watchers only if the
+  checkout remains and that repository is still selected.

@@ -1,14 +1,10 @@
+import { useEngine } from '../context/EngineContext.js';
 import { worktreeSessionRow } from '@n10/core';
 import { useState, useEffect, useCallback, useEffectEvent } from 'react';
 import { listAllBranches, listWorktrees } from '@n10/worktree-manager';
-import type {
-  AgentSession,
-  DiscoveredWorktree,
-  WorktreeRemovalCheck,
-} from '@n10/core';
+import type { AgentSession, DiscoveredWorktree } from '@n10/core';
 import { readConfig } from '@n10/vcs-core';
 import {
-  removeWorktreeSession,
   isSessionAlive,
   launchSession,
   onSessionExit,
@@ -23,6 +19,7 @@ export function useSessionManager(
   const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [worktreeBranches, setWorktreeBranches] = useState<string[]>([]);
   const { terminal } = useLayout();
+  const { worktrees } = useEngine();
 
   const refreshSessions = useCallback(async () => {
     const worktrees = await listWorktrees(repo);
@@ -36,15 +33,6 @@ export function useSessionManager(
     setWorktreeBranches(worktrees.map((wt) => wt.branch).filter(Boolean));
     return filtered;
   }, [repo]);
-
-  // No refresh of its own: core's removal has discovery look again, and
-  // `onDiscovered` below re-reads the rows, as it does for a worktree
-  // removed outside n10.
-  const performDelete = useCallback(
-    (_sessionName: string, branch: string, approved: WorktreeRemovalCheck) =>
-      removeWorktreeSession(branch, approved, repo),
-    [repo]
-  );
 
   // Attach to an agent session that was started outside this process —
   // another n10, an Orchestra spawn, someone tagging a `tmux
@@ -118,6 +106,7 @@ export function useSessionManager(
     sessions,
     worktreeBranches,
     refreshSessions,
-    performDelete,
+    performDelete: worktrees.remove,
+    checkRemoval: worktrees.checkRemoval,
   };
 }

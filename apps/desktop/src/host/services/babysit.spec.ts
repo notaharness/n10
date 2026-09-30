@@ -167,8 +167,8 @@ describe('babysit service', () => {
   it('stops the babysitter of a branch whose worktree is being removed', async () => {
     await mod.startBabysit(7);
     await mod.startBabysit(8);
-    mod.stopBabysitForBranch('feat/7');
-    mod.stopBabysitForBranch('feat/none');
+    mod.stopBabysitForBranch('/repo', 'feat/7');
+    mod.stopBabysitForBranch('/repo', 'feat/none');
     expect(state.stopped).toEqual([7]);
     expect(
       [...mod.babysatStatuses(state.cwd).values()].map((s) => s.prId)

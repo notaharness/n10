@@ -28,11 +28,11 @@ export function keptNotice(
 /** Remove what the prompt showed, with the verdict it showed. Takes the
  *  state, not the context: the modal clears it before this runs. */
 export function runConfirmedDelete(
-  { sessionName, branch, approved }: DeleteConfirmState,
+  { branch, approved }: DeleteConfirmState,
   { sessions, asyncOps }: Pick<DeleteConfirmHandlerCtx, 'sessions' | 'asyncOps'>
 ): void {
   void asyncOps.run('delete', async () => {
-    const outcome = await sessions.performDelete(sessionName, branch, approved);
+    const outcome = await sessions.performDelete(branch, approved);
     sessions.flashStatus(keptNotice(branch, outcome) ?? `Deleted ${branch}`);
   });
 }

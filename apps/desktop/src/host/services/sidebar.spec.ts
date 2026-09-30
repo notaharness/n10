@@ -64,10 +64,13 @@ vi.mock('./babysit.js', () => ({
 }));
 
 vi.mock('./remote-sync.js', () => ({
+  refreshRemoteSync: () => Promise.resolve(),
   getSyncDecorations: () => ({
     merged: new Set<string>(),
     conflicts: new Map<string, number>(),
     lastGitSyncAt: 42,
+    error: null,
+    loading: false,
   }),
 }));
 

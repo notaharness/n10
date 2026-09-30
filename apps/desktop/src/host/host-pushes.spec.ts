@@ -3,12 +3,8 @@ import { installHostPushes } from './host-pushes.js';
 
 const state = vi.hoisted(() => ({
   restart: vi.fn(),
-  installRestart: vi.fn(),
   opened: vi.fn(),
   discover: vi.fn(),
-}));
-vi.mock('./services/program.js', () => ({
-  setSyncRestarter: state.installRestart,
 }));
 vi.mock('./services/repo.js', () => ({ setRepoOpenedListener: state.opened }));
 vi.mock('./services/remote-sync.js', () => ({
@@ -31,12 +27,8 @@ vi.mock('./services/machines.js', () => ({
   setMachinesNotifier: vi.fn(),
 }));
 
-it('installs config-driven sync restarts before repository opening can start the loops', () => {
+it('installs repository opening to start the engine sync and discovery adapters', () => {
   installHostPushes({ broadcast: vi.fn(), sendTo: vi.fn() });
-  expect(state.installRestart).toHaveBeenCalledExactlyOnceWith(state.restart);
-  expect(state.installRestart.mock.invocationCallOrder[0]).toBeLessThan(
-    state.opened.mock.invocationCallOrder[0]
-  );
   const opened = state.opened.mock.calls[0][0] as (repo: string) => void;
   opened('/repo');
   expect(state.restart).toHaveBeenCalledExactlyOnceWith('/repo');

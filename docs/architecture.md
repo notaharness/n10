@@ -130,3 +130,10 @@ libs/image-loader/               — Comment-image download + decode
   src/lib/gif-animation.ts       — full composited RGBA frames + per-frame delays (native resolution)
   src/lib/fetch-image.ts         — auth-aware fetch (gh token bearer / Azure DevOps PAT basic)
 ```
+
+Sync runs in `libs/engine/src/lib/sync`: one captured repository, config-driven
+scheduling, fetch/merge/conflict reads, guarded auto-removal and stable snapshots.
+The TUI’s `useRemoteSync` observes that service; desktop `services/remote-sync`
+binds selected-repo lifetime and maps notices to IPC. Manual and automatic
+removal share `engine/worktrees` commands over core’s safety verdicts. ESLint
+rejects direct shell imports of sync passes and removal primitives.

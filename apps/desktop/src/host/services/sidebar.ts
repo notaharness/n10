@@ -12,7 +12,7 @@ import { pullRequestPollIntervalMs } from '@n10/engine';
 import { activeRepoIs, requireRepo } from './repo.js';
 import { babysatStatuses } from './babysit.js';
 import { isOwnSessionAlive } from './sessions.js';
-import { getSyncDecorations } from './remote-sync.js';
+import { getSyncDecorations, refreshRemoteSync } from './remote-sync.js';
 import { pullRequests, resolveProvider } from './program.js';
 import type { SidebarModel, SyncState } from '../contract.js';
 
@@ -121,8 +121,8 @@ export function getSyncState(): SyncState {
     providerConfigured: configured,
     lastRemoteSyncAt: remote.fetchedAt,
     lastGitSyncAt: getSyncDecorations().lastGitSyncAt,
-    remoteError: remote.error,
-    remoteSyncing: remote.refreshing,
+    remoteError: remote.error ?? getSyncDecorations().error,
+    remoteSyncing: remote.refreshing || getSyncDecorations().loading,
     remoteIntervalMs: pullRequestPollIntervalMs(config.prPollInterval),
     remoteFetches: pullRequests.fetchCount(),
   };
@@ -138,7 +138,7 @@ export function getSyncState(): SyncState {
  * refresh's own request starts.
  */
 export async function refreshRemote(): Promise<void> {
-  await pullRequests.refresh(requireRepo());
+  await Promise.all([pullRequests.refresh(requireRepo()), refreshRemoteSync()]);
 }
 
 /**

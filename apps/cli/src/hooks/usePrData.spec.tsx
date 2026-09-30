@@ -9,7 +9,12 @@ import { useEffect } from 'react';
 import { Box } from 'ink';
 import { render } from 'ink-testing-library';
 import type { AppConfig, BranchPrMap, VcsProvider } from '@n10/vcs-core';
-import { createPullRequestList, type PullRequestList } from '@n10/engine';
+import {
+  createPullRequestList,
+  createRemoteSync,
+  createWorktreeCommands,
+  type PullRequestList,
+} from '@n10/engine';
 import { EngineProvider, usePrData } from '@n10/app-core';
 
 const flashes = vi.hoisted(() => [] as string[]);
@@ -67,8 +72,28 @@ function mount() {
     });
     return <Box />;
   }
+  const worktrees = createWorktreeCommands({ repo: '/repo' });
+  const sync = createRemoteSync({
+    config: {
+      repo: '/repo',
+      getSnapshot: () => ({
+        config: { vendorAuth: {}, vendorProject: {} },
+        provider: null,
+        vcsConfigured: false,
+        syncRevision: 0,
+      }),
+      subscribe: () => () => undefined,
+    },
+    pullRequests: list,
+    worktrees,
+  });
   const tree = () => (
-    <EngineProvider pullRequests={list} repo="/repo">
+    <EngineProvider
+      pullRequests={list}
+      repo="/repo"
+      sync={sync}
+      worktrees={worktrees}
+    >
       <Probe />
     </EngineProvider>
   );

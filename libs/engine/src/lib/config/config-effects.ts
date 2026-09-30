@@ -10,6 +10,9 @@ export function configEffects(before: AppConfig, after: AppConfig) {
   return {
     credentials,
     refresh: credentials || before.prPollInterval !== after.prPollInterval,
-    sync: credentials || before.mergePollInterval !== after.mergePollInterval,
+    sync:
+      credentials ||
+      before.mergePollInterval !== after.mergePollInterval ||
+      before.autoDeleteOnMerge !== after.autoDeleteOnMerge,
   };
 }

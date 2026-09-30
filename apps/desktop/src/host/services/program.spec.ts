@@ -16,12 +16,8 @@ vi.mock('@n10/engine', () => ({
 }));
 vi.mock('./providers.js', () => ({ PROVIDERS: state.providers }));
 
-it('composes repository config with the shared PR cache and host sync port', async () => {
-  const { setSyncRestarter } = await import('./program.js');
-  const restart = vi.fn();
-  setSyncRestarter(restart);
+it('composes repository config with the shared PR cache', async () => {
+  await import('./program.js');
   expect(state.options?.providers).toBe(state.providers);
   expect(state.options?.pullRequests).toBe(state.pullRequests);
-  state.options?.restartSync?.('/repo');
-  expect(restart).toHaveBeenCalledExactlyOnceWith('/repo');
 });

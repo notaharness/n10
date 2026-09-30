@@ -26,9 +26,9 @@ Domain ownership and execution boundaries are specified in
 before dispatching effects; React observes stable snapshots. The host cannot
 import React bindings. No new worker or generic kernel is needed by these domains.
 
-When changing shared behavior, compare both shells. Worktree removal is
-implemented in the TUI's `performDelete` and desktop's `services/worktrees.ts`;
-both use core's removal sequence to stop persisted tmux sessions. Draft posting uses one comment per `postReviewComments` call,
+When changing shared behavior, compare both shells. Worktree removal is an
+engine command over core’s guarded removal sequence; shells request a verdict
+and present confirmation before executing that command. Draft posting uses one comment per `postReviewComments` call,
 so a partial failure cannot reset already-posted comments to drafts.
 
 A fresh worktree needs its own `npm ci`: workspace links and nested dependencies
@@ -568,3 +568,21 @@ The desktop still changes process cwd for the session primitives that require it
 This is a shell adapter constraint, not an engine input: repository detection and
 snapshots always receive a captured path. Session and worktree migrations remove
 the remaining ambient ownership in the order in the [domain plan](design/engine-domains.md).
+
+## Shared remote sync
+
+One engine service runs the complete fetch, merged-branch sweep and conflict
+read for a captured repository. Config’s sync revision invalidates an active
+pass and rearms its timer; auto-delete changes count as a revision so disabling
+it cancels a pending sweep. Timer ticks skip busy work. Explicit refreshes join
+one queued follow-up, and repeated start calls preserve the existing schedule.
+Fetch or provider errors retain the last successful badges and timestamp while
+publishing an error. Shells render typed notices and observe loading state.
+
+Cancellation is checked between reads and before and after guarded removal.
+Repository switches can start another service immediately; stale reads cannot
+publish or start removal. Shutdown cancels future work and awaits removals
+already underway. It does not put a deadline on a Git mutation. Both manual and
+automatic removals go through captured-repo engine commands, with core retaining
+the stop/remove/delete safety checks. Desktop supplies repo-qualified babysitter
+ports; a retained checkout resumes watchers only while its repo is selected.

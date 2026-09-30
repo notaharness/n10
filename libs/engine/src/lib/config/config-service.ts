@@ -19,7 +19,7 @@ export interface ConfigSnapshot {
   repository: RepositoryRef | null;
   viewer: string | null;
   revision: number;
-  /** Consumed by the TUI's sync adapter to replace its polling schedule. */
+  /** Consumed by the engine sync service to replace its schedule. */
   syncRevision: number;
 }
 
@@ -37,8 +37,6 @@ export interface ConfigServiceOptions {
   repo: string;
   providers: VcsProvider[];
   pullRequests: Pick<PullRequestList, 'credentialsChanged' | 'read'>;
-  /** Adapter for the desktop's sync loop, until sync is an engine domain. */
-  restartSync?: (repo: string) => void;
 }
 
 /** One repository's config. No timers, ambient cwd, or React-owned writes. */
@@ -77,7 +75,6 @@ export function createConfigService(
     // The write has landed. Invalidate before any subscriber can start a read.
     if (effects.credentials) pullRequests.credentialsChanged();
     if (effects.refresh) void pullRequests.read(repo, { force: true });
-    if (effects.sync) options.restartSync?.(repo);
     for (const listener of listeners) listener();
   }
 

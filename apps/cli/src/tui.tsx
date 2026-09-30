@@ -5,12 +5,18 @@ import { azureDevOpsProvider } from '@n10/vcs-azure-devops';
 import { githubProvider } from '@n10/vcs-github';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal.js';
 import { OnboardingWizard } from './components/OnboardingWizard.js';
-import { createPullRequestList, createRepositoryService } from '@n10/engine';
+import {
+  createPullRequestList,
+  createRepositoryService,
+  createRemoteSync,
+  createWorktreeCommands,
+} from '@n10/engine';
 import {
   settlePendingRuns,
   ConfigProvider,
   EngineProvider,
   useConfig,
+  useEngine,
   KeybindProvider,
   NavProvider,
   useNavState,
@@ -53,6 +59,7 @@ const EXIT_GRACE_MS = 3_000;
 
 function App() {
   const { exit } = useApp();
+  const { sync } = useEngine();
   // Ink's exit() only unmounts the React tree — it does not stop child
   // processes. Active PTYs (running agents) keep node-pty handles open,
   // so the Node event loop never drains and the process hangs after
@@ -65,6 +72,7 @@ function App() {
   // can't resurrect the #56 hang.
   const handleExit = () => {
     void (async () => {
+      await sync.stop();
       await Promise.race([
         settlePendingRuns(),
         new Promise((resolve) => setTimeout(resolve, EXIT_GRACE_MS)),
@@ -163,9 +171,21 @@ export async function runTui(args: string[]): Promise<void> {
     process.exit(1);
   }
 
+  const worktrees = createWorktreeCommands({ repo: repo.cwd });
+  const sync = createRemoteSync({
+    config: repo.config,
+    pullRequests,
+    worktrees,
+  });
+
   render(
     <ConfigProvider service={repo.config}>
-      <EngineProvider pullRequests={pullRequests} repo={repo.cwd}>
+      <EngineProvider
+        pullRequests={pullRequests}
+        repo={repo.cwd}
+        sync={sync}
+        worktrees={worktrees}
+      >
         <KeybindProvider>
           <LayoutProvider>
             <NavProvider>

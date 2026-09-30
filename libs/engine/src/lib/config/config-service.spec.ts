@@ -48,19 +48,15 @@ function harness(repo = '/repo-a') {
       return Promise.resolve({});
     }),
   };
-  const restartSync = vi.fn((cwd: string) => {
-    events.push(`sync:${cwd}`);
-  });
   const service = createConfigService({
     repo,
     providers,
     pullRequests,
-    restartSync,
   });
   service.subscribe(() => {
     events.push('snapshot');
   });
-  return { service, events, pullRequests, restartSync };
+  return { service, events, pullRequests };
 }
 
 beforeEach(() => {
@@ -87,12 +83,7 @@ describe('config commands', () => {
   it('persists before invalidation, refresh, sync and snapshot notification', () => {
     const { service, events, pullRequests } = harness();
     service.updateField(field('token', 'vendorAuth'), 'new');
-    expect(events).toEqual([
-      'credentials',
-      'read:/repo-a:new',
-      'sync:/repo-a',
-      'snapshot',
-    ]);
+    expect(events).toEqual(['credentials', 'read:/repo-a:new', 'snapshot']);
     expect(pullRequests.read).toHaveBeenCalledExactlyOnceWith('/repo-a', {
       force: true,
     });
@@ -141,7 +132,7 @@ describe('config commands', () => {
   });
 
   it('round-trips booleans and finite intervals through the persisted config', () => {
-    const { service, restartSync, pullRequests } = harness();
+    const { service, pullRequests } = harness();
     service.updateField(field('diffFileListTree'), 'false');
     service.updateField(field('autoRebase'), 'true');
     service.updateField(field('mergePollInterval'), '300000');
@@ -150,10 +141,18 @@ describe('config commands', () => {
       autoRebase: true,
       mergePollInterval: 300000,
     });
-    expect(restartSync).toHaveBeenCalledExactlyOnceWith('/repo-a');
+    expect(service.getSnapshot().syncRevision).toBe(1);
     expect(pullRequests.read).not.toHaveBeenCalled();
     service.updateField(field('mergePollInterval'), 'Infinity');
     expect(service.getSnapshot().config.mergePollInterval).toBeUndefined();
+  });
+
+  it('invalidates pending sync when auto-delete is toggled', () => {
+    const { service } = harness();
+    service.updateField(field('autoDeleteOnMerge'), 'true');
+    const enabled = service.getSnapshot().syncRevision;
+    service.updateField(field('autoDeleteOnMerge'), 'false');
+    expect(service.getSnapshot().syncRevision).toBe(enabled + 1);
   });
 
   it('refreshes the PR cadence without resetting provider memos or sync', () => {
@@ -207,12 +206,7 @@ describe('config commands', () => {
       '/repo-a'
     );
     service.reload();
-    expect(events).toEqual([
-      'credentials',
-      'read:/repo-a:old',
-      'sync:/repo-a',
-      'snapshot',
-    ]);
+    expect(events).toEqual(['credentials', 'read:/repo-a:old', 'snapshot']);
     expect(service.getSnapshot().config.vendorProject.repo).toBe('detected');
   });
 

@@ -1,163 +1,75 @@
-import {
-  computeConflictCounts,
-  remoteSyncIntervalMs,
-  sweepMergedBranches,
-  syncRemote,
-} from '@n10/core';
-import { listWorktrees } from '@n10/worktree-manager';
-import { readConfig } from '@n10/vcs-core';
-import { PROVIDERS } from './providers.js';
-import { cachedPullRequests } from './pull-requests.js';
-import { removeWorktree } from './worktrees.js';
+import { createRemoteSync, EMPTY_SYNC_SNAPSHOT } from '@n10/engine';
+import type { ConfigService, RemoteSync, SyncNotice } from '@n10/engine';
+import { activeConfigService } from './repo.js';
+import { pullRequests } from './program.js';
+import { worktreeCommands } from './worktrees.js';
 import type { SyncNoticeEvent } from '../contract.js';
 
-/**
- * The desktop's scheduling shell around the shared remote-sync core
- * (`@n10/app-core` sync/remote-sync) — the same passes the TUI's
- * useRemoteSync / useMergedBranches / useConflictCounts hooks drive:
- * git fetch + fast-forward main, the merged-branch sweep (with
- * auto-delete-on-merge), and conflict counting. Results decorate the
- * sidebar model; user-facing events reach the renderer as toasts via
- * the sync-notice channel.
- */
+const stopping = new Set<Promise<void>>();
 
-interface SyncDecorations {
-  merged: Set<string>;
-  conflicts: Map<string, number>;
-  /** ms-epoch of the last completed git sync pass, null if never. */
-  lastGitSyncAt: number | null;
+function stop(service: RemoteSync): Promise<void> {
+  const pending = service.stop();
+  stopping.add(pending);
+  void pending.then(() => stopping.delete(pending));
+  return pending;
 }
 
-let decorations: SyncDecorations = {
-  merged: new Set(),
-  conflicts: new Map(),
-  lastGitSyncAt: null,
-};
-let warnedRebase: ReadonlySet<string> = new Set();
-let timer: ReturnType<typeof setInterval> | null = null;
-// Every startRemoteSyncLoop bumps the generation; a pass carries the
-// generation it was started under and aborts (via the shared sweep's
-// isCancelled hook) as soon as a newer one exists. Every git call in a
-// pass names the pass's repository, but the removal goes through the
-// worktrees service, which acts on the open one: the synchronous check
-// right before it keeps a stale pass from removing anything there.
-let generation = 0;
-let lastCwd: string | null = null;
-// Passes are serialized so a repo switch's kickoff pass isn't skipped
-// just because the previous repo's pass is still winding down.
-let queue: Promise<void> = Promise.resolve();
-
+let config: ConfigService | undefined;
+let sync: RemoteSync | undefined;
 let notifier: ((notice: SyncNoticeEvent) => void) | null = null;
 
-/** Installed by main.ts; forwards sync notices to renderer windows. */
+function present(notice: SyncNotice): SyncNoticeEvent {
+  switch (notice.type) {
+    case 'removed':
+      return {
+        message: `Auto-deleted merged branch: ${notice.branch}`,
+        kind: 'success',
+      };
+    case 'kept-branch':
+      return {
+        message: `Auto-deleted the worktree of merged branch ${notice.branch}; kept the branch: it has commits made after the check`,
+        kind: 'warning',
+      };
+    case 'rebase-in-progress':
+      return {
+        message: `Auto-delete of ${notice.branch} skipped: rebase in progress`,
+        kind: 'warning',
+      };
+    case 'failed':
+      return { message: `Sync failed: ${notice.error}`, kind: 'warning' };
+  }
+}
+
 export function setSyncNotifier(fn: (notice: SyncNoticeEvent) => void): void {
   notifier = fn;
 }
 
-export function getSyncDecorations(): SyncDecorations {
-  return decorations;
+export function getSyncDecorations() {
+  return sync?.getSnapshot() ?? EMPTY_SYNC_SNAPSHOT;
 }
 
-/** (Re)start the loop for a repo — called on every repo open, and when
- *  mergePollInterval changes. Switching repos drops the previous
- *  repo's state; a same-repo restart (interval change) keeps the
- *  current decorations so badges don't blink out until the next pass. */
+/** Bind repository selection to engine lifetime; settings scheduling is internal. */
 export function startRemoteSyncLoop(cwd: string): void {
-  stopRemoteSyncLoop();
-  generation += 1;
-  const gen = generation;
-  if (cwd !== lastCwd) {
-    decorations = {
-      merged: new Set(),
-      conflicts: new Map(),
-      lastGitSyncAt: null,
-    };
-    warnedRebase = new Set();
-  }
-  lastCwd = cwd;
-  const interval = remoteSyncIntervalMs(readConfig(cwd).mergePollInterval);
-  const tick = () => {
-    queue = queue.then(() => runSyncPass(cwd, gen)).catch(() => undefined);
-  };
-  timer = setInterval(tick, interval);
-  timer.unref?.();
-  tick();
-}
-
-export function stopRemoteSyncLoop(): void {
-  if (timer) clearInterval(timer);
-  timer = null;
-  // Bump the generation too, so a pass already running is cancelled at
-  // its next checkpoint. Without this, quitting during the auto-delete
-  // step lets `removeWorktree` → `deleteBranch` keep going and the
-  // process can exit between them, leaving an orphaned branch.
-  generation += 1;
-}
-
-async function runSyncPass(cwd: string, gen: number): Promise<void> {
-  const cancelled = () => gen !== generation;
-  if (cancelled()) return;
-  try {
-    const config = readConfig(cwd);
-    const provider = PROVIDERS.find((p) => p.id === config.vendor) ?? null;
-    const vcsConfigured =
-      provider != null &&
-      provider.isConfigured(config.vendorAuth, config.vendorProject);
-    // The TUI's polling is gated on vcsConfigured too.
-    if (!vcsConfigured) return;
-
-    const ts = await syncRemote(cwd);
-    if (cancelled()) return;
-    const branches = (await listWorktrees(cwd))
-      .map((w) => w.branch)
-      .filter(Boolean);
-    if (cancelled()) return;
-
-    const { merged, nextWarned } = await sweepMergedBranches({
-      provider,
-      vcsConfigured,
+  const current = activeConfigService();
+  if (current.repo !== cwd) return;
+  if (config !== current) {
+    if (sync) void stop(sync);
+    config = current;
+    sync = createRemoteSync({
       config,
-      branches,
-      warnedRebase,
-      isCancelled: cancelled,
-      cwd,
-      onAutoDelete: async (_sessionName, branch, approved) => {
-        if (cancelled()) return;
-        // Core's removal, as in the TUI: kept if the branch moved after
-        // the sweep judged it.
-        const outcome = await removeWorktree(branch, approved);
-        if (outcome === 'removed') {
-          notifier?.({
-            message: `Auto-deleted merged branch: ${branch}`,
-            kind: 'success',
-          });
-        } else if (outcome === 'kept-branch') {
-          notifier?.({
-            message: `Auto-deleted the worktree of merged branch ${branch}; kept the branch: it has commits made after the check`,
-            kind: 'warning',
-          });
-        }
-      },
-      onRebaseInProgress: (branch) =>
-        notifier?.({
-          message: `Auto-delete of ${branch} skipped: rebase in progress`,
-          kind: 'warning',
-        }),
+      pullRequests,
+      worktrees: worktreeCommands(cwd),
     });
-    if (cancelled()) return;
-    warnedRebase = nextWarned;
-
-    // A branch with a pull request is judged against that request's
-    // target on the remote refs — the same predicate the babysitter
-    // applies, so the badge and the agent's briefing agree.
-    const conflicts = await computeConflictCounts(
-      branches.filter((b) => !merged.has(b)),
-      cachedPullRequests(cwd),
-      cwd
-    );
-    if (cancelled()) return;
-    decorations = { merged, conflicts, lastGitSyncAt: ts };
-  } catch (err: unknown) {
-    console.error('[desktop] remote sync pass failed:', err);
+    sync.subscribeNotices((notice) => notifier?.(present(notice)));
   }
+  sync?.start();
+}
+
+export async function stopRemoteSyncLoop(): Promise<void> {
+  if (sync) void stop(sync);
+  await Promise.all(stopping);
+}
+
+export function refreshRemoteSync(): Promise<void> {
+  return sync?.refresh() ?? Promise.resolve();
 }

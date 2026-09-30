@@ -1,12 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Worktree removal is the destructive path, and it is a sequence, not a
- * single call: kill the agent, remove the worktree, then delete the
- * branch. Getting the order or the conditions wrong strands a PTY in a
- * deleted directory, deletes a branch whose worktree is still there, or
- * removes a directory out from under a live agent.
- */
+/** Host adapters supply repository/watch ports and launch detached editors. */
 
 const calls = vi.hoisted(() => ({
   log: [] as string[],
@@ -43,11 +37,11 @@ vi.mock('@n10/core', () => ({
 }));
 
 vi.mock('./babysit.js', () => ({
-  stopBabysitForBranch: (branch: string) => {
+  stopBabysitForBranch: (_repo: string, branch: string) => {
     calls.log.push(`stop-babysit:${branch}`);
     return [42];
   },
-  startBabysit: (prId: number) => {
+  startBabysitForRepo: (_repo: string, prId: number) => {
     calls.log.push(`start-babysit:${prId}`);
     return Promise.resolve({ phase: 'watching' });
   },
@@ -108,46 +102,6 @@ describe('removeWorktree', () => {
       'remove-session:/repo:feature/x:force',
     ]);
   });
-  it("returns core's outcome to the caller", async () => {
-    calls.removed = 'git-refused';
-    expect(
-      await removeWorktree('feature/x', {
-        verdict: 'clear',
-        tip: 'abc123',
-        repo: '/repo/.git',
-        checkout: '/repo/wt',
-      })
-    ).toBe('git-refused');
-  });
-
-  // The agent a kept worktree still holds is still worth watching.
-  it.each(['changed', 'git-refused'])(
-    'babysits the pull request again when core answers %s',
-    async (outcome) => {
-      calls.removed = outcome;
-      await removeWorktree('feature/x', {
-        verdict: 'clear',
-        tip: 'abc123',
-        repo: '/repo/.git',
-        checkout: '/repo/wt',
-      });
-      expect(calls.log.at(-1)).toBe('start-babysit:42');
-    }
-  );
-
-  it.each(['removed', 'kept-branch'])(
-    'leaves babysitting stopped when core answers %s',
-    async (outcome) => {
-      calls.removed = outcome;
-      await removeWorktree('feature/x', {
-        verdict: 'clear',
-        tip: 'abc123',
-        repo: '/repo/.git',
-        checkout: '/repo/wt',
-      });
-      expect(calls.log).not.toContain('start-babysit:42');
-    }
-  );
 });
 
 describe('openInEditor', () => {

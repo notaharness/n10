@@ -72,10 +72,7 @@ vi.mock('../pty-registry.js', () => ({
   isSessionAlive: (name: string) => env.alive.has(name),
 }));
 
-// Existence, not preference: the sweep must refuse to delete a
-// worktree whose tmux agent is running whatever backend is selected
-// now. Mocking it with a config parameter would let a regression that
-// re-gated it on the preference slip through here.
+// A surviving tmux agent prevents deletion even without a registry client.
 vi.mock('../session-backend.js', () => ({
   hasLiveTmuxSession: (name: string) => env.persisted.has(name),
 }));
@@ -134,6 +131,13 @@ describe('remoteSyncIntervalMs', () => {
     expect(remoteSyncIntervalMs(0)).toBe(REMOTE_SYNC_MIN_MS);
   });
 
+  it.each([NaN, Infinity, -Infinity])(
+    'uses the default for an invalid interval %s',
+    (value) => {
+      expect(remoteSyncIntervalMs(value)).toBe(remoteSyncIntervalMs(undefined));
+    }
+  );
+
   it('honours a longer interval, and falls back when unset', () => {
     expect(remoteSyncIntervalMs(7_200_000)).toBe(7_200_000);
     expect(remoteSyncIntervalMs(undefined)).toBeGreaterThanOrEqual(
@@ -190,17 +194,6 @@ describe('sweepMergedBranches', () => {
     expect(env.deleted).toEqual([]);
   });
 
-  // The agent is running whether or not tmux is still the preference,
-  // and deleting its worktree is destructive. A user who switched to
-  // PTY after the session was created must not lose it.
-  it('leaves it alone even when the config now selects pty', async () => {
-    env.persisted = new Set([worktreeSessionKey(checkout('feature/a'))]);
-    await sweep({
-      config: { autoDeleteOnMerge: true } as never,
-    });
-    expect(env.deleted).toEqual([]);
-  });
-
   it('leaves a branch git will not part with safely', async () => {
     env.removable = { 'feature/a': { safe: false, reason: 'unpushed work' } };
     await sweep();
@@ -220,8 +213,7 @@ describe('sweepMergedBranches', () => {
     // A failed lookup must not read as "nothing is merged" — and
     // certainly must not delete on the strength of it.
     env.fetchThrows = true;
-    const result = await sweep();
-    expect([...result.merged]).toEqual([]);
+    await expect(sweep()).rejects.toThrow('provider down');
     expect(env.deleted).toEqual([]);
   });
 

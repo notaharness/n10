@@ -2,7 +2,6 @@ import { keyForWorktree } from '@n10/core';
 import { spawn } from 'node:child_process';
 import type { SidebarItem } from '@n10/core';
 import {
-  checkWorktreeRemoval,
   getSpawnedAt,
   hasSession,
   isSessionAlive,
@@ -164,10 +163,9 @@ const checkoutBranch: SidebarAction = (ctx) => {
  */
 async function confirmOrDelete(
   ctx: SidebarInputCtx,
-  sessionName: string,
   branch: string
 ): Promise<void> {
-  const check = await checkWorktreeRemoval(branch);
+  const check = await ctx.sessions.checkRemoval(branch);
   switch (check.verdict) {
     case 'refused':
       ctx.sessions.flashStatus(`Cannot delete: ${check.reason}`);
@@ -176,7 +174,6 @@ async function confirmOrDelete(
       // High friction: typing the branch name, for work on disk.
       ctx.deleteConfirm.setConfirmDelete({
         branch,
-        sessionName,
         reason: check.reason,
         mode: 'type-branch',
         approved: check,
@@ -189,7 +186,6 @@ async function confirmOrDelete(
       // session is never blown away by accident.
       ctx.deleteConfirm.setConfirmDelete({
         branch,
-        sessionName,
         reason: 'An agent is running here — deleting stops it',
         mode: 'yes-no',
         approved: check,
@@ -197,11 +193,7 @@ async function confirmOrDelete(
       ctx.deleteConfirm.setConfirmInput('');
       return;
     case 'clear': {
-      const outcome = await ctx.sessions.performDelete(
-        sessionName,
-        branch,
-        check
-      );
+      const outcome = await ctx.sessions.performDelete(branch, check);
       const notice = keptNotice(branch, outcome);
       if (notice) ctx.sessions.flashStatus(notice);
     }
@@ -217,7 +209,7 @@ const deleteBranch: SidebarAction = (ctx) => {
     const wt = worktrees.find((w) => keyForWorktree(w) === sessionName);
     const branch = wt?.branch;
     if (branch) {
-      await confirmOrDelete(ctx, sessionName, branch);
+      await confirmOrDelete(ctx, branch);
       return;
     }
     stopSession(sessionName);
