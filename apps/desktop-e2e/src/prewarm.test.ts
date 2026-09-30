@@ -16,7 +16,8 @@ import {
  */
 
 const BANNER = 'n10-fake-agent-ready';
-/** Longer than the editor's hover wait (150 ms). */
+/** Long enough for a pointer at rest to settle: hoverIntent samples
+ *  every 100 ms. */
 const REST_MS = 300;
 
 async function launch(page: Page, branch: string): Promise<void> {

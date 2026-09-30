@@ -10,12 +10,9 @@ import {
   type ReactNode,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { HoverIntent } from './hover-intent.js';
 import { hasOrphanedFetch } from './orphaned-fetch.js';
 import type { Tab } from './tabs-model.js';
-
-/** How long the pointer rests on a tab or a sidebar row before its
- *  pane is rendered ahead of the switch. */
-export const PREWARM_HOVER_MS = 150;
 
 /**
  * The pane a hover asked the editor to hold ready.
@@ -89,65 +86,69 @@ export function usePrewarm(): PrewarmApi {
 }
 
 /**
- * Hover handlers that hold `target()`'s pane ready once the pointer
- * has rested on the element for `PREWARM_HOVER_MS`.
+ * Hover handlers that hold `target()`'s pane ready once the pointer has
+ * settled on the element, as hoverIntent decides it (`HoverIntent`):
+ * sampled every 100 ms from the moment it comes over, and settled when
+ * it moved under 6 px since the last sample.
  *
- * Only a real mouse moving counts: a row scrolled under a still
- * pointer gets moves with no movement, and a wheel over it cancels, so
- * scrolling past a list warms nothing; neither does sweeping across
- * it, since every move restarts the wait. Leaving lets the pane go, and
- * so does the element going away (a closed tab, a row that left the
- * list). `onStrip` marks a tab on the tab strip. `pressed` is for the element's own press handler: a press wins over
- * a hover in progress, and the pane it warmed is now the one shown.
+ * Only a real mouse moving counts: a row scrolled under a still pointer
+ * gets moves with no movement, and a wheel over it stops the sampling,
+ * so scrolling past a list warms nothing; neither does sweeping across
+ * it, which moves too far between samples. Leaving lets the pane go,
+ * and so does the element going away (a closed tab, a row that left
+ * the list). `onStrip` marks a tab on the tab strip. `pressed` is for
+ * the element's own press handler: a press wins over a hover in
+ * progress, and the pane it warmed is now the one shown.
  */
 export function useHoverPrewarm(target: () => Tab | null, onStrip = false) {
   const { warm, cool } = usePrewarm();
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const warmed = useRef<string | null>(null);
   const targetRef = useRef(target);
   useEffect(() => {
     targetRef.current = target;
   });
+  const [intent] = useState(() => new HoverIntent());
 
-  const cancel = useCallback(() => {
-    if (timer.current !== null) clearTimeout(timer.current);
-    timer.current = null;
-  }, []);
   useEffect(
     () => () => {
-      cancel();
+      intent.cancel();
       if (warmed.current !== null) cool(warmed.current);
     },
-    [cancel, cool]
+    [intent, cool]
   );
 
   const onPointerMove = useCallback(
     (e: PointerEvent) => {
       if (e.pointerType !== 'mouse' || e.buttons !== 0) return;
       if (e.movementX === 0 && e.movementY === 0) return;
-      cancel();
-      timer.current = setTimeout(() => {
-        timer.current = null;
-        const tab = targetRef.current();
-        if (!tab) return;
-        warmed.current = tab.id;
-        warm(tab, onStrip);
-      }, PREWARM_HOVER_MS);
+      const at = { x: e.clientX, y: e.clientY };
+      // The first real move over the element is where sampling starts;
+      // once a pane is held, moving on the element changes nothing.
+      if (intent.sampling) intent.move(at);
+      else if (warmed.current === null) {
+        intent.enter(at, () => {
+          const tab = targetRef.current();
+          if (!tab) return;
+          warmed.current = tab.id;
+          warm(tab, onStrip);
+        });
+      }
     },
-    [cancel, warm, onStrip]
+    [intent, warm, onStrip]
   );
   const onPointerLeave = useCallback(() => {
-    cancel();
+    intent.cancel();
     if (warmed.current !== null) cool(warmed.current);
     warmed.current = null;
-  }, [cancel, cool]);
+  }, [intent, cool]);
+  const onWheel = useCallback(() => intent.cancel(), [intent]);
   const pressed = useCallback(() => {
-    cancel();
+    intent.cancel();
     warmed.current = null;
-  }, [cancel]);
+  }, [intent]);
 
   return {
-    handlers: { onPointerMove, onPointerLeave, onWheel: cancel },
+    handlers: { onPointerMove, onPointerLeave, onWheel },
     pressed,
   };
 }

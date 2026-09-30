@@ -135,9 +135,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
   the chunk `seq` forward.
 - `EditorArea` renders the active tab's pane and at most one spare, hidden
   and `inert` (`use-editor-panes.ts`, `lib/tabs/editor-panes.ts`): the tab a
-  hover settled on (`lib/tabs/prewarm.tsx`, 150 ms, one at a time,
-  superseded rather than queued, and dropped while a pane let go of is still
-  reading, `lib/tabs/orphaned-fetch.ts`), else the tab left last. Pressing the
+  hover settled on (`lib/tabs/prewarm.tsx`, by hoverIntent's rule in
+  `hover-intent.ts`; one at a time, superseded rather than queued, and
+  dropped while a pane let go of is still reading,
+  `lib/tabs/orphaned-fetch.ts`), else the tab left last. Pressing the
   spare's tab shows the same pane; anything that acts without an event on it
   asks `usePaneShown`. Tabs and sidebar rows are chosen on a plain primary
   press (`useSortableTab` composes it after the drag sensor's own

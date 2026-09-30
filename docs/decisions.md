@@ -243,9 +243,13 @@ and `inert`. A hidden wterm per open agent cost the renderer a terminal write
 for every chunk every agent printed, and bought nothing under tmux: the
 client's terminal accumulates no scrollback of its own, since tmux keeps the
 history. One spare buys an instant switch for the tab the user is about to
-open: the tab the pointer has rested on for 150 ms (a tab or a sidebar row),
-or else the tab left last. Panes are keyed by tab id, so pressing the spare's
-tab shows the pane already rendered, and the pane it replaces becomes the
+open: the tab the pointer has settled on (a tab or a sidebar row), or else the
+tab left last. Settled is decided as the hoverIntent jQuery plugin decides it
+(`lib/tabs/hover-intent.ts`): the position is sampled every 100 ms, and a
+pointer that moved under 6 px since the last sample has settled, so a hand
+still drifting a pixel or two on the row counts, where it would keep
+restarting a fixed wait. Panes are keyed by tab id, so pressing the spare's tab
+shows the pane already rendered, and the pane it replaces becomes the
 spare. A new hover replaces the spare rather than queueing behind it, and a
 press on any other tab mounts that tab straight away; missing a pre-warm is
 fine, a press that waits behind one is not. A pane let go of before its reads
