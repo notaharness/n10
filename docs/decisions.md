@@ -450,6 +450,14 @@ news; the user's own latest comment is not relayed. Recovery from a reported CI
 failure is news; an initial green result alone is not. An unavailable conflict
 check is reported as unavailable, never interpreted as a clean result.
 
+Worktree-removal suspension stops a watch and recreates it when removal is
+refused or fails. That discards the delivered baseline, so the resumed watch may
+re-brief findings the agent already received. A separate change should
+park/resume the same watch and test
+refused removal and late delivery together. It must retain the removal safety
+verdicts and must not detach sessions on repository switches. See
+[the suspension follow-up](design/engine-domains.md#babysitter-removal-suspension).
+
 Batch updates after ten minutes of quiet or thirty minutes maximum, and deliver
 only after the agent has been idle for thirty seconds. Start agents with `seed`,
 not `continue-or-seed`, which may discard the prompt. Use `checkoutWorktree` for

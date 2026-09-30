@@ -31,10 +31,11 @@ const mocks = vi.hoisted(() => ({
   idleFor: vi.fn<() => number>(),
   deliverToRunningSession: vi.fn<(name: string, prompt: string) => boolean>(),
   launchSession: vi.fn(),
+  logError: vi.fn(),
   listWorktrees: vi.fn(),
 }));
 
-vi.mock('@n10/logger', () => ({ logError: () => undefined }));
+vi.mock('@n10/logger', () => ({ logError: mocks.logError }));
 // No `createWorktree` here on purpose: the babysitter must never reach
 // the variant that invents a branch, and an import of it would fail
 // loudly rather than pass through a stub.
@@ -611,6 +612,30 @@ describe('startPrBabysitter', () => {
     });
     sitter.stop();
   });
+
+  it.each(['stopped', 'parked'] as const)(
+    'ignores a late read failure after the watch is %s',
+    async (state) => {
+      let current = true;
+      let reject!: (error: Error) => void;
+      lookup = () =>
+        new Promise((_resolve, fail) => {
+          reject = fail;
+        });
+      const sitter = start({ isCurrent: () => current });
+      const polling = sitter.pollNow();
+      await vi.advanceTimersByTimeAsync(0);
+      const snapshot = sitter.status();
+      if (state === 'stopped') sitter.stop();
+      else current = false;
+      reject(new Error('late provider failure'));
+      await polling;
+      expect(sitter.status()).toBe(snapshot);
+      expect(statuses).toEqual([]);
+      expect(mocks.logError).not.toHaveBeenCalled();
+      sitter.stop();
+    }
+  );
 
   it('coalesces explicit polls into one follow-up and resolves every caller', async () => {
     let release!: (value: PullRequestLookup) => void;
