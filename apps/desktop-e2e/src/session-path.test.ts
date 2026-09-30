@@ -1,3 +1,4 @@
+import { agentDraftDirectory } from './setup/agent-drafts.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
@@ -38,7 +39,10 @@ test.describe('Session PATH', () => {
     await expect(visibleText(page, /beam=\d+\.\d+\.\d+\S* dir=/)).toBeVisible();
     const stored = JSON.parse(
       readFileSync(
-        join(fixtureHome, '.n10', 'reviews', 'pr-7', 'comments.json'),
+        join(
+          agentDraftDirectory(fixtureHome, desktop.repoPath, 7),
+          'comments.json'
+        ),
         'utf8'
       )
     ) as { comments: { body: string; file: string }[] };

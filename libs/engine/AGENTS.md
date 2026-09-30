@@ -51,3 +51,10 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   reset them. Parse untrusted PR identity before provider work and check it again
   after awaits. Diff resources pin source and target commits with explicit cwd;
   parsing Git metadata stays a core primitive, rendering stays shell-specific.
+
+- **Review commands**: capture repo/account before awaiting, resolve thread ids
+  from the scoped resource, and invalidate related resources after confirmed
+  writes. Human drafts use core’s account-scoped store and submission ledger;
+  agent findings have a separate ledger store over the same primitives. Publish
+  only through the configured VCS publisher. Keep uncertain outcomes bound to
+  their original account, reconcile on retry, and never reset posted findings.

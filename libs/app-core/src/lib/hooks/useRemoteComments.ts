@@ -1,10 +1,5 @@
 import { useMemo, useCallback, useEffect, useEffectEvent } from 'react';
-import type {
-  PullRequestComments,
-  RemoteCommentThread,
-  RemoteCommentReply,
-  VcsProvider,
-} from '@n10/vcs-core';
+import type { PullRequestComments } from '@n10/vcs-core';
 import { useEngine } from '../context/EngineContext.js';
 import { useReadResource } from './useReadResource.js';
 
@@ -13,12 +8,9 @@ const EMPTY_COMMENTS: PullRequestComments = {
   generalComments: [],
 };
 
+/** Observes review resources; all provider commands and invalidation are engine-owned. */
 export function useRemoteComments(
   prId: number | null,
-  provider: VcsProvider | null,
-  auth: Record<string, string>,
-  project: Record<string, string>,
-  onResolvedChange?: () => void,
   onFetchError?: (message: string) => void
 ) {
   const { reviews } = useEngine();
@@ -35,78 +27,22 @@ export function useRemoteComments(
   const refresh = useCallback(() => {
     if (resource) void resource.read(true);
   }, [resource]);
-
   const replyToThread = useCallback(
-    async (threadId: string, body: string): Promise<RemoteCommentReply> => {
-      if (!prId || !provider?.replyToThread || !resource)
-        throw new Error("Can't reply on this pull request");
-      const thread = [...comments.threads, ...comments.generalComments].find(
-        (item) => item.id === threadId
-      );
-      if (!thread)
-        throw new Error(`Reply failed: thread ${threadId} not found`);
-      const reply = await provider.replyToThread(
-        auth,
-        project,
-        prId,
-        thread,
-        body
-      );
-      const append = (threads: RemoteCommentThread[]) =>
-        threads.map((item) =>
-          item.id === threadId
-            ? { ...item, comments: [...item.comments, reply] }
-            : item
-        );
-      if (
-        !resource.patch(snapshot, (data) => ({
-          threads: append(data.threads),
-          generalComments: append(data.generalComments),
-        }))
-      )
-        resource.invalidate();
-      return reply;
+    async (threadId: string, body: string) => {
+      if (!prId) throw new Error("Can't reply on this pull request");
+      return reviews.commands.reply({ prId, threadId, body });
     },
-    [prId, provider, auth, project, resource, comments, snapshot]
+    [prId, reviews]
   );
-
   const toggleResolved = useCallback(
-    async (threadId: string, resolved: boolean): Promise<boolean> => {
-      if (!prId || !provider?.setThreadResolved || !resource) return false;
-      const thread = [...comments.threads, ...comments.generalComments].find(
-        (item) => item.id === threadId
-      );
-      if (!thread?.canResolve) return false;
-      await provider.setThreadResolved(auth, project, prId, thread, resolved);
-      const update = (threads: RemoteCommentThread[]) =>
-        threads.map((item) =>
-          item.id === threadId ? { ...item, isResolved: resolved } : item
-        );
-      if (
-        !resource.patch(snapshot, (data) => ({
-          threads: update(data.threads),
-          generalComments: update(data.generalComments),
-        }))
-      )
-        resource.invalidate();
-      onResolvedChange?.();
-      return true;
+    async (threadId: string, resolved: boolean) => {
+      if (!prId) return false;
+      return reviews.commands.resolve({ prId, threadId, resolved });
     },
-    [
-      prId,
-      provider,
-      auth,
-      project,
-      resource,
-      comments,
-      snapshot,
-      onResolvedChange,
-    ]
+    [prId, reviews]
   );
-
   return {
-    threads: comments.threads,
-    generalComments: comments.generalComments,
+    ...comments,
     loading: snapshot.loading,
     error: snapshot.error,
     refresh,

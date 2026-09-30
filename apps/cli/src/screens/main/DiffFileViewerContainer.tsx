@@ -1,3 +1,4 @@
+import { useEngine } from '@n10/app-core';
 import { useCallback } from 'react';
 import { useInput } from 'ink';
 import type { PullRequestInfo } from '@n10/vcs-core';
@@ -46,6 +47,7 @@ export function DiffFileViewerContainer({
   terminalFocused,
   diffBundle,
 }: DiffFileViewerContainerProps) {
+  const { reviews } = useEngine();
   const sessionCtx = useSessionActions();
   const configCtx = useConfig();
   const keybinds = useKeybindResolve();
@@ -117,6 +119,7 @@ export function DiffFileViewerContainer({
               prId: selectedPr.id,
               positions: commentPositions,
               selectedReviewPr: selectedPr,
+              service: reviews.agentComments,
             }
           : undefined,
         remoteCtx: {

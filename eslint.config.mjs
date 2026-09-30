@@ -63,6 +63,32 @@ const shellOperationPaths = [
       'Review resources and diff freshness belong to the engine review service.',
   },
   {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: [
+      'listReviewDrafts',
+      'saveReviewDraft',
+      'discardReviewDraft',
+      'submitReview',
+      'searchMentions',
+    ],
+    message: 'Review commands belong to the engine review service.',
+  },
+  {
+    name: '@n10/review-comments',
+    allowTypeImports: true,
+    importNames: [
+      'readComments',
+      'appendComment',
+      'updateComment',
+      'removeComment',
+      'commentDirPath',
+      'commentFilePath',
+    ],
+    message:
+      'Agent finding resources and commands belong to the engine review service.',
+  },
+  {
     name: '@n10/worktree-manager',
     allowTypeImports: true,
     importNames: [

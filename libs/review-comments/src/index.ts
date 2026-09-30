@@ -11,11 +11,7 @@ export {
   updateComment,
   removeComment,
 } from './lib/comment-store.js';
-export {
-  postReviewComments,
-  renderCommentBody,
-  type PostContext,
-} from './lib/comment-poster.js';
+export { renderCommentBody } from './lib/comment-body.js';
 export {
   AGENT_ATTRIBUTION,
   AGENT_FOOTER,

@@ -53,6 +53,7 @@ export function reviewReadFixture(
     config,
     isCurrent,
     pullRequests: {
+      read: vi.fn(async () => ({})),
       lookupPullRequest,
       subscribe(listener: (repo: string) => void) {
         observers.add(listener);

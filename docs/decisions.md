@@ -28,8 +28,9 @@ import React bindings. No new worker or generic kernel is needed by these domain
 
 When changing shared behavior, compare both shells. Worktree removal is an
 engine command over core’s guarded removal sequence; shells request a verdict
-and present confirmation before executing that command. Draft posting uses one comment per `postReviewComments` call,
-so a partial failure cannot reset already-posted comments to drafts.
+and present confirmation before executing that command. Agent findings publish through VCS publishers and core’s durable submission
+ledger. A partial failure retains completed comments; an unanswered write is
+reconciled before retrying.
 
 A fresh worktree needs its own `npm ci`: workspace links and nested dependencies
 must resolve to that checkout. Copying only another checkout's root
@@ -486,10 +487,12 @@ PR list changes expire the repository’s review reads so a new head, check or
 review cannot remain hidden behind their TTL. Same-scope invalidation retains the
 last successful answer. Manual remote refresh invalidates provider reads after
 the provider memo is cleared.
-Confirmed desktop thread/verdict writes invalidate the captured repository's reads;
-the TUI's confirmed thread edits update their unchanged base snapshot or invalidate
-a snapshot that raced the write. Review
-commands and publication reconciliation are the following domain slice.
+Both shells issue reply, resolve and verdict commands through the engine. A
+confirmed thread change patches its unchanged base snapshot or invalidates a raced
+snapshot, and expires
+related checks/conversation reads; resolve/verdict commands refresh the captured
+repository's list. Draft save/discard/submission and mention search share the same
+identity context.
 
 Git metadata parsing is a core operation with explicit cwd. The engine refreshes
 source refs when the PR head differs, shares the core target-fetch queue's five-minute
@@ -504,6 +507,24 @@ or active reads. Patch maps have smaller capacities than provider records.
 No worker is added for orchestration or subprocess waits. Desktop diff parsing and
 syntax highlighting remain in their existing renderer workers; the final profiling
 slice determines whether host CPU work warrants another boundary.
+
+## Agent findings and publication
+
+`engine/reviews/agent-comments.ts` owns finding resources, edit/delete policy and
+filesystem observation. The common Git directory identifies the repository, so
+linked worktrees share findings while equal PR numbers in different repositories
+do not. Files live under `~/.n10/reviews/<repository hash>/pr-<number>`; no legacy
+unscoped path is read. The standalone utility resolves this identity through core.
+Only observed resources attach a nonrecursive watcher; disposal closes it.
+
+Agent publication uses core’s draft submission machinery in the separate
+`~/.n10/agent-review-publications` store, keyed by provider repository, PR and
+account. Human writing stays in `review-drafts`. Every network write goes through
+`VcsProvider.publishReview`; review-comments contains storage and formatting only.
+Comments are submitted singly, with a chosen verdict on the first submission.
+Completed findings stay posted after a later failure. An uncertain outcome retains
+its ledger and account binding, blocks edits, and is reconciled on retry. Restarted
+processes can retry findings left posting without inventing a second write path.
 
 ## Diff generation and rendering
 

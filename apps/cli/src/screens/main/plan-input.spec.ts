@@ -149,6 +149,7 @@ function viewerCtx(pane: DiffViewerHandlerCtx['pane']): DiffViewerHandlerCtx {
     rowMap: { positions: [], totalRows: 0, sectionAnchorRows: [0] },
     sectionAnchorRows: [0],
     commentCtx: {
+      service: {} as never,
       comments: [localDraft()],
       prId: PR_ID,
       positions: new Map(),

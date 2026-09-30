@@ -38,17 +38,10 @@ function makeThread(
 
 type HookValue = ReturnType<typeof useRemoteComments>;
 
-// Stable empty objects shared across renders so the hook's internal
-// useCallback dep array doesn't change on every render (which would
-// re-run the fetch effect and re-fire the request).
-const EMPTY_AUTH = Object.freeze({}) as Record<string, string>;
-const EMPTY_PROJECT = Object.freeze({}) as Record<string, string>;
-
 // Probe mounts the hook and captures its latest return value into `outRef`.
 function mountProbe(
   prId: number | null,
   provider: VcsProvider | null,
-  onResolvedChange?: () => void,
   onFetchError?: (message: string) => void
 ): {
   outRef: { current: HookValue | null };
@@ -58,14 +51,7 @@ function mountProbe(
   const outRef: { current: HookValue | null } = { current: null };
 
   function Probe({ prId: currentPrId }: { prId: number | null }) {
-    const value = useRemoteComments(
-      currentPrId,
-      provider,
-      EMPTY_AUTH,
-      EMPTY_PROJECT,
-      onResolvedChange,
-      onFetchError
-    );
+    const value = useRemoteComments(currentPrId, onFetchError);
     // Capture on every render via an effect — direct assignment
     // during render is blocked by the react-hooks/immutability rule.
     useEffect(() => {
@@ -236,7 +222,7 @@ describe('useRemoteComments', () => {
     unmount();
   });
 
-  it('toggleResolved updates isResolved on the matching thread and fires onResolvedChange', async () => {
+  it('toggleResolved updates isResolved on the matching thread', async () => {
     const thread = makeThread({ id: 't1', isResolved: false });
     const payload: PullRequestComments = {
       threads: [thread],
@@ -247,16 +233,14 @@ describe('useRemoteComments', () => {
       fetchCommentThreads: vi.fn().mockResolvedValue(payload),
       setThreadResolved: vi.fn().mockResolvedValue(undefined),
     } as unknown as VcsProvider;
-    const onResolvedChange = vi.fn();
 
-    const { outRef, unmount } = mountProbe(42, provider, onResolvedChange);
+    const { outRef, unmount } = mountProbe(42, provider);
     await waitForState(outRef, (v) => v.threads.length === 1);
 
     await outRef.current!.toggleResolved('t1', true);
     await waitForState(outRef, (v) => v.threads[0]?.isResolved === true);
 
     expect(outRef.current?.threads[0]?.isResolved).toBe(true);
-    expect(onResolvedChange).toHaveBeenCalledTimes(1);
     unmount();
   });
 
@@ -282,7 +266,7 @@ describe('useRemoteComments', () => {
     unmount();
   });
 
-  it('toggleResolved re-throws provider errors and does not fire onResolvedChange', async () => {
+  it('toggleResolved re-throws provider errors', async () => {
     const provider = {
       id: 'github',
       fetchCommentThreads: vi.fn().mockResolvedValue({
@@ -291,15 +275,13 @@ describe('useRemoteComments', () => {
       }),
       setThreadResolved: vi.fn().mockRejectedValue(new Error('forbidden')),
     } as unknown as VcsProvider;
-    const onResolvedChange = vi.fn();
 
-    const { outRef, unmount } = mountProbe(42, provider, onResolvedChange);
+    const { outRef, unmount } = mountProbe(42, provider);
     await waitForState(outRef, (v) => v.threads.length === 1);
 
     await expect(outRef.current!.toggleResolved('t1', true)).rejects.toThrow(
       'forbidden'
     );
-    expect(onResolvedChange).not.toHaveBeenCalled();
     unmount();
   });
 
@@ -311,7 +293,7 @@ describe('useRemoteComments', () => {
     } as unknown as VcsProvider;
     const onFetchError = vi.fn();
 
-    const { unmount } = mountProbe(42, provider, undefined, onFetchError);
+    const { unmount } = mountProbe(42, provider, onFetchError);
     await flush();
     expect(provider.fetchCommentThreads).toHaveBeenCalledTimes(1);
 
@@ -360,7 +342,7 @@ describe('useRemoteComments', () => {
     unmount();
   });
 
-  it('toggleResolved returns false when provider lacks setThreadResolved', async () => {
+  it('toggleResolved reports an unavailable provider capability', async () => {
     const provider = {
       id: 'github',
       fetchCommentThreads: vi
@@ -371,8 +353,9 @@ describe('useRemoteComments', () => {
     const { outRef, unmount } = mountProbe(42, provider);
     await flush();
 
-    const result = await outRef.current!.toggleResolved('t1', true);
-    expect(result).toBe(false);
+    await expect(outRef.current!.toggleResolved('t1', true)).rejects.toThrow(
+      "isn't available"
+    );
     unmount();
   });
 });

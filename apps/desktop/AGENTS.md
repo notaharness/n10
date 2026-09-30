@@ -113,7 +113,7 @@ Every rule below has its reasoning in `docs/decisions.md`.
   (`diff/LineGutter.tsx`, one tab stop per file, one file and one side
   per range, consecutive lines on screen only). Composers and the reviewer's inline drafts hang in the
   flat diff through `mineByFile` (`diff/use-diff-comments.ts`). The review agent's findings stay in
-  `@n10/review-comments`, keyed by PR number.
+  `engine/reviews`, with a shared finding store keyed by common Git directory and PR number.
 - A mention is the provider's token (`@login`, Azure's `@<id>`) from its
   own search (core `pull-requests/mention-search.ts`,
   `comments/MentionPicker.tsx`); a display name is only ever shown.

@@ -10,6 +10,13 @@ export interface ReviewComment {
   side: 'LEFT' | 'RIGHT';
   status: 'draft' | 'posting' | 'posted';
   createdAt: string;
+  /** Account/repository bound to an unanswered publication; retry before editing. */
+  publication?: {
+    provider: string;
+    host: string;
+    repository: string;
+    viewer: string | null;
+  };
   /**
    * The provider's id for an existing review thread this draft was
    * written in answer to, when it was (`n10 util add-comment

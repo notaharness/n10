@@ -140,6 +140,10 @@ export function createProviderReads(options: ReviewContextOptions) {
         });
       });
     },
+    invalidateRelated() {
+      for (const cache of [snapshots, checks, conversations])
+        cache.invalidate();
+    },
     invalidate() {
       for (const cache of caches) cache.invalidate();
     },

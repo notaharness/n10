@@ -34,3 +34,9 @@ export type {
   DiffFiles,
   DiffRefs,
 } from './lib/reviews/diff-reads.js';
+
+export type {
+  ReplyToReviewThread,
+  ResolveReviewThread,
+} from './lib/reviews/review-commands.js';
+export type { PostAgentCommentsRequest } from './lib/reviews/agent-publication.js';

@@ -3,12 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * The drafts bridge's own jobs: parse what the renderer sends as
- * untrusted, key the store by the configured account, and answer only
- * for the repository that is open. Core's store runs for real, under a
- * scratch HOME.
- */
+import { reviewReadFixture } from './review-read-fixture.js';
+import { createReviewDraftCommands } from './review-draft-commands.js';
 
 const REF = {
   provider: 'github',
@@ -20,31 +16,20 @@ const REPLY = { kind: 'reply', threadId: 'T-1' };
 
 const env = vi.hoisted(() => ({ open: true, username: 'bea' }));
 
-vi.mock('@n10/vcs-core', async (original) => ({
-  ...(await original<Record<string, unknown>>()),
-  configuredRepository: () => ({
-    provider: 'github',
-    host: 'github.com',
-    repository: 'acme/app',
+const fixture = reviewReadFixture(
+  () => ({
+    repository: {
+      provider: 'github',
+      host: 'github.com',
+      repository: 'acme/app',
+    },
+    viewer: env.username,
+    vcsConfigured: false,
   }),
-  readConfig: () => ({
-    vendor: 'github',
-    vendorProject: { owner: 'acme', repo: 'app', username: env.username },
-  }),
-}));
-vi.mock('./repo.js', () => ({
-  requireRepo: () => '/repo',
-  activeRepoIs: (cwd: string) => env.open && cwd === '/repo',
-}));
-// Only a submit resolves the provider; these tests never publish.
-
-vi.mock('./program.js', () => ({
-  resolveProvider: () => ({ config: {}, provider: null, configured: false }),
-}));
-
-const { discardDraft, listDrafts, saveDraft } = await import(
-  './review-drafts.js'
+  () => env.open
 );
+const service = createReviewDraftCommands(fixture.options, vi.fn());
+const { list: listDrafts, save: saveDraft, discard: discardDraft } = service;
 
 let home: string;
 const realHome = process.env['HOME'];
@@ -95,7 +80,7 @@ describe('review drafts service', () => {
   it('refuses a repository that is no longer open', async () => {
     env.open = false;
     await expect(listDrafts({ ref: REF, viewer: 'bea' })).rejects.toThrow(
-      /no longer the repository open/
+      /no longer open/
     );
   });
 

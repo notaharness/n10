@@ -1,3 +1,4 @@
+import type { ReviewService } from '@n10/engine';
 import type {
   SessionActionsContextValue,
   ConfigContextValue,
@@ -90,6 +91,7 @@ export interface DiffFileListHandlerCtx {
 }
 
 export interface CommentContext {
+  service: ReviewService['agentComments'];
   comments: ReviewComment[];
   prId: number;
   positions: Map<string, CommentPositionInfo>;

@@ -46,9 +46,9 @@ holds the keybind-driven state transitions; screens under `src/screens/main`
   project must reference its spec tsconfig as well as the app one.
 - `n10 util add-comment` (`@n10/review-comments` `util-command.ts`) is how a
   review agent records drafts; desktop sessions run it through the desktop's
-  own shim (decisions.md D16). Draft posting is one comment
-  per `postReviewComments` call so a mid-batch failure cannot reset live
-  comments to draft.
+  own shim (decisions.md D16). Engine agent-draft commands publish through
+  the VCS publishers and core’s durable ledger, retaining completed comments
+  after a partial failure. Findings are scoped to the common Git directory.
 - Packaging: `prepare-publish` assembles `dist/` from this build and the
   desktop build; see the `publish-beta` skill.
 - Comment images (`![alt](url)`) render inline through kitty graphics only

@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * The mention bridge's own jobs: parse what the renderer sends as
- * untrusted, search through the configured provider with its
- * credentials, and answer only for the repository that is open.
- */
+import { reviewReadFixture } from './review-read-fixture.js';
+import { createReviewDraftCommands } from './review-draft-commands.js';
 
 const REF = {
   provider: 'github',
@@ -19,31 +16,19 @@ const env = vi.hoisted(() => ({
   asked: [] as unknown[][],
 }));
 
-vi.mock('@n10/vcs-core', async (original) => ({
-  ...(await original<Record<string, unknown>>()),
-  configuredRepository: () => ({
-    provider: 'github',
-    host: 'github.com',
-    repository: 'acme/app',
-  }),
-  readConfig: () => ({
-    vendor: 'github',
-    vendorProject: { owner: 'acme', repo: 'app', username: 'bob' },
-  }),
-}));
-vi.mock('./repo.js', () => ({
-  requireRepo: () => '/repo',
-  activeRepoIs: (cwd: string) => env.open && cwd === '/repo',
-}));
-
-vi.mock('./program.js', () => ({
-  resolveProvider: () => ({
+const fixture = reviewReadFixture(
+  () => ({
+    repository: {
+      provider: 'github',
+      host: 'github.com',
+      repository: 'acme/app',
+    },
+    viewer: 'bob',
+    vcsConfigured: true,
     config: {
-      vendor: 'github',
       vendorAuth: { token: 't' },
       vendorProject: { owner: 'acme', repo: 'app' },
     },
-    configured: true,
     provider: {
       id: 'github',
       searchMentionCandidates: (...args: unknown[]) => {
@@ -52,9 +37,12 @@ vi.mock('./program.js', () => ({
       },
     },
   }),
-}));
-
-const { searchMentionCandidates } = await import('./mentions.js');
+  () => env.open
+);
+const { mentions: searchMentionCandidates } = createReviewDraftCommands(
+  fixture.options,
+  vi.fn()
+);
 
 beforeEach(() => {
   env.open = true;
@@ -86,7 +74,7 @@ describe('searchMentionCandidates', () => {
     env.open = false;
     await expect(
       searchMentionCandidates({ ref: REF, query: 'al' })
-    ).rejects.toThrow(/no longer the repository open/);
+    ).rejects.toThrow(/no longer open/);
     expect(env.asked).toEqual([]);
   });
 });

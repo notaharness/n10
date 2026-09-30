@@ -81,6 +81,21 @@ interface N10Bridge {
   listForeignSessions(): Promise<
     { repo: string; branch: string; sessionName: string }[]
   >;
+  postDraftComments(req: {
+    prId: number;
+    ids?: string[];
+    headSha?: string;
+  }): Promise<number>;
+  updateDraftComment(
+    prId: number,
+    id: string,
+    patch: { body?: string; severity?: string }
+  ): Promise<void>;
+  listDraftComments(
+    prId: number
+  ): Promise<
+    { id: string; body: string; status: 'draft' | 'posting' | 'posted' }[]
+  >;
   listReviewDrafts(req: {
     ref: Record<string, unknown>;
     viewer?: string | null;
@@ -89,7 +104,6 @@ interface N10Bridge {
     sourceBranch: string,
     targetBranch: string
   ): Promise<{ text: string; head: string }>;
-  /** What the Finish review form calls (its UI is a later slice). */
   submitReview(req: {
     ref: Record<string, unknown>;
     viewer?: string | null;
@@ -104,7 +118,6 @@ interface N10Bridge {
       | 'RESET_VOTE';
     draftIds: string[];
   }): Promise<{ drafts: FakeReviewDraft[]; resumed: { state: string } | null }>;
-  /** Asserted on for completeness: the conversation has no UI yet. */
   getPullRequestConversation(req: {
     ref: Record<string, unknown>;
     viewer?: string;
