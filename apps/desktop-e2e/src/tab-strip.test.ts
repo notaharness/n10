@@ -1,8 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
-import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, switchRepo, tab, tabs } from './setup/app.js';
+import { test, expect, fakeAgent } from './fixtures/desktop.js';
+import {
+  createWorktree,
+  launchAgentFromRail,
+  sidebarRow,
+  switchRepo,
+  tab,
+  tabs,
+} from './setup/app.js';
+import type { FakeGitHub } from './setup/fake-gh.js';
 import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 import {
   armContextMenuChoice,
@@ -124,6 +132,21 @@ test.describe('Tab strip overflow, chosen before', () => {
 /** The label as painted, cut or not. */
 const shownLabel = (t: Locator) => t.locator('[data-tab-label-shown]');
 
+/** Whether the painted label's text ends inside its box: a cut that
+ *  kept too much would run on under the tab's edge. */
+const fitsItsBox = (t: Locator) =>
+  shownLabel(t).evaluate((el) => {
+    const text = document.createRange();
+    text.selectNodeContents(el);
+    return (
+      text.getBoundingClientRect().right <=
+      el.getBoundingClientRect().right + 0.5
+    );
+  });
+
+const TITLE =
+  'Handle cancelled requests without leaving the half-written cache entry behind';
+
 /** The tab whose accessible name starts with the whole of `name`. */
 const namedTab = (page: Page, name: string) =>
   tab(page, new RegExp(`^${name}\\b`));
@@ -141,12 +164,45 @@ test.describe('Tab labels', () => {
     expect(shown).toMatch(/^….+-a-long-branch-name$/);
     expect(LONG.endsWith(shown.slice(1))).toBe(true);
     expect(shown.length).toBeLessThan(LONG.length);
+    expect(await fitsItsBox(t)).toBe(true);
+    // A sighted reader gets the whole of it too, on hover.
+    await expect(t.locator('[data-tab-label]')).toHaveAttribute('title', LONG);
   });
 
   test('a name that fits is shown whole', async ({ desktop }) => {
     const { page } = desktop;
     await createWorktree(page, 'docs');
-    await expect(shownLabel(namedTab(page, 'docs'))).toHaveText('docs');
+    const t = namedTab(page, 'docs');
+    await expect(shownLabel(t)).toHaveText('docs');
+    await expect(t.locator('[data-tab-label]')).not.toHaveAttribute(
+      'title',
+      /./
+    );
+  });
+});
+
+test.describe('Tab labels of pull requests', () => {
+  const GITHUB: FakeGitHub = {
+    prs: [{ number: 7, title: TITLE, headRefName: 'cancel-requests' }],
+  };
+  test.use({
+    fakeGitHub: GITHUB,
+    repo: { worktrees: [{ branch: 'cancel-requests' }] },
+  });
+
+  test('a title too long for its tab loses its end, and reads from its start', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await sidebarRow(page, /Handle cancelled requests/).click();
+    const t = namedTab(page, TITLE);
+    await expect(t).toBeVisible();
+
+    const shown = await shownLabel(t).evaluate((el) => el.textContent);
+    expect(shown).toMatch(/^Handle cancelled .+…$/);
+    expect(TITLE.startsWith(shown.slice(0, -1))).toBe(true);
+    expect(await fitsItsBox(t)).toBe(true);
+    await expect(t.locator('[data-tab-label]')).toHaveAttribute('title', TITLE);
   });
 });
 
@@ -199,6 +255,49 @@ test.describe('Repository colours', () => {
     const settings = tab(page, /Settings/);
     await expect(settings).toBeVisible();
     await expect(settings.locator('[data-repo-band]')).toHaveCount(0);
+  });
+});
+
+test.describe('Close button on a tab asking for attention', () => {
+  test.use({
+    n10Config: {
+      aiCommand: fakeAgent({ stream: true, intervalMs: 120, streamMs: 6000 }),
+    },
+  });
+
+  test('keeps its cover opaque through the blink', async ({ desktop }) => {
+    const { page } = desktop;
+    await createWorktree(page, 'worker');
+    await launchAgentFromRail(page);
+    await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await createWorktree(page, 'elsewhere');
+    const worker = tab(page, /worker/);
+    await expect(worker).toHaveClass(/tab-attention/, { timeout: 30_000 });
+
+    await worker.hover();
+    const cover = worker
+      .getByRole('button', { name: 'Close tab' })
+      .locator('..');
+    await expect(cover).toHaveCSS('opacity', '1');
+    // Both halves of the 1.4s blink, sampled, each as the alpha it
+    // paints with: Chromium writes a mixed colour as oklab().
+    const seen = await cover.evaluate(async (el) => {
+      const ctx = document.createElement('canvas').getContext('2d')!;
+      const samples = new Map<string, number>();
+      for (let i = 0; i < 16; i++) {
+        const colour = getComputedStyle(el).backgroundColor;
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.fillStyle = colour;
+        ctx.fillRect(0, 0, 1, 1);
+        samples.set(colour, ctx.getImageData(0, 0, 1, 1).data[3]!);
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      return [...samples.values()];
+    });
+    expect(seen.length).toBeGreaterThan(1);
+    expect(seen.every((alpha) => alpha === 255)).toBe(true);
   });
 });
 

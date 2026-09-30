@@ -1,3 +1,4 @@
+import { basename } from 'node:path';
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
@@ -108,6 +109,15 @@ export async function switchRepo(page: Page, cwd: string): Promise<void> {
       timeout: 30_000,
     })
     .toMatchObject({ cwd });
+  // The host is there; wait for the window too. Until the workspace has
+  // rendered under the new repository, a key pressed next (Ctrl+K for
+  // the palette) can land while the old one unmounts and go nowhere.
+  await expect(
+    page
+      .getByRole('banner')
+      .getByRole('button', { name: basename(cwd), exact: true })
+  ).toBeVisible({ timeout: 30_000 });
+  await newWorktreeButton(page).waitFor({ state: 'visible', timeout: 30_000 });
 }
 
 /**

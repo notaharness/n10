@@ -184,7 +184,7 @@ test.describe('Terminal tabs', () => {
       const tab = terminalTabs(page);
       await expect(tab).toHaveCount(1);
       await expect(tab).toHaveAttribute('aria-selected', 'true');
-      await expect(tab).not.toContainText('picked-repo/');
+      await expect(tab).not.toHaveAccessibleName(/^picked-repo\//);
     } finally {
       cleanupTestRepo(other);
     }

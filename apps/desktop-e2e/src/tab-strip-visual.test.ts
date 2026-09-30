@@ -1,4 +1,4 @@
-import type { ElectronApplication, Page } from '@playwright/test';
+import type { ElectronApplication, Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
 import { createWorktree, switchRepo, tab } from './setup/app.js';
 import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
@@ -44,6 +44,28 @@ function size(app: ElectronApplication) {
     const window = BrowserWindow.getAllWindows()[0]!;
     window.setMinimumSize(0, 0);
     window.setContentSize(1000, 600);
+  });
+}
+
+/**
+ * Hold `el` in `:hover` through DevTools rather than the pointer.
+ * Chromium drops a pointer's hover once the page's style changes, and
+ * Playwright's capture injects a stylesheet (to stop animations and
+ * hide the caret), so a pointer hover does not survive into the shot.
+ */
+async function forceHover(page: Page, el: Locator): Promise<void> {
+  await el.evaluate((node) => node.setAttribute('data-force-hover', ''));
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('DOM.enable');
+  await cdp.send('CSS.enable');
+  const { root } = await cdp.send('DOM.getDocument');
+  const { nodeId } = await cdp.send('DOM.querySelector', {
+    nodeId: root.nodeId,
+    selector: '[data-force-hover]',
+  });
+  await cdp.send('CSS.forcePseudoState', {
+    nodeId,
+    forcedPseudoClasses: ['hover'],
   });
 }
 
@@ -95,25 +117,14 @@ test.describe('Visual (tab strip) @visual', () => {
       const { page, app } = desktop;
       await twoReposOfTabs(page, app, other);
       const hovered = tab(page, /fix-login-loop/);
-      await hovered.hover();
-      await expect(
-        hovered.getByRole('button', { name: 'Close tab' })
-      ).toBeVisible();
+      await forceHover(page, hovered);
       await expect(
         hovered.getByRole('button', { name: 'Close tab' }).locator('..')
       ).toHaveCSS('opacity', '1');
-      // One capture, as it is. The stylesheet Playwright injects to
-      // disable animations drops Chromium's hover state, as does any
-      // capture after the first, and toHaveScreenshot captures until two
-      // frames agree. The fade is over (asserted above); the strip has
-      // no caret.
-      const capture = await strip(page).screenshot({
-        animations: 'allow',
-        caret: 'initial',
-      });
-      expect(capture).toMatchSnapshot('tab-strip-hover-dark.png', {
-        maxDiffPixels: 0,
-      });
+      await expect(strip(page)).toHaveScreenshot(
+        'tab-strip-hover-dark.png',
+        shot
+      );
     });
   });
 });
