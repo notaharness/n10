@@ -19,7 +19,6 @@ import {
   handleTextInput,
   resolveValue,
 } from '@n10/core';
-import { autoDetectProjectConfig } from '@n10/vcs-core';
 
 // ── Shared context slice types ────────────────────────────────────
 
@@ -119,17 +118,13 @@ function editToggle({ ctx, field }: SettingsActionCtx): void {
 }
 
 function autoDetect({ ctx }: SettingsActionCtx): void {
-  const { updated, detected } = autoDetectProjectConfig(
-    ctx.config.repo,
-    ctx.config.providers
-  );
+  const { updated, detected } = ctx.config.detect();
   if (!updated) {
     ctx.sessions.flashStatus(
       'Nothing new to detect; every setting is filled in'
     );
     return;
   }
-  ctx.config.reload();
   ctx.sessions.flashStatus(
     `Auto-detected: ${Object.keys(detected).join(', ')}`
   );

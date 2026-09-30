@@ -6,7 +6,7 @@ import {
 } from '@n10/core';
 import { listWorktrees } from '@n10/worktree-manager';
 import { readConfig } from '@n10/vcs-core';
-import { PROVIDERS } from './repo.js';
+import { PROVIDERS } from './providers.js';
 import { cachedPullRequests } from './pull-requests.js';
 import { removeWorktree } from './worktrees.js';
 import type { SyncNoticeEvent } from '../contract.js';

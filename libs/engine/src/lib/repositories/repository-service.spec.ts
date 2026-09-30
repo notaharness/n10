@@ -3,11 +3,7 @@ import { mkdirSync, rmSync, symlinkSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import type * as Os from 'node:os';
-import {
-  readConfig,
-  writeGlobalConfig,
-  writeProjectConfig,
-} from '@n10/vcs-core';
+import { readConfig, writeGlobalConfig } from '@n10/vcs-core';
 import type { VcsProvider } from '@n10/vcs-core';
 import { createRepositoryService } from './repository-service.js';
 
@@ -52,41 +48,58 @@ const providers: VcsProvider[] = [
   },
 ];
 
+function harness(registry = providers) {
+  const pullRequests = {
+    credentialsChanged: vi.fn(),
+    read: vi.fn(async () => ({})),
+  };
+  const restartSync = vi.fn();
+  const service = createRepositoryService({
+    providers: registry,
+    pullRequests,
+    restartSync,
+  });
+  return { service, pullRequests, restartSync };
+}
+
 describe('repository scope', () => {
-  it('detects the requested checkout without changing the process directory', () => {
+  it('opens a nested directory under the canonical Git root without changing cwd', () => {
     const original = process.cwd();
     const cwd = repo('detection');
+    const nested = join(cwd, 'apps', 'cli');
+    mkdirSync(nested, { recursive: true });
     execFileSync(
       'git',
       ['remote', 'add', 'origin', 'https://github.com/acme/app.git'],
       { cwd }
     );
-    const service = createRepositoryService(providers);
-    const current = service.open(cwd);
+    const { service } = harness();
+    const current = service.open(nested);
+    expect(current.cwd).toBe(cwd);
+    expect(current.config.repo).toBe(cwd);
     expect(process.cwd()).toBe(original);
     expect(readConfig(cwd).email).toBe('detection@test.invalid');
-    expect(current.repository?.repository).toBe('acme/app');
-    expect(current.providerId).toBe('github');
+    expect(current.config.getSnapshot().repository?.repository).toBe(
+      'acme/app'
+    );
+    expect(current.config.getSnapshot().provider?.id).toBe('github');
   });
 
-  it('canonicalizes aliases and preserves snapshot identity on a no-op reopen', () => {
+  it('shares a handle for aliases and replaces it on repository selection', () => {
     const cwd = repo('canonical');
     const link = join(fixture.home, 'alias');
     symlinkSync(cwd, link);
-    const service = createRepositoryService([]);
-    const changed = vi.fn();
-    const unsubscribe = service.subscribe(changed);
+    const { service } = harness([]);
     const current = service.open(link);
     expect(current.cwd).toBe(cwd);
     expect(service.open(cwd)).toBe(current);
-    expect(changed).toHaveBeenCalledTimes(1);
-    unsubscribe();
-    service.open(repo('another'));
-    expect(changed).toHaveBeenCalledTimes(1);
+    const next = service.open(repo('another'));
+    expect(next).not.toBe(current);
+    expect(next.config).not.toBe(current.config);
   });
 
   it('keeps the active scope when another checkout fails validation', () => {
-    const service = createRepositoryService([]);
+    const { service } = harness([]);
     const current = service.open(repo('valid'));
     expect(() => service.open(join(fixture.home, 'missing'))).toThrow(
       'Not a git repository'
@@ -95,18 +108,45 @@ describe('repository scope', () => {
     expect(service.isActive(current.cwd)).toBe(true);
   });
 
-  it('reloads repository and viewer identity after configuration changes', () => {
-    const service = createRepositoryService(providers);
+  it('publishes config-derived identity and effects through one subscription', () => {
+    const { service, restartSync, pullRequests } = harness();
     const cwd = repo('identity');
     const current = service.open(cwd);
-    expect(current.providerId).toBeNull();
-    writeProjectConfig(
-      { vendor: 'github', vendorProject: { username: 'bob' } },
-      cwd
+    const changed = vi.fn();
+    current.config.subscribe(changed);
+    current.config.updateField(
+      { key: 'vendor', label: 'Provider', configBag: 'project' },
+      'github'
     );
-    const next = service.reload();
-    expect(next?.viewer).toBe('bob');
-    expect(next?.repository?.repository).toBe('acme/app');
-    expect(service.reload()).toBe(next);
+    current.config.updateField(
+      { key: 'username', label: 'Username', configBag: 'vendorProject' },
+      'bob'
+    );
+    expect(current.config.getSnapshot().viewer).toBe('bob');
+    expect(current.config.getSnapshot().repository?.repository).toBe(
+      'acme/app'
+    );
+    expect(changed).toHaveBeenCalledTimes(2);
+    expect(restartSync).toHaveBeenLastCalledWith(cwd);
+    expect(pullRequests.credentialsChanged).toHaveBeenCalledTimes(2);
+    expect(service.getSnapshot()).toBe(current);
+    expect(changed).toHaveBeenCalledTimes(2);
+  });
+
+  it('reloads same-repo detection through the existing config service', () => {
+    const { service, pullRequests } = harness();
+    const cwd = repo('redetection');
+    const current = service.open(cwd);
+    const changed = vi.fn();
+    current.config.subscribe(changed);
+    execFileSync(
+      'git',
+      ['remote', 'add', 'origin', 'https://github.com/acme/app.git'],
+      { cwd }
+    );
+    expect(service.open(cwd)).toBe(current);
+    expect(current.config.getSnapshot().provider?.id).toBe('github');
+    expect(changed).toHaveBeenCalledOnce();
+    expect(pullRequests.credentialsChanged).toHaveBeenCalledOnce();
   });
 });

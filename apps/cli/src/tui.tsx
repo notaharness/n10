@@ -5,11 +5,7 @@ import { azureDevOpsProvider } from '@n10/vcs-azure-devops';
 import { githubProvider } from '@n10/vcs-github';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal.js';
 import { OnboardingWizard } from './components/OnboardingWizard.js';
-import {
-  createPullRequestList,
-  createConfigService,
-  createRepositoryService,
-} from '@n10/engine';
+import { createPullRequestList, createRepositoryService } from '@n10/engine';
 import {
   settlePendingRuns,
   ConfigProvider,
@@ -28,7 +24,12 @@ import {
   SidebarProvider,
   ToastProvider,
 } from '@n10/app-core';
-import { killAll, applySessionBackend, probeTmuxAvailability } from '@n10/core';
+import {
+  killAll,
+  applySessionBackend,
+  probeTmuxAvailability,
+  resetRepoRoot,
+} from '@n10/core';
 import {
   repoTitle,
   setWindowTitle,
@@ -150,15 +151,20 @@ export async function runTui(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const repo = createRepositoryService(providers).open(process.cwd());
-  const configService = createConfigService({
-    repo: repo.cwd,
-    providers,
-    pullRequests,
-  });
+  let repo;
+  try {
+    repo = createRepositoryService({ providers, pullRequests }).open(
+      process.cwd()
+    );
+    process.chdir(repo.cwd);
+    resetRepoRoot();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
 
   render(
-    <ConfigProvider service={configService}>
+    <ConfigProvider service={repo.config}>
       <EngineProvider pullRequests={pullRequests} repo={repo.cwd}>
         <KeybindProvider>
           <LayoutProvider>

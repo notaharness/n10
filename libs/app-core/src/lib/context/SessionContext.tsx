@@ -81,11 +81,11 @@ function describeError(err: unknown): string {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const { config, provider } = useConfig();
+  const { config, provider, repo } = useConfig();
   const { setBranches } = useBranchPickerActions();
   const { flash } = useToastActions();
 
-  const sessionMgr = useSessionManager(setBranches);
+  const sessionMgr = useSessionManager(repo, setBranches);
 
   const { prMap, error: prError, refresh: refreshPr } = usePrData();
   const { lastSynced, triggerSync } = useRemoteSync();

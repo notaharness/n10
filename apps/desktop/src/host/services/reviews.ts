@@ -1,8 +1,9 @@
 import { readConfig } from '@n10/vcs-core';
 import type { PullRequestComments, ReviewVerdict } from '@n10/vcs-core';
 import { fetchFileDiffText, fetchReviewDiff } from '@n10/core';
-import { PROVIDERS, requireRepo } from './repo.js';
-import { configuredViewer } from '@n10/engine';
+import { PROVIDERS } from './providers.js';
+import { requireRepo } from './repo.js';
+import { configuredViewer } from '@n10/vcs-core';
 import { refreshPrList } from './sidebar.js';
 import type { ReplyRequest, ResolveRequest } from '../contract.js';
 

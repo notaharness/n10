@@ -15,8 +15,8 @@ below it, and the ESLint module boundaries enforce the direction.
 Behavior moves into the engine one resource at a time. The pull request list
 is there (`libs/engine/src/lib/pull-requests/`); remote sync, review threads and
 session orchestration are still coordinated by each shell. Config state and effects
-for settings commands and repository opening are owned by the engine. The host
-binds config service lifetime to repository opening; unmigrated domains still read
+for settings commands and repository opening are owned by the engine. The engine repository handle
+owns config service lifetime; unmigrated domains still read
 captured-repo config directly. See [the domain plan](design/engine-domains.md) for
 the survey, migration order, target diagram and worker decisions.
 

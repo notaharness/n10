@@ -1138,6 +1138,15 @@ describe('fetchRemote', () => {
 });
 
 describe('listAllBranches', () => {
+  it('reads the requested checkout even when process cwd names another repository', async () => {
+    mockExec.mockResolvedValueOnce(resolve('scoped-branch\n'));
+    expect(await listAllBranches('/another-repo')).toEqual(['scoped-branch']);
+    expect(mockExec).toHaveBeenLastCalledWith(
+      'git branch -a --format="%(refname:short)"',
+      expect.objectContaining({ cwd: '/another-repo' })
+    );
+  });
+
   it('should return deduplicated local and remote branches', async () => {
     mockExec.mockResolvedValueOnce(
       resolve(

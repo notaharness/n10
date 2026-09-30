@@ -557,8 +557,10 @@ daemon's control socket and the UI's gating. Code cites these as
 
 `engine/repositories` owns canonical identity and the open sequence: validate,
 fill missing project configuration against that explicit checkout, configure
-worktree paths, then publish the repository snapshot. Failed validation preserves
-the active scope; aliases of the same checkout share identity. Core supplies
+worktree paths, then create or reload its config handle. Failed validation preserves
+the active scope; nested directories and aliases resolve to Git’s toplevel.
+The config service derives repository/provider/viewer metadata and publishes
+changes; repository selection has no second metadata store. Core supplies
 filesystem validation and resolver operations. Desktop chooses its startup repo
 and keeps recents; the TUI opens its requested checkout before mounting React.
 

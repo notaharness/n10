@@ -1,7 +1,8 @@
-import { configuredRepository, configuredViewer } from '@n10/engine';
+import { configuredRepository, configuredViewer } from '@n10/vcs-core';
 import { PullRequestIdentityError } from '@n10/core';
 import { readConfig, type RepositoryRef } from '@n10/vcs-core';
-import { activeRepoIs, PROVIDERS } from './repo.js';
+import { activeRepoIs } from './repo.js';
+import { PROVIDERS } from './providers.js';
 
 /**
  * The repository and account core's reads by identity check, read

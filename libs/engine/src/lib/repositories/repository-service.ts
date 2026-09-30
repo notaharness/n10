@@ -1,82 +1,49 @@
-import { isDeepStrictEqual } from 'node:util';
-import { canonicalRepoPath, configureWorktreePath, isGitRepo } from '@n10/core';
-import {
-  autoDetectProjectConfig,
-  isVcsConfigured,
-  readConfig,
-} from '@n10/vcs-core';
-import type { AppConfig, RepositoryRef, VcsProvider } from '@n10/vcs-core';
+import { configureWorktreePath, resolveRepositoryRoot } from '@n10/core';
+import { autoDetectProjectConfig } from '@n10/vcs-core';
+import { createConfigService } from '../config/config-service.js';
+import type {
+  ConfigService,
+  ConfigServiceOptions,
+} from '../config/config-service.js';
 
-export interface RepositorySnapshot {
-  cwd: string;
-  providerId: string | null;
-  vcsConfigured: boolean;
-  repository: RepositoryRef | null;
-  viewer: string | null;
+export interface RepositoryHandle {
+  readonly cwd: string;
+  readonly config: ConfigService;
 }
 
-export function configuredViewer(config: AppConfig): string | null {
-  const identifier =
-    config.vendor === 'github' ? config.vendorProject.username : config.email;
-  return identifier || null;
-}
-
-export function configuredRepository(
-  config: AppConfig,
-  providers: VcsProvider[]
-): RepositoryRef | null {
-  const provider = providers.find((p) => p.id === config.vendor) ?? null;
-  if (!provider || !isVcsConfigured(config, provider)) return null;
-  return provider.repositoryRef?.(config.vendorProject) ?? null;
-}
-
-/** Repository identity and opening policy, independent of shell navigation. */
-export function createRepositoryService(providers: VcsProvider[]) {
-  let snapshot: RepositorySnapshot | null = null;
-  const listeners = new Set<() => void>();
-
-  function describe(cwd: string): RepositorySnapshot {
-    const config = readConfig(cwd);
-    const provider = providers.find((p) => p.id === config.vendor) ?? null;
-    return {
-      cwd,
-      providerId: provider?.id ?? null,
-      vcsConfigured: isVcsConfigured(config, provider),
-      repository: configuredRepository(config, providers),
-      viewer: configuredViewer(config),
-    };
-  }
-
-  function publish(next: RepositorySnapshot): RepositorySnapshot {
-    if (!isDeepStrictEqual(snapshot, next)) {
-      snapshot = next;
-      for (const listener of listeners) listener();
-    }
-    return snapshot ?? next;
-  }
-
+/** Selection owns a captured-repo config service; metadata comes from that
+ * service's snapshot and changes through its subscription, never a second store. */
+export function createRepositoryService(
+  options: Omit<ConfigServiceOptions, 'repo'>
+) {
+  let current: RepositoryHandle | null = null;
   return {
-    getSnapshot: () => snapshot,
-    subscribe(listener: () => void) {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    open(path: string): RepositorySnapshot {
-      const cwd = canonicalRepoPath(path);
-      if (!isGitRepo(cwd)) throw new Error(`Not a git repository: ${path}`);
-      try {
-        autoDetectProjectConfig(cwd, providers);
-      } catch {
-        // Detection fills optional fields; a failed probe must not block opening.
+    getSnapshot: () => current,
+    open(path: string): RepositoryHandle {
+      const cwd = resolveRepositoryRoot(path);
+      if (current?.cwd === cwd) {
+        try {
+          current.config.detect();
+        } catch {
+          current.config.reload();
+        }
+      } else {
+        try {
+          autoDetectProjectConfig(cwd, options.providers);
+        } catch {
+          // Optional detection must not prevent opening a valid checkout.
+        }
+        current = {
+          cwd,
+          config: createConfigService({ ...options, repo: cwd }),
+        };
       }
-      configureWorktreePath(cwd, readConfig(cwd).worktreePath);
-      return publish(describe(cwd));
+      configureWorktreePath(
+        cwd,
+        current.config.getSnapshot().config.worktreePath
+      );
+      return current;
     },
-    reload(): RepositorySnapshot | null {
-      return snapshot ? publish(describe(snapshot.cwd)) : null;
-    },
-    isActive: (cwd: string) => snapshot?.cwd === cwd,
+    isActive: (cwd: string) => current?.cwd === cwd,
   };
 }

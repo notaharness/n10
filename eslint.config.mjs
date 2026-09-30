@@ -7,19 +7,37 @@ import importPlugin from 'eslint-plugin-import';
 import vitest from '@vitest/eslint-plugin';
 import ink from './tools/eslint-plugin-ink.mjs';
 
-const configPersistencePaths = [
+const shellOperationPaths = [
   {
     name: '@n10/vcs-core',
     allowTypeImports: true,
-    importNames: ['writeGlobalConfig', 'writeProjectConfig'],
+    importNames: [
+      'writeGlobalConfig',
+      'writeProjectConfig',
+      'autoDetectProjectConfig',
+    ],
     message: 'Config writes belong to the engine config service.',
   },
   {
     name: '@n10/core',
     allowTypeImports: true,
-    importNames: ['persistConfigField', 'persistKeybindFields'],
+    importNames: [
+      'persistConfigField',
+      'persistKeybindFields',
+      'configureWorktreePath',
+    ],
     message:
       'Only the engine config service dispatches persistence and effects.',
+  },
+  {
+    name: '@n10/worktree-manager',
+    allowTypeImports: true,
+    importNames: [
+      'setWorktreeResolver',
+      'resetWorktreeResolver',
+      'createTemplateResolver',
+    ],
+    message: 'Repository worktree setup belongs to the engine.',
   },
 ];
 
@@ -384,7 +402,7 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
-        { paths: configPersistencePaths },
+        { paths: shellOperationPaths },
       ],
     },
   },
@@ -421,43 +439,12 @@ export default tseslint.config(
       '@typescript-eslint/no-restricted-imports': [
         'error',
         {
-          paths: configPersistencePaths,
+          paths: shellOperationPaths,
           patterns: [
             {
               group: ['electron', 'electron/*'],
               allowTypeImports: true,
               message: 'Host code uses ShellCalls for Electron operations.',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  {
-    files: [
-      'apps/desktop/src/host/services/repo.ts',
-      'apps/cli/src/tui.tsx',
-      'libs/app-core/src/lib/hooks/useSessionManager.ts',
-    ],
-    rules: {
-      '@typescript-eslint/no-restricted-imports': [
-        'error',
-        {
-          paths: [
-            {
-              name: '@n10/vcs-core',
-              importNames: ['autoDetectProjectConfig'],
-              message:
-                'Repository startup belongs to the engine repository service.',
-            },
-            {
-              name: '@n10/worktree-manager',
-              importNames: [
-                'setWorktreeResolver',
-                'resetWorktreeResolver',
-                'createTemplateResolver',
-              ],
-              message: 'The engine repository service owns worktree setup.',
             },
           ],
         },

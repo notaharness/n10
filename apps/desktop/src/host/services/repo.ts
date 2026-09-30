@@ -1,8 +1,6 @@
 import { canonicalRepoPath, isGitRepo, resetRepoRoot } from '@n10/core';
-import { createRepositoryService } from '@n10/engine';
-import { githubProvider } from '@n10/vcs-github';
-import { azureDevOpsProvider } from '@n10/vcs-azure-devops';
-import type { VcsProvider } from '@n10/vcs-core';
+import type { ConfigService, RepositoryHandle } from '@n10/engine';
+import { repositories } from './program.js';
 import { NoActiveRepoError, type RepoInfo } from '../contract.js';
 import {
   loadRecents,
@@ -12,8 +10,6 @@ import {
   type RecentRepo,
 } from './recent-repos.js';
 
-export const PROVIDERS: VcsProvider[] = [githubProvider, azureDevOpsProvider];
-const repositories = createRepositoryService(PROVIDERS);
 let repoOpenedListener: ((cwd: string) => void) | null = null;
 
 export function setRepoOpenedListener(fn: (cwd: string) => void): void {
@@ -49,22 +45,43 @@ export function activeRepoIs(cwd: string): boolean {
 }
 
 export function openRepo(path: string): RepoInfo {
-  const info = repositories.open(path);
+  const opened = repositories.open(path);
   // Session primitives still use the process repo root; the session-domain
-  // migration removes this shell-owned ambient state.
-  process.chdir(info.cwd);
+  // migration removes this shell-owned ambient state. Resetting the cached root
+  // is essential: otherwise removal in one repo can address another repo’s agent.
+  process.chdir(opened.cwd);
   resetRepoRoot();
   try {
-    saveRecents(recordOpen(canonicalRecents(loadRecents()), info.cwd));
+    saveRecents(recordOpen(canonicalRecents(loadRecents()), opened.cwd));
   } catch {
     // Recent-repos bookkeeping must never block opening a repo.
   }
-  repoOpenedListener?.(info.cwd);
-  return info;
+  repoOpenedListener?.(opened.cwd);
+  return repoInfo(opened);
 }
 
 export function getRepo(): RepoInfo | null {
-  return repositories.reload();
+  const current = repositories.getSnapshot();
+  if (!current) return null;
+  return repoInfo(current);
+}
+
+function repoInfo(current: RepositoryHandle): RepoInfo {
+  const { provider, vcsConfigured, repository, viewer } =
+    current.config.getSnapshot();
+  return {
+    cwd: current.cwd,
+    providerId: provider?.id ?? null,
+    vcsConfigured,
+    repository,
+    viewer,
+  };
+}
+
+export function activeConfigService(): ConfigService {
+  const current = repositories.getSnapshot();
+  if (!current) throw new NoActiveRepoError();
+  return current.config;
 }
 
 /**
@@ -79,17 +96,13 @@ export function openStartupRepo(
 ): RepoInfo | null {
   const startDir = env.N10_START_DIR;
   if (startDir) {
-    if (!isGitRepo(startDir)) {
-      console.warn(`[desktop] N10_START_DIR is not a git repo: ${startDir}`);
-    } else {
-      try {
-        return openRepo(startDir);
-      } catch (err: unknown) {
-        console.warn(
-          `[desktop] failed to open start dir ${startDir}:`,
-          err instanceof Error ? err.message : err
-        );
-      }
+    try {
+      return openRepo(startDir);
+    } catch (err: unknown) {
+      console.warn(
+        `[desktop] failed to open start dir ${startDir}:`,
+        err instanceof Error ? err.message : err
+      );
     }
   }
   // Restore the last session: newest recent that still validates.

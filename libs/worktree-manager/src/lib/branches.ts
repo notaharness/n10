@@ -120,11 +120,12 @@ export function dedupeBranchNames(output: string): string[] {
 }
 
 /** List local + remote git branches (remote branches stripped of origin/ prefix, deduplicated) */
-export async function listAllBranches(): Promise<string[]> {
+export async function listAllBranches(cwd?: string): Promise<string[]> {
   try {
-    const { stdout } = await exec('git branch -a --format="%(refname:short)"', {
-      encoding: 'utf8',
-    });
+    const { stdout } = await exec(
+      'git branch -a --format="%(refname:short)"',
+      gitOptions(cwd)
+    );
     return dedupeBranchNames(stdout);
   } catch (e) {
     log('error', 'listAllBranches', 'git branch -a failed', e);

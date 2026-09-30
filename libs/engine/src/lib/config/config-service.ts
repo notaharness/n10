@@ -1,6 +1,12 @@
 import { isDeepStrictEqual } from 'node:util';
-import { readConfig, isVcsConfigured } from '@n10/vcs-core';
-import type { AppConfig, VcsProvider } from '@n10/vcs-core';
+import {
+  readConfig,
+  isVcsConfigured,
+  autoDetectProjectConfig,
+  configuredRepository,
+  configuredViewer,
+} from '@n10/vcs-core';
+import type { AppConfig, VcsProvider, RepositoryRef } from '@n10/vcs-core';
 import { persistConfigField, persistKeybindFields } from '@n10/core';
 import type { KeybindFields, SettingsField } from '@n10/core';
 import type { PullRequestList } from '../pull-requests/pull-request-list.js';
@@ -10,6 +16,8 @@ export interface ConfigSnapshot {
   config: AppConfig;
   provider: VcsProvider | null;
   vcsConfigured: boolean;
+  repository: RepositoryRef | null;
+  viewer: string | null;
   revision: number;
   /** Consumed by the TUI's sync adapter to replace its polling schedule. */
   syncRevision: number;
@@ -17,10 +25,10 @@ export interface ConfigSnapshot {
 
 export interface ConfigService {
   readonly repo: string;
-  readonly providers: VcsProvider[];
   getSnapshot(): ConfigSnapshot;
   subscribe(listener: () => void): () => void;
   reload(): void;
+  detect(): ReturnType<typeof autoDetectProjectConfig>;
   updateField(field: SettingsField, value: string | undefined): void;
   updateKeybindFields(updater: (prev: KeybindFields) => KeybindFields): void;
 }
@@ -49,6 +57,8 @@ export function createConfigService(
       config,
       provider,
       vcsConfigured: isVcsConfigured(config, provider),
+      repository: configuredRepository(config, providers),
+      viewer: configuredViewer(config),
       revision,
       syncRevision,
     };
@@ -73,7 +83,6 @@ export function createConfigService(
 
   return {
     repo,
-    providers,
     getSnapshot: () => snapshot,
     subscribe(listener) {
       listeners.add(listener);
@@ -82,6 +91,11 @@ export function createConfigService(
       };
     },
     reload,
+    detect() {
+      const result = autoDetectProjectConfig(repo, providers);
+      reload();
+      return result;
+    },
     updateField(field, value) {
       // Read current disk state so a second field write preserves other edits.
       // Re-read after persistence to apply provider selection and global fallbacks.

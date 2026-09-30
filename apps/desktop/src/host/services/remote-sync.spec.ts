@@ -55,7 +55,6 @@ function nextSync(): Promise<number> {
 }
 
 vi.mock('./repo.js', () => ({
-  PROVIDERS: [{ id: 'github', isConfigured: () => env.configured }],
   requireRepo: () => '/repo-a',
 }));
 
@@ -359,3 +358,7 @@ describe('when git or the provider is unreachable', () => {
     expect(sync.getSyncDecorations().lastGitSyncAt).toBe(2000);
   });
 });
+
+vi.mock('./providers.js', () => ({
+  PROVIDERS: [{ id: 'github', isConfigured: () => env.configured }],
+}));

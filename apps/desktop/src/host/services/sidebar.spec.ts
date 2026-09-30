@@ -2,6 +2,7 @@ import { worktreeSessionKey } from '@n10/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as SidebarModule from './sidebar.js';
 import type * as PullRequestsModule from './pull-requests.js';
+import type * as ProgramModule from './program.js';
 import type * as Core from '@n10/core';
 
 /**
@@ -56,29 +57,6 @@ const env = vi.hoisted(() => ({
 vi.mock('./repo.js', () => ({
   requireRepo: () => env.cwd,
   activeRepoIs: (cwd: string) => cwd === env.cwd,
-  PROVIDERS: [
-    {
-      id: 'github',
-      isConfigured: () => env.configured,
-      forgetPullRequestCache: () => {
-        env.forgetCount += 1;
-        env.events.push('forget');
-      },
-      fetchPullRequests: () => {
-        env.fetchCount += 1;
-        env.events.push('start');
-        return new Promise((resolve, reject) => {
-          env.pending.push({
-            resolve: (v: Record<string, unknown>) => {
-              env.events.push('end');
-              resolve(v);
-            },
-            reject,
-          });
-        });
-      },
-    },
-  ],
 }));
 
 vi.mock('./babysit.js', () => ({
@@ -137,6 +115,7 @@ vi.mock('@n10/core', async (importOriginal) => ({
 
 let sidebar: typeof SidebarModule;
 let pullRequests: typeof PullRequestsModule;
+let program: typeof ProgramModule;
 
 /** Settle every pending promise without advancing the clock: the
  *  microtask queue drains before an immediate runs. */
@@ -163,6 +142,7 @@ beforeEach(async () => {
   vi.resetModules();
   sidebar = await import('./sidebar.js');
   pullRequests = await import('./pull-requests.js');
+  program = await import('./program.js');
 });
 
 /** Resolve the nth outstanding provider fetch. */
@@ -272,7 +252,7 @@ describe('after the credentials change', () => {
 
     let announced = 0;
     pullRequests.setRemoteUpdatedNotifier(() => announced++);
-    pullRequests.pullRequests.credentialsChanged();
+    program.pullRequests.credentialsChanged();
     // The cleared list and error are themselves a change worth
     // painting, before any fetch has landed.
     expect(announced).toBe(1);
@@ -444,3 +424,29 @@ describe('getSidebarSnapshot', () => {
     ]);
   });
 });
+
+vi.mock('./providers.js', () => ({
+  PROVIDERS: [
+    {
+      id: 'github',
+      isConfigured: () => env.configured,
+      forgetPullRequestCache: () => {
+        env.forgetCount += 1;
+        env.events.push('forget');
+      },
+      fetchPullRequests: () => {
+        env.fetchCount += 1;
+        env.events.push('start');
+        return new Promise((resolve, reject) => {
+          env.pending.push({
+            resolve: (v: Record<string, unknown>) => {
+              env.events.push('end');
+              resolve(v);
+            },
+            reject,
+          });
+        });
+      },
+    },
+  ],
+}));

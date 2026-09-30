@@ -6,14 +6,12 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 import type { ConfigService, ConfigSnapshot } from '@n10/engine';
-import type { VcsProvider } from '@n10/vcs-core';
 
 export interface ConfigContextValue extends ConfigSnapshot {
   repo: string;
-  providers: VcsProvider[];
   updateField: ConfigService['updateField'];
   updateKeybindFields: ConfigService['updateKeybindFields'];
-  reload: ConfigService['reload'];
+  detect: ConfigService['detect'];
 }
 
 const ConfigContext = createContext<ConfigContextValue | null>(null);
@@ -31,10 +29,9 @@ export function ConfigProvider({
     () => ({
       ...snapshot,
       repo: service.repo,
-      providers: service.providers,
       updateField: service.updateField,
       updateKeybindFields: service.updateKeybindFields,
-      reload: service.reload,
+      detect: service.detect,
     }),
     [service, snapshot]
   );

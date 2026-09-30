@@ -1,8 +1,9 @@
-import { configuredRepository, configuredViewer } from '@n10/engine';
+import { configuredRepository, configuredViewer } from '@n10/vcs-core';
 import { PullRequestIdentityError, type SnapshotSources } from '@n10/core';
 import { readConfig } from '@n10/vcs-core';
 import { lookupPullRequest } from './pull-requests.js';
-import { activeRepoIs, PROVIDERS } from './repo.js';
+import { activeRepoIs } from './repo.js';
+import { PROVIDERS } from './providers.js';
 
 /**
  * The open repository's facts that a read by identity checks, before

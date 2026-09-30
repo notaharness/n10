@@ -27,7 +27,9 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   a failed write publishes nothing. Sync adapters consume a revision or the
   restart callback. Keep secrets in Node; only the host's masked form crosses IPC.
 
-- **Repositories** (`repositories/`): canonicalize and validate before publishing
-  an active scope. Detection and config reads use that path, never process cwd.
+- **Repositories** (`repositories/`): canonicalize Git’s root before replacing
+  the selected handle. Each handle owns one config service; its subscription is
+  the sole channel for config-derived metadata. Selection returns a handle
+  synchronously and does not keep another metadata store. Detection and config reads use that path, never process cwd.
   Shells select startup repositories and own recents; opening must not detach
   sessions belonging to the previously selected repository.

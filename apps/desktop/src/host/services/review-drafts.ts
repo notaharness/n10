@@ -13,7 +13,7 @@ import {
   type SubmittedReview,
 } from '@n10/core';
 import { openContext } from './open-context.js';
-import { resolveProvider } from './pull-requests.js';
+import { resolveProvider } from './program.js';
 import { requireRepo } from './repo.js';
 
 /**

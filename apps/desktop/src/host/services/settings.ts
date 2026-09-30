@@ -3,7 +3,7 @@ import {
   resolveValue,
   type SettingsField,
 } from '@n10/core';
-import { activeConfigService } from './config-scope.js';
+import { activeConfigService } from './repo.js';
 import { SECRET_PLACEHOLDER } from '../contract.js';
 import type { SettingsFieldView, SettingsGroup } from '../contract.js';
 

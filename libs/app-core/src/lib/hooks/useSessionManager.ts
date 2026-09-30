@@ -16,13 +16,16 @@ import {
 } from '@n10/core';
 import { useLayout } from '../context/LayoutContext.js';
 
-export function useSessionManager(setBranches: (v: string[]) => void) {
+export function useSessionManager(
+  repo: string,
+  setBranches: (v: string[]) => void
+) {
   const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [worktreeBranches, setWorktreeBranches] = useState<string[]>([]);
   const { terminal } = useLayout();
 
   const refreshSessions = useCallback(async () => {
-    const worktrees = await listWorktrees();
+    const worktrees = await listWorktrees(repo);
     const filtered: AgentSession[] = worktrees.map((wt) =>
       worktreeSessionRow(wt, isSessionAlive)
     );
@@ -32,15 +35,15 @@ export function useSessionManager(setBranches: (v: string[]) => void) {
     // never run against an empty ref.
     setWorktreeBranches(worktrees.map((wt) => wt.branch).filter(Boolean));
     return filtered;
-  }, []);
+  }, [repo]);
 
   // No refresh of its own: core's removal has discovery look again, and
   // `onDiscovered` below re-reads the rows, as it does for a worktree
   // removed outside n10.
   const performDelete = useCallback(
     (_sessionName: string, branch: string, approved: WorktreeRemovalCheck) =>
-      removeWorktreeSession(branch, approved),
-    []
+      removeWorktreeSession(branch, approved, repo),
+    [repo]
   );
 
   // Attach to an agent session that was started outside this process —
@@ -61,7 +64,7 @@ export function useSessionManager(setBranches: (v: string[]) => void) {
         cwd: wt.path,
         cols: terminal.paneCols,
         rows: terminal.paneRows,
-        config: readConfig(),
+        config: readConfig(repo),
         request: { intent: 'continue-or-blank' },
       });
     }
@@ -80,7 +83,7 @@ export function useSessionManager(setBranches: (v: string[]) => void) {
     void (async () => {
       if (cancelled) return;
       await refreshSessions();
-      const allBranches = await listAllBranches();
+      const allBranches = await listAllBranches(repo);
       if (!cancelled) setBranches(allBranches);
     })();
 
@@ -94,7 +97,7 @@ export function useSessionManager(setBranches: (v: string[]) => void) {
     // exits on its own. An exit changes nothing about the worktree list,
     // so flip the one session's flag in place rather than shelling out
     // to git via refreshSessions() — several agents exiting at once
-    // would otherwise spawn a listWorktrees() storm to update one bool.
+    // would otherwise spawn a listWorktrees(repo) storm to update one bool.
     const unsubscribe = onSessionExit((name) => {
       if (cancelled) return;
       setSessions((prev) =>

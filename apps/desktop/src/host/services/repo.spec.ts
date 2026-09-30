@@ -1,4 +1,4 @@
-import { isGitRepo } from '@n10/core';
+import { execFileSync } from 'node:child_process';
 import type * as Os from 'node:os';
 import {
   describe,
@@ -15,7 +15,6 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
-  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -50,7 +49,7 @@ let plainDir: string;
 beforeEach(() => {
   const base = mkdtempSync(join(tmpdir(), 'n10-repo-test-'));
   gitDir = join(base, 'repo');
-  mkdirSync(join(gitDir, '.git'), { recursive: true });
+  execFileSync('git', ['init', '--quiet', gitDir]);
   plainDir = join(base, 'plain');
   mkdirSync(plainDir, { recursive: true });
 });
@@ -58,16 +57,6 @@ beforeEach(() => {
 afterEach(() => {
   process.chdir(originalCwd);
   rmSync(join(gitDir, '..'), { recursive: true, force: true });
-});
-
-describe('isGitRepo', () => {
-  it('accepts a directory containing a .git directory', () => {
-    expect(isGitRepo(gitDir)).toBe(true);
-  });
-
-  it('rejects a directory without .git', () => {
-    expect(isGitRepo(plainDir)).toBe(false);
-  });
 });
 
 describe('openStartupRepo', () => {
@@ -97,27 +86,6 @@ describe('openStartupRepo', () => {
 
   it('returns null with no start dir and empty recents', () => {
     expect(openStartupRepo({ N10_START_DIR: undefined }, [])).toBeNull();
-  });
-});
-
-describe('isGitRepo (worktrees and submodules)', () => {
-  it('accepts a checkout whose .git is a file', () => {
-    // git worktrees and submodules point at the real git dir with a
-    // file, not a directory; rejecting those would hide every worktree
-    // from the picker.
-    const base = mkdtempSync(join(tmpdir(), 'n10-repo-file-'));
-    const wt = join(base, 'wt');
-    mkdirSync(wt, { recursive: true });
-    writeFileSync(join(wt, '.git'), 'gitdir: /elsewhere/.git/worktrees/wt\n');
-    try {
-      expect(isGitRepo(wt)).toBe(true);
-    } finally {
-      rmSync(base, { recursive: true, force: true });
-    }
-  });
-
-  it('rejects a directory that does not exist', () => {
-    expect(isGitRepo(join(tmpdir(), 'n10-definitely-not-here'))).toBe(false);
   });
 });
 

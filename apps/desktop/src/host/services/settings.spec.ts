@@ -19,7 +19,7 @@ const state = vi.hoisted(() => ({
   resolved: {} as Record<string, string>,
 }));
 
-vi.mock('./config-scope.js', () => ({
+vi.mock('./repo.js', () => ({
   activeConfigService: () => ({
     getSnapshot: () => ({ config: state.config, provider: null }),
     updateField: (field: SettingsField, value: string | undefined) => {

@@ -43,9 +43,8 @@ function harness(
     config: {
       config: { vendorAuth: {}, vendorProject: {}, ...config } as AppConfig,
       provider: null,
-      providers: [],
       updateField,
-      reload: vi.fn(),
+      detect: vi.fn(() => ({ updated: true, detected: { email: 'detected' } })),
     },
     sessions: { flashStatus },
     keybinds: { resolve: () => action, setPreset },
@@ -116,3 +115,10 @@ it.each(WRITE_ACTIONS)(
     expect(h.flashStatus).toHaveBeenCalledWith('Read-only config');
   }
 );
+
+it('runs manual detection through the config service', () => {
+  const h = harness('settings.auto-detect');
+  handleSettingsInput('', NO_KEY, h.ctx);
+  expect(h.ctx.config.detect).toHaveBeenCalledOnce();
+  expect(h.flashStatus).toHaveBeenCalledWith('Auto-detected: email');
+});

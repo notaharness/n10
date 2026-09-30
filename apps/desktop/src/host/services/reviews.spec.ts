@@ -40,9 +40,12 @@ vi.mock('@n10/core', () => ({
   },
 }));
 
-vi.mock('@n10/vcs-core', () => ({ readConfig: () => env.config }));
+vi.mock('@n10/vcs-core', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  readConfig: () => env.config,
+}));
 
-vi.mock('./repo.js', () => {
+vi.mock('./providers.js', () => {
   const record =
     (method: string) =>
     (...args: unknown[]) => {
@@ -50,7 +53,6 @@ vi.mock('./repo.js', () => {
       return Promise.resolve(method === 'fetchPullRequests' ? {} : undefined);
     };
   return {
-    requireRepo: () => '/repo',
     get PROVIDERS() {
       const p: Record<string, unknown> = {
         id: 'github',
@@ -271,3 +273,5 @@ describe('diffs', () => {
     ]);
   });
 });
+
+vi.mock('./repo.js', () => ({ requireRepo: () => '/repo' }));

@@ -3,7 +3,7 @@ import {
   readPullRequestSnapshot,
   type PullRequestSnapshot,
 } from '@n10/core';
-import { resolveProvider } from './pull-requests.js';
+import { resolveProvider } from './program.js';
 import { identitySources } from './pr-identity.js';
 import { requireRepo } from './repo.js';
 

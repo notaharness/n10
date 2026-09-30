@@ -13,7 +13,7 @@ import { activeRepoIs, requireRepo } from './repo.js';
 import { babysatStatuses } from './babysit.js';
 import { isOwnSessionAlive } from './sessions.js';
 import { getSyncDecorations } from './remote-sync.js';
-import { pullRequests, resolveProvider } from './pull-requests.js';
+import { pullRequests, resolveProvider } from './program.js';
 import type { SidebarModel, SyncState } from '../contract.js';
 
 /**

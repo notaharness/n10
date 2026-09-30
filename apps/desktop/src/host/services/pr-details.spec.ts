@@ -37,17 +37,6 @@ const env = vi.hoisted(() => ({
 
 vi.mock('@n10/vcs-core', async (original) => ({
   ...(await original<Record<string, unknown>>()),
-  readConfig: () => ({ vendor: 'github', vendorProject: { ...env.project } }),
-}));
-// Both answer from the config they are handed, so a closure that read
-// config once would miss every change below.
-vi.mock('./repo.js', () => ({
-  requireRepo: () => '/repo',
-  activeRepoIs: (cwd: string) => env.open && cwd === '/repo',
-  PROVIDERS: [],
-}));
-vi.mock('@n10/engine', async (original) => ({
-  ...(await original<Record<string, unknown>>()),
   configuredRepository: (config: {
     vendorProject: { owner: string; repo: string };
   }) =>
@@ -58,13 +47,23 @@ vi.mock('@n10/engine', async (original) => ({
           repository: `${config.vendorProject.owner}/${config.vendorProject.repo}`,
         }
       : null,
+  readConfig: () => ({ vendor: 'github', vendorProject: { ...env.project } }),
 }));
+// Both answer from the config they are handed, so a closure that read
+// config once would miss every change below.
+vi.mock('./repo.js', () => ({
+  requireRepo: () => '/repo',
+  activeRepoIs: (cwd: string) => env.open && cwd === '/repo',
+}));
+
 vi.mock('./pull-requests.js', () => ({
   lookupPullRequest: (cwd: string, prId: number) => {
     env.lookups.push([cwd, prId]);
     env.onLookup();
     return Promise.resolve({ kind: 'gone' });
   },
+}));
+vi.mock('./program.js', () => ({
   resolveProvider: () => ({
     config: {
       vendor: 'github',

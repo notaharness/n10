@@ -10,17 +10,11 @@
  */
 import {
   EMPTY_PULL_REQUEST_LIST,
-  createPullRequestList,
-  providerResolver,
   type PullRequestListSnapshot,
 } from '@n10/engine';
 import type { PullRequestLookup } from '@n10/core';
 import type { BranchPrMap, VcsProvider } from '@n10/vcs-core';
-import { PROVIDERS } from './repo.js';
-
-export const resolveProvider = providerResolver(PROVIDERS);
-
-export const pullRequests = createPullRequestList({ providers: PROVIDERS });
+import { resolveProvider, pullRequests } from './program.js';
 
 // Installed by main.ts. Fires when what the sidebar would answer has
 // moved, so the renderer refetches then rather than on its next poll

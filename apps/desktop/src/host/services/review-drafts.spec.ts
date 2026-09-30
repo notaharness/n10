@@ -22,6 +22,11 @@ const env = vi.hoisted(() => ({ open: true, username: 'bea' }));
 
 vi.mock('@n10/vcs-core', async (original) => ({
   ...(await original<Record<string, unknown>>()),
+  configuredRepository: () => ({
+    provider: 'github',
+    host: 'github.com',
+    repository: 'acme/app',
+  }),
   readConfig: () => ({
     vendor: 'github',
     vendorProject: { owner: 'acme', repo: 'app', username: env.username },
@@ -30,18 +35,10 @@ vi.mock('@n10/vcs-core', async (original) => ({
 vi.mock('./repo.js', () => ({
   requireRepo: () => '/repo',
   activeRepoIs: (cwd: string) => env.open && cwd === '/repo',
-  PROVIDERS: [],
 }));
 // Only a submit resolves the provider; these tests never publish.
-vi.mock('@n10/engine', async (original) => ({
-  ...(await original<Record<string, unknown>>()),
-  configuredRepository: () => ({
-    provider: 'github',
-    host: 'github.com',
-    repository: 'acme/app',
-  }),
-}));
-vi.mock('./pull-requests.js', () => ({
+
+vi.mock('./program.js', () => ({
   resolveProvider: () => ({ config: {}, provider: null, configured: false }),
 }));
 
