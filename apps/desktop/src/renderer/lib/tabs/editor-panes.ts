@@ -13,15 +13,19 @@ export interface Shown {
 export const NOTHING_SHOWN: Shown = { tab: null, left: null, seq: 0 };
 
 /** The pane held ready: the tab a hover settled on since the last
- *  switch, or else the one on screen before it, while still open. */
+ *  switch, or else the one on screen before it, while still open. A
+ *  sidebar row's tab may not be open yet (it is the one a click would
+ *  open); a tab on the strip that has closed holds nothing. */
 export function spareFor(
   shown: Shown,
-  hover: { tab: Tab | null; seq: number },
+  hover: { tab: Tab | null; seq: number; onStrip: boolean },
   tabs: readonly Tab[]
 ): Tab | null {
-  if (hover.seq > shown.seq) return hover.tab;
-  const left = shown.left;
-  return left && tabs.some((t) => t.id === left.id) ? left : null;
+  const open = (tab: Tab) => tabs.some((t) => t.id === tab.id);
+  if (hover.seq > shown.seq) {
+    return hover.tab && (!hover.onStrip || open(hover.tab)) ? hover.tab : null;
+  }
+  return shown.left && open(shown.left) ? shown.left : null;
 }
 
 /**

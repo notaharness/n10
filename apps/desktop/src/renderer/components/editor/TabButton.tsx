@@ -232,7 +232,10 @@ export function TabButton({
   const planCount = usePlanCount(item?.pr?.id);
   // Resting on a tab renders its pane ahead of the press; another
   // repository's tab has no pane here to render.
-  const hover = useHoverPrewarm(() => (active || foreignRepo ? null : tab));
+  const hover = useHoverPrewarm(
+    () => (active || foreignRepo ? null : tab),
+    true
+  );
   const { setNode, props, style, isDragging } = useSortableTab({
     id: tab.id,
     label,

@@ -21,19 +21,39 @@ const [a, b, c] = [item('a'), item('b'), item('c')];
 describe('spareFor', () => {
   it('holds the tab left last while it is open', () => {
     const shown: Shown = { tab: b, left: a, seq: 1 };
-    expect(spareFor(shown, { tab: null, seq: 1 }, [a, b])).toBe(a);
-    expect(spareFor(shown, { tab: null, seq: 1 }, [b])).toBeNull();
+    expect(spareFor(shown, { tab: null, seq: 1, onStrip: false }, [a, b])).toBe(
+      a
+    );
+    expect(
+      spareFor(shown, { tab: null, seq: 1, onStrip: false }, [b])
+    ).toBeNull();
   });
 
   it('holds a tab hovered since the last switch instead', () => {
     const shown: Shown = { tab: b, left: a, seq: 1 };
-    expect(spareFor(shown, { tab: c, seq: 2 }, [a, b, c])).toBe(c);
+    expect(spareFor(shown, { tab: c, seq: 2, onStrip: true }, [a, b, c])).toBe(
+      c
+    );
     // The hover let go of it: nothing, not the tab left last again.
-    expect(spareFor(shown, { tab: null, seq: 3 }, [a, b, c])).toBeNull();
+    expect(
+      spareFor(shown, { tab: null, seq: 3, onStrip: false }, [a, b, c])
+    ).toBeNull();
+  });
+
+  it('lets go of a hovered tab that has closed, but not of a row', () => {
+    const shown: Shown = { tab: b, left: a, seq: 1 };
+    // A tab on the strip, closed under the pointer.
+    expect(
+      spareFor(shown, { tab: c, seq: 2, onStrip: true }, [a, b])
+    ).toBeNull();
+    // A sidebar row: its tab opens only when the row is clicked.
+    expect(spareFor(shown, { tab: c, seq: 2, onStrip: false }, [a, b])).toBe(c);
   });
 
   it('holds nothing before anything was shown', () => {
-    expect(spareFor(NOTHING_SHOWN, { tab: null, seq: 0 }, [a])).toBeNull();
+    expect(
+      spareFor(NOTHING_SHOWN, { tab: null, seq: 0, onStrip: false }, [a])
+    ).toBeNull();
   });
 });
 

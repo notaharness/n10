@@ -248,7 +248,11 @@ or else the tab left last. Panes are keyed by tab id, so pressing the spare's
 tab shows the pane already rendered, and the pane it replaces becomes the
 spare. A new hover replaces the spare rather than queueing behind it, and a
 press on any other tab mounts that tab straight away; missing a pre-warm is
-fine, a press that waits behind one is not. Tabs and sidebar rows are chosen
+fine, a press that waits behind one is not. A pane let go of before its reads
+came back leaves them running on the host, which cannot take a call back, so
+until they have landed a new hover warms nothing: it is dropped, not queued,
+and reads for panes nobody looks at never stack up. Leaving an element, or its
+going away (a closed tab), lets its pane go. Tabs and sidebar rows are chosen
 on the primary button's press, as browser and editor tabs are, so the swap
 starts before the release; the drag sensor still waits for the pointer to
 travel. A terminal watches its session while it is mounted
