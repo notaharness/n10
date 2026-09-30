@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { asksForReview, holdingVerdict, type ReviewDecision } from './types.js';
+import {
+  asksForReview,
+  holdingVerdict,
+  viewerEntry,
+  reviewersToCount,
+  type PullRequestReviewer,
+  type ReviewDecision,
+} from './types.js';
 
 const by = (name: string, decision: ReviewDecision) => ({ name, decision });
 
@@ -50,5 +57,68 @@ describe('asksForReview', () => {
     // Azure DevOps keeps no request apart from its list.
     expect(asksForReview(reviewer('no-response'))).toBe(true);
     expect(asksForReview(reviewer('approved'))).toBe(false);
+  });
+});
+
+describe('viewerEntry', () => {
+  const me = {
+    identifier: 'me',
+    displayName: 'Me',
+    decision: 'approved' as const,
+  };
+  const team = (decision: ReviewDecision) => ({
+    identifier: 'core-team',
+    displayName: 'Core Team',
+    decision,
+    includesViewer: true,
+  });
+  const isMe = (r: { identifier: string }) => r.identifier === 'me';
+
+  it('takes the viewer’s own entry first', () => {
+    expect(viewerEntry([team('no-response'), me], isMe)).toBe(me);
+  });
+
+  it('stands a still-asked group of theirs in for them', () => {
+    const asked = team('no-response');
+    expect(viewerEntry([asked], isMe)).toBe(asked);
+  });
+
+  it('never gives them a group’s vote, or a group they are not in', () => {
+    expect(viewerEntry([team('approved')], isMe)).toBeUndefined();
+    expect(
+      viewerEntry([{ ...team('no-response'), includesViewer: false }], isMe)
+    ).toBeUndefined();
+  });
+});
+
+const team: PullRequestReviewer = {
+  displayName: '[proj]\\Core Team',
+  identifier: 'vstfs:///Classification/TeamProject/proj\\Core Team',
+  decision: 'approved',
+};
+const teammate: PullRequestReviewer = {
+  displayName: 'Teammate',
+  identifier: 'teammate@example.com',
+  decision: 'approved',
+  votedFor: [team.identifier],
+};
+
+describe('reviewersToCount', () => {
+  /** Azure lists a teammate's vote for a team twice: on the team's row
+   *  and on the teammate's own. It is one vote. */
+  it('counts a group answered by a listed member once, as the member', () => {
+    expect(reviewersToCount([team, teammate])).toEqual([teammate]);
+  });
+
+  it('keeps a group nobody listed has voted for', () => {
+    const pending = { ...team, decision: 'no-response' as const };
+    const other = { ...teammate, votedFor: undefined };
+    const none = { ...teammate, identifier: 'b@example.com', votedFor: [] };
+    const rows = [pending, other, none];
+    expect(reviewersToCount(rows)).toEqual(rows);
+  });
+
+  it('keeps a group whose voter is not listed', () => {
+    expect(reviewersToCount([team])).toEqual([team]);
   });
 });

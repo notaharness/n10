@@ -36,6 +36,11 @@ ceiling: it is a REST surface. Reasoning: `docs/decisions.md`.
   reads as not merged, so its worktree gets no badge and is never auto-deleted.
   An unpaged read sees only Azure's first 101 rows, which can miss a
   long-lived branch completed in a busy repository.
+- An Azure group (team) reviewer is its own row carrying the vote of
+  whichever member voted for it; that member's row names the group in
+  `votedFor`, and tallies go through `reviewersToCount` so the pair counts
+  once. `includesViewer` marks the caller's groups so `viewerEntry` can
+  stand a pending one in for them; never copy a group's vote onto a person.
 - GitHub's search returns the rollup and counts with the list, so it
   implements neither `forgetPullRequestCache` nor `resetCaches`.
 - Every `gh` read — `ghQuery`, `ghRest`, the provider's GETs, `gh auth

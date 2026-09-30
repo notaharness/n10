@@ -76,6 +76,8 @@ interface RawReviewer {
   vote?: number;
   hasDeclined?: boolean;
   isContainer?: boolean;
+  /** Set on a member who voted on behalf of a group reviewer. */
+  votedFor?: { uniqueName?: string }[];
 }
 
 function toAdoConfig(
@@ -113,16 +115,37 @@ function invalidatePr(config: AdoConfig, prId: number): void {
   invalidateAdoCache(`${repo}/thread/${prId}/`);
 }
 
-export function parseReviewer(raw: RawReviewer): PullRequestReviewer {
+/** The groups a reviewer's vote answered for, when there are any. */
+function votedFor(raw: RawReviewer): { votedFor?: string[] } {
+  const groups = (raw.votedFor ?? [])
+    .map((g) => g.uniqueName ?? '')
+    .filter(Boolean);
+  return groups.length > 0 ? { votedFor: groups } : {};
+}
+
+/**
+ * A reviewer as Azure lists it. A group — a team, in Azure's terms a
+ * container — is its own row carrying its own vote, which is whichever
+ * member voted for it; `myTeamIds` only marks the groups the signed-in
+ * user belongs to, so that a request to the group reads as a request
+ * to them.
+ */
+export function parseReviewer(
+  raw: RawReviewer,
+  myTeamIds: ReadonlySet<string> = new Set()
+): PullRequestReviewer {
   const vote = raw.vote ?? 0;
   const validVotes: ReviewerVote[] = [10, 5, 0, -5, -10];
   const normalizedVote = validVotes.includes(vote as ReviewerVote)
     ? (vote as ReviewerVote)
     : 0;
+  const mine = !!raw.isContainer && !!raw.id && myTeamIds.has(raw.id);
   return {
     displayName: raw.displayName ?? 'Unknown',
     identifier: raw.uniqueName ?? '',
     decision: voteToDecision(normalizedVote, raw.hasDeclined ?? false),
+    ...(mine ? { includesViewer: true } : {}),
+    ...votedFor(raw),
   };
 }
 
@@ -151,7 +174,8 @@ export function parsePullRequest(
     lastMergeSourceCommit?: { commitId?: string };
     lastMergeTargetCommit?: { commitId?: string };
   },
-  project: Record<string, string>
+  project: Record<string, string>,
+  myTeamIds?: ReadonlySet<string>
 ): ParsedPullRequest {
   const sourceBranch = (raw.sourceRefName ?? '').replace(/^refs\/heads\//, '');
   const targetBranch = (raw.targetRefName ?? '').replace(/^refs\/heads\//, '');
@@ -162,7 +186,7 @@ export function parsePullRequest(
     sourceBranch,
     targetBranch,
     isDraft: raw.isDraft ?? false,
-    reviewers: (raw.reviewers ?? []).map(parseReviewer),
+    reviewers: (raw.reviewers ?? []).map((r) => parseReviewer(r, myTeamIds)),
     createdByIdentifier: raw.createdBy?.uniqueName ?? '',
     createdByDisplayName: raw.createdBy?.displayName ?? '',
     url: `https://dev.azure.com/${project.org}/${project.project}/_git/${project.repo}/pullrequest/${prId}`,
@@ -216,14 +240,10 @@ export function countActiveThreads(
 }
 
 interface ConnectionData {
-  authenticatedUser?: {
-    id?: string;
-    properties?: { Account?: { $value?: string } };
-  };
+  authenticatedUser?: { id?: string };
 }
 
-/** `/connectiondata` answers both "who am I" questions, so one cached
- *  read serves the email and the identity GUID alike. */
+/** Who the access token belongs to, cached for `TTL.identity`. */
 function fetchConnectionData(config: AdoConfig): Promise<ConnectionData> {
   return adoGet<ConnectionData>(
     'fetchConnectionData',
@@ -233,13 +253,6 @@ function fetchConnectionData(config: AdoConfig): Promise<ConnectionData> {
     authHeaders(config.pat),
     `organization ${config.org}`
   );
-}
-
-export async function fetchAuthenticatedUserEmail(
-  config: AdoConfig
-): Promise<string> {
-  const data = await fetchConnectionData(config);
-  return data.authenticatedUser?.properties?.Account?.$value ?? '';
 }
 
 /** The authenticated user's identity GUID — needed to cast a reviewer
@@ -273,39 +286,10 @@ export async function fetchMyTeamIds(config: AdoConfig): Promise<Set<string>> {
   }
 }
 
-export function enrichReviewersWithTeamMembership(
-  rawReviewers: RawReviewer[],
-  myTeamIds: Set<string>,
-  userEmail: string
-): RawReviewer[] {
-  if (myTeamIds.size === 0 || !userEmail) return rawReviewers;
-
-  const hasExplicitUser = rawReviewers.some(
-    (r) =>
-      !r.isContainer && r.uniqueName?.toLowerCase() === userEmail.toLowerCase()
-  );
-  if (hasExplicitUser) return rawReviewers;
-
-  const result = [...rawReviewers];
-  for (const r of rawReviewers) {
-    if (r.isContainer && r.id && myTeamIds.has(r.id)) {
-      result.push({
-        displayName: r.displayName ?? 'Unknown',
-        uniqueName: userEmail,
-        vote: r.vote,
-        hasDeclined: r.hasDeclined,
-        isContainer: false,
-      });
-      break; // only add one synthetic entry
-    }
-  }
-  return result;
-}
-
 export async function fetchActivePullRequests(
   config: AdoConfig,
   project: Record<string, string>,
-  teamContext?: { myTeamIds: Set<string>; userEmail: string }
+  myTeamIds: ReadonlySet<string> = new Set()
 ): Promise<ParsedPullRequest[]> {
   const rows = await adoGetAll<Record<string, unknown>>(
     'fetchActivePullRequests',
@@ -319,19 +303,7 @@ export async function fetchActivePullRequests(
     authHeaders(config.pat),
     `repository ${config.repo}`
   );
-  return rows.map((raw) => {
-    if (teamContext) {
-      const rawWithReviewers = raw as { reviewers?: RawReviewer[] };
-      if (rawWithReviewers.reviewers) {
-        rawWithReviewers.reviewers = enrichReviewersWithTeamMembership(
-          rawWithReviewers.reviewers,
-          teamContext.myTeamIds,
-          teamContext.userEmail
-        );
-      }
-    }
-    return parsePullRequest(raw, project);
-  });
+  return rows.map((raw) => parsePullRequest(raw, project, myTeamIds));
 }
 
 /**
@@ -363,21 +335,6 @@ export async function fetchActiveCommentCount(
 ): Promise<number> {
   const data = await fetchRawThreads(config, prId);
   return countActiveThreads(data.value ?? []);
-}
-
-// ── Identity ────────────────────────────────────────────────────────
-
-/** Who we are and which teams we are in. Both reads are cached by the
- *  shared transport at `TTL.identity`, so this is a memory lookup on
- *  every poll but the first of each half hour. */
-async function getCachedIdentity(
-  config: AdoConfig
-): Promise<{ userEmail: string; myTeamIds: Set<string> }> {
-  const [userEmail, myTeamIds] = await Promise.all([
-    fetchAuthenticatedUserEmail(config).catch(() => ''),
-    fetchMyTeamIds(config),
-  ]);
-  return { userEmail, myTeamIds };
 }
 
 // ── Comment thread helpers ──────────────────────────────────────────
@@ -858,11 +815,10 @@ export const azureDevOpsProvider: VcsProvider = {
     const config = toAdoConfig(auth, project);
 
     return counted('fetchPullRequests', async () => {
-      const { userEmail, myTeamIds } = await getCachedIdentity(config);
-      const teamContext =
-        userEmail && myTeamIds.size > 0 ? { myTeamIds, userEmail } : undefined;
-
-      const prs = await fetchActivePullRequests(config, project, teamContext);
+      // Cached by the transport at `TTL.identity`: a memory lookup on
+      // every poll but the first of each half hour.
+      const myTeamIds = await fetchMyTeamIds(config);
+      const prs = await fetchActivePullRequests(config, project, myTeamIds);
 
       // CI reaches a pull request by two unrelated routes and a repo
       // usually only uses one: pipelines run against the merge ref,

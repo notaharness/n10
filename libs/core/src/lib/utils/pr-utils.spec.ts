@@ -3,6 +3,8 @@ import { describe, it, expect } from 'vitest';
 import type {
   BranchPrMap,
   PullRequestInfo,
+  PullRequestReviewer,
+  ReviewDecision,
   AppConfig,
   VcsProvider,
 } from '@n10/vcs-core';
@@ -292,6 +294,83 @@ describe('categorizeReviews', () => {
     const result = categorizeReviews(prMap, mockConfig, mockProvider);
     expect(result.waitingForAuthor.map((p) => p.id)).toEqual([1]);
     expect(result.approvedByYou.map((p) => p.id)).toEqual([2]);
+  });
+
+  describe('through a group the user belongs to', () => {
+    const team = (decision: ReviewDecision) => ({
+      displayName: '[proj]\\Core Team',
+      identifier: 'vstfs:///Classification/TeamProject/proj\\Core Team',
+      decision,
+      includesViewer: true,
+    });
+    const me = (decision: ReviewDecision) => ({
+      displayName: 'Me',
+      identifier: 'me@test.com',
+      decision,
+    });
+    const reviewedBy = (...reviewers: PullRequestReviewer[]): BranchPrMap => ({
+      'branch-a': makePr({
+        id: 1,
+        createdByIdentifier: 'other@test.com',
+        reviewers,
+      }),
+    });
+
+    it('asks for a review while the group has not answered', () => {
+      const result = categorizeReviews(
+        reviewedBy(team('no-response')),
+        mockConfig,
+        mockProvider
+      );
+      expect(result.needsReview.map((p) => p.id)).toEqual([1]);
+    });
+
+    /** The reported bug: a teammate's approval of the group read as the
+     *  user's own, on a pull request they never looked at. */
+    it('never files the group’s vote as the user’s', () => {
+      for (const decision of [
+        'approved',
+        'waiting-for-author',
+        'rejected',
+      ] as const) {
+        const result = categorizeReviews(
+          reviewedBy(team(decision)),
+          mockConfig,
+          mockProvider
+        );
+        expect(result).toEqual({
+          needsReview: [],
+          waitingForAuthor: [],
+          approvedByYou: [],
+        });
+      }
+    });
+
+    it('goes by the user’s own vote when they have one', () => {
+      expect(
+        categorizeReviews(
+          reviewedBy(team('approved'), me('no-response')),
+          mockConfig,
+          mockProvider
+        ).needsReview.map((p) => p.id)
+      ).toEqual([1]);
+      expect(
+        categorizeReviews(
+          reviewedBy(team('no-response'), me('approved')),
+          mockConfig,
+          mockProvider
+        ).approvedByYou.map((p) => p.id)
+      ).toEqual([1]);
+    });
+
+    it('ignores a pending group the user is not in', () => {
+      const result = categorizeReviews(
+        reviewedBy({ ...team('no-response'), includesViewer: false }),
+        mockConfig,
+        mockProvider
+      );
+      expect(result.needsReview).toEqual([]);
+    });
   });
 });
 

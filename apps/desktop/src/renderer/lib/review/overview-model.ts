@@ -1,9 +1,11 @@
 import {
   asksForReview,
   holdingVerdict,
+  reviewersToCount,
   type PullRequestInfo,
   type PullRequestReviewer,
   type ReviewDecision,
+  viewerEntry,
 } from '@n10/vcs-core/types';
 import type { Mode } from './review-model.js';
 
@@ -120,14 +122,18 @@ export function adoptPullRequest(
   return { ...state, hasPr, mode: state.chosen ? state.mode : initial };
 }
 
-/** The viewer's own entry among the reviewers, if they are one. */
+/** The viewer's own entry among the reviewers, or else a group of
+ *  theirs that is still asked (`viewerEntry`). */
 export function viewerReview(
   pr: PullRequestInfo,
   viewer: string | null
 ): PullRequestReviewer | undefined {
   if (viewer == null) return undefined;
   const me = viewer.toLowerCase();
-  return pr.reviewers?.find((r) => r.identifier.toLowerCase() === me);
+  return viewerEntry(
+    pr.reviewers ?? [],
+    (r) => r.identifier.toLowerCase() === me
+  );
 }
 
 /** What the primary button in the attention strip does. */
@@ -215,7 +221,7 @@ function reviewerStep(pr: PullRequestInfo, viewer: string | null): NextStep {
 }
 
 function authorStep(pr: PullRequestInfo): NextStep {
-  const reviewers = pr.reviewers ?? [];
+  const reviewers = reviewersToCount(pr.reviewers ?? []);
   const unresolved = unresolvedDetail(pr);
   const view = { action: 'review-changes' as const, label: 'View changes' };
   // The count is the fact; who owes the next move on each thread is not
@@ -261,9 +267,10 @@ export function nextStep(
   return role === 'author' ? authorStep(pr) : reviewerStep(pr, viewer);
 }
 
-/** The reviewers still asked for a verdict: one who declined is not. */
+/** The reviewers still asked for a verdict, one row per vote
+ *  (`reviewersToCount`): one who declined is not. */
 export function activeReviewers(
   reviewers: readonly PullRequestReviewer[]
 ): PullRequestReviewer[] {
-  return reviewers.filter((r) => r.decision !== 'declined');
+  return reviewersToCount(reviewers).filter((r) => r.decision !== 'declined');
 }
