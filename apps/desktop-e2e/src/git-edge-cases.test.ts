@@ -146,7 +146,7 @@ test.describe('A worktree whose branch was switched inside it', () => {
           window.n10.launchAgent({ branch, intent: 'continue-or-blank' }),
         'original'
       )
-    ).rejects.toThrow('Failed to resolve a worktree');
+    ).rejects.toThrow('Failed to create a worktree');
     expect(await page.evaluate(() => window.n10.listSessions())).toEqual([]);
     await page.evaluate(
       (branch) =>
