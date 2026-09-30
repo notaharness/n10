@@ -7,7 +7,7 @@ creates the services it needs, adapts their events to its transport, and
 renders their snapshots. Reasoning: `docs/decisions.md`.
 
 - A service exposes a snapshot (stable identity until it changes) and a
-  subscription naming what changed; awaited reads never reject.
+  subscription naming what changed; snapshot refreshes never reject.
 - Schedule explicitly with timers the service owns, unref'd so a watch never
   holds a process open. A tick that finds work out is skipped, not queued.
 - Services rely on each read settling. Deadlines belong to the transport that
@@ -85,4 +85,6 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   unavailable capability, never a local executor. Bind PTY handles to their
   opening transport; detach late attaches from a replaced port. Beam sockets,
   mail relay, reconnection and native daemon ownership stay in shell adapters.
-  Machine data types are exported by browser-safe `@n10/engine/contract`.
+  `refresh` retains last-good rows and an error; `listMachines` rejects that
+  error for callers that require a successful read, including IPC and ownership
+  checks. Machine data types are exported by browser-safe `@n10/engine/contract`.

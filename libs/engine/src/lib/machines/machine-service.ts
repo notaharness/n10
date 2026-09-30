@@ -113,6 +113,7 @@ export function createMachineService() {
     active = request;
     return request;
   }
+  /** Read fresh fleet rows, rejecting a failed refresh instead of returning cached rows. */
   async function listMachines(): Promise<MachineView[]> {
     const value = await refresh();
     if (value.error) throw new Error(value.error);
@@ -145,6 +146,7 @@ export function createMachineService() {
       emit({ type: 'status', status: snapshot.status });
     },
     refresh,
+    listMachines,
     receiveMachines,
     receiveStatus,
     receiveDirectory(landed: DirectoryPublished): void {

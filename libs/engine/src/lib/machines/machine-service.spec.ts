@@ -126,7 +126,7 @@ describe('the push channel', () => {
 
   it('listMachines() also refreshes the cache, for a caller that only reads', async () => {
     service.setPort(fakePort());
-    await service.refresh();
+    await expect(service.listMachines()).resolves.toEqual([localMachine()]);
     expect(service.getSnapshot().machines).toEqual([localMachine()]);
   });
 
@@ -185,7 +185,7 @@ it('rejects a late result from a replaced port without hiding the new capability
   });
 });
 
-it('preserves the last fleet and announces failed reads without rejecting them', async () => {
+it('retains the fleet on refresh failure but rejects a requested machine list', async () => {
   const port = fakePort();
   service.setPort(port);
   await service.refresh();
@@ -199,6 +199,8 @@ it('preserves the last fleet and announces failed reads without rejecting them',
     error: 'Connection lost',
   });
   expect(events).toContainEqual({ type: 'changed' });
+  await expect(service.listMachines()).rejects.toThrow('Connection lost');
+  expect(service.getSnapshot().machines).toEqual([localMachine()]);
 });
 
 it('publishes an empty recovered fleet so subscribers clear a startup error', async () => {

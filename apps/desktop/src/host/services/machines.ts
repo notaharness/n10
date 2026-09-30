@@ -22,11 +22,7 @@ export const runCeremony = machines.runCeremony;
 export const cancelCeremony = machines.cancelCeremony;
 export const resetFleet = machines.resetFleet;
 
-export async function listMachines(): Promise<MachineView[]> {
-  const snapshot = await machines.refresh();
-  if (snapshot.error) throw new Error(snapshot.error);
-  return snapshot.machines;
-}
+export const listMachines = machines.listMachines;
 
 let changed: ((value: MachineView[]) => void) | null = null;
 let statusChanged: ((value: FleetStatus) => void) | null = null;
