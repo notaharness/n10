@@ -100,3 +100,41 @@ export async function armContextMenuDismiss(
     };
   });
 }
+
+/** A context menu item as the user sees it. */
+export interface MenuItemView {
+  label: string;
+  type: string;
+  checked: boolean;
+}
+
+/**
+ * Arm the next `Menu.popup` to note its items and close without a
+ * choice, and return a read of what it noted: a radio item's `checked`
+ * is the choice the menu shows as made.
+ */
+export async function armContextMenuPeek(
+  app: ElectronApplication
+): Promise<() => Promise<MenuItemView[]>> {
+  await app.evaluate(({ Menu }) => {
+    const proto = Menu.prototype as unknown as {
+      popup: (opts?: { callback?: () => void }) => void;
+    };
+    const original = proto.popup;
+    const store = globalThis as { peekedMenu?: MenuItemView[] };
+    delete store.peekedMenu;
+    proto.popup = function patched(this: Electron.Menu, opts) {
+      proto.popup = original;
+      store.peekedMenu = this.items.map((i) => ({
+        label: i.label,
+        type: i.type,
+        checked: i.checked,
+      }));
+      opts?.callback?.();
+    };
+  });
+  return () =>
+    app.evaluate(
+      () => (globalThis as { peekedMenu?: MenuItemView[] }).peekedMenu ?? []
+    );
+}
