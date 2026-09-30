@@ -687,10 +687,9 @@ changes; repository selection has no second metadata store. Core supplies
 filesystem validation and resolver operations. Desktop chooses its startup repo
 and keeps recents; the TUI opens its requested checkout before mounting React.
 
-The desktop still changes process cwd for plan delivery.
-Repository detection, worktree operations and session commands receive captured
-paths. The remaining domains take explicit handles in the
-[domain plan](design/engine-domains.md).
+Repository detection, worktree operations, session commands and plan delivery
+receive captured paths and repository handles. Plan delivery validates the
+repository lifetime before each effect.
 
 ## Shared remote sync
 
@@ -794,3 +793,16 @@ React bindings, and rejects raw config reads in production shells. Core PTY I/O
 remains available to shell transports. The small shared terminal-dimension
 validator is extracted because session, terminal and plan commands use it; this
 does not introduce a generic kernel framework or a second desktop query cache.
+
+## Host execution boundaries
+
+Engine domains share one Node owner per shell. The desktop keeps its measured
+utility-process boundary; the renderer owns its existing diff/highlight workers.
+Domain separation does not require thread separation. The
+[host workload assessment](design/host-worker-assessment.md) records timer delay,
+CPU, RSS and real Git-read latency for idle, ten-terminal and large-diff cases.
+It does not demonstrate a sustained host CPU bottleneck that would pay for a
+worker pool. Keep ordered mutations and PTY ownership in their current process.
+Require an attributed CPU profile and identical-fixture before/after evidence
+before adding another worker; asynchronous I/O or smaller payloads may address
+the measured cost without a new lifetime and queue.

@@ -39,6 +39,8 @@ export interface LaunchOptions {
   n10Config?: Record<string, unknown>;
   projectConfig?: Record<string, unknown>;
   fakeGitHub?: FakeGitHub;
+  /** Isolated output for the utility-process timer sampler. */
+  hostProbeLog?: string;
 }
 
 function seedHome(
@@ -100,6 +102,12 @@ export async function launchApp(opts: LaunchOptions): Promise<PerfApp> {
       N10_START_DIR: opts.repoPath,
       N10_DESKTOP_VERSION: 'perf',
       ...ghEnv,
+      ...(opts.hostProbeLog
+        ? {
+            N10_HOST_REQUIRE: join(HERE, 'host-probe.cjs'),
+            N10_HOST_PROBE_LOG: opts.hostProbeLog,
+          }
+        : {}),
       // Last, and not negotiable — see the note in the e2e fixture.
       TMUX_TMPDIR: homeDir,
     },

@@ -7,16 +7,17 @@ below it, and the ESLint module boundaries enforce the direction.
 
 | Layer                      | Role                                                                                                                                                                                                                       |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@n10/core`                | Primitive operations: Git, filesystem, tmux and PTY, config, providers, pure helpers. Node only.                                                                                                                           |
+| `@n10/core`                | Primitive operations: Git, filesystem, tmux and PTY, config, providers, pure helpers. Node entry plus explicit browser-safe subpaths.                                                                                      |
 | `@n10/engine`              | The program: state, scheduling, caching and the events that announce them, over core. Node only; never React, Ink or Electron.                                                                                             |
 | `@n10/app-core`            | React contexts/hooks over the engine, including config snapshots; the desktop renderer also uses the browser-safe plan binding. Browser-safe hooks receive structural engine clients; terminal-only hooks live in the CLI. |
 | `apps/cli`, `apps/desktop` | Rendering and input. The TUI runs the engine in its own process; the desktop runs it in the `n10 host` utility process, behind the host bridge. Two open shells share the implementation, not the state.                   |
 
-The engine owns config, repository selection, worktrees, remote sync, the PR
+The engine owns config, repository handles, worktrees, remote sync, the PR
 list, review reads/commands, worktree sessions, directory terminals, babysitters, fleet state and plan delivery. Repository handles own config,
 worktree, review and session observation lifetimes; shells bind sync lifetime.
 The [domain plan](design/engine-domains.md)
-records the survey, migration order, target diagram and worker evidence.
+records the survey, migration order and target diagram. The
+[host assessment](design/host-worker-assessment.md) records reproducible worker evidence.
 
 ## Directory map
 
@@ -40,7 +41,7 @@ apps/desktop/                    — Electron GUI shell, shipped inside `@notaha
   src/preload/preload.ts         — Typed contextBridge → window.n10
   src/host/menu-template.ts      — Pure native app menu template, used by main and the web demo
   src/host/contract.ts           — Single source of truth for the bridge API + IPC channel names (incl. MenuCommand, ContextMenuItem, DesktopPrefs)
-  src/host/services/             — Session-host services (sidebar w/ remote PR cache, sessions w/ scrollback buffer, settings, desktop-prefs…)
+  src/host/services/             — Host adapters (engine snapshots/commands, IPC events, scrollback, desktop preferences)
   src/renderer/                  — Vite + React 19 + Tailwind v4 web app (no Node access)
     styles.css                   — Design tokens (VS Code-style light/dark palette, type scale) — components use tokens only
     components/ui/               — shadcn-style primitives (radix-ui + cva + lucide): button, dialog, command, select…
@@ -98,9 +99,8 @@ libs/core/                       — Shell-agnostic operations. No React, Ink, E
   src/lib/babysit/               — Pure observation model and briefing composition
   src/ui.ts                      — Browser-safe presentation and input models
   src/plan.ts                    — Browser-safe entry (`@n10/core/plan`) for the renderer
-  src/lib/utils/                 — Pure helpers (sidebar-items, session-sort, diff-fetcher, virtual-viewport…)
+  src/lib/utils/                 — Git reads and presentation helpers (diff-fetcher, sidebar-items, virtual-viewport…)
   src/lib/settings/              — Settings field model, coercion and explicitly scoped config writes
-  src/lib/sync/                  — Remote sync passes (sweepMergedBranches, conflict counts)
   src/lib/agents/                — Agent registry
   src/lib/activity.ts            — Agent activity registry; pty-registry.ts — PTY session lifecycle
   src/lib/session-backend.ts     — Required tmux availability, tagged-session observations and cleanup
