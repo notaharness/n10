@@ -5,6 +5,7 @@ import {
   TerminalIcon,
   XIcon,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import type {
   SessionActivitySnapshot,
   SidebarItem,
@@ -14,12 +15,13 @@ import { usePlanCount } from '../../lib/plan/plan.js';
 import { useHoverPrewarm } from '../../lib/tabs/prewarm.js';
 import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
 import {
+  cutSide,
   tabPresentation,
   type TabFace,
 } from '../../lib/tabs/tab-presentation.js';
 import { useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import type { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
-import { cn } from '../../lib/utils.js';
+import { cn, errorMessage } from '../../lib/utils.js';
 import { pressWithoutFocus } from './tab-keyboard.js';
 import { runTabMenu } from './tab-menu.js';
 import { TabLabel } from './TabLabel.js';
@@ -232,7 +234,9 @@ export function TabButton({
       onDoubleClick={() => tabs.pin(tab.id)}
       onContextMenu={(e) => {
         e.preventDefault();
-        void runTabMenu(tab, tabs, closer, tabOverflow);
+        runTabMenu(tab, tabs, closer, tabOverflow).catch((err: unknown) =>
+          toast.error(errorMessage(err))
+        );
       }}
       title={tabTitle(tab, foreignRepo)}
       data-face={face}
@@ -250,16 +254,22 @@ export function TabButton({
         running={item ? itemRunning(item) : running}
         snapshot={snapshot}
       />
-      <TabLabel label={label} preview={tab.preview} foreignRepo={foreignRepo} />
+      <TabLabel
+        label={label}
+        preview={tab.preview}
+        foreignRepo={foreignRepo}
+        cut={cutSide(face)}
+      />
       <PlanCountBadge count={planCount} />
       {unseen && <UnseenDot />}
-      <RepoBand color={repoColor} />
       <TabCloseButton
         onClose={(e) => {
           e.stopPropagation();
           closer.close(tab.id);
         }}
       />
+      {/* After the close button, so its cover leaves the band whole. */}
+      <RepoBand color={repoColor} />
     </div>
   );
 }

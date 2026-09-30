@@ -151,12 +151,14 @@ Every rule below has its reasoning in `docs/decisions.md`.
   shows it (`showSession`), which is what marks output seen.
 - The tab strip wraps or scrolls as the `tabOverflow` desktop pref says,
   chosen from a tab's menu (radio items). Wrapped, dnd-kit sorts it with
-  `rectSortingStrategy` and no axis lock. Labels are cut from the front by
-  measurement (`TabLabel.tsx`, `lib/tabs/front-truncate.ts`): Chromium has no
-  start-side `text-overflow`. A repository's colour is its recents entry's
-  `color`, taken as it is added (`recent-repos.ts`), indexing the `--repo-*`
-  tokens (`lib/tabs/repo-colors.ts`). The close button overlays the tab's end
-  in the tab's own opaque background.
+  `rectSortingStrategy` and no axis lock. A label that does not fit is cut
+  by measurement (`TabLabel.tsx`, `lib/tabs/label-cut.ts`), from the start
+  for branch names and paths, from the end for titles (`cutSide`), with the
+  whole label as its tooltip; Chromium has no start-side `text-overflow`. A
+  repository's colour is its recents entry's `color`, taken as it is added
+  (`recent-repos.ts`), indexing the `--repo-*` tokens, one per recents slot
+  (`lib/tabs/repo-colors.ts`). The close button overlays the tab's end in the
+  tab's own background, opaque in every state, the attention blink included.
 - Each tab's view (picked pane, picked file, diff anchor, walkthrough step)
   lives beside the tabs in `TabViewsHost` (`lib/tabs/tab-views.tsx`) for this
   run, across repository switches: read once as initial state, written on

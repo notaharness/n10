@@ -1,9 +1,10 @@
 import { useCallback, useState, useSyncExternalStore } from 'react';
 import {
-  dropLeading,
-  frontCut,
+  cutToFit,
+  dropChars,
+  type CutSide,
   type LabelPart,
-} from '../../lib/tabs/front-truncate.js';
+} from '../../lib/tabs/label-cut.js';
 import { repoDisplayName } from '../../lib/tabs/tab-presentation.js';
 import { cn } from '../../lib/utils.js';
 
@@ -65,21 +66,21 @@ function useTextBox(el: HTMLElement | null): string {
 /** What canvas and layout may disagree by on one string's width. */
 const MEASURE_SLACK_PX = 0.5;
 
-/** The label's runs cut from the front to fit the box, or whole until
- *  it has been measured. */
-function fitted(parts: LabelPart[], box: string): LabelPart[] {
-  if (!box) return parts;
+/** How many characters the label loses from `side` to fit the box:
+ *  none until it has been measured. */
+function cutFor(text: string, box: string, side: CutSide): number {
+  if (!box) return 0;
   const [width = '0', font = ''] = box.split('\n');
-  const text = parts.map((p) => p.text).join('');
   const room = Number(width) + MEASURE_SLACK_PX;
-  return dropLeading(parts, frontCut(text, room, measurer(font)));
+  return cutToFit(text, room, measurer(font), side);
 }
 
 /**
  * The tab's title, prefixed with its repository when that is not the
  * open one — the strip spans repos, and `main` alone says nothing about
- * which checkout it is. Too long for the tab, it loses its front, so the
- * end of the branch stays in view.
+ * which checkout it is. Too long for the tab, it loses `cut`'s end (a
+ * branch its start, so its end stays in view) and shows the whole of
+ * itself as a tooltip.
  *
  * Three layers: the whole label, hidden, sizes the tab as the text
  * would; the cut one is painted over it; and a screen reader reads the
@@ -89,10 +90,12 @@ export function TabLabel({
   label,
   preview,
   foreignRepo,
+  cut,
 }: {
   label: string;
   preview: boolean;
   foreignRepo: string | null;
+  cut: CutSide;
 }) {
   const [el, setEl] = useState<HTMLSpanElement | null>(null);
   const box = useTextBox(el);
@@ -107,10 +110,13 @@ export function TabLabel({
       ]
     : [{ key: 'label', text: label }];
   const whole = parts.map((p) => p.text).join('');
+  const dropped = cutFor(whole, box, cut);
   return (
     <span
       ref={setEl}
       data-tab-label
+      data-cut={dropped > 0 ? cut : undefined}
+      title={dropped > 0 ? whole : undefined}
       className={cn(
         'relative min-w-0 flex-1 overflow-hidden whitespace-nowrap',
         preview && 'italic'
@@ -120,7 +126,7 @@ export function TabLabel({
         {whole}
       </span>
       <span aria-hidden data-tab-label-shown className="absolute inset-0">
-        {fitted(parts, box).map((p) => (
+        {dropChars(parts, dropped, cut).map((p) => (
           <span key={p.key} className={p.className}>
             {p.text}
           </span>
