@@ -607,6 +607,18 @@ export default tseslint.config(
     },
   })),
   {
+    files: ['libs/engine/src/lib/*/api.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ExportAllDeclaration',
+          message: 'Name each public domain export explicitly.',
+        },
+      ],
+    },
+  },
+  {
     files: ['libs/engine/src/lib/kernel/**/*.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
@@ -628,11 +640,11 @@ export default tseslint.config(
     rules: {
       'no-restricted-globals': [
         'error',
-        'process',
-        'Buffer',
-        '__dirname',
-        '__filename',
-        'require',
+        {
+          globals: ['process', 'Buffer', '__dirname', '__filename', 'require'],
+          checkGlobalObject: true,
+          globalObjects: ['global'],
+        },
       ],
       '@typescript-eslint/no-restricted-imports': [
         'error',

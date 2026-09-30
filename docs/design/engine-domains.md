@@ -175,7 +175,8 @@ The sole config-read exception is the hook integration fixture that supplies
 fake persisted config. Host code still rejects Electron imports; main/host reject
 React bindings. Shell-specific I/O adapters may use core PTY primitives.
 
-Every engine domain has an explicit `api.ts`. Cross-domain imports must use it;
+Every engine domain has an explicit `api.ts` with named exports; wildcard domain
+exports are lint errors. Cross-domain imports must use this public entry;
 the root barrel exports those public surfaces. Kernel modules cannot import
 domains. The shared terminal-dimension validator is the only extracted kernel
 mechanic: no command bus, generic scheduler or speculative resource framework.

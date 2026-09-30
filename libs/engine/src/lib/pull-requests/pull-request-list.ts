@@ -72,7 +72,7 @@ import {
  * checkouts one person has open at once — the desktop's tab strip
  * spans repositories, and following a tab opens its repository.
  */
-export const MAX_CACHED_SCOPES = 8;
+const MAX_CACHED_SCOPES = 8;
 
 export interface PullRequestListOptions {
   providers: readonly VcsProvider[];

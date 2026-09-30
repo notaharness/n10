@@ -1,5 +1,5 @@
 /** Public domain surface; neighboring domains import this entry. */
-export * from './config-service.js';
+export { createConfigService } from './config-service.js';
 export type {
   ConfigSnapshot,
   ConfigService,

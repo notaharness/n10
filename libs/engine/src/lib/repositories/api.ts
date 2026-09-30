@@ -1,2 +1,3 @@
 /** Public domain surface; neighboring domains import this entry. */
-export * from './repository-service.js';
+export { createRepositoryService } from './repository-service.js';
+export type { RepositoryHandle } from './repository-service.js';
