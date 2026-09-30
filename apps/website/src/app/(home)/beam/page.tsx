@@ -11,7 +11,7 @@ import { Footer } from '@/components/landing/footer';
 export const metadata: Metadata = {
   title: 'Beam',
   description:
-    'Pool the machines you own into a fleet and open shells, run commands and leave durable messages between them; n10 and Orchestra use Beam to run agents on another machine.',
+    'Passkey-signed membership, an encrypted directory and WireGuard tunnels connect the machines you own.',
 };
 
 export default function BeamPage() {
@@ -22,11 +22,11 @@ export default function BeamPage() {
       <div className="px-4">
         <BeamOverviewDiagram />
       </div>
+      <BeamNotes />
       <BeamStreams />
       <div className="px-4">
         <BeamQueueDiagram />
       </div>
-      <BeamNotes />
       <BeamCta />
       <Footer />
     </main>

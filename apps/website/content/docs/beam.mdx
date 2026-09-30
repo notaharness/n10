@@ -1,23 +1,51 @@
 ---
 title: Beam
-description: Pool the machines you own, then open shells, run commands and send messages between them.
+description: Passkey-signed membership and WireGuard tunnels for the machines you own.
 ---
 
-Beam pools the machines you own into a fleet. From any machine in the fleet
-you can open a shell on another, run a command there, or send a message that
-waits until the other machine is online. n10 Desktop uses it to run agents on
-your other machines.
+Beam connects one person's machines into a fleet. From any member you can
+open a shell on another, run a command there, or queue a message until it
+connects. n10 Desktop uses Beam to run agents on your other machines.
 
-Machines connect over encrypted tunnels built with
-[tailcat](https://github.com/tailscale/tailcat), no Tailscale account needed.
-One passkey signs every machine into the fleet, and machines find each other
-through an encrypted directory at [beam.n10.is](https://beam.n10.is). Shells,
-commands and messages travel through the tunnels, never through beam.n10.is.
-When two machines can't connect directly, the tunnel goes through an
-encrypted relay.
+Each machine holds its own WireGuard node key. A passkey scoped to
+`beam.n10.is` signs a WebAuthn assertion for each membership or revocation
+statement. The assertion's challenge commits to the statement, including a
+joining machine's public key and address. Peers verify it and proof that the
+machine holds the matching node key before accepting a connection.
 
-Beam is in beta. The source, the full command reference and the trust model
-are at [github.com/notaharness/beam](https://github.com/notaharness/beam).
+The passkey's PRF supplies a secret from which Beam derives a directory
+encryption key and read token. Machines encrypt membership and revocation
+records locally with XChaCha20-Poly1305. The Cloudflare Worker at
+[beam.n10.is](https://beam.n10.is) stores those records and checks an
+assertion before each append. It sees fleet IDs, statement hashes, assertions,
+request metadata, record sizes and timing, but cannot read the records or
+mint a signed member.
+
+[Tailcat](https://github.com/tailscale/tailcat) connects members with
+WireGuard, directly where possible and through a DERP relay otherwise. The
+relay sees endpoint IPs and packet metadata, but not shell, command or
+message contents. The directory worker does not carry that traffic. Beam
+does not require a Tailscale account.
+
+## Trust and limits
+
+The worker also serves the passkey ceremony page. During an approval, that
+page requests the signature and sees the PRF result. It seals one result to
+the initiating machine through a one-time worker slot; the worker holds only
+the sealed result. A compromised page can choose one statement for that tap;
+on a machine's first enrolment it can substitute the fleet root the machine
+pins. Approve only a ceremony you started, show its QR code privately, and
+compare a joining machine's fleet fingerprint with `beam status` on an
+existing member.
+
+Revocation applies locally at once and spreads to connected peers. Offline
+peers learn it later, and the directory can withhold records, so a new machine
+may temporarily admit a revoked key. A revoked machine retains directory read
+access. By default, a member can open a shell as the daemon's user on other
+members; if one is compromised and copies their keys, start a new fleet.
+
+Beam is in beta. The source and [full trust model](https://github.com/notaharness/beam/blob/main/docs/01-model.md)
+are in the beam repository.
 
 ## Install
 

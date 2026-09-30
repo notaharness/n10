@@ -5,7 +5,7 @@ import { ScrollFigure } from '@/components/scroll-figure';
  */
 const panels = [
   { label: 'sent while offline', sub: 'kept on disk by the sender' },
-  { label: 'the machine reconnects', sub: 'over whichever side dials' },
+  { label: 'the machines connect', sub: 'the sender dials the recipient' },
   { label: 'delivered', sub: 'when the machine is back' },
 ];
 

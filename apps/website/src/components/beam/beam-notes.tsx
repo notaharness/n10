@@ -1,31 +1,40 @@
 import { withCode } from '@/components/inline-code';
-const notes = [
+
+const limits = [
   {
-    title: 'Built into n10 and Orchestra',
+    title: 'The ceremony page is trusted during a tap',
     description:
-      "The Fleet section in n10 Desktop's sidebar creates or joins a fleet. Once another machine is in it, n10 Desktop can launch a worktree, agent or terminal there. Orchestra does the same with `--machine`.",
+      'The hosted page requests the WebAuthn signature and receives the PRF result. A compromised page can choose one statement you approve. At first enrolment, it can also substitute the root a machine pins. Approve only a ceremony you started, keep its QR code private, and compare a new machine’s fleet fingerprint with `beam status` on an existing member.',
   },
   {
-    title: 'Guard the passkey',
+    title: 'Revocation reaches peers over time',
     description:
-      'One passkey signs every membership, and by default any machine in the fleet can open a shell on the others. The directory at beam.n10.is keeps each machine’s entry encrypted, and the fleet’s identifiers, passkey public key and signatures in the clear. Show a QR code only where you alone can see it. Remove a machine with `beam revoke`. `beam peer grant` limits a machine to `msg`, mailbox messages only, but n10 then won’t deliver its Orchestra reports: that needs the default, `all`.',
+      'A revocation takes effect locally at once and reaches connected peers through sync. Offline peers learn it when they reconnect. The directory can withhold a record, so a new or partitioned machine may temporarily admit a revoked key. There is no online freshness check for each connection.',
   },
   {
-    title: 'Use Beam on its own',
+    title: 'Members have real access',
     description:
-      'Beam is a standalone npm package. One Go binary is both the daemon and the CLI. It needs no Git or tmux and runs on macOS and Linux.',
+      'By default, a member can open a shell as the daemon’s user on every other machine. A compromised member may copy other machine keys before it is revoked; recovery then requires a new fleet. Per-machine grants can restrict what a peer opens on that machine.',
+  },
+  {
+    title: 'The service still controls availability',
+    description:
+      'The worker can delay setup and publication, and a DERP relay can drop packets. A revoked machine keeps its cached directory key and read token, so it can still read future encrypted directory entries. It cannot use them to sign another membership.',
   },
 ];
 
 export function BeamNotes() {
   return (
     <section className="mx-auto w-full max-w-3xl px-4 py-12">
-      <div className="flex flex-col gap-6">
-        {notes.map((note) => (
-          <div key={note.title}>
-            <h3 className="font-semibold">{note.title}</h3>
+      <h2 className="text-center text-2xl font-semibold tracking-tight sm:text-3xl">
+        Where trust remains
+      </h2>
+      <div className="mt-8 flex flex-col gap-6">
+        {limits.map((limit) => (
+          <div key={limit.title}>
+            <h3 className="font-semibold">{limit.title}</h3>
             <p className="text-fd-muted-foreground mt-1">
-              {withCode(note.description)}
+              {withCode(limit.description)}
             </p>
           </div>
         ))}

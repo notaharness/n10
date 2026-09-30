@@ -11,12 +11,12 @@ export function BeamHero() {
             @notaharness/beam
           </span>
           <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-6xl lg:text-5xl xl:text-6xl">
-            Run agents on another machine
+            Passkey-controlled access to your machines
           </h1>
           <p className="text-fd-muted-foreground max-w-xl text-lg text-pretty">
-            Pool your laptop, workstation and headless boxes into a fleet with
-            one passkey. Open a shell, run a command or leave a message for a
-            machine that is asleep. No SSH keys, no Tailscale account.
+            Beam lets your machines open shells, run commands and queue messages
+            for each other. Your passkey approves membership. A directory stores
+            encrypted records, while WireGuard carries traffic between machines.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link href="/docs/beam" className={buttonVariants({ size: 'lg' })}>

@@ -1,204 +1,79 @@
-import { ScrollFigure } from '@/components/scroll-figure';
-/**
- * The core pitch in one picture: today an agent only runs where you're
- * sitting; with beam, a second machine holds the same two boxes (tmux,
- * the agent) and one connection joins them. Colours come from the
- * fd-* tokens directly (not Tailwind classes) so the SVG repaints for
- * dark mode the same way the rest of the page does.
- */
+const actors = [
+  {
+    name: 'Your machines',
+    role: 'Hold the keys and run the work',
+    details: [
+      'Keep their node private keys and the passkey-derived directory key.',
+      'Decrypt and verify fleet records before admitting peers.',
+      'Read shell, command and message content.',
+    ],
+  },
+  {
+    name: 'Directory worker',
+    role: 'Stores encrypted fleet records',
+    details: [
+      'Verifies a passkey assertion before appending a record.',
+      'Sees fleet IDs, statement hashes, assertions, request IPs, sizes and timing.',
+      'Cannot read stored records or sign a statement on its own.',
+    ],
+  },
+  {
+    name: 'DERP relay',
+    role: 'Forwards WireGuard packets when needed',
+    details: [
+      'Sees endpoint IPs, public keys, packet sizes and timing.',
+      'Cannot read tunnel traffic or admit a machine.',
+      'Can delay or drop packets.',
+    ],
+  },
+];
+
 export function BeamOverviewDiagram() {
   return (
-    <div className="n10-frame bg-fd-card mx-auto w-full max-w-3xl rounded-xl p-4 sm:p-6">
-      <ScrollFigure minWidth={560}>
-        <svg
-          viewBox="0 0 640 220"
-          className="h-auto w-full"
-          role="img"
-          aria-label="Your laptop runs n10 or Orchestra with tmux and your agent. Beam connects it to another machine in your fleet, where the beam daemon runs tmux and another agent."
-        >
-          <defs>
-            <marker
-              id="beam-ov-arrow"
-              viewBox="0 0 10 10"
-              refX="9"
-              refY="5"
-              markerWidth="6"
-              markerHeight="6"
-              orient="auto-start-reverse"
-            >
-              <path
-                d="M0 0L10 5L0 10z"
-                fill="var(--color-fd-muted-foreground)"
-              />
-            </marker>
-          </defs>
-
-          <rect
-            x="16"
-            y="16"
-            width="220"
-            height="188"
-            rx="14"
-            fill="none"
-            stroke="var(--color-fd-border)"
-            strokeWidth="1.5"
-          />
-          <text
-            x="126"
-            y="40"
-            textAnchor="middle"
-            fontSize="13"
-            fontWeight="600"
-            fill="var(--color-fd-foreground)"
-          >
-            Your laptop
-          </text>
-          <rect
-            x="36"
-            y="60"
-            width="180"
-            height="40"
-            rx="8"
-            fill="var(--color-fd-background)"
-            stroke="var(--color-fd-border)"
-          />
-          <text
-            x="126"
-            y="84"
-            textAnchor="middle"
-            fontSize="12"
-            fill="var(--color-fd-foreground)"
-          >
-            n10 or Orchestra
-          </text>
-          <line
-            x1="126"
-            y1="100"
-            x2="126"
-            y2="126"
-            stroke="var(--color-fd-muted-foreground)"
-            markerEnd="url(#beam-ov-arrow)"
-          />
-          <rect
-            x="36"
-            y="130"
-            width="180"
-            height="40"
-            rx="8"
-            fill="var(--color-fd-background)"
-            stroke="var(--color-fd-border)"
-          />
-          <text
-            x="126"
-            y="154"
-            textAnchor="middle"
-            fontSize="12"
-            fill="var(--color-fd-foreground)"
-          >
-            tmux + your agent
-          </text>
-
-          <rect
-            x="404"
-            y="16"
-            width="220"
-            height="188"
-            rx="14"
-            fill="none"
-            stroke="var(--color-fd-primary)"
-            strokeWidth="1.5"
-            strokeDasharray="5 4"
-          />
-          <text
-            x="514"
-            y="40"
-            textAnchor="middle"
-            fontSize="13"
-            fontWeight="600"
-            fill="var(--color-fd-foreground)"
-          >
-            A machine in your fleet
-          </text>
-          <rect
-            x="424"
-            y="60"
-            width="180"
-            height="40"
-            rx="8"
-            fill="var(--color-fd-background)"
-            stroke="var(--color-fd-border)"
-          />
-          <text
-            x="514"
-            y="84"
-            textAnchor="middle"
-            fontSize="12"
-            fill="var(--color-fd-foreground)"
-          >
-            beam daemon
-          </text>
-          <line
-            x1="514"
-            y1="100"
-            x2="514"
-            y2="126"
-            stroke="var(--color-fd-muted-foreground)"
-            markerEnd="url(#beam-ov-arrow)"
-          />
-          <rect
-            x="424"
-            y="130"
-            width="180"
-            height="40"
-            rx="8"
-            fill="var(--color-fd-background)"
-            stroke="var(--color-fd-border)"
-          />
-          <text
-            x="514"
-            y="154"
-            textAnchor="middle"
-            fontSize="12"
-            fill="var(--color-fd-foreground)"
-          >
-            tmux + another agent
-          </text>
-
-          <line
-            x1="238"
-            y1="120"
-            x2="402"
-            y2="120"
-            stroke="var(--color-fd-primary)"
-            strokeWidth="2.5"
-            markerEnd="url(#beam-ov-arrow)"
-            markerStart="url(#beam-ov-arrow)"
-          />
-          <rect
-            x="270"
-            y="106"
-            width="100"
-            height="24"
-            rx="12"
-            fill="var(--color-fd-background)"
-            stroke="var(--color-fd-primary)"
-          />
-          <text
-            x="320"
-            y="122"
-            textAnchor="middle"
-            fontSize="11"
-            fontFamily="var(--font-mono, monospace)"
-            fill="var(--color-fd-primary)"
-          >
-            beam
-          </text>
-        </svg>
-      </ScrollFigure>
-      <p className="text-fd-muted-foreground mt-4 text-center text-sm">
-        Beam connects the machines. Your tmux sessions, worktrees and agents
-        work there as they do on your laptop.
+    <section className="mx-auto w-full max-w-5xl py-12">
+      <h2 className="text-center text-2xl font-semibold tracking-tight sm:text-3xl">
+        Who can see what
+      </h2>
+      <p className="text-fd-muted-foreground mx-auto mt-4 max-w-3xl text-center text-pretty">
+        Your machines verify membership and protect traffic themselves. The
+        hosted services supply discovery and a path when direct connections
+        fail.
       </p>
-    </div>
+      <div className="n10-frame bg-fd-card mt-8 rounded-xl p-4 sm:p-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          {actors.map((actor) => (
+            <article
+              key={actor.name}
+              className="border-fd-border bg-fd-background rounded-lg border p-5"
+            >
+              <h3 className="font-semibold">{actor.name}</h3>
+              <p className="text-fd-primary mt-1 font-mono text-xs">
+                {actor.role}
+              </p>
+              <ul className="text-fd-muted-foreground mt-4 space-y-2 text-sm">
+                {actor.details.map((detail) => (
+                  <li key={detail}>{detail}</li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+        <div className="border-fd-border text-fd-muted-foreground mt-5 grid gap-2 border-t pt-5 text-sm lg:grid-cols-3">
+          <p>
+            <span className="text-fd-foreground font-medium">Approval:</span>{' '}
+            the hosted page seals one passkey result to your machine through a
+            worker slot.
+          </p>
+          <p>
+            <span className="text-fd-foreground font-medium">Directory:</span>{' '}
+            signed, encrypted records from your machines to the worker.
+          </p>
+          <p>
+            <span className="text-fd-foreground font-medium">Traffic:</span>{' '}
+            WireGuard between machines, directly or through DERP.
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }

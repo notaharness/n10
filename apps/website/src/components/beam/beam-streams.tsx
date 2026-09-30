@@ -18,7 +18,7 @@ const streams = [
     name: 'beam msg',
     title: 'Queue a message',
     description:
-      'Leave a message for a machine that is asleep or offline. Beam stores it on disk and delivers it when the machine returns.',
+      'Leave a message for an offline machine. The sender keeps it on disk and retries delivery when the machines connect.',
   },
 ];
 
@@ -26,8 +26,14 @@ export function BeamStreams() {
   return (
     <section className="mx-auto w-full max-w-5xl px-4 py-12">
       <h2 className="text-center text-2xl font-semibold tracking-tight sm:text-3xl">
-        Three ways to reach a machine in your fleet
+        What travels through the tunnel
       </h2>
+      <p className="text-fd-muted-foreground mx-auto mt-4 max-w-3xl text-center text-pretty">
+        Tailcat establishes a WireGuard connection, directly when possible and
+        through a DERP relay when needed. The directory worker carries none of
+        this traffic. Peers verify membership and node-key possession before
+        accepting a stream.
+      </p>
       <div className="mt-8">
         <BeamStreamsDiagram />
       </div>
