@@ -24,6 +24,16 @@ Linux 7.0.0-34-generic, Electron 44.4.3; harness Node 24.15.0. This is a develop
 workstation, not a dedicated performance runner. Results characterize these
 fixtures and do not establish a latency guarantee on slower machines.
 
+Concurrent reviewer e2e activity was not recorded alongside the benchmark. All
+18 launches therefore have **unknown overlap status**; none is established as
+an isolated, quiet-machine sample. The retained workload files were written on
+2026-09-30 at 18:32:20 UTC (idle), 18:33:50 (light), 18:35:15 (redraw), 18:36:45
+(burst), 18:37:51 (small diff), and 18:38:59 (large diff). These are file write
+times, not individual measurement windows: the saved metrics contain durations,
+and the timestamped probe logs are deleted after each launch. Exact attribution
+requires the reviewer run interval and retained per-launch wall-clock windows;
+the results below must not be presented as a controlled no-contention baseline.
+
 Each launch settles for five seconds. Idle and terminal cases then sample for
 15 seconds. Diff cases perform the first read and an immediate cached read,
 then observe for 15 seconds. Engine caches start empty; the OS page cache is not
