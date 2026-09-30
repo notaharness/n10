@@ -45,7 +45,6 @@ function writeJsonFile<T>(path: string, data: T): void {
 // ── Raw config shapes (on-disk) ────────────────────────────────────
 
 interface RawGlobalConfig {
-  pat?: string;
   prPollInterval?: number;
   aiCommand?: string;
   agentId?: AgentId;
@@ -54,6 +53,7 @@ interface RawGlobalConfig {
   autoRebase?: boolean;
   autoHideSidebar?: boolean;
   jumpToInactiveOnEscape?: boolean;
+  diffFileListTree?: boolean;
   mergePollInterval?: number;
   editor?: string;
   worktreePath?: string;
@@ -62,52 +62,16 @@ interface RawGlobalConfig {
 }
 
 interface RawProjectConfig {
-  org?: string;
-  project?: string;
-  repo?: string;
   email?: string;
   vendor?: string;
   vendorProject?: Record<string, string>;
   editor?: string;
 }
 
-// ── Migration from old flat format ─────────────────────────────────
-
-function migrateGlobalConfig(raw: RawGlobalConfig): RawGlobalConfig {
-  if (raw.pat && !raw.vendorAuth) {
-    raw.vendorAuth = {
-      'azure-devops': { pat: raw.pat },
-    };
-    delete raw.pat;
-  }
-  return raw;
-}
-
-function migrateProjectConfig(raw: RawProjectConfig): RawProjectConfig {
-  if ((raw.org || raw.project || raw.repo) && !raw.vendorProject) {
-    raw.vendor = 'azure-devops';
-    raw.vendorProject = {};
-    if (raw.org) {
-      raw.vendorProject.org = raw.org;
-      delete raw.org;
-    }
-    if (raw.project) {
-      raw.vendorProject.project = raw.project;
-      delete raw.project;
-    }
-    if (raw.repo) {
-      raw.vendorProject.repo = raw.repo;
-      delete raw.repo;
-    }
-  }
-  return raw;
-}
-
 // ── Public API ──────────────────────────────────────────────────────
 
 export function readGlobalConfig(): RawGlobalConfig {
-  const raw = readJsonFile<RawGlobalConfig>(GLOBAL_CONFIG_PATH, {});
-  return migrateGlobalConfig(raw);
+  return readJsonFile<RawGlobalConfig>(GLOBAL_CONFIG_PATH, {});
 }
 
 export function writeGlobalConfig(config: RawGlobalConfig): void {
@@ -115,8 +79,7 @@ export function writeGlobalConfig(config: RawGlobalConfig): void {
 }
 
 export function readProjectConfig(cwd = process.cwd()): RawProjectConfig {
-  const raw = readJsonFile<RawProjectConfig>(projectConfigPath(cwd), {});
-  return migrateProjectConfig(raw);
+  return readJsonFile<RawProjectConfig>(projectConfigPath(cwd), {});
 }
 
 export function writeProjectConfig(
@@ -147,6 +110,7 @@ export function readConfig(cwd = process.cwd()): AppConfig {
     autoRebase: global.autoRebase,
     autoHideSidebar: global.autoHideSidebar,
     jumpToInactiveOnEscape: global.jumpToInactiveOnEscape,
+    diffFileListTree: global.diffFileListTree,
     mergePollInterval: global.mergePollInterval,
     editor: project.editor ?? global.editor,
     worktreePath: global.worktreePath,

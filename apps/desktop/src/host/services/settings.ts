@@ -1,10 +1,7 @@
-import { readConfig } from '@n10/vcs-core';
-import { persistConfigField, updateConfigField } from '@n10/app-core';
+import { createConfigService, type ConfigService } from '@n10/engine';
 import {
   buildSettingsFields,
   resolveValue,
-  settingsEffects,
-  type SettingsEffect,
   type SettingsField,
 } from '@n10/core';
 import { PROVIDERS, requireRepo } from './repo.js';
@@ -52,14 +49,28 @@ function kindFor(field: SettingsField): SettingsFieldView['kind'] {
   return 'select';
 }
 
+let service: ConfigService | undefined;
+
+function activeConfig(): ConfigService {
+  const repo = requireRepo();
+  if (service?.repo !== repo) {
+    service = createConfigService({
+      repo,
+      providers: PROVIDERS,
+      pullRequests,
+      restartSync: startRemoteSyncLoop,
+    });
+  }
+  service.reload();
+  return service;
+}
+
 function activeFields() {
-  const config = readConfig(requireRepo());
-  const provider = config.vendor
-    ? PROVIDERS.find((p) => p.id === config.vendor) ?? null
-    : null;
+  const current = activeConfig();
+  const { config, provider } = current.getSnapshot();
   return {
     config,
-    provider,
+    service: current,
     fields: buildSettingsFields(provider).filter(
       (f) => !f.action && !TUI_ONLY_KEYS.has(f.key)
     ),
@@ -105,8 +116,7 @@ export function updateSettingsFromView(
   ref: { label: string; key: string },
   value: string
 ): void {
-  requireRepo(); // settings always operate on the active repo
-  const { config, fields } = activeFields();
+  const { service, fields } = activeFields();
   const field = fields.find((f) => f.label === ref.label && f.key === ref.key);
   if (!field) throw new Error(`Unknown settings field: ${ref.label}`);
   // The renderer only ever saw a placeholder for a stored secret, so
@@ -117,31 +127,5 @@ export function updateSettingsFromView(
   // undefined`) so project-level values fall back to global instead
   // of shadowing it with '' (or 0 for numeric keys).
   const normalized = value === '' ? undefined : value;
-  const updated = updateConfigField(config, field, normalized);
-  persistConfigField(field, normalized, updated);
-  runSettingsEffects(settingsEffects(field));
-}
-
-/**
- * Carry out what the write implies. Which effects a field has is
- * `@n10/core`'s call (settings/effects.ts) and is shared with the
- * TUI; only the doing is the host's.
- */
-function runSettingsEffects(effects: SettingsEffect[]): void {
-  for (const effect of effects) {
-    switch (effect) {
-      case 'reset-provider-cache':
-        pullRequests.credentialsChanged();
-        break;
-      case 'refresh-remote':
-        // Forced, but not a user refresh: a credential change has
-        // already reset every provider's caches, and an interval edit
-        // is no reason to make one spend a cycle's per-row reads.
-        void pullRequests.read(requireRepo(), { force: true });
-        break;
-      case 'restart-sync-loop':
-        startRemoteSyncLoop(requireRepo());
-        break;
-    }
-  }
+  service.updateField(field, normalized);
 }

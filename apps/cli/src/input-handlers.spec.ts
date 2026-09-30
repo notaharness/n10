@@ -85,59 +85,22 @@ describe('settings preset navigation', () => {
   });
 });
 
-/**
- * A saved access token has to take effect now. The engine reads the
- * persisted config, so the effects run once the write has landed, and
- * a credential change goes to the engine rather than to each provider.
- */
-describe('a credential edit', () => {
+it('passes a credential edit to the config command', () => {
   const provider = {
     id: 'azure-devops',
     authFields: [{ key: 'pat', label: 'Personal Access Token', masked: true }],
     projectFields: [],
   };
-
-  function editPat() {
-    const events: string[] = [];
-    const h = harness('', {}, 0);
-    const ctx = h.ctx as unknown as Record<string, Record<string, unknown>>;
-    ctx.config.provider = provider;
-    ctx.config.updateField = () => {
-      // ConfigContext persists in a microtask it queues here.
-      queueMicrotask(() => events.push('persisted'));
-    };
-    ctx.settings.editingField = 'pat';
-    ctx.settings.editBuffer = 'ado_rotated';
-    ctx.settings.settingsFieldIndex = buildSettingsFields(
-      provider as never
-    ).findIndex((f) => f.key === 'pat');
-    ctx.engine = {
-      repo: '/repo',
-      pullRequests: {
-        credentialsChanged: () => events.push('credentials'),
-        read: (cwd: string, opts: { force?: boolean }) => {
-          events.push(`read ${cwd} force=${String(opts.force)}`);
-          return Promise.resolve({});
-        },
-      },
-    };
-    ctx.sessions.triggerSync = () => {
-      events.push('sync');
-      return Promise.resolve();
-    };
-    handleSettingsInput('', { return: true } as KeyPress, h.ctx);
-    return events;
-  }
-
-  it('hands the change to the engine and refreshes, after the write', async () => {
-    const events = editPat();
-    expect(events).toEqual([]);
-    await Promise.resolve();
-    expect(events).toEqual([
-      'persisted',
-      'credentials',
-      'read /repo force=true',
-      'sync',
-    ]);
-  });
+  const h = harness('', {}, 0);
+  h.ctx.config.provider = provider as never;
+  h.ctx.settings.editingField = 'pat';
+  h.ctx.settings.editBuffer = 'rotated';
+  h.ctx.settings.settingsFieldIndex = buildSettingsFields(
+    provider as never
+  ).findIndex((f) => f.key === 'pat');
+  handleSettingsInput('', { return: true } as KeyPress, h.ctx);
+  expect(h.updateField).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ key: 'pat', configBag: 'vendorAuth' }),
+    'rotated'
+  );
 });

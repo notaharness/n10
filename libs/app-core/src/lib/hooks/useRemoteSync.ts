@@ -5,11 +5,16 @@ import { usePolling } from './usePolling.js';
 
 /** TUI scheduling shell around the shared {@link syncRemote} pass. */
 export function useRemoteSync() {
-  const { vcsConfigured, config } = useConfig();
+  const { vcsConfigured, config, repo, syncRevision } = useConfig();
 
   const interval = remoteSyncIntervalMs(config.mergePollInterval);
-  const sync = useCallback(() => syncRemote(), []);
-  const polling = usePolling<number>(sync, interval, vcsConfigured);
+  const sync = useCallback(() => syncRemote(repo), [repo]);
+  const polling = usePolling<number>(
+    sync,
+    interval,
+    vcsConfigured,
+    syncRevision
+  );
 
   return {
     lastSynced: polling.value ?? 0,

@@ -36,8 +36,9 @@ holds the keybind-driven state transitions; screens under `src/screens/main`
   `stopSession` terminates one held target or one persisted target, never both.
 - The pull request list is `@n10/engine`'s, created in `tui.tsx` and provided
   by `EngineProvider`. `usePrData` observes it and holds a watch; nothing here
-  calls the provider's list. Settings effects run after the config write lands
-  (`input-handlers.ts`), since the engine reads the persisted config.
+  calls the provider's list. The engine config service persists settings and
+  dispatches effects; `ConfigProvider` observes its snapshots. Input handlers
+  only issue commands.
 - Rows are named by branch here; the desktop names a PR row by its title.
 - Tests: `ink-testing-library` for text content and keyboard navigation. ANSI
   rendering, PTY forwarding and real terminal interaction are manual or

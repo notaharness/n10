@@ -1,0 +1,145 @@
+# Engine domains and execution boundaries
+
+## Ownership
+
+The engine owns product coordination: scoped state, freshness, scheduling,
+commands and invalidation. Core owns operations that can run without a frontend
+or a long-lived engine. A domain migration includes both consumers and deletes
+their policy implementations. Sharing a helper while retaining two coordinators
+does not complete a migration.
+
+The target is shared implementation. The TUI and desktop still have independent
+engine instances; a multi-client daemon would require separate decisions about
+job lifetime, terminal input/resize ownership, reconnect and cross-process writes.
+
+```mermaid
+flowchart TB
+  CLI[Ink TUI] --> React[app-core: React bindings]
+  Renderer[Desktop renderer] --> Bridge[Browser-safe host contract / preload]
+  Bridge --> Main[Electron main: IPC forwarding and native UI]
+  Main --> Host[Utility process: host adapters]
+  React --> Engine[engine: domain services]
+  Host --> Engine
+  Engine --> Core[core: operations and identity]
+  Core --> Providers[vcs: provider protocols and storage]
+  Core --> Git[worktree-manager: Git operations]
+  Core --> Terminal[terminal / terminal-tmux / terminal-pty]
+  Renderer --> WebWorkers[Diff parsing and syntax Web Workers]
+  Host --> Beam[Beam transport adapter]
+```
+
+Desktop engine code lives in `main/host-worker.ts`'s utility process, not Electron
+main. The TUI runs it in process. Main owns windows, menus, dialogs and process
+supervision. Host adapters map commands/events to IPC and supply platform ports;
+they must not import React bindings or Electron. Renderer navigation, tabs,
+visibility, focus, toast text and terminal presentation remain shell concerns.
+
+## Survey and migration order
+
+| Area             | Implementation at the survey baseline                                                                                                                       | Destination and sequence                                                                                                                                                                                                                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PR list          | `engine/src/lib/pull-requests`, TUI `usePrData`, host `pull-requests`                                                                                       | Already engine-owned. Preserve scoped snapshots, single-flight reads, deadlines and memo invalidation.                                                                                                                                                                                                  |
+| Settings         | `app-core/ConfigContext` owns persistence/state; CLI `input-handlers` and host `settings` dispatch effects; unused host `config` exposes another write path | **First slice:** engine config service owns snapshots, persistence ordering and effects. Core owns coercion/bag writes; React observes; host filters and masks the form.                                                                                                                                |
+| Repository setup | `useSessionManager` and host `repo` detect config, configure resolver and discover sessions; host changes process cwd                                       | Follow config with explicit repo handles. Capture cwd through every operation before enabling concurrent repos. Auto-detection remains a primitive; its updates enter the config service through reload.                                                                                                |
+| Sync             | TUI `useRemoteSync`, `useMergedBranches`, `useConflictCounts`; host `remote-sync` serializes a promise chain; core `sync` supplies passes                   | Next domain: one bounded coordinator with skipped busy ticks, one explicit refresh, generation cancellation, success/error/last-success state and captured repo. Delete all three TUI policy hooks and host loop.                                                                                       |
+| Worktrees        | `worktree-manager`, core `session/remove-worktree`, TUI `useSessionManager`, host `worktrees`                                                               | Keep guarded stop/remove/delete operation and outcomes in core. Engine commands orchestrate it and invalidate worktree/session resources; sync uses that command. No duplicate removal sequence.                                                                                                        |
+| Review reads     | TUI `useRemoteComments`/`useDiffData`, host `reviews`, `pr-details`, `pr-checks`, `pr-conversation`; core PR snapshot/identity helpers                      | Scoped engine resources, keyed by repository/provider/account/PR and revisions. Keep provider parsing and wire protocols in vcs. Move reads before publication.                                                                                                                                         |
+| Review writes    | TUI `useReviewComments`, host `drafts`/`review-drafts`; review-comments poster plus vcs publishers                                                          | One engine command surface over scoped durable stores. Route both agent-comment publication paths through vcs publishers and delete review-comments' poster. Preserve partial/unknown outcomes; never automatically replay an uncertain mutation. Separate reviewable slice.                            |
+| Sessions         | core discovery/launch/registry/babysit; TUI `useSessionManager`; host `discovery`, `sessions`, `terminals`, `babysit`                                       | Engine owns observation, adoption, launch policy, attention facts and babysitter lifetime. Core keeps identity/launch/removal operations; terminal libs execute opaque plans. Shells supply view size and output transports. Preserve clients across repo switches and detach, never kill, on shutdown. |
+| Machines         | host `remote-machines`, main/beam ports and daemon owner                                                                                                    | Engine owns fleet state and remote command policy once session scope includes machine identity. Beam remains a transport adapter; Electron retains utility-process spawning. Preserve external daemon ownership.                                                                                        |
+| Plans            | core browser-safe plan store and checkout operations, app-core plan hook, desktop plan presentation                                                         | Keep the cart local to each frontend for now. Checkout becomes an engine command with session work. No new global cart or persistence without a product need.                                                                                                                                           |
+
+Config is first because it removes a backend-to-React dependency, fixes implicit
+repo writes and eliminates duplicate effect dispatch without changing destructive
+sync policy or terminal lifetime. Sync is higher risk: core safety checks must
+remain authoritative during repo switches and auto-deletion. Reviews then benefit
+from the established config/account scope and command invalidation model.
+
+The agent registry's `agentIdFromCommand` legacy inference is a separate cleanup
+alongside session extraction. Use explicit agent identity, including fixture agents;
+do not introduce a replacement compatibility path. Config storage reads the current nested format; flat Azure credential/project
+format migrations are removed with this slice.
+
+## First slice contract
+
+A config service has one explicit repository, stable snapshots and subscriptions.
+Its snapshot holds resolved config, provider, configured status, revision and a
+sync revision. Commands persist first, re-read the effective config (including
+fallbacks), then invalidate PR credentials/read demand and notify subscribers.
+Failed writes publish nothing and run no effects. A reload compares effective
+values, so a no-op preserves snapshot identity. An explicit saved override may
+need a disk write even when the effective value is unchanged.
+
+The service owns field-to-effect policy. The desktop adapter restarts its current
+sync loop when asked; the TUI observes the sync revision as a polling dependency.
+Keybind patching uses the same store; keybind interpretation stays in React.
+Secrets stay in the Node service: the existing host form masks them and does not
+expose the service snapshot over IPC. Subscription payloads contain no credentials.
+
+This does not promise external-file watching or cross-process coherence. Desktop
+refreshes its config service when reading settings, and TUI explicitly reloads after
+auto-detection. PR reads continue to resolve persisted config.
+
+## Kernel: extract from evidence
+
+Keep domains as folders with public factories and explicit ports. The PR list's
+poll schedule and scoped store already solve its needs; a second domain with
+synchronous commands does not justify replacing them with a generic framework.
+
+Extract shared scope/store/scheduling mechanics only when another domain needs the
+same semantics. Keep a future kernel domain-free. Prefer direct typed commands and
+subscriptions until transport/reconnect needs justify a command bus and revisioned
+event stream. Do not add `@n10/react`, a universal `useResource`, TanStack query-core,
+or a second IPC contract as part of this slice. The desktop query cache remains a
+presentation cache; it must not become a second owner of migrated domain policy.
+
+## Dependency enforcement
+
+`eslint.config.mjs` enforces Nx tag direction (`scope:core` cannot depend on engine
+or app-core; engine cannot depend on app-core) and forbids React/Ink/Electron in
+Node domain code. Restrict package subpaths as well as bare imports. Host/main
+backend files cannot import app-core. Host files cannot import Electron.
+
+Renderer value imports are limited to the host bridge and explicitly browser-safe
+entries; Node types may be imported as types. Extend the existing rule to Node
+builtins and every provider. Preserve the plan/readiness exceptions.
+
+During migration, unmigrated hooks may still import core/provider operations.
+For migrated config bindings and shell settings handlers, restricted imports prevent
+raw config persistence and effect-policy helpers from returning. When all domains
+move, tighten app-core globally to browser-safe bindings and split the contract
+into an engine-owned browser entry. Do not declare that end state enforced today.
+
+Future cross-domain dependencies must use public domain APIs; kernel imports of
+domains and relative cross-domain implementation imports can be forbidden with
+folder-specific `no-restricted-imports` overrides when those folders exist.
+
+## Workers and processes
+
+Retain the measured utility-process host boundary. [PR #260](https://github.com/notaharness/n10/pull/260)
+reports the same ten-tab, three-launch, twenty-switch benchmark against #259:
+main-loop p99 fell from 5.4–5.7 ms to 0.5 ms across light/redraw/burst loads. Total
+RSS increased by about 111–121 MB; switch latency did not improve. This supports
+main-loop isolation, not a claim that process splitting makes computation faster.
+
+Retain the renderer's existing lazy Web Worker pool for diff parsing/highlighting
+(`renderer/workers/diff-worker.ts`, `lib/diff/worker-pool.ts`). Its recorded
+scheduling measurement is 1288 ms versus 38 ms to make the flicked-to file readable;
+`bench-highlight.mjs` and `bench-engine.mjs` reproduce highlighting workloads.
+This is presentation work already off the renderer loop; routing it through the
+host would add transport and ownership complexity without demonstrated benefit.
+
+Do **not** add host worker_threads in this slice. Git reads use child processes
+(`core/utils/git-run.ts`), provider I/O is asynchronous, and remote sync mostly
+waits on subprocesses/network. Another worker does not accelerate that waiting.
+Small config reads/writes do not have a measured event-loop problem. Keep mutations,
+PTY connection ownership and ordered session commands in their current owner.
+
+For a future worker proposal, collect host event-loop delay and a CPU profile under
+large diffs, many sessions and large Git output; separate subprocess time from
+JSON/diff parsing and copying. Measure p95/p99 interaction latency, throughput,
+cold start, transfer cost and RSS before/after on identical fixtures. Prefer async
+I/O over moving synchronous I/O wholesale. Only measured sustained CPU work should
+get a bounded worker_threads pool, with plain inputs, stale-result rejection,
+queue limits and explicit error/disposal behavior. Use another utility process
+only for demonstrated crash/native-resource isolation, not one process per domain.

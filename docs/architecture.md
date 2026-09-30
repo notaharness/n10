@@ -5,16 +5,18 @@
 n10 is one program with two frontends. Each layer depends only on the ones
 below it, and the ESLint module boundaries enforce the direction.
 
-| Layer                      | Role                                                                                                                                                                                                                   |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@n10/core`                | Primitive operations: Git, filesystem, tmux and PTY, config, providers, pure helpers. Node only.                                                                                                                       |
-| `@n10/engine`              | The program: state, scheduling, caching and the events that announce them, over core. Node only; never React, Ink or Electron.                                                                                         |
-| `@n10/app-core`            | React bindings. The TUI's contexts and hooks, and the plan binding the desktop renderer also uses; the desktop host imports its config write helpers. Its end state is thin, browser-safe hooks over an engine client. |
-| `apps/cli`, `apps/desktop` | Rendering and input. The TUI runs the engine in its own process; the desktop runs it in the Electron main process, behind the host bridge. Two open shells share the implementation, not the state.                    |
+| Layer                      | Role                                                                                                                                                                                                     |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@n10/core`                | Primitive operations: Git, filesystem, tmux and PTY, config, providers, pure helpers. Node only.                                                                                                         |
+| `@n10/engine`              | The program: state, scheduling, caching and the events that announce them, over core. Node only; never React, Ink or Electron.                                                                           |
+| `@n10/app-core`            | React contexts/hooks over the engine, including config snapshots; the desktop renderer also uses the browser-safe plan binding. Its end state is thin, browser-safe hooks over an engine client.         |
+| `apps/cli`, `apps/desktop` | Rendering and input. The TUI runs the engine in its own process; the desktop runs it in the `n10 host` utility process, behind the host bridge. Two open shells share the implementation, not the state. |
 
 Behavior moves into the engine one resource at a time. The pull request list
-is there (`libs/engine/src/lib/pull-requests/`); remote sync, review threads,
-config effects and session orchestration are still coordinated by each shell.
+is there (`libs/engine/src/lib/pull-requests/`); remote sync, review threads and
+session orchestration are still coordinated by each shell. Config state and effects
+are owned by the engine. See [the domain plan](design/engine-domains.md) for
+the survey, migration order, target diagram and worker decisions.
 
 ## Directory map
 
@@ -77,13 +79,14 @@ apps/website/                    — Next.js 16 + Fumadocs site at n10.is, deplo
   src/components/landing/        — Marketing page sections, data-driven where repeated (Features)
   Own tsconfig/eslint/import conventions — see apps/website/README.md, not this file
 libs/engine/                     — The program both shells run: state, scheduling, caching. No React, Ink, Electron or app-core (lint-enforced)
+  src/lib/config/                — Repository-scoped config snapshots, writes and settings effects
   src/lib/pull-requests/         — The pull request list: scoped reads, one request per scope, queued refreshes, snapshots and subscriptions, watch schedule
 libs/core/                       — Shell-agnostic operations. No React, Ink, Electron or engine (lint-enforced)
   src/lib/session/               — Session launch + plan checkout flows
   src/lib/plan/                  — Plan store (external store) + prompt composition
   src/plan.ts                    — Browser-safe entry (`@n10/core/plan`) for the renderer
   src/lib/utils/                 — Pure helpers (sidebar-items, session-sort, diff-fetcher, virtual-viewport…)
-  src/lib/settings/              — Settings field model (fields, presets, resolveValue)
+  src/lib/settings/              — Settings field model, coercion and explicitly scoped config writes
   src/lib/sync/                  — Remote sync passes (sweepMergedBranches, conflict counts)
   src/lib/agents/                — Agent registry
   src/lib/activity.ts            — Agent activity registry; pty-registry.ts — PTY session lifecycle
@@ -98,7 +101,7 @@ libs/core/                       — Shell-agnostic operations. No React, Ink, E
     hints.ts                     — Human-readable key display strings
     controls-data.ts             — Controls panel data logic (buildControlsRows, getBindingRows)
   src/lib/input/                 — KeyPress type (shell-agnostic ink-Key shape) + text-input handling
-libs/app-core/                   — React bindings: the TUI's contexts and hooks, the plan binding the desktop renderer uses, and the config write helpers the desktop host imports
+libs/app-core/                   — React bindings: the TUI's contexts and hooks, the plan binding the desktop renderer uses; config bindings observe the engine
   src/lib/context/               — React state contexts (Config, Engine, Session, Sidebar, Nav, Modal, Toast, Layout…)
   src/lib/hooks/                 — Shell-agnostic hooks (useSessionManager, useDiffData, useRemoteComments…)
   src/lib/controllers/           — Headless screen controllers (diff file list / viewer view-models)

@@ -5,7 +5,7 @@ import { azureDevOpsProvider } from '@n10/vcs-azure-devops';
 import { githubProvider } from '@n10/vcs-github';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal.js';
 import { OnboardingWizard } from './components/OnboardingWizard.js';
-import { createPullRequestList } from '@n10/engine';
+import { createPullRequestList, createConfigService } from '@n10/engine';
 import {
   settlePendingRuns,
   ConfigProvider,
@@ -146,8 +146,14 @@ export async function runTui(args: string[]): Promise<void> {
     process.exit(1);
   }
 
+  const configService = createConfigService({
+    repo: process.cwd(),
+    providers,
+    pullRequests,
+  });
+
   render(
-    <ConfigProvider providers={providers}>
+    <ConfigProvider service={configService}>
       <EngineProvider pullRequests={pullRequests} repo={process.cwd()}>
         <KeybindProvider>
           <LayoutProvider>

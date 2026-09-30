@@ -21,6 +21,11 @@ import it, and neither imports a shell or the React layer (enforced in
 `eslint.config.mjs`). Each process creates its own engine services, so a TUI
 and a desktop open on one repository poll independently.
 
+Domain ownership and execution boundaries are specified in
+[the engine plan](design/engine-domains.md). Config commands persist and re-read
+before dispatching effects; React observes stable snapshots. The host cannot
+import React bindings. No new worker or generic kernel is justified by this slice.
+
 When changing shared behavior, compare both shells. Worktree removal is
 implemented in the TUI's `performDelete` and desktop's `services/worktrees.ts`;
 both use core's removal sequence to stop persisted tmux sessions. Draft posting uses one comment per `postReviewComments` call,
@@ -433,16 +438,17 @@ demand is its renderer's sidebar poll.
   `timeout`), so a hung read cannot hold the queue: the engine sees an ordinary
   failure. Mutations run without one; a killed mutation may or may not have
   reached GitHub.
-- The engine resolves providers from the persisted config. The TUI persists a
-  settings edit in a microtask, so its settings effects are queued behind that
-  write. A settings edit's `refresh-remote` is a forced read, not `refresh()`:
+- The engine resolves providers from persisted config. Config commands persist
+  before invalidation, refresh and subscription notification. A settings edit
+  forces a read without `refresh()`:
   a credential change has already reset every provider, and an interval edit
   should not cost a cycle of per-row reads.
 
 GitHub uses authenticated `gh`; offline tests replace that executable on PATH.
-Azure DevOps uses REST and a PAT, with recorded anonymized fixtures rather than
-e2e coverage. Extend those fixtures when changing Azure behavior. Scrub identities
-and repository details from recordings; keep credentials out of fixtures.
+Azure DevOps uses REST and a PAT. Provider tests use recorded anonymized
+fixtures; desktop e2e uses an offline host preload. Extend those fixtures when
+changing Azure behavior. Scrub identities and repository details from recordings;
+keep real credentials out of fixtures.
 
 Azure statuses are history. Group by context and choose the newest iteration,
 date and id. `notApplicable` retracts a check without voting; missing state means

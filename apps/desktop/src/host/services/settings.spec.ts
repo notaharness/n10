@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SettingsEffect, SettingsField } from '@n10/core';
+import type { SettingsField } from '@n10/core';
 import { SECRET_PLACEHOLDER } from '../contract.js';
 
 /**
@@ -16,11 +16,6 @@ const state = vi.hoisted(() => ({
   config: {} as Record<string, unknown>,
   fields: [] as SettingsField[],
   persisted: [] as { key: string; value: string | undefined }[],
-  syncRestarts: 0,
-  credentialChanges: 0,
-  remoteRefreshes: 0,
-  effects: [] as SettingsEffect[],
-  effectsAskedFor: [] as string[],
   resolved: {} as Record<string, string>,
 }));
 
@@ -29,52 +24,23 @@ vi.mock('./repo.js', () => ({
   PROVIDERS: [{ id: 'azure-devops' }, { id: 'github' }],
 }));
 
-vi.mock('./pull-requests.js', () => ({
-  pullRequests: {
-    credentialsChanged: () => {
-      state.credentialChanges += 1;
+vi.mock('./pull-requests.js', () => ({ pullRequests: {} }));
+vi.mock('./remote-sync.js', () => ({ startRemoteSyncLoop: vi.fn() }));
+vi.mock('@n10/engine', () => ({
+  createConfigService: ({ repo }: { repo: string }) => ({
+    repo,
+    reload: vi.fn(),
+    getSnapshot: () => ({ config: state.config, provider: null }),
+    updateField: (field: SettingsField, value: string | undefined) => {
+      state.persisted.push({ key: field.key, value });
     },
-    read: (_cwd: string, opts?: { force?: boolean }) => {
-      if (opts?.force) state.remoteRefreshes += 1;
-      return Promise.resolve({});
-    },
-  },
-}));
-
-vi.mock('./remote-sync.js', () => ({
-  startRemoteSyncLoop: () => {
-    state.syncRestarts += 1;
-  },
-}));
-
-vi.mock('@n10/vcs-core', () => ({
-  readConfig: () => state.config,
+  }),
 }));
 
 vi.mock('@n10/core', () => ({
   buildSettingsFields: () => state.fields,
   resolveValue: (_config: unknown, field: SettingsField) =>
     state.resolved[field.key] ?? '',
-  // Which effects a field has is decided in @n10/core and asserted
-  // there (settings/effects.spec.ts). What matters here is that the
-  // host asks, and then does what it is told.
-  settingsEffects: (field: SettingsField) => {
-    state.effectsAskedFor.push(field.key);
-    return state.effects;
-  },
-}));
-
-// updateConfigField/persistConfigField are pure, but they live in
-// ConfigContext.tsx and so ship from @n10/app-core.
-vi.mock('@n10/app-core', () => ({
-  updateConfigField: (
-    config: Record<string, unknown>,
-    field: SettingsField,
-    value: string | undefined
-  ) => ({ ...config, [field.key]: value }),
-  persistConfigField: (field: SettingsField, value: string | undefined) => {
-    state.persisted.push({ key: field.key, value });
-  },
 }));
 
 const { getSettingsView, updateSettingsFromView } = await import(
@@ -94,11 +60,6 @@ beforeEach(() => {
   state.config = { vendor: 'azure-devops' };
   state.fields = [field()];
   state.persisted = [];
-  state.syncRestarts = 0;
-  state.credentialChanges = 0;
-  state.remoteRefreshes = 0;
-  state.effects = [];
-  state.effectsAskedFor = [];
   state.resolved = {};
 });
 
@@ -152,81 +113,6 @@ describe('updateSettingsFromView', () => {
         'new-token'
       );
       expect(state.persisted).toEqual([{ key: 'pat', value: 'new-token' }]);
-    });
-  });
-
-  /**
-   * A replacement access token used to change nothing the user could
-   * see: the sidebar kept the failure the old one caused, and the next
-   * real attempt was a poll interval — up to an hour — away. The host
-   * asks @n10/core what a write implies and then carries it out; the
-   * shared table is what stops the TUI and the desktop drifting.
-   */
-  describe('effects of a write', () => {
-    it('asks about the field it just wrote', () => {
-      updateSettingsFromView({ label: 'Editor', key: 'editor' }, 'vim');
-      expect(state.effectsAskedFor).toEqual(['editor']);
-    });
-
-    it('restarts the sync loop when told to', () => {
-      // Otherwise a new cadence only takes effect after the old timer fires.
-      state.effects = ['restart-sync-loop'];
-      updateSettingsFromView({ label: 'Editor', key: 'editor' }, 'vim');
-      expect(state.syncRestarts).toBe(1);
-    });
-
-    it('hands a provider change to the pull request list', () => {
-      // Which caches that clears — every provider's, and every
-      // repository's list — is the engine's, and asserted there.
-      state.effects = ['reset-provider-cache'];
-      state.fields = [field({ label: 'Vendor', key: 'vendor' })];
-      updateSettingsFromView({ label: 'Vendor', key: 'vendor' }, 'github');
-      expect(state.credentialChanges).toBe(1);
-      expect(state.remoteRefreshes).toBe(0);
-    });
-
-    it('drops the provider cache and fetches now for a credential change', () => {
-      state.effects = [
-        'reset-provider-cache',
-        'refresh-remote',
-        'restart-sync-loop',
-      ];
-      state.fields = [
-        field({
-          label: 'Personal Access Token',
-          key: 'pat',
-          masked: true,
-          configBag: 'vendorAuth',
-        }),
-      ];
-      updateSettingsFromView(
-        { label: 'Personal Access Token', key: 'pat' },
-        'ado_rotated'
-      );
-      expect(state.credentialChanges).toBe(1);
-      expect(state.remoteRefreshes).toBe(1);
-      expect(state.syncRestarts).toBe(1);
-    });
-
-    it('runs nothing at all when the untouched placeholder comes back', () => {
-      state.effects = ['reset-provider-cache', 'refresh-remote'];
-      state.fields = [
-        field({
-          label: 'Personal Access Token',
-          key: 'pat',
-          masked: true,
-          configBag: 'vendorAuth',
-        }),
-      ];
-      updateSettingsFromView(
-        { label: 'Personal Access Token', key: 'pat' },
-        SECRET_PLACEHOLDER
-      );
-      // Nothing was written, so there is nothing to invalidate — and a
-      // refetch here would fire on every visit to the settings page.
-      expect(state.effectsAskedFor).toEqual([]);
-      expect(state.credentialChanges).toBe(0);
-      expect(state.remoteRefreshes).toBe(0);
     });
   });
 });

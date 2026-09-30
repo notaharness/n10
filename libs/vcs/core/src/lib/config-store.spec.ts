@@ -4,7 +4,6 @@ import { execSync } from 'node:child_process';
 import {
   projectKey,
   readGlobalConfig,
-  readProjectConfig,
   readConfig,
   isVcsConfigured,
   autoDetectProjectConfig,
@@ -49,82 +48,12 @@ describe('projectKey', () => {
   });
 });
 
-describe('migrateGlobalConfig (via readGlobalConfig)', () => {
-  it('should migrate flat pat field to vendorAuth', () => {
-    mockReadFileSync.mockReturnValueOnce(JSON.stringify({ pat: 'my-token' }));
-
-    const config = readGlobalConfig();
-    expect(config.vendorAuth).toEqual({
-      'azure-devops': { pat: 'my-token' },
-    });
-    expect(config.pat).toBeUndefined();
-  });
-
-  it('should not migrate when vendorAuth already exists', () => {
-    mockReadFileSync.mockReturnValueOnce(
-      JSON.stringify({
-        pat: 'old-token',
-        vendorAuth: { github: { token: 'gh-token' } },
-      })
-    );
-
-    const config = readGlobalConfig();
-    expect(config.vendorAuth).toEqual({ github: { token: 'gh-token' } });
-    // pat is preserved because vendorAuth exists — migration skipped
-    expect(config.pat).toBe('old-token');
-  });
-
-  it('should return empty config when file does not exist', () => {
+describe('readGlobalConfig', () => {
+  it('returns empty config when the file does not exist', () => {
     mockReadFileSync.mockImplementationOnce(() => {
       throw new Error('ENOENT');
     });
-
-    const config = readGlobalConfig();
-    expect(config).toEqual({});
-  });
-});
-
-describe('migrateProjectConfig (via readProjectConfig)', () => {
-  it('should migrate flat org/project/repo to vendorProject', () => {
-    mockReadFileSync.mockReturnValueOnce(
-      JSON.stringify({
-        org: 'my-org',
-        project: 'my-project',
-        repo: 'my-repo',
-      })
-    );
-
-    const config = readProjectConfig('/tmp/test');
-    expect(config.vendor).toBe('azure-devops');
-    expect(config.vendorProject).toEqual({
-      org: 'my-org',
-      project: 'my-project',
-      repo: 'my-repo',
-    });
-    expect(config.org).toBeUndefined();
-    expect(config.project).toBeUndefined();
-    expect(config.repo).toBeUndefined();
-  });
-
-  it('should migrate partial fields (only org)', () => {
-    mockReadFileSync.mockReturnValueOnce(JSON.stringify({ org: 'just-org' }));
-
-    const config = readProjectConfig('/tmp/test');
-    expect(config.vendor).toBe('azure-devops');
-    expect(config.vendorProject).toEqual({ org: 'just-org' });
-  });
-
-  it('should not migrate when vendorProject already exists', () => {
-    mockReadFileSync.mockReturnValueOnce(
-      JSON.stringify({
-        vendor: 'github',
-        vendorProject: { owner: 'me', repo: 'my-repo' },
-      })
-    );
-
-    const config = readProjectConfig('/tmp/test');
-    expect(config.vendor).toBe('github');
-    expect(config.vendorProject).toEqual({ owner: 'me', repo: 'my-repo' });
+    expect(readGlobalConfig()).toEqual({});
   });
 });
 

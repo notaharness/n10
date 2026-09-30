@@ -1,3 +1,4 @@
+import { builtinModules } from 'node:module';
 import nx from '@nx/eslint-plugin';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
@@ -269,7 +270,7 @@ export default tseslint.config(
     // Anything that needs React belongs in @n10/app-core, which
     // depends on this library. The plan store is the worked example:
     // the store is here, its useSyncExternalStore binding is there.
-    files: ['libs/core/src/**/*.ts'],
+    files: ['libs/core/src/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -290,7 +291,13 @@ export default tseslint.config(
                 'ink',
                 'electron',
                 '@n10/app-core',
+                '@n10/app-core/*',
                 '@n10/engine',
+                '@n10/engine/*',
+                'react/*',
+                'react-dom/*',
+                'ink/*',
+                'electron/*',
               ],
               message:
                 '@n10/core must not depend on a shell, the engine or the ' +
@@ -316,7 +323,7 @@ export default tseslint.config(
     // the engine never renders, so it cannot import a renderer, a
     // shell or the React layer that binds it. Same shape as core's
     // block above, one layer up.
-    files: ['libs/engine/src/**/*.ts'],
+    files: ['libs/engine/src/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -331,7 +338,17 @@ export default tseslint.config(
           ],
           patterns: [
             {
-              group: ['react-dom', 'ink', 'electron', '@n10/app-core'],
+              group: [
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                'ink',
+                'ink/*',
+                'electron',
+                'electron/*',
+                '@n10/app-core',
+                '@n10/app-core/*',
+              ],
               message:
                 '@n10/engine must not depend on a shell or on the React ' +
                 'layer. The shell subscribes to the engine.',
@@ -340,6 +357,113 @@ export default tseslint.config(
             {
               group: ['**/index'],
               message: 'No barrel imports — import from the concrete file.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['apps/desktop/src/{host,main}/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@n10/app-core',
+                '@n10/app-core/*',
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                'ink',
+                'ink/*',
+              ],
+              message:
+                'Backend adapters call engine/core; React bindings belong to the frontend.',
+            },
+            { group: ['**/index'], message: 'Import from the concrete file.' },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['apps/desktop/src/host/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['electron', 'electron/*'],
+              allowTypeImports: true,
+              message: 'Host code uses ShellCalls for Electron operations.',
+            },
+          ],
+        },
+      ],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@n10/app-core',
+                '@n10/app-core/*',
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                'ink',
+                'ink/*',
+              ],
+              message:
+                'The utility-process host uses engine/core and ShellCalls, never React or Electron.',
+            },
+            { group: ['**/index'], message: 'Import from the concrete file.' },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      'libs/app-core/src/lib/context/ConfigContext.tsx',
+      'apps/cli/src/input-handlers.ts',
+      'apps/desktop/src/host/services/settings.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['electron', 'electron/*'],
+              allowTypeImports: true,
+              message: 'Host code uses ShellCalls for Electron operations.',
+            },
+          ],
+          paths: [
+            {
+              name: '@n10/vcs-core',
+              importNames: [
+                'readConfig',
+                'readGlobalConfig',
+                'writeGlobalConfig',
+                'readProjectConfig',
+                'writeProjectConfig',
+              ],
+              message:
+                'Config state and writes belong to the engine config service.',
+            },
+            {
+              name: '@n10/core',
+              importNames: ['persistConfigField', 'persistKeybindFields'],
+              message:
+                'Only the engine config service dispatches persistence and effects.',
             },
           ],
         },
@@ -452,6 +576,7 @@ export default tseslint.config(
             '@n10/terminal-tmux',
             '@n10/vcs-core',
             '@n10/vcs-github',
+            '@n10/vcs-azure-devops',
             '@n10/worktree-manager',
           ].map((name) => ({
             name,
@@ -462,6 +587,11 @@ export default tseslint.config(
               'window.n10, or import a browser-safe subpath.',
           })),
           patterns: [
+            {
+              group: ['node:*', ...builtinModules],
+              allowTypeImports: true,
+              message: 'Node runtime APIs belong behind the host bridge.',
+            },
             {
               group: [
                 '@n10/*/*',

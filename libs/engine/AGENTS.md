@@ -20,3 +20,9 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   good list with the error. Eviction never takes the scope a watched repository
   shows: its watch would read it back and evict the next. Tests drive time with fake timers and a matching
   `now`.
+
+- **Config** (`config/`): one explicit repo per service, stable snapshots and
+  synchronous commands. Persist and re-read effective config before invalidating
+  PR caches or notifying subscribers. A no-op reload preserves snapshot identity;
+  a failed write publishes nothing. Sync adapters consume a revision or the
+  restart callback. Keep secrets in Node; only the host's masked form crosses IPC.
