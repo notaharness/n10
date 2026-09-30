@@ -9,12 +9,24 @@ const mocks = vi.hoisted(() => ({
   lookup: vi.fn(),
   create: vi.fn(),
   launch: vi.fn(),
+  alive: vi.fn(),
+  connection: vi.fn(),
+  entry: vi.fn(),
+  stop: vi.fn(),
+  deliver: vi.fn(),
+  log: vi.fn(),
 }));
 vi.mock('@n10/core', async (original) => ({
   ...(await original<typeof Core>()),
   sessionKeyForBranch: mocks.lookup,
   launchSession: mocks.launch,
+  isSessionAlive: mocks.alive,
+  hasSessionConnection: mocks.connection,
+  getSession: mocks.entry,
+  stopSession: mocks.stop,
+  deliverToRunningSession: mocks.deliver,
 }));
+vi.mock('@n10/logger', () => ({ logError: mocks.log }));
 vi.mock('@n10/worktree-manager', async (original) => ({
   ...(await original<typeof Worktrees>()),
   createWorktree: mocks.create,
@@ -43,6 +55,7 @@ beforeEach(() => {
     worktreePath: '/custom/{branch}',
   };
   current = true;
+  mocks.deliver.mockReturnValue(true);
   mocks.lookup.mockResolvedValue(null);
   mocks.create.mockResolvedValue('/custom/feature/x');
   changed.mockResolvedValue(undefined);
@@ -124,4 +137,46 @@ it('adopts a completed launch under its captured repository after selection chan
   wait.release();
   const delivered = await sending;
   expect(started).toHaveBeenCalledWith(delivered.name, '/repo');
+});
+
+it('keeps the old agent alive if selection changes while checkout is pending', async () => {
+  const wait = deferred();
+  mocks.lookup.mockResolvedValue('existing');
+  mocks.alive.mockReturnValue(true);
+  mocks.create.mockImplementation(async () => {
+    await wait.promise;
+    return '/custom/feature/x';
+  });
+  const sending = commands.checkoutPlan(request);
+  await vi.waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+  current = false;
+  wait.release();
+  await expect(sending).rejects.toThrow('repository changed');
+  expect(mocks.stop).not.toHaveBeenCalled();
+  expect(mocks.launch).not.toHaveBeenCalled();
+});
+
+it('does not readopt an unchanged registry entry after attaching to inject', async () => {
+  mocks.lookup.mockResolvedValue('existing');
+  mocks.alive.mockReturnValue(true);
+  mocks.connection.mockReturnValue(false);
+  mocks.entry.mockReturnValue({ retained: true });
+  const started = vi.fn();
+  await expect(
+    commands.checkoutPlan({ ...request, mode: 'inject' }, { started })
+  ).resolves.toMatchObject({ outcome: 'injected' });
+  expect(mocks.launch).toHaveBeenCalledOnce();
+  expect(started).not.toHaveBeenCalled();
+});
+
+it('keeps successful delivery authoritative when observation refresh rejects', async () => {
+  changed.mockRejectedValueOnce(new Error('refresh failed'));
+  await expect(commands.checkoutPlan(request)).resolves.toMatchObject({
+    outcome: 'spawned',
+  });
+  expect(mocks.launch).toHaveBeenCalledOnce();
+  expect(mocks.log).toHaveBeenCalledWith(
+    'refresh after plan delivery',
+    expect.any(Error)
+  );
 });

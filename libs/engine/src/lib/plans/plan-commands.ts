@@ -1,3 +1,4 @@
+import { logError } from '@n10/logger';
 import {
   deliverToRunningSession,
   getSession,
@@ -121,6 +122,8 @@ export function createPlanCommands(options: {
         async () => {
           try {
             await options.changed();
+          } catch (error) {
+            logError('refresh after plan delivery', error);
           } finally {
             pending.delete(branch);
           }

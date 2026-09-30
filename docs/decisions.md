@@ -769,7 +769,9 @@ in-flight sends coalesce; a different prompt or delivery mode is rejected so no
 plan is silently dropped. Delivery returns the actual checkout's session key.
 Completed launches are adopted under the captured repository even if selection
 changes during launch; worktree/session observation refreshes after success or
-failure. Mutations have no automatic replay or timeout.
+failure. A refresh failure is logged and cannot replace the delivery result,
+so a successfully sent plan is never presented as retryable. Mutations have no
+automatic replay or timeout.
 
 The frontend retains its cart and composed preview. Core retains launch, attach,
 stop and inject primitives; its plan checkout orchestrator and the desktop's
