@@ -73,14 +73,17 @@ test.describe('Visual @visual', () => {
     await expect(page).toHaveScreenshot('command-palette.png', shot);
   });
 
-  test('settings page', async ({ desktop }) => {
-    const { page } = desktop;
-    await clickAppMenuItem(desktop.app, 'Settings…');
-    await expect(tab(page, /Settings/)).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Appearance' })
-    ).toBeVisible();
-    await expect(page).toHaveScreenshot('settings.png', shot);
+  test.describe('configured agent', () => {
+    test.use({ n10Config: { agentId: 'claude' } });
+    test('settings page', async ({ desktop }) => {
+      const { page } = desktop;
+      await clickAppMenuItem(desktop.app, 'Settings…');
+      await expect(tab(page, /Settings/)).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Appearance' })
+      ).toBeVisible();
+      await expect(page).toHaveScreenshot('settings.png', shot);
+    });
   });
 
   test('remove worktree dialog', async ({ desktop }) => {

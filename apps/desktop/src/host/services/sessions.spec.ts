@@ -247,13 +247,7 @@ vi.mock('@n10/core', async (importOriginal) => {
       });
       return Promise.resolve('spawned');
     },
-    buildAgentOptions: (config: { agentId?: string }) => [
-      {
-        name: `${config.agentId ?? 'Custom'} (default)`,
-        agent: { id: config.agentId ?? 'test' },
-      },
-      { name: 'Codex', agent: { id: 'codex' } },
-    ],
+    buildAgentOptions: actual.buildAgentOptions,
     buildReviewLaunchRequest: (pr: { id: number }, instruction?: string) => ({
       intent: 'review',
       prompt: `review #${pr.id}${instruction ? `: ${instruction}` : ''}`,
@@ -1149,14 +1143,21 @@ describe('checkoutPlan', () => {
 describe('listAgentOptions', () => {
   it('lists the repo config default first, then the rest of the registry', () => {
     state.configByCwd['/repo-a'] = { agentId: 'claude' };
-    expect(sessions.listAgentOptions()).toEqual([
-      { id: 'claude', name: 'claude (default)' },
-      { id: 'codex', name: 'Codex' },
-    ]);
+    expect(sessions.listAgentOptions()[0]).toEqual({
+      id: 'claude',
+      name: 'Claude (default)',
+    });
+    expect(sessions.listAgentOptions()).toContainEqual({
+      id: 'codex',
+      name: 'Codex',
+    });
   });
 
   it('labels a custom command as the hidden test runner', () => {
-    state.configByCwd['/repo-a'] = { aiCommand: 'node fake.mjs' };
+    state.configByCwd['/repo-a'] = {
+      agentId: 'test',
+      aiCommand: 'node fake.mjs',
+    };
     expect(sessions.listAgentOptions()[0]).toEqual({
       id: 'test',
       name: 'Custom (default)',

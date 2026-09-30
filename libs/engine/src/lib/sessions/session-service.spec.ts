@@ -287,7 +287,7 @@ it('retains a stopped launch across repository handle replacement', async () => 
   expect(reopened.connections()).toEqual([
     expect.objectContaining({ name: key, running: false }),
   ]);
-  expect(connections('/other')).toEqual([]);
+  expect(connections.read('/other')).toEqual([]);
   reopened.dispose();
   f.service.dispose();
 });

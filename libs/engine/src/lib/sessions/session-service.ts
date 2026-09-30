@@ -49,7 +49,7 @@ export function createSessionService(options: {
   const listeners = new Set<() => void>();
   function publish(): void {
     if (disposed) return;
-    connections(config.repo);
+    connections.observe();
     const next = {
       sessions: worktrees
         .getSnapshot()
@@ -114,7 +114,10 @@ export function createSessionService(options: {
       publish();
       return snapshot.sessions;
     },
-    connections: () => connections(config.repo),
+    connections() {
+      connections.observe();
+      return connections.read(config.repo);
+    },
     scanNow: async () => {
       await discovery?.scanNow();
     },

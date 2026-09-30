@@ -10,8 +10,7 @@ import {
 /** Process-lifetime history preserves stopped agents as relaunch targets. */
 export function createSessionConnections() {
   const observed = new Set<string>();
-  return (repo: string) => {
-    for (const name of sessionNames()) observed.add(name);
+  function read(repo: string) {
     return [...observed].flatMap((name) => {
       const identity = sessionIdentity(name);
       if (identity?.kind !== 'worktree' || identity.repo !== repo) return [];
@@ -29,5 +28,11 @@ export function createSessionConnections() {
         },
       ];
     });
+  }
+  return {
+    observe() {
+      for (const name of sessionNames()) observed.add(name);
+    },
+    read,
   };
 }

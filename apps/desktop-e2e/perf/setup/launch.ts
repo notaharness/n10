@@ -49,7 +49,11 @@ function seedHome(
   mkdirSync(n10, { recursive: true });
   writeFileSync(
     join(n10, 'config.json'),
-    JSON.stringify({ aiCommand: 'true', ...opts.n10Config }, null, 2),
+    JSON.stringify(
+      { agentId: 'test', aiCommand: 'true', ...opts.n10Config },
+      null,
+      2
+    ),
     'utf8'
   );
   if (opts.projectConfig) {

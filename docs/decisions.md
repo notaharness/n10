@@ -164,7 +164,20 @@ tag identity, PTY activity classification and native launch/incarnation checks
 remain core primitives. Output relays, pane dimensions and terminal-tab UI stay
 in the shell.
 
-Discovery polls worktrees and tmux and attaches through the shared launcher. Recheck local connection state between
+Discovery polls worktrees and tmux and attaches through the shared launcher.
+The original warm tmux 3.4 measurement (50 iterations) was 2.3 ms for
+`git worktree list --porcelain -z` and 3.3 ms for `tmux list-sessions -F`:
+two forks and about 5.5 ms per scan, or 0.14% of one core at four seconds.
+Both are batch listings; fork count does not grow with the worktree count.
+Tmux hooks are per-server global state: separate n10 instances overwrite each
+other, while appended hooks cannot be selectively removed. Control mode needs
+an existing session and participates in window sizing unless `ignore-size` is
+set. Neither supplies a simpler independent observer. The non-recursive
+filesystem watch is a latency shortcut; polling still discovers work when the
+watch cannot be installed. Three adoption attempts, a scan apart, survive
+transient Git locks without creating an endless deterministic spawn loop.
+
+Recheck local connection state between
 awaits so concurrent user actions cannot create duplicate connections. Failed
 attaches have bounded retries. Failed local clients become eligible for
 rediscovery without pretending their hosted agents exited.

@@ -15,12 +15,17 @@ import {
   type DiscoveryScan,
 } from '@n10/core';
 
+/** Two batch listings per scan; measured cost and alternatives: docs/decisions.md. */
 const DISCOVERY_INTERVAL_MS = 4_000;
 
+/** Coalesce the directory events from one worktree operation. */
 const WATCH_DEBOUNCE_MS = 200;
 
+/** Survive transient index.lock failures without retrying deterministic spawn errors forever. */
 const MAX_ADOPT_ATTEMPTS = 3;
 
+/** Offers alone are not changes: an adoption can lose a race without changing
+ * anything a shell could display. `delta.changed` would refetch every such tick. */
 function worthAnnouncing(delta: DiscoveryDelta, adopted: number): boolean {
   return (
     adopted > 0 ||
@@ -39,6 +44,7 @@ export interface SessionDiscoveryOptions {
   adopt: (worktree: DiscoveredWorktree) => void | Promise<void>;
   adoptTerminal?: (terminal: DiscoveredTerminal) => void | Promise<void>;
   onChanged: (delta: DiscoveryDelta) => void;
+  /** Abandon work between awaits when selection changes, before attaching a stale repo's sessions. */
   isCurrent?: () => boolean;
 }
 
