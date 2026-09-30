@@ -302,3 +302,38 @@ npx nx test core
 PORT=5198 npx nx e2e cli-e2e -- gemini.test.ts
 npx nx e2e desktop-e2e -- gemini.test.ts gemini-review.test.ts
 ```
+
+## Copilot CLI
+
+The command surface was checked against Copilot CLI 1.0.87 (`--version`,
+`--help`, `sessions --help`, `help commands`) and the official
+[command reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference).
+No authenticated conversation, model request or real session restoration is
+exercised by the tests. Help-only probes do not establish live prompt parsing.
+
+`agentId: "copilot"` selects the standalone CLI. Blank launches use `copilot`;
+seeded/review launches use the documented `--interactive=PROMPT` form with
+guidance folded into the prompt. The short `-i PROMPT` form is valid too. Tests
+verify n10's argv and prompt delivery contract, not a defect in Copilot's
+short-option parser.
+
+Automatic continuation stays disabled: documented `--continue` prefers the
+current directory but can fall back to global history. n10 does not record a
+conversation ID. Both shells cover refusal and explicit fresh starts; surviving
+processes can be attached without launching another one.
+
+Both e2e shells install `libs/core/tests/fixtures/fake-vendor-cli.mjs` through
+`setup/fake-cli.ts`. The fake accepts blank/attached-prompt launches and rejects
+`--continue`; it does not model upstream history. Coverage includes TUI/Desktop
+launch, refusal, fresh starts, report-tag clearing, selected-agent review prompts
+and busy/idle transitions. Activity measures changing terminal output, not
+internal model turns. Local managed panes use `tmux:` message targets; Copilot
+has no separate n10 inbox/queue adapter.
+
+Choose an unused `PORT` when another worktree runs the TUI browser bridge:
+
+```sh
+npx nx test core
+PORT=5198 npx nx e2e cli-e2e -- copilot.test.ts
+npx nx e2e desktop-e2e -- copilot.test.ts copilot-review.test.ts
+```

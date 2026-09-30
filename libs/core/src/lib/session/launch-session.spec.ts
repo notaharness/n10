@@ -46,7 +46,7 @@ const copilot: AgentDefinition = {
   name: 'Copilot',
   supportsAppendSystemPrompt: false,
   blank: () => ({ cmd: 'copilot', args: [] }),
-  seed: (p) => ({ cmd: 'copilot', args: ['-i', p] }),
+  seed: (p) => ({ cmd: 'copilot', args: [`--interactive=${p}`] }),
 };
 
 // An agent that can't seed at all — exercises the blank fallback.
@@ -82,7 +82,7 @@ describe('buildLaunchSpec', () => {
   it('seed passes the prompt through', () => {
     expect(
       buildLaunchSpec(copilot, { intent: 'seed', prompt: 'do it' })
-    ).toEqual({ cmd: 'copilot', args: ['-i', 'do it'] });
+    ).toEqual({ cmd: 'copilot', args: ['--interactive=do it'] });
   });
 
   it('seed degrades to blank when the agent cannot seed', () => {
@@ -94,7 +94,7 @@ describe('buildLaunchSpec', () => {
   it('continue-or-seed degrades to seed when the agent has no continue', () => {
     expect(
       buildLaunchSpec(copilot, { intent: 'continue-or-seed', prompt: 'do it' })
-    ).toEqual({ cmd: 'copilot', args: ['-i', 'do it'] });
+    ).toEqual({ cmd: 'copilot', args: ['--interactive=do it'] });
   });
 
   describe('system guidance', () => {
@@ -118,7 +118,7 @@ describe('buildLaunchSpec', () => {
       });
       expect(spec).toEqual({
         cmd: 'copilot',
-        args: ['-i', 'use add-comment\n\nreview this'],
+        args: ['--interactive=use add-comment\n\nreview this'],
       });
     });
 

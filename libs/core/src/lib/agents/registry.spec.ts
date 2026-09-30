@@ -140,10 +140,10 @@ describe('agent registry', () => {
       });
     });
 
-    it('copilot seeds with -i and has no continue', () => {
+    it('copilot seeds interactively and has no continue', () => {
       expect(copilot.seed!('hi')).toEqual({
         cmd: 'copilot',
-        args: ['-i', 'hi'],
+        args: ['--interactive=hi'],
       });
       expect(copilot.continueOrBlank).toBeUndefined();
       expect(copilot.continueOrSeed).toBeUndefined();
