@@ -60,9 +60,8 @@ The reasoning behind each rule is in `docs/decisions.md`.
   Extending what a relay can deliver into means extending this allowlist, not
   trusting more of the envelope.
 - **Worktree operations**: pass an immutable `WorktreeScope` through Git and
-  guarded removal. `repositoryWorktreeScope(repo)` captures persisted settings
-  for standalone operations; engine commands use their config snapshot. Never
-  select a process-wide path resolver.
+  guarded removal. Engine commands capture the scope from their config snapshot
+  and reuse it for lookup and checkout. Never select a process-wide path resolver.
 - **Observation** (`discovery/`, `session-backend.ts`): pure scan differences,
   tagged observations and live-worktree lookups. `observeTmuxSessions` receives
   the repository explicitly. The engine owns polling, adoption and removal rescans.
@@ -98,8 +97,7 @@ The reasoning behind each rule is in `docs/decisions.md`.
   keeps every file. Untracked files are assembled by hand, never `git add -N`,
   and symlinks render as mode-120000 patches. Git-backed cases live in
   `worktree-diff.integration.spec.ts`.
-- **Sync** (`sync/`): `sweepMergedBranches`, conflict counts. `asyncOps.run`
-  never rejects; errors go through `setOperationErrorHandler`.
+- `asyncOps.run` never rejects; errors go through `setOperationErrorHandler`.
 - `keybindings/registry.ts` is the action catalog and carries a 900-line
   ceiling on purpose. Presets: Normie, Vim.
 - No recursive `fs.watch` over a checkout; `node_modules` alone exhausts the

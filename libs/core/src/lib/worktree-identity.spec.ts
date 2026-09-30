@@ -31,9 +31,6 @@ vi.mock('@n10/terminal-tmux', () => ({
   tmuxListSessionsDetailed: () => listMock(),
 }));
 vi.mock('@n10/worktree-manager', () => ({ listWorktrees: vi.fn() }));
-vi.mock('./worktree-scope.js', () => ({
-  repositoryWorktreeScope: (cwd: string) => ({ cwd }),
-}));
 vi.mock('./pty-registry.js', () => ({
   liveSessionNames: () => liveNamesMock(),
   getSession: (name: string) => entries.get(name),

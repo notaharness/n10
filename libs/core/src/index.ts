@@ -170,8 +170,6 @@ export { setLocalSessionEnv } from './lib/session/local-session-env.js';
 
 export * from './lib/repository.js';
 
-export { repositoryWorktreeScope } from './lib/worktree-scope.js';
-
 export {
   agentCommentRepository,
   runReviewUtility,
