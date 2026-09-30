@@ -94,11 +94,26 @@ test.describe('Visual (tab strip) @visual', () => {
     }) => {
       const { page, app } = desktop;
       await twoReposOfTabs(page, app, other);
-      await tab(page, /fix-login-loop/).hover();
-      await expect(strip(page)).toHaveScreenshot(
-        'tab-strip-hover-dark.png',
-        shot
-      );
+      const hovered = tab(page, /fix-login-loop/);
+      await hovered.hover();
+      await expect(
+        hovered.getByRole('button', { name: 'Close tab' })
+      ).toBeVisible();
+      await expect(
+        hovered.getByRole('button', { name: 'Close tab' }).locator('..')
+      ).toHaveCSS('opacity', '1');
+      // One capture, as it is. The stylesheet Playwright injects to
+      // disable animations drops Chromium's hover state, as does any
+      // capture after the first, and toHaveScreenshot captures until two
+      // frames agree. The fade is over (asserted above); the strip has
+      // no caret.
+      const capture = await strip(page).screenshot({
+        animations: 'allow',
+        caret: 'initial',
+      });
+      expect(capture).toMatchSnapshot('tab-strip-hover-dark.png', {
+        maxDiffPixels: 0,
+      });
     });
   });
 });
