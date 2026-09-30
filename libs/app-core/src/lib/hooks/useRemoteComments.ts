@@ -58,10 +58,13 @@ export function useRemoteComments(
             ? { ...item, comments: [...item.comments, reply] }
             : item
         );
-      resource.patch(snapshot, (data) => ({
-        threads: append(data.threads),
-        generalComments: append(data.generalComments),
-      }));
+      if (
+        !resource.patch(snapshot, (data) => ({
+          threads: append(data.threads),
+          generalComments: append(data.generalComments),
+        }))
+      )
+        resource.invalidate();
       return reply;
     },
     [prId, provider, auth, project, resource, comments, snapshot]
@@ -79,10 +82,13 @@ export function useRemoteComments(
         threads.map((item) =>
           item.id === threadId ? { ...item, isResolved: resolved } : item
         );
-      resource.patch(snapshot, (data) => ({
-        threads: update(data.threads),
-        generalComments: update(data.generalComments),
-      }));
+      if (
+        !resource.patch(snapshot, (data) => ({
+          threads: update(data.threads),
+          generalComments: update(data.generalComments),
+        }))
+      )
+        resource.invalidate();
       onResolvedChange?.();
       return true;
     },

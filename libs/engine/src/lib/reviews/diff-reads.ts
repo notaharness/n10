@@ -17,8 +17,10 @@ export interface DiffRequest {
   targetBranch: string;
   headSha?: string;
 }
-export interface DiffFiles {
+export interface DiffFiles extends DiffRefs {
   files: DiffFile[];
+}
+export interface DiffRefs {
   sourceRef: string;
   targetRef: string;
 }
@@ -29,9 +31,12 @@ export function createDiffReads(
   repo: string,
   worktrees: Pick<WorktreeService, 'find'>
 ) {
-  const files = createResourceCache<DiffFiles>(30_000);
-  const patches = createResourceCache<string>(30_000, 8);
-  const full = createResourceCache<ReviewDiffText>(30_000, 4);
+  const resolutions = createResourceCache<DiffRefs>(30_000);
+  const manifests = createResourceCache<DiffFile[]>(Infinity);
+  const files = createResourceCache<DiffFiles>(0);
+  const patches = createResourceCache<string>(Infinity, 8);
+  const full = createResourceCache<ReviewDiffText>(0, 4);
+  const texts = createResourceCache<string>(Infinity, 4);
   const live = createResourceCache<string>(1_000, 2);
   async function ensureFetched(req: DiffRequest) {
     const current = await gitLine(
@@ -49,8 +54,8 @@ export function createDiffReads(
       }),
     ]);
   }
-  function fileList(req: DiffRequest) {
-    return files.get(JSON.stringify(req), async () => {
+  function resolve(req: DiffRequest) {
+    return resolutions.get(JSON.stringify(req), async () => {
       await ensureFetched(req);
       const [source, target] = await Promise.all([
         resolveRef(repo, req.sourceBranch),
@@ -63,40 +68,48 @@ export function createDiffReads(
         ),
         gitLine(['rev-parse', '--verify', `${target}^{commit}`], { cwd: repo }),
       ]);
-      return {
-        files: await readDiffFiles(repo, sourceRef, targetRef),
-        sourceRef,
-        targetRef,
-      };
+      return { sourceRef, targetRef };
     });
   }
+  function fileList(req: DiffRequest) {
+    return files.get(JSON.stringify(req), async () => {
+      const refs = await readResourceValue(resolve(req));
+      const manifest = manifests.get(JSON.stringify(refs), () =>
+        readDiffFiles(repo, refs.sourceRef, refs.targetRef)
+      );
+      return { ...refs, files: await readResourceValue(manifest) };
+    });
+  }
+  const caches = [resolutions, manifests, files, patches, full, texts, live];
   return {
     files: fileList,
-    file(req: DiffRequest, filename: string) {
-      return patches.get(JSON.stringify([req, filename]), async () => {
-        const refs = await readResourceValue(fileList(req));
-        return fetchFileDiffText(
-          repo,
-          req.sourceBranch,
-          req.targetBranch,
-          filename,
-          refs
-        );
-      });
+    file(refs: DiffRefs, filename: string) {
+      return patches.get(
+        JSON.stringify([refs.sourceRef, refs.targetRef, filename]),
+        () =>
+          fetchFileDiffText(
+            repo,
+            refs.sourceRef,
+            refs.targetRef,
+            filename,
+            refs
+          )
+      );
     },
     full(req: DiffRequest) {
       return full.get(JSON.stringify(req), async () => {
         const refs = await readResourceValue(fileList(req));
-        return {
-          text: await fetchDiffText(
-            repo,
-            req.sourceBranch,
-            req.targetBranch,
-            refs
-          ),
-          head: refs.sourceRef,
-        };
+        const content = texts.get(
+          JSON.stringify([refs.sourceRef, refs.targetRef]),
+          () => fetchDiffText(repo, refs.sourceRef, refs.targetRef, refs)
+        );
+        return { text: await readResourceValue(content), head: refs.sourceRef };
       });
+    },
+    invalidate() {
+      resolutions.invalidate();
+      files.invalidate();
+      full.invalidate();
     },
     worktree(branch: string, targetBranch: string) {
       return live.get(JSON.stringify([branch, targetBranch]), async () => {
@@ -107,10 +120,10 @@ export function createDiffReads(
       });
     },
     reset() {
-      for (const cache of [files, patches, full, live]) cache.reset();
+      for (const cache of caches) cache.reset();
     },
     dispose() {
-      for (const cache of [files, patches, full, live]) cache.dispose();
+      for (const cache of caches) cache.dispose();
     },
   };
 }

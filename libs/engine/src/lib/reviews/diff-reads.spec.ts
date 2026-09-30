@@ -56,9 +56,11 @@ it('shares metadata and immutable commit refs across file and full patches', asy
   const diff = createDiffReads('/repo/a', { find });
   await readResourceValue(diff.files(request));
   expect(fetchFileDiffText).not.toHaveBeenCalled();
-  expect(await readResourceValue(diff.file(request, 'a.ts'))).toBe(
-    'file patch'
-  );
+  expect(
+    await readResourceValue(
+      diff.file({ sourceRef: 'head', targetRef: 'base' }, 'a.ts')
+    )
+  ).toBe('file patch');
   expect(await readResourceValue(diff.full(request))).toEqual({
     text: 'full patch',
     head: 'head',
@@ -70,15 +72,15 @@ it('shares metadata and immutable commit refs across file and full patches', asy
   );
   expect(fetchFileDiffText).toHaveBeenCalledWith(
     '/repo/a',
-    'feature',
-    'main',
+    'head',
+    'base',
     'a.ts',
     expect.objectContaining({ sourceRef: 'head', targetRef: 'base' })
   );
   expect(fetchDiffText).toHaveBeenCalledWith(
     '/repo/a',
-    'feature',
-    'main',
+    'head',
+    'base',
     expect.objectContaining({ sourceRef: 'head', targetRef: 'base' })
   );
 });
@@ -120,4 +122,32 @@ it('propagates metadata failures instead of claiming an empty diff', async () =>
     'Cannot read files'
   );
   expect(fetchDiffText).not.toHaveBeenCalled();
+});
+
+it('keeps patches tied to the displayed manifest when branch resolution moves', async () => {
+  const diff = createDiffReads('/repo', { find });
+  const old = await readResourceValue(diff.files(request));
+  expect(await readResourceValue(diff.file(old, 'a.ts'))).toBe('file patch');
+  vi.mocked(gitLine).mockResolvedValue('next');
+  vi.mocked(fetchFileDiffText).mockResolvedValue('new patch');
+  diff.invalidate();
+  const next = await readResourceValue(diff.files(request));
+  expect(next.sourceRef).toBe('next');
+  expect(await readResourceValue(diff.file(next, 'a.ts'))).toBe('new patch');
+  expect(await readResourceValue(diff.file(old, 'a.ts'))).toBe('file patch');
+  expect(fetchFileDiffText).toHaveBeenCalledTimes(2);
+});
+
+it('invalidates branch resolution without expiring content for unchanged commits', async () => {
+  const diff = createDiffReads('/repo', { find });
+  await readResourceValue(diff.full(request));
+  diff.invalidate();
+  await readResourceValue(diff.full(request));
+  expect(fetchRefs).toHaveBeenCalledTimes(2);
+  expect(readDiffFiles).toHaveBeenCalledOnce();
+  expect(fetchDiffText).toHaveBeenCalledOnce();
+  vi.mocked(gitLine).mockResolvedValue('next');
+  diff.invalidate();
+  expect((await readResourceValue(diff.full(request))).head).toBe('next');
+  expect(fetchDiffText).toHaveBeenCalledTimes(2);
 });

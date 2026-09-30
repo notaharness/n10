@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { DiffFile } from '@n10/core';
-import type { DiffRequest } from '@n10/engine';
+import type { DiffRequest, DiffRefs } from '@n10/engine';
 import { useEngine } from '../context/EngineContext.js';
 import { useReadResource } from './useReadResource.js';
 
@@ -26,7 +26,7 @@ export function useDiffData(
   );
   const snapshot = useReadResource(resource);
   return {
-    request,
+    request: snapshot.data,
     files: snapshot.data?.files ?? NO_FILES,
     loading: snapshot.loading,
     error: snapshot.error,
@@ -34,7 +34,7 @@ export function useDiffData(
 }
 
 export function useFileDiffData(
-  request: DiffRequest | null,
+  request: DiffRefs | null,
   filename: string | null
 ) {
   const { reviews } = useEngine();

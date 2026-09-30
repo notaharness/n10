@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { readConfig } from '@n10/vcs-core';
 import type { VcsProvider } from '@n10/vcs-core';
 import {
   createPullRequestList,
@@ -11,6 +12,11 @@ import type {
   ConfigSnapshot,
   PullRequestList,
 } from '@n10/engine';
+
+vi.mock('@n10/vcs-core', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  readConfig: vi.fn(),
+}));
 
 /** Real engine resources under an inert config adapter; no Git or provider reads at construction. */
 export function reviewEngineFixture(
@@ -26,6 +32,7 @@ export function reviewEngineFixture(
     revision: 0,
     syncRevision: 0,
   };
+  vi.mocked(readConfig).mockReturnValue(snapshot.config);
   const config: ConfigService = {
     repo: '/repo',
     getSnapshot: () => snapshot,

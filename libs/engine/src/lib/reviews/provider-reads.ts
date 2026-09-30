@@ -29,12 +29,30 @@ export function createProviderReads(options: ReviewContextOptions) {
   const context = createReviewContext(options);
   const comments = createResourceCache<PullRequestComments>(REVIEW_READ_TTL_MS);
   const descriptions = createResourceCache<string>(REVIEW_READ_TTL_MS);
-  const snapshots =
-    createResourceCache<PullRequestSnapshot>(REVIEW_READ_TTL_MS);
-  const checks =
-    createResourceCache<PullRequestChecksAnswer>(REVIEW_READ_TTL_MS);
-  const conversations =
-    createResourceCache<PullRequestConversationRead>(REVIEW_READ_TTL_MS);
+  const snapshots = createResourceCache<PullRequestSnapshot>(
+    REVIEW_READ_TTL_MS,
+    32,
+    ({ detail }) =>
+      detail.state !== 'failed' &&
+      (detail.state !== 'read' ||
+        (detail.value.reviewers?.state !== 'failed' &&
+          detail.value.iteration?.state !== 'failed'))
+  );
+  const checks = createResourceCache<PullRequestChecksAnswer>(
+    REVIEW_READ_TTL_MS,
+    32,
+    ({ checks, requirements }) =>
+      checks.state !== 'failed' &&
+      requirements.reviewers.state !== 'failed' &&
+      (checks.state !== 'read' ||
+        (checks.value.checks.state !== 'failed' &&
+          checks.value.rules.state !== 'failed'))
+  );
+  const conversations = createResourceCache<PullRequestConversationRead>(
+    REVIEW_READ_TTL_MS,
+    32,
+    ({ conversation }) => conversation.state !== 'failed'
+  );
   const caches = [comments, descriptions, snapshots, checks, conversations];
   function request(value: unknown) {
     const req = parseSnapshotRequest(value);

@@ -107,3 +107,17 @@ describe('getPullRequestConversation', () => {
     expect(read.conversation.state).toBe('unsupported');
   });
 });
+
+it('retries a typed conversation failure immediately', async () => {
+  env.onRead = () => {
+    throw new Error('offline');
+  };
+  expect(
+    (await getPullRequestConversation({ ref: REF })).conversation.state
+  ).toBe('failed');
+  env.onRead = () => undefined;
+  expect(
+    (await getPullRequestConversation({ ref: REF })).conversation.state
+  ).toBe('read');
+  expect(env.reads).toEqual([42, 42]);
+});

@@ -473,9 +473,10 @@ per-row cache-reset methods. `request-budget.spec.ts` checks request counts.
 
 The repository handle owns `engine/reviews`: thread, description, detail, checks,
 conversation and Git diff resources. Reads coalesce, ordinary callers reuse fresh
-answers, and a forced read queues one follow-up. Provider data and committed diffs
+answers, and a forced read queues one follow-up. Provider data and branch resolutions
 are fresh for 30 seconds; live checkout diffs for one second. A failed read retains
-same-scope data and backs off for that interval. Account/config changes clear data
+same-scope data and permits immediate retry. Explicit thread invalidation (including
+opening a composer) forces an engine read. Account/config changes clear data
 and reject obsolete publication; disposing a repository prevents late publication.
 The desktop RPC rejects a failed answer and its query cache retains the last good
 view. TUI hooks subscribe directly. Frontends own visibility and error presentation,
@@ -486,13 +487,17 @@ review cannot remain hidden behind their TTL. Same-scope invalidation retains th
 last successful answer. Manual remote refresh invalidates provider reads after
 the provider memo is cleared.
 Confirmed desktop thread/verdict writes invalidate the captured repository's reads;
-the TUI's confirmed thread edits update only their unchanged base snapshot. Review
+the TUI's confirmed thread edits update their unchanged base snapshot or invalidate
+a snapshot that raced the write. Review
 commands and publication reconciliation are the following domain slice.
 
 Git metadata parsing is a core operation with explicit cwd. The engine refreshes
 source refs when the PR head differs, shares the core target-fetch queue's five-minute
 freshness, and pins both commit IDs before reading file lists or patches. Full patches
-and per-file patches use the same comparison. Metadata overflow is an error, never
+and per-file patches use the same comparison. Resolution caches expire on list
+changes; manifests and patches are keyed by exact commit IDs, with no time expiry.
+The TUI carries its displayed manifest's refs into each patch request. Config
+identity checks compare disk values without invoking reload or publishing effects. Metadata overflow is an error, never
 an incomplete file list. Resource maps evict idle entries without evicting observed
 or active reads. Patch maps have smaller capacities than provider records.
 

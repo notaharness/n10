@@ -18,6 +18,7 @@ export function createReviewService(
     if (isDeepStrictEqual(rows, next)) return;
     rows = next;
     provider.invalidate();
+    diff.invalidate();
   });
   let snapshot = options.config.getSnapshot();
   const unsubscribe = options.config.subscribe(() => {

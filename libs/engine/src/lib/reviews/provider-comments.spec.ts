@@ -1,3 +1,4 @@
+import * as vcs from '@n10/vcs-core';
 import { expect, it, vi } from 'vitest';
 import { reviewReadFixture } from './review-read-fixture.js';
 import { readResourceValue } from './read-resource.js';
@@ -144,4 +145,23 @@ it('expires review reads when list facts move, preserving rows and ignoring othe
   });
   expect(fetchCommentThreads).toHaveBeenCalledTimes(2);
   reviews.dispose();
+});
+
+it('rejects a disk identity change without publishing config effects from a query', async () => {
+  const fetchCommentThreads = vi
+    .fn()
+    .mockResolvedValue({ threads: [], generalComments: [] });
+  const fixture = reviewReadFixture(() => ({
+    config: { vendorAuth: { token: 'first' } } as never,
+    vcsConfigured: true,
+    provider: { id: 'github', fetchCommentThreads },
+  }));
+  vi.mocked(vcs.readConfig).mockReturnValue({
+    vendorAuth: { token: 'next' },
+  } as never);
+  await expect(readResourceValue(fixture.service.comments(7))).rejects.toThrow(
+    'account or repository changed'
+  );
+  expect(fetchCommentThreads).not.toHaveBeenCalled();
+  expect(fixture.options.config.reload).not.toHaveBeenCalled();
 });

@@ -54,8 +54,8 @@ const api: N10HostApi = {
     ipcRenderer.invoke(IPC.checkWorktreeRemoval, branch),
   openInEditor: (branch) => ipcRenderer.invoke(IPC.openInEditor, branch),
 
-  fetchCommentThreads: (prId) =>
-    ipcRenderer.invoke(IPC.fetchCommentThreads, prId),
+  fetchCommentThreads: (prId, force) =>
+    ipcRenderer.invoke(IPC.fetchCommentThreads, prId, force),
   replyToThread: (req) => ipcRenderer.invoke(IPC.replyToThread, req),
   setThreadResolved: (req) => ipcRenderer.invoke(IPC.setThreadResolved, req),
   fetchCommentImage: (url) => ipcRenderer.invoke(IPC.fetchCommentImage, url),
@@ -128,8 +128,6 @@ const api: N10HostApi = {
     ipcRenderer.invoke(IPC.fetchDiffText, sourceBranch, targetBranch),
   fetchWorktreeDiffText: (branch, targetBranch) =>
     ipcRenderer.invoke(IPC.fetchWorktreeDiffText, branch, targetBranch),
-  fetchFileDiffText: (sourceBranch, targetBranch, file) =>
-    ipcRenderer.invoke(IPC.fetchFileDiffText, sourceBranch, targetBranch, file),
 
   openExternal: (url) => ipcRenderer.invoke(IPC.openExternal, url),
   showContextMenu: (items) => ipcRenderer.invoke(IPC.showContextMenu, items),

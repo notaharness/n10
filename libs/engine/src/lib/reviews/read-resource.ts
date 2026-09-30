@@ -17,7 +17,7 @@ export interface ReadResource<T> {
   /** Expire same-scope data without dropping the last successful answer. */
   invalidate(): void;
   /** Apply a confirmed mutation only to the snapshot it was based on. */
-  patch(base: ReadSnapshot<T>, update: (data: T) => T): void;
+  patch(base: ReadSnapshot<T>, update: (data: T) => T): boolean;
   dispose(): void;
   observed(): boolean;
 }
@@ -25,7 +25,8 @@ export interface ReadResource<T> {
 /** A bounded read lane: ordinary readers join, forced readers share one follow-up. */
 export function createReadResource<T>(
   load: () => Promise<T>,
-  ttl: number
+  ttl: number,
+  cacheable: (value: T) => boolean = () => true
 ): ReadResource<T> {
   let snapshot: ReadSnapshot<T> = {
     data: null,
@@ -55,11 +56,12 @@ export function createReadResource<T>(
     try {
       const data = await load();
       if (disposed || gen !== generation) return;
-      attemptedAt = Date.now();
-      publish({ data, fetchedAt: attemptedAt });
+      const fetchedAt = Date.now();
+      attemptedAt = cacheable(data) ? fetchedAt : null;
+      publish({ data, fetchedAt });
     } catch (error) {
       if (disposed || gen !== generation) return;
-      attemptedAt = Date.now();
+      attemptedAt = null;
       publish({
         error: error instanceof Error ? error.message : String(error),
       });
@@ -98,8 +100,9 @@ export function createReadResource<T>(
     observed: () => listeners.size > 0,
     read,
     patch(base, update) {
-      if (!disposed && snapshot === base && snapshot.data !== null)
-        publish({ data: update(snapshot.data) });
+      if (disposed || snapshot !== base || snapshot.data === null) return false;
+      publish({ data: update(snapshot.data) });
+      return true;
     },
     invalidate() {
       generation += 1;

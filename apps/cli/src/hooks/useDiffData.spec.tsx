@@ -88,8 +88,8 @@ describe('engine diff bindings', () => {
     await vi.waitFor(() => expect(probe.out.current?.file.data).toBe(patch));
     expect(reads.patch).toHaveBeenCalledWith(
       '/repo',
-      'feature-42',
-      'main',
+      'feature-42^{commit}',
+      'main^{commit}',
       'foo.ts',
       expect.objectContaining({ sourceRef: 'feature-42^{commit}' })
     );

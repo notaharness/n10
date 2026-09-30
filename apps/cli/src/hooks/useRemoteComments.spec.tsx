@@ -204,6 +204,38 @@ describe('useRemoteComments', () => {
     unmount();
   });
 
+  it('reads a confirmed reply again when refresh races the write', async () => {
+    const thread = makeThread({ id: 't1' });
+    const payload = { threads: [thread], generalComments: [] };
+    const pending = deferred<RemoteCommentReply>();
+    const reply = { ...thread.comments[0], id: 'reply', body: 'answer' };
+    const fetchCommentThreads = vi.fn().mockResolvedValue(payload);
+    const provider = {
+      id: 'github',
+      fetchCommentThreads,
+      replyToThread: () => pending.promise,
+    } as unknown as VcsProvider;
+    const { outRef, unmount } = mountProbe(42, provider);
+    await waitForState(outRef, (value) => value.threads.length === 1);
+    const command = outRef.current!.replyToThread('t1', 'answer');
+    outRef.current!.refresh();
+    await vi.waitFor(() =>
+      expect(fetchCommentThreads).toHaveBeenCalledTimes(2)
+    );
+    await flush();
+    fetchCommentThreads.mockResolvedValue({
+      threads: [{ ...thread, comments: [...thread.comments, reply] }],
+      generalComments: [],
+    });
+    pending.resolve(reply);
+    await command;
+    await vi.waitFor(() =>
+      expect(outRef.current?.threads[0]?.comments).toHaveLength(2)
+    );
+    expect(fetchCommentThreads).toHaveBeenCalledTimes(3);
+    unmount();
+  });
+
   it('toggleResolved updates isResolved on the matching thread and fires onResolvedChange', async () => {
     const thread = makeThread({ id: 't1', isResolved: false });
     const payload: PullRequestComments = {

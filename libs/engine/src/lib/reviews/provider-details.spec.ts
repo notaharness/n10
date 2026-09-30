@@ -212,3 +212,20 @@ describe('getPullRequestChecks', () => {
     expect(res).toMatchObject({ viewer: 'bob', checks: { state: 'read' } });
   });
 });
+
+it('retries typed detail and checks failures immediately', async () => {
+  const detail = vi.fn().mockRejectedValue(new Error('offline'));
+  const checks = vi.fn().mockRejectedValue(new Error('offline'));
+  env.detail = detail;
+  env.checks = checks;
+  expect((await getPullRequestSnapshot({ ref: REF })).detail.state).toBe(
+    'failed'
+  );
+  await getPullRequestSnapshot({ ref: REF });
+  expect(detail).toHaveBeenCalledTimes(2);
+  expect((await getPullRequestChecks({ ref: REF })).checks.state).toBe(
+    'failed'
+  );
+  await getPullRequestChecks({ ref: REF });
+  expect(checks).toHaveBeenCalledTimes(2);
+});

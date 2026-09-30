@@ -1,3 +1,4 @@
+import { readConfig, configuredViewer } from '@n10/vcs-core';
 import { PullRequestIdentityError } from '@n10/core';
 import type { SnapshotSources } from '@n10/core';
 import type {
@@ -22,8 +23,16 @@ export function createReviewContext(options: ReviewContextOptions) {
   function current(): ConfigSnapshot {
     if (!isCurrent())
       throw new PullRequestIdentityError('This repository is no longer open');
-    config.reload();
-    return config.getSnapshot();
+    const snapshot = config.getSnapshot();
+    const disk = readConfig(config.repo);
+    if (
+      configEffects(snapshot.config, disk).credentials ||
+      configuredViewer(snapshot.config) !== configuredViewer(disk)
+    )
+      throw new PullRequestIdentityError(
+        'The review account or repository changed; refresh the repository'
+      );
+    return snapshot;
   }
   const sources: Pick<SnapshotSources, 'repository' | 'viewer' | 'lookup'> = {
     repository: () => current().repository,

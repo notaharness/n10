@@ -1,3 +1,4 @@
+import * as vcs from '@n10/vcs-core';
 import type { BranchPrMap } from '@n10/vcs-core';
 import { EMPTY_PULL_REQUEST_LIST } from '../pull-requests/pull-request-snapshot.js';
 import { vi } from 'vitest';
@@ -18,6 +19,9 @@ export function reviewReadFixture(
     kind: 'gone',
   })
 ) {
+  vi.spyOn(vcs, 'readConfig').mockImplementation(
+    () => current().config ?? ({} as vcs.AppConfig)
+  );
   const listeners = new Set<() => void>();
   const config: ConfigService = {
     repo: '/repo',

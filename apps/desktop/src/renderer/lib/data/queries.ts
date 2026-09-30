@@ -282,7 +282,11 @@ export function useParsedDiff(text: string | undefined) {
 export function useThreads(cwd: string, prId: number) {
   return useQuery({
     queryKey: keys.threads(cwd, prId),
-    queryFn: () => window.n10.fetchCommentThreads(prId),
+    queryFn: ({ client, queryKey }) =>
+      window.n10.fetchCommentThreads(
+        prId,
+        client.getQueryState(queryKey)?.isInvalidated ?? false
+      ),
     staleTime: 0,
     // prId 0 = a worktree without a PR: nothing to fetch.
     enabled: prId > 0,

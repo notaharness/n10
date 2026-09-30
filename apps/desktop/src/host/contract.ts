@@ -371,7 +371,10 @@ export interface N10HostApi {
   openInEditor(branch: string): Promise<{ editor: string }>;
 
   // ── Reviews ──────────────────────────────────────────────────
-  fetchCommentThreads(prId: number): Promise<PullRequestComments>;
+  fetchCommentThreads(
+    prId: number,
+    force?: boolean
+  ): Promise<PullRequestComments>;
   replyToThread(req: ReplyRequest): Promise<void>;
   setThreadResolved(req: ResolveRequest): Promise<void>;
   /** Full PR description (list payloads truncate or omit it). */
@@ -499,11 +502,6 @@ export interface N10HostApi {
    *  what it has committed. Empty string when the branch has no
    *  worktree. */
   fetchWorktreeDiffText(branch: string, targetBranch: string): Promise<string>;
-  fetchFileDiffText(
-    sourceBranch: string,
-    targetBranch: string,
-    file: string
-  ): Promise<string>;
 
   // ── Shell ────────────────────────────────────────────────────
   /** Open a URL in the user's default browser. */
@@ -632,7 +630,6 @@ export const IPC = {
   checkoutPlan: 'n10/session/checkout-plan',
   fetchDiffText: 'n10/diff/text',
   fetchWorktreeDiffText: 'n10/diff/worktree-text',
-  fetchFileDiffText: 'n10/diff/file-text',
   openExternal: 'n10/shell/open-external',
   showContextMenu: 'n10/shell/context-menu',
   showAppMenu: 'n10/shell/app-menu',

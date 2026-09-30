@@ -39,7 +39,7 @@ it('joins ordinary reads and coalesces forced reads behind the active request', 
   expect(load).toHaveBeenCalledTimes(2);
 });
 
-it('retains same-scope data on failure and backs off until the TTL expires', async () => {
+it('retains same-scope data on failure and retries immediately', async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   const load = vi
     .fn()
@@ -53,13 +53,11 @@ it('retains same-scope data on failure and backs off until the TTL expires', asy
     error: 'Offline',
     loading: false,
   });
-  await resource.read();
-  expect(load).toHaveBeenCalledTimes(2);
-  vi.setSystemTime(Date.now() + 101);
   expect(await resource.read()).toMatchObject({
     data: 'recovered',
     error: null,
   });
+  expect(load).toHaveBeenCalledTimes(3);
 });
 
 it('clears old identity data immediately and discards an in-flight answer after reset', async () => {

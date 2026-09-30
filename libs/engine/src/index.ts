@@ -29,4 +29,8 @@ export {
   type ReadResource,
   type ReadSnapshot,
 } from './lib/reviews/read-resource.js';
-export type { DiffRequest, DiffFiles } from './lib/reviews/diff-reads.js';
+export type {
+  DiffRequest,
+  DiffFiles,
+  DiffRefs,
+} from './lib/reviews/diff-reads.js';

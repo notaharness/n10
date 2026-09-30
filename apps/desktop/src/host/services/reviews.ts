@@ -65,9 +65,10 @@ export function getReviewViewer(): { identifier: string } | null {
 }
 
 export async function fetchCommentThreads(
-  prId: number
+  prId: number,
+  force = false
 ): Promise<PullRequestComments> {
-  return readResourceValue(activeReviewService().comments(prId));
+  return readResourceValue(activeReviewService().comments(prId), force);
 }
 
 export async function replyToThread(req: ReplyRequest): Promise<void> {
@@ -134,15 +135,5 @@ export async function submitReviewVerdict(
 export function getDiffText(sourceBranch: string, targetBranch: string) {
   return readResourceValue(
     activeReviewService().diff.full({ sourceBranch, targetBranch })
-  );
-}
-
-export function getFileDiffText(
-  sourceBranch: string,
-  targetBranch: string,
-  file: string
-) {
-  return readResourceValue(
-    activeReviewService().diff.file({ sourceBranch, targetBranch }, file)
   );
 }
