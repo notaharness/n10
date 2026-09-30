@@ -18,20 +18,6 @@ import { fetchRefs } from './fetch-queue.js';
 
 // Operations in a sync pass. The engine owns scheduling, state and notices.
 
-export const REMOTE_SYNC_DEFAULT_MS = 3_600_000; // 1 hour
-export const REMOTE_SYNC_MIN_MS = 300_000; // 5 minutes
-
-export function remoteSyncIntervalMs(
-  mergePollInterval: number | undefined
-): number {
-  return Math.max(
-    REMOTE_SYNC_MIN_MS,
-    typeof mergePollInterval === 'number' && Number.isFinite(mergePollInterval)
-      ? mergePollInterval
-      : REMOTE_SYNC_DEFAULT_MS
-  );
-}
-
 /** One sync pass over the repository at `cwd`: fetch all remotes
  *  (pruning), through the fetch line every other fetch of the
  *  repository waits in, then fast-forward its main branch to what was
@@ -54,7 +40,7 @@ export async function syncRemote(cwd: string): Promise<number> {
  * rebasing, so a later rebase of the same branch warns again instead of
  * staying silent.
  */
-export function diffRebaseWarnings(
+function diffRebaseWarnings(
   rebasingNow: readonly string[],
   alreadyWarned: ReadonlySet<string>
 ): { toWarn: string[]; nextWarned: Set<string> } {
@@ -74,10 +60,9 @@ type SweepConfig = Pick<
   'vendorAuth' | 'vendorProject' | 'autoDeleteOnMerge'
 >;
 
-/** Called with a merged branch's checkout session, the branch, and the
+/** Called with the merged branch and the
  *  verdict to remove it with: `clear`, at the commit it was judged. */
 type AutoDelete = (
-  sessionName: string,
   branch: string,
   approved: WorktreeRemovalCheck
 ) => void | Promise<void>;
@@ -91,7 +76,7 @@ async function autoDeleteMerged(args: {
   merged: Set<string>;
   onAutoDelete: AutoDelete;
   isCancelled: () => boolean;
-  cwd: string | undefined;
+  cwd: string;
 }): Promise<string[] | null> {
   const { merged, onAutoDelete, isCancelled, cwd } = args;
   const rebasingNow: string[] = [];
@@ -115,11 +100,7 @@ async function autoDeleteMerged(args: {
     const check = await canRemoveBranch(branch, { confirmedMerged: true, cwd });
     if (isCancelled()) return null;
     if (check.safe) {
-      await onAutoDelete(
-        sessionName,
-        branch,
-        await clearVerdictAt(checkout.path, tip)
-      );
+      await onAutoDelete(branch, await clearVerdictAt(checkout.path, tip));
     } else {
       if (check.reason === 'rebase in progress') rebasingNow.push(branch);
       logError(
@@ -151,19 +132,12 @@ export async function sweepMergedBranches(opts: {
   branches: string[];
   /** Branches already warned about an in-progress rebase. */
   warnedRebase: ReadonlySet<string>;
-  /** Fires with the merged set as soon as it is known, before the
-   *  (potentially slow) auto-delete pass — lets UIs show merged
-   *  badges without waiting for deletions. */
-  onMerged?: (merged: Set<string>) => void;
   onAutoDelete: AutoDelete;
   onRebaseInProgress: (branch: string) => void;
-  /** Abort between async steps (the TUI passes its effect-cancel flag). */
-  isCancelled?: () => boolean;
-  /** The repository's root, which every git call and session key names;
-   *  the process's repository when not given. The desktop passes the
-   *  repository it captured, since the process's directory follows
-   *  whichever repository is open by the time a step runs. */
-  cwd?: string;
+  /** The engine cancels stale passes between async steps. */
+  isCancelled: () => boolean;
+  /** Captured repository root for every Git call and session identity. */
+  cwd: string;
 }): Promise<MergedSweepResult> {
   const {
     provider,
@@ -171,10 +145,9 @@ export async function sweepMergedBranches(opts: {
     config,
     branches,
     warnedRebase,
-    onMerged,
     onAutoDelete,
     onRebaseInProgress,
-    isCancelled = () => false,
+    isCancelled,
     cwd,
   } = opts;
   const keepWarned = new Set(warnedRebase);
@@ -189,7 +162,6 @@ export async function sweepMergedBranches(opts: {
     branches
   );
   if (isCancelled()) return { merged, nextWarned: keepWarned };
-  onMerged?.(merged);
   if (!config.autoDeleteOnMerge) {
     return { merged, nextWarned: keepWarned };
   }

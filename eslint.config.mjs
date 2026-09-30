@@ -36,12 +36,7 @@ const shellOperationPaths = [
   {
     name: '@n10/core',
     allowTypeImports: true,
-    importNames: [
-      'syncRemote',
-      'sweepMergedBranches',
-      'computeConflictCounts',
-      'remoteSyncIntervalMs',
-    ],
+    importNames: ['syncRemote', 'sweepMergedBranches', 'computeConflictCounts'],
     message: 'Sync scheduling and passes belong to the engine sync service.',
   },
   {

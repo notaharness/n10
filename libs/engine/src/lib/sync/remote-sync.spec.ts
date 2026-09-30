@@ -25,8 +25,10 @@ const env = vi.hoisted(() => ({
   warning: false,
   warned: [] as ReadonlySet<string>[],
 }));
-vi.mock('@n10/core', () => ({
+vi.mock('./sync-interval.js', () => ({
   remoteSyncIntervalMs: (value: number) => value,
+}));
+vi.mock('@n10/core', () => ({
   syncRemote: (repo: string) => {
     env.synced.push(repo);
     return new Promise<number>((resolve, reject) =>
@@ -37,8 +39,7 @@ vi.mock('@n10/core', () => ({
     env.swept.push(options.cwd!);
     env.warned.push(options.warnedRebase);
     if (env.failSweep) throw new Error('Provider unavailable');
-    if (env.autoDelete)
-      await options.onAutoDelete('session', 'feature/a', verdict);
+    if (env.autoDelete) await options.onAutoDelete('feature/a', verdict);
     if (env.warning) options.onRebaseInProgress('feature/b');
     return { merged: env.merged, nextWarned: new Set(['feature/b']) };
   },

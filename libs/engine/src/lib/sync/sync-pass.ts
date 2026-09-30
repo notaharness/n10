@@ -34,7 +34,7 @@ export async function runSyncPass(options: {
     cwd: repo,
     warnedRebase: options.warned,
     isCancelled: cancelled,
-    onAutoDelete: async (_session, branch, approved) => {
+    onAutoDelete: async (branch, approved) => {
       if (cancelled()) return;
       const outcome = await options.remove(branch, approved);
       if (cancelled()) return;
