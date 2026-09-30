@@ -373,6 +373,17 @@ test.describe('Pull request Overview', () => {
       // around it scrolls instead: not the diff kept behind it.
       const title = overviewTitle(page, 'Handle cancelled requests');
       await expect(title).toBeVisible();
+      // The diff behind it has its lines, or there is nothing to spill.
+      // Hidden, so not a role query; this tab's pane, not a spare's.
+      const hiddenDiff = page
+        .locator('[data-terminal-pane]')
+        .filter({ has: title })
+        .locator('[data-diff-scroll]');
+      await expect
+        .poll(() =>
+          hiddenDiff.evaluate((el) => el.scrollHeight > el.clientHeight)
+        )
+        .toBe(true);
       const before = await top(title);
       await wheelOver(title, 600);
       expect(await top(title)).toBe(before);
