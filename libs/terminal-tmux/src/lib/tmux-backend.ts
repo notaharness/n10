@@ -12,6 +12,10 @@ export type { TmuxLaunchPlan } from './tmux-launch.js';
 
 type ExitCallback = (code: number, signal?: number) => void;
 
+/** How long a retained final frame waits for a client that has not
+ *  drawn yet (see `clientDrawn`). */
+const CLIENT_DRAW_WAIT_MS = 2_000;
+
 /** Explicit create, attach or restart; no identity interpretation in the transport. */
 export async function createTmuxBackend(
   spec: SessionSpec,
@@ -44,6 +48,8 @@ class TmuxBackend implements SessionBackend {
    *  it — a read already in flight when the client exits may have been
    *  dispatched before the hosted process was, and so answer stale. */
   private inspecting: Promise<void> | null = null;
+  /** Settles on the current client's first output. */
+  private drawn: Promise<void> = Promise.resolve();
   private state = {
     running: true,
     exitCode: undefined as number | undefined,
@@ -80,6 +86,13 @@ class TmuxBackend implements SessionBackend {
       rows: this.height,
       cwd: this.spec.cwd,
       env,
+    });
+    this.drawn = new Promise<void>((resolve) => {
+      const first = () => {
+        client.offData(first);
+        resolve();
+      };
+      client.onData(first);
     });
     for (const cb of this.data) client.onData(cb);
     client.onExit(() => {
@@ -176,7 +189,26 @@ class TmuxBackend implements SessionBackend {
     return promise;
   }
 
-  private handlePaneState(read: TmuxPaneRead): void {
+  /**
+   * The current client's first output, or `CLIENT_DRAW_WAIT_MS` without
+   * it. A tmux client opens by entering the alternate screen and drawing
+   * the pane's visible rows, and a pane that died at once keeps its last
+   * output in history, above those rows. A final frame replayed before
+   * that first draw is hidden behind it for good: the viewer is left
+   * with "Pane is dead" and not the reason.
+   */
+  private clientDrawn(): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const waited = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, CLIENT_DRAW_WAIT_MS);
+      timer.unref?.();
+    });
+    return Promise.race([this.drawn, waited]).finally(() =>
+      clearTimeout(timer)
+    );
+  }
+
+  private async handlePaneState(read: TmuxPaneRead): Promise<void> {
     // Disposal (or the process having already been marked exited by an
     // earlier poll) can land between the read starting and resolving.
     if (this.disposed || !this.state.running) return;
@@ -184,30 +216,36 @@ class TmuxBackend implements SessionBackend {
     // pane — n10 simply could not talk to tmux this tick. Leave
     // `state.running` and the timer untouched; the next tick tries again.
     if (read.status === 'failed') return;
-    if (read.status === 'ok' && !read.state.paneDead) return;
+    if (read.status !== 'ok') {
+      this.concludeExit();
+      return;
+    }
     // `paneDead` alone, deliberately. An exit status arrives only once
     // tmux has reaped the process, and a machine short of CPU can leave
     // it unreaped for good — the status then never comes, nor does the
     // retained "Pane is dead" notice this frame would otherwise carry.
     // Waiting for either strands a finished agent as running.
-    if (read.status === 'ok') this.replayFinalFrame();
-    this.state = {
-      running: false,
-      exitCode: read.status === 'ok' ? read.state.exitCode : undefined,
-      signal: read.status === 'ok' ? read.state.exitSignal : undefined,
-    };
+    if (!read.state.paneDead) return;
+    await this.clientDrawn();
+    if (this.disposed || !this.state.running) return;
+    this.replayFinalFrame();
+    this.concludeExit(read.state.exitCode, read.state.exitSignal);
+  }
+
+  private concludeExit(exitCode?: number, signal?: number): void {
+    this.state = { running: false, exitCode, signal };
     clearInterval(this.timer);
     clearTimeout(this.reconnectTimer);
     clearTimeout(this.stableTimer);
-    for (const cb of [...this.exits])
-      cb(this.state.exitCode ?? 0, this.state.signal);
+    for (const cb of [...this.exits]) cb(exitCode ?? 0, signal);
   }
 
   private replayFinalFrame(): void {
     const frame = tmuxCapturePane(this.name);
     if (frame == null) return;
     // A process may exit before its client's first redraw. Replay the
-    // retained frame, including history, before any listener handles exit.
+    // retained frame, including history, once the client has drawn
+    // (`clientDrawn`) and before any listener handles exit.
     const output =
       '\x1b[?1049l\x1b[3J\x1b[2J\x1b[H' + frame.replace(/\r?\n/g, '\r\n');
     this.finalFrame = output;

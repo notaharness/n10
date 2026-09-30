@@ -23,6 +23,10 @@ const mock = vi.hoisted(() => ({
    *  already closed — what a detached or killed tmux client leaves
    *  behind until the re-attach replaces it. */
   resizeThrows: false,
+  /** A tmux client draws the pane as it attaches. When true, the next
+   *  client stays silent until a test calls its `draw`. */
+  clientSilent: false,
+  client: null as { draw(data: string): void } | null,
   data: vi.fn(),
   spawn: vi.fn(),
   dispose: vi.fn(),
@@ -34,15 +38,26 @@ vi.mock('@n10/terminal-pty', () => ({
     pid = 123;
     cols = 80;
     rows = 24;
+    private readonly listeners = new Set<(data: string) => void>();
     constructor(...args: unknown[]) {
       mock.calls.push('attach');
       mock.spawn(...args);
+      mock.client = this;
+      if (!mock.clientSilent) queueMicrotask(() => this.draw('\x1b[?1049h'));
+    }
+    draw(data: string) {
+      for (const cb of [...this.listeners]) cb(data);
     }
     onExit(cb: () => void) {
       mock.clientExit = cb;
     }
-    onData = mock.data;
-    offData = vi.fn();
+    onData(cb: (data: string) => void) {
+      mock.data(cb);
+      this.listeners.add(cb);
+    }
+    offData(cb: (data: string) => void) {
+      this.listeners.delete(cb);
+    }
     dispose = mock.dispose;
     write = mock.write;
     resize = (cols: number, rows: number) => {
@@ -133,6 +148,8 @@ beforeEach(() => {
   mock.paneStateResolvers.length = 0;
   mock.readFailed = false;
   mock.resizeThrows = false;
+  mock.clientSilent = false;
+  mock.client = null;
   mock.spawn.mockReset();
   mock.dispose.mockReset();
   mock.data.mockReset();
@@ -304,6 +321,39 @@ describe('hosted process lifecycle', () => {
     expect(events[0]).toContain('final output');
     expect(events[1]).toBe('exit');
   });
+  /** A tmux client enters the alternate screen as it draws. A frame
+   *  replayed before that stays behind it, and the viewer sees "Pane is
+   *  dead" without the reason, which is in the frame's history. */
+  it('replays a final frame only after the client has drawn', async () => {
+    mock.clientSilent = true;
+    mock.state = { paneDead: true, exitCode: 127 };
+    const backend = await launch();
+    const events: string[] = [];
+    backend.onData((data) => events.push(data));
+    backend.onExit(() => events.push('exit'));
+    await vi.advanceTimersByTimeAsync(600);
+    expect(events).toEqual([]);
+
+    mock.client?.draw('\x1b[?1049h');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(events).toEqual([
+      '\x1b[?1049h',
+      expect.stringContaining('final output'),
+      'exit',
+    ]);
+  });
+
+  it('replays a final frame anyway when the client never draws', async () => {
+    mock.clientSilent = true;
+    mock.state = { paneDead: true, exitCode: 127 };
+    const backend = await launch();
+    const events: string[] = [];
+    backend.onData((data) => events.push(data));
+    backend.onExit(() => events.push('exit'));
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(events).toEqual([expect.stringContaining('final output'), 'exit']);
+  });
+
   it('notifies remaining exit listeners when the first listener disposes the backend', async () => {
     const backend = await launch();
     const relayExit = vi.fn();
@@ -382,7 +432,8 @@ describe('hosted process lifecycle', () => {
       cols: 100,
       rows: 40,
     });
-    expect(mock.data).toHaveBeenCalledTimes(2);
+    // Once on each client, beside the backend's own first-draw watch.
+    expect(mock.data.mock.calls.filter(([cb]) => cb === data)).toHaveLength(2);
     expect(mock.data).toHaveBeenLastCalledWith(data);
     expect(backend.processState?.running).toBe(true);
   });
