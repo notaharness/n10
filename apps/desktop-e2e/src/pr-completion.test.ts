@@ -252,7 +252,23 @@ test.describe('Completion', () => {
     const headline = completion.locator('[data-readiness-headline]');
     // The reader is reading Completion: it is the top of what is in view,
     // which the browser keeps still when anything above it changes height.
-    await completion.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    // Until the rest of the Overview has loaded there may be nothing to
+    // scroll, so scroll until it is there.
+    await expect
+      .poll(() =>
+        completion.evaluate((el) => {
+          el.scrollIntoView({ block: 'start' });
+          const pane = el.closest('.overflow-auto');
+          // Within a pixel: the grid lays out on fractions of one.
+          return pane
+            ? Math.abs(
+                el.getBoundingClientRect().top -
+                  pane.getBoundingClientRect().top
+              )
+            : Infinity;
+        })
+      )
+      .toBeLessThan(1);
     const top = () =>
       completion.evaluate((el) => el.getBoundingClientRect().top);
     const before = await top();
