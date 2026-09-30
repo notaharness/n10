@@ -1,12 +1,9 @@
 import { readConfig, configuredViewer } from '@n10/vcs-core';
 import { PullRequestIdentityError } from '@n10/core';
 import type { SnapshotSources } from '@n10/core';
-import type {
-  ConfigService,
-  ConfigSnapshot,
-} from '../config/config-service.js';
-import { configEffects } from '../config/config-effects.js';
-import type { PullRequestList } from '../pull-requests/pull-request-list.js';
+import type { ConfigService, ConfigSnapshot } from '../config/api.js';
+import { configEffects } from '../config/api.js';
+import type { PullRequestList } from '../pull-requests/api.js';
 
 export interface ReviewContextOptions {
   config: ConfigService;

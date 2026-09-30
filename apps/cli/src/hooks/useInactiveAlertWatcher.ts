@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { hasUnseenOutput, snapshot } from '@n10/core';
 import { enqueue as enqueueAlert } from '@n10/core';
-import { useToastActions } from '../context/ToastContext.js';
-import { useConfig } from '../context/ConfigContext.js';
-import { useSessionData } from '../context/SessionContext.js';
+import { useToastActions } from '@n10/app-core';
+import { useConfig } from '@n10/app-core';
+import { useSessionData } from '@n10/app-core';
 
 const POLL_MS = 250;
 

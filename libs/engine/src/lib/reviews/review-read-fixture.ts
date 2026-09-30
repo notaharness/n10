@@ -1,11 +1,8 @@
 import * as vcs from '@n10/vcs-core';
 import type { BranchPrMap } from '@n10/vcs-core';
-import { EMPTY_PULL_REQUEST_LIST } from '../pull-requests/pull-request-snapshot.js';
+import { EMPTY_PULL_REQUEST_LIST } from '../pull-requests/api.js';
 import { vi } from 'vitest';
-import type {
-  ConfigSnapshot,
-  ConfigService,
-} from '../config/config-service.js';
+import type { ConfigSnapshot, ConfigService } from '../config/api.js';
 import type { ReviewContextOptions } from './review-context.js';
 import { createProviderReads } from './provider-reads.js';
 

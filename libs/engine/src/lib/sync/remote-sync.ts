@@ -1,9 +1,9 @@
 import { logError } from '@n10/logger';
 import { remoteSyncIntervalMs } from './sync-interval.js';
 import type { WorktreeRemovalCheck, WorktreeRemovalOutcome } from '@n10/core';
-import type { ConfigSnapshot } from '../config/config-service.js';
-import type { PullRequestList } from '../pull-requests/pull-request-list.js';
-import type { WorktreeService } from '../worktrees/worktree-service.js';
+import type { ConfigSnapshot } from '../config/api.js';
+import type { PullRequestList } from '../pull-requests/api.js';
+import type { WorktreeService } from '../worktrees/api.js';
 import { EMPTY_SYNC_SNAPSHOT } from './sync-snapshot.js';
 import type { SyncNotice, SyncSnapshot } from './sync-snapshot.js';
 import { runSyncPass } from './sync-pass.js';

@@ -7,7 +7,6 @@
 
 import type { DiffLine } from '@n10/diff';
 import type { RemoteCommentThread } from '@n10/vcs-core';
-import { log } from '@n10/logger';
 import type { ReviewComment } from './types.js';
 
 /** Diff-row index of every file line, one map per side of the diff. */
@@ -76,25 +75,8 @@ export function computeRemoteInsertionMap(
   const outOfDiff: RemoteCommentThread[] = [];
 
   for (const thread of threads) {
-    // Every placement decision is logged with the same identifying fields:
-    // which thread went where is the first thing asked when a comment
-    // renders somewhere surprising.
-    const where = {
-      file: thread.file,
-      side: thread.side,
-      lineStart: thread.lineStart,
-      lineEnd: thread.lineEnd,
-      isOutdated: thread.isOutdated,
-    };
-
     if (thread.lineEnd == null) {
       outOfDiff.push(thread);
-      log(
-        'warn',
-        'placement.remoteThread',
-        `thread ${thread.id} has null lineEnd → out-of-diff (transformer didn't resolve a line)`,
-        where
-      );
       continue;
     }
 
@@ -107,20 +89,8 @@ export function computeRemoteInsertionMap(
 
     if (insertAfter !== undefined) {
       pushAt(insertions, insertAfter, thread);
-      log(
-        'info',
-        'placement.remoteThread',
-        `thread ${thread.id} placed inline after diff index ${insertAfter}`,
-        where
-      );
     } else {
       outOfDiff.push(thread);
-      log(
-        'warn',
-        'placement.remoteThread',
-        `thread ${thread.id} pushed to out-of-diff (no matching diff line)`,
-        { ...where, diffLineCount: diffLines.length }
-      );
     }
   }
 

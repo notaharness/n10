@@ -5,7 +5,7 @@ import type {
   ReviewComment,
   RowMap,
 } from '@n10/review-comments';
-import { maxDiffScrollOffset } from '@n10/core';
+import { maxDiffScrollOffset } from '@n10/core/ui';
 
 export interface UseAutoSelectFirstCommentOptions {
   /** The currently opened diff file. The hook arms once per file change. */

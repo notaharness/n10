@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchCommentImage, resetCommentImageCache } from './comment-images.js';
 
 /**
- * Attachments in pull request comments are downloaded by the *main*
+ * Attachments in pull request comments are downloaded by the host
  * process, from URLs written by whoever opened the pull request. So the
  * size cap is not a nicety: buffering an arbitrarily large — or
  * endless, chunked — response there takes the window and every live
@@ -21,8 +21,11 @@ const creds = vi.hoisted(() => ({
   config: {} as Record<string, unknown>,
 }));
 
-vi.mock('./repo.js', () => ({ requireRepo: () => '/repo' }));
-vi.mock('@n10/vcs-core', () => ({ readConfig: () => creds.config }));
+vi.mock('./repo.js', () => ({
+  activeRepository: () => ({
+    config: { getSnapshot: () => ({ config: creds.config }) },
+  }),
+}));
 vi.mock('node:child_process', () => ({
   // Stands in for `gh auth token`.
   execFile: (

@@ -9,8 +9,8 @@ import type { ReactNode } from 'react';
 import type { CategorizedReviews, PullRequestInfo } from '@n10/vcs-core';
 
 import type { AgentSession, SidebarItem } from '@n10/core';
-import { getItemKey, getPrFromItem, isItemActive } from '@n10/core';
-import { buildSidebarItems } from '@n10/core';
+import { getItemKey, getPrFromItem, isItemActive } from '@n10/core/ui';
+import { buildSidebarItems } from '@n10/core/ui';
 import { useSessionData } from './SessionContext.js';
 import { useConfig } from './ConfigContext.js';
 

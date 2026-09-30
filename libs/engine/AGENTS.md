@@ -93,3 +93,7 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   lookup, checks repository lifetime before mutation, coalesces identical sends
   and rejects differing in-flight prompts. Refresh after partial failure; adopt
   completed launches under their captured repository. The cart stays in the UI.
+
+- **Public APIs**: import neighboring domains through their `api.ts`; private
+  cross-domain imports and kernel imports of domains are lint errors. Root exports
+  are Node-only. React bindings import structural types from `@n10/engine/contract`.

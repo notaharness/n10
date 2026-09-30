@@ -18,7 +18,8 @@ flowchart TB
   Renderer[Desktop renderer] --> Bridge[Browser-safe host contract / preload]
   Bridge --> Main[Electron main: IPC forwarding and native UI]
   Main --> Host[Utility process: host adapters]
-  React --> Engine[engine: domain services]
+  React -. injected structural clients .-> Engine[engine: domain services]
+  React --> Pure[core/ui, core/plan, review-comments/ui: pure models]
   Host --> Engine
   Engine --> Providers
   Engine --> Core[core: operations and identity]
@@ -159,19 +160,26 @@ or app-core; engine cannot depend on app-core) and forbids React/Ink/Electron in
 Node domain code. Restrict package subpaths as well as bare imports. Host/main
 backend files cannot import app-core. Host files cannot import Electron.
 
-Renderer rules deny Node builtins and Node-only packages, allowing browser-safe
-entries; Node types may be imported as types. Extend the existing rule to Node
-builtins and every provider. Preserve the plan/readiness exceptions.
+Renderer and app-core rules deny Node builtins and Node-only package values,
+including their subpaths. App-core also rejects Node process globals. Browser-safe entries are explicitly
+allowed: core's `ui`, `plan` and `readiness`; review-comments' `ui` and
+`conventional`; vcs-core's `types` and `pr-details`; engine's type-only `contract`.
+App-core consumes structural engine clients supplied by the shell. Desktop keeps
+its IPC/query bindings and uses the shared plan binding. Terminal I/O, activity
+presentation, running-tab registry reads and TTY dimensions live in the CLI.
+A browser bundle test follows the complete app-core import graph, catching Node
+capabilities hidden behind a nominally pure entry.
 
-During migration, unmigrated hooks may still import core/provider operations.
-Across shell directories and app-core, restricted imports prevent raw config
-persistence. Unmigrated domains may still read config directly. When all domains
-move, tighten app-core globally to browser-safe bindings and split the contract
-into an engine-owned browser entry. Do not declare that end state enforced today.
+All shell bindings reject raw config reads/writes and migrated backend commands.
+The sole config-read exception is the hook integration fixture that supplies
+fake persisted config. Host code still rejects Electron imports; main/host reject
+React bindings. Shell-specific I/O adapters may use core PTY primitives.
 
-Future cross-domain dependencies must use public domain APIs; kernel imports of
-domains and relative cross-domain implementation imports can be forbidden with
-folder-specific `no-restricted-imports` overrides when those folders exist.
+Every engine domain has an explicit `api.ts`. Cross-domain imports must use it;
+the root barrel exports those public surfaces. Kernel modules cannot import
+domains. The shared terminal-dimension validator is the only extracted kernel
+mechanic: no command bus, generic scheduler or speculative resource framework.
+Type-only edges may describe another domain's client without loading it.
 
 ## Workers and processes
 

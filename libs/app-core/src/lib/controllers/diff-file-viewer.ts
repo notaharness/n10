@@ -7,8 +7,8 @@ import {
   getCommentPositions,
   buildRowMap,
   type CommentImageLayouts,
-} from '@n10/review-comments';
-import { planItemKey } from '@n10/core';
+} from '@n10/review-comments/ui';
+import { planItemKey } from '@n10/core/plan';
 import { useToastActions } from '../context/ToastContext.js';
 import { usePlan } from '../context/PlanContext.js';
 import { useAutoSelectFirstComment } from '../hooks/useAutoSelectFirstComment.js';

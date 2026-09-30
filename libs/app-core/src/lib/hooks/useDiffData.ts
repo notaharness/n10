@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { DiffFile } from '@n10/core';
-import type { DiffRequest, DiffRefs } from '@n10/engine';
+import type { DiffRequest, DiffRefs } from '@n10/engine/contract';
 import { useEngine } from '../context/EngineContext.js';
 import { useReadResource } from './useReadResource.js';
 

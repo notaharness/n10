@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import type * as Os from 'node:os';
 import { readConfig, writeGlobalConfig } from '@n10/vcs-core';
 import type { VcsProvider } from '@n10/vcs-core';
-import { EMPTY_PULL_REQUEST_LIST } from '../pull-requests/pull-request-snapshot.js';
+import { EMPTY_PULL_REQUEST_LIST } from '../pull-requests/api.js';
 import { createRepositoryService } from './repository-service.js';
 
 const fixture = vi.hoisted(() => ({ home: '' }));

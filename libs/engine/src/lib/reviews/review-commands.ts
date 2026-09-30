@@ -3,7 +3,7 @@ import type {
   RemoteCommentThread,
   ReviewVerdict,
 } from '@n10/vcs-core';
-import type { PullRequestList } from '../pull-requests/pull-request-list.js';
+import type { PullRequestList } from '../pull-requests/api.js';
 import {
   createReviewContext,
   requirePullRequestNumber,

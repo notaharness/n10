@@ -8,7 +8,7 @@ import {
   __resetForTests as resetHooks,
   __timerActiveForTests,
   __subscriberCountForTests,
-} from '@n10/app-core';
+} from './useActivity.js';
 import {
   attach,
   __resetActivityForTests as resetActivity,

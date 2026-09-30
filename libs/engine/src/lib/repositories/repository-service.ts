@@ -1,25 +1,16 @@
-import { createSessionConnections } from '../sessions/session-connections.js';
-import {
-  createSessionService,
-  type SessionService,
-} from '../sessions/session-service.js';
-import {
-  createReviewService,
-  type ReviewService,
-} from '../reviews/review-service.js';
-import type { PullRequestList } from '../pull-requests/pull-request-list.js';
+import { createSessionConnections } from '../sessions/api.js';
+import { createSessionService, type SessionService } from '../sessions/api.js';
+import { createReviewService, type ReviewService } from '../reviews/api.js';
+import type { PullRequestList } from '../pull-requests/api.js';
 import {
   createWorktreeService,
   type WorktreeService,
-} from '../worktrees/worktree-service.js';
-import type { WorktreeWatchers } from '../worktrees/worktree-commands.js';
+} from '../worktrees/api.js';
+import type { WorktreeWatchers } from '../worktrees/api.js';
 import { resolveRepositoryRoot } from '@n10/core';
 import { autoDetectProjectConfig } from '@n10/vcs-core';
-import { createConfigService } from '../config/config-service.js';
-import type {
-  ConfigService,
-  ConfigServiceOptions,
-} from '../config/config-service.js';
+import { createConfigService } from '../config/api.js';
+import type { ConfigService, ConfigServiceOptions } from '../config/api.js';
 
 export interface RepositoryHandle {
   readonly cwd: string;

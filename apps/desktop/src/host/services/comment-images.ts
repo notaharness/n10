@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readConfig } from '@n10/vcs-core';
-import { requireRepo } from './repo.js';
+import { activeRepository } from './repo.js';
 import type { CommentImagePayload } from '../contract.js';
 
 /**
@@ -107,7 +106,7 @@ async function authHeaderFor(url: URL): Promise<string | undefined> {
   const creds: ImageCredentials = {};
   if (isGitHubHost(host)) creds.githubToken = await getGhToken();
   if (isAzureHost(host)) {
-    const config = readConfig(requireRepo());
+    const config = activeRepository().config.getSnapshot().config;
     creds.azurePat = config.vendorAuth?.['pat'];
   }
   return authHeaderForUrl(url, creds);

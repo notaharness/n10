@@ -1,3 +1,4 @@
+import { paneDimension } from '../kernel/terminal-size.js';
 import {
   getSession,
   getSessionLaunchContext,
@@ -14,11 +15,8 @@ import {
 import type { LaunchRequest, SessionIncarnation } from '@n10/core';
 import type { AppConfig } from '@n10/vcs-core';
 import type { Machine } from '@n10/worktree-manager';
-import type { WorktreeService } from '../worktrees/worktree-service.js';
-import type {
-  WorktreeTarget,
-  WorktreeConfig,
-} from '../worktrees/worktree-commands.js';
+import type { WorktreeService } from '../worktrees/api.js';
+import type { WorktreeTarget, WorktreeConfig } from '../worktrees/api.js';
 
 export interface SessionLaunch {
   target: WorktreeTarget;
@@ -36,15 +34,6 @@ export interface SessionLaunchPorts {
   started?(name: string, repo: string): void;
   progress?(step: 'worktree' | 'start'): void;
 }
-export function paneDimension(
-  value: number | undefined,
-  fallback: number
-): number {
-  return !value || !Number.isFinite(value) || value < 2
-    ? fallback
-    : Math.min(500, Math.floor(value));
-}
-
 function canReuse(req: SessionLaunch, name: string): boolean {
   return (
     !req.fresh &&

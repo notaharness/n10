@@ -1,4 +1,5 @@
-import { createPlanCommands } from '../plans/plan-commands.js';
+import { paneDimension } from '../kernel/terminal-size.js';
+import { createPlanCommands } from '../plans/api.js';
 import { createSessionConnections } from './session-connections.js';
 import { isDeepStrictEqual } from 'node:util';
 import {
@@ -16,9 +17,9 @@ import type {
   DiscoveryDelta,
 } from '@n10/core';
 import { logError } from '@n10/logger';
-import type { WorktreeConfig } from '../worktrees/worktree-commands.js';
-import type { WorktreeService } from '../worktrees/worktree-service.js';
-import { createSessionCommands, paneDimension } from './session-commands.js';
+import type { WorktreeConfig } from '../worktrees/api.js';
+import type { WorktreeService } from '../worktrees/api.js';
+import { createSessionCommands } from './session-commands.js';
 import type { SessionLaunchPorts } from './session-commands.js';
 import { startSessionDiscovery } from './session-discovery.js';
 import type { SessionDiscovery } from './session-discovery.js';

@@ -17,7 +17,7 @@ import type {
   WorktreeInfo,
 } from '@n10/worktree-manager';
 import { logError } from '@n10/logger';
-import type { ConfigSnapshot } from '../config/config-service.js';
+import type { ConfigSnapshot } from '../config/api.js';
 
 export interface WorktreeConfig {
   repo: string;

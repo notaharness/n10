@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useSidebar } from '../context/SidebarContext.js';
+import { useSidebar } from '@n10/app-core';
 import { getSpawnedAt as registryGetSpawnedAt } from '@n10/core';
 import {
   orderRunningTabs,

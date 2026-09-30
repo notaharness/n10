@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { worktreeSessionKey } from '@n10/core';
 import type { AppConfig } from '@n10/vcs-core';
 import { worktreeScope } from '@n10/worktree-manager';
-import type { WorktreeService } from '../worktrees/worktree-service.js';
+import type { WorktreeService } from '../worktrees/api.js';
 import type { SessionDiscoveryOptions } from './session-discovery.js';
 import { createSessionConnections } from './session-connections.js';
 import { createSessionService } from './session-service.js';

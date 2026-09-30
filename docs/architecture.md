@@ -5,12 +5,12 @@
 n10 is one program with two frontends. Each layer depends only on the ones
 below it, and the ESLint module boundaries enforce the direction.
 
-| Layer                      | Role                                                                                                                                                                                                     |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@n10/core`                | Primitive operations: Git, filesystem, tmux and PTY, config, providers, pure helpers. Node only.                                                                                                         |
-| `@n10/engine`              | The program: state, scheduling, caching and the events that announce them, over core. Node only; never React, Ink or Electron.                                                                           |
-| `@n10/app-core`            | React contexts/hooks over the engine, including config snapshots; the desktop renderer also uses the browser-safe plan binding. Its end state is thin, browser-safe hooks over an engine client.         |
-| `apps/cli`, `apps/desktop` | Rendering and input. The TUI runs the engine in its own process; the desktop runs it in the `n10 host` utility process, behind the host bridge. Two open shells share the implementation, not the state. |
+| Layer                      | Role                                                                                                                                                                                                                       |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@n10/core`                | Primitive operations: Git, filesystem, tmux and PTY, config, providers, pure helpers. Node only.                                                                                                                           |
+| `@n10/engine`              | The program: state, scheduling, caching and the events that announce them, over core. Node only; never React, Ink or Electron.                                                                                             |
+| `@n10/app-core`            | React contexts/hooks over the engine, including config snapshots; the desktop renderer also uses the browser-safe plan binding. Browser-safe hooks receive structural engine clients; terminal-only hooks live in the CLI. |
+| `apps/cli`, `apps/desktop` | Rendering and input. The TUI runs the engine in its own process; the desktop runs it in the `n10 host` utility process, behind the host bridge. Two open shells share the implementation, not the state.                   |
 
 The engine owns config, repository selection, worktrees, remote sync, the PR
 list, review reads/commands, worktree sessions, directory terminals, babysitters, fleet state and plan delivery. Repository handles own config,
@@ -89,11 +89,14 @@ libs/engine/                     — The program both shells run: state, schedul
   src/lib/babysitters/           — Per-repository PR watches, observation freshness, bounded polling and delivery coordination
   src/lib/machines/              — Fleet snapshots, remote ownership policy and injected command/PTY/mail ports
   src/lib/plans/                 — Captured-repository plan checkout, delivery, coalescing and invalidation
-  src/contract.ts                — Browser-safe engine data contracts
+  src/lib/*/api.ts               — Public domain APIs; private cross-domain imports are lint errors
+  src/lib/kernel/                — Domain-free terminal dimension validation
+  src/contract.ts                — Browser-safe payloads and structural client types
 libs/core/                       — Shell-agnostic operations. No React, Ink, Electron or engine (lint-enforced)
   src/lib/session/               — Session launch and delivery primitives
   src/lib/plan/                  — Plan store (external store) + prompt composition
   src/lib/babysit/               — Pure observation model and briefing composition
+  src/ui.ts                      — Browser-safe presentation and input models
   src/plan.ts                    — Browser-safe entry (`@n10/core/plan`) for the renderer
   src/lib/utils/                 — Pure helpers (sidebar-items, session-sort, diff-fetcher, virtual-viewport…)
   src/lib/settings/              — Settings field model, coercion and explicitly scoped config writes

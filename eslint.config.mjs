@@ -11,6 +11,12 @@ const shellOperationPaths = [
   {
     name: '@n10/vcs-core',
     allowTypeImports: true,
+    importNames: ['readConfig', 'readGlobalConfig', 'readProjectConfig'],
+    message: 'Read the captured engine config snapshot.',
+  },
+  {
+    name: '@n10/vcs-core',
+    allowTypeImports: true,
     importNames: ['writeGlobalConfig', 'writeProjectConfig'],
     message: 'Config writes belong to the engine config service.',
   },
@@ -120,6 +126,40 @@ const shellOperationPaths = [
       'Worktree resources and commands belong to the engine worktree service.',
   },
 ];
+
+const engineDomains = [
+  'babysitters',
+  'config',
+  'machines',
+  'plans',
+  'pull-requests',
+  'repositories',
+  'reviews',
+  'sessions',
+  'sync',
+  'worktrees',
+];
+const browserRuntimePaths = [
+  ...builtinModules,
+  'electron',
+  'ink',
+  '@n10/core',
+  '@n10/engine',
+  '@n10/logger',
+  '@n10/terminal',
+  '@n10/terminal-pty',
+  '@n10/terminal-tmux',
+  '@n10/vcs-core',
+  '@n10/vcs-github',
+  '@n10/vcs-azure-devops',
+  '@n10/worktree-manager',
+  '@n10/review-comments',
+].map((name) => ({
+  name,
+  allowTypeImports: true,
+  message:
+    'Browser bindings receive engine clients and import pure presentation entries.',
+}));
 
 export default tseslint.config(
   ...nx.configs['flat/base'],
@@ -530,6 +570,100 @@ export default tseslint.config(
     },
   },
   {
+    // The engine fixture replaces persisted config to isolate hook integration tests.
+    files: ['apps/cli/src/hooks/review-engine-fixture.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: shellOperationPaths.filter(
+            (entry) => !entry.importNames.includes('readConfig')
+          ),
+        },
+      ],
+    },
+  },
+  ...engineDomains.map((domain) => ({
+    files: [`libs/engine/src/lib/${domain}/**/*.ts`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '../*/**',
+                '!../*/api.js',
+                '!../kernel/**',
+                '@n10/engine',
+                '@n10/engine/*',
+              ],
+              message:
+                'Use the neighboring domain public api.js; kernel mechanics contain no domain policy.',
+            },
+          ],
+        },
+      ],
+    },
+  })),
+  {
+    files: ['libs/engine/src/lib/kernel/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../*/**', '@n10/engine', '@n10/engine/*'],
+              message: 'Kernel mechanics cannot depend on engine domains.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['libs/app-core/src/**/*.{ts,tsx}'],
+    ignores: ['**/*.spec.{ts,tsx}'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        'process',
+        'Buffer',
+        '__dirname',
+        '__filename',
+        'require',
+      ],
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: browserRuntimePaths,
+          patterns: [
+            {
+              group: [
+                'node:*',
+                'electron/*',
+                'ink/*',
+                '@n10/*/*',
+                '!@n10/core/ui',
+                '!@n10/core/plan',
+                '!@n10/core/readiness',
+                '!@n10/review-comments/ui',
+                '!@n10/review-comments/conventional',
+                '!@n10/vcs-core/types',
+                '!@n10/vcs-core/pr-details',
+                '!@n10/engine/contract',
+              ],
+              allowTypeImports: true,
+              message:
+                'Only browser-safe package entries belong in React bindings.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Ink enforces its layout contract at runtime by throwing, so a
     // component that breaks it type-checks, builds, ships, and takes
     // down the TUI the first time that branch renders. See
@@ -661,6 +795,9 @@ export default tseslint.config(
                 // Browser-safe by construction, and tested as such.
                 '!@n10/core/plan',
                 '!@n10/core/readiness',
+                '!@n10/core/ui',
+                '!@n10/review-comments/ui',
+                '!@n10/engine/contract',
                 '!@n10/app-core/plan',
                 '!@n10/vcs-core/types',
                 '!@n10/vcs-core/pr-details',

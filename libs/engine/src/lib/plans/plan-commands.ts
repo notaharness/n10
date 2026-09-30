@@ -1,4 +1,5 @@
 import { logError } from '@n10/logger';
+import { paneDimension } from '../kernel/terminal-size.js';
 import {
   deliverToRunningSession,
   getSession,
@@ -13,9 +14,8 @@ import {
 import { createWorktree, worktreeScope } from '@n10/worktree-manager';
 import type { WorktreeScope } from '@n10/worktree-manager';
 import type { AppConfig } from '@n10/vcs-core';
-import { paneDimension } from '../sessions/session-commands.js';
-import type { SessionLaunchPorts } from '../sessions/session-commands.js';
-import type { WorktreeConfig } from '../worktrees/worktree-commands.js';
+import type { SessionLaunchPorts } from '../sessions/api.js';
+import type { WorktreeConfig } from '../worktrees/api.js';
 import type { PlanCheckoutRequest, PlanDelivery } from './plan-types.js';
 
 interface Captured {

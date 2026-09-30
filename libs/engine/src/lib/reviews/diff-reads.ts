@@ -8,7 +8,7 @@ import {
   fetchWorktreeDiffText,
 } from '@n10/core';
 import type { DiffFile, ReviewDiffText } from '@n10/core';
-import type { WorktreeService } from '../worktrees/worktree-service.js';
+import type { WorktreeService } from '../worktrees/api.js';
 import { createResourceCache } from './resource-cache.js';
 import { readResourceValue } from './read-resource.js';
 

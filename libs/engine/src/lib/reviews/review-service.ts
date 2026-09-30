@@ -1,7 +1,7 @@
 import { createAgentComments } from './agent-comments.js';
 import { isDeepStrictEqual } from 'node:util';
-import { configEffects } from '../config/config-effects.js';
-import type { WorktreeService } from '../worktrees/worktree-service.js';
+import { configEffects } from '../config/api.js';
+import type { WorktreeService } from '../worktrees/api.js';
 import { createProviderReads } from './provider-reads.js';
 import { createDiffReads } from './diff-reads.js';
 import {

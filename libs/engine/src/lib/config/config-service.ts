@@ -9,7 +9,7 @@ import {
 import type { AppConfig, VcsProvider, RepositoryRef } from '@n10/vcs-core';
 import { persistConfigField, persistKeybindFields } from '@n10/core';
 import type { KeybindFields, SettingsField } from '@n10/core';
-import type { PullRequestList } from '../pull-requests/pull-request-list.js';
+import type { PullRequestList } from '../pull-requests/api.js';
 import { configEffects } from './config-effects.js';
 
 export interface ConfigSnapshot {

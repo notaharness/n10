@@ -6,7 +6,7 @@ import type {
   WorktreeService,
   ReviewService,
   SessionService,
-} from '@n10/engine';
+} from '@n10/engine/contract';
 
 /**
  * The engine services a shell created, and the repository this

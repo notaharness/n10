@@ -1,7 +1,7 @@
 import { logError } from '@n10/logger';
 import type { BabysitStatus } from '@n10/core';
-import type { ConfigSnapshot } from '../config/config-service.js';
-import type { PullRequestList } from '../pull-requests/pull-request-list.js';
+import type { ConfigSnapshot } from '../config/api.js';
+import type { PullRequestList } from '../pull-requests/api.js';
 import { startPrBabysitter } from './pr-babysitter.js';
 import type { PrBabysitter } from './babysit-types.js';
 

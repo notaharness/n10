@@ -4,7 +4,7 @@ import {
   useEffectEvent,
   useSyncExternalStore,
 } from 'react';
-import type { SyncNotice } from '@n10/engine';
+import type { SyncNotice } from '@n10/engine/contract';
 import { useEngine } from '../context/EngineContext.js';
 import { useToastActions } from '../context/ToastContext.js';
 

@@ -2,7 +2,7 @@ import { memo, useEffect, type ReactNode } from 'react';
 import { Text, Box } from 'ink';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import type { AgentSession } from '@n10/core';
-import { useActivityStatus, useFlashPhase } from '@n10/app-core';
+import { useActivityStatus, useFlashPhase } from '../hooks/useActivity.js';
 import { remove as removeInactiveAlert, tabDigit } from '@n10/core';
 import { Divider } from './Divider.js';
 import { PrBadge } from './PrBadge.js';

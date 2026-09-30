@@ -777,3 +777,20 @@ The frontend retains its cart and composed preview. Core retains launch, attach,
 stop and inject primitives; its plan checkout orchestrator and the desktop's
 coalescing/adoption coordinator are deleted. The browser-safe engine contract
 owns the plan request/result types.
+
+### Browser bindings and domain boundaries
+
+App-core is a browser-safe React layer over injected structural clients. The
+engine's type-only `contract` entry exposes client and payload types without
+loading Node services. Core `ui`/`plan` and review-comments `ui` expose pure
+presentation models. A browser bundle regression covers their transitive graph.
+Placement computes data without writing host logs. CLI-owned hooks adapt PTY
+frames, activity, tab registry state and TTY dimensions; `LayoutProvider` requires
+the shell's dimension hook and pane initialization receives session presence.
+
+Engine domains import neighboring domains through explicit `api.ts` surfaces.
+ESLint enforces those edges, prohibits domains in the kernel and Node APIs in
+React bindings, and rejects raw config reads in production shells. Core PTY I/O
+remains available to shell transports. The small shared terminal-dimension
+validator is extracted because session, terminal and plan commands use it; this
+does not introduce a generic kernel framework or a second desktop query cache.

@@ -5,7 +5,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import type { ReactNode } from 'react';
-import type { ConfigService, ConfigSnapshot } from '@n10/engine';
+import type { ConfigService, ConfigSnapshot } from '@n10/engine/contract';
 
 export interface ConfigContextValue extends ConfigSnapshot {
   repo: string;

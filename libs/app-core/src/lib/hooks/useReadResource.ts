@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import type { ReadResource, ReadSnapshot } from '@n10/engine';
+import type { ReadResource, ReadSnapshot } from '@n10/engine/contract';
 
 const EMPTY = { data: null, loading: false, error: null, fetchedAt: null };
 const emptySnapshot = () => EMPTY;

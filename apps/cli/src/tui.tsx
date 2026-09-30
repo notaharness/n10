@@ -1,3 +1,4 @@
+import { useTerminalDimensions } from './hooks/useTerminalDimensions.js';
 import { useState } from 'react';
 import { render, Box, useApp } from 'ink';
 import type { VcsProvider } from '@n10/vcs-core';
@@ -180,7 +181,7 @@ export async function runTui(args: string[]): Promise<void> {
         sessions={repo.sessions}
       >
         <KeybindProvider>
-          <LayoutProvider>
+          <LayoutProvider useDimensions={useTerminalDimensions}>
             <NavProvider>
               <AsyncOpsProvider>
                 <PlanProvider>

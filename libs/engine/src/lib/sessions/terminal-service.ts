@@ -1,3 +1,4 @@
+import { paneDimension } from '../kernel/terminal-size.js';
 import { statSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import {
@@ -13,7 +14,6 @@ import {
   type TerminalKind,
 } from '@n10/core';
 import { readConfig } from '@n10/vcs-core';
-import { paneDimension } from './session-commands.js';
 import { terminalFacts, type TerminalRecord } from './terminal-facts.js';
 
 export interface TerminalLaunch {

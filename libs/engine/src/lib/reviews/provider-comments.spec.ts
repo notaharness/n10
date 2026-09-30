@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest';
 import { reviewReadFixture } from './review-read-fixture.js';
 import { readResourceValue } from './read-resource.js';
 import { createReviewService } from './review-service.js';
-import type { WorktreeService } from '../worktrees/worktree-service.js';
+import type { WorktreeService } from '../worktrees/api.js';
 
 it.each(['7 OR 1=1', '../../admin', 2.5, 0, -1])(
   'rejects invalid PR identity %s before provider work',

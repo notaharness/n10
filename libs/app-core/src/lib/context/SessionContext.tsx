@@ -1,4 +1,4 @@
-import type { WorktreeService, SessionService } from '@n10/engine';
+import type { WorktreeService, SessionService } from '@n10/engine/contract';
 import { useEngine } from './EngineContext.js';
 import { createContext, useContext, useMemo, useEffect } from 'react';
 import type { ReactNode } from 'react';
@@ -11,7 +11,7 @@ import {
   findOrphanPrs,
   categorizeReviews as categorizePrReviews,
   buildSessionPrMap,
-} from '@n10/core';
+} from '@n10/core/ui';
 import { setOperationErrorHandler } from '../hooks/useAsyncOperation.js';
 import { useSessionManager } from '../hooks/useSessionManager.js';
 import { usePrData } from '../hooks/usePrData.js';
@@ -21,7 +21,7 @@ import { useBranchPickerActions } from './ModalContext.js';
 import { useToastActions } from './ToastContext.js';
 import type { ToastVariant } from './ToastContext.js';
 import type { AgentSession } from '@n10/core';
-import { sortSessionsByPrId } from '@n10/core';
+import { sortSessionsByPrId } from '@n10/core/ui';
 
 // ── Data context (consumed by SidebarProvider, changes on data refresh) ──
 
