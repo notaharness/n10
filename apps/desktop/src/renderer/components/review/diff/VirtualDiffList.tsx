@@ -27,6 +27,8 @@ import { useFileAnalyses } from '../../../lib/diff/highlight.js';
 import { focusIsLost } from '../../../lib/focus.js';
 import { MyDraftsContext } from '../../../lib/review/my-drafts-context.js';
 import {
+  readsSettled,
+  scrollTelling,
   useDiffJumps,
   type DiffJumpHandle,
 } from '../../../lib/diff/use-diff-jumps.js';
@@ -128,6 +130,8 @@ export function VirtualDiffList({
     [rows, linesByFile]
   );
 
+  // Scrolls the list makes itself reach the jumps as they happen.
+  const scrolledRef = useRef<(() => void) | null>(null);
   // React Compiler declines to memoize a component that calls this,
   // because the virtualizer hands back methods rather than values. That
   // is a property of @tanstack/react-virtual and not something this
@@ -140,6 +144,7 @@ export function VirtualDiffList({
     estimateSize: (i) => estimateRowHeight(rows[i]),
     getItemKey: (i) => rows[i].key,
     overscan: 16,
+    scrollToFn: scrollTelling(scrolledRef),
   });
   const virtualItems = virtualizer.getVirtualItems();
   useDiffAnchor({
@@ -198,22 +203,14 @@ export function VirtualDiffList({
     []
   );
 
-  // Settled once no read is in flight and no file on screen waits for
-  // one: a jump lands before its file's batch is even asked for.
-  const bodies = prDiff?.bodies;
-  const waiting = useMemo(
-    () =>
-      bodies !== undefined &&
-      [...toRead].some((f) => bodies.get(f)?.state === 'loading'),
-    [bodies, toRead]
-  );
   useDiffJumps(
     jumpRef,
     flat,
     rows,
     virtualizer,
     scrollRef,
-    (prDiff?.settled ?? true) && !waiting
+    scrolledRef,
+    readsSettled(prDiff, toRead)
   );
 
   // Moving through lines, or back from a closed composer, may land on

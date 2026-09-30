@@ -113,18 +113,39 @@ test.describe('many files', () => {
   });
 });
 
-test.describe('files of many lines', () => {
-  const pad4 = (i: number) => String(i).padStart(4, '0');
-  const pathOf = (i: number) =>
-    `pkg-${String(Math.floor(i / 100)).padStart(2, '0')}/m-${pad4(i)}.txt`;
+const pad4 = (i: number) => String(i).padStart(4, '0');
+const pathOf = (i: number) =>
+  `pkg-${String(Math.floor(i / 100)).padStart(2, '0')}/m-${pad4(i)}.txt`;
+
+/** `count` files of 42 lines, a hundred to a directory: a batch each. */
+function manyLines(count: number): Record<string, string> {
   const files: Record<string, string> = {};
-  for (let i = 0; i < 1200; i++) {
+  for (let i = 0; i < count; i++) {
     files[pathOf(i)] = Array.from(
       { length: 42 },
       (_, n) => `file ${pad4(i)} line ${n}\n`
     ).join('');
   }
-  test.use({ repo: { worktrees: [{ branch: BRANCH, files }] } });
+  return files;
+}
+
+/** How far a file's header is below the top of the diff; null while
+ *  the list has it unmounted. */
+function fromTop(page: Page, path: string): Promise<number | null> {
+  return page.locator(`div[data-file="${path}"]`).evaluate((el) => {
+    // A row the list remounts is detached for a moment.
+    const list = el.closest('[data-diff-scroll]');
+    if (!list) return null;
+    return Math.round(
+      el.getBoundingClientRect().top - list.getBoundingClientRect().top
+    );
+  });
+}
+
+test.describe('files of many lines', () => {
+  test.use({
+    repo: { worktrees: [{ branch: BRANCH, files: manyLines(1200) }] },
+  });
 
   test('a tree click lands on its file once the rows above are measured', async ({
     desktop,
@@ -142,23 +163,63 @@ test.describe('files of many lines', () => {
       await button.click();
       // Its batch has landed, and the rows above it take their size.
       await expect(diffText(page, `file ${pad4(i)} line 0`)).toBeVisible();
-      const header = page.locator(`div[data-file="${pathOf(i)}"]`);
       await expect
-        .poll(
-          () =>
-            header.evaluate((el) => {
-              // A row the list remounts is detached for a moment.
-              const list = el.closest('[data-diff-scroll]');
-              if (!list) return null;
-              return Math.round(
-                el.getBoundingClientRect().top -
-                  list.getBoundingClientRect().top
-              );
-            }),
-          { message: `${pathOf(i)}'s header, from the top of the diff` }
-        )
+        .poll(() => fromTop(page, pathOf(i)), {
+          message: `${pathOf(i)}'s header, from the top of the diff`,
+        })
         .toBe(0);
     }
+  });
+});
+
+test.describe('a read let go above the reader', () => {
+  // Six batches, and between the fifth and sixth a file too large to
+  // read until asked for: asking is one read more than are kept, and
+  // lets go of the oldest, above it.
+  const big = 'pkg-05/big.txt';
+  test.use({
+    repo: {
+      worktrees: [
+        {
+          branch: BRANCH,
+          files: {
+            ...manyLines(600),
+            [big]: Array.from(
+              { length: 200_000 },
+              (_, i) => `big line ${i}\n`
+            ).join(''),
+          },
+        },
+      ],
+    },
+  });
+
+  test('leaves what the reader sees where it was', async ({ desktop }) => {
+    test.setTimeout(120_000);
+    const { page } = desktop;
+    await sidebarRow(page, /Large/).first().click();
+    await showChanges(page);
+    await expect(diffText(page, 'file 0000 line 0')).toBeVisible({
+      timeout: 30_000,
+    });
+    for (const i of [150, 250, 350, 450, 550]) {
+      const button = fileButton(page, new RegExp(`m-${pad4(i)}\\.txt`));
+      await button.scrollIntoViewIfNeeded();
+      await button.click();
+      await expect(diffText(page, `file ${pad4(i)} line 0`)).toBeVisible();
+    }
+    await fileButton(page, 'big.txt').click();
+    await expect.poll(() => fromTop(page, big)).toBe(0);
+    // Opened, it offers its changes. The files let go above give way to
+    // notices of about their size; the reader stays on this one.
+    await page.getByRole('button', { name: `Added ${big}` }).click();
+    await page.getByRole('button', { name: 'Load changes' }).click();
+    await expect.poll(() => fromTop(page, big)).toBe(0);
+    // And once its lines arrive below it.
+    await expect(diffText(page, 'big line 0')).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect.poll(() => fromTop(page, big)).toBe(0);
   });
 });
 

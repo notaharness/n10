@@ -1,12 +1,14 @@
-import type { Virtualizer } from '@tanstack/react-virtual';
+import { elementScroll, type Virtualizer } from '@tanstack/react-virtual';
 import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   type Ref,
   type RefObject,
 } from 'react';
+import type { FileBody } from './diff-bodies.js';
 import type { FlatRow } from './diff-virtual.js';
 
 /** A place in the list: a row, and how far into it the viewport starts.
@@ -34,16 +36,51 @@ export interface DiffJumpHandle {
   topRow(): RowPlace | null;
 }
 
+type Place = Pick<RowPlace, 'key' | 'offset'>;
+
 type Target =
   | { id: string }
   | { file: string }
-  | { row: RowPlace }
+  | { row: Place }
   | { top: true };
+
+/** No read in flight, and no file on screen waiting for one: a jump
+ *  lands before its file's batch is even asked for. A worktree's
+ *  files all arrive with their lines. */
+export function readsSettled(
+  prDiff:
+    | { settled: boolean; bodies: ReadonlyMap<string, FileBody> }
+    | undefined,
+  onScreen: ReadonlySet<string>
+): boolean {
+  if (!prDiff) return true;
+  for (const f of onScreen) {
+    if (prDiff.bodies.get(f)?.state === 'loading') return false;
+  }
+  return prDiff.settled;
+}
+
+/** The virtualizer's own scrolling, told to `scrolledRef` as it happens. */
+export function scrollTelling(
+  scrolledRef: RefObject<(() => void) | null>
+): typeof elementScroll {
+  return (offset, options, instance) => {
+    elementScroll(offset, options, instance);
+    scrolledRef.current?.();
+  };
+}
 
 /** Where the rows are, in the terms a jump names them. */
 interface RowIndex {
   indexById: ReadonlyMap<string, number>;
   fileIndex: ReadonlyMap<string, number>;
+}
+
+/** Where the reader is: the row at the top of the viewport and, for when
+ *  that row goes, its file's header. */
+interface Kept {
+  row: Place;
+  header: Place | null;
 }
 
 function indexOf(
@@ -60,8 +97,29 @@ function indexOf(
   return 0;
 }
 
+/** The place at `offset`, in the rows the list last laid out; null while
+ *  the virtualizer measures rows not laid out yet. */
+function placeAt(
+  virtualizer: Virtualizer<HTMLDivElement, Element>,
+  laidOut: { rows: readonly FlatRow[]; index: RowIndex },
+  offset: number
+): Kept | null {
+  const item = virtualizer.getVirtualItemForOffset(offset);
+  const row = item && laidOut.rows[item.index];
+  if (!item || !row || row.key !== item.key) return null;
+  const h = 'file' in row ? laidOut.index.fileIndex.get(row.file) : undefined;
+  const header = h === undefined ? undefined : virtualizer.measurementsCache[h];
+  return {
+    row: { key: row.key, offset: offset - item.start },
+    header: header
+      ? { key: String(header.key), offset: offset - header.start }
+      : null,
+  };
+}
+
 /**
- * Jumps into the list that land where they aimed.
+ * Jumps into the list that land where they aimed, and a reader who stays
+ * where they are.
  *
  * A jump scrolls to where its target is now, but a pull request's
  * files arrive a batch at a time: the batch holding the target — and
@@ -73,6 +131,17 @@ function indexOf(
  * before its file's batch is asked for). After that nothing is left to
  * move it, and a later change — a poll, Hide resolved — must not pull
  * the reader back.
+ *
+ * Reads land and are let go above the reader, too, and a file let go
+ * gives way to a notice only about its size. Whatever the rows above
+ * do, the row at the top of the viewport keeps its place — or, when it
+ * went (a notice replaced by the lines it stood for), its file's header
+ * does. A list at its very top stays there instead, as the browser's
+ * own scroll anchoring does, so rows arriving above the first are seen.
+ * The place is noted as the reader scrolls and as the list scrolls
+ * itself (`scrolledRef`, called from the virtualizer's `scrollToFn`):
+ * the browser reports a scroll only a frame later, and rows can change
+ * in between.
  */
 export function useDiffJumps(
   jumpRef: Ref<DiffJumpHandle> | undefined,
@@ -80,18 +149,28 @@ export function useDiffJumps(
   rows: readonly FlatRow[],
   virtualizer: Virtualizer<HTMLDivElement, Element>,
   scrollRef: RefObject<HTMLDivElement | null>,
+  scrolledRef: RefObject<(() => void) | null>,
   settled: boolean
 ) {
   const pending = useRef<Target | null>(null);
+  const kept = useRef<Kept | null>(null);
+  const laidOut = useRef({ rows, index });
 
   const scrollTo = useCallback(
     (target: Target) => {
       const i = indexOf(target, index, rows);
       if (i == null) return false;
       if ('row' in target) {
+        // Sizes measured since the list rendered count too: asking for
+        // its size brings them in.
+        virtualizer.getTotalSize();
         const start = virtualizer.getOffsetForIndex(i, 'start');
         if (!start) return false;
-        virtualizer.scrollToOffset(start[0] + target.row.offset);
+        const offset = start[0] + target.row.offset;
+        const now = scrollRef.current?.scrollTop;
+        if (now === undefined || Math.abs(offset - now) >= 1) {
+          virtualizer.scrollToOffset(offset);
+        }
       } else if ('top' in target) {
         virtualizer.scrollToOffset(0);
       } else {
@@ -101,8 +180,39 @@ export function useDiffJumps(
       }
       return true;
     },
-    [index, rows, virtualizer]
+    [index, rows, virtualizer, scrollRef]
   );
+
+  const note = useCallback(() => {
+    const top = scrollRef.current?.scrollTop ?? 0;
+    if (top <= 0) {
+      kept.current = null;
+      return;
+    }
+    kept.current = placeAt(virtualizer, laidOut.current, top) ?? kept.current;
+  }, [virtualizer, scrollRef]);
+
+  // New rows, before they are painted: the reader keeps their place,
+  // unless a jump is still aiming (below).
+  useLayoutEffect(() => {
+    if (laidOut.current.rows === rows) return;
+    laidOut.current = { rows, index };
+    const was = kept.current;
+    if (was && !pending.current && !scrollTo({ row: was.row }) && was.header) {
+      scrollTo({ row: was.header });
+    }
+    note();
+  }, [rows, index, scrollTo, note]);
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    scrolledRef.current = note;
+    el?.addEventListener('scroll', note, { passive: true });
+    return () => {
+      scrolledRef.current = null;
+      el?.removeEventListener('scroll', note);
+    };
+  }, [scrollRef, scrolledRef, note]);
 
   // New rows: make the pending jump again, against where they put it.
   useEffect(() => {
