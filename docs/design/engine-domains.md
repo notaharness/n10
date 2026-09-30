@@ -60,7 +60,60 @@ alongside session extraction. Use explicit agent identity, including fixture age
 do not introduce a replacement compatibility path. Config storage reads the current nested format; flat Azure credential/project
 format migrations are removed with this slice.
 
-## First slice contract
+## Delivery stack
+
+The implementation covers every domain above. Each row is a separate reviewable
+PR based on its predecessor; a domain with materially different read/write risks
+is split explicitly. Every PR replaces the relevant shell policy with engine
+consumers and deletes superseded code. Changes requested on an earlier PR are
+propagated through the stack before merging.
+
+1. **Config**: scoped snapshots, persistence and settings effects (#263).
+2. **Repository scope**: one engine repository-open operation for canonical
+   identity, validation, config detection and worktree setup. Both shells use
+   it; desktop retains recent-repo UI and selection. Engine operations receive
+   captured repo paths; shell cwd changes survive only until their remaining
+   core callers are migrated, without adding a second compatibility API.
+3. **Sync**: one owned schedule and complete fetch/merged/conflict pass, bounded
+   refreshes, cancellation, snapshots and typed notices. Both shell coordinators
+   disappear. Preserve removal verdicts and repo-switch safety.
+4. **Worktrees**: list/branch resources and create/check/remove commands over
+   core's guarded operations. Both shells consume the same state/invalidation;
+   sync calls the domain's removal command.
+5. **PR and review reads**: scoped detail/check/conversation/thread/diff resources,
+   including freshness and invalidation. Provider protocols remain in vcs;
+   renderer diff parsing/highlighting remains presentation work.
+6. **Review commands and drafts**: shared reply/resolve/draft/publication commands,
+   scoped stores and publication reconciliation. Both agent-comment posting paths
+   use vcs publishers; delete review-comments' independent poster.
+7. **Sessions**: discovery, adoption, launch/restart/stop, lifecycle and attention
+   facts shared by both shells, then babysitter coordination if its size warrants
+   a separate PR. Delete shell orchestration; preserve retained connections across
+   repo switches. Remove legacy command-to-agent inference and use explicit
+   fixture-agent identity.
+8. **Machines**: fleet snapshots and remote command policy with injected machine
+   ports. Beam socket/native-process ownership stays in desktop adapters; an
+   unsupported shell observes an unavailable capability without a fake backend.
+9. **Plans**: shared checkout command and session invalidation. Keep each
+   frontend's browser-safe cart and presentation local; delete duplicated
+   checkout coordination, not the intentionally local cart.
+10. **Contract and dependency closure**: extract the browser-safe engine contract
+    used by bindings/IPC, enforce domain public APIs, and tighten migrated bindings
+    against direct backend operations. Extract kernel mechanics only where the
+    implemented domains demonstrate reuse; no speculative command framework.
+11. **Worker evidence**: profile the completed host under large-diff and active
+    terminal workloads. Record results and retain existing execution boundaries
+    if no additional offload pays off. Any justified worker is its own coherent
+    PR with bounded queues, disposal and before/after measurements.
+
+For every slice, run typecheck before code changes, relevant unit tests with
+negative regression probes, full lint, final typecheck and affected TUI/desktop
+e2e. Open the PR immediately after its local checks so review overlaps the next
+slice. Review findings and replies live on that PR. A completed stack requires
+all listed domain ownership changes and the final dependency audit; a worker or
+shared daemon is not a quota to fill.
+
+## Config contract
 
 A config service has one explicit repository, stable snapshots and subscriptions.
 Its snapshot holds resolved config, provider, configured status, revision and a
