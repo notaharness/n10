@@ -93,7 +93,9 @@ propagated through the stack before merging.
    facts shared by both shells, then babysitter coordination if its size warrants
    a separate PR. Delete shell orchestration; preserve retained connections across
    repo switches. Remove legacy command-to-agent inference and use explicit
-   fixture-agent identity.
+   fixture-agent identity. Discovery receives the repository handle’s live scope
+   port; launch captures one handle for both cwd and domain services before any
+   asynchronous work.
 8. **Machines**: fleet snapshots and remote command policy with injected machine
    ports. Beam socket/native-process ownership stays in desktop adapters; an
    unsupported shell observes an unavailable capability without a fake backend.

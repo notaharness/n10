@@ -139,10 +139,21 @@ describe('worktree resources', () => {
     ports.list.mockRejectedValueOnce(new Error('Git unavailable'));
     expect(await service.refresh()).toMatchObject({
       worktrees: [row],
-      error: 'Git unavailable',
+      error: 'Could not read worktrees and branches: Git unavailable',
       loading: false,
     });
     expect((await service.refresh()).error).toBeNull();
+  });
+  it('reports the Git reason without exposing the command line', async () => {
+    const { service } = harness();
+    ports.list.mockRejectedValueOnce(
+      new Error(
+        'Command failed: git worktree list --porcelain -z\nfatal: repository unavailable\n'
+      )
+    );
+    expect((await service.read()).error).toBe(
+      'Could not read worktrees and branches: fatal: repository unavailable'
+    );
   });
   it('applies path edits immediately and cannot publish the read using the old template', async () => {
     const a = deferred<WorktreeInfo[]>(),

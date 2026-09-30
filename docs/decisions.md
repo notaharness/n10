@@ -604,7 +604,10 @@ ports; a retained checkout resumes watchers only while its repo is selected.
 Repository handles own `WorktreeService`. A read shares the resource's active
 request or a snapshot fetched within one second; an explicit refresh during a
 read joins one follow-up. Failed Git reads retain the last good lists with an
-error. Successful commands refresh the resource, so both shells see the same
+error. Desktop RPCs reject a failed refresh so the query layer reports it;
+TanStack Query keeps its prior successful sidebar data, and Workspace renders
+that data while toasting the error. A first failed read has no prior rows.
+Successful commands refresh the resource, so both shells see the same
 creation, removal and rebase behavior. A configured path change invalidates
 in-flight publication and reads with the new path policy immediately.
 

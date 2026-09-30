@@ -34,15 +34,16 @@ function harness() {
     resume: vi.fn(async () => undefined),
     isCurrent: vi.fn(() => true),
   };
+  const changed = vi.fn(async () => undefined);
   const commands = createWorktreeCommands({
     config: {
       repo: '/captured',
       getSnapshot: () => ({ config: { vendorAuth: {}, vendorProject: {} } }),
     },
     watchers,
-    changed: async () => undefined,
+    changed,
   });
-  return { commands, watchers };
+  return { commands, watchers, changed };
 }
 describe('worktree removal command', () => {
   it('suspends watchers and names the captured repo in the guarded operation', async () => {
@@ -64,6 +65,15 @@ describe('worktree removal command', () => {
       const { commands, watchers } = harness();
       await expect(commands.remove('topic', approved)).resolves.toBe(outcome);
       expect(watchers.resume).toHaveBeenCalledExactlyOnceWith('/captured', 42);
+    }
+  );
+  it.each(['removed', 'refused'] as const)(
+    'invalidates the resource after %s',
+    async (outcome) => {
+      state.outcome = outcome;
+      const { commands, changed } = harness();
+      await commands.remove('topic', approved);
+      expect(changed).toHaveBeenCalledOnce();
     }
   );
   it('keeps watchers stopped when only the branch remains', async () => {

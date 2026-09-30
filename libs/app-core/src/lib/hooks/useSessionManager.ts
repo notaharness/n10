@@ -1,6 +1,7 @@
 import { useEngine } from '../context/EngineContext.js';
 import {
   useState,
+  useMemo,
   useEffect,
   useCallback,
   useEffectEvent,
@@ -9,6 +10,7 @@ import {
 import {
   worktreeSessionRow,
   isSessionAlive,
+  sessionNames,
   launchSession,
   onSessionExit,
   startSessionDiscovery,
@@ -17,6 +19,8 @@ import type { AgentSession, DiscoveredWorktree } from '@n10/core';
 import { readConfig } from '@n10/vcs-core';
 import { useLayout } from '../context/LayoutContext.js';
 import { useToastActions } from '../context/ToastContext.js';
+
+const runningSessions = () => new Set(sessionNames().filter(isSessionAlive));
 
 export function useSessionManager(
   repo: string,
@@ -30,9 +34,13 @@ export function useSessionManager(
     worktrees.getSnapshot
   );
   // Registry events change running flags without changing the checkout snapshot.
-  const [, setSessionRevision] = useState(0);
-  const sessions: AgentSession[] = snapshot.worktrees.map((wt) =>
-    worktreeSessionRow(wt, isSessionAlive, repo)
+  const [running, setRunning] = useState(runningSessions);
+  const sessions = useMemo<AgentSession[]>(
+    () =>
+      snapshot.worktrees.map((wt) =>
+        worktreeSessionRow(wt, (name) => running.has(name), repo)
+      ),
+    [snapshot.worktrees, repo, running]
   );
   const reportError = useEffectEvent(() => {
     if (snapshot.error) flash(snapshot.error, 'warning');
@@ -41,7 +49,7 @@ export function useSessionManager(
 
   const refreshSessions = useCallback(async () => {
     const next = await worktrees.refresh();
-    setSessionRevision((value) => value + 1);
+    setRunning(runningSessions());
     return next.worktrees.map((wt) =>
       worktreeSessionRow(wt, isSessionAlive, repo)
     );
@@ -77,7 +85,7 @@ export function useSessionManager(
       onChanged: () => onDiscovered(),
     });
     const unsubscribe = onSessionExit(() => {
-      if (!cancelled) setSessionRevision((value) => value + 1);
+      if (!cancelled) setRunning(runningSessions());
     });
     return () => {
       cancelled = true;

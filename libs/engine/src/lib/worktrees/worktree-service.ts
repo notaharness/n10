@@ -31,6 +31,15 @@ export interface WorktreeService extends WorktreeCommands {
   dispose(): void;
 }
 
+function readError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const reason = message
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith('Command failed'));
+  return `Could not read worktrees and branches${reason ? `: ${reason}` : ''}`;
+}
+
 /** One repository's worktree and branch resources, shared by every consumer. */
 export function createWorktreeService(options: {
   config: WorktreeConfig;
@@ -77,10 +86,8 @@ export function createWorktreeService(options: {
       fetchedAt = Date.now();
       publish({ worktrees, branches, allBranches });
     } catch (error) {
-      if (!disposed && gen === generation)
-        publish({
-          error: error instanceof Error ? error.message : String(error),
-        });
+      logError('worktree read', error);
+      if (!disposed && gen === generation) publish({ error: readError(error) });
     } finally {
       if (!disposed && gen === generation) publish({ loading: false });
     }
