@@ -6,7 +6,10 @@ import {
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { keys } from './query-keys.js';
-import { verdictDecision } from '../review/review-verdict.js';
+import {
+  verdictDecision,
+  withViewerVerdict,
+} from '../review/review-verdict.js';
 import { errorMessage } from '../utils.js';
 import { useTabs } from '../tabs/tabs.js';
 import { keptNotice } from './removal-notice.js';
@@ -76,28 +79,16 @@ export function useSubmitVerdict(cwd: string, providerId?: string) {
       const prev = qc.getQueryData<SidebarItem[]>(key);
       if (prev) {
         const decision = verdictDecision(verdict, providerId);
-        const me = viewer.identifier.toLowerCase();
         qc.setQueryData<SidebarItem[]>(
           key,
           prev.map((item) => {
             if (item.pr?.id !== prId) return item;
-            const reviewers = item.pr.reviewers ?? [];
-            const mine = reviewers.some(
-              (r) => r.identifier.toLowerCase() === me
+            const reviewers = withViewerVerdict(
+              item.pr.reviewers ?? [],
+              viewer.identifier,
+              decision
             );
-            const next = mine
-              ? reviewers.map((r) =>
-                  r.identifier.toLowerCase() === me ? { ...r, decision } : r
-                )
-              : [
-                  ...reviewers,
-                  {
-                    identifier: viewer.identifier,
-                    displayName: 'You',
-                    decision,
-                  },
-                ];
-            return { ...item, pr: { ...item.pr, reviewers: next } };
+            return { ...item, pr: { ...item.pr, reviewers } };
           })
         );
       }

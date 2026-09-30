@@ -1,6 +1,7 @@
 import {
   asksForReview,
   holdingVerdict,
+  reviewersToCount,
   type PullRequestInfo,
   type PullRequestReviewer,
   type ReviewDecision,
@@ -220,7 +221,7 @@ function reviewerStep(pr: PullRequestInfo, viewer: string | null): NextStep {
 }
 
 function authorStep(pr: PullRequestInfo): NextStep {
-  const reviewers = pr.reviewers ?? [];
+  const reviewers = reviewersToCount(pr.reviewers ?? []);
   const unresolved = unresolvedDetail(pr);
   const view = { action: 'review-changes' as const, label: 'View changes' };
   // The count is the fact; who owes the next move on each thread is not
@@ -266,9 +267,10 @@ export function nextStep(
   return role === 'author' ? authorStep(pr) : reviewerStep(pr, viewer);
 }
 
-/** The reviewers still asked for a verdict: one who declined is not. */
+/** The reviewers still asked for a verdict, one row per vote
+ *  (`reviewersToCount`): one who declined is not. */
 export function activeReviewers(
   reviewers: readonly PullRequestReviewer[]
 ): PullRequestReviewer[] {
-  return reviewers.filter((r) => r.decision !== 'declined');
+  return reviewersToCount(reviewers).filter((r) => r.decision !== 'declined');
 }
