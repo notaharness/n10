@@ -569,6 +569,23 @@ export default tseslint.config(
     },
   },
   {
+    // Checks the renderer's batch plan against core's diff reads in real
+    // Git: it tests what the primitives return, and coordinates nothing.
+    files: [
+      'apps/desktop/src/host/services/pr-diff-batches.integration.spec.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: shellOperationPaths.filter(
+            (entry) => !entry.importNames.includes('readPrDiffPatch')
+          ),
+        },
+      ],
+    },
+  },
+  {
     // The engine fixture replaces persisted config to isolate hook integration tests.
     files: ['apps/cli/src/hooks/review-engine-fixture.ts'],
     rules: {

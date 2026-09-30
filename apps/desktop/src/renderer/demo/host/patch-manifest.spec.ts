@@ -51,6 +51,8 @@ describe('the demo manifest read off a patch', () => {
     });
     expect(files[2]).toMatchObject({ oldPath: 'old.md', similarity: 100 });
     expect(files[3]!.kind).toBe('binary');
+    // Sizes from the lines shown, and none for a side with no blob.
+    expect([files[1]!.oldSize, files[1]!.newSize]).toEqual([null, 8]);
   });
 
   it('reads the sections for the paths asked for, a rename by either', () => {

@@ -2,7 +2,6 @@ import { AlertTriangleIcon, GitCompareArrowsIcon } from 'lucide-react';
 import type { PrComparison } from '../../../../host/contract.js';
 import type { Ref } from 'react';
 import { copyText } from '../../../lib/copy-text.js';
-import type { PrDiffTruncation } from '../../../lib/review/use-pr-diff.js';
 import { Banner } from '../../ui/banner.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/tooltip.js';
 
@@ -106,20 +105,13 @@ export function megabytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** The patch passed its ceiling: say how much of the pull request the
- *  diff below holds, from the manifest's count of every file. */
-export function TruncationBanner({
-  truncation,
-  shownFiles,
-}: {
-  truncation: PrDiffTruncation;
-  shownFiles: number;
-}) {
+/** Git's listing of the files was cut: the list below is not the whole
+ *  pull request, and nothing may read as if it were. */
+export function IncompleteManifestBanner({ listed }: { listed: number }) {
   return (
-    <Banner aria-label="Diff cut short">
-      Showing {shownFiles} of {truncation.manifestComplete ? '' : 'at least '}
-      {truncation.manifestFiles} files: the diff passed{' '}
-      {megabytes(truncation.limitBytes)} and was cut at a file boundary.
+    <Banner aria-label="File list incomplete">
+      The file list is incomplete: Git’s listing was cut after {listed}{' '}
+      {listed === 1 ? 'file' : 'files'}, and more may have changed.
     </Banner>
   );
 }

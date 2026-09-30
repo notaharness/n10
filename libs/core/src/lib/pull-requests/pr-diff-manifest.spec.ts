@@ -42,6 +42,9 @@ describe('parseManifestListing', () => {
         kind: 'text',
         additions: 3,
         deletions: 1,
+        // Sizes come from the object store, not the listing.
+        oldSize: null,
+        newSize: null,
       },
       expect.objectContaining({
         path: 'new name.ts',

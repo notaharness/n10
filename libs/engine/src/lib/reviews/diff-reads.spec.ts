@@ -18,6 +18,7 @@ import { readResourceValue } from './read-resource.js';
  */
 
 vi.mock('@n10/core', () => ({
+  WHOLE_FILE_CONTEXT: 2_147_483_647,
   fetchRefs: vi.fn(),
   fetchWorktreeDiffText: vi.fn(),
   readPrDiffManifest: vi.fn(),
@@ -47,7 +48,7 @@ const patchRequest = { repo: '/repo/a', mergeBaseOid: BASE, headOid: HEAD };
 const find = vi.fn();
 let current = true;
 const reads = (repo = '/repo/a') =>
-  createDiffReads(repo, () => current, { find });
+  createDiffReads(repo, () => current, { find }, {});
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -82,7 +83,26 @@ describe('manifest', () => {
       targetBranch: 'main',
       expectedHeadOid: HEAD,
     });
-    expect(readPrDiffManifest).toHaveBeenCalledWith('/repo/a', comparison());
+    expect(readPrDiffManifest).toHaveBeenCalledWith(
+      '/repo/a',
+      comparison(),
+      {}
+    );
+  });
+
+  it('lists under the ceiling the environment sets', async () => {
+    const diff = createDiffReads(
+      '/repo/a',
+      () => true,
+      { find },
+      {
+        N10_DIFF_MANIFEST_MAX_BYTES: '400',
+      }
+    );
+    await readResourceValue(diff.manifest(request));
+    expect(readPrDiffManifest).toHaveBeenCalledWith('/repo/a', comparison(), {
+      maxBytes: 400,
+    });
   });
 
   it('keeps an unpinned target fresh, and fetches nothing for a pinned one', async () => {
@@ -180,7 +200,7 @@ describe('manifest', () => {
 describe('patch', () => {
   it('reads between the given commits, for the given paths, once', async () => {
     const diff = reads();
-    const req = { ...patchRequest, paths: ['src/a.ts'] };
+    const req = { ...patchRequest, paths: ['src/a.ts'], context: 3 };
     expect(await readResourceValue(diff.patch(req))).toEqual({
       ok: true,
       patch: { text: 'patch', truncated: false, limitBytes: 1 },
@@ -190,8 +210,29 @@ describe('patch', () => {
     expect(readPrDiffPatch).toHaveBeenCalledExactlyOnceWith(
       '/repo/a',
       { mergeBaseOid: BASE, headOid: HEAD },
-      { paths: ['src/a.ts'] }
+      { paths: ['src/a.ts'], context: 3 }
     );
+  });
+
+  it('keeps the last two patches read, and joins one still being read', async () => {
+    const diff = reads();
+    const of = (path: string) => ({ ...patchRequest, paths: [path] });
+    const calls = (path: string) =>
+      vi
+        .mocked(readPrDiffPatch)
+        .mock.calls.filter(([, , o]) => o?.paths?.[0] === path).length;
+    await Promise.all([
+      readResourceValue(diff.patch(of('a'))),
+      readResourceValue(diff.patch(of('a'))),
+    ]);
+    expect(calls('a')).toBe(1);
+    for (const path of ['b', 'c'])
+      await readResourceValue(diff.patch(of(path)));
+    await readResourceValue(diff.patch(of('c')));
+    expect(calls('c')).toBe(1);
+    // Past the two kept: read again.
+    await readResourceValue(diff.patch(of('a')));
+    expect(calls('a')).toBe(2);
   });
 
   it('drops an answer when the repository closes mid-read', async () => {
@@ -224,6 +265,12 @@ describe('patch', () => {
     ],
   ])('rejects malformed paths %#', (req) => {
     expect(() => reads().patch(req)).toThrow('paths must');
+  });
+
+  it.each([-1, 1.5, '3', 2 ** 31])('rejects a context of %j', (context) => {
+    expect(() => reads().patch({ ...patchRequest, context })).toThrow(
+      'context must be'
+    );
   });
 
   it('rejects bounds that are not strings', () => {

@@ -1,18 +1,8 @@
 import {
-  ChevronDownIcon,
-  ChevronUpIcon,
-  ColumnsIcon,
-  EyeOffIcon,
-  MessageSquareIcon,
-  RowsIcon,
-  WrapTextIcon,
-} from 'lucide-react';
-import {
   startTransition,
   useEffect,
   useRef,
   useState,
-  type Ref,
   type RefObject,
   type ReactNode,
 } from 'react';
@@ -25,24 +15,25 @@ import {
   setDiffOptions,
   useDiffOptions,
 } from '../../../lib/diff/diff-options.js';
+import {
+  useSingleFileView,
+  type DiffPlaceControls,
+} from '../../../lib/diff/use-single-file.js';
 import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
-import { cn } from '../../../lib/utils.js';
-import { Button } from '../../ui/button.js';
 import { Skeleton } from '../../ui/skeleton.js';
-import { Tip } from '../../ui/tooltip.js';
 import type { DiffReadState } from '../../../lib/data/read-state.js';
 import { ReadFailure, StaleNotice } from '../ReadNotice.js';
-import { ComparisonIdentity } from './ComparisonIdentity.js';
+import { IncompleteManifestBanner } from './ComparisonIdentity.js';
 import { DiffEmpty } from './DiffEmpty.js';
-import { PrDiffBanners } from './PrDiffBanners.js';
+import { DiffToolbar } from './DiffToolbar.js';
+import { MovedBanner } from './MovedBanner.js';
+import { SingleFileBar } from './SingleFileBar.js';
 import { VirtualDiffList, type DiffJumpHandle } from './VirtualDiffList.js';
 
 /**
- * The diff content pane: the diff *settings* toolbar (view / wrap /
- * hide-resolved / post-drafts / comment navigation) and the scrolling
- * per-file diffs. Only diff-specific controls live here — the PR meta
- * (author, CI, reviewers, files changed) is in the tab header — so this
- * bar is gone when the terminal replaces the pane.
+ * The diff content pane: its toolbar (`DiffToolbar`), what can be said
+ * about the read and the comparison, and the scrolling diff — every
+ * file in one list, or one at a time (`use-single-file.ts`).
  */
 export function DiffPane({
   prId,
@@ -67,6 +58,7 @@ export function DiffPane({
   navIndex,
   onPrev,
   onNext,
+  place,
 }: {
   prId: number;
   headSha?: string;
@@ -89,38 +81,48 @@ export function DiffPane({
   prDiff?: PrDiffView;
   focusThreadId: string | null;
   scrollRef: RefObject<HTMLDivElement | null>;
-  jumpRef?: Ref<DiffJumpHandle>;
+  jumpRef: RefObject<DiffJumpHandle | null>;
   navCount: number;
   navIndex: number;
   onPrev: () => void;
   onNext: () => void;
+  /** Where the reader is: the file single-file mode shows. */
+  place: DiffPlaceControls;
 }) {
-  // Terminal-first: the workspace's first frame (header, rail,
-  // terminal) must never wait on the diff. The list mounts in a
-  // follow-up low-priority render; virtualization keeps that render
-  // small, this gate keeps it out of frame one entirely.
-  const [warm, setWarm] = useState(false);
-  useEffect(() => {
-    const id = requestAnimationFrame(() =>
-      startTransition(() => setWarm(true))
-    );
-    return () => cancelAnimationFrame(id);
-  }, []);
+  const warm = useWarm();
   const loading = read.kind === 'loading' || !warm;
   const stale = 'stale' in read ? read.stale : null;
   // The comparison the moved banner's load leads to.
   const comparisonRef = useRef<HTMLButtonElement>(null);
+  const single = useDiffOptions().layout === 'single';
+  const view = useSingleFileView(
+    files,
+    generalThreads.length > 0,
+    place,
+    single,
+    prDiff?.incomplete
+  );
+  // The row at the top of the screen stays there across the switch —
+  // the conversation, or a line of a file — since rows keep their keys.
+  const toggleLayout = () => {
+    const top = jumpRef.current?.topRow() ?? null;
+    setDiffOptions({ layout: single ? 'all' : 'single' });
+    if (top?.file) place.select(top.file, top);
+    else if (top) place.showConversation();
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <Toolbar
+      <DiffToolbar
         navCount={navCount}
         navIndex={navIndex}
         onPrev={onPrev}
         onNext={onNext}
         prDiff={prDiff}
+        onToggleLayout={toggleLayout}
         comparisonRef={comparisonRef}
       />
+      {view.page && !loading && <SingleFileBar page={view.page} />}
       {stale && (
         <StaleNotice
           what="diff"
@@ -131,11 +133,7 @@ export function DiffPane({
         />
       )}
       {prDiff && !loading && (
-        <PrDiffBanners
-          prDiff={prDiff}
-          shownFiles={files.length}
-          comparisonRef={comparisonRef}
-        />
+        <PrDiffBanners prDiff={prDiff} comparisonRef={comparisonRef} />
       )}
       {threadsNotice}
       <div
@@ -146,48 +144,29 @@ export function DiffPane({
         aria-label="Changes"
         className="relative min-h-0 flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
       >
-        {loading && (
-          <div className="space-y-2 p-4">
-            <Skeleton className="h-4 w-1/3" />
-            <Skeleton className="h-3 w-full" />
-            <Skeleton className="h-3 w-11/12" />
-            <Skeleton className="h-3 w-4/5" />
-          </div>
-        )}
-        {read.kind === 'failed' && (
-          <ReadFailure
-            title={
-              read.stage === 'fetch'
-                ? "Couldn't load the diff"
-                : "Couldn't show the diff"
-            }
-            error={read.error}
-            retrying={retrying}
-            onRetry={onRetry}
-            className="m-4"
-          />
-        )}
-        {!loading && (
-          <DiffEmpty
-            read={read}
-            prDiff={prDiff}
-            sourceBranch={sourceBranch}
-            targetBranch={targetBranch}
-          />
-        )}
+        <ReadStatus
+          loading={loading}
+          read={read}
+          retrying={retrying}
+          onRetry={onRetry}
+          prDiff={prDiff}
+          sourceBranch={sourceBranch}
+          targetBranch={targetBranch}
+        />
         {!loading && (
           <VirtualDiffList
-            files={files}
+            files={view.files}
             diffHead={diffHead}
             threadsByFile={threadsByFile}
             draftsByFile={draftsByFile}
-            generalThreads={generalThreads}
-            commentsLoading={commentsLoading}
+            generalThreads={view.conversation ? generalThreads : NO_THREADS}
+            commentsLoading={view.conversation && commentsLoading}
             prId={prId}
             headSha={headSha}
             focusThreadId={focusThreadId}
             scrollRef={scrollRef}
             jumpRef={jumpRef}
+            prDiff={prDiff}
           />
         )}
       </div>
@@ -195,113 +174,100 @@ export function DiffPane({
   );
 }
 
-function Toolbar({
-  navCount,
-  navIndex,
-  onPrev,
-  onNext,
+const NO_THREADS: RemoteCommentThread[] = [];
+
+/**
+ * Terminal-first: the workspace's first frame (header, rail, terminal)
+ * must never wait on the diff. The list mounts in a follow-up
+ * low-priority render; virtualization keeps that render small, this
+ * gate keeps it out of frame one entirely.
+ */
+function useWarm(): boolean {
+  const [warm, setWarm] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() =>
+      startTransition(() => setWarm(true))
+    );
+    return () => cancelAnimationFrame(id);
+  }, []);
+  return warm;
+}
+
+/** What the read has come to when it is not files: still loading, a
+ *  failure, or a comparison with no changes. */
+function ReadStatus({
+  loading,
+  read,
+  retrying,
+  onRetry,
+  prDiff,
+  sourceBranch,
+  targetBranch,
+}: {
+  loading: boolean;
+  read: DiffReadState;
+  retrying: boolean;
+  onRetry: () => void;
+  prDiff?: PrDiffView;
+  sourceBranch: string;
+  targetBranch: string;
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-2 p-4">
+        <Skeleton className="h-4 w-1/3" />
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-11/12" />
+        <Skeleton className="h-3 w-4/5" />
+      </div>
+    );
+  }
+  if (read.kind === 'failed') {
+    return (
+      <ReadFailure
+        title={
+          read.stage === 'fetch'
+            ? "Couldn't load the diff"
+            : "Couldn't show the diff"
+        }
+        error={read.error}
+        retrying={retrying}
+        onRetry={onRetry}
+        className="m-4"
+      />
+    );
+  }
+  return (
+    <DiffEmpty
+      read={read}
+      prDiff={prDiff}
+      sourceBranch={sourceBranch}
+      targetBranch={targetBranch}
+    />
+  );
+}
+
+/** What changed about the comparison since it was read, above the diff. */
+function PrDiffBanners({
   prDiff,
   comparisonRef,
 }: {
-  navCount: number;
-  navIndex: number;
-  onPrev: () => void;
-  onNext: () => void;
-  prDiff?: PrDiffView;
+  prDiff: PrDiffView;
   comparisonRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const o = useDiffOptions();
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border px-2 text-sm">
-      <div className="flex items-center rounded-md border border-border p-0.5">
-        <Tip label="Unified view">
-          <button
-            type="button"
-            onClick={() => setDiffOptions({ view: 'unified' })}
-            className={cn(
-              'flex h-5 items-center gap-1 rounded px-1.5 text-xs',
-              o.view === 'unified'
-                ? 'bg-accent text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            <RowsIcon className="size-3.5" /> Unified
-          </button>
-        </Tip>
-        <Tip label="Side-by-side view">
-          <button
-            type="button"
-            onClick={() => setDiffOptions({ view: 'split' })}
-            className={cn(
-              'flex h-5 items-center gap-1 rounded px-1.5 text-xs',
-              o.view === 'split'
-                ? 'bg-accent text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            <ColumnsIcon className="size-3.5" /> Split
-          </button>
-        </Tip>
-      </div>
-      <Tip label={o.wrap ? 'Disable line wrapping' : 'Wrap long lines'}>
-        <Button
-          variant={o.wrap ? 'secondary' : 'ghost'}
-          size="sm"
-          onClick={() => setDiffOptions({ wrap: !o.wrap })}
-          aria-pressed={o.wrap}
-        >
-          <WrapTextIcon /> Wrap
-        </Button>
-      </Tip>
-      <Tip
-        label={
-          o.hideResolved ? 'Show resolved threads' : 'Hide resolved threads'
-        }
-      >
-        <Button
-          variant={o.hideResolved ? 'secondary' : 'ghost'}
-          size="sm"
-          onClick={() => setDiffOptions({ hideResolved: !o.hideResolved })}
-          aria-pressed={o.hideResolved}
-        >
-          <EyeOffIcon /> Hide resolved
-        </Button>
-      </Tip>
-      <div className="flex-1" />
-      {prDiff?.comparison && (
-        <ComparisonIdentity
-          comparison={prDiff.comparison}
-          ref={comparisonRef}
+    <>
+      {prDiff.moved && prDiff.comparison && (
+        <MovedBanner
+          moved={prDiff.moved}
+          shownHead={prDiff.comparison.headOid}
+          load={prDiff.loadMoved}
+          focusAfter={comparisonRef}
         />
       )}
-      {navCount > 0 && (
-        <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
-          <MessageSquareIcon className="size-3.5" />
-          <span className="tabular-nums">
-            {navIndex >= 0 ? navIndex + 1 : '–'}/{navCount}
-          </span>
-          <Tip label="Previous comment">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onPrev}
-              aria-label="Previous comment"
-            >
-              <ChevronUpIcon />
-            </Button>
-          </Tip>
-          <Tip label="Next comment">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onNext}
-              aria-label="Next comment"
-            >
-              <ChevronDownIcon />
-            </Button>
-          </Tip>
-        </div>
+      {prDiff.incomplete && (
+        <IncompleteManifestBanner listed={prDiff.manifestFiles.length} />
       )}
-    </div>
+    </>
   );
 }

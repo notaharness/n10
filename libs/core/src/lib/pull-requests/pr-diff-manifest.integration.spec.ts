@@ -23,6 +23,7 @@ import {
 import {
   readPrDiffManifest,
   readPrDiffPatch,
+  WHOLE_FILE_CONTEXT,
   type PrDiffManifestFile,
 } from './pr-diff-manifest.js';
 
@@ -570,6 +571,45 @@ describe('the manifest over special changes', () => {
     expect(byPath(files, path)).toMatchObject(expected);
   });
 
+  it('carries each side’s blob size, and none for a side without a blob', () => {
+    expect(byPath(files, 'bin.dat')).toMatchObject({ oldSize: 3, newSize: 3 });
+    expect(byPath(files, 'copysrc.txt').newSize).toBe(
+      numbered(40).replace('line 1\n', 'one\n').length
+    );
+    expect(byPath(files, 'deleted.txt')).toMatchObject({
+      oldSize: 4,
+      newSize: null,
+    });
+    // A submodule's commit is not an object this clone has.
+    expect(byPath(files, 'vendor/lib').newSize).toBeNull();
+  });
+
+  it('bounds a patch by what changed when asked for less context', async () => {
+    const whole = await readPrDiffPatch(repo, comparison, {
+      paths: ['copysrc.txt'],
+    });
+    const bounded = await readPrDiffPatch(repo, comparison, {
+      paths: ['copysrc.txt'],
+      context: 1,
+    });
+    const lines = (text: string) => parseDiffFiles(text)[0]!.lines;
+    // Header, the edit as a remove and an add, and the other 39 lines.
+    expect(lines(whole.text)).toHaveLength(42);
+    // The hunk header, the edit, and one line after it.
+    expect(lines(bounded.text).map((l) => l.type)).toEqual([
+      'hunk-header',
+      'remove',
+      'add',
+      'context',
+    ]);
+    await expect(
+      readPrDiffPatch(repo, comparison, { context: -1 })
+    ).rejects.toThrow('Not a context line count');
+    await expect(
+      readPrDiffPatch(repo, comparison, { context: WHOLE_FILE_CONTEXT + 1 })
+    ).rejects.toThrow('Not a context line count');
+  });
+
   it('agrees with the patch on every path and status', async () => {
     const patch = await readPrDiffPatch(repo, comparison);
     expect(patch.truncated).toBe(false);
@@ -637,6 +677,31 @@ describe('the manifest over special changes', () => {
         headOid: comparison.headOid,
       })
     ).rejects.toThrow('Not an object id');
+  });
+});
+
+describe('a whole file', () => {
+  it('reads every line of a file too long for a fixed context', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'n10-pr-long-'));
+    try {
+      initRepo(repo);
+      const lines = Array.from({ length: 200_000 }, (_, i) => `${i}`);
+      write(repo, 'long.txt', `${lines.join('\n')}\n`);
+      commit(repo, 'base');
+      git(repo, 'checkout', '-q', '-b', 'long');
+      // Further from either end than any context short of the file.
+      lines[150_000] = 'the one edit';
+      write(repo, 'long.txt', `${lines.join('\n')}\n`);
+      const head = commit(repo, 'edit');
+      const base = git(repo, 'rev-parse', 'main');
+      const { text } = await readPrDiffPatch(repo, {
+        mergeBaseOid: base,
+        headOid: head,
+      });
+      expect(text).toContain('@@ -1,200000 +1,200000 @@');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });
 

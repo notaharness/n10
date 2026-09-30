@@ -51,6 +51,8 @@ const listed = (path: string): Core.PrDiffManifestFile => ({
   kind: 'text',
   additions: 1,
   deletions: 0,
+  oldSize: null,
+  newSize: null,
 });
 const file = {
   filename: 'foo.ts',

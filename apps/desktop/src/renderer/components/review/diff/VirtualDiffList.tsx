@@ -2,19 +2,21 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   useCallback,
   useEffect,
-  useImperativeHandle,
   useMemo,
+  useRef,
   useState,
   type Ref,
   type RefObject,
 } from 'react';
 import type { DiffLine } from '@n10/diff';
 import type {
+  PrDiffManifestFile,
   RemoteCommentThread,
   ReviewComment,
 } from '../../../../host/contract.js';
 import { expandIndices } from '../../../lib/diff/diff-model.js';
 import { useDiffOptions } from '../../../lib/diff/diff-options.js';
+import { filesOnScreen } from '../../../lib/diff/diff-rows-model.js';
 import { linePoints, pointKey } from '../../../lib/diff/diff-points.js';
 import {
   buildFlatDiff,
@@ -24,20 +26,21 @@ import {
 import { useFileAnalyses } from '../../../lib/diff/highlight.js';
 import { focusIsLost } from '../../../lib/focus.js';
 import { MyDraftsContext } from '../../../lib/review/my-drafts-context.js';
+import {
+  useDiffJumps,
+  type DiffJumpHandle,
+} from '../../../lib/diff/use-diff-jumps.js';
+import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
 import { useTheme } from '../../../lib/theme.js';
+import { rowGutter } from './code-gutter.js';
 import { DiffRowView, type RowContext } from './DiffRowView.js';
 import { pointId } from './LineGutter.js';
 import { useDiffAnchor } from './use-diff-anchor.js';
 import { useDiffComments } from './use-diff-comments.js';
 
-/** Imperative scrolling into the virtualized list — jump targets may
- *  not be materialized yet, so DOM queries can't do this. */
-export interface DiffJumpHandle {
-  /** Scroll the row containing this thread/draft id into view. */
-  jumpToId(id: string): boolean;
-  /** Scroll a file's header row into view. */
-  jumpToFile(file: string): boolean;
-}
+const NO_MANIFEST: ReadonlyMap<string, PrDiffManifestFile> = new Map();
+
+export type { DiffJumpHandle };
 
 /**
  * The all-files diff as ONE virtualized list: only the rows in (and
@@ -57,6 +60,7 @@ export function VirtualDiffList({
   focusThreadId,
   scrollRef,
   jumpRef,
+  prDiff,
 }: {
   files: [string, DiffLine[]][];
   /** The commit the diff was read at; what new comments anchor to. */
@@ -70,6 +74,9 @@ export function VirtualDiffList({
   focusThreadId: string | null;
   scrollRef: RefObject<HTMLDivElement | null>;
   jumpRef?: Ref<DiffJumpHandle>;
+  /** A pull request's manifest and file bodies; absent for a worktree,
+   *  whose files all arrive with their lines. */
+  prDiff?: PrDiffView;
 }) {
   const options = useDiffOptions();
   const { resolved } = useTheme();
@@ -78,6 +85,7 @@ export function VirtualDiffList({
   );
 
   const linesByFile = useMemo(() => new Map(files), [files]);
+  const manifest = prDiff?.manifestByPath ?? NO_MANIFEST;
   const comments = useDiffComments({
     prId,
     head: diffHead,
@@ -98,8 +106,10 @@ export function VirtualDiffList({
         mineByFile,
         mineCount,
         fileState,
+        ...(prDiff ? { bodies: prDiff.bodies, counts: prDiff.counts } : {}),
       }),
     [
+      prDiff,
       files,
       options.view,
       options.hideResolved,
@@ -140,17 +150,27 @@ export function VirtualDiffList({
   });
 
   // Highlight only files that currently have rows on screen.
-  const wantedFiles = useMemo(() => {
-    const wanted = new Set<string>();
-    for (const vi of virtualItems) {
-      const row = rows[vi.index];
-      if ('file' in row) wanted.add(row.file);
-    }
-    return wanted;
-    // virtualItems identity churns per scroll frame; the derived set is
-    // tiny and memo keeps downstream effects keyed on real changes.
-  }, [virtualItems, rows]);
+  const { shown: wantedFiles, toRead } = useMemo(
+    () =>
+      filesOnScreen(
+        rows,
+        virtualItems.map((vi) => vi.index)
+      ),
+    // virtualItems identity churns per scroll frame; the derived sets
+    // are tiny and memo keeps downstream effects keyed on real changes.
+    [virtualItems, rows]
+  );
   const analyses = useFileAnalyses(linesByFile, resolved, wantedFiles);
+
+  // An open file on screen is a file to read: its batch is asked for
+  // once the list settles with its placeholder in view. Not while it
+  // scrolls: a drag through the list would ask for every batch it
+  // passes.
+  const showFiles = prDiff?.showFiles;
+  const scrolling = virtualizer.isScrolling;
+  useEffect(() => {
+    if (!scrolling) showFiles?.(toRead);
+  }, [showFiles, toRead, scrolling]);
 
   const patchFile = useCallback(
     (file: string, patch: Partial<FileDisplayState>) =>
@@ -178,23 +198,22 @@ export function VirtualDiffList({
     []
   );
 
-  useImperativeHandle(
+  // Settled once no read is in flight and no file on screen waits for
+  // one: a jump lands before its file's batch is even asked for.
+  const bodies = prDiff?.bodies;
+  const waiting = useMemo(
+    () =>
+      bodies !== undefined &&
+      [...toRead].some((f) => bodies.get(f)?.state === 'loading'),
+    [bodies, toRead]
+  );
+  useDiffJumps(
     jumpRef,
-    () => ({
-      jumpToId: (id) => {
-        const index = flat.indexById.get(id);
-        if (index == null) return false;
-        virtualizer.scrollToIndex(index, { align: 'center' });
-        return true;
-      },
-      jumpToFile: (file) => {
-        const index = flat.fileIndex.get(file);
-        if (index == null) return false;
-        virtualizer.scrollToIndex(index, { align: 'start' });
-        return true;
-      },
-    }),
-    [flat, virtualizer]
+    flat,
+    rows,
+    virtualizer,
+    scrollRef,
+    (prDiff?.settled ?? true) && !waiting
   );
 
   // Moving through lines, or back from a closed composer, may land on
@@ -262,6 +281,10 @@ export function VirtualDiffList({
     };
   });
 
+  // Each mounted file header's toggle, where a file notice that
+  // replaces itself hands the keyboard.
+  const headers = useRef(new Map<string, HTMLButtonElement>());
+
   // In Split the new side is where most comments go, so a file's tab
   // stop is its first new-side line; Left and Right cross columns.
   const split = options.view === 'split';
@@ -287,6 +310,9 @@ export function VirtualDiffList({
     commentOnFile: comments.scope.ref
       ? (file) => comments.commentOn(file, null)
       : null,
+    manifest,
+    prDiff,
+    headers: headers.current,
   };
 
   return (
@@ -305,7 +331,10 @@ export function VirtualDiffList({
             data-row-kind={rows[vi.index].kind}
             ref={virtualizer.measureElement}
             className="absolute top-0 left-0 w-full"
-            style={{ transform: `translateY(${vi.start}px)` }}
+            style={{
+              transform: `translateY(${vi.start}px)`,
+              ...rowGutter(rows[vi.index], linesByFile),
+            }}
           >
             <DiffRowView row={rows[vi.index]} ctx={ctx} />
           </div>

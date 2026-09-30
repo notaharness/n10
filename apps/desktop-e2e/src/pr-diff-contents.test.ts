@@ -1,5 +1,4 @@
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
@@ -8,8 +7,8 @@ import { updateFakeGh } from './setup/fake-gh.js';
 
 /**
  * What a pull request's diff claims to hold is what the commits hold:
- * a change the reader's git config would hide still shows, and a diff
- * with nothing on screen is "no changes" only when there are none.
+ * a change the reader's git config would hide still shows. How it reads
+ * files too big to read at once is `large-pr-diff.test.ts`.
  */
 
 const BRANCH = 'contents';
@@ -70,27 +69,5 @@ test('lists a submodule change the repository’s config hides', async ({
   await expect(
     page.locator('[data-diff-scroll]').getByText(`Subproject commit ${pointer}`)
   ).toBeVisible({ timeout: 30_000 });
-  await expect(noChanges(page)).toHaveCount(0);
-});
-
-test('a diff cut before its first file ends is not an empty one', async ({
-  desktop,
-}) => {
-  const { page, repoPath, homeDir } = desktop;
-  const worktree = worktreeOf(repoPath);
-  // Past the 64 MiB patch ceiling on its own, and first in patch order.
-  writeFileSync(join(worktree, 'a-huge.txt'), Buffer.alloc(65 << 20, 97));
-  writeFileSync(join(worktree, 'z-small.txt'), 'small\n');
-  git(worktree, 'rm', '-q', 'notes.txt');
-  git(worktree, 'add', 'a-huge.txt', 'z-small.txt');
-  git(worktree, 'commit', '-q', '-m', 'a huge file');
-
-  await pushAndOpen(page, homeDir);
-  await expect(
-    page.getByRole('status', { name: 'Diff cut short' })
-  ).toContainText('Showing 0 of 2 files', { timeout: 60_000 });
-  await expect(
-    page.getByText("No file can be shown: the first file's diff alone passes")
-  ).toBeVisible();
   await expect(noChanges(page)).toHaveCount(0);
 });

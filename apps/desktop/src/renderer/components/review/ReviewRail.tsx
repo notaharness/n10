@@ -3,7 +3,7 @@ import type { ReviewComment } from '../../../host/contract.js';
 import { Button } from '../ui/button.js';
 import { ScrollArea } from '../ui/scroll-area.js';
 import { Tip } from '../ui/tooltip.js';
-import { FileTree, type FileEntry } from './diff/FileTree.js';
+import { FileTree, type FileEntry, type FileListing } from './diff/FileTree.js';
 import type { SessionCard } from '../../lib/review/session-cards.js';
 import { PlanSection, ReviewReadySection } from './ReviewRailSections.js';
 import { SessionsSection } from './SessionCards.js';
@@ -52,6 +52,7 @@ export function ReviewRail({
   planActive,
   onPlan,
   entries,
+  listing,
   diffLoading,
   selectedFile,
   onSelectFile,
@@ -77,6 +78,8 @@ export function ReviewRail({
   planActive: boolean;
   onPlan: () => void;
   entries: FileEntry[];
+  /** A pull request's listing: completeness and what is not shown. */
+  listing?: FileListing;
   diffLoading: boolean;
   selectedFile: string | null;
   onSelectFile: (path: string) => void;
@@ -130,6 +133,7 @@ export function ReviewRail({
       <ScrollArea className="min-h-0 flex-1">
         <FileTree
           entries={entries}
+          listing={listing}
           loading={diffLoading}
           selected={selectedFile}
           onSelect={onSelectFile}

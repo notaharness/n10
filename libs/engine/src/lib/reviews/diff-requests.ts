@@ -1,3 +1,5 @@
+import { WHOLE_FILE_CONTEXT } from '@n10/core';
+
 /**
  * Diff requests from untrusted input: a renderer that displays remote
  * content names them, and they become Git arguments and cache keys.
@@ -26,6 +28,8 @@ export interface PrDiffPatchRequest {
   headOid: string;
   /** Only these files. Name a rename by both of its paths. */
   paths?: string[];
+  /** Lines of context around each change; whole files when absent. */
+  context?: number;
 }
 
 /**
@@ -63,6 +67,21 @@ function requirePaths(value: unknown): string[] | undefined {
   return paths;
 }
 
+function requireContext(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== 'number' ||
+    !Number.isInteger(value) ||
+    value < 0 ||
+    value > WHOLE_FILE_CONTEXT
+  ) {
+    throw new Error(
+      `context must be a whole number of lines from 0 to ${WHOLE_FILE_CONTEXT}`
+    );
+  }
+  return value;
+}
+
 function fields(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object'
     ? (value as Record<string, unknown>)
@@ -87,10 +106,12 @@ export function parsePatchRequest(value: unknown): PrDiffPatchRequest {
   const req = fields(value);
   const repo = requireString(req.repo, 'repo');
   const paths = requirePaths(req.paths);
+  const context = requireContext(req.context);
   return {
     repo,
     mergeBaseOid: requireString(req.mergeBaseOid, 'mergeBaseOid'),
     headOid: requireString(req.headOid, 'headOid'),
     ...(paths ? { paths } : {}),
+    ...(context === undefined ? {} : { context }),
   };
 }

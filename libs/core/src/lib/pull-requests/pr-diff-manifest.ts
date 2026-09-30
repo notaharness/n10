@@ -1,6 +1,7 @@
 import type { DiffChangeStatus } from '@n10/diff';
 import { trimToFileBoundary } from '../utils/diff-patch.js';
 import { runGit } from '../utils/git-run.js';
+import { readBlobSizes } from './blob-sizes.js';
 import { OBJECT_ID, type PrComparison } from './pr-comparison.js';
 
 /**
@@ -38,6 +39,10 @@ export interface PrDiffManifestFile {
    *  was cut before it counted them. */
   additions: number | null;
   deletions: number | null;
+  /** Blob sizes in bytes; null where there is no blob on that side (or
+   *  the clone lacks it, as for a submodule's commit). */
+  oldSize: number | null;
+  newSize: number | null;
 }
 
 export interface PrDiffManifest {
@@ -86,7 +91,11 @@ const DIFF_FLAGS = [
 ];
 
 /** The manifest's listing: generous, since it costs bytes per file. */
-const MANIFEST_MAX_BYTES = 64 * 1024 * 1024;
+export const MANIFEST_MAX_BYTES = 64 * 1024 * 1024;
+
+/** Whole-file context, the default: comments anywhere in a changed
+ *  file have a line to sit on. Git's largest, so no file is longer. */
+export const WHOLE_FILE_CONTEXT = 2_147_483_647;
 
 /**
  * Ceiling on one patch read. Whole-file context makes a patch as big
@@ -127,7 +136,10 @@ function kindOf(
   return binary ? 'binary' : 'text';
 }
 
-type RawRecord = Omit<PrDiffManifestFile, 'kind' | 'additions' | 'deletions'>;
+type RawRecord = Omit<
+  PrDiffManifestFile,
+  'kind' | 'additions' | 'deletions' | 'oldSize' | 'newSize'
+>;
 
 /** A mode or object id, or null where git writes zeros for "absent". */
 const present = (value: string, absent: RegExp | string) =>
@@ -211,6 +223,8 @@ export function parseManifestListing(text: string): PrDiffManifestFile[] {
       ),
       additions,
       deletions,
+      oldSize: null,
+      newSize: null,
     };
   });
 }
@@ -219,7 +233,8 @@ export function parseManifestListing(text: string): PrDiffManifestFile[] {
  *  head. A commit-to-commit diff: it reads objects, never the index. */
 export async function readPrDiffManifest(
   cwd: string,
-  comparison: PrComparison
+  comparison: PrComparison,
+  opts: { maxBytes?: number } = {}
 ): Promise<PrDiffManifest> {
   requireBounds(comparison);
   const { text, truncated } = await runGit(
@@ -233,27 +248,49 @@ export async function readPrDiffManifest(
       comparison.mergeBaseOid,
       comparison.headOid,
     ],
-    { cwd, maxBytes: MANIFEST_MAX_BYTES }
+    { cwd, maxBytes: opts.maxBytes ?? MANIFEST_MAX_BYTES }
   );
+  const files = parseManifestListing(text);
+  const sizes = await readBlobSizes(
+    cwd,
+    files.flatMap((f) => [f.oldOid, f.newOid]).filter((o) => o !== null)
+  );
+  const size = (oid: string | null) =>
+    oid === null ? null : sizes.get(oid) ?? null;
   return {
     comparison,
-    files: parseManifestListing(text),
+    files: files.map((f) => ({
+      ...f,
+      oldSize: size(f.oldOid),
+      newSize: size(f.newOid),
+    })),
     complete: !truncated,
   };
 }
 
 /**
- * The patch between a comparison's merge base and head, whole-file
- * context, for every file or only `paths`. A path is matched
- * literally: `*` or `:(glob)` in a file name is just a character. Ask
- * for a rename by both of its paths, or git sees an addition.
+ * The patch between a comparison's merge base and head, for every file
+ * or only `paths`. A path is matched literally: `*` or `:(glob)` in a
+ * file name is just a character. Ask for a rename by both of its
+ * paths, or git sees an addition.
+ *
+ * Whole-file context unless `context` says otherwise: a smaller one
+ * bounds a large file's patch by what changed rather than by its size.
  */
 export async function readPrDiffPatch(
   cwd: string,
   bounds: PrDiffBounds,
-  opts: { paths?: readonly string[] } = {}
+  opts: { paths?: readonly string[]; context?: number } = {}
 ): Promise<PrDiffPatch> {
   requireBounds(bounds);
+  const context = opts.context ?? WHOLE_FILE_CONTEXT;
+  if (
+    !Number.isInteger(context) ||
+    context < 0 ||
+    context > WHOLE_FILE_CONTEXT
+  ) {
+    throw new Error(`Not a context line count: ${context}`);
+  }
   const pathspec = opts.paths?.length
     ? ['--', ...opts.paths.map((p) => `:(literal)${p}`)]
     : [];
@@ -263,7 +300,7 @@ export async function readPrDiffPatch(
       ...DIFF_FLAGS,
       '--src-prefix=a/',
       '--dst-prefix=b/',
-      '-U99999',
+      `-U${context}`,
       bounds.mergeBaseOid,
       bounds.headOid,
       ...pathspec,

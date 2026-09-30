@@ -604,7 +604,9 @@ first read for: a target can move past the same merge base.
 The TUI carries its displayed manifest's refs into each patch request. Config
 identity checks compare disk values without invoking reload or publishing effects. Metadata overflow is an error, never
 an incomplete file list. Resource maps evict idle entries without evicting observed
-or active reads. Patch maps have smaller capacities than provider records.
+or active reads. A patch map keeps the two last finished reads beside those in
+flight: the renderer holds what is on screen, and each patch may reach the
+ceiling.
 
 No worker is added for orchestration or subprocess waits. Desktop diff parsing and
 syntax highlighting remain in their existing renderer workers; the final profiling
@@ -637,11 +639,13 @@ include index, working tree and untracked files. Build untracked patches without
 `git add -N`: displaying a diff must not modify the agent's index. Poll active
 worktrees; do not recursively watch a checkout and exhaust inotify on dependencies.
 
-Whole-file context (`-U99999`) supports comments on unchanged lines; fold it in
-the viewer. Stream Git output with `runGit`, which preserves partial output and
-reports truncation rather than discarding the entire buffer on overflow. This
-read transport kills a child after 30 seconds and rejects, releasing its resource
-lane; mutations use a separate transport and do not inherit this deadline.
+Whole-file context supports comments on unchanged lines; fold it in the
+viewer. A pull request's diff asks for Git's largest context, so no file is
+cut short; worktree diffs still ask for 99,999 lines. Stream Git output with
+`runGit`, which preserves partial output and reports truncation rather than
+discarding the entire buffer on overflow. This read transport kills a child
+after 30 seconds and rejects, releasing its resource lane; mutations use a
+separate transport and do not inherit this deadline.
 
 Bound worktree diffs before expensive reads. Use `lstat` for symlinks, churn to
 bound deleted files, and exclude both paths of an oversized rename. A content-free
@@ -665,9 +669,34 @@ background tab: head, target branch, and the target commit it resolved to, so a
 re-read after the cache expires resolves the same way. A closed tab reopened
 comes back at that revision with anything newer offered, not swapped in.
 Choosing what a new visit compares against belongs to revision selection.
-Loading the newer revision reads it before moving the pin, so a failed load
-leaves the diff in place. Only a pin whose read never reached the screen
+Loading the newer revision reads its file list and first batch before moving
+the pin, so a failed load leaves the diff in place. Only a pin whose read never reached the screen
 follows the provider without being asked: there is nothing to keep.
+
+A PR's file list comes from the manifest, never from a patch that may have been
+cut, so every file is listed however big the change. Bodies are read in batches
+of at most 4 MiB or 100 files, in list order, once the list settles with them in
+view; the first batch reads at once, so a small PR is read at once. A file
+showing only its collapsed header is read once opened. Deleted files, renamed
+or copied ones, and the rest batch apart: Git pairs renames among the paths a
+read names, keeping a few candidate sources for each file, so a subset can pair
+files otherwise than the whole-PR manifest did; a small PR that deletes or
+renames files takes a read per kind. Each read is checked against
+the manifest, and a file paired otherwise is read again by its own paths. What
+stays read is bounded — the first batch, those on screen, the last four that
+left the screen or were asked for elsewhere — and at most two reads run at
+once; a dropped read is cancelled or released, and read again when reached. A file past 2 MiB is read only when
+asked, by its changes or whole, so one file cannot hold the rest back. A file
+cut from a shared read is offered a read of its own; only a lone read past the
+ceiling is "too large". Counts Git never gave stay unknown rather than zero,
+and the Files header lists what cannot be shown. A jump into files not yet read
+stays pending while their bodies land above it, until no read is in flight and
+no file on screen waits for one — a jump lands before its file's batch is asked
+for — or the reader scrolls. Single-file mode hands the same list one section: fold,
+Viewed and comment state are shared, not copied, and a switch keeps the row on
+screen. It still virtualizes its section, so it is not yet the unvirtualized
+reading surface assistive technology needs; that belongs to keyboard and
+navigation work (I11).
 
 File-tree collapse state follows each file's content revision, not poll timing
 or churn counts. Ignore temporary empty snapshots; unchanged snapshots preserve

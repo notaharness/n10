@@ -1,18 +1,19 @@
 import { queryOptions } from '@tanstack/react-query';
 import type { PullRequestInfo } from '@n10/vcs-core';
-import type {
-  PrComparison,
-  PrDiffError,
-  PrDiffManifest,
-} from '../../../host/contract.js';
+import type { PrDiffError, PrDiffManifest } from '../../../host/contract.js';
 import { keys } from '../data/query-keys.js';
+import {
+  readError,
+  type DiffReadState,
+  type QueryLike,
+} from '../data/read-state.js';
 import { measured } from '../perf.js';
 import type { PinnedRevision } from './pinned-revisions.js';
 
 /**
- * The two reads behind a pull request's diff, as query options both the
- * pane and a prefetch (Load new commits, Retry) use, so either one fills
- * the cache the other reads.
+ * The read behind a pull request's diff — its comparison and file list
+ * — as query options both the pane and Load new commits use, so either
+ * one fills the cache the other reads.
  */
 
 /** A failure that describes the pull request rather than the transport. */
@@ -45,16 +46,6 @@ async function loadManifest(
   return result.manifest;
 }
 
-async function loadPatch(repo: string, comparison: PrComparison) {
-  const result = await window.n10.fetchPrDiffPatch({
-    repo,
-    mergeBaseOid: comparison.mergeBaseOid,
-    headOid: comparison.headOid,
-  });
-  if (!result.ok) throw new PrDiffLoadError(result.error);
-  return result.patch;
-}
-
 /** Resolve the pinned revision to commits and list its files. */
 export function manifestQuery(
   cwd: string,
@@ -78,15 +69,26 @@ export function manifestQuery(
   });
 }
 
-/** The patch between two commits, which never changes. */
-export function patchQuery(cwd: string, comparison: PrComparison | null) {
-  return queryOptions({
-    queryKey: keys.prDiffPatch(
-      cwd,
-      comparison?.mergeBaseOid ?? '',
-      comparison?.headOid ?? ''
-    ),
-    queryFn: () => measured('fetch', () => loadPatch(cwd, comparison!)),
-    staleTime: Infinity,
-  });
+/**
+ * What the pane can say about the comparison: resolving it and listing
+ * its files is the pane's read, and a failure there is the diff failing.
+ * Each file's body has its own state (`use-pr-diff-bodies.ts`). No files
+ * is "no changes" only when Git's listing was complete.
+ */
+export function prDiffReadState(
+  manifest: QueryLike<PrDiffManifest>
+): DiffReadState {
+  if (manifest.data === undefined) {
+    return manifest.error == null
+      ? { kind: 'loading' }
+      : { kind: 'failed', stage: 'fetch', error: readError(manifest.error) };
+  }
+  const stale =
+    manifest.error == null
+      ? null
+      : { error: readError(manifest.error), since: manifest.dataUpdatedAt };
+  const { files, complete } = manifest.data;
+  return files.length === 0 && complete
+    ? { kind: 'empty', stale }
+    : { kind: 'ready', stale };
 }

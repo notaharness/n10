@@ -1,12 +1,13 @@
 import type { DiffLine } from '@n10/diff';
 import type { PullRequestInfo } from '@n10/vcs-core';
-import { useState, type ReactNode, type Ref, type RefObject } from 'react';
+import { useState, type ReactNode, type RefObject } from 'react';
 import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
 import type { PlanItem } from '@n10/core/plan';
 import type { DiffReadState } from '../../lib/data/read-state.js';
+import type { DiffPlaceControls } from '../../lib/diff/use-single-file.js';
 import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { type Mode } from '../../lib/review/review-model.js';
 import { cn } from '../../lib/utils.js';
@@ -156,6 +157,7 @@ export function ContentPane({
   focusThreadId,
   scrollRef,
   jumpRef,
+  place,
   navCount,
   navIndex,
   onPrev,
@@ -203,7 +205,9 @@ export function ContentPane({
   prDiff?: PrDiffView;
   focusThreadId: string | null;
   scrollRef: RefObject<HTMLDivElement | null>;
-  jumpRef: Ref<DiffJumpHandle>;
+  jumpRef: RefObject<DiffJumpHandle | null>;
+  /** Where the reader is in the diff: the file one-at-a-time shows. */
+  place: DiffPlaceControls;
   navCount: number;
   navIndex: number;
   onPrev: () => void;
@@ -259,6 +263,7 @@ export function ContentPane({
               fileOrder={fileOrder}
               onExit={onExitReview}
               onOpenInDiff={onOpenInDiff}
+              prDiff={prDiff}
             />
           )}
         </StackedPane>
@@ -311,6 +316,7 @@ export function ContentPane({
           focusThreadId={focusThreadId}
           scrollRef={scrollRef}
           jumpRef={jumpRef}
+          place={place}
           navCount={navCount}
           navIndex={navIndex}
           onPrev={onPrev}

@@ -37,7 +37,18 @@ export type PrDiffPatchResult =
   | { ok: false; error: RepoChangedError };
 
 const TARGET_FETCH_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * The manifest's listing ceiling, lowered by the e2e suite
+ * (`N10_DIFF_MANIFEST_MAX_BYTES`) to play a listing too big to finish
+ * without building one.
+ */
+function manifestCeiling(env: Record<string, string | undefined>) {
+  const raw = Number(env['N10_DIFF_MANIFEST_MAX_BYTES']);
+  return Number.isInteger(raw) && raw > 0 ? { maxBytes: raw } : {};
+}
 const RESOLUTION_TTL_MS = 30_000;
+const PATCHES_KEPT = 2;
 
 /**
  * A pull request's diff at exact commits: a request resolves once to
@@ -47,8 +58,10 @@ const RESOLUTION_TTL_MS = 30_000;
 export function createDiffReads(
   repo: string,
   isCurrent: () => boolean,
-  worktrees: Pick<WorktreeService, 'find'>
+  worktrees: Pick<WorktreeService, 'find'>,
+  env: Record<string, string | undefined> = process.env
 ) {
+  const ceiling = manifestCeiling(env);
   const manifests = createResourceCache<PrDiffManifestResult>(
     RESOLUTION_TTL_MS,
     32,
@@ -60,9 +73,12 @@ export function createDiffReads(
     Infinity,
     8
   );
+  // Patches are the reader's batches, up to the patch ceiling each, and
+  // the renderer holds the set on screen: this joins reads in flight and
+  // keeps the last two finished, never evicting one still loading.
   const patches = createResourceCache<PrDiffPatchResult>(
     Infinity,
-    64,
+    PATCHES_KEPT,
     (result) => result.ok
   );
   const live = createResourceCache<string>(1_000, 2);
@@ -88,7 +104,11 @@ export function createDiffReads(
     return listings.get(
       JSON.stringify([comparison.mergeBaseOid, comparison.headOid]),
       async () => {
-        const { files, complete } = await readPrDiffManifest(repo, comparison);
+        const { files, complete } = await readPrDiffManifest(
+          repo,
+          comparison,
+          ceiling
+        );
         return { files, complete };
       }
     );
@@ -124,12 +144,11 @@ export function createDiffReads(
         async (): Promise<PrDiffPatchResult> => {
           const before = changed(asked);
           if (before) return { ok: false, error: before };
-          const { paths, ...bounds } = req;
-          const patch = await readPrDiffPatch(
-            repo,
-            bounds,
-            paths ? { paths } : {}
-          );
+          const { paths, context, ...bounds } = req;
+          const patch = await readPrDiffPatch(repo, bounds, {
+            ...(paths ? { paths } : {}),
+            ...(context === undefined ? {} : { context }),
+          });
           const after = changed(asked);
           return after ? { ok: false, error: after } : { ok: true, patch };
         }

@@ -24,7 +24,18 @@ function kindOf(mode: string | null): ManifestFileKind {
   return 'text';
 }
 
-type Header = Omit<PrDiffManifestFile, 'additions' | 'deletions' | 'kind'>;
+type Header = Omit<
+  PrDiffManifestFile,
+  'additions' | 'deletions' | 'kind' | 'oldSize' | 'newSize'
+>;
+
+/** The bytes of one side as the patch shows it: the demo's patches
+ *  carry little context, so a modified file reads smaller than it is. */
+function sideBytes(lines: readonly string[], signs: string): number {
+  return lines
+    .filter((l) => l.length > 0 && signs.includes(l[0]!))
+    .reduce((n, l) => n + new TextEncoder().encode(l.slice(1)).length + 1, 0);
+}
 
 /** What each header line says about the file, by its prefix. */
 const HEADERS: [string, (file: Header, value: string) => void][] = [
@@ -91,11 +102,15 @@ export function manifestFile(section: string): PrDiffManifestFile {
   const changed = lines.slice(body);
   const count = (sign: string) =>
     binary ? null : changed.filter((l) => l.startsWith(sign)).length;
+  const size = (exists: boolean, signs: string) =>
+    exists && !binary ? sideBytes(changed.slice(1), signs) : null;
   return {
     ...file,
     kind: binary ? 'binary' : kindOf(file.newMode ?? file.oldMode),
     additions: count('+'),
     deletions: count('-'),
+    oldSize: size(file.status !== 'added', '- '),
+    newSize: size(file.status !== 'deleted', '+ '),
   };
 }
 

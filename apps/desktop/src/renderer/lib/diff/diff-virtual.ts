@@ -9,7 +9,6 @@ import {
   buildSplitRows,
   buildUnifiedRows,
   defaultCollapseReason,
-  type CollapseReason,
   type SplitRow,
 } from './diff-model.js';
 import {
@@ -18,116 +17,44 @@ import {
   pushOrphans,
   splitMine,
 } from './diff-anchors.js';
+import {
+  noticeRow,
+  type FileDisplayState,
+  type FileStats,
+  type FlatDiff,
+  type FlatDiffOptions,
+  type FlatRow,
+} from './diff-rows-model.js';
+import type { FileBody } from './diff-bodies.js';
 
-// ── Flat rows for the virtualized all-files diff ─────────────────
-//
-// The diff renders as ONE list across every file — headers, code
-// rows, fold markers and comment cards — so the viewer can virtualize
-// it (materialize only the rows in the viewport, terminal-style).
-// Everything here is pure data: the component maps a FlatRow to the
-// existing row primitives.
+export {
+  estimateRowHeight,
+  type FileDisplayState,
+  type FileStats,
+  type FlatDiff,
+  type FlatDiffOptions,
+  type FlatRow,
+} from './diff-rows-model.js';
 
-export type FlatRow =
-  | { key: string; kind: 'conversation' }
-  | { key: string; kind: 'file-header'; file: string }
-  /** The reviewer's own comments on a whole file, under its header. */
-  | { key: string; kind: 'file-drafts'; file: string; mine: InlineTarget[] }
-  | { key: string; kind: 'hunk'; file: string; index: number }
-  | { key: string; kind: 'unified'; file: string; index: number }
-  | { key: string; kind: 'split-context'; file: string; index: number }
-  | {
-      key: string;
-      kind: 'split-pair';
-      file: string;
-      row: Extract<SplitRow, { kind: 'pair' }>;
-    }
-  | { key: string; kind: 'fold'; file: string; from: number; to: number }
-  | {
-      key: string;
-      kind: 'comments';
-      file: string;
-      threads: RemoteCommentThread[];
-      drafts: ReviewComment[];
-      /** The reviewer's own drafts ending on this line. */
-      mine: InlineTarget[];
-      /** Indent under the gutter (unified view). */
-      indent: boolean;
-    }
-  | {
-      key: string;
-      kind: 'orphans';
-      file: string;
-      threads: RemoteCommentThread[];
-      drafts: ReviewComment[];
-      mine: InlineTarget[];
-    };
-
-/** Rough pixel heights per row kind; the virtualizer refines them by
- *  measuring rendered rows. Code rows are the exact leading-5 height. */
-export function estimateRowHeight(row: FlatRow): number {
-  switch (row.kind) {
-    case 'unified':
-    case 'split-context':
-    case 'split-pair':
-      return 20;
-    case 'hunk':
-      return 20;
-    case 'fold':
-      return 24;
-    case 'file-header':
-      return 37;
-    case 'comments':
-    case 'file-drafts':
-      return 160;
-    case 'orphans':
-      return 220;
-    case 'conversation':
-      return 260;
+/**
+ * A file's changed lines: Git's counts from the manifest, else the lines
+ * in hand — but only once they are the file's lines. A pull request's
+ * file not read yet has none, and zero would say nothing changed.
+ */
+function lineCounts(
+  file: string,
+  lines: readonly DiffLine[],
+  opts: FlatDiffOptions
+): { adds: number | null; dels: number | null } {
+  const counted = opts.counts?.get(file);
+  if (counted) return { adds: counted.additions, dels: counted.deletions };
+  if (opts.bodies && opts.bodies.get(file)?.state !== 'loaded') {
+    return { adds: null, dels: null };
   }
-}
-
-export interface FileDisplayState {
-  /** Overrides the collapse-reason default when set. */
-  open?: boolean;
-  viewed?: boolean;
-  expanded?: ReadonlySet<number>;
-}
-
-export interface FileStats {
-  adds: number;
-  dels: number;
-  openThreads: number;
-  draftCount: number;
-  /** The reviewer's own drafts on this file, lines and whole file. */
-  mineCount: number;
-  collapseReason: CollapseReason;
-  open: boolean;
-  viewed: boolean;
-}
-
-export interface FlatDiff {
-  rows: FlatRow[];
-  /** Comment/draft id → row index (the comments/orphans/conversation
-   *  row containing it). */
-  indexById: Map<string, number>;
-  /** File → its header row index. */
-  fileIndex: Map<string, number>;
-  /** Per-file header data. */
-  stats: Map<string, FileStats>;
-}
-
-export interface FlatDiffOptions {
-  view: 'unified' | 'split';
-  hideResolved: boolean;
-  hasConversation: boolean;
-  generalThreads: readonly RemoteCommentThread[];
-  threadsByFile: ReadonlyMap<string, RemoteCommentThread[]>;
-  draftsByFile: ReadonlyMap<string, ReviewComment[]>;
-  /** The reviewer's own inline drafts, open composers included. */
-  mineByFile?: ReadonlyMap<string, InlineTarget[]>;
-  /** How many of those each file holds, kept ones only, for its header. */
-  mineCount?: ReadonlyMap<string, number>;
-  fileState: ReadonlyMap<string, FileDisplayState>;
+  return {
+    adds: lines.filter((l) => l.type === 'add').length,
+    dels: lines.filter((l) => l.type === 'remove').length,
+  };
 }
 
 /**
@@ -149,9 +76,8 @@ function fileSlice(
   activeDrafts: ReviewComment[];
 } {
   const state = opts.fileState.get(file) ?? {};
-  const adds = lines.filter((l) => l.type === 'add').length;
-  const dels = lines.filter((l) => l.type === 'remove').length;
-  const collapseReason = defaultCollapseReason(file, adds + dels);
+  const { adds, dels } = lineCounts(file, lines, opts);
+  const collapseReason = defaultCollapseReason(file, (adds ?? 0) + (dels ?? 0));
   const allThreads = opts.threadsByFile.get(file) ?? [];
   const visibleThreads = opts.hideResolved
     ? allThreads.filter((t) => !t.isResolved)
@@ -176,6 +102,70 @@ function fileSlice(
   };
 }
 
+/**
+ * A file with no lines on screen: a notice in their place. Lines on the
+ * way (`loading`) take its comments with them — a jump to one lands on
+ * the file now and follows the comment in when they arrive, rather than
+ * the comment showing here and then moving. A file with no lines to
+ * anchor to, or none unless asked, keeps its comments under the notice.
+ */
+function pushUnread(
+  rows: FlatRow[],
+  indexById: Map<string, number>,
+  file: string,
+  body: FileBody,
+  slice: ReturnType<typeof fileSlice>,
+  mine: InlineTarget[]
+): void {
+  const notice = rows.length;
+  rows.push(noticeRow(file, slice.stats));
+  const { visibleThreads, activeDrafts } = slice;
+  if (body.state !== 'loading') {
+    pushOrphans(rows, indexById, file, visibleThreads, activeDrafts, mine);
+    return;
+  }
+  for (const x of [...visibleThreads, ...activeDrafts]) {
+    indexById.set(x.id, notice);
+  }
+  for (const x of mine) indexById.set(x.key, notice);
+}
+
+/** The reviewer's comments on a whole file, under its header, so they
+ *  show even while the file is collapsed (generated, large, or marked
+ *  Viewed). */
+function pushFileDrafts(
+  rows: FlatRow[],
+  indexById: Map<string, number>,
+  file: string,
+  mine: InlineTarget[]
+): void {
+  if (mine.length === 0) return;
+  for (const x of mine) indexById.set(x.key, rows.length);
+  rows.push({ key: `fd:${file}`, kind: 'file-drafts', file, mine });
+}
+
+/**
+ * What a pull request's file body adds before its lines: a notice in
+ * place of lines not in hand, or one introducing lines read by their
+ * changes alone. True when there are no lines to lay out.
+ */
+function pushBodyRows(
+  rows: FlatRow[],
+  indexById: Map<string, number>,
+  file: string,
+  opts: FlatDiffOptions,
+  slice: ReturnType<typeof fileSlice>,
+  mine: InlineTarget[]
+): boolean {
+  const body = opts.bodies?.get(file);
+  if (body && body.state !== 'loaded') {
+    pushUnread(rows, indexById, file, body, slice, mine);
+    return true;
+  }
+  if (body?.scope === 'changes') rows.push(noticeRow(file, slice.stats));
+  return false;
+}
+
 export function buildFlatDiff(
   files: readonly [string, DiffLine[]][],
   opts: FlatDiffOptions
@@ -198,18 +188,11 @@ export function buildFlatDiff(
     rows.push({ key: `h:${file}`, kind: 'file-header', file });
     stats.set(file, slice.stats);
     const own = splitMine(opts.mineByFile?.get(file) ?? []);
-    // Under the header, so a comment on the whole file shows even while
-    // the file is collapsed (generated, large, or marked Viewed).
-    if (own.onFile.length > 0) {
-      for (const x of own.onFile) indexById.set(x.key, rows.length);
-      rows.push({
-        key: `fd:${file}`,
-        kind: 'file-drafts',
-        file,
-        mine: own.onFile,
-      });
-    }
+    pushFileDrafts(rows, indexById, file, own.onFile);
     if (!slice.stats.open) continue;
+    if (pushBodyRows(rows, indexById, file, opts, slice, own.onLines)) {
+      continue;
+    }
 
     const present = presentAnchors(lines);
     const t = anchorComments(present, visibleThreads, (x) =>

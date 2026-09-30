@@ -1,16 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
-import {
-  useQuery,
-  useQueryClient,
-  type QueryClient,
-  type UseQueryResult,
-} from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   PrComparison,
-  PrDiffManifest,
-  PrDiffPatch,
+  PrDiffManifestFile,
 } from '../../../host/contract.js';
-import { readError, type QueryLike } from '../data/read-state.js';
+import { readError, type DiffReadState } from '../data/read-state.js';
 import {
   movedFrom,
   pinKey,
@@ -22,37 +16,35 @@ import {
   type PinnedRevision,
   type ReportedRevision,
 } from './pinned-revisions.js';
+import { planBatches } from '../diff/diff-bodies.js';
+import { batchQuery } from './pr-diff-batches.js';
 import {
   manifestQuery,
-  patchQuery,
+  prDiffReadState,
   type PrBranches,
 } from './pr-diff-queries.js';
+import { usePrDiffBodies, type PrDiffBodies } from './use-pr-diff-bodies.js';
 
 /**
  * A pull request's diff, read at exact commits.
  *
  * The host resolves the pull request — its branches plus the head the
- * provider reported — to a merge base and a head commit, and the patch
- * is read between those. A head this clone cannot produce is an error
- * that says so, never the local branch's diff shown in its place.
+ * provider reported — to a merge base and a head commit, and lists
+ * every file changed between them. Their bodies are read between the
+ * same two commits, a batch at a time (`use-pr-diff-bodies.ts`). A head
+ * this clone cannot produce is an error that says so, never the local
+ * branch's diff shown in its place.
  *
  * The revision is pinned (`pinned-revisions.ts`): when the provider
  * reports a newer head or another target, the diff on screen stays
  * where the reader is and `moved` offers the new one, instead of the
  * next list poll or a remount swapping the code out from under them.
- * Loading it reads the new comparison first and moves the pin only once
- * that read succeeds, so a failed load leaves the diff as it was.
+ * Loading it resolves the new comparison, lists its files and reads
+ * their first batch before the pin moves, so a failed load leaves the
+ * diff as it was and a successful one swaps it in a single step.
  */
 
 export { PrDiffLoadError } from './pr-diff-queries.js';
-
-export interface PrDiffTruncation {
-  limitBytes: number;
-  /** Files the manifest lists; the patch holds fewer. */
-  manifestFiles: number;
-  /** False when the manifest itself was cut: there may be more. */
-  manifestComplete: boolean;
-}
 
 /** Loading the revision the provider reports now. */
 export interface LoadMoved {
@@ -62,103 +54,75 @@ export interface LoadMoved {
   error: string | null;
 }
 
+interface LineCounts {
+  additions: number;
+  deletions: number;
+}
+
 /** What the diff pane says about the comparison, beside its files. */
-export interface PrDiffView {
+export interface PrDiffView extends PrDiffBodies {
   comparison: PrComparison | null;
   /** The target branch the diff on screen is compared with, which a
    *  retarget does not change until the reader loads it. */
   target: string;
-  truncated: PrDiffTruncation | null;
   /** What the provider reports that the diff on screen is not at. */
   moved: MovedRevision | null;
   loadMoved: LoadMoved;
+  /** Every changed file, in Git's order, and by path. */
+  manifestFiles: readonly PrDiffManifestFile[];
+  manifestByPath: ReadonlyMap<string, PrDiffManifestFile>;
+  /** Changed-line counts per file, where Git counted them: they hold
+   *  before a file's body is read. */
+  counts: ReadonlyMap<string, LineCounts>;
+  /** Git's listing of the files was cut: some may be missing. */
+  incomplete: boolean;
 }
 
 /**
- * The patch read, in the shape the read-state model takes: resolution
- * and the read after it are one read to the reader, and either failing
- * is the diff failing.
+ * The pull request's diff as the review workspace takes it: the pane's
+ * read (resolving the comparison and listing its files) in the
+ * read-state model's terms, and the view of the files themselves.
  */
 export interface PrDiffRead {
-  patch: QueryLike<string> & { isFetching: boolean };
+  state: DiffReadState;
+  fetching: boolean;
   /** Names this read, so a held failure never outlives it. */
   key: readonly unknown[];
-  /** Read again from where it failed: a fetch may now succeed. */
+  /** Resolve and list again: a fetch may now succeed. */
   retry: () => Promise<unknown>;
   view: PrDiffView;
 }
 
-function truncationOf(
-  patch: PrDiffPatch | undefined,
-  manifest: PrDiffManifest | undefined
-): PrDiffTruncation | null {
-  if (!patch?.truncated || !manifest) return null;
-  return {
-    limitBytes: patch.limitBytes,
-    manifestFiles: manifest.files.length,
-    manifestComplete: manifest.complete,
-  };
+const NO_FILES: readonly PrDiffManifestFile[] = [];
+
+function useManifestMaps(files: readonly PrDiffManifestFile[]) {
+  return useMemo(() => {
+    const manifestByPath = new Map(files.map((f) => [f.path, f]));
+    const counts = new Map<string, LineCounts>();
+    for (const f of files) {
+      if (f.additions !== null && f.deletions !== null) {
+        counts.set(f.path, { additions: f.additions, deletions: f.deletions });
+      }
+    }
+    return { manifestByPath, counts };
+  }, [files]);
 }
 
-/**
- * Keep what the pin learns as its reads land: the target commit it
- * resolved to, and that its diff reached the screen.
- */
+/** Keep the target commit the pin resolved to, and that its file list
+ *  reached the screen. */
 function useRecordPin(
   key: string,
   pin: PinnedRevision,
-  comparison: PrComparison | null,
-  shown: boolean
+  comparison: PrComparison | null
 ) {
   const targetOid = pin.head ? comparison?.targetOid : undefined;
   useEffect(() => {
     if (targetOid) updatePin(key, { targetOid });
   }, [key, targetOid]);
+  const shown = comparison !== null;
   useEffect(() => {
     if (shown) updatePin(key, { shown: true });
   }, [key, shown]);
-}
-
-/**
- * Load what the provider reports: read the new comparison and its patch
- * first, then move the pin. A failure keeps the pin — and the diff on
- * screen — and says why.
- */
-function useLoadMoved(
-  cwd: string,
-  pr: PrBranches | undefined,
-  key: string,
-  reported: ReportedRevision
-): LoadMoved {
-  const queryClient = useQueryClient();
-  const attempt = `${key}|${reported.head ?? ''}|${reported.target}`;
-  const [state, setState] = useState({
-    attempt: '',
-    loading: false,
-    error: '',
-  });
-  const current = state.attempt === attempt ? state : null;
-  const { head, target } = reported;
-  const run = useCallback(() => {
-    if (current?.loading) return;
-    setState({ attempt, loading: true, error: '' });
-    const next: PinnedRevision = { head, target };
-    const load = async () => {
-      const manifest = await queryClient.query(manifestQuery(cwd, pr, next));
-      await queryClient.query(patchQuery(cwd, manifest.comparison));
-      setPin(key, { ...next, targetOid: manifest.comparison.targetOid });
-    };
-    // Both handlers attached: the chain cannot reject.
-    void load().then(
-      () => setState({ attempt, loading: false, error: '' }),
-      (e: unknown) => setState({ attempt, loading: false, error: readError(e) })
-    );
-  }, [current?.loading, attempt, head, target, queryClient, cwd, pr, key]);
-  return {
-    run,
-    loading: current?.loading ?? false,
-    error: current?.error || null,
-  };
 }
 
 /**
@@ -181,40 +145,56 @@ function useFollow(
 }
 
 /**
- * Resolution failed, or the read after it did: retry that one, and
- * settle only once the patch is in, so Retry spins for the whole read.
+ * Load what the provider reports: resolve the new comparison, list its
+ * files and read the first batch, then move the pin. A failure keeps
+ * the pin — and the diff on screen — and says why.
  */
-async function retryRead(
-  queryClient: QueryClient,
+function useLoadMoved(
   cwd: string,
-  manifest: UseQueryResult<PrDiffManifest>,
-  patch: UseQueryResult<PrDiffPatch>
-): Promise<unknown> {
-  if (!manifest.error) return patch.refetch();
-  const { data } = await manifest.refetch();
-  if (!data) return undefined;
-  return queryClient.query(patchQuery(cwd, data.comparison));
+  pr: PrBranches | undefined,
+  key: string,
+  reported: ReportedRevision
+): LoadMoved {
+  const queryClient = useQueryClient();
+  const attempt = `${key}|${reported.head ?? ''}|${reported.target}`;
+  const [state, setState] = useState({
+    attempt: '',
+    loading: false,
+    error: '',
+  });
+  const current = state.attempt === attempt ? state : null;
+  const { head, target } = reported;
+  const run = useCallback(() => {
+    if (current?.loading) return;
+    setState({ attempt, loading: true, error: '' });
+    const next: PinnedRevision = { head, target };
+    const load = async () => {
+      const { comparison, files } = await queryClient.query(
+        manifestQuery(cwd, pr, next)
+      );
+      const first = planBatches(files)[0];
+      if (first) {
+        await queryClient.query(
+          batchQuery(cwd, comparison, first, 'whole-file')
+        );
+      }
+      setPin(key, { ...next, targetOid: comparison.targetOid });
+    };
+    // Both handlers attached: the chain cannot reject.
+    void load().then(
+      () => setState({ attempt, loading: false, error: '' }),
+      (e: unknown) => setState({ attempt, loading: false, error: readError(e) })
+    );
+  }, [current?.loading, attempt, head, target, queryClient, cwd, pr, key]);
+  return {
+    run,
+    loading: current?.loading ?? false,
+    error: current?.error || null,
+  };
 }
 
 function reportedOf(pr: PrBranches | undefined): ReportedRevision {
   return { head: pr?.headSha, target: pr?.targetBranch ?? '' };
-}
-
-/** The manifest at the pin, then the patch between its commits. */
-function useReads(
-  cwd: string,
-  pr: PrBranches | undefined,
-  pin: PinnedRevision,
-  enabled: boolean
-) {
-  const manifestOptions = manifestQuery(cwd, pr, pin);
-  const manifest = useQuery({ ...manifestOptions, enabled: enabled && !!pr });
-  const comparison = manifest.data?.comparison ?? null;
-  const patch = useQuery({
-    ...patchQuery(cwd, comparison),
-    enabled: enabled && comparison !== null,
-  });
-  return { key: manifestOptions.queryKey, manifest, comparison, patch };
 }
 
 export function usePrDiff(
@@ -222,36 +202,33 @@ export function usePrDiff(
   pr: PrBranches | undefined,
   opts: { enabled: boolean }
 ): PrDiffRead {
-  const queryClient = useQueryClient();
   const key = pinKey(cwd, pr?.id ?? 0);
   const reported = reportedOf(pr);
   const pin = usePinnedRevision(key, reported);
-  const { manifest, comparison, patch, ...read } = useReads(
-    cwd,
-    pr,
-    pin,
-    opts.enabled
-  );
-  const error = manifest.error ?? patch.error;
-  const shown = patch.data !== undefined;
-  useRecordPin(key, pin, comparison, shown);
-  const moved = useFollow(key, pin, reported, error !== null && !shown);
+  const options = manifestQuery(cwd, pr, pin);
+  const manifest = useQuery({ ...options, enabled: opts.enabled && !!pr });
+  const comparison = manifest.data?.comparison ?? null;
+  const manifestFiles = manifest.data?.files ?? NO_FILES;
+  const bodies = usePrDiffBodies(cwd, comparison, manifestFiles);
+  const maps = useManifestMaps(manifestFiles);
+  useRecordPin(key, pin, comparison);
+  const readFailed = manifest.error !== null && comparison === null;
+  const moved = useFollow(key, pin, reported, readFailed);
   const loadMoved = useLoadMoved(cwd, pr, key, reported);
   return {
-    patch: {
-      data: patch.data?.text,
-      error,
-      dataUpdatedAt: patch.dataUpdatedAt,
-      isFetching: manifest.isFetching || patch.isFetching,
-    },
-    key: read.key,
-    retry: () => retryRead(queryClient, cwd, manifest, patch),
+    state: prDiffReadState(manifest),
+    fetching: manifest.isFetching,
+    key: options.queryKey,
+    retry: () => manifest.refetch(),
     view: {
+      ...bodies,
+      ...maps,
       comparison,
       target: pin.target,
-      truncated: truncationOf(patch.data, manifest.data),
       moved,
       loadMoved,
+      manifestFiles,
+      incomplete: manifest.data ? !manifest.data.complete : false,
     },
   };
 }

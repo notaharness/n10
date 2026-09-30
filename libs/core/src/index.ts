@@ -93,6 +93,7 @@ export * from './lib/pull-requests/pr-review-requirements.js';
 export type * from './lib/pull-requests/pull-request-lookup.js';
 export * from './lib/pull-requests/pr-comparison.js';
 export * from './lib/pull-requests/pr-diff-manifest.js';
+export * from './lib/pull-requests/blob-sizes.js';
 export * from './lib/pull-requests/review-draft-anchor.js';
 export * from './lib/pull-requests/review-draft-store.js';
 export * from './lib/pull-requests/review-draft-types.js';

@@ -51,9 +51,10 @@ export const keys = {
     target: string,
     head: string
   ) => ['pr-diff-manifest', cwd, prId, source, target, head] as const,
-  /** Keyed by commits: the patch between two never changes. */
-  prDiffPatch: (cwd: string, mergeBase: string, head: string) =>
-    ['pr-diff-patch', cwd, mergeBase, head] as const,
+  /** One batch of a pull request's files, keyed by the commits it is
+   *  read between (`base..head`): what is between them never changes. */
+  prDiffBatch: (cwd: string, range: string, batch: string) =>
+    ['pr-diff-batch', cwd, range, batch] as const,
   worktreeDiff: (cwd: string, branch: string, target: string) =>
     ['worktree-diff', cwd, branch, target] as const,
   parsedDiff: (content: string) => ['parsed-diff', content] as const,

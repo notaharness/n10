@@ -134,11 +134,17 @@ Every rule below has its reasoning in `docs/decisions.md`.
   vote is cast last, so a failure leaves what posted as posted. An
   inline draft being posted or maybe posted is shown, locked; a reply
   draft in that state is not yet shown in its thread.
-- Diffs are whole-file (`-U99999`), folded client-side
-  (`lib/diff/diff-model.ts`). A PR diffs the exact commits the engine's review reads resolve
+- Diffs are whole-file (Git's largest `-U` for a PR), folded client-side
+  (`lib/diff/diff-model.ts`). A PR lists every file from the engine's manifest first
+  and reads bodies in batches as they come into view
+  (`lib/diff/diff-bodies.ts`), holding a bounded set (`lib/review/pr-diff-reads.ts`);
+  a file past 2 MiB waits to be asked for. Single-file
+  mode (`lib/diff/single-file.ts`) is a view of the same list, never a second
+  model. A PR diffs the exact commits the engine's review reads resolve
   from the provider's head (`lib/review/use-pr-diff.ts`), never the local branch.
   `lib/review/pinned-revisions.ts` holds each PR's revision outside its pane
-  until the reader loads a newer one, which is read before the pin moves. A bare worktree
+  until the reader loads a newer one, whose file list and first batch are read
+  before the pin moves. A bare worktree
   diffs its working tree, polled at 2 s only while the agent runs. `FileTree` collapse
   state is reconciled from the per-file `revision` delta during render
   (`lib/diff/file-tree-model.ts`), never from the poll.
