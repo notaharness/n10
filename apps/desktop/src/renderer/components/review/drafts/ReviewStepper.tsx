@@ -1,5 +1,5 @@
 import { CheckIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { DiffLine } from '@n10/diff';
 import type { ReviewComment } from '../../../../host/contract.js';
@@ -14,6 +14,7 @@ import {
   useUpdateDraft,
 } from '../../../lib/data/mutations.js';
 import { useRepo } from '../../../lib/repo-context.js';
+import { useTabView } from '../../../lib/tabs/tab-views.js';
 import { errorMessage } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { StepCard } from './ReviewStepCard.js';
@@ -50,9 +51,12 @@ export function ReviewStepper({
     () => orderDraftsForReview(drafts, fileOrder),
     [drafts, fileOrder]
   );
-  const [index, setIndex] = useState(0);
+  // The step the reader was on when they left the tab.
+  const { saved, save } = useTabView();
+  const [index, setIndex] = useState(saved.step ?? 0);
   const clamped = Math.min(index, Math.max(0, ordered.length - 1));
   if (clamped !== index) setIndex(clamped);
+  useEffect(() => save({ step: clamped }), [clamped, save]);
 
   const current = ordered[clamped];
   const done = ordered.length === 0;

@@ -1,6 +1,12 @@
 import type { Page } from '@playwright/test';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
-import { createWorktree, sidebarRow, tab, visibleText } from './setup/app.js';
+import {
+  createWorktree,
+  showChanges,
+  sidebarRow,
+  tab,
+  visibleText,
+} from './setup/app.js';
 import type { FakeGitHub } from './setup/fake-gh.js';
 
 /**
@@ -64,6 +70,7 @@ async function openPr(page: Page) {
   await sidebarRow(page, /Add undo support|#42/)
     .first()
     .click();
+  await showChanges(page);
   await expect(page.getByText('Review').first()).toBeVisible({
     timeout: 30_000,
   });

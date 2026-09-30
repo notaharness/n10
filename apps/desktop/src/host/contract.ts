@@ -444,12 +444,17 @@ export interface N10HostApi {
    *  sidebar spinner): `active` = producing output now, `flashing` =
    *  went idle after a real work streak and the user hasn't looked. */
   getSessionActivity(): Promise<Record<string, SessionActivitySnapshot>>;
-  /** This window shows the session's terminal: send it the session's
-   *  output from now on, and answer the host's ring buffer for the
-   *  terminal to start from. While watched, the session's output counts
-   *  as seen. Counted per window — each call needs its `unwatch`. */
+  /** This window holds a terminal for the session: send it the
+   *  session's output from now on, and answer the host's ring buffer
+   *  for the terminal to start from. Counted per window — each call
+   *  needs its `unwatch`. */
   watchSession(name: string): Promise<SessionBuffer>;
   unwatchSession(name: string): Promise<void>;
+  /** The session's terminal is on screen in this window: its output
+   *  counts as seen. A terminal held ready off screen watches without
+   *  showing. Counted per window — each call needs its `hide`. */
+  showSession(name: string): Promise<void>;
+  hideSession(name: string): Promise<void>;
   writeSession(name: string, data: string): Promise<void>;
   resizeSession(name: string, cols: number, rows: number): Promise<void>;
   killSession(name: string): Promise<void>;
@@ -590,6 +595,8 @@ export const IPC = {
   getSessionActivity: 'n10/session/activity',
   watchSession: 'n10/session/watch',
   unwatchSession: 'n10/session/unwatch',
+  showSession: 'n10/session/show',
+  hideSession: 'n10/session/hide',
   writeSession: 'n10/session/write',
   resizeSession: 'n10/session/resize',
   killSession: 'n10/session/kill',

@@ -8,6 +8,7 @@ import {
 } from './setup/app.js';
 import { sessionKey } from './setup/session-keys.js';
 import {
+  SHOWN_TERMINAL,
   currentPid,
   expectAgentFillsPane,
   gridReckonings,
@@ -16,12 +17,13 @@ import {
 } from './setup/terminal-grid.js';
 
 /**
- * Switching between agent tabs. Only the tab on screen has a terminal;
- * the others keep running in tmux, and the host keeps their output.
- * Coming back mounts a fresh terminal from the host's ring buffer, so
- * everything a switch used to get for free from a terminal that never
- * went away — the current screen, the keyboard, the pane's size — it
- * now has to get on arrival.
+ * Switching between agent tabs. The tab on screen has a terminal, and
+ * so does one more, held ready off screen (the tab left last, or the
+ * one the pointer rests on); the others keep running in tmux, and the
+ * host keeps their output. Coming back to one of those mounts a fresh
+ * terminal from the host's ring buffer, so everything a switch used to
+ * get for free from a terminal that never went away — the current
+ * screen, the keyboard, the pane's size — it has to get on arrival.
  */
 
 const BANNER = 'n10-fake-agent-ready';
@@ -34,47 +36,52 @@ async function launch(page: Page, branch: string) {
 
 /** The highest `working <n>` line the terminal on screen shows. */
 async function latestWork(page: Page): Promise<number> {
-  const text = await page.evaluate(() => {
-    const el = document.querySelector<HTMLElement>('.wterm');
-    return el?.innerText ?? '';
-  });
+  const text = await page.evaluate(
+    (shown) => document.querySelector<HTMLElement>(shown)?.innerText ?? '',
+    SHOWN_TERMINAL
+  );
   return Math.max(
     0,
     ...[...text.matchAll(/working (\d+)/g)].map((m) => Number(m[1]))
   );
 }
 
-test.describe('Streaming agents in two tabs', () => {
+test.describe('Streaming agents in several tabs', () => {
   test.use({
     n10Config: { aiCommand: fakeAgent({ stream: true, intervalMs: 100 }) },
   });
 
-  test('only the tab on screen has a terminal, and only it is sent output', async ({
+  test('only the tab on screen and the one held ready have terminals, and only they are sent output', async ({
     desktop,
   }) => {
     const { page } = desktop;
     await launch(page, 'alpha');
     await launch(page, 'beta');
+    await launch(page, 'gamma');
 
-    await expect(page.locator('.wterm')).toHaveCount(1);
-    // Both agents print at the same rate, so the time beta takes to
-    // print ten lines is time alpha printed in too — unseen here.
+    // Gamma on screen, beta (left last) held ready, alpha neither.
+    await expect(page.locator('.wterm')).toHaveCount(2);
+    await expect(page.locator(SHOWN_TERMINAL)).toHaveCount(1);
+    // All agents print at the same rate, so the time gamma takes to
+    // print ten lines is time alpha printed in too — unsent here.
     const seen = await page.evaluate(
-      (beta) =>
+      (gamma) =>
         new Promise<string[]>((resolve) => {
           const names = new Set<string>();
-          let fromBeta = 0;
+          let fromGamma = 0;
           const off = window.n10.onSessionData(({ name }) => {
             names.add(name);
-            if (name === beta && ++fromBeta >= 10) {
+            if (name === gamma && ++fromGamma >= 10) {
               off();
               resolve([...names]);
             }
           });
         }),
-      await sessionKey(page, 'beta')
+      await sessionKey(page, 'gamma')
     );
-    expect(seen).toEqual([await sessionKey(page, 'beta')]);
+    expect(seen.sort()).toEqual(
+      [await sessionKey(page, 'beta'), await sessionKey(page, 'gamma')].sort()
+    );
   });
 
   test('coming back shows what the agent printed while you were away', async ({
@@ -87,8 +94,9 @@ test.describe('Streaming agents in two tabs', () => {
 
     // Beta started after alpha was left, at the same rate: by the time
     // it has printed fifteen lines, so has alpha, with nothing to draw
-    // them into.
+    // them into once gamma's arrival stopped holding it ready.
     await launch(page, 'beta');
+    await launch(page, 'gamma');
     await expect
       .poll(() => latestWork(page), { timeout: 10_000 })
       .toBeGreaterThanOrEqual(15);
@@ -98,10 +106,10 @@ test.describe('Streaming agents in two tabs', () => {
       .poll(() => latestWork(page), { timeout: 10_000 })
       .toBeGreaterThanOrEqual(left + 10);
     // …and the terminal is scrolled to them, not somewhere above.
-    const atBottom = await page.evaluate(() => {
-      const el = document.querySelector<HTMLElement>('.wterm')!;
+    const atBottom = await page.evaluate((shown) => {
+      const el = document.querySelector<HTMLElement>(shown)!;
       return el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
-    });
+    }, SHOWN_TERMINAL);
     expect(atBottom).toBe(true);
   });
 });
@@ -119,7 +127,7 @@ test.describe('Typing into an agent after a switch', () => {
     await tab(page, /alpha/).click();
     await expect(visibleText(page, BANNER)).toBeVisible();
     // No click into the terminal first: arriving is enough.
-    await expect(page.locator('.wterm textarea')).toBeFocused();
+    await expect(page.locator(`${SHOWN_TERMINAL} textarea`)).toBeFocused();
     // The palette's Ctrl+K that created beta also reached alpha's
     // terminal, which had the keyboard then; end that line first.
     await page.keyboard.press('Enter');
@@ -185,9 +193,9 @@ test.describe('Fitting the terminal to its pane', () => {
     for (let i = 0; i < 2; i++) {
       await tab(page, /alpha/).click();
       await expect(visibleText(page, BANNER)).toBeVisible();
-      await expect(page.locator('.wterm')).toHaveCount(1);
+      await expect(page.locator(SHOWN_TERMINAL)).toHaveCount(1);
       await tab(page, /beta/).click();
-      await expect(page.locator('.wterm')).toHaveCount(1);
+      await expect(page.locator(SHOWN_TERMINAL)).toHaveCount(1);
     }
     await tab(page, /alpha/).click();
     await expect.poll(() => reports()).toBeGreaterThanOrEqual(before);

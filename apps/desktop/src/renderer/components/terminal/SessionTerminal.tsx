@@ -11,6 +11,7 @@ import {
   sessionFeed,
   type SessionFeed,
 } from '../../lib/terminals/session-feed.js';
+import { usePaneShown } from '../../lib/tabs/pane-shown.js';
 import { useTheme } from '../../lib/theme.js';
 import { errorMessage } from '../../lib/utils.js';
 
@@ -30,19 +31,21 @@ function paneGrid(el: HTMLElement, term: TerminalHandle) {
 /**
  * The terminal of the session on screen, bound to its host PTY.
  *
- * Mounted only while it is shown: the editor mounts the active tab
- * alone, and a review workspace only while its agent pane is up. A
- * session nobody is looking at keeps running in tmux, and the host
- * keeps its emulator, activity and ring buffer; the renderer holds no
- * terminal for it and is sent none of its output.
+ * Mounted while its pane is on screen, or is the editor's one spare
+ * pane, rendered off screen for a switch (`EditorArea`); a review
+ * workspace mounts it only while its agent pane is up. A session
+ * nobody holds a terminal for keeps running in tmux, and the host keeps
+ * its emulator, activity and ring buffer; the renderer is sent none of
+ * its output.
  *
  * On mount the terminal watches the session (`watchSession`), which
  * answers the host's ring buffer to start from and sends every chunk
  * after it. That is all the scrollback a terminal has on arriving —
  * under tmux, whose own history is the record, a screen or so. `seq`
- * ordering drops any live chunk the snapshot already held. Watching
- * also counts as seeing: while mounted, the session's output never
- * asks for the user's attention.
+ * ordering drops any live chunk the snapshot already held. While its
+ * pane is on screen it also shows the session (`showSession`), which
+ * counts as seeing: its output does not ask for the user's attention.
+ * A spare terminal holds no focus and sees nothing.
  */
 export function SessionTerminal({
   name,
@@ -64,6 +67,7 @@ export function SessionTerminal({
   const wrapRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const { resolved } = useTheme();
+  const shown = usePaneShown();
 
   // Terminal responses and user input can race a session ending. Keep
   // the host's refusal visible without throwing an unhandled rejection
@@ -135,6 +139,12 @@ export function SessionTerminal({
     };
   }, [name, reportError, requestRepaint]);
 
+  useEffect(() => {
+    if (!shown) return;
+    void window.n10.showSession(name).catch(reportError);
+    return () => void window.n10.hideSession(name).catch(reportError);
+  }, [shown, name, reportError]);
+
   // wterm is ready at its default grid, and the snapshot was drawn for
   // the PTY's: written first, the rows past the default are cut off
   // until the app next redraws. So the terminal takes the pane's grid,
@@ -195,17 +205,21 @@ export function SessionTerminal({
 
   // wterm focuses its input when it starts. While reconnecting that
   // would take keystrokes `write` then drops, so the focus is handed
-  // back; a reconnect gives it to the terminal again.
+  // back; a reconnect gives it to the terminal again. A spare pane is
+  // inert and cannot hold it; being swapped on screen gives it — a
+  // frame later, once the press that swapped it has finished moving
+  // focus itself (a tab's lets go of it, a sidebar row's takes it).
   useEffect(() => {
-    if (!ready) return;
-    if (!disabled) {
-      termRef.current?.focus();
-      return;
+    if (!ready) return undefined;
+    if (!disabled && shown) {
+      const raf = requestAnimationFrame(() => termRef.current?.focus());
+      return () => cancelAnimationFrame(raf);
     }
     const focused = document.activeElement;
     if (focused instanceof HTMLElement && wrapRef.current?.contains(focused))
       focused.blur();
-  }, [ready, disabled]);
+    return undefined;
+  }, [ready, disabled, shown]);
 
   // Fit the terminal grid to its pane. autoResize stays ON (with it off
   // the react wrapper pins an inline height of rows*17px and keeps

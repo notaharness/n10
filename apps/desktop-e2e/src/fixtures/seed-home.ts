@@ -51,10 +51,13 @@ export function fakeAgent(
     printSeed?: boolean;
     /** Print the PTY grid as `size:<cols>x<rows>`, and again on resize. */
     printSize?: boolean;
+    /** End each streamed line with `@<checkout directory>`. */
+    tag?: boolean;
   } = {}
 ): string {
   const flags = [`--banner=n10-fake-agent-ready`];
   if (opts.stream) flags.push('--stream');
+  if (opts.tag) flags.push('--tag');
   if (opts.echo) flags.push('--echo');
   if (opts.printSeed) flags.push('--print-seed');
   if (opts.printSize) flags.push('--print-size');

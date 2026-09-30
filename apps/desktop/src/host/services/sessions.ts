@@ -32,7 +32,7 @@ import {
   stopOwnWorktreeSession,
 } from './session-registry.js';
 import { relayBuffer, setSessionBroadcaster } from './session-relay.js';
-import { unwatch, watch, type Viewer } from './session-watch.js';
+import { hide, show, unwatch, watch, type Viewer } from './session-watch.js';
 import { agentTerminalNames, terminalBuffer } from './terminals.js';
 import type {
   PlanCheckoutRequest,
@@ -357,6 +357,14 @@ export function watchSession(viewer: Viewer, name: string): SessionBuffer {
 
 export function unwatchSession(viewer: Viewer, name: string): void {
   unwatch(viewer, name);
+}
+
+export function showSession(viewer: Viewer, name: string): void {
+  show(viewer, name);
+}
+
+export function hideSession(viewer: Viewer, name: string): void {
+  hide(viewer, name);
 }
 
 export function killSession(name: string): void {

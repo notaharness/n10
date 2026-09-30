@@ -6,6 +6,11 @@ import { expect, type Page } from '@playwright/test';
  * can actually show.
  */
 
+/** The terminal on screen: not the one in the pane the editor holds
+ *  ready for a switch, which is rendered too, hidden. */
+export const SHOWN_TERMINAL =
+  '[data-editor-panes] > :not([data-spare-pane]) .wterm';
+
 export interface Grid {
   cols: number;
   rows: number;
@@ -60,8 +65,8 @@ export async function paneGrid(page: Page): Promise<Grid> {
 export async function gridReckonings(
   page: Page
 ): Promise<{ contentRect: Grid; clientBox: Grid }> {
-  return page.evaluate(() => {
-    const el = document.querySelector<HTMLElement>('.wterm');
+  return page.evaluate((shown) => {
+    const el = document.querySelector<HTMLElement>(shown);
     const row = el?.querySelector<HTMLElement>('.term-row');
     if (!el || !row) throw new Error('no terminal on screen');
     const cs = getComputedStyle(el);
@@ -97,7 +102,7 @@ export async function gridReckonings(
       ),
       clientBox: grid(el.clientWidth, el.clientHeight),
     };
-  });
+  }, SHOWN_TERMINAL);
 }
 
 /**

@@ -5,7 +5,11 @@ import type { Viewer } from './services/session-watch.js';
 
 /** Contract methods whose answer depends on which window asked. The
  *  renderer calls them like any other; the handler adds the window. */
-export type ViewerScoped = 'watchSession' | 'unwatchSession';
+export type ViewerScoped =
+  | 'watchSession'
+  | 'unwatchSession'
+  | 'showSession'
+  | 'hideSession';
 
 export type ViewerApi = {
   [K in ViewerScoped]: (
@@ -20,6 +24,10 @@ export function createViewerApi(): ViewerApi {
       Promise.resolve(sessions.watchSession(viewer, name)),
     unwatchSession: (viewer, name) =>
       Promise.resolve(sessions.unwatchSession(viewer, name)),
+    showSession: (viewer, name) =>
+      Promise.resolve(sessions.showSession(viewer, name)),
+    hideSession: (viewer, name) =>
+      Promise.resolve(sessions.hideSession(viewer, name)),
   };
 }
 
@@ -30,6 +38,8 @@ export function viewerHandlers(
   return {
     [IPC.watchSession]: api.watchSession,
     [IPC.unwatchSession]: api.unwatchSession,
+    [IPC.showSession]: api.showSession,
+    [IPC.hideSession]: api.hideSession,
   };
 }
 

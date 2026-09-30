@@ -10,6 +10,8 @@ import {
   focusTerminal,
   launchAgentFromRail,
   openPalette,
+  showChanges,
+  showFile,
   showOverview,
   sidebarRow,
   tabs,
@@ -271,16 +273,14 @@ test.describe('Pull request reads that fail', () => {
     },
   });
 
-  /** The viewer's own pull request, which opens on its changes. */
+  /** The viewer's own pull request, on its changes. */
   async function openPr(page: Page, title: string) {
     await sidebarRow(page, new RegExp(title)).first().click();
-    await expect(
-      page.getByRole('button', { name: 'Back to review' })
-    ).toBeVisible({ timeout: 30_000 });
+    await showChanges(page);
   }
 
   async function openOverview(page: Page, title: string) {
-    await openPr(page, title);
+    await sidebarRow(page, new RegExp(title)).first().click();
     await showOverview(page);
   }
 
@@ -328,7 +328,11 @@ test.describe('Pull request reads that fail', () => {
     desktop,
   }) => {
     const { page, homeDir } = desktop;
-    await openPr(page, 'Flaky reads');
+    // With its comments unread, the Overview's next step waits on them.
+    await sidebarRow(page, /Flaky reads/)
+      .first()
+      .click();
+    await showFile(page);
 
     const failure = page
       .getByRole('alert')

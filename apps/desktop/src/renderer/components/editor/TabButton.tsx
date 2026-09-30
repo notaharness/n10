@@ -11,6 +11,7 @@ import type {
   SidebarItem,
 } from '../../../host/contract.js';
 import { usePlanCount } from '../../lib/plan/plan.js';
+import { useHoverPrewarm } from '../../lib/tabs/prewarm.js';
 import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
 import {
   repoDisplayName,
@@ -229,12 +230,21 @@ export function TabButton({
   // A plan is built inside a tab and then navigated away from, so the
   // count has to be visible from wherever the user ends up.
   const planCount = usePlanCount(item?.pr?.id);
+  // Resting on a tab renders its pane ahead of the press; another
+  // repository's tab has no pane here to render.
+  const hover = useHoverPrewarm(
+    () => (active || foreignRepo ? null : tab),
+    true
+  );
   const { setNode, props, style, isDragging } = useSortableTab({
     id: tab.id,
     label,
     tabStop,
     actions: {
-      activate: () => tabs.activate(tab.id),
+      activate: () => {
+        hover.pressed();
+        tabs.activate(tab.id);
+      },
       close: () => closer.close(tab.id),
     },
   });
@@ -243,6 +253,7 @@ export function TabButton({
     <div
       ref={setNode}
       {...props}
+      {...hover.handlers}
       style={style}
       aria-selected={active}
       onMouseDown={(e) => {

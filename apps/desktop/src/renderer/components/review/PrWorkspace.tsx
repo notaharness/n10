@@ -120,7 +120,6 @@ export function PrWorkspace({
 
   const [mode, setMode] = useReviewMode({
     pr,
-    viewer: repo.viewer,
     agent: { hasSession: Boolean(sessionName), running },
   });
   const inlineThreads = useMemo(
@@ -209,7 +208,6 @@ export function PrWorkspace({
   const backToReview = useBackToReview({
     mode: effMode,
     pr,
-    viewer: repo.viewer,
     setMode,
     changes: scrollRef,
     root: rootRef,

@@ -21,7 +21,7 @@ import type { Mode } from './review-model.js';
 export type ReviewRole = 'author' | 'reviewer';
 
 /** Whose pull request this is, from where the reader stands. An
- *  unknown viewer reads as a reviewer: the Overview is the safe start. */
+ *  unknown viewer reads as a reviewer. */
 export function reviewRole(
   pr: PullRequestInfo,
   viewer: string | null
@@ -33,31 +33,31 @@ export function reviewRole(
 }
 
 /**
- * The pane a tab opens on. A running agent is what the tab is for. A
- * pull request someone asked you to review opens on its Overview —
- * what it is and why, before any code. Your own work opens on its diff.
+ * The pane a tab opens on. A running agent is what the tab is for.
+ * Otherwise a pull request opens on its Overview, whoever wrote it —
+ * the pull request's main page, from which Review changes leads to the
+ * diff. A worktree with no pull request has no Overview, and opens on
+ * its diff.
  */
 export function initialMode({
   running,
   hasPr,
-  role,
 }: {
   running: boolean;
   hasPr: boolean;
-  role: ReviewRole;
 }): Mode {
   if (running) return 'agent';
-  return hasPr ? reviewPaneFor(role) : 'diff';
+  return reviewStart(hasPr);
 }
 
 /** The panes that are the pull request's review, as opposed to the
  *  agent, a walkthrough or the plan. */
 export type ReviewPane = 'overview' | 'diff';
 
-/** The review a reader starts on: the Overview for someone else's pull
- *  request, the diff for their own. */
-export function reviewPaneFor(role: ReviewRole): ReviewPane {
-  return role === 'reviewer' ? 'overview' : 'diff';
+/** Where the review starts: the Overview, when there is a pull request
+ *  to have one. */
+export function reviewStart(hasPr: boolean): ReviewPane {
+  return hasPr ? 'overview' : 'diff';
 }
 
 /** The review pane the reader was last on, or null before either has
@@ -70,12 +70,12 @@ export function lastReviewPane(
 }
 
 /** The review pane the reader was last on; before either has shown,
- *  the one the pull request opens on for them. */
+ *  where the review starts. */
 export function backToReviewPane(
   last: ReviewPane | null,
-  role: ReviewRole
+  hasPr: boolean
 ): ReviewPane {
-  return last ?? reviewPaneFor(role);
+  return last ?? reviewStart(hasPr);
 }
 
 /** Where Back goes from `mode`, always up, never back through where the

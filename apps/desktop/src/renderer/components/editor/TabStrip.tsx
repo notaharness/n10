@@ -17,7 +17,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { KeyboardEvent, ReactNode } from 'react';
+import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import { usePrefersReducedMotion } from '../../lib/reduced-motion.js';
 import {
   ChordKeyboardSensor,
@@ -107,10 +107,26 @@ export function TabStrip({
   );
 }
 
+/** A press that selects a tab as it goes down: the primary button
+ *  alone, not on the tab's close button. Modified presses and the
+ *  other buttons keep their click, middle-click and menu meanings. */
+function selectsOnPress(e: PointerEvent<HTMLElement>): boolean {
+  if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey)
+    return false;
+  return !(e.target as Element).closest('button');
+}
+
 /**
  * What a tab in `TabStrip` spreads onto its element to be sortable.
  * `label` is what the drag announcements call it; `tabStop` makes it
  * the row's one Tab stop (the arrows move focus within the row).
+ *
+ * A primary press selects the tab as the button goes down, the way
+ * browsers' and editors' tabs do, rather than on release. It runs
+ * after the pointer sensor's own `onPointerDown`, which only starts
+ * watching the pointer: the tab lifts once it has travelled
+ * `DRAG_THRESHOLD_PX`, so a press that becomes a drag has selected the
+ * tab it drags.
  */
 export function useSortableTab({
   id,
@@ -154,6 +170,10 @@ export function useSortableTab({
     props: {
       ...attributes,
       ...listeners,
+      onPointerDown: (e: PointerEvent<HTMLElement>) => {
+        listeners?.onPointerDown?.(e);
+        if (selectsOnPress(e)) actions.activate();
+      },
       onKeyDown: (e: KeyboardEvent<HTMLElement>) => {
         listeners?.onKeyDown?.(e);
         // The sensor took it (the lift chord), a drag is under way, or

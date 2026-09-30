@@ -92,8 +92,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
   collapsible rail (Agent · Files) beside one content pane that
   swaps between Overview, diff, agent terminal (mounted only while shown) and
-  `ReviewStepper`. It opens on the Overview for someone else's PR and on the
-  diff for yours (`lib/review/overview-model.ts`). The diff toolbar lives in
+  `ReviewStepper`. It opens on a running agent's terminal, else on the PR's
+  Overview, whoever wrote it (`lib/review/overview-model.ts`). The diff toolbar lives in
   `DiffPane`, not the tab header. Overview and header lay out by container
   width (`@container`), not viewport.
 - The Overview's activity reads the whole conversation by identity
@@ -133,10 +133,23 @@ Every rule below has its reasoning in `docs/decisions.md`.
   composed in the renderer so the preview is the delivery; `plan-model.spec.ts`
   asserts numbering against `planRows`. Adopting a respawned session carries
   the chunk `seq` forward.
-- `EditorArea` mounts only the active tab. `SessionTerminal` is mounted only
-  while shown; it watches its session (`watchSession`/`unwatchSession`,
-  counted per window in `services/session-watch.ts`), and the host sends PTY
-  output only to watching windows. Watching is what marks output seen.
+- `EditorArea` renders the active tab's pane and at most one spare, hidden
+  and `inert` (`use-editor-panes.ts`, `lib/tabs/editor-panes.ts`): the tab a
+  hover settled on (`lib/tabs/prewarm.tsx`, by hoverIntent's rule in
+  `hover-intent.ts`; one at a time, superseded rather than queued, and
+  dropped while a pane let go of is still reading,
+  `lib/tabs/orphaned-fetch.ts`), else the tab left last. Pressing the
+  spare's tab shows the same pane; anything that acts without an event on it
+  asks `usePaneShown`. Tabs and sidebar rows are chosen on a plain primary
+  press (`useSortableTab` composes it after the drag sensor's own
+  `onPointerDown`). A mounted `SessionTerminal` watches its session
+  (`watchSession`, counted per window in `services/session-watch.ts`) and
+  the host sends PTY output only to watching windows; only one on screen
+  shows it (`showSession`), which is what marks output seen.
+- Each tab's view (picked pane, picked file, diff anchor, walkthrough step)
+  lives beside the tabs in `TabViewsHost` (`lib/tabs/tab-views.tsx`) for this
+  run, across repository switches: read once as initial state, written on
+  change, dropped on close. Nothing persists it.
 - `SessionTerminal` sends `resizeSession` on every fit and refits on the
   session's `spawnedAt` epoch. It reckons the grid exactly as wterm's own
   observer does (`terminalBox`, `measureTerminalGrid`); any other answer

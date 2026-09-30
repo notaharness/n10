@@ -5,9 +5,9 @@ import type * as WatchModule from './session-watch.js';
 /**
  * Where a session's output goes: into its ring buffer always, and to a
  * window only while that window watches the session. A session nobody
- * shows must cost no renderer anything, and a window that stops showing
- * it — by unmounting its terminal, reloading or closing — must stop
- * receiving it and stop counting its output as seen.
+ * holds a terminal for must cost no renderer anything, and a window
+ * that lets go of it — by unmounting its terminal, reloading or closing
+ * — must stop receiving it. Its output is seen only while on screen.
  */
 
 const state = vi.hoisted(() => ({
@@ -117,23 +117,30 @@ describe('session output relay', () => {
   });
 });
 
-describe('watching as seeing', () => {
+describe('seeing', () => {
+  it('is being on screen, not holding a terminal', () => {
+    watch.watch(1, 'a');
+    expect(state.shown.get('a')).toBeUndefined();
+    watch.show(1, 'a');
+    expect(state.shown.get('a')).toBe(1);
+  });
+
   it('shows the terminal once per window, until that window lets go', () => {
-    watch.watch(1, 'a');
-    watch.watch(1, 'a');
-    watch.watch(2, 'a');
+    watch.show(1, 'a');
+    watch.show(1, 'a');
+    watch.show(2, 'a');
     expect(state.shown.get('a')).toBe(2);
-    watch.unwatch(1, 'a');
+    watch.hide(1, 'a');
     expect(state.shown.get('a')).toBe(2);
-    watch.unwatch(1, 'a');
+    watch.hide(1, 'a');
     watch.dropViewer(2);
     expect(state.shown.get('a')).toBe(0);
   });
 
-  it('ignores an unwatch it never saw a watch for', () => {
-    watch.unwatch(1, 'a');
-    watch.watch(1, 'a');
-    watch.unwatch(2, 'a');
+  it('ignores a hide it never saw a show for', () => {
+    watch.hide(1, 'a');
+    watch.show(1, 'a');
+    watch.hide(2, 'a');
     expect(state.shown.get('a')).toBe(1);
   });
 });

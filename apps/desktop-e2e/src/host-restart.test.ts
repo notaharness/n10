@@ -6,6 +6,7 @@ import {
   tab,
   visibleText,
 } from './setup/app.js';
+import { SHOWN_TERMINAL } from './setup/terminal-grid.js';
 import { findN10SessionFor, tmuxClients } from './setup/tmux.js';
 
 /**
@@ -28,7 +29,8 @@ function hostPid(app: ElectronApplication): Promise<number | undefined> {
 /** The highest `working <n>` line the terminal on screen shows. */
 async function latestWork(page: Page): Promise<number> {
   const text = await page.evaluate(
-    () => document.querySelector<HTMLElement>('.wterm')?.innerText ?? ''
+    (shown) => document.querySelector<HTMLElement>(shown)?.innerText ?? '',
+    SHOWN_TERMINAL
   );
   return Math.max(
     0,

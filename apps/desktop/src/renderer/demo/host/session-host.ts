@@ -30,6 +30,8 @@ type SessionHost = Pick<
   | 'getSessionActivity'
   | 'watchSession'
   | 'unwatchSession'
+  | 'showSession'
+  | 'hideSession'
   | 'writeSession'
   | 'resizeSession'
   | 'killSession'
@@ -195,14 +197,10 @@ export function createSessionHost(
     getSessionActivity: () =>
       later(Object.fromEntries(hub.all().map((s) => [s.name, s.activity()]))),
     // The demo pushes every session's output to the page and lets the
-    // terminal filter it, so watching only answers the replay and
+    // terminal filter it, so watching only answers the replay; showing
     // counts as seeing.
     watchSession: (name) => {
       const session = hub.get(name);
-      if (session) {
-        session.watchers += 1;
-        session.flashing = false;
-      }
       return later(
         {
           data: session?.output ?? '',
@@ -212,9 +210,18 @@ export function createSessionHost(
         20
       );
     },
-    unwatchSession: (name) => {
+    unwatchSession: () => later(undefined),
+    showSession: (name) => {
       const session = hub.get(name);
-      if (session) session.watchers = Math.max(0, session.watchers - 1);
+      if (session) {
+        session.onScreen += 1;
+        session.flashing = false;
+      }
+      return later(undefined);
+    },
+    hideSession: (name) => {
+      const session = hub.get(name);
+      if (session) session.onScreen = Math.max(0, session.onScreen - 1);
       return later(undefined);
     },
     writeSession: (name, data) => {

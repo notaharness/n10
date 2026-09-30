@@ -238,25 +238,50 @@ new repository entering the previous repository's tab state.
 Use native menus and dialogs where the OS supports the interaction. The review
 workspace has a navigation rail and one content pane. The diff owns its toolbar.
 
-Only the active tab is mounted, and a terminal only while it is on screen. A
-hidden wterm per open agent cost the renderer a terminal write for every chunk
-every agent printed, and bought nothing under tmux: the client's terminal
-accumulates no scrollback of its own, since tmux keeps the history. A terminal
-that mounts watches its session (`watchSession`): the host answers the ring
-buffer and then sends that window the session's output, and nothing for
-sessions no window watches. Watching holds core's `showTerminal`, the same
-seen-signal the TUI's pane holds. Tab switches never detach or kill sessions.
-A tab's review workspace mounts afresh on every switch, with or without an
-agent: it opens where `initialMode` says (a working agent's terminal), and the
-pane, walkthrough step and diff scroll it was left on are not kept.
+The editor renders two panes at most: the active tab's and one spare, hidden
+and `inert`. A hidden wterm per open agent cost the renderer a terminal write
+for every chunk every agent printed, and bought nothing under tmux: the
+client's terminal accumulates no scrollback of its own, since tmux keeps the
+history. One spare buys an instant switch for the tab the user is about to
+open: the tab the pointer has settled on (a tab or a sidebar row), or else the
+tab left last. Settled is decided as the hoverIntent jQuery plugin decides it
+(`lib/tabs/hover-intent.ts`): the position is sampled every 100 ms, and a
+pointer that moved under 6 px since the last sample has settled, so a hand
+still drifting a pixel or two on the row counts, where it would keep
+restarting a fixed wait. Panes are keyed by tab id, so pressing the spare's tab
+shows the pane already rendered, and the pane it replaces becomes the
+spare. A new hover replaces the spare rather than queueing behind it, and a
+press on any other tab mounts that tab straight away; missing a pre-warm is
+fine, a press that waits behind one is not. A pane let go of before its reads
+came back leaves them running on the host, which cannot take a call back, so
+until they have landed a new hover warms nothing: it is dropped, not queued,
+and reads for panes nobody looks at never stack up. Leaving an element, or its
+going away (a closed tab), lets its pane go. Tabs and sidebar rows are chosen
+on the primary button's press, as browser and editor tabs are, so the swap
+starts before the release; the drag sensor still waits for the pointer to
+travel. A terminal watches its session while it is mounted
+(`watchSession`): the host answers the ring buffer and then sends that window
+the session's output, and nothing for sessions no window watches. Only a
+terminal on screen shows its session (`showSession`), which holds core's
+`showTerminal`, the same seen-signal the TUI's pane holds; a spare sees
+nothing. Tab switches never detach or kill sessions.
+
+A tab that mounts again opens where the user left it: the pane they picked,
+the diff's picked file and top line, and the walkthrough step. A pane they
+never picked follows the landing rule again, so an agent started since shows.
+The views are held per tab id in memory for this run, beside the tabs
+(`TabViewsHost` in `lib/tabs/tab-views.tsx`), so they outlive a repository
+switch, and dropped when the tab closes. Nothing is written to disk or to tmux:
+a reload starts every tab fresh. A saved file or line no longer in the diff is
+not guessed at: the view starts from the top.
 
 Each tab has an ErrorBoundary. Markdown paragraphs render as `div` when they may
 contain block images; the host fetches protected images with provider auth.
 
-A pull request tab opens on its Overview when someone else wrote it, and on the
-diff when you did (`initialMode`). An unknown account counts as a reviewer, so
-the safe start is the change's purpose before its code. A running agent still
-takes the pane. The Overview never calls a pull request ready: the list row has
+A pull request tab opens on its Overview, whoever wrote it (`initialMode`): the
+Overview is the pull request's main page, and Review changes leads on to the
+diff. A running agent takes the pane instead, and a worktree without a pull
+request has no Overview and opens on its diff. The Overview never calls a pull request ready: the list row has
 no policies, required reviewers, conflicts or merge permission, so readiness
 stays "not fully known" until those are read. Until a native requirement signal
 is read, an approval or a passing check is an observation, and a failing check
