@@ -27,6 +27,7 @@ const mock = vi.hoisted(() => ({
    *  client stays silent until a test calls its `draw`. */
   clientSilent: false,
   client: null as { draw(data: string): void } | null,
+  capture: vi.fn(() => 'final output\n'),
   data: vi.fn(),
   spawn: vi.fn(),
   dispose: vi.fn(),
@@ -107,7 +108,7 @@ vi.mock('./tmux-cli.js', async (original) => {
         mock.paneStateResolvers.push(() => resolve(respond()));
       });
     },
-    tmuxCapturePane: () => 'final output\n',
+    tmuxCapturePane: () => mock.capture(),
     runTmux: (args: string[], following: string[][] = []) => {
       mock.calls.push(
         [args, ...following].map((command) => command.join(' ')).join(' ; ')
@@ -153,6 +154,7 @@ beforeEach(() => {
   mock.spawn.mockReset();
   mock.dispose.mockReset();
   mock.data.mockReset();
+  mock.capture.mockClear();
   // Left unreset, a resize from the previous test counts as this
   // one's — which is exactly the assertion the reconnect-window test
   // makes.
@@ -352,6 +354,22 @@ describe('hosted process lifecycle', () => {
     backend.onExit(() => events.push('exit'));
     await vi.advanceTimersByTimeAsync(2_000);
     expect(events).toEqual([expect.stringContaining('final output'), 'exit']);
+  });
+
+  it('neither captures a final frame nor concludes the exit once disposed during the wait', async () => {
+    mock.clientSilent = true;
+    mock.state = { paneDead: true, exitCode: 127 };
+    const backend = await launch();
+    const events: string[] = [];
+    backend.onData((data) => events.push(data));
+    backend.onExit(() => events.push('exit'));
+    await vi.advanceTimersByTimeAsync(600);
+    // A disposed client draws nothing, so the timer ends the wait.
+    backend.dispose();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(events).toEqual([]);
+    expect(mock.capture).not.toHaveBeenCalled();
+    expect(backend.processState?.running).toBe(true);
   });
 
   it('notifies remaining exit listeners when the first listener disposes the backend', async () => {

@@ -662,11 +662,11 @@ describe('RemoteTmuxBackend (D4)', () => {
       backend.onExit(exited);
       await flushMicrotasks();
       expect(exited).toHaveBeenCalledWith(127, undefined);
-      return chunks;
+      return { backend, chunks };
     }
 
     it('is replayed only after the stream has drawn', async () => {
-      const chunks = await deadPane();
+      const { chunks } = await deadPane();
       // The stream's tmux client has not drawn yet; its alternate
       // screen would hide a frame written now.
       await vi.advanceTimersByTimeAsync(1_000);
@@ -678,8 +678,19 @@ describe('RemoteTmuxBackend (D4)', () => {
       expect(chunks[1]).toContain('agent: not found');
     });
 
+    it('is not captured once the backend is disposed during the wait', async () => {
+      const { backend, chunks } = await deadPane();
+      // A disposed stream draws nothing, so the timer ends the wait.
+      backend.dispose();
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(chunks).toEqual([]);
+      expect(
+        run.mock.calls.some(([argv]) => argv.includes('capture-pane'))
+      ).toBe(false);
+    });
+
     it('is replayed anyway when the stream never draws', async () => {
-      const chunks = await deadPane();
+      const { chunks } = await deadPane();
       await vi.advanceTimersByTimeAsync(2_000);
       expect(chunks).toHaveLength(1);
       expect(chunks[0]).toContain('agent: not found');
