@@ -21,6 +21,7 @@ const env = vi.hoisted(() => ({
   conflicts: new Map<string, number>(),
   compared: [] as unknown[][],
   autoDelete: false,
+  beforeRemoval: (() => undefined) as () => void,
   failSweep: false,
   warning: false,
   warned: [] as ReadonlySet<string>[],
@@ -39,7 +40,10 @@ vi.mock('@n10/core', () => ({
     env.swept.push(options.cwd!);
     env.warned.push(options.warnedRebase);
     if (env.failSweep) throw new Error('Provider unavailable');
-    if (env.autoDelete) await options.onAutoDelete('feature/a', verdict);
+    if (env.autoDelete) {
+      env.beforeRemoval();
+      await options.onAutoDelete('feature/a', verdict);
+    }
     if (env.warning) options.onRebaseInProgress('feature/b');
     return { merged: env.merged, nextWarned: new Set(['feature/b']) };
   },
@@ -120,6 +124,7 @@ beforeEach(() => {
   env.conflicts = new Map();
   env.compared = [];
   env.autoDelete = false;
+  env.beforeRemoval = () => undefined;
   env.failSweep = false;
   env.warning = false;
   env.warned = [];
@@ -335,7 +340,7 @@ describe('guarded removal and notices', () => {
     expect(notices).toEqual([]);
   });
 
-  it('waits for a removal already started, but publishes nothing from it after stop', async () => {
+  it('waits for a started removal and reports its completion after stop', async () => {
     const { sync, remove, notices } = harness();
     env.autoDelete = true;
     let finish!: (value: 'removed') => void;
@@ -357,8 +362,22 @@ describe('guarded removal and notices', () => {
     finish('removed');
     await stopping;
     await flush();
-    expect(notices).toEqual([]);
+    expect(notices).toEqual([
+      { type: 'removed', branch: 'feature/a', repo: '/repo-a' },
+    ]);
     expect(env.compared).toEqual([]);
+  });
+
+  it('cancels between the asynchronous verdict and the removal command', async () => {
+    const { sync, remove } = harness();
+    env.autoDelete = true;
+    env.beforeRemoval = () => {
+      void sync.stop();
+    };
+    sync.start();
+    await complete();
+    expect(env.swept).toEqual(['/repo-a']);
+    expect(remove).not.toHaveBeenCalled();
   });
 
   it('carries rebase-warning history into the next sweep', async () => {

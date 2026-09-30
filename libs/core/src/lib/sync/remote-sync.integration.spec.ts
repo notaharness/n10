@@ -119,7 +119,7 @@ describe('syncRemote', () => {
     const b = remoteWithClone('unreachable', 'main');
     git(b.clone, 'remote', 'set-url', 'origin', join(root, 'missing-remote'));
     await expect(syncRemote(b.clone)).rejects.toThrow(
-      'Failed to fetch repository refs'
+      'Could not fetch from origin'
     );
   });
 

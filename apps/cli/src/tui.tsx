@@ -29,6 +29,7 @@ import {
   SessionProvider,
   SidebarProvider,
   ToastProvider,
+  useToastActions,
 } from '@n10/app-core';
 import {
   killAll,
@@ -60,6 +61,7 @@ const EXIT_GRACE_MS = 3_000;
 function App() {
   const { exit } = useApp();
   const { sync } = useEngine();
+  const { flash } = useToastActions();
   // Ink's exit() only unmounts the React tree — it does not stop child
   // processes. Active PTYs (running agents) keep node-pty handles open,
   // so the Node event loop never drains and the process hangs after
@@ -72,6 +74,7 @@ function App() {
   // can't resurrect the #56 hang.
   const handleExit = () => {
     void (async () => {
+      flash('Closing n10 — waiting for active operations…', 'info');
       await sync.stop();
       await Promise.race([
         settlePendingRuns(),

@@ -60,7 +60,11 @@ export function startRemoteSyncLoop(cwd: string): void {
       pullRequests,
       worktrees: worktreeCommands(cwd),
     });
-    sync.subscribeNotices((notice) => notifier?.(present(notice)));
+    sync.subscribeNotices((notice) => {
+      const event = present(notice);
+      if (notice.repo !== config?.repo) event.message += ` (${notice.repo})`;
+      notifier?.(event);
+    });
   }
   sync?.start();
 }

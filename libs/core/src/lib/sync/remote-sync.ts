@@ -25,7 +25,7 @@ import { fetchRefs } from './fetch-queue.js';
  *  the last successful state rather than publishing a false success time. */
 export async function syncRemote(cwd: string): Promise<number> {
   if (!(await fetchRefs({ cwd, refs: 'all' }))) {
-    throw new Error(`Failed to fetch repository refs: ${cwd}`);
+    throw new Error('Could not fetch from origin');
   }
   await fastForwardMainBranch(cwd);
   return Date.now();

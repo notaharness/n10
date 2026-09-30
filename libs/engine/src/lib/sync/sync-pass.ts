@@ -37,7 +37,6 @@ export async function runSyncPass(options: {
     onAutoDelete: async (branch, approved) => {
       if (cancelled()) return;
       const outcome = await options.remove(branch, approved);
-      if (cancelled()) return;
       if (outcome === 'removed' || outcome === 'kept-branch') {
         notice({ type: outcome, repo, branch });
       }

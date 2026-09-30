@@ -110,3 +110,21 @@ it('waits for retiring scopes on shutdown as well as the current one', async () 
   await shutdown;
   expect(stopped).toBe(true);
 });
+
+it('names the repository when a retired scope completes a removal', async () => {
+  const host = await import('./remote-sync.js');
+  const notify = vi.fn();
+  host.setSyncNotifier(notify);
+  host.startRemoteSyncLoop('/repo-a');
+  state.config = { repo: '/repo-b' };
+  host.startRemoteSyncLoop('/repo-b');
+  state.instances[0].notify({
+    type: 'removed',
+    repo: '/repo-a',
+    branch: 'topic',
+  });
+  expect(notify).toHaveBeenCalledWith({
+    message: 'Auto-deleted merged branch: topic (/repo-a)',
+    kind: 'success',
+  });
+});

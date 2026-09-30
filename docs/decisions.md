@@ -579,10 +579,18 @@ one queued follow-up, and repeated start calls preserve the existing schedule.
 Fetch or provider errors retain the last successful badges and timestamp while
 publishing an error. Shells render typed notices and observe loading state.
 
-Cancellation is checked between reads and before and after guarded removal.
+A failed fetch aborts the pass: badges and automatic deletion use the last
+complete pass until Git transport recovers. This conservative policy avoids
+combining fresh provider results with stale local refs. Worktree changes alone
+do not trigger a fetch; both shells refresh badges on the configured sync
+interval or explicit refresh.
+
+Cancellation is checked between reads and before guarded removal. A completed
+removal always emits its repository-qualified notice, even after cancellation.
 Repository switches can start another service immediately; stale reads cannot
 publish or start removal. Shutdown cancels future work and awaits removals
-already underway. It does not put a deadline on a Git mutation. Both manual and
+already underway. It does not put a deadline on a Git mutation. Desktop detaches terminal clients
+and stops its daemon while removals finish; the TUI announces its shutdown wait. Both manual and
 automatic removals go through captured-repo engine commands, with core retaining
 the stop/remove/delete safety checks. Desktop supplies repo-qualified babysitter
 ports; a retained checkout resumes watchers only while its repo is selected.
