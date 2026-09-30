@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   idleFor: vi.fn<() => number>(),
   deliverToRunningSession: vi.fn<(name: string, prompt: string) => boolean>(),
   launchSession: vi.fn(),
+  listWorktrees: vi.fn(),
 }));
 
 vi.mock('@n10/logger', () => ({ logError: () => undefined }));
@@ -46,8 +47,7 @@ vi.mock('@n10/worktree-manager', async (original) => ({
   checkoutWorktree: (branch: string, cwd?: string) =>
     mocks.checkoutWorktree(branch, cwd),
   // The checkout the PR's branch is in, which keys its agent session.
-  listWorktrees: () =>
-    Promise.resolve([{ branch: 'feat/thing', path: '/wt/feat-thing' }]),
+  listWorktrees: (scope: unknown) => mocks.listWorktrees(scope),
 }));
 vi.mock('@n10/core', async (original) => ({
   ...(await original<typeof Core>()),
@@ -278,6 +278,9 @@ describe('startPrBabysitter', () => {
     mocks.countConflictsBetween.mockResolvedValue(0);
     mocks.refExists.mockResolvedValue(true);
     mocks.checkoutWorktree.mockResolvedValue('/wt/feat-thing');
+    mocks.listWorktrees.mockResolvedValue([
+      { branch: 'feat/thing', path: '/wt/feat-thing' },
+    ]);
     mocks.isSessionAlive.mockReturnValue(true);
     mocks.idleFor.mockReturnValue(60_000);
     mocks.deliverToRunningSession.mockReturnValue(true);
@@ -399,6 +402,20 @@ describe('startPrBabysitter', () => {
       `${worktreeSessionKey('/wt/feat-thing', '/repo')}@/wt/feat-thing`,
     ]);
     expect(statuses.at(-1)?.deliveries).toBe(1);
+    sitter.stop();
+  });
+
+  it('uses one captured custom scope for lookup and checkout', async () => {
+    mocks.isSessionAlive.mockReturnValue(false);
+    const sitter = start({
+      getConfig: () => ({ ...config, worktreePath: '/custom/{branch}' }),
+    });
+    await pollPastDebounce(sitter);
+    const scope = mocks.listWorktrees.mock.calls.at(
+      -1
+    )?.[0] as WorktreeManager.WorktreeScope;
+    expect(scope.resolver.dir('feat/thing')).toBe('/custom/feat/thing');
+    expect(mocks.checkoutWorktree.mock.calls.at(-1)?.[1]).toBe(scope);
     sitter.stop();
   });
 
@@ -592,6 +609,27 @@ describe('startPrBabysitter', () => {
       lastError: 'gh: rate limited',
       lastPolledAt: null,
     });
+    sitter.stop();
+  });
+
+  it('coalesces explicit polls into one follow-up and resolves every caller', async () => {
+    let release!: (value: PullRequestLookup) => void;
+    const read = vi
+      .fn<() => Promise<PullRequestLookup>>()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          })
+      )
+      .mockResolvedValue({ kind: 'found', pr });
+    const sitter = start({ readPullRequest: read });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(read).toHaveBeenCalledOnce();
+    const pending = [sitter.pollNow(), sitter.pollNow(), sitter.pollNow()];
+    release({ kind: 'found', pr });
+    await Promise.all(pending);
+    expect(read).toHaveBeenCalledTimes(2);
     sitter.stop();
   });
 

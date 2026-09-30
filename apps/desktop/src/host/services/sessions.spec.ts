@@ -124,6 +124,7 @@ vi.mock('./repo.js', async () => {
     }
     return {
       cwd: repo,
+      worktrees: { scope: () => ({ cwd: repo }) },
       sessions,
       config: {
         getSnapshot: () => ({ config: state.configByCwd[repo] ?? {} }),
@@ -196,7 +197,7 @@ vi.mock('@n10/core', async (importOriginal) => {
       );
     },
     // The checkout that has the branch, as core reads it from git.
-    sessionKeyForBranch: (branch: string, repo: string) => {
+    sessionKeyForBranch: (branch: string, { cwd: repo }: { cwd: string }) => {
       const path = state.worktrees.get(`${repo}\0${branch}`);
       return Promise.resolve(
         path ? actual.worktreeSessionKey(path, repo) : null

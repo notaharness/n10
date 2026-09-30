@@ -160,7 +160,8 @@ async function doCheckoutPlan(
   repoCwd: string
 ): Promise<PlanCheckoutResult> {
   const branch = req.pr.sourceBranch;
-  const current = await sessionKeyForBranch(branch, repoCwd);
+  const scope = activeRepository().worktrees.scope();
+  const current = await sessionKeyForBranch(branch, scope);
   // Reject a stale request aimed at another repository's relay.
   if (current && known.has(current) && !ownSession(current))
     throw foreignSessionError(current);
@@ -186,7 +187,7 @@ async function doCheckoutPlan(
   if (result === 'failed') {
     throw new Error(failure ?? 'Could not send the plan to the agent');
   }
-  const name = await sessionKeyForBranch(branch, repoCwd);
+  const name = await sessionKeyForBranch(branch, scope);
   if (
     name &&
     (result === 'spawned' || (getSession(name) && getSession(name) !== before))

@@ -80,7 +80,10 @@ export async function checkoutPlan(
   const repo = deps.repo ?? getRepoRoot() ?? process.cwd();
   // The agent in the checkout that has the PR's branch, when there is
   // one; a spawn below keys by the checkout it lands in.
-  const name = await sessionKeyForBranch(pr.sourceBranch, repo);
+  const name = await sessionKeyForBranch(
+    pr.sourceBranch,
+    worktreeScope(repo, { template: config.worktreePath })
+  );
 
   const seed = (cwd: string) =>
     launchSession({

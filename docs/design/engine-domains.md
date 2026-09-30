@@ -207,3 +207,11 @@ shell selects the active instance and stops its schedules when selection changes
 retained session clients have their own lifetime. The PR list is a multi-repository
 cache because readers and watchers share entries across scopes. Do not impose a
 single global store shape on both lifetimes.
+
+## Babysitter removal suspension
+
+Removal currently stops a watch and recreates it if guarded removal is refused.
+That discards its delivered baseline and may brief the same outstanding findings
+again. A follow-up should park/resume the same watch and preserve its baseline,
+with tests for refused removal and late delivery. This is distinct from changing
+the guarded removal verdict or detaching sessions on repository switches.

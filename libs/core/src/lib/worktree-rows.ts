@@ -1,7 +1,9 @@
-import { repositoryWorktreeScope } from './worktree-scope.js';
-import { listWorktrees, type WorktreeInfo } from '@n10/worktree-manager';
+import {
+  listWorktrees,
+  type WorktreeScope,
+  type WorktreeInfo,
+} from '@n10/worktree-manager';
 import { getSession } from './pty-registry.js';
-import { getRepoRoot } from './repo-root.js';
 import { keyForWorktree } from './session-key.js';
 import type { AgentSession } from './types.js';
 
@@ -50,10 +52,10 @@ export function sessionForBranch(
  */
 export async function sessionKeyForBranch(
   branch: string,
-  repo = getRepoRoot() ?? process.cwd()
+  scope: WorktreeScope
 ): Promise<string | null> {
-  const worktree = (await listWorktrees(repositoryWorktreeScope(repo))).find(
+  const worktree = (await listWorktrees(scope)).find(
     (w) => w.branch === branch
   );
-  return worktree ? keyForWorktree(worktree, repo) : null;
+  return worktree ? keyForWorktree(worktree, scope.cwd) : null;
 }

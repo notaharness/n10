@@ -8,11 +8,12 @@ import {
   sessionKeyForBranch,
 } from '@n10/core';
 import type { BabysitHold } from '@n10/core';
-import type { PullRequestInfo } from '@n10/vcs-core';
+import type { AppConfig, PullRequestInfo } from '@n10/vcs-core';
 import {
   checkoutWorktree,
   refExists,
   worktreeScope,
+  type WorktreeScope,
 } from '@n10/worktree-manager';
 import type { PrBabysitterOptions } from './babysit-types.js';
 
@@ -52,7 +53,8 @@ async function spawnForUpdate(
   opts: PrBabysitterOptions,
   pr: PullRequestInfo,
   prompt: string,
-  live: () => boolean
+  live: () => boolean,
+  captured: { config: AppConfig; scope: WorktreeScope }
 ): Promise<Delivery> {
   if (!(await branchAvailable(pr.sourceBranch, opts.cwd))) {
     return { outcome: 'held', held: 'branch-unavailable' };
@@ -61,10 +63,7 @@ async function spawnForUpdate(
   // Checkout only: a `createWorktree` that falls back to `-b` would
   // invent a branch of this name off HEAD and start an agent on the
   // wrong base.
-  const worktree = await checkoutWorktree(
-    pr.sourceBranch,
-    worktreeScope(opts.cwd, { template: opts.getConfig().worktreePath })
-  );
+  const worktree = await checkoutWorktree(pr.sourceBranch, captured.scope);
   if (!worktree) {
     return { outcome: 'failed', error: 'Could not create the worktree' };
   }
@@ -72,7 +71,7 @@ async function spawnForUpdate(
   // or the watch been stopped. A spawn now would run in the wrong
   // repository's terms.
   if (!live()) return { outcome: 'held', held: 'interrupted' };
-  const config = opts.getConfig();
+  const { config } = captured;
   const { cols, rows } = opts.paneSize();
   // `seed`, never `continue-or-seed`: continuing a prior conversation
   // takes the prompt only when there is nothing to continue, and an
@@ -99,11 +98,13 @@ export async function deliver(
   prompt: string,
   live: () => boolean
 ): Promise<Delivery> {
-  const name = await sessionKeyForBranch(pr.sourceBranch, opts.cwd);
+  const config = opts.getConfig();
+  const scope = worktreeScope(opts.cwd, { template: config.worktreePath });
+  const name = await sessionKeyForBranch(pr.sourceBranch, scope);
   if (!live()) return { outcome: 'held', held: 'interrupted' };
   if (name && opts.isForeignSession?.(name)) {
     return { outcome: 'held', held: 'foreign-session' };
   }
   if (name && isSessionAlive(name)) return injectIntoLive(opts, name, prompt);
-  return spawnForUpdate(opts, pr, prompt, live);
+  return spawnForUpdate(opts, pr, prompt, live, { config, scope });
 }

@@ -6,7 +6,16 @@ import { adoptSession } from './session-registry.js';
 import { pullRequests } from './program.js';
 
 const babysitters = createBabysitterService({
-  config: () => activeRepository().config.getSnapshot(),
+  config: (repo) => {
+    const active = activeRepository();
+    if (active.cwd !== repo)
+      throw new Error('Babysitter read a parked repository');
+    const snapshot = active.config.getSnapshot();
+    return {
+      ...snapshot,
+      provider: snapshot.vcsConfigured ? snapshot.provider : null,
+    };
+  },
   pullRequests,
   isCurrent: activeRepoIs,
   paneSize: defaultPaneSize,

@@ -251,3 +251,15 @@ it('keeps snapshot identity until a watch changes', async () => {
   service.stop('/repo', 7);
   expect(service.getSnapshot('/repo').size).toBe(0);
 });
+
+it('ignores a stopped watch ending after a successor starts', async () => {
+  await service.start('/repo', 7);
+  const stopped = state.started[0];
+  service.stop('/repo', 7);
+  await service.start('/repo', 7);
+  stopped.onStatus({ prId: 7, phase: 'ended' });
+  expect(service.getSnapshot('/repo').get(7)).toMatchObject({
+    phase: 'watching',
+  });
+  expect(changes).toEqual([]);
+});

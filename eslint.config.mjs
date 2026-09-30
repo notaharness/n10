@@ -9,13 +9,6 @@ import ink from './tools/eslint-plugin-ink.mjs';
 
 const shellOperationPaths = [
   {
-    name: '@n10/core',
-    allowTypeImports: true,
-    importNames: ['startPrBabysitter', 'observePullRequest'],
-    message:
-      'Babysitter coordination belongs to the engine babysitter service.',
-  },
-  {
     name: '@n10/vcs-core',
     allowTypeImports: true,
     importNames: ['writeGlobalConfig', 'writeProjectConfig'],
