@@ -47,10 +47,10 @@ const NO_THREADS: ReadState<unknown> = {
  * The review workspace for a PR: a collapsible left rail (Agent ·
  * Files) beside a single content pane that swaps between the Overview,
  * the diff, the agent terminal, the plan and the walkthrough. Selecting
- * a file shows the diff; selecting the agent shows its terminal (which
- * stays mounted so its scrollback survives). The diff's own toolbar
- * lives inside the diff pane, so it's gone while the terminal is
- * showing.
+ * a file shows the diff; selecting the agent shows its terminal, which
+ * is mounted only while it shows (`SessionTerminal`). The diff's own
+ * toolbar lives inside the diff pane, so it's gone while the terminal
+ * is showing.
  *
  * What to show is decided in `lib/review/review-model.ts`; this component
  * wires that to the queries, the refs and the markup.
@@ -72,7 +72,6 @@ export function PrWorkspace({
   sessionName,
   sessionEpoch,
   running,
-  active,
   busy,
   onLaunch,
   onStop,
@@ -91,7 +90,6 @@ export function PrWorkspace({
    *  agent is on the other end of it. */
   sessionEpoch: number;
   running: boolean;
-  active: boolean;
   busy: boolean;
   onLaunch: () => void;
   onStop: () => void;
@@ -123,7 +121,7 @@ export function PrWorkspace({
   const [mode, setMode] = useReviewMode({
     pr,
     viewer: repo.viewer,
-    agent: { hasSession: Boolean(sessionName), running, active },
+    agent: { hasSession: Boolean(sessionName), running },
   });
   const inlineThreads = useMemo(
     () => comments.data?.threads ?? [],
@@ -278,7 +276,6 @@ export function PrWorkspace({
               baseBranch={baseBranch}
               sessionName={sessionName}
               sessionEpoch={sessionEpoch}
-              active={active}
               connectionBanner={connectionBanner}
               inputDisabled={inputDisabled}
               files={files}

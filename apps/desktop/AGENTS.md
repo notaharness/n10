@@ -78,7 +78,7 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `tabs.properties.spec.ts` holds the invariants.
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
   collapsible rail (Agent · Files) beside one content pane that
-  swaps between Overview, diff, agent terminal (kept mounted) and
+  swaps between Overview, diff, agent terminal (mounted only while shown) and
   `ReviewStepper`. It opens on the Overview for someone else's PR and on the
   diff for yours (`lib/review/overview-model.ts`). The diff toolbar lives in
   `DiffPane`, not the tab header. Overview and header lay out by container
@@ -120,9 +120,17 @@ Every rule below has its reasoning in `docs/decisions.md`.
   composed in the renderer so the preview is the delivery; `plan-model.spec.ts`
   asserts numbering against `planRows`. Adopting a respawned session carries
   the chunk `seq` forward.
+- `EditorArea` mounts only the active tab. `SessionTerminal` is mounted only
+  while shown; it watches its session (`watchSession`/`unwatchSession`,
+  counted per window in `services/session-watch.ts`), and the host sends PTY
+  output only to watching windows. Watching is what marks output seen.
 - `SessionTerminal` sends `resizeSession` on every fit and refits on the
-  session's `spawnedAt` epoch. `paneTerminalGrid` measures a hidden `.wterm`
-  inside `[data-terminal-pane]` for the launch estimate.
+  session's `spawnedAt` epoch. It reckons the grid exactly as wterm's own
+  observer does (`terminalBox`, `measureTerminalGrid`); any other answer
+  makes the two resize the PTY back and forth. It bounces the grid for a
+  full repaint only when the snapshot is `truncated`. `paneTerminalGrid`
+  measures a hidden `.wterm` inside `[data-terminal-pane]` for the launch
+  estimate.
 - A terminal exit event carries `retained`: retained agent tabs stay open
   for viewing and restart. `dropEnded` closes a terminal tab a defined
   listing omits; `undefined` means not asked yet.

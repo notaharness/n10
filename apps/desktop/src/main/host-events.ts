@@ -9,7 +9,7 @@
  * it because it is one subject, and because every window-broadcast in
  * the app should be findable in one place.
  */
-import { BrowserWindow } from 'electron';
+import { app, BrowserWindow, webContents } from 'electron';
 import {
   BABYSIT_EVENTS,
   DISCOVERY_EVENTS,
@@ -27,6 +27,7 @@ import {
   startDiscoveryForRepo,
 } from '../host/services/discovery.js';
 import { setSessionBroadcaster } from '../host/services/sessions.js';
+import { dropViewer } from '../host/services/session-watch.js';
 import { setBabysitNotifier } from '../host/services/babysit.js';
 import {
   setBeamStatusNotifier,
@@ -46,10 +47,34 @@ function broadcast(channel: string, payload?: unknown): void {
   }
 }
 
+// PTY output goes only to the windows watching the session, so a
+// session nobody shows costs no renderer anything.
+function sendTo(viewer: number, channel: string, payload: unknown): void {
+  const contents = webContents.fromId(viewer);
+  if (!contents || contents.isDestroyed() || contents.isCrashed()) return;
+  contents.send(channel, payload);
+}
+
+/** A window's watches end with the page that made them: closing it,
+ *  reloading it (the renderer-crash recovery does) or losing its
+ *  renderer. The next page watches again as its terminals mount. A
+ *  navigation counts once committed: `main.ts` cancels the ones that
+ *  would leave the app, and the page stays. */
+function dropWatchesWithPage(): void {
+  app.on('web-contents-created', (_event, contents) => {
+    const viewer = contents.id;
+    const drop = () => dropViewer(viewer);
+    contents.on('destroyed', drop);
+    contents.on('render-process-gone', drop);
+    contents.on('did-navigate', drop);
+  });
+}
+
 /** Wire every host → renderer push, and the per-repo loops behind
  *  them. Call once at startup, before the first repo is opened. */
 export function installHostEventBridge(): void {
-  setSessionBroadcaster(broadcast);
+  setSessionBroadcaster(broadcast, sendTo);
+  dropWatchesWithPage();
 
   // Per-repo background work, (re)started whenever a repo is opened.
   // The sync loop's user-facing events (auto-deleted merged branch, …)

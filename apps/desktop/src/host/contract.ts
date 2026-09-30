@@ -187,6 +187,10 @@ export interface SessionBuffer {
   data: string;
   /** seq of the last chunk included in `data`. */
   seq: number;
+  /** The buffer has dropped its oldest output, so `data` starts part
+   *  way through the stream: without the attach's full redraw, it only
+   *  repaints what changed after it. */
+  truncated: boolean;
 }
 
 // ── Settings ─────────────────────────────────────────────────────
@@ -440,11 +444,12 @@ export interface N10HostApi {
    *  sidebar spinner): `active` = producing output now, `flashing` =
    *  went idle after a real work streak and the user hasn't looked. */
   getSessionActivity(): Promise<Record<string, SessionActivitySnapshot>>;
-  /** The user is looking at this session — clears its flashing state. */
-  markSessionSeen(name: string): Promise<void>;
-  /** Recent output for a session so a (re)mounted terminal can replay
-   *  what it missed before subscribing to live data. */
-  getSessionBuffer(name: string): Promise<SessionBuffer>;
+  /** This window shows the session's terminal: send it the session's
+   *  output from now on, and answer the host's ring buffer for the
+   *  terminal to start from. While watched, the session's output counts
+   *  as seen. Counted per window — each call needs its `unwatch`. */
+  watchSession(name: string): Promise<SessionBuffer>;
+  unwatchSession(name: string): Promise<void>;
   writeSession(name: string, data: string): Promise<void>;
   resizeSession(name: string, cols: number, rows: number): Promise<void>;
   killSession(name: string): Promise<void>;
@@ -467,7 +472,8 @@ export interface N10HostApi {
   listTerminals(): Promise<TerminalSummary[]>;
   /** Kill the terminal's session, on either backend, and forget it. */
   killTerminal(name: string): Promise<void>;
-  /** Subscribe to PTY output. Returns an unsubscribe function. */
+  /** PTY output of the sessions this window watches (`watchSession`).
+   *  Returns an unsubscribe function. */
   onSessionData(cb: (payload: SessionDataEvent) => void): () => void;
   onSessionExit(cb: (payload: SessionExitEvent) => void): () => void;
   /** Named launch progress for a remote launch (ux-machines.md §5) —
@@ -582,8 +588,8 @@ export const IPC = {
   listSessions: 'n10/session/list',
   listForeignSessions: 'n10/session/list-foreign',
   getSessionActivity: 'n10/session/activity',
-  markSessionSeen: 'n10/session/seen',
-  getSessionBuffer: 'n10/session/buffer',
+  watchSession: 'n10/session/watch',
+  unwatchSession: 'n10/session/unwatch',
   writeSession: 'n10/session/write',
   resizeSession: 'n10/session/resize',
   killSession: 'n10/session/kill',

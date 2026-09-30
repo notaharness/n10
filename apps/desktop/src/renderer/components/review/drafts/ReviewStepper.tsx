@@ -30,7 +30,6 @@ export function ReviewStepper({
   drafts,
   filesByName,
   fileOrder,
-  active,
   onExit,
   onOpenInDiff,
 }: {
@@ -39,12 +38,6 @@ export function ReviewStepper({
   drafts: ReviewComment[];
   filesByName: Map<string, DiffLine[]>;
   fileOrder: Map<string, number>;
-  /** Whether this stepper's tab is the visible one. Its shortcuts are
-   *  bound on `window`, and the pane stays mounted while the tab is in
-   *  the background (a live agent keeps its terminal alive), so without
-   *  this a keypress meant for another tab would post or discard a
-   *  draft here. */
-  active: boolean;
   onExit: () => void;
   onOpenInDiff: (file: string) => void;
 }) {
@@ -82,7 +75,6 @@ export function ReviewStepper({
         current.lineStart,
         current.lineEnd
       )}
-      active={active}
       busy={post.isPending || update.isPending || remove.isPending}
       atStart={clamped === 0}
       atEnd={clamped >= ordered.length - 1}

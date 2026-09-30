@@ -12,7 +12,6 @@ import {
   getSpawnedAt,
   noteInput,
   noteResize,
-  noteSeen,
   snapshot as activitySnapshot,
 } from '@n10/core';
 import { readConfig } from '@n10/vcs-core';
@@ -33,6 +32,7 @@ import {
   stopOwnWorktreeSession,
 } from './session-registry.js';
 import { relayBuffer, setSessionBroadcaster } from './session-relay.js';
+import { unwatch, watch, type Viewer } from './session-watch.js';
 import { agentTerminalNames, terminalBuffer } from './terminals.js';
 import type {
   PlanCheckoutRequest,
@@ -347,8 +347,16 @@ export function getSessionActivity(): Record<
   return out;
 }
 
-export function markSessionSeen(name: string): void {
-  noteSeen(name);
+/** Start sending `name`'s output to `viewer`, and answer what its
+ *  terminal starts from. One synchronous step, so no chunk can fall
+ *  between the snapshot and the first one pushed after it. */
+export function watchSession(viewer: Viewer, name: string): SessionBuffer {
+  watch(viewer, name);
+  return getSessionBuffer(name);
+}
+
+export function unwatchSession(viewer: Viewer, name: string): void {
+  unwatch(viewer, name);
 }
 
 export function killSession(name: string): void {
@@ -402,5 +410,5 @@ export function getSessionBuffer(name: string): SessionBuffer {
   if (entry) return relayBuffer(entry);
   // A terminal tab belongs to a directory, not to the open repository,
   // so its scrollback is answered whatever repository that is.
-  return terminalBuffer(name) ?? { data: '', seq: 0 };
+  return terminalBuffer(name) ?? { data: '', seq: 0, truncated: false };
 }

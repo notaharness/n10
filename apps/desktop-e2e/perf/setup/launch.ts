@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
@@ -79,6 +80,10 @@ export async function launchApp(opts: LaunchOptions): Promise<PerfApp> {
   // one: the main process would load the renderer from a dev server
   // instead of the build being measured.
   delete parentEnv.N10_VITE_URL;
+  // While `TMUX` is set tmux ignores `TMUX_TMPDIR`, and a benchmark
+  // started from inside tmux would put its agents on that server.
+  delete parentEnv.TMUX;
+  delete parentEnv.TMUX_PANE;
 
   const started = Date.now();
   const app = await electron.launch({
@@ -109,11 +114,44 @@ export async function launchApp(opts: LaunchOptions): Promise<PerfApp> {
       } catch {
         /* already gone */
       }
+      // Quitting detaches; the agents would outlive the benchmark on a
+      // server whose socket is about to be deleted with the home.
+      reapTmux(homeDir);
       await rm(homeDir, { recursive: true, force: true }).catch(
         () => undefined
       );
     },
   };
+}
+
+/** Kill every session on the tmux server inside `homeDir`, a temp home
+ *  `launchApp` created, and so the server with them. */
+function reapTmux(homeDir: string): void {
+  const env: NodeJS.ProcessEnv = { ...process.env, TMUX_TMPDIR: homeDir };
+  delete env.TMUX;
+  delete env.TMUX_PANE;
+  let names: string[] = [];
+  try {
+    names = execFileSync('tmux', ['list-sessions', '-F', '#{session_name}'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      env,
+    })
+      .split('\n')
+      .filter(Boolean);
+  } catch {
+    return; // no server: nothing was launched
+  }
+  for (const name of names) {
+    try {
+      execFileSync('tmux', ['kill-session', '-t', `=${name}`], {
+        stdio: 'ignore',
+        env,
+      });
+    } catch {
+      /* already gone */
+    }
+  }
 }
 
 /**

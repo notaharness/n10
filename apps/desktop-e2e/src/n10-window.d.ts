@@ -60,7 +60,11 @@ interface N10Bridge {
     intent: string;
   }): Promise<{ name: string }>;
   killSession(name: string): Promise<void>;
-  getSessionBuffer(name: string): Promise<{ data: string; seq: number }>;
+  watchSession(name: string): Promise<{ data: string; seq: number }>;
+  onSessionData(
+    cb: (event: { name: string; data: string; seq: number }) => void
+  ): () => void;
+  unwatchSession(name: string): Promise<void>;
   listRecentRepos(): Promise<{ cwd: string; valid: boolean }[]>;
   listTerminals(): Promise<
     {

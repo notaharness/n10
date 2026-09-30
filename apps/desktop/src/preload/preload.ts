@@ -74,8 +74,8 @@ const api: N10HostApi = {
   listSessions: () => ipcRenderer.invoke(IPC.listSessions),
   listForeignSessions: () => ipcRenderer.invoke(IPC.listForeignSessions),
   getSessionActivity: () => ipcRenderer.invoke(IPC.getSessionActivity),
-  markSessionSeen: (name) => ipcRenderer.invoke(IPC.markSessionSeen, name),
-  getSessionBuffer: (name) => ipcRenderer.invoke(IPC.getSessionBuffer, name),
+  watchSession: (name) => ipcRenderer.invoke(IPC.watchSession, name),
+  unwatchSession: (name) => ipcRenderer.invoke(IPC.unwatchSession, name),
   writeSession: (name, data) =>
     ipcRenderer.invoke(IPC.writeSession, name, data),
   resizeSession: (name, cols, rows) =>

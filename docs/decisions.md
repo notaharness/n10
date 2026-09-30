@@ -231,8 +231,20 @@ the renderer, and recheck identity between host awaits, to prevent rows from a
 new repository entering the previous repository's tab state.
 
 Use native menus and dialogs where the OS supports the interaction. The review
-workspace has a navigation rail and one content pane; keep the terminal mounted
-when switching to the diff so scrollback survives. The diff owns its toolbar.
+workspace has a navigation rail and one content pane. The diff owns its toolbar.
+
+Only the active tab is mounted, and a terminal only while it is on screen. A
+hidden wterm per open agent cost the renderer a terminal write for every chunk
+every agent printed, and bought nothing under tmux: the client's terminal
+accumulates no scrollback of its own, since tmux keeps the history. A terminal
+that mounts watches its session (`watchSession`): the host answers the ring
+buffer and then sends that window the session's output, and nothing for
+sessions no window watches. Watching holds core's `showTerminal`, the same
+seen-signal the TUI's pane holds. Tab switches never detach or kill sessions.
+A tab's review workspace mounts afresh on every switch, with or without an
+agent: it opens where `initialMode` says (a working agent's terminal), and the
+pane, walkthrough step and diff scroll it was left on are not kept.
+
 Each tab has an ErrorBoundary. Markdown paragraphs render as `div` when they may
 contain block images; the host fetches protected images with provider auth.
 

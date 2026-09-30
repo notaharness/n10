@@ -172,7 +172,7 @@ export async function dismissSessionMenu(page: Page): Promise<void> {
  * the changes to the Overview.
  */
 export async function showOverview(page: Page): Promise<void> {
-  // Every open tab stays mounted, and so does an Overview once shown.
+  // An Overview stays mounted once shown, hidden while another pane is up.
   const heading = page
     .locator('h1[data-overview-heading]')
     .filter({ visible: true });

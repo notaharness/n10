@@ -60,13 +60,7 @@ function ExitedAgentBar({ session }: { session: TerminalSummary }) {
  * `epoch` is the session's spawn time from the host's listing, which is
  * what makes the pane re-fit when the process behind the name changes.
  */
-export function TerminalView({
-  tab,
-  active,
-}: {
-  tab: TerminalTab;
-  active: boolean;
-}) {
+export function TerminalView({ tab }: { tab: TerminalTab }) {
   const terminals = useTerminals();
   const session = terminals.data?.find((t) => t.name === tab.name);
   const machines = useMachines();
@@ -95,9 +89,9 @@ export function TerminalView({
       {pane.showExitedBar && session && <ExitedAgentBar session={session} />}
       <div className="relative min-h-0 flex-1">
         <SessionTerminal
+          key={tab.name}
           name={tab.name}
           epoch={epoch}
-          active={active}
           disabled={pane.inputDisabled}
         />
       </div>

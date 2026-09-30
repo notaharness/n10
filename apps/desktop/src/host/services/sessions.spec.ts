@@ -297,7 +297,10 @@ beforeEach(async () => {
     listSessions,
     reconnectSession,
   } = sessions);
-  sessions.setSessionBroadcaster(() => undefined);
+  sessions.setSessionBroadcaster(
+    () => undefined,
+    () => undefined
+  );
 });
 
 /** The session key of `branch`'s checkout as the fakes create it. */
@@ -413,9 +416,12 @@ describe('launchAgent', () => {
   it('emits worktree then start steps for a remote launch, keyed to launchId', async () => {
     state.knownMachines.add('dddddddddddddddd');
     const broadcasts: unknown[] = [];
-    sessions.setSessionBroadcaster((channel, payload) => {
-      if (channel === 'n10/launch/step') broadcasts.push(payload);
-    });
+    sessions.setSessionBroadcaster(
+      (channel, payload) => {
+        if (channel === 'n10/launch/step') broadcasts.push(payload);
+      },
+      () => undefined
+    );
     await launchAgent({
       branch: 'feature/x',
       intent: 'continue-or-blank',
@@ -430,9 +436,12 @@ describe('launchAgent', () => {
 
   it('emits no steps for a local launch', async () => {
     const broadcasts: unknown[] = [];
-    sessions.setSessionBroadcaster((channel, payload) => {
-      if (channel === 'n10/launch/step') broadcasts.push(payload);
-    });
+    sessions.setSessionBroadcaster(
+      (channel, payload) => {
+        if (channel === 'n10/launch/step') broadcasts.push(payload);
+      },
+      () => undefined
+    );
     await launchAgent({ branch: 'feature/x', intent: 'continue-or-blank' });
     expect(broadcasts).toEqual([]);
   });
@@ -822,11 +831,16 @@ describe('session buffer', () => {
     expect(getSessionBuffer(keyFor('buf', '/repo-a'))).toEqual({
       data: 'one two',
       seq: 2,
+      truncated: false,
     });
   });
 
   it('is empty for a session that was never launched', () => {
-    expect(getSessionBuffer('nothing')).toEqual({ data: '', seq: 0 });
+    expect(getSessionBuffer('nothing')).toEqual({
+      data: '',
+      seq: 0,
+      truncated: false,
+    });
   });
 
   it('drops the oldest output once the buffer is full', async () => {
