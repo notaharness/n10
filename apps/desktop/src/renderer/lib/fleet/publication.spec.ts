@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CeremonyOutcome } from '../../../host/contract-machines.js';
+import type { CeremonyOutcome } from '@n10/engine/contract';
 import { landedKey, pendingAfter, publicationKey } from './publication.js';
 
 type Succeeded = Extract<CeremonyOutcome, { ok: true }>;

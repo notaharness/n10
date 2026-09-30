@@ -96,7 +96,7 @@ propagated through the stack before merging.
    fixture-agent identity. Discovery receives the repository handle’s live scope
    port; launch captures one handle for both cwd and domain services before any
    asynchronous work.
-8. **Machines**: fleet snapshots and remote command policy with injected machine
+8. **Machines**: fleet snapshots, stale-read rejection and remote command policy with injected machine
    ports. Beam socket/native-process ownership stays in desktop adapters; an
    unsupported shell observes an unavailable capability without a fake backend.
 9. **Plans**: shared checkout command and session invalidation. Keep each

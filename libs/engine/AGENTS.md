@@ -79,3 +79,10 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   ticks and bound explicit follow-ups. Check liveness after awaits; use captured
   repository identity when adopting a completed launch. Core supplies pure models,
   prompts and primitive operations; shells supply config, dimensions and relays.
+
+- **Machines** (`machines/`): own fleet snapshots, stale-result rejection and
+  remote launch ownership policy over injected ports. Missing ports mean an
+  unavailable capability, never a local executor. Bind PTY handles to their
+  opening transport; detach late attaches from a replaced port. Beam sockets,
+  mail relay, reconnection and native daemon ownership stay in shell adapters.
+  Machine data types are exported by browser-safe `@n10/engine/contract`.

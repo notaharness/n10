@@ -1,5 +1,5 @@
 import type {
-  BeamStatus,
+  FleetStatus,
   CeremonyOutcome,
   CeremonyProgress,
   CeremonyRequest,
@@ -59,7 +59,7 @@ function passkeyUrl(fields: Record<string, string>): string {
 }
 
 class Fleet {
-  readonly status = new Channel<BeamStatus>();
+  readonly status = new Channel<FleetStatus>();
   readonly machinesChanged = new Channel<MachineView[]>();
   readonly progress = new Channel<CeremonyProgress>();
   readonly published = new Channel<DirectoryPublished>();
@@ -87,7 +87,7 @@ class Fleet {
     return [local, ...aliased];
   }
 
-  beamStatus(): BeamStatus {
+  beamStatus(): FleetStatus {
     return {
       state: 'ready',
       detail: null,

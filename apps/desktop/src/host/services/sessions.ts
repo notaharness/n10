@@ -9,7 +9,7 @@ import {
 } from '@n10/core';
 import { readConfig } from '@n10/vcs-core';
 import { activeRepository, requireRepo } from './repo.js';
-import { refuseIfRemoteOwns } from './plan-remote-owner.js';
+import { machines } from './machines.js';
 import { machineFor } from './remote-machines.js';
 import { broadcastLaunchStep } from './session-relay.js';
 import {
@@ -78,7 +78,7 @@ export async function launchAgent(
     },
     {
       beforeLaunch: (branch, current) =>
-        refuseIfRemoteOwns(repo.cwd, branch, current),
+        machines.refuseIfRemoteOwns(repo.cwd, branch, current),
       started: adoptSession,
       progress: (step) => {
         if (req.machine && req.launchId)
@@ -165,7 +165,7 @@ async function doCheckoutPlan(
   // Reject a stale request aimed at another repository's relay.
   if (current && known.has(current) && !ownSession(current))
     throw foreignSessionError(current);
-  await refuseIfRemoteOwns(repoCwd, branch, current);
+  await machines.refuseIfRemoteOwns(repoCwd, branch, current);
   const config = readConfig(repoCwd);
   // core reports failures by flashing a status line, which the TUI has
   // and the host does not. Capture the message and reject with it: the

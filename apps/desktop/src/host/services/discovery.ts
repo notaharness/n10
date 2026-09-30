@@ -1,7 +1,7 @@
 import { activeRepository } from './repo.js';
 import { adoptSession } from './session-registry.js';
 import { defaultPaneSize } from './sessions.js';
-import { refuseIfRemoteOwns } from './plan-remote-owner.js';
+import { machines } from './machines.js';
 import { adoptTerminal, forgetTerminal } from './terminals.js';
 
 let stop: (() => void) | undefined;
@@ -23,7 +23,7 @@ export function startDiscoveryForRepo(cwd: string): void {
         throw new Error(
           'Cannot attach: the worktree has no branch checked out'
         );
-      await refuseIfRemoteOwns(repo.cwd, branch, name);
+      await machines.refuseIfRemoteOwns(repo.cwd, branch, name);
     },
     started: adoptSession,
     adoptTerminal,

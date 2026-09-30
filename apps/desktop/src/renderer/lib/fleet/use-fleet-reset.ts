@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { FleetResetOutcome } from '../../../host/contract-machines.js';
+import type { FleetResetOutcome } from '@n10/engine/contract';
 import { errorMessage } from '../utils.js';
 
 /**

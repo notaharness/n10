@@ -8,7 +8,7 @@ import {
   MENU_EVENTS,
   SESSION_EVENTS,
   SYNC_EVENTS,
-  type BeamStatus,
+  type FleetStatus,
   type CeremonyProgress,
   type DirectoryPublished,
   type N10HostApi,
@@ -167,7 +167,7 @@ const api: N10HostApi = {
   listMachines: () => ipcRenderer.invoke(IPC.listMachines),
   getBeamStatus: () => ipcRenderer.invoke(IPC.getBeamStatus),
   onBeamStatusChanged: (cb) => {
-    const listener = (_e: unknown, payload: BeamStatus) => cb(payload);
+    const listener = (_e: unknown, payload: FleetStatus) => cb(payload);
     ipcRenderer.on(MACHINES_EVENTS.beamStatus, listener);
     return () =>
       ipcRenderer.removeListener(MACHINES_EVENTS.beamStatus, listener);

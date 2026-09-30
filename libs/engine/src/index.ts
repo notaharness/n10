@@ -63,3 +63,17 @@ export type {
   BabysitterEvent,
   BabysitterPorts,
 } from './lib/babysitters/babysitter-service.js';
+
+export { createMachineService } from './lib/machines/machine-service.js';
+export type {
+  MachineEvent,
+  MachineSnapshot,
+} from './lib/machines/machine-service.js';
+export type {
+  MachinesPort,
+  InboundMailPort,
+} from './lib/machines/machine-ports.js';
+export type {
+  RemoteMachinePort,
+  StreamEventPayload,
+} from './lib/machines/remote-machines.js';

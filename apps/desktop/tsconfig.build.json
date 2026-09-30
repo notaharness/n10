@@ -20,9 +20,6 @@
       "path": "../../libs/vcs/github/tsconfig.lib.json"
     },
     {
-      "path": "../../libs/terminal-tmux/tsconfig.lib.json"
-    },
-    {
       "path": "../../libs/worktree-manager/tsconfig.lib.json"
     },
     {

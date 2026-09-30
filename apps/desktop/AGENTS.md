@@ -33,7 +33,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - `main/beam/` is a client of the beam daemon's control socket (beam's
   docs/06) and installs the three machine ports: `MachinesPort`,
   `RemoteMachinePort` and `InboundMailPort`. Nothing above them knows beam.
-  Attach input stays within beam's four-frame window. The mail relay's
+  The engine owns fleet snapshots and remote ownership policy; these ports
+  supply transport. Attach input stays within beam's four-frame window. The mail relay's
   ack and defer rules are decisions.md D13/D14; it delivers into a
   session only for a sender granted `all` (D17).
 - Start the beam daemon only through `spawnOwnedDaemon`, which runs it

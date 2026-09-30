@@ -4,7 +4,7 @@ import type * as CoreModule from '@n10/core';
 import { worktreeSessionKey } from '@n10/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as SessionsModule from './sessions.js';
-import type { MachineView } from '../contract-machines.js';
+import type { MachineView } from '@n10/engine/contract';
 import type { TaggedSession } from '@n10/core';
 
 /** Sessions from multiple repositories coexist under qualified keys. */
@@ -165,9 +165,17 @@ vi.mock('./remote-machines.js', () => ({
   },
 }));
 
-vi.mock('./machines.js', () => ({
-  listMachines: () => Promise.resolve(state.machines),
-}));
+vi.mock('./machines.js', async () => {
+  const { createMachineService } = await vi.importActual<typeof EngineModule>(
+    '@n10/engine'
+  );
+  const machines = createMachineService();
+  machines.setPort({
+    listMachines: async () => state.machines,
+  } as EngineModule.MachinesPort);
+  machines.setRemotePort({} as EngineModule.RemoteMachinePort);
+  return { machines };
+});
 
 vi.mock('@n10/core', async (importOriginal) => {
   const actual = await importOriginal<typeof CoreModule>();

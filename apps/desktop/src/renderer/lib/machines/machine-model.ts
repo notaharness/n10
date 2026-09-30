@@ -3,7 +3,7 @@ import type {
   InboundMailItem,
   MachineState,
   MachineView,
-} from '../../../host/contract-machines.js';
+} from '@n10/engine/contract';
 import { relativeTime } from '../utils.js';
 
 /**

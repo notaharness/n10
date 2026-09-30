@@ -14,7 +14,7 @@
  * split.
  */
 
-import type { MachineView } from './contract-machines.js';
+import type { MachineView } from '@n10/engine/contract';
 
 // ── Sessions (agent terminals) ───────────────────────────────────
 

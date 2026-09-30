@@ -21,7 +21,9 @@ vi.mock('./session-registry.js', () => ({ adoptSession: state.adopt }));
 vi.mock('./sessions.js', () => ({
   defaultPaneSize: () => ({ cols: 120, rows: 40 }),
 }));
-vi.mock('./plan-remote-owner.js', () => ({ refuseIfRemoteOwns: state.guard }));
+vi.mock('./machines.js', () => ({
+  machines: { refuseIfRemoteOwns: state.guard },
+}));
 vi.mock('./terminals.js', () => ({
   adoptTerminal: state.terminal,
   forgetTerminal: state.forget,

@@ -49,9 +49,9 @@ export type {
 // The push half of the contract — channel names and their payloads.
 export * from './contract-events.js';
 // Machines: this one and the other members of its beam fleet.
-export type * from './contract-machines.js';
+export type * from '@n10/engine/contract';
 import type {
-  BeamStatus,
+  FleetStatus,
   CeremonyOutcome,
   CeremonyProgress,
   CeremonyRequest,
@@ -59,7 +59,7 @@ import type {
   FleetResetOutcome,
   MachineGrant,
   MachineView,
-} from './contract-machines.js';
+} from '@n10/engine/contract';
 // Terminal tabs — sessions bound to a directory rather than a worktree.
 export type * from './contract-terminals.js';
 import type {
@@ -529,8 +529,8 @@ export interface N10HostApi {
    *  this machine is enrolled. Repo independent — like `listTerminals`,
    *  this answers the same whatever repository (if any) is open. */
   listMachines(): Promise<MachineView[]>;
-  getBeamStatus(): Promise<BeamStatus>;
-  onBeamStatusChanged(cb: (status: BeamStatus) => void): () => void;
+  getBeamStatus(): Promise<FleetStatus>;
+  onBeamStatusChanged(cb: (status: FleetStatus) => void): () => void;
   /** The name a peer goes by here only; `null` clears it. */
   setMachineAlias(peerId: string, alias: string | null): Promise<void>;
   /** What that peer may open on this machine. */

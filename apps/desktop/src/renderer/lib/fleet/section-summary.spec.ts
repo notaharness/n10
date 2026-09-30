@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { BeamStatus, MachineView } from '../../../host/contract.js';
+import type { FleetStatus, MachineView } from '@n10/engine/contract';
 import { fleetSectionSummary } from './section-summary.js';
 
-const ready: BeamStatus = {
+const ready: FleetStatus = {
   state: 'ready',
   detail: null,
   enrolled: true,

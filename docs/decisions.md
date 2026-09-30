@@ -744,3 +744,18 @@ exists. Editor process launching and selection/focus remain shell adapters.
 Discovery captures its repository and replaces its non-recursive filesystem
 watch when the configured worktree base changes. Switching repositories disposes
 the old resource subscription; it does not detach retained session clients.
+
+## Engine fleet boundary
+
+`engine/machines` owns fleet snapshots, one in-flight read, mail overlays,
+remote command/PTY capability and the local-versus-remote launch guard. A push or
+transport replacement invalidates an older list response. Failed reads retain
+last-known machines and report an error; a shell without ports observes an
+unavailable capability. Commands never fall back to a local executor.
+
+Each PTY handle uses the transport that opened it. A port replaced during attach
+causes the late stream to detach from its original transport. Fleet data types
+live in the browser-safe `@n10/engine/contract` entry. Desktop only adapts engine
+events to IPC and installs Beam ports; Beam sockets, reconnection, enrolment
+protocols, the mail relay and utility-process daemon ownership remain adapters.
+D15's external-versus-app-owned daemon shutdown rule is unchanged.

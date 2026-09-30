@@ -1,9 +1,4 @@
-/**
- * Machines: this one and the other members of its beam fleet, as the
- * beam daemon reports them (beam docs/06, `PeerView`), plus enrolment.
- * Split from `contract.ts` because it is one subject, and because that
- * file is a catalogue already.
- */
+/** Fleet state and commands shared by engine consumers and transport adapters. */
 
 /** beam's peer states. `revoked-by-fleet` is the peer refusing this
  *  machine as revoked: it will not take this machine again. */
@@ -58,7 +53,7 @@ export interface MachineView {
  *  connection whose socket answers while beam still brings up its
  *  transport (every op but `status` waits for it); `restarting` is an
  *  unexpected loss being retried; `unavailable` says why in `detail`. */
-export interface BeamStatus {
+export interface FleetStatus {
   state: 'connecting' | 'starting' | 'ready' | 'restarting' | 'unavailable';
   detail: string | null;
   enrolled: boolean;
@@ -111,12 +106,12 @@ export type CeremonyOutcome =
       published: boolean;
       acknowledgedBy: number;
     }
-  | BeamFailure;
+  | FleetFailure;
 
 /** A refused operation. `code` is beam's error token (docs/06), or
  *  `connection-lost` when the connection dropped mid-request; `detail`
  *  is beam's own words. The renderer owns what each tells the owner. */
-export interface BeamFailure {
+export interface FleetFailure {
   ok: false;
   code: string;
   detail: string | null;
@@ -124,4 +119,4 @@ export interface BeamFailure {
 
 /** `fleet.reset` (beam docs/06): this machine leaves its fleet, keeping
  *  its identity. */
-export type FleetResetOutcome = { ok: true } | BeamFailure;
+export type FleetResetOutcome = { ok: true } | FleetFailure;

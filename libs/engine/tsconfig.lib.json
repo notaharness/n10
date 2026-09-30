@@ -18,6 +18,9 @@
       "path": "../vcs/core/tsconfig.lib.json"
     },
     {
+      "path": "../terminal-tmux/tsconfig.lib.json"
+    },
+    {
       "path": "../review-comments/tsconfig.lib.json"
     },
     {

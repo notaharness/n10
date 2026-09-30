@@ -11,7 +11,12 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./contract": {
+      "types": "./src/contract.ts",
+      "import": "./src/contract.ts",
+      "default": "./src/contract.ts"
+    }
   },
   "nx": {
     "name": "@n10/engine",

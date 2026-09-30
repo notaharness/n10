@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { MachineView } from '../contract-machines.js';
-import {
-  dismissInboundMail,
-  setInboundMailPort,
-  withMailOverlay,
-} from './inbound-mail.js';
+import type { MachineView } from './machine-types.js';
+import { createMachineService } from './machine-service.js';
+let service: ReturnType<typeof createMachineService>;
+function withMailOverlay(machines: MachineView[]) {
+  service.receiveMachines(machines);
+  return service.getSnapshot().machines;
+}
 
 function machine(peerId: string): MachineView {
   return {
@@ -22,7 +23,7 @@ function machine(peerId: string): MachineView {
 }
 
 beforeEach(() => {
-  setInboundMailPort(null);
+  service = createMachineService();
 });
 
 describe('withMailOverlay', () => {
@@ -33,7 +34,7 @@ describe('withMailOverlay', () => {
   });
 
   it('overlays each machine with its own snapshot, by peerId', () => {
-    setInboundMailPort({
+    service.setMailPort({
       snapshotFor: (peerId: string) =>
         peerId === 'bbbbbbbbbbbbbbbb'
           ? {
@@ -54,16 +55,16 @@ describe('withMailOverlay', () => {
 
 describe('dismissInboundMail', () => {
   it('rejects when no port is installed', async () => {
-    await expect(dismissInboundMail('e1')).rejects.toThrow(/not available/);
+    await expect(service.dismissMail('e1')).rejects.toThrow(/not available/);
   });
 
   it('forwards to the installed port', async () => {
     const dismissed: string[] = [];
-    setInboundMailPort({
+    service.setMailPort({
       snapshotFor: () => ({ inboundWaiting: [], inboundRefused: [] }),
       dismiss: (id: string) => dismissed.push(id),
     });
-    await dismissInboundMail('e1');
+    await service.dismissMail('e1');
     expect(dismissed).toEqual(['e1']);
   });
 });

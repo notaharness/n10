@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 import { useCallback, useMemo, useState } from 'react';
-import type { CeremonyRequest } from '../../../host/contract-machines.js';
+import type { CeremonyRequest } from '@n10/engine/contract';
 import { useCeremony, type CeremonyHooks } from './use-ceremony.js';
 
 type EnrolmentMode = 'create' | 'join';
