@@ -41,9 +41,11 @@ tab is the backlog agent; the benchmark does not measure switching latency.
 A host-only `N10_HOST_REQUIRE` preload samples timer lateness every 10 ms and
 flushes timestamped samples once per second. The recorder itself incurs timer,
 JSON and small synchronous file-write costs, included in the idle baseline.
-Samples are restricted to the measured host PID and window; missing samples or
-a changed host PID fail the benchmark. Main-process delay uses the existing
-10 ms timer sampler. These are timer lateness measurements, not command latency.
+Samples are restricted to the measured host PID and window. A missing log, fewer
+than half the expected 10 ms ticks, or a changed host PID fails the benchmark.
+The coverage floor rejects partial logs and windows blocked for most of the
+measurement; those failures require investigation, not an inferred zero delay.
+Main-process delay uses the existing 10 ms timer sampler. These are timer lateness measurements, not command latency.
 Report maximum delay alongside p99: one large-copy stall can vanish from p99
 when averaged into a 15-second window.
 

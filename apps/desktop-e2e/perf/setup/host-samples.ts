@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { cpuMs } from './proc-cpu.js';
 import { pace } from './pace.js';
@@ -16,6 +16,8 @@ function hostDelays(
   start: number,
   end: number
 ): number[] {
+  if (!existsSync(file))
+    throw new Error('Host probe did not load (no samples file)');
   return readFileSync(file, 'utf8')
     .trim()
     .split('\n')
@@ -85,8 +87,13 @@ export async function measureHost(
   // Let the host write the completed window; this wait is outside measurement.
   await pace(page, 1100);
   const delays = hostDelays(log, host.pid, start, end);
-  if (delays.length < 100)
-    throw new Error(`Insufficient host samples: ${delays.length}`);
+  // The probe ticks every 10 ms; reject missing coverage instead of reporting
+  // percentiles from a small surviving fragment of the measurement window.
+  const minimumSamples = Math.ceil(((end - start) / 10) * 0.5);
+  if (delays.length < minimumSamples)
+    throw new Error(
+      `Host sample coverage too low: ${delays.length} of at least ${minimumSamples}; probe data is missing or the host was blocked for most of the window`
+    );
   return {
     ...result,
     hostSamples: delays.length,
