@@ -13,6 +13,7 @@ import { tmuxCapturePaneWith, tmuxKillSessionWith } from './tmux-cli-remote.js';
 import { prepareRemoteTmuxSession } from './tmux-launch-remote.js';
 import type { TmuxLaunchPlan } from './tmux-launch.js';
 import type { RemoteSessionPoller } from './remote-poller.js';
+import { ClientDraw } from './client-draw.js';
 
 /** One remote pty stream's client contract — deliberately narrow: the
  *  desktop supplies a concrete implementation over its beam transport;
@@ -115,6 +116,7 @@ export class RemoteTmuxBackend implements SessionBackend {
   private width: number;
   private height: number;
   private finalFrame: string | null = null;
+  private readonly draw = new ClientDraw();
   private reconnectAttempts = 0;
   /** Whether anything has said the *connection* is in doubt, as opposed
    *  to this one stream having ended. Reset only once a re-attach has
@@ -148,6 +150,7 @@ export class RemoteTmuxBackend implements SessionBackend {
   }
 
   private bindHandle(handle: RemotePtyHandle): void {
+    this.draw.track(handle);
     for (const cb of this.data) handle.onData(cb);
     handle.onClose(() => {
       if (this.disposed || this.handle !== handle) return;
@@ -264,9 +267,16 @@ export class RemoteTmuxBackend implements SessionBackend {
     // failure, and an uncaught rejection in Electron main is a
     // process-level crash over what is otherwise a routine "the machine
     // went away right as the session ended" (finding 4).
-    if (info.found) void this.replayFinalFrame().catch(() => undefined);
+    if (info.found) void this.replayOnceDrawn().catch(() => undefined);
     for (const cb of [...this.exits])
       cb(this.state.exitCode ?? 0, this.state.signal);
+  }
+
+  /** The dead pane's final frame, once the stream's tmux client has
+   *  drawn (`ClientDraw`). */
+  private async replayOnceDrawn(): Promise<void> {
+    await this.draw.settled();
+    if (!this.disposed) await this.replayFinalFrame();
   }
 
   private async replayFinalFrame(): Promise<void> {

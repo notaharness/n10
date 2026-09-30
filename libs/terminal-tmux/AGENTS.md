@@ -15,12 +15,13 @@ explicit serializable `TmuxLaunchPlan` to async `createTmuxBackend`:
 
 `dispose()` releases the local PTY client and polling timer; the hosted process
 survives. `kill()` terminates the exact tmux session. `onExit` reports hosted
-process exit, including retained panes, after replaying a retained pane's final
-frame once the client has first drawn (its alternate screen would hide one
-written earlier); `onDisconnect` reports a local client
+process exit, including retained panes; `onDisconnect` reports a local client
 ending while the hosted process is still running. The backend reconnects its
 client with bounded backoff while preserving the local subscriptions and size. Native `pane_dead` and exit
 status drive lifecycle information; no global tmux hooks are installed.
+The local and remote backends replay a retained pane's final frame only once
+their client has first drawn (`ClientDraw`): its alternate screen would hide a
+frame written earlier.
 
 ## Safety and protocol
 
