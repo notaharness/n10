@@ -30,8 +30,8 @@ ceiling: it is a REST surface. Reasoning: `docs/decisions.md`.
   read while the cycle's statuses are fresh (30 s), two after.
 - An Azure group (team) reviewer is its own row carrying the vote of
   whichever member voted for it. `includesViewer` marks the caller's
-  groups so `categorizeReviews` can treat a pending one as a request;
-  never copy a group's vote onto a person.
+  groups so `viewerEntry` can stand a pending one in for them; never copy
+  a group's vote onto a person.
 - GitHub's search returns the rollup and counts with the list, so it
   implements neither `forgetPullRequestCache` nor `resetCaches`.
 - Every `gh` read — `ghQuery`, `ghRest`, the provider's GETs, `gh auth

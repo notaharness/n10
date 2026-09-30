@@ -158,6 +158,36 @@ describe('nextStep', () => {
     expect(nextStep(pr, 'reviewer', null)).not.toHaveProperty('detailAction');
   });
 
+  describe('asked through a team the reviewer is in', () => {
+    const team = (decision: Decision) => ({
+      identifier: 'core-team',
+      displayName: 'Core Team',
+      decision,
+      includesViewer: true,
+    });
+
+    it('says their review is requested while the team has not answered', () => {
+      const pr = { ...PR, reviewers: [team('no-response')] };
+      expect(nextStep(pr, 'reviewer', 'bea').summary).toBe(
+        'Your review is requested'
+      );
+    });
+
+    it('never gives them a teammate’s vote for the team', () => {
+      const pr = { ...PR, reviewers: [team('approved')] };
+      expect(nextStep(pr, 'reviewer', 'bea').summary).toBe(
+        'Not reviewed by you yet'
+      );
+    });
+
+    it('goes by their own vote when they have one', () => {
+      const pr = { ...PR, reviewers: [team('no-response'), bea('approved')] };
+      expect(nextStep(pr, 'reviewer', 'bea').summary).toBe(
+        'You approved this pull request'
+      );
+    });
+  });
+
   it('says a review is requested only where the provider asks for it', () => {
     // On GitHub, a reply in a thread lists the reader without a request.
     const pr = {
