@@ -23,7 +23,7 @@ test.describe('Network guard', () => {
     },
   });
 
-  test('refuses a provider to the session host, the main process and the window', async ({
+  test('refuses a provider to the session host, the main process, the window and the browser', async ({
     desktop,
   }) => {
     const { app, page, homeDir } = desktop;
@@ -48,13 +48,13 @@ test.describe('Network guard', () => {
 
     // Chromium's, from the window and from the main process. `no-cors`
     // resolves on any answer, so only a refusal rejects.
-    const window = await page.evaluate(() =>
+    const fromWindow = await page.evaluate(() =>
       fetch('https://github.com/', { mode: 'no-cors' }).then(
         () => 'reached',
         () => 'refused'
       )
     );
-    expect(window).toBe('refused');
+    expect(fromWindow).toBe('refused');
     const net = await app.evaluate(({ net }) =>
       net.fetch('https://dev.azure.com/').then(
         () => 'reached',
@@ -62,6 +62,14 @@ test.describe('Network guard', () => {
       )
     );
     expect(net).toBe('refused');
+
+    // The system browser, which the app hands a link the window opens.
+    await page.evaluate(() => {
+      window.open('https://github.com/n10/fixture/pull/1');
+    });
+    await expect
+      .poll(refusals)
+      .toContain('browser: openExternal https://github.com/n10/fixture/pull/1');
 
     expect(refusals()).toEqual(
       expect.arrayContaining([

@@ -68,8 +68,9 @@ or auto-detection replaces them.
 
 The suite is offline. `fixtures/network-guard.cjs`, loaded into the main
 process (`-r`) and the session host, refuses every connection to GitHub or
-Azure DevOps that gets past the fakes: Node sockets in both processes, and
-Chromium's requests through each session's `webRequest`. A refusal fails the
+Azure DevOps that gets past the fakes: Node sockets in both processes,
+Chromium's requests through each session's `webRequest`, and provider URLs
+handed to `shell.openExternal`, which would start the system browser. A refusal fails the
 test at teardown and is attached as `network-refusals`; a test that provokes
 one on purpose takes it with `takeNetworkRefusals`. The fixture runs no test
 without the guard in both processes. A test given `githubToken` runs unguarded,

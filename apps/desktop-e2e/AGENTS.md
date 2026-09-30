@@ -29,7 +29,8 @@ build target pins production). Full notes: `docs/testing.md`.
   nothing; seed no Azure DevOps token of your own beside it. `acceptedPat`
   models a revoked token (401).
 - No test reaches GitHub or Azure DevOps: `fixtures/network-guard.cjs`
-  refuses what gets past the fakes in the main process and the host, and a
+  refuses what gets past the fakes in the main process and the host
+  (sockets, `webRequest`, `shell.openExternal`), and a
   refusal fails the test (`setup/network-guard.ts`). Only `githubToken`
   (@integration) runs unguarded.
 - Playwright's Electron launcher drops `NODE_OPTIONS`, so a main-process

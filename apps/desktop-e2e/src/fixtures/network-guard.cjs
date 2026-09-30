@@ -15,7 +15,9 @@
  * through `net.Socket.prototype.connect` — `fetch` and `https` included
  * — so a provider host is refused there, in place of its DNS lookup.
  * In the main process Chromium's own requests (the windows, Electron's
- * `net`) are refused through each session's `webRequest`.
+ * `net`) are refused through each session's `webRequest`, and so is a
+ * provider URL handed to `shell.openExternal`, which would otherwise
+ * start the system browser at it.
  *
  * It fails closed: each process writes `$N10_NETWORK_GUARD.<type>.loaded`
  * once it is in place, and the fixture runs no test without both.
@@ -72,9 +74,29 @@ function guardSockets() {
   };
 }
 
-function guardSessions() {
+function isProviderUrl(url) {
+  try {
+    return PROVIDER.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** The app calls it as `void shell.openExternal(url)`, so a refusal
+ *  resolves: nothing opens, and the log fails the test. */
+function guardOpenExternal(shell) {
+  const openExternal = shell.openExternal;
+  shell.openExternal = function guardedOpenExternal(url, options) {
+    if (!isProviderUrl(url)) return openExternal.call(this, url, options);
+    refuse(`openExternal ${url}`);
+    return Promise.resolve();
+  };
+}
+
+function guardMain() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- Electron's module is not a Node built-in, and a preload is CommonJS.
-  const { app } = require('electron');
+  const { app, shell } = require('electron');
+  guardOpenExternal(shell);
   app.on('session-created', (session) => {
     session.webRequest.onBeforeRequest(
       { urls: PROVIDER_URLS },
@@ -88,6 +110,6 @@ function guardSessions() {
 
 if (BASE) {
   guardSockets();
-  if (process.type === 'browser') guardSessions();
+  if (process.type === 'browser') guardMain();
   writeFileSync(`${BASE}.${process.type}.loaded`, '', 'utf8');
 }
