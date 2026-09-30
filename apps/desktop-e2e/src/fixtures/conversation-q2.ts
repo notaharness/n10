@@ -1,4 +1,8 @@
-import type { FakePr, FakeThread } from '../setup/fake-gh.js';
+import {
+  twoDaysAgoAt,
+  type FakePr,
+  type FakeThread,
+} from '../setup/fake-gh.js';
 
 /**
  * The Q2 conversation fixture: 130 review threads, one of them with 125
@@ -42,8 +46,7 @@ export function q2Conversation(): Pick<
     isOutdated: true,
   };
   threads[2] = { ...threads[2]!, path: 'logo.png', line: undefined };
-  const at = (min: number) =>
-    `2026-09-20T09:${String(min).padStart(2, '0')}:00Z`;
+  const at = (min: number) => twoDaysAgoAt(9, min);
   const alex = { __typename: 'User', login: 'alex' };
   return {
     threads,

@@ -10,6 +10,20 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
+/** `h` hours before now, as GitHub writes a time. Dated this way, a
+ *  fixture's age ("3d ago") reads the same on every run; a fixed date's
+ *  grows a day at a time, and a screenshot of it goes stale overnight. */
+export function hoursAgo(h: number): string {
+  return new Date(Date.now() - h * 3_600_000).toISOString();
+}
+
+/** `h:m` into the day that began two days before now: times that keep
+ *  their order within the day and their age from run to run, and come
+ *  after anything the fake leaves undated. */
+export function twoDaysAgoAt(h: number, m = 0): string {
+  return hoursAgo(48 - h - m / 60);
+}
+
 /**
  * A pull request as a test declares it. Only `number`, `title` and
  * `headRefName` are needed; everything else has a sane default.
@@ -165,6 +179,12 @@ export interface FakeGitHub {
   loseAnswers?: string[];
   /** Written by the fake: how many of each review write reached it. */
   reviewWrites?: Record<string, number>;
+  /**
+   * The run's clock, in ms: what the scenario leaves undated happened
+   * 72 hours before it, and reads "3d ago". `installFakeGh` stamps it,
+   * so every `gh` call — each its own process — dates things alike.
+   */
+  now?: number;
 }
 
 /**
@@ -216,7 +236,11 @@ export function installFakeGh(
   );
 
   const scenarioPath = fakeGhScenarioPath(homeDir);
-  writeFileSync(scenarioPath, JSON.stringify(scenario, null, 2), 'utf8');
+  writeFileSync(
+    scenarioPath,
+    JSON.stringify({ now: Date.now(), ...scenario }, null, 2),
+    'utf8'
+  );
 
   return {
     PATH: binDir,
