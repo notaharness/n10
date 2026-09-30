@@ -56,7 +56,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - Babysitters (`services/babysit.ts`) live per repo in memory, sit out while
   another repo is open, stop when their worktree is removed, and push only
   `spawned` and `ended`; everything else rides on the sidebar poll.
-- Terminal tabs have no state file; tmux is the record: the kind is the
+- `engine/sessions/terminal-service.ts` owns process-wide terminal lifecycle;
+  `services/terminals.ts` supplies output relays, recents and tab grouping.
+  Terminal tabs have no state file; tmux is the record: the kind is the
   `@orchestra-session-type` tag (`shell` | `agent`), the name is a label
   (`<repo>-shell`, suffixed on collision) and the key, the directory is
   `#{session_path}`. The tab group is derived at read time

@@ -68,9 +68,10 @@ The reasoning behind each rule is in `docs/decisions.md`.
   the repository explicitly. The engine owns polling, adoption and removal rescans.
   Retained agent panes are not running processes.
 - **Terminal sessions** (`terminal/launch-terminal.ts`): explicit shell/agent
-  requests use the same launcher as worktrees. Allocate the final tmux name
-  before creating the registry key. Agent panes retain final output; shell
-  exits close their tabs. Native pane state controls exit, not client disconnect.
+  requests use the same launcher as worktrees, with the terminal directory as
+  their explicit scope. Allocate the final tmux name before creating the registry
+  key. Native pane state controls exit, not client disconnect. The engine owns
+  agent retention and shell-exit cleanup; tab presentation belongs to the shell.
 
 - **Session launch** (`session/`) receives the resolved checkout and explicit
   config; it replaces a live session only with native incarnation approval. Force-remove is offered only

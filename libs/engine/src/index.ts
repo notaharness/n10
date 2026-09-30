@@ -51,3 +51,9 @@ export type {
   SessionLaunch,
   SessionLaunchPorts,
 } from './lib/sessions/session-commands.js';
+export { createTerminalService } from './lib/sessions/terminal-service.js';
+export type {
+  TerminalLaunch,
+  TerminalPorts,
+} from './lib/sessions/terminal-service.js';
+export type { TerminalFacts } from './lib/sessions/terminal-facts.js';

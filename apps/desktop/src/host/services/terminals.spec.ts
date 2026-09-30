@@ -1,13 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as TerminalsModule from './terminals.js';
 
-/**
- * The desktop's terminal tabs: sessions that belong to a directory
- * rather than a worktree. What the host adds over `@n10/core`'s
- * launcher is bookkeeping — which directory, which kind, whether the
- * directory is a repository root (and so which tab group), the output
- * relay — and none of it may depend on which repository is open.
- */
+/** Exercise the desktop relay and presentation adapter over the real engine
+ * lifecycle, with controlled filesystem and terminal primitives. */
 
 const state = vi.hoisted(() => ({
   alive: new Set<string>(),
@@ -56,10 +51,6 @@ vi.mock('node:fs', () => ({
     if (state.missingDirs.has(p)) throw new Error('ENOENT');
     return { isDirectory: () => true };
   },
-}));
-
-vi.mock('./repo.js', () => ({
-  requireRepo: () => '/home/dev/n10',
 }));
 
 vi.mock('./recent-repos.js', () => ({

@@ -146,8 +146,9 @@ and worktree-path tags, with no fallback to `#{session_path}` or the branch
 termination. Duplicate worktree identities resolve to the oldest session;
 extras are listed, never silently killed.
 
-Labels are `<repo>-<branch>`, `<repo>-shell` or `<repo>-agent`. The repo is the
-canonical main checkout's basename; `/`, `.` and `:` become `-`. A label longer
+Labels are `<repo>-<branch>` for worktrees and `<directory>-shell` or
+`<directory>-agent` for standalone terminals. Worktree labels use the canonical
+main checkout's basename; terminal labels use their own directory's basename; `/`, `.` and `:` become `-`. A label longer
 than 200 characters keeps its first 195 plus a four-digit hash suffix. Name
 collisions add `-2`, `-3`, and so on, always from the original preferred label.
 A duplicate-name race retries allocation without adopting the other session.
@@ -199,9 +200,17 @@ A tagged worktree process is running only while its pane is alive. Standalone
 terminal tabs are found globally by their session type and tmux `session_path`.
 An orphaned worktree session appears as an agent terminal when its tagged checkout
 no longer matches a listed worktree; attachment preserves its original tags.
-Terminal grouping is derived from its directory. Restoring tabs does not move
-focus. Discovery also removes retained tabs whose sessions were deleted outside
-n10.
+The process-wide engine terminal service owns directory/kind identity, launch
+coalescing, retained agents, shell exit cleanup and native-target removal.
+Restarts take directory, kind and machine from the retained terminal; request
+fields cannot redirect it. Core tags a newly created standalone terminal with
+its own directory, independent of the selected repository. Engine facts expose
+connection health only for remote terminals.
+
+Desktop adapts lifecycle callbacks into output relays, preserving relay sequence
+numbers across restarts. Tab grouping, home-directory display and recent-repo
+bookkeeping stay shell-specific. Restoring tabs does not move focus. Discovery
+also removes retained tabs whose sessions were deleted outside n10.
 
 Agent panes use `remain-on-exit` and retain final output. Resume uses the
 recorded agent, regardless of the current project default: Claude and Codex

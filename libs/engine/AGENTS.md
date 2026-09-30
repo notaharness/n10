@@ -66,3 +66,9 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   Repository disposal stops observation, never the connected agents. Shells supply
   dimensions, relays and terminal-tab presentation. Core keeps pure observations,
   tags, PTY activity classification and native guarded launch/removal operations.
+
+- **Directory terminals** (`sessions/terminal-service.ts`): one process-wide
+  instance owns launch coalescing and retained kind/directory identity. A restart
+  takes its machine from the qualified key. Never stat a remote directory locally.
+  An old client's exit cannot drop its successor; agent panes remain while their
+  native target exists. Shells adapt started/ended callbacks to output delivery.

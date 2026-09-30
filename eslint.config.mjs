@@ -79,6 +79,7 @@ const shellOperationPaths = [
     allowTypeImports: true,
     importNames: [
       'launchSession',
+      'launchTerminalSession',
       'stopSession',
       'observeTmuxSessions',
       'getSessionLaunchContext',

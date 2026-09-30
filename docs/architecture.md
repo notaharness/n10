@@ -13,7 +13,7 @@ below it, and the ESLint module boundaries enforce the direction.
 | `apps/cli`, `apps/desktop` | Rendering and input. The TUI runs the engine in its own process; the desktop runs it in the `n10 host` utility process, behind the host bridge. Two open shells share the implementation, not the state. |
 
 The engine owns config, repository selection, worktrees, remote sync, the PR
-list, review reads/commands and worktree sessions. Repository handles own config,
+list, review reads/commands, worktree sessions and directory terminals. Repository handles own config,
 worktree, review and session observation lifetimes; shells bind sync lifetime.
 Babysitter coordination, machines and plan checkout follow the [domain plan](design/engine-domains.md), which
 records the survey, migration order, target diagram and worker evidence.
@@ -85,7 +85,7 @@ libs/engine/                     — The program both shells run: state, schedul
   src/lib/worktrees/             — Checkout/branch resources and scoped commands
   src/lib/sync/                  — Remote sync schedule, passes and notices
   src/lib/reviews/               — Review resources, commands, scoped findings, draft publication and pinned Git diffs
-  src/lib/sessions/              — Repository-scoped discovery, adoption, launch/stop, connection facts and session rows
+  src/lib/sessions/              — Repository-scoped worktree sessions; process-wide directory terminal lifecycle
 libs/core/                       — Shell-agnostic operations. No React, Ink, Electron or engine (lint-enforced)
   src/lib/session/               — Session launch + plan checkout flows
   src/lib/plan/                  — Plan store (external store) + prompt composition
