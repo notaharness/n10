@@ -3,7 +3,7 @@ import {
   sessionKeyForBranch,
   worktreeSessionKey,
 } from '@n10/core';
-import { createWorktree } from '@n10/worktree-manager';
+import { activeWorktreeService } from './repo.js';
 import type { SessionLaunchRequest } from '../contract.js';
 import { refuseIfRemoteOwns } from './plan-remote-owner.js';
 import { machineFor } from './remote-machines.js';
@@ -32,7 +32,7 @@ export function noteLaunchStep(
  *  own choice of where to launch — `findSession` already resolves or
  *  creates on exactly that machine; only a local launch risks a second,
  *  local agent (finding 4). */
-export async function refuseRemoteOwned(
+async function refuseRemoteOwned(
   req: SessionLaunchRequest,
   repoCwd: string,
   knownWorktreePath?: string
@@ -54,12 +54,14 @@ export async function resolveLaunchWorktree(
   repoCwd: string,
   knownWorktreePath?: string
 ): Promise<string> {
+  const worktrees = activeWorktreeService();
+  await refuseRemoteOwned(req, repoCwd, knownWorktreePath);
   if (knownWorktreePath) return knownWorktreePath;
   const machine = req.machine ? machineFor(req.machine) : undefined;
   noteLaunchStep(req, 'worktree');
-  const wtPath = await createWorktree(req.branch, repoCwd, machine);
-  if (!wtPath) {
-    throw new Error(`Failed to resolve a worktree for "${req.branch}"`);
-  }
+  const wtPath = await worktrees.create(
+    req.branch,
+    machine ? { cwd: repoCwd, machine } : undefined
+  );
   return machine ? resolveRemoteWorktreePath(wtPath, machine.executor) : wtPath;
 }

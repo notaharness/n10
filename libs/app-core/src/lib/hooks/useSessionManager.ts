@@ -1,49 +1,54 @@
 import { useEngine } from '../context/EngineContext.js';
-import { worktreeSessionRow } from '@n10/core';
-import { useState, useEffect, useCallback, useEffectEvent } from 'react';
-import { listAllBranches, listWorktrees } from '@n10/worktree-manager';
-import type { AgentSession, DiscoveredWorktree } from '@n10/core';
-import { readConfig } from '@n10/vcs-core';
 import {
+  useState,
+  useEffect,
+  useCallback,
+  useEffectEvent,
+  useSyncExternalStore,
+} from 'react';
+import {
+  worktreeSessionRow,
   isSessionAlive,
   launchSession,
   onSessionExit,
   startSessionDiscovery,
 } from '@n10/core';
+import type { AgentSession, DiscoveredWorktree } from '@n10/core';
+import { readConfig } from '@n10/vcs-core';
 import { useLayout } from '../context/LayoutContext.js';
+import { useToastActions } from '../context/ToastContext.js';
 
 export function useSessionManager(
   repo: string,
   setBranches: (v: string[]) => void
 ) {
-  const [sessions, setSessions] = useState<AgentSession[]>([]);
-  const [worktreeBranches, setWorktreeBranches] = useState<string[]>([]);
   const { terminal } = useLayout();
   const { worktrees } = useEngine();
+  const { flash } = useToastActions();
+  const snapshot = useSyncExternalStore(
+    worktrees.subscribe,
+    worktrees.getSnapshot
+  );
+  // Registry events change running flags without changing the checkout snapshot.
+  const [, setSessionRevision] = useState(0);
+  const sessions: AgentSession[] = snapshot.worktrees.map((wt) =>
+    worktreeSessionRow(wt, isSessionAlive, repo)
+  );
+  const reportError = useEffectEvent(() => {
+    if (snapshot.error) flash(snapshot.error, 'warning');
+  });
+  useEffect(() => reportError(), [snapshot.error]);
 
   const refreshSessions = useCallback(async () => {
-    const worktrees = await listWorktrees(repo);
-    const filtered: AgentSession[] = worktrees.map((wt) =>
-      worktreeSessionRow(wt, isSessionAlive)
+    const next = await worktrees.refresh();
+    setSessionRevision((value) => value + 1);
+    return next.worktrees.map((wt) =>
+      worktreeSessionRow(wt, isSessionAlive, repo)
     );
-    setSessions(filtered);
-    // Detached-HEAD orphans have an empty branch; drop them here so the
-    // merged/conflict git queries (countConflicts, fetchMergedBranches)
-    // never run against an empty ref.
-    setWorktreeBranches(worktrees.map((wt) => wt.branch).filter(Boolean));
-    return filtered;
-  }, [repo]);
+  }, [worktrees, repo]);
 
-  // Attach to an agent session that was started outside this process —
-  // another n10, an Orchestra spawn, someone tagging a `tmux
-  // new-session` by hand. This is the ordinary launch path: on the tmux
-  // backend the factory resolves the running session by its tags and
-  // attaches to it rather than starting a second one, and discovery
-  // only ever offers a session the registry holds no live PTY for.
-  //
-  // An effect event, so it reads the pane size at the moment it
-  // attaches. A plain closure would capture whatever the terminal was
-  // when discovery started and size every later agent to that.
+  // Discovery passes the actual checkout. Attaching never creates a new worktree.
+  // The effect event reads the current terminal size at the moment of adoption.
   const adoptExternalSession = useEffectEvent(
     async (wt: DiscoveredWorktree) => {
       await launchSession({
@@ -57,56 +62,29 @@ export function useSessionManager(
       });
     }
   );
-
-  // Something changed the worktrees or the live sessions — outside this
-  // process, or a removal core made here. Both are read from disk by
-  // refreshSessions, so re-reading is the whole response.
   const onDiscovered = useEffectEvent(() => {
     void refreshSessions();
   });
-
   const startSessionManager = useEffectEvent(() => {
     let cancelled = false;
-
-    void (async () => {
-      if (cancelled) return;
-      await refreshSessions();
-      const allBranches = await listAllBranches(repo);
-      if (!cancelled) setBranches(allBranches);
-    })();
-
+    void worktrees.refresh().then((next) => {
+      if (!cancelled) setBranches(next.allBranches);
+    });
     const discovery = startSessionDiscovery({
+      repo,
       isCurrent: () => !cancelled,
       adopt: (wt) => adoptExternalSession(wt),
       onChanged: () => onDiscovered(),
     });
-
-    // Flip the row's running indicator (green → gray) when an agent PTY
-    // exits on its own. An exit changes nothing about the worktree list,
-    // so flip the one session's flag in place rather than shelling out
-    // to git via refreshSessions() — several agents exiting at once
-    // would otherwise spawn a listWorktrees(repo) storm to update one bool.
-    const unsubscribe = onSessionExit((name) => {
-      if (cancelled) return;
-      setSessions((prev) =>
-        prev.map((s) => (s.name === name ? { ...s, running: false } : s))
-      );
+    const unsubscribe = onSessionExit(() => {
+      if (!cancelled) setSessionRevision((value) => value + 1);
     });
-
     return () => {
       cancelled = true;
       discovery.stop();
       unsubscribe();
     };
   });
-
   useEffect(() => startSessionManager(), []);
-
-  return {
-    sessions,
-    worktreeBranches,
-    refreshSessions,
-    performDelete: worktrees.remove,
-    checkRemoval: worktrees.checkRemoval,
-  };
+  return { sessions, refreshSessions };
 }

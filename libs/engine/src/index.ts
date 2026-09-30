@@ -10,4 +10,12 @@ export * from './lib/config/config-service.js';
 export * from './lib/repositories/repository-service.js';
 export * from './lib/sync/remote-sync.js';
 export * from './lib/sync/sync-snapshot.js';
-export * from './lib/worktrees/worktree-commands.js';
+export {
+  createWorktreeService,
+  type WorktreeService,
+  type WorktreeSnapshot,
+} from './lib/worktrees/worktree-service.js';
+export type {
+  WorktreeWatchers,
+  WorktreeTarget,
+} from './lib/worktrees/worktree-commands.js';

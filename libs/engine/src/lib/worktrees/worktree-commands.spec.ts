@@ -4,11 +4,13 @@ import { createWorktreeCommands } from './worktree-commands.js';
 
 const state = vi.hoisted(() => ({
   outcome: 'removed' as WorktreeRemovalOutcome,
+  fail: false,
   calls: [] as unknown[][],
 }));
 vi.mock('@n10/core', () => ({
   removeWorktreeSession: async (...args: unknown[]) => {
     state.calls.push(args);
+    if (state.fail) throw new Error('Removal failed');
     return state.outcome;
   },
   checkWorktreeRemoval: vi.fn(),
@@ -22,6 +24,7 @@ const approved = {
 } as const;
 beforeEach(() => {
   state.calls = [];
+  state.fail = false;
   state.outcome = 'removed';
 });
 
@@ -31,7 +34,14 @@ function harness() {
     resume: vi.fn(async () => undefined),
     isCurrent: vi.fn(() => true),
   };
-  const commands = createWorktreeCommands({ repo: '/captured', watchers });
+  const commands = createWorktreeCommands({
+    config: {
+      repo: '/captured',
+      getSnapshot: () => ({ config: { vendorAuth: {}, vendorProject: {} } }),
+    },
+    watchers,
+    changed: async () => undefined,
+  });
   return { commands, watchers };
 }
 describe('worktree removal command', () => {
@@ -42,7 +52,9 @@ describe('worktree removal command', () => {
       '/captured',
       'topic'
     );
-    expect(state.calls).toEqual([['topic', approved, '/captured']]);
+    expect(state.calls).toEqual([
+      ['topic', approved, expect.objectContaining({ cwd: '/captured' })],
+    ]);
     expect(watchers.resume).not.toHaveBeenCalled();
   });
   it.each(['changed', 'git-refused', 'refused'] as const)(
@@ -66,6 +78,14 @@ describe('worktree removal command', () => {
     watchers.isCurrent.mockReturnValue(false);
     await commands.remove('topic', approved);
     expect(watchers.resume).not.toHaveBeenCalled();
+  });
+  it('restores watchers when guarded removal unexpectedly rejects', async () => {
+    state.fail = true;
+    const { commands, watchers } = harness();
+    await expect(commands.remove('topic', approved)).rejects.toThrow(
+      'Removal failed'
+    );
+    expect(watchers.resume).toHaveBeenCalledExactlyOnceWith('/captured', 42);
   });
   it('returns the removal outcome if restoring a watcher fails', async () => {
     state.outcome = 'changed';

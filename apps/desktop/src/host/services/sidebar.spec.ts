@@ -78,7 +78,7 @@ vi.mock('@n10/vcs-core', () => ({
   readConfig: () => ({ vendor: 'github', ...env.config }),
 }));
 
-vi.mock('@n10/worktree-manager', () => ({
+vi.mock('./worktrees.js', () => ({
   listWorktrees: () =>
     env.holdWorktrees
       ? new Promise<typeof env.worktrees>((resolve) => {
@@ -86,8 +86,6 @@ vi.mock('@n10/worktree-manager', () => ({
           env.releaseWorktrees = (list) => resolve(list ?? env.worktrees);
         })
       : Promise.resolve(env.worktrees),
-  worktreeSessionName: (wt: { branch?: string }) =>
-    (wt.branch ?? 'detached').replace(/\//g, '-'),
 }));
 
 vi.mock('@n10/core', async (importOriginal) => ({

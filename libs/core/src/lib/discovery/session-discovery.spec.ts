@@ -1,6 +1,6 @@
 import { worktreeSessionKey, terminalSessionKey } from '../session-key.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { WorktreeInfo } from '@n10/worktree-manager';
+import type { WorktreeInfo, WorktreeScope } from '@n10/worktree-manager';
 import type {
   DiscoveredTerminal,
   DiscoveredWorktree,
@@ -15,7 +15,7 @@ const {
   watchMock,
   basePathMock,
 } = vi.hoisted(() => ({
-  listWorktreesMock: vi.fn<() => Promise<WorktreeInfo[]>>(),
+  listWorktreesMock: vi.fn<(scope: WorktreeScope) => Promise<WorktreeInfo[]>>(),
   listPersistedMock: vi.fn<() => Set<string>>(),
   listTerminalsMock: vi.fn<() => DiscoveredTerminal[]>(),
   isSessionAliveMock: vi.fn<(name: string) => boolean>(),
@@ -32,14 +32,13 @@ vi.mock('@n10/logger', () => ({
   logError: () => undefined,
 }));
 vi.mock('@n10/worktree-manager', () => ({
-  listWorktrees: () => listWorktreesMock(),
-  // The real rule, not `wt.branch`: a detached-HEAD worktree has no
-  // branch and is named after its directory. Stubbing it as the branch
-  // would let the scanner collapse every orphan onto the empty string
-  // and no test would notice.
-  worktreeSessionName: (wt: WorktreeInfo) =>
-    wt.branch || wt.path.split('/').pop(),
-  worktreesBasePath: () => basePathMock(),
+  listWorktrees: (scope: WorktreeScope) => listWorktreesMock(scope),
+}));
+vi.mock('../worktree-scope.js', () => ({
+  repositoryWorktreeScope: (repo: string) => ({
+    cwd: repo,
+    resolver: { base: () => basePathMock() },
+  }),
 }));
 vi.mock('../pty-registry.js', () => ({
   sessionNames: () => sessionNamesMock(),
@@ -127,6 +126,7 @@ function start(
   );
   const onChanged = vi.fn();
   const discovery = startSessionDiscovery({
+    repo: '/repo',
     adopt,
     adoptTerminal,
     onChanged,
@@ -590,6 +590,20 @@ describe('startSessionDiscovery', () => {
       expect(watchMock).toHaveBeenCalledWith(
         '/repo/.claude/worktrees',
         expect.objectContaining({ recursive: false, persistent: false }),
+        expect.any(Function)
+      );
+    });
+
+    it('replaces the watch when the configured worktree base changes', async () => {
+      const watcher = captureWatcher();
+      const { discovery } = start();
+      await discovery.scanNow();
+      basePathMock.mockReturnValue('/repo/checkouts');
+      await discovery.scanNow();
+      expect(watcher.handle.close).toHaveBeenCalledOnce();
+      expect(watchMock).toHaveBeenLastCalledWith(
+        '/repo/checkouts',
+        expect.objectContaining({ recursive: false }),
         expect.any(Function)
       );
     });

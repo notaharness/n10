@@ -155,6 +155,13 @@ describe('config commands', () => {
     expect(service.getSnapshot().syncRevision).toBe(enabled + 1);
   });
 
+  it('cancels pending sync when the worktree path policy changes', () => {
+    const { service } = harness();
+    const revision = service.getSnapshot().syncRevision;
+    service.updateField(field('worktreePath'), 'checkouts/{session}');
+    expect(service.getSnapshot().syncRevision).toBe(revision + 1);
+  });
+
   it('refreshes the PR cadence without resetting provider memos or sync', () => {
     const { service, events } = harness();
     service.updateField(field('prPollInterval'), '15000');

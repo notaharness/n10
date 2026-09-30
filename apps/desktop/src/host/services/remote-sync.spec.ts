@@ -13,9 +13,11 @@ const state = vi.hoisted(() => ({
   pullRequests: {},
   worktrees: {},
 }));
-vi.mock('./repo.js', () => ({ activeConfigService: () => state.config }));
+vi.mock('./repo.js', () => ({
+  activeConfigService: () => state.config,
+  activeWorktreeService: () => state.worktrees,
+}));
 vi.mock('./program.js', () => ({ pullRequests: state.pullRequests }));
-vi.mock('./worktrees.js', () => ({ worktreeCommands: () => state.worktrees }));
 vi.mock('@n10/engine', () => ({
   EMPTY_SYNC_SNAPSHOT: { lastGitSyncAt: null },
   createRemoteSync: (options: RemoteSyncOptions) => {

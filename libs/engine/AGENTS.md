@@ -38,6 +38,10 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   reads before removal; errors preserve the last successful snapshot. Stop
   cancels reads and awaits removals already underway, without timing out mutations.
   Notices are typed facts; shells own their wording and presentation.
-- **Worktree commands** (`worktrees/`): pass the captured repository to core’s
-  guarded removal and babysitter ports. Resume suspended watchers only if the
-  checkout remains and that repository is still selected.
+- **Worktrees** (`worktrees/`): repository handles own the resource lifetime.
+  Read worktrees and local/remote branch lists together; cache for one second,
+  coalesce refreshes and preserve good data on failure. Path-setting changes
+  cancel stale publication and refresh the resource. Commands capture an
+  immutable WorktreeScope before awaiting Git. Session targets resolve by
+  checkout identity, never branch labels. Core guards removal; resume suspended
+  watchers only if the checkout remains and its repository is selected.

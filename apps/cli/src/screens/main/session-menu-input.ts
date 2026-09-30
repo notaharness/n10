@@ -10,9 +10,8 @@ import {
   cycleAgentIndex,
   type SessionMenuOptionKey,
 } from '@n10/core';
-import { createWorktree, listWorktrees } from '@n10/worktree-manager';
 import type { SessionMenuHandlerCtx } from './input-types.js';
-import { resolveEditorTarget } from './editor-target.js';
+import { worktreeTarget } from './worktree-target.js';
 
 // Session menu input. The menu opens on any sidebar row whose agent is
 // not running (Tab/Enter from the sidebar, or right after the branch
@@ -68,7 +67,7 @@ async function launchSelectedAgent(
 ): Promise<string | null> {
   const item = ctx.selectedItem;
   const worktreePath = item
-    ? await resolveEditorTarget(item, { listWorktrees, createWorktree })
+    ? await ctx.sessions.worktrees.resolve(worktreeTarget(item))
     : null;
   if (!worktreePath) {
     ctx.sessions.flashStatus('No worktree found for selected session');
@@ -104,13 +103,7 @@ async function launchReview(
 ): Promise<string | null> {
   const pr = ctx.pane.sessionMenu?.pr;
   if (!pr) return null;
-  const worktreePath = await createWorktree(pr.sourceBranch);
-  if (!worktreePath) {
-    ctx.sessions.flashStatus(
-      `Failed to create worktree for ${pr.sourceBranch}`
-    );
-    return null;
-  }
+  const worktreePath = await ctx.sessions.worktrees.create(pr.sourceBranch);
   const name = worktreeSessionKey(worktreePath);
   await launchSession({
     name,

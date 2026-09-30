@@ -7,9 +7,9 @@ import { existsSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { log } from '@n10/logger';
 import { exec, gitOptions } from './exec.js';
-import { refuseRemote, type Machine } from './machine.js';
+import { refuseRemote } from './machine.js';
 import { assertShellSafeRef } from './refs.js';
-import { worktreeDir } from './worktree-resolver.js';
+import type { WorktreeScope } from './worktree-resolver.js';
 import { listWorktrees } from './worktree-list.js';
 
 /** Work that removal loses. `git worktree remove` needs `--force` for
@@ -37,25 +37,22 @@ function isProtectedBranch(branch: string): boolean {
 }
 
 /**
- * Assess deleting `branch` and its worktree, in `cwd`'s repository (the
- * process's directory when omitted). `confirmedMerged` skips the
+ * Assess deleting `branch` and its worktree in the captured repository. `confirmedMerged` skips the
  * unpushed check: the provider has vouched for the commits.
  */
 export async function assessBranchRemoval(
   branch: string,
-  {
-    confirmedMerged = false,
-    cwd,
-    machine,
-  }: { confirmedMerged?: boolean; cwd?: string; machine?: Machine } = {}
+  scope: WorktreeScope,
+  { confirmedMerged = false }: { confirmedMerged?: boolean } = {}
 ): Promise<BranchRemovalAssessment> {
+  const { cwd, machine } = scope;
   refuseRemote('canRemoveBranch', machine);
   assertShellSafeRef(branch);
   if (isProtectedBranch(branch)) {
     return { refusal: 'protected branch', risks: [] };
   }
 
-  const wt = (await listWorktrees(cwd)).find((w) => w.branch === branch);
+  const wt = (await listWorktrees(scope)).find((w) => w.branch === branch);
 
   // A mid-rebase worktree carries in-progress rebase state (recovered
   // from rebase-merge/rebase-apply) that force-removing the worktree
@@ -69,7 +66,7 @@ export async function assessBranchRemoval(
   // Use the worktree's real path from git so the status check runs
   // against the actual checkout, not a resolver-derived guess that may
   // not exist (which would silently skip the uncommitted-changes guard).
-  const dir = wt?.path ?? resolverDir(branch, cwd);
+  const dir = wt?.path ?? resolve(cwd, scope.resolver.dir(branch));
   const risks: RemovalRisk[] = [];
   const changes = await uncommittedChanges(dir, branch, wt !== undefined);
   if (changes) risks.push(changes);
@@ -80,24 +77,17 @@ export async function assessBranchRemoval(
   return { refusal: null, risks };
 }
 
-/** Where the resolver would put `branch`'s checkout in the repository
- *  at `cwd`: a relative resolver path is that repository's, not the
- *  process's. */
-function resolverDir(branch: string, cwd?: string): string {
-  return resolve(cwd ?? process.cwd(), worktreeDir(branch));
-}
-
 /**
- * Check whether a branch can be safely deleted, in `cwd`'s repository
- * (the process's directory when omitted).
+ * Check whether a branch can be safely deleted in the captured repository.
  * Returns { safe: true } or { safe: false, reason } with the refusal or
  * the first risk.
  */
 export async function canRemoveBranch(
   branch: string,
-  opts: { confirmedMerged?: boolean; cwd?: string; machine?: Machine } = {}
+  scope: WorktreeScope,
+  opts: { confirmedMerged?: boolean } = {}
 ): Promise<{ safe: true } | { safe: false; reason: string }> {
-  const { refusal, risks } = await assessBranchRemoval(branch, opts);
+  const { refusal, risks } = await assessBranchRemoval(branch, scope, opts);
   const reason = refusal ?? risks[0];
   return reason ? { safe: false, reason } : { safe: true };
 }

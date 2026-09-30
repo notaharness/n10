@@ -1,11 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { realpathSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import {
-  createTemplateResolver,
-  resetWorktreeResolver,
-  setWorktreeResolver,
-} from '@n10/worktree-manager';
 
 /** Worktrees and submodules have a .git file; main checkouts have a directory. */
 export function isGitRepo(cwd: string): boolean {
@@ -25,11 +20,6 @@ export function canonicalRepoPath(cwd: string): string {
   } catch {
     return cwd;
   }
-}
-
-export function configureWorktreePath(cwd: string, template?: string): void {
-  if (template) setWorktreeResolver(createTemplateResolver(template, cwd));
-  else resetWorktreeResolver();
 }
 
 /** Resolve the checkout root from any directory within it. */

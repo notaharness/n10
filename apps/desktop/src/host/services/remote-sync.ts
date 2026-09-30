@@ -1,8 +1,7 @@
 import { createRemoteSync, EMPTY_SYNC_SNAPSHOT } from '@n10/engine';
 import type { ConfigService, RemoteSync, SyncNotice } from '@n10/engine';
-import { activeConfigService } from './repo.js';
+import { activeConfigService, activeWorktreeService } from './repo.js';
 import { pullRequests } from './program.js';
-import { worktreeCommands } from './worktrees.js';
 import type { SyncNoticeEvent } from '../contract.js';
 
 const stopping = new Set<Promise<void>>();
@@ -58,7 +57,7 @@ export function startRemoteSyncLoop(cwd: string): void {
     sync = createRemoteSync({
       config,
       pullRequests,
-      worktrees: worktreeCommands(cwd),
+      worktrees: activeWorktreeService(),
     });
     sync.subscribeNotices((notice) => {
       const event = present(notice);

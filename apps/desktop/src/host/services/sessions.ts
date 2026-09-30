@@ -18,11 +18,7 @@ import { readConfig } from '@n10/vcs-core';
 import { tmuxSessionSnapshot, sameTmuxIncarnation } from '@n10/terminal-tmux';
 import { requireRepo } from './repo.js';
 import { refuseIfRemoteOwns } from './plan-remote-owner.js';
-import {
-  noteLaunchStep,
-  refuseRemoteOwned,
-  resolveLaunchWorktree,
-} from './launch-worktree.js';
+import { noteLaunchStep, resolveLaunchWorktree } from './launch-worktree.js';
 import {
   adoptSession,
   foreignSessionError,
@@ -142,7 +138,6 @@ async function doLaunchAgent(
   repoCwd: string,
   knownWorktreePath?: string
 ): Promise<{ name: string }> {
-  await refuseRemoteOwned(req, repoCwd, knownWorktreePath);
   const wtPath = await resolveLaunchWorktree(req, repoCwd, knownWorktreePath);
   const name = worktreeSessionKey(wtPath, repoCwd, req.machine);
   const reused = reuseConnection(req, name);
@@ -155,6 +150,7 @@ async function doLaunchAgent(
   // configured one; the resolver still owns the id → agent mapping.
   const stored = readConfig(repoCwd);
   const config = req.agentId ? { ...stored, agentId: req.agentId } : stored;
+  const explicitAgent = req.fresh || req.agentId || req.intent === 'blank';
   const before = getSession(name);
   const entry = await launchSession({
     name,
@@ -165,7 +161,7 @@ async function doLaunchAgent(
     cols: clampDim(req.cols, DEFAULT_COLS),
     rows: clampDim(req.rows, DEFAULT_ROWS),
     config,
-    agent: needsSelectedAgent(req) ? resolveAgent(config) : undefined,
+    agent: explicitAgent ? resolveAgent(config) : undefined,
     mode: knownWorktreePath ? 'attach' : 'open',
     fresh: req.fresh,
     expected: req.expected,
@@ -407,10 +403,6 @@ function canReuseConnection(req: SessionLaunchRequest, name: string): boolean {
   const nativeName = getSession(name)?.pty.name;
   const live = nativeName && tmuxSessionSnapshot(nativeName)?.incarnation;
   return !!live && sameTmuxIncarnation(live, req.expected);
-}
-
-function needsSelectedAgent(req: SessionLaunchRequest): boolean {
-  return Boolean(req.fresh || req.agentId || req.intent === 'blank');
 }
 
 export function getSessionBuffer(name: string): SessionBuffer {

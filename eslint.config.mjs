@@ -30,8 +30,9 @@ const shellOperationPaths = [
   {
     name: '@n10/core',
     allowTypeImports: true,
-    importNames: ['configureWorktreePath'],
-    message: 'Repository opening belongs to the engine repository service.',
+    importNames: ['repositoryWorktreeScope'],
+    message:
+      'Worktree resources and commands belong to the engine worktree service.',
   },
   {
     name: '@n10/core',
@@ -49,11 +50,20 @@ const shellOperationPaths = [
     name: '@n10/worktree-manager',
     allowTypeImports: true,
     importNames: [
-      'setWorktreeResolver',
-      'resetWorktreeResolver',
+      'worktreeScope',
       'createTemplateResolver',
+      'listWorktrees',
+      'listBranches',
+      'listAllBranches',
+      'createWorktree',
+      'checkoutWorktree',
+      'removeWorktree',
+      'rebaseOntoMaster',
+      'assessBranchRemoval',
+      'canRemoveBranch',
     ],
-    message: 'Repository opening belongs to the engine repository service.',
+    message:
+      'Worktree resources and commands belong to the engine worktree service.',
   },
 ];
 

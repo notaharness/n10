@@ -59,6 +59,7 @@ async function attach(worktree: DiscoveredWorktree): Promise<void> {
 export function startDiscoveryForRepo(cwd: string): void {
   stopDiscovery();
   discovery = startSessionDiscovery({
+    repo: cwd,
     isCurrent: () => activeRepoIs(cwd),
     adopt: attach,
     // Terminal tabs come back the same way — the first scan is what

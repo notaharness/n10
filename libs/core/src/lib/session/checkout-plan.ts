@@ -2,7 +2,7 @@ import { getRepoRoot } from '../repo-root.js';
 import { worktreeSessionKey } from '../session-key.js';
 import { sessionKeyForBranch } from '../worktree-rows.js';
 import type { AppConfig, PullRequestInfo } from '@n10/vcs-core';
-import { createWorktree } from '@n10/worktree-manager';
+import { createWorktree, worktreeScope } from '@n10/worktree-manager';
 import { isSessionAlive, hasSessionConnection } from '../pty-registry.js';
 import { hasLiveTmuxSession } from '../session-backend.js';
 import { stopSession } from './stop-session.js';
@@ -51,7 +51,10 @@ async function inject(
 ): Promise<CheckoutResult> {
   const { pr, prompt, paneCols, paneRows, config, flashStatus } = deps;
   if (!isSessionAlive(name) || !hasSessionConnection(name)) {
-    const cwd = await createWorktree(pr.sourceBranch, repo);
+    const cwd = await createWorktree(
+      pr.sourceBranch,
+      worktreeScope(repo, { template: config.worktreePath })
+    );
     if (!cwd) return 'failed';
     await launchSession({
       name: worktreeSessionKey(cwd, repo),
@@ -94,7 +97,10 @@ export async function checkoutPlan(
   if (name && (isSessionAlive(name) || hasLiveTmuxSession(name))) {
     if (mode === 'inject') return inject(deps, repo, name);
     // An explicit new session terminates the old agent before seeding a replacement.
-    const worktreePath = await createWorktree(pr.sourceBranch, repo);
+    const worktreePath = await createWorktree(
+      pr.sourceBranch,
+      worktreeScope(repo, { template: config.worktreePath })
+    );
     if (!worktreePath) {
       flashStatus(`Failed to resolve worktree for ${pr.sourceBranch}`);
       return 'failed';
@@ -105,7 +111,10 @@ export async function checkoutPlan(
   }
 
   // ── States B & C: no running agent — ensure a worktree, then spawn ──
-  const worktreePath = await createWorktree(pr.sourceBranch, repo);
+  const worktreePath = await createWorktree(
+    pr.sourceBranch,
+    worktreeScope(repo, { template: config.worktreePath })
+  );
   if (!worktreePath) {
     flashStatus(`Failed to create worktree for ${pr.sourceBranch}`);
     return 'failed';

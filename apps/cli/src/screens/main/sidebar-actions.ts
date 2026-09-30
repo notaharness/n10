@@ -1,4 +1,3 @@
-import { keyForWorktree } from '@n10/core';
 import { spawn } from 'node:child_process';
 import type { SidebarItem } from '@n10/core';
 import {
@@ -11,14 +10,8 @@ import {
   orderRunningTabs,
   openSessionMenuState,
 } from '@n10/core';
-import {
-  createWorktree,
-  listAllBranches,
-  listWorktrees,
-  rebaseOntoMaster,
-} from '@n10/worktree-manager';
 import type { SidebarInputCtx } from './input-types.js';
-import { resolveEditorTarget } from './editor-target.js';
+import { worktreeTarget } from './worktree-target.js';
 import { keptNotice } from './confirm-delete-input.js';
 
 /** One sidebar action. Everything it needs comes from the context. */
@@ -148,7 +141,7 @@ const startSession: SidebarAction = (ctx) => {
 
 const checkoutBranch: SidebarAction = (ctx) => {
   void ctx.asyncOps.run('fetch-branches', async () => {
-    const allBranches = await listAllBranches();
+    const allBranches = (await ctx.sessions.worktrees.read()).allBranches;
     ctx.branchPicker.setBranches(allBranches);
     ctx.branchPicker.setCreating(true);
     ctx.branchPicker.setBranchFilter('');
@@ -165,7 +158,7 @@ async function confirmOrDelete(
   ctx: SidebarInputCtx,
   branch: string
 ): Promise<void> {
-  const check = await ctx.sessions.checkRemoval(branch);
+  const check = await ctx.sessions.worktrees.checkRemoval(branch);
   switch (check.verdict) {
     case 'refused':
       ctx.sessions.flashStatus(`Cannot delete: ${check.reason}`);
@@ -193,7 +186,7 @@ async function confirmOrDelete(
       ctx.deleteConfirm.setConfirmInput('');
       return;
     case 'clear': {
-      const outcome = await ctx.sessions.performDelete(branch, check);
+      const outcome = await ctx.sessions.worktrees.remove(branch, check);
       const notice = keptNotice(branch, outcome);
       if (notice) ctx.sessions.flashStatus(notice);
     }
@@ -205,8 +198,7 @@ const deleteBranch: SidebarAction = (ctx) => {
   if (!sessionName) return;
 
   void ctx.asyncOps.run('check-delete', async () => {
-    const worktrees = await listWorktrees();
-    const wt = worktrees.find((w) => keyForWorktree(w) === sessionName);
+    const wt = await ctx.sessions.worktrees.find({ session: sessionName });
     const branch = wt?.branch;
     if (branch) {
       await confirmOrDelete(ctx, branch);
@@ -250,12 +242,6 @@ const rebase: SidebarAction = (ctx) => {
 
   const sessionName = selectedItem.session.name;
   void ctx.asyncOps.run('rebase', async () => {
-    const worktrees = await listWorktrees();
-    const wt = worktrees.find((w) => keyForWorktree(w) === sessionName);
-    if (!wt) {
-      ctx.sessions.flashStatus('No worktree found for selected session');
-      return;
-    }
     // No "Updating from origin…" flash — the 'rebase' spinner
     // (label: "Rebasing") already communicates that we're working.
     const rebaseMessages = {
@@ -263,7 +249,11 @@ const rebase: SidebarAction = (ctx) => {
       conflict: 'Conflicts detected — rebase aborted',
       error: 'Failed to fetch from origin',
     } as const;
-    ctx.sessions.flashStatus(rebaseMessages[await rebaseOntoMaster(wt.path)]);
+    ctx.sessions.flashStatus(
+      rebaseMessages[
+        await ctx.sessions.worktrees.rebase({ session: sessionName })
+      ]
+    );
   });
 };
 
@@ -278,10 +268,7 @@ const openEditor: SidebarAction = (ctx) => {
   if (!item) return;
 
   void ctx.asyncOps.run('open-editor', async () => {
-    const wtPath = await resolveEditorTarget(item, {
-      listWorktrees,
-      createWorktree,
-    });
+    const wtPath = await ctx.sessions.worktrees.resolve(worktreeTarget(item));
     if (!wtPath) {
       ctx.sessions.flashStatus('No worktree found for selected session');
       return;

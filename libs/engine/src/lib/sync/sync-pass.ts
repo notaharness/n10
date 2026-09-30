@@ -1,10 +1,10 @@
+import type { WorktreeService } from '../worktrees/worktree-service.js';
 import {
   computeConflictCounts,
   sweepMergedBranches,
   syncRemote,
 } from '@n10/core';
 import { logError } from '@n10/logger';
-import { listWorktrees } from '@n10/worktree-manager';
 import type { WorktreeRemovalCheck, WorktreeRemovalOutcome } from '@n10/core';
 import type { ConfigSnapshot } from '../config/config-service.js';
 import type { PullRequestList } from '../pull-requests/pull-request-list.js';
@@ -14,6 +14,7 @@ export async function runSyncPass(options: {
   repo: string;
   config: Pick<ConfigSnapshot, 'config' | 'provider' | 'vcsConfigured'>;
   pullRequests: Pick<PullRequestList, 'getSnapshot'>;
+  worktrees: Pick<WorktreeService, 'refresh'>;
   warned: ReadonlySet<string>;
   cancelled(): boolean;
   remove(
@@ -34,9 +35,9 @@ export async function runSyncPass(options: {
   }
   if (cancelled()) return null;
   if (error) notice({ type: 'failed', repo, error });
-  const branches = (await listWorktrees(repo))
-    .map((w) => w.branch)
-    .filter(Boolean);
+  const worktrees = await options.worktrees.refresh();
+  if (worktrees.error) throw new Error(worktrees.error);
+  const branches = worktrees.worktrees.map((w) => w.branch).filter(Boolean);
   if (cancelled()) return null;
   const { merged, nextWarned } = await sweepMergedBranches({
     ...config,

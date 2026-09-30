@@ -1,3 +1,4 @@
+import type * as WorktreeManager from '@n10/worktree-manager';
 import { worktreeSessionKey } from '../session-key.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type {
@@ -35,7 +36,8 @@ vi.mock('@n10/logger', () => ({ logError: () => undefined }));
 // No `createWorktree` here on purpose: the babysitter must never reach
 // the variant that invents a branch, and an import of it would fail
 // loudly rather than pass through a stub.
-vi.mock('@n10/worktree-manager', () => ({
+vi.mock('@n10/worktree-manager', async (original) => ({
+  ...(await original<typeof WorktreeManager>()),
   branchToSessionName: (b: string) => b.replace(/\//g, '-'),
   countConflictsBetween: (base: string, head: string, cwd?: string) =>
     mocks.countConflictsBetween(base, head, cwd),
@@ -408,7 +410,10 @@ describe('startPrBabysitter', () => {
     const sitter = start();
     await pollPastDebounce(sitter);
     expect(mocks.refExists).toHaveBeenCalledWith('feat/thing', '/repo');
-    expect(mocks.checkoutWorktree).toHaveBeenCalledWith('feat/thing', '/repo');
+    expect(mocks.checkoutWorktree).toHaveBeenCalledWith(
+      'feat/thing',
+      expect.objectContaining({ cwd: '/repo' })
+    );
     sitter.stop();
   });
 

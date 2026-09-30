@@ -74,6 +74,25 @@ function addCheckout(branch: string, repo = state.cwd): string {
 vi.mock('./repo.js', () => ({
   requireRepo: () => state.cwd,
   activeRepoIs: (cwd: string) => cwd === state.cwd,
+  activeWorktreeService: () => {
+    const repo = state.cwd;
+    return {
+      create: (
+        branch: string,
+        remote?: { cwd: string; machine: { id: string } }
+      ) => {
+        const cwd = remote?.cwd ?? repo;
+        state.createWorktreeCalls.push({
+          branch,
+          cwd,
+          machine: remote?.machine,
+        });
+        if (state.createFails.has(branch))
+          return Promise.reject(new Error(`git refused ${branch}`));
+        return Promise.resolve(addCheckout(branch, cwd));
+      },
+    };
+  },
 }));
 
 vi.mock('@n10/vcs-core', () => ({
@@ -93,13 +112,6 @@ vi.mock('@n10/terminal-tmux', () => ({
 
 vi.mock('@n10/worktree-manager', () => ({
   branchToSessionName: (branch: string) => branch.replace(/\//g, '-'),
-  createWorktree: (branch: string, cwd: string, machine?: { id: string }) => {
-    state.createWorktreeCalls.push({ branch, cwd, machine });
-    if (state.createFails.has(branch)) {
-      return Promise.reject(new Error(`git refused ${branch}`));
-    }
-    return Promise.resolve(addCheckout(branch, cwd));
-  },
 }));
 
 vi.mock('./remote-machines.js', () => ({

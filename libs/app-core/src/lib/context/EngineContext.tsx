@@ -1,10 +1,6 @@
 import { createContext, useContext, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import type {
-  PullRequestList,
-  RemoteSync,
-  WorktreeCommands,
-} from '@n10/engine';
+import type { PullRequestList, RemoteSync, WorktreeService } from '@n10/engine';
 
 /**
  * The engine services a shell created, and the repository this
@@ -15,7 +11,7 @@ export interface EngineContextValue {
   pullRequests: PullRequestList;
   repo: string;
   sync: RemoteSync;
-  worktrees: WorktreeCommands;
+  worktrees: WorktreeService;
 }
 
 const EngineContext = createContext<EngineContextValue | null>(null);

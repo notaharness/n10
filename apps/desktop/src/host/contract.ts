@@ -354,7 +354,7 @@ export interface N10HostApi {
   listBranches(): Promise<string[]>;
   /** All local + remote branch names (checkout candidates). */
   listAllBranches(): Promise<string[]>;
-  createWorktree(branch: string): Promise<string | null>;
+  createWorktree(branch: string): Promise<string>;
   /** Remove with the verdict the user confirmed; core's outcome says
    *  what was kept, if anything. */
   removeWorktree(

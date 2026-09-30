@@ -1,4 +1,4 @@
-import { listWorktrees } from '@n10/worktree-manager';
+import { listWorktrees } from './worktrees.js';
 import {
   buildSidebarItems,
   buildSessionPrMap,

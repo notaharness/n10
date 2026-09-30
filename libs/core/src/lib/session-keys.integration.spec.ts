@@ -1,3 +1,4 @@
+import type * as WorktreeManager from '@n10/worktree-manager';
 import * as repoRoot from './repo-root.js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -80,9 +81,13 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
           repo: await repositoryOf(fixture.repo),
           checkout: canonicalWorktreePath(path),
         } as const;
-        expect(await removeWorktreeSession(branch, forced, fixture.repo)).toBe(
-          'removed'
-        );
+        expect(
+          await removeWorktreeSession(
+            branch,
+            forced,
+            worktreeScope(fixture.repo)
+          )
+        ).toBe('removed');
         expect(isSessionAlive(key)).toBe(false);
         expect(isSessionAlive(tab.name)).toBe(true);
         killSession(tab.name);
@@ -174,4 +179,8 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       killSession(key);
     });
   }
+);
+
+const { worktreeScope } = await vi.importActual<typeof WorktreeManager>(
+  '@n10/worktree-manager'
 );

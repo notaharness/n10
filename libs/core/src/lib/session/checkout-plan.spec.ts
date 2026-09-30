@@ -1,3 +1,4 @@
+import type * as WorktreeManager from '@n10/worktree-manager';
 import { worktreeSessionKey } from '../session-key.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AppConfig, PullRequestInfo } from '@n10/vcs-core';
@@ -30,7 +31,8 @@ vi.mock('./launch-session.js', () => ({
 
 const branchToSessionName = vi.fn((b: string) => `sess-${b}`);
 const createWorktree = vi.fn();
-vi.mock('@n10/worktree-manager', () => ({
+vi.mock('@n10/worktree-manager', async (original) => ({
+  ...(await original<typeof WorktreeManager>()),
   branchToSessionName: (b: string) => branchToSessionName(b),
   createWorktree: (b: string) => createWorktree(b),
   // The checkout the PR's branch is in, which keys its session.

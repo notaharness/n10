@@ -24,6 +24,7 @@ interface N10Bridge {
   listSessions(): Promise<
     { name: string; running: boolean; spawnedAt: number }[]
   >;
+  createWorktree(branch: string): Promise<string>;
   listWorktrees(): Promise<{ branch: string; path: string; state?: string }[]>;
   getSessionActivity(): Promise<
     Record<string, { active: boolean; flashing: boolean }>

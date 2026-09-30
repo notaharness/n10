@@ -2,8 +2,7 @@
  * Git worktree lifecycle: creating a checkout for a branch, removing
  * one, deciding whether removal is safe, and rebasing one onto main.
  *
- * Manages .claude/worktrees/ directory for per-branch worktrees
- * used by the TUI to give each Claude session its own checkout.
+ * Each operation receives an immutable repository and path scope.
  */
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -16,7 +15,7 @@ import {
   type Machine,
 } from './machine.js';
 import { assertShellSafeRef } from './refs.js';
-import { worktreeDir } from './worktree-resolver.js';
+import type { WorktreeScope } from './worktree-resolver.js';
 import { listWorktrees, type WorktreeInfo } from './worktree-list.js';
 import { getMainBranch } from './branches.js';
 
@@ -36,21 +35,17 @@ import { getMainBranch } from './branches.js';
  */
 async function worktreeForBranch(
   branch: string,
-  cwd?: string,
-  machine?: Machine
+  scope: WorktreeScope
 ): Promise<WorktreeInfo | null> {
-  const wt = (await listWorktrees(cwd, machine)).find(
-    (w) => w.branch === branch
-  );
+  const wt = (await listWorktrees(scope)).find((w) => w.branch === branch);
   return wt ?? null;
 }
 
 async function worktreePathForBranch(
   branch: string,
-  cwd?: string,
-  machine?: Machine
+  scope: WorktreeScope
 ): Promise<string | null> {
-  return (await worktreeForBranch(branch, cwd, machine))?.path ?? null;
+  return (await worktreeForBranch(branch, scope))?.path ?? null;
 }
 
 /**
@@ -58,23 +53,29 @@ async function worktreePathForBranch(
  * If the branch exists, checks it out. If not, creates a new branch from HEAD.
  * Returns the worktree path on success, null on failure.
  *
- * `machine` is local by default. A remote machine (D5) runs the same
+ * The scope is local by default. A remote machine (D5) runs the same
  * two-step git sequence through its executor instead of a local fork —
  * see {@link createWorktreeRemote} for what that path cannot do that
  * the local one can.
  */
 export async function createWorktree(
   branch: string,
-  cwd = process.cwd(),
-  machine?: Machine
+  scope: WorktreeScope
 ): Promise<string | null> {
+  const { cwd, machine, resolver } = scope;
   assertShellSafeRef(branch);
-  const relativeDir = worktreeDir(branch);
+  const relativeDir = resolver.dir(branch);
   const absoluteDir = resolve(cwd, relativeDir);
   if (isRemoteMachine(machine))
-    return createWorktreeRemote(branch, cwd, relativeDir, absoluteDir, machine);
+    return createWorktreeRemote(
+      branch,
+      scope,
+      relativeDir,
+      absoluteDir,
+      machine
+    );
 
-  const existingPath = await worktreePathForBranch(branch, cwd);
+  const existingPath = await worktreePathForBranch(branch, scope);
   if (existingPath) return existingPath;
   // A derived directory may belong to another branch. Never run an agent there.
   if (existsSync(absoluteDir)) return null;
@@ -122,12 +123,13 @@ export async function createWorktree(
  */
 async function createWorktreeRemote(
   branch: string,
-  cwd: string,
+  scope: WorktreeScope,
   relativeDir: string,
   absoluteDir: string,
   machine: Machine
 ): Promise<string | null> {
-  const existingPath = await worktreePathForBranch(branch, cwd, machine);
+  const { cwd } = scope;
+  const existingPath = await worktreePathForBranch(branch, scope);
   if (existingPath) return existingPath;
   try {
     await runGitOn(machine, ['worktree', 'add', relativeDir, branch], cwd);
@@ -168,18 +170,16 @@ async function createWorktreeRemote(
  * request's source branch), a new branch would put an agent to work
  * on the wrong base.
  *
- * `cwd` names the repository to add the worktree to. A caller that
- * outlives a change of the process's directory must pass it: the
- * worktree directory is resolved against it, and so is the git call.
+ * The scope captures the repository and path policy for both resolution and Git.
  */
 export async function checkoutWorktree(
   branch: string,
-  cwd = process.cwd(),
-  machine?: Machine
+  scope: WorktreeScope
 ): Promise<string | null> {
+  const { cwd, machine, resolver } = scope;
   refuseRemote('checkoutWorktree', machine);
   assertShellSafeRef(branch);
-  const relativeDir = worktreeDir(branch);
+  const relativeDir = resolver.dir(branch);
   const absoluteDir = resolve(cwd, relativeDir);
 
   // As in `createWorktree`: a worktree's directory is independent of
@@ -189,7 +189,7 @@ export async function checkoutWorktree(
   // directory — is what stops a branch that is already checked out
   // somewhere from reading as "no worktree, and git refused to make
   // one", which for a babysitter means silently doing nothing.
-  const existingPath = await worktreePathForBranch(branch, cwd);
+  const existingPath = await worktreePathForBranch(branch, scope);
   if (existingPath) return existingPath;
   if (existsSync(absoluteDir)) return null;
 
@@ -209,7 +209,7 @@ export async function checkoutWorktree(
  * Remove a git worktree for a branch.
  * Returns true on success, false on failure.
  *
- * `machine` is local by default. A remote machine (D5) removes the
+ * The scope is local by default. A remote machine (D5) removes the
  * worktree through its executor instead of a local fork — the
  * function this package's AGENTS.md exists to warn about: running
  * locally when the caller asked for a remote machine would delete the
@@ -217,16 +217,13 @@ export async function checkoutWorktree(
  */
 export async function removeWorktree(
   branch: string,
-  {
-    force = false,
-    cwd = process.cwd(),
-    machine,
-  }: { force?: boolean; cwd?: string; machine?: Machine } = {}
+  scope: WorktreeScope,
+  { force = false }: { force?: boolean } = {}
 ): Promise<boolean> {
+  const { cwd, machine } = scope;
   assertShellSafeRef(branch);
-  // Prefer the worktree's real path from git; fall back to the
-  // resolver-derived dir only if git doesn't know the branch.
-  const target = await worktreePathForBranch(branch, cwd, machine);
+  // Resolve the actual checkout from Git; never remove a guessed directory.
+  const target = await worktreePathForBranch(branch, scope);
   if (!target) return false;
   assertShellSafeRef(target, 'worktree path');
   const removeArgs = [

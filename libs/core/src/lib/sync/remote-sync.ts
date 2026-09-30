@@ -1,6 +1,8 @@
 import { keyForWorktree } from '../session-key.js';
 import {
   branchTip,
+  worktreeScope,
+  type WorktreeScope,
   canRemoveBranch,
   fastForwardMainBranch,
   listWorktrees,
@@ -57,7 +59,7 @@ function diffRebaseWarnings(
  */
 type SweepConfig = Pick<
   AppConfig,
-  'vendorAuth' | 'vendorProject' | 'autoDeleteOnMerge'
+  'vendorAuth' | 'vendorProject' | 'autoDeleteOnMerge' | 'worktreePath'
 >;
 
 /** Called with the merged branch and the
@@ -76,13 +78,14 @@ async function autoDeleteMerged(args: {
   merged: Set<string>;
   onAutoDelete: AutoDelete;
   isCancelled: () => boolean;
-  cwd: string;
+  scope: WorktreeScope;
 }): Promise<string[] | null> {
-  const { merged, onAutoDelete, isCancelled, cwd } = args;
+  const { merged, onAutoDelete, isCancelled, scope } = args;
+  const { cwd } = scope;
   const rebasingNow: string[] = [];
   // One listing for the pass: each merged branch's session is the one in
   // the checkout that has it.
-  const checkouts = await listWorktrees(cwd);
+  const checkouts = await listWorktrees(scope);
   for (const branch of merged) {
     // A live agent prevents auto-deletion even when n10 is detached.
     // Deleting its working directory would disrupt the running process.
@@ -97,7 +100,9 @@ async function autoDeleteMerged(args: {
       continue;
     }
     const tip = await branchTip(branch, checkout.path);
-    const check = await canRemoveBranch(branch, { confirmedMerged: true, cwd });
+    const check = await canRemoveBranch(branch, scope, {
+      confirmedMerged: true,
+    });
     if (isCancelled()) return null;
     if (check.safe) {
       await onAutoDelete(branch, await clearVerdictAt(checkout.path, tip));
@@ -170,7 +175,7 @@ export async function sweepMergedBranches(opts: {
     merged,
     onAutoDelete,
     isCancelled,
-    cwd,
+    scope: worktreeScope(cwd, { template: config.worktreePath }),
   });
   if (rebasingNow === null) return { merged, nextWarned: keepWarned };
 

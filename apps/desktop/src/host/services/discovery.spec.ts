@@ -36,6 +36,15 @@ const state = vi.hoisted(() => ({
 vi.mock('./repo.js', () => ({
   requireRepo: () => state.cwd,
   activeRepoIs: (cwd: string) => cwd === state.cwd,
+  activeWorktreeService: () => ({
+    create: (branch: string) => {
+      state.createWorktreeCalls.push(branch);
+      if (state.createFails.has(branch)) {
+        return Promise.reject(new Error(`git refused ${branch}`));
+      }
+      return Promise.resolve(`${state.cwd}/.claude/worktrees/${branch}`);
+    },
+  }),
 }));
 
 vi.mock('./recent-repos.js', () => ({
@@ -48,13 +57,6 @@ vi.mock('@n10/vcs-core', () => ({
 
 vi.mock('@n10/worktree-manager', () => ({
   branchToSessionName: (branch: string) => branch.replace(/\//g, '-'),
-  createWorktree: (branch: string) => {
-    state.createWorktreeCalls.push(branch);
-    if (state.createFails.has(branch)) {
-      return Promise.reject(new Error(`git refused ${branch}`));
-    }
-    return Promise.resolve(`${state.cwd}/.claude/worktrees/${branch}`);
-  },
 }));
 
 vi.mock('@n10/core', async (importOriginal) => {

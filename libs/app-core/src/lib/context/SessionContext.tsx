@@ -1,3 +1,5 @@
+import type { WorktreeService } from '@n10/engine';
+import { useEngine } from './EngineContext.js';
 import { createContext, useContext, useMemo, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type {
@@ -18,11 +20,7 @@ import { useConfig } from './ConfigContext.js';
 import { useBranchPickerActions } from './ModalContext.js';
 import { useToastActions } from './ToastContext.js';
 import type { ToastVariant } from './ToastContext.js';
-import type {
-  AgentSession,
-  WorktreeRemovalCheck,
-  WorktreeRemovalOutcome,
-} from '@n10/core';
+import type { AgentSession } from '@n10/core';
 import { sortSessionsByPrId } from '@n10/core';
 
 // ── Data context (consumed by SidebarProvider, changes on data refresh) ──
@@ -30,7 +28,6 @@ import { sortSessionsByPrId } from '@n10/core';
 export interface SessionDataContextValue {
   sessions: AgentSession[];
   sortedSessions: AgentSession[];
-  worktreeBranches: string[];
   prMap: BranchPrMap;
   prError: string | null;
   orphanPrs: PullRequestInfo[];
@@ -51,14 +48,8 @@ export interface SessionActionsContextValue {
    * top-right toast stack.
    */
   flashStatus: (msg: string, variant?: ToastVariant) => void;
-  checkRemoval: (branch: string) => Promise<WorktreeRemovalCheck>;
+  worktrees: WorktreeService;
   refreshSessions: () => Promise<AgentSession[]>;
-  /** Resolves with what was removed: anything but `removed` kept
-   *  something, and the caller says why. */
-  performDelete: (
-    branch: string,
-    approved: WorktreeRemovalCheck
-  ) => Promise<WorktreeRemovalOutcome>;
   refreshPr: () => Promise<void>;
   triggerSync: () => Promise<void>;
 }
@@ -76,6 +67,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const { config, provider, repo } = useConfig();
   const { setBranches } = useBranchPickerActions();
   const { flash } = useToastActions();
+  const { worktrees } = useEngine();
 
   const sessionMgr = useSessionManager(repo, setBranches);
 
@@ -128,7 +120,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     () => ({
       sessions: sessionMgr.sessions,
       sortedSessions,
-      worktreeBranches: sessionMgr.worktreeBranches,
       prMap,
       prError,
       orphanPrs,
@@ -142,7 +133,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [
       sessionMgr.sessions,
       sortedSessions,
-      sessionMgr.worktreeBranches,
       prMap,
       prError,
       orphanPrs,
@@ -155,25 +145,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  const { refreshSessions, performDelete, checkRemoval } = sessionMgr;
+  const { refreshSessions } = sessionMgr;
 
   const actionsValue = useMemo<SessionActionsContextValue>(
     () => ({
       flashStatus: flash,
       refreshSessions,
-      performDelete,
-      checkRemoval,
+      worktrees,
       refreshPr,
       triggerSync,
     }),
-    [
-      flash,
-      refreshSessions,
-      performDelete,
-      checkRemoval,
-      refreshPr,
-      triggerSync,
-    ]
+    [flash, refreshSessions, worktrees, refreshPr, triggerSync]
   );
 
   return (

@@ -13,6 +13,7 @@ export function configEffects(before: AppConfig, after: AppConfig) {
     sync:
       credentials ||
       before.mergePollInterval !== after.mergePollInterval ||
-      before.autoDeleteOnMerge !== after.autoDeleteOnMerge,
+      before.autoDeleteOnMerge !== after.autoDeleteOnMerge ||
+      before.worktreePath !== after.worktreePath,
   };
 }

@@ -598,3 +598,23 @@ retry a mutation. Both manual and
 automatic removals go through captured-repo engine commands, with core retaining
 the stop/remove/delete safety checks. Desktop supplies repo-qualified babysitter
 ports; a retained checkout resumes watchers only while its repo is selected.
+
+## Repository-scoped worktrees
+
+Repository handles own `WorktreeService`. A read shares the resource's active
+request or a snapshot fetched within one second; an explicit refresh during a
+read joins one follow-up. Failed Git reads retain the last good lists with an
+error. Successful commands refresh the resource, so both shells see the same
+creation, removal and rebase behavior. A configured path change invalidates
+in-flight publication and reads with the new path policy immediately.
+
+`WorktreeScope` is an immutable value passed through the Git primitives and
+removal safety checks. It captures repository, path resolver and optional remote
+machine before awaiting. A desktop launch that overlaps repository selection
+keeps the original service. The process has no selected worktree resolver.
+Session targets resolve from checkout identity; PR targets ensure a checkout
+exists. Editor process launching and selection/focus remain shell adapters.
+
+Discovery captures its repository and replaces its non-recursive filesystem
+watch when the configured worktree base changes. Switching repositories disposes
+the old resource subscription; it does not detach retained session clients.

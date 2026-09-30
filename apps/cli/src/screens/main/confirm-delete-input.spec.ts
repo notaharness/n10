@@ -72,7 +72,7 @@ function makeCtx(confirmDelete: DeleteConfirmState, confirmInput = '') {
       setConfirmInput: vi.fn(),
     },
     sessions: {
-      performDelete: vi.fn().mockResolvedValue('removed'),
+      worktrees: { remove: vi.fn().mockResolvedValue('removed') },
       flashStatus: vi.fn(),
     },
     asyncOps: {
@@ -99,7 +99,7 @@ describe('confirming a typed branch name', () => {
     handleConfirmDeleteInput('', ENTER, t.handlerCtx);
     await t.settle();
 
-    expect(t.ctx.sessions.performDelete).toHaveBeenCalledExactlyOnceWith(
+    expect(t.ctx.sessions.worktrees.remove).toHaveBeenCalledExactlyOnceWith(
       'alpha',
       FORCED.approved
     );
@@ -115,7 +115,7 @@ describe('confirming a typed branch name', () => {
     handleConfirmDeleteInput('', ENTER, t.handlerCtx);
     await t.settle();
 
-    expect(t.ctx.sessions.performDelete).not.toHaveBeenCalled();
+    expect(t.ctx.sessions.worktrees.remove).not.toHaveBeenCalled();
   });
 });
 
@@ -126,7 +126,7 @@ describe('confirming a running agent’s removal', () => {
     runConfirmedDelete(RUNNING, t.handlerCtx);
     await t.settle();
 
-    expect(t.ctx.sessions.performDelete).toHaveBeenCalledExactlyOnceWith(
+    expect(t.ctx.sessions.worktrees.remove).toHaveBeenCalledExactlyOnceWith(
       'alpha',
       RUNNING.approved
     );
@@ -144,7 +144,7 @@ describe('confirming a running agent’s removal', () => {
     ],
   ])('says what core kept when it answers %s', async (outcome, message) => {
     const t = makeCtx(RUNNING);
-    t.ctx.sessions.performDelete.mockResolvedValue(outcome);
+    t.ctx.sessions.worktrees.remove.mockResolvedValue(outcome);
 
     runConfirmedDelete(RUNNING, t.handlerCtx);
     await t.settle();

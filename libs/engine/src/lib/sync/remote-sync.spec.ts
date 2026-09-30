@@ -52,12 +52,6 @@ vi.mock('@n10/core', () => ({
     return Promise.resolve(env.conflicts);
   },
 }));
-vi.mock('@n10/worktree-manager', () => ({
-  listWorktrees: async (repo: string) => {
-    env.listed.push(repo);
-    return env.branches.map((branch) => ({ branch }));
-  },
-}));
 vi.mock('@n10/logger', () => ({ logError: vi.fn() }));
 
 const { createRemoteSync } = await import('./remote-sync.js');
@@ -97,7 +91,23 @@ function harness(repo = '/repo-a') {
         error: null,
       }),
     },
-    worktrees: { remove },
+    worktrees: {
+      remove,
+      refresh: async () => {
+        env.listed.push(repo);
+        return {
+          worktrees: env.branches.map((branch) => ({
+            branch,
+            path: '/wt/' + branch,
+            bare: false,
+          })),
+          branches: [],
+          allBranches: [],
+          loading: false,
+          error: null,
+        };
+      },
+    },
   });
   services.push(sync);
   const notices: SyncNotice[] = [];

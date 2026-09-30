@@ -1,7 +1,6 @@
 import { worktreeSessionKey } from '@n10/core';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type * as CoreModule from '@n10/core';
-import type * as WorktreeManagerModule from '@n10/worktree-manager';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import {
   ACTIONS,
@@ -27,14 +26,9 @@ vi.mock('@n10/core', async (importOriginal) => ({
   launchSession: vi.fn(),
 }));
 
-vi.mock('@n10/worktree-manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof WorktreeManagerModule>()),
-  listWorktrees: vi.fn(),
-  createWorktree: vi.fn(),
-}));
-
 import { launchSession } from '@n10/core';
-import { createWorktree, listWorktrees } from '@n10/worktree-manager';
+const createWorktree = vi.fn();
+const resolveWorktree = vi.fn();
 import { handleSessionMenuInput } from './session-menu-input.js';
 
 // ── Fixtures ─────────────────────────────────────────────────────
@@ -123,6 +117,7 @@ function makeCtx(opts: {
   };
   const nav = { focus: 'sidebar', setFocus: vi.fn() };
   const sessions = {
+    worktrees: { create: createWorktree, resolve: resolveWorktree },
     flashStatus: vi.fn(),
     refreshSessions: vi.fn().mockResolvedValue([]),
   };
@@ -182,6 +177,8 @@ const openMenu = (pr: PullRequestInfo | null = null): SessionMenuState => ({
 beforeEach(() => {
   vi.clearAllMocks();
   liveSessions = new Set();
+  resolveWorktree.mockReset();
+  createWorktree.mockReset();
 });
 
 // ── Agent picker ─────────────────────────────────────────────────
@@ -222,9 +219,7 @@ describe('session menu — start', () => {
       menu: { ...openMenu(), agentIndex: 2 },
       selectedItem: sessionItem('/wt/alpha'),
     });
-    vi.mocked(listWorktrees).mockResolvedValue([
-      { path: '/wt/alpha', branch: 'alpha', bare: false },
-    ]);
+    resolveWorktree.mockResolvedValue('/wt/alpha');
 
     press(KEYS.enter(), t.ctx);
     await t.settle();
@@ -260,9 +255,7 @@ describe('session menu — start', () => {
         menu: { ...openMenu(), agentIndex },
         selectedItem: sessionItem('/wt/alpha'),
       });
-      vi.mocked(listWorktrees).mockResolvedValue([
-        { path: '/wt/alpha', branch: 'alpha', bare: false },
-      ]);
+      resolveWorktree.mockResolvedValue('/wt/alpha');
       press(KEYS.enter(), t.ctx);
       await t.settle();
       const params = vi.mocked(launchSession).mock.calls[0]![0];
@@ -287,9 +280,7 @@ describe('session menu — start', () => {
       menu: openMenu(),
       selectedItem: sessionItem('/wt/alpha'),
     });
-    vi.mocked(listWorktrees).mockResolvedValue([
-      { path: '/wt/alpha', branch: 'alpha', bare: false },
-    ]);
+    resolveWorktree.mockResolvedValue('/wt/alpha');
     press(KEYS.enter(), t.ctx);
     await vi.waitFor(() => expect(launchSession).toHaveBeenCalledOnce());
     expect(t.sessions.refreshSessions).not.toHaveBeenCalled();
@@ -305,7 +296,7 @@ describe('session menu — start', () => {
       menu: openMenu(),
       selectedItem: sessionItem('/wt/alpha'),
     });
-    vi.mocked(listWorktrees).mockResolvedValue([]);
+    resolveWorktree.mockResolvedValue(null);
 
     press(KEYS.enter(), t.ctx);
     await t.settle();

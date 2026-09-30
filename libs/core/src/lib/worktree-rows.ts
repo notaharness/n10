@@ -1,3 +1,4 @@
+import { repositoryWorktreeScope } from './worktree-scope.js';
 import { listWorktrees, type WorktreeInfo } from '@n10/worktree-manager';
 import { getSession } from './pty-registry.js';
 import { getRepoRoot } from './repo-root.js';
@@ -51,6 +52,8 @@ export async function sessionKeyForBranch(
   branch: string,
   repo = getRepoRoot() ?? process.cwd()
 ): Promise<string | null> {
-  const worktree = (await listWorktrees(repo)).find((w) => w.branch === branch);
+  const worktree = (await listWorktrees(repositoryWorktreeScope(repo))).find(
+    (w) => w.branch === branch
+  );
   return worktree ? keyForWorktree(worktree, repo) : null;
 }

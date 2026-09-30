@@ -59,7 +59,12 @@ The reasoning behind each rule is in `docs/decisions.md`.
   registry file names is refused.
   Extending what a relay can deliver into means extending this allowlist, not
   trusting more of the envelope.
-- **Discovery** (`discovery/`): poll and use pure `diffScans`; attach through the
+- **Worktree operations**: pass an immutable `WorktreeScope` through Git and
+  guarded removal. `repositoryWorktreeScope(repo)` captures persisted settings
+  for standalone operations; engine commands use their config snapshot. Never
+  select a process-wide path resolver.
+- **Discovery** (`discovery/`): capture the repository, replace the filesystem
+  watch when its configured worktree base changes, poll and use pure `diffScans`; attach through the
   shared launcher, rechecking connection state between awaits. Retired names
   are suppressed. Observe worktree processes, orphaned sessions and standalone
   terminals in one listing. Retained agent panes are not running processes.

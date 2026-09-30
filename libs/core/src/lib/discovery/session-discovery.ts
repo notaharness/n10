@@ -35,7 +35,8 @@ import { keyForWorktree, sessionIdentity } from '../session-key.js';
  */
 import { watch, type FSWatcher } from 'node:fs';
 import { log, logError } from '@n10/logger';
-import { listWorktrees, worktreesBasePath } from '@n10/worktree-manager';
+import { listWorktrees } from '@n10/worktree-manager';
+import { repositoryWorktreeScope } from '../worktree-scope.js';
 import {
   hasSessionConnection,
   isSessionAlive,
@@ -92,6 +93,7 @@ function worthAnnouncing(delta: DiscoveryDelta, adopted: number): boolean {
 }
 
 export interface SessionDiscoveryOptions {
+  repo: string;
   /** Scan cadence in ms. */
   intervalMs?: number;
   /**
@@ -155,7 +157,13 @@ export async function rescanSessionDiscovery(): Promise<void> {
 export function startSessionDiscovery(
   opts: SessionDiscoveryOptions
 ): SessionDiscovery {
-  const { adopt, adoptTerminal, onChanged, isCurrent = () => true } = opts;
+  const {
+    repo,
+    adopt,
+    adoptTerminal,
+    onChanged,
+    isCurrent = () => true,
+  } = opts;
   const intervalMs = opts.intervalMs ?? DISCOVERY_INTERVAL_MS;
 
   let previous: DiscoveryScan | null = null;
@@ -174,16 +182,17 @@ export function startSessionDiscovery(
   /** A scan that is scheduled but has not started looking yet. */
   let pending: Promise<void> | null = null;
   let watcher: FSWatcher | null = null;
+  let watchedBase: string | null = null;
   let watchTimer: ReturnType<typeof setTimeout> | null = null;
 
   async function observe(): Promise<DiscoveryScan> {
-    const worktrees: DiscoveredWorktree[] = (await listWorktrees()).map(
-      (wt) => ({
-        name: keyForWorktree(wt),
-        branch: wt.branch,
-        path: wt.path,
-      })
-    );
+    const worktrees: DiscoveredWorktree[] = (
+      await listWorktrees(repositoryWorktreeScope(repo))
+    ).map((wt) => ({
+      name: keyForWorktree(wt, repo),
+      branch: wt.branch,
+      path: wt.path,
+    }));
     const seen = observeTmuxSessions(worktrees);
     return {
       worktrees,
@@ -317,19 +326,20 @@ export function startSessionDiscovery(
    *  an inotify handle per directory and `node_modules` alone exhausts
    *  the Linux default. */
   function ensureWatch(): void {
-    if (watcher || stopped) return;
+    if (stopped) return;
+    const base = repositoryWorktreeScope(repo).resolver.base();
+    if (watcher && watchedBase === base) return;
+    watcher?.close();
+    watcher = null;
+    watchedBase = base;
     try {
-      watcher = watch(
-        worktreesBasePath(),
-        { persistent: false, recursive: false },
-        () => {
-          if (watchTimer || stopped) return;
-          watchTimer = setTimeout(() => {
-            watchTimer = null;
-            void scanNow();
-          }, WATCH_DEBOUNCE_MS);
-        }
-      );
+      watcher = watch(base, { persistent: false, recursive: false }, () => {
+        if (watchTimer || stopped) return;
+        watchTimer = setTimeout(() => {
+          watchTimer = null;
+          void scanNow();
+        }, WATCH_DEBOUNCE_MS);
+      });
       // A watch on a directory that is later deleted errors rather than
       // going quiet. Drop it and let the next scan re-establish one.
       watcher.on('error', () => {

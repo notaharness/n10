@@ -1,3 +1,4 @@
+import type { Machine } from './machine.js';
 /**
  * Integration tests for worktree functions.
  * These run real git commands against throwaway repos in temp directories.
@@ -15,11 +16,7 @@ import {
 } from './worktree.js';
 import { canRemoveBranch } from './removal-check.js';
 import { listWorktrees } from './worktree-list.js';
-import {
-  resetWorktreeResolver,
-  setWorktreeResolver,
-  createTemplateResolver,
-} from './worktree-resolver.js';
+import { worktreeScope } from './worktree-resolver.js';
 import {
   listBranches,
   listAllBranches,
@@ -109,7 +106,7 @@ function setupRemoteAndClone(): {
 beforeEach(() => {
   originalCwd = process.cwd();
   resetMainBranchCache();
-  resetWorktreeResolver();
+  template = undefined;
 });
 
 afterEach(() => {
@@ -134,7 +131,7 @@ describe('integration: listBranches', () => {
     execSync('git checkout -b feature-a', { stdio: 'pipe' });
     execSync('git checkout -b feature-b', { stdio: 'pipe' });
 
-    const branches = await listBranches();
+    const branches = await listBranches(process.cwd());
     expect(branches).toContain('feature-a');
     expect(branches).toContain('feature-b');
   });
@@ -148,11 +145,11 @@ describe('integration: createWorktree / removeWorktree', () => {
     execSync('git checkout -b test-wt', { stdio: 'pipe' });
     execSync('git checkout -', { stdio: 'pipe' }); // back to default branch
 
-    const path = await createWorktree('test-wt');
+    const path = await createWorktree('test-wt', scope());
     expect(path).not.toBeNull();
     expect(existsSync(path!)).toBe(true);
 
-    const removed = await removeWorktree('test-wt');
+    const removed = await removeWorktree('test-wt', scope(), {});
     expect(removed).toBe(true);
     expect(existsSync(path!)).toBe(false);
   });
@@ -161,15 +158,15 @@ describe('integration: createWorktree / removeWorktree', () => {
     const { repoDir } = setupGitRepo();
     process.chdir(repoDir);
 
-    const path = await createWorktree('brand-new-branch');
+    const path = await createWorktree('brand-new-branch', scope());
     expect(path).not.toBeNull();
     expect(existsSync(path!)).toBe(true);
 
     // Verify branch was created
-    const branches = await listBranches();
+    const branches = await listBranches(process.cwd());
     expect(branches).toContain('brand-new-branch');
 
-    await removeWorktree('brand-new-branch');
+    await removeWorktree('brand-new-branch', scope(), {});
   });
 });
 
@@ -178,16 +175,16 @@ describe('integration: canRemoveBranch', () => {
     const { repoDir } = setupGitRepo();
     process.chdir(repoDir);
 
-    const path = await createWorktree('dirty-branch');
+    const path = await createWorktree('dirty-branch', scope());
     expect(path).not.toBeNull();
 
     // Create a dirty file in the worktree
     writeFileSync(join(path!, 'dirty.txt'), 'uncommitted content');
 
-    const result = await canRemoveBranch('dirty-branch');
+    const result = await canRemoveBranch('dirty-branch', scope(), {});
     expect(result).toEqual({ safe: false, reason: 'uncommitted changes' });
 
-    await removeWorktree('dirty-branch');
+    await removeWorktree('dirty-branch', scope(), {});
   });
 
   it('should allow removal of clean branch that is pushed', async () => {
@@ -199,13 +196,13 @@ describe('integration: canRemoveBranch', () => {
     execSync('git push -u origin clean-branch', { stdio: 'pipe' });
     execSync('git checkout master', { stdio: 'pipe' });
 
-    const path = await createWorktree('clean-branch');
+    const path = await createWorktree('clean-branch', scope());
     expect(path).not.toBeNull();
 
-    const result = await canRemoveBranch('clean-branch');
+    const result = await canRemoveBranch('clean-branch', scope(), {});
     expect(result).toEqual({ safe: true });
 
-    await removeWorktree('clean-branch');
+    await removeWorktree('clean-branch', scope(), {});
   });
   // Named, the repository is where every check looks, even for a
   // branch with no checkout there: a dirty checkout of the same branch
@@ -214,17 +211,17 @@ describe('integration: canRemoveBranch', () => {
     const { repoDir: here } = setupGitRepo();
     const { repoDir: there } = setupGitRepo();
     process.chdir(here);
-    const path = await createWorktree('shared');
+    const path = await createWorktree('shared', scope());
     writeFileSync(join(path!, 'dirty.txt'), 'uncommitted content');
     execSync('git branch shared', { cwd: there, stdio: 'pipe' });
 
     expect(
-      await canRemoveBranch('shared', { confirmedMerged: true, cwd: there })
+      await canRemoveBranch('shared', scope(there), { confirmedMerged: true })
     ).toEqual({
       safe: true,
     });
 
-    await removeWorktree('shared', { force: true });
+    await removeWorktree('shared', scope(), { force: true });
   });
 });
 
@@ -399,7 +396,7 @@ describe('integration: rebaseOntoMaster', () => {
     process.chdir(cloneDir);
 
     // Create worktree with a feature branch
-    const wtPath = await createWorktree('feature-rebase');
+    const wtPath = await createWorktree('feature-rebase', scope());
     expect(wtPath).not.toBeNull();
 
     // Add a non-conflicting commit in the worktree
@@ -410,7 +407,7 @@ describe('integration: rebaseOntoMaster', () => {
     const result = await rebaseOntoMaster(wtPath!);
     expect(result).toBe('success');
 
-    await removeWorktree('feature-rebase');
+    await removeWorktree('feature-rebase', scope(), {});
   });
 
   it('should detect conflict and abort rebase', async () => {
@@ -433,7 +430,7 @@ describe('integration: rebaseOntoMaster', () => {
     });
     execSync('git checkout master', { cwd: cloneDir, stdio: 'pipe' });
 
-    const wtPath = await createWorktree('feature-rebase-conflict');
+    const wtPath = await createWorktree('feature-rebase-conflict', scope());
     expect(wtPath).not.toBeNull();
 
     // Add a conflicting commit in the worktree
@@ -447,7 +444,7 @@ describe('integration: rebaseOntoMaster', () => {
     const result = await rebaseOntoMaster(wtPath!);
     expect(result).toBe('conflict');
 
-    await removeWorktree('feature-rebase-conflict');
+    await removeWorktree('feature-rebase-conflict', scope(), {});
   });
 });
 
@@ -485,49 +482,54 @@ describe('integration: bare repo with template resolver', () => {
     const { bareDir, parentDir } = setupBareRepo();
     process.chdir(bareDir);
 
-    setWorktreeResolver(createTemplateResolver('../{session}', bareDir));
+    template = '../{session}';
 
-    const path = await createWorktree('feature/sidebar');
+    const path = await createWorktree('feature/sidebar', scope());
     expect(path).not.toBeNull();
     expect(existsSync(path!)).toBe(true);
     // Sibling of the bare repo
     expect(path).toBe(join(parentDir, 'feature-sidebar'));
 
-    await removeWorktree('feature/sidebar');
+    await removeWorktree('feature/sidebar', scope(), {});
   });
 
   it('should list only resolver-owned worktrees', async () => {
     const { bareDir } = setupBareRepo();
     process.chdir(bareDir);
 
-    setWorktreeResolver(createTemplateResolver('../{session}', bareDir));
+    template = '../{session}';
 
-    await createWorktree('feature/a');
-    await createWorktree('feature/b');
+    await createWorktree('feature/a', scope());
+    await createWorktree('feature/b', scope());
 
-    const worktrees = await listWorktrees();
+    const worktrees = await listWorktrees(scope());
     expect(worktrees).toHaveLength(2);
     expect(worktrees.map((w) => w.branch).sort()).toEqual([
       'feature/a',
       'feature/b',
     ]);
 
-    await removeWorktree('feature/a');
-    await removeWorktree('feature/b');
+    await removeWorktree('feature/a', scope(), {});
+    await removeWorktree('feature/b', scope(), {});
   });
 
   it('should remove the correct worktree', async () => {
     const { bareDir, parentDir } = setupBareRepo();
     process.chdir(bareDir);
 
-    setWorktreeResolver(createTemplateResolver('../{session}', bareDir));
+    template = '../{session}';
 
-    await createWorktree('feature/remove-me');
+    await createWorktree('feature/remove-me', scope());
     const wtPath = join(parentDir, 'feature-remove-me');
     expect(existsSync(wtPath)).toBe(true);
 
-    const removed = await removeWorktree('feature/remove-me');
+    const removed = await removeWorktree('feature/remove-me', scope(), {});
     expect(removed).toBe(true);
     expect(existsSync(wtPath)).toBe(false);
   });
 });
+
+let template: string | undefined;
+function scope(cwd = process.cwd(), machine?: Machine) {
+  return worktreeScope(cwd, { template, machine });
+}

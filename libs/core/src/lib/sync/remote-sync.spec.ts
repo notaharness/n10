@@ -1,3 +1,4 @@
+import type * as WorktreeManager from '@n10/worktree-manager';
 import { worktreeSessionKey } from '../session-key.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VcsProvider } from '@n10/vcs-core';
@@ -40,7 +41,8 @@ const env = vi.hoisted(() => ({
   checks: 0,
 }));
 
-vi.mock('@n10/worktree-manager', () => ({
+vi.mock('@n10/worktree-manager', async (original) => ({
+  ...(await original<typeof WorktreeManager>()),
   branchTip: (branch: string) => Promise.resolve(`tip:${branch}`),
   repositoryOf: () => Promise.resolve('/repo/.git'),
   branchToSessionName: (b: string) => b.replace(/\//g, '-'),

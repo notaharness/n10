@@ -9,7 +9,6 @@ import {
   createPullRequestList,
   createRepositoryService,
   createRemoteSync,
-  createWorktreeCommands,
 } from '@n10/engine';
 import {
   settlePendingRuns,
@@ -163,7 +162,7 @@ export async function runTui(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const worktrees = createWorktreeCommands({ repo: repo.cwd });
+  const worktrees = repo.worktrees;
   const sync = createRemoteSync({
     config: repo.config,
     pullRequests,

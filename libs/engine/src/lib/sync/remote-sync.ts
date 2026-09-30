@@ -3,7 +3,7 @@ import { remoteSyncIntervalMs } from './sync-interval.js';
 import type { WorktreeRemovalCheck, WorktreeRemovalOutcome } from '@n10/core';
 import type { ConfigSnapshot } from '../config/config-service.js';
 import type { PullRequestList } from '../pull-requests/pull-request-list.js';
-import type { WorktreeCommands } from '../worktrees/worktree-commands.js';
+import type { WorktreeService } from '../worktrees/worktree-service.js';
 import { EMPTY_SYNC_SNAPSHOT } from './sync-snapshot.js';
 import type { SyncNotice, SyncSnapshot } from './sync-snapshot.js';
 import { runSyncPass } from './sync-pass.js';
@@ -18,7 +18,7 @@ export interface RemoteSyncOptions {
     subscribe(listener: () => void): () => void;
   };
   pullRequests: Pick<PullRequestList, 'getSnapshot'>;
-  worktrees: Pick<WorktreeCommands, 'remove'>;
+  worktrees: Pick<WorktreeService, 'remove' | 'refresh'>;
 }
 
 export interface RemoteSync {
@@ -85,6 +85,7 @@ export function createRemoteSync(options: RemoteSyncOptions): RemoteSync {
         repo,
         config: current,
         pullRequests,
+        worktrees,
         warned,
         remove,
         notice,

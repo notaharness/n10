@@ -1,3 +1,4 @@
+import { startBabysitForRepo, stopBabysitForBranch } from './babysit.js';
 import { canonicalRepoPath, isGitRepo, resetRepoRoot } from '@n10/core';
 import type { ConfigService, RepositoryHandle } from '@n10/engine';
 import { repositories } from './program.js';
@@ -46,7 +47,13 @@ export function activeRepoIs(cwd: string): boolean {
 
 export function openRepo(path: string): RepoInfo {
   const previous = repositories.getSnapshot();
-  const opened = repositories.open(path);
+  const opened = repositories.open(path, {
+    worktreeWatchers: {
+      suspend: stopBabysitForBranch,
+      resume: startBabysitForRepo,
+      isCurrent: activeRepoIs,
+    },
+  });
   // Session primitives still use the process repo root; the session-domain
   // migration removes this shell-owned ambient state. Resetting the cached root
   // is essential: otherwise removal in one repo can address another repo’s agent.
@@ -84,6 +91,12 @@ function repoInfo(current: RepositoryHandle): RepoInfo {
     repository,
     viewer,
   };
+}
+
+export function activeWorktreeService() {
+  const current = repositories.getSnapshot();
+  if (!current) throw new NoActiveRepoError();
+  return current.worktrees;
 }
 
 export function activeConfigService(): ConfigService {

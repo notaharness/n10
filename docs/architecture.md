@@ -137,3 +137,12 @@ The TUI’s `useRemoteSync` observes that service; desktop `services/remote-sync
 binds selected-repo lifetime and maps notices to IPC. Manual and automatic
 removal share `engine/worktrees` commands over core’s safety verdicts. ESLint
 rejects direct shell imports of sync passes and removal primitives.
+
+Worktree resources live in `engine/worktrees`: one repository handle owns the
+worktree list, local/remote branch lists, freshness and command invalidation.
+Both shells observe or read that snapshot and call its commands. The
+`worktree-manager` package implements Git operations over an immutable
+`WorktreeScope` (repository, path resolver and optional remote machine), without
+a process-wide selected resolver. Config path edits invalidate the resource;
+repository switches dispose its subscription without detaching session clients.
+ESLint forbids shells from calling these Git reads, mutations or scope factories.

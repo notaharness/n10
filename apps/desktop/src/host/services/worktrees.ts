@@ -1,73 +1,31 @@
-import { createWorktreeCommands } from '@n10/engine';
-import {
-  type WorktreeRemovalCheck,
-  type WorktreeRemovalOutcome,
-} from '@n10/core';
-import {
-  listWorktrees as listWts,
-  listBranches as listBr,
-  listAllBranches as listAllBr,
-  createWorktree as createWt,
-} from '@n10/worktree-manager';
 import { spawn } from 'node:child_process';
 import { fetchWorktreeDiffText } from '@n10/core';
-import { readConfig } from '@n10/vcs-core';
-import { activeRepoIs, requireRepo } from './repo.js';
-import { startBabysitForRepo, stopBabysitForBranch } from './babysit.js';
+import type { WorktreeRemovalCheck } from '@n10/core';
+import { activeConfigService, activeWorktreeService } from './repo.js';
 
-// All worktree-manager functions resolve paths against process.cwd();
-// openRepo() chdir'd into the active repo, so these are repo-scoped.
-
-export function listWorktrees() {
-  requireRepo();
-  return listWts();
+async function read() {
+  const snapshot = await activeWorktreeService().read();
+  if (snapshot.error) throw new Error(snapshot.error);
+  return snapshot;
 }
 
-export function listBranches() {
-  requireRepo();
-  return listBr();
+export async function listWorktrees() {
+  return (await read()).worktrees;
 }
-
-export function listAllBranches() {
-  requireRepo();
-  return listAllBr();
+export async function listBranches() {
+  return (await read()).branches;
 }
-
-export async function createWorktree(branch: string): Promise<string> {
-  requireRepo();
-  const path = await createWt(branch);
-  // The resolver answers `null` for anything git refused — an invalid
-  // ref name, a branch already checked out elsewhere. Returning that as
-  // a success made the renderer's mutation resolve, toast "Worktree
-  // ready", and leave the optimistically-opened tab on its loading
-  // state forever, because no sidebar item was ever coming. The launch
-  // and open-in-editor paths already throw here; this one did not.
-  if (!path) {
-    throw new Error(`Failed to create a worktree for "${branch}"`);
-  }
-  return path;
+export async function listAllBranches() {
+  return (await read()).allBranches;
 }
-
-export function worktreeCommands(repo: string) {
-  return createWorktreeCommands({
-    repo,
-    watchers: {
-      suspend: stopBabysitForBranch,
-      resume: startBabysitForRepo,
-      isCurrent: activeRepoIs,
-    },
-  });
+export function createWorktree(branch: string) {
+  return activeWorktreeService().create(branch);
 }
-
-export function removeWorktree(
-  branch: string,
-  approved: WorktreeRemovalCheck
-): Promise<WorktreeRemovalOutcome> {
-  return worktreeCommands(requireRepo()).remove(branch, approved);
+export function removeWorktree(branch: string, approved: WorktreeRemovalCheck) {
+  return activeWorktreeService().remove(branch, approved);
 }
-
 export function checkWorktreeRemoval(branch: string) {
-  return worktreeCommands(requireRepo()).checkRemoval(branch);
+  return activeWorktreeService().checkRemoval(branch);
 }
 
 /**
@@ -80,8 +38,7 @@ export async function getWorktreeDiffText(
   branch: string,
   targetBranch: string
 ): Promise<string> {
-  requireRepo();
-  const wt = (await listWts()).find((w) => w.branch === branch);
+  const wt = (await listWorktrees()).find((w) => w.branch === branch);
   if (!wt) return '';
   return fetchWorktreeDiffText(wt.path, targetBranch);
 }
@@ -92,16 +49,11 @@ export async function getWorktreeDiffText(
 export async function openInEditor(branch: string): Promise<{
   editor: string;
 }> {
-  const cwd = requireRepo();
-  const config = readConfig(cwd);
+  const service = activeWorktreeService();
+  const { config } = activeConfigService().getSnapshot();
   const editor = config.editor || process.env.VISUAL || process.env.EDITOR;
-  if (!editor) {
-    throw new Error('No editor configured — set one in Settings');
-  }
-  const path = await createWt(branch);
-  if (!path) {
-    throw new Error(`Failed to resolve a worktree for "${branch}"`);
-  }
+  if (!editor) throw new Error('No editor configured — set one in Settings');
+  const path = await service.create(branch);
   spawn(editor, [path], { detached: true, stdio: 'ignore' }).unref();
   return { editor };
 }

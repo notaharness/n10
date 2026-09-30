@@ -29,7 +29,11 @@ import { sessionKeyForBranch } from '../worktree-rows.js';
  */
 import { logError } from '@n10/logger';
 import type { AppConfig, PullRequestInfo, VcsProvider } from '@n10/vcs-core';
-import { checkoutWorktree, refExists } from '@n10/worktree-manager';
+import {
+  checkoutWorktree,
+  refExists,
+  worktreeScope,
+} from '@n10/worktree-manager';
 import { idleFor } from '../activity.js';
 import { isSessionAlive } from '../pty-registry.js';
 import {
@@ -160,7 +164,10 @@ async function spawnForUpdate(
   // Checkout only: a `createWorktree` that falls back to `-b` would
   // invent a branch of this name off HEAD and start an agent on the
   // wrong base.
-  const worktree = await checkoutWorktree(pr.sourceBranch, opts.cwd);
+  const worktree = await checkoutWorktree(
+    pr.sourceBranch,
+    worktreeScope(opts.cwd, { template: opts.getConfig().worktreePath })
+  );
   if (!worktree) {
     return { outcome: 'failed', error: 'Could not create the worktree' };
   }

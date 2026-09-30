@@ -91,7 +91,9 @@ describe('repository scope', () => {
     const current = service.open(link);
     expect(current.cwd).toBe(cwd);
     expect(service.open(cwd)).toBe(current);
+    const dispose = vi.spyOn(current.worktrees, 'dispose');
     const next = service.open(repo('another'));
+    expect(dispose).toHaveBeenCalledOnce();
     expect(next).not.toBe(current);
     expect(next.config).not.toBe(current.config);
   });

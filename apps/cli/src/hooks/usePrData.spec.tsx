@@ -12,7 +12,7 @@ import type { AppConfig, BranchPrMap, VcsProvider } from '@n10/vcs-core';
 import {
   createPullRequestList,
   createRemoteSync,
-  createWorktreeCommands,
+  createWorktreeService,
   type PullRequestList,
 } from '@n10/engine';
 import { EngineProvider, usePrData } from '@n10/app-core';
@@ -72,7 +72,13 @@ function mount() {
     });
     return <Box />;
   }
-  const worktrees = createWorktreeCommands({ repo: '/repo' });
+  const worktrees = createWorktreeService({
+    config: {
+      repo: '/repo',
+      getSnapshot: () => ({ config: { vendorAuth: {}, vendorProject: {} } }),
+      subscribe: () => () => undefined,
+    },
+  });
   const sync = createRemoteSync({
     config: {
       repo: '/repo',

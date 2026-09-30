@@ -1,0 +1,256 @@
+import type * as WorktreeManager from '@n10/worktree-manager';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type {
+  WorktreeInfo,
+  WorktreeScope,
+  Machine,
+} from '@n10/worktree-manager';
+import { createWorktreeService } from './worktree-service.js';
+import type { WorktreeService } from './worktree-service.js';
+
+const ports = vi.hoisted(() => ({
+  list: vi.fn<(scope: WorktreeScope) => Promise<WorktreeInfo[]>>(),
+  branches: vi.fn<(cwd: string) => Promise<string[]>>(),
+  all: vi.fn<(cwd: string) => Promise<string[]>>(),
+  create:
+    vi.fn<(branch: string, scope: WorktreeScope) => Promise<string | null>>(),
+  fetch: vi.fn(),
+  remove: vi.fn(),
+  check: vi.fn(),
+  rebase: vi.fn(),
+}));
+vi.mock('@n10/worktree-manager', async (original) => ({
+  ...(await original<typeof WorktreeManager>()),
+  listWorktrees: ports.list,
+  listBranches: ports.branches,
+  listAllBranches: ports.all,
+  createWorktree: ports.create,
+  rebaseOntoMaster: ports.rebase,
+}));
+vi.mock('@n10/core', () => ({
+  fetchRefs: ports.fetch,
+  checkWorktreeRemoval: ports.check,
+  removeWorktreeSession: ports.remove,
+  keyForWorktree: (wt: WorktreeInfo, repo: string) =>
+    JSON.stringify(['worktree', repo, wt.path]),
+}));
+vi.mock('@n10/logger', () => ({ logError: vi.fn() }));
+const row = { branch: 'topic', path: '/repo/trees/topic', bare: false };
+const services: WorktreeService[] = [];
+const flush = async () => {
+  for (let n = 0; n < 12; n++) await Promise.resolve();
+};
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+function harness(repo = '/repo') {
+  let snapshot = {
+    config: {
+      vendorAuth: {},
+      vendorProject: {},
+      worktreePath: 'trees/{session}',
+    },
+  };
+  const listeners = new Set<() => void>();
+  const service = createWorktreeService({
+    config: {
+      repo,
+      getSnapshot: () => snapshot,
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+    },
+  });
+  services.push(service);
+  return {
+    service,
+    listeners,
+    configure(template: string) {
+      snapshot = { config: { ...snapshot.config, worktreePath: template } };
+      for (const listener of listeners) listener();
+    },
+  };
+}
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  ports.list.mockReset().mockResolvedValue([row]);
+  ports.branches.mockReset().mockResolvedValue(['main', 'topic']);
+  ports.all.mockReset().mockResolvedValue(['main', 'topic', 'remote-topic']);
+  ports.create.mockReset().mockResolvedValue(row.path);
+  ports.fetch.mockReset().mockResolvedValue(true);
+  ports.remove.mockReset().mockResolvedValue('removed');
+  ports.check.mockReset().mockResolvedValue({ verdict: 'clear' });
+  ports.rebase.mockReset().mockResolvedValue('success');
+});
+afterEach(() => {
+  for (const service of services.splice(0)) service.dispose();
+  vi.useRealTimers();
+});
+
+describe('worktree resources', () => {
+  it('shares one scoped read between consumers and preserves cached snapshot identity', async () => {
+    const { service } = harness();
+    const first = service.read();
+    expect(service.read()).toBe(first);
+    const snapshot = await first;
+    expect(snapshot).toMatchObject({
+      worktrees: [row],
+      branches: ['main', 'topic'],
+      allBranches: ['main', 'topic', 'remote-topic'],
+      loading: false,
+      error: null,
+    });
+    expect(await service.read()).toBe(snapshot);
+    expect(ports.list).toHaveBeenCalledOnce();
+    expect(ports.list.mock.calls[0][0].cwd).toBe('/repo');
+    expect(ports.list.mock.calls[0][0].resolver.base()).toBe('/repo/trees');
+    expect(ports.branches).toHaveBeenCalledWith('/repo');
+    expect(ports.all).toHaveBeenCalledWith('/repo');
+    vi.setSystemTime(Date.now() + 1_001);
+    await service.read();
+    expect(ports.list).toHaveBeenCalledTimes(2);
+  });
+  it('coalesces explicit refreshes into one follow-up, without queuing ordinary readers', async () => {
+    const a = deferred<WorktreeInfo[]>(),
+      b = deferred<WorktreeInfo[]>();
+    ports.list.mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
+    const { service } = harness();
+    const active = service.read();
+    expect(service.read()).toBe(active);
+    expect(service.refresh()).toBe(active);
+    expect(service.refresh()).toBe(active);
+    a.resolve([row]);
+    await flush();
+    expect(ports.list).toHaveBeenCalledTimes(2);
+    b.resolve([]);
+    expect((await active).worktrees).toEqual([]);
+    expect(ports.list).toHaveBeenCalledTimes(2);
+  });
+  it('retains known checkouts on a failed read and clears the error after recovery', async () => {
+    const { service } = harness();
+    await service.read();
+    ports.list.mockRejectedValueOnce(new Error('Git unavailable'));
+    expect(await service.refresh()).toMatchObject({
+      worktrees: [row],
+      error: 'Git unavailable',
+      loading: false,
+    });
+    expect((await service.refresh()).error).toBeNull();
+  });
+  it('applies path edits immediately and cannot publish the read using the old template', async () => {
+    const a = deferred<WorktreeInfo[]>(),
+      b = deferred<WorktreeInfo[]>();
+    ports.list.mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
+    const { service, configure } = harness();
+    const notifications = vi.fn();
+    service.subscribe(notifications);
+    const active = service.read();
+    configure('other/{session}');
+    a.resolve([row]);
+    await flush();
+    expect(service.getSnapshot().worktrees).toEqual([]);
+    expect(ports.list.mock.calls[0][0].resolver.base()).toBe('/repo/trees');
+    expect(ports.list.mock.calls[1][0].resolver.base()).toBe('/repo/other');
+    const next = { ...row, path: '/repo/other/topic' };
+    b.resolve([next]);
+    await active;
+    expect(service.getSnapshot().worktrees).toEqual([next]);
+    expect(notifications).toHaveBeenCalled();
+  });
+  it('cancels publication and drops the config subscription when its repo is retired', async () => {
+    const pending = deferred<WorktreeInfo[]>();
+    ports.list.mockReturnValue(pending.promise);
+    const { service, listeners } = harness();
+    const listener = vi.fn();
+    service.subscribe(listener);
+    const active = service.read();
+    service.dispose();
+    listener.mockClear();
+    pending.resolve([row]);
+    await active;
+    expect(listener).not.toHaveBeenCalled();
+    expect(listeners.size).toBe(0);
+    expect(service.getSnapshot().worktrees).toEqual([]);
+  });
+});
+
+describe('worktree commands', () => {
+  it('creates under the captured template and refreshes shared resources after success', async () => {
+    const { service, configure } = harness();
+    const pending = deferred<string | null>();
+    ports.create.mockReturnValueOnce(pending.promise);
+    const created = service.create('topic');
+    configure('elsewhere/{branch}');
+    pending.resolve(row.path);
+    await created;
+    const at = ports.create.mock.calls[0][1];
+    expect(at.cwd).toBe('/repo');
+    expect(at.resolver.dir('topic')).toBe('trees/topic');
+    expect(ports.list).toHaveBeenCalled();
+    expect(ports.list.mock.calls.at(-1)![0].resolver.dir('topic')).toBe(
+      'elsewhere/topic'
+    );
+  });
+  it('reports a refused creation and never publishes a successful refresh for it', async () => {
+    const { service } = harness();
+    ports.create.mockResolvedValueOnce(null);
+    await expect(service.create('bad')).rejects.toThrow(
+      'Failed to create a worktree'
+    );
+    expect(ports.list).not.toHaveBeenCalled();
+  });
+  it('resolves an existing checkout by session identity even after its branch changes', async () => {
+    const { service } = harness();
+    ports.list.mockResolvedValue([{ ...row, branch: 'renamed' }]);
+    expect(
+      await service.resolve({
+        session: JSON.stringify(['worktree', '/repo', row.path]),
+      })
+    ).toBe(row.path);
+    expect(await service.resolve({ session: 'missing' })).toBeNull();
+    expect(ports.create).not.toHaveBeenCalled();
+  });
+  it('ensures the branch checkout for PR targets using the shared idempotent primitive', async () => {
+    const { service } = harness();
+    expect(await service.resolve({ branch: 'topic' })).toBe(row.path);
+    expect(ports.create).toHaveBeenCalledWith(
+      'topic',
+      expect.objectContaining({ cwd: '/repo' })
+    );
+  });
+  it('refreshes branch resources only after a successful explicit fetch', async () => {
+    const { service } = harness();
+    ports.fetch.mockResolvedValueOnce(false);
+    await expect(service.fetchBranches()).rejects.toThrow('Failed to fetch');
+    expect(ports.list).not.toHaveBeenCalled();
+    await service.fetchBranches();
+    expect(ports.fetch).toHaveBeenCalledWith({ cwd: '/repo', refs: 'all' });
+    expect(ports.all).toHaveBeenCalledOnce();
+  });
+  it('rebases the actual checkout and invalidates its resource', async () => {
+    const { service } = harness();
+    expect(await service.rebase({ branch: 'topic' })).toBe('success');
+    expect(ports.rebase).toHaveBeenCalledWith(row.path, undefined);
+    expect(ports.all).toHaveBeenCalledOnce();
+    await expect(service.rebase({ branch: 'missing' })).rejects.toThrow(
+      'No worktree'
+    );
+  });
+  it('passes remote creation to the named machine without refreshing local resources', async () => {
+    const { service } = harness();
+    const machine = { id: 'peer' } as Machine;
+    await service.create('topic', { cwd: '/remote/repo', machine });
+    expect(ports.create).toHaveBeenCalledWith(
+      'topic',
+      expect.objectContaining({ cwd: '/remote/repo', machine })
+    );
+    expect(ports.list).not.toHaveBeenCalled();
+  });
+});

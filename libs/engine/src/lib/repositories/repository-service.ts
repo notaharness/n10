@@ -1,4 +1,9 @@
-import { configureWorktreePath, resolveRepositoryRoot } from '@n10/core';
+import {
+  createWorktreeService,
+  type WorktreeService,
+} from '../worktrees/worktree-service.js';
+import type { WorktreeWatchers } from '../worktrees/worktree-commands.js';
+import { resolveRepositoryRoot } from '@n10/core';
 import { autoDetectProjectConfig } from '@n10/vcs-core';
 import { createConfigService } from '../config/config-service.js';
 import type {
@@ -9,6 +14,7 @@ import type {
 export interface RepositoryHandle {
   readonly cwd: string;
   readonly config: ConfigService;
+  readonly worktrees: WorktreeService;
 }
 
 /** Selection owns a captured-repo config service; metadata comes from that
@@ -19,7 +25,10 @@ export function createRepositoryService(
   let current: RepositoryHandle | null = null;
   return {
     getSnapshot: () => current,
-    open(path: string): RepositoryHandle {
+    open(
+      path: string,
+      ports: { worktreeWatchers?: WorktreeWatchers } = {}
+    ): RepositoryHandle {
       const cwd = resolveRepositoryRoot(path);
       if (current?.cwd === cwd) {
         try {
@@ -33,15 +42,14 @@ export function createRepositoryService(
         } catch {
           // Optional detection must not prevent opening a valid checkout.
         }
-        current = {
-          cwd,
-          config: createConfigService({ ...options, repo: cwd }),
-        };
+        const config = createConfigService({ ...options, repo: cwd });
+        const worktrees = createWorktreeService({
+          config,
+          watchers: ports.worktreeWatchers,
+        });
+        current?.worktrees.dispose();
+        current = { cwd, config, worktrees };
       }
-      configureWorktreePath(
-        cwd,
-        current.config.getSnapshot().config.worktreePath
-      );
       return current;
     },
     isActive: (cwd: string) => current?.cwd === cwd,

@@ -32,7 +32,7 @@ export function runConfirmedDelete(
   { sessions, asyncOps }: Pick<DeleteConfirmHandlerCtx, 'sessions' | 'asyncOps'>
 ): void {
   void asyncOps.run('delete', async () => {
-    const outcome = await sessions.performDelete(branch, approved);
+    const outcome = await sessions.worktrees.remove(branch, approved);
     sessions.flashStatus(keptNotice(branch, outcome) ?? `Deleted ${branch}`);
   });
 }

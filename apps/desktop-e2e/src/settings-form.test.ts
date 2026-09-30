@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
@@ -57,6 +57,26 @@ test.describe('Settings form', () => {
     await expect
       .poll(() => config(homeDir).worktreePath, { timeout: 15_000 })
       .toBe('/tmp/on-enter');
+  });
+
+  test('applies an edited worktree path without reopening the repository', async ({
+    desktop,
+  }) => {
+    const { app, page, repoPath, homeDir } = desktop;
+    await openSettings(app, page);
+    const field = page.getByLabel('Worktree Path', { exact: true });
+    await field.fill('checkouts/{session}');
+    await field.press('Enter');
+    await expect
+      .poll(() => config(homeDir).worktreePath)
+      .toBe('checkouts/{session}');
+    const path = await page.evaluate(() =>
+      window.n10.createWorktree('edited-path')
+    );
+    expect(path).toBe(join(repoPath, 'checkouts', 'edited-path'));
+    expect(existsSync(path)).toBe(true);
+    const rows = await page.evaluate(() => window.n10.listWorktrees());
+    expect(rows.map((row) => row.path)).toContain(path);
   });
 
   test('routes a project-scoped field to the project config, not the global one', async ({
