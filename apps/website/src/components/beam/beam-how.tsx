@@ -1,44 +1,38 @@
-const steps = [
+const membership = [
   {
-    title: 'Each machine keeps its own key',
+    title: 'Machine identity',
     description:
-      'Beam gives each machine a WireGuard node key. The private key stays on that machine; its public key identifies it to the fleet.',
+      'Each machine generates a node key and keeps the private key on disk. The public key identifies that machine to the fleet.',
   },
   {
-    title: 'Your passkey signs admission',
+    title: 'Passkey approval',
     description:
-      'A WebAuthn assertion commits to the machine’s public key, address and label. The passkey provider holds the signing key; Beam receives an assertion for each membership or revocation.',
+      'The passkey signs a WebAuthn assertion whose challenge commits to one membership or revocation statement. The passkey provider keeps the signing key. A membership statement includes the machine’s public key, address and label.',
   },
   {
-    title: 'The PRF encrypts discovery',
+    title: 'Directory encryption',
     description:
-      'The passkey’s PRF gives your machines a shared secret. They derive a key from it and encrypt membership and revocation records with XChaCha20-Poly1305 before uploading them.',
+      'The passkey’s PRF extension produces a secret. Machines derive a directory key and read token from it, then encrypt signed records with XChaCha20-Poly1305 before uploading them.',
   },
   {
-    title: 'Peers verify before accepting',
+    title: 'Peer verification',
     description:
-      'On contact, a machine checks the signed membership and proof that its peer holds the matching node key. It then pins the peer locally.',
+      'Before accepting streams, each receiver checks the signed membership, proof of node-key possession and its stored revocations. It pins verified members locally. Connections need no directory lookup.',
   },
 ];
 
 export function BeamHow() {
   return (
-    <section className="mx-auto w-full max-w-5xl px-4 py-12">
-      <h2 className="text-center text-2xl font-semibold tracking-tight sm:text-3xl">
-        How a machine joins the fleet
+    <section className="mx-auto w-full max-w-5xl px-6 py-16">
+      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+        How membership works
       </h2>
-      <div className="mt-8 grid gap-6 sm:grid-cols-2">
-        {steps.map((step, i) => (
-          <div
-            key={step.title}
-            className="border-fd-border bg-fd-card rounded-xl border p-6"
-          >
-            <div className="text-fd-primary font-mono text-sm font-semibold">
-              {String(i + 1).padStart(2, '0')}
-            </div>
-            <h3 className="mt-2 font-semibold">{step.title}</h3>
-            <p className="text-fd-muted-foreground mt-2 text-sm">
-              {step.description}
+      <div className="mt-10 grid gap-x-16 gap-y-10 sm:grid-cols-2">
+        {membership.map((item) => (
+          <div key={item.title} className="border-fd-border border-t pt-5">
+            <h3 className="font-semibold">{item.title}</h3>
+            <p className="text-fd-muted-foreground mt-3 leading-relaxed">
+              {item.description}
             </p>
           </div>
         ))}

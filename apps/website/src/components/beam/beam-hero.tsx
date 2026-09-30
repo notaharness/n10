@@ -5,18 +5,19 @@ import { buttonVariants } from '@/components/ui/button';
 export function BeamHero() {
   return (
     <section className="relative overflow-hidden">
-      <div className="relative mx-auto grid w-full max-w-6xl items-center gap-x-10 gap-y-12 px-4 pt-16 pb-24 sm:pt-24 lg:grid-cols-[1fr_1.2fr]">
+      <div className="relative mx-auto grid w-full max-w-6xl items-center gap-x-10 gap-y-12 px-4 pt-16 pb-24 sm:pt-24 lg:grid-cols-[1.2fr_1fr]">
         <div className="relative z-10 flex flex-col items-center gap-6 text-center lg:items-start lg:text-left">
           <span className="border-fd-border bg-fd-card text-fd-muted-foreground rounded-full border px-3 py-1 font-mono text-xs">
             @notaharness/beam
           </span>
-          <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-6xl lg:text-5xl xl:text-6xl">
-            Passkey-controlled access to your machines
+          <h1 className="text-[2rem] leading-[1.1] font-semibold tracking-tight text-balance sm:text-5xl xl:text-[3.25rem]">
+            <span className="whitespace-nowrap">Passkey-controlled</span> access
+            to your machines
           </h1>
           <p className="text-fd-muted-foreground max-w-xl text-lg text-pretty">
-            Beam lets your machines open shells, run commands and queue messages
-            for each other. Your passkey approves membership. A directory stores
-            encrypted records, while WireGuard carries traffic between machines.
+            Beam connects your machines using Tailscale’s tailcat library. Your
+            passkey approves which machines can connect. Members can open shells
+            on each other. Messages wait on the sender until delivery.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link href="/docs/beam" className={buttonVariants({ size: 'lg' })}>
@@ -29,6 +30,26 @@ export function BeamHero() {
               GitHub
             </Link>
           </div>
+          <a
+            href="https://github.com/tailscale/tailcat"
+            className="text-fd-muted-foreground hover:text-fd-foreground inline-flex items-center gap-6 p-6 text-sm"
+          >
+            <img
+              src="/brands/tailscale-icon-black.svg"
+              alt=""
+              width={48}
+              height={48}
+              className="n10-only-light"
+            />
+            <img
+              src="/brands/tailscale-icon-white.svg"
+              alt=""
+              width={48}
+              height={48}
+              className="n10-only-dark"
+            />
+            Powered by Tailscale
+          </a>
         </div>
         <BeamMesh className="mx-auto w-full max-w-xl lg:max-w-none" />
       </div>
