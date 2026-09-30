@@ -6,9 +6,11 @@ import {
   fileTree,
   launchAgentFromRail,
   sidebarRow,
+  switchRepo,
   tab,
   visibleText,
 } from './setup/app.js';
+import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 
 /**
  * Coming back to a tab finds it where it was left: the pane that
@@ -164,4 +166,31 @@ test('a file gone from the diff when its tab comes back starts from the top', as
         .evaluate((el) => el.scrollTop)
     )
     .toBe(0);
+});
+
+test('a tab keeps where it was left across a repository switch', async ({
+  desktop,
+}) => {
+  const { page, repoPath } = desktop;
+  const elsewhere = createTestRepo({ name: 'elsewhere' });
+  try {
+    await openKept(page, 'alpha');
+    await pick(page, 'd.txt');
+    await scrollDiff(page, 600);
+    await expect.poll(() => topLine(page)).toMatch(/^alpha-d line/);
+    const left = await topLine(page);
+
+    await switchRepo(page, elsewhere);
+    // The tab stays on the strip; pressing it opens its repository again.
+    await tab(page, /alpha/).click();
+    await expect
+      .poll(() => page.evaluate(() => window.n10.getRepo()), {
+        timeout: 30_000,
+      })
+      .toMatchObject({ cwd: repoPath });
+    await expect(pickedFile(page)).toHaveAttribute('title', 'd.txt');
+    await expect.poll(() => topLine(page)).toBe(left);
+  } finally {
+    cleanupTestRepo(elsewhere);
+  }
 });

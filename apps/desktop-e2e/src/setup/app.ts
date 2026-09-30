@@ -91,6 +91,26 @@ export async function openPalette(page: Page): Promise<Locator> {
 }
 
 /**
+ * Leave the current repository and open `cwd` through the palette's
+ * picker, as a user does. `window.n10.openRepo` would switch only the
+ * host, and the renderer would never learn about it.
+ */
+export async function switchRepo(page: Page, cwd: string): Promise<void> {
+  // No filter typed: the palette's own `value` for this entry is
+  // "command switch open repository", so searching for the words on
+  // screen scores it out of the list.
+  await openPalette(page);
+  await page.getByRole('option', { name: /Open another repository/ }).click();
+  await page.getByPlaceholder('/path/to/repository').fill(cwd);
+  await page.getByRole('button', { name: 'Open', exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => window.n10.getRepo()), {
+      timeout: 30_000,
+    })
+    .toMatchObject({ cwd });
+}
+
+/**
  * Open a worktree for `branch` through the command palette, and wait
  * for the sidebar to show it.
  *

@@ -16,6 +16,7 @@ import { errorMessage } from './lib/utils.js';
 import { RepoOpen } from './screens/RepoOpen.js';
 import { Workspace } from './screens/Workspace.js';
 import { PrewarmProvider } from './lib/tabs/prewarm.js';
+import { TabViewsHost } from './lib/tabs/tab-views.js';
 import { TabsProvider } from './lib/tabs/tabs.js';
 import { useRepoFollowsTabs } from './lib/tabs/use-repo-follows-tabs.js';
 
@@ -33,12 +34,14 @@ export function App() {
             so switching repos must not unmount the tabs of the one being
             left — their agents keep running and stay in the strip. */}
         <TabsProvider>
-          <PrewarmProvider>
-            <FleetProvider>
-              <Gate />
-              <RevocationDialog />
-            </FleetProvider>
-          </PrewarmProvider>
+          <TabViewsHost>
+            <PrewarmProvider>
+              <FleetProvider>
+                <Gate />
+                <RevocationDialog />
+              </FleetProvider>
+            </PrewarmProvider>
+          </TabViewsHost>
         </TabsProvider>
         <Toaster />
       </TooltipProvider>

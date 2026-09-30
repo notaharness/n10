@@ -35,7 +35,6 @@ export {
   itemTabId,
   standsFor,
   tabIdFor,
-  tabOpening,
   terminalTabId,
 } from './tab-identity.js';
 

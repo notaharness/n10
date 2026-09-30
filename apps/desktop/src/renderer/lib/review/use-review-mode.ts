@@ -54,10 +54,12 @@ export function useReviewMode({
 }): [Mode, Dispatch<SetStateAction<Mode>>] {
   const hasPr = pr != null;
   const initial = () => initialMode({ running: agent.running, hasPr });
-  // A tab the reader comes back to opens where they left it.
+  // A tab the reader comes back to opens on the pane they picked
+  // there. One they never picked follows the landing rule again, so an
+  // agent started since shows, and one that has ended no longer does.
   const { saved, save } = useTabView();
-  const [pane, setPane] = useState<PaneState>(
-    () => saved.pane ?? { mode: initial(), chosen: false, hasPr }
+  const [pane, setPane] = useState<PaneState>(() =>
+    saved.pane?.chosen ? saved.pane : { mode: initial(), chosen: false, hasPr }
   );
   useEffect(() => save({ pane }), [pane, save]);
   if (pane.hasPr !== hasPr) setPane(adoptPullRequest(pane, hasPr, initial()));

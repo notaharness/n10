@@ -1,10 +1,9 @@
 import { sessionBranch } from './setup/session-keys.js';
-import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
 import {
   createWorktree,
   launchAgentFromRail,
-  openPalette,
+  switchRepo,
   sidebarRow,
   tab,
   tabs,
@@ -35,22 +34,6 @@ const ALPHA = 'repo-alpha';
 const BETA = 'repo-beta';
 /** A branch name both checkouts have — the collision case. */
 const SHARED = 'shared-name';
-
-/** Leave the current repository and open `cwd` through the picker. */
-async function switchRepo(page: Page, cwd: string): Promise<void> {
-  // No filter typed: the palette's own `value` for this entry is
-  // "command switch open repository", so searching for the words on
-  // screen scores it out of the list.
-  await openPalette(page);
-  await page.getByRole('option', { name: /Open another repository/ }).click();
-  await page.getByPlaceholder('/path/to/repository').fill(cwd);
-  await page.getByRole('button', { name: 'Open', exact: true }).click();
-  await expect
-    .poll(() => page.evaluate(() => window.n10.getRepo()), {
-      timeout: 30_000,
-    })
-    .toMatchObject({ cwd });
-}
 
 test.describe('Tabs across repositories', () => {
   test.use({ repo: { name: ALPHA } });

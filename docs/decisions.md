@@ -258,11 +258,14 @@ terminal on screen shows its session (`showSession`), which holds core's
 `showTerminal`, the same seen-signal the TUI's pane holds; a spare sees
 nothing. Tab switches never detach or kill sessions.
 
-A tab that mounts again opens where the user left it: its pane, the diff's
-picked file and top line, and the walkthrough step, held per tab id in memory
-for this run (`lib/tabs/tab-views.tsx`) and dropped when the tab closes.
-Nothing is written to disk or to tmux, so a reload may lose it. A saved file or
-line no longer in the diff is not guessed at: the view starts from the top.
+A tab that mounts again opens where the user left it: the pane they picked,
+the diff's picked file and top line, and the walkthrough step. A pane they
+never picked follows the landing rule again, so an agent started since shows.
+The views are held per tab id in memory for this run, beside the tabs
+(`TabViewsHost` in `lib/tabs/tab-views.tsx`), so they outlive a repository
+switch, and dropped when the tab closes. Nothing is written to disk or to tmux:
+a reload starts every tab fresh. A saved file or line no longer in the diff is
+not guessed at: the view starts from the top.
 
 Each tab has an ErrorBoundary. Markdown paragraphs render as `div` when they may
 contain block images; the host fetches protected images with provider auth.

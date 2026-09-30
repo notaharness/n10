@@ -1,6 +1,5 @@
-import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { openPalette, sidebarRow, tab } from './setup/app.js';
+import { sidebarRow, switchRepo, tab } from './setup/app.js';
 import type { FakeGitHub } from './setup/fake-gh.js';
 import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 
@@ -20,18 +19,6 @@ const TITLE = 'Add undo support';
 const GITHUB: FakeGitHub = {
   prs: [{ number: 42, title: TITLE, headRefName: BRANCH }],
 };
-
-async function switchRepo(page: Page, cwd: string): Promise<void> {
-  await openPalette(page);
-  await page.getByRole('option', { name: /Open another repository/ }).click();
-  await page.getByPlaceholder('/path/to/repository').fill(cwd);
-  await page.getByRole('button', { name: 'Open', exact: true }).click();
-  await expect
-    .poll(() => page.evaluate(() => window.n10.getRepo()), {
-      timeout: 30_000,
-    })
-    .toMatchObject({ cwd });
-}
 
 test.use({
   fakeGitHub: GITHUB,

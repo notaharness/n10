@@ -144,9 +144,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
   (`watchSession`, counted per window in `services/session-watch.ts`) and
   the host sends PTY output only to watching windows; only one on screen
   shows it (`showSession`), which is what marks output seen.
-- Each tab's view (pane, picked file, diff anchor, walkthrough step) lives in
-  `lib/tabs/tab-views.tsx` for this run: read once as initial state, written
-  on change, dropped on close. Nothing persists it.
+- Each tab's view (picked pane, picked file, diff anchor, walkthrough step)
+  lives beside the tabs in `TabViewsHost` (`lib/tabs/tab-views.tsx`) for this
+  run, across repository switches: read once as initial state, written on
+  change, dropped on close. Nothing persists it.
 - `SessionTerminal` sends `resizeSession` on every fit and refits on the
   session's `spawnedAt` epoch. It reckons the grid exactly as wterm's own
   observer does (`terminalBox`, `measureTerminalGrid`); any other answer
