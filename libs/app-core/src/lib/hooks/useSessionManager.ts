@@ -1,18 +1,12 @@
 import { worktreeSessionRow } from '@n10/core';
 import { useState, useEffect, useCallback, useEffectEvent } from 'react';
-import {
-  listAllBranches,
-  listWorktrees,
-  setWorktreeResolver,
-  createTemplateResolver,
-} from '@n10/worktree-manager';
+import { listAllBranches, listWorktrees } from '@n10/worktree-manager';
 import type {
   AgentSession,
   DiscoveredWorktree,
   WorktreeRemovalCheck,
 } from '@n10/core';
-import { readConfig, autoDetectProjectConfig } from '@n10/vcs-core';
-import type { VcsProvider } from '@n10/vcs-core';
+import { readConfig } from '@n10/vcs-core';
 import {
   removeWorktreeSession,
   isSessionAlive,
@@ -22,11 +16,7 @@ import {
 } from '@n10/core';
 import { useLayout } from '../context/LayoutContext.js';
 
-export function useSessionManager(
-  providers: VcsProvider[],
-  reloadConfig: () => void,
-  setBranches: (v: string[]) => void
-) {
+export function useSessionManager(setBranches: (v: string[]) => void) {
   const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [worktreeBranches, setWorktreeBranches] = useState<string[]>([]);
   const { terminal } = useLayout();
@@ -84,19 +74,8 @@ export function useSessionManager(
     void refreshSessions();
   });
 
-  // Startup, once. An effect event rather than an effect with a lint
-  // exception: everything below reads the latest providers, config and
-  // setters, but none of their identities should re-run a sequence that
-  // reads config off disk, shells out to git and subscribes to PTY
-  // exits. Declaring them as dependencies would restart all of that on
-  // an unrelated parent render.
   const startSessionManager = useEffectEvent(() => {
     let cancelled = false;
-
-    const config = readConfig();
-    if (config.worktreePath) {
-      setWorktreeResolver(createTemplateResolver(config.worktreePath));
-    }
 
     void (async () => {
       if (cancelled) return;
@@ -104,12 +83,6 @@ export function useSessionManager(
       const allBranches = await listAllBranches();
       if (!cancelled) setBranches(allBranches);
     })();
-
-    // Auto-detect per-project fields on first launch
-    const { updated } = autoDetectProjectConfig(process.cwd(), providers);
-    if (updated) {
-      reloadConfig();
-    }
 
     const discovery = startSessionDiscovery({
       isCurrent: () => !cancelled,

@@ -1,8 +1,8 @@
+import { configuredRepository, configuredViewer } from '@n10/engine';
 import { PullRequestIdentityError, type SnapshotSources } from '@n10/core';
 import { readConfig } from '@n10/vcs-core';
 import { lookupPullRequest } from './pull-requests.js';
-import { activeRepoIs, configuredRepository } from './repo.js';
-import { configuredViewer } from './viewer.js';
+import { activeRepoIs, PROVIDERS } from './repo.js';
 
 /**
  * The open repository's facts that a read by identity checks, before
@@ -21,7 +21,7 @@ export function identitySources(
           `${cwd} is no longer the repository open in n10`
         );
       }
-      return configuredRepository(readConfig(cwd));
+      return configuredRepository(readConfig(cwd), PROVIDERS);
     },
     viewer: () => configuredViewer(readConfig(cwd)),
     lookup: (prId) => lookupPullRequest(cwd, prId),

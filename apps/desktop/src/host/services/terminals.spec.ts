@@ -59,7 +59,6 @@ vi.mock('node:fs', () => ({
 }));
 
 vi.mock('./repo.js', () => ({
-  isGitRepo: (cwd: string) => state.repoRoots.has(cwd),
   requireRepo: () => '/home/dev/n10',
 }));
 
@@ -74,6 +73,7 @@ vi.mock('@n10/vcs-core', () => ({
 }));
 
 vi.mock('@n10/core', () => ({
+  isGitRepo: (cwd: string) => state.repoRoots.has(cwd),
   launchTerminalSession: async (spec: {
     name?: string;
     kind: string;

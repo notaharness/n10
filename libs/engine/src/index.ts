@@ -7,3 +7,4 @@ export * from './lib/pull-requests/pull-request-list.js';
 export * from './lib/pull-requests/pull-request-snapshot.js';
 export * from './lib/pull-requests/pull-request-scope.js';
 export * from './lib/config/config-service.js';
+export * from './lib/repositories/repository-service.js';

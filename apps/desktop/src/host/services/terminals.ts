@@ -22,7 +22,7 @@ import type {
   TerminalSummary,
 } from '../contract.js';
 import { ensureRecent } from './recent-repos.js';
-import { isGitRepo } from './repo.js';
+import { isGitRepo } from '@n10/core';
 import {
   attachRelay,
   broadcastLaunchStep,

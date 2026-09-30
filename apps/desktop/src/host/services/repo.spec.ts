@@ -1,8 +1,10 @@
+import { isGitRepo } from '@n10/core';
+import type * as Os from 'node:os';
 import {
   describe,
   it,
   expect,
-  beforeAll,
+  vi,
   beforeEach,
   afterAll,
   afterEach,
@@ -21,13 +23,23 @@ import {
   activeRepoIs,
   forgetRecentRepo,
   getRepo,
-  isGitRepo,
   listRecentRepos,
   openRepo,
   openStartupRepo,
 } from './repo.js';
-import { loadRecents, saveRecents } from './recent-repos.js';
+import { saveRecents } from './recent-repos.js';
 import type { RecentRepo } from '@n10/vcs-core';
+
+const fixture = vi.hoisted(() => ({ home: '' }));
+vi.mock('node:os', async (original) => {
+  const os = await original<typeof Os>();
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  fixture.home = fs.mkdtempSync(path.join(os.tmpdir(), 'n10-repo-home-'));
+  return { ...os, homedir: () => fixture.home };
+});
+const originalCwd = process.cwd();
+afterAll(() => rmSync(fixture.home, { recursive: true, force: true }));
 
 const recents = (cwds: string[]): RecentRepo[] =>
   cwds.map((cwd, i) => ({ cwd, lastOpenedAt: i }));
@@ -44,17 +56,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  process.chdir(originalCwd);
   rmSync(join(gitDir, '..'), { recursive: true, force: true });
-});
-
-// openRepo records to the real recents store; snapshot and restore
-// around the suite so tests never leave pollution behind.
-let savedRecents: RecentRepo[] | null = null;
-beforeAll(() => {
-  savedRecents = loadRecents();
-});
-afterAll(() => {
-  if (savedRecents) saveRecents(savedRecents);
 });
 
 describe('isGitRepo', () => {
@@ -156,8 +159,6 @@ describe('opening a repository through a symlink', () => {
     link = join(gitDir, '..', 'link-to-repo');
     symlinkSync(gitDir, link);
   });
-  // Only this test's own paths: the recents store is the real one on
-  // this machine, shared with anything else writing it meanwhile.
   const ours = () =>
     listRecentRepos()
       .map((r) => r.cwd)

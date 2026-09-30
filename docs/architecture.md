@@ -15,9 +15,9 @@ below it, and the ESLint module boundaries enforce the direction.
 Behavior moves into the engine one resource at a time. The pull request list
 is there (`libs/engine/src/lib/pull-requests/`); remote sync, review threads and
 session orchestration are still coordinated by each shell. Config state and effects
-for settings commands are owned by the engine. The host binds config service
-lifetime to repository opening; unmigrated domains still read captured-repo config
-directly. See [the domain plan](design/engine-domains.md) for
+for settings commands and repository opening are owned by the engine. The host
+binds config service lifetime to repository opening; unmigrated domains still read
+captured-repo config directly. See [the domain plan](design/engine-domains.md) for
 the survey, migration order, target diagram and worker decisions.
 
 ## Directory map
@@ -81,6 +81,7 @@ apps/website/                    — Next.js 16 + Fumadocs site at n10.is, deplo
   src/components/landing/        — Marketing page sections, data-driven where repeated (Features)
   Own tsconfig/eslint/import conventions — see apps/website/README.md, not this file
 libs/engine/                     — The program both shells run: state, scheduling, caching. No React, Ink, Electron or app-core (lint-enforced)
+  src/lib/repositories/          — Canonical repository identity, validation, detection and opening policy
   src/lib/config/                — Repository-scoped config snapshots, writes and settings effects
   src/lib/pull-requests/         — The pull request list: scoped reads, one request per scope, queued refreshes, snapshots and subscriptions, watch schedule
 libs/core/                       — Shell-agnostic operations. No React, Ink, Electron or engine (lint-enforced)

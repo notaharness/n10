@@ -1,7 +1,7 @@
+import { configuredRepository, configuredViewer } from '@n10/engine';
 import { PullRequestIdentityError } from '@n10/core';
 import { readConfig, type RepositoryRef } from '@n10/vcs-core';
-import { activeRepoIs, configuredRepository } from './repo.js';
-import { configuredViewer } from './viewer.js';
+import { activeRepoIs, PROVIDERS } from './repo.js';
 
 /**
  * The repository and account core's reads by identity check, read
@@ -19,7 +19,7 @@ export function openContext(cwd: string): {
           `${cwd} is no longer the repository open in n10`
         );
       }
-      return configuredRepository(readConfig(cwd));
+      return configuredRepository(readConfig(cwd), PROVIDERS);
     },
     viewer: () => configuredViewer(readConfig(cwd)),
   };

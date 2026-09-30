@@ -151,10 +151,11 @@ function fillBlankFields(
  * missing remote or an unconfigured identity is an ordinary answer
  * rather than a failure.
  */
-function gitValue(args: string): string | null {
+function gitValue(cwd: string, args: string): string | null {
   try {
     const out = execSync(`git ${args}`, {
       encoding: 'utf8',
+      cwd,
       stdio: 'pipe',
     }).trim();
     return out || null;
@@ -165,12 +166,13 @@ function gitValue(args: string): string | null {
 
 /** Vendor and project fields, read off the `origin` remote. */
 function detectVendorFromRemote(
+  cwd: string,
   cfg: RawProjectConfig,
   providers: VcsProvider[],
   detected: Record<string, string>
 ): void {
   if (cfg.vendor && cfg.vendorProject) return;
-  const remoteUrl = gitValue('remote get-url origin');
+  const remoteUrl = gitValue(cwd, 'remote get-url origin');
   if (!remoteUrl) return;
   const match = detectProvider(remoteUrl, providers);
   if (!match) return;
@@ -203,11 +205,12 @@ function detectProviderFields(
 
 /** Commit email, from git's own config. */
 function detectEmail(
+  cwd: string,
   cfg: RawProjectConfig,
   detected: Record<string, string>
 ): void {
   if (cfg.email) return;
-  const email = gitValue('config user.email');
+  const email = gitValue(cwd, 'config user.email');
   if (!email) return;
   cfg.email = email;
   detected.email = email;
@@ -229,9 +232,9 @@ export function autoDetectProjectConfig(
   const cfg = readProjectConfig(cwd);
   const detected: Record<string, string> = {};
 
-  detectVendorFromRemote(cfg, providers, detected);
+  detectVendorFromRemote(cwd, cfg, providers, detected);
   detectProviderFields(cfg, providers, detected);
-  detectEmail(cfg, detected);
+  detectEmail(cwd, cfg, detected);
 
   const updated = Object.keys(detected).length > 0;
   if (updated) {

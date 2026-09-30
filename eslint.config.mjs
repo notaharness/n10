@@ -434,6 +434,37 @@ export default tseslint.config(
     },
   },
   {
+    files: [
+      'apps/desktop/src/host/services/repo.ts',
+      'apps/cli/src/tui.tsx',
+      'libs/app-core/src/lib/hooks/useSessionManager.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@n10/vcs-core',
+              importNames: ['autoDetectProjectConfig'],
+              message:
+                'Repository startup belongs to the engine repository service.',
+            },
+            {
+              name: '@n10/worktree-manager',
+              importNames: [
+                'setWorktreeResolver',
+                'resetWorktreeResolver',
+                'createTemplateResolver',
+              ],
+              message: 'The engine repository service owns worktree setup.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Ink enforces its layout contract at runtime by throwing, so a
     // component that breaks it type-checks, builds, ships, and takes
     // down the TUI the first time that branch renders. See

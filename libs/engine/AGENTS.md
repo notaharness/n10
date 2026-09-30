@@ -26,3 +26,8 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   PR caches or notifying subscribers. A no-op reload preserves snapshot identity;
   a failed write publishes nothing. Sync adapters consume a revision or the
   restart callback. Keep secrets in Node; only the host's masked form crosses IPC.
+
+- **Repositories** (`repositories/`): canonicalize and validate before publishing
+  an active scope. Detection and config reads use that path, never process cwd.
+  Shells select startup repositories and own recents; opening must not detach
+  sessions belonging to the previously selected repository.

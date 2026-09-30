@@ -552,3 +552,17 @@ daemon's control socket and the UI's gating. Code cites these as
 | D15 | The desktop uses a beam daemon already running and leaves it on quit. Otherwise it starts one with `--exit-with-parent`, and on quit stops it through the child: its stdin closed, then a kill.                                                                                                        | A daemon started from the CLI or a service is not the app's. The app's own stops with it, crash included, so this machine leaves its peers' lists. Unenrolled, a daemon serves only its socket (beam docs/02): D8's cost is one idle process.                                                                                                                                                                                            |
 | D16 | Plain `n10` opens the desktop, `n10 --tui` the TUI, `n10 util` the review utility, all one package. The desktop's local sessions still get `n10` and `beam` from a directory first on their PATH; the `n10` there runs `util` with the app's own code and forwards the rest to the next `n10` on PATH. | One package with one executable cannot conflict with itself on install, and a TUI user never has to download the Electron binary. A session's `n10 util` must work where no `n10` is on its PATH (a dev build, `npx`) and match the running app when a global one differs, and a dependency's executable, beam, never reaches the PATH. The app's Electron runs the shim as Node, so nothing else is needed. beam stays its own command. |
 | D17 | Delivery into a session, pane or Claude inbox, needs the sender's grant here to be `all`; `msg` is the mailbox alone. A `claude:<id>` target then reaches any live Claude session registered with that id.                                                                                             | An `all` peer can already run anything here through `beam exec`, so typing into an agent gives it nothing more; a `msg` machine, one that should only report (beam docs/01), could otherwise start work through an agent. Nothing local says which Claude session supervises remote players, and a player's tags are its machine's say-so.                                                                                               |
+
+## Repository scope
+
+`engine/repositories` owns canonical identity and the open sequence: validate,
+fill missing project configuration against that explicit checkout, configure
+worktree paths, then publish the repository snapshot. Failed validation preserves
+the active scope; aliases of the same checkout share identity. Core supplies
+filesystem validation and resolver operations. Desktop chooses its startup repo
+and keeps recents; the TUI opens its requested checkout before mounting React.
+
+The desktop still changes process cwd for the session primitives that require it.
+This is a shell adapter constraint, not an engine input: repository detection and
+snapshots always receive a captured path. Session and worktree migrations remove
+the remaining ambient ownership in the order in the [domain plan](design/engine-domains.md).

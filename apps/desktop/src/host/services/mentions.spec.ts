@@ -29,6 +29,10 @@ vi.mock('@n10/vcs-core', async (original) => ({
 vi.mock('./repo.js', () => ({
   requireRepo: () => '/repo',
   activeRepoIs: (cwd: string) => env.open && cwd === '/repo',
+  PROVIDERS: [],
+}));
+vi.mock('@n10/engine', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
   configuredRepository: () => ({
     provider: 'github',
     host: 'github.com',

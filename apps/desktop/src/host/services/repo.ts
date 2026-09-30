@@ -1,22 +1,9 @@
-import { realpathSync, statSync } from 'node:fs';
-import { join } from 'node:path';
-import {
-  readConfig,
-  isVcsConfigured,
-  autoDetectProjectConfig,
-  type AppConfig,
-} from '@n10/vcs-core';
-import {
-  createTemplateResolver,
-  resetWorktreeResolver,
-  setWorktreeResolver,
-} from '@n10/worktree-manager';
-import { resetRepoRoot } from '@n10/core';
+import { canonicalRepoPath, isGitRepo, resetRepoRoot } from '@n10/core';
+import { createRepositoryService } from '@n10/engine';
 import { githubProvider } from '@n10/vcs-github';
 import { azureDevOpsProvider } from '@n10/vcs-azure-devops';
-import type { RepositoryRef, VcsProvider } from '@n10/vcs-core';
+import type { VcsProvider } from '@n10/vcs-core';
 import { NoActiveRepoError, type RepoInfo } from '../contract.js';
-import { configuredViewer } from './viewer.js';
 import {
   loadRecents,
   forgetRecent,
@@ -26,52 +13,11 @@ import {
 } from './recent-repos.js';
 
 export const PROVIDERS: VcsProvider[] = [githubProvider, azureDevOpsProvider];
-
-let activeCwd: string | null = null;
-
-// Installed by main.ts; runs after a repo is (re)opened. Lets the
-// shell start per-repo background work (the remote sync loop) without
-// a service-level import cycle.
+const repositories = createRepositoryService(PROVIDERS);
 let repoOpenedListener: ((cwd: string) => void) | null = null;
 
 export function setRepoOpenedListener(fn: (cwd: string) => void): void {
   repoOpenedListener = fn;
-}
-
-/** True when the directory exists and looks like a git repo. */
-export function isGitRepo(cwd: string): boolean {
-  try {
-    // A worktree or submodule has a .git *file* pointing at the real
-    // git dir, so both shapes count. Checking `isDirectory()` first and
-    // handling the file in a catch never worked: statSync succeeds on a
-    // file, so it simply returned false and the fallback was
-    // unreachable — which refused to open a worktree, in the app whose
-    // subject is worktrees.
-    const entry = statSync(join(cwd, '.git'));
-    return entry.isDirectory() || entry.isFile();
-  } catch {
-    return false;
-  }
-}
-
-/**
- * The identity of a repository directory: its real path.
- *
- * That is the string git answers for the toplevel, which is what a
- * tmux session's `@orchestra-repo` tag, a worktree's origin and the
- * strip's repository groups are all computed from. Every path a repository is
- * opened by — the picker, the recents list, `N10_START_DIR`, a
- * foreign tab — goes through here once, at this boundary, so a
- * checkout reached through a symlink (or macOS's `/var` against
- * `/private/var`) is the same repository everywhere. A path that
- * cannot be resolved is kept as given; `isGitRepo` rejects it next.
- */
-export function canonicalRepoPath(cwd: string): string {
-  try {
-    return realpathSync(cwd);
-  } catch {
-    return cwd;
-  }
 }
 
 /** The recents list under canonical paths, one entry per repository —
@@ -90,77 +36,35 @@ function canonicalRecents(recents: RecentRepo[]): RecentRepo[] {
 }
 
 export function requireRepo(): string {
-  if (activeCwd === null) throw new NoActiveRepoError();
-  return activeCwd;
+  const current = repositories.getSnapshot();
+  if (!current) throw new NoActiveRepoError();
+  return current.cwd;
 }
 
 /** Whether `cwd` is still the open repository. Long, awaiting host work
  *  checks this between steps: opening another repo mid-flight would
  *  otherwise let it finish against the wrong checkout. */
 export function activeRepoIs(cwd: string): boolean {
-  return activeCwd === cwd;
+  return repositories.isActive(cwd);
 }
 
 export function openRepo(path: string): RepoInfo {
-  const cwd = canonicalRepoPath(path);
-  if (!isGitRepo(cwd)) {
-    throw new Error(`Not a git repository: ${path}`);
-  }
-  activeCwd = cwd;
-  process.chdir(cwd);
-  // The repo root is memoized for the TUI's one-repo-per-process life.
-  // Opening another repo in place must invalidate it *before* anything
-  // derived from it is rebuilt below, or every tmux session name stays
-  // keyed to the first repo — which is how a worktree removal here ends
-  // up killing an agent running over there.
+  const info = repositories.open(path);
+  // Session primitives still use the process repo root; the session-domain
+  // migration removes this shell-owned ambient state.
+  process.chdir(info.cwd);
   resetRepoRoot();
   try {
-    saveRecents(recordOpen(canonicalRecents(loadRecents()), cwd));
+    saveRecents(recordOpen(canonicalRecents(loadRecents()), info.cwd));
   } catch {
     // Recent-repos bookkeeping must never block opening a repo.
   }
-  // Same startup wiring as the TUI's useSessionManager mount:
-  // auto-detect provider fields on first open, honor a custom
-  // worktreePath template (without it, listWorktrees would only own
-  // the default .claude/worktrees dir).
-  try {
-    autoDetectProjectConfig(cwd, PROVIDERS);
-  } catch {
-    // Detection is best-effort; a failing provider probe must not
-    // block opening the repo.
-  }
-  const config = readConfig(cwd);
-  if (config.worktreePath) {
-    setWorktreeResolver(createTemplateResolver(config.worktreePath, cwd));
-  } else {
-    resetWorktreeResolver();
-  }
-  repoOpenedListener?.(cwd);
-  return repoInfo(cwd, config);
+  repoOpenedListener?.(info.cwd);
+  return info;
 }
 
 export function getRepo(): RepoInfo | null {
-  if (activeCwd === null) return null;
-  return repoInfo(activeCwd, readConfig(activeCwd));
-}
-
-/** The open repository as its provider names it, or null while no
- *  provider is configured for it. */
-export function configuredRepository(config: AppConfig): RepositoryRef | null {
-  const provider = PROVIDERS.find((p) => p.id === config.vendor) ?? null;
-  if (!provider || !isVcsConfigured(config, provider)) return null;
-  return provider.repositoryRef?.(config.vendorProject) ?? null;
-}
-
-function repoInfo(cwd: string, config: AppConfig): RepoInfo {
-  const provider = PROVIDERS.find((p) => p.id === config.vendor) ?? null;
-  return {
-    cwd,
-    providerId: provider?.id ?? null,
-    vcsConfigured: provider ? isVcsConfigured(config, provider) : false,
-    repository: configuredRepository(config),
-    viewer: configuredViewer(config),
-  };
+  return repositories.reload();
 }
 
 /**

@@ -36,7 +36,6 @@ const state = vi.hoisted(() => ({
 vi.mock('./repo.js', () => ({
   requireRepo: () => state.cwd,
   activeRepoIs: (cwd: string) => cwd === state.cwd,
-  isGitRepo: () => false,
 }));
 
 vi.mock('./recent-repos.js', () => ({
@@ -61,6 +60,7 @@ vi.mock('@n10/worktree-manager', () => ({
 vi.mock('@n10/core', async (importOriginal) => {
   const actual = await importOriginal<typeof CoreModule>();
   return {
+    isGitRepo: () => false,
     worktreeSessionKey: actual.worktreeSessionKey,
     sessionLabel: actual.sessionLabel,
     sessionIdentity: actual.sessionIdentity,
