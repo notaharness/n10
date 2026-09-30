@@ -7,6 +7,7 @@ import {
   getCommentPositions,
   buildRowMap,
   type CommentImageLayouts,
+  type RemotePlacementDiagnostic,
 } from '@n10/review-comments/ui';
 import { planItemKey } from '@n10/core/plan';
 import { useToastActions } from '../context/ToastContext.js';
@@ -177,6 +178,9 @@ export function useDiffFileViewerViewModel({
     setPendingScrollThreadId: pane.setPendingScrollThreadId,
   });
 
+  const placementDiagnostics: RemotePlacementDiagnostic[] | undefined =
+    interleaveResult?.placementDiagnostics;
+
   return {
     inPlanKeys,
     annotatedLines,
@@ -185,6 +189,7 @@ export function useDiffFileViewerViewModel({
     fileDiffLoading,
     fileComments,
     fileRemoteThreads,
+    placementDiagnostics,
     diffTotalRows,
     sectionAnchorRows,
   };

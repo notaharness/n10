@@ -17,12 +17,6 @@ import {
   REPLY_INPUT_ROWS,
 } from './comment-rows.js';
 
-// Milestone 2 of the UX-parity plan: threads render as Ink cards. The
-// annotated-line stream now carries thread/comment objects directly
-// (one entry per thread) instead of pre-rendered ANSI header+body
-// strings. These tests lock in that schema so downstream renderers can
-// safely switch on `line.type`.
-
 function makeDiffLines(
   specs: { oldLine?: number; newLine?: number }[]
 ): DiffLine[] {
@@ -534,5 +528,49 @@ describe('buildRowMap', () => {
     expect(map.totalRows).toBe(0);
     expect(map.positions).toEqual([]);
     expect(map.sectionAnchorRows).toEqual([0]);
+  });
+});
+
+describe('remote placement diagnostics', () => {
+  it('returns distinct reasons and anchor metadata without exposing comment bodies', () => {
+    const threads = [
+      makeRemoteThread({ id: 'general', lineStart: null, lineEnd: null }),
+      makeRemoteThread({ id: 'before-diff', lineStart: 1, lineEnd: 1 }),
+      makeRemoteThread({ id: 'inline', lineStart: 10, lineEnd: 10 }),
+    ];
+    const { placementDiagnostics } = interleaveComments(
+      makeDiffLines([{ oldLine: 10, newLine: 10 }]),
+      [],
+      null,
+      threads
+    );
+    expect(placementDiagnostics).toEqual([
+      {
+        threadId: 'general',
+        file: 'test.ts',
+        side: 'RIGHT',
+        lineStart: null,
+        lineEnd: null,
+        reason: 'missing-line-end',
+      },
+      {
+        threadId: 'before-diff',
+        file: 'test.ts',
+        side: 'RIGHT',
+        lineStart: 1,
+        lineEnd: 1,
+        reason: 'no-matching-diff-line',
+      },
+      {
+        threadId: 'inline',
+        file: 'test.ts',
+        side: 'RIGHT',
+        lineStart: 10,
+        lineEnd: 10,
+        reason: 'inline',
+        diffIndex: 0,
+      },
+    ]);
+    expect(interleaveComments([], [], null).placementDiagnostics).toEqual([]);
   });
 });

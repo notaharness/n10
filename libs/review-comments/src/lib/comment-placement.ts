@@ -61,9 +61,20 @@ function pushAt<T>(buckets: Map<number, T[]>, index: number, item: T): void {
   buckets.set(index, existing);
 }
 
+export interface RemotePlacementDiagnostic {
+  threadId: string;
+  file: string | null;
+  side: RemoteCommentThread['side'];
+  lineStart: number | null;
+  lineEnd: number | null;
+  reason: 'inline' | 'missing-line-end' | 'no-matching-diff-line';
+  diffIndex?: number;
+}
+
 export interface RemoteInsertionMap {
   insertions: Map<number, RemoteCommentThread[]>;
   outOfDiff: RemoteCommentThread[];
+  diagnostics: RemotePlacementDiagnostic[];
 }
 
 export function computeRemoteInsertionMap(
@@ -73,10 +84,19 @@ export function computeRemoteInsertionMap(
   const { newLineToIndex, oldLineToIndex } = buildLineIndexes(diffLines);
   const insertions = new Map<number, RemoteCommentThread[]>();
   const outOfDiff: RemoteCommentThread[] = [];
+  const diagnostics: RemotePlacementDiagnostic[] = [];
 
   for (const thread of threads) {
+    const anchor = {
+      threadId: thread.id,
+      file: thread.file,
+      side: thread.side,
+      lineStart: thread.lineStart,
+      lineEnd: thread.lineEnd,
+    };
     if (thread.lineEnd == null) {
       outOfDiff.push(thread);
+      diagnostics.push({ ...anchor, reason: 'missing-line-end' });
       continue;
     }
 
@@ -89,12 +109,14 @@ export function computeRemoteInsertionMap(
 
     if (insertAfter !== undefined) {
       pushAt(insertions, insertAfter, thread);
+      diagnostics.push({ ...anchor, reason: 'inline', diffIndex: insertAfter });
     } else {
       outOfDiff.push(thread);
+      diagnostics.push({ ...anchor, reason: 'no-matching-diff-line' });
     }
   }
 
-  return { insertions, outOfDiff };
+  return { insertions, outOfDiff, diagnostics };
 }
 
 export interface InsertionMap {

@@ -43,6 +43,7 @@ export {
 export type {
   InsertionMap,
   RemoteInsertionMap,
+  RemotePlacementDiagnostic,
 } from './lib/comment-placement.js';
 export {
   computeInsertionMap,
