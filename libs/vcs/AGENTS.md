@@ -29,6 +29,13 @@ ceiling: it is a REST surface. Reasoning: `docs/decisions.md`.
   demand and touches no cycle memo; its checks add the policy evaluations and
   share the rest: one read while the cycle's statuses are fresh (30 s), two
   after.
+- Azure's merged sweep (`fetchMergedBranches`) is the only thing that marks a
+  worktree merged. It pages completed pull requests closed in the last thirty
+  days, GitHub's `merged:>` window, and stops after ten pages (1,000 rows): a
+  pull request closed earlier, or past the first thousand closes in the window,
+  reads as not merged, so its worktree gets no badge and is never auto-deleted.
+  An unpaged read sees only Azure's first 101 rows, which can miss a
+  long-lived branch completed in a busy repository.
 - GitHub's search returns the rollup and counts with the list, so it
   implements neither `forgetPullRequestCache` nor `resetCaches`.
 - Every `gh` read — `ghQuery`, `ghRest`, the provider's GETs, `gh auth
