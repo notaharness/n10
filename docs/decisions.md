@@ -599,6 +599,8 @@ source refs when the PR head differs, shares the core target-fetch queue's five-
 freshness, and pins both commit IDs before reading file lists or patches. Full patches
 and per-file patches use the same comparison. Resolution caches expire on list
 changes; manifests and patches are keyed by exact commit IDs, with no time expiry.
+A manifest carries the comparison just resolved, never the one its listing was
+first read for: a target can move past the same merge base.
 The TUI carries its displayed manifest's refs into each patch request. Config
 identity checks compare disk values without invoking reload or publishing effects. Metadata overflow is an error, never
 an incomplete file list. Resource maps evict idle entries without evicting observed
@@ -648,6 +650,24 @@ and render symlinks as mode-120000 patches without following them. Trim total-ou
 overruns at complete file boundaries. The PR path retains files because review
 comments depend on them. Git-backed regression cases live in
 `worktree-diff.integration.spec.ts`.
+
+A PR diff resolves the provider's head and target to commits and never
+substitutes a local branch for a commit the clone lacks. Missing commits or
+branches trigger a real fetch, since an earlier one evidently missed them; a
+target the caller did not pin is fetched at most every five minutes. The
+engine's review reads own this for both shells: the TUI's file list is the
+same manifest, and its file view the same patch. Both
+reads pin git's output format against user config: no copy detection, which
+would present new code as a small edit of its source; every submodule change;
+fixed prefixes. The provider list polls, so the revision on screen is pinned
+per repository and pull request outside the pane, which unmounts in a
+background tab: head, target branch, and the target commit it resolved to, so a
+re-read after the cache expires resolves the same way. A closed tab reopened
+comes back at that revision with anything newer offered, not swapped in.
+Choosing what a new visit compares against belongs to revision selection.
+Loading the newer revision reads it before moving the pin, so a failed load
+leaves the diff in place. Only a pin whose read never reached the screen
+follows the provider without being asked: there is nothing to keep.
 
 File-tree collapse state follows each file's content revision, not poll timing
 or churn counts. Ignore temporary empty snapshots; unchanged snapshots preserve

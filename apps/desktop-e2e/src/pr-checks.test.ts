@@ -15,6 +15,8 @@ const GITHUB: FakeGitHub = {
   prs: [
     {
       number: 214,
+      // The head the checks below are read on; this clone lacks it.
+      headRefOid: 'f'.repeat(40),
       title: 'Handle cancelled requests',
       headRefName: 'cancel-requests',
       author: 'alex',

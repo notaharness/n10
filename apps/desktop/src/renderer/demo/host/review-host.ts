@@ -3,15 +3,14 @@ import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
-import { isOid } from '@n10/vcs-core/pr-details';
 import { VIEWER } from '../data/identity.js';
 import { later } from './hub.js';
 import type { DemoState } from './state.js';
 
 /**
- * Pull requests, their threads, drafts and diffs, for whichever
- * repository is open. Diffs and descriptions are the real ones, loaded
- * only when a tab asks for them.
+ * Pull requests, their threads and drafts, for whichever repository
+ * is open. Descriptions are the real ones, loaded only when a tab asks
+ * for them; diffs are `pr-diff-host.ts`.
  */
 export async function load(
   loader: (() => Promise<{ default: string }>) | undefined
@@ -85,7 +84,6 @@ type ReviewHost = Pick<
   | 'updateDraftComment'
   | 'deleteDraftComment'
   | 'postDraftComments'
-  | 'fetchDiffText'
   | 'fetchWorktreeDiffText'
 >;
 
@@ -109,7 +107,6 @@ export function createReviewHost(state: DemoState): ReviewHost {
   const setDrafts = (prId: number, next: ReviewComment[]) => {
     repo().drafts[prId] = next;
   };
-  const diffOf = (branch: string) => load(repo().data.diffs[branch]);
   return {
     fetchCommentThreads: (prId) => later(repo().threadsOf(prId), 120),
     replyToThread: ({ prId, thread, body }) => {
@@ -172,13 +169,6 @@ export function createReviewHost(state: DemoState): ReviewHost {
       );
       repo().recount(prId);
       return later(chosen.length, 400);
-    },
-    fetchDiffText: async (source) => {
-      const pr = repo()
-        .pullRequests()
-        .find((p) => p.sourceBranch === source);
-      const head = pr && isOid(pr.headSha) ? pr.headSha : '0'.repeat(40);
-      return { text: await diffOf(source), head };
     },
     fetchWorktreeDiffText: () => later(''),
   };

@@ -138,10 +138,10 @@ export function createHostApi(): HostApi {
     onSessionExit: () => () => undefined,
     onLaunchStep: () => () => undefined,
 
-    fetchDiffText: (sourceBranch, targetBranch) =>
-      reviews.getDiffText(sourceBranch, targetBranch),
     fetchWorktreeDiffText: (branch, targetBranch) =>
       worktrees.getWorktreeDiffText(branch, targetBranch),
+    fetchPrDiffManifest: (req) => reviews.getPrDiffManifest(req),
+    fetchPrDiffPatch: (req) => reviews.getPrDiffPatch(req),
 
     openExternal: (url) => externalOpener(url),
     showContextMenu: (items) => contextMenu(items),
@@ -299,8 +299,9 @@ export function registerHostHandlers(
     [IPC.getSessionLaunchContext]: api.getSessionLaunchContext as HostMethod,
     [IPC.listAgentOptions]: api.listAgentOptions as HostMethod,
     [IPC.checkoutPlan]: api.checkoutPlan as HostMethod,
-    [IPC.fetchDiffText]: api.fetchDiffText as HostMethod,
     [IPC.fetchWorktreeDiffText]: api.fetchWorktreeDiffText as HostMethod,
+    [IPC.fetchPrDiffManifest]: api.fetchPrDiffManifest as HostMethod,
+    [IPC.fetchPrDiffPatch]: api.fetchPrDiffPatch as HostMethod,
     [IPC.openExternal]: api.openExternal as HostMethod,
     [IPC.showContextMenu]: api.showContextMenu as HostMethod,
     [IPC.showAppMenu]: api.showAppMenu as HostMethod,

@@ -95,7 +95,7 @@ export function PrWorkspace({
     cwd: repo.cwd,
     branch,
     baseBranch,
-    isPr: pr != null,
+    pr,
     running,
   });
   const files = diff.files;
@@ -290,6 +290,7 @@ export function PrWorkspace({
               diffRead={diff.read}
               diffRetrying={diff.retrying}
               onRetryDiff={diff.retry}
+              prDiff={diff.prDiff}
               focusThreadId={nav.focusId}
               scrollRef={nav.scrollRef}
               jumpRef={nav.jumpRef}

@@ -32,8 +32,11 @@ export async function submitReviewVerdict(
 ) {
   await activeReviewService().commands.verdict(prId, verdict);
 }
-export function getDiffText(sourceBranch: string, targetBranch: string) {
-  return readResourceValue(
-    activeReviewService().diff.full({ sourceBranch, targetBranch })
-  );
+/** A pull request's comparison and file manifest at exact commits. */
+export function getPrDiffManifest(req: unknown) {
+  return readResourceValue(activeReviewService().diff.manifest(req));
+}
+/** The patch between a resolved comparison's commits. */
+export function getPrDiffPatch(req: unknown) {
+  return readResourceValue(activeReviewService().diff.patch(req));
 }

@@ -96,6 +96,11 @@ The reasoning behind each rule is in `docs/decisions.md`.
   keeps every file. Untracked files are assembled by hand, never `git add -N`,
   and symlinks render as mode-120000 patches. Git-backed cases live in
   `worktree-diff.integration.spec.ts`.
+- **PR diffs** (`pull-requests/pr-comparison.ts`, `pr-diff-manifest.ts`):
+  resolve to head, target and merge-base ids once, then read by id. A head
+  the clone lacks is an error, never the local branch. The manifest lists
+  every file; the patch reports truncation as data, not a placeholder file.
+  The engine's review reads own their caching and freshness.
 - `asyncOps.run` never rejects; errors go through `setOperationErrorHandler`.
 - `keybindings/registry.ts` is the action catalog and carries a 900-line
   ceiling on purpose. Presets: Normie, Vim.

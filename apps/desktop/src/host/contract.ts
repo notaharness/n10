@@ -75,6 +75,14 @@ import type {
   ForeignSessionSummary,
   SessionSummary,
 } from './contract-sessions.js';
+// Pull request diffs at exact commits.
+export type * from './contract-diff.js';
+import type {
+  PrDiffManifestRequest,
+  PrDiffManifestResult,
+  PrDiffPatchRequest,
+  PrDiffPatchResult,
+} from '@n10/engine/contract';
 // Review requests — replies, resolutions, review launches, drafts.
 export type * from './contract-reviews.js';
 import type {
@@ -100,7 +108,6 @@ import type {
   PullRequestSnapshot,
   RepositoryRef,
   ReviewDraft,
-  ReviewDiffText,
   ReviewDrafts,
   SaveDraftRequest,
   SnapshotRequest,
@@ -511,17 +518,19 @@ export interface N10HostApi {
   onLaunchStep(cb: (payload: LaunchStepEvent) => void): () => void;
 
   // ── Diff ─────────────────────────────────────────────────────
-  /** A pull request's diff, with the commit its new side was read at:
-   *  what a comment's line numbers belong to. */
-  fetchDiffText(
-    sourceBranch: string,
-    targetBranch: string
-  ): Promise<ReviewDiffText>;
   /** Diff of a branch's worktree against its base including uncommitted
    *  and untracked work — what an agent has done so far, as opposed to
    *  what it has committed. Empty string when the branch has no
    *  worktree. */
   fetchWorktreeDiffText(branch: string, targetBranch: string): Promise<string>;
+  /** Resolve a pull request to exact commits and list every file that
+   *  changed between them. Failures that describe the pull request
+   *  (a head this clone cannot produce, unrelated history) are data. */
+  fetchPrDiffManifest(
+    req: PrDiffManifestRequest
+  ): Promise<PrDiffManifestResult>;
+  /** The patch between a resolved comparison's commits. */
+  fetchPrDiffPatch(req: PrDiffPatchRequest): Promise<PrDiffPatchResult>;
 
   // ── Shell ────────────────────────────────────────────────────
   /** Open a URL in the user's default browser. */
@@ -650,8 +659,9 @@ export const IPC = {
   listAgentOptions: 'n10/session/agent-options',
   getSessionLaunchContext: 'n10/session/launch-context',
   checkoutPlan: 'n10/session/checkout-plan',
-  fetchDiffText: 'n10/diff/text',
   fetchWorktreeDiffText: 'n10/diff/worktree-text',
+  fetchPrDiffManifest: 'n10/diff/pr-manifest',
+  fetchPrDiffPatch: 'n10/diff/pr-patch',
   openExternal: 'n10/shell/open-external',
   showContextMenu: 'n10/shell/context-menu',
   showAppMenu: 'n10/shell/app-menu',

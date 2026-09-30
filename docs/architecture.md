@@ -100,7 +100,7 @@ libs/core/                       — Shell-agnostic operations. No React, Ink, E
   src/lib/babysit/               — Pure observation model and briefing composition
   src/ui.ts                      — Browser-safe presentation and input models
   src/plan.ts                    — Browser-safe entry (`@n10/core/plan`) for the renderer
-  src/lib/utils/                 — Git reads and presentation helpers (diff-fetcher, sidebar-items, virtual-viewport…)
+  src/lib/utils/                 — Git reads and presentation helpers (worktree-diff, sidebar-items, virtual-viewport…)
   src/lib/settings/              — Settings field model, coercion and explicitly scoped config writes
   src/lib/agents/                — Agent registry
   src/lib/activity.ts            — Agent activity registry; pty-registry.ts — PTY session lifecycle

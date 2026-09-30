@@ -72,7 +72,13 @@ export function useDiffFileViewerViewModel({
     return m;
   }, [prId, planSnapshot]);
 
-  const fileRead = useFileDiffData(diffBundle.request, pane.diffViewFile);
+  const viewed = useMemo(
+    () =>
+      diffBundle.files.find((file) => file.filename === pane.diffViewFile) ??
+      null,
+    [diffBundle.files, pane.diffViewFile]
+  );
+  const fileRead = useFileDiffData(diffBundle.request, viewed);
   const fileDiffText = fileRead.data;
   const { flash } = useToastActions();
   useEffect(() => {

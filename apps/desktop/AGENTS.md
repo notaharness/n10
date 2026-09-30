@@ -135,8 +135,11 @@ Every rule below has its reasoning in `docs/decisions.md`.
   inline draft being posted or maybe posted is shown, locked; a reply
   draft in that state is not yet shown in its thread.
 - Diffs are whole-file (`-U99999`), folded client-side
-  (`lib/diff/diff-model.ts`). A PR diffs commits; a bare worktree diffs its
-  working tree, polled at 2 s only while the agent runs. `FileTree` collapse
+  (`lib/diff/diff-model.ts`). A PR diffs the exact commits the engine's review reads resolve
+  from the provider's head (`lib/review/use-pr-diff.ts`), never the local branch.
+  `lib/review/pinned-revisions.ts` holds each PR's revision outside its pane
+  until the reader loads a newer one, which is read before the pin moves. A bare worktree
+  diffs its working tree, polled at 2 s only while the agent runs. `FileTree` collapse
   state is reconciled from the per-file `revision` delta during render
   (`lib/diff/file-tree-model.ts`), never from the poll.
 - The plan is a cart of value snapshots (`@n10/core/plan`). The prompt is

@@ -1,115 +1,139 @@
 import {
   fetchRefs,
-  resolveRef,
-  gitLine,
-  readDiffFiles,
-  fetchFileDiffText,
-  fetchDiffText,
   fetchWorktreeDiffText,
+  readPrDiffManifest,
+  readPrDiffPatch,
+  resolvePrComparison,
 } from '@n10/core';
-import type { DiffFile, ReviewDiffText } from '@n10/core';
+import type {
+  PrComparison,
+  PrComparisonError,
+  PrDiffManifest,
+  PrDiffPatch,
+} from '@n10/core';
 import type { WorktreeService } from '../worktrees/api.js';
 import { createResourceCache } from './resource-cache.js';
 import { readResourceValue } from './read-resource.js';
+import {
+  parseManifestRequest,
+  parsePatchRequest,
+  type PrDiffManifestRequest,
+  type PrDiffPatchRequest,
+} from './diff-requests.js';
 
-export interface DiffRequest {
-  sourceBranch: string;
-  targetBranch: string;
-  headSha?: string;
+export type { PrDiffManifestRequest, PrDiffPatchRequest };
+
+/** The repository changed between the request and the answer. */
+export interface RepoChangedError {
+  code: 'repo-changed';
+  message: string;
 }
-export interface DiffFiles extends DiffRefs {
-  files: DiffFile[];
-}
-export interface DiffRefs {
-  sourceRef: string;
-  targetRef: string;
-}
+export type PrDiffError = PrComparisonError | RepoChangedError;
+export type PrDiffManifestResult =
+  | { ok: true; manifest: PrDiffManifest }
+  | { ok: false; error: PrDiffError };
+export type PrDiffPatchResult =
+  | { ok: true; patch: PrDiffPatch }
+  | { ok: false; error: RepoChangedError };
+
 const TARGET_FETCH_TTL_MS = 5 * 60 * 1000;
+const RESOLUTION_TTL_MS = 30_000;
 
-/** Branch freshness and pinned refs are shared by list, full and per-file reads. */
+/**
+ * A pull request's diff at exact commits: a request resolves once to
+ * head, target and merge-base ids, and the manifest and every patch are
+ * read by those ids, so they never change and are cached until evicted.
+ */
 export function createDiffReads(
   repo: string,
+  isCurrent: () => boolean,
   worktrees: Pick<WorktreeService, 'find'>
 ) {
-  const resolutions = createResourceCache<DiffRefs>(30_000);
-  const manifests = createResourceCache<DiffFile[]>(Infinity);
-  const files = createResourceCache<DiffFiles>(0);
-  const patches = createResourceCache<string>(Infinity, 8);
-  const full = createResourceCache<ReviewDiffText>(0, 4);
-  const texts = createResourceCache<string>(Infinity, 4);
+  const manifests = createResourceCache<PrDiffManifestResult>(
+    RESOLUTION_TTL_MS,
+    32,
+    (result) => result.ok
+  );
+  // What the commits determine. The comparison is the one just resolved:
+  // a target that moves past the same merge base lists the same files.
+  const listings = createResourceCache<Omit<PrDiffManifest, 'comparison'>>(
+    Infinity,
+    8
+  );
+  const patches = createResourceCache<PrDiffPatchResult>(
+    Infinity,
+    64,
+    (result) => result.ok
+  );
   const live = createResourceCache<string>(1_000, 2);
-  async function ensureFetched(req: DiffRequest) {
-    const current = await gitLine(
-      ['rev-parse', '--verify', `origin/${req.sourceBranch}`],
-      { cwd: repo }
-    ).catch(() => null);
-    await Promise.all([
-      current && req.headSha === current
-        ? Promise.resolve(true)
-        : fetchRefs({ cwd: repo, refs: [req.sourceBranch] }),
-      fetchRefs({
+  const changed = (asked: string): RepoChangedError | null =>
+    asked === repo && isCurrent()
+      ? null
+      : {
+          code: 'repo-changed',
+          message: `${asked} is no longer the open repository`,
+        };
+  async function resolve(req: Omit<PrDiffManifestRequest, 'repo'>) {
+    // A target the provider did not pin is this clone's idea of it;
+    // keep that reasonably fresh without a fetch on every read.
+    if (!req.expectedTargetOid)
+      await fetchRefs({
         cwd: repo,
         refs: [req.targetBranch],
         maxAgeMs: TARGET_FETCH_TTL_MS,
-      }),
-    ]);
-  }
-  function resolve(req: DiffRequest) {
-    return resolutions.get(JSON.stringify(req), async () => {
-      await ensureFetched(req);
-      const [source, target] = await Promise.all([
-        resolveRef(repo, req.sourceBranch),
-        resolveRef(repo, req.targetBranch),
-      ]);
-      const [sourceRef, targetRef] = await Promise.all([
-        gitLine(
-          ['rev-parse', '--verify', `${req.headSha ?? source}^{commit}`],
-          { cwd: repo }
-        ),
-        gitLine(['rev-parse', '--verify', `${target}^{commit}`], { cwd: repo }),
-      ]);
-      return { sourceRef, targetRef };
-    });
-  }
-  function fileList(req: DiffRequest) {
-    return files.get(JSON.stringify(req), async () => {
-      const refs = await readResourceValue(resolve(req));
-      const manifest = manifests.get(JSON.stringify(refs), () =>
-        readDiffFiles(repo, refs.sourceRef, refs.targetRef)
-      );
-      return { ...refs, files: await readResourceValue(manifest) };
-    });
-  }
-  const caches = [resolutions, manifests, files, patches, full, texts, live];
-  return {
-    files: fileList,
-    file(refs: DiffRefs, filename: string) {
-      return patches.get(
-        JSON.stringify([refs.sourceRef, refs.targetRef, filename]),
-        () =>
-          fetchFileDiffText(
-            repo,
-            refs.sourceRef,
-            refs.targetRef,
-            filename,
-            refs
-          )
-      );
-    },
-    full(req: DiffRequest) {
-      return full.get(JSON.stringify(req), async () => {
-        const refs = await readResourceValue(fileList(req));
-        const content = texts.get(
-          JSON.stringify([refs.sourceRef, refs.targetRef]),
-          () => fetchDiffText(repo, refs.sourceRef, refs.targetRef, refs)
-        );
-        return { text: await readResourceValue(content), head: refs.sourceRef };
       });
+    return resolvePrComparison({ cwd: repo, ...req });
+  }
+  function listing(comparison: PrComparison) {
+    return listings.get(
+      JSON.stringify([comparison.mergeBaseOid, comparison.headOid]),
+      async () => {
+        const { files, complete } = await readPrDiffManifest(repo, comparison);
+        return { files, complete };
+      }
+    );
+  }
+  const caches = [manifests, listings, patches, live];
+  return {
+    /** Resolve a pull request to commits and list every changed file.
+     *  Failures that describe the pull request are data. Branches are
+     *  resolved again after a while; a listing between commits is not. */
+    manifest(value: unknown) {
+      const { repo: asked, ...req } = parseManifestRequest(value);
+      return manifests.get(
+        JSON.stringify([asked, req]),
+        async (): Promise<PrDiffManifestResult> => {
+          const before = changed(asked);
+          if (before) return { ok: false, error: before };
+          const resolved = await resolve(req);
+          if (!resolved.ok) return resolved;
+          const { comparison } = resolved;
+          const listed = await readResourceValue(listing(comparison));
+          const after = changed(asked);
+          return after
+            ? { ok: false, error: after }
+            : { ok: true, manifest: { ...listed, comparison } };
+        }
+      );
     },
-    invalidate() {
-      resolutions.invalidate();
-      files.invalidate();
-      full.invalidate();
+    /** The patch between a resolved comparison's commits. */
+    patch(value: unknown) {
+      const { repo: asked, ...req } = parsePatchRequest(value);
+      return patches.get(
+        JSON.stringify([asked, req]),
+        async (): Promise<PrDiffPatchResult> => {
+          const before = changed(asked);
+          if (before) return { ok: false, error: before };
+          const { paths, ...bounds } = req;
+          const patch = await readPrDiffPatch(
+            repo,
+            bounds,
+            paths ? { paths } : {}
+          );
+          const after = changed(asked);
+          return after ? { ok: false, error: after } : { ok: true, patch };
+        }
+      );
     },
     worktree(branch: string, targetBranch: string) {
       return live.get(JSON.stringify([branch, targetBranch]), async () => {
@@ -118,6 +142,10 @@ export function createDiffReads(
           ? fetchWorktreeDiffText(checkout.path, targetBranch)
           : '';
       });
+    },
+    /** Branches may have moved: resolve them again. Commit reads stay. */
+    invalidate() {
+      manifests.invalidate();
     },
     reset() {
       for (const cache of caches) cache.reset();

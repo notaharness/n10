@@ -18,6 +18,7 @@
  * empty result rather than failing, so a test declares only what it
  * cares about.
  */
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { reviewGraphql } from './fake-gh-review.mjs';
 
@@ -118,6 +119,30 @@ function flags(args) {
 
 const page = { hasNextPage: false, endCursor: null };
 
+/**
+ * The head GitHub would report: the branch's real tip in the repository
+ * the app runs `gh` from, unless the scenario names one. The diff is
+ * read at exactly this commit, so a made-up id would be a head the
+ * clone does not have — which is its own test, declared explicitly.
+ */
+function headOid(pr) {
+  if (pr.headRefOid) return pr.headRefOid;
+  try {
+    return execFileSync(
+      'git',
+      [
+        'rev-parse',
+        '--verify',
+        '--quiet',
+        `refs/heads/${pr.headRefName}^{commit}`,
+      ],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    ).trim();
+  } catch {
+    return 'f'.repeat(40);
+  }
+}
+
 /** A review request as the scenario gives it: a login, or a person or
  *  team asked as a code owner. */
 function requestOf(entry) {
@@ -144,7 +169,7 @@ function searchNode(pr) {
     title: pr.title,
     headRefName: pr.headRefName,
     baseRefName: pr.baseRefName ?? 'main',
-    headRefOid: pr.headRefOid ?? 'f'.repeat(40),
+    headRefOid: headOid(pr),
     url: `https://github.com/${scenario.owner ?? 'n10'}/${
       scenario.repo ?? 'fixture'
     }/pull/${pr.number}`,
@@ -346,7 +371,7 @@ function checksNode(pr) {
         nodes: [
           {
             commit: {
-              oid: pr.headRefOid ?? 'f'.repeat(40),
+              oid: headOid(pr),
               statusCheckRollup: {
                 contexts: { totalCount: nodes.length, pageInfo: page, nodes },
               },

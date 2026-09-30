@@ -3,7 +3,14 @@ export { createReviewService } from './review-service.js';
 export type { ReviewService } from './review-service.js';
 export { readResourceValue } from './read-resource.js';
 export type { ReadResource, ReadSnapshot } from './read-resource.js';
-export type { DiffRequest, DiffFiles, DiffRefs } from './diff-reads.js';
+export type {
+  PrDiffManifestRequest,
+  PrDiffPatchRequest,
+  PrDiffManifestResult,
+  PrDiffPatchResult,
+  PrDiffError,
+  RepoChangedError,
+} from './diff-reads.js';
 export type {
   ReplyToReviewThread,
   ResolveReviewThread,

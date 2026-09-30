@@ -360,6 +360,8 @@ const OVERVIEW_GITHUB: FakeGitHub = {
 
 const OVERVIEW_REPO = {
   name: 'n10-visual',
+  // The Overview shows the head: the same commit on every run.
+  commitDate: '2026-01-01T00:00:00Z',
   worktrees: [
     {
       branch: 'cancel-requests',

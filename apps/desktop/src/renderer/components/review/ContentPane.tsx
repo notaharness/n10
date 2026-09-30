@@ -13,6 +13,7 @@ import { cn } from '../../lib/utils.js';
 import { SessionTerminal } from '../terminal/SessionTerminal.js';
 import { Button } from '../ui/button.js';
 import { ConnectionBanner } from '../terminal/ConnectionBanner.js';
+import type { PrDiffView } from '../../lib/review/use-pr-diff.js';
 import type { PrConnectionBanner } from './PrWorkspace.js';
 import { DiffPane } from './diff/DiffPane.js';
 import { type DiffJumpHandle } from './diff/VirtualDiffList.js';
@@ -151,6 +152,7 @@ export function ContentPane({
   diffRead,
   diffRetrying,
   onRetryDiff,
+  prDiff,
   focusThreadId,
   scrollRef,
   jumpRef,
@@ -196,6 +198,9 @@ export function ContentPane({
   diffRead: DiffReadState;
   diffRetrying: boolean;
   onRetryDiff: () => void;
+  /** The comparison a pull request's diff was read at; absent on a
+   *  bare worktree tab, whose diff is its working tree. */
+  prDiff?: PrDiffView;
   focusThreadId: string | null;
   scrollRef: RefObject<HTMLDivElement | null>;
   jumpRef: Ref<DiffJumpHandle>;
@@ -302,6 +307,7 @@ export function ContentPane({
           read={diffRead}
           retrying={diffRetrying}
           onRetry={onRetryDiff}
+          prDiff={prDiff}
           focusThreadId={focusThreadId}
           scrollRef={scrollRef}
           jumpRef={jumpRef}

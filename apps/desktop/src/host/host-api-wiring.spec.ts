@@ -68,7 +68,8 @@ vi.mock('./services/reviews.js', () =>
     'fetchPrDescription',
     'submitReviewVerdict',
     'getReviewViewer',
-    'getDiffText',
+    'getPrDiffManifest',
+    'getPrDiffPatch',
   ])
 );
 vi.mock('./services/sessions.js', () =>
@@ -246,7 +247,16 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ],
   ['submitReviewVerdict', [7, 'approve'], 'reviews.submitReviewVerdict'],
   ['getReviewViewer', [], 'reviews.getReviewViewer'],
-  ['fetchDiffText', ['feature', 'main'], 'reviews.getDiffText'],
+  [
+    'fetchPrDiffManifest',
+    [{ repo: '/r', sourceBranch: 'feature', targetBranch: 'main' }],
+    'reviews.getPrDiffManifest',
+  ],
+  [
+    'fetchPrDiffPatch',
+    [{ repo: '/r', mergeBaseOid: 'a', headOid: 'b' }],
+    'reviews.getPrDiffPatch',
+  ],
   [
     'fetchWorktreeDiffText',
     ['feature', 'main'],

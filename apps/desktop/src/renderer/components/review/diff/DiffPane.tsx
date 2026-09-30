@@ -10,6 +10,7 @@ import {
 import {
   startTransition,
   useEffect,
+  useRef,
   useState,
   type Ref,
   type RefObject,
@@ -24,12 +25,16 @@ import {
   setDiffOptions,
   useDiffOptions,
 } from '../../../lib/diff/diff-options.js';
+import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
 import { cn } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { Skeleton } from '../../ui/skeleton.js';
 import { Tip } from '../../ui/tooltip.js';
 import type { DiffReadState } from '../../../lib/data/read-state.js';
 import { ReadFailure, StaleNotice } from '../ReadNotice.js';
+import { ComparisonIdentity } from './ComparisonIdentity.js';
+import { DiffEmpty } from './DiffEmpty.js';
+import { PrDiffBanners } from './PrDiffBanners.js';
 import { VirtualDiffList, type DiffJumpHandle } from './VirtualDiffList.js';
 
 /**
@@ -54,6 +59,7 @@ export function DiffPane({
   read,
   retrying,
   onRetry,
+  prDiff,
   focusThreadId,
   scrollRef,
   jumpRef,
@@ -79,6 +85,8 @@ export function DiffPane({
   read: DiffReadState;
   retrying: boolean;
   onRetry: () => void;
+  /** A pull request's comparison; absent for a bare worktree. */
+  prDiff?: PrDiffView;
   focusThreadId: string | null;
   scrollRef: RefObject<HTMLDivElement | null>;
   jumpRef?: Ref<DiffJumpHandle>;
@@ -100,6 +108,8 @@ export function DiffPane({
   }, []);
   const loading = read.kind === 'loading' || !warm;
   const stale = 'stale' in read ? read.stale : null;
+  // The comparison the moved banner's load leads to.
+  const comparisonRef = useRef<HTMLButtonElement>(null);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -108,6 +118,8 @@ export function DiffPane({
         navIndex={navIndex}
         onPrev={onPrev}
         onNext={onNext}
+        prDiff={prDiff}
+        comparisonRef={comparisonRef}
       />
       {stale && (
         <StaleNotice
@@ -116,6 +128,13 @@ export function DiffPane({
           retrying={retrying}
           onRetry={onRetry}
           className="mx-2 mt-2 shrink-0"
+        />
+      )}
+      {prDiff && !loading && (
+        <PrDiffBanners
+          prDiff={prDiff}
+          shownFiles={files.length}
+          comparisonRef={comparisonRef}
         />
       )}
       {threadsNotice}
@@ -148,11 +167,13 @@ export function DiffPane({
             className="m-4"
           />
         )}
-        {!loading && read.kind === 'empty' && (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            No changes between <span className="font-mono">{targetBranch}</span>{' '}
-            and <span className="font-mono">{sourceBranch}</span>.
-          </div>
+        {!loading && (
+          <DiffEmpty
+            read={read}
+            prDiff={prDiff}
+            sourceBranch={sourceBranch}
+            targetBranch={targetBranch}
+          />
         )}
         {!loading && (
           <VirtualDiffList
@@ -179,11 +200,15 @@ function Toolbar({
   navIndex,
   onPrev,
   onNext,
+  prDiff,
+  comparisonRef,
 }: {
   navCount: number;
   navIndex: number;
   onPrev: () => void;
   onNext: () => void;
+  prDiff?: PrDiffView;
+  comparisonRef: RefObject<HTMLButtonElement | null>;
 }) {
   const o = useDiffOptions();
   return (
@@ -243,6 +268,12 @@ function Toolbar({
         </Button>
       </Tip>
       <div className="flex-1" />
+      {prDiff?.comparison && (
+        <ComparisonIdentity
+          comparison={prDiff.comparison}
+          ref={comparisonRef}
+        />
+      )}
       {navCount > 0 && (
         <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
           <MessageSquareIcon className="size-3.5" />

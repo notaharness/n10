@@ -16,7 +16,11 @@ export function createReviewService(
 ) {
   const provider = createProviderReads(options);
   const agentComments = createAgentComments(options, provider.invalidate);
-  const diff = createDiffReads(options.config.repo, options.worktrees);
+  const diff = createDiffReads(
+    options.config.repo,
+    options.isCurrent,
+    options.worktrees
+  );
   let rows = options.pullRequests.getSnapshot(options.config.repo).prMap;
   const unsubscribeRows = options.pullRequests.subscribe((repo) => {
     if (repo !== options.config.repo) return;
@@ -38,6 +42,7 @@ export function createReviewService(
     if (credentials || path) diff.reset();
   });
   return {
+    repo: options.config.repo,
     agentComments,
     commands: createReviewCommands(options, provider),
     drafts: createReviewDraftCommands(options, provider.invalidate),

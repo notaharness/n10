@@ -41,8 +41,19 @@ export const keys = {
   machines: ['machines'] as const,
   beamStatus: ['beam-status'] as const,
   agentOptions: (cwd: string) => ['agent-options', cwd] as const,
-  diff: (cwd: string, source: string, target: string) =>
-    ['diff', cwd, source, target] as const,
+  /** A pull request resolved to commits: keyed by the head it was
+   *  asked to read, so a pinned head is one entry however often the
+   *  list reports a newer one. */
+  prDiffManifest: (
+    cwd: string,
+    prId: number,
+    source: string,
+    target: string,
+    head: string
+  ) => ['pr-diff-manifest', cwd, prId, source, target, head] as const,
+  /** Keyed by commits: the patch between two never changes. */
+  prDiffPatch: (cwd: string, mergeBase: string, head: string) =>
+    ['pr-diff-patch', cwd, mergeBase, head] as const,
   worktreeDiff: (cwd: string, branch: string, target: string) =>
     ['worktree-diff', cwd, branch, target] as const,
   parsedDiff: (content: string) => ['parsed-diff', content] as const,

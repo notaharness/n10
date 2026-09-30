@@ -129,10 +129,11 @@ const api: N10HostApi = {
     return () => ipcRenderer.removeListener(LAUNCH_EVENTS.step, listener);
   },
 
-  fetchDiffText: (sourceBranch, targetBranch) =>
-    ipcRenderer.invoke(IPC.fetchDiffText, sourceBranch, targetBranch),
   fetchWorktreeDiffText: (branch, targetBranch) =>
     ipcRenderer.invoke(IPC.fetchWorktreeDiffText, branch, targetBranch),
+  fetchPrDiffManifest: (req) =>
+    ipcRenderer.invoke(IPC.fetchPrDiffManifest, req),
+  fetchPrDiffPatch: (req) => ipcRenderer.invoke(IPC.fetchPrDiffPatch, req),
 
   openExternal: (url) => ipcRenderer.invoke(IPC.openExternal, url),
   showContextMenu: (items) => ipcRenderer.invoke(IPC.showContextMenu, items),

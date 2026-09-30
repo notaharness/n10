@@ -228,7 +228,7 @@ describe('refreshRepoInfo', () => {
     qc.setQueryData(keys.threads('/repo', 42), { threads: [] });
     qc.setQueryData(keys.sidebar('/repo'), ['row']);
     qc.setQueryData(keys.settings('/repo'), { fields: [] });
-    qc.setQueryData(keys.diff('/repo', 'undo', 'main'), 'patch');
+    qc.setQueryData(keys.worktreeDiff('/repo', 'undo', 'main'), 'patch');
     return qc;
   }
 
@@ -260,7 +260,9 @@ describe('refreshRepoInfo', () => {
       // The settings page that made the change keeps its answer, and
       // git's diff never came from the provider.
       expect(qc.getQueryData(keys.settings('/repo'))).toEqual({ fields: [] });
-      expect(qc.getQueryData(keys.diff('/repo', 'undo', 'main'))).toBe('patch');
+      expect(qc.getQueryData(keys.worktreeDiff('/repo', 'undo', 'main'))).toBe(
+        'patch'
+      );
     }
   );
 

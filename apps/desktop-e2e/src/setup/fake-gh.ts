@@ -22,7 +22,9 @@ export interface FakePr {
   title: string;
   headRefName: string;
   baseRefName?: string;
-  /** The head commit GitHub reports; `f` × 40 when left off. */
+  /** The head GitHub reports. Defaults to `headRefName`'s tip in the
+   *  test repository; set it to a commit the repository lacks to play
+   *  a push this clone has not fetched. */
   headRefOid?: string;
   /** Defaults to the scenario's username, which makes it *your* PR and
    *  puts it under "Pull Requests" rather than a review bucket. */

@@ -1,16 +1,28 @@
 import { lstat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { resolveRef } from './diff-fetcher.js';
 import { completePatch, placeholderPatch } from './diff-patch.js';
 import { gitLine, runGit } from './git-run.js';
 import { BINARY_NOTE, tooLargeNote, untrackedDiff } from './untracked-diff.js';
 
 export { untrackedFilePatch, BINARY_NOTE } from './untracked-diff.js';
 
+
+/** The target's remote-tracking ref, else the local branch. */
+async function resolveRef(cwd: string, branch: string): Promise<string> {
+  for (const candidate of [`origin/${branch}`, branch]) {
+    try {
+      await gitLine(['rev-parse', '--verify', candidate], { cwd });
+      return candidate;
+    } catch {
+      // try next
+    }
+  }
+  throw new Error(`Cannot resolve ref for branch: ${branch}`);
+}
 /**
  * What an agent has done to a worktree so far, committed or not.
  *
- * The review diff (`fetchDiffText`) compares two *commits*, which is
+ * A pull request's diff (`pr-diff-manifest.ts`) compares two *commits*, which is
  * right for a pull request and useless for watching an agent work:
  * everything it has written since its last commit — usually everything
  * it has written at all — is invisible there. This runs inside the

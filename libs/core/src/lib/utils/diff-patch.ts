@@ -1,10 +1,9 @@
 /**
  * Patch text the app writes itself, rather than getting from git.
  *
- * Both diff paths need to say something about a file they cannot show,
- * and both need to cut an over-long patch somewhere safe. Shared here so
- * the two never drift, and so `diff-fetcher` does not have to import
- * from `worktree-diff`, which imports back from it.
+ * Both diff paths need to cut an over-long patch somewhere safe, and
+ * the worktree diff says something about a file it cannot show. Shared
+ * here so the two never drift.
  */
 
 export function megabytes(bytes: number): string {
