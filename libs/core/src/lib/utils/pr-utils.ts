@@ -1,8 +1,8 @@
 import type { AgentSession } from '../types.js';
 
 import {
-  asksForReview,
   isBlockingDecision,
+  viewerEntry,
   type BranchPrMap,
   type PullRequestInfo,
   type PullRequestReviewer,
@@ -54,22 +54,6 @@ function reviewBucket(
 }
 
 /**
- * The entry that speaks for the viewer: their own, or else a group they
- * belong to that is still asked. A group that has voted was answered by
- * another member, so its vote is never filed as the viewer's.
- */
-function viewerEntry(
-  reviewers: readonly PullRequestReviewer[],
-  config: AppConfig,
-  provider: VcsProvider
-): PullRequestReviewer | undefined {
-  return (
-    reviewers.find((r) => provider.matchesUser(r.identifier, config)) ??
-    reviewers.find((r) => r.includesViewer && asksForReview(r))
-  );
-}
-
-/**
  * Categorize PRs where the current user is a reviewer.
  */
 export function categorizeReviews(
@@ -86,7 +70,9 @@ export function categorizeReviews(
     if (!pr || !pr.reviewers) continue;
     // Skip PRs created by the current user — they belong in sessions, not reviews
     if (provider.matchesUser(pr.createdByIdentifier, config)) continue;
-    const reviewer = viewerEntry(pr.reviewers, config, provider);
+    const reviewer = viewerEntry(pr.reviewers, (r) =>
+      provider.matchesUser(r.identifier, config)
+    );
     const bucket = reviewer && reviewBucket(reviewer, pr.isDraft ?? false);
     if (bucket) buckets[bucket].push(pr);
   }
