@@ -144,7 +144,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   from the provider's head (`lib/review/use-pr-diff.ts`), never the local branch.
   `lib/review/pinned-revisions.ts` holds each PR's revision outside its pane
   until the reader loads a newer one, whose file list and first batch are read
-  before the pin moves. A bare worktree
+  before the pin moves; `revision-choice.ts` keeps the changes chosen beside
+  it, by the same key, so both outlive the tab. A bare worktree
   diffs its working tree, polled at 2 s only while the agent runs. `FileTree` collapse
   state is reconciled from the per-file `revision` delta during render
   (`lib/diff/file-tree-model.ts`), never from the poll.

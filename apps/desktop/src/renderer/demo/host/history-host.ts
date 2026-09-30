@@ -4,12 +4,7 @@ import type {
   PullRequestRef,
 } from '../../../host/contract.js';
 import { VIEWER } from '../data/identity.js';
-import {
-  demoEvents,
-  demoLastReview,
-  demoLastVisit,
-  demoPushes,
-} from './demo-history.js';
+import { demoEvents, demoLastReview, demoLastVisit } from './demo-history.js';
 import { later } from './hub.js';
 import type { DemoState } from './state.js';
 
@@ -22,7 +17,7 @@ import type { DemoState } from './state.js';
 
 type HistoryHost = Pick<
   N10HostApi,
-  'getPullRequestHistory' | 'recordPullRequestVisit' | 'resolvePrRevisionRange'
+  'getPullRequestHistory' | 'recordPullRequestVisit'
 >;
 
 const keyOf = (ref: PullRequestRef) => `${ref.repository}#${ref.number}`;
@@ -78,30 +73,6 @@ export function createHistoryHost(state: DemoState): HistoryHost {
       }
       visits.set(key, { ...visit, at: Date.now(), visitId });
       return later(undefined);
-    },
-    resolvePrRevisionRange: ({ repo, from, to }) => {
-      if (repo !== state.repo().cwd) {
-        return later({
-          ok: false,
-          error: { code: 'repo-changed', message: `${repo} is not open` },
-        });
-      }
-      // Among a demo pull request's pushes, a later one builds on an
-      // earlier one.
-      const order = state
-        .repo()
-        .pullRequests()
-        .flatMap((pr) => demoPushes(pr).map((p) => p.oid));
-      const linear = order.indexOf(from) <= order.indexOf(to);
-      return later({
-        ok: true,
-        range: {
-          fromOid: from,
-          toOid: to,
-          linear,
-          base: { state: 'unchanged' },
-        },
-      });
     },
   };
 }

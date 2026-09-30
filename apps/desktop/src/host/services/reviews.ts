@@ -40,3 +40,8 @@ export function getPrDiffManifest(req: unknown) {
 export function getPrDiffPatch(req: unknown) {
   return readResourceValue(activeReviewService().diff.patch(req));
 }
+/** Two revisions resolved to exact commits, and every file changed
+ *  between them. */
+export function getPrRangeManifest(req: unknown) {
+  return readResourceValue(activeReviewService().diff.rangeManifest(req));
+}

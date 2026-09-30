@@ -55,13 +55,15 @@ export interface RowContext {
   /** Each mounted file header's toggle, where a file notice that
    *  replaces itself hands the keyboard. */
   headers: Map<string, HTMLButtonElement>;
+  /** Whether a comment can be written on this line (`linePoints`). */
+  commentable: (point: LinePoint) => boolean;
 }
 
 function gutter(
   ctx: RowContext,
   point: LinePoint | null
 ): GutterProps | undefined {
-  if (!point || !ctx.gutterFor) return undefined;
+  if (!point || !ctx.gutterFor || !ctx.commentable(point)) return undefined;
   return ctx.gutterFor(point, ctx.firstPoint(point.file));
 }
 

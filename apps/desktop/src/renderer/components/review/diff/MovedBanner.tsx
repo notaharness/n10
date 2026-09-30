@@ -1,5 +1,5 @@
 import { Loader2Icon, RefreshCwIcon } from 'lucide-react';
-import { useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { refocusAfter } from '../../../lib/focus.js';
 import type { MovedRevision } from '../../../lib/review/pinned-revisions.js';
 import type { LoadMoved } from '../../../lib/review/use-pr-diff.js';
@@ -64,7 +64,7 @@ export function MovedBanner({
   load: LoadMoved;
   /** Where the keyboard goes when the banner closes itself after a
    *  load: the comparison it loaded. */
-  focusAfter: RefObject<HTMLElement | null>;
+  focusAfter: () => HTMLElement | null | undefined;
 }) {
   const button = useRef<HTMLButtonElement>(null);
   // The button goes with the banner once the load succeeds; the browser
@@ -72,7 +72,7 @@ export function MovedBanner({
   useLayoutEffect(
     () => () => {
       if (document.activeElement === button.current) {
-        refocusAfter(() => focusAfter.current);
+        refocusAfter(focusAfter);
       }
     },
     [focusAfter]

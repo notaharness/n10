@@ -6,7 +6,9 @@ import { splitPoint, unifiedPoint, type LinePoint } from './range-selection.js';
  * The lines on screen that a comment can be placed on, file by file in
  * screen order, and the row each sits in. Folded lines are not on
  * screen and are not stepped onto: moving past a fold lands on the
- * next line that is shown.
+ * next line that is shown. Nor are lines on a side not numbered as the
+ * pull request's comments are (`anchoredSides`): a comment there would
+ * be filed against lines it was not written on.
  */
 export interface LinePoints {
   byFile: Map<string, LinePoint[]>;
@@ -40,15 +42,18 @@ function pointsOfRow(
   }
 }
 
+const BOTH_SIDES = { LEFT: true, RIGHT: true } as const;
+
 export function linePoints(
   rows: readonly FlatRow[],
-  lines: ReadonlyMap<string, DiffLine[]>
+  lines: ReadonlyMap<string, DiffLine[]>,
+  sides: Readonly<Record<'LEFT' | 'RIGHT', boolean>> = BOTH_SIDES
 ): LinePoints {
   const byFile = new Map<string, LinePoint[]>();
   const rowOf = new Map<string, number>();
   rows.forEach((row, index) => {
     for (const p of pointsOfRow(row, lines)) {
-      if (!p) continue;
+      if (!p || !sides[p.side]) continue;
       const list = byFile.get(p.file) ?? [];
       list.push(p);
       byFile.set(p.file, list);

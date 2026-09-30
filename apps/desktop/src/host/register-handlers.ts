@@ -145,7 +145,7 @@ export function createHostApi(): HostApi {
       worktrees.getWorktreeDiffText(branch, targetBranch),
     fetchPrDiffManifest: (req) => reviews.getPrDiffManifest(req),
     fetchPrDiffPatch: (req) => reviews.getPrDiffPatch(req),
-    resolvePrRevisionRange: (req) => prHistory.resolvePrRevisionRange(req),
+    fetchPrRangeManifest: (req) => reviews.getPrRangeManifest(req),
 
     openExternal: (url) => externalOpener(url),
     showContextMenu: (items) => contextMenu(items),

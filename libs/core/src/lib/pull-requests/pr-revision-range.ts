@@ -1,6 +1,7 @@
 import { isOid, type Oid, type PullRequestRef } from '@n10/vcs-core';
 import { fetchRefs } from '../sync/fetch-queue.js';
 import { gitLine, runGit } from '../utils/git-run.js';
+import { readPrDiffManifest, type PrDiffManifest } from './pr-diff-manifest.js';
 import { prScope } from './pr-store-file.js';
 
 /**
@@ -35,6 +36,9 @@ export interface RevisionRange {
    *  since. False after a force-push or rebase — the diff between the
    *  two trees is still exact, but it is not a list of new commits. */
   linear: boolean;
+  /** `from` builds on `to`: the range runs back in time, and its diff
+   *  undoes the commits between — not a rewrite. */
+  backwards: boolean;
   /** Whether the two revisions meet the target at different commits —
    *  the range then also carries the target's own changes, merged in or
    *  rebased onto — or why that cannot be said. */
@@ -205,8 +209,45 @@ export async function resolveRevisionRange(
     }
   }
   const linear = await isAncestor(cwd, from, to);
+  const backwards = !linear && (await isAncestor(cwd, to, from));
   const base = await baseOf(cwd, from, to, target, fetched);
-  return { ok: true, range: { fromOid: from, toOid: to, linear, base } };
+  return {
+    ok: true,
+    range: { fromOid: from, toOid: to, linear, backwards, base },
+  };
+}
+
+export type RevisionRangeManifestResult =
+  | { ok: true; range: RevisionRange; manifest: PrDiffManifest }
+  | { ok: false; error: RevisionRangeError };
+
+/**
+ * Resolve two revisions and list every file changed from one to the
+ * other. The manifest's comparison has `from` as its old side, so each
+ * body read for it (`readPrDiffPatch`) is between the same two commits.
+ * It names commits only: which refs they came from is the pull
+ * request's own comparison's to say.
+ */
+export async function readRevisionRangeManifest(
+  req: RevisionRangeRequest & { target: Oid },
+  opts: { maxBytes?: number } = {}
+): Promise<RevisionRangeManifestResult> {
+  const resolved = await resolveRevisionRange(req);
+  if (!resolved.ok) return resolved;
+  const manifest = await readPrDiffManifest(
+    req.cwd,
+    {
+      headOid: req.to,
+      mergeBaseOid: req.from,
+      targetOid: req.target,
+      sourceRef: null,
+      targetRef: req.target,
+      headVerified: false,
+      targetVerified: false,
+    },
+    opts
+  );
+  return { ok: true, range: resolved.range, manifest };
 }
 
 /**

@@ -50,4 +50,18 @@ describe('the lines a comment can go on', () => {
     expect(row(2)).toBe(row(3));
     expect(row(0)).not.toBe(row(2));
   });
+
+  it('leaves out a side shown at a revision comments are not numbered by', () => {
+    const { byFile, rowOf } = linePoints(flat('split'), byName, {
+      LEFT: false,
+      RIGHT: true,
+    });
+    expect(byFile.get('a.ts')).toEqual([
+      { file: 'a.ts', side: 'RIGHT', line: 1 },
+      { file: 'a.ts', side: 'RIGHT', line: 2 },
+    ]);
+    expect(rowOf.has(pointKey({ file: 'a.ts', side: 'LEFT', line: 1 }))).toBe(
+      false
+    );
+  });
 });

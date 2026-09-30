@@ -35,15 +35,19 @@ export function useReviewDiff({
   baseBranch,
   pr,
   running,
+  shown,
 }: {
   cwd: string;
   branch: string;
   baseBranch: string;
   pr: PullRequestInfo | undefined;
   running: boolean;
+  /** The diff is in front of the reader: its tab active, its pane on
+   *  the diff. */
+  shown: boolean;
 }) {
   const isPr = pr != null;
-  const prDiff = usePrDiff(cwd, pr, { enabled: isPr });
+  const prDiff = usePrDiff(cwd, pr, { enabled: isPr, shown });
   const workingDiff = useWorktreeDiff(cwd, branch, baseBranch, {
     enabled: !isPr,
     live: running,

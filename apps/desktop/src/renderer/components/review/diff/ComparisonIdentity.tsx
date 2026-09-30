@@ -32,30 +32,58 @@ function IdentityRow({
   );
 }
 
-/**
- * The comparison as `merge-base → head`, short ids, in the diff
- * toolbar. The tooltip names every commit and where it came from;
- * clicking copies the range for `git diff` or `git log`.
- */
-export function ComparisonIdentity({
-  comparison,
-  ref,
-}: {
-  comparison: PrComparison;
-  ref?: Ref<HTMLButtonElement>;
-}) {
-  const { mergeBaseOid, headOid, targetOid } = comparison;
-  const headNote = comparison.headVerified
+/** Two revisions shown in place of the pull request's own comparison,
+ *  and what the earlier one is: "your last review"… */
+export interface ShownRange {
+  from: string;
+  to: string;
+  note: string;
+}
+
+function boundsOf(comparison: PrComparison, range: ShownRange | null) {
+  return {
+    mergeBaseOid: range?.from ?? comparison.mergeBaseOid,
+    headOid: range?.to ?? comparison.headOid,
+    targetOid: comparison.targetOid,
+  };
+}
+
+/** Where each commit came from, as the tooltip says it. */
+function notesOf(comparison: PrComparison, headOid: string) {
+  const pullHead = comparison.headVerified
     ? comparison.sourceRef ?? 'the pull request’s head'
     : `${
         comparison.sourceRef ?? 'local branch'
       }, not confirmed by the provider`;
-  const targetNote = comparison.targetVerified
-    ? `${comparison.targetRef}, as the provider reports it`
-    : `${comparison.targetRef} as this clone last fetched it`;
-  const unverified = comparison.headVerified
-    ? ''
-    : ' The head is not confirmed by the provider.';
+  return {
+    headNote:
+      headOid === comparison.headOid ? pullHead : 'a revision you chose',
+    targetNote: comparison.targetVerified
+      ? `${comparison.targetRef}, as the provider reports it`
+      : `${comparison.targetRef} as this clone last fetched it`,
+    unverified: comparison.headVerified
+      ? ''
+      : ' The head is not confirmed by the provider.',
+  };
+}
+
+/**
+ * The comparison as `merge-base → head`, short ids — or `from → to`
+ * when two of the pull request's revisions are shown. The tooltip names
+ * every commit and where it came from; clicking copies the range for
+ * `git diff` or `git log`.
+ */
+export function ComparisonIdentity({
+  comparison,
+  range = null,
+  ref,
+}: {
+  comparison: PrComparison;
+  range?: ShownRange | null;
+  ref?: Ref<HTMLButtonElement>;
+}) {
+  const { mergeBaseOid, headOid, targetOid } = boundsOf(comparison, range);
+  const { headNote, targetNote, unverified } = notesOf(comparison, headOid);
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -69,10 +97,10 @@ export function ComparisonIdentity({
           onClick={() =>
             copyText(`${mergeBaseOid}..${headOid}`, 'Comparison range copied')
           }
-          className="flex min-w-0 items-center gap-1 rounded px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="flex shrink-0 items-center gap-1 rounded px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           <GitCompareArrowsIcon className="size-3.5 shrink-0" />
-          <span className="truncate">
+          <span>
             {short(mergeBaseOid)} → {short(headOid)}
           </span>
           {!comparison.headVerified && (
@@ -85,11 +113,15 @@ export function ComparisonIdentity({
       </TooltipTrigger>
       <TooltipContent side="bottom" className="max-w-sm">
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
-          <IdentityRow label="Head" oid={headOid} note={headNote} />
           <IdentityRow
-            label="Base"
+            label={range ? 'To' : 'Head'}
+            oid={headOid}
+            note={headNote}
+          />
+          <IdentityRow
+            label={range ? 'From' : 'Base'}
             oid={mergeBaseOid}
-            note={`where it left ${comparison.targetRef}`}
+            note={range?.note ?? `where it left ${comparison.targetRef}`}
           />
           <IdentityRow label="Target" oid={targetOid} note={targetNote} />
         </dl>

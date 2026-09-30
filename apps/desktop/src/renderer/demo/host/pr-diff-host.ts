@@ -1,6 +1,8 @@
 import type { N10HostApi, PrComparison } from '../../../host/contract.js';
+import { demoPushes } from './demo-history.js';
 import { later } from './hub.js';
 import { manifestFile, patchSections, sectionsFor } from './patch-manifest.js';
+import { standInOid } from './stand-in-oid.js';
 import type { DemoState } from './state.js';
 
 /**
@@ -11,26 +13,42 @@ import type { DemoState } from './state.js';
  * say, is a stable stand-in per branch.
  */
 
-type PrDiffHost = Pick<N10HostApi, 'fetchPrDiffManifest' | 'fetchPrDiffPatch'>;
+type PrDiffHost = Pick<
+  N10HostApi,
+  'fetchPrDiffManifest' | 'fetchPrDiffPatch' | 'fetchPrRangeManifest'
+>;
+
+/** Which of a pull request's three pushes first touched each file of
+ *  its patch — every third — so a range between two pushes lists the
+ *  files the later ones changed. */
+const pushOfFile = (index: number) => index % 3;
 
 const PATCH_LIMIT = 64 * 1024 * 1024;
-
-/** A commit id that stays the same for the same name. */
-export function standInOid(name: string): string {
-  let hash = 2166136261;
-  let out = '';
-  while (out.length < 40) {
-    for (const c of `${name}#${out.length}`) {
-      hash = Math.imul(hash ^ c.charCodeAt(0), 16777619) >>> 0;
-    }
-    out += hash.toString(16).padStart(8, '0');
-  }
-  return out.slice(0, 40);
-}
 
 async function load(loader: (() => Promise<{ default: string }>) | undefined) {
   return loader ? (await loader()).default : '';
 }
+
+/** The demo pull request and push `oid` is, if any. */
+function pushOf(state: DemoState, oid: string) {
+  for (const pr of state.repo().pullRequests()) {
+    const index = demoPushes(pr).findIndex((p) => p.oid === oid);
+    if (index >= 0) return { pr, index };
+  }
+  return null;
+}
+
+const missing = (code: 'from-unavailable' | 'to-unavailable', oid: string) => ({
+  ok: false as const,
+  error: {
+    code,
+    oid,
+    message: `Revision ${oid.slice(
+      0,
+      7
+    )} is not in this clone, and the remote doesn’t have it`,
+  },
+});
 
 export function createPrDiffHost(state: DemoState): PrDiffHost {
   // Which branch's patch two commits stand for, once they are handed out.
@@ -68,6 +86,46 @@ export function createPrDiffHost(state: DemoState): PrDiffHost {
       );
       return later(
         { ok: true, manifest: { comparison, files, complete: true } },
+        120
+      );
+    },
+    fetchPrRangeManifest: async ({ repo, from, to, target }) => {
+      const refused = repoChanged(repo);
+      if (refused) return refused;
+      const older = pushOf(state, from);
+      if (!older) return later(missing('from-unavailable', from));
+      const newer = pushOf(state, to);
+      if (!newer) return later(missing('to-unavailable', to));
+      const branch = newer.pr.sourceBranch;
+      branches.set(`${from}..${to}`, branch);
+      const [lo, hi] = [older.index, newer.index].sort((a, b) => a - b);
+      const files = patchSections(await patchOf(branch))
+        .map(manifestFile)
+        .filter((_, i) => pushOfFile(i) > lo! && pushOfFile(i) <= hi!);
+      return later(
+        {
+          ok: true,
+          range: {
+            fromOid: from,
+            toOid: to,
+            linear: older.index <= newer.index,
+            backwards: older.index > newer.index,
+            base: { state: 'unchanged' },
+          },
+          manifest: {
+            comparison: {
+              headOid: to,
+              mergeBaseOid: from,
+              targetOid: target,
+              sourceRef: null,
+              targetRef: target,
+              headVerified: false,
+              targetVerified: false,
+            },
+            files,
+            complete: true,
+          },
+        },
         120
       );
     },

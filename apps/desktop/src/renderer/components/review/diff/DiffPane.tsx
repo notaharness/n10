@@ -24,9 +24,11 @@ import { Skeleton } from '../../ui/skeleton.js';
 import type { DiffReadState } from '../../../lib/data/read-state.js';
 import { ReadFailure, StaleNotice } from '../ReadNotice.js';
 import { IncompleteManifestBanner } from './ComparisonIdentity.js';
-import { DiffEmpty } from './DiffEmpty.js';
+import { ComparisonBar } from './ComparisonBar.js';
+import { DiffEmpty, ShowAllChanges } from './DiffEmpty.js';
 import { DiffToolbar } from './DiffToolbar.js';
 import { MovedBanner } from './MovedBanner.js';
+import { SelectorFocus } from './selector-focus.js';
 import { SingleFileBar } from './SingleFileBar.js';
 import { VirtualDiffList, type DiffJumpHandle } from './VirtualDiffList.js';
 
@@ -94,6 +96,7 @@ export function DiffPane({
   const stale = 'stale' in read ? read.stale : null;
   // The comparison the moved banner's load leads to.
   const comparisonRef = useRef<HTMLButtonElement>(null);
+  const selectorRef = useRef<HTMLButtonElement>(null);
   const single = useDiffOptions().layout === 'single';
   const view = useSingleFileView(
     files,
@@ -112,65 +115,71 @@ export function DiffPane({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <DiffToolbar
-        navCount={navCount}
-        navIndex={navIndex}
-        onPrev={onPrev}
-        onNext={onNext}
-        prDiff={prDiff}
-        onToggleLayout={toggleLayout}
-        comparisonRef={comparisonRef}
-      />
-      {view.page && !loading && <SingleFileBar page={view.page} />}
-      {stale && (
-        <StaleNotice
-          what="diff"
-          stale={stale}
-          retrying={retrying}
-          onRetry={onRetry}
-          className="mx-2 mt-2 shrink-0"
+    <SelectorFocus value={selectorRef}>
+      <div className="flex h-full min-h-0 flex-col">
+        <ComparisonBar prDiff={prDiff} comparisonRef={comparisonRef} />
+        <DiffToolbar
+          navCount={navCount}
+          navIndex={navIndex}
+          onPrev={onPrev}
+          onNext={onNext}
+          onToggleLayout={toggleLayout}
         />
-      )}
-      {prDiff && !loading && (
-        <PrDiffBanners prDiff={prDiff} comparisonRef={comparisonRef} />
-      )}
-      {threadsNotice}
-      <div
-        ref={scrollRef}
-        data-diff-scroll
-        tabIndex={-1}
-        role="region"
-        aria-label="Changes"
-        className="relative min-h-0 flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
-      >
-        <ReadStatus
-          loading={loading}
-          read={read}
-          retrying={retrying}
-          onRetry={onRetry}
-          prDiff={prDiff}
-          sourceBranch={sourceBranch}
-          targetBranch={targetBranch}
-        />
-        {!loading && (
-          <VirtualDiffList
-            files={view.files}
-            diffHead={diffHead}
-            threadsByFile={threadsByFile}
-            draftsByFile={draftsByFile}
-            generalThreads={view.conversation ? generalThreads : NO_THREADS}
-            commentsLoading={view.conversation && commentsLoading}
-            prId={prId}
-            headSha={headSha}
-            focusThreadId={focusThreadId}
-            scrollRef={scrollRef}
-            jumpRef={jumpRef}
-            prDiff={prDiff}
+        {view.page && !loading && <SingleFileBar page={view.page} />}
+        {stale && (
+          <StaleNotice
+            what="diff"
+            stale={stale}
+            retrying={retrying}
+            onRetry={onRetry}
+            className="mx-2 mt-2 shrink-0"
           />
         )}
+        {prDiff && !loading && (
+          <PrDiffBanners
+            prDiff={prDiff}
+            // The commits it loaded, or the selector when a "since" has
+            // none to name.
+            focusAfter={() => comparisonRef.current ?? selectorRef.current}
+          />
+        )}
+        {threadsNotice}
+        <div
+          ref={scrollRef}
+          data-diff-scroll
+          tabIndex={-1}
+          role="region"
+          aria-label="Changes"
+          className="relative min-h-0 flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
+        >
+          <ReadStatus
+            loading={loading}
+            read={read}
+            retrying={retrying}
+            onRetry={onRetry}
+            prDiff={prDiff}
+            sourceBranch={sourceBranch}
+            targetBranch={targetBranch}
+          />
+          {!loading && (
+            <VirtualDiffList
+              files={view.files}
+              diffHead={diffHead}
+              threadsByFile={threadsByFile}
+              draftsByFile={draftsByFile}
+              generalThreads={view.conversation ? generalThreads : NO_THREADS}
+              commentsLoading={view.conversation && commentsLoading}
+              prId={prId}
+              headSha={headSha}
+              focusThreadId={focusThreadId}
+              scrollRef={scrollRef}
+              jumpRef={jumpRef}
+              prDiff={prDiff}
+            />
+          )}
+        </div>
       </div>
-    </div>
+    </SelectorFocus>
   );
 }
 
@@ -223,18 +232,24 @@ function ReadStatus({
     );
   }
   if (read.kind === 'failed') {
+    const revisions = prDiff?.revisions.pair ? prDiff.revisions : null;
     return (
-      <ReadFailure
-        title={
-          read.stage === 'fetch'
-            ? "Couldn't load the diff"
-            : "Couldn't show the diff"
-        }
-        error={read.error}
-        retrying={retrying}
-        onRetry={onRetry}
-        className="m-4"
-      />
+      <div className="m-4 flex flex-col items-start gap-3">
+        <ReadFailure
+          title={
+            revisions
+              ? 'Couldn’t compare these revisions'
+              : read.stage === 'fetch'
+              ? "Couldn't load the diff"
+              : "Couldn't show the diff"
+          }
+          error={read.error}
+          retrying={retrying}
+          onRetry={onRetry}
+          className="w-full"
+        />
+        {revisions && <ShowAllChanges revisions={revisions} />}
+      </div>
     );
   }
   return (
@@ -250,10 +265,10 @@ function ReadStatus({
 /** What changed about the comparison since it was read, above the diff. */
 function PrDiffBanners({
   prDiff,
-  comparisonRef,
+  focusAfter,
 }: {
   prDiff: PrDiffView;
-  comparisonRef: RefObject<HTMLButtonElement | null>;
+  focusAfter: () => HTMLElement | null;
 }) {
   return (
     <>
@@ -262,7 +277,7 @@ function PrDiffBanners({
           moved={prDiff.moved}
           shownHead={prDiff.comparison.headOid}
           load={prDiff.loadMoved}
-          focusAfter={comparisonRef}
+          focusAfter={focusAfter}
         />
       )}
       {prDiff.incomplete && (

@@ -82,8 +82,8 @@ import type {
   PrDiffManifestResult,
   PrDiffPatchRequest,
   PrDiffPatchResult,
-  PrRevisionRangeRequest,
-  PrRevisionRangeResult,
+  PrRangeManifestRequest,
+  PrRangeManifestResult,
 } from '@n10/engine/contract';
 // Review requests — replies, resolutions, review launches, drafts.
 export type * from './contract-reviews.js';
@@ -548,11 +548,12 @@ export interface N10HostApi {
   ): Promise<PrDiffManifestResult>;
   /** The patch between a resolved comparison's commits. */
   fetchPrDiffPatch(req: PrDiffPatchRequest): Promise<PrDiffPatchResult>;
-  /** Two revisions resolved to exact commits, fetched by id when the
-   *  clone lacks one; a revision nowhere to be had is data. */
-  resolvePrRevisionRange(
-    req: PrRevisionRangeRequest
-  ): Promise<PrRevisionRangeResult>;
+  /** Two revisions resolved to exact commits — fetched by id when the
+   *  clone lacks one — and every file changed from one to the other. A
+   *  revision nowhere to be had is data. */
+  fetchPrRangeManifest(
+    req: PrRangeManifestRequest
+  ): Promise<PrRangeManifestResult>;
 
   // ── Shell ────────────────────────────────────────────────────
   /** Open a URL in the user's default browser. */
@@ -686,7 +687,7 @@ export const IPC = {
   fetchWorktreeDiffText: 'n10/diff/worktree-text',
   fetchPrDiffManifest: 'n10/diff/pr-manifest',
   fetchPrDiffPatch: 'n10/diff/pr-patch',
-  resolvePrRevisionRange: 'n10/diff/pr-revision-range',
+  fetchPrRangeManifest: 'n10/diff/pr-range-manifest',
   openExternal: 'n10/shell/open-external',
   showContextMenu: 'n10/shell/context-menu',
   showAppMenu: 'n10/shell/app-menu',

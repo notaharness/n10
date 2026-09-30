@@ -97,6 +97,26 @@ export const keys = {
       ref.id ?? null,
       viewer,
     ] as const,
+  /** A pull request's revision history, read for one visit: the last
+   *  visit it reports is fixed for that visit (`use-pr-history.ts`). */
+  prHistory: (
+    cwd: string,
+    ref: PullRequestRef,
+    viewer: string | null,
+    visitId: string
+  ) =>
+    [
+      'pr-history',
+      cwd,
+      pullRequestKey(ref),
+      ref.id ?? null,
+      viewer,
+      visitId,
+    ] as const,
+  /** The files between two revisions: what is between them never
+   *  changes, and the target commit only decides the base note. */
+  prRangeManifest: (cwd: string, from: string, to: string, target: string) =>
+    ['pr-range-manifest', cwd, from, to, target] as const,
   /** The reviewer's own drafts on one pull request, by identity. */
   reviewDrafts: (
     cwd: string,
@@ -167,6 +187,7 @@ const PROVIDER_KEYS: ReadonlySet<string> = new Set([
   'threads',
   'pr-description',
   'pr-snapshot',
+  'pr-history',
   'comment-image',
   'drafts',
   'review-viewer',

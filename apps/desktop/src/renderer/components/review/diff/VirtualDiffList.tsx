@@ -108,7 +108,13 @@ export function VirtualDiffList({
         mineByFile,
         mineCount,
         fileState,
-        ...(prDiff ? { bodies: prDiff.bodies, counts: prDiff.counts } : {}),
+        ...(prDiff
+          ? {
+              bodies: prDiff.bodies,
+              counts: prDiff.counts,
+              anchored: prDiff.anchored,
+            }
+          : {}),
       }),
     [
       prDiff,
@@ -125,9 +131,10 @@ export function VirtualDiffList({
     ]
   );
   const rows = flat.rows;
+  const anchored = prDiff?.anchored;
   const points = useMemo(
-    () => linePoints(rows, linesByFile),
-    [rows, linesByFile]
+    () => linePoints(rows, linesByFile, anchored),
+    [rows, linesByFile, anchored]
   );
 
   // Scrolls the list makes itself reach the jumps as they happen.
@@ -310,6 +317,7 @@ export function VirtualDiffList({
     manifest,
     prDiff,
     headers: headers.current,
+    commentable: (p) => points.rowOf.has(pointKey(p)),
   };
 
   return (

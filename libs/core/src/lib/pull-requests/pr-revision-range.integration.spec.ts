@@ -13,6 +13,7 @@ import type { PullRequestRef } from '@n10/vcs-core';
 import { __resetFetchQueueForTests } from '../sync/fetch-queue.js';
 import { recordPullRequestVisit } from './pr-history.js';
 import {
+  readRevisionRangeManifest,
   resolveRevisionRange,
   retainRevisions,
   type RevisionRangeResult,
@@ -127,8 +128,21 @@ describe('resolveRevisionRange over a revision sequence', () => {
       fromOid: oid.H1,
       toOid: oid.H2,
       linear: true,
+      backwards: false,
       base: { state: 'unchanged' },
     });
+  });
+
+  it('reads a range run back in time as backwards, not a rewrite', async () => {
+    const range = rangeOf(
+      await resolveRevisionRange({
+        cwd: clone,
+        from: oid.H2!,
+        to: oid.H1!,
+        target: oid.B1!,
+      })
+    );
+    expect(range).toMatchObject({ linear: false, backwards: true });
   });
 
   it('does not count a target that moved on without the branch', async () => {
@@ -154,6 +168,7 @@ describe('resolveRevisionRange over a revision sequence', () => {
     );
     expect(range).toMatchObject({
       linear: false,
+      backwards: false,
       base: { state: 'unchanged' },
     });
   });
@@ -223,6 +238,47 @@ describe('resolveRevisionRange over a revision sequence', () => {
     expect(range).toMatchObject({
       linear: true,
       base: { state: 'unknown', reason: 'no-merge-base' },
+    });
+  });
+
+  it('lists the files changed between two revisions, and no others', async () => {
+    const result = await readRevisionRangeManifest({
+      cwd: clone,
+      from: oid.H1!,
+      to: oid.H2!,
+      target: oid.B1!,
+    });
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.manifest.files.map((f) => f.path)).toEqual(['b.txt']);
+    expect(result.manifest.comparison).toMatchObject({
+      mergeBaseOid: oid.H1,
+      headOid: oid.H2,
+    });
+  });
+
+  it('lists the target’s own changes when they came in between', async () => {
+    const result = await readRevisionRangeManifest({
+      cwd: clone,
+      from: oid.H2!,
+      to: oid.H3!,
+      target: oid.B2!,
+    });
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.range.base).toEqual({ state: 'moved' });
+    expect(result.manifest.files.map((f) => f.path)).toEqual(['base.txt']);
+  });
+
+  it('lists nothing for a revision it cannot find', async () => {
+    const result = await readRevisionRangeManifest({
+      cwd: clone,
+      from: 'f'.repeat(40),
+      to: oid.H1!,
+      target: oid.B1!,
+      fetch: false,
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'from-unavailable' },
     });
   });
 

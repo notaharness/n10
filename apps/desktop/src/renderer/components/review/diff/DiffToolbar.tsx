@@ -8,17 +8,15 @@ import {
   RowsIcon,
   WrapTextIcon,
 } from 'lucide-react';
-import type { ReactNode, RefObject } from 'react';
+import type { ReactNode } from 'react';
 import {
   setDiffOptions,
   useDiffOptions,
   type DiffOptions,
 } from '../../../lib/diff/diff-options.js';
-import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
 import { cn } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { Tip } from '../../ui/tooltip.js';
-import { ComparisonIdentity } from './ComparisonIdentity.js';
 
 /**
  * The diff's settings — view, wrap, hide resolved, one file at a time —
@@ -32,19 +30,14 @@ export function DiffToolbar({
   navIndex,
   onPrev,
   onNext,
-  prDiff,
   onToggleLayout,
-  comparisonRef,
 }: {
   navCount: number;
   navIndex: number;
   onPrev: () => void;
   onNext: () => void;
-  prDiff?: PrDiffView;
   /** Continuous ↔ one file at a time, keeping the reader's file. */
   onToggleLayout: () => void;
-  /** The comparison, where the moved banner's load hands focus. */
-  comparisonRef: RefObject<HTMLButtonElement | null>;
 }) {
   const o = useDiffOptions();
   const single = o.layout === 'single';
@@ -73,12 +66,6 @@ export function DiffToolbar({
         <FileIcon /> One file
       </Toggle>
       <div className="flex-1" />
-      {prDiff?.comparison && (
-        <ComparisonIdentity
-          comparison={prDiff.comparison}
-          ref={comparisonRef}
-        />
-      )}
       {navCount > 0 && (
         <CommentStepper
           count={navCount}

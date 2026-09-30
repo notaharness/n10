@@ -33,14 +33,20 @@ export interface PrDiffPatchRequest {
   context?: number;
 }
 
-/** Two revisions to compare, in the repository the caller shows. */
-export interface PrRevisionRangeRequest {
+/**
+ * Two revisions of the pull request on screen — since the reader's last
+ * visit, since their last review, or any two heads — to list the files
+ * changed from one to the other. Bodies are then read with
+ * `PrDiffPatchRequest`, `from` as the old side.
+ */
+export interface PrRangeManifestRequest {
   repo: string;
   /** The earlier revision: the diff's old side. */
   from: string;
   to: string;
-  /** The target branch's commit now; null when not known. */
-  target: string | null;
+  /** The target commit the pull request's diff on screen is read
+   *  against, to tell whether the target's changes came in between. */
+  target: string;
 }
 
 /**
@@ -132,12 +138,12 @@ function requireOid(value: unknown, name: string): string {
   return value;
 }
 
-export function parseRangeRequest(value: unknown): PrRevisionRangeRequest {
+export function parseRangeRequest(value: unknown): PrRangeManifestRequest {
   const req = fields(value);
   return {
     repo: requireString(req.repo, 'repo'),
     from: requireOid(req.from, 'from'),
     to: requireOid(req.to, 'to'),
-    target: req.target === null ? null : requireOid(req.target, 'target'),
+    target: requireOid(req.target, 'target'),
   };
 }

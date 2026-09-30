@@ -453,6 +453,45 @@ function rulesAnswer() {
   return answer;
 }
 
+const AT = '2026-01-01T00:00:00Z';
+
+/** The timeline and reviews `readGitHubRevisions` asks for. */
+function revisionsOf(pr) {
+  const history = pr.history ?? {};
+  const events = history.events ?? [{ commit: headOid(pr) }];
+  return {
+    timelineItems: {
+      pageInfo: { hasPreviousPage: false },
+      nodes: events.map((e) =>
+        e.forcePush
+          ? {
+              __typename: 'HeadRefForcePushedEvent',
+              createdAt: e.at ?? AT,
+              beforeCommit: e.forcePush.before
+                ? { oid: e.forcePush.before }
+                : null,
+              afterCommit: { oid: e.forcePush.after },
+            }
+          : {
+              __typename: 'PullRequestCommit',
+              commit: { oid: e.commit, committedDate: e.at ?? AT },
+            }
+      ),
+    },
+    reviews: {
+      pageInfo: { hasPreviousPage: false },
+      nodes: (history.reviews ?? []).map((r) => ({
+        state: 'APPROVED',
+        body: '',
+        viewerDidAuthor: r.mine !== false,
+        submittedAt: r.at ?? AT,
+        commit: { oid: r.commit },
+        comments: { totalCount: 0, nodes: [] },
+      })),
+    },
+  };
+}
+
 function threadNode(t, i) {
   return {
     id: t.id ?? `thread-${i + 1}`,
@@ -675,6 +714,23 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
               })),
             },
           },
+        },
+      },
+    });
+  }
+
+  // A pull request's revision history: its commits and force-pushes,
+  // and the reviews the signed-in user submitted (`history` in the
+  // scenario). Left out, the history is the head alone and no review.
+  if (query.includes('query PullRequestRevisions')) {
+    const pr = prs.find((p) => String(p.number) === String(vars.number));
+    if (failing(pr, 'history')) failLikeGitHub();
+    out({
+      data: {
+        viewer: { login: scenario.username ?? 'n10-tester' },
+        repository: {
+          id: 'R_fixture',
+          pullRequest: pr ? revisionsOf(pr) : null,
         },
       },
     });

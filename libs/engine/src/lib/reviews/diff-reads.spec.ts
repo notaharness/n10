@@ -4,8 +4,8 @@ import {
   fetchWorktreeDiffText,
   readPrDiffManifest,
   readPrDiffPatch,
+  readRevisionRangeManifest,
   resolvePrComparison,
-  resolveRevisionRange,
 } from '@n10/core';
 import type { PrComparison } from '@n10/core';
 import { createDiffReads } from './diff-reads.js';
@@ -24,8 +24,8 @@ vi.mock('@n10/core', () => ({
   fetchWorktreeDiffText: vi.fn(),
   readPrDiffManifest: vi.fn(),
   readPrDiffPatch: vi.fn(),
+  readRevisionRangeManifest: vi.fn(),
   resolvePrComparison: vi.fn(),
-  resolveRevisionRange: vi.fn(),
 }));
 
 const HEAD = 'b'.repeat(40);
@@ -282,62 +282,78 @@ describe('patch', () => {
   });
 });
 
-describe('range', () => {
-  const range = { repo: '/repo/a', from: BASE, to: HEAD, target: null };
+describe('rangeManifest', () => {
+  const range = { repo: '/repo/a', from: BASE, to: HEAD, target: TARGET };
   beforeEach(() => {
-    vi.mocked(resolveRevisionRange).mockResolvedValue({
+    vi.mocked(readRevisionRangeManifest).mockResolvedValue({
       ok: true,
       range: {
         fromOid: BASE,
         toOid: HEAD,
         linear: true,
-        base: { state: 'unknown', reason: 'no-target' },
+        backwards: false,
+        base: { state: 'unchanged' },
       },
+      manifest: { comparison: comparison(), files: [], complete: true },
     });
   });
 
   it.each(['from', 'to', 'target'] as const)(
     'refuses a %s that is not an object id',
     (key) => {
-      expect(() => reads().range({ ...range, [key]: 'main' })).toThrow(
+      expect(() => reads().rangeManifest({ ...range, [key]: 'main' })).toThrow(
         `${key} must be an object id`
       );
-      expect(resolveRevisionRange).not.toHaveBeenCalled();
+      expect(readRevisionRangeManifest).not.toHaveBeenCalled();
     }
   );
 
   it('answers only for its own repository', async () => {
     expect(
-      await readResourceValue(reads().range({ ...range, repo: '/repo/b' }))
+      await readResourceValue(
+        reads().rangeManifest({ ...range, repo: '/repo/b' })
+      )
     ).toMatchObject({ ok: false, error: { code: 'repo-changed' } });
-    expect(resolveRevisionRange).not.toHaveBeenCalled();
+    expect(readRevisionRangeManifest).not.toHaveBeenCalled();
   });
 
   it('drops an answer when the repository closes during the read', async () => {
-    vi.mocked(resolveRevisionRange).mockImplementationOnce(async () => {
+    vi.mocked(readRevisionRangeManifest).mockImplementationOnce(async () => {
       current = false;
       return { ok: false, error: { code: 'to-unavailable', message: 'x' } };
     });
-    expect(await readResourceValue(reads().range(range))).toMatchObject({
-      ok: false,
-      error: { code: 'repo-changed' },
-    });
+    expect(await readResourceValue(reads().rangeManifest(range))).toMatchObject(
+      { ok: false, error: { code: 'repo-changed' } }
+    );
   });
 
-  it('resolves in its repository, once', async () => {
+  it('reads a range that failed again, rather than keeping the failure', async () => {
     const diff = reads();
-    expect(await readResourceValue(diff.range(range))).toMatchObject({
+    vi.mocked(readRevisionRangeManifest).mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'from-unavailable', message: 'not in this clone' },
+    });
+    expect(await readResourceValue(diff.rangeManifest(range))).toMatchObject({
+      ok: false,
+    });
+    expect(await readResourceValue(diff.rangeManifest(range))).toMatchObject({
+      ok: true,
+    });
+    expect(readRevisionRangeManifest).toHaveBeenCalledTimes(2);
+  });
+
+  it('reads the range in its repository, once', async () => {
+    const diff = reads();
+    expect(await readResourceValue(diff.rangeManifest(range))).toMatchObject({
       ok: true,
       range: { linear: true },
     });
     diff.invalidate();
-    await readResourceValue(diff.range(range));
-    expect(resolveRevisionRange).toHaveBeenCalledExactlyOnceWith({
-      cwd: '/repo/a',
-      from: BASE,
-      to: HEAD,
-      target: null,
-    });
+    await readResourceValue(diff.rangeManifest(range));
+    expect(readRevisionRangeManifest).toHaveBeenCalledExactlyOnceWith(
+      { cwd: '/repo/a', from: BASE, to: HEAD, target: TARGET },
+      {}
+    );
   });
 });
 

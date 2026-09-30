@@ -138,8 +138,8 @@ const api: N10HostApi = {
   fetchPrDiffManifest: (req) =>
     ipcRenderer.invoke(IPC.fetchPrDiffManifest, req),
   fetchPrDiffPatch: (req) => ipcRenderer.invoke(IPC.fetchPrDiffPatch, req),
-  resolvePrRevisionRange: (req) =>
-    ipcRenderer.invoke(IPC.resolvePrRevisionRange, req),
+  fetchPrRangeManifest: (req) =>
+    ipcRenderer.invoke(IPC.fetchPrRangeManifest, req),
 
   openExternal: (url) => ipcRenderer.invoke(IPC.openExternal, url),
   showContextMenu: (items) => ipcRenderer.invoke(IPC.showContextMenu, items),

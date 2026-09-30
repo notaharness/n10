@@ -36,6 +36,36 @@ export {
   type FlatRow,
 } from './diff-rows-model.js';
 
+const BOTH_SIDES = { LEFT: true, RIGHT: true } as const;
+
+/** A file's comments by the line each sits under, on the sides `on`
+ *  numbers as comments do: threads, the agent's drafts, and the
+ *  reviewer's own. */
+function anchorFile(
+  lines: readonly DiffLine[],
+  threads: readonly RemoteCommentThread[],
+  drafts: readonly ReviewComment[],
+  mine: ReturnType<typeof splitMine>['onLines'],
+  on: NonNullable<FlatDiffOptions['anchored']> = BOTH_SIDES
+) {
+  const present = presentAnchors(lines);
+  const t = anchorComments(present, threads, (x) =>
+    x.lineStart == null || !on[x.side] ? null : x.lineEnd ?? x.lineStart
+  );
+  const d = anchorComments(present, drafts, (x) =>
+    on[x.side] ? x.lineEnd : null
+  );
+  const m = anchorComments(present, mine, (x) =>
+    on[x.side] ? x.anchor.range!.end : null
+  );
+  return {
+    t,
+    d,
+    m,
+    pinnedAll: new Set([...t.pinned, ...d.pinned, ...m.pinned]),
+  };
+}
+
 /**
  * A file's changed lines: Git's counts from the manifest, else the lines
  * in hand — but only once they are the file's lines. A pull request's
@@ -194,13 +224,13 @@ export function buildFlatDiff(
       continue;
     }
 
-    const present = presentAnchors(lines);
-    const t = anchorComments(present, visibleThreads, (x) =>
-      x.lineStart == null ? null : x.lineEnd ?? x.lineStart
+    const { t, d, m, pinnedAll } = anchorFile(
+      lines,
+      visibleThreads,
+      activeDrafts,
+      own.onLines,
+      opts.anchored
     );
-    const d = anchorComments(present, activeDrafts, (x) => x.lineEnd);
-    const m = anchorComments(present, own.onLines, (x) => x.anchor.range!.end);
-    const pinnedAll = new Set([...t.pinned, ...d.pinned, ...m.pinned]);
 
     const unified = buildUnifiedRows(lines, {
       pinnedAnchors: pinnedAll,

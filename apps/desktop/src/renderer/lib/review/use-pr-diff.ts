@@ -18,12 +18,14 @@ import {
 } from './pinned-revisions.js';
 import { planBatches } from '../diff/diff-bodies.js';
 import { batchQuery } from './pr-diff-batches.js';
-import {
-  manifestQuery,
-  prDiffReadState,
-  type PrBranches,
-} from './pr-diff-queries.js';
+import { manifestQuery, type PrBranches } from './pr-diff-queries.js';
 import { usePrDiffBodies, type PrDiffBodies } from './use-pr-diff-bodies.js';
+import { anchoredSides, type AnchoredSides } from './revision-model.js';
+import {
+  shownRead,
+  usePrRevisions,
+  type RevisionControls,
+} from './use-pr-revisions.js';
 
 /**
  * A pull request's diff, read at exact commits.
@@ -40,7 +42,8 @@ import { usePrDiffBodies, type PrDiffBodies } from './use-pr-diff-bodies.js';
  * where the reader is and `moved` offers the new one, instead of the
  * next list poll or a remount swapping the code out from under them.
  * Loading it resolves the new comparison, lists its files and reads
- * their first batch before the pin moves, so a failed load leaves the
+ * their first batch — and the same for the range a "since" shows at
+ * the new head — before the pin moves, so a failed load leaves the
  * diff as it was and a successful one swaps it in a single step.
  */
 
@@ -76,6 +79,10 @@ export interface PrDiffView extends PrDiffBodies {
   counts: ReadonlyMap<string, LineCounts>;
   /** Git's listing of the files was cut: some may be missing. */
   incomplete: boolean;
+  /** Which of the pull request's changes are shown, and what else can be. */
+  revisions: RevisionControls;
+  /** The sides whose lines comments can sit on (`anchoredSides`). */
+  anchored: AnchoredSides;
 }
 
 /**
@@ -92,8 +99,6 @@ export interface PrDiffRead {
   retry: () => Promise<unknown>;
   view: PrDiffView;
 }
-
-const NO_FILES: readonly PrDiffManifestFile[] = [];
 
 function useManifestMaps(files: readonly PrDiffManifestFile[]) {
   return useMemo(() => {
@@ -153,7 +158,8 @@ function useLoadMoved(
   cwd: string,
   pr: PrBranches | undefined,
   key: string,
-  reported: ReportedRevision
+  reported: ReportedRevision,
+  prefetch: (next: PrComparison) => Promise<void>
 ): LoadMoved {
   const queryClient = useQueryClient();
   const attempt = `${key}|${reported.head ?? ''}|${reported.target}`;
@@ -178,6 +184,10 @@ function useLoadMoved(
           batchQuery(cwd, comparison, first, 'whole-file')
         );
       }
+      // And what a "since" shows at the new head. A range that cannot
+      // be read says so once the pin moves, from its own query; it
+      // does not hold the new head back.
+      await prefetch(comparison).catch(() => undefined);
       setPin(key, { ...next, targetOid: comparison.targetOid });
     };
     // Both handlers attached: the chain cannot reject.
@@ -185,7 +195,17 @@ function useLoadMoved(
       () => setState({ attempt, loading: false, error: '' }),
       (e: unknown) => setState({ attempt, loading: false, error: readError(e) })
     );
-  }, [current?.loading, attempt, head, target, queryClient, cwd, pr, key]);
+  }, [
+    current?.loading,
+    attempt,
+    head,
+    target,
+    queryClient,
+    cwd,
+    pr,
+    key,
+    prefetch,
+  ]);
   return {
     run,
     loading: current?.loading ?? false,
@@ -200,26 +220,38 @@ function reportedOf(pr: PrBranches | undefined): ReportedRevision {
 export function usePrDiff(
   cwd: string,
   pr: PrBranches | undefined,
-  opts: { enabled: boolean }
+  opts: {
+    enabled: boolean;
+    /** The diff is in front of the reader, so its visit counts. */
+    shown: boolean;
+  }
 ): PrDiffRead {
-  const key = pinKey(cwd, pr?.id ?? 0);
+  const prId = pr?.id ?? 0;
+  const enabled = opts.enabled && !!pr;
+  const key = pinKey(cwd, prId);
   const reported = reportedOf(pr);
   const pin = usePinnedRevision(key, reported);
   const options = manifestQuery(cwd, pr, pin);
-  const manifest = useQuery({ ...options, enabled: opts.enabled && !!pr });
+  const manifest = useQuery({ ...options, enabled });
   const comparison = manifest.data?.comparison ?? null;
-  const manifestFiles = manifest.data?.files ?? NO_FILES;
-  const bodies = usePrDiffBodies(cwd, comparison, manifestFiles);
+  const revisions = usePrRevisions(cwd, prId, key, enabled, {
+    comparison,
+    all: manifest.data,
+    shown: opts.shown,
+  });
+  const shown = shownRead(manifest, options.queryKey, revisions.read);
+  const manifestFiles = shown.files;
+  const bodies = usePrDiffBodies(cwd, shown.comparison, manifestFiles);
   const maps = useManifestMaps(manifestFiles);
   useRecordPin(key, pin, comparison);
   const readFailed = manifest.error !== null && comparison === null;
   const moved = useFollow(key, pin, reported, readFailed);
-  const loadMoved = useLoadMoved(cwd, pr, key, reported);
+  const loadMoved = useLoadMoved(cwd, pr, key, reported, revisions.prefetch);
   return {
-    state: prDiffReadState(manifest),
-    fetching: manifest.isFetching,
-    key: options.queryKey,
-    retry: () => manifest.refetch(),
+    state: shown.state,
+    fetching: shown.fetching,
+    key: shown.key,
+    retry: shown.retry,
     view: {
       ...bodies,
       ...maps,
@@ -228,7 +260,9 @@ export function usePrDiff(
       moved,
       loadMoved,
       manifestFiles,
-      incomplete: manifest.data ? !manifest.data.complete : false,
+      incomplete: shown.incomplete,
+      revisions: revisions.controls,
+      anchored: anchoredSides(revisions.controls.pair, comparison),
     },
   };
 }

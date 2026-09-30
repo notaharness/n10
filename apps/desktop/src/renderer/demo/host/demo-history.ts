@@ -1,7 +1,7 @@
 import type { PullRequestInfo } from '@n10/vcs-core';
 import type { Checkpoint, RevisionEvent } from '../../../host/contract.js';
 import { VIEWER } from '../data/identity.js';
-import { standInOid } from './pr-diff-host.js';
+import { standInOid } from './stand-in-oid.js';
 
 /**
  * A demo pull request's history: three pushes ending at the head its

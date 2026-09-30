@@ -4,14 +4,15 @@ import {
   readPrDiffManifest,
   readPrDiffPatch,
   resolvePrComparison,
-  resolveRevisionRange,
+  readRevisionRangeManifest,
 } from '@n10/core';
 import type {
   PrComparison,
   PrComparisonError,
   PrDiffManifest,
   PrDiffPatch,
-  RevisionRangeResult,
+  RevisionRange,
+  RevisionRangeError,
 } from '@n10/core';
 import type { WorktreeService } from '../worktrees/api.js';
 import { createResourceCache } from './resource-cache.js';
@@ -22,13 +23,13 @@ import {
   parseRangeRequest,
   type PrDiffManifestRequest,
   type PrDiffPatchRequest,
-  type PrRevisionRangeRequest,
+  type PrRangeManifestRequest,
 } from './diff-requests.js';
 
 export type {
   PrDiffManifestRequest,
   PrDiffPatchRequest,
-  PrRevisionRangeRequest,
+  PrRangeManifestRequest,
 };
 
 /** The repository changed between the request and the answer. */
@@ -40,9 +41,9 @@ export type PrDiffError = PrComparisonError | RepoChangedError;
 export type PrDiffManifestResult =
   | { ok: true; manifest: PrDiffManifest }
   | { ok: false; error: PrDiffError };
-export type PrRevisionRangeResult =
-  | RevisionRangeResult
-  | { ok: false; error: RepoChangedError };
+export type PrRangeManifestResult =
+  | { ok: true; range: RevisionRange; manifest: PrDiffManifest }
+  | { ok: false; error: RevisionRangeError | RepoChangedError };
 export type PrDiffPatchResult =
   | { ok: true; patch: PrDiffPatch }
   | { ok: false; error: RepoChangedError };
@@ -92,9 +93,9 @@ export function createDiffReads(
     PATCHES_KEPT,
     (result) => result.ok
   );
-  const ranges = createResourceCache<PrRevisionRangeResult>(
+  const ranges = createResourceCache<PrRangeManifestResult>(
     Infinity,
-    16,
+    8,
     (result) => result.ok
   );
   const live = createResourceCache<string>(1_000, 2);
@@ -170,16 +171,20 @@ export function createDiffReads(
         }
       );
     },
-    /** Two revisions resolved to exact commits, fetched by id when the
-     *  clone lacks one; a revision nowhere to be had is data. */
-    range(value: unknown) {
+    /** Two revisions resolved to exact commits — fetched by id when the
+     *  clone lacks one — and every file changed from one to the other.
+     *  A revision nowhere to be had is data. */
+    rangeManifest(value: unknown) {
       const { repo: asked, ...req } = parseRangeRequest(value);
       return ranges.get(
         JSON.stringify([asked, req]),
-        async (): Promise<PrRevisionRangeResult> => {
+        async (): Promise<PrRangeManifestResult> => {
           const before = changed(asked);
           if (before) return { ok: false, error: before };
-          const result = await resolveRevisionRange({ cwd: repo, ...req });
+          const result = await readRevisionRangeManifest(
+            { cwd: repo, ...req },
+            ceiling
+          );
           const after = changed(asked);
           return after ? { ok: false, error: after } : result;
         }

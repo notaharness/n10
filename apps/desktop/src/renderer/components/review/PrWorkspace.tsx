@@ -15,6 +15,7 @@ import { refocusAfter } from '../../lib/focus.js';
 import { useRepo } from '../../lib/repo-context.js';
 import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { useCommentNavigator } from '../../lib/review/use-comment-navigator.js';
+import { useDiffShown } from '../../lib/review/use-diff-shown.js';
 import { useReviewDiff } from '../../lib/review/use-review-diff.js';
 import { useBackToReview } from '../../lib/review/use-review-mode.js';
 import { useReviewRail } from '../../lib/review/use-review-rail.js';
@@ -90,12 +91,14 @@ export function PrWorkspace({
 }) {
   const { repo } = useRepo();
   const prId = pr?.id ?? 0;
+  const diffShown = useDiffShown();
   const diff = useReviewDiff({
     cwd: repo.cwd,
     branch,
     baseBranch,
     pr,
     running,
+    shown: diffShown.shown,
   });
   const { files, prDiff } = diff;
   const comments = useThreads(repo.cwd, prId);
@@ -200,6 +203,7 @@ export function PrWorkspace({
     changes: scrollRef,
     root: rootRef,
   });
+  diffShown.settle(effMode);
 
   return (
     <div ref={rootRef} className="flex h-full min-h-0 min-w-0 flex-col">

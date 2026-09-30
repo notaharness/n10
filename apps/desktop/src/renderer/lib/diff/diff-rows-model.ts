@@ -140,6 +140,12 @@ export interface FlatDiffOptions {
   /** Changed-line counts from the manifest, which hold before a body is
    *  read and so keep headers steady while it loads. */
   counts?: ReadonlyMap<string, { additions: number; deletions: number }>;
+  /** The sides whose line numbers are the ones comments anchor to: the
+   *  pull request's merge base (LEFT) and head (RIGHT). Two other
+   *  revisions number their lines otherwise, so a comment on a side
+   *  they replace goes under its file, never onto whatever line has
+   *  its number. Both, when absent. */
+  anchored?: Readonly<Record<'LEFT' | 'RIGHT', boolean>>;
 }
 
 /**

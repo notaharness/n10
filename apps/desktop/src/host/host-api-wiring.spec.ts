@@ -70,6 +70,7 @@ vi.mock('./services/reviews.js', () =>
     'getReviewViewer',
     'getPrDiffManifest',
     'getPrDiffPatch',
+    'getPrRangeManifest',
   ])
 );
 vi.mock('./services/sessions.js', () =>
@@ -117,11 +118,7 @@ vi.mock('./services/pr-details.js', () =>
   recorder('prDetails', ['getPullRequestSnapshot'])
 );
 vi.mock('./services/pr-history.js', () =>
-  recorder('prHistory', [
-    'getPullRequestHistory',
-    'recordPullRequestVisit',
-    'resolvePrRevisionRange',
-  ])
+  recorder('prHistory', ['getPullRequestHistory', 'recordPullRequestVisit'])
 );
 vi.mock('./services/pr-conversation.js', () =>
   recorder('prConversation', ['getPullRequestConversation'])
@@ -275,9 +272,9 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     'reviews.getPrDiffPatch',
   ],
   [
-    'resolvePrRevisionRange',
-    [{ repo: '/r', from: 'a', to: 'b', target: null }],
-    'prHistory.resolvePrRevisionRange',
+    'fetchPrRangeManifest',
+    [{ repo: '/r', from: 'a', to: 'b', target: 'c' }],
+    'reviews.getPrRangeManifest',
   ],
   [
     'fetchWorktreeDiffText',
