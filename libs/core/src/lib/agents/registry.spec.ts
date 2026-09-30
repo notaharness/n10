@@ -150,11 +150,31 @@ describe('agent registry', () => {
     });
 
     it('codex/gemini/opencode seed with their respective flags', () => {
-      expect(codex.seed!('p')).toEqual({ cmd: 'codex', args: ['p'] });
+      expect(codex.seed!('p')).toEqual({ cmd: 'codex', args: ['--', 'p'] });
       expect(gemini.seed!('p')).toEqual({ cmd: 'gemini', args: ['-i', 'p'] });
       expect(opencode.seed!('p')).toEqual({
         cmd: 'opencode',
         args: ['--prompt', 'p'],
+      });
+    });
+
+    it.each([
+      'review',
+      '--help',
+      '- fix the bug',
+      'quotes " \' $HOME\nnext line',
+    ])('protects the Codex prompt %j from CLI argument parsing', (prompt) => {
+      expect(codex.seed!(prompt)).toEqual({
+        cmd: 'codex',
+        args: ['--', prompt],
+      });
+      expect(codex.resume!(prompt)).toEqual({
+        cmd: 'codex',
+        args: ['resume', '--last', '--', prompt],
+      });
+      expect(codex.resume!()).toEqual({
+        cmd: 'codex',
+        args: ['resume', '--last'],
       });
     });
 

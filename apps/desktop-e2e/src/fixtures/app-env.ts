@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 
 /**
  * The environment the app under test is launched with: the developer's
@@ -63,6 +63,7 @@ export function appEnv(opts: {
     // The fake `gh` has to win the PATH lookup; the Azure DevOps
     // preload finds its scenario here.
     ...opts.ghEnv,
+    PATH: [opts.ghEnv.PATH, env.PATH].filter(Boolean).join(delimiter),
     // Last, and not negotiable. A tmux server is identified by its
     // socket directory, and the default one is the developer's own —
     // holding their real work and every persisted agent session. A

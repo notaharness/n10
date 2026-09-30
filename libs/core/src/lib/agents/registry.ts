@@ -158,9 +158,10 @@ const CODEX: AgentDefinition = {
   blank: () => ({ cmd: 'codex', args: [] }),
   resume: (prompt) => ({
     cmd: 'codex',
-    args: ['resume', '--last', ...(prompt ? [prompt] : [])],
+    args: ['resume', '--last', ...(prompt ? ['--', prompt] : [])],
   }),
-  seed: (prompt) => ({ cmd: 'codex', args: [prompt] }),
+  // Protect prompts beginning with a flag or a Codex subcommand name.
+  seed: (prompt) => ({ cmd: 'codex', args: ['--', prompt] }),
 };
 
 const GEMINI: AgentDefinition = {
