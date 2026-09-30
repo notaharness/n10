@@ -1,4 +1,4 @@
-import type { ReviewDecision } from '@n10/vcs-core/types';
+import type { PullRequestReviewer, ReviewDecision } from '@n10/vcs-core/types';
 import type { ReviewVerdict } from '../../../host/contract.js';
 
 /**
@@ -18,4 +18,33 @@ export function verdictDecision(
     return 'approved';
   if (providerId === 'github') return 'changes-requested';
   return verdict === 'wait-for-author' ? 'waiting-for-author' : 'rejected';
+}
+
+/**
+ * The reviewer list once the viewer's verdict lands, for the optimistic
+ * patch: their own row takes the decision, or a `You` row is added.
+ *
+ * Azure DevOps rolls a member's vote into every group of theirs on the
+ * pull request and names those groups in `votedFor`, so the patched row
+ * names them too and a tally counts one vote, as the re-read will.
+ * GitHub marks no group as the viewer's, so it adds nothing there.
+ */
+export function withViewerVerdict(
+  reviewers: readonly PullRequestReviewer[],
+  viewerIdentifier: string,
+  decision: ReviewDecision
+): PullRequestReviewer[] {
+  const me = viewerIdentifier.toLowerCase();
+  const isMe = (r: PullRequestReviewer) => r.identifier.toLowerCase() === me;
+  const groups = reviewers
+    .filter((r) => r.includesViewer)
+    .map((r) => r.identifier);
+  const voted = groups.length > 0 ? { votedFor: groups } : {};
+  if (reviewers.some(isMe)) {
+    return reviewers.map((r) => (isMe(r) ? { ...r, decision, ...voted } : r));
+  }
+  return [
+    ...reviewers,
+    { identifier: viewerIdentifier, displayName: 'You', decision, ...voted },
+  ];
 }
