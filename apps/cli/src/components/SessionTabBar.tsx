@@ -1,10 +1,7 @@
 import { Box, Text } from 'ink';
 import type { PullRequestInfo } from '@n10/vcs-core';
-import {
-  useSessionData,
-  runningTabsFromItems,
-  useSidebar,
-} from '@n10/app-core';
+import { useSessionData, useSidebar } from '@n10/app-core';
+import { runningTabsFromItems } from '../hooks/useRunningTabs.js';
 import {
   getItemKey,
   getSpawnedAt,
@@ -38,7 +35,7 @@ function tabLabel(
 export function SessionTabBar() {
   const { items, selectedIndex } = useSidebar();
   const { sessionPrMap } = useSessionData();
-  // Same computation as app-core's useRunningTabs, but fed explicitly
+  // Same computation as useRunningTabs, but fed explicitly
   // so the component only depends on barrel exports (test-mockable).
   const { tabs, numbers } = useMemo(
     () => runningTabsFromItems(items, getSpawnedAt),

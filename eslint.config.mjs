@@ -1,3 +1,4 @@
+import { builtinModules } from 'node:module';
 import nx from '@nx/eslint-plugin';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
@@ -5,6 +6,160 @@ import react from 'eslint-plugin-react';
 import importPlugin from 'eslint-plugin-import';
 import vitest from '@vitest/eslint-plugin';
 import ink from './tools/eslint-plugin-ink.mjs';
+
+const shellOperationPaths = [
+  {
+    name: '@n10/vcs-core',
+    allowTypeImports: true,
+    importNames: ['readConfig', 'readGlobalConfig', 'readProjectConfig'],
+    message: 'Read the captured engine config snapshot.',
+  },
+  {
+    name: '@n10/vcs-core',
+    allowTypeImports: true,
+    importNames: ['writeGlobalConfig', 'writeProjectConfig'],
+    message: 'Config writes belong to the engine config service.',
+  },
+  {
+    name: '@n10/vcs-core',
+    allowTypeImports: true,
+    importNames: ['autoDetectProjectConfig'],
+    message: 'Repository opening belongs to the engine repository service.',
+  },
+  {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: ['persistConfigField', 'persistKeybindFields'],
+    message: 'Config writes belong to the engine config service.',
+  },
+  {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: ['repositoryWorktreeScope'],
+    message:
+      'Worktree resources and commands belong to the engine worktree service.',
+  },
+  {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: ['syncRemote', 'sweepMergedBranches', 'computeConflictCounts'],
+    message: 'Sync scheduling and passes belong to the engine sync service.',
+  },
+  {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: ['checkWorktreeRemoval', 'removeWorktreeSession'],
+    message: 'Worktree removal belongs to engine worktree commands.',
+  },
+  {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: [
+      'readPullRequestSnapshot',
+      'readPullRequestChecks',
+      'readPullRequestConversation',
+      'fetchDiffText',
+      'fetchFileDiffText',
+      'fetchWorktreeDiffText',
+      'readDiffFiles',
+      'resolveRef',
+    ],
+    message:
+      'Review resources and diff freshness belong to the engine review service.',
+  },
+  {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: [
+      'listReviewDrafts',
+      'saveReviewDraft',
+      'discardReviewDraft',
+      'submitReview',
+      'searchMentions',
+    ],
+    message: 'Review commands belong to the engine review service.',
+  },
+  {
+    name: '@n10/core',
+    allowTypeImports: true,
+    importNames: [
+      'launchSession',
+      'launchTerminalSession',
+      'stopSession',
+      'observeTmuxSessions',
+      'getSessionLaunchContext',
+    ],
+    message:
+      'Session observation and commands belong to the engine session service.',
+  },
+  {
+    name: '@n10/review-comments',
+    allowTypeImports: true,
+    importNames: [
+      'readComments',
+      'appendComment',
+      'updateComment',
+      'removeComment',
+      'commentDirPath',
+      'commentFilePath',
+    ],
+    message:
+      'Agent finding resources and commands belong to the engine review service.',
+  },
+  {
+    name: '@n10/worktree-manager',
+    allowTypeImports: true,
+    importNames: [
+      'worktreeScope',
+      'createTemplateResolver',
+      'listWorktrees',
+      'listBranches',
+      'listAllBranches',
+      'createWorktree',
+      'checkoutWorktree',
+      'removeWorktree',
+      'rebaseOntoMaster',
+      'assessBranchRemoval',
+      'canRemoveBranch',
+    ],
+    message:
+      'Worktree resources and commands belong to the engine worktree service.',
+  },
+];
+
+const engineDomains = [
+  'babysitters',
+  'config',
+  'machines',
+  'plans',
+  'pull-requests',
+  'repositories',
+  'reviews',
+  'sessions',
+  'sync',
+  'worktrees',
+];
+const browserRuntimePaths = [
+  ...builtinModules,
+  'electron',
+  'ink',
+  '@n10/core',
+  '@n10/engine',
+  '@n10/logger',
+  '@n10/terminal',
+  '@n10/terminal-pty',
+  '@n10/terminal-tmux',
+  '@n10/vcs-core',
+  '@n10/vcs-github',
+  '@n10/vcs-azure-devops',
+  '@n10/worktree-manager',
+  '@n10/review-comments',
+].map((name) => ({
+  name,
+  allowTypeImports: true,
+  message:
+    'Browser bindings receive engine clients and import pure presentation entries.',
+}));
 
 export default tseslint.config(
   ...nx.configs['flat/base'],
@@ -236,10 +391,10 @@ export default tseslint.config(
     // It cannot lower `try/finally` (nor a conditional inside
     // `try/catch`, nor some member-expression reorders), and when it
     // gives up on a function every react-hooks rule gives up with it.
-    // These six files are therefore unanalysed: `refs`,
+    // These files are therefore unanalysed: `refs`,
     // `set-state-in-render`, `purity` and the rest report nothing
-    // here no matter what the code does. Two render-phase ref writes
-    // in usePolling and useRemoteComments are live examples.
+    // here no matter what the code does. The render-phase ref write
+    // in usePolling is one example.
     //
     // The code is right as written — `finally` is the correct way to
     // release a loading flag — so the list is the honest artifact,
@@ -250,9 +405,7 @@ export default tseslint.config(
       'apps/desktop/src/renderer/components/settings/FieldRow.tsx',
       'apps/desktop/src/renderer/components/terminal/SessionTerminal.tsx',
       'apps/desktop/src/renderer/screens/RepoOpen.tsx',
-      'libs/app-core/src/lib/hooks/useDiffData.ts',
       'libs/app-core/src/lib/hooks/usePolling.ts',
-      'libs/app-core/src/lib/hooks/useRemoteComments.ts',
     ],
     rules: {
       'react-hooks/todo': 'off',
@@ -269,7 +422,7 @@ export default tseslint.config(
     // Anything that needs React belongs in @n10/app-core, which
     // depends on this library. The plan store is the worked example:
     // the store is here, its useSyncExternalStore binding is there.
-    files: ['libs/core/src/**/*.ts'],
+    files: ['libs/core/src/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -290,7 +443,13 @@ export default tseslint.config(
                 'ink',
                 'electron',
                 '@n10/app-core',
+                '@n10/app-core/*',
                 '@n10/engine',
+                '@n10/engine/*',
+                'react/*',
+                'react-dom/*',
+                'ink/*',
+                'electron/*',
               ],
               message:
                 '@n10/core must not depend on a shell, the engine or the ' +
@@ -316,7 +475,7 @@ export default tseslint.config(
     // the engine never renders, so it cannot import a renderer, a
     // shell or the React layer that binds it. Same shape as core's
     // block above, one layer up.
-    files: ['libs/engine/src/**/*.ts'],
+    files: ['libs/engine/src/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -331,7 +490,17 @@ export default tseslint.config(
           ],
           patterns: [
             {
-              group: ['react-dom', 'ink', 'electron', '@n10/app-core'],
+              group: [
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                'ink',
+                'ink/*',
+                'electron',
+                'electron/*',
+                '@n10/app-core',
+                '@n10/app-core/*',
+              ],
               message:
                 '@n10/engine must not depend on a shell or on the React ' +
                 'layer. The shell subscribes to the engine.',
@@ -340,6 +509,166 @@ export default tseslint.config(
             {
               group: ['**/index'],
               message: 'No barrel imports — import from the concrete file.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['apps/**/*.{ts,tsx}', 'libs/app-core/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { paths: shellOperationPaths },
+      ],
+    },
+  },
+  {
+    files: ['apps/desktop/src/{host,main}/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@n10/app-core',
+                '@n10/app-core/*',
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                'ink',
+                'ink/*',
+              ],
+              message:
+                'Backend adapters call engine/core; React bindings belong to the frontend.',
+            },
+            { group: ['**/index'], message: 'Import from the concrete file.' },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['apps/desktop/src/host/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: shellOperationPaths,
+          patterns: [
+            {
+              group: ['electron', 'electron/*'],
+              allowTypeImports: true,
+              message: 'Host code uses ShellCalls for Electron operations.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The engine fixture replaces persisted config to isolate hook integration tests.
+    files: ['apps/cli/src/hooks/review-engine-fixture.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: shellOperationPaths.filter(
+            (entry) => !entry.importNames.includes('readConfig')
+          ),
+        },
+      ],
+    },
+  },
+  ...engineDomains.map((domain) => ({
+    files: [`libs/engine/src/lib/${domain}/**/*.ts`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '../*/**',
+                '!../*/api.js',
+                '!../kernel/**',
+                '@n10/engine',
+                '@n10/engine/*',
+              ],
+              message:
+                'Use the neighboring domain public api.js; kernel mechanics contain no domain policy.',
+            },
+          ],
+        },
+      ],
+    },
+  })),
+  {
+    files: ['libs/engine/src/lib/*/api.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ExportAllDeclaration',
+          message: 'Name each public domain export explicitly.',
+        },
+      ],
+    },
+  },
+  {
+    files: ['libs/engine/src/lib/kernel/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../*/**', '@n10/engine', '@n10/engine/*'],
+              message: 'Kernel mechanics cannot depend on engine domains.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['libs/app-core/src/**/*.{ts,tsx}'],
+    ignores: ['**/*.spec.{ts,tsx}'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        {
+          globals: ['process', 'Buffer', '__dirname', '__filename', 'require'],
+          checkGlobalObject: true,
+          globalObjects: ['global'],
+        },
+      ],
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: browserRuntimePaths,
+          patterns: [
+            {
+              group: [
+                'node:*',
+                'electron/*',
+                'ink/*',
+                '@n10/*/*',
+                '!@n10/core/ui',
+                '!@n10/core/plan',
+                '!@n10/core/readiness',
+                '!@n10/review-comments/ui',
+                '!@n10/review-comments/conventional',
+                '!@n10/vcs-core/types',
+                '!@n10/vcs-core/pr-details',
+                '!@n10/engine/contract',
+              ],
+              allowTypeImports: true,
+              message:
+                'Only browser-safe package entries belong in React bindings.',
             },
           ],
         },
@@ -443,15 +772,20 @@ export default tseslint.config(
         'error',
         {
           paths: [
+            ...builtinModules,
             '@n10/app-core',
             '@n10/core',
             '@n10/engine',
             '@n10/logger',
+            '@n10/terminal',
+            '@n10/kitty-graphics',
+            '@n10/image-loader',
             '@n10/review-comments',
             '@n10/terminal-pty',
             '@n10/terminal-tmux',
             '@n10/vcs-core',
             '@n10/vcs-github',
+            '@n10/vcs-azure-devops',
             '@n10/worktree-manager',
           ].map((name) => ({
             name,
@@ -463,11 +797,19 @@ export default tseslint.config(
           })),
           patterns: [
             {
+              group: ['node:*'],
+              allowTypeImports: true,
+              message: 'Node runtime APIs belong behind the host bridge.',
+            },
+            {
               group: [
                 '@n10/*/*',
                 // Browser-safe by construction, and tested as such.
                 '!@n10/core/plan',
                 '!@n10/core/readiness',
+                '!@n10/core/ui',
+                '!@n10/review-comments/ui',
+                '!@n10/engine/contract',
                 '!@n10/app-core/plan',
                 '!@n10/vcs-core/types',
                 '!@n10/vcs-core/pr-details',

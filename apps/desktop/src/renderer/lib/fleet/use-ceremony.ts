@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type {
-  CeremonyOutcome,
-  CeremonyRequest,
-} from '../../../host/contract-machines.js';
+import type { CeremonyOutcome, CeremonyRequest } from '@n10/engine/contract';
 import { errorMessage } from '../utils.js';
 import {
   ceremonyStep,

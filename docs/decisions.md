@@ -21,10 +21,16 @@ import it, and neither imports a shell or the React layer (enforced in
 `eslint.config.mjs`). Each process creates its own engine services, so a TUI
 and a desktop open on one repository poll independently.
 
-When changing shared behavior, compare both shells. Worktree removal is
-implemented in the TUI's `performDelete` and desktop's `services/worktrees.ts`;
-both use core's removal sequence to stop persisted tmux sessions. Draft posting uses one comment per `postReviewComments` call,
-so a partial failure cannot reset already-posted comments to drafts.
+Domain ownership and execution boundaries are specified in
+[the engine plan](design/engine-domains.md). Config commands persist and re-read
+before dispatching effects; React observes stable snapshots. The host cannot
+import React bindings. No new worker or generic kernel is needed by these domains.
+
+When changing shared behavior, compare both shells. Worktree removal is an
+engine command over core’s guarded removal sequence; shells request a verdict
+and present confirmation before executing that command. Agent findings publish through VCS publishers and core’s durable submission
+ledger. A partial failure retains completed comments; an unanswered write is
+reconciled before retrying.
 
 A fresh worktree needs its own `npm ci`: workspace links and nested dependencies
 must resolve to that checkout. Copying only another checkout's root
@@ -140,8 +146,9 @@ and worktree-path tags, with no fallback to `#{session_path}` or the branch
 termination. Duplicate worktree identities resolve to the oldest session;
 extras are listed, never silently killed.
 
-Labels are `<repo>-<branch>`, `<repo>-shell` or `<repo>-agent`. The repo is the
-canonical main checkout's basename; `/`, `.` and `:` become `-`. A label longer
+Labels are `<repo>-<branch>` for worktrees and `<directory>-shell` or
+`<directory>-agent` for standalone terminals. Worktree labels use the canonical
+main checkout's basename; terminal labels use their own directory's basename; `/`, `.` and `:` become `-`. A label longer
 than 200 characters keeps its first 195 plus a four-digit hash suffix. Name
 collisions add `-2`, `-3`, and so on, always from the original preferred label.
 A duplicate-name race retries allocation without adopting the other session.
@@ -150,19 +157,60 @@ Core registry keys are JSON tuples: `["worktree", repo, canonicalCheckout]` or
 
 ## Discovery, restart and terminal lifecycle
 
-Discovery polls worktrees and tmux, diffs observations with `diffScans`, and
-attaches through the shared launcher. Recheck local connection state between
+The repository handle's engine session service owns discovery, adoption, session
+rows, connection facts and launch/stop commands. Discovery reads the handle's live
+worktree scope and supplies its explicit repository to tmux observation; core
+never reads process cwd for this scan. Pure observation differences (`diffScans`),
+tag identity, PTY activity classification and native launch/incarnation checks
+remain core primitives. Output relays, pane dimensions and terminal-tab UI stay
+in the shell.
+
+Discovery polls worktrees and tmux and attaches through the shared launcher.
+The original warm tmux 3.4 measurement (50 iterations) was 2.3 ms for
+`git worktree list --porcelain -z` and 3.3 ms for `tmux list-sessions -F`:
+two forks and about 5.5 ms per scan, or 0.14% of one core at four seconds.
+Both are batch listings; fork count does not grow with the worktree count.
+Tmux hooks are per-server global state: separate n10 instances overwrite each
+other, while appended hooks cannot be selectively removed. Control mode needs
+an existing session and participates in window sizing unless `ignore-size` is
+set. Neither supplies a simpler independent observer. The non-recursive
+filesystem watch is a latency shortcut; polling still discovers work when the
+watch cannot be installed. Three adoption attempts, a scan apart, survive
+transient Git locks without creating an endless deterministic spawn loop.
+
+Recheck local connection state between
 awaits so concurrent user actions cannot create duplicate connections. Failed
 attaches have bounded retries. Failed local clients become eligible for
 rediscovery without pretending their hosted agents exited.
 
+A launch captures one repository handle and its config before awaiting worktree
+resolution or fleet checks. A repository change before launch refuses the request.
+Identical requests join; incompatible requests resolving to one checkout cannot
+replace each other's PTY. Stopping observation on a repo switch disposes timers
+and listeners but preserves every connected agent. Exit notifications update
+session facts without spawning or reattaching. The process-level repository service
+retains observed connection identities after an explicit stop, so an existing
+pane remains a relaunch target even after switching away and back.
+
+Agent selection uses explicit `agentId`, defaulting to Claude. The hidden fixture
+runner requires `agentId: 'test'`; only that runner interprets `aiCommand`. No
+command-prefix inference or migration fallback exists.
+
 A tagged worktree process is running only while its pane is alive. Standalone
 terminal tabs are found globally by their session type and tmux `session_path`.
-An orphaned worktree session appears as an agent terminal when its tagged branch
+An orphaned worktree session appears as an agent terminal when its tagged checkout
 no longer matches a listed worktree; attachment preserves its original tags.
-Terminal grouping is derived from its directory. Restoring tabs does not move
-focus. Discovery also removes retained tabs whose sessions were deleted outside
-n10.
+The process-wide engine terminal service owns directory/kind identity, launch
+coalescing, retained agents, shell exit cleanup and native-target removal.
+Restarts take directory, kind and machine from the retained terminal; request
+fields cannot redirect it. Core tags a newly created standalone terminal with
+its own directory, independent of the selected repository. Engine facts expose
+connection health only for remote terminals.
+
+Desktop adapts lifecycle callbacks into output relays, preserving relay sequence
+numbers across restarts. Tab grouping, home-directory display and recent-repo
+bookkeeping stay shell-specific. Restoring tabs does not move focus. Discovery
+also removes retained tabs whose sessions were deleted outside n10.
 
 Agent panes use `remain-on-exit` and retain final output. Resume uses the
 recorded agent, regardless of the current project default: Claude and Codex
@@ -207,8 +255,8 @@ verdict did not name, such as a file written into a checkout judged clean. Any
 of them keeps everything. A branch that moves during the removal itself, or
 that git will not delete, keeps the branch. `removeWorktreeSession`
 returns what it did, and each shell says what was kept and why. The
-merged-branch sweep uses the same guard. `removeWorktreeSession`
-scans discovery before and after removing, so the shells learn of n10's
+merged-branch sweep uses the same guard. The engine worktree command
+scans its repository’s discovery before and after core removal, so the shells learn of n10's
 removals through `onChanged`, as they learn of `git worktree remove`: discovery
 can only report the removal of a worktree it has seen.
 
@@ -385,11 +433,30 @@ item numbers match what the user sees. The renderer composes the delivered text
 because it previews that exact prompt. Checkout injects into a live agent,
 respawns an ended one, or creates a worktree and launches an agent.
 
+`engine/babysitters` owns watches keyed by repository and PR, their polling,
+remote-read freshness and delivery coordination. Core keeps the pure baseline
+model, prompt composition and Git/session primitives. Desktop supplies the active
+config handle, pane dimensions and output adoption; it holds no watcher registry.
+The TUI has no babysitting controls. A parked repository retains its watch baseline
+but cannot poll or deliver until selected again. Concurrent starts share one lookup;
+stop, shutdown and worktree removal cancel pending starts before they create a watch.
+Busy timer ticks are skipped; explicit polls share at most one queued follow-up.
+Spawn completion names its captured repository even if selection changed while
+launching. Shutdown stops watchers and detaches clients without killing agents.
+
 The babysitter baseline is what the agent was told, not the latest observation.
 Hold or delivery failures leave it unchanged. A new head or thread reply can be
 news; the user's own latest comment is not relayed. Recovery from a reported CI
 failure is news; an initial green result alone is not. An unavailable conflict
 check is reported as unavailable, never interpreted as a clean result.
+
+Worktree-removal suspension stops a watch and recreates it when removal is
+refused or fails. That discards the delivered baseline, so the resumed watch may
+re-brief findings the agent already received. A separate change should
+park/resume the same watch and test
+refused removal and late delivery together. It must retain the removal safety
+verdicts and must not detach sessions on repository switches. See
+[the suspension follow-up](design/engine-domains.md#babysitter-removal-suspension).
 
 Batch updates after ten minutes of quiet or thirty minutes maximum, and deliver
 only after the agent has been idle for thirty seconds. Start agents with `seed`,
@@ -398,8 +465,9 @@ an existing branch: inventing one from HEAD would send work to the wrong commit.
 
 Pass `cwd` to every Git operation and check `live()` after awaits. Serialize
 fetches through `sync/fetch-queue.ts`; invalidate reused refs when the head moves.
-Use `sync/conflicts.ts` for both the badge and briefing. The worktree resolver is
-process-global, so check liveness immediately before checkout as well.
+Use `sync/conflicts.ts` for both the badge and briefing. Checkout receives the
+captured repository and configured worktree path. Check liveness immediately
+before checkout as well.
 
 Babysitters read the shared PR cache, distinguish unknown from gone, and require
 consecutive absences before ending a watch. Resolve the provider per poll so
@@ -433,16 +501,17 @@ demand is its renderer's sidebar poll.
   `timeout`), so a hung read cannot hold the queue: the engine sees an ordinary
   failure. Mutations run without one; a killed mutation may or may not have
   reached GitHub.
-- The engine resolves providers from the persisted config. The TUI persists a
-  settings edit in a microtask, so its settings effects are queued behind that
-  write. A settings edit's `refresh-remote` is a forced read, not `refresh()`:
+- The engine resolves providers from persisted config. Config commands persist
+  before invalidation, refresh and subscription notification. A settings edit
+  forces a read without `refresh()`:
   a credential change has already reset every provider, and an interval edit
   should not cost a cycle of per-row reads.
 
 GitHub uses authenticated `gh`; offline tests replace that executable on PATH.
-Azure DevOps uses REST and a PAT, with recorded anonymized fixtures rather than
-e2e coverage. Extend those fixtures when changing Azure behavior. Scrub identities
-and repository details from recordings; keep credentials out of fixtures.
+Azure DevOps uses REST and a PAT. Provider tests use recorded anonymized
+fixtures; desktop e2e uses an offline host preload. Extend those fixtures when
+changing Azure behavior. Scrub identities and repository details from recordings;
+keep real credentials out of fixtures.
 
 Azure statuses are history. Group by context and choose the newest iteration,
 date and id. `notApplicable` retracts a check without voting; missing state means
@@ -463,6 +532,64 @@ Babysitter thread reads use the provider throttle and TTL outside the list-cycle
 budget. GitHub gets rollup and counts with its list query and needs no equivalent
 per-row cache-reset methods. `request-budget.spec.ts` checks request counts.
 
+## Review read ownership
+
+The repository handle owns `engine/reviews`: thread, description, detail, checks,
+conversation and Git diff resources. Reads coalesce, ordinary callers reuse fresh
+answers, and a forced read queues one follow-up. Provider data and branch resolutions
+are fresh for 30 seconds; live checkout diffs for one second. A failed read retains
+same-scope data and permits immediate retry. Explicit thread invalidation (including
+opening a composer) forces an engine read. Account/config changes clear data
+and reject obsolete publication; disposing a repository prevents late publication.
+The desktop RPC rejects a failed answer and its query cache retains the last good
+view. TUI hooks subscribe directly. Frontends own visibility and error presentation,
+not another freshness policy.
+
+PR list changes expire the repository’s review reads so a new head, check or
+review cannot remain hidden behind their TTL. Same-scope invalidation retains the
+last successful answer. Manual remote refresh invalidates provider reads after
+the provider memo is cleared.
+Both shells issue reply, resolve and verdict commands through the engine. A
+confirmed thread change patches its unchanged base snapshot or invalidates a raced
+snapshot, and expires
+related checks/conversation reads; resolve/verdict commands refresh the captured
+repository's list. Draft save/discard/submission and mention search share the same
+identity context.
+
+Git metadata parsing is a core operation with explicit cwd. The engine refreshes
+source refs when the PR head differs, shares the core target-fetch queue's five-minute
+freshness, and pins both commit IDs before reading file lists or patches. Full patches
+and per-file patches use the same comparison. Resolution caches expire on list
+changes; manifests and patches are keyed by exact commit IDs, with no time expiry.
+The TUI carries its displayed manifest's refs into each patch request. Config
+identity checks compare disk values without invoking reload or publishing effects. Metadata overflow is an error, never
+an incomplete file list. Resource maps evict idle entries without evicting observed
+or active reads. Patch maps have smaller capacities than provider records.
+
+No worker is added for orchestration or subprocess waits. Desktop diff parsing and
+syntax highlighting remain in their existing renderer workers; the final profiling
+slice determines whether host CPU work warrants another boundary.
+
+## Agent findings and publication
+
+`engine/reviews/agent-comments.ts` owns finding resources, edit/delete policy and
+filesystem observation. The common Git directory identifies the repository, so
+linked worktrees share findings while equal PR numbers in different repositories
+do not. Files live under `~/.n10/reviews/<repository hash>/pr-<number>`; no legacy
+unscoped path is read. The standalone utility resolves this identity through core.
+Only observed resources attach a nonrecursive watcher; disposal closes it.
+
+Agent publication uses core’s draft submission machinery in the separate
+`~/.n10/agent-review-publications` store, keyed by provider repository, PR and
+account. Human writing stays in `review-drafts`. Every network write goes through
+`VcsProvider.publishReview`; review-comments contains storage and formatting only.
+Selected findings are submitted as one native review with one verdict. A partial
+retry resumes the same durable submission and skips confirmed findings; the
+error reports how many findings were posted.
+Completed findings stay posted after a later failure. An uncertain outcome retains
+its ledger and account binding, blocks edits, and is reconciled on retry. Restarted
+processes can retry findings left posting without inventing a second write path.
+
 ## Diff generation and rendering
 
 PR diffs compare commits so review anchors remain stable. Bare worktree diffs
@@ -472,7 +599,9 @@ worktrees; do not recursively watch a checkout and exhaust inotify on dependenci
 
 Whole-file context (`-U99999`) supports comments on unchanged lines; fold it in
 the viewer. Stream Git output with `runGit`, which preserves partial output and
-reports truncation rather than discarding the entire buffer on overflow.
+reports truncation rather than discarding the entire buffer on overflow. This
+read transport kills a child after 30 seconds and rejects, releasing its resource
+lane; mutations use a separate transport and do not inherit this deadline.
 
 Bound worktree diffs before expensive reads. Use `lstat` for symlinks, churn to
 bound deleted files, and exclude both paths of an oversized rename. A content-free
@@ -546,3 +675,134 @@ daemon's control socket and the UI's gating. Code cites these as
 | D15 | The desktop uses a beam daemon already running and leaves it on quit. Otherwise it starts one with `--exit-with-parent`, and on quit stops it through the child: its stdin closed, then a kill.                                                                                                        | A daemon started from the CLI or a service is not the app's. The app's own stops with it, crash included, so this machine leaves its peers' lists. Unenrolled, a daemon serves only its socket (beam docs/02): D8's cost is one idle process.                                                                                                                                                                                            |
 | D16 | Plain `n10` opens the desktop, `n10 --tui` the TUI, `n10 util` the review utility, all one package. The desktop's local sessions still get `n10` and `beam` from a directory first on their PATH; the `n10` there runs `util` with the app's own code and forwards the rest to the next `n10` on PATH. | One package with one executable cannot conflict with itself on install, and a TUI user never has to download the Electron binary. A session's `n10 util` must work where no `n10` is on its PATH (a dev build, `npx`) and match the running app when a global one differs, and a dependency's executable, beam, never reaches the PATH. The app's Electron runs the shim as Node, so nothing else is needed. beam stays its own command. |
 | D17 | Delivery into a session, pane or Claude inbox, needs the sender's grant here to be `all`; `msg` is the mailbox alone. A `claude:<id>` target then reaches any live Claude session registered with that id.                                                                                             | An `all` peer can already run anything here through `beam exec`, so typing into an agent gives it nothing more; a `msg` machine, one that should only report (beam docs/01), could otherwise start work through an agent. Nothing local says which Claude session supervises remote players, and a player's tags are its machine's say-so.                                                                                               |
+
+## Repository scope
+
+`engine/repositories` owns canonical identity and the open sequence: validate,
+fill missing project configuration against that explicit checkout, configure
+worktree paths, then create or reload its config handle. Failed validation preserves
+the active scope; nested directories and aliases resolve to Git’s toplevel.
+The config service derives repository/provider/viewer metadata and publishes
+changes; repository selection has no second metadata store. Core supplies
+filesystem validation and resolver operations. Desktop chooses its startup repo
+and keeps recents; the TUI opens its requested checkout before mounting React.
+
+Repository detection, worktree operations, session commands and plan delivery
+receive captured paths and repository handles. Plan delivery validates the
+repository lifetime before each effect.
+
+## Shared remote sync
+
+One engine service runs the complete fetch, merged-branch sweep and conflict
+read for a captured repository. Config’s sync revision invalidates an active
+pass and rearms its timer; auto-delete changes count as a revision so disabling
+it cancels a pending sweep. Timer ticks skip busy work. Explicit refreshes join
+one queued follow-up, and repeated start calls preserve the existing schedule.
+Provider errors retain the last successful badges and timestamp while
+publishing an error. Shells render typed notices and observe loading state.
+
+A failed fetch preserves the last successful fetch timestamp and publishes a
+plain-language error. Provider-based merged detection and conflict reads continue
+using local Git data. Automatic deletion still requires core’s guarded local
+verdict, which refuses removal when it cannot establish safety. Worktree changes alone
+do not trigger a fetch; both shells refresh badges on the configured sync
+interval or explicit refresh.
+
+Cancellation is checked between reads and before guarded removal. A completed
+removal always emits its repository-qualified notice, even after cancellation.
+Repository switches can start another service immediately; stale reads cannot
+publish or start removal. Shutdown cancels future work and awaits removals
+already underway. It does not put a deadline on a Git mutation. Desktop detaches terminal clients
+and stops its daemon while removals finish. The TUI announces a shared three-second
+grace period for automatic removals and manual operations, then detaches and exits
+even if an operation is still pending; this shell exit bound does not cancel or
+retry a mutation. Both manual and
+automatic removals go through captured-repo engine commands, with core retaining
+the stop/remove/delete safety checks. Desktop supplies repo-qualified babysitter
+ports; a retained checkout resumes watchers only while its repo is selected.
+
+## Repository-scoped worktrees
+
+Repository handles own `WorktreeService`. A read shares the resource's active
+request or a snapshot fetched within one second; an explicit refresh during a
+read joins one follow-up. Failed Git reads retain the last good lists with an
+error. Desktop RPCs reject a failed refresh so the query layer reports it;
+TanStack Query keeps its prior successful sidebar data, and Workspace renders
+that data while toasting the error. A first failed read has no prior rows.
+Successful commands refresh the resource, so both shells see the same
+creation, removal and rebase behavior. A configured path change invalidates
+in-flight publication and reads with the new path policy immediately.
+
+`WorktreeScope` is an immutable value passed through the Git primitives and
+removal safety checks. It captures repository, path resolver and optional remote
+machine before awaiting. A desktop launch that overlaps repository selection
+keeps the original service. The process has no selected worktree resolver.
+Session targets resolve from checkout identity; PR targets ensure a checkout
+exists. Editor process launching and selection/focus remain shell adapters.
+
+Discovery captures its repository and replaces its non-recursive filesystem
+watch when the configured worktree base changes. Switching repositories disposes
+the old resource subscription; it does not detach retained session clients.
+
+## Engine fleet boundary
+
+`engine/machines` owns fleet snapshots, one in-flight read, mail overlays,
+remote command/PTY capability and the local-versus-remote launch guard. A push or
+transport replacement invalidates an older list response. Failed reads retain
+last-known machines and report an error; a shell without ports observes an
+unavailable capability. Commands never fall back to a local executor.
+
+Each PTY handle uses the transport that opened it. A port replaced during attach
+causes the late stream to detach from its original transport. Fleet data types
+live in the browser-safe `@n10/engine/contract` entry. Desktop only adapts engine
+events to IPC and installs Beam ports; Beam sockets, reconnection, enrolment
+protocols, the mail relay and utility-process daemon ownership remain adapters.
+D15's external-versus-app-owned daemon shutdown rule is unchanged.
+
+### Engine plan delivery
+
+`plans/plan-commands.ts` supplies `sessions.checkoutPlan` to both shells. The
+command captures config and path policy before its first await and checks the
+repository lifetime before checkout, delivery or process replacement. Identical
+in-flight sends coalesce; a different prompt or delivery mode is rejected so no
+plan is silently dropped. Delivery returns the actual checkout's session key.
+Completed launches are adopted under the captured repository even if selection
+changes during launch; worktree/session observation refreshes after success or
+failure. A refresh failure is logged and cannot replace the delivery result,
+so a successfully sent plan is never presented as retryable. Mutations have no
+automatic replay or timeout.
+
+The frontend retains its cart and composed preview. Core retains launch, attach,
+stop and inject primitives; its plan checkout orchestrator and the desktop's
+coalescing/adoption coordinator are deleted. The browser-safe engine contract
+owns the plan request/result types.
+
+### Browser bindings and domain boundaries
+
+App-core is a browser-safe React layer over injected structural clients. The
+engine's type-only `contract` entry exposes client and payload types without
+loading Node services. Core `ui`/`plan` and review-comments `ui` expose pure
+presentation models. A browser bundle regression covers their transitive graph.
+Placement computes data without writing host logs. CLI-owned hooks adapt PTY
+frames, activity, tab registry state and TTY dimensions; `LayoutProvider` requires
+the shell's dimension hook and pane initialization receives session presence.
+
+Engine domains import neighboring domains through explicit `api.ts` surfaces.
+ESLint enforces those edges, prohibits domains in the kernel and Node APIs in
+React bindings, and rejects raw config reads in production shells. Core PTY I/O
+remains available to shell transports. The small shared terminal-dimension
+validator is extracted because session, terminal and plan commands use it; this
+does not introduce a generic kernel framework or a second desktop query cache.
+
+## Host execution boundaries
+
+Engine domains share one Node owner per shell. The desktop keeps its measured
+utility-process boundary; the renderer owns its existing diff/highlight workers.
+Domain separation does not require thread separation. The
+[host workload assessment](design/host-worker-assessment.md) records timer delay,
+CPU, RSS and real Git-read latency for idle, ten-terminal and large-diff cases.
+It does not demonstrate a sustained host CPU bottleneck that would pay for a
+worker pool. Keep ordered mutations and PTY ownership in their current process.
+Require an attributed CPU profile and identical-fixture before/after evidence
+before adding another worker; asynchronous I/O or smaller payloads may address
+the measured cost without a new lifetime and queue.

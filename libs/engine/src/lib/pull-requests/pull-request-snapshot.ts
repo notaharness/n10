@@ -1,6 +1,6 @@
 import type { BranchPrMap } from '@n10/vcs-core';
 
-export const PULL_REQUEST_POLL_DEFAULT_MS = 60_000;
+const PULL_REQUEST_POLL_DEFAULT_MS = 60_000;
 
 /** No minimum: `prPollInterval` is honoured verbatim. */
 export function pullRequestPollIntervalMs(

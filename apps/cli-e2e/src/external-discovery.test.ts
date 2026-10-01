@@ -31,6 +31,7 @@ const BANNER = 'external-agent-was-already-running';
 
 test.use({
   n10Config: {
+    agentId: 'test',
     aiCommand: fakeAgentCommand({ banner: 'n10-fake-agent-ready' }),
     keybindPreset: 'vim',
   },

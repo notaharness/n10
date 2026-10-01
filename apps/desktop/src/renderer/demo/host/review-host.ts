@@ -87,7 +87,6 @@ type ReviewHost = Pick<
   | 'postDraftComments'
   | 'fetchDiffText'
   | 'fetchWorktreeDiffText'
-  | 'fetchFileDiffText'
 >;
 
 export function createReviewHost(state: DemoState): ReviewHost {
@@ -182,7 +181,5 @@ export function createReviewHost(state: DemoState): ReviewHost {
       return { text: await diffOf(source), head };
     },
     fetchWorktreeDiffText: () => later(''),
-    fetchFileDiffText: async (source, _target, file) =>
-      fileSection(await diffOf(source), file),
   };
 }

@@ -1,12 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Worktree removal is the destructive path, and it is a sequence, not a
- * single call: kill the agent, remove the worktree, then delete the
- * branch. Getting the order or the conditions wrong strands a PTY in a
- * deleted directory, deletes a branch whose worktree is still there, or
- * removes a directory out from under a live agent.
- */
+/** Host adapters supply repository/watch ports and launch detached editors. */
 
 const calls = vi.hoisted(() => ({
   log: [] as string[],
@@ -18,62 +12,32 @@ const calls = vi.hoisted(() => ({
 }));
 
 vi.mock('./repo.js', () => ({
-  requireRepo: () => '/repo',
-  activeRepoIs: (cwd: string) => cwd === '/repo',
+  activeConfigService: () => ({
+    getSnapshot: () => ({ config: calls.config }),
+  }),
+  activeWorktreeService: () => ({
+    remove: (branch: string, approved: { verdict: string }) => {
+      calls.log.push(`remove:${branch}:${approved.verdict}`);
+      return Promise.resolve(calls.removed);
+    },
+    create: (branch: string) => {
+      calls.log.push(`create:${branch}`);
+      return calls.createReturns
+        ? Promise.resolve(calls.createReturns)
+        : Promise.reject(new Error('Failed to resolve a worktree'));
+    },
+  }),
 }));
 
-vi.mock('@n10/vcs-core', () => ({ readConfig: () => calls.config }));
-
-vi.mock('node:child_process', () => ({
+vi.mock('node:child_process', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
   spawn: (cmd: string, args: string[], opts: { detached: boolean }) => {
     calls.spawned.push({ cmd, args, detached: opts.detached });
     return { unref: () => undefined };
   },
 }));
 
-vi.mock('@n10/core', () => ({
-  removeWorktreeSession: (
-    branch: string,
-    approved: { verdict: string },
-    repo: string
-  ) => {
-    calls.log.push(`remove-session:${repo}:${branch}:${approved.verdict}`);
-    return Promise.resolve(calls.removed);
-  },
-}));
-
-vi.mock('./babysit.js', () => ({
-  stopBabysitForBranch: (branch: string) => {
-    calls.log.push(`stop-babysit:${branch}`);
-    return [42];
-  },
-  startBabysit: (prId: number) => {
-    calls.log.push(`start-babysit:${prId}`);
-    return Promise.resolve({ phase: 'watching' });
-  },
-}));
-
-vi.mock('@n10/worktree-manager', () => ({
-  listWorktrees: () => Promise.resolve(calls.worktrees),
-  listBranches: () => Promise.resolve(['main']),
-  listAllBranches: () => Promise.resolve(['main', 'origin/main']),
-  createWorktree: (branch: string) => {
-    calls.log.push(`create:${branch}`);
-    return Promise.resolve(calls.createReturns);
-  },
-  removeWorktree: (branch: string, opts: { force: boolean }) => {
-    calls.log.push(`remove:${branch}:${opts.force ? 'force' : 'safe'}`);
-    return Promise.resolve(calls.removed);
-  },
-  canRemoveBranch: () => Promise.resolve({ safe: true }),
-  deleteBranch: (branch: string) => {
-    calls.log.push(`delete-branch:${branch}`);
-    return Promise.resolve(true);
-  },
-  branchToSessionName: (branch: string) => branch.replace(/\//g, '-'),
-  worktreeSessionName: (wt: { branch: string }) =>
-    `wt-${wt.branch.replace(/\//g, '-')}`,
-}));
+vi.mock('@n10/core', () => ({}));
 
 const { openInEditor, removeWorktree } = await import('./worktrees.js');
 
@@ -91,7 +55,7 @@ beforeEach(() => {
 });
 
 describe('removeWorktree', () => {
-  it('stops babysitting then delegates removal with the captured repository', async () => {
+  it('delegates the approved removal to the selected engine service', async () => {
     expect(
       await removeWorktree('feature/x', {
         verdict: 'force',
@@ -103,51 +67,8 @@ describe('removeWorktree', () => {
         checkout: '/repo/wt',
       })
     ).toBe('removed');
-    expect(calls.log).toEqual([
-      'stop-babysit:feature/x',
-      'remove-session:/repo:feature/x:force',
-    ]);
+    expect(calls.log).toEqual(['remove:feature/x:force']);
   });
-  it("returns core's outcome to the caller", async () => {
-    calls.removed = 'git-refused';
-    expect(
-      await removeWorktree('feature/x', {
-        verdict: 'clear',
-        tip: 'abc123',
-        repo: '/repo/.git',
-        checkout: '/repo/wt',
-      })
-    ).toBe('git-refused');
-  });
-
-  // The agent a kept worktree still holds is still worth watching.
-  it.each(['changed', 'git-refused'])(
-    'babysits the pull request again when core answers %s',
-    async (outcome) => {
-      calls.removed = outcome;
-      await removeWorktree('feature/x', {
-        verdict: 'clear',
-        tip: 'abc123',
-        repo: '/repo/.git',
-        checkout: '/repo/wt',
-      });
-      expect(calls.log.at(-1)).toBe('start-babysit:42');
-    }
-  );
-
-  it.each(['removed', 'kept-branch'])(
-    'leaves babysitting stopped when core answers %s',
-    async (outcome) => {
-      calls.removed = outcome;
-      await removeWorktree('feature/x', {
-        verdict: 'clear',
-        tip: 'abc123',
-        repo: '/repo/.git',
-        checkout: '/repo/wt',
-      });
-      expect(calls.log).not.toContain('start-babysit:42');
-    }
-  );
 });
 
 describe('openInEditor', () => {

@@ -1,14 +1,14 @@
 import type {
-  BeamFailure,
+  FleetFailure,
   CeremonyOutcome,
   CeremonyProgress,
   CeremonyRequest,
-} from '../../host/contract-machines.js';
+} from '@n10/engine/contract';
 import { BeamOpError, ControlConnection } from './control.js';
 
 /** A failure as beam named it. A connection that closed under a
  *  request is `connection-lost`: the request may have completed. */
-export function failure(err: unknown, lost = false): BeamFailure {
+export function failure(err: unknown, lost = false): FleetFailure {
   if (err instanceof BeamOpError) {
     return { ok: false, code: err.code, detail: err.detail || null };
   }

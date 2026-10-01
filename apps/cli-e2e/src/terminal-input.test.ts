@@ -3,11 +3,9 @@ import { startFromSessionMenu } from './setup/sessions.js';
 import { settleFor } from './setup/waits.js';
 
 // Vim preset for the keybindings this test uses (s settings, c branch
-// picker, K kill, x delete). `aiCommand: 'bash'` is an unrecognized
-// command, so it resolves to the hidden test-runner agent and spawns a
-// real bash we can drive to verify terminal I/O forwarding.
+// picker, K kill, x delete). The explicit test agent runs bash.
 test.use({
-  n10Config: { keybindPreset: 'vim', aiCommand: 'bash' },
+  n10Config: { agentId: 'test', keybindPreset: 'vim', aiCommand: 'bash' },
 });
 
 test.describe('Terminal Input', () => {

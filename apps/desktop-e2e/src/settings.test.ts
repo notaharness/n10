@@ -18,20 +18,16 @@ function storedPat(homeDir: string): string | undefined {
 test.describe('Settings', () => {
   test.use({
     n10Config: {
-      vendorAuth: { 'azure-devops': { pat: PAT } },
       // Long enough that nothing in these tests can be explained by a
       // poll happening to fire: a refetch inside them is one something
       // asked for.
       prPollInterval: 3_600_000,
       mergePollInterval: 3_600_000,
     },
-    // A provider's auth fields only appear in the settings model once a
-    // vendor is selected, and the vendor is per-project config.
-    projectConfig: {
-      vendor: 'azure-devops',
-      org: 'acme',
-      project: 'widgets',
-      repo: 'widgets',
+    fakeAzureDevOps: {
+      pat: PAT,
+      user: { displayName: 'Reviewer', uniqueName: 'reviewer@example.test' },
+      prs: [],
     },
   });
 
@@ -88,27 +84,24 @@ test.describe('Settings', () => {
     expect(storedPat(homeDir)).toBe('ado_rotated');
   });
 
-  /**
-   * Replacing a rejected access token has to take effect now.
-   *
-   * There is no Azure organization behind `acme/widgets`, so the
-   * provider fails here exactly as it does against a revoked token —
-   * which is the situation being tested. What the assertion turns on
-   * is not whether the fetch succeeds but whether one was *started*:
-   * `remoteFetches` is monotonic, and with the poll interval set to an
-   * hour nothing else in the test can move it.
-   */
+  // The offline provider serves a cached list. Changing credentials must
+  // start a new read even though its poll is an hour away.
   test('saving a token refetches immediately instead of waiting for the poll', async ({
     desktop,
   }) => {
     const { page } = desktop;
     const syncState = () => page.evaluate(() => window.n10.getSyncState());
 
-    // Let the launch fetch finish and record a failure, so there is a
-    // stale error to clear.
+    // Wait for the initial list so the write cannot borrow its fetch.
     await expect
-      .poll(async () => (await syncState()).remoteError, { timeout: 20_000 })
-      .not.toBeNull();
+      .poll(
+        async () => {
+          const state = await syncState();
+          return state.remoteFetches > 0 && !state.remoteSyncing;
+        },
+        { timeout: 20_000 }
+      )
+      .toBe(true);
     const before = (await syncState()).remoteFetches;
 
     const after = await page.evaluate(async () => {
@@ -120,10 +113,7 @@ test.describe('Settings', () => {
         'ado_rotated'
       );
       // Read straight after the save. What is asserted below is that
-      // a fetch was *started* — the clearing of the stale error is a
-      // unit-level concern (host/services/sidebar.spec.ts), because
-      // the new attempt may already have failed again by the time this
-      // second round trip lands.
+      // a fetch was started, independently of when its answer arrives.
       return window.n10.getSyncState();
     });
 

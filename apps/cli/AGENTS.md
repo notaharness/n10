@@ -3,7 +3,7 @@
 This project is the published `@notaharness/n10` package. `src/main.ts` is the
 `n10` executable: plain `n10` runs Electron on the desktop build shipped beside
 it (`commands/launch-desktop.ts`), `--tui` loads `src/tui.tsx`, and `util`
-loads `commands/util.ts`, which is `@n10/review-comments` alone. Those two are
+loads `commands/util.ts`, which delegates to core’s scoped review utility. Those two are
 dynamic imports of local modules (Nx forbids lazy-loading a library imported
 statically elsewhere), which esbuild splits into chunks. Keep Ink, React and
 Electron out of `main.ts`'s static imports so `util`, `--help` and `--version`
@@ -32,12 +32,14 @@ holds the keybind-driven state transitions; screens under `src/screens/main`
   without it every file needs `import React`.
 - Ink paints nothing when `CI`, `CONTINUOUS_INTEGRATION` or `GITHUB_ACTIONS`
   is set. Strip them from any env that spawns n10.
-- Worktree removal uses core's shared stop → remove → delete sequence.
+- Session launch/stop and discovery use the engine repository handle. Worktree
+  removal uses the engine command over core’s guarded stop → remove → delete sequence.
   `stopSession` terminates one held target or one persisted target, never both.
 - The pull request list is `@n10/engine`'s, created in `tui.tsx` and provided
   by `EngineProvider`. `usePrData` observes it and holds a watch; nothing here
-  calls the provider's list. Settings effects run after the config write lands
-  (`input-handlers.ts`), since the engine reads the persisted config.
+  calls the provider's list. The engine config service persists settings and
+  dispatches effects; `ConfigProvider` observes its snapshots. Input handlers
+  only issue commands.
 - Rows are named by branch here; the desktop names a PR row by its title.
 - Tests: `ink-testing-library` for text content and keyboard navigation. ANSI
   rendering, PTY forwarding and real terminal interaction are manual or
@@ -45,9 +47,9 @@ holds the keybind-driven state transitions; screens under `src/screens/main`
   project must reference its spec tsconfig as well as the app one.
 - `n10 util add-comment` (`@n10/review-comments` `util-command.ts`) is how a
   review agent records drafts; desktop sessions run it through the desktop's
-  own shim (decisions.md D16). Draft posting is one comment
-  per `postReviewComments` call so a mid-batch failure cannot reset live
-  comments to draft.
+  own shim (decisions.md D16). Engine agent-draft commands publish through
+  the VCS publishers and core’s durable ledger, retaining completed comments
+  after a partial failure. Findings are scoped to the common Git directory.
 - Packaging: `prepare-publish` assembles `dist/` from this build and the
   desktop build; see the `publish-beta` skill.
 - Comment images (`![alt](url)`) render inline through kitty graphics only

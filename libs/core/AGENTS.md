@@ -3,9 +3,9 @@
 The shell-agnostic operations: Git, worktrees, PTY and session
 infrastructure, config, providers, keybindings, the plan store, pure helpers.
 No react, ink, electron, `@n10/app-core` or `@n10/engine` (lint-enforced);
-state, scheduling and caching over these belong in `libs/engine`. `src/plan.ts`
-and `src/readiness.ts` are the browser-safe entries (`@n10/core/plan`,
-`@n10/core/readiness`); nothing under them may touch `node:`, and they
+state, scheduling and caching over these belong in `libs/engine`. `src/ui.ts`,
+`src/plan.ts` and `src/readiness.ts` are the browser-safe entries (`@n10/core/ui`,
+`@n10/core/plan`, `@n10/core/readiness`); nothing under them may touch `node:`, and they
 import `@n10/vcs-core` as types, or its `./types` subpath for values.
 The reasoning behind each rule is in `docs/decisions.md`.
 
@@ -59,37 +59,32 @@ The reasoning behind each rule is in `docs/decisions.md`.
   registry file names is refused.
   Extending what a relay can deliver into means extending this allowlist, not
   trusting more of the envelope.
-- **Discovery** (`discovery/`): poll and use pure `diffScans`; attach through the
-  shared launcher, rechecking connection state between awaits. Retired names
-  are suppressed. Observe worktree processes, orphaned sessions and standalone
-  terminals in one listing. Retained agent panes are not running processes.
-  `removeWorktreeSession` rescans before it resolves, so shells learn of
-  every removal, n10's or not, through `onChanged`.
+- **Worktree operations**: pass an immutable `WorktreeScope` through Git and
+  guarded removal. Engine commands capture the scope from their config snapshot
+  and reuse it for lookup and checkout. Never select a process-wide path resolver.
+- **Observation** (`discovery/`, `session-backend.ts`): pure scan differences,
+  tagged observations and live-worktree lookups. `observeTmuxSessions` receives
+  the repository explicitly. The engine owns polling, adoption and removal rescans.
+  Retained agent panes are not running processes.
 - **Terminal sessions** (`terminal/launch-terminal.ts`): explicit shell/agent
-  requests use the same launcher as worktrees. Allocate the final tmux name
-  before creating the registry key. Agent panes retain final output; shell
-  exits close their tabs. Native pane state controls exit, not client disconnect.
+  requests use the same launcher as worktrees, with the terminal directory as
+  their explicit scope. Allocate the final tmux name before creating the registry
+  key. Native pane state controls exit, not client disconnect. The engine owns
+  agent retention and shell-exit cleanup; tab presentation belongs to the shell.
 
-- **Session launch** (`session/`) resolves the worktree via `createWorktree`
-  (exact branch match, rejecting a derived path occupied by another branch), reads config from the
-  repo root, and only replaces a live session with explicit incarnation approval. Force-remove is offered only
+- **Session launch** (`session/`) receives the resolved checkout and explicit
+  config; it replaces a live session only with native incarnation approval. Force-remove is offered only
   for uncommitted changes, unpushed commits and submodules. `removeWorktreeSession`
   takes the confirmed verdict, never a bare `force`. It forces only past risks
   the verdict named, and keeps everything if the checkout changed in any way the
   verdict did not cover, checked before and after the agent stops. It returns
   what it did.
 - **Plan** (`plan/`): items are value snapshots taken at add time.
-  `composePlanPrompt` numbers items in `planRows` order. Checkout is
-  three-state: inject into a live agent, respawn, or create the worktree and
-  spawn.
-- **Babysit** (`babysit/`): the baseline is what the agent was told, not what
-  was last seen. Send after ten minutes of quiet or thirty at most, only while
-  the agent has been idle thirty seconds (`idleFor`). Spawn only through
-  `checkoutWorktree` (existing branch) with `seed`, never `continue-or-seed`.
-  Every Git call takes `cwd`; ask `live()` after each await. Fetches go through
-  `sync/fetch-queue.ts`; the merge check is `sync/conflicts.ts` so badge and
-  briefing agree. `onStatus` fires on transitions only. Timing overrides:
-  `babysitTimingFromEnv`.
+  `composePlanPrompt` numbers items in `planRows` order. The engine owns
+  checkout and session delivery; carts stay in each frontend.
+- **Babysit** (`babysit/`): pure baseline/observation model and prompt composition.
+  The engine owns watch lifetime, freshness, polling and delivery coordination.
+  The baseline records what the agent was told, not merely what was observed.
 - **Pull request lookup** (`pull-requests/pull-request-lookup.ts`): the
   `found`/`gone`/`unknown` answer a babysitter reads. The list behind it is
   `@n10/engine`'s.
@@ -101,8 +96,7 @@ The reasoning behind each rule is in `docs/decisions.md`.
   keeps every file. Untracked files are assembled by hand, never `git add -N`,
   and symlinks render as mode-120000 patches. Git-backed cases live in
   `worktree-diff.integration.spec.ts`.
-- **Sync** (`sync/`): `sweepMergedBranches`, conflict counts. `asyncOps.run`
-  never rejects; errors go through `setOperationErrorHandler`.
+- `asyncOps.run` never rejects; errors go through `setOperationErrorHandler`.
 - `keybindings/registry.ts` is the action catalog and carries a 900-line
   ceiling on purpose. Presets: Normie, Vim.
 - No recursive `fs.watch` over a checkout; `node_modules` alone exhausts the

@@ -64,7 +64,7 @@ describe('diff-fetcher integration', () => {
   it('diff includes full file context so comment-referenced lines are present', async () => {
     // Dynamic import so it runs in the temp repo's cwd
     const { fetchDiffText } = await import('./diff-fetcher.js');
-    const diffText = await fetchDiffText('feature', 'master');
+    const diffText = await fetchDiffText(process.cwd(), 'feature', 'master');
     const parsed = parseUnifiedDiff(diffText);
     const diffLines = parsed.get('test.txt');
 
@@ -109,7 +109,7 @@ describe('diff-fetcher integration', () => {
 
   it('comment is placed at correct position when referenced lines are in diff', async () => {
     const { fetchDiffText } = await import('./diff-fetcher.js');
-    const diffText = await fetchDiffText('feature', 'master');
+    const diffText = await fetchDiffText(process.cwd(), 'feature', 'master');
     const parsed = parseUnifiedDiff(diffText);
     const diffLines = parsed.get('test.txt')!;
 

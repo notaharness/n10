@@ -5,16 +5,19 @@
 n10 is one program with two frontends. Each layer depends only on the ones
 below it, and the ESLint module boundaries enforce the direction.
 
-| Layer                      | Role                                                                                                                                                                                                                   |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@n10/core`                | Primitive operations: Git, filesystem, tmux and PTY, config, providers, pure helpers. Node only.                                                                                                                       |
-| `@n10/engine`              | The program: state, scheduling, caching and the events that announce them, over core. Node only; never React, Ink or Electron.                                                                                         |
-| `@n10/app-core`            | React bindings. The TUI's contexts and hooks, and the plan binding the desktop renderer also uses; the desktop host imports its config write helpers. Its end state is thin, browser-safe hooks over an engine client. |
-| `apps/cli`, `apps/desktop` | Rendering and input. The TUI runs the engine in its own process; the desktop runs it in the Electron main process, behind the host bridge. Two open shells share the implementation, not the state.                    |
+| Layer                      | Role                                                                                                                                                                                                                       |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@n10/core`                | Primitive operations: Git, filesystem, tmux and PTY, config, providers, pure helpers. Node entry plus explicit browser-safe subpaths.                                                                                      |
+| `@n10/engine`              | The program: state, scheduling, caching and the events that announce them, over core. Node only; never React, Ink or Electron.                                                                                             |
+| `@n10/app-core`            | React contexts/hooks over the engine, including config snapshots; the desktop renderer also uses the browser-safe plan binding. Browser-safe hooks receive structural engine clients; terminal-only hooks live in the CLI. |
+| `apps/cli`, `apps/desktop` | Rendering and input. The TUI runs the engine in its own process; the desktop runs it in the `n10 host` utility process, behind the host bridge. Two open shells share the implementation, not the state.                   |
 
-Behavior moves into the engine one resource at a time. The pull request list
-is there (`libs/engine/src/lib/pull-requests/`); remote sync, review threads,
-config effects and session orchestration are still coordinated by each shell.
+The engine owns config, repository handles, worktrees, remote sync, the PR
+list, review reads/commands, worktree sessions, directory terminals, babysitters, fleet state and plan delivery. Repository handles own config,
+worktree, review and session observation lifetimes; shells bind sync lifetime.
+The [domain plan](design/engine-domains.md)
+records the survey, migration order and target diagram. The
+[host assessment](design/host-worker-assessment.md) records reproducible worker evidence.
 
 ## Directory map
 
@@ -38,7 +41,7 @@ apps/desktop/                    — Electron GUI shell, shipped inside `@notaha
   src/preload/preload.ts         — Typed contextBridge → window.n10
   src/host/menu-template.ts      — Pure native app menu template, used by main and the web demo
   src/host/contract.ts           — Single source of truth for the bridge API + IPC channel names (incl. MenuCommand, ContextMenuItem, DesktopPrefs)
-  src/host/services/             — Session-host services (sidebar w/ remote PR cache, sessions w/ scrollback buffer, settings, desktop-prefs…)
+  src/host/services/             — Host adapters (engine snapshots/commands, IPC events, scrollback, desktop preferences)
   src/renderer/                  — Vite + React 19 + Tailwind v4 web app (no Node access)
     styles.css                   — Design tokens (VS Code-style light/dark palette, type scale) — components use tokens only
     components/ui/               — shadcn-style primitives (radix-ui + cva + lucide): button, dialog, command, select…
@@ -77,28 +80,41 @@ apps/website/                    — Next.js 16 + Fumadocs site at n10.is, deplo
   src/components/landing/        — Marketing page sections, data-driven where repeated (Features)
   Own tsconfig/eslint/import conventions — see apps/website/README.md, not this file
 libs/engine/                     — The program both shells run: state, scheduling, caching. No React, Ink, Electron or app-core (lint-enforced)
+  src/lib/repositories/          — Canonical repository identity, validation, detection and opening policy
+  src/lib/config/                — Repository-scoped config snapshots, writes and settings effects
   src/lib/pull-requests/         — The pull request list: scoped reads, one request per scope, queued refreshes, snapshots and subscriptions, watch schedule
+  src/lib/worktrees/             — Checkout/branch resources and scoped commands
+  src/lib/sync/                  — Remote sync schedule, passes and notices
+  src/lib/reviews/               — Review resources, commands, scoped findings, draft publication and pinned Git diffs
+  src/lib/sessions/              — Repository-scoped worktree sessions; process-wide directory terminal lifecycle
+  src/lib/babysitters/           — Per-repository PR watches, observation freshness, bounded polling and delivery coordination
+  src/lib/machines/              — Fleet snapshots, remote ownership policy and injected command/PTY/mail ports
+  src/lib/plans/                 — Captured-repository plan checkout, delivery, coalescing and invalidation
+  src/lib/*/api.ts               — Public domain APIs; private cross-domain imports are lint errors
+  src/lib/kernel/                — Domain-free terminal dimension validation
+  src/contract.ts                — Browser-safe payloads and structural client types
 libs/core/                       — Shell-agnostic operations. No React, Ink, Electron or engine (lint-enforced)
-  src/lib/session/               — Session launch + plan checkout flows
+  src/lib/session/               — Session launch and delivery primitives
   src/lib/plan/                  — Plan store (external store) + prompt composition
+  src/lib/babysit/               — Pure observation model and briefing composition
+  src/ui.ts                      — Browser-safe presentation and input models
   src/plan.ts                    — Browser-safe entry (`@n10/core/plan`) for the renderer
-  src/lib/utils/                 — Pure helpers (sidebar-items, session-sort, diff-fetcher, virtual-viewport…)
-  src/lib/settings/              — Settings field model (fields, presets, resolveValue)
-  src/lib/sync/                  — Remote sync passes (sweepMergedBranches, conflict counts)
+  src/lib/utils/                 — Git reads and presentation helpers (diff-fetcher, sidebar-items, virtual-viewport…)
+  src/lib/settings/              — Settings field model, coercion and explicitly scoped config writes
   src/lib/agents/                — Agent registry
   src/lib/activity.ts            — Agent activity registry; pty-registry.ts — PTY session lifecycle
   src/lib/session-backend.ts     — Required tmux availability, tagged-session observations and cleanup
   src/lib/session-identity.ts    — `@orchestra-*` tag names, session labels and matching rules shared with Orchestra
   src/lib/session-resolver.ts    — The one `list-sessions` fork every tmux lookup goes through
   src/lib/session/open-session.ts — Explicit session requests → create, attach or restart plans
-  src/lib/discovery/             — Session discovery: scan/diff, live worktree sessions, worktree HEAD reader
+  src/lib/discovery/             — Pure observation diff, live worktree lookup and worktree HEAD reader
   src/lib/keybindings/           — Customizable keybinding system
     registry.ts                  — Action catalog, presets (Normie/Vim), ActionId type
     resolver.ts                  — matchesKey, resolveAction, findConflict, descriptorFromKeypress
     hints.ts                     — Human-readable key display strings
     controls-data.ts             — Controls panel data logic (buildControlsRows, getBindingRows)
   src/lib/input/                 — KeyPress type (shell-agnostic ink-Key shape) + text-input handling
-libs/app-core/                   — React bindings: the TUI's contexts and hooks, the plan binding the desktop renderer uses, and the config write helpers the desktop host imports
+libs/app-core/                   — React bindings: the TUI's contexts and hooks, the plan binding the desktop renderer uses; config bindings observe the engine
   src/lib/context/               — React state contexts (Config, Engine, Session, Sidebar, Nav, Modal, Toast, Layout…)
   src/lib/hooks/                 — Shell-agnostic hooks (useSessionManager, useDiffData, useRemoteComments…)
   src/lib/controllers/           — Headless screen controllers (diff file list / viewer view-models)
@@ -124,3 +140,19 @@ libs/image-loader/               — Comment-image download + decode
   src/lib/gif-animation.ts       — full composited RGBA frames + per-frame delays (native resolution)
   src/lib/fetch-image.ts         — auth-aware fetch (gh token bearer / Azure DevOps PAT basic)
 ```
+
+Sync runs in `libs/engine/src/lib/sync`: one captured repository, config-driven
+scheduling, fetch/merge/conflict reads, guarded auto-removal and stable snapshots.
+The TUI’s `useRemoteSync` observes that service; desktop `services/remote-sync`
+binds selected-repo lifetime and maps notices to IPC. Manual and automatic
+removal share `engine/worktrees` commands over core’s safety verdicts. ESLint
+rejects direct shell imports of sync passes and removal primitives.
+
+Worktree resources live in `engine/worktrees`: one repository handle owns the
+worktree list, local/remote branch lists, freshness and command invalidation.
+Both shells observe or read that snapshot and call its commands. The
+`worktree-manager` package implements Git operations over an immutable
+`WorktreeScope` (repository, path resolver and optional remote machine), without
+a process-wide selected resolver. Config path edits invalidate the resource;
+repository switches dispose its subscription without detaching session clients.
+ESLint forbids shells from calling these Git reads, mutations or scope factories.

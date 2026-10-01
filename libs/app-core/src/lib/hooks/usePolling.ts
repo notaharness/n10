@@ -8,12 +8,7 @@ export interface PollingState<T> {
   refresh: () => Promise<void>;
 }
 
-// Small ~30-line polling primitive. Picked over TanStack Query because:
-// - TanStack Query adds ~18KB gzipped for what 4 hooks need to do.
-// - Its cache+retry machinery is irrelevant in a single-user CLI.
-// - Its React dev warnings under Ink are an unknown we don't need to
-//   find out about in production.
-// See Step 23 of the React refactor plan for the full trade-off.
+/** Polling adapter for resources awaiting engine migration. */
 export function usePolling<T>(
   fn: () => Promise<T>,
   intervalMs: number,

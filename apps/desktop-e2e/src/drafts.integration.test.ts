@@ -1,3 +1,4 @@
+import { agentDraftDirectory } from './setup/agent-drafts.js';
 import type { Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -15,7 +16,7 @@ import {
  * The draft review flow: what the review agent writes, and what you do
  * with it before any of it reaches GitHub.
  *
- * The agent leaves comments in ~/.n10/reviews/pr-<id>/comments.json
+ * The agent leaves comments in the repository-scoped agent findings store
  * through `n10 util add-comment`; the desktop picks them up, shows
  * them against the code they were written about, and walks you through
  * them in severity order. Everything up to the moment of posting is
@@ -143,7 +144,10 @@ test.describe('@integration Agent draft comments', () => {
     // `add-comment` run does not overwrite them.
     const stored = JSON.parse(
       readFileSync(
-        join(homeDir, '.n10', 'reviews', `pr-${PR_ID}`, 'comments.json'),
+        join(
+          agentDraftDirectory(homeDir, desktop.repoPath, PR_ID),
+          'comments.json'
+        ),
         'utf8'
       )
     ) as { comments: { id: string; body: string }[] };

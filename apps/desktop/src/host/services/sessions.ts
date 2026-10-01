@@ -1,35 +1,20 @@
-import { sessionKeyForBranch, worktreeSessionKey } from '@n10/core';
 import {
   buildReviewLaunchRequest,
-  checkoutPlan as checkoutPlanCore,
-  launchSession,
   getSession,
-  LOCAL_MACHINE,
-  sessionIdentity,
-  isSessionAlive,
-  hasSessionConnection,
-  resolveAgent,
-  getSpawnedAt,
   noteInput,
   noteResize,
   snapshot as activitySnapshot,
 } from '@n10/core';
-import { readConfig } from '@n10/vcs-core';
-import { tmuxSessionSnapshot, sameTmuxIncarnation } from '@n10/terminal-tmux';
-import { requireRepo } from './repo.js';
-import { refuseIfRemoteOwns } from './plan-remote-owner.js';
-import {
-  noteLaunchStep,
-  refuseRemoteOwned,
-  resolveLaunchWorktree,
-} from './launch-worktree.js';
+import { activeRepository, requireRepo } from './repo.js';
+import { machines } from './machines.js';
+import { machineFor } from './remote-machines.js';
+import { broadcastLaunchStep } from './session-relay.js';
 import {
   adoptSession,
   foreignSessionError,
   known,
   ownSession,
   ownSessionNames,
-  stopOwnWorktreeSession,
 } from './session-registry.js';
 import { relayBuffer, setSessionBroadcaster } from './session-relay.js';
 import { hide, show, unwatch, watch, type Viewer } from './session-watch.js';
@@ -44,12 +29,7 @@ import type {
 } from '../contract.js';
 
 export type { SessionLaunchRequest, SessionSummary };
-export {
-  adoptSpawnedSession,
-  isForeignSession,
-  isOwnSessionAlive,
-  killOwnSession,
-} from './session-registry.js';
+export { isForeignSession, isOwnSessionAlive } from './session-registry.js';
 
 /** What launching or reattaching an agent hands back to the caller. */
 interface LaunchResult {
@@ -71,111 +51,39 @@ export function defaultPaneSize(): { cols: number; rows: number } {
 
 // ── Operations ───────────────────────────────────────────────────
 
-// Overlapping launch calls for the same session (double-click racing
-// the renderer's isPending flag) must not double-spawn: the second
-// spawn would dispose the first PTY and attach a duplicate data relay.
-const inflightLaunches = new Map<
-  string,
-  { signature: string; promise: Promise<{ name: string }> }
->();
-
-/**
- * `knownWorktreePath` is for callers that have already been told where
- * the checkout is — discovery hands over the worktree git actually
- * reported. It is deliberately a parameter rather than a field on
- * `SessionLaunchRequest`: that type crosses the IPC bridge, and the
- * renderer has no business naming a directory to spawn an agent in.
- */
-export function launchAgent(
-  req: SessionLaunchRequest,
-  knownWorktreePath?: string
+/** Capture one repository handle before any worktree or fleet await. */
+export async function launchAgent(
+  req: SessionLaunchRequest
 ): Promise<LaunchResult> {
-  const repo = requireRepo();
-  // Keyed by what was asked for: the session's own key is its checkout,
-  // which is only known once the worktree is resolved below.
-  const requestKey = JSON.stringify([
-    repo,
-    req.machine ?? LOCAL_MACHINE,
-    knownWorktreePath ?? req.branch,
-  ]);
-  const signature = JSON.stringify([
-    req.intent,
-    req.agentId,
-    req.prompt,
-    req.systemGuidance,
-    req.fresh,
-    req.expected,
-    knownWorktreePath,
-    req.machine,
-  ]);
-  const existing = inflightLaunches.get(requestKey);
-  if (existing) {
-    return existing.signature === signature
-      ? existing.promise
-      : Promise.reject(
-          new Error(
-            'Another launch is in progress for this worktree. Try again when it finishes.'
-          )
-        );
-  }
-  const promise = doLaunchAgent(req, repo, knownWorktreePath).finally(() =>
-    inflightLaunches.delete(requestKey)
-  );
-  inflightLaunches.set(requestKey, { signature, promise });
-  return promise;
-}
-
-/** Reuse a live connection — split out to keep `doLaunchAgent` under
- *  budget. */
-function reuseConnection(
-  req: SessionLaunchRequest,
-  name: string
-): { name: string } | null {
-  if (!canReuseConnection(req, name)) return null;
-  // A stale UI request must not read another repository's relay.
-  if (!ownSession(name)) throw foreignSessionError(name);
-  return { name };
-}
-
-async function doLaunchAgent(
-  req: SessionLaunchRequest,
-  repoCwd: string,
-  knownWorktreePath?: string
-): Promise<{ name: string }> {
-  await refuseRemoteOwned(req, repoCwd, knownWorktreePath);
-  const wtPath = await resolveLaunchWorktree(req, repoCwd, knownWorktreePath);
-  const name = worktreeSessionKey(wtPath, repoCwd, req.machine);
-  const reused = reuseConnection(req, name);
-  if (reused) return reused;
-  noteLaunchStep(req, 'start');
-  // Config comes from the repo root, like the TUI — per-project config
-  // is keyed by cwd hash, so reading from the worktree path resolved a
-  // different (empty) project bag.
-  // A per-launch agent pick from the session menu overrides the
-  // configured one; the resolver still owns the id → agent mapping.
-  const stored = readConfig(repoCwd);
-  const config = req.agentId ? { ...stored, agentId: req.agentId } : stored;
-  const before = getSession(name);
-  const entry = await launchSession({
-    name,
-    cwd: wtPath,
-    // Discovery attaches to whatever the checkout is on now; a launch
-    // from the UI names the branch it expects to find there.
-    ...(knownWorktreePath ? {} : { branch: req.branch }),
-    cols: clampDim(req.cols, DEFAULT_COLS),
-    rows: clampDim(req.rows, DEFAULT_ROWS),
-    config,
-    agent: needsSelectedAgent(req) ? resolveAgent(config) : undefined,
-    mode: knownWorktreePath ? 'attach' : 'open',
-    fresh: req.fresh,
-    expected: req.expected,
-    request: {
-      intent: req.intent,
-      prompt: req.prompt,
-      systemGuidance: req.systemGuidance,
+  const repo = activeRepository();
+  const name = await repo.sessions.launch(
+    {
+      target: { branch: req.branch },
+      request: {
+        intent: req.intent,
+        prompt: req.prompt,
+        systemGuidance: req.systemGuidance,
+      },
+      agentId: req.agentId,
+      fresh: req.fresh,
+      expected: req.expected,
+      cols: req.cols,
+      rows: req.rows,
+      remote: req.machine
+        ? { id: req.machine, machine: machineFor(req.machine) }
+        : undefined,
     },
-  });
-  if (entry !== before || !ownSession(name)) adoptSession(name, repoCwd);
+    {
+      beforeLaunch: (branch, current) =>
+        machines.refuseIfRemoteOwns(repo.cwd, branch, current),
+      started: adoptSession,
+      progress: (step) => {
+        if (req.machine && req.launchId)
+          broadcastLaunchStep({ launchId: req.launchId, step });
+      },
+    }
+  );
+  if (!known.has(name)) adoptSession(name, repo.cwd);
   return { name };
 }
 
@@ -210,103 +118,23 @@ export async function launchReviewAgent(req: ReviewLaunchRequest): Promise<{
   });
 }
 
-// Double-sends land here the way double-clicks land on launch: the
-// renderer disables the button while a send is in flight, but the
-// second click can beat the state update. Joining the in-flight
-// promise makes the second one a no-op instead of a second spawn.
-// (A checkout racing a plain launch of the same branch is not
-// serialized — the loser's PTY is disposed by the winner's spawn,
-// which is the same outcome as two launches racing.)
-const inflightCheckouts = new Map<string, Promise<PlanCheckoutResult>>();
-
-/**
- * Send a composed plan to the agent for `req.pr`.
- *
- * The three-state decision — inject into a live agent, respawn it, or
- * create the worktree and start one — lives in @n10/core and is
- * shared with the TUI. What the desktop adds is its own bookkeeping:
- * the ownership guard, and adopting whatever PTY comes out so its
- * output reaches the renderer.
- */
-export function checkoutPlan(
+export async function checkoutPlan(
   req: PlanCheckoutRequest
 ): Promise<PlanCheckoutResult> {
-  const repoCwd = requireRepo();
-  // Keyed by the PR's branch: which checkout (and so which session) it
-  // lands in is only known once core has resolved or created it.
-  const key = JSON.stringify([repoCwd, req.pr.sourceBranch]);
-  const existing = inflightCheckouts.get(key);
-  if (existing) return existing;
-  const promise = doCheckoutPlan(req, repoCwd).finally(() =>
-    inflightCheckouts.delete(key)
-  );
-  inflightCheckouts.set(key, promise);
-  return promise;
-}
-
-async function doCheckoutPlan(
-  req: PlanCheckoutRequest,
-  repoCwd: string
-): Promise<PlanCheckoutResult> {
-  const branch = req.pr.sourceBranch;
-  const current = await sessionKeyForBranch(branch, repoCwd);
-  // Reject a stale request aimed at another repository's relay.
-  if (current && known.has(current) && !ownSession(current))
-    throw foreignSessionError(current);
-  await refuseIfRemoteOwns(repoCwd, branch, current);
-  const config = readConfig(repoCwd);
-  // core reports failures by flashing a status line, which the TUI has
-  // and the host does not. Capture the message and reject with it: the
-  // renderer toasts it and leaves the plan intact for a retry.
-  let failure: string | null = null;
-  const before = current ? getSession(current) : undefined;
-  const result = await checkoutPlanCore({
-    repo: repoCwd,
-    pr: req.pr,
-    prompt: req.prompt,
-    paneCols: clampDim(req.cols, DEFAULT_COLS),
-    paneRows: clampDim(req.rows, DEFAULT_ROWS),
-    mode: req.mode,
-    config,
-    flashStatus: (msg) => {
-      failure ??= msg;
+  const repo = activeRepository();
+  const result = await repo.sessions.checkoutPlan(req, {
+    beforeLaunch: async (branch, current) => {
+      if (current && known.has(current) && !ownSession(current))
+        throw foreignSessionError(current);
+      await machines.refuseIfRemoteOwns(repo.cwd, branch, current);
     },
+    started: adoptSession,
   });
-  if (result === 'failed') {
-    throw new Error(failure ?? 'Could not send the plan to the agent');
-  }
-  const name = await sessionKeyForBranch(branch, repoCwd);
-  if (
-    name &&
-    (result === 'spawned' || (getSession(name) && getSession(name) !== before))
-  ) {
-    adoptSession(name, repoCwd);
-  }
-  return result;
-}
-
-function clampDim(value: number | undefined, fallback: number): number {
-  if (!value || !Number.isFinite(value) || value < 2) return fallback;
-  return Math.min(500, Math.floor(value));
+  return result.outcome;
 }
 
 export function listSessions(): SessionSummary[] {
-  return ownSessionNames().map((name) => {
-    const machine = sessionIdentity(name)?.machine ?? LOCAL_MACHINE;
-    return {
-      name,
-      running: isSessionAlive(name),
-      spawnedAt: getSpawnedAt(name) ?? 0,
-      machine,
-      // A local session must never carry a connectionState at all —
-      // see the matching comment in terminals.ts's summarize()
-      // (finding 10).
-      connectionState:
-        machine === LOCAL_MACHINE
-          ? undefined
-          : getSession(name)?.pty.connectionState,
-    };
-  });
+  return activeRepository().sessions.connections();
 }
 
 export function writeSession(name: string, data: string): void {
@@ -371,7 +199,7 @@ export function killSession(name: string): void {
   // Never reach into another repository's agent (see KnownSession.repoCwd).
   // Qualified identity also protects entries this host did not launch.
   if (known.has(name) && !ownSession(name)) throw foreignSessionError(name);
-  stopOwnWorktreeSession(name);
+  activeRepository().sessions.stop(name);
 }
 
 /** Manual retry after Phase 5's bounded automatic reconnect (3
@@ -384,33 +212,6 @@ export function killSession(name: string): void {
  *  "nothing happened" to the caller. */
 export function reconnectSession(name: string): void {
   getSession(name)?.pty.reconnect?.();
-}
-
-// `name` is only a tmux label — tmux-launch.ts's create path reuses one
-// once its holder is killed — so a matching `expected` is verified
-// against a fresh snapshot's native incarnation, not the cached
-// `pty.name`, which cannot tell a live reuse from a same-named
-// replacement underneath it. A mismatch or unreadable snapshot falls
-// through to the full launch path's own guarded compare-and-swap.
-//
-// `tmuxSessionSnapshot` only ever asks *local* tmux — labels are
-// `<repo>-<branch>` on every machine, so a same-named local session
-// could answer for a remote one's incarnation check (finding 9). A
-// remote registry entry has no local snapshot to compare against, so
-// this reads it the same as an unreadable one: no match, fall through.
-function canReuseConnection(req: SessionLaunchRequest, name: string): boolean {
-  if (req.fresh || !isSessionAlive(name) || !hasSessionConnection(name))
-    return false;
-  if (!req.expected) return true;
-  const machine = sessionIdentity(name)?.machine ?? LOCAL_MACHINE;
-  if (machine !== LOCAL_MACHINE) return false;
-  const nativeName = getSession(name)?.pty.name;
-  const live = nativeName && tmuxSessionSnapshot(nativeName)?.incarnation;
-  return !!live && sameTmuxIncarnation(live, req.expected);
-}
-
-function needsSelectedAgent(req: SessionLaunchRequest): boolean {
-  return Boolean(req.fresh || req.agentId || req.intent === 'blank');
 }
 
 export function getSessionBuffer(name: string): SessionBuffer {

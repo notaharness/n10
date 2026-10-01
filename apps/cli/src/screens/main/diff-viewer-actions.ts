@@ -1,10 +1,4 @@
 import { type ActionId, planItemKey } from '@n10/core';
-import {
-  readComments,
-  updateComment,
-  postReviewComments,
-  type PostContext,
-} from '@n10/review-comments';
 import { getDisplayFiles } from '@n10/diff';
 import { openCommentInEditor } from '../../utils/editor-edit.js';
 import {
@@ -147,40 +141,17 @@ function actionPostComment(a: DiffViewerActionCtx): void {
   const comment = fileComments.find((c) => c.id === ctx.pane.selectedCommentId);
   if (!comment || comment.status !== 'draft') return;
 
-  const pr = commentCtx.selectedReviewPr;
-  const vendor = ctx.config.config.vendor;
-  if (!vendor) {
-    ctx.sessions.flashStatus('No provider set up — open settings');
-    return;
-  }
-  if (vendor !== 'github' && vendor !== 'azure-devops') {
-    ctx.sessions.flashStatus("Can't post comments for this repository");
-    return;
-  }
-  if (vendor === 'github' && !pr.headSha) {
-    ctx.sessions.flashStatus(
-      "Couldn't post: refresh pull requests and try again"
-    );
-    return;
-  }
-
-  const postCtx: PostContext = {
-    vendor,
-    vendorAuth: ctx.config.config.vendorAuth,
-    vendorProject: ctx.config.config.vendorProject,
-    prId: commentCtx.prId,
-    headSha: pr.headSha,
-  };
-
   const postedId = comment.id;
   const prId = commentCtx.prId;
-  updateComment(prId, postedId, { status: 'posting' });
-
   // Loading state shown by the top-right spinner; no "Posting
   // comment…" flash. Result/failure toasts fire on completion.
   void ctx.asyncOps.run('post-comment', async () => {
     try {
-      await postReviewComments([comment], postCtx);
+      await commentCtx.service.post({
+        prId,
+        ids: [postedId],
+        headSha: commentCtx.selectedReviewPr.headSha,
+      });
       ctx.sessions.flashStatus('Comment posted');
       // Refetch remote threads so the newly-created remote thread
       // for this comment shows up in the diff viewer — the local
@@ -188,9 +159,9 @@ function actionPostComment(a: DiffViewerActionCtx): void {
       // without this refresh there'd be a visual gap until the user
       // re-opened the PR.
       ctx.remoteCtx?.refresh();
-      const freshComments = readComments(prId).filter(
-        (c) => c.file === ctx.pane.diffViewFile
-      );
+      const freshComments = commentCtx.service
+        .read(prId)
+        .filter((c) => c.file === ctx.pane.diffViewFile);
       const nextDraftId = findAdjacentCommentId(
         'next',
         postedId,
@@ -205,7 +176,6 @@ function actionPostComment(a: DiffViewerActionCtx): void {
         ctx.pane.setSelectedCommentId(null);
       }
     } catch (err) {
-      updateComment(prId, postedId, { status: 'draft' });
       ctx.sessions.flashStatus(`Post failed: ${(err as Error).message}`);
     }
   });
@@ -232,7 +202,15 @@ function actionEditorEdit(a: DiffViewerActionCtx): void {
     initialBody: comment.body,
     editor,
     onUpdate: (newBody) => {
-      updateComment(prId, comment.id, { body: newBody });
+      try {
+        commentCtx.service.update(prId, comment.id, { body: newBody });
+      } catch (error) {
+        ctx.sessions.flashStatus(
+          `Could not save comment: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
     },
   });
 

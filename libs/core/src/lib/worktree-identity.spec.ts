@@ -90,7 +90,7 @@ describe('discovery matches a session to its checkout', () => {
     listMock.mockReturnValue([
       session({ branch: 'feature', path: WT, tag: WT }),
     ]);
-    const seen = observeTmuxSessions([worktree(WT, 'other')]);
+    const seen = observeTmuxSessions(REPO, [worktree(WT, 'other')]);
     expect([...seen.persisted]).toEqual([keyForWorktree({ path: WT }, REPO)]);
     expect(seen.terminals).toEqual([]);
   });
@@ -99,7 +99,7 @@ describe('discovery matches a session to its checkout', () => {
     listMock.mockReturnValue([
       session({ branch: 'feature', path: WT, tag: WT }),
     ]);
-    const seen = observeTmuxSessions([
+    const seen = observeTmuxSessions(REPO, [
       worktree(WT, 'other'),
       worktree(WT2, 'feature'),
     ]);
@@ -108,7 +108,7 @@ describe('discovery matches a session to its checkout', () => {
 
   it('treats a worktree session without the tag as foreign', () => {
     listMock.mockReturnValue([session({ branch: 'feature', path: WT })]);
-    const seen = observeTmuxSessions([worktree(WT, 'feature')]);
+    const seen = observeTmuxSessions(REPO, [worktree(WT, 'feature')]);
     expect(seen.persisted.size).toBe(0);
     expect(seen.terminals).toEqual([]);
   });
@@ -117,7 +117,7 @@ describe('discovery matches a session to its checkout', () => {
     listMock.mockReturnValue([
       session({ branch: 'feature', path: '/somewhere/else', tag: WT }),
     ]);
-    const seen = observeTmuxSessions([worktree(WT, 'feature')]);
+    const seen = observeTmuxSessions(REPO, [worktree(WT, 'feature')]);
     expect([...seen.persisted]).toEqual([keyForWorktree({ path: WT }, REPO)]);
   });
 
@@ -129,7 +129,7 @@ describe('discovery matches a session to its checkout', () => {
         tag: '/repo/.claude/worktrees/gone',
       }),
     ]);
-    const seen = observeTmuxSessions([worktree(WT2, 'feature')]);
+    const seen = observeTmuxSessions(REPO, [worktree(WT2, 'feature')]);
     expect(seen.persisted.size).toBe(0);
     // Surfaced where it runs instead, as an orphan agent.
     expect(seen.terminals).toEqual([

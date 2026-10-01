@@ -1,6 +1,9 @@
-import { listWorktrees, type WorktreeInfo } from '@n10/worktree-manager';
+import {
+  listWorktrees,
+  type WorktreeScope,
+  type WorktreeInfo,
+} from '@n10/worktree-manager';
 import { getSession } from './pty-registry.js';
-import { getRepoRoot } from './repo-root.js';
 import { keyForWorktree } from './session-key.js';
 import type { AgentSession } from './types.js';
 
@@ -33,14 +36,6 @@ export function worktreeSessionRow(
   };
 }
 
-/** The row of the worktree that has `branch` checked out, if any. */
-export function sessionForBranch(
-  sessions: readonly AgentSession[],
-  branch: string
-): AgentSession | undefined {
-  return sessions.find((s) => s.branch === branch);
-}
-
 /**
  * The session key of the checkout that has `branch` checked out, or
  * `null` when none has — for the callers that start from a pull
@@ -49,8 +44,10 @@ export function sessionForBranch(
  */
 export async function sessionKeyForBranch(
   branch: string,
-  repo = getRepoRoot() ?? process.cwd()
+  scope: WorktreeScope
 ): Promise<string | null> {
-  const worktree = (await listWorktrees(repo)).find((w) => w.branch === branch);
-  return worktree ? keyForWorktree(worktree, repo) : null;
+  const worktree = (await listWorktrees(scope)).find(
+    (w) => w.branch === branch
+  );
+  return worktree ? keyForWorktree(worktree, scope.cwd) : null;
 }

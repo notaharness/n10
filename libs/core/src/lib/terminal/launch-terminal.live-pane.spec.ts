@@ -21,7 +21,6 @@ vi.mock('../session-resolver.js', () => ({
   resolveSessionByName: () => state.existing,
   resolveWorktreeSession: () => state.existing,
 }));
-vi.mock('../repo-root.js', () => ({ getRepoRoot: () => '/repo' }));
 import { terminalSessionKey } from '../session-key.js';
 import { launchTerminalSession } from './launch-terminal.js';
 

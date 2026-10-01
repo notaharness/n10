@@ -15,6 +15,7 @@ import { listTaggedSessions } from './setup/tmux.js';
 // alive; the test's private tmux server shows what became of the agents.
 test.use({
   n10Config: {
+    agentId: 'test',
     aiCommand: fakeAgentCommand({
       bursts: 'inf',
       burstMs: 500,

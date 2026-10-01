@@ -56,6 +56,7 @@ export function createHostApi(): HostApi {
 
     openRepo: (cwd) => Promise.resolve(repo.openRepo(cwd)),
     getRepo: () => Promise.resolve(repo.getRepo()),
+    refreshRepo: () => Promise.resolve(repo.refreshRepo()),
     listRecentRepos: () => Promise.resolve(repo.listRecentRepos()),
     selectRepoDirectory: () => pickFolder('Open repository'),
     selectFolder: () => pickFolder('Open folder'),
@@ -77,7 +78,8 @@ export function createHostApi(): HostApi {
     checkWorktreeRemoval: (branch) => worktrees.checkWorktreeRemoval(branch),
     openInEditor: (branch) => worktrees.openInEditor(branch),
 
-    fetchCommentThreads: (prId) => reviews.fetchCommentThreads(prId),
+    fetchCommentThreads: (prId, force) =>
+      reviews.fetchCommentThreads(prId, force),
     replyToThread: (req: ReplyRequest) => reviews.replyToThread(req),
     setThreadResolved: (req: ResolveRequest) => reviews.setThreadResolved(req),
     fetchPrDescription: (prId) => reviews.fetchPrDescription(prId),
@@ -136,8 +138,6 @@ export function createHostApi(): HostApi {
       reviews.getDiffText(sourceBranch, targetBranch),
     fetchWorktreeDiffText: (branch, targetBranch) =>
       worktrees.getWorktreeDiffText(branch, targetBranch),
-    fetchFileDiffText: (sourceBranch, targetBranch, file) =>
-      reviews.getFileDiffText(sourceBranch, targetBranch, file),
 
     openExternal: (url) => externalOpener(url),
     showContextMenu: (items) => contextMenu(items),
@@ -240,6 +240,7 @@ export function registerHostHandlers(
     [IPC.getVersion]: api.getVersion as HostMethod,
     [IPC.openRepo]: api.openRepo as HostMethod,
     [IPC.getRepo]: api.getRepo as HostMethod,
+    [IPC.refreshRepo]: api.refreshRepo as HostMethod,
     [IPC.listRecentRepos]: api.listRecentRepos as HostMethod,
     [IPC.selectRepoDirectory]: api.selectRepoDirectory as HostMethod,
     [IPC.selectFolder]: api.selectFolder as HostMethod,
@@ -294,7 +295,6 @@ export function registerHostHandlers(
     [IPC.checkoutPlan]: api.checkoutPlan as HostMethod,
     [IPC.fetchDiffText]: api.fetchDiffText as HostMethod,
     [IPC.fetchWorktreeDiffText]: api.fetchWorktreeDiffText as HostMethod,
-    [IPC.fetchFileDiffText]: api.fetchFileDiffText as HostMethod,
     [IPC.openExternal]: api.openExternal as HostMethod,
     [IPC.showContextMenu]: api.showContextMenu as HostMethod,
     [IPC.showAppMenu]: api.showAppMenu as HostMethod,

@@ -19,6 +19,7 @@ execSync(
 test.use({
   n10RepoPath: repoDir,
   n10Config: {
+    agentId: 'test',
     aiCommand: 'echo n10-detached-active && sleep 300',
     keybindPreset: 'vim',
   },

@@ -29,7 +29,7 @@ export interface GitOutput {
 
 export function runGit(
   args: readonly string[],
-  opts: { cwd?: string; maxBytes: number }
+  opts: { cwd?: string; maxBytes: number; timeoutMs?: number }
 ): Promise<GitOutput> {
   return new Promise<GitOutput>((resolve, reject) => {
     const child = spawn('git', [...args], {
@@ -78,8 +78,17 @@ export function runGit(
     const finish = (fn: () => void) => {
       if (settled) return;
       settled = true;
+      clearTimeout(deadline);
       fn();
     };
+
+    // This transport is for reads. Bound the child itself so a hung Git read
+    // cannot hold an engine resource lane indefinitely. Mutations use exec.
+    const deadline = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish(() => reject(new Error(`git ${args[0]} timed out`)));
+    }, opts.timeoutMs ?? 30_000);
+    deadline.unref();
 
     child.on('error', (err) => finish(() => reject(err)));
     child.on('close', (code) => {

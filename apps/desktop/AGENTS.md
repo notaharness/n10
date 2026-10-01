@@ -26,14 +26,15 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - The host creates tmux servers itself: a utility process does not hand
   Chromium's descriptors to the persistent server, as spawning straight
   from the main process on Linux would.
-- `services/repo.ts` `openRepo` does what the TUI's `useSessionManager` mount
-  does: detect project config and set the worktree resolver. The host
+- `services/repo.ts` opens an engine repository handle; session and worktree
+  commands capture that handle before awaiting. Discovery observes its live scope. The host
   awaits the tmux probe and validates the requirement before opening a
   repo; missing tmux is a startup error with an installation hint.
 - `main/beam/` is a client of the beam daemon's control socket (beam's
   docs/06) and installs the three machine ports: `MachinesPort`,
   `RemoteMachinePort` and `InboundMailPort`. Nothing above them knows beam.
-  Attach input stays within beam's four-frame window. The mail relay's
+  The engine owns fleet snapshots and remote ownership policy; these ports
+  supply transport. Attach input stays within beam's four-frame window. The mail relay's
   ack and defer rules are decisions.md D13/D14; it delivers into a
   session only for a sender granted `all` (D17).
 - Start the beam daemon only through `spawnOwnedDaemon`, which runs it
@@ -53,12 +54,14 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `services/pull-requests.ts`; `services/sidebar.ts`, babysitters, the sync
   loop and settings effects all go through it. The renderer is told only of
   changes it would paint. Do not call the provider's list from a second place.
-- Babysitters (`services/babysit.ts`) live per repo in memory, sit out while
-  another repo is open, stop when their worktree is removed, and push only
+- Engine babysitters (`services/babysit.ts` adapts their events) live per repo in
+  memory, sit out while another repo is open, stop when their worktree is removed, and push only
   `spawned` and `ended`; everything else rides on the sidebar poll.
-- Terminal tabs have no state file; tmux is the record: the kind is the
+- `libs/engine/src/lib/sessions/terminal-service.ts` owns process-wide terminal lifecycle;
+  `services/terminals.ts` supplies output relays, recents and tab grouping.
+  Terminal tabs have no state file; tmux is the record: the kind is the
   `@orchestra-session-type` tag (`shell` | `agent`), the name is a label
-  (`<repo>-shell`, suffixed on collision) and the key, the directory is
+  (`<directory>-shell`, suffixed on collision) and the key, the directory is
   `#{session_path}`. The tab group is derived at read time
   (`services/terminal-home.ts`). Closing a terminal tab confirms and kills;
   quitting only detaches. Agent panes remain available after exit for viewing
@@ -113,7 +116,7 @@ Every rule below has its reasoning in `docs/decisions.md`.
   (`diff/LineGutter.tsx`, one tab stop per file, one file and one side
   per range, consecutive lines on screen only). Composers and the reviewer's inline drafts hang in the
   flat diff through `mineByFile` (`diff/use-diff-comments.ts`). The review agent's findings stay in
-  `@n10/review-comments`, keyed by PR number.
+  `engine/reviews`, with a shared finding store keyed by common Git directory and PR number.
 - A mention is the provider's token (`@login`, Azure's `@<id>`) from its
   own search (core `pull-requests/mention-search.ts`,
   `comments/MentionPicker.tsx`); a display name is only ever shown.

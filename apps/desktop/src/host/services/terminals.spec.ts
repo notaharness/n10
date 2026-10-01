@@ -1,13 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as TerminalsModule from './terminals.js';
 
-/**
- * The desktop's terminal tabs: sessions that belong to a directory
- * rather than a worktree. What the host adds over `@n10/core`'s
- * launcher is bookkeeping — which directory, which kind, whether the
- * directory is a repository root (and so which tab group), the output
- * relay — and none of it may depend on which repository is open.
- */
+/** Exercise the desktop relay and presentation adapter over the real engine
+ * lifecycle, with controlled filesystem and terminal primitives. */
 
 const state = vi.hoisted(() => ({
   alive: new Set<string>(),
@@ -30,37 +25,15 @@ const state = vi.hoisted(() => ({
   // spawn: the host tells a session's exit from a successor's by
   // identity, so the mock must not hand out a fresh object per read.
   sessions: new Map<string, { exited: boolean; pty: unknown }>(),
-  configByCwd: {} as Record<string, unknown>,
   repoRoots: new Set<string>(),
   recents: [] as string[],
   nextId: 0,
   modes: [] as ('open' | 'attach' | undefined)[],
   allocatedName: undefined as string | undefined,
-  /** Per-name overrides for `sessionIdentity`, so a single test can
-   *  make one retained tab's own identity claim a remote machine —
-   *  every other name still answers `null`, matching every other test
-   *  in this suite, which is local throughout (finding 6). */
-  identityByName: new Map<string, { machine: string }>(),
-  /** Per-name `pty.connectionState`, read live — finding 10's test
-   *  flips this after a session exists. */
-  connectionStateByName: new Map<string, string>(),
-  // Every path used across this file is a real directory as far as
-  // launchTerminal's cwd check is concerned, unless a test says
-  // otherwise — the check itself is exercised by its own describe
-  // block, with a controlled path list.
-  missingDirs: new Set<string>(),
 }));
 
 vi.mock('node:fs', () => ({
-  statSync: (p: string) => {
-    if (state.missingDirs.has(p)) throw new Error('ENOENT');
-    return { isDirectory: () => true };
-  },
-}));
-
-vi.mock('./repo.js', () => ({
-  isGitRepo: (cwd: string) => state.repoRoots.has(cwd),
-  requireRepo: () => '/home/dev/n10',
+  statSync: () => ({ isDirectory: () => true }),
 }));
 
 vi.mock('./recent-repos.js', () => ({
@@ -70,10 +43,11 @@ vi.mock('./recent-repos.js', () => ({
 }));
 
 vi.mock('@n10/vcs-core', () => ({
-  readConfig: (cwd: string) => state.configByCwd[cwd] ?? { fromCwd: cwd },
+  readConfig: (cwd: string) => ({ fromCwd: cwd }),
 }));
 
 vi.mock('@n10/core', () => ({
+  isGitRepo: (cwd: string) => state.repoRoots.has(cwd),
   launchTerminalSession: async (spec: {
     name?: string;
     kind: string;
@@ -113,9 +87,6 @@ vi.mock('@n10/core', () => ({
         onData: (cb: (data: string) => void) => state.onData.set(name, cb),
         onExit: (cb: (code: number) => void) =>
           state.onExit.get(name)?.push(cb),
-        get connectionState() {
-          return state.connectionStateByName.get(name);
-        },
       },
     });
     return { name };
@@ -134,14 +105,7 @@ vi.mock('@n10/core', () => ({
   isSessionAlive: (name: string) => state.alive.has(name),
   getSpawnedAt: () => 1000,
   LOCAL_MACHINE: 'local',
-  // Every session in this suite is local by default; a real machine
-  // tag would be parsed off the qualified key (D2), which these
-  // fixture names never are — `identityByName` lets one test claim
-  // otherwise for one retained tab.
-  sessionIdentity: (name: string) =>
-    state.identityByName.get(name)
-      ? { kind: 'terminal', id: name, ...state.identityByName.get(name) }
-      : null,
+  sessionIdentity: () => null,
 }));
 
 let terminals: typeof TerminalsModule;
@@ -154,17 +118,13 @@ beforeEach(async () => {
   state.onData = new Map();
   state.onExit = new Map();
   state.sessions = new Map();
-  state.configByCwd = {};
   state.repoRoots = new Set(['/home/dev/n10', '/home/dev/other']);
   state.recents = [];
   state.nextId = 0;
   state.modes = [];
   state.allocatedName = undefined;
-  state.missingDirs = new Set();
   state.tmuxHolds = new Set();
   state.broadcasts = [];
-  state.identityByName = new Map();
-  state.connectionStateByName = new Map();
   vi.resetModules();
   terminals = await import('./terminals.js');
   const relay = await import('./session-relay.js');
@@ -238,33 +198,6 @@ describe('launchTerminal', () => {
     expect(state.broadcasts).toEqual([]);
   });
 
-  it('gives each terminal in the same directory its own session', async () => {
-    const a = await terminals.launchTerminal(
-      { kind: 'shell', cwd: '/x' },
-      HOME
-    );
-    const b = await terminals.launchTerminal(
-      { kind: 'shell', cwd: '/x' },
-      HOME
-    );
-    expect(a.name).not.toBe(b.name);
-    expect(terminals.listTerminals(HOME).map((t) => t.name)).toEqual([
-      a.name,
-      b.name,
-    ]);
-  });
-
-  // An agent at a repository root should be that repository's agent —
-  // per-project config is keyed by the directory it is read for.
-  it('reads config for the directory the terminal opens in', async () => {
-    state.configByCwd['/home/dev/other'] = { marker: 'other-config' };
-    await terminals.launchTerminal(
-      { kind: 'agent', cwd: '/home/dev/other' },
-      HOME
-    );
-    expect(state.spawns[0].config).toEqual({ marker: 'other-config' });
-  });
-
   it('relays the session’s output into a buffer the renderer can replay', async () => {
     const { name } = await terminals.launchTerminal(
       { kind: 'shell', cwd: '/x' },
@@ -276,27 +209,6 @@ describe('launchTerminal', () => {
       data: '$ ls\r\n',
       seq: 2,
       truncated: false,
-    });
-  });
-
-  // A relative or missing directory otherwise reaches node-pty or the
-  // tmux client, which fail opaquely — `posix_spawnp failed`, or a
-  // client that exits the instant it starts — naming neither the
-  // problem nor which of the two backends hit it.
-  describe('rejects a directory it cannot actually launch into', () => {
-    it('refuses a relative path', async () => {
-      await expect(
-        terminals.launchTerminal({ kind: 'shell', cwd: 'relative/dir' }, HOME)
-      ).rejects.toThrow(/absolute path/);
-      expect(state.spawns).toEqual([]);
-    });
-
-    it('refuses a path that does not exist', async () => {
-      state.missingDirs.add('/home/dev/gone');
-      await expect(
-        terminals.launchTerminal({ kind: 'shell', cwd: '/home/dev/gone' }, HOME)
-      ).rejects.toThrow(/does not exist/);
-      expect(state.spawns).toEqual([]);
     });
   });
 });
@@ -432,41 +344,6 @@ describe('a terminal whose process ended', () => {
     expect(terminals.listTerminals(HOME)).toEqual([]);
     expect(terminals.agentTerminalNames()).toEqual([]);
   });
-
-  // A terminal the user closed was killed and forgotten already; the
-  // exit that follows the kill must not release anything twice, or
-  // touch a terminal that has since been opened under the same name.
-  it('does nothing for a terminal that was already killed', async () => {
-    const { name } = await terminals.launchTerminal(
-      { kind: 'shell', cwd: '/x' },
-      HOME
-    );
-    const exits = state.onExit.get(name) ?? [];
-    terminals.killTerminal(name);
-    for (const cb of exits) cb(0);
-    expect(state.released).toEqual([]);
-  });
-
-  // Re-adopting a terminal (the user detached from inside tmux, and
-  // discovery found the session still running) respawns under the same
-  // name. The old client's exit lands after the respawn, and must not
-  // drop the terminal the new client is attached to.
-  it('keeps a terminal that was respawned under the same name', async () => {
-    await terminals.adoptTerminal({
-      name: 'n10-shell',
-      kind: 'shell',
-      path: '/x',
-    });
-    const oldExits = [...(state.onExit.get('n10-shell') ?? [])];
-    await terminals.adoptTerminal({
-      name: 'n10-shell',
-      kind: 'shell',
-      path: '/x',
-    });
-    for (const cb of oldExits) cb(0);
-    expect(terminals.listTerminals(HOME)).toHaveLength(1);
-    expect(state.released).toEqual([]);
-  });
 });
 
 describe('a retained agent pane', () => {
@@ -510,24 +387,6 @@ describe('a retained agent pane', () => {
     expect(terminals.listTerminals(HOME)).toHaveLength(1);
   });
 
-  it('validates the retained tab’s own directory, not the cwd the restart request carries', async () => {
-    // The renderer's restart request shouldn't need to carry a real cwd
-    // at all — the tab already knows where it lives.
-    const tab = await terminals.launchTerminal(
-      { kind: 'agent', cwd: '/x' },
-      HOME
-    );
-    state.tmuxHolds.add(tab.name);
-    endProcess(tab.name);
-    const restarted = await terminals.launchTerminal(
-      { kind: 'agent', cwd: 'not/a/real/path', sessionName: tab.name },
-      HOME
-    );
-    expect(restarted.name).toBe(tab.name);
-    expect(restarted.cwd).toBe('/x');
-    expect(state.spawns.at(-1)?.cwd).toBe('/x');
-  });
-
   it('notes the retained tab’s own repository on restart, not the request cwd', async () => {
     // The renderer's restart request shouldn't need to carry a real
     // repository at all — the tab already knows where it lives.
@@ -542,116 +401,6 @@ describe('a retained agent pane', () => {
       HOME
     );
     expect(state.recents).toEqual(['/home/dev/other']);
-  });
-
-  it('rejects a concurrent restart with different parameters instead of joining it', async () => {
-    // Resume then Start-new within one launch window must not silently
-    // resolve the second (Start-new) request to the first (Resume)'s
-    // in-flight result.
-    const tab = await terminals.launchTerminal(
-      { kind: 'agent', cwd: '/x' },
-      HOME
-    );
-    state.tmuxHolds.add(tab.name);
-    endProcess(tab.name);
-
-    const resume = terminals.launchTerminal(
-      { kind: 'agent', cwd: '/x', sessionName: tab.name },
-      HOME
-    );
-    await expect(
-      terminals.launchTerminal(
-        { kind: 'agent', cwd: '/x', sessionName: tab.name, fresh: true },
-        HOME
-      )
-    ).rejects.toThrow(/in progress/);
-    const resumed = await resume;
-    expect(resumed.name).toBe(tab.name);
-    expect(state.spawns).toHaveLength(2);
-  });
-
-  it('still refuses a restart when the retained tab’s own directory is gone', async () => {
-    const tab = await terminals.launchTerminal(
-      { kind: 'agent', cwd: '/gone-now' },
-      HOME
-    );
-    state.tmuxHolds.add(tab.name);
-    endProcess(tab.name);
-    state.missingDirs.add('/gone-now');
-    await expect(
-      terminals.launchTerminal(
-        { kind: 'agent', cwd: '/gone-now', sessionName: tab.name },
-        HOME
-      )
-    ).rejects.toThrow(/does not exist/);
-  });
-
-  // Finding 6: a restart request never carries `machine` — TerminalView
-  // sends only {sessionName, kind, cwd} — so gating the directory check
-  // on `req.machine` alone `statSync`s a path on this machine that only
-  // ever existed on the remote one, and rejects a resumable remote
-  // agent as "Terminal directory does not exist". The retained tab's
-  // own identity (D2's key) is what must decide this, not a field the
-  // restart request never had.
-  it('does not statSync a retained tab’s directory when its own identity says it is remote', async () => {
-    const tab = await terminals.launchTerminal(
-      { kind: 'agent', cwd: '/remote/checkout', machine: 'bbbbbbbbbbbbbbbb' },
-      HOME
-    );
-    state.identityByName.set(tab.name, { machine: 'bbbbbbbbbbbbbbbb' });
-    state.tmuxHolds.add(tab.name);
-    endProcess(tab.name);
-    // A path that would fail assertLaunchableCwd if it were ever checked.
-    state.missingDirs.add('/remote/checkout');
-    const restarted = await terminals.launchTerminal(
-      { kind: 'agent', cwd: '/remote/checkout', sessionName: tab.name },
-      HOME
-    );
-    expect(restarted.name).toBe(tab.name);
-    expect(restarted.running).toBe(true);
-  });
-
-  // Finding 10: a local session must never carry a connectionState at
-  // all — TmuxBackend's own local-client reconnect (a distinct, older
-  // concern than the remote D4 banner) must not reach the renderer for
-  // a local terminal, even when it legitimately reports one.
-  it('omits connectionState for a local terminal even when the PTY reports one', async () => {
-    const tab = await terminals.launchTerminal(
-      { kind: 'agent', cwd: '/x' },
-      HOME
-    );
-    state.connectionStateByName.set(tab.name, 'reconnecting');
-    const [summary] = terminals.listTerminals(HOME);
-    expect(summary?.connectionState).toBeUndefined();
-  });
-
-  it('still reports connectionState for a remote terminal', async () => {
-    const tab = await terminals.launchTerminal(
-      { kind: 'agent', cwd: '/remote/checkout', machine: 'bbbbbbbbbbbbbbbb' },
-      HOME
-    );
-    state.identityByName.set(tab.name, { machine: 'bbbbbbbbbbbbbbbb' });
-    state.connectionStateByName.set(tab.name, 'reconnecting');
-    const [summary] = terminals.listTerminals(HOME);
-    expect(summary?.connectionState).toBe('reconnecting');
-  });
-});
-
-describe('killTerminal', () => {
-  it('kills the session and forgets the terminal', async () => {
-    const { name } = await terminals.launchTerminal(
-      { kind: 'shell', cwd: '/x' },
-      HOME
-    );
-    terminals.killTerminal(name);
-    expect(state.killed).toEqual([name]);
-    expect(terminals.listTerminals(HOME)).toEqual([]);
-    expect(terminals.terminalBuffer(name)).toBeUndefined();
-  });
-
-  it('is a no-op for a name it never launched', () => {
-    terminals.killTerminal('n10-shell-9');
-    expect(state.killed).toEqual([]);
   });
 });
 

@@ -8,7 +8,7 @@ import {
   getNavHintKeys,
   keysToDisplayString,
   resolveAction,
-} from '@n10/core';
+} from '@n10/core/ui';
 import type { HintEntry } from '@n10/core';
 import type { InputContext, KeyDescriptor } from '@n10/core';
 import type { KeyPress } from '@n10/core';

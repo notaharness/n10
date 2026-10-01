@@ -97,6 +97,6 @@ export function usePullRequestSnapshot(
     queryKey: keys.prSnapshot(cwd, ref ?? NO_REF, viewer),
     queryFn: () => loadPullRequestSnapshot(ref!, viewer),
     enabled: ref != null,
-    staleTime: 60_000,
+    staleTime: 0,
   });
 }

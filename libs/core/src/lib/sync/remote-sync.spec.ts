@@ -1,3 +1,4 @@
+import type * as WorktreeManager from '@n10/worktree-manager';
 import { worktreeSessionKey } from '../session-key.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VcsProvider } from '@n10/vcs-core';
@@ -27,7 +28,11 @@ const env = vi.hoisted(() => ({
   alive: new Set<string>(),
   persisted: new Set<string>(),
   removable: {} as Record<string, { safe: boolean; reason?: string }>,
-  deleted: [] as { session: string; branch: string; tip: string | null }[],
+  deleted: [] as {
+    checkout: string | null;
+    branch: string;
+    tip: string | null;
+  }[],
   rebaseWarned: [] as string[],
   conflicts: {} as Record<string, number>,
   /** Every merge check, as `base..head`. */
@@ -36,7 +41,8 @@ const env = vi.hoisted(() => ({
   checks: 0,
 }));
 
-vi.mock('@n10/worktree-manager', () => ({
+vi.mock('@n10/worktree-manager', async (original) => ({
+  ...(await original<typeof WorktreeManager>()),
   branchTip: (branch: string) => Promise.resolve(`tip:${branch}`),
   repositoryOf: () => Promise.resolve('/repo/.git'),
   branchToSessionName: (b: string) => b.replace(/\//g, '-'),
@@ -72,21 +78,14 @@ vi.mock('../pty-registry.js', () => ({
   isSessionAlive: (name: string) => env.alive.has(name),
 }));
 
-// Existence, not preference: the sweep must refuse to delete a
-// worktree whose tmux agent is running whatever backend is selected
-// now. Mocking it with a config parameter would let a regression that
-// re-gated it on the preference slip through here.
+// A surviving tmux agent prevents deletion even without a registry client.
 vi.mock('../session-backend.js', () => ({
   hasLiveTmuxSession: (name: string) => env.persisted.has(name),
 }));
 
-const {
-  computeConflictCounts,
-  diffRebaseWarnings,
-  remoteSyncIntervalMs,
-  REMOTE_SYNC_MIN_MS,
-  sweepMergedBranches,
-} = await import('./remote-sync.js');
+const { computeConflictCounts, sweepMergedBranches } = await import(
+  './remote-sync.js'
+);
 
 const provider = {
   id: 'github',
@@ -99,13 +98,18 @@ const provider = {
 function sweep(over: Partial<Parameters<typeof sweepMergedBranches>[0]> = {}) {
   return sweepMergedBranches({
     provider,
+    cwd: '/repo',
     vcsConfigured: true,
     config: { autoDeleteOnMerge: true } as never,
     branches: ['feature/a'],
     warnedRebase: new Set<string>(),
-    onAutoDelete: (session, branch, approved) => {
+    onAutoDelete: (branch, approved) => {
       expect(approved.verdict).toBe('clear');
-      env.deleted.push({ session, branch, tip: approved.tip });
+      env.deleted.push({
+        checkout: approved.checkout,
+        branch,
+        tip: approved.tip,
+      });
     },
     onRebaseInProgress: (branch) => env.rebaseWarned.push(branch),
     isCancelled: () => env.checks >= env.cancelAfterChecks,
@@ -127,46 +131,13 @@ beforeEach(() => {
   env.checks = 0;
 });
 
-describe('remoteSyncIntervalMs', () => {
-  it('never polls the provider faster than the floor', () => {
-    // A hand-edited config of 1 would otherwise hammer the API.
-    expect(remoteSyncIntervalMs(1)).toBe(REMOTE_SYNC_MIN_MS);
-    expect(remoteSyncIntervalMs(0)).toBe(REMOTE_SYNC_MIN_MS);
-  });
-
-  it('honours a longer interval, and falls back when unset', () => {
-    expect(remoteSyncIntervalMs(7_200_000)).toBe(7_200_000);
-    expect(remoteSyncIntervalMs(undefined)).toBeGreaterThanOrEqual(
-      REMOTE_SYNC_MIN_MS
-    );
-  });
-});
-
-describe('diffRebaseWarnings', () => {
-  it('warns once per rebase episode', () => {
-    const first = diffRebaseWarnings(['a'], new Set());
-    expect(first.toWarn).toEqual(['a']);
-
-    const second = diffRebaseWarnings(['a'], first.nextWarned);
-    expect(second.toWarn).toEqual([]);
-  });
-
-  it('warns again once the branch has stopped and started rebasing', () => {
-    // Dropping out of the carried set is what allows a second episode
-    // to be reported instead of staying silent forever.
-    const warned = diffRebaseWarnings(['a'], new Set()).nextWarned;
-    const cleared = diffRebaseWarnings([], warned).nextWarned;
-    expect(diffRebaseWarnings(['a'], cleared).toWarn).toEqual(['a']);
-  });
-});
-
 describe('sweepMergedBranches', () => {
   it('deletes a merged branch that is safe to remove', async () => {
     const result = await sweep();
     expect([...result.merged]).toEqual(['feature/a']);
     expect(env.deleted).toEqual([
       {
-        session: worktreeSessionKey(checkout('feature/a')),
+        checkout: checkout('feature/a'),
         branch: 'feature/a',
         // The commit it was judged at, so removal leaves a branch that
         // moves on before the removal runs.
@@ -178,26 +149,17 @@ describe('sweepMergedBranches', () => {
   it('leaves a branch alone when its agent is still running', async () => {
     // The user deliberately left that agent running; deleting the
     // worktree under it destroys whatever it had in memory.
-    env.alive = new Set([worktreeSessionKey(checkout('feature/a'))]);
+    env.alive = new Set([worktreeSessionKey(checkout('feature/a'), '/repo')]);
     await sweep();
     expect(env.deleted).toEqual([]);
   });
 
   it('leaves a branch alone when a tmux session for it survived a restart', async () => {
     // Same agent, just not in this process's registry.
-    env.persisted = new Set([worktreeSessionKey(checkout('feature/a'))]);
+    env.persisted = new Set([
+      worktreeSessionKey(checkout('feature/a'), '/repo'),
+    ]);
     await sweep();
-    expect(env.deleted).toEqual([]);
-  });
-
-  // The agent is running whether or not tmux is still the preference,
-  // and deleting its worktree is destructive. A user who switched to
-  // PTY after the session was created must not lose it.
-  it('leaves it alone even when the config now selects pty', async () => {
-    env.persisted = new Set([worktreeSessionKey(checkout('feature/a'))]);
-    await sweep({
-      config: { autoDeleteOnMerge: true } as never,
-    });
     expect(env.deleted).toEqual([]);
   });
 
@@ -220,8 +182,7 @@ describe('sweepMergedBranches', () => {
     // A failed lookup must not read as "nothing is merged" — and
     // certainly must not delete on the strength of it.
     env.fetchThrows = true;
-    const result = await sweep();
-    expect([...result.merged]).toEqual([]);
+    await expect(sweep()).rejects.toThrow('provider down');
     expect(env.deleted).toEqual([]);
   });
 
@@ -230,18 +191,6 @@ describe('sweepMergedBranches', () => {
     expect((await sweep({ provider: null })).merged.size).toBe(0);
     expect((await sweep({ branches: [] })).merged.size).toBe(0);
     expect(env.deleted).toEqual([]);
-  });
-
-  it('reports the merged set before starting the slow deletions', async () => {
-    // Lets a UI show merged badges without waiting on git.
-    const order: string[] = [];
-    await sweep({
-      onMerged: () => order.push('merged'),
-      onAutoDelete: () => {
-        order.push('deleted');
-      },
-    });
-    expect(order).toEqual(['merged', 'deleted']);
   });
 
   it('stops deleting the moment the pass is cancelled', async () => {
@@ -262,6 +211,20 @@ describe('sweepMergedBranches', () => {
     await sweep({ warnedRebase: first.nextWarned });
     // Same rebase, still in progress: no second warning.
     expect(env.rebaseWarned).toEqual([]);
+  });
+
+  it('warns again when a rebase ends and another one begins', async () => {
+    const rebasing = {
+      'feature/a': { safe: false, reason: 'rebase in progress' },
+    };
+    env.removable = rebasing;
+    const first = await sweep();
+    env.removable = {};
+    const clear = await sweep({ warnedRebase: first.nextWarned });
+    env.removable = rebasing;
+    env.rebaseWarned = [];
+    await sweep({ warnedRebase: clear.nextWarned });
+    expect(env.rebaseWarned).toEqual(['feature/a']);
   });
 
   it('does not warn about a branch blocked for some other reason', async () => {

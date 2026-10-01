@@ -40,8 +40,8 @@ what ships. Three things make it a demo rather than a test:
   ugly — a banner and echo lines, built to be asserted against — and a
   capture needs the opposite. This one paces its output like an agent at
   work and reads back the plan it was seeded with, while staying
-  deterministic and offline. n10 launches it through the ordinary
-  `aiCommand` path.
+  deterministic and offline. n10 launches it through the explicitly selected
+  `agentId: 'test'` runner, which reads `aiCommand`.
 - **`capture.mjs`** runs a dedicated Xvfb display at 2x device scale,
   records it with `ffmpeg -f x11grab`, and drives the app with a visible
   cursor that glides between targets instead of teleporting.

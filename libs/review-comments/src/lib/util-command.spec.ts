@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -88,7 +89,14 @@ describe('add-comment', () => {
    * nothing about the file that is actually the contract.
    */
   const stored = (): ReviewComment[] => {
-    const path = join(home, '.n10', 'reviews', `pr-${PR}`, 'comments.json');
+    const path = join(
+      home,
+      '.n10',
+      'reviews',
+      createHash('sha256').update('/repo').digest('hex').slice(0, 32),
+      `pr-${PR}`,
+      'comments.json'
+    );
     return (
       JSON.parse(readFileSync(path, 'utf8')) as {
         comments: ReviewComment[];
@@ -97,7 +105,7 @@ describe('add-comment', () => {
   };
 
   it('writes the draft the flags describe', async () => {
-    await util.handleUtilCommand(['add-comment', ...BASE]);
+    await util.handleUtilCommand(['add-comment', ...BASE], '/repo');
     expect(stored()).toHaveLength(1);
     expect(stored()[0]).toMatchObject({
       file: 'src/undo.c',
@@ -114,11 +122,10 @@ describe('add-comment', () => {
    *  draft is only a file and a line, and nothing downstream can tell
    *  which thread it answers. */
   it('records the thread a draft answers', async () => {
-    await util.handleUtilCommand([
-      'add-comment',
-      ...BASE,
-      '--thread=PRRT_kwDOAbC123',
-    ]);
+    await util.handleUtilCommand(
+      ['add-comment', ...BASE, '--thread=PRRT_kwDOAbC123'],
+      '/repo'
+    );
     expect(stored()[0].threadId).toBe('PRRT_kwDOAbC123');
   });
 
@@ -127,33 +134,39 @@ describe('add-comment', () => {
    *  order, the rail dot, the TUI chip, the posted body — reads the
    *  stored one. */
   it('raises the stored severity to match a louder header in the body', async () => {
-    await util.handleUtilCommand([
-      'add-comment',
-      `--pr=${PR}`,
-      '--file=src/undo.c',
-      '--lineStart=12',
-      '--lineEnd=12',
-      '--severity=nit',
-      '--body=question (blocking): does this drop writes on crash?',
-    ]);
+    await util.handleUtilCommand(
+      [
+        'add-comment',
+        `--pr=${PR}`,
+        '--file=src/undo.c',
+        '--lineStart=12',
+        '--lineEnd=12',
+        '--severity=nit',
+        '--body=question (blocking): does this drop writes on crash?',
+      ],
+      '/repo'
+    );
     expect(stored()[0].severity).toBe('critical');
   });
 
   it('will not let an accidental label quieten the declared severity', async () => {
-    await util.handleUtilCommand([
-      'add-comment',
-      `--pr=${PR}`,
-      '--file=src/undo.c',
-      '--lineStart=12',
-      '--lineEnd=12',
-      '--severity=critical',
-      '--body=Note: this drops writes on crash',
-    ]);
+    await util.handleUtilCommand(
+      [
+        'add-comment',
+        `--pr=${PR}`,
+        '--file=src/undo.c',
+        '--lineStart=12',
+        '--lineEnd=12',
+        '--severity=critical',
+        '--body=Note: this drops writes on crash',
+      ],
+      '/repo'
+    );
     expect(stored()[0].severity).toBe('critical');
   });
 
   it('leaves threadId off a draft that answers nothing', async () => {
-    await util.handleUtilCommand(['add-comment', ...BASE]);
+    await util.handleUtilCommand(['add-comment', ...BASE], '/repo');
     expect(stored()[0].threadId).toBeUndefined();
   });
 });

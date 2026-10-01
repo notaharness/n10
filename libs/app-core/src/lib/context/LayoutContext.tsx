@@ -1,15 +1,10 @@
 import { createContext, useContext, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import {
-  useTerminalDimensions,
-  type TerminalDimensions,
-} from '../hooks/useTerminalDimensions.js';
-
-/**
- * Source of terminal/window dimensions. The CLI shell uses the default
- * (Node TTY `process.stdout`); the desktop GUI injects a hook backed by
- * window resize events via the `useDimensions` provider prop.
- */
+/** Shells supply dimensions from their own rendering surface. */
+export interface TerminalDimensions {
+  rows: number;
+  cols: number;
+}
 export type UseDimensions = () => TerminalDimensions;
 
 // Layout constants. Exported as LAYOUT so any consumer that needs to
@@ -57,10 +52,10 @@ const LayoutContext = createContext<LayoutContextValue | null>(null);
 
 export function LayoutProvider({
   children,
-  useDimensions = useTerminalDimensions,
+  useDimensions,
 }: {
   children: ReactNode;
-  useDimensions?: UseDimensions;
+  useDimensions: UseDimensions;
 }) {
   const { rows: termRows, cols: termCols } = useDimensions();
 

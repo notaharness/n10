@@ -1,9 +1,6 @@
 import { MoreHorizontalIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import type {
-  MachineGrant,
-  MachineView,
-} from '../../../host/contract-machines.js';
+import type { MachineGrant, MachineView } from '@n10/engine/contract';
 import { copyText } from '../../lib/copy-text.js';
 import { useSetMachineGrant } from '../../lib/data/mutations-machines.js';
 import {

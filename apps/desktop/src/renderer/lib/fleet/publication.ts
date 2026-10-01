@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type {
-  CeremonyOutcome,
-  DirectoryPublished,
-} from '../../../host/contract-machines.js';
+import type { CeremonyOutcome, DirectoryPublished } from '@n10/engine/contract';
 
 type Succeeded = Extract<CeremonyOutcome, { ok: true }>;
 

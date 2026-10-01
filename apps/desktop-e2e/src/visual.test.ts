@@ -73,14 +73,17 @@ test.describe('Visual @visual', () => {
     await expect(page).toHaveScreenshot('command-palette.png', shot);
   });
 
-  test('settings page', async ({ desktop }) => {
-    const { page } = desktop;
-    await clickAppMenuItem(desktop.app, 'Settings…');
-    await expect(tab(page, /Settings/)).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Appearance' })
-    ).toBeVisible();
-    await expect(page).toHaveScreenshot('settings.png', shot);
+  test.describe('configured agent', () => {
+    test.use({ n10Config: { agentId: 'claude' } });
+    test('settings page', async ({ desktop }) => {
+      const { page } = desktop;
+      await clickAppMenuItem(desktop.app, 'Settings…');
+      await expect(tab(page, /Settings/)).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Appearance' })
+      ).toBeVisible();
+      await expect(page).toHaveScreenshot('settings.png', shot);
+    });
   });
 
   test('remove worktree dialog', async ({ desktop }) => {
@@ -375,6 +378,11 @@ async function openOverview(page: Page) {
   await expect(
     page.getByRole('button', { name: /request\.ts/ }).first()
   ).toBeVisible({ timeout: 30_000 });
+  // The footer is in every overview shot; provider reads can finish after
+  // the overview and file list, leaving a transient syncing indicator.
+  await expect(page.getByText('synced just now', { exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
 }
 
 test.describe('Visual (overview) @visual', () => {
@@ -395,11 +403,18 @@ test.describe('Visual (overview) @visual', () => {
   test('pull request overview at 800×600', async ({ desktop }) => {
     const { app, page } = desktop;
     await openOverview(page);
+    const titlebar = page.getByRole('banner');
+    const controlsInset = await titlebar.evaluate(
+      (bar) => getComputedStyle(bar).paddingRight
+    );
     await app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
       window.setMinimumSize(0, 0);
       window.setContentSize(800, 600);
     });
+    // Electron updates the native control overlay after the content resize.
+    // Its button width is unchanged; wait for CSS env() geometry to catch up.
+    await expect(titlebar).toHaveCSS('padding-right', controlsInset);
     await expect(page.getByText('Your review is requested')).toBeVisible();
     await expect(page).toHaveScreenshot('pr-overview-narrow.png', shot);
   });

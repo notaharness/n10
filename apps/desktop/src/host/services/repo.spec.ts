@@ -1,8 +1,10 @@
+import { execFileSync } from 'node:child_process';
+import type * as Os from 'node:os';
 import {
   describe,
   it,
   expect,
-  beforeAll,
+  vi,
   beforeEach,
   afterAll,
   afterEach,
@@ -13,21 +15,33 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
-  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  setRepoOpenedListener,
   activeRepoIs,
+  activeConfigService,
+  refreshRepo,
   forgetRecentRepo,
   getRepo,
-  isGitRepo,
   listRecentRepos,
   openRepo,
   openStartupRepo,
 } from './repo.js';
-import { loadRecents, saveRecents } from './recent-repos.js';
+import { saveRecents } from './recent-repos.js';
 import type { RecentRepo } from '@n10/vcs-core';
+
+const fixture = vi.hoisted(() => ({ home: '' }));
+vi.mock('node:os', async (original) => {
+  const os = await original<typeof Os>();
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  fixture.home = fs.mkdtempSync(path.join(os.tmpdir(), 'n10-repo-home-'));
+  return { ...os, homedir: () => fixture.home };
+});
+const originalCwd = process.cwd();
+afterAll(() => rmSync(fixture.home, { recursive: true, force: true }));
 
 const recents = (cwds: string[]): RecentRepo[] =>
   cwds.map((cwd, i) => ({ cwd, lastOpenedAt: i }));
@@ -38,33 +52,15 @@ let plainDir: string;
 beforeEach(() => {
   const base = mkdtempSync(join(tmpdir(), 'n10-repo-test-'));
   gitDir = join(base, 'repo');
-  mkdirSync(join(gitDir, '.git'), { recursive: true });
+  execFileSync('git', ['init', '--quiet', gitDir]);
   plainDir = join(base, 'plain');
   mkdirSync(plainDir, { recursive: true });
 });
 
 afterEach(() => {
+  setRepoOpenedListener(() => undefined);
+  process.chdir(originalCwd);
   rmSync(join(gitDir, '..'), { recursive: true, force: true });
-});
-
-// openRepo records to the real recents store; snapshot and restore
-// around the suite so tests never leave pollution behind.
-let savedRecents: RecentRepo[] | null = null;
-beforeAll(() => {
-  savedRecents = loadRecents();
-});
-afterAll(() => {
-  if (savedRecents) saveRecents(savedRecents);
-});
-
-describe('isGitRepo', () => {
-  it('accepts a directory containing a .git directory', () => {
-    expect(isGitRepo(gitDir)).toBe(true);
-  });
-
-  it('rejects a directory without .git', () => {
-    expect(isGitRepo(plainDir)).toBe(false);
-  });
 });
 
 describe('openStartupRepo', () => {
@@ -97,28 +93,20 @@ describe('openStartupRepo', () => {
   });
 });
 
-describe('isGitRepo (worktrees and submodules)', () => {
-  it('accepts a checkout whose .git is a file', () => {
-    // git worktrees and submodules point at the real git dir with a
-    // file, not a directory; rejecting those would hide every worktree
-    // from the picker.
-    const base = mkdtempSync(join(tmpdir(), 'n10-repo-file-'));
-    const wt = join(base, 'wt');
-    mkdirSync(wt, { recursive: true });
-    writeFileSync(join(wt, '.git'), 'gitdir: /elsewhere/.git/worktrees/wt\n');
-    try {
-      expect(isGitRepo(wt)).toBe(true);
-    } finally {
-      rmSync(base, { recursive: true, force: true });
-    }
-  });
-
-  it('rejects a directory that does not exist', () => {
-    expect(isGitRepo(join(tmpdir(), 'n10-definitely-not-here'))).toBe(false);
-  });
-});
-
 describe('opening a repository', () => {
+  it('starts repository observers only when the handle changes', () => {
+    const opened = vi.fn();
+    setRepoOpenedListener(opened);
+    openRepo(gitDir);
+    openRepo(gitDir);
+    expect(opened).toHaveBeenCalledExactlyOnceWith(gitDir);
+    const other = join(gitDir, '..', 'other');
+    execFileSync('git', ['init', '--quiet', other]);
+    openRepo(other);
+    expect(opened).toHaveBeenCalledTimes(2);
+    expect(opened).toHaveBeenLastCalledWith(other);
+  });
+
   it('refuses a directory that is not a repository', () => {
     // The picker relies on this to keep the user on the picker with an
     // error, rather than opening an empty workspace over nothing.
@@ -156,8 +144,6 @@ describe('opening a repository through a symlink', () => {
     link = join(gitDir, '..', 'link-to-repo');
     symlinkSync(gitDir, link);
   });
-  // Only this test's own paths: the recents store is the real one on
-  // this machine, shared with anything else writing it meanwhile.
   const ours = () =>
     listRecentRepos()
       .map((r) => r.cwd)
@@ -224,4 +210,14 @@ describe('recent repositories', () => {
     saveRecents(recents(Array.from({ length: 25 }, (_, i) => `/repo-${i}`)));
     expect(listRecentRepos().length).toBeLessThanOrEqual(10);
   });
+});
+
+it('refreshes config explicitly without making snapshot reads publish', () => {
+  openRepo(gitDir);
+  const service = activeConfigService();
+  const reload = vi.spyOn(service, 'reload');
+  getRepo();
+  expect(reload).not.toHaveBeenCalled();
+  expect(refreshRepo()?.cwd).toBe(gitDir);
+  expect(reload).toHaveBeenCalledOnce();
 });

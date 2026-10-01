@@ -117,7 +117,7 @@ function settle(message: Extract<MainToHost, { t: 'reply' }>): void {
 // Terminal clients go; the tmux sessions behind them stay. Then the
 // daemon this host started stops (D15).
 async function shutdown(): Promise<void> {
-  stopRemoteSyncLoop();
+  const removals = stopRemoteSyncLoop();
   stopDiscovery();
   stopAllBabysitters();
   try {
@@ -126,6 +126,7 @@ async function shutdown(): Promise<void> {
     // nothing was running
   }
   await beam.shutdown().catch(logFailure('beam shutdown'));
+  await removals;
   post({ t: 'stopped' });
   setImmediate(() => process.exit(0));
 }

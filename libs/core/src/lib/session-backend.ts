@@ -4,7 +4,6 @@ import {
   terminalSessionKey,
   sessionIdentity,
 } from './session-key.js';
-import { getRepoRoot } from './repo-root.js';
 import {
   isTmuxAvailable,
   tmuxKillSession,
@@ -73,8 +72,6 @@ export interface TmuxObservation {
   terminals: DiscoveredTerminal[];
 }
 
-const NOTHING: TmuxObservation = { persisted: new Set(), terminals: [] };
-
 /**
  * One fork, two answers: which worktree sessions survived, and which
  * terminal sessions exist.
@@ -107,10 +104,9 @@ const NOTHING: TmuxObservation = { persisted: new Set(), terminals: [] };
  * sessions.
  */
 export function observeTmuxSessions(
+  root: string,
   worktrees: readonly DiscoveredWorktree[]
 ): TmuxObservation {
-  const root = getRepoRoot();
-  if (!root) return NOTHING;
   const ctx: ClassifyContext = {
     root,
     byPath: new Map(

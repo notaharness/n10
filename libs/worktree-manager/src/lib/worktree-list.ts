@@ -9,7 +9,7 @@ import { log } from '@n10/logger';
 import { exec, gitOptions } from './exec.js';
 import { isRemoteMachine, runGitOn, type Machine } from './machine.js';
 import { branchToSessionName } from './refs.js';
-import { ownsWorktreePath } from './worktree-resolver.js';
+import type { WorktreeScope, WorktreeResolver } from './worktree-resolver.js';
 
 export interface WorktreeInfo {
   path: string;
@@ -128,14 +128,8 @@ export function recoverRebaseBranch(worktreePath: string): string | null {
  * them via `worktreeSessionName` (directory basename) so they render
  * in the sidebar and can host a session by their directory name.
  *
- * `cwd` names the repository to list, and to judge ownership against.
- * Omitting it runs against the process's directory, which is the open
- * repository — what every caller polling for the sidebar wants. A
- * caller acting on a repository it was handed passes it, so the answer
- * cannot be about somewhere the desktop `chdir`-ed to meanwhile.
- *
- * `machine` is local by default. A remote machine runs the same `git
- * worktree list --porcelain -z` through its executor instead of a
+ * The scope names the repository and its path ownership policy. Its optional
+ * remote machine runs `git worktree list --porcelain -z` instead of a
  * local fork — but cannot recover a detached-HEAD worktree's rebase
  * branch (`recoverRebaseBranch` reads the remote's `.git` directory
  * directly, which only makes sense against this machine's filesystem),
@@ -143,10 +137,10 @@ export function recoverRebaseBranch(worktreePath: string): string | null {
  * with its recovered branch. Everything else is unchanged.
  */
 export async function listWorktrees(
-  cwd?: string,
-  machine?: Machine
+  scope: WorktreeScope
 ): Promise<WorktreeInfo[]> {
-  if (isRemoteMachine(machine)) return listWorktreesRemote(cwd, machine);
+  const { cwd, machine, resolver } = scope;
+  if (isRemoteMachine(machine)) return listWorktreesRemote(scope, machine);
   try {
     const { stdout } = await exec(
       'git worktree list --porcelain -z',
@@ -154,19 +148,20 @@ export async function listWorktrees(
     );
     return recoverDetachedHeads(
       parseWorktrees(stdout),
-      cwd,
+      resolver,
       recoverRebaseBranch
     );
   } catch (e) {
     log('error', 'listWorktrees', 'git worktree list failed', e);
-    return [];
+    throw e;
   }
 }
 
 async function listWorktreesRemote(
-  cwd: string | undefined,
+  scope: WorktreeScope,
   machine: Machine
 ): Promise<WorktreeInfo[]> {
+  const { cwd, resolver } = scope;
   try {
     const { stdout } = await runGitOn(
       machine,
@@ -175,7 +170,7 @@ async function listWorktreesRemote(
     );
     // No local filesystem to recover a detached HEAD's rebase branch
     // from — see this function's doc comment.
-    return recoverDetachedHeads(parseWorktrees(stdout), cwd, () => null);
+    return recoverDetachedHeads(parseWorktrees(stdout), resolver, () => null);
   } catch (e) {
     log(
       'error',
@@ -183,16 +178,16 @@ async function listWorktreesRemote(
       `remote git worktree list failed on ${machine.id}`,
       e
     );
-    return [];
+    throw e;
   }
 }
 
 function recoverDetachedHeads(
   parsed: WorktreeInfo[],
-  cwd: string | undefined,
+  resolver: WorktreeResolver,
   recover: (worktreePath: string) => string | null
 ): WorktreeInfo[] {
-  const owned = parsed.filter((w) => !w.bare && ownsWorktreePath(w.path, cwd));
+  const owned = parsed.filter((w) => !w.bare && resolver.owns(w.path));
   const recovered: WorktreeInfo[] = [];
   for (const w of owned) {
     if (w.branch !== '') {

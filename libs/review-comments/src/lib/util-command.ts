@@ -29,7 +29,7 @@ export function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
-function handleAddComment(args: string[]): void {
+function handleAddComment(args: string[], repository: string): void {
   const parsed = parseArgs(args);
 
   const missing: string[] = [];
@@ -100,15 +100,18 @@ function handleAddComment(args: string[]): void {
     ...(parsed.thread ? { threadId: parsed.thread } : {}),
   };
 
-  appendComment(prId, comment);
+  appendComment(repository, prId, comment);
   console.log(comment.id);
 }
 
-export async function handleUtilCommand(args: string[]): Promise<void> {
+export async function handleUtilCommand(
+  args: string[],
+  repository: string
+): Promise<void> {
   const subcommand = args[0];
 
   if (subcommand === 'add-comment') {
-    handleAddComment(args.slice(1));
+    handleAddComment(args.slice(1), repository);
     return;
   }
 

@@ -222,40 +222,11 @@ export function makeTestAgent(rawCommand: string): AgentDefinition {
 
 const KNOWN_IDS = new Set<string>(AGENTS.map((a) => a.id));
 
-/**
- * Map a legacy `aiCommand` string back to an agent id. Recognized
- * preset commands map to their agent; anything else (custom wrappers,
- * the e2e fakes) routes to the hidden test runner so it runs verbatim.
- */
-export function agentIdFromCommand(
-  aiCommand: string | undefined
-): ResolvedAgentId {
-  if (!aiCommand) return 'claude';
-  const cmd = aiCommand.trim();
-  if (cmd.startsWith('claude')) return 'claude';
-  if (cmd.startsWith('codex')) return 'codex';
-  if (cmd.startsWith('gemini')) return 'gemini';
-  if (
-    cmd === 'copilot' ||
-    cmd.startsWith('copilot ') ||
-    cmd.startsWith('gh copilot')
-  )
-    return 'copilot';
-  if (cmd.startsWith('opencode')) return 'opencode';
-  return 'test';
-}
-
-/**
- * Resolve the agent to launch for a config. Prefers the explicit
- * `agentId`; otherwise migrates the legacy `aiCommand`. Unknown ids and
- * the `test` id resolve to the hidden test runner bound to `aiCommand`.
- */
+/** Resolve an explicitly selected agent, defaulting to Claude. */
 export function resolveAgent(config: AppConfig): AgentDefinition {
-  const id: ResolvedAgentId =
-    config.agentId ?? agentIdFromCommand(config.aiCommand);
+  const id = config.agentId ?? 'claude';
   if (id === 'test') return makeTestAgent(config.aiCommand ?? '');
-  const found = AGENTS.find((a) => a.id === id);
-  return found ?? CLAUDE;
+  return AGENTS.find((agent) => agent.id === id) ?? CLAUDE;
 }
 
 export function isKnownAgentId(id: string): id is AgentId {

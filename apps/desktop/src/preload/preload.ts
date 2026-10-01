@@ -8,7 +8,7 @@ import {
   MENU_EVENTS,
   SESSION_EVENTS,
   SYNC_EVENTS,
-  type BeamStatus,
+  type FleetStatus,
   type CeremonyProgress,
   type DirectoryPublished,
   type N10HostApi,
@@ -31,6 +31,7 @@ const api: N10HostApi = {
 
   openRepo: (cwd) => ipcRenderer.invoke(IPC.openRepo, cwd),
   getRepo: () => ipcRenderer.invoke(IPC.getRepo),
+  refreshRepo: () => ipcRenderer.invoke(IPC.refreshRepo),
   listRecentRepos: () => ipcRenderer.invoke(IPC.listRecentRepos),
   selectRepoDirectory: () => ipcRenderer.invoke(IPC.selectRepoDirectory),
   selectFolder: () => ipcRenderer.invoke(IPC.selectFolder),
@@ -53,8 +54,8 @@ const api: N10HostApi = {
     ipcRenderer.invoke(IPC.checkWorktreeRemoval, branch),
   openInEditor: (branch) => ipcRenderer.invoke(IPC.openInEditor, branch),
 
-  fetchCommentThreads: (prId) =>
-    ipcRenderer.invoke(IPC.fetchCommentThreads, prId),
+  fetchCommentThreads: (prId, force) =>
+    ipcRenderer.invoke(IPC.fetchCommentThreads, prId, force),
   replyToThread: (req) => ipcRenderer.invoke(IPC.replyToThread, req),
   setThreadResolved: (req) => ipcRenderer.invoke(IPC.setThreadResolved, req),
   fetchCommentImage: (url) => ipcRenderer.invoke(IPC.fetchCommentImage, url),
@@ -127,8 +128,6 @@ const api: N10HostApi = {
     ipcRenderer.invoke(IPC.fetchDiffText, sourceBranch, targetBranch),
   fetchWorktreeDiffText: (branch, targetBranch) =>
     ipcRenderer.invoke(IPC.fetchWorktreeDiffText, branch, targetBranch),
-  fetchFileDiffText: (sourceBranch, targetBranch, file) =>
-    ipcRenderer.invoke(IPC.fetchFileDiffText, sourceBranch, targetBranch, file),
 
   openExternal: (url) => ipcRenderer.invoke(IPC.openExternal, url),
   showContextMenu: (items) => ipcRenderer.invoke(IPC.showContextMenu, items),
@@ -168,7 +167,7 @@ const api: N10HostApi = {
   listMachines: () => ipcRenderer.invoke(IPC.listMachines),
   getBeamStatus: () => ipcRenderer.invoke(IPC.getBeamStatus),
   onBeamStatusChanged: (cb) => {
-    const listener = (_e: unknown, payload: BeamStatus) => cb(payload);
+    const listener = (_e: unknown, payload: FleetStatus) => cb(payload);
     ipcRenderer.on(MACHINES_EVENTS.beamStatus, listener);
     return () =>
       ipcRenderer.removeListener(MACHINES_EVENTS.beamStatus, listener);

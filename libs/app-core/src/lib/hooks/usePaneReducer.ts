@@ -3,11 +3,10 @@ import type { PaneMode, SessionMenuState, SidebarItem } from '@n10/core';
 import {
   consumeSessionMenuRequest,
   getPrFromItem,
-  hasSession,
   openSessionMenuState,
   peekSessionMenuRequest,
   subscribeSessionMenuRequest,
-} from '@n10/core';
+} from '@n10/core/ui';
 
 // ── State ────────────────────────────────────────────────────────
 
@@ -207,10 +206,10 @@ export type PaneModeValue = PaneState & PaneActions;
 
 function defaultPaneMode(
   item: SidebarItem | undefined,
-  sessionName: string | null
+  hasTerminal: boolean
 ): PaneMode {
   if (!item) return 'terminal';
-  if (sessionName && hasSession(sessionName)) return 'terminal';
+  if (hasTerminal) return 'terminal';
   const pr = getPrFromItem(item);
   if (pr) return 'pr-detail';
   return 'terminal';
@@ -234,14 +233,15 @@ function defaultPaneMode(
  */
 export function usePaneReducer(
   selectedItem: SidebarItem | undefined,
-  sessionNameForTerminal: string | null
+  sessionNameForTerminal: string | null,
+  hasTerminal: boolean
 ): PaneModeValue {
   const [state, dispatch] = useReducer(
     paneReducer,
-    { selectedItem, sessionNameForTerminal },
+    { selectedItem, hasTerminal },
     (arg) => ({
       ...initialState,
-      paneMode: defaultPaneMode(arg.selectedItem, arg.sessionNameForTerminal),
+      paneMode: defaultPaneMode(arg.selectedItem, arg.hasTerminal),
     })
   );
 

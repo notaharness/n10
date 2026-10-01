@@ -1,7 +1,8 @@
-import { worktreeSessionKey } from '@n10/core';
+import { worktreeSessionKey, worktreeSessionRow } from '@n10/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as SidebarModule from './sidebar.js';
 import type * as PullRequestsModule from './pull-requests.js';
+import type * as ProgramModule from './program.js';
 import type * as Core from '@n10/core';
 
 /**
@@ -55,30 +56,33 @@ const env = vi.hoisted(() => ({
 
 vi.mock('./repo.js', () => ({
   requireRepo: () => env.cwd,
+  activeRepository: () => {
+    const cwd = env.cwd;
+    return {
+      cwd,
+      sessions: {
+        read: async () => {
+          const worktrees = env.holdWorktrees
+            ? await new Promise<typeof env.worktrees>((resolve) => {
+                env.holdWorktrees = false;
+                env.releaseWorktrees = (list) => resolve(list ?? env.worktrees);
+              })
+            : env.worktrees;
+          return worktrees.map((wt) =>
+            worktreeSessionRow(
+              { ...wt, branch: wt.branch ?? '' } as Parameters<
+                typeof worktreeSessionRow
+              >[0],
+              () => false,
+              cwd
+            )
+          );
+        },
+      },
+    };
+  },
+  activeReviewService: () => ({ invalidateProvider: vi.fn() }),
   activeRepoIs: (cwd: string) => cwd === env.cwd,
-  PROVIDERS: [
-    {
-      id: 'github',
-      isConfigured: () => env.configured,
-      forgetPullRequestCache: () => {
-        env.forgetCount += 1;
-        env.events.push('forget');
-      },
-      fetchPullRequests: () => {
-        env.fetchCount += 1;
-        env.events.push('start');
-        return new Promise((resolve, reject) => {
-          env.pending.push({
-            resolve: (v: Record<string, unknown>) => {
-              env.events.push('end');
-              resolve(v);
-            },
-            reject,
-          });
-        });
-      },
-    },
-  ],
 }));
 
 vi.mock('./babysit.js', () => ({
@@ -86,27 +90,18 @@ vi.mock('./babysit.js', () => ({
 }));
 
 vi.mock('./remote-sync.js', () => ({
+  refreshRemoteSync: () => Promise.resolve(),
   getSyncDecorations: () => ({
     merged: new Set<string>(),
     conflicts: new Map<string, number>(),
     lastGitSyncAt: 42,
+    error: null,
+    loading: false,
   }),
 }));
 
 vi.mock('@n10/vcs-core', () => ({
   readConfig: () => ({ vendor: 'github', ...env.config }),
-}));
-
-vi.mock('@n10/worktree-manager', () => ({
-  listWorktrees: () =>
-    env.holdWorktrees
-      ? new Promise<typeof env.worktrees>((resolve) => {
-          env.holdWorktrees = false;
-          env.releaseWorktrees = (list) => resolve(list ?? env.worktrees);
-        })
-      : Promise.resolve(env.worktrees),
-  worktreeSessionName: (wt: { branch?: string }) =>
-    (wt.branch ?? 'detached').replace(/\//g, '-'),
 }));
 
 vi.mock('@n10/core', async (importOriginal) => ({
@@ -137,6 +132,7 @@ vi.mock('@n10/core', async (importOriginal) => ({
 
 let sidebar: typeof SidebarModule;
 let pullRequests: typeof PullRequestsModule;
+let program: typeof ProgramModule;
 
 /** Settle every pending promise without advancing the clock: the
  *  microtask queue drains before an immediate runs. */
@@ -163,6 +159,7 @@ beforeEach(async () => {
   vi.resetModules();
   sidebar = await import('./sidebar.js');
   pullRequests = await import('./pull-requests.js');
+  program = await import('./program.js');
 });
 
 /** Resolve the nth outstanding provider fetch. */
@@ -272,7 +269,7 @@ describe('after the credentials change', () => {
 
     let announced = 0;
     pullRequests.setRemoteUpdatedNotifier(() => announced++);
-    pullRequests.pullRequests.credentialsChanged();
+    program.pullRequests.credentialsChanged();
     // The cleared list and error are themselves a change worth
     // painting, before any fetch has landed.
     expect(announced).toBe(1);
@@ -292,17 +289,18 @@ describe('lookupPullRequest', () => {
     await flush();
     settle(0, { feature: { id: 7 } });
     await model;
-    const found = await pullRequests.lookupPullRequest('/repo-a', 7);
+    const found = await program.pullRequests.lookupPullRequest('/repo-a', 7);
     expect(found).toMatchObject({ kind: 'found', pr: { id: 7 } });
     expect(env.fetchCount).toBe(1);
   });
 
   it('cannot say when no provider is configured', async () => {
     env.configured = false;
-    expect(await pullRequests.lookupPullRequest('/repo-a', 7)).toMatchObject({
+    expect(
+      await program.pullRequests.lookupPullRequest('/repo-a', 7)
+    ).toMatchObject({
       kind: 'unknown',
     });
-    expect(pullRequests.repoProvider('/repo-a')).toBeNull();
   });
 });
 
@@ -444,3 +442,29 @@ describe('getSidebarSnapshot', () => {
     ]);
   });
 });
+
+vi.mock('./providers.js', () => ({
+  PROVIDERS: [
+    {
+      id: 'github',
+      isConfigured: () => env.configured,
+      forgetPullRequestCache: () => {
+        env.forgetCount += 1;
+        env.events.push('forget');
+      },
+      fetchPullRequests: () => {
+        env.fetchCount += 1;
+        env.events.push('start');
+        return new Promise((resolve, reject) => {
+          env.pending.push({
+            resolve: (v: Record<string, unknown>) => {
+              env.events.push('end');
+              resolve(v);
+            },
+            reject,
+          });
+        });
+      },
+    },
+  ],
+}));

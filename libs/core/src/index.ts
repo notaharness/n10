@@ -27,8 +27,11 @@ export {
   resolveValue,
 } from './lib/settings/fields.js';
 export type { SettingsField } from './lib/settings/fields.js';
-export { settingsEffects, hasSettingsEffect } from './lib/settings/effects.js';
-export type { SettingsEffect } from './lib/settings/effects.js';
+export {
+  persistConfigField,
+  persistKeybindFields,
+} from './lib/settings/persistence.js';
+export type { KeybindFields } from './lib/settings/persistence.js';
 
 // ── Domain types ─────────────────────────────────────────────────
 export * from './lib/types.js';
@@ -73,7 +76,6 @@ export * from './lib/session/session-launch-context.js';
 export * from './lib/session/session-menu.js';
 export * from './lib/session/session-menu-request.js';
 export * from './lib/session/review-prompt.js';
-export * from './lib/session/checkout-plan.js';
 export * from './lib/session/relay-target.js';
 export * from './lib/session/claude-inbox.js';
 export * from './lib/sync/remote-sync.js';
@@ -94,11 +96,8 @@ export * from './lib/pull-requests/review-draft-store.js';
 export * from './lib/pull-requests/review-draft-types.js';
 export * from './lib/pull-requests/review-drafts.js';
 export * from './lib/discovery/discovery-model.js';
-export * from './lib/discovery/session-discovery.js';
 export * from './lib/babysit/babysit-model.js';
 export * from './lib/babysit/babysit-prompt.js';
-export * from './lib/babysit/babysit-observe.js';
-export * from './lib/babysit/pr-babysitter.js';
 export * from './lib/discovery/worktree-origin.js';
 export * from './lib/discovery/live-worktree-sessions.js';
 
@@ -112,6 +111,8 @@ export * from './lib/utils/virtual-viewport.js';
 export * from './lib/utils/diff-scroll.js';
 export * from './lib/utils/pr-utils.js';
 export * from './lib/utils/diff-fetcher.js';
+export { readDiffFiles } from './lib/utils/diff-files.js';
+export { gitLine } from './lib/utils/git-run.js';
 export * from './lib/utils/worktree-diff.js';
 export * from './lib/utils/language.js';
 export * from './lib/utils/resolve-preset-name.js';
@@ -165,3 +166,10 @@ export {
   type WorktreeRemovalOutcome,
 } from './lib/session/remove-worktree.js';
 export { setLocalSessionEnv } from './lib/session/local-session-env.js';
+
+export * from './lib/repository.js';
+
+export {
+  agentCommentRepository,
+  runReviewUtility,
+} from './lib/pull-requests/agent-comment-scope.js';

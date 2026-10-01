@@ -61,7 +61,7 @@ test('Codex worktree launch, activity and recorded-agent continuation in Desktop
   // A changed default must not replace the recorded Codex conversation.
   writeFileSync(
     join(homeDir, '.n10/config.json'),
-    JSON.stringify({ aiCommand: 'exit 42' })
+    JSON.stringify({ agentId: 'test', aiCommand: 'exit 42' })
   );
   await page
     .getByRole('button', { name: 'Relaunch agent', exact: true })

@@ -29,6 +29,10 @@ describe('terminal requests', () => {
     });
     expect(state.calls[0].build()).toEqual({ spec: { cmd: '', args: [] } });
   });
+  it('tags a standalone terminal with its own directory, independent of the selected repo', async () => {
+    await launchTerminalSession({ ...base, cwd: '/elsewhere', kind: 'shell' });
+    expect(state.calls[0].session.repo).toBe('/elsewhere');
+  });
   it('uses the agent adapter for a fresh agent terminal', async () => {
     await launchTerminalSession({ ...base, kind: 'agent' });
     expect(state.calls[0].build()).toEqual({

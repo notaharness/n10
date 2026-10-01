@@ -12,6 +12,7 @@ import {
 // perfect for exercising input plumbing.
 test.use({
   n10Config: {
+    agentId: 'test',
     aiCommand: 'echo n10-session-active && sleep 300',
     autoHideSidebar: false,
     keybindPreset: 'vim',

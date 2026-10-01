@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MachineView } from '../../../host/contract-machines.js';
+import type { MachineView } from '@n10/engine/contract';
 import {
   fingerprintGroups,
   hasPeerMachines,

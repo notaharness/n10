@@ -1,4 +1,4 @@
-import type { MachineView } from '../../../host/contract-machines.js';
+import type { MachineView } from '@n10/engine/contract';
 import { useFleet } from '../../lib/fleet/fleet-context.js';
 import { FocusScope } from '../../lib/fleet/use-focus-on-mount.js';
 import { fingerprintGroups } from '../../lib/machines/machine-model.js';

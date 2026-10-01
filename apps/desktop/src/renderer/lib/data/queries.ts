@@ -43,7 +43,7 @@ import type {
  */
 export async function loadRepoGate(): Promise<RepoInfo | null> {
   const [repo] = await Promise.all([
-    window.n10.getRepo().catch(() => null),
+    window.n10.refreshRepo().catch(() => null),
     loadDesktopPrefs(),
   ]);
   return repo;
@@ -210,7 +210,7 @@ export function useDiff(
     queryFn: () =>
       measured('fetch', () => window.n10.fetchDiffText(source, target)),
     enabled: opts.enabled ?? true,
-    staleTime: 60_000,
+    staleTime: 0,
   });
 }
 
@@ -282,8 +282,12 @@ export function useParsedDiff(text: string | undefined) {
 export function useThreads(cwd: string, prId: number) {
   return useQuery({
     queryKey: keys.threads(cwd, prId),
-    queryFn: () => window.n10.fetchCommentThreads(prId),
-    staleTime: 30_000,
+    queryFn: ({ client, queryKey }) =>
+      window.n10.fetchCommentThreads(
+        prId,
+        client.getQueryState(queryKey)?.isInvalidated ?? false
+      ),
+    staleTime: 0,
     // prId 0 = a worktree without a PR: nothing to fetch.
     enabled: prId > 0,
   });

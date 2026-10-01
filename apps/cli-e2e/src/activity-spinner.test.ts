@@ -7,6 +7,7 @@ import { createSession, waitForSidebarFocused } from './setup/sessions.js';
 // see the activity live in the terminal pane).
 test.use({
   n10Config: {
+    agentId: 'test',
     aiCommand: fakeAgentCommand({ bursts: 1, burstMs: 12_000 }),
     autoHideSidebar: false,
     keybindPreset: 'vim',

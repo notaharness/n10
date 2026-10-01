@@ -16,7 +16,12 @@
       "import": "./src/conventional.ts",
       "default": "./src/conventional.ts"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./ui": {
+      "types": "./src/ui.ts",
+      "import": "./src/ui.ts",
+      "default": "./src/ui.ts"
+    }
   },
   "nx": {
     "name": "@n10/review-comments",

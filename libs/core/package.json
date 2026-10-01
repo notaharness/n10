@@ -21,7 +21,12 @@
       "import": "./src/readiness.ts",
       "default": "./src/readiness.ts"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./ui": {
+      "types": "./src/ui.ts",
+      "import": "./src/ui.ts",
+      "default": "./src/ui.ts"
+    }
   },
   "nx": {
     "name": "@n10/core",

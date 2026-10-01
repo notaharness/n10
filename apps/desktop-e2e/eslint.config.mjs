@@ -8,6 +8,11 @@ export default [
     ignores: ['**/out-tsc', '**/test-output'],
   },
   {
+    // Electron loads the host probe synchronously through NODE_OPTIONS --require.
+    files: ['perf/setup/host-probe.cjs'],
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
+  {
     files: ['**/*.ts', '**/*.js'],
     rules: {},
   },

@@ -1,3 +1,4 @@
+import { createConfigService, createPullRequestList } from '@n10/engine';
 import type { ReactElement } from 'react';
 import { render as inkRender } from 'ink-testing-library';
 import type { VcsProvider } from '@n10/vcs-core';
@@ -44,8 +45,13 @@ export function renderWithProviders(
   options: RenderWithProvidersOptions = {}
 ): RenderWithProvidersResult {
   const providers = options.providers ?? [];
+  const service = createConfigService({
+    repo: process.cwd(),
+    providers,
+    pullRequests: createPullRequestList({ providers }),
+  });
   return inkRender(
-    <ConfigProvider providers={providers}>
+    <ConfigProvider service={service}>
       <KeybindProvider>
         <ToastProvider>{node}</ToastProvider>
       </KeybindProvider>

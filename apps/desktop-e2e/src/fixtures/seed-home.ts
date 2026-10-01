@@ -1,3 +1,4 @@
+import { agentDraftDirectory } from '../setup/agent-drafts.js';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -132,6 +133,7 @@ export function seedHome(
     join(n10, 'config.json'),
     JSON.stringify(
       {
+        agentId: 'test',
         aiCommand: fakeAgent(),
         ...opts.n10Config,
       },
@@ -142,7 +144,7 @@ export function seedHome(
   );
 
   seedProjectConfig(n10, repoPath, opts);
-  seedDrafts(n10, opts.drafts);
+  seedDrafts(n10, repoPath, opts.drafts);
 
   if (opts.desktopPrefs) {
     writeFileSync(
@@ -186,11 +188,11 @@ function seedProjectConfig(
 
 function seedDrafts(
   n10: string,
+  repoPath: string,
   drafts: Record<number, unknown[]> | undefined
 ): void {
   for (const [prId, comments] of Object.entries(drafts ?? {})) {
-    // Same layout the review agent writes to: ~/.n10/reviews/pr-<id>.
-    const dir = join(n10, 'reviews', `pr-${prId}`);
+    const dir = agentDraftDirectory(dirname(n10), repoPath, Number(prId));
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, 'comments.json'),

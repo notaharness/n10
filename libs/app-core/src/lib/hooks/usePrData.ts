@@ -12,7 +12,7 @@ import { useToastActions } from '../context/ToastContext.js';
  * mounted, and toasting an error.
  */
 export function usePrData() {
-  const { pullRequests, repo } = useEngine();
+  const { pullRequests, repo, reviews } = useEngine();
   const { config } = useConfig();
   const { flash } = useToastActions();
 
@@ -54,7 +54,8 @@ export function usePrData() {
    *  answers when this refresh's own request starts. */
   const refresh = useCallback(async (): Promise<void> => {
     await pullRequests.refresh(repo);
-  }, [pullRequests, repo]);
+    reviews.invalidateProvider();
+  }, [pullRequests, repo, reviews]);
 
   return {
     prMap: snapshot.prMap,

@@ -1,14 +1,18 @@
+import type * as WorktreeModule from '@n10/worktree-manager';
+import type * as EngineModule from '@n10/engine';
+import type { AppConfig } from '@n10/vcs-core';
 import type * as CoreModule from '@n10/core';
 import { worktreeSessionKey } from '@n10/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as SessionsModule from './sessions.js';
-import type { MachineView } from '../contract-machines.js';
+import type { MachineView } from '@n10/engine/contract';
 import type { TaggedSession } from '@n10/core';
 
 /** Sessions from multiple repositories coexist under qualified keys. */
 
 const state = vi.hoisted(() => ({
   cwd: '/repo-a',
+  handles: new Map<string, EngineModule.SessionService>(),
   alive: new Set<string>(),
   spawns: [] as {
     name: string;
@@ -32,7 +36,7 @@ const state = vi.hoisted(() => ({
   onData: new Map<string, (data: string) => void>(),
   configByCwd: {} as Record<string, unknown>,
   createFails: new Set<string>(),
-  /** Prompts core's checkoutPlan delivered into a live agent. */
+  /** Prompts the engine plan command delivered into a live agent. */
   injected: [] as { name: string; prompt: string }[],
   /** Branch names whose checkout core should report as failed. */
   checkoutFails: new Set<string>(),
@@ -71,10 +75,70 @@ function addCheckout(branch: string, repo = state.cwd): string {
   return path;
 }
 
-vi.mock('./repo.js', () => ({
-  requireRepo: () => state.cwd,
-  activeRepoIs: (cwd: string) => cwd === state.cwd,
-}));
+vi.mock('./repo.js', async () => {
+  const { createSessionService } = await vi.importActual<typeof EngineModule>(
+    '@n10/engine'
+  );
+  const handles = state.handles;
+  function activeRepository() {
+    const repo = state.cwd;
+    let sessions = handles.get(repo);
+    if (!sessions) {
+      const create = (
+        branch: string,
+        remote?: { cwd: string; machine: { id: string } }
+      ) => {
+        const cwd = remote?.cwd ?? repo;
+        state.createWorktreeCalls.push({
+          branch,
+          cwd,
+          machine: remote?.machine,
+        });
+        if (state.createFails.has(branch))
+          return Promise.reject(new Error(`git refused ${branch}`));
+        return Promise.resolve(addCheckout(branch, cwd));
+      };
+      const worktrees = {
+        create,
+        find: async (target: { branch: string }) => {
+          const path = state.worktrees.get(`${repo}\0${target.branch}`);
+          return path ? { path, branch: target.branch } : null;
+        },
+        resolve: (target: { branch: string }) => create(target.branch),
+        refresh: async () => undefined,
+        subscribe: () => () => undefined,
+        getSnapshot: () => ({ worktrees: [], error: null }),
+      } as unknown as EngineModule.WorktreeService;
+      sessions = createSessionService({
+        config: {
+          repo,
+          getSnapshot: () => ({
+            config: (state.configByCwd[repo] ?? {
+              fromCwd: repo,
+            }) as AppConfig,
+          }),
+          subscribe: () => () => undefined,
+        },
+        worktrees,
+        isCurrent: () => state.cwd === repo,
+      });
+      handles.set(repo, sessions);
+    }
+    return {
+      cwd: repo,
+      worktrees: { scope: () => ({ cwd: repo }) },
+      sessions,
+      config: {
+        getSnapshot: () => ({ config: state.configByCwd[repo] ?? {} }),
+      },
+    };
+  }
+  return {
+    requireRepo: () => state.cwd,
+    activeRepoIs: (cwd: string) => cwd === state.cwd,
+    activeRepository,
+  };
+});
 
 vi.mock('@n10/vcs-core', () => ({
   readConfig: (cwd: string) => state.configByCwd[cwd] ?? { fromCwd: cwd },
@@ -91,14 +155,11 @@ vi.mock('@n10/terminal-tmux', () => ({
     ),
 }));
 
-vi.mock('@n10/worktree-manager', () => ({
-  branchToSessionName: (branch: string) => branch.replace(/\//g, '-'),
-  createWorktree: (branch: string, cwd: string, machine?: { id: string }) => {
-    state.createWorktreeCalls.push({ branch, cwd, machine });
-    if (state.createFails.has(branch)) {
-      return Promise.reject(new Error(`git refused ${branch}`));
-    }
-    return Promise.resolve(addCheckout(branch, cwd));
+vi.mock('@n10/worktree-manager', async (original) => ({
+  ...(await original<typeof WorktreeModule>()),
+  createWorktree: async (branch: string, scope: { cwd: string }) => {
+    if (state.checkoutFails.has(branch)) return null;
+    return addCheckout(branch, scope.cwd);
   },
 }));
 
@@ -110,9 +171,17 @@ vi.mock('./remote-machines.js', () => ({
   },
 }));
 
-vi.mock('./machines.js', () => ({
-  listMachines: () => Promise.resolve(state.machines),
-}));
+vi.mock('./machines.js', async () => {
+  const { createMachineService } = await vi.importActual<typeof EngineModule>(
+    '@n10/engine'
+  );
+  const machines = createMachineService();
+  machines.setPort({
+    listMachines: async () => state.machines,
+  } as EngineModule.MachinesPort);
+  machines.setRemotePort({} as EngineModule.RemoteMachinePort);
+  return { machines };
+});
 
 vi.mock('@n10/core', async (importOriginal) => {
   const actual = await importOriginal<typeof CoreModule>();
@@ -122,8 +191,27 @@ vi.mock('@n10/core', async (importOriginal) => {
     sessionIdentity: actual.sessionIdentity,
     LOCAL_MACHINE: actual.LOCAL_MACHINE,
     resolveAgent: actual.resolveAgent,
+    sessionIncarnationMatches: (
+      name: string,
+      expected: CoreModule.SessionIncarnation
+    ) => {
+      if (actual.sessionIdentity(name)?.machine !== actual.LOCAL_MACHINE)
+        return false;
+      const native = state.ptyNames.get(name) ?? name;
+      const live = state.tmuxSnapshots.get(native)?.incarnation as
+        | CoreModule.SessionIncarnation
+        | undefined;
+      return (
+        !!live &&
+        ['name', 'sessionId', 'paneId', 'panePid', 'serverPid'].every(
+          (key) =>
+            live[key as keyof CoreModule.SessionIncarnation] ===
+            expected[key as keyof CoreModule.SessionIncarnation]
+        )
+      );
+    },
     // The checkout that has the branch, as core reads it from git.
-    sessionKeyForBranch: (branch: string, repo: string) => {
+    sessionKeyForBranch: (branch: string, { cwd: repo }: { cwd: string }) => {
       const path = state.worktrees.get(`${repo}\0${branch}`);
       return Promise.resolve(
         path ? actual.worktreeSessionKey(path, repo) : null
@@ -138,49 +226,11 @@ vi.mock('@n10/core', async (importOriginal) => {
       running: false,
       canResume: false,
     }),
-    // Stands in for the real orchestrator, whose own branching is tested
-    // in libs/core. What matters here is what the *desktop* does with
-    // each outcome: inject changes nothing it tracks, a spawn has to be
-    // adopted so its output reaches the renderer.
-    checkoutPlan: (deps: {
-      pr: { sourceBranch: string };
-      prompt: string;
-      mode: 'inject' | 'new-session';
-      flashStatus: (msg: string) => void;
-    }) => {
-      if (state.checkoutFails.has(deps.pr.sourceBranch)) {
-        deps.flashStatus(
-          `Failed to create worktree for ${deps.pr.sourceBranch}`
-        );
-        return Promise.resolve('failed');
-      }
-      // Resolves the branch's checkout, creating it when there is none.
-      const cwd = addCheckout(deps.pr.sourceBranch);
-      const name = actual.worktreeSessionKey(cwd, state.cwd);
-      if (
-        (state.alive.has(name) || state.persisted.has(name)) &&
-        deps.mode === 'inject'
-      ) {
-        state.alive.add(name);
-        state.injected.push({ name, prompt: deps.prompt });
-        return Promise.resolve('injected');
-      }
-      state.alive.add(name);
-      state.spawns.push({
-        name,
-        cwd,
-        config: null,
-        request: { intent: 'seed', prompt: deps.prompt },
-      });
-      return Promise.resolve('spawned');
+    deliverToRunningSession: (name: string, prompt: string) => {
+      state.injected.push({ name, prompt });
+      return state.alive.has(name);
     },
-    buildAgentOptions: (config: { agentId?: string }) => [
-      {
-        name: `${config.agentId ?? 'Custom'} (default)`,
-        agent: { id: config.agentId ?? 'test' },
-      },
-      { name: 'Codex', agent: { id: 'codex' } },
-    ],
+    buildAgentOptions: actual.buildAgentOptions,
     buildReviewLaunchRequest: (pr: { id: number }, instruction?: string) => ({
       intent: 'review',
       prompt: `review #${pr.id}${instruction ? `: ${instruction}` : ''}`,
@@ -239,6 +289,7 @@ vi.mock('@n10/core', async (importOriginal) => {
     hasSessionConnection: (name: string) => state.alive.has(name),
     hasLiveTmuxSession: (name: string) => state.persisted.has(name),
     getSpawnedAt: () => 1000,
+    sessionNames: () => [...state.entries.keys()],
     noteInput: () => undefined,
     noteResize: () => undefined,
     noteSeen: () => undefined,
@@ -264,6 +315,7 @@ let reconnectSession: typeof sessions.reconnectSession;
 
 beforeEach(async () => {
   state.cwd = '/repo-a';
+  state.handles.clear();
   state.alive = new Set();
   state.spawns = [];
   state.killed = [];
@@ -769,53 +821,9 @@ describe('another repository owns the name', () => {
     });
   });
 
-  it('skips it during worktree removal instead of killing it', async () => {
-    await launchInAThenSwitch();
-    // Housekeeping inside a legitimate operation: removing this repo's
-    // `shared` worktree must not reach the other repo's agent, and must
-    // not abort the removal either.
-    expect(() =>
-      sessions.killOwnSession(keyFor('shared', '/repo-a'))
-    ).not.toThrow();
-    expect(state.killed).toEqual([]);
-    state.cwd = '/repo-a';
-    sessions.killOwnSession(keyFor('shared', '/repo-a'));
-    expect(state.killed).toEqual([keyFor('shared', '/repo-a')]);
-  });
-
-  it('treats a discovered session as the repo that discovered it', async () => {
-    // Discovery attaches by calling `launchAgent` with the checkout git
-    // reported, so a session it picks up is recorded like any other —
-    // under whichever repo was open at the time. The ownership guards
-    // read that record, so the two have to agree: a worktree found in
-    // this repo counts as ours, and one found over there does not
-    // become ours by sharing a branch name.
-    const discovered = worktreeSessionKey(
-      '/repo-a/elsewhere/shared',
-      '/repo-a'
-    );
-    state.cwd = '/repo-a';
-    await launchAgent(
-      { branch: 'shared', intent: 'continue-or-blank' },
-      '/repo-a/elsewhere/shared'
-    );
-    expect(sessions.isOwnSessionAlive(discovered)).toBe(true);
-
-    state.cwd = '/repo-b';
-    expect(sessions.isOwnSessionAlive(discovered)).toBe(false);
-    await launchAgent(
-      { branch: 'shared', intent: 'continue-or-blank' },
-      '/repo-b/elsewhere/shared'
-    );
-    expect(state.spawns).toHaveLength(2);
-    sessions.killOwnSession(discovered);
-    expect(state.killed).toEqual([]);
-  });
-
   it('ignores names without a worktree identity', () => {
-    // No entry means no ownership claim — killing is a no-op there
-    // rather than an error, matching the registry's own behaviour.
-    expect(() => killSession('never-seen')).not.toThrow();
+    // A name without an explicit worktree identity never authorizes a stop.
+    expect(() => killSession('never-seen')).toThrow('another repository');
     expect(state.killed).toEqual([]);
     expect(state.persistedKilled).toEqual([]);
   });
@@ -941,7 +949,7 @@ describe('checkoutPlan', () => {
   });
 
   it('adopts a spawned session so its output reaches the renderer', async () => {
-    // core does the spawning; without the host adopting it, the PTY
+    // The engine owns the launch; without the host adopting it, the PTY
     // runs with nothing relaying it and the terminal pane stays blank.
     await expect(checkoutPlan(req())).resolves.toBe('spawned');
     emit(keyFor('feature/x', '/repo-a'), 'agent says hello');
@@ -1033,13 +1041,6 @@ describe('checkoutPlan', () => {
   });
 
   // ── Cross-machine duplicate agent (Phase 8's closed hole) ─────────
-  //
-  // checkoutPlan used to resolve a branch's session by *local* state
-  // only, so a branch whose agent runs on another fleet member found
-  // nothing here and spawned a second, local agent for it — the exact
-  // duplicate-agent shape a whole review round closed on the launch
-  // path (open-session.ts's findSession), just left open on this one.
-
   it('refuses, naming the machine, when the branch already has an agent running elsewhere', async () => {
     state.knownMachines.add('bbbbbbbbbbbbbbbb');
     state.machines = [connectedMachine('bbbbbbbbbbbbbbbb', 'workbox')];
@@ -1088,14 +1089,6 @@ describe('checkoutPlan', () => {
     await expect(checkoutPlan(req())).resolves.toBe('spawned');
   });
 
-  // ── Finding 1 (HIGH): a live local agent must always be injectable ──
-  //
-  // The cross-machine check above used to run before core's own State A
-  // (a live local agent) was ever considered, so a peer merely *also*
-  // having a session tagged with this repo path and branch — the normal
-  // case once the same branch is launched on a second machine — made
-  // "Send plan to agent" refuse forever, even though the agent it should
-  // inject into was sitting right there in the pane.
   it('injects into a live local agent even when a peer also has a session for this branch', async () => {
     await launchAgent({ branch: 'feature/x', intent: 'continue-or-blank' });
     state.spawns = [];
@@ -1118,14 +1111,21 @@ describe('checkoutPlan', () => {
 describe('listAgentOptions', () => {
   it('lists the repo config default first, then the rest of the registry', () => {
     state.configByCwd['/repo-a'] = { agentId: 'claude' };
-    expect(sessions.listAgentOptions()).toEqual([
-      { id: 'claude', name: 'claude (default)' },
-      { id: 'codex', name: 'Codex' },
-    ]);
+    expect(sessions.listAgentOptions()[0]).toEqual({
+      id: 'claude',
+      name: 'Claude (default)',
+    });
+    expect(sessions.listAgentOptions()).toContainEqual({
+      id: 'codex',
+      name: 'Codex',
+    });
   });
 
   it('labels a custom command as the hidden test runner', () => {
-    state.configByCwd['/repo-a'] = { aiCommand: 'node fake.mjs' };
+    state.configByCwd['/repo-a'] = {
+      agentId: 'test',
+      aiCommand: 'node fake.mjs',
+    };
     expect(sessions.listAgentOptions()[0]).toEqual({
       id: 'test',
       name: 'Custom (default)',
@@ -1141,7 +1141,9 @@ describe('stopping persisted sessions', () => {
   });
 
   it('does not stop an unregistered session from another repository', () => {
-    killSession(keyFor('retained', '/repo-b'));
+    expect(() => killSession(keyFor('retained', '/repo-b'))).toThrow(
+      'another repository'
+    );
     expect(state.persistedKilled).toEqual([]);
     expect(state.killed).toEqual([]);
   });
@@ -1149,8 +1151,7 @@ describe('stopping persisted sessions', () => {
   it('does not stop a foreign registry entry that was never adopted by this host', () => {
     const name = keyFor('retained', '/repo-b');
     state.alive.add(name);
-    killSession(name);
-    sessions.killOwnSession(name);
+    expect(() => killSession(name)).toThrow('another repository');
     expect(state.alive.has(name)).toBe(true);
     expect(state.killed).toEqual([]);
     expect(state.persistedKilled).toEqual([]);

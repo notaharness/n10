@@ -352,15 +352,10 @@ export type AgentId = 'claude' | 'copilot' | 'codex' | 'gemini' | 'opencode';
 export interface AppConfig {
   email?: string;
   prPollInterval?: number;
-  /**
-   * Legacy raw agent command (run via `sh -c`). Still honored: when
-   * `agentId` is unset it is mapped back to a known agent, and any
-   * unrecognized command routes to the hidden test runner (used by the
-   * e2e harness). New configs should prefer `agentId`.
-   */
+  /** Raw command for an explicitly configured internal test agent. */
   aiCommand?: string;
-  /** Selected AI agent. Takes precedence over `aiCommand` when set. */
-  agentId?: AgentId;
+  /** Selected AI agent; test fixtures may explicitly select the hidden runner. */
+  agentId?: AgentId | 'test';
   vendor?: string;
   vendorAuth: Record<string, string>;
   vendorProject: Record<string, string>;

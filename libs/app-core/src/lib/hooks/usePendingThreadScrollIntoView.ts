@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { CommentPositionInfo, RowMap } from '@n10/review-comments';
-import { revealThreadEndOffset } from '@n10/core';
+import { revealThreadEndOffset } from '@n10/core/ui';
 
 export interface UsePendingThreadScrollIntoViewOptions {
   /** Thread id to scroll into view, or null when nothing is pending. */

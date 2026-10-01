@@ -1,6 +1,5 @@
 import { worktreeSessionKey } from '@n10/core';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type * as WorktreeManagerModule from '@n10/worktree-manager';
 import type { WorktreeInfo } from '@n10/worktree-manager';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import {
@@ -41,16 +40,6 @@ vi.mock('@n10/core', async (importOriginal) => ({
   hasSession: (name: string) =>
     liveSessions.has(name) || exitedSessions.has(name),
   isSessionAlive: (name: string) => liveSessions.has(name),
-  stopSession: (name: string) => killSessionMock(name),
-  checkWorktreeRemoval: (branch: string) => checkWorktreeRemovalMock(branch),
-}));
-
-vi.mock('@n10/worktree-manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof WorktreeManagerModule>()),
-  listWorktrees: vi.fn(),
-  listAllBranches: vi.fn(),
-  createWorktree: vi.fn(),
-  rebaseOntoMaster: vi.fn(),
 }));
 
 vi.mock('node:child_process', async (importOriginal) => ({
@@ -59,12 +48,10 @@ vi.mock('node:child_process', async (importOriginal) => ({
 }));
 
 import { spawn } from 'node:child_process';
-import {
-  createWorktree,
-  listAllBranches,
-  listWorktrees,
-  rebaseOntoMaster,
-} from '@n10/worktree-manager';
+const findWorktree = vi.fn();
+const resolveWorktree = vi.fn();
+const readWorktrees = vi.fn();
+const rebaseWorktree = vi.fn();
 import { handleSidebarInput } from './sidebar-input.js';
 
 // ── Fixtures ─────────────────────────────────────────────────────
@@ -216,9 +203,17 @@ function makeCtx(opts: CtxOpts = {}) {
   };
   const nav = { focus: opts.focus ?? 'sidebar', setFocus: vi.fn() };
   const sessions = {
+    commands: { stop: killSessionMock },
     flashStatus: vi.fn(),
     refreshSessions: vi.fn().mockResolvedValue([]),
-    performDelete: vi.fn().mockResolvedValue('removed'),
+    worktrees: {
+      remove: vi.fn().mockResolvedValue('removed'),
+      checkRemoval: checkWorktreeRemovalMock,
+      find: findWorktree,
+      resolve: resolveWorktree,
+      read: readWorktrees,
+      rebase: rebaseWorktree,
+    },
     refreshPr: vi.fn().mockResolvedValue(undefined),
     triggerSync: vi.fn().mockResolvedValue(undefined),
   };
@@ -284,11 +279,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   liveSessions = new Set();
   exitedSessions = new Set();
-  vi.mocked(listWorktrees).mockResolvedValue([]);
-  vi.mocked(listAllBranches).mockResolvedValue([]);
+  findWorktree.mockResolvedValue(null);
+  resolveWorktree.mockResolvedValue(null);
+  readWorktrees.mockResolvedValue({ allBranches: [] });
   checkWorktreeRemovalMock.mockResolvedValue(CLEAR);
-  vi.mocked(createWorktree).mockResolvedValue(null);
-  vi.mocked(rebaseOntoMaster).mockResolvedValue('success');
+
+  rebaseWorktree.mockResolvedValue('success');
   vi.mocked(spawn).mockReturnValue({
     unref: vi.fn(),
   } as unknown as ReturnType<typeof spawn>);
@@ -391,7 +387,7 @@ describe('sidebar handler — sync-origin', () => {
 
 describe('sidebar handler — checkout-branch', () => {
   it('loads branches and opens the picker in create mode', async () => {
-    vi.mocked(listAllBranches).mockResolvedValue(['master', 'feat/x']);
+    readWorktrees.mockResolvedValue({ allBranches: ['master', 'feat/x'] });
     const t = makeCtx();
 
     press(KEYS.checkoutBranch(), t.ctx);
@@ -536,17 +532,14 @@ describe('sidebar handler — focus-terminal', () => {
 describe('sidebar handler — delete-branch', () => {
   it('deletes a clean branch whose agent has already exited', async () => {
     const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
-    vi.mocked(listWorktrees).mockResolvedValue([
-      worktree('/wt/alpha', 'alpha'),
-    ]);
+    findWorktree.mockResolvedValue(worktree('/wt/alpha', 'alpha'));
 
     press(KEYS.deleteBranch(), t.ctx);
     await t.settle();
 
     expect(t.asyncOps.run.mock.calls[0]?.[0]).toBe('check-delete');
     expect(checkWorktreeRemovalMock).toHaveBeenCalledExactlyOnceWith('alpha');
-    expect(t.sessions.performDelete).toHaveBeenCalledExactlyOnceWith(
-      worktreeSessionKey('/wt/alpha'),
+    expect(t.sessions.worktrees.remove).toHaveBeenCalledExactlyOnceWith(
       'alpha',
       CLEAR
     );
@@ -556,10 +549,8 @@ describe('sidebar handler — delete-branch', () => {
 
   it('says so when core kept a branch that changed after the check', async () => {
     const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
-    vi.mocked(listWorktrees).mockResolvedValue([
-      worktree('/wt/alpha', 'alpha'),
-    ]);
-    t.sessions.performDelete.mockResolvedValue('changed');
+    findWorktree.mockResolvedValue(worktree('/wt/alpha', 'alpha'));
+    t.sessions.worktrees.remove.mockResolvedValue('changed');
 
     press(KEYS.deleteBranch(), t.ctx);
     await t.settle();
@@ -578,32 +569,27 @@ describe('sidebar handler — delete-branch', () => {
     } as const;
     checkWorktreeRemovalMock.mockResolvedValue(running);
     const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
-    vi.mocked(listWorktrees).mockResolvedValue([
-      worktree('/wt/alpha', 'alpha'),
-    ]);
+    findWorktree.mockResolvedValue(worktree('/wt/alpha', 'alpha'));
 
     press(KEYS.deleteBranch(), t.ctx);
     await t.settle();
 
     expect(t.deleteConfirm.setConfirmDelete).toHaveBeenCalledExactlyOnceWith({
       branch: 'alpha',
-      sessionName: worktreeSessionKey('/wt/alpha'),
       reason: 'An agent is running here — deleting stops it',
       mode: 'yes-no',
       // Confirming removes with this verdict, which does not force.
       approved: running,
     });
     expect(t.deleteConfirm.setConfirmInput).toHaveBeenCalledExactlyOnceWith('');
-    expect(t.sessions.performDelete).not.toHaveBeenCalled();
+    expect(t.sessions.worktrees.remove).not.toHaveBeenCalled();
   });
 
   it.each(['uncommitted changes', 'not pushed to upstream'])(
     'requires typing the branch name when forcing past: %s',
     async (reason) => {
       const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
-      vi.mocked(listWorktrees).mockResolvedValue([
-        worktree('/wt/alpha', 'alpha'),
-      ]);
+      findWorktree.mockResolvedValue(worktree('/wt/alpha', 'alpha'));
       const forced = {
         verdict: 'force',
         reason,
@@ -618,7 +604,6 @@ describe('sidebar handler — delete-branch', () => {
 
       expect(t.deleteConfirm.setConfirmDelete).toHaveBeenCalledExactlyOnceWith({
         branch: 'alpha',
-        sessionName: worktreeSessionKey('/wt/alpha'),
         reason,
         mode: 'type-branch',
         approved: forced,
@@ -626,16 +611,14 @@ describe('sidebar handler — delete-branch', () => {
       expect(t.deleteConfirm.setConfirmInput).toHaveBeenCalledExactlyOnceWith(
         ''
       );
-      expect(t.sessions.performDelete).not.toHaveBeenCalled();
+      expect(t.sessions.worktrees.remove).not.toHaveBeenCalled();
       expect(t.sessions.flashStatus).not.toHaveBeenCalled();
     }
   );
 
   it('flashes and stops when core refuses the removal', async () => {
     const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
-    vi.mocked(listWorktrees).mockResolvedValue([
-      worktree('/wt/alpha', 'alpha'),
-    ]);
+    findWorktree.mockResolvedValue(worktree('/wt/alpha', 'alpha'));
     checkWorktreeRemovalMock.mockResolvedValue({
       verdict: 'refused',
       reason: 'protected branch',
@@ -648,12 +631,13 @@ describe('sidebar handler — delete-branch', () => {
       'Cannot delete: protected branch'
     );
     expect(t.deleteConfirm.setConfirmDelete).not.toHaveBeenCalled();
-    expect(t.sessions.performDelete).not.toHaveBeenCalled();
+    expect(t.sessions.worktrees.remove).not.toHaveBeenCalled();
   });
 
   it('kills the orphaned PTY when the row has no worktree left', async () => {
     const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
-    vi.mocked(listWorktrees).mockResolvedValue([]);
+    findWorktree.mockResolvedValue(null);
+    resolveWorktree.mockResolvedValue(null);
 
     press(KEYS.deleteBranch(), t.ctx);
     await t.settle();
@@ -670,15 +654,12 @@ describe('sidebar handler — delete-branch', () => {
     const t = makeCtx({
       selectedItem: reviewPrItem(makePr({ sourceBranch: 'feat/thing' }), true),
     });
-    vi.mocked(listWorktrees).mockResolvedValue([
-      worktree('/wt/feat-thing', 'feat/thing'),
-    ]);
+    findWorktree.mockResolvedValue(worktree('/wt/feat-thing', 'feat/thing'));
 
     press(KEYS.deleteBranch(), t.ctx);
     await t.settle();
 
-    expect(t.sessions.performDelete).toHaveBeenCalledExactlyOnceWith(
-      PR_SESSION,
+    expect(t.sessions.worktrees.remove).toHaveBeenCalledExactlyOnceWith(
       'feat/thing',
       CLEAR
     );
@@ -756,30 +737,24 @@ describe('sidebar handler — rebase', () => {
     ['error', 'Failed to fetch from origin'],
   ] as const)('reports %s', async (outcome, message) => {
     const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
-    vi.mocked(listWorktrees).mockResolvedValue([
-      worktree('/wt/alpha', 'alpha'),
-    ]);
-    vi.mocked(rebaseOntoMaster).mockResolvedValue(outcome);
+    findWorktree.mockResolvedValue(worktree('/wt/alpha', 'alpha'));
+    rebaseWorktree.mockResolvedValue(outcome);
 
     press(KEYS.rebase(), t.ctx);
     await t.settle();
 
     expect(t.asyncOps.run.mock.calls[0]?.[0]).toBe('rebase');
-    expect(rebaseOntoMaster).toHaveBeenCalledExactlyOnceWith('/wt/alpha');
+    expect(rebaseWorktree).toHaveBeenCalledExactlyOnceWith({
+      session: worktreeSessionKey('/wt/alpha'),
+    });
     expect(t.sessions.flashStatus).toHaveBeenCalledExactlyOnceWith(message);
   });
 
-  it('flashes when the session has no worktree', async () => {
+  it('passes worktree failures to the operation error handler', async () => {
     const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
-    vi.mocked(listWorktrees).mockResolvedValue([]);
-
+    rebaseWorktree.mockRejectedValueOnce(new Error('Worktree is missing'));
     press(KEYS.rebase(), t.ctx);
-    await t.settle();
-
-    expect(t.sessions.flashStatus).toHaveBeenCalledExactlyOnceWith(
-      'No worktree found for selected session'
-    );
-    expect(rebaseOntoMaster).not.toHaveBeenCalled();
+    await expect(t.settle()).rejects.toThrow('Worktree is missing');
   });
 
   it('ignores PR rows', () => {
@@ -814,9 +789,7 @@ describe('sidebar handler — open-editor', () => {
       selectedItem: sessionItem('/wt/alpha'),
       editor: 'code',
     });
-    vi.mocked(listWorktrees).mockResolvedValue([
-      worktree('/wt/alpha', 'alpha'),
-    ]);
+    resolveWorktree.mockResolvedValue('/wt/alpha');
 
     press(KEYS.openEditor(), t.ctx);
     await t.settle();
@@ -837,13 +810,16 @@ describe('sidebar handler — open-editor', () => {
       selectedItem: orphanPrItem(makePr({ sourceBranch: 'feat/thing' })),
       editor: 'code',
     });
-    vi.mocked(listWorktrees).mockResolvedValue([]);
-    vi.mocked(createWorktree).mockResolvedValue('/wt/feat-thing');
+    findWorktree.mockResolvedValue(null);
+    resolveWorktree.mockResolvedValue(null);
+    resolveWorktree.mockResolvedValue('/wt/feat-thing');
 
     press(KEYS.openEditor(), t.ctx);
     await t.settle();
 
-    expect(createWorktree).toHaveBeenCalledExactlyOnceWith('feat/thing');
+    expect(resolveWorktree).toHaveBeenCalledExactlyOnceWith({
+      branch: 'feat/thing',
+    });
     expect(t.sessions.refreshSessions).toHaveBeenCalledOnce();
     expect(spawn).toHaveBeenCalledExactlyOnceWith(
       'code',
@@ -855,9 +831,7 @@ describe('sidebar handler — open-editor', () => {
   it('falls back to $VISUAL then $EDITOR', async () => {
     process.env.VISUAL = 'vis';
     const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
-    vi.mocked(listWorktrees).mockResolvedValue([
-      worktree('/wt/alpha', 'alpha'),
-    ]);
+    resolveWorktree.mockResolvedValue('/wt/alpha');
 
     press(KEYS.openEditor(), t.ctx);
     await t.settle();
@@ -884,9 +858,7 @@ describe('sidebar handler — open-editor', () => {
 
   it('flashes when no editor is configured anywhere', async () => {
     const t = makeCtx({ selectedItem: sessionItem('/wt/alpha') });
-    vi.mocked(listWorktrees).mockResolvedValue([
-      worktree('/wt/alpha', 'alpha'),
-    ]);
+    resolveWorktree.mockResolvedValue('/wt/alpha');
 
     press(KEYS.openEditor(), t.ctx);
     await t.settle();
@@ -902,7 +874,8 @@ describe('sidebar handler — open-editor', () => {
       selectedItem: sessionItem('/wt/alpha'),
       editor: 'code',
     });
-    vi.mocked(listWorktrees).mockResolvedValue([]);
+    findWorktree.mockResolvedValue(null);
+    resolveWorktree.mockResolvedValue(null);
 
     press(KEYS.openEditor(), t.ctx);
     await t.settle();

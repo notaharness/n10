@@ -49,9 +49,9 @@ export type {
 // The push half of the contract — channel names and their payloads.
 export * from './contract-events.js';
 // Machines: this one and the other members of its beam fleet.
-export type * from './contract-machines.js';
+export type * from '@n10/engine/contract';
 import type {
-  BeamStatus,
+  FleetStatus,
   CeremonyOutcome,
   CeremonyProgress,
   CeremonyRequest,
@@ -59,7 +59,7 @@ import type {
   FleetResetOutcome,
   MachineGrant,
   MachineView,
-} from './contract-machines.js';
+} from '@n10/engine/contract';
 // Terminal tabs — sessions bound to a directory rather than a worktree.
 export type * from './contract-terminals.js';
 import type {
@@ -315,6 +315,7 @@ export interface N10HostApi {
   /** Validate + open a directory as the active repo. */
   openRepo(cwd: string): Promise<RepoInfo>;
   getRepo(): Promise<RepoInfo | null>;
+  refreshRepo(): Promise<RepoInfo | null>;
 
   // ── Recent repos ─────────────────────────────────────────────
   listRecentRepos(): Promise<RecentRepoEntry[]>;
@@ -353,7 +354,7 @@ export interface N10HostApi {
   listBranches(): Promise<string[]>;
   /** All local + remote branch names (checkout candidates). */
   listAllBranches(): Promise<string[]>;
-  createWorktree(branch: string): Promise<string | null>;
+  createWorktree(branch: string): Promise<string>;
   /** Remove with the verdict the user confirmed; core's outcome says
    *  what was kept, if anything. */
   removeWorktree(
@@ -370,7 +371,10 @@ export interface N10HostApi {
   openInEditor(branch: string): Promise<{ editor: string }>;
 
   // ── Reviews ──────────────────────────────────────────────────
-  fetchCommentThreads(prId: number): Promise<PullRequestComments>;
+  fetchCommentThreads(
+    prId: number,
+    force?: boolean
+  ): Promise<PullRequestComments>;
   replyToThread(req: ReplyRequest): Promise<void>;
   setThreadResolved(req: ResolveRequest): Promise<void>;
   /** Full PR description (list payloads truncate or omit it). */
@@ -498,11 +502,6 @@ export interface N10HostApi {
    *  what it has committed. Empty string when the branch has no
    *  worktree. */
   fetchWorktreeDiffText(branch: string, targetBranch: string): Promise<string>;
-  fetchFileDiffText(
-    sourceBranch: string,
-    targetBranch: string,
-    file: string
-  ): Promise<string>;
 
   // ── Shell ────────────────────────────────────────────────────
   /** Open a URL in the user's default browser. */
@@ -530,8 +529,8 @@ export interface N10HostApi {
    *  this machine is enrolled. Repo independent — like `listTerminals`,
    *  this answers the same whatever repository (if any) is open. */
   listMachines(): Promise<MachineView[]>;
-  getBeamStatus(): Promise<BeamStatus>;
-  onBeamStatusChanged(cb: (status: BeamStatus) => void): () => void;
+  getBeamStatus(): Promise<FleetStatus>;
+  onBeamStatusChanged(cb: (status: FleetStatus) => void): () => void;
   /** The name a peer goes by here only; `null` clears it. */
   setMachineAlias(peerId: string, alias: string | null): Promise<void>;
   /** What that peer may open on this machine. */
@@ -577,6 +576,7 @@ export const IPC = {
   selectFolder: 'n10/shell/select-folder',
   forgetRecent: 'n10/repo/forget',
   getRepo: 'n10/repo/get',
+  refreshRepo: 'n10/repo/refresh',
   getSettingsView: 'n10/settings/view',
   updateSettingsField: 'n10/config/update-field',
   getSidebarModel: 'n10/sidebar/model',
@@ -630,7 +630,6 @@ export const IPC = {
   checkoutPlan: 'n10/session/checkout-plan',
   fetchDiffText: 'n10/diff/text',
   fetchWorktreeDiffText: 'n10/diff/worktree-text',
-  fetchFileDiffText: 'n10/diff/file-text',
   openExternal: 'n10/shell/open-external',
   showContextMenu: 'n10/shell/context-menu',
   showAppMenu: 'n10/shell/app-menu',

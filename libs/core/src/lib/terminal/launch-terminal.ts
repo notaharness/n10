@@ -3,7 +3,6 @@ import type { NamedPtyEntry } from '../pty-registry.js';
 import { buildAgentLaunch } from '../session/launch-session.js';
 import { openSession } from '../session/open-session.js';
 import { sessionIdentity } from '../session-key.js';
-import { getRepoRoot } from '../repo-root.js';
 import type { TerminalKind } from './terminal-name.js';
 
 export interface TerminalLaunchParams {
@@ -46,7 +45,7 @@ export async function launchTerminalSession(
     session: {
       type: 'terminal',
       kind: params.kind,
-      repo: getRepoRoot() ?? params.cwd,
+      repo: params.cwd,
       target: identity.target,
       machine: identity.machine,
     },

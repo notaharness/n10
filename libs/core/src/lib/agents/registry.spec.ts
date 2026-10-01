@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import type { AppConfig } from '@n10/vcs-core';
 import {
   AGENTS,
-  agentIdFromCommand,
   makeTestAgent,
   resolveAgent,
   isKnownAgentId,
@@ -44,28 +43,6 @@ describe('agent registry', () => {
     expect(AGENTS.every((a) => !a.hidden)).toBe(true);
   });
 
-  describe('agentIdFromCommand', () => {
-    it('defaults to claude when empty', () => {
-      expect(agentIdFromCommand(undefined)).toBe('claude');
-      expect(agentIdFromCommand('')).toBe('claude');
-    });
-
-    it('maps legacy preset strings back to their agent', () => {
-      expect(agentIdFromCommand('claude --continue || claude')).toBe('claude');
-      expect(agentIdFromCommand('codex')).toBe('codex');
-      expect(agentIdFromCommand('gemini')).toBe('gemini');
-      expect(agentIdFromCommand('copilot')).toBe('copilot');
-      expect(agentIdFromCommand('gh copilot')).toBe('copilot');
-      expect(agentIdFromCommand('opencode')).toBe('opencode');
-    });
-
-    it('routes unrecognized commands to the hidden test runner', () => {
-      expect(agentIdFromCommand('cat')).toBe('test');
-      expect(agentIdFromCommand('echo hi && sleep 300')).toBe('test');
-      expect(agentIdFromCommand('node /tmp/fake-agent.mjs')).toBe('test');
-    });
-  });
-
   describe('resolveAgent', () => {
     it('prefers explicit agentId over aiCommand', () => {
       const agent = resolveAgent(
@@ -74,12 +51,12 @@ describe('agent registry', () => {
       expect(agent.id).toBe('codex');
     });
 
-    it('migrates legacy aiCommand when agentId is unset', () => {
-      expect(resolveAgent(config({ aiCommand: 'gemini' })).id).toBe('gemini');
+    it('uses the default agent without inferring identity from a command', () => {
+      expect(resolveAgent(config({ aiCommand: 'gemini' })).id).toBe('claude');
     });
 
-    it('routes an unrecognized aiCommand to the test runner that runs it raw', () => {
-      const agent = resolveAgent(config({ aiCommand: 'cat' }));
+    it('runs an explicitly selected test agent with its configured command', () => {
+      const agent = resolveAgent(config({ agentId: 'test', aiCommand: 'cat' }));
       expect(agent.id).toBe('test');
       expect(agent.hidden).toBe(true);
       expect(agent.blank()).toEqual(shellSpec('cat'));

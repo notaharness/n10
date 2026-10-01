@@ -1,3 +1,4 @@
+import type { AppConfig, VcsProvider } from '@n10/vcs-core';
 import type { AgentSession } from '../types.js';
 
 import {
@@ -6,9 +7,7 @@ import {
   type PullRequestInfo,
   type PullRequestReviewer,
   type CategorizedReviews,
-  type AppConfig,
-  type VcsProvider,
-} from '@n10/vcs-core';
+} from '@n10/vcs-core/types';
 
 /**
  * Find PRs created by the current user whose branch no worktree has

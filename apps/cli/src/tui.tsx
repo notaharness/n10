@@ -1,3 +1,4 @@
+import { useTerminalDimensions } from './hooks/useTerminalDimensions.js';
 import { useState } from 'react';
 import { render, Box, useApp } from 'ink';
 import type { VcsProvider } from '@n10/vcs-core';
@@ -5,12 +6,17 @@ import { azureDevOpsProvider } from '@n10/vcs-azure-devops';
 import { githubProvider } from '@n10/vcs-github';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal.js';
 import { OnboardingWizard } from './components/OnboardingWizard.js';
-import { createPullRequestList } from '@n10/engine';
+import {
+  createPullRequestList,
+  createRepositoryService,
+  createRemoteSync,
+} from '@n10/engine';
 import {
   settlePendingRuns,
   ConfigProvider,
   EngineProvider,
   useConfig,
+  useEngine,
   KeybindProvider,
   NavProvider,
   useNavState,
@@ -23,13 +29,20 @@ import {
   SessionProvider,
   SidebarProvider,
   ToastProvider,
+  useToastActions,
 } from '@n10/app-core';
-import { killAll, applySessionBackend, probeTmuxAvailability } from '@n10/core';
+import {
+  killAll,
+  applySessionBackend,
+  probeTmuxAvailability,
+  resetRepoRoot,
+} from '@n10/core';
 import {
   repoTitle,
   setWindowTitle,
   restoreWindowTitle,
 } from './utils/window-title.js';
+import { waitForExit } from './utils/wait-for-exit.js';
 import { MainTab } from './screens/main/MainTab.js';
 
 // ── Provider registry ──────────────────────────────────────────────
@@ -39,31 +52,23 @@ const providers: VcsProvider[] = [azureDevOpsProvider, githubProvider];
 // The same pull request list the desktop host runs, in this process.
 const pullRequests = createPullRequestList({ providers });
 
-// Upper bound on how long 'q' waits for in-flight git ops to finish
-// before force-exiting. Real worktree/branch ops finish well under this;
-// the cap guarantees quit still works if an op wedges.
 const EXIT_GRACE_MS = 3_000;
 
 // ── App ────────────────────────────────────────────────────────────
 
 function App() {
   const { exit } = useApp();
-  // Ink's exit() only unmounts the React tree — it does not stop child
-  // processes. Active PTYs (running agents) keep node-pty handles open,
-  // so the Node event loop never drains and the process hangs after
-  // pressing 'q'. Tear down PTYs first, then force-exit. (#56)
-  //
-  // But process.exit(0) is synchronous and would abort an in-flight git
-  // mutation (worktree create/delete, rebase) mid-write, leaving a
-  // half-made worktree or dangling branch on disk. So first let any
-  // pending run() op settle — bounded by a grace timeout so a wedged op
-  // can't resurrect the #56 hang.
+  const { sync } = useEngine();
+  const { flash } = useToastActions();
+  // Give manual operations and automatic removals one shared grace period.
+  // Ink unmounts the UI; the entry point must also detach PTY clients and exit.
   const handleExit = () => {
     void (async () => {
-      await Promise.race([
-        settlePendingRuns(),
-        new Promise((resolve) => setTimeout(resolve, EXIT_GRACE_MS)),
-      ]);
+      flash(
+        'Closing n10 — waiting up to 3 seconds for active operations…',
+        'info'
+      );
+      await waitForExit(() => sync.stop(), settlePendingRuns, EXIT_GRACE_MS);
       killAll();
       exit();
       process.exit(0);
@@ -146,11 +151,37 @@ export async function runTui(args: string[]): Promise<void> {
     process.exit(1);
   }
 
+  let repo;
+  try {
+    repo = createRepositoryService({ providers, pullRequests }).open(
+      process.cwd()
+    );
+    process.chdir(repo.cwd);
+    resetRepoRoot();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+
+  const worktrees = repo.worktrees;
+  const sync = createRemoteSync({
+    config: repo.config,
+    pullRequests,
+    worktrees,
+  });
+
   render(
-    <ConfigProvider providers={providers}>
-      <EngineProvider pullRequests={pullRequests} repo={process.cwd()}>
+    <ConfigProvider service={repo.config}>
+      <EngineProvider
+        pullRequests={pullRequests}
+        repo={repo.cwd}
+        sync={sync}
+        worktrees={worktrees}
+        reviews={repo.reviews}
+        sessions={repo.sessions}
+      >
         <KeybindProvider>
-          <LayoutProvider>
+          <LayoutProvider useDimensions={useTerminalDimensions}>
             <NavProvider>
               <AsyncOpsProvider>
                 <PlanProvider>

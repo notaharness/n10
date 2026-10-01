@@ -5,7 +5,7 @@ import type {
   ReviewComment,
   RowMap,
 } from '@n10/review-comments';
-import { maxDiffScrollOffset } from '@n10/core';
+import { maxDiffScrollOffset } from '@n10/core/ui';
 
 export interface UseAutoSelectFirstCommentOptions {
   /** The currently opened diff file. The hook arms once per file change. */
@@ -87,7 +87,7 @@ export function useAutoSelectFirstComment({
     // translate the refStartLine slot index to a physical row via the
     // row map and pin two rows above for a bit of code context.
     // commentPositions/rowMap depend on the parsed diff text, which
-    // loads async via `loadFileDiff`. If comments arrived first the
+    // loads through the selected file resource. If comments arrived first the
     // first effect pass has nothing to scroll to — bail and let the
     // diff-text render fire us again. Without this gate we'd arm the
     // ref now, the next pass would be blocked, and the user would see

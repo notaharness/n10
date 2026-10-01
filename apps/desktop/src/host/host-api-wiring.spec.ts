@@ -37,6 +37,7 @@ vi.mock('./services/repo.js', () =>
   recorder('repo', [
     'openRepo',
     'getRepo',
+    'refreshRepo',
     'listRecentRepos',
     'forgetRecentRepo',
   ])
@@ -68,7 +69,6 @@ vi.mock('./services/reviews.js', () =>
     'submitReviewVerdict',
     'getReviewViewer',
     'getDiffText',
-    'getFileDiffText',
   ])
 );
 vi.mock('./services/sessions.js', () =>
@@ -166,6 +166,7 @@ beforeEach(() => {
 const WIRING: [keyof HostApi, unknown[], string][] = [
   ['openRepo', ['/repo'], 'repo.openRepo'],
   ['getRepo', [], 'repo.getRepo'],
+  ['refreshRepo', [], 'repo.refreshRepo'],
   ['listRecentRepos', [], 'repo.listRecentRepos'],
   ['forgetRecent', ['/repo'], 'repo.forgetRecentRepo'],
 
@@ -200,7 +201,7 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ['checkWorktreeRemoval', ['feature'], 'worktrees.checkWorktreeRemoval'],
   ['openInEditor', ['feature'], 'worktrees.openInEditor'],
 
-  ['fetchCommentThreads', [7], 'reviews.fetchCommentThreads'],
+  ['fetchCommentThreads', [7, true], 'reviews.fetchCommentThreads'],
   ['fetchPrDescription', [7], 'reviews.fetchPrDescription'],
   [
     'getPullRequestSnapshot',
@@ -239,7 +240,6 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ['submitReviewVerdict', [7, 'approve'], 'reviews.submitReviewVerdict'],
   ['getReviewViewer', [], 'reviews.getReviewViewer'],
   ['fetchDiffText', ['feature', 'main'], 'reviews.getDiffText'],
-  ['fetchFileDiffText', ['feature', 'main', 'a.ts'], 'reviews.getFileDiffText'],
   [
     'fetchWorktreeDiffText',
     ['feature', 'main'],

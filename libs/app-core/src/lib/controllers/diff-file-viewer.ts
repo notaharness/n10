@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from 'react';
+import { useFileDiffData } from '../hooks/useDiffData.js';
+import { useMemo, useEffect } from 'react';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import { parseUnifiedDiff } from '@n10/diff';
 import {
@@ -6,8 +7,10 @@ import {
   getCommentPositions,
   buildRowMap,
   type CommentImageLayouts,
-} from '@n10/review-comments';
-import { planItemKey } from '@n10/core';
+  type RemotePlacementDiagnostic,
+} from '@n10/review-comments/ui';
+import { planItemKey } from '@n10/core/plan';
+import { useToastActions } from '../context/ToastContext.js';
 import { usePlan } from '../context/PlanContext.js';
 import { useAutoSelectFirstComment } from '../hooks/useAutoSelectFirstComment.js';
 import { usePendingThreadScrollIntoView } from '../hooks/usePendingThreadScrollIntoView.js';
@@ -69,18 +72,13 @@ export function useDiffFileViewerViewModel({
     return m;
   }, [prId, planSnapshot]);
 
-  // Trigger a per-file diff fetch on file open. Cached internally
-  // by useDiffData, so navigating back and forth is free.
-  const { loadFileDiff } = diffBundle;
+  const fileRead = useFileDiffData(diffBundle.request, pane.diffViewFile);
+  const fileDiffText = fileRead.data;
+  const { flash } = useToastActions();
   useEffect(() => {
-    if (pane.diffViewFile) {
-      void loadFileDiff(pane.diffViewFile);
-    }
-  }, [pane.diffViewFile, loadFileDiff]);
-
-  const fileDiffText = pane.diffViewFile
-    ? diffBundle.fileDiffs.get(pane.diffViewFile) ?? null
-    : null;
+    if (fileRead.error)
+      flash(`Could not load diff: ${fileRead.error}`, 'error');
+  }, [fileRead.error, flash]);
 
   const fileDiffData = useMemo(() => {
     if (!pane.diffViewFile || !fileDiffText) return null;
@@ -90,8 +88,7 @@ export function useDiffFileViewerViewModel({
     return { fileDiffLines };
   }, [pane.diffViewFile, fileDiffText]);
 
-  const fileDiffLoading =
-    diffBundle.fileDiffLoading === pane.diffViewFile && !fileDiffData;
+  const fileDiffLoading = fileRead.loading && !fileDiffData;
 
   const fileComments = useMemo(
     () => diffBundle.comments.filter((c) => c.file === pane.diffViewFile),
@@ -181,6 +178,9 @@ export function useDiffFileViewerViewModel({
     setPendingScrollThreadId: pane.setPendingScrollThreadId,
   });
 
+  const placementDiagnostics: RemotePlacementDiagnostic[] | undefined =
+    interleaveResult?.placementDiagnostics;
+
   return {
     inPlanKeys,
     annotatedLines,
@@ -189,6 +189,7 @@ export function useDiffFileViewerViewModel({
     fileDiffLoading,
     fileComments,
     fileRemoteThreads,
+    placementDiagnostics,
     diffTotalRows,
     sectionAnchorRows,
   };

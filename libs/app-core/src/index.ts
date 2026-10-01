@@ -1,12 +1,6 @@
-// @n10/app-core — the React layer shared by n10's shells.
-//
-// Contexts, hooks and headless screen controllers. Everything here
-// needs React; anything that does not belongs in @n10/core, which
-// this package depends on and which never depends back.
-//
-// Consumers import backend primitives from @n10/core directly — this
-// barrel deliberately does not re-export them, so the layer a symbol
-// comes from is visible at every call site.
+// Browser-safe React contexts, hooks and headless controllers over injected
+// engine clients and pure presentation models. Terminal I/O and process
+// dimensions belong to apps/cli; desktop supplies its own IPC/query bindings.
 
 // ── Plan store (React binding) ───────────────────────────────────
 export { usePlanStore } from './lib/plan/use-plan-store.js';
@@ -29,26 +23,19 @@ export * from './lib/context/SidebarContext.js';
 export * from './lib/context/ToastContext.js';
 
 // ── Hooks ────────────────────────────────────────────────────────
-export * from './lib/hooks/useActivity.js';
 export * from './lib/hooks/useAsyncOperation.js';
 export * from './lib/hooks/useAutoSelectFirstComment.js';
 export * from './lib/hooks/useBranchPicker.js';
-export * from './lib/hooks/useConflictCounts.js';
 export * from './lib/hooks/useDeleteConfirmation.js';
 export * from './lib/hooks/useDiffBundle.js';
 export * from './lib/hooks/useDiffData.js';
-export * from './lib/hooks/useInactiveAlertWatcher.js';
-export * from './lib/hooks/useMergedBranches.js';
 export * from './lib/hooks/useNavigation.js';
 export * from './lib/hooks/usePaneReducer.js';
 export * from './lib/hooks/usePendingThreadScrollIntoView.js';
 export * from './lib/hooks/usePolling.js';
 export * from './lib/hooks/usePrData.js';
-export * from './lib/hooks/usePtySession.js';
 export * from './lib/hooks/useRemoteComments.js';
 export * from './lib/hooks/useRemoteSync.js';
 export * from './lib/hooks/useReviewComments.js';
-export * from './lib/hooks/useRunningTabs.js';
 export * from './lib/hooks/useSessionManager.js';
 export * from './lib/hooks/useSettings.js';
-export * from './lib/hooks/useTerminalDimensions.js';

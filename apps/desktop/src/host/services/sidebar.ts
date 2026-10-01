@@ -1,30 +1,32 @@
-import { listWorktrees } from '@n10/worktree-manager';
 import {
   buildSidebarItems,
   buildSessionPrMap,
   categorizeReviews,
   findOrphanPrs,
   sortSessionsByPrId,
-  worktreeSessionRow,
   type SidebarItem,
 } from '@n10/core';
 import { pullRequestPollIntervalMs } from '@n10/engine';
-import { activeRepoIs, requireRepo } from './repo.js';
+import {
+  activeRepository,
+  activeRepoIs,
+  activeReviewService,
+  requireRepo,
+} from './repo.js';
 import { babysatStatuses } from './babysit.js';
-import { isOwnSessionAlive } from './sessions.js';
-import { getSyncDecorations } from './remote-sync.js';
-import { pullRequests, resolveProvider } from './pull-requests.js';
+import { getSyncDecorations, refreshRemoteSync } from './remote-sync.js';
+import { pullRequests, resolveProvider } from './program.js';
 import type { SidebarModel, SyncState } from '../contract.js';
 
 /**
  * Assemble the unified, ordered sidebar model exactly like the TUI's
  * SidebarProvider — worktrees, then draft PRs, then PRs, then the
- * three review buckets — by reusing app-core's pure builders. Runs in
- * the main process where git + provider access is available; the
+ * three review buckets — by reusing core's pure builders. Runs in
+ * the host process where Git and provider access are available; the
  * result is plain data streamed to the renderer.
  *
- * Local state (worktrees, alive PTYs) is cheap and re-read on every
- * call; remote pull request data comes from the host's one instance
+ * Worktree session rows and liveness come from the captured engine handle.
+ * Remote pull request data comes from the host's one instance
  * of `@n10/engine`'s pull request list (`services/pull-requests.ts`),
  * so the renderer can poll the model frequently without hammering the
  * provider API. The renderer's poll is also the list's demand: each
@@ -49,20 +51,16 @@ import type { SidebarModel, SyncState } from '../contract.js';
 /** The rows alone. Exported for its tests; the bridge serves
  *  `getSidebarSnapshot`, which says which repository they are of. */
 export async function listSidebarItems(): Promise<SidebarItem[]> {
-  const cwd = requireRepo();
+  const repo = activeRepository();
+  const cwd = repo.cwd;
   const { config, provider } = resolveProvider(cwd);
 
   // Local git first and on its own: worktrees are the rows the user is
   // most likely looking for, and they must not queue behind a provider
   // call that may be a network round trip away.
   pullRequests.refreshInBackground(cwd);
-  const worktrees = await listWorktrees();
+  const sessions = await repo.sessions.read();
   const prMap = pullRequests.getSnapshot(cwd).prMap;
-  // Rows are keyed by checkout, so the agent in a worktree stays that
-  // worktree's whichever branch it is on now (`worktreeSessionRow`).
-  const sessions = worktrees.map((wt) =>
-    worktreeSessionRow(wt, isOwnSessionAlive, cwd)
-  );
 
   const checkedOut = new Set(
     sessions.flatMap((s) => (s.branch ? [s.branch] : []))
@@ -77,7 +75,7 @@ export async function listSidebarItems(): Promise<SidebarItem[]> {
   const sortedSessions = sortSessionsByPrId(sessions, sessionPrMap);
 
   // Merged/conflict decorations come from the host's remote sync loop
-  // (same shared passes the TUI's hooks drive).
+  // (the same engine service the TUI observes).
   const sync = getSyncDecorations();
   return buildSidebarItems(
     sortedSessions,
@@ -94,14 +92,8 @@ export async function listSidebarItems(): Promise<SidebarItem[]> {
  * The sidebar stamped with the repository it describes — what the
  * renderer is handed.
  *
- * `listSidebarItems` reads the open repository more than once over its
- * awaits (the worktree list, then which sessions are this repo's), so a
- * switch landing in between yields rows of one repository with the
- * live state of another. Rather than stamp that, it is computed again
- * for the repository the host is on now, and stamped with that one; the
- * renderer then knows exactly which workspace the answer is for. Bounded,
- * because a host that keeps switching under the call has a bigger
- * problem than a stale sidebar.
+ * A repository switch can land while the captured engine handle reads local
+ * state. Recompute for the selected handle before stamping a response.
  */
 export async function getSidebarSnapshot(): Promise<SidebarModel> {
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -121,8 +113,8 @@ export function getSyncState(): SyncState {
     providerConfigured: configured,
     lastRemoteSyncAt: remote.fetchedAt,
     lastGitSyncAt: getSyncDecorations().lastGitSyncAt,
-    remoteError: remote.error,
-    remoteSyncing: remote.refreshing,
+    remoteError: remote.error ?? getSyncDecorations().error,
+    remoteSyncing: remote.refreshing || getSyncDecorations().loading,
     remoteIntervalMs: pullRequestPollIntervalMs(config.prPollInterval),
     remoteFetches: pullRequests.fetchCount(),
   };
@@ -138,7 +130,9 @@ export function getSyncState(): SyncState {
  * refresh's own request starts.
  */
 export async function refreshRemote(): Promise<void> {
-  await pullRequests.refresh(requireRepo());
+  const reviews = activeReviewService();
+  await Promise.all([pullRequests.refresh(requireRepo()), refreshRemoteSync()]);
+  reviews.invalidateProvider();
 }
 
 /**
