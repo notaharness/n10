@@ -17,6 +17,7 @@ import type { AppConfig } from '@n10/vcs-core';
 import type { Machine } from '@n10/worktree-manager';
 import type { WorktreeService } from '../worktrees/api.js';
 import type { WorktreeTarget, WorktreeConfig } from '../worktrees/api.js';
+import type { BranchCheckout } from './branch-sessions.js';
 
 export interface SessionLaunch {
   target: WorktreeTarget;
@@ -81,6 +82,8 @@ export function createSessionCommands(options: {
   const repo = config.repo;
   const requested: Pending = new Map();
   const resolved: Pending = new Map();
+  /** Remote checkouts resolved this run, by machine and branch. */
+  const remoteCheckouts = new Map<string, BranchCheckout>();
   function assertCurrent(): void {
     if (!isCurrent())
       throw new Error(
@@ -114,8 +117,23 @@ export function createSessionCommands(options: {
     if (!('branch' in req.target))
       throw new Error('Choose a branch to launch on another machine.');
     ports.progress?.('worktree');
-    const path = await worktrees.create(req.target.branch, req.remote.machine);
-    return resolveRemoteWorktreePath(path, req.remote.machine.executor);
+    return remoteCheckout(req.target.branch, req.remote);
+  }
+  async function remoteCheckout(
+    branch: string,
+    remote: NonNullable<SessionLaunch['remote']>
+  ): Promise<string> {
+    const created = await worktrees.create(branch, remote.machine);
+    const path = await resolveRemoteWorktreePath(
+      created,
+      remote.machine.executor
+    );
+    remoteCheckouts.set(JSON.stringify([remote.id, branch]), {
+      machine: remote.id,
+      path,
+      branch,
+    });
+    return path;
   }
   async function start(
     req: SessionLaunch,
@@ -182,6 +200,24 @@ export function createSessionCommands(options: {
     ): Promise<string> {
       const key = JSON.stringify([req.target, req.remote?.id]);
       return joinLaunch(requested, key, req, () => perform(req, ports));
+    },
+    /** `branch`'s checkout on this machine or `remote`, created there
+     *  when it has none, in that machine's terms. */
+    async checkoutOn(
+      branch: string,
+      remote?: SessionLaunch['remote']
+    ): Promise<string> {
+      assertCurrent();
+      const path = remote
+        ? await remoteCheckout(branch, remote)
+        : await worktrees.resolve({ branch });
+      assertCurrent();
+      if (!path) throw new Error(`Failed to check out ${branch}`);
+      return path;
+    },
+    /** The remote checkouts resolved this run. */
+    remoteCheckouts(): BranchCheckout[] {
+      return [...remoteCheckouts.values()];
     },
     stop(name: string): void {
       assertCurrent();

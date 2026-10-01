@@ -26,6 +26,9 @@ export interface TerminalLaunch {
   cols?: number;
   rows?: number;
   machine?: string;
+  /** `cwd` is the machine's own path, as it reported it, not one named
+   *  on this machine. */
+  machinePath?: boolean;
 }
 export interface TerminalPorts {
   started(name: string, previousName?: string): void;
@@ -44,11 +47,11 @@ function assertLaunchableCwd(cwd: string): void {
   if (!isDir) throw new Error(`Terminal directory does not exist: ${cwd}`);
 }
 
-/** A directory named on this machine, as the terminal's machine finds it. */
-function directoryFor(cwd: string, machine?: string): Promise<string> {
-  return !machine || machine === LOCAL_MACHINE
-    ? Promise.resolve(cwd)
-    : directoryOnMachine(cwd, requireMachine(machine).executor);
+/** The request's directory as the terminal's machine finds it. */
+function directoryFor(req: TerminalLaunch, machine?: string): Promise<string> {
+  return !machine || machine === LOCAL_MACHINE || req.machinePath
+    ? Promise.resolve(req.cwd)
+    : directoryOnMachine(req.cwd, requireMachine(machine).executor);
 }
 
 /** Process-wide directory terminals survive repository selection changes. */
@@ -137,7 +140,7 @@ export function createTerminalService(ports: TerminalPorts) {
     const machine = req.sessionName
       ? sessionIdentity(req.sessionName)?.machine
       : req.machine;
-    const cwd = existing?.cwd ?? (await directoryFor(req.cwd, machine));
+    const cwd = existing?.cwd ?? (await directoryFor(req, machine));
     if (!machine || machine === LOCAL_MACHINE) assertLaunchableCwd(cwd);
     return { ...req, cwd, kind: existing?.kind ?? req.kind, machine };
   }
