@@ -15,9 +15,10 @@ export const BEAM_TEST_BINARY = process.env.BEAM_TEST_BINARY;
 /** beam's own grace for a daemon that was asked to stop. */
 const STOP_GRACE_MS = 12_000;
 const START_TIMEOUT_MS = 20_000;
+const TAIL_LINES = 200;
 
 /** A child started with `--exit-with-parent`, and its stderr tail for a
- *  failure message. `stop` closes its stdin and sends SIGTERM, either of
+ *  failure message or a failed test's attachment. `stop` closes its stdin and sends SIGTERM, either of
  *  which stops it, then kills it after beam's grace. */
 class Held {
   private tail: string[] = [];
@@ -33,7 +34,7 @@ class Held {
     });
     child.stderr?.setEncoding('utf8');
     child.stderr?.on('data', (chunk: string) => {
-      this.tail = [...this.tail, ...chunk.split('\n')].slice(-20);
+      this.tail = [...this.tail, ...chunk.split('\n')].slice(-TAIL_LINES);
     });
   }
 
@@ -54,6 +55,13 @@ class Held {
     return `${this.name} exited (${
       this.child.exitCode ?? this.child.signalCode
     }): ${this.tail.join('\n')}`;
+  }
+
+  /** Whether it still runs, and what it last wrote to stderr. */
+  log(): string {
+    return this.exited
+      ? this.describe()
+      : `${this.name} running:\n${this.tail.join('\n')}`;
   }
 
   async stop(): Promise<void> {
@@ -164,6 +172,8 @@ export interface BeamMachine {
   cli(args: string[]): Promise<CliResult>;
   /** This machine's peerId, from `beam status --json`. */
   peerId(): Promise<string>;
+  /** The daemon's state and stderr tail, for a failed test. */
+  log(): string;
   stop(): Promise<void>;
 }
 
@@ -236,6 +246,7 @@ export async function startMachine(
       if (code !== 0) throw new Error(`beam status: ${stderr}`);
       return (JSON.parse(stdout) as { peerId: string }).peerId;
     },
+    log: () => held.log(),
     stop: () => held.stop(),
   };
 }
