@@ -2,8 +2,6 @@ import type { Metadata } from 'next';
 import { BeamCta } from '@/components/beam/beam-cta';
 import { BeamHero } from '@/components/beam/beam-hero';
 import { BeamHow } from '@/components/beam/beam-how';
-import { BeamRevocation } from '@/components/beam/beam-revocation';
-import { BeamNotes } from '@/components/beam/beam-notes';
 import { BeamOverviewDiagram } from '@/components/beam/beam-overview-diagram';
 import { BeamStreams } from '@/components/beam/beam-streams';
 import { Footer } from '@/components/landing/footer';
@@ -20,10 +18,8 @@ export default function BeamPage() {
       <BeamHero />
       <BeamHow />
       <BeamOverviewDiagram />
-      <BeamRevocation />
-      <BeamNotes />
-      <BeamStreams />
       <BeamCta />
+      <BeamStreams />
       <Footer />
     </main>
   );

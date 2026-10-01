@@ -1,18 +1,18 @@
 const streams = [
   {
-    command: 'beam connect buildbox',
+    command: 'beam connect mac-mini-home',
     title: 'Interactive shells',
     description:
-      'Opens a terminal on buildbox. Use tmux to keep work running after disconnecting.',
+      'Opens a terminal on mac-mini-home. Use tmux to keep work running after disconnecting.',
   },
   {
-    command: 'beam exec buildbox -- uname -a',
+    command: 'beam exec mac-mini-home -- uname -a',
     title: 'Remote commands',
     description:
       'Pipes input and output through the tunnel and returns the remote exit code.',
   },
   {
-    command: "beam msg send buildbox --topic jobs 'ready'",
+    command: "beam msg send mac-mini-home --topic jobs 'ready'",
     title: 'Message delivery',
     description:
       'Keeps the message on the sender’s disk until the recipient stores it. Delivery needs both daemons connected.',

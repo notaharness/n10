@@ -131,7 +131,7 @@ Create the fleet on your first machine, then join each of the others:
 
 ```sh
 beam init --label laptop     # on the first machine: two passkey prompts
-beam join --label buildbox   # on every other machine: one passkey prompt
+beam join --label mac-mini-home   # on every other machine: one passkey prompt
 ```
 
 Each prompt opens a browser, or on a headless machine draws a QR code to scan
@@ -143,14 +143,14 @@ Then, from any machine:
 
 ```sh
 beam peers                                   # the fleet and who is online
-beam connect buildbox                        # a shell on buildbox
-beam exec buildbox -- uname -a               # one command, with its exit code
-beam msg send buildbox --topic jobs 'ready'  # delivered now, or when buildbox connects
-beam msg listen --topic jobs                 # on buildbox: print incoming messages
+beam connect mac-mini-home                        # a shell on mac-mini-home
+beam exec mac-mini-home -- uname -a               # one command, with its exit code
+beam msg send mac-mini-home --topic jobs 'ready'  # delivered now, or when mac-mini-home connects
+beam msg listen --topic jobs                 # on mac-mini-home: print incoming messages
 ```
 
 A shell ends when the connection does, so run long-lived work in tmux:
-`beam connect buildbox -- tmux new-session -A -s agents`.
+`beam connect mac-mini-home -- tmux new-session -A -s agents`.
 
 By default every machine in the fleet can run commands as you on every
 other. Run `beam --help` for every command, including limiting and revoking
