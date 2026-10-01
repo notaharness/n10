@@ -1,10 +1,33 @@
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
+import { focusTerminal, visibleText } from './setup/app.js';
 import {
   confirmNewTerminal,
   openNewTerminalDialog,
   terminalTabs,
 } from './setup/terminals.js';
+
+/** Asks the terminal for its background (OSC 11), as Claude Code does
+ *  at start, and prints the answer. */
+const ASK_BACKGROUND = `
+process.stdin.setRawMode(true);
+process.stdout.write('\\x1b]11;?\\x1b\\\\');
+let got = '';
+process.stdin.on('data', (data) => {
+  got += data;
+  const answer = /\\x1b\\]11;([^\\x07\\x1b]*)/.exec(got);
+  if (answer) {
+    console.log('background ' + answer[1]);
+    process.exit(0);
+  }
+});
+setTimeout(() => {
+  console.log('background unanswered');
+  process.exit(1);
+}, 5000);
+`;
 
 /**
  * Following the system theme: the UI and its terminals paint from one
@@ -69,6 +92,28 @@ test.describe('Theme', () => {
       await expect
         .poll(() => painted(page))
         .toEqual({ ui: theme, terminal: theme });
+    }
+  });
+
+  // tmux asks its client terminal for its colours when the client
+  // starts, and answers its panes from them.
+  test("a program in a terminal is told the theme's background", async ({
+    desktop,
+  }) => {
+    const { app, page, repoPath } = desktop;
+    writeFileSync(join(repoPath, 'ask-background.cjs'), ASK_BACKGROUND);
+
+    for (const [theme, background] of [
+      ['dark', 'rgb:1e1e/1e1e/1e1e'],
+      ['light', 'rgb:fafa/fafa/fafa'],
+    ] as const) {
+      await switchSystemTheme(app, theme);
+      await openShell(app, page);
+      await focusTerminal(page);
+      await page.keyboard.type('node ask-background.cjs\n', { delay: 20 });
+      await expect(visibleText(page, `background ${background}`)).toBeVisible({
+        timeout: 15_000,
+      });
     }
   });
 });

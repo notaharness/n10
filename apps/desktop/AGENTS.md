@@ -192,7 +192,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   each tab.
 - The theme painted is the host's (`services/theme.ts`), which main
   posts from `nativeTheme`; `lib/theme.ts` gives the UI class and every
-  terminal that one value. Do not paint from `prefers-color-scheme`
+  terminal that one value. Do not paint from `prefers-color-scheme`. The
+  host's terminal emulators answer colour and scheme queries from it
   (decisions.md, Theme).
 - Components use design tokens from `styles.css` and the primitives in
   `components/ui` only. Check visual work with `scripts/qa-shots.mjs`.

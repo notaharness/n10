@@ -24,7 +24,7 @@ import { installMachineResolver } from '../host/services/remote-machines.js';
 import { stopRemoteSyncLoop } from '../host/services/remote-sync.js';
 import { openStartupRepo } from '../host/services/repo.js';
 import { dropViewer } from '../host/services/session-watch.js';
-import { setTheme } from '../host/services/theme.js';
+import { installTerminalColors, setTheme } from '../host/services/theme.js';
 import { appBeamClient } from './beam/app-beam.js';
 import type { DaemonExit, OwnedDaemon } from './beam/owned-daemon.js';
 import {
@@ -174,6 +174,7 @@ async function start(): Promise<void> {
     prefsChanged: (next) =>
       void callMain('prefsChanged', next).catch(logFailure('prefs')),
   });
+  installTerminalColors();
   installMachineResolver();
   beam.start();
   await probeTmuxAvailability();

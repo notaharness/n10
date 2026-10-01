@@ -832,3 +832,18 @@ posts it to the host at fork and on every `'updated'`; windows read it from
 the host and repaint on its push. The renderer's `prefers-color-scheme` only
 seeds the first paint: a class set from its change event beside a terminal
 that re-read `matches` on each render could disagree.
+
+Programs in a terminal learn the theme the way they would from any terminal.
+The host's headless emulator for each attach client answers OSC 10/11 with
+the colours wterm paints, answers `CSI ? 996 n` and, while the program has
+mode 2031 set, reports `CSI ? 997 ; 1|2 n` on change. These replies go to the
+client's input, apart from xterm's own answers, which the renderer gives.
+tmux is that program: it asks its client for colours when the client
+attaches (again on a resize, at most every 30 seconds) and answers its panes'
+OSC 10/11 from what it last read. Only tmux 3.6 and later set mode 2031 on the
+client, ask again when the client reports a scheme change, and pass the change
+on to panes that enabled it; that is what lets a running program, such as
+Claude Code with its auto theme, follow a switch. Older tmux answers from the
+colours it read at attach or at the last such resize, so after a switch only
+terminals attached since then report the new theme; nothing native makes it
+ask again.
