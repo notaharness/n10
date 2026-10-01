@@ -291,3 +291,46 @@ it('retains a stopped launch across repository handle replacement', async () => 
   reopened.dispose();
   f.service.dispose();
 });
+it('names the branch of a terminal in a linked checkout, never the main checkout’s', () => {
+  const { service, worktrees } = fixture();
+  worktrees
+    .getSnapshot()
+    .worktrees.push({ branch: 'main', path: '/repo', bare: false });
+  const shell = {
+    name: 'shell',
+    kind: 'shell' as const,
+    cwd: '/repo/wt/src',
+    machine: 'local',
+    running: true,
+    spawnedAt: 1,
+  };
+  expect(service.terminalBranch(shell)).toBe('feature');
+  expect(service.terminalBranch({ ...shell, cwd: '/repo' })).toBeUndefined();
+  expect(
+    service.branchSessions('feature', [shell]).sessions.map((s) => s.name)
+  ).toEqual(['shell']);
+});
+it('checks a branch out on another machine and knows its terminals there', async () => {
+  const { service, worktrees } = fixture();
+  const machine = {
+    id: 'peer',
+    executor: {
+      run: vi.fn(async () => ({
+        stdout: '/home/them/wt\n',
+        stderr: '',
+        code: 0,
+      })),
+    },
+  };
+  vi.mocked(worktrees.create).mockResolvedValueOnce('/home/them/wt');
+  await expect(
+    service.checkoutOn('feature', { id: 'peer', machine })
+  ).resolves.toBe('/home/them/wt');
+  expect(worktrees.create).toHaveBeenCalledWith('feature', machine);
+  expect(
+    service.terminalBranch({ machine: 'peer', cwd: '/home/them/wt' })
+  ).toBe('feature');
+  expect(
+    service.terminalBranch({ machine: 'local', cwd: '/home/them/wt' })
+  ).toBe(undefined);
+});

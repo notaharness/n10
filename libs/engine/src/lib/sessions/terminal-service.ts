@@ -3,12 +3,14 @@ import { statSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import {
   detachSession,
+  directoryOnMachine,
   getSession,
   hasPersistedTerminalSession,
   killSession,
   launchTerminalSession,
   LOCAL_MACHINE,
   releaseExitedSession,
+  requireMachine,
   sessionIdentity,
   type DiscoveredTerminal,
   type TerminalKind,
@@ -24,6 +26,9 @@ export interface TerminalLaunch {
   cols?: number;
   rows?: number;
   machine?: string;
+  /** `cwd` is the machine's own path, as it reported it, not one named
+   *  on this machine. */
+  machinePath?: boolean;
 }
 export interface TerminalPorts {
   started(name: string, previousName?: string): void;
@@ -40,6 +45,13 @@ function assertLaunchableCwd(cwd: string): void {
     // Name an unavailable directory before the backend tries to spawn in it.
   }
   if (!isDir) throw new Error(`Terminal directory does not exist: ${cwd}`);
+}
+
+/** The request's directory as the terminal's machine finds it. */
+function directoryFor(req: TerminalLaunch, machine?: string): Promise<string> {
+  return !machine || machine === LOCAL_MACHINE || req.machinePath
+    ? Promise.resolve(req.cwd)
+    : directoryOnMachine(req.cwd, requireMachine(machine).executor);
 }
 
 /** Process-wide directory terminals survive repository selection changes. */
@@ -119,20 +131,22 @@ export function createTerminalService(ports: TerminalPorts) {
     starting.set(key, { signature, promise });
     return promise;
   }
-  function resolveRequest(req: TerminalLaunch): TerminalLaunch {
+  /** A restart keeps its recorded directory; a fresh remote terminal
+   *  opens where its machine finds the requested directory. */
+  async function resolveRequest(req: TerminalLaunch): Promise<TerminalLaunch> {
     const existing = req.sessionName ? known.get(req.sessionName) : undefined;
     if (req.sessionName && !existing)
       throw new Error('Unknown terminal session');
-    const cwd = existing?.cwd ?? req.cwd;
     const machine = req.sessionName
       ? sessionIdentity(req.sessionName)?.machine
       : req.machine;
+    const cwd = existing?.cwd ?? (await directoryFor(req, machine));
     if (!machine || machine === LOCAL_MACHINE) assertLaunchableCwd(cwd);
     return { ...req, cwd, kind: existing?.kind ?? req.kind, machine };
   }
   return {
     async launch(req: TerminalLaunch, onStart?: () => void) {
-      const name = await start(resolveRequest(req), undefined, onStart);
+      const name = await start(await resolveRequest(req), undefined, onStart);
       const record = known.get(name);
       if (!record) throw new Error(`Terminal ${name} ended during launch`);
       return terminalFacts(name, record);

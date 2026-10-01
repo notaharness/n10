@@ -27,6 +27,7 @@ export function useKillTerminal() {
     mutationFn: (name: string) => window.n10.killTerminal(name),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: keys.terminals });
+      void qc.invalidateQueries({ queryKey: keys.branchSessionsAll });
     },
   });
 }

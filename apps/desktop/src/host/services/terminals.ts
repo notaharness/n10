@@ -1,6 +1,10 @@
 import { homedir } from 'node:os';
 import { isGitRepo, LOCAL_MACHINE, type DiscoveredTerminal } from '@n10/core';
-import { createTerminalService, type TerminalFacts } from '@n10/engine';
+import {
+  createTerminalService,
+  type TerminalFacts,
+  type TerminalLaunch,
+} from '@n10/engine';
 import type {
   SessionBuffer,
   TerminalLaunchRequest,
@@ -46,7 +50,7 @@ function noteRepository(summary: TerminalSummary): void {
 }
 
 export async function launchTerminal(
-  req: TerminalLaunchRequest,
+  req: TerminalLaunchRequest & Pick<TerminalLaunch, 'machinePath'>,
   home: string = homedir()
 ): Promise<TerminalSummary> {
   const facts = await terminals.launch(req, () => {

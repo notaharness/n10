@@ -853,6 +853,23 @@ describe('terminal tabs', () => {
     expect(activeTabRepo(openTerminal(empty, inAlpha))).toBe(REPO);
   });
 
+  // A terminal in a branch's checkout lives in that branch's tab, so
+  // the strip gives it none, then or after the branch is forgotten.
+  it('opens no tab for a terminal in a branch checkout, now or later', () => {
+    const inBranch: TerminalEntry = {
+      ...plain,
+      name: 'n10-shell-2',
+      cwd: `${REPO}/.claude/worktrees/topic`,
+      branch: 'topic',
+    };
+    let s = syncTerminals(empty, [inBranch]);
+    expect(s.tabs).toEqual([]);
+    s = syncTerminals(s, [{ ...inBranch, branch: undefined }]);
+    expect(s.tabs).toEqual([]);
+    // Opening it on purpose still gives it a tab.
+    expect(openTerminal(s, inBranch).tabs).toHaveLength(1);
+  });
+
   // The restore path: the host lists the terminals tmux gave back, and
   // every one gets a tab — without moving focus, since a terminal from
   // another repository would otherwise switch the workspace at startup.

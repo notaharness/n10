@@ -43,6 +43,11 @@ export function activeRepository(): RepositoryHandle {
   return current;
 }
 
+/** The open repository, or null before one is open. */
+export function openRepository(): RepositoryHandle | null {
+  return repositories.getSnapshot();
+}
+
 export function requireRepo(): string {
   return activeRepository().cwd;
 }

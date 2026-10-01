@@ -2,13 +2,8 @@ import { Loader2Icon, PlayIcon, TerminalIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionSummary, SidebarItem } from '../../../host/contract.js';
 import { useRepo } from '../../lib/repo-context.js';
-import {
-  useAllBranches,
-  useMachines,
-  useSessions,
-} from '../../lib/data/queries.js';
-import { useReconnectSession } from '../../lib/data/mutations-terminals.js';
-import { resolveMachineLabel } from '../../lib/machines/machine-model.js';
+import { useAllBranches, useSessions } from '../../lib/data/queries.js';
+import { useBranchSessionRail } from '../../lib/review/use-branch-session-rail.js';
 import {
   itemBranch,
   itemHasWorktree,
@@ -24,7 +19,7 @@ import {
   estimateTerminalGrid,
   paneTerminalGrid,
 } from '../../lib/terminal-grid.js';
-import { terminalPaneState } from '../../lib/terminals/terminal-pane-state.js';
+import { LaunchTerminalDialog } from '../review/LaunchTerminalDialog.js';
 import { PrWorkspace } from './lazy-panes.js';
 import { Button } from '../ui/button.js';
 import { LaunchDialog, type LaunchChoice } from './LaunchDialog.js';
@@ -33,8 +28,8 @@ import { useItemLaunch } from './use-item-launch.js';
 /**
  * One editor tab for a sidebar item.
  *   • A pull request → the review workspace (PrWorkspace): a rail of
- *     Agent / Files / Comments beside a pane that swaps between the diff
- *     and the agent terminal. Launch/Stop live in the rail.
+ *     sessions and files beside a pane that swaps between the diff and
+ *     a session's terminal. Launch and Stop live in the rail.
  *   • A bare worktree → its agent terminal, or a launch call-to-action.
  *
  * Every launch goes through the session menu (LaunchDialog) — it is
@@ -56,21 +51,12 @@ function resolveItemState(
   const rowSessionName =
     itemSessionName(item) ??
     (sessionRow ? itemSessionName(sessionRow) : undefined);
-  const liveSession = aliveSessions.find((s) => s.name === rowSessionName);
   return {
     sessionName: liveSessionName(rowSessionName, aliveSessions),
-    // Restarting an agent keeps the session's name, so the name alone
-    // cannot tell the terminal that the thing on the other end of it is
-    // a different process that has never been told the pane's size.
-    sessionEpoch: liveSession?.spawnedAt ?? 0,
     running:
       itemRunning(item) || (sessionRow ? itemRunning(sessionRow) : false),
     hasWorktree: Boolean(rowSessionName) || itemHasWorktree(item),
     pr: item.pr ?? sessionRow?.pr,
-    // The pane's connection banner (ux-machines.md §6) — independent of
-    // `running` above, which is processState only (decisions.md D4).
-    connectionState: liveSession?.connectionState,
-    machine: liveSession?.machine,
   };
 }
 
@@ -102,7 +88,6 @@ function launchTarget(branch: string, state: ItemState | undefined) {
     branch,
     hasWorktree: state?.hasWorktree ?? false,
     pr: state?.pr,
-    sessionName: state?.sessionName,
   };
 }
 
@@ -173,37 +158,6 @@ function Preparing({ itemKey }: { itemKey: string }) {
   );
 }
 
-/** The agent pane's connection banner (ux-machines.md §6) — Phase 5
- *  wired this into TerminalView only; a session running here is
- *  exactly where a silent dead remote connection does the most damage,
- *  since it is the headline capability of this whole feature. Split
- *  out to keep ItemView's own complexity down. */
-function useConnectionBanner(
-  sessionName: string | undefined,
-  state: ItemState
-) {
-  const machines = useMachines();
-  const reconnect = useReconnectSession();
-  const pane = sessionName
-    ? terminalPaneState({
-        kind: 'agent',
-        running: state.running,
-        connectionState: state.connectionState,
-      })
-    : { bannerState: null, inputDisabled: false };
-  const connectionBanner =
-    pane.bannerState && sessionName
-      ? {
-          state: pane.bannerState,
-          machineLabel:
-            resolveMachineLabel(state.machine, machines.data) ?? 'this machine',
-          onReconnect: () => reconnect.mutate(sessionName),
-          reconnecting: reconnect.isPending,
-        }
-      : null;
-  return { connectionBanner, inputDisabled: pane.inputDisabled };
-}
-
 export function ItemView({
   item,
   items,
@@ -244,28 +198,20 @@ export function ItemView({
     // the moment it mounts.
     return estimateTerminalGrid(tab.getBoundingClientRect(), 0.6);
   };
-  const { choose, stop, busy, remoteStep, remoteError, resetRemote } =
-    useItemLaunch(
-      repo.cwd,
-      launchTarget(branch, state),
-      estimateGrid,
-      menu.close
-    );
-  const { connectionBanner, inputDisabled } = useConnectionBanner(
-    state?.sessionName,
-    state ?? {
-      sessionName: undefined,
-      sessionEpoch: 0,
-      running: false,
-      hasWorktree: false,
-      pr: undefined,
-      connectionState: undefined,
-      machine: undefined,
-    }
+  const { choose, busy, remoteStep, remoteError, resetRemote } = useItemLaunch(
+    repo.cwd,
+    launchTarget(branch, state),
+    estimateGrid,
+    menu.close
+  );
+  const sessions = useBranchSessionRail(
+    repo.cwd,
+    state?.pr?.sourceBranch ?? branch,
+    estimateGrid
   );
 
   if (!item || !state) return <Preparing itemKey={itemKey} />;
-  const { sessionName, sessionEpoch, running, hasWorktree, pr } = state;
+  const { sessionName, running, hasWorktree, pr } = state;
 
   const onLaunchClick = () => {
     onPin();
@@ -284,6 +230,17 @@ export function ItemView({
     if (!choice.machine) closeMenu();
     choose(choice);
   };
+  const terminalDialog = sessions.choice && (
+    <LaunchTerminalDialog
+      branch={pr?.sourceBranch ?? branch}
+      defaultMachine={sessions.terminalMachine}
+      busy={sessions.terminalBusy}
+      remoteStep={sessions.choice.remoteStep}
+      remoteError={sessions.choice.remoteError}
+      onLaunch={sessions.choice.launchOn}
+      onClose={sessions.choice.close}
+    />
+  );
   const dialog = menu.open && (
     <LaunchDialog
       pr={pr}
@@ -307,22 +264,20 @@ export function ItemView({
           pr={pr}
           branch={pr.sourceBranch}
           baseBranch={pr.targetBranch}
-          sessionName={sessionName}
-          sessionEpoch={sessionEpoch}
+          ownSession={sessionName}
           running={running}
           busy={busy}
           onLaunch={onLaunchClick}
-          onStop={stop}
-          connectionBanner={connectionBanner}
-          inputDisabled={inputDisabled}
+          sessions={sessions}
         />
         {dialog}
+        {terminalDialog}
       </div>
     );
   }
 
   // A worktree without a PR: same workspace, gracefully degraded —
-  // Agent + Files rail with the diff vs the default branch; no
+  // sessions and files with the diff vs the default branch; no
   // comments/drafts sections. Worktree still being created → loader.
   return (
     <div ref={paneRef} className="flex h-full min-h-0 min-w-0 flex-col">
@@ -330,14 +285,11 @@ export function ItemView({
         <PrWorkspace
           branch={branch}
           baseBranch={baseBranch}
-          sessionName={sessionName}
-          sessionEpoch={sessionEpoch}
+          ownSession={sessionName}
           running={running}
           busy={busy}
           onLaunch={onLaunchClick}
-          onStop={stop}
-          connectionBanner={connectionBanner}
-          inputDisabled={inputDisabled}
+          sessions={sessions}
         />
       ) : (
         <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-muted-foreground">
@@ -349,6 +301,7 @@ export function ItemView({
         </div>
       )}
       {dialog}
+      {terminalDialog}
     </div>
   );
 }

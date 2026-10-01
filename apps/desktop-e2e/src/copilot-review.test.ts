@@ -26,7 +26,7 @@ test('Desktop selects Copilot for a review and preserves its interactive prompt'
 }) => {
   const { page, repoPath } = desktop;
   await sidebarRow(page, /#42/).first().click();
-  await page.getByRole('button', { name: 'Launch agent', exact: true }).click();
+  await page.getByRole('button', { name: 'Launch Agent', exact: true }).click();
   const menu = sessionMenu(page);
   await menu.getByRole('radio', { name: 'Review', exact: true }).click();
   await menu.getByRole('combobox', { name: 'Agent' }).click();

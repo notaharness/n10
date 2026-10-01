@@ -93,6 +93,13 @@ vi.mock('./services/sessions.js', () =>
 vi.mock('./services/terminals.js', () =>
   recorder('terminals', ['launchTerminal', 'listTerminals', 'killTerminal'])
 );
+vi.mock('./services/branch-sessions.js', () =>
+  recorder('branchSessions', [
+    'listTerminals',
+    'listBranchSessions',
+    'launchBranchTerminal',
+  ])
+);
 vi.mock('./services/foreign-sessions.js', () =>
   recorder('foreignSessions', ['listForeignSessions'])
 );
@@ -280,8 +287,14 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     [{ kind: 'shell', cwd: '/x' }],
     'terminals.launchTerminal',
   ],
-  ['listTerminals', [], 'terminals.listTerminals'],
+  ['listTerminals', [], 'branchSessions.listTerminals'],
   ['killTerminal', ['n10-shell'], 'terminals.killTerminal'],
+  ['listBranchSessions', ['feature'], 'branchSessions.listBranchSessions'],
+  [
+    'launchBranchTerminal',
+    [{ branch: 'feature', machine: 'peer' }],
+    'branchSessions.launchBranchTerminal',
+  ],
 
   ['getDesktopPrefs', [], 'prefs.loadDesktopPrefs'],
 

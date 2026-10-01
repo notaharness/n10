@@ -48,6 +48,10 @@ vi.mock('@n10/vcs-core', () => ({
 
 vi.mock('@n10/core', () => ({
   isGitRepo: (cwd: string) => state.repoRoots.has(cwd),
+  // The remote machine has every directory asked for (the engine's spec
+  // covers resolving it there).
+  requireMachine: (id: string) => ({ id, executor: {} }),
+  directoryOnMachine: (cwd: string) => Promise.resolve(cwd),
   launchTerminalSession: async (spec: {
     name?: string;
     kind: string;

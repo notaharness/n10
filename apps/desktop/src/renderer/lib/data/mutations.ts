@@ -41,6 +41,8 @@ function useInvalidator(cwd: string) {
     sync: () => qc.invalidateQueries({ queryKey: keys.sync(cwd) }),
     branches: () => qc.invalidateQueries({ queryKey: keys.branches(cwd) }),
     sessions: () => qc.invalidateQueries({ queryKey: keys.sessions(cwd) }),
+    branchSessions: () =>
+      qc.invalidateQueries({ queryKey: keys.branchSessionsAll }),
     // A write to a thread changes the conversation the Overview reads
     // too; its entries are keyed by ref, so every one in this
     // repository goes, which is the pull request on screen.
@@ -188,6 +190,7 @@ export function useLaunchAgent(cwd: string) {
     onSuccess: () => {
       void inv.sidebar();
       void inv.sessions();
+      void inv.branchSessions();
     },
   });
 }
@@ -200,6 +203,7 @@ export function useLaunchReview(cwd: string) {
       void inv.sidebar();
       void inv.branches();
       void inv.sessions();
+      void inv.branchSessions();
     },
   });
 }
@@ -265,6 +269,7 @@ export function useKillSession(cwd: string) {
     onSuccess: () => {
       void inv.sidebar();
       void inv.sessions();
+      void inv.branchSessions();
     },
   });
 }

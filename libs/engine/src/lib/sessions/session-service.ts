@@ -3,10 +3,12 @@ import { createPlanCommands } from '../plans/api.js';
 import { createSessionConnections } from './session-connections.js';
 import { isDeepStrictEqual } from 'node:util';
 import {
+  canonicalWorktreePath,
   getSession,
   hasSessionConnection,
   isSessionAlive,
   launchSession,
+  LOCAL_MACHINE,
   onSessionExit,
   worktreeSessionRow,
 } from '@n10/core';
@@ -19,6 +21,16 @@ import type {
 import { logError } from '@n10/logger';
 import type { WorktreeConfig } from '../worktrees/api.js';
 import type { WorktreeService } from '../worktrees/api.js';
+import {
+  branchSessions,
+  remoteAgentCheckouts,
+  terminalBranch,
+} from './branch-sessions.js';
+import type {
+  AgentConnection,
+  BranchSessions,
+  BranchTerminal,
+} from './branch-sessions.js';
 import { createSessionCommands } from './session-commands.js';
 import type { SessionLaunchPorts } from './session-commands.js';
 import { startSessionDiscovery } from './session-discovery.js';
@@ -97,17 +109,58 @@ export function createSessionService(options: {
     });
     if (entry !== before) ports.started?.(wt.name, config.repo);
   }
+  /** Every checkout known here: this machine's linked worktrees (the
+   *  main checkout is the repository, not a branch's), remote ones
+   *  resolved this run, and those remote agents work in. */
+  function knownCheckouts(agents: readonly AgentConnection[]) {
+    const root = canonicalWorktreePath(config.repo);
+    const local = worktrees.getSnapshot().worktrees.flatMap((wt) => {
+      const path = canonicalWorktreePath(wt.path);
+      return wt.branch && path !== root
+        ? [{ machine: LOCAL_MACHINE, path, branch: wt.branch }]
+        : [];
+    });
+    return [
+      ...local,
+      ...commands.remoteCheckouts(),
+      ...remoteAgentCheckouts(agents),
+    ];
+  }
+  const commands = createSessionCommands({
+    ...options,
+    changed: publish,
+    isCurrent: () => !disposed && isCurrent(),
+  });
   return {
     ...createPlanCommands({
       config,
       isCurrent: () => !disposed && isCurrent(),
       changed: refresh,
     }),
-    ...createSessionCommands({
-      ...options,
-      changed: publish,
-      isCurrent: () => !disposed && isCurrent(),
-    }),
+    ...commands,
+    /** The agents and `terminals` working in `branch`'s checkouts. */
+    branchSessions(
+      branch: string,
+      terminals: readonly BranchTerminal[]
+    ): BranchSessions {
+      connections.observe();
+      const agents = connections.read(config.repo);
+      return branchSessions({
+        branch,
+        checkouts: knownCheckouts(agents),
+        agents,
+        terminals,
+      });
+    },
+    /** The branch whose checkout `terminal` is in: its review tab lists
+     *  it. Undefined for any other directory, the main checkout's too. */
+    terminalBranch(terminal: Pick<BranchTerminal, 'machine' | 'cwd'>) {
+      connections.observe();
+      return terminalBranch(
+        terminal,
+        knownCheckouts(connections.read(config.repo))
+      );
+    },
     getSnapshot: () => snapshot,
     subscribe(listener: () => void) {
       listeners.add(listener);

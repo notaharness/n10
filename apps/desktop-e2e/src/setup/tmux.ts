@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { basename, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 
 /**
  * Helpers for asserting on the tmux sessions the desktop app creates.
@@ -22,6 +22,14 @@ import { basename, resolve } from 'node:path';
  *  socket lives inside one, and `socketEnv` refuses any other dir. */
 const HOME_PREFIX = 'n10-desktop-e2e-home-';
 
+/** `dir` is a fixture temp home, or a peer machine's HOME inside one. */
+function inFixtureHome(dir: string): boolean {
+  for (let at = resolve(dir); at !== dirname(at); at = dirname(at)) {
+    if (basename(at).startsWith(HOME_PREFIX)) return true;
+  }
+  return false;
+}
+
 export function tmuxAvailable(): boolean {
   try {
     execFileSync('tmux', ['-V'], { stdio: 'ignore' });
@@ -31,7 +39,7 @@ export function tmuxAvailable(): boolean {
   }
 }
 
-/** The socket dir a tmux helper is about to use, proven to be one of
+/** The socket dir a tmux helper is about to use, proven to be in one of
  *  this run's throwaway homes.
  *
  *  Two things decide which tmux server a command reaches, and checking
@@ -59,9 +67,9 @@ export function socketEnv(tmuxTmpdir: string): NodeJS.ProcessEnv {
         "that is the developer's own tmux server"
     );
   }
-  if (!basename(tmuxTmpdir).startsWith(HOME_PREFIX)) {
+  if (!inFixtureHome(tmuxTmpdir)) {
     throw new Error(
-      `${tmuxTmpdir} is not a ${HOME_PREFIX}* temp home created by the fixture`
+      `${tmuxTmpdir} is not in a ${HOME_PREFIX}* temp home created by the fixture`
     );
   }
   const env: NodeJS.ProcessEnv = { ...process.env, TMUX_TMPDIR: tmuxTmpdir };
@@ -187,6 +195,29 @@ export function detachTmuxClients(name: string, tmuxTmpdir: string): void {
     stdio: 'ignore',
     env: socketEnv(tmuxTmpdir),
   });
+}
+
+/** The directory a session's process runs in and what its pane shows,
+ *  on the test's server (or a peer machine's, by its HOME). */
+export function paneOf(
+  name: string,
+  tmuxTmpdir: string
+): { cwd: string; text: string } {
+  const run = (args: string[]) =>
+    execFileSync('tmux', args, {
+      encoding: 'utf8',
+      env: socketEnv(tmuxTmpdir),
+    });
+  return {
+    cwd: run([
+      'display-message',
+      '-p',
+      '-t',
+      `=${name}:`,
+      '#{pane_current_path}',
+    ]).trim(),
+    text: run(['capture-pane', '-p', '-t', `=${name}:`]),
+  };
 }
 
 /** The pids of the clients attached to one session on the test's

@@ -3,6 +3,7 @@ import { log, logError } from '@n10/logger';
 import { listWorktrees, type WorktreeScope } from '@n10/worktree-manager';
 import {
   keyForWorktree,
+  LOCAL_MACHINE,
   sessionIdentity,
   hasSessionConnection,
   isSessionAlive,
@@ -153,15 +154,21 @@ export function startSessionDiscovery(
     );
     // A repo switch starts a fresh scanner, but terminal tabs are process-global.
     // Reconcile held terminal keys too, including final frames from an earlier scan.
+    // The scan sees this machine's tmux only: another machine's terminal
+    // ends when its own connection does.
     if (adoptTerminal) {
       const present = new Set(next.terminals.map((terminal) => terminal.name));
       delta.endedTerminals = [
         ...new Set([
           ...delta.endedTerminals,
-          ...sessionNames().filter(
-            (name) =>
-              sessionIdentity(name)?.kind === 'terminal' && !present.has(name)
-          ),
+          ...sessionNames().filter((name) => {
+            const identity = sessionIdentity(name);
+            return (
+              identity?.kind === 'terminal' &&
+              identity.machine === LOCAL_MACHINE &&
+              !present.has(name)
+            );
+          }),
         ]),
       ];
     }

@@ -59,10 +59,12 @@ import type {
   FleetResetOutcome,
   MachineGrant,
   MachineView,
+  BranchSessions,
 } from '@n10/engine/contract';
 // Terminal tabs — sessions bound to a directory rather than a worktree.
 export type * from './contract-terminals.js';
 import type {
+  BranchTerminalRequest,
   TerminalLaunchRequest,
   TerminalSummary,
 } from './contract-terminals.js';
@@ -492,6 +494,12 @@ export interface N10HostApi {
   listTerminals(): Promise<TerminalSummary[]>;
   /** Kill the terminal's session, on either backend, and forget it. */
   killTerminal(name: string): Promise<void>;
+  /** The agents and terminals working in `branch`'s checkouts of the
+   *  open repository, on every machine, and the machine a new terminal
+   *  opens on by default. */
+  listBranchSessions(branch: string): Promise<BranchSessions>;
+  /** Open a shell in the branch's checkout on the requested machine. */
+  launchBranchTerminal(req: BranchTerminalRequest): Promise<TerminalSummary>;
   /** PTY output of the sessions this window watches (`watchSession`).
    *  Returns an unsubscribe function. */
   onSessionData(cb: (payload: SessionDataEvent) => void): () => void;
@@ -616,6 +624,8 @@ export const IPC = {
   launchTerminal: 'n10/terminal/launch',
   listTerminals: 'n10/terminal/list',
   killTerminal: 'n10/terminal/kill',
+  listBranchSessions: 'n10/branch-sessions/list',
+  launchBranchTerminal: 'n10/branch-sessions/terminal',
   fetchCommentThreads: 'n10/reviews/comments',
   replyToThread: 'n10/reviews/reply',
   setThreadResolved: 'n10/reviews/resolve',

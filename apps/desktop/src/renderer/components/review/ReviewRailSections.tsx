@@ -1,99 +1,20 @@
 import {
-  BotIcon,
-  ChevronRightIcon,
   ClipboardCheckIcon,
   ClipboardListIcon,
   Loader2Icon,
-  PlayIcon,
   SendIcon,
-  SquareIcon,
 } from 'lucide-react';
 import type { ReviewComment } from '../../../host/contract.js';
 import { severityCounts } from '../../lib/diff/diff-model.js';
 import { formatSeverityBreakdown } from '../../lib/review/severity.js';
 import { cn } from '../../lib/utils.js';
 import { Button } from '../ui/button.js';
-import { Tip } from '../ui/tooltip.js';
 
 /**
  * The stacked entries at the top of the review rail. Each is its own
  * component because each appears on its own condition — there is no
  * order or state shared between them, only a column.
  */
-
-/**
- * A running agent is the rail's headline: a card that takes the reader
- * to its terminal, saying it is running, with Stop beside it. An idle
- * one is just the button that starts it.
- */
-export function AgentSection({
-  running,
-  busy,
-  hasSession,
-  agentActive,
-  onSelectAgent,
-  onLaunch,
-  onStop,
-}: {
-  running: boolean;
-  busy: boolean;
-  hasSession: boolean;
-  agentActive: boolean;
-  onSelectAgent: () => void;
-  onLaunch: () => void;
-  onStop: () => void;
-}) {
-  if (!running) {
-    return (
-      <Button className="w-full" size="sm" onClick={onLaunch} disabled={busy}>
-        <PlayIcon />{' '}
-        {busy ? 'Working…' : hasSession ? 'Relaunch agent' : 'Launch agent'}
-      </Button>
-    );
-  }
-  return (
-    <div
-      className={cn(
-        'flex items-stretch overflow-hidden rounded-md border transition-colors',
-        agentActive
-          ? 'border-primary bg-primary/10'
-          : 'border-border hover:bg-sidebar-accent'
-      )}
-    >
-      <button
-        type="button"
-        onClick={onSelectAgent}
-        aria-current={agentActive ? 'true' : undefined}
-        className="group flex min-w-0 flex-1 items-center gap-3 px-2.5 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
-      >
-        <span className="relative flex size-9 shrink-0 items-center justify-center rounded-md bg-success/15 text-success">
-          <BotIcon className="size-5" />
-          <span className="absolute -right-0.5 -bottom-0.5 flex size-2.5">
-            <span className="absolute inline-flex size-full rounded-full bg-success opacity-60 motion-safe:animate-ping" />
-            <span className="relative inline-flex size-2.5 rounded-full bg-success ring-2 ring-sidebar" />
-          </span>
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-base font-medium">Agent</span>
-          <span className="block truncate text-xs text-success">Running</span>
-        </span>
-        <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
-      </button>
-      <div className="flex items-center border-l border-border px-1">
-        <Tip label="Stop agent">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onStop}
-            aria-label="Stop agent"
-          >
-            <SquareIcon />
-          </Button>
-        </Tip>
-      </div>
-    </div>
-  );
-}
 
 /** The way in to the draft walkthrough, plus a post-everything escape. */
 export function ReviewReadySection({

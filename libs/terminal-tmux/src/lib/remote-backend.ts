@@ -83,13 +83,19 @@ export interface RemoteMachine {
 
 type ExitCallback = (code: number, signal?: number) => void;
 
-function sanitizedEnv(spec: SessionSpec): Record<string, string> {
+/** The terminal the attached tmux client draws for: the emulator on
+ *  this side, as the local PTY names it (terminal-pty's pty-session).
+ *  The far daemon's own environment may have no `TERM` at all (one a
+ *  service manager started), and tmux will not attach without one. */
+const ATTACH_TERM = 'xterm-256color';
+
+function attachEnv(spec: SessionSpec): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(spec.env ?? {})) {
     if (value != null && key !== 'TMUX' && key !== 'TMUX_PANE')
       env[key] = value;
   }
-  return env;
+  return { ...env, TERM: ATTACH_TERM };
 }
 
 const MAX_RECONNECT_ATTEMPTS = 3;
@@ -207,7 +213,7 @@ export class RemoteTmuxBackend implements SessionBackend {
       const handle = await this.machine.ptyOpener.open({
         argv: ['tmux', ...tmuxAttachArgs(this.name)],
         cwd: this.spec.cwd,
-        env: sanitizedEnv(this.spec),
+        env: attachEnv(this.spec),
         cols: this.width,
         rows: this.height,
         reconnect: this.transportSuspect,
@@ -386,7 +392,7 @@ export async function createRemoteTmuxBackend(
   const handle = await machine.ptyOpener.open({
     argv: ['tmux', ...tmuxAttachArgs(name)],
     cwd: spec.cwd,
-    env: sanitizedEnv(spec),
+    env: attachEnv(spec),
     cols: spec.cols,
     rows: spec.rows,
   });

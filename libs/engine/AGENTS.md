@@ -66,10 +66,15 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   Repository disposal stops observation, never the connected agents. Shells supply
   dimensions, relays and terminal-tab presentation. Core keeps pure observations,
   tags, PTY activity classification and native guarded launch/removal operations.
+  `branchSessions` (`branch-sessions.ts`) decides which agents and terminals
+  work in a branch's checkouts on any machine: this machine's linked worktrees
+  (never the main checkout), remote checkouts `checkoutOn` resolved, and those
+  remote agents were created for. A remote path stays in that machine's terms.
 
 - **Directory terminals** (`sessions/terminal-service.ts`): one process-wide
   instance owns launch coalescing and retained kind/directory identity. A restart
-  takes its machine from the qualified key. Never stat a remote directory locally.
+  takes its machine from the qualified key. Never stat a remote directory locally;
+  a fresh remote terminal opens where its machine resolves the directory (D18).
   An old client's exit cannot drop its successor; agent panes remain while their
   native target exists. Shells adapt started/ended callbacks to output delivery.
 

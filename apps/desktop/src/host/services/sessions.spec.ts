@@ -84,16 +84,10 @@ vi.mock('./repo.js', async () => {
     const repo = state.cwd;
     let sessions = handles.get(repo);
     if (!sessions) {
-      const create = (
-        branch: string,
-        remote?: { cwd: string; machine: { id: string } }
-      ) => {
-        const cwd = remote?.cwd ?? repo;
-        state.createWorktreeCalls.push({
-          branch,
-          cwd,
-          machine: remote?.machine,
-        });
+      // The engine resolves a remote machine's own clone (its spec).
+      const create = (branch: string, machine?: { id: string }) => {
+        const cwd = repo;
+        state.createWorktreeCalls.push({ branch, cwd, machine });
         if (state.createFails.has(branch))
           return Promise.reject(new Error(`git refused ${branch}`));
         return Promise.resolve(addCheckout(branch, cwd));

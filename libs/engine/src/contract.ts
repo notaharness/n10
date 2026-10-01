@@ -16,4 +16,6 @@ export type {
   ReadResource,
   ReadSnapshot,
   SyncNotice,
+  BranchSession,
+  BranchSessions,
 } from './index.js';

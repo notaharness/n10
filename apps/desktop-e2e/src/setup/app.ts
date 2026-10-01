@@ -164,6 +164,18 @@ export async function createWorktree(
   await row.waitFor({ state: 'visible', timeout: 30_000 });
 }
 
+/** The review rail's session cards, agents first. */
+export function sessionCards(page: Page): Locator {
+  return page.locator('[data-session-card]').filter({ visible: true });
+}
+
+/** The visible session card titled `title` (`Agent` or `Terminal`). */
+export function sessionCard(page: Page, title: 'Agent' | 'Terminal'): Locator {
+  return sessionCards(page).filter({
+    has: page.getByText(title, { exact: true }),
+  });
+}
+
 /** The session menu ("What would you like to do?"), once open. */
 export function sessionMenu(page: Page): Locator {
   return page.locator('[data-launch-dialog]');

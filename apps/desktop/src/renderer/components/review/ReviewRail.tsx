@@ -4,11 +4,9 @@ import { Button } from '../ui/button.js';
 import { ScrollArea } from '../ui/scroll-area.js';
 import { Tip } from '../ui/tooltip.js';
 import { FileTree, type FileEntry } from './diff/FileTree.js';
-import {
-  AgentSection,
-  PlanSection,
-  ReviewReadySection,
-} from './ReviewRailSections.js';
+import type { SessionCard } from '../../lib/review/session-cards.js';
+import { PlanSection, ReviewReadySection } from './ReviewRailSections.js';
+import { SessionsSection } from './SessionCards.js';
 
 /** What is left of the rail while it is hidden: the button back. */
 export function CollapsedRail({ onShow }: { onShow: () => void }) {
@@ -29,19 +27,20 @@ export function CollapsedRail({ onShow }: { onShow: () => void }) {
 }
 
 /**
- * The review rail: the agent, the review and plan when they have
+ * The review rail: the sessions, the review and plan when they have
  * something, and the files. The Overview is the top of the review
  * and where every Back leads, and it carries the conversation, so the
  * rail lists neither.
  */
 export function ReviewRail({
-  running,
-  busy,
-  hasSession,
-  agentActive,
-  onSelectAgent,
-  onLaunch,
-  onStop,
+  sessions,
+  shownSession,
+  agentBusy,
+  terminalBusy,
+  onOpenSession,
+  onLaunchAgent,
+  onLaunchTerminal,
+  onStopSession,
   onHide,
   drafts,
   reviewActive,
@@ -57,13 +56,15 @@ export function ReviewRail({
   selectedFile,
   onSelectFile,
 }: {
-  running: boolean;
-  busy: boolean;
-  hasSession: boolean;
-  agentActive: boolean;
-  onSelectAgent: () => void;
-  onLaunch: () => void;
-  onStop: () => void;
+  sessions: SessionCard[];
+  /** The session whose terminal the pane shows now, if any. */
+  shownSession: string | null;
+  agentBusy: boolean;
+  terminalBusy: boolean;
+  onOpenSession: (name: string) => void;
+  onLaunchAgent: () => void;
+  onLaunchTerminal: () => void;
+  onStopSession: (card: SessionCard) => void;
   onHide: () => void;
   drafts: ReviewComment[];
   reviewActive: boolean;
@@ -98,17 +99,16 @@ export function ReviewRail({
         </Tip>
       </div>
 
-      {/* Agent — a running row you can select to view the terminal, or
-          a launch button (opening the session/review menu) otherwise. */}
       <div className="shrink-0 border-b border-border px-2 pb-2">
-        <AgentSection
-          running={running}
-          busy={busy}
-          hasSession={hasSession}
-          agentActive={agentActive}
-          onSelectAgent={onSelectAgent}
-          onLaunch={onLaunch}
-          onStop={onStop}
+        <SessionsSection
+          cards={sessions}
+          activeName={shownSession}
+          agentBusy={agentBusy}
+          terminalBusy={terminalBusy}
+          onLaunchAgent={onLaunchAgent}
+          onLaunchTerminal={onLaunchTerminal}
+          onOpen={onOpenSession}
+          onStop={onStopSession}
         />
       </div>
 

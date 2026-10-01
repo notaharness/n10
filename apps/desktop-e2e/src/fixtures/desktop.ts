@@ -49,6 +49,9 @@ export interface DesktopOptions extends HomeSeed {
    * clone the shared sandbox repo once per file.
    */
   repoPathOverride?: string;
+  /** Create the test repo inside the app's HOME (`fixtureHome`), where
+   *  a path is home-relative, instead of a temp directory beside it. */
+  repoInHome?: boolean;
   /**
    * Hand the app a GitHub token. Its HOME is isolated, so the `gh` CLI
    * it authenticates through cannot see the developer's stored
@@ -116,6 +119,7 @@ export const test = base.extend<
   repo: [undefined, { option: true }],
   startWithoutRepo: [false, { option: true }],
   repoPathOverride: [undefined, { option: true }],
+  repoInHome: [false, { option: true }],
   githubToken: [undefined, { option: true }],
   drafts: [undefined, { option: true }],
   fakeGitHub: [undefined, { option: true }],
@@ -132,6 +136,7 @@ export const test = base.extend<
       repo,
       startWithoutRepo,
       repoPathOverride,
+      repoInHome,
       githubToken,
       drafts,
       fakeGitHub,
@@ -147,8 +152,14 @@ export const test = base.extend<
     provide,
     testInfo
   ) => {
-    const ownsRepo = !repoPathOverride;
-    const repoPath = repoPathOverride ?? createTestRepo(repo ?? {});
+    // A repo in the fixture HOME goes with it.
+    const ownsRepo = !repoPathOverride && !repoInHome;
+    const repoPath =
+      repoPathOverride ??
+      createTestRepo({
+        ...repo,
+        ...(repoInHome ? { parent: fixtureHome } : {}),
+      });
     const homeDir = fixtureHome;
     const ghEnv = seedHome(homeDir, repoPath, {
       n10Config,

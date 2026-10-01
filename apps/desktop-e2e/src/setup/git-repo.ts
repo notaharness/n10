@@ -60,6 +60,9 @@ export interface TestRepoOptions {
    * otherwise every run differs by the tempdir's random suffix.
    */
   name?: string;
+  /** Create the repo (named `name`, else `repo`) in this directory
+   *  rather than a random temp parent. The caller owns the directory. */
+  parent?: string;
   /** Extra branches to create off the initial commit. */
   branches?: string[];
   /** Files committed on main before anything branches, path →
@@ -78,10 +81,19 @@ export interface TestRepoOptions {
   worktrees?: TestRepoWorktree[];
 }
 
+/** The new repo's directory: `name` in `parent`, else in (or as) a
+ *  random temp parent. */
+function repoDir(opts: TestRepoOptions): string {
+  const parent = opts.parent ?? mkdtempSync(join(tmpdir(), 'n10-desktop-e2e-'));
+  const name = opts.name ?? (opts.parent ? 'repo' : undefined);
+  if (!name) return parent;
+  const dir = join(parent, name);
+  mkdirSync(dir);
+  return dir;
+}
+
 export function createTestRepo(opts: TestRepoOptions = {}): string {
-  const parent = mkdtempSync(join(tmpdir(), 'n10-desktop-e2e-'));
-  const dir = opts.name ? join(parent, opts.name) : parent;
-  if (opts.name) mkdirSync(dir);
+  const dir = repoDir(opts);
   git(dir, ['init', '-q', '-b', 'main']);
   git(dir, ['config', 'user.email', 'test@n10.dev']);
   git(dir, ['config', 'user.name', 'n10 Test']);
