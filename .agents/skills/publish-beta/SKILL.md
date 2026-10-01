@@ -1,42 +1,68 @@
 ---
 name: publish-beta
-description: Publish the n10 npm package at a new beta version. Use only when the user requests a release.
+description: Release the n10 npm package at a new version. Use only when the user requests a release.
 disable-model-invocation: true
 ---
 
-# Publish a beta
+# Release n10
 
-Publish only when the user asks. n10 is one package, `@notaharness/n10`
-(`apps/cli`), which carries the desktop app too.
+Release only when the user asks. n10 is one package, `@notaharness/n10`
+(`apps/cli`), which carries the desktop app too. Pushing a `vX.Y.Z` tag runs
+`.github/workflows/release.yml`, which tests the packed package, publishes it
+through npm trusted publishing and creates the GitHub release. Nothing is
+published from a local machine; no npm login or token is involved.
 
-1. Check the worktree and the current version in `apps/cli/package.json`
-   against `npm view @notaharness/n10 versions --json`. If that version is
-   unpublished, release it as is; otherwise choose the next `-beta.N`.
-2. Verify `npm whoami` identifies an account with access to the scope.
-3. When the version changes, update it in `apps/cli/package.json` and its
-   lockfile entry. Review the diff, run the relevant checks, and commit the
-   version bump. The private workspace packages keep `0.0.1`.
-4. Run the Nx target, which builds the CLI and the desktop, prepares the
-   publishable `dist`, publishes with `--tag beta`, then moves `latest` via
-   `apps/cli/scripts/dist-tag-latest.mjs`:
+| Tag             | npm dist-tag                                     | GitHub release |
+| --------------- | ------------------------------------------------ | -------------- |
+| `v1.0.0-beta.2` | `beta`, and `latest` while `LATEST_FOLLOWS_BETA` | prerelease     |
+| `v1.0.0`        | `latest`                                         | release        |
+
+Any version with a `-` is a prerelease. `LATEST_FOLLOWS_BETA`, at the top of
+`release.yml`, is `true` while n10 is beta-only, so a plain install gets the
+newest beta. Set it to `false` at 1.0, so `latest` stays on stable releases.
+
+1. Choose the version. Compare `apps/cli/package.json` with
+   `npm view @notaharness/n10 versions --json`; for a beta, take the next
+   `-beta.N`. The private workspace packages keep `0.0.1`.
+2. Bump it on an up-to-date `master`. This updates `apps/cli/package.json`
+   and its lockfile entry:
 
    ```sh
-   npx nx run cli:publish
+   npm version 1.0.0-beta.2 --no-git-tag-version -w apps/cli
+   git commit -am "chore(cli): release 1.0.0-beta.2"
    ```
 
-5. Verify the `beta` and `latest` tags point to the chosen version:
+3. Tag the bump and push both:
+
+   ```sh
+   git tag v1.0.0-beta.2
+   git push --atomic origin master v1.0.0-beta.2
+   ```
+
+   The workflow fails before building when the tag does not match
+   `apps/cli/package.json`.
+
+4. Watch the run (`gh run watch`), then verify the dist-tag and the release:
 
    ```sh
    npm view @notaharness/n10 dist-tags --json
+   gh release view v1.0.0-beta.2
    ```
 
-If a step fails, inspect published versions and tags before retrying; do not
-republish an existing version.
+To rehearse a release, `gh workflow run release.yml` on `master` runs the
+build, the install test and `npm publish --dry-run`, without the GitHub
+release. It cannot check the trusted publisher, which admits only tags.
 
-To try the package before publishing, `npx nx run cli:prepare-publish`, then
-`npm pack` in `apps/cli/dist` and install the tarball into a scratch prefix
-(`npm install -g --prefix <dir> <tarball>`). `cli:install-global` installs it
-into your own global prefix.
+If a job fails, re-run the failed jobs (`gh run rerun <run-id> --failed`).
+When `publish` fails at a trusted-publisher check, nothing was published: fix
+the publisher on npmjs.com first. A re-run of `publish` after the version
+reached npm skips the publish and finishes the dist-tags, and
+`github-release`, which needs `publish`, then runs.
+
+To try the package locally, `npx nx run cli:prepare-publish`, `npm pack` in
+`apps/cli/dist`, then `apps/cli/scripts/test-installed.sh <tarball>`, the
+check CI runs. `cli:install-global` installs it into your own global prefix.
 
 Read [packaging notes](references/packaging.md) when changing publish preparation,
-runtime dependencies, global installation, or agent-review command availability.
+the release workflow, runtime dependencies, global installation, or
+agent-review command availability.

@@ -38,8 +38,43 @@ supplies globally. Desktop sessions reach it through a shim in the desktop
 bundle (decisions.md D16), so drafting works where no `n10` is on a session's
 PATH and matches the running app's version.
 
-## Tags
+## Install test
 
-Publish with `beta`, then move `latest` to the same version using
-`apps/cli/scripts/dist-tag-latest.mjs`. This keeps installs with and without `@beta`
-consistent. Verify both tags after releasing.
+`apps/cli/scripts/test-installed.sh` installs a packed tarball into a scratch
+global prefix and runs the CLI, the TUI and the desktop under Xvfb.
+`.github/workflows/package.yml` runs it in a clean `node:24` container on pull
+requests that touch packaging, and as the release gate.
+
+## Release workflow
+
+`.github/workflows/release.yml` runs on a `v*` tag, which must equal
+`apps/cli/package.json`'s version. The `publish` job publishes the tarball the
+Package workflow tested, through npm trusted publishing (OIDC) with
+provenance. A stable version goes under the `latest` dist-tag and a
+prerelease under `beta`. While the workflow's `LATEST_FOLLOWS_BETA` is
+`true`, a prerelease then moves `latest` to itself with `npm dist-tag add`,
+so plain installs get the newest beta during the beta-only period. Once it is
+`false`, `latest` stays on the last stable release. `npm dist-tag`
+authenticates through trusted publishing from npm 11.21.0, which the job
+installs, and only when the trusted publisher allows npm dist-tag.
+
+The trusted publisher on npmjs.com names this repository, `release.yml`
+and the `npm` environment, whose deployment rule admits only `v*` tags;
+renaming the workflow file or the environment breaks publishing until it is
+updated there. Before publishing, `publish` checks both permissions, so a
+misconfigured publisher fails before the version is spent. `npm publish
+--dry-run` at verbose level performs the OIDC exchange, and the job fails
+unless npm logs that it succeeded. When it will move `latest`, it also adds
+and removes a `release-check` dist-tag on the current `latest`: npm checks
+the dist-tag permission only when a tag changes, and `dist-tag add` sends
+nothing when the tag already has the version. A dispatched rehearsal runs
+`npm publish --dry-run` in its own job, outside that environment, so it
+checks neither.
+
+`publish` can be re-run: when the version is already on npm, it skips the
+OIDC check and the publish and only sets the dist-tags.
+
+The `github-release` job creates the GitHub release with generated notes,
+marked as a prerelease for a prerelease version, and attaches every artifact
+named `release-*` from the run. Jobs that build release assets upload under
+that prefix and join its `needs`.
