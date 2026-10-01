@@ -505,8 +505,7 @@
   }
 }
 
-/* Runs by default, holds still under reduced motion, and the figure's
- * button overrides either through data-playing. */
+/* Runs by default and holds still under reduced motion. */
 .n10-mesh {
   --n10-mesh-play: running;
 }
@@ -515,14 +514,6 @@
   .n10-mesh {
     --n10-mesh-play: paused;
   }
-}
-
-.n10-mesh[data-playing='true'] {
-  --n10-mesh-play: running;
-}
-
-.n10-mesh[data-playing='false'] {
-  --n10-mesh-play: paused;
 }
 
 /* The beam page's closing panel: the same isometric ground as its hero,
@@ -575,14 +566,6 @@
   .orchestra-stage {
     --orchestra-play: paused;
   }
-}
-
-.orchestra-stage[data-playing='true'] {
-  --orchestra-play: running;
-}
-
-.orchestra-stage[data-playing='false'] {
-  --orchestra-play: paused;
 }
 
 .orchestra-pool {

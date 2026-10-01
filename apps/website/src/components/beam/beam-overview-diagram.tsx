@@ -1,204 +1,111 @@
-import { ScrollFigure } from '@/components/scroll-figure';
-/**
- * The core pitch in one picture: today an agent only runs where you're
- * sitting; with beam, a second machine holds the same two boxes (tmux,
- * the agent) and one connection joins them. Colours come from the
- * fd-* tokens directly (not Tailwind classes) so the SVG repaints for
- * dark mode the same way the rest of the page does.
- */
-export function BeamOverviewDiagram() {
+import { BeamSectionRow } from './beam-section-row';
+import { BeamFigure } from './beam-figure';
+import { Browser, Key, Label, Lock, Track } from './beam-drawing';
+import { Laptop, Rack } from './mesh/machines';
+import { BEAM_COLORS } from './mesh/palette';
+
+function DirectoryDrawing() {
   return (
-    <div className="n10-frame bg-fd-card mx-auto w-full max-w-3xl rounded-xl p-4 sm:p-6">
-      <ScrollFigure minWidth={560}>
-        <svg
-          viewBox="0 0 640 220"
-          className="h-auto w-full"
-          role="img"
-          aria-label="Your laptop runs n10 or Orchestra with tmux and your agent. Beam connects it to another machine in your fleet, where the beam daemon runs tmux and another agent."
-        >
-          <defs>
-            <marker
-              id="beam-ov-arrow"
-              viewBox="0 0 10 10"
-              refX="9"
-              refY="5"
-              markerWidth="6"
-              markerHeight="6"
-              orient="auto-start-reverse"
-            >
-              <path
-                d="M0 0L10 5L0 10z"
-                fill="var(--color-fd-muted-foreground)"
-              />
-            </marker>
-          </defs>
+    <BeamFigure label="The worker stores encrypted records and serves the approval page, which receives the directory secret">
+      <Track d="M100 160H300" color={BEAM_COLORS.blue} />
+      <path
+        d="M300 83V135"
+        stroke="var(--color-fd-border)"
+        strokeWidth={1.5}
+        strokeDasharray="4 5"
+      />
+      <g transform="translate(70 170)">
+        <Laptop cx={0} cy={0} />
+      </g>
+      <g transform="translate(300 175) scale(.8)">
+        <Rack cx={0} cy={0} />
+      </g>
+      <Browser x={300} y={58} />
+      <Key x={340} y={58} />
+      <Lock x={190} y={145} />
+      <Label x={113} y={54}>
+        Approval page
+      </Label>
+      <path d="M180 50H264" stroke="var(--color-fd-border)" />
+      <Label x={113} y={77} muted>
+        Receives PRF output
+      </Label>
+      <Label x={70} y={217}>
+        Machine
+      </Label>
+      <Label x={300} y={217}>
+        Worker
+      </Label>
+      <Label x={187} y={119} muted>
+        Encrypted records
+      </Label>
+    </BeamFigure>
+  );
+}
 
-          <rect
-            x="16"
-            y="16"
-            width="220"
-            height="188"
-            rx="14"
-            fill="none"
-            stroke="var(--color-fd-border)"
-            strokeWidth="1.5"
-          />
-          <text
-            x="126"
-            y="40"
-            textAnchor="middle"
-            fontSize="13"
-            fontWeight="600"
-            fill="var(--color-fd-foreground)"
-          >
-            Your laptop
-          </text>
-          <rect
-            x="36"
-            y="60"
-            width="180"
-            height="40"
-            rx="8"
-            fill="var(--color-fd-background)"
-            stroke="var(--color-fd-border)"
-          />
-          <text
-            x="126"
-            y="84"
-            textAnchor="middle"
-            fontSize="12"
-            fill="var(--color-fd-foreground)"
-          >
-            n10 or Orchestra
-          </text>
-          <line
-            x1="126"
-            y1="100"
-            x2="126"
-            y2="126"
-            stroke="var(--color-fd-muted-foreground)"
-            markerEnd="url(#beam-ov-arrow)"
-          />
-          <rect
-            x="36"
-            y="130"
-            width="180"
-            height="40"
-            rx="8"
-            fill="var(--color-fd-background)"
-            stroke="var(--color-fd-border)"
-          />
-          <text
-            x="126"
-            y="154"
-            textAnchor="middle"
-            fontSize="12"
-            fill="var(--color-fd-foreground)"
-          >
-            tmux + your agent
-          </text>
+function RelayDrawing() {
+  return (
+    <BeamFigure label="Machines connect directly through tailcat, with Tailscale relays as a fallback">
+      <Track d="M70 155H330" />
+      <Track d="M70 145L200 80L330 145" color={BEAM_COLORS.blue} pending />
+      <g transform="translate(65 160) scale(.9)">
+        <Laptop cx={0} cy={0} />
+      </g>
+      <g transform="translate(200 95) scale(.6)">
+        <Rack cx={0} cy={0} />
+      </g>
+      <g transform="translate(335 160) scale(.9)">
+        <Laptop cx={0} cy={0} />
+      </g>
+      <Lock x={200} y={144} />
+      <Label x={200} y={30}>
+        Tailscale relay
+      </Label>
+      <Label x={65} y={204}>
+        Machine A
+      </Label>
+      <Label x={335} y={204}>
+        Machine B
+      </Label>
+      <Label x={200} y={119} muted>
+        Fallback
+      </Label>
+      <Label x={200} y={190}>
+        Direct
+      </Label>
+    </BeamFigure>
+  );
+}
 
-          <rect
-            x="404"
-            y="16"
-            width="220"
-            height="188"
-            rx="14"
-            fill="none"
-            stroke="var(--color-fd-primary)"
-            strokeWidth="1.5"
-            strokeDasharray="5 4"
-          />
-          <text
-            x="514"
-            y="40"
-            textAnchor="middle"
-            fontSize="13"
-            fontWeight="600"
-            fill="var(--color-fd-foreground)"
-          >
-            A machine in your fleet
-          </text>
-          <rect
-            x="424"
-            y="60"
-            width="180"
-            height="40"
-            rx="8"
-            fill="var(--color-fd-background)"
-            stroke="var(--color-fd-border)"
-          />
-          <text
-            x="514"
-            y="84"
-            textAnchor="middle"
-            fontSize="12"
-            fill="var(--color-fd-foreground)"
-          >
-            beam daemon
-          </text>
-          <line
-            x1="514"
-            y1="100"
-            x2="514"
-            y2="126"
-            stroke="var(--color-fd-muted-foreground)"
-            markerEnd="url(#beam-ov-arrow)"
-          />
-          <rect
-            x="424"
-            y="130"
-            width="180"
-            height="40"
-            rx="8"
-            fill="var(--color-fd-background)"
-            stroke="var(--color-fd-border)"
-          />
-          <text
-            x="514"
-            y="154"
-            textAnchor="middle"
-            fontSize="12"
-            fill="var(--color-fd-foreground)"
-          >
-            tmux + another agent
-          </text>
-
-          <line
-            x1="238"
-            y1="120"
-            x2="402"
-            y2="120"
-            stroke="var(--color-fd-primary)"
-            strokeWidth="2.5"
-            markerEnd="url(#beam-ov-arrow)"
-            markerStart="url(#beam-ov-arrow)"
-          />
-          <rect
-            x="270"
-            y="106"
-            width="100"
-            height="24"
-            rx="12"
-            fill="var(--color-fd-background)"
-            stroke="var(--color-fd-primary)"
-          />
-          <text
-            x="320"
-            y="122"
-            textAnchor="middle"
-            fontSize="11"
-            fontFamily="var(--font-mono, monospace)"
-            fill="var(--color-fd-primary)"
-          >
-            beam
-          </text>
-        </svg>
-      </ScrollFigure>
-      <p className="text-fd-muted-foreground mt-4 text-center text-sm">
-        Beam connects the machines. Your tmux sessions, worktrees and agents
-        work there as they do on your laptop.
+export function BeamDirectory() {
+  return (
+    <BeamSectionRow
+      title="Directory and approval page"
+      illustrationSide="left"
+      illustration={<DirectoryDrawing />}
+    >
+      <p className="text-fd-muted-foreground mt-4 leading-relaxed">
+        The worker stores ciphertext and sees request metadata. It also serves
+        the approval page. One approval on a hostile page or someone else’s link
+        exposes permanent directory read access and one chosen statement. That
+        can add an attacker’s machine with a shell on every member.
       </p>
-    </div>
+    </BeamSectionRow>
+  );
+}
+
+export function BeamNetworking() {
+  return (
+    <BeamSectionRow
+      title="Connecting through Tailscale"
+      illustration={<RelayDrawing />}
+    >
+      <p className="text-fd-muted-foreground mt-4 leading-relaxed">
+        Tailscale’s tailcat library connects your machines directly peer-to-peer
+        when possible. Tailscale’s relays provide a fallback when a direct
+        connection is unavailable. You do not need to set up a VPN or open
+        ports. Beam configures the tunnels.
+      </p>
+    </BeamSectionRow>
   );
 }

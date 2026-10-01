@@ -1,28 +1,119 @@
 ---
 title: Beam
-description: Pool the machines you own, then open shells, run commands and send messages between them.
+description: Passkey-controlled access to your machines, with transport from Tailscale’s tailcat library.
 ---
 
-Beam pools the machines you own into a fleet. From any machine in the fleet
-you can open a shell on another, run a command there, or send a message that
-waits until the other machine is online. n10 Desktop uses it to run agents on
-your other machines.
+Beam connects one person’s machines using [tailcat](https://github.com/tailscale/tailcat),
+Tailscale’s transport library. Members can open shells on each other and exchange
+messages. n10 Desktop uses Beam to run agents on your other machines.
 
-Machines connect over encrypted tunnels built with
-[tailcat](https://github.com/tailscale/tailcat), no Tailscale account needed.
-One passkey signs every machine into the fleet, and machines find each other
-through an encrypted directory at [beam.n10.is](https://beam.n10.is). Shells,
-commands and messages travel through the tunnels, never through beam.n10.is.
-When two machines can't connect directly, the tunnel goes through an
-encrypted relay.
+## How membership works
 
-Beam is in beta. The source, the full command reference and the trust model
-are at [github.com/notaharness/beam](https://github.com/notaharness/beam).
+Each machine generates a node key and keeps its private key on disk. A passkey
+scoped to `beam.n10.is` signs a WebAuthn assertion for each membership or
+revocation statement. The passkey provider keeps the signing key. The assertion’s
+challenge commits to the statement,
+including a joining machine’s public key, address and label. Before accepting
+streams, a peer verifies the assertion and a proof that the machine holds the
+matching node key. It checks its stored revocations and pins verified members
+locally. Connections need no directory lookup.
+
+The passkey’s PRF extension supplies a secret. Beam derives a directory encryption
+key and read token from it using HKDF-SHA256. Machines cache both locally and
+encrypt signed membership and revocation records with XChaCha20-Poly1305 before
+uploading them.
+
+## Who can read what
+
+Fleet machines can decrypt the directory’s addresses and labels. The machines at
+each end of a connection can read its shell traffic and messages.
+
+The Cloudflare Worker at [beam.n10.is](https://beam.n10.is) stores encrypted
+records and checks a passkey assertion before each append. It sees fleet IDs,
+statement hashes, assertions, request IPs, sizes and timing. **The same worker
+serves the passkey approval page.** That page receives the PRF output from which
+the directory key and read token are derived. Whoever controls the worker can
+change the page and capture directory read access at your next approval.
+
+The approval page seals its result to the initiating machine with HPKE and
+returns it through a one-time worker slot. The slot holds ciphertext. This
+protects the result in transit, but the page sees the result before sealing it.
+
+## Approving a request
+
+A hostile approval page, or an approval link someone else created, gets permanent
+directory read access from one approval. It can read every machine’s address and
+label for as long as the fleet exists. It also gets a signature over one statement
+of its choosing, which can add an attacker’s machine with a shell on every member
+under the default grant. That approval does not let it sign later statements.
+
+At a machine’s first enrolment, a hostile page can substitute the fleet root that
+the machine pins. An attacker holding that root can authorize further machines
+in the substituted fleet.
+
+Approve only requests you started. Compare the action, machine name and machine
+fingerprint on the approval page with your terminal. Keep the QR code private:
+anyone who sees it can answer first. At first enrolment this can put the machine
+in their fleet. Compare the new machine’s fleet fingerprint with `beam status`
+on an existing member. If they differ, reset the new machine with
+`beam fleet reset`.
+
+## Revoking a machine
+
+Once the approved result returns, revocation applies locally and spreads to
+connected peers. Offline peers learn it when they reconnect. The worker can
+withhold records, so a fresh machine may admit a revoked key until it learns
+otherwise. There is no per-connection freshness authority.
+
+A revoked machine retains the directory key and read token, with read access to
+all entries for the fleet’s lifetime. It also keeps the addresses needed to
+complete transport handshakes. Peers that know the revocation close those
+connections at admission. Beam accepts the remaining transport resource cost.
+
+## Access between members
+
+By default, a member can open a shell as the daemon’s user on every other member.
+Per-machine grants restrict what a peer can open on the receiving machine. If a
+member is compromised and used before you revoke it, the attacker may copy other
+members’ node keys through shell access. Revoking the compromised machine’s key
+does not evict an attacker holding those other keys. Start a new fleet to recover.
+
+## Worker and domain availability
+
+Every approval returns through the worker’s slot. An outage stops `beam init`,
+`beam join` and `beam revoke`, including local revocation. Established tunnels,
+shells and message delivery keep working without the worker. A starting daemon
+cannot learn revocations from an unavailable directory.
+
+Passkeys are bound to `beam.n10.is`. If the domain is lost, existing fleets cannot
+add or remove machines. A self-hosted worker on another domain cannot use those
+credentials. Losing the passkey without a synced copy also requires a new fleet.
+
+## Transport and relays
+
+Tailscale’s tailcat library uses WireGuard underneath. It connects members
+directly where possible and through DERP relays otherwise. Beam does not require
+a Tailscale account or connect to your Tailscale tailnet.
+
+The default relays are Tailscale’s public tailcat fleet. They log metadata, impose
+rate limits and have no SLA. They see endpoint IPs, public keys, packet sizes and
+timing. They cannot decrypt tunnel contents or approve membership. They can delay
+or drop packets. Use `beam daemon --derp-map URL` to select your own relay map.
+Changing a machine’s relay map requires `beam join` again because the signed
+address includes relay coordinates.
+
+The directory worker carries no tunnel traffic. Messages stay on the sender’s
+disk until the recipient acknowledges storing them. The sender retries delivery
+on the tunnel it dials to the recipient; both daemons must be connected. The
+recipient stores the message until an application takes it.
+
+Beam is in beta. See its [full trust model](https://github.com/notaharness/beam/blob/main/docs/01-model.md)
+and [transport documentation](https://github.com/notaharness/beam/blob/main/docs/03-transport.md).
 
 ## Install
 
-n10 Desktop includes Beam for its [Fleet section](/docs/guides/fleet), so you
-don't need Beam to use Fleet. The `beam` command is on the `PATH` only in
+n10 Desktop includes Beam for its [Fleet section](/docs/guides/fleet), so no
+separate Beam install is needed for Fleet. The `beam` command is on the `PATH` only in
 terminals and sessions n10 Desktop starts. Install it yourself to use `beam`
 from any shell, or on machines without n10 Desktop, such as a headless build
 box. It runs on macOS and Linux, arm64 and x64.
@@ -34,13 +125,13 @@ browser or on your phone.
 npm install -g @notaharness/beam
 ```
 
-## Use it
+## Creating a fleet and connecting
 
 Create the fleet on your first machine, then join each of the others:
 
 ```sh
 beam init --label laptop     # on the first machine: two passkey prompts
-beam join --label buildbox   # on every other machine: one passkey prompt
+beam join --label mac-mini-home   # on every other machine: one passkey prompt
 ```
 
 Each prompt opens a browser, or on a headless machine draws a QR code to scan
@@ -52,14 +143,14 @@ Then, from any machine:
 
 ```sh
 beam peers                                   # the fleet and who is online
-beam connect buildbox                        # a shell on buildbox
-beam exec buildbox -- uname -a               # one command, with its exit code
-beam msg send buildbox --topic jobs 'ready'  # delivered now, or when buildbox connects
-beam msg listen --topic jobs                 # on buildbox: print incoming messages
+beam connect mac-mini-home                        # a shell on mac-mini-home
+beam exec mac-mini-home -- uname -a               # one command, with its exit code
+beam msg send mac-mini-home --topic jobs 'ready'  # delivered now, or when mac-mini-home connects
+beam msg listen --topic jobs                 # on mac-mini-home: print incoming messages
 ```
 
 A shell ends when the connection does, so run long-lived work in tmux:
-`beam connect buildbox -- tmux new-session -A -s agents`.
+`beam connect mac-mini-home -- tmux new-session -A -s agents`.
 
 By default every machine in the fleet can run commands as you on every
 other. Run `beam --help` for every command, including limiting and revoking

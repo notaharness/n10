@@ -7,8 +7,8 @@ const INSTALL = 'npm install -g @notaharness/beam';
 
 export function BeamCta() {
   return (
-    <section className="mx-auto w-full max-w-5xl px-4 pt-8 pb-24">
-      <div className="border-fd-border bg-fd-card relative overflow-hidden rounded-2xl border px-6 py-16 text-center">
+    <section className="mx-auto w-full max-w-6xl px-4">
+      <div className="border-fd-border bg-fd-card relative overflow-hidden rounded-2xl border px-6 py-16 text-center sm:py-20">
         <div
           aria-hidden
           className="n10-beam-panel-spectrum absolute inset-x-[10%] -top-16 h-32"
@@ -16,18 +16,25 @@ export function BeamCta() {
         <div aria-hidden className="n10-beam-panel-grid absolute inset-0" />
         <div className="relative">
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Try Beam
+            Install Beam
           </h2>
-          <div className="n10-frame bg-fd-background mx-auto mt-6 flex max-w-md items-center gap-2 rounded-lg py-1.5 pr-1.5 pl-4">
+          <div className="n10-frame bg-fd-background mx-auto mt-4 flex max-w-md items-center gap-2 rounded-lg py-1.5 pr-1.5 pl-4">
             <code className="min-w-0 flex-1 text-left font-mono text-sm">
               <span className="text-fd-primary/70 select-none">$&nbsp;</span>
               {wrapAtSpaces(INSTALL)}
             </code>
             <CopyButton text={INSTALL} label="Copy the Beam install command" />
           </div>
-          <p className="text-fd-muted-foreground mx-auto mt-5 max-w-md text-sm text-pretty">
-            Beam is in early beta. Open an issue if its behaviour does not match
-            the docs.
+          <p className="text-fd-muted-foreground mx-auto mt-4 max-w-md text-sm text-pretty">
+            Beam is a Go binary for macOS and Linux. n10 Desktop includes it in
+            the{' '}
+            <Link
+              href="/docs/guides/fleet"
+              className="underline underline-offset-4"
+            >
+              Fleet section
+            </Link>{' '}
+            to run agents on your other machines.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link href="/docs/beam" className={buttonVariants()}>

@@ -42,7 +42,7 @@ fingerprint as n10 before you approve. Each link expires after five minutes.
 
   ```sh
   npm install -g @notaharness/beam
-  beam join --label buildbox
+  beam join --label mac-mini-home
   ```
 
 After joining, compare the fleet fingerprint on the new machine with the one
@@ -55,7 +55,7 @@ join again.
 
 With a second machine in the fleet, the launch dialog and the new-terminal
 dialog get a **Machine** selector, and the command palette gets
-**Open terminal on buildbox** for each connected machine.
+**Open terminal on mac-mini-home** for each connected machine.
 
 The worktree, the tmux session and the agent all run on the machine you
 pick, for a new branch or an existing one, and the terminal shows up in n10 like any other. That machine needs:
@@ -89,7 +89,7 @@ describes.
 
 ## Revoke a machine, or start over
 
-Choose **Revoke buildbox…** from a machine's menu. A dialog opens; approve
+Choose **Revoke mac-mini-home…** from a machine's menu. A dialog opens; approve
 its one passkey prompt. The fleet stops accepting that machine for good. Revoking doesn't
 erase anything on it.
 
