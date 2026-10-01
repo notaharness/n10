@@ -1,5 +1,6 @@
 import xtermHeadless from '@xterm/headless';
 import type { IDisposable } from '@xterm/headless';
+import { ThemeReports, type TerminalColors } from './theme-reports.js';
 
 const { Terminal } = xtermHeadless;
 
@@ -12,6 +13,8 @@ export type MouseTrackingMode = 'none' | 'x10' | 'vt200' | 'drag' | 'any';
 export class TerminalEmulator {
   private terminal: InstanceType<typeof Terminal>;
   private renderDisposables = new Map<() => void, IDisposable>();
+  private replyListeners = new Set<(data: string) => void>();
+  private themeReports: ThemeReports;
   private disposed = false;
 
   constructor(cols = 80, rows = 24) {
@@ -20,6 +23,22 @@ export class TerminalEmulator {
       rows,
       allowProposedApi: true,
     });
+    this.themeReports = new ThemeReports(this.terminal, (data) => {
+      for (const listener of this.replyListeners) listener(data);
+    });
+  }
+
+  /** The colours the renderer paints with, which programs asking for
+   *  them are told (`ThemeReports`); `null` answers nothing. */
+  setThemeColors(colors: TerminalColors | null): void {
+    this.themeReports.set(colors);
+  }
+
+  /** What this terminal answers the program it runs, for the caller to
+   *  write to its input. */
+  onReply(cb: (data: string) => void): () => void {
+    this.replyListeners.add(cb);
+    return () => this.replyListeners.delete(cb);
   }
 
   write(data: string): Promise<void> {
@@ -166,6 +185,8 @@ export class TerminalEmulator {
       disposable.dispose();
     }
     this.renderDisposables.clear();
+    this.replyListeners.clear();
+    this.themeReports.dispose();
     this.terminal.dispose();
   }
 }

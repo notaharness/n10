@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { IPC } from '../host/contract.js';
+import { IPC, type ResolvedTheme } from '../host/contract.js';
 import type { HostToMain, MainToHost } from './host-protocol.js';
 import { FIRST_DELAY_MS, MAX_DELAY_MS, MAX_RESTARTS } from './host-restarts.js';
 
@@ -56,6 +56,8 @@ const call = () =>
     sender: { id: 1 },
   }) as Promise<unknown>;
 
+let theme: ResolvedTheme = 'light';
+
 function start(
   shell: Partial<Parameters<typeof startHostProcess>[0]['shell']> = {}
 ) {
@@ -72,6 +74,7 @@ function start(
       ...shell,
     },
     pushes: { broadcast: () => undefined, sendTo: () => undefined },
+    theme: () => theme,
     onRespawn,
     onFailed,
   });
@@ -80,6 +83,7 @@ function start(
 
 beforeEach(() => {
   vi.useFakeTimers();
+  theme = 'light';
   electron.forks = [];
   electron.handlers.clear();
 });
@@ -116,6 +120,26 @@ describe('the session host process', () => {
     expect(onFailed).toHaveBeenCalledOnce();
     await vi.advanceTimersByTimeAsync(MAX_DELAY_MS * 4);
     expect(hosts()).toHaveLength(1 + MAX_RESTARTS);
+  });
+
+  it('tells every host the theme in effect when it starts, and when it changes', async () => {
+    theme = 'dark';
+    const { host } = start();
+    const themes = () =>
+      latest()
+        .posted.filter((m) => m.t === 'theme')
+        .map((m) => m.theme);
+    expect(themes()).toEqual(['dark']);
+
+    theme = 'light';
+    host.themeChanged();
+    expect(themes()).toEqual(['dark', 'light']);
+
+    latest().say({ t: 'ready', repo: null });
+    await host.started;
+    latest().emit('exit', 1);
+    await vi.advanceTimersByTimeAsync(MAX_DELAY_MS);
+    expect(themes()).toEqual(['light']);
   });
 
   it('holds a call made while the host starts again until it is ready', async () => {

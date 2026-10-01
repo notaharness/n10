@@ -24,6 +24,7 @@ import { installMachineResolver } from '../host/services/remote-machines.js';
 import { stopRemoteSyncLoop } from '../host/services/remote-sync.js';
 import { openStartupRepo } from '../host/services/repo.js';
 import { dropViewer } from '../host/services/session-watch.js';
+import { installTerminalColors, setTheme } from '../host/services/theme.js';
 import { appBeamClient } from './beam/app-beam.js';
 import type { DaemonExit, OwnedDaemon } from './beam/owned-daemon.js';
 import {
@@ -142,6 +143,9 @@ port.on('message', ({ data }: { data: MainToHost }) => {
     case 'drop-viewer':
       dropViewer(data.viewer);
       return;
+    case 'theme':
+      setTheme(data.theme);
+      return;
     case 'daemon-exit':
       daemonExits.get(data.daemon)?.(data.exit);
       return;
@@ -170,6 +174,7 @@ async function start(): Promise<void> {
     prefsChanged: (next) =>
       void callMain('prefsChanged', next).catch(logFailure('prefs')),
   });
+  installTerminalColors();
   installMachineResolver();
   beam.start();
   await probeTmuxAvailability();

@@ -1,5 +1,7 @@
 import { TerminalEmulator } from '@n10/terminal';
-import type { SessionBackend } from '@n10/terminal';
+import type { SessionBackend, TerminalColors } from '@n10/terminal';
+
+export type { TerminalColors };
 import * as activity from './activity.js';
 import { remove as removeInactiveAlert } from './inactive-alerts.js';
 
@@ -25,6 +27,16 @@ export interface NamedPtyEntry extends PtyEntry {
 }
 
 const registry = new Map<string, PtyEntry>();
+
+// What every session's terminal tells its program about the colours it
+// is painted with; `null` (a shell that does not paint them) tells
+// nothing.
+let terminalColors: TerminalColors | null = null;
+
+export function setTerminalColors(colors: TerminalColors | null): void {
+  terminalColors = colors;
+  for (const entry of registry.values()) entry.emu.setThemeColors(colors);
+}
 
 // Subscribers notified when an agent PTY exits on its own (Ctrl-D twice
 // in claude, the agent crashing, etc.). React-side state derives the
@@ -76,6 +88,12 @@ export function spawnSession(
   pty.onData((data) => {
     void emu.write(data);
   });
+  // A reply to a reconnecting client would be sent nowhere; the next
+  // client asks again.
+  emu.onReply((data) => {
+    if ((pty.connectionState ?? 'connected') === 'connected') pty.write(data);
+  });
+  emu.setThemeColors(terminalColors);
 
   pty.onExit((code) => {
     entry.exited = true;

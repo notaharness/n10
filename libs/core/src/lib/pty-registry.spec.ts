@@ -48,6 +48,12 @@ class MockEmu {
   onRender = vi.fn((callback: () => void) => this.renders.add(callback));
   offRender = vi.fn((callback: () => void) => this.renders.delete(callback));
   dispose = vi.fn();
+  setThemeColors = vi.fn();
+  replies: ((data: string) => void)[] = [];
+  onReply = (cb: (data: string) => void) => this.replies.push(cb);
+  reply(data: string) {
+    for (const cb of this.replies) cb(data);
+  }
 }
 
 vi.mock('@n10/terminal', () => ({
@@ -71,6 +77,7 @@ import {
   killSession,
   releaseExitedSession,
   detachSession,
+  setTerminalColors,
 } from './pty-registry.js';
 
 const NAMES = ['s1', 's2'];
@@ -246,5 +253,45 @@ describe('pty-registry — teardown contract', () => {
     // still-live session instead of starting a fresh one.
     expect(first.dispose).toHaveBeenCalledTimes(1);
     expect(first.kill).not.toHaveBeenCalled();
+  });
+});
+
+describe('pty-registry — theme reports', () => {
+  const DARK = {
+    scheme: 'dark' as const,
+    foreground: '#d4d4d4',
+    background: '#1e1e1e',
+  };
+
+  beforeEach(() => {
+    for (const n of NAMES) killSession(n);
+    ptys.length = 0;
+    emus.length = 0;
+  });
+
+  afterEach(() => {
+    for (const n of NAMES) killSession(n);
+    setTerminalColors(null);
+    activity.__resetForTests();
+  });
+
+  it('gives every terminal the colours, those already running and those to come', () => {
+    spawnSession('s1');
+    setTerminalColors(DARK);
+    spawnSession('s2');
+    expect(emus[0]!.setThemeColors).toHaveBeenLastCalledWith(DARK);
+    expect(emus[1]!.setThemeColors).toHaveBeenLastCalledWith(DARK);
+  });
+
+  it("writes a terminal's replies to its own session while it is connected", () => {
+    spawnSession('s1');
+    spawnSession('s2');
+    emus[1]!.reply('\x1b[?997;1n');
+    expect(ptys[1]!.write).toHaveBeenCalledExactlyOnceWith('\x1b[?997;1n');
+    expect(ptys[0]!.write).not.toHaveBeenCalled();
+
+    ptys[1]!.connectionState = 'reconnecting';
+    emus[1]!.reply('\x1b[?997;2n');
+    expect(ptys[1]!.write).toHaveBeenCalledOnce();
   });
 });

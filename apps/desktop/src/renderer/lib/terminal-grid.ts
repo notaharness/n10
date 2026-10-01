@@ -1,13 +1,13 @@
 /**
  * Estimate a terminal's column/row grid from its pane in pixels. Char
- * metrics mirror the `.wterm` styles in styles.css (13px mono ≈ 7.8px
- * wide, 18px rows, 8/12px padding). Used to size the PTY at launch and
- * to fit the rendered terminal to its pane.
+ * metrics mirror wterm's own stylesheet (`@wterm/dom/css`: 14px mono
+ * ≈ 8.4px wide, 17px rows, 12px padding). Used to size the PTY at
+ * launch and to fit the rendered terminal to its pane.
  */
-const CHAR_WIDTH = 7.8;
-const ROW_HEIGHT = 18;
+const CHAR_WIDTH = 8.4;
+const ROW_HEIGHT = 17;
 const PAD_X = 24;
-const PAD_Y = 16;
+const PAD_Y = 24;
 
 export interface Grid {
   cols: number;
@@ -17,7 +17,7 @@ export interface Grid {
 /**
  * Compute the grid for a pane from the wterm element's *measured* cell
  * metrics — the same probe wterm's own observer uses, one `W` wide, so
- * the two never disagree (the 7.8px estimate overflowed the pane
+ * the two never disagree (the fixed estimate overflowed the pane
  * whenever the real glyph was wider, and an average over many glyphs
  * rounds a column differently from wterm, which then resizes the PTY
  * back and forth). Returns null when the element isn't measurable yet

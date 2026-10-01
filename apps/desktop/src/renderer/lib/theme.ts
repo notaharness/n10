@@ -1,20 +1,31 @@
 import { useSyncExternalStore } from 'react';
-import type { ThemePreference } from '../../host/contract.js';
+import type { ResolvedTheme, ThemePreference } from '../../host/contract.js';
 
-export type { ThemePreference };
-export type ResolvedTheme = 'light' | 'dark';
+export type { ResolvedTheme, ThemePreference };
 
 /**
- * Theme store. The persisted source of truth is the host's desktop
- * prefs file (so the native menu's Theme radio and the window chrome
- * agree with us); localStorage is only a first-paint cache so the
- * right class is on <html> before the bridge answers.
+ * Theme store. The preference persists in the host's desktop prefs
+ * file (so the native menu's Theme radio and the window chrome agree
+ * with us); localStorage is only a first-paint cache so the right
+ * class is on <html> before the bridge answers.
+ *
+ * What is painted is the host's resolved theme: Electron's
+ * `nativeTheme`, which folds the preference into the OS colour scheme.
+ * The UI's class and every terminal read that one value, so a missed
+ * or late media-query event cannot leave them disagreeing.
  */
 const STORAGE_KEY = 'n10.theme';
-const media = window.matchMedia('(prefers-color-scheme: dark)');
 const listeners = new Set<() => void>();
 
 let preference: ThemePreference = readStored();
+// Until the host answers: the page's own colour scheme, which Electron
+// derives from the same `nativeTheme`.
+let resolved: ResolvedTheme =
+  preference !== 'system'
+    ? preference
+    : window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
 
 function readStored(): ThemePreference {
   try {
@@ -26,15 +37,7 @@ function readStored(): ThemePreference {
   return 'system';
 }
 
-export function resolveTheme(
-  pref: ThemePreference = preference
-): ResolvedTheme {
-  if (pref === 'system') return media.matches ? 'dark' : 'light';
-  return pref;
-}
-
 function apply(): void {
-  const resolved = resolveTheme();
   document.documentElement.classList.toggle('dark', resolved === 'dark');
   document.documentElement.style.colorScheme = resolved;
   for (const l of listeners) l();
@@ -59,16 +62,29 @@ export function getThemePreference(): ThemePreference {
   return preference;
 }
 
-media.addEventListener('change', () => {
-  if (preference === 'system') apply();
-});
+function getResolvedTheme(): ResolvedTheme {
+  return resolved;
+}
+
+function setResolved(theme: ResolvedTheme): void {
+  if (theme === resolved) return;
+  resolved = theme;
+  apply();
+}
 
 /** Call once at startup so the first paint already has the right class;
- *  then reconcile with the host's persisted preference. */
+ *  then take the host's persisted preference and resolved theme. */
 export function initTheme(): void {
   apply();
-  void window.n10
-    ?.getDesktopPrefs()
+  const bridge = window.n10;
+  if (!bridge) return;
+  bridge.onThemeChanged(setResolved);
+  void bridge
+    .getTheme()
+    .then(setResolved)
+    .catch(() => undefined);
+  void bridge
+    .getDesktopPrefs()
     .then((p) => {
       if (p.theme !== preference) setLocal(p.theme);
     })
@@ -86,6 +102,10 @@ export function useTheme(): {
   setPreference: (p: ThemePreference) => void;
 } {
   const pref = useSyncExternalStore(subscribe, getThemePreference);
-  const resolved = useSyncExternalStore(subscribe, () => resolveTheme());
-  return { preference: pref, resolved, setPreference: setThemePreference };
+  const theme = useSyncExternalStore(subscribe, getResolvedTheme);
+  return {
+    preference: pref,
+    resolved: theme,
+    setPreference: setThemePreference,
+  };
 }

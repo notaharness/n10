@@ -10,6 +10,7 @@ import {
   DISCOVERY_EVENTS,
   MACHINES_EVENTS,
   SYNC_EVENTS,
+  THEME_EVENTS,
 } from './contract.js';
 import { setRepoOpenedListener } from './services/repo.js';
 import {
@@ -23,6 +24,7 @@ import {
 } from './services/discovery.js';
 import { setSessionBroadcaster } from './services/sessions.js';
 import { setBabysitNotifier } from './services/babysit.js';
+import { onThemeChange } from './services/theme.js';
 import {
   setBeamStatusNotifier,
   setCeremonyProgressNotifier,
@@ -68,6 +70,10 @@ export function installHostPushes({ broadcast, sendTo }: HostPushes): void {
   // A babysitter started an agent (a row and a session) or ended; its
   // status otherwise rides on the sidebar item.
   setBabysitNotifier((event) => broadcast(BABYSIT_EVENTS.changed, event));
+
+  // Windows repaint from the theme the main process reported, so the
+  // UI and its terminals follow the same signal.
+  onThemeChange((theme) => broadcast(THEME_EVENTS.changed, theme));
 
   // The machines list is pushed whole on every change the beam daemon
   // reports, so the renderer writes it straight into the query cache
