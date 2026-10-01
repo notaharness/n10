@@ -675,7 +675,7 @@ export const IPC = {
   cancelCeremony: 'n10/machines/ceremony/cancel',
   resetFleet: 'n10/machines/fleet-reset',
   dismissInboundMail: 'n10/machines/dismiss-inbound-mail',
-} as const;
+} as const satisfies { [K in keyof N10HostApi]?: string };
 
 /** Error thrown by host handlers when no repo has been opened yet. */
 export class NoActiveRepoError extends Error {
