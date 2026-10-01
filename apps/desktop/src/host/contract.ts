@@ -286,6 +286,10 @@ export interface SyncState {
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
+/** The theme in effect: Electron's `nativeTheme`, which folds the
+ *  preference (its `themeSource`) into the OS colour scheme. */
+export type ResolvedTheme = 'light' | 'dark';
+
 export interface DesktopPrefs {
   theme: ThemePreference;
   /** Use the OS window frame + native menu bar instead of the custom
@@ -582,6 +586,9 @@ export interface N10HostApi {
   onBabysitChanged(cb: (event: BabysitChangedEvent) => void): () => void;
   getDesktopPrefs(): Promise<DesktopPrefs>;
   setDesktopPrefs(patch: Partial<DesktopPrefs>): Promise<DesktopPrefs>;
+  /** The theme in effect; its changes arrive on `onThemeChanged`. */
+  getTheme(): Promise<ResolvedTheme>;
+  onThemeChanged(cb: (theme: ResolvedTheme) => void): () => void;
   /** Native about box. */
   showAbout(): Promise<void>;
 }
@@ -656,6 +663,7 @@ export const IPC = {
   showAppMenu: 'n10/shell/app-menu',
   getDesktopPrefs: 'n10/shell/prefs/get',
   setDesktopPrefs: 'n10/shell/prefs/set',
+  getTheme: 'n10/shell/theme',
   showAbout: 'n10/shell/about',
   startBabysit: 'n10/babysit/start',
   stopBabysit: 'n10/babysit/stop',

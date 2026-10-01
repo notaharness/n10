@@ -822,3 +822,13 @@ worker pool. Keep ordered mutations and PTY ownership in their current process.
 Require an attributed CPU profile and identical-fixture before/after evidence
 before adding another worker; asynchronous I/O or smaller payloads may address
 the measured cost without a new lifetime and queue.
+
+## Theme
+
+The desktop paints one theme: Electron's `nativeTheme`, which folds the
+preference (`themeSource`) into the OS colour scheme, including the
+xdg-desktop-portal `color-scheme` Electron reads on Linux. The main process
+posts it to the host at fork and on every `'updated'`; windows read it from
+the host and repaint on its push. The renderer's `prefers-color-scheme` only
+seeds the first paint: a class set from its change event beside a terminal
+that re-read `matches` on each render could disagree.

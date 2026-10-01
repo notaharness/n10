@@ -13,7 +13,7 @@
  */
 import { join } from 'node:path';
 import { app, ipcMain, utilityProcess, type UtilityProcess } from 'electron';
-import { IPC } from '../host/contract.js';
+import { IPC, type ResolvedTheme } from '../host/contract.js';
 import type { HostPushes } from '../host/host-pushes.js';
 import { spawnOwnedDaemon, type OwnedDaemon } from './beam/owned-daemon.js';
 import { newGate, within } from './host-gate.js';
@@ -45,6 +45,8 @@ type Shell = Omit<ShellCalls, 'spawnDaemon' | 'stopDaemon' | 'killDaemon'>;
 export interface HostProcessOptions {
   shell: Shell;
   pushes: HostPushes;
+  /** The theme in effect, which every host is told when it starts. */
+  theme: () => ResolvedTheme;
   /** A host was forked again and is ready. */
   onRespawn: () => void;
   /** The host kept dying and will not be forked again; `message` says
@@ -57,6 +59,8 @@ export interface HostProcess {
    *  rejects with why it could not start (tmux missing, …). */
   readonly started: Promise<string | null>;
   dropViewer(viewer: number): void;
+  /** Tells the host the theme changed (`options.theme`). */
+  themeChanged(): void;
   /** Lets the host release its terminal clients and beam, then stops
    *  any daemon a host that died left behind. */
   stop(): Promise<void>;
@@ -209,6 +213,8 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
     child = host;
     host.on('message', (message: HostToMain) => onMessage(host, message));
     host.once('exit', (code) => onExit(host, code));
+    // Queued until the host listens, so it arrives before any call.
+    post({ t: 'theme', theme: options.theme() });
   }
 
   async function invoke(channel: string, viewer: number, args: unknown[]) {
@@ -250,6 +256,7 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
   return {
     started,
     dropViewer: (viewer) => post({ t: 'drop-viewer', viewer }),
+    themeChanged: () => post({ t: 'theme', theme: options.theme() }),
     stop,
   };
 }

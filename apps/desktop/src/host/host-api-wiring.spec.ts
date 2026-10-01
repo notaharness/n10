@@ -143,6 +143,7 @@ vi.mock('./services/babysit.js', () =>
 vi.mock('./services/desktop-prefs.js', () =>
   recorder('prefs', ['loadDesktopPrefs', 'saveDesktopPrefs'])
 );
+vi.mock('./services/theme.js', () => recorder('theme', ['getTheme']));
 vi.mock('./services/machines.js', () =>
   recorder('machines', [
     'listMachines',
@@ -297,6 +298,7 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ],
 
   ['getDesktopPrefs', [], 'prefs.loadDesktopPrefs'],
+  ['getTheme', [], 'theme.getTheme'],
 
   ['startBabysit', [7], 'babysit.startBabysit'],
   ['stopBabysit', [7], 'babysit.stopBabysit'],
@@ -341,6 +343,7 @@ describe('host API wiring', () => {
       'onSessionExit',
       'onLaunchStep',
       'onMenuCommand',
+      'onThemeChanged',
       'onBabysitChanged',
       'onSyncNotice',
       'onRemoteUpdated',

@@ -6,7 +6,11 @@
  * `call` is the other direction: what only the main process can do
  * (dialogs, menus, the shell, forking the beam daemon).
  */
-import type { ContextMenuItem, DesktopPrefs } from '../host/contract.js';
+import type {
+  ContextMenuItem,
+  DesktopPrefs,
+  ResolvedTheme,
+} from '../host/contract.js';
 import type { DaemonExit } from './beam/owned-daemon.js';
 
 /** What the host asks of the main process. */
@@ -35,6 +39,7 @@ export type MainToHost =
   | { t: 'reply'; id: number; ok: true; value: unknown }
   | { t: 'reply'; id: number; ok: false; error: string }
   | { t: 'drop-viewer'; viewer: number }
+  | { t: 'theme'; theme: ResolvedTheme }
   | { t: 'daemon-exit'; daemon: number; exit: DaemonExit }
   | { t: 'shutdown' };
 

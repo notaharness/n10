@@ -8,6 +8,7 @@ import type {
 import { IPC } from './contract.js';
 import * as repo from './services/repo.js';
 import * as prefs from './services/desktop-prefs.js';
+import * as theme from './services/theme.js';
 import * as settings from './services/settings.js';
 import * as sidebar from './services/sidebar.js';
 import * as worktrees from './services/worktrees.js';
@@ -156,6 +157,8 @@ export function createHostApi(): HostApi {
       prefsChanged(next);
       return Promise.resolve(next);
     },
+    getTheme: () => Promise.resolve(theme.getTheme()),
+    onThemeChanged: () => () => undefined,
     showAbout: () => aboutBox(),
 
     startBabysit: (prId) => babysit.startBabysit(prId),

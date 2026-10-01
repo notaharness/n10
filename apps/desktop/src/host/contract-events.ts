@@ -107,6 +107,12 @@ export const MENU_EVENTS = {
   command: 'n10/menu/command',
 } as const;
 
+/** The resolved theme (`ResolvedTheme`) changed: the OS switched, or
+ *  the preference did. */
+export const THEME_EVENTS = {
+  changed: 'n10/shell/theme/changed',
+} as const;
+
 // ── Remote sync ──────────────────────────────────────────────────
 
 export const SYNC_EVENTS = {

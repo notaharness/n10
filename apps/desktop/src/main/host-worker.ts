@@ -24,6 +24,7 @@ import { installMachineResolver } from '../host/services/remote-machines.js';
 import { stopRemoteSyncLoop } from '../host/services/remote-sync.js';
 import { openStartupRepo } from '../host/services/repo.js';
 import { dropViewer } from '../host/services/session-watch.js';
+import { setTheme } from '../host/services/theme.js';
 import { appBeamClient } from './beam/app-beam.js';
 import type { DaemonExit, OwnedDaemon } from './beam/owned-daemon.js';
 import {
@@ -141,6 +142,9 @@ port.on('message', ({ data }: { data: MainToHost }) => {
       return;
     case 'drop-viewer':
       dropViewer(data.viewer);
+      return;
+    case 'theme':
+      setTheme(data.theme);
       return;
     case 'daemon-exit':
       daemonExits.get(data.daemon)?.(data.exit);
