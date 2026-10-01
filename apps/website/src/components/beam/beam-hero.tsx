@@ -5,7 +5,7 @@ import { buttonVariants } from '@/components/ui/button';
 export function BeamHero() {
   return (
     <section className="relative overflow-hidden">
-      <div className="relative mx-auto grid w-full max-w-6xl items-center gap-x-10 gap-y-12 px-4 pt-16 pb-24 sm:pt-24 lg:grid-cols-[1.2fr_1fr]">
+      <div className="relative mx-auto grid w-full max-w-6xl items-center gap-x-14 gap-y-10 px-4 pt-16 sm:pt-24 lg:grid-cols-[1.2fr_1fr]">
         <div className="relative z-10 flex flex-col items-start gap-6 text-left">
           <span className="border-fd-border bg-fd-card text-fd-muted-foreground rounded-full border px-3 py-1 font-mono text-xs">
             @notaharness/beam
@@ -38,15 +38,15 @@ export function BeamHero() {
             <img
               src="/brands/tailscale-logo-black.svg"
               alt="Tailscale"
-              width={249}
-              height={48}
+              width={218}
+              height={42}
               className="n10-only-light"
             />
             <img
               src="/brands/tailscale-logo-white.svg"
               alt="Tailscale"
-              width={249}
-              height={48}
+              width={218}
+              height={42}
               className="n10-only-dark"
             />
           </a>

@@ -3,7 +3,7 @@ import { BeamCta } from '@/components/beam/beam-cta';
 import { BeamHero } from '@/components/beam/beam-hero';
 import { BeamHow } from '@/components/beam/beam-how';
 import { BeamOverviewDiagram } from '@/components/beam/beam-overview-diagram';
-import { BeamStreams } from '@/components/beam/beam-streams';
+import { BeamGettingStarted } from '@/components/beam/beam-getting-started';
 import { Footer } from '@/components/landing/footer';
 
 export const metadata: Metadata = {
@@ -15,11 +15,14 @@ export const metadata: Metadata = {
 export default function BeamPage() {
   return (
     <main className="flex flex-1 flex-col">
-      <BeamHero />
-      <BeamHow />
-      <BeamOverviewDiagram />
-      <BeamCta />
-      <BeamStreams />
+      {/* Keep section spacing in one place rather than stacking child padding. */}
+      <div className="flex flex-col gap-24 pb-24">
+        <BeamHero />
+        <BeamHow />
+        <BeamOverviewDiagram />
+        <BeamCta />
+        <BeamGettingStarted />
+      </div>
       <Footer />
     </main>
   );

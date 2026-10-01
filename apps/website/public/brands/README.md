@@ -11,5 +11,5 @@ The [Tailscale media kit](https://tailscale.com/press) contains the originals as
 
 Its `Tailscale_BrandToolkit_10-2025.pdf`, pages 3–4, specifies dark/light variants,
 contrast and clear space. The credit uses the appropriate unmodified wordmark
-at 48px high, on a plain background, with a separate “Powered by” label. The
+at 42px high, on a plain background, with a separate “Powered by” label. The
 wordmark starts at the same left edge as the hero heading.

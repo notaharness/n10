@@ -6,20 +6,18 @@ import { BEAM_COLORS } from './mesh/palette';
 
 export function BeamHow() {
   return (
-    <section className="mx-auto grid w-full max-w-5xl items-center gap-10 px-6 py-12 md:grid-cols-[1fr_1.2fr]">
-      <div>
+    <section className="mx-auto grid w-full max-w-6xl items-center gap-10 px-4 md:grid-cols-12 md:gap-14">
+      <div className="min-w-0 md:col-span-5">
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           How a machine joins
         </h2>
-        <p className="text-fd-muted-foreground mt-5 leading-relaxed">
-          Your passkey signs the machine’s membership. The approval page
-          receives that assertion and the PRF secret used to derive the
-          directory key.
+        <p className="text-fd-muted-foreground mt-4 leading-relaxed">
+          Use your passkey to approve each machine you add to your fleet.
+          Removing a machine also needs your approval.
         </p>
         <p className="text-fd-muted-foreground mt-4 leading-relaxed">
-          Peers check the signature, node-key possession and known revocations
-          before accepting a connection. The signing key stays with your passkey
-          provider. Each machine keeps its own node key.
+          Each approval covers one change. A machine already in the fleet cannot
+          add another machine on its own.
         </p>
         <Link
           href="/docs/beam#how-membership-works"
@@ -28,37 +26,39 @@ export function BeamHow() {
           Membership details
         </Link>
       </div>
-      <BeamFigure label="Passkey approval sends a signed membership and directory secret to the joining machine">
-        <Track d="M85 95H160" color={BEAM_COLORS.sand} />
-        <Track d="M232 95H310" color={BEAM_COLORS.blue} />
-        <Key x={48} y={95} />
-        <Browser x={200} y={95} />
-        <g transform="translate(337 112) scale(.85)">
-          <Laptop cx={0} cy={0} />
-        </g>
-        <Key x={321} y={151} color={BEAM_COLORS.blue} />
-        <Label x={65} y={48}>
-          Passkey
-        </Label>
-        <Label x={200} y={48}>
-          beam.n10.is
-        </Label>
-        <Label x={335} y={48}>
-          Machine
-        </Label>
-        <Label x={65} y={151} muted>
-          Signing key
-        </Label>
-        <Label x={200} y={151} muted>
-          Approval page
-        </Label>
-        <Label x={335} y={190} muted>
-          Node key
-        </Label>
-        <Label x={200} y={222} muted>
-          One signature per statement
-        </Label>
-      </BeamFigure>
+      <div className="min-w-0 md:col-span-7">
+        <BeamFigure label="Your passkey approves one machine joining your fleet">
+          <Track d="M85 95H160" color={BEAM_COLORS.sand} />
+          <Track d="M232 95H310" color={BEAM_COLORS.blue} />
+          <Key x={48} y={95} />
+          <Browser x={200} y={95} />
+          <g transform="translate(337 112) scale(.85)">
+            <Laptop cx={0} cy={0} />
+          </g>
+          <Key x={321} y={151} color={BEAM_COLORS.blue} />
+          <Label x={65} y={48}>
+            Passkey
+          </Label>
+          <Label x={200} y={48}>
+            beam.n10.is
+          </Label>
+          <Label x={335} y={48}>
+            Machine
+          </Label>
+          <Label x={65} y={151} muted>
+            Signing key
+          </Label>
+          <Label x={200} y={151} muted>
+            Approval page
+          </Label>
+          <Label x={335} y={190} muted>
+            Node key
+          </Label>
+          <Label x={200} y={222} muted>
+            Each approval covers one change
+          </Label>
+        </BeamFigure>
+      </div>
     </section>
   );
 }

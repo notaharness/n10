@@ -78,15 +78,15 @@ function RelayDrawing() {
 
 export function BeamOverviewDiagram() {
   return (
-    <section className="mx-auto w-full max-w-5xl px-6 py-12">
+    <section className="mx-auto w-full max-w-6xl px-4">
       <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
         Directory and networking
       </h2>
-      <div className="mt-8 grid gap-12 md:grid-cols-2">
+      <div className="mt-10 grid gap-10 md:grid-cols-2 md:gap-14">
         <div>
           <DirectoryDrawing />
           <h3 className="mt-6 font-semibold">Directory and approval page</h3>
-          <p className="text-fd-muted-foreground mt-3 leading-relaxed">
+          <p className="text-fd-muted-foreground mt-4 leading-relaxed">
             The worker stores ciphertext and sees request metadata. It also
             serves the approval page. One approval on a hostile page or someone
             else’s link exposes permanent directory read access and one chosen
@@ -97,7 +97,7 @@ export function BeamOverviewDiagram() {
         <div>
           <RelayDrawing />
           <h3 className="mt-6 font-semibold">Connecting through Tailscale</h3>
-          <p className="text-fd-muted-foreground mt-3 leading-relaxed">
+          <p className="text-fd-muted-foreground mt-4 leading-relaxed">
             Tailscale’s tailcat library connects your machines directly
             peer-to-peer when possible. Tailscale’s relays provide a fallback
             when a direct connection is unavailable. You do not need to set up a
