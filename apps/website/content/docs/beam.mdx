@@ -41,16 +41,6 @@ protects the result in transit, but the page sees the result before sealing it.
 
 ## Approving a request
 
-A hostile approval page, or an approval link someone else created, gets permanent
-directory read access from one approval. It can read every machine’s address and
-label for as long as the fleet exists. It also gets a signature over one statement
-of its choosing, which can add an attacker’s machine with a shell on every member
-under the default grant. That approval does not let it sign later statements.
-
-At a machine’s first enrolment, a hostile page can substitute the fleet root that
-the machine pins. An attacker holding that root can authorize further machines
-in the substituted fleet.
-
 Approve only requests you started. Compare the action, machine name and machine
 fingerprint on the approval page with your terminal. Keep the QR code private:
 anyone who sees it can answer first. At first enrolment this can put the machine
