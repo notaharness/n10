@@ -1,5 +1,6 @@
 import { copyFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { stripVTControlCharacters } from 'node:util';
 import type { Page, TestInfo } from '@playwright/test';
 import { test as base, expect } from '../fixtures/desktop.js';
 import {
@@ -51,15 +52,78 @@ export const fleetTest = base.extend<{
     // Playwright's own failure screenshot comes after the daemons stop,
     // when every peer reads offline.
     if (testInfo.status !== testInfo.expectedStatus) {
-      const path = testInfo.outputPath('fleet-up.png');
-      await desktop.page.screenshot({ path });
-      await testInfo.attach('fleet-up', { path, contentType: 'image/png' });
-      const log = testInfo.outputPath('n10.log');
-      await copyFile(join(fixtureHome, 'n10.log'), log).catch(() => undefined);
-      await testInfo.attach('n10-log', { path: log, contentType: 'text/plain' });
+      await attachScreenshot(testInfo, desktop.page);
+      await attachAppLog(testInfo, fixtureHome);
+      await attachStreams(testInfo, desktop.page);
     }
   },
 });
+
+/** The app while the fleet is up, when it can still be drawn: a page
+ *  that has crashed or closed is no reason to fail the teardown. */
+async function attachScreenshot(testInfo: TestInfo, page: Page): Promise<void> {
+  const path = testInfo.outputPath('fleet-up.png');
+  const taken = await page.screenshot({ path }).then(
+    () => true,
+    () => false
+  );
+  if (taken)
+    await testInfo.attach('fleet-up', { path, contentType: 'image/png' });
+}
+
+/** The app's log, when it wrote one: a missing file is no reason to
+ *  fail the teardown and bury why the test failed. */
+async function attachAppLog(testInfo: TestInfo, home: string): Promise<void> {
+  const path = testInfo.outputPath('n10.log');
+  const copied = await copyFile(join(home, 'n10.log'), path).then(
+    () => true,
+    () => false
+  );
+  if (copied)
+    await testInfo.attach('n10-log', { path, contentType: 'text/plain' });
+}
+
+/**
+ * Everything each session's stream has sent, as the host holds it, as
+ * text. A tmux client that refuses to attach ("open terminal failed: …")
+ * says so in its stream and exits; the terminal on screen then shows
+ * the pane's last frame instead, so the refusal is only here.
+ */
+async function attachStreams(testInfo: TestInfo, page: Page): Promise<void> {
+  const streams = await page
+    .evaluate(async () => {
+      const [sessions, terminals] = await Promise.all([
+        window.n10.listSessions(),
+        window.n10.listTerminals(),
+      ]);
+      const names = [
+        ...new Set([...sessions, ...terminals].map((s) => s.name)),
+      ];
+      // One stream that cannot be read leaves the others.
+      const read = await Promise.allSettled(
+        names.map(async (name) => {
+          try {
+            return (await window.n10.watchSession(name)).data;
+          } finally {
+            await window.n10.unwatchSession(name);
+          }
+        })
+      );
+      return read.map((r, i) => ({
+        name: names[i]!,
+        text: r.status === 'fulfilled' ? r.value : `(${String(r.reason)})`,
+      }));
+    })
+    .then((all) =>
+      all
+        .map(({ name, text }) => `${name}:\n${stripVTControlCharacters(text)}`)
+        .join('\n\n')
+    )
+    .catch((err: unknown) => `streams: ${String(err)}`);
+  const path = testInfo.outputPath('session-streams.log');
+  await writeFile(path, streams);
+  await testInfo.attach('session-streams', { path, contentType: 'text/plain' });
+}
 
 /** A failed test gets the machine's daemon log and its view of the
  *  fleet, which show why a peer dropped. */
