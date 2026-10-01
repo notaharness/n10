@@ -52,14 +52,24 @@ export const fleetTest = base.extend<{
     // Playwright's own failure screenshot comes after the daemons stop,
     // when every peer reads offline.
     if (testInfo.status !== testInfo.expectedStatus) {
-      const path = testInfo.outputPath('fleet-up.png');
-      await desktop.page.screenshot({ path });
-      await testInfo.attach('fleet-up', { path, contentType: 'image/png' });
+      await attachScreenshot(testInfo, desktop.page);
       await attachAppLog(testInfo, fixtureHome);
       await attachStreams(testInfo, desktop.page);
     }
   },
 });
+
+/** The app while the fleet is up, when it can still be drawn: a page
+ *  that has crashed or closed is no reason to fail the teardown. */
+async function attachScreenshot(testInfo: TestInfo, page: Page): Promise<void> {
+  const path = testInfo.outputPath('fleet-up.png');
+  const taken = await page.screenshot({ path }).then(
+    () => true,
+    () => false
+  );
+  if (taken)
+    await testInfo.attach('fleet-up', { path, contentType: 'image/png' });
+}
 
 /** The app's log, when it wrote one: a missing file is no reason to
  *  fail the teardown and bury why the test failed. */
@@ -89,17 +99,24 @@ async function attachStreams(testInfo: TestInfo, page: Page): Promise<void> {
       const names = [
         ...new Set([...sessions, ...terminals].map((s) => s.name)),
       ];
-      return Promise.all(
+      // One stream that cannot be read leaves the others.
+      const read = await Promise.allSettled(
         names.map(async (name) => {
-          const { data } = await window.n10.watchSession(name);
-          await window.n10.unwatchSession(name);
-          return { name, data };
+          try {
+            return (await window.n10.watchSession(name)).data;
+          } finally {
+            await window.n10.unwatchSession(name);
+          }
         })
       );
+      return read.map((r, i) => ({
+        name: names[i]!,
+        text: r.status === 'fulfilled' ? r.value : `(${String(r.reason)})`,
+      }));
     })
     .then((all) =>
       all
-        .map(({ name, data }) => `${name}:\n${stripVTControlCharacters(data)}`)
+        .map(({ name, text }) => `${name}:\n${stripVTControlCharacters(text)}`)
         .join('\n\n')
     )
     .catch((err: unknown) => `streams: ${String(err)}`);

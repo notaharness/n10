@@ -38,10 +38,10 @@ test.describe('A pull request worked on another machine @beam', () => {
     },
   });
 
-  // A session started outside the app, here, for discovery to find.
-  const outside = uniqueExternalBranch();
+  // Sessions started outside the app, here, for discovery to find.
+  const outside = [uniqueExternalBranch(), uniqueExternalBranch()];
   test.afterEach(({ desktop }) => {
-    cleanupExternalSessions(desktop.repoPath, [outside], desktop.homeDir);
+    cleanupExternalSessions(desktop.repoPath, outside, desktop.homeDir);
   });
 
   test('its agent and a terminal beside it name the machine they run on', async ({
@@ -98,21 +98,24 @@ test.describe('A pull request worked on another machine @beam', () => {
 
     // Discovery reads this machine's tmux, where the terminal is not.
     // A session started here from outside gets a tab once a scan has
-    // adopted it. The terminal on workbox outlives that scan: it still
-    // answers, and its card is still beside the agent's. (A terminal
-    // the scan ended loses its card a moment after the new tab shows;
-    // by then this input has gone to the agent instead.)
-    const { repoPath, homeDir } = desktop;
-    startExternalTmuxSession({
-      repoPath,
-      homeDir,
-      branch: outside,
-      worktreePath: addExternalWorktree(repoPath, outside),
-      command: 'sleep 120',
-    });
-    await expect(tabs(page).filter({ hasText: outside })).toBeVisible({
-      timeout: 30_000,
-    });
+    // adopted it; a second one's tab means a later scan has run too.
+    // The terminal on workbox outlives both and still answers. A
+    // terminal those scans ended would keep its card but no longer
+    // carry what is typed into it.
+    const adopted = async (branch: string) => {
+      startExternalTmuxSession({
+        repoPath: desktop.repoPath,
+        homeDir: desktop.homeDir,
+        branch,
+        worktreePath: addExternalWorktree(desktop.repoPath, branch),
+        command: 'sleep 600',
+      });
+      await expect(tabs(page).filter({ hasText: branch })).toBeVisible({
+        timeout: 30_000,
+      });
+    };
+    await adopted(outside[0]!);
+    await adopted(outside[1]!);
     await focusTerminal(page);
     await page.keyboard.type('echo survived-$((6 * 7))\n');
     await expect(visibleText(page, 'survived-42')).toBeVisible({
