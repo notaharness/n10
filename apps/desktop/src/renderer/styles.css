@@ -43,7 +43,9 @@
   --statusbar: #f8f8f8;
   --statusbar-foreground: #3b3b3b;
   --tab: #f8f8f8;
-  --tab-active: #ffffff;
+  /* Tinted, so the active tab stands apart from the repository bands;
+     strong enough to tell, light enough to keep them at 3:1 on it. */
+  --tab-active: color-mix(in srgb, var(--primary) 10%, var(--background));
   /* Opaque, so the close button can cover a tab's end in its colour. */
   --tab-hover: color-mix(in srgb, var(--accent) 60%, var(--tab));
 
@@ -107,7 +109,7 @@
   --statusbar: #181818;
   --statusbar-foreground: #cccccc;
   --tab: #181818;
-  --tab-active: #1f1f1f;
+  --tab-active: color-mix(in srgb, var(--primary) 18%, var(--background));
   --tab-hover: color-mix(in srgb, var(--accent) 60%, var(--tab));
 
   --repo-1: #2dd4bf;

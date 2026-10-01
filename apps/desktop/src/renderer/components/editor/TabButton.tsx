@@ -29,25 +29,42 @@ import { useSortableTab } from './TabStrip.js';
 
 type Closer = ReturnType<typeof useCloseTabs>;
 
-/** The tab's kind icon, with the agent's state hung off its corner. */
+/** The tab's kind icon, with the agent's state hung off its corner,
+ *  set off by a ring of the tab's own background. */
 function TabIcon({
   Icon,
   running,
   snapshot,
+  active,
 }: {
   Icon: typeof SettingsIcon;
   running: boolean;
   snapshot: SessionActivitySnapshot | undefined;
+  active: boolean;
 }) {
+  const fill = active ? 'bg-tab-active' : 'bg-tab group-hover:bg-tab-hover';
+  const ring = active
+    ? 'ring-tab-active'
+    : 'ring-tab group-hover:ring-tab-hover';
   return (
     <span className="relative flex shrink-0">
       <Icon className="size-4" />
       {snapshot?.active ? (
-        <span className="absolute -right-1 -bottom-1 flex items-center justify-center rounded-full bg-tab-active p-0.5">
+        <span
+          className={cn(
+            'absolute -right-1 -bottom-1 flex items-center justify-center rounded-full p-0.5',
+            fill
+          )}
+        >
           <span className="agent-spinner size-2.5 rounded-full" />
         </span>
       ) : running ? (
-        <span className="absolute -right-0.5 -bottom-0.5 size-2 rounded-full bg-success ring-2 ring-tab-active" />
+        <span
+          className={cn(
+            'absolute -right-0.5 -bottom-0.5 size-2 rounded-full bg-success ring-2',
+            ring
+          )}
+        />
       ) : null}
     </span>
   );
@@ -135,14 +152,19 @@ function tabClassName({
   unseen,
   dragging,
   flashing,
+  wrap,
 }: {
   active: boolean;
   unseen: boolean;
   dragging: boolean;
   flashing: boolean;
+  wrap: boolean;
 }): string {
   return cn(
-    'group relative flex h-9 max-w-56 min-w-28 cursor-default items-center gap-2 border-r border-border px-3 text-base transition-colors select-none',
+    'group relative flex h-9 min-w-28 cursor-default items-center gap-2 border-r border-border px-3 text-base transition-colors select-none',
+    // Wrapped, a full row's tabs share its width (TabStrip's end takes
+    // the last row's room); in one row, each keeps its own.
+    wrap ? 'grow' : 'max-w-56',
     // Lifted above the tabs it slides over.
     dragging && 'z-10',
     // Opaque in every state: the close button takes it to cover the
@@ -246,13 +268,14 @@ export function TabButton({
         unseen,
         dragging: isDragging,
         flashing: snapshot?.flashing ?? false,
+        wrap: tabOverflow === 'wrap',
       })}
     >
-      {active && <span className="absolute inset-x-0 top-0 h-px bg-primary" />}
       <TabIcon
         Icon={Icon}
         running={item ? itemRunning(item) : running}
         snapshot={snapshot}
+        active={active}
       />
       <TabLabel
         label={label}

@@ -112,6 +112,47 @@ test.describe('Tab strip overflow', () => {
       .poll(() => tabNames(page))
       .toEqual(['spike-front-truncation', ...MANY.slice(0, -1)]);
   });
+
+  test('a full row is shared out among its tabs, and the last row keeps their own widths', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    const edges = await tabs(page).evaluateAll((els) =>
+      els.map((el) => {
+        const r = el.getBoundingClientRect();
+        return { top: Math.round(r.top), right: r.right };
+      })
+    );
+    const ends = new Map<number, number>();
+    for (const e of edges) ends.set(e.top, e.right);
+    const stripBox = await box(strip(page));
+    const stripRight = stripBox.x + stripBox.width;
+    const rowEnds = [...ends.values()];
+    expect(rowEnds.length).toBeGreaterThan(1);
+    for (const end of rowEnds.slice(0, -1))
+      expect(end).toBeCloseTo(stripRight, 0);
+    expect(rowEnds.at(-1)).toBeLessThan(stripRight - 40);
+  });
+
+  test('a tab dropped in the room after the last tab goes to the end', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    const first = tab(page, /feature-tab-strip-wrap/);
+    const last = tab(page, /spike-front-truncation/);
+    const [from, to] = await Promise.all([box(first), box(last)]);
+    expect(to.y).toBeGreaterThan(from.y);
+
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x + to.width + 40, to.y + to.height / 2, {
+      steps: 15,
+    });
+    await page.mouse.up();
+    await expect
+      .poll(() => tabNames(page))
+      .toEqual([...MANY.slice(1), 'feature-tab-strip-wrap']);
+  });
 });
 
 test.describe('Tab strip overflow, chosen before', () => {

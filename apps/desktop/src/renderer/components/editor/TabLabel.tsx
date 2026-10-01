@@ -122,7 +122,9 @@ export function TabLabel({
         preview && 'italic'
       )}
     >
-      <span aria-hidden className="invisible">
+      {/* At most as wide as a tab of its own needs: a tab grows past
+          that only into a row's room. */}
+      <span aria-hidden className="invisible block max-w-44 overflow-hidden">
         {whole}
       </span>
       <span aria-hidden data-tab-label-shown className="absolute inset-0">

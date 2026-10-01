@@ -1,11 +1,14 @@
 import {
   closestCenter,
   DndContext,
+  pointerWithin,
   PointerSensor,
+  useDroppable,
   useSensor,
   useSensors,
   type Active,
   type Announcements,
+  type CollisionDetection,
   type DragEndEvent,
   type Over,
 } from '@dnd-kit/core';
@@ -32,6 +35,18 @@ import {
 /** How far the pointer travels before a press becomes a drag, so
  *  clicks and double clicks on a tab stay clicks. */
 const DRAG_THRESHOLD_PX = 5;
+
+/** The room after the last tab, a drop target for the end of the strip. */
+const END_ID = 'tab-strip-end';
+
+/** What the pointer is over — a tab, or the room after the last one —
+ *  or, where it is over neither (a keyboard drag, or a border), the
+ *  tab nearest the dragged one. Nearest alone would take a tab on the
+ *  row above for the room at the end of the row below. */
+const collisions: CollisionDetection = (args) => {
+  const within = pointerWithin(args);
+  return within.length > 0 ? within : closestCenter(args);
+};
 
 /** A tab as a screen reader hears it: its label, not its id. */
 function spoken(target: Active | Over): string {
@@ -84,6 +99,11 @@ export function TabStrip({
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return;
     const id = String(active.id);
+    if (over.id === END_ID) {
+      const last = ids.at(-1);
+      if (last !== undefined && last !== id) onMove(id, last, 'after');
+      return;
+    }
     const targetId = String(over.id);
     // Dropped over a tab to its right, it lands after that tab — the
     // slot the others made room for.
@@ -94,7 +114,7 @@ export function TabStrip({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={collisions}
       modifiers={wrap ? [] : [restrictToHorizontalAxis]}
       accessibility={{ announcements, screenReaderInstructions }}
       onDragEnd={onDragEnd}
@@ -116,11 +136,24 @@ export function TabStrip({
           )}
         >
           {children}
-          <div className="flex-1" aria-hidden />
+          <StripEnd />
         </div>
       </SortableContext>
     </DndContext>
   );
+}
+
+/**
+ * The room after the last tab. Its growth outweighs the tabs', so it
+ * takes the last row's room while each full row above is shared out
+ * among its tabs. A tab dropped here goes to the end of the strip.
+ */
+function StripEnd() {
+  const { setNodeRef } = useDroppable({
+    id: END_ID,
+    data: { label: 'the end of the tabs' },
+  });
+  return <div ref={setNodeRef} aria-hidden className="grow-[9999] basis-0" />;
 }
 
 /** A press that selects a tab as it goes down: the primary button

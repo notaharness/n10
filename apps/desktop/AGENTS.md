@@ -151,7 +151,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   shows it (`showSession`), which is what marks output seen.
 - The tab strip wraps or scrolls as the `tabOverflow` desktop pref says,
   chosen from a tab's menu (radio items). Wrapped, dnd-kit sorts it with
-  `rectSortingStrategy` and no axis lock. A label that does not fit is cut
+  `rectSortingStrategy` and no axis lock; full rows share their width, and
+  the strip's end, a drop target for "last", takes the last row's room.
+  Collisions go by pointer first, then nearest centre. A label that does not fit is cut
   by measurement (`TabLabel.tsx`, `lib/tabs/label-cut.ts`), from the start
   for branch names and paths, from the end for titles (`cutSide`), with the
   whole label as its tooltip; Chromium has no start-side `text-overflow`. A
