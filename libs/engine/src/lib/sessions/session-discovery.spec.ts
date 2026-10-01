@@ -422,6 +422,14 @@ describe('startSessionDiscovery', () => {
       );
     });
 
+    it('leaves another machine’s terminal to its own connection', async () => {
+      const remote = terminalSessionKey('remote-shell', 'a'.repeat(32));
+      sessionNamesMock.mockReturnValue([remote]);
+      const { discovery, onChanged } = start();
+      await discovery.scanNow();
+      expect(onChanged).not.toHaveBeenCalled();
+    });
+
     it('announces a terminal killed from outside', async () => {
       alive.add(shellTerm.name);
       listTerminalsMock.mockReturnValue([shellTerm]);
