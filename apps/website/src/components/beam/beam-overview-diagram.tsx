@@ -44,21 +44,21 @@ function DirectoryDrawing() {
 
 function RelayDrawing() {
   return (
-    <BeamFigure label="A DERP relay carries encrypted traffic between machines and observes connection metadata">
-      <Track d="M70 145L200 95L330 145" />
+    <BeamFigure label="Machines connect directly through tailcat, with Tailscale relays as a fallback">
+      <Track d="M70 155H330" />
+      <Track d="M70 145L200 80L330 145" color={BEAM_COLORS.blue} pending />
       <g transform="translate(65 160) scale(.9)">
         <Laptop cx={0} cy={0} />
       </g>
-      <g transform="translate(200 110) scale(.7)">
+      <g transform="translate(200 95) scale(.6)">
         <Rack cx={0} cy={0} />
       </g>
       <g transform="translate(335 160) scale(.9)">
         <Laptop cx={0} cy={0} />
       </g>
-      <Lock x={130} y={104} />
-      <Lock x={270} y={104} />
-      <Label x={200} y={43}>
-        DERP relay
+      <Lock x={200} y={144} />
+      <Label x={200} y={30}>
+        Tailscale relay
       </Label>
       <Label x={65} y={204}>
         Machine A
@@ -66,8 +66,11 @@ function RelayDrawing() {
       <Label x={335} y={204}>
         Machine B
       </Label>
-      <Label x={200} y={238} muted>
-        Contents encrypted between machines
+      <Label x={200} y={119} muted>
+        Fallback
+      </Label>
+      <Label x={200} y={190}>
+        Direct
       </Label>
     </BeamFigure>
   );
@@ -77,7 +80,7 @@ export function BeamOverviewDiagram() {
   return (
     <section className="mx-auto w-full max-w-5xl px-6 py-12">
       <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-        Who can read what
+        Directory and networking
       </h2>
       <div className="mt-8 grid gap-12 md:grid-cols-2">
         <div>
@@ -93,12 +96,12 @@ export function BeamOverviewDiagram() {
         </div>
         <div>
           <RelayDrawing />
-          <h3 className="mt-6 font-semibold">Tailscale’s DERP fleet</h3>
+          <h3 className="mt-6 font-semibold">Connecting through Tailscale</h3>
           <p className="text-fd-muted-foreground mt-3 leading-relaxed">
-            Beam uses Tailscale’s public tailcat relays by default. They see
-            endpoint IPs, public keys, packet sizes and timing. They log
-            metadata, impose rate limits and have no SLA. They cannot decrypt
-            traffic or approve membership. They can delay or drop packets.
+            Tailscale’s tailcat library connects your machines directly
+            peer-to-peer when possible. Tailscale’s relays provide a fallback
+            when a direct connection is unavailable. You do not need to set up a
+            VPN or open ports. Beam configures the tunnels.
           </p>
         </div>
       </div>
