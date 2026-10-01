@@ -1,5 +1,6 @@
 import {
   holdingVerdict,
+  reviewersToCount,
   type PullRequestInfo,
   type PullRequestReviewer,
 } from '@n10/vcs-core';
@@ -42,7 +43,8 @@ function holding(reviewers: readonly PullRequestReviewer[]): string | null {
 }
 
 function reviews(pr: PullRequestInfo): ReadinessAspect {
-  const all = pr.reviewers ?? [];
+  // One row per vote: a team a listed member voted for is that vote.
+  const all = reviewersToCount(pr.reviewers ?? []);
   const asked = all.filter((r) => r.decision !== 'declined');
   const row = { id: 'reviews' as const };
   const held = holding(asked);
