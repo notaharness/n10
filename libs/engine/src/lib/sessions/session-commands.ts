@@ -114,10 +114,7 @@ export function createSessionCommands(options: {
     if (!('branch' in req.target))
       throw new Error('Choose a branch to launch on another machine.');
     ports.progress?.('worktree');
-    const path = await worktrees.create(req.target.branch, {
-      cwd: repo,
-      machine: req.remote.machine,
-    });
+    const path = await worktrees.create(req.target.branch, req.remote.machine);
     return resolveRemoteWorktreePath(path, req.remote.machine.executor);
   }
   async function start(

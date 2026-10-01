@@ -149,6 +149,12 @@ export {
   LOCAL_MACHINE,
 } from './lib/session-key.js';
 export type { SessionIdentity } from './lib/session-key.js';
+export {
+  directoryOnMachine,
+  homeRelative,
+  localHomes,
+  remoteWorktreeScope,
+} from './lib/machine-paths.js';
 
 export {
   setMachineResolver,

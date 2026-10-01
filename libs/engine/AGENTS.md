@@ -69,7 +69,8 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
 
 - **Directory terminals** (`sessions/terminal-service.ts`): one process-wide
   instance owns launch coalescing and retained kind/directory identity. A restart
-  takes its machine from the qualified key. Never stat a remote directory locally.
+  takes its machine from the qualified key. Never stat a remote directory locally;
+  a fresh remote terminal opens where its machine resolves the directory (D18).
   An old client's exit cannot drop its successor; agent panes remain while their
   native target exists. Shells adapt started/ended callbacks to output delivery.
 

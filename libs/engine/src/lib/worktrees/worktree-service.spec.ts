@@ -18,6 +18,14 @@ const ports = vi.hoisted(() => ({
   remove: vi.fn(),
   check: vi.fn(),
   rebase: vi.fn(),
+  remoteScope:
+    vi.fn<
+      (
+        repo: string,
+        template: string | undefined,
+        machine: Machine
+      ) => Promise<WorktreeScope>
+    >(),
 }));
 vi.mock('@n10/worktree-manager', async (original) => ({
   ...(await original<typeof WorktreeManager>()),
@@ -31,6 +39,7 @@ vi.mock('@n10/core', () => ({
   fetchRefs: ports.fetch,
   checkWorktreeRemoval: ports.check,
   removeWorktreeSession: ports.remove,
+  remoteWorktreeScope: ports.remoteScope,
   keyForWorktree: (wt: WorktreeInfo, repo: string) =>
     JSON.stringify(['worktree', repo, wt.path]),
 }));
@@ -254,14 +263,21 @@ describe('worktree commands', () => {
       'No worktree'
     );
   });
-  it('passes remote creation to the named machine without refreshing local resources', async () => {
-    const { service } = harness();
+  it('creates a remote checkout in that machine’s clone without refreshing local resources', async () => {
+    const { service } = harness('/home/hisuser/repo');
     const machine = { id: 'peer' } as Machine;
-    await service.create('topic', { cwd: '/remote/repo', machine });
-    expect(ports.create).toHaveBeenCalledWith(
-      'topic',
-      expect.objectContaining({ cwd: '/remote/repo', machine })
+    const remote = {
+      cwd: '/home/otheruser/repo',
+      machine,
+    } as unknown as WorktreeScope;
+    ports.remoteScope.mockResolvedValueOnce(remote);
+    await service.create('topic', machine);
+    expect(ports.remoteScope).toHaveBeenCalledWith(
+      '/home/hisuser/repo',
+      'trees/{session}',
+      machine
     );
+    expect(ports.create).toHaveBeenCalledWith('topic', remote);
     expect(ports.list).not.toHaveBeenCalled();
   });
 });

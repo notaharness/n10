@@ -3,6 +3,7 @@ import {
   removeWorktreeSession,
   fetchRefs,
   keyForWorktree,
+  remoteWorktreeScope,
 } from '@n10/core';
 import type { WorktreeRemovalCheck, WorktreeRemovalOutcome } from '@n10/core';
 import {
@@ -38,10 +39,9 @@ export interface WorktreeCommands {
     branch: string,
     approved: WorktreeRemovalCheck
   ): Promise<WorktreeRemovalOutcome>;
-  create(
-    branch: string,
-    remote?: { cwd: string; machine: Machine }
-  ): Promise<string>;
+  /** On `machine`, the checkout lives in that machine's clone of the
+   *  repository, never at this machine's path. */
+  create(branch: string, machine?: Machine): Promise<string>;
   find(target: WorktreeTarget): Promise<WorktreeInfo | null>;
   resolve(target: WorktreeTarget): Promise<string | null>;
   fetchBranches(): Promise<void>;
@@ -59,20 +59,18 @@ export function createWorktreeCommands(options: {
   const repo = config.repo;
   const scope = () =>
     worktreeScope(repo, { template: config.getSnapshot().config.worktreePath });
-  async function create(
-    branch: string,
-    remote?: { cwd: string; machine: Machine }
-  ): Promise<string> {
+  async function create(branch: string, machine?: Machine): Promise<string> {
     const at = scope();
-    const target = remote
-      ? worktreeScope(remote.cwd, {
-          template: config.getSnapshot().config.worktreePath,
-          machine: remote.machine,
-        })
+    const target = machine
+      ? await remoteWorktreeScope(
+          repo,
+          config.getSnapshot().config.worktreePath,
+          machine
+        )
       : at;
     const path = await createWorktree(branch, target);
     if (!path) throw new Error(`Failed to create a worktree for "${branch}"`);
-    if (!remote) await changed();
+    if (!machine) await changed();
     return path;
   }
   async function locate(

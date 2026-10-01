@@ -1,4 +1,6 @@
 import type * as Fs from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import type * as Vcs from '@n10/vcs-core';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type * as Core from '@n10/core';
@@ -24,6 +26,7 @@ const state = vi.hoisted(() => ({
   kill: vi.fn(),
   release: vi.fn(),
   detach: vi.fn(),
+  remoteRun: vi.fn(),
 }));
 vi.mock('node:fs', async (original) => ({
   ...(await original<typeof Fs>()),
@@ -43,6 +46,10 @@ vi.mock('@n10/core', async (original) => ({
   killSession: state.kill,
   releaseExitedSession: state.release,
   detachSession: state.detach,
+  requireMachine: (id: string) => ({
+    id,
+    executor: { run: state.remoteRun },
+  }),
 }));
 const local = terminalSessionKey('terminal');
 const remote = terminalSessionKey('terminal', 'peer');
@@ -280,4 +287,36 @@ it('exposes connection health only for remote terminals', async () => {
     machine: 'peer',
     connectionState: 'failed',
   });
+});
+it('opens a fresh remote terminal where that machine finds the directory, never at this machine’s path', async () => {
+  const { service } = fixture();
+  // The remote user's home is /home/otheruser; only code/app exists there.
+  state.remoteRun.mockImplementation(async (argv: string[]) =>
+    argv[4] === 'code/app'
+      ? { stdout: '/home/otheruser/code/app\n', stderr: '', code: 0 }
+      : { stdout: '', stderr: "sh: 1: cd: can't cd", code: 2 }
+  );
+  const summary = await service.launch({
+    kind: 'shell',
+    cwd: join(homedir(), 'code/app'),
+    machine: 'peer',
+  });
+  expect(state.stat).not.toHaveBeenCalled();
+  expect(state.remoteRun).toHaveBeenCalledWith(
+    ['sh', '-c', 'CDPATH= cd -P -- "$1" && pwd -P', 'sh', 'code/app'],
+    { cwd: '~' }
+  );
+  expect(state.launch).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      cwd: '/home/otheruser/code/app',
+      machine: 'peer',
+    })
+  );
+  expect(summary).toMatchObject({
+    cwd: '/home/otheruser/code/app',
+    machine: 'peer',
+  });
+  await expect(
+    service.launch({ kind: 'shell', cwd: '/srv/missing', machine: 'peer' })
+  ).rejects.toThrow('Directory does not exist on that machine: /srv/missing');
 });
