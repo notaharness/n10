@@ -13,6 +13,12 @@ import {
 } from './setup/app.js';
 import { fleetTest as test, formFleet } from './setup/beam-fleet.js';
 import { BEAM_TEST_BINARY } from './setup/beam-testkit.js';
+import {
+  addExternalWorktree,
+  cleanupExternalSessions,
+  startExternalTmuxSession,
+  uniqueExternalBranch,
+} from './setup/external.js';
 
 const BRANCH = 'remote-review';
 
@@ -30,6 +36,12 @@ test.describe('A pull request worked on another machine @beam', () => {
       username: 'n10-tester',
       prs: [{ number: 31, title: 'Remote review', headRefName: BRANCH }],
     },
+  });
+
+  // A session started outside the app, here, for discovery to find.
+  const outside = uniqueExternalBranch();
+  test.afterEach(({ desktop }) => {
+    cleanupExternalSessions(desktop.repoPath, [outside], desktop.homeDir);
   });
 
   test('its agent and a terminal beside it name the machine they run on', async ({
@@ -83,5 +95,30 @@ test.describe('A pull request worked on another machine @beam', () => {
       )
     ).toBeVisible({ timeout: 30_000 });
     await expect(tabs(page)).toHaveCount(1);
+
+    // Discovery reads this machine's tmux, where the terminal is not.
+    // A session started here from outside gets a tab once a scan has
+    // adopted it. The terminal on workbox outlives that scan: it still
+    // answers, and its card is still beside the agent's. (A terminal
+    // the scan ended loses its card a moment after the new tab shows;
+    // by then this input has gone to the agent instead.)
+    const { repoPath, homeDir } = desktop;
+    startExternalTmuxSession({
+      repoPath,
+      homeDir,
+      branch: outside,
+      worktreePath: addExternalWorktree(repoPath, outside),
+      command: 'sleep 120',
+    });
+    await expect(tabs(page).filter({ hasText: outside })).toBeVisible({
+      timeout: 30_000,
+    });
+    await focusTerminal(page);
+    await page.keyboard.type('echo survived-$((6 * 7))\n');
+    await expect(visibleText(page, 'survived-42')).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(terminal).toContainText('Running');
+    await expect(sessionCards(page)).toHaveCount(2);
   });
 });
