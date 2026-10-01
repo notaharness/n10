@@ -19,6 +19,9 @@ process exit, including retained panes; `onDisconnect` reports a local client
 ending while the hosted process is still running. The backend reconnects its
 client with bounded backoff while preserving the local subscriptions and size. Native `pane_dead` and exit
 status drive lifecycle information; no global tmux hooks are installed.
+The local and remote backends replay a retained pane's final frame only once
+their client has first drawn (`ClientDraw`): its alternate screen would hide a
+frame written earlier.
 
 ## Safety and protocol
 
