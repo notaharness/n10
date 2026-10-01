@@ -4,6 +4,7 @@ import {
   type PullRequestInfo,
   type PullRequestReviewer,
   type ReviewDecision,
+  viewerEntry,
 } from '@n10/vcs-core/types';
 import type { Mode } from './review-model.js';
 
@@ -120,14 +121,18 @@ export function adoptPullRequest(
   return { ...state, hasPr, mode: state.chosen ? state.mode : initial };
 }
 
-/** The viewer's own entry among the reviewers, if they are one. */
+/** The viewer's own entry among the reviewers, or else a group of
+ *  theirs that is still asked (`viewerEntry`). */
 export function viewerReview(
   pr: PullRequestInfo,
   viewer: string | null
 ): PullRequestReviewer | undefined {
   if (viewer == null) return undefined;
   const me = viewer.toLowerCase();
-  return pr.reviewers?.find((r) => r.identifier.toLowerCase() === me);
+  return viewerEntry(
+    pr.reviewers ?? [],
+    (r) => r.identifier.toLowerCase() === me
+  );
 }
 
 /** What the primary button in the attention strip does. */

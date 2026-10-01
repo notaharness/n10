@@ -3,6 +3,7 @@ import type { AgentSession } from '../types.js';
 
 import {
   isBlockingDecision,
+  viewerEntry,
   type BranchPrMap,
   type PullRequestInfo,
   type PullRequestReviewer,
@@ -68,7 +69,7 @@ export function categorizeReviews(
     if (!pr || !pr.reviewers) continue;
     // Skip PRs created by the current user — they belong in sessions, not reviews
     if (provider.matchesUser(pr.createdByIdentifier, config)) continue;
-    const reviewer = pr.reviewers.find((r) =>
+    const reviewer = viewerEntry(pr.reviewers, (r) =>
       provider.matchesUser(r.identifier, config)
     );
     const bucket = reviewer && reviewBucket(reviewer, pr.isDraft ?? false);

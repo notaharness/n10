@@ -66,6 +66,10 @@ export interface PullRequestReviewer {
    *  after a verdict, where `decision` still holds that verdict. Absent
    *  where the list does not say. */
   requested?: boolean;
+  /** A group reviewer the signed-in user belongs to. Asking the group
+   *  asks the user, but its `decision` is whoever voted for the group,
+   *  never the user's own. */
+  includesViewer?: boolean;
 }
 
 /** The provider holds a request for this reviewer's verdict. Where the
@@ -76,6 +80,19 @@ export interface PullRequestReviewer {
 export function asksForReview(reviewer: PullRequestReviewer): boolean {
   if (reviewer.decision === 'declined') return false;
   return reviewer.requested ?? reviewer.decision === 'no-response';
+}
+
+/** The entry that speaks for the viewer: their own, or else a group
+ *  they belong to that is still asked. A group that has voted was
+ *  answered by another member, so its vote is never the viewer's. */
+export function viewerEntry(
+  reviewers: readonly PullRequestReviewer[],
+  isViewer: (reviewer: PullRequestReviewer) => boolean
+): PullRequestReviewer | undefined {
+  return (
+    reviewers.find(isViewer) ??
+    reviewers.find((r) => r.includesViewer && asksForReview(r))
+  );
 }
 
 export interface PullRequestInfo {
