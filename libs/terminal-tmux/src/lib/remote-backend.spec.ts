@@ -109,6 +109,31 @@ describe('RemoteTmuxBackend (D4)', () => {
     expect(params.cwd).toBe('/tmp');
   });
 
+  // The far daemon may run without a TERM, and tmux attaches to none.
+  it('names this side’s terminal to every attach, the first and a reattach', async () => {
+    run.mockImplementation(async (argv: string[]) => {
+      if (argv.includes('has-session'))
+        return { stdout: '', stderr: '', code: 1 };
+      if (argv.includes('list-sessions')) return aliveListing('wt');
+      return { stdout: '', stderr: '', code: 0 };
+    });
+    await createRemoteTmuxBackend(
+      spec,
+      { mode: 'create', label: 'wt', tags: {} },
+      machine,
+      poller
+    );
+    opens[0]!.close();
+    await vi.advanceTimersByTimeAsync(500);
+    await flushMicrotasks();
+    const calls = (machine.ptyOpener.open as ReturnType<typeof vi.fn>).mock
+      .calls;
+    expect(calls.map((c) => c[0].env.TERM)).toEqual([
+      'xterm-256color',
+      'xterm-256color',
+    ]);
+  });
+
   it('a dropped connection sets connectionState to reconnecting and leaves processState.running true', async () => {
     run.mockImplementation(async (argv: string[]) => {
       if (argv.includes('has-session'))
