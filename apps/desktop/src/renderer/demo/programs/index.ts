@@ -16,8 +16,9 @@ import { Zsh } from './zsh.js';
 
 /**
  * Which program runs in which session: what is alive when the page
- * loads (an agent in n10, one in beam on the desktop at home, and a zsh
- * tab), and what launching, reviewing and checking out a plan start.
+ * loads (agents in n10 and in beam, one of them on the desktop at home,
+ * and a zsh tab), and what launching, reviewing and checking out
+ * a plan start.
  */
 const DEMO_REPLY: Beat[] = [
   { after: 900, working: 'Thinking' },
@@ -34,6 +35,24 @@ const DEMO_REPLY: Beat[] = [
     ],
   },
 ];
+
+/** An agent that finished a docs pass before the page loaded: enough
+ *  open tabs, from both repositories, for the strip to wrap. */
+function docsAgent(repo: string, branch: string, asked: string): ClaudeCode {
+  return new ClaudeCode({
+    cwd: displayDir(repo, branch),
+    history: [
+      { kind: 'prompt', text: asked },
+      { kind: 'read', files: 4 },
+      {
+        kind: 'say',
+        paragraphs: ['Updated the page. It is ready for a look.'],
+      },
+      { kind: 'done', text: 'Worked for 1m 12s' },
+    ],
+    reply: () => DEMO_REPLY,
+  });
+}
 
 /** A plan with no script of its own: acknowledge it, answer its threads. */
 function genericPlan(pr: PullRequestInfo, repo: RepoState): Beat[] {
@@ -83,6 +102,21 @@ export const PROGRAMS = {
         terminal: { kind: 'shell', cwd: N10 },
       }
     );
+    for (const [repo, branch, asked] of [
+      [N10, 'docs/roadmap', 'Bring the roadmap up to date with what shipped.'],
+      [
+        N10,
+        'docs/keyboard-shortcuts',
+        'List the desktop shortcuts on one page.',
+      ],
+      [BEAM, 'docs/relay-regions', 'Document which regions the relays run in.'],
+    ] as const) {
+      hub.spawn(sessionKey(repo, branch), docsAgent(repo, branch, asked), {
+        repo,
+        branch,
+        machine: 'local',
+      });
+    }
   },
 
   agent(req: SessionLaunchRequest, repo: RepoState): ClaudeCode {

@@ -235,6 +235,9 @@ export interface RecentRepoEntry {
   lastOpenedAt: number;
   /** Re-validated against the filesystem at list time. */
   valid: boolean;
+  /** Its colour on screen, taken as it was added: an index into the
+   *  renderer's repository palette, wrapping past its end. */
+  color: number;
 }
 
 // ── Sync (remote PR data) ────────────────────────────────────────
@@ -286,7 +289,12 @@ export interface DesktopPrefs {
   /** Use the OS window frame + native menu bar instead of the custom
    *  title bar. Applied on next launch. */
   nativeFrame: boolean;
+  /** What the tab strip does with more tabs than fit: wrap onto more
+   *  rows, or scroll the one row sideways. */
+  tabOverflow: TabOverflow;
 }
+
+export type TabOverflow = 'wrap' | 'scroll';
 
 /** One entry of a native context menu. */
 export type ContextMenuItem =
@@ -297,6 +305,9 @@ export type ContextMenuItem =
       enabled?: boolean;
       /** Render as a destructive action where the platform supports it. */
       danger?: boolean;
+      /** A radio item, one of the adjacent items that also have it:
+       *  whether it is the one chosen. */
+      checked?: boolean;
     };
 
 /** Mirror of app-core's ActivitySnapshot, redeclared so the renderer

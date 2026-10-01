@@ -2,6 +2,7 @@ import { QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import type { N10HostApi, RepoInfo } from '../host/contract.js';
+import { TabDragProvider } from './components/editor/TabStrip.js';
 import { RevokeMachineDialog } from './components/machines/RevokeMachineDialog.js';
 import { Toaster } from './components/ui/sonner.js';
 import { TooltipProvider } from './components/ui/tooltip.js';
@@ -32,14 +33,17 @@ export function App() {
       <TooltipProvider>
         {/* Above the gate on purpose: the tab strip spans repositories,
             so switching repos must not unmount the tabs of the one being
-            left — their agents keep running and stay in the strip. */}
+            left — their agents keep running and stay in the strip — nor
+            drop a drag the press that switched them began. */}
         <TabsProvider>
           <TabViewsHost>
             <PrewarmProvider>
-              <FleetProvider>
-                <Gate />
-                <RevocationDialog />
-              </FleetProvider>
+              <TabDragProvider>
+                <FleetProvider>
+                  <Gate />
+                  <RevocationDialog />
+                </FleetProvider>
+              </TabDragProvider>
             </PrewarmProvider>
           </TabViewsHost>
         </TabsProvider>
@@ -61,11 +65,13 @@ function Gate() {
   const qc = useQueryClient();
   const { data: repo, isPending } = useRepoGate();
 
-  /** Adopt a repository the host has already switched to. */
+  /** Adopt a repository the host has already switched to. Opening it
+   *  put it on the recents list, with its colour if it is new there. */
   const adoptRepo = useCallback(
     (r: RepoInfo) => {
       resetRepoScopedCache(qc);
       qc.setQueryData(keys.repo, r);
+      void qc.invalidateQueries({ queryKey: keys.recents });
     },
     [qc]
   );

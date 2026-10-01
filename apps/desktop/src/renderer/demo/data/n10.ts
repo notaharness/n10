@@ -92,17 +92,29 @@ export const N10_REPO: RepoData = {
   branches: [
     'master',
     'docs/roadmap',
+    'docs/keyboard-shortcuts',
     PR_FLEET.sourceBranch,
     PR_TABS.sourceBranch,
     PR_LINUX.sourceBranch,
     PR_REVIEW.sourceBranch,
   ],
-  worktrees: ['docs/roadmap', PR_FLEET.sourceBranch, PR_TABS.sourceBranch],
+  worktrees: [
+    'docs/roadmap',
+    'docs/keyboard-shortcuts',
+    PR_FLEET.sourceBranch,
+    PR_TABS.sourceBranch,
+  ],
   sidebar: () => [
     {
       kind: 'session',
-      session: worktreeSession(N10, 'docs/roadmap', false),
+      session: worktreeSession(N10, 'docs/roadmap', true),
       branch: 'docs/roadmap',
+      isMerged: false,
+    },
+    {
+      kind: 'session',
+      session: worktreeSession(N10, 'docs/keyboard-shortcuts', true),
+      branch: 'docs/keyboard-shortcuts',
       isMerged: false,
     },
     {

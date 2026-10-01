@@ -14,6 +14,7 @@ export type DesktopPrefsLike = DesktopPrefs;
 const DEFAULTS: DesktopPrefs = {
   theme: 'system',
   nativeFrame: false,
+  tabOverflow: 'wrap',
 };
 
 function prefsPath(): string {

@@ -8,6 +8,7 @@ import {
   loadRecents,
   recordOpen,
   saveRecents,
+  withColors,
   type RecentRepo,
 } from './recent-repos.js';
 
@@ -63,6 +64,60 @@ describe('recordOpen', () => {
     expect(recents).toHaveLength(10);
     expect(recents[0]!.cwd).toBe('/repo-14');
     expect(recents.at(-1)!.cwd).toBe('/repo-5');
+  });
+});
+
+describe('repository colours', () => {
+  const colors = (recents: RecentRepo[]) =>
+    Object.fromEntries(recents.map((r) => [r.cwd, r.color]));
+
+  it('gives a new repository the lowest colour no other one holds', () => {
+    const recents: RecentRepo[] = [
+      { cwd: '/a', lastOpenedAt: 2, color: 0 },
+      { cwd: '/b', lastOpenedAt: 1, color: 2 },
+    ];
+    expect(colors(recordOpen(recents, '/c'))).toEqual({
+      '/a': 0,
+      '/b': 2,
+      '/c': 1,
+    });
+  });
+
+  it('keeps a repository its colour when it is opened again', () => {
+    const recents: RecentRepo[] = [
+      { cwd: '/a', lastOpenedAt: 2, color: 0 },
+      { cwd: '/b', lastOpenedAt: 1, color: 1 },
+    ];
+    const next = recordOpen(recents, '/b');
+    expect(next.map((r) => r.cwd)).toEqual(['/b', '/a']);
+    expect(colors(next)).toEqual({ '/a': 0, '/b': 1 });
+  });
+
+  it('frees the colour of a repository that falls off the list', () => {
+    let recents: RecentRepo[] = [];
+    for (let i = 0; i < 10; i++) recents = recordOpen(recents, `/repo-${i}`);
+    // /repo-0 held colour 0 and is the oldest.
+    recents = recordOpen(recents, '/new');
+    expect(recents.some((r) => r.cwd === '/repo-0')).toBe(false);
+    expect(colors(recents)['/new']).toBe(0);
+  });
+
+  it('colours entries saved before colours, leaving the rest alone', () => {
+    expect(
+      colors(
+        withColors([
+          { cwd: '/a', lastOpenedAt: 3 },
+          { cwd: '/b', lastOpenedAt: 2, color: 0 },
+          { cwd: '/c', lastOpenedAt: 1 },
+        ])
+      )
+    ).toEqual({ '/a': 1, '/b': 0, '/c': 2 });
+  });
+
+  it('colours a repository put on the list without being opened', () => {
+    saveRecents([{ cwd: '/a', lastOpenedAt: 1, color: 0 }], file);
+    ensureRecent('/b', file);
+    expect(colors(loadRecents(file))).toEqual({ '/a': 0, '/b': 1 });
   });
 });
 

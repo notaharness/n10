@@ -2,12 +2,17 @@ import { startBabysitForRepo, stopBabysitForBranch } from './babysit.js';
 import { canonicalRepoPath, isGitRepo, resetRepoRoot } from '@n10/core';
 import type { ConfigService, RepositoryHandle } from '@n10/engine';
 import { repositories } from './program.js';
-import { NoActiveRepoError, type RepoInfo } from '../contract.js';
+import {
+  NoActiveRepoError,
+  type RecentRepoEntry,
+  type RepoInfo,
+} from '../contract.js';
 import {
   loadRecents,
   forgetRecent,
   recordOpen,
   saveRecents,
+  withColors,
   type RecentRepo,
 } from './recent-repos.js';
 
@@ -150,8 +155,8 @@ export function openStartupRepo(
  * re-validated against the filesystem so dead checkouts render as
  * invalid instead of failing on click.
  */
-export function listRecentRepos(): (RecentRepo & { valid: boolean })[] {
-  return canonicalRecents(loadRecents())
+export function listRecentRepos(): RecentRepoEntry[] {
+  return withColors(canonicalRecents(loadRecents()))
     .slice(0, 10)
     .map((r) => ({ ...r, valid: isGitRepo(r.cwd) }));
 }

@@ -18,6 +18,8 @@ import {
   itemWorktree,
 } from '../../lib/sidebar/sidebar-model.js';
 import { PaneShownContext } from '../../lib/tabs/pane-shown.js';
+import { useRepoColors } from '../../lib/tabs/repo-colors.js';
+import { tabRepo } from '../../lib/tabs/tab-presentation.js';
 import { TabViewScope } from '../../lib/tabs/tab-views.js';
 import { foreignRepoOf, useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
@@ -227,6 +229,13 @@ export function EditorArea({
     return resolveMachineLabel(machineId, machines.data);
   };
 
+  // Each repository's colour; a tab with no repository has none.
+  const repoColors = useRepoColors();
+  const colorOf = (tab: Tab): string | null => {
+    const r = tabRepo(tab);
+    return (r && repoColors.get(r)) ?? null;
+  };
+
   // No blanket overlay while a pane mounts: the virtualized diff and
   // the rail each show their own skeletons, and the terminal renders
   // in the first frame.
@@ -249,7 +258,7 @@ export function EditorArea({
 
   return (
     <div className="flex h-full min-w-0 flex-col bg-background">
-      <TabStrip ids={tabs.tabs.map((t) => t.id)} onMove={tabs.moveTab}>
+      <TabStrip ids={tabs.tabs.map((t) => t.id)}>
         {tabs.tabs.map((tab) => {
           const sessionName = sessionNameFor(tab);
           return (
@@ -265,6 +274,7 @@ export function EditorArea({
               running={tab.kind === 'terminal' && terminalRunning.has(tab.name)}
               unseen={tabs.unseen.includes(tab.id)}
               machineLabel={machineLabelFor(tab)}
+              repoColor={colorOf(tab)}
             />
           );
         })}

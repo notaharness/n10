@@ -43,7 +43,25 @@
   --statusbar: #f8f8f8;
   --statusbar-foreground: #3b3b3b;
   --tab: #f8f8f8;
-  --tab-active: #ffffff;
+  /* Tinted, so the active tab stands apart from the repository bands;
+     strong enough to tell, light enough to keep them at 3:1 on it. */
+  --tab-active: color-mix(in srgb, var(--primary) 10%, var(--background));
+  /* Opaque, so the close button can cover a tab's end in its colour. */
+  --tab-hover: color-mix(in srgb, var(--accent) 60%, var(--tab));
+
+  /* Repositories, in the order they take them (lib/tabs/repo-colors.ts):
+     one for each the recents list holds, each at least 3:1 against every
+     tab background. */
+  --repo-1: #0d9488;
+  --repo-2: #ea580c;
+  --repo-3: #7c3aed;
+  --repo-4: #db2777;
+  --repo-5: #15803d;
+  --repo-6: #a16207;
+  --repo-7: #0284c7;
+  --repo-8: #dc2626;
+  --repo-9: #4f46e5;
+  --repo-10: #92400e;
 
   --success: #1a7f37;
   --warning: #9a6700;
@@ -91,7 +109,18 @@
   --statusbar: #181818;
   --statusbar-foreground: #cccccc;
   --tab: #181818;
-  --tab-active: #1f1f1f;
+  --tab-active: color-mix(in srgb, var(--primary) 18%, var(--background));
+
+  --repo-1: #2dd4bf;
+  --repo-2: #fb923c;
+  --repo-3: #a78bfa;
+  --repo-4: #f472b6;
+  --repo-5: #4ade80;
+  --repo-6: #facc15;
+  --repo-7: #38bdf8;
+  --repo-8: #f87171;
+  --repo-9: #818cf8;
+  --repo-10: #d6a77a;
 
   --success: #3fb950;
   --warning: #d29922;
@@ -140,6 +169,7 @@
   --color-statusbar-foreground: var(--statusbar-foreground);
   --color-tab: var(--tab);
   --color-tab-active: var(--tab-active);
+  --color-tab-hover: var(--tab-hover);
 
   --color-success: var(--success);
   --color-warning: var(--warning);
@@ -246,12 +276,11 @@
 
   /* Subtle attention pulse for a tab whose agent just finished a work
      streak and hasn't been looked at yet (the TUI's title flash):
-     blinks toward — but not all the way to — the active-tab shade. */
+     blinks toward — but not all the way to — the active-tab shade.
+     Only the lit half is declared: the other is the tab's own
+     background, hover included, and opaque, which the close button's
+     cover takes on. */
   @keyframes tab-attention {
-    0%,
-    100% {
-      background-color: transparent;
-    }
     50% {
       background-color: color-mix(in srgb, var(--tab-active) 85%, var(--tab));
     }

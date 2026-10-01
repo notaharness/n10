@@ -279,6 +279,21 @@ foreign sessions and terminals. Reconcile only the repo described by the update.
 Agent auto-open history is repo-qualified; closing a tab must not reopen it on
 an unchanged poll. Store titles on tabs because foreign items may be unavailable.
 
+The tab strip's `DndContext` (`TabDragProvider`) lives above the gate for the
+same reason. A tab is chosen on press, and choosing a foreign tab opens its
+repository, which remounts `Workspace`. Inside it, the remount dropped the
+pointer sensor watching the press, so a foreign tab could never be dragged.
+Above it, the sensor outlives the remount and lifts the remounted tab by id.
+
+Wrapped, full rows share their width and the last row keeps its tabs' own: an
+end piece after the last tab grows far faster than the tabs, so only the last
+row's room goes to it. The end piece is a pointer drop target only, resolved
+to the last tab so the sorting strategy opens the end slot; collisions go by
+pointer first because the nearest centre takes a tab on the row above for the
+room at the end of the row below. A keyboard drag steps between droppables,
+so it skips the end piece. Labels are cut by measurement because Chromium has
+no start-side `text-overflow`, and branch names keep their end.
+
 Sidebar snapshots carry their repository identity. Drop mismatched answers in
 the renderer, and recheck identity between host awaits, to prevent rows from a
 new repository entering the previous repository's tab state.

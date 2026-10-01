@@ -1,5 +1,6 @@
 import type { SidebarItem } from '../../../host/contract.js';
 import { itemTitle } from '../sidebar/sidebar-model.js';
+import type { CutSide } from './label-cut.js';
 import type { Tab } from './tab-identity.js';
 
 /**
@@ -14,29 +15,14 @@ import type { Tab } from './tab-identity.js';
 /** What a tab is a tab of, as far as its icon is concerned. */
 export type TabFace = 'settings' | 'pr' | 'branch' | 'terminal';
 
-/** How many characters of a terminal's directory the tab shows. The
- *  strip truncates from the end (CSS), which for a path hides exactly
- *  the part that tells two directories apart, so the cut is made here
- *  from the front instead. */
-const TERMINAL_LABEL_MAX = 24;
-
 /**
- * Shorten a path from the front, so its tail stays readable.
- *
- * Whole segments go first — `…/Code/n10` rather than `…e/Code/n10`
- * — and only when the last segment alone is too long is it cut inside.
+ * Which end a label too long for its tab loses. A branch name or a
+ * directory is told from its neighbours by its end (`…/tab-strip-wrap`,
+ * `…/Code/n10`), so it loses its start; a pull request's title, and
+ * anything else, reads from its start and loses its end.
  */
-export function truncateLeading(path: string, max: number): string {
-  if (path.length <= max) return path;
-  const segments = path.split('/');
-  let tail = '';
-  for (let i = segments.length - 1; i > 0; i--) {
-    const next = `/${segments[i]}${tail}`;
-    if (`…${next}`.length > max) break;
-    tail = next;
-  }
-  if (tail) return `…${tail}`;
-  return `…${path.slice(path.length - (max - 1))}`;
+export function cutSide(face: TabFace): CutSide {
+  return face === 'branch' || face === 'terminal' ? 'start' : 'end';
 }
 
 /**
@@ -73,10 +59,7 @@ function basePresentation(
 ): { label: string; face: TabFace } {
   if (tab.kind === 'settings') return { label: 'Settings', face: 'settings' };
   if (tab.kind === 'terminal') {
-    return {
-      label: truncateLeading(tab.displayPath, TERMINAL_LABEL_MAX),
-      face: 'terminal',
-    };
+    return { label: tab.displayPath, face: 'terminal' };
   }
   const label =
     (item ? itemTitle(item) : undefined) ??

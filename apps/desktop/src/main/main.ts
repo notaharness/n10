@@ -83,6 +83,9 @@ function popupContextMenu(items: ContextMenuItem[]): Promise<string | null> {
           : {
               label: item.label,
               enabled: item.enabled ?? true,
+              ...(item.checked === undefined
+                ? {}
+                : { type: 'radio' as const, checked: item.checked }),
               click: () => {
                 chosen = item.id;
               },

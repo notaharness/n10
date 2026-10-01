@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, describe, expect, it } from 'vitest';
 import type {
+  DesktopPrefs,
   N10HostApi,
   RepoInfo,
   SidebarItem,
@@ -64,7 +65,11 @@ describe('loadRepoGate', () => {
     stubHost({
       refreshRepo: () => Promise.reject(new Error('host is not ready')),
       getDesktopPrefs: () =>
-        Promise.resolve({ theme: 'system' as const, nativeFrame: false }),
+        Promise.resolve({
+          theme: 'system' as const,
+          nativeFrame: false,
+          tabOverflow: 'wrap' as const,
+        }),
     });
 
     // A rejection here must not surface as a failed query: the gate
@@ -74,7 +79,7 @@ describe('loadRepoGate', () => {
   });
 
   it('waits for the desktop prefs before reporting the repository', async () => {
-    const prefs = deferred<{ theme: 'system'; nativeFrame: boolean }>();
+    const prefs = deferred<DesktopPrefs>();
     stubHost({
       refreshRepo: () => Promise.resolve(REPO),
       getDesktopPrefs: () => prefs.promise,
@@ -86,7 +91,7 @@ describe('loadRepoGate', () => {
     // with are not — resolving now would paint the wrong one first.
     expect(await state(gate)).toBe('pending');
 
-    prefs.resolve({ theme: 'system', nativeFrame: false });
+    prefs.resolve({ theme: 'system', nativeFrame: false, tabOverflow: 'wrap' });
     expect(await gate).toEqual(REPO);
   });
 
