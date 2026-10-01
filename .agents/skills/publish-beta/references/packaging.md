@@ -50,16 +50,28 @@ requests that touch packaging, and as the release gate.
 `.github/workflows/release.yml` runs on a `v*` tag, which must equal
 `apps/cli/package.json`'s version. The `publish` job publishes the tarball the
 Package workflow tested, through npm trusted publishing (OIDC) with
-provenance. The trusted publisher on npmjs.com names this repository, `release.yml`
+provenance. A stable version goes under the `latest` dist-tag and a
+prerelease under `beta`. While the workflow's `LATEST_FOLLOWS_BETA` is
+`true`, a prerelease then moves `latest` to itself with `npm dist-tag add`,
+so plain installs get the newest beta during the beta-only period. Once it is
+`false`, `latest` stays on the last stable release. `npm dist-tag`
+authenticates through trusted publishing from npm 11.21.0, which the job
+installs, and only when the trusted publisher allows npm dist-tag.
+
+The trusted publisher on npmjs.com names this repository, `release.yml`
 and the `npm` environment, whose deployment rule admits only `v*` tags;
 renaming the workflow file or the environment breaks publishing until it is
-updated there. A dispatched rehearsal runs `npm publish --dry-run` in its own
-job, outside that environment.
+updated there. Before publishing, `publish` checks both permissions, so a
+misconfigured publisher fails before the version is spent. `npm publish
+--dry-run` at verbose level performs the OIDC exchange, and the job fails
+unless npm logs that it succeeded. When it will move `latest`, it also adds
+and removes a `release-check` dist-tag on the current `latest`: npm checks
+the dist-tag permission only when a tag changes, and `dist-tag add` sends
+nothing when the tag already has the version. A dispatched rehearsal runs
+`npm publish --dry-run` in its own job, outside that environment, so it
+checks neither.
 
-Trusted publishing authenticates `npm publish` only, not `npm dist-tag`, so a
-release sets one tag: `latest`. Every release, prerelease or not, is what a
-plain `npm install -g @notaharness/n10` installs.
-
-The `github-release` job creates the GitHub release with generated notes and
-attaches every artifact named `release-*` from the run. Jobs that build
-release assets upload under that prefix and join its `needs`.
+The `github-release` job creates the GitHub release with generated notes,
+marked as a prerelease for a prerelease version, and attaches every artifact
+named `release-*` from the run. Jobs that build release assets upload under
+that prefix and join its `needs`.

@@ -83,6 +83,15 @@ Review its changes before you open a pull request.
 - Fill in the pull request template.
 - Keep it small. Split unrelated changes into separate pull requests.
 
+## Releases
+
+A maintainer releases by bumping `apps/cli/package.json`'s version on
+`master` and pushing a matching `vX.Y.Z` tag. CI tests the packed package,
+publishes it to npm and creates the GitHub release, a prerelease for
+`vX.Y.Z-beta.N`. Betas go under npm's `beta` dist-tag and, while n10 is
+beta-only, `latest` too, so a plain install gets the newest. The steps are in the
+[`publish-beta` skill](.agents/skills/publish-beta/SKILL.md).
+
 ## Discuss
 
 Use [issues](https://github.com/notaharness/n10/issues) for bugs, proposals

@@ -2,7 +2,9 @@ name: Release
 
 # A vX.Y.Z tag releases X.Y.Z: it packs and tests the package (package.yml),
 # publishes that tarball to npm through trusted publishing, and creates the
-# GitHub release.
+# GitHub release. A prerelease (vX.Y.Z-beta.N) is a GitHub prerelease and
+# goes under npm's `beta` dist-tag, and `latest` too while LATEST_FOLLOWS_BETA
+# is true; any other version goes under `latest`.
 # Run by hand, it rehearses the release of the selected ref's version:
 # everything but the GitHub release, and npm publish with --dry-run.
 on:
@@ -12,6 +14,12 @@ on:
 
 permissions: {}
 
+env:
+  # n10 is beta-only, so a plain `npm install` must get the newest beta:
+  # while this is true, a prerelease moves `latest` as well as `beta`. Set it
+  # to false at 1.0, so `latest` stays on stable releases.
+  LATEST_FOLLOWS_BETA: true
+
 concurrency:
   group: release
 
@@ -20,14 +28,34 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      name: ${{ steps.version.outputs.name }}
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      dist-tag: ${{ steps.version.outputs.dist-tag }}
+      move-latest: ${{ steps.version.outputs.move-latest }}
     steps:
       - uses: actions/checkout@v4
-      - run: |
+      - id: version
+        run: |
+          name=$(node -p 'require("./apps/cli/package.json").name')
           version=$(node -p 'require("./apps/cli/package.json").version')
           if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
             echo "::error::tag $GITHUB_REF_NAME does not match apps/cli/package.json's $version"
             exit 1
           fi
+          case $version in
+            *-*) prerelease=true dist_tag=beta move_latest=$LATEST_FOLLOWS_BETA ;;
+            *) prerelease=false dist_tag=latest move_latest=false ;;
+          esac
+          {
+            echo "name=$name"
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+            echo "dist-tag=$dist_tag"
+            echo "move-latest=$move_latest"
+          } >> "$GITHUB_OUTPUT"
+          echo "$name@$version: dist-tag $dist_tag, moves latest $move_latest, GitHub prerelease $prerelease"
 
   package:
     needs: version
@@ -36,31 +64,58 @@ jobs:
     uses: ./.github/workflows/package.yml
 
   # Its own job, so a GitHub release that fails after publishing can be
-  # re-run alone. Why only `latest`: publish-beta's packaging notes.
+  # re-run alone.
   publish:
     if: github.event_name == 'push'
-    needs: package
+    needs: [version, package]
     runs-on: ubuntu-latest
     # Its deployment rule admits only v* tags; npm's trusted publisher names it.
     environment: npm
     permissions:
       id-token: write # trusted publishing and provenance
+    env:
+      PACKAGE: ${{ needs.version.outputs.name }}
+      VERSION: ${{ needs.version.outputs.version }}
+      DIST_TAG: ${{ needs.version.outputs.dist-tag }}
+      MOVE_LATEST: ${{ needs.version.outputs.move-latest }}
     steps:
       - uses: actions/setup-node@v4
         with:
-          node-version: 24 # its npm (11.5.1 or later) supports trusted publishing
-          registry-url: https://registry.npmjs.org
+          node-version: 24
+      # npm dist-tag authenticates through trusted publishing from 11.21.0.
+      - run: npm install -g npm@11.21.0
       - uses: actions/download-artifact@v4
         with:
           name: package
           path: package
-      - run: npm publish --provenance --tag latest package/*.tgz
+      # npm publish exchanges the job's OIDC token even in a dry run, and logs
+      # whether the trusted publisher took it, so a misconfigured publisher
+      # fails here with npm's reason instead of at the publish.
+      - name: npm takes this workflow as the trusted publisher
+        run: |
+          npm publish --dry-run --loglevel verbose --tag "$DIST_TAG" ./package/*.tgz 2> npm.log || { cat npm.log; exit 1; }
+          grep -q 'oidc Successfully retrieved and set token' npm.log || { grep oidc npm.log; echo "::error::npm's trusted publisher for this package did not take this workflow"; exit 1; }
+      # npm checks the publisher's "Allow npm dist-tag" when a tag changes, and
+      # dist-tag add skips the request when the tag already has the version, so
+      # the check sets and removes a tag of its own.
+      - if: env.MOVE_LATEST == 'true'
+        name: npm lets this workflow change dist-tags
+        run: |
+          current=$(npm view "$PACKAGE" dist-tags.latest)
+          npm dist-tag add "$PACKAGE@$current" release-check
+          npm dist-tag rm "$PACKAGE" release-check
+      - run: npm publish --provenance --tag "$DIST_TAG" ./package/*.tgz
+      - if: env.MOVE_LATEST == 'true'
+        run: npm dist-tag add "$PACKAGE@$VERSION" latest
 
-  # A dispatched rehearsal: outside the tag-only environment, with no token.
+  # A dispatched rehearsal: outside the tag-only environment, with no token,
+  # so it cannot check the trusted publisher.
   rehearse:
     if: github.event_name == 'workflow_dispatch'
-    needs: package
+    needs: [version, package]
     runs-on: ubuntu-latest
+    env:
+      DIST_TAG: ${{ needs.version.outputs.dist-tag }}
     steps:
       - uses: actions/setup-node@v4
         with:
@@ -69,13 +124,13 @@ jobs:
         with:
           name: package
           path: package
-      - run: npm publish --dry-run --tag latest package/*.tgz
+      - run: npm publish --dry-run --tag "$DIST_TAG" ./package/*.tgz
 
   # Release assets are the artifacts named release-*. The Linux package jobs
   # (#122) join `needs` and upload their .deb and AppImage under that prefix.
   github-release:
     if: github.event_name == 'push'
-    needs: publish
+    needs: [version, publish]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -91,4 +146,4 @@ jobs:
             --verify-tag --generate-notes --prerelease="$PRERELEASE" "${assets[@]}"
         env:
           GH_TOKEN: ${{ github.token }}
-          PRERELEASE: ${{ contains(github.ref_name, '-') }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}

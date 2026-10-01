@@ -1,45 +1,66 @@
 ---
 name: publish-beta
-description: Publish the n10 npm package at a new beta version. Use only when the user requests a release.
+description: Release the n10 npm package at a new version. Use only when the user requests a release.
 disable-model-invocation: true
 ---
 
-# Publish a beta
+# Release n10
 
-Publish only when the user asks. n10 is one package, `@notaharness/n10`
+Release only when the user asks. n10 is one package, `@notaharness/n10`
 (`apps/cli`), which carries the desktop app too. Pushing a `vX.Y.Z` tag runs
-`.github/workflows/release.yml`, which publishes through npm trusted
-publishing; no npm login or token is involved.
+`.github/workflows/release.yml`, which tests the packed package, publishes it
+through npm trusted publishing and creates the GitHub release. Nothing is
+published from a local machine; no npm login or token is involved.
 
-1. Check the worktree and the current version in `apps/cli/package.json`
-   against `npm view @notaharness/n10 versions --json`. If that version is
-   unpublished, release it as is; otherwise choose the next `-beta.N`.
-2. When the version changes, update it in `apps/cli/package.json` and its
-   lockfile entry, commit the bump on a branch and merge it to `master`
-   through a pull request. The private workspace packages keep `0.0.1`.
-3. Optionally rehearse from `master`: `gh workflow run release.yml`. It runs
-   everything but the GitHub release, with `npm publish --dry-run`, which
-   still fails when the version is already published.
-4. Tag the merged commit with the version and push the tag:
+| Tag             | npm dist-tag                                     | GitHub release |
+| --------------- | ------------------------------------------------ | -------------- |
+| `v1.0.0-beta.2` | `beta`, and `latest` while `LATEST_FOLLOWS_BETA` | prerelease     |
+| `v1.0.0`        | `latest`                                         | release        |
+
+Any version with a `-` is a prerelease. `LATEST_FOLLOWS_BETA`, at the top of
+`release.yml`, is `true` while n10 is beta-only, so a plain install gets the
+newest beta. Set it to `false` at 1.0, so `latest` stays on stable releases.
+
+1. Choose the version. Compare `apps/cli/package.json` with
+   `npm view @notaharness/n10 versions --json`; for a beta, take the next
+   `-beta.N`. The private workspace packages keep `0.0.1`.
+2. Bump it on an up-to-date `master`. This updates `apps/cli/package.json`
+   and its lockfile entry:
 
    ```sh
-   git tag v1.0.0-beta.2 origin/master
-   git push origin v1.0.0-beta.2
+   npm version 1.0.0-beta.2 --no-git-tag-version -w apps/cli
+   git commit -am "chore(cli): release 1.0.0-beta.2"
+   ```
+
+3. Tag the bump and push both:
+
+   ```sh
+   git tag v1.0.0-beta.2
+   git push --atomic origin master v1.0.0-beta.2
    ```
 
    The workflow fails before building when the tag does not match
    `apps/cli/package.json`.
-5. Watch the run (`gh run watch`), then verify `latest` points to the new
-   version and the release exists:
+
+4. Watch the run (`gh run watch`), then verify the dist-tag and the release:
 
    ```sh
    npm view @notaharness/n10 dist-tags --json
    gh release view v1.0.0-beta.2
    ```
 
-If a job fails, inspect published versions before re-running; npm refuses to
-republish an existing version. A failed `github-release` job can be re-run
-alone after `publish` succeeded.
+To rehearse a release, `gh workflow run release.yml` on `master` runs the
+build, the install test and `npm publish --dry-run`, without the GitHub
+release. It cannot check the trusted publisher, which admits only tags.
+
+If a job fails, check `npm view @notaharness/n10 versions --json` before
+re-running; npm refuses to republish an existing version. A failed
+`github-release` job can be re-run alone after `publish` succeeded. When
+`publish` fails at a trusted-publisher check, nothing was published: fix the
+publisher on npmjs.com and re-run the job. When only its last step, moving
+`latest`, fails, the version is published under `beta`; re-running would
+republish, so move `latest` by hand instead
+(`npm dist-tag add @notaharness/n10@1.0.0-beta.2 latest`).
 
 To try the package locally, `npx nx run cli:prepare-publish`, `npm pack` in
 `apps/cli/dist`, then `apps/cli/scripts/test-installed.sh <tarball>`, the
