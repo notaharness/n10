@@ -74,7 +74,10 @@ class Held {
   }
 }
 
+/** Nothing of the developer's terminal either: a daemon a service
+ *  manager starts, like CI's, has no `TERM`. */
 const SCRUBBED = new Set([
+  'TERM',
   'TMUX',
   'TMUX_PANE',
   'BEAM_CONFIG_DIR',
