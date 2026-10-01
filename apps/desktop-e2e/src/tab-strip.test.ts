@@ -134,7 +134,7 @@ test.describe('Tab strip overflow', () => {
     expect(rowEnds.at(-1)).toBeLessThan(stripRight - 40);
   });
 
-  test('a tab dropped in the room after the last tab goes to the end', async ({
+  test('over the room after the last tab, a dragged tab opens the end slot and drops there', async ({
     desktop,
   }) => {
     const { page } = desktop;
@@ -148,6 +148,11 @@ test.describe('Tab strip overflow', () => {
     await page.mouse.move(to.x + to.width + 40, to.y + to.height / 2, {
       steps: 15,
     });
+    // Before the drop, the last tab has slid aside to open the end slot,
+    // as it does with the pointer over it.
+    await expect
+      .poll(() => last.evaluate((el) => el.style.transform))
+      .toMatch(/^translate3d\((?!0px, 0px)/);
     await page.mouse.up();
     await expect
       .poll(() => tabNames(page))
