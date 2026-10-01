@@ -66,19 +66,23 @@ export type TmuxPaneRead =
   | { status: 'gone' }
   | { status: 'failed' };
 
-/** tmux's own wording for "this server has no sessions left" — the same
- *  condition {@link tmuxListSessionsDetailed} treats as an empty list, not
- *  a failure. Killing a session's last sibling on a server tears the
- *  server down with it, so the target being gone can surface either as
- *  this non-zero exit or as the exit-0/empty-output case below,
+/** tmux's own wording for "there is no server": its socket answers no
+ *  one, or was never created on a machine that has not run tmux yet. The
+ *  same condition {@link tmuxListSessionsDetailed} treats as an empty
+ *  list, not a failure. Killing a session's last sibling on a server
+ *  tears the server down with it, so the target being gone can surface
+ *  either as this non-zero exit or as the exit-0/empty-output case below,
  *  depending on whether other sessions kept the server alive. */
-const NO_SERVER = /no server running/;
+const NO_SERVER =
+  /no server running|error connecting to .* \(No such file or directory\)/;
+
+export function isNoServer(result: TmuxRunResult): boolean {
+  return result.exitCode !== 0 && NO_SERVER.test(result.stderr);
+}
 
 function classifyPaneStateResult(result: TmuxRunResult): TmuxPaneRead {
   if (result.exitCode !== 0)
-    return NO_SERVER.test(result.stderr)
-      ? { status: 'gone' }
-      : { status: 'failed' };
+    return isNoServer(result) ? { status: 'gone' } : { status: 'failed' };
   const fields = result.stdout.trimEnd().split('\t');
   // display-message may succeed with empty output for a vanished target.
   // Require an actual pane identity and explicit native liveness state.
