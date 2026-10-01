@@ -53,14 +53,11 @@ To rehearse a release, `gh workflow run release.yml` on `master` runs the
 build, the install test and `npm publish --dry-run`, without the GitHub
 release. It cannot check the trusted publisher, which admits only tags.
 
-If a job fails, check `npm view @notaharness/n10 versions --json` before
-re-running; npm refuses to republish an existing version. A failed
-`github-release` job can be re-run alone after `publish` succeeded. When
-`publish` fails at a trusted-publisher check, nothing was published: fix the
-publisher on npmjs.com and re-run the job. When only its last step, moving
-`latest`, fails, the version is published under `beta`; re-running would
-republish, so move `latest` by hand instead
-(`npm dist-tag add @notaharness/n10@1.0.0-beta.2 latest`).
+If a job fails, re-run the failed jobs (`gh run rerun <run-id> --failed`).
+When `publish` fails at a trusted-publisher check, nothing was published: fix
+the publisher on npmjs.com first. A re-run of `publish` after the version
+reached npm skips the publish and finishes the dist-tags, and
+`github-release`, which needs `publish`, then runs.
 
 To try the package locally, `npx nx run cli:prepare-publish`, `npm pack` in
 `apps/cli/dist`, then `apps/cli/scripts/test-installed.sh <tarball>`, the

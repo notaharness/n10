@@ -88,13 +88,22 @@ jobs:
         with:
           name: package
           path: package
+      # A re-run after a failure past the publish finishes the dist-tags only.
+      - id: published
+        name: whether this version is already on npm
+        run: |
+          if [ "$(npm view "$PACKAGE@$VERSION" version 2> /dev/null)" = "$VERSION" ]; then
+            echo "$PACKAGE@$VERSION is already published"
+            echo "done=true" >> "$GITHUB_OUTPUT"
+          fi
       # npm publish exchanges the job's OIDC token even in a dry run, and logs
       # whether the trusted publisher took it, so a misconfigured publisher
       # fails here with npm's reason instead of at the publish.
-      - name: npm takes this workflow as the trusted publisher
+      - if: steps.published.outputs.done != 'true'
+        name: npm takes this workflow as the trusted publisher
         run: |
           npm publish --dry-run --loglevel verbose --tag "$DIST_TAG" ./package/*.tgz 2> npm.log || { cat npm.log; exit 1; }
-          grep -q 'oidc Successfully retrieved and set token' npm.log || { grep oidc npm.log; echo "::error::npm's trusted publisher for this package did not take this workflow"; exit 1; }
+          grep -q 'oidc Successfully retrieved and set token' npm.log || { grep oidc npm.log || true; echo "::error::npm's trusted publisher for this package did not take this workflow"; exit 1; }
       # npm checks the publisher's "Allow npm dist-tag" when a tag changes, and
       # dist-tag add skips the request when the tag already has the version, so
       # the check sets and removes a tag of its own.
@@ -104,7 +113,8 @@ jobs:
           current=$(npm view "$PACKAGE" dist-tags.latest)
           npm dist-tag add "$PACKAGE@$current" release-check
           npm dist-tag rm "$PACKAGE" release-check
-      - run: npm publish --provenance --tag "$DIST_TAG" ./package/*.tgz
+      - if: steps.published.outputs.done != 'true'
+        run: npm publish --provenance --tag "$DIST_TAG" ./package/*.tgz
       - if: env.MOVE_LATEST == 'true'
         run: npm dist-tag add "$PACKAGE@$VERSION" latest
 

@@ -71,6 +71,9 @@ nothing when the tag already has the version. A dispatched rehearsal runs
 `npm publish --dry-run` in its own job, outside that environment, so it
 checks neither.
 
+`publish` can be re-run: when the version is already on npm, it skips the
+OIDC check and the publish and only sets the dist-tags.
+
 The `github-release` job creates the GitHub release with generated notes,
 marked as a prerelease for a prerelease version, and attaches every artifact
 named `release-*` from the run. Jobs that build release assets upload under
