@@ -90,6 +90,17 @@ describe('registerHostHandlers', () => {
     expect(seen).toEqual([[4, 'a']]);
   });
 
+  it('refuses to start without an implementation for a contract channel', () => {
+    const { registrar } = collect();
+    const partial = { ...createHostApi(), getVersion: undefined };
+    expect(() =>
+      registerHostHandlers(
+        registrar,
+        partial as unknown as ReturnType<typeof createHostApi>
+      )
+    ).toThrow(`No host implementation for ${IPC.getVersion}`);
+  });
+
   it('refuses a window-scoped call it cannot attribute to a window', async () => {
     const { registered, registrar } = collect();
     registerHostHandlers(registrar);
