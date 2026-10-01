@@ -154,7 +154,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `rectSortingStrategy` and no axis lock; full rows share their width, and
   the strip's end takes the last row's room. Collisions go by pointer
   first, then nearest centre; over the strip's end, a drag is over the
-  last tab, so the strategy opens the end slot. A label that does not fit is cut
+  last tab, so the strategy opens the end slot. The strip's `DndContext`
+  (`TabDragProvider`) sits above the repository gate: a tab is chosen on
+  press, choosing another repository's tab remounts `Workspace` (keyed by
+  repository), and the sensor watching the press must outlive that. A label that does not fit is cut
   by measurement (`TabLabel.tsx`, `lib/tabs/label-cut.ts`), from the start
   for branch names and paths, from the end for titles (`cutSide`), with the
   whole label as its tooltip; Chromium has no start-side `text-overflow`. A

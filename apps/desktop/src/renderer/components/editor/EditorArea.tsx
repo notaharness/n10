@@ -258,7 +258,7 @@ export function EditorArea({
 
   return (
     <div className="flex h-full min-w-0 flex-col bg-background">
-      <TabStrip ids={tabs.tabs.map((t) => t.id)} onMove={tabs.moveTab}>
+      <TabStrip ids={tabs.tabs.map((t) => t.id)}>
         {tabs.tabs.map((tab) => {
           const sessionName = sessionNameFor(tab);
           return (

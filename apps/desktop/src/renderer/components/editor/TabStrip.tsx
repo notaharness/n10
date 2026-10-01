@@ -23,6 +23,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
+import { useTabs } from '../../lib/tabs/tabs.js';
 import { usePrefersReducedMotion } from '../../lib/reduced-motion.js';
 import { cn } from '../../lib/utils.js';
 import {
@@ -82,25 +83,21 @@ const announcements: Announcements = {
 };
 
 /**
- * The tab row, sortable by pointer and by keyboard (see
- * `tab-keyboard.ts`: a chord lifts, so Enter and Space still activate).
- * The other tabs slide aside while one is dragged; the order only
- * changes in the model on drop.
+ * The drag and drop the tab strip sorts in, by pointer and by keyboard
+ * (see `tab-keyboard.ts`: a chord lifts, so Enter and Space still
+ * activate). The other tabs slide aside while one is dragged; the order
+ * only changes in the model on drop.
  *
- * More tabs than fit wrap onto more rows, or, as the desktop prefs say
- * (`tabOverflow`, chosen from a tab's menu), scroll the one row
- * sideways. Wrapped, the tabs are a grid to dnd-kit — its rect
- * strategy, free to move across rows; in one row, a horizontal list.
+ * Above the repository gate, beside the tabs it sorts: a tab is chosen
+ * on press, choosing another repository's tab opens that repository,
+ * and the workspace, strip included, remounts under the new one. Out
+ * here, the sensor watching the press outlives that remount, and lifts
+ * the remounted tab by its id once the pointer has travelled
+ * `DRAG_THRESHOLD_PX`.
  */
-export function TabStrip({
-  ids,
-  onMove,
-  children,
-}: {
-  ids: readonly string[];
-  onMove: (id: string, targetId: string, side: 'before' | 'after') => void;
-  children: ReactNode;
-}) {
+export function TabDragProvider({ children }: { children: ReactNode }) {
+  const tabs = useTabs();
+  const ids = tabs.tabs.map((t) => t.id);
   const wrap = useDesktopPrefs().tabOverflow === 'wrap';
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -117,7 +114,7 @@ export function TabStrip({
     // Dropped over a tab to its right, it lands after that tab — the
     // slot the others made room for.
     const side = ids.indexOf(id) < ids.indexOf(targetId) ? 'after' : 'before';
-    onMove(id, targetId, side);
+    tabs.moveTab(id, targetId, side);
   };
 
   return (
@@ -128,27 +125,48 @@ export function TabStrip({
       accessibility={{ announcements, screenReaderInstructions }}
       onDragEnd={onDragEnd}
     >
-      <SortableContext
-        items={[...ids]}
-        strategy={wrap ? rectSortingStrategy : horizontalListSortingStrategy}
-      >
-        <div
-          role="tablist"
-          aria-label="Open tabs"
-          data-overflow={wrap ? 'wrap' : 'scroll'}
-          className={cn(
-            'flex shrink-0 items-stretch border-b border-border bg-tab',
-            wrap
-              ? // Every row but the last is ruled off from the one below.
-                'flex-wrap [&>[role=tab]]:-mb-px [&>[role=tab]]:border-b'
-              : 'h-9 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-          )}
-        >
-          {children}
-          <StripEnd />
-        </div>
-      </SortableContext>
+      {children}
     </DndContext>
+  );
+}
+
+/**
+ * The tab row, sortable in `TabDragProvider`.
+ *
+ * More tabs than fit wrap onto more rows, or, as the desktop prefs say
+ * (`tabOverflow`, chosen from a tab's menu), scroll the one row
+ * sideways. Wrapped, the tabs are a grid to dnd-kit — its rect
+ * strategy, free to move across rows; in one row, a horizontal list.
+ */
+export function TabStrip({
+  ids,
+  children,
+}: {
+  ids: readonly string[];
+  children: ReactNode;
+}) {
+  const wrap = useDesktopPrefs().tabOverflow === 'wrap';
+  return (
+    <SortableContext
+      items={[...ids]}
+      strategy={wrap ? rectSortingStrategy : horizontalListSortingStrategy}
+    >
+      <div
+        role="tablist"
+        aria-label="Open tabs"
+        data-overflow={wrap ? 'wrap' : 'scroll'}
+        className={cn(
+          'flex shrink-0 items-stretch border-b border-border bg-tab',
+          wrap
+            ? // Every row but the last is ruled off from the one below.
+              'flex-wrap [&>[role=tab]]:-mb-px [&>[role=tab]]:border-b'
+            : 'h-9 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+        )}
+      >
+        {children}
+        <StripEnd />
+      </div>
+    </SortableContext>
   );
 }
 
