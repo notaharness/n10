@@ -85,10 +85,14 @@ export function BeamDirectory() {
       illustration={<DirectoryDrawing />}
     >
       <p className="text-fd-muted-foreground mt-4 leading-relaxed">
-        The worker stores ciphertext and sees request metadata. It also serves
-        the approval page. One approval on a hostile page or someone else’s link
-        exposes permanent directory read access and one chosen statement. That
-        can add an attacker’s machine with a shell on every member.
+        Our Cloudflare worker stores only encrypted data.{' '}
+        <strong className="text-fd-foreground font-semibold">Your data</strong>{' '}
+        never reaches us unencrypted and can only be read by you when unlocked
+        with{' '}
+        <strong className="text-fd-foreground font-semibold">
+          your passkey
+        </strong>{' '}
+        in your browser on your computer or phone.
       </p>
     </BeamSectionRow>
   );

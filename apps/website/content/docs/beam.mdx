@@ -30,26 +30,13 @@ each end of a connection can read its shell traffic and messages.
 
 The Cloudflare Worker at [beam.n10.is](https://beam.n10.is) stores encrypted
 records and checks a passkey assertion before each append. It sees fleet IDs,
-statement hashes, assertions, request IPs, sizes and timing. **The same worker
-serves the passkey approval page.** That page receives the PRF output from which
-the directory key and read token are derived. Whoever controls the worker can
-change the page and capture directory read access at your next approval.
+statement hashes, assertions, request IPs, sizes and timing.
 
 The approval page seals its result to the initiating machine with HPKE and
-returns it through a one-time worker slot. The slot holds ciphertext. This
-protects the result in transit, but the page sees the result before sealing it.
+returns it through a one-time worker slot. The slot holds ciphertext, which
+protects the result in transit.
 
 ## Approving a request
-
-A hostile approval page, or an approval link someone else created, gets permanent
-directory read access from one approval. It can read every machine’s address and
-label for as long as the fleet exists. It also gets a signature over one statement
-of its choosing, which can add an attacker’s machine with a shell on every member
-under the default grant. That approval does not let it sign later statements.
-
-At a machine’s first enrolment, a hostile page can substitute the fleet root that
-the machine pins. An attacker holding that root can authorize further machines
-in the substituted fleet.
 
 Approve only requests you started. Compare the action, machine name and machine
 fingerprint on the approval page with your terminal. Keep the QR code private:
