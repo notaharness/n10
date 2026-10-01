@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { BeamSectionRow } from './beam-section-row';
 import { BeamFigure } from './beam-figure';
 import { Browser, Key, Label, Track } from './beam-drawing';
 import { Laptop } from './mesh/machines';
@@ -6,27 +7,9 @@ import { BEAM_COLORS } from './mesh/palette';
 
 export function BeamHow() {
   return (
-    <section className="mx-auto grid w-full max-w-6xl items-center gap-10 px-4 md:grid-cols-12 md:gap-14">
-      <div className="min-w-0 md:col-span-5">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          How a machine joins
-        </h2>
-        <p className="text-fd-muted-foreground mt-4 leading-relaxed">
-          Use your passkey to approve each machine you add to your fleet.
-          Removing a machine also needs your approval.
-        </p>
-        <p className="text-fd-muted-foreground mt-4 leading-relaxed">
-          Each approval covers one change. A machine already in the fleet cannot
-          add another machine on its own.
-        </p>
-        <Link
-          href="/docs/beam#how-membership-works"
-          className="text-fd-primary mt-5 inline-block text-sm underline underline-offset-4"
-        >
-          Membership details
-        </Link>
-      </div>
-      <div className="min-w-0 md:col-span-7">
+    <BeamSectionRow
+      title="How a machine connects"
+      illustration={
         <BeamFigure label="Your passkey approves one machine joining your fleet">
           <Track d="M85 95H160" color={BEAM_COLORS.sand} />
           <Track d="M232 95H310" color={BEAM_COLORS.blue} />
@@ -58,7 +41,22 @@ export function BeamHow() {
             Each approval covers one change
           </Label>
         </BeamFigure>
-      </div>
-    </section>
+      }
+    >
+      <p className="text-fd-muted-foreground mt-4 leading-relaxed">
+        Use your passkey to approve each machine you add to your fleet. Removing
+        a machine also needs your approval.
+      </p>
+      <p className="text-fd-muted-foreground mt-4 leading-relaxed">
+        Each approval covers one change. A machine already in the fleet cannot
+        add another machine on its own.
+      </p>
+      <Link
+        href="/docs/beam#how-membership-works"
+        className="text-fd-primary mt-5 inline-block text-sm underline underline-offset-4"
+      >
+        Membership details
+      </Link>
+    </BeamSectionRow>
   );
 }

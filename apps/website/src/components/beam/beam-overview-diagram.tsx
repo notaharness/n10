@@ -1,3 +1,4 @@
+import { BeamSectionRow } from './beam-section-row';
 import { BeamFigure } from './beam-figure';
 import { Browser, Key, Label, Lock, Track } from './beam-drawing';
 import { Laptop, Rack } from './mesh/machines';
@@ -76,35 +77,35 @@ function RelayDrawing() {
   );
 }
 
-export function BeamOverviewDiagram() {
+export function BeamDirectory() {
   return (
-    <section className="mx-auto w-full max-w-6xl px-4">
-      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-        Directory and networking
-      </h2>
-      <div className="mt-10 grid gap-10 md:grid-cols-2 md:gap-14">
-        <div>
-          <DirectoryDrawing />
-          <h3 className="mt-6 font-semibold">Directory and approval page</h3>
-          <p className="text-fd-muted-foreground mt-4 leading-relaxed">
-            The worker stores ciphertext and sees request metadata. It also
-            serves the approval page. One approval on a hostile page or someone
-            else’s link exposes permanent directory read access and one chosen
-            statement. That can add an attacker’s machine with a shell on every
-            member.
-          </p>
-        </div>
-        <div>
-          <RelayDrawing />
-          <h3 className="mt-6 font-semibold">Connecting through Tailscale</h3>
-          <p className="text-fd-muted-foreground mt-4 leading-relaxed">
-            Tailscale’s tailcat library connects your machines directly
-            peer-to-peer when possible. Tailscale’s relays provide a fallback
-            when a direct connection is unavailable. You do not need to set up a
-            VPN or open ports. Beam configures the tunnels.
-          </p>
-        </div>
-      </div>
-    </section>
+    <BeamSectionRow
+      title="Directory and approval page"
+      illustrationSide="left"
+      illustration={<DirectoryDrawing />}
+    >
+      <p className="text-fd-muted-foreground mt-4 leading-relaxed">
+        The worker stores ciphertext and sees request metadata. It also serves
+        the approval page. One approval on a hostile page or someone else’s link
+        exposes permanent directory read access and one chosen statement. That
+        can add an attacker’s machine with a shell on every member.
+      </p>
+    </BeamSectionRow>
+  );
+}
+
+export function BeamNetworking() {
+  return (
+    <BeamSectionRow
+      title="Connecting through Tailscale"
+      illustration={<RelayDrawing />}
+    >
+      <p className="text-fd-muted-foreground mt-4 leading-relaxed">
+        Tailscale’s tailcat library connects your machines directly peer-to-peer
+        when possible. Tailscale’s relays provide a fallback when a direct
+        connection is unavailable. You do not need to set up a VPN or open
+        ports. Beam configures the tunnels.
+      </p>
+    </BeamSectionRow>
   );
 }

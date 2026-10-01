@@ -2,7 +2,10 @@ import type { Metadata } from 'next';
 import { BeamCta } from '@/components/beam/beam-cta';
 import { BeamHero } from '@/components/beam/beam-hero';
 import { BeamHow } from '@/components/beam/beam-how';
-import { BeamOverviewDiagram } from '@/components/beam/beam-overview-diagram';
+import {
+  BeamDirectory,
+  BeamNetworking,
+} from '@/components/beam/beam-overview-diagram';
 import { BeamGettingStarted } from '@/components/beam/beam-getting-started';
 import { Footer } from '@/components/landing/footer';
 
@@ -18,10 +21,11 @@ export default function BeamPage() {
       {/* Keep section spacing in one place rather than stacking child padding. */}
       <div className="flex flex-col gap-24 pb-24">
         <BeamHero />
-        <BeamHow />
-        <BeamOverviewDiagram />
-        <BeamCta />
         <BeamGettingStarted />
+        <BeamCta />
+        <BeamHow />
+        <BeamDirectory />
+        <BeamNetworking />
       </div>
       <Footer />
     </main>
