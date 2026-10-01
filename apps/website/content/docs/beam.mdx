@@ -30,14 +30,11 @@ each end of a connection can read its shell traffic and messages.
 
 The Cloudflare Worker at [beam.n10.is](https://beam.n10.is) stores encrypted
 records and checks a passkey assertion before each append. It sees fleet IDs,
-statement hashes, assertions, request IPs, sizes and timing. **The same worker
-serves the passkey approval page.** That page receives the PRF output from which
-the directory key and read token are derived. Whoever controls the worker can
-change the page and capture directory read access at your next approval.
+statement hashes, assertions, request IPs, sizes and timing.
 
 The approval page seals its result to the initiating machine with HPKE and
-returns it through a one-time worker slot. The slot holds ciphertext. This
-protects the result in transit, but the page sees the result before sealing it.
+returns it through a one-time worker slot. The slot holds ciphertext, which
+protects the result in transit.
 
 ## Approving a request
 
