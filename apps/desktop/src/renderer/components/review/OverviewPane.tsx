@@ -99,7 +99,7 @@ export function OverviewPane({
   const nested = useNestedChecks(pr.id, pane, checksButton);
 
   return (
-    <div ref={pane} className="@container h-full overflow-auto">
+    <div ref={pane} className="@container relative h-full overflow-auto">
       {nested.showing && (
         <PrChecks
           read={read}

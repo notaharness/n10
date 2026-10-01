@@ -139,6 +139,27 @@ function visibleRight(el: Element): number {
   return right;
 }
 
+/** Turn the wheel over an element and wait until the page has seen it
+ *  and painted twice: long enough for any scroll it starts to show. */
+async function wheelOver(locator: Locator, dy: number): Promise<void> {
+  const page = locator.page();
+  await locator.hover();
+  // Listening before the wheel turns; a handle, so the promise is not
+  // awaited here.
+  const seen = await page.evaluateHandle(() => ({
+    painted: new Promise<void>((resolve) =>
+      addEventListener(
+        'wheel',
+        () =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        { once: true, passive: true }
+      )
+    ),
+  }));
+  await page.mouse.wheel(0, dy);
+  await seen.evaluate((s) => s.painted);
+}
+
 async function openPr(page: Page, row: RegExp): Promise<void> {
   await sidebarRow(page, row).first().click();
   // In the header bar, or beside the Overview's title.
@@ -318,6 +339,70 @@ test.describe('Pull request Overview', () => {
     await expect
       .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
       .toBe('https://github.com/n10/fixture/pull/214');
+  });
+
+  test.describe('with a long diff behind it', () => {
+    test.use({
+      repo: {
+        worktrees: [
+          {
+            branch: 'cancel-requests',
+            files: {
+              'request.ts': Array.from(
+                { length: 200 },
+                (_, i) => `export const step${i} = ${i};`
+              ).join('\n'),
+            },
+          },
+          {
+            branch: 'tidy-retry',
+            files: { 'retry.ts': 'export const retryDelay = 100;\n' },
+          },
+        ],
+      },
+    });
+
+    test('stays put under the wheel in a window taller than it', async ({
+      desktop,
+    }) => {
+      const { app, page } = desktop;
+      await resize(app, 1360, 1400);
+      await openPr(page, /#214/);
+
+      // The Overview fits, so it has nothing to scroll, and nothing
+      // around it scrolls instead: not the diff kept behind it.
+      const title = overviewTitle(page, 'Handle cancelled requests');
+      await expect(title).toBeVisible();
+      // The diff behind it has its lines, or there is nothing to spill.
+      // Hidden, so not a role query; this tab's pane, not a spare's.
+      const hiddenDiff = page
+        .locator('[data-terminal-pane]')
+        .filter({ has: title })
+        .locator('[data-diff-scroll]');
+      await expect
+        .poll(() =>
+          hiddenDiff.evaluate((el) => el.scrollHeight > el.clientHeight)
+        )
+        .toBe(true);
+      const before = await top(title);
+      await wheelOver(title, 600);
+      expect(await top(title)).toBe(before);
+
+      // The diff scrolled to its end takes the wheel no further.
+      await showChanges(page);
+      const changes = page.getByRole('region', { name: 'Changes' });
+      await wheelOver(changes, 100_000);
+      await expect
+        .poll(() =>
+          changes.evaluate(
+            (el) => el.scrollHeight - el.clientHeight - el.scrollTop
+          )
+        )
+        .toBeLessThan(1);
+      const edge = await top(changes);
+      await wheelOver(changes, 600);
+      expect(await top(changes)).toBe(edge);
+    });
   });
 
   test('says where reviews stand in words at 1024×768', async ({ desktop }) => {
