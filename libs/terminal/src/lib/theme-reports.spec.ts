@@ -53,8 +53,10 @@ describe('theme reports', () => {
     expect(replies).toEqual([]);
   });
 
-  it('answers a colour-scheme query', async () => {
+  it('answers a colour-scheme query, and leaves other queries to xterm', async () => {
     terminal(DARK);
+    await emu.write('\x1b[?6n');
+    expect(replies).toEqual([]);
     await emu.write('\x1b[?996n');
     emu.setThemeColors(LIGHT);
     await emu.write('\x1b[?996n');
@@ -78,9 +80,9 @@ describe('theme reports', () => {
     expect(replies).toHaveLength(2);
   });
 
-  it('leaves the modes it watches to xterm', async () => {
+  it('leaves the modes set beside 2031 to xterm', async () => {
     terminal(DARK);
-    await emu.write('\x1b[?2004;2031h\x1b[?1000h');
+    await emu.write('\x1b[?1000;2031h');
     expect(emu.mouseTrackingMode).toBe('vt200');
   });
 });
