@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MachineView } from '@n10/engine/contract';
 import {
+  preferredMachineChoice,
   fingerprintGroups,
   hasPeerMachines,
   inboundMailRows,
@@ -187,6 +188,45 @@ describe('isMachineSelectable', () => {
     for (const state of ['offline', 'revoked', 'revoked-by-fleet'] as const) {
       expect(isMachineSelectable(machine({ state }))).toBe(false);
     }
+  });
+});
+
+describe('preferredMachineChoice', () => {
+  const PEER = 'bbbbbbbbbbbbbbbb';
+  const agentMachine = machine({ peerId: PEER, state: 'connected' });
+
+  it('starts on the preferred machine', () => {
+    expect(preferredMachineChoice([local, agentMachine], null, PEER)).toEqual({
+      value: PEER,
+      remote: PEER,
+      unavailable: null,
+    });
+  });
+
+  it('keeps an unavailable preferred machine, naming it, instead of switching here', () => {
+    const away = machine({ peerId: PEER, state: 'offline' });
+    expect(preferredMachineChoice([local, away], null, PEER)).toEqual({
+      value: PEER,
+      remote: PEER,
+      unavailable: away,
+    });
+  });
+
+  it('follows the reader’s pick, and this machine when that is preferred', () => {
+    expect(
+      preferredMachineChoice([local, agentMachine], 'aaaaaaaaaaaaaaaa', PEER)
+    ).toEqual({
+      value: 'aaaaaaaaaaaaaaaa',
+      remote: undefined,
+      unavailable: null,
+    });
+    expect(
+      preferredMachineChoice([local, agentMachine], null, 'local')
+    ).toEqual({
+      value: 'aaaaaaaaaaaaaaaa',
+      remote: undefined,
+      unavailable: null,
+    });
   });
 });
 

@@ -8,7 +8,6 @@ import type {
 } from '../../../host/contract.js';
 import {
   useCreateWorktree,
-  useKillSession,
   useLaunchAgent,
   useLaunchReview,
 } from '../../lib/data/mutations.js';
@@ -22,7 +21,6 @@ export interface LaunchTarget {
   branch: string;
   hasWorktree: boolean;
   pr: PullRequestInfo | undefined;
-  sessionName: string | undefined;
 }
 
 type Grid = Pick<SessionLaunchRequest, 'cols' | 'rows'>;
@@ -30,7 +28,7 @@ type Grid = Pick<SessionLaunchRequest, 'cols' | 'rows'>;
 /**
  * The tab's launch actions, behind the session menu: start a session
  * with the agent chosen there (checking the worktree out first when
- * the row has none), start a review, or stop the running agent.
+ * the row has none) or start a review.
  *
  * A choice that names a `machine` (ux-machines.md §5) skips the local
  * worktree checkout above — the host creates the worktree on the
@@ -49,11 +47,10 @@ export function useItemLaunch(
 ) {
   const launch = useLaunchAgent(cwd);
   const launchReview = useLaunchReview(cwd);
-  const kill = useKillSession(cwd);
   const create = useCreateWorktree(cwd);
   const progress = useLaunchProgress();
   const [remoteError, setRemoteError] = useState<string | null>(null);
-  const { branch, hasWorktree, pr, sessionName } = target;
+  const { branch, hasWorktree, pr } = target;
 
   const startSession = async (
     fresh: boolean,
@@ -157,10 +154,6 @@ export function useItemLaunch(
       );
   };
 
-  const stop = () =>
-    sessionName &&
-    kill.mutate(sessionName, { onError: (e) => toast.error(errorMessage(e)) });
-
   const resetRemote = () => {
     progress.reset();
     setRemoteError(null);
@@ -168,7 +161,6 @@ export function useItemLaunch(
 
   return {
     choose,
-    stop,
     busy: launch.isPending || create.isPending || launchReview.isPending,
     /** Set only during a remote launch (ux-machines.md §5); a local
      *  launch is fast enough that showing this would be a regression. */

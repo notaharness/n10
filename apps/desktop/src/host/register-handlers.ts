@@ -15,6 +15,7 @@ import * as reviews from './services/reviews.js';
 import * as sessions from './services/sessions.js';
 import * as foreignSessions from './services/foreign-sessions.js';
 import * as terminals from './services/terminals.js';
+import * as branchSessions from './services/branch-sessions.js';
 import * as commentImages from './services/comment-images.js';
 import * as clipboardImage from './services/clipboard-image.js';
 import * as drafts from './services/drafts.js';
@@ -124,8 +125,11 @@ export function createHostApi(): HostApi {
     saveClipboardImage: (data, mimeType) =>
       Promise.resolve(clipboardImage.saveClipboardImage(data, mimeType)),
     launchTerminal: (req) => terminals.launchTerminal(req),
-    listTerminals: () => Promise.resolve(terminals.listTerminals()),
+    listTerminals: () => Promise.resolve(branchSessions.listTerminals()),
     killTerminal: (name) => Promise.resolve(terminals.killTerminal(name)),
+    listBranchSessions: (branch) =>
+      Promise.resolve(branchSessions.listBranchSessions(branch)),
+    launchBranchTerminal: (req) => branchSessions.launchBranchTerminal(req),
     onSessionData: () => {
       // Events are pushed via setSessionBroadcaster; the preload side
       // subscribes directly to ipcRenderer events. Nothing to do here.
@@ -268,6 +272,8 @@ export function registerHostHandlers(
     [IPC.saveClipboardImage]: api.saveClipboardImage as HostMethod,
     [IPC.launchTerminal]: api.launchTerminal as HostMethod,
     [IPC.listTerminals]: api.listTerminals as HostMethod,
+    [IPC.listBranchSessions]: api.listBranchSessions as HostMethod,
+    [IPC.launchBranchTerminal]: api.launchBranchTerminal as HostMethod,
     [IPC.killTerminal]: api.killTerminal as HostMethod,
     [IPC.fetchCommentThreads]: api.fetchCommentThreads as HostMethod,
     [IPC.replyToThread]: api.replyToThread as HostMethod,

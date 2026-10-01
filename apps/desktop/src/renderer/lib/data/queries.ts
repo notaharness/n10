@@ -305,8 +305,7 @@ export function useAgentOptions(cwd: string) {
  * Sessions the host has actually launched this run — running, or ended
  * with their final frame kept. This is the "does a PTY exist?" signal:
  * the sidebar names a would-be session for every worktree, so a name
- * alone must never be read as one existing (it is what made a fresh
- * worktree offer "Relaunch agent").
+ * alone must never be read as one existing.
  */
 export function useSessions(cwd: string) {
   return useQuery({

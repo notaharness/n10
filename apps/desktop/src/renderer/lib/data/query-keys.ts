@@ -25,6 +25,11 @@ export const keys = {
   branches: (cwd: string) => ['branches', cwd] as const,
   settings: (cwd: string) => ['settings', cwd] as const,
   sessions: (cwd: string) => ['sessions', cwd] as const,
+  /** A branch's agents and terminals; `branchSessionsAll` is every
+   *  branch's, for writes that change any of them. */
+  branchSessions: (cwd: string, branch: string) =>
+    ['branch-sessions', cwd, branch] as const,
+  branchSessionsAll: ['branch-sessions'] as const,
   /** Not repo-scoped: a terminal belongs to a directory, and the host
    *  lists every one whatever repository is open. */
   terminals: ['terminals'] as const,

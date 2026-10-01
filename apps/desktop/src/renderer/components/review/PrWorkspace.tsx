@@ -16,11 +16,10 @@ import { useRepo } from '../../lib/repo-context.js';
 import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { useCommentNavigator } from '../../lib/review/use-comment-navigator.js';
 import { useReviewDiff } from '../../lib/review/use-review-diff.js';
-import {
-  useBackToReview,
-  useReviewMode,
-} from '../../lib/review/use-review-mode.js';
+import { useBackToReview } from '../../lib/review/use-review-mode.js';
 import { useReviewRail } from '../../lib/review/use-review-rail.js';
+import type { BranchSessionRail } from '../../lib/review/use-branch-session-rail.js';
+import { useSessionPane } from '../../lib/review/use-shown-session.js';
 import { usePlanCheckout } from '../../lib/plan/use-plan-checkout.js';
 import { usePostAll } from '../../lib/review/use-post-all.js';
 import {
@@ -44,11 +43,11 @@ const NO_THREADS: ReadState<unknown> = {
 };
 
 /**
- * The review workspace for a PR: a collapsible left rail (Agent ·
+ * The review workspace for a PR: a collapsible left rail (Sessions ·
  * Files) beside a single content pane that swaps between the Overview,
- * the diff, the agent terminal, the plan and the walkthrough. Selecting
- * a file shows the diff; selecting the agent shows its terminal, which
- * is mounted only while it shows (`SessionTerminal`). The diff's own
+ * the diff, a session's terminal, the plan and the walkthrough.
+ * Selecting a file shows the diff; selecting a session's card shows its
+ * terminal, which is mounted only while it shows (`SessionTerminal`). The diff's own
  * toolbar lives inside the diff pane, so it's gone while the terminal
  * is showing.
  *
@@ -69,36 +68,26 @@ export function PrWorkspace({
   pr,
   branch,
   baseBranch,
-  sessionName,
-  sessionEpoch,
+  ownSession,
   running,
   busy,
   onLaunch,
-  onStop,
-  connectionBanner,
-  inputDisabled,
+  sessions,
 }: {
   /** Absent for a worktree without a PR: the rail degrades gracefully
-   *  (no comments, drafts or review walkthrough — just Agent + Files). */
+   *  (no comments, drafts or review walkthrough — just sessions and files). */
   pr?: PullRequestInfo;
   branch: string;
   baseBranch: string;
-  /** PTY session for this branch, if one exists (running or its final frame). */
-  sessionName?: string;
-  /** When that session was spawned. A restart in the same pane keeps
-   *  the name and changes this, which is what tells the terminal a new
-   *  agent is on the other end of it. */
-  sessionEpoch: number;
+  /** This machine's agent for the branch, the pane's first choice. */
+  ownSession?: string;
+  /** Whether that agent runs: the diff polls, and the plan delivers to it. */
   running: boolean;
   busy: boolean;
+  /** Opens the session menu: Launch Agent. */
   onLaunch: () => void;
-  onStop: () => void;
-  /** Set only while the session's connection is reconnecting/failed
-   *  (ux-machines.md §6) — the headline capability of this feature runs
-   *  here, so a silent dead connection does the most damage in exactly
-   *  this pane. */
-  connectionBanner?: PrConnectionBanner | null;
-  inputDisabled?: boolean;
+  /** The branch's sessions on every machine, and Launch Terminal. */
+  sessions: BranchSessionRail;
 }) {
   const { repo } = useRepo();
   const prId = pr?.id ?? 0;
@@ -118,10 +107,8 @@ export function PrWorkspace({
   const options = useDiffOptions();
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const [mode, setMode] = useReviewMode({
-    pr,
-    agent: { hasSession: Boolean(sessionName), running },
-  });
+  const pane = useSessionPane(pr, sessions, ownSession);
+  const { mode, setMode } = pane;
   const inlineThreads = useMemo(
     () => comments.data?.threads ?? [],
     [comments.data]
@@ -198,7 +185,7 @@ export function PrWorkspace({
   // whether the plan has anything in it — every mode falls back to the
   // diff when its own precondition is gone (see resolveMode).
   const effMode = resolveMode(mode, {
-    hasSession: Boolean(sessionName),
+    hasSession: pane.hasSession,
     hasDrafts,
     hasPr: pr != null,
     // A plan belongs to a pull request: it is a queue of *its* review
@@ -238,13 +225,14 @@ export function PrWorkspace({
                 className="min-w-0"
               >
                 <ReviewRail
-                  running={running}
-                  busy={busy}
-                  hasSession={Boolean(sessionName)}
-                  agentActive={effMode === 'agent'}
-                  onSelectAgent={() => setMode('agent')}
-                  onLaunch={onLaunch}
-                  onStop={onStop}
+                  sessions={sessions.cards}
+                  shownSession={effMode === 'agent' ? pane.shownName : null}
+                  agentBusy={busy}
+                  terminalBusy={sessions.terminalBusy}
+                  onOpenSession={pane.open}
+                  onLaunchAgent={onLaunch}
+                  onLaunchTerminal={sessions.launchTerminal}
+                  onStopSession={sessions.stop}
                   onHide={() => rail.setHidden(true)}
                   drafts={drafts}
                   reviewActive={effMode === 'review'}
@@ -272,10 +260,10 @@ export function PrWorkspace({
               prId={prId}
               branch={branch}
               baseBranch={baseBranch}
-              sessionName={sessionName}
-              sessionEpoch={sessionEpoch}
-              connectionBanner={connectionBanner}
-              inputDisabled={inputDisabled}
+              sessionName={pane.shownName ?? undefined}
+              sessionEpoch={pane.epoch}
+              connectionBanner={pane.banner.connectionBanner}
+              inputDisabled={pane.banner.inputDisabled}
               files={files}
               diffHead={diff.head}
               filesByName={filesByName}

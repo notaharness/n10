@@ -201,6 +201,35 @@ export function machineChoice(
   return { value, remote };
 }
 
+/** A picker that starts on `preferred` (`'local'` or a peerId): the
+ *  machine a launch belongs on until the reader picks another. Unlike
+ *  {@link machineChoice}, a preferred machine that is unavailable stays
+ *  picked and is named in `unavailable`, since falling back to this
+ *  machine would launch where nobody asked; the caller holds the launch
+ *  until it is back or another is picked. A machine the reader picks
+ *  falls back as {@link machineChoice}'s does. */
+export function preferredMachineChoice(
+  machines: readonly MachineView[],
+  chosen: string | null,
+  preferred: string
+): {
+  value: string;
+  remote: string | undefined;
+  unavailable: MachineView | null;
+} {
+  const preferredPeer =
+    chosen === null
+      ? machines.find((m) => m.peerId === preferred && !m.isLocal)
+      : undefined;
+  if (!preferredPeer)
+    return { ...machineChoice(machines, chosen), unavailable: null };
+  return {
+    value: preferredPeer.peerId,
+    remote: preferredPeer.peerId,
+    unavailable: isMachineSelectable(preferredPeer) ? null : preferredPeer,
+  };
+}
+
 export interface MachineOption {
   machine: MachineView;
   disabled: boolean;
