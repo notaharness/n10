@@ -696,8 +696,7 @@
   fill: var(--color-fd-muted-foreground);
 }
 
-/* Unreadably small on a phone; OrchestraStage lists the players below
- * the scene there instead. */
+/* Unreadably small on a phone, where the scene goes without them. */
 @media (max-width: 639px) {
   .orchestra-nameplate {
     display: none;
