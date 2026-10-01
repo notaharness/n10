@@ -1,4 +1,8 @@
-import type { ReviewDecision } from '@n10/vcs-core/types';
+import {
+  reviewersToCount,
+  type PullRequestReviewer,
+  type ReviewDecision,
+} from '@n10/vcs-core/types';
 import type { SidebarItem } from '../../../host/contract.js';
 
 export type SectionKey =
@@ -278,10 +282,15 @@ function toneFor(approval: ApprovalState, ci: CiState): StatusTone {
  * so beats making them read two clauses and draw the conclusion.
  */
 export function prStatusIndicator(
-  reviewers: { decision: ReviewDecision }[],
+  listed: readonly Pick<
+    PullRequestReviewer,
+    'identifier' | 'decision' | 'votedFor'
+  >[],
   buildStatus: string | undefined,
   isBlocking: (decision: ReviewDecision) => boolean
 ): PrStatusIndicator {
+  // A teammate's vote for a team is listed on both rows; it is one vote.
+  const reviewers = reviewersToCount(listed);
   const total = reviewers.length;
   const approved = reviewers.filter((r) => r.decision === 'approved').length;
   const ci = ciState(buildStatus);

@@ -54,6 +54,24 @@ describe('ThrottleGate', () => {
     expect(g.noteThrottled(30_000)).toBe(30_000);
   });
 
+  it("takes the server's wait even past the backoff ceiling", () => {
+    // The ceiling bounds a wait the client made up. One the server
+    // named is when requests are allowed again; resuming earlier only
+    // earns another refusal.
+    const { g } = gate({ max: 60_000 });
+    expect(g.noteThrottled(600_000)).toBe(600_000);
+    expect(g.noteQuotaExhausted(900_000)).toBe(900_000);
+  });
+
+  it("bounds a server's wait at its own ceiling", () => {
+    // A day-long Retry-After from a proxy, or an HTTP date read against
+    // a skewed clock, must not park the provider for the session.
+    const { g, time } = gate();
+    expect(g.noteThrottled(24 * 60 * 60_000)).toBe(60 * 60_000);
+    time.advance(60 * 60_000);
+    expect(g.noteQuotaExhausted(24 * 60 * 60_000)).toBe(60 * 60_000);
+  });
+
   it('keeps its own backoff when the server asks for less', () => {
     // A `Retry-After: 1` on the fifth consecutive refusal is not an
     // invitation to go straight back.

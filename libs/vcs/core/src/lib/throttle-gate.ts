@@ -9,27 +9,37 @@
  * wait the server named has elapsed.
  *
  * Wait length is the larger of what the server asked for and an
- * exponential backoff over consecutive refusals, capped. A single 429
- * that names no `Retry-After` pauses briefly; a provider refusing
- * everything escalates towards the cap instead of hammering it every
- * poll. One success reopens the gate and resets the escalation.
+ * exponential backoff over consecutive refusals. A single 429 that
+ * names no `Retry-After` pauses briefly; a provider refusing everything
+ * escalates towards the cap instead of hammering it every poll. The cap
+ * bounds only the backoff: a longer wait the server named is when it
+ * will take requests again, and resuming earlier earns another refusal.
+ * A server's wait has its own, far higher ceiling. One success reopens
+ * the gate and resets the escalation.
  */
 
 export interface ThrottleGateOptions {
   now?: () => number;
   /** Wait after the first refusal, doubling from there. */
   baseDelayMs?: number;
-  /** Ceiling for the computed backoff. */
+  /** Ceiling for the computed backoff, not for a server's own wait. */
   maxDelayMs?: number;
+  /** Ceiling for a wait the server names. Far above anything a provider
+   *  asks for, it bounds a broken header — a proxy's day-long
+   *  `Retry-After`, a date read against a skewed clock — that would
+   *  otherwise park the provider for the rest of the session. */
+  maxServerWaitMs?: number;
 }
 
 const DEFAULT_BASE_MS = 2_000;
 const DEFAULT_MAX_MS = 5 * 60_000;
+const DEFAULT_MAX_SERVER_WAIT_MS = 60 * 60_000;
 
 export class ThrottleGate {
   private readonly now: () => number;
   private readonly baseDelayMs: number;
   private readonly maxDelayMs: number;
+  private readonly maxServerWaitMs: number;
   private openAt = 0;
   private consecutive = 0;
 
@@ -37,6 +47,8 @@ export class ThrottleGate {
     this.now = options.now ?? (() => Date.now());
     this.baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_MS;
     this.maxDelayMs = options.maxDelayMs ?? DEFAULT_MAX_MS;
+    this.maxServerWaitMs =
+      options.maxServerWaitMs ?? DEFAULT_MAX_SERVER_WAIT_MS;
   }
 
   /** ms until the gate opens; 0 when it is open now. */
@@ -58,10 +70,8 @@ export class ThrottleGate {
       this.maxDelayMs,
       this.baseDelayMs * 2 ** (this.consecutive - 1)
     );
-    const wait = Math.min(
-      this.maxDelayMs,
-      Math.max(backoff, retryAfterMs ?? 0)
-    );
+    const asked = Math.min(this.maxServerWaitMs, retryAfterMs ?? 0);
+    const wait = Math.max(backoff, asked);
     // Never shorten an existing pause: a second refusal arriving from a
     // request that was already in flight must not reopen the gate early.
     this.openAt = Math.max(this.openAt, this.now() + wait);
@@ -71,12 +81,12 @@ export class ThrottleGate {
   /**
    * Close the gate for exactly as long as the server said, without
    * counting it as a refusal. Used for a *successful* response whose
-   * headers say the quota is spent — nothing went wrong yet, and the
-   * escalation should not start on the strength of it.
+   * headers ask for a pause or say the quota is spent — nothing went
+   * wrong yet, and the escalation should not start on the strength of it.
    */
   noteQuotaExhausted(retryAfterMs: number | null): number {
     const wait = Math.min(
-      this.maxDelayMs,
+      this.maxServerWaitMs,
       Math.max(0, retryAfterMs ?? this.baseDelayMs)
     );
     this.openAt = Math.max(this.openAt, this.now() + wait);

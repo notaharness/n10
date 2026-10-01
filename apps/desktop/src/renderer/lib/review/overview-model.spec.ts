@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PullRequestInfo } from '@n10/vcs-core/types';
 import {
+  activeReviewers,
   adoptPullRequest,
   backTarget,
   backToReviewPane,
@@ -158,6 +159,36 @@ describe('nextStep', () => {
     expect(nextStep(pr, 'reviewer', null)).not.toHaveProperty('detailAction');
   });
 
+  describe('asked through a team the reviewer is in', () => {
+    const team = (decision: Decision) => ({
+      identifier: 'core-team',
+      displayName: 'Core Team',
+      decision,
+      includesViewer: true,
+    });
+
+    it('says their review is requested while the team has not answered', () => {
+      const pr = { ...PR, reviewers: [team('no-response')] };
+      expect(nextStep(pr, 'reviewer', 'bea').summary).toBe(
+        'Your review is requested'
+      );
+    });
+
+    it('never gives them a teammate’s vote for the team', () => {
+      const pr = { ...PR, reviewers: [team('approved')] };
+      expect(nextStep(pr, 'reviewer', 'bea').summary).toBe(
+        'Not reviewed by you yet'
+      );
+    });
+
+    it('goes by their own vote when they have one', () => {
+      const pr = { ...PR, reviewers: [team('no-response'), bea('approved')] };
+      expect(nextStep(pr, 'reviewer', 'bea').summary).toBe(
+        'You approved this pull request'
+      );
+    });
+  });
+
   it('says a review is requested only where the provider asks for it', () => {
     // On GitHub, a reply in a thread lists the reader without a request.
     const pr = {
@@ -223,6 +254,18 @@ describe('nextStep', () => {
     ).toBe('Approved by Bea and 1 other');
   });
 
+  it('names the teammate who voted for a team, not the team as well', () => {
+    const team = {
+      identifier: 'core-team',
+      displayName: 'Core Team',
+      decision: 'approved' as const,
+    };
+    const reviewers = [team, { ...bea('approved'), votedFor: ['core-team'] }];
+    expect(nextStep({ ...PR, reviewers }, 'author', 'alex').summary).toBe(
+      'Approved by Bea'
+    );
+  });
+
   it('says what the row shows about reviews, never that one is required', () => {
     // Whether a review is required is the provider's, in Completion.
     expect(nextStep(PR, 'author', 'alex')).toMatchObject({
@@ -233,5 +276,22 @@ describe('nextStep', () => {
       nextStep({ ...PR, reviewers: [bea('no-response')] }, 'author', 'alex')
         .summary
     ).toBe('No approvals yet');
+  });
+});
+
+describe('activeReviewers', () => {
+  it('counts one row per vote, and nobody who declined', () => {
+    const team = {
+      identifier: 'core-team',
+      displayName: 'Core Team',
+      decision: 'approved' as const,
+    };
+    const teammate = { ...bea('approved'), votedFor: ['core-team'] };
+    const cy = {
+      identifier: 'cy',
+      displayName: 'Cy',
+      decision: 'declined' as const,
+    };
+    expect(activeReviewers([team, teammate, cy])).toEqual([teammate]);
   });
 });
