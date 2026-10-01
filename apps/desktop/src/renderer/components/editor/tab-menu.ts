@@ -13,7 +13,7 @@ const OVERFLOW: Record<string, TabOverflow> = {
 
 /** The native context menu a tab offers: closing, keeping a preview,
  *  and what the whole strip does when its tabs overflow. */
-export function tabMenuItems(
+function tabMenuItems(
   tab: Tab,
   tabCount: number,
   overflow: TabOverflow

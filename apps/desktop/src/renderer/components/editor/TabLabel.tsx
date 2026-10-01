@@ -1,4 +1,4 @@
-import { useCallback, useState, useSyncExternalStore } from 'react';
+import { memo, useCallback, useState, useSyncExternalStore } from 'react';
 import {
   cutToFit,
   dropChars,
@@ -86,7 +86,7 @@ function cutFor(text: string, box: string, side: CutSide): number {
  * would; the cut one is painted over it; and a screen reader reads the
  * whole label, never the cut.
  */
-export function TabLabel({
+export const TabLabel = memo(function TabLabel({
   label,
   preview,
   foreignRepo,
@@ -137,4 +137,4 @@ export function TabLabel({
       <span className="sr-only">{whole}</span>
     </span>
   );
-}
+});

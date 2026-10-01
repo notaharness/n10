@@ -1,5 +1,6 @@
 import type { SidebarItem } from '../../../host/contract.js';
 import { itemTitle } from '../sidebar/sidebar-model.js';
+import type { CutSide } from './label-cut.js';
 import type { Tab } from './tab-identity.js';
 
 /**
@@ -20,7 +21,7 @@ export type TabFace = 'settings' | 'pr' | 'branch' | 'terminal';
  * `…/Code/n10`), so it loses its start; a pull request's title, and
  * anything else, reads from its start and loses its end.
  */
-export function cutSide(face: TabFace): 'start' | 'end' {
+export function cutSide(face: TabFace): CutSide {
   return face === 'branch' || face === 'terminal' ? 'start' : 'end';
 }
 

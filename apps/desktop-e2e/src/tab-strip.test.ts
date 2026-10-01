@@ -17,7 +17,7 @@ import {
   armContextMenuPeek,
   clickAppMenuItem,
 } from './setup/menu.js';
-import { tabNames } from './setup/tab-row.js';
+import { LIFT, motion, tabNames } from './setup/tab-row.js';
 
 /**
  * How the tab strip lays its tabs out: what it does with more than fit,
@@ -157,6 +157,36 @@ test.describe('Tab strip overflow', () => {
     await expect
       .poll(() => tabNames(page))
       .toEqual([...MANY.slice(1), 'feature-tab-strip-wrap']);
+  });
+
+  test('lifted by keyboard from the end of the first row, a tab goes down into the second', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    const tops = await tabs(page).evaluateAll((els) =>
+      els.map((el) => Math.round(el.getBoundingClientRect().top))
+    );
+    const end = tops.lastIndexOf(tops[0]!);
+    expect(end).toBeLessThan(MANY.length - 1);
+    const name = MANY[end]!;
+    const t = tab(page, new RegExp(name));
+    await t.focus();
+    await page.keyboard.press(LIFT);
+    // The sensor hears arrows a task after the lift.
+    await expect(async () => {
+      await page.keyboard.press('ArrowDown');
+      expect((await motion(t)).transform).toMatch(
+        /^translate3d\(-?[\d.]+px, [1-9]/
+      );
+    }).toPass();
+    // Dropped once the strip has taken it to be over another tab.
+    await expect(
+      page.getByText(new RegExp(`^${name} is over (?!${name}\\.)`))
+    ).toBeAttached();
+    await page.keyboard.press('Space');
+    await expect
+      .poll(async () => (await tabNames(page)).indexOf(name))
+      .toBeGreaterThan(end);
   });
 });
 

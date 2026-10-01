@@ -110,7 +110,6 @@
   --statusbar-foreground: #cccccc;
   --tab: #181818;
   --tab-active: color-mix(in srgb, var(--primary) 18%, var(--background));
-  --tab-hover: color-mix(in srgb, var(--accent) 60%, var(--tab));
 
   --repo-1: #2dd4bf;
   --repo-2: #fb923c;
@@ -277,8 +276,8 @@
 
   /* Subtle attention pulse for a tab whose agent just finished a work
      streak and hasn't been looked at yet (the TUI's title flash):
-     blinks toward — but not all the way to — the active-tab shade. */
-  /* Only the lit half is declared: the other is the tab's own
+     blinks toward — but not all the way to — the active-tab shade.
+     Only the lit half is declared: the other is the tab's own
      background, hover included, and opaque, which the close button's
      cover takes on. */
   @keyframes tab-attention {

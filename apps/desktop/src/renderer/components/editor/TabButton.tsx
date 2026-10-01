@@ -140,8 +140,8 @@ function RepoBand({ color }: { color: string | null }) {
 }
 
 /** The hover title: the full path, for telling two checkouts of the
- *  same repo apart — and a terminal's whole directory, since its label
- *  is cut from the front. */
+ *  same repo apart — and a terminal's absolute directory, where its
+ *  label shows it from home. */
 function tabTitle(tab: Tab, foreignRepo: string | null): string | undefined {
   if (foreignRepo) return foreignRepo;
   return tab.kind === 'terminal' ? tab.cwd : undefined;

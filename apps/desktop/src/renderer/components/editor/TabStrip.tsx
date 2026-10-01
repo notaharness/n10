@@ -3,6 +3,7 @@ import {
   DndContext,
   pointerWithin,
   PointerSensor,
+  useDndContext,
   useDroppable,
   useSensor,
   useSensors,
@@ -173,11 +174,16 @@ export function TabStrip({
 /**
  * The room after the last tab. Its growth outweighs the tabs', so it
  * takes the last row's room while each full row above is shared out
- * among its tabs. A drop target only for its rect: collisions resolve
- * it to the last tab.
+ * among its tabs. A drop target only for its rect, and only under the
+ * pointer: collisions resolve it to the last tab, and a keyboard drag,
+ * which steps from droppable to droppable, skips it.
  */
 function StripEnd() {
-  const { setNodeRef } = useDroppable({ id: END_ID });
+  const { activatorEvent } = useDndContext();
+  const { setNodeRef } = useDroppable({
+    id: END_ID,
+    disabled: activatorEvent instanceof KeyboardEvent,
+  });
   return <div ref={setNodeRef} aria-hidden className="grow-[9999] basis-0" />;
 }
 
