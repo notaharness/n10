@@ -27,7 +27,7 @@ test('Codex worktree launch, activity and recorded-agent continuation in Desktop
   const { page, homeDir, repoPath } = desktop;
   const cwd = join(repoPath, '.claude/worktrees/codex-life');
   await createWorktree(page, 'codex-life');
-  await page.getByRole('button', { name: 'Launch agent', exact: true }).click();
+  await page.getByRole('button', { name: 'Launch Agent', exact: true }).click();
   await expect(
     sessionMenu(page).getByRole('combobox', { name: 'Agent' })
   ).toHaveText('Codex (default)');
@@ -63,9 +63,7 @@ test('Codex worktree launch, activity and recorded-agent continuation in Desktop
     join(homeDir, '.n10/config.json'),
     JSON.stringify({ agentId: 'test', aiCommand: 'exit 42' })
   );
-  await page
-    .getByRole('button', { name: 'Relaunch agent', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Launch Agent', exact: true }).click();
   const menu = sessionMenu(page);
   await expect(
     menu.getByRole('button', { name: 'Continue with Codex', exact: true })

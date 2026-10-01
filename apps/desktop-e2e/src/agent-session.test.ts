@@ -5,6 +5,8 @@ import {
   agentSpinner,
   createWorktree,
   launchAgentFromRail,
+  sessionCard,
+  sessionCards,
   tab,
 } from './setup/app.js';
 
@@ -36,31 +38,30 @@ test.describe('Agent sessions', () => {
   /**
    * The sidebar names a would-be session for every worktree, whether or
    * not one was ever launched. Reading that name as "a session exists"
-   * offered to *re*launch an agent that had never run, and mounted a
+   * would list a card for an agent that had never run, and mount a
    * terminal pane with no PTY behind it.
    */
-  test('a worktree with no agent offers to launch one, not relaunch', async ({
+  test('a worktree with no agent lists no session until one runs', async ({
     desktop,
   }) => {
     const { page } = desktop;
     await createWorktree(page, BRANCH);
 
     await expect(
-      page.getByRole('button', { name: 'Launch agent', exact: true })
+      page.getByRole('button', { name: 'Launch Agent', exact: true })
     ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: /Relaunch agent/i })
-    ).toHaveCount(0);
+    await expect(sessionCards(page)).toHaveCount(0);
 
-    // And once one has run, it is a relaunch.
     await launchAgent(page);
+    await expect(sessionCard(page, 'Agent')).toContainText('Running');
+    // A stopped agent stays listed, to be launched again.
     await page.evaluate(
       (name) => window.n10.killSession(name),
       await sessionKey(page, BRANCH)
     );
-    await expect(
-      page.getByRole('button', { name: /Relaunch agent/i })
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(sessionCard(page, 'Agent')).toContainText('Exited', {
+      timeout: 15_000,
+    });
   });
 
   test('launching an agent starts a session and shows its output', async ({

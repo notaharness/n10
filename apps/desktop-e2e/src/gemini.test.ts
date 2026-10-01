@@ -26,7 +26,7 @@ test('Gemini worktree launch, activity and explicit fresh restart in Desktop', a
   const { page, homeDir, repoPath } = desktop;
   const cwd = join(repoPath, '.claude/worktrees/gemini-life');
   await createWorktree(page, 'gemini-life');
-  await page.getByRole('button', { name: 'Launch agent', exact: true }).click();
+  await page.getByRole('button', { name: 'Launch Agent', exact: true }).click();
   await expect(
     sessionMenu(page).getByRole('combobox', { name: 'Agent' })
   ).toHaveText('Gemini (default)');
@@ -57,9 +57,7 @@ test('Gemini worktree launch, activity and explicit fresh restart in Desktop', a
       )
     )
     .toEqual([false]);
-  await page
-    .getByRole('button', { name: 'Relaunch agent', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Launch Agent', exact: true }).click();
   const menu = sessionMenu(page);
   await expect(
     menu.getByRole('radio', { name: 'Continue', exact: true })

@@ -10,6 +10,7 @@ import {
   focusTerminal,
   launchAgentFromRail,
   openPalette,
+  sessionCard,
   showChanges,
   showFile,
   showOverview,
@@ -36,11 +37,11 @@ import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
 /**
  * Wait until the host says this branch's agent has finished.
  *
- * Not the rail's "Relaunch agent" button, and deliberately so. That
- * button reads `hasSession && !running`, and `running` reaches the
- * renderer through a query polled every two seconds — so it is equally
- * true in the window between the launch creating the session and the
- * first poll that catches it alive. A wait on the button alone lands
+ * Not the rail's "Exited" card, and deliberately so. That card reads
+ * `!running`, and `running` reaches the renderer through a query
+ * polled every two seconds — so it is equally true in the window
+ * between the launch creating the session and the first poll that
+ * catches it alive. A wait on the card alone lands
  * in that window on a loaded machine and hands the test back an agent
  * that is still starting: the assertions that follow then describe a
  * live session and fail for the wrong reason.
@@ -48,7 +49,7 @@ import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
  * `listSessions()` is answered by the host from its own registry with
  * no cache in front of it, and a name only appears there once the
  * session has been created — so a session that is present and not
- * running has genuinely exited. The button is then waited on second,
+ * running has genuinely exited. The card is then waited on second,
  * because that is the exit as the user meets it.
  *
  * It is deliberately not tmux's retained "Pane is dead" notice either.
@@ -73,9 +74,9 @@ async function expectAgentExited(page: Page, branch: string): Promise<void> {
       { timeout: 30_000 }
     )
     .toBe(false);
-  await expect(
-    page.getByRole('button', { name: 'Relaunch agent', exact: true })
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(sessionCard(page, 'Agent')).toContainText('Exited', {
+    timeout: 30_000,
+  });
 }
 
 test.describe('An agent that exits immediately', () => {

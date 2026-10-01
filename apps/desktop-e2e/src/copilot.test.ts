@@ -26,7 +26,7 @@ test('Copilot worktree launch, activity and explicit fresh restart in Desktop', 
   const { page, homeDir, repoPath } = desktop;
   const cwd = join(repoPath, '.claude/worktrees/copilot-life');
   await createWorktree(page, 'copilot-life');
-  await page.getByRole('button', { name: 'Launch agent', exact: true }).click();
+  await page.getByRole('button', { name: 'Launch Agent', exact: true }).click();
   await expect(
     sessionMenu(page).getByRole('combobox', { name: 'Agent' })
   ).toHaveText('Copilot (default)');
@@ -57,9 +57,7 @@ test('Copilot worktree launch, activity and explicit fresh restart in Desktop', 
       )
     )
     .toEqual([false]);
-  await page
-    .getByRole('button', { name: 'Relaunch agent', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Launch Agent', exact: true }).click();
   const menu = sessionMenu(page);
   await expect(
     menu.getByRole('radio', { name: 'Continue', exact: true })

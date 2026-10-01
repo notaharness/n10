@@ -42,7 +42,7 @@ async function openMenu(
   const sessions = await page.evaluate(() => window.n10.listSessions());
   if (!sessions.some((s) => s.running)) {
     await page
-      .getByRole('button', { name: /^(Launch|Relaunch) agent$/, exact: true })
+      .getByRole('button', { name: 'Launch Agent', exact: true })
       .click();
   } else {
     await armContextMenuChoice(app, 'Session…');

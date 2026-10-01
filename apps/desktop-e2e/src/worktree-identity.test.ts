@@ -99,7 +99,7 @@ test.describe('A worktree session belongs to its checkout', () => {
     );
     await sidebarRow(page, /^feature$/).click();
     await expect(
-      page.getByRole('button', { name: 'Launch agent', exact: true })
+      page.getByRole('button', { name: 'Launch Agent', exact: true })
     ).toBeVisible({ timeout: 15_000 });
   });
 });
