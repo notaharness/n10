@@ -65,7 +65,7 @@ export const BEAM_REPO: RepoData = {
   sidebar: () => [
     {
       kind: 'session',
-      session: worktreeSession(BEAM, 'docs/relay-regions', false),
+      session: worktreeSession(BEAM, 'docs/relay-regions', true),
       branch: 'docs/relay-regions',
       isMerged: false,
     },

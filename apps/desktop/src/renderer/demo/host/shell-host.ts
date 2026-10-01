@@ -117,14 +117,13 @@ export function createShellHost(state: DemoState): ShellHost {
           cwd,
           lastOpenedAt: Date.now() - i * 3_600_000,
           valid: true,
-          color: i,
+          color: state.colors.get(cwd) ?? 0,
         }))
       ),
     selectRepoDirectory: () => pickFolder('Open a repository'),
     selectFolder: () => pickFolder('Choose a folder'),
     forgetRecent: (cwd) => {
-      const at = state.recent.indexOf(cwd);
-      if (at >= 0) state.recent.splice(at, 1);
+      state.forget(cwd);
       return later(undefined);
     },
     getSettingsView: () => later(SETTINGS),

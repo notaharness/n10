@@ -90,6 +90,9 @@ export class DemoState implements Channels {
     REPOS.map((data) => [data.cwd, new RepoState(data, this)])
   );
   readonly recent: string[] = [...RECENT];
+  /** Each recent repository's colour, kept while it stays listed: the
+   *  lowest no other one holds, as the host's recents list assigns. */
+  readonly colors = new Map(RECENT.map((cwd, i) => [cwd, i]));
   current: string = RECENT[0] as string;
 
   /** The open repository. */
@@ -102,7 +105,20 @@ export class DemoState implements Channels {
     const repo = this.repos.get(cwd);
     if (!repo) throw new Error(`${cwd} is not a git repository`);
     this.current = cwd;
-    if (!this.recent.includes(cwd)) this.recent.unshift(cwd);
+    if (!this.recent.includes(cwd)) {
+      this.recent.unshift(cwd);
+      const taken = new Set(this.colors.values());
+      let color = 0;
+      while (taken.has(color)) color++;
+      this.colors.set(cwd, color);
+    }
     return repo;
+  }
+
+  /** Drop a repository from the recents, freeing its colour. */
+  forget(cwd: string): void {
+    const at = this.recent.indexOf(cwd);
+    if (at >= 0) this.recent.splice(at, 1);
+    this.colors.delete(cwd);
   }
 }
