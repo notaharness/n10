@@ -11,7 +11,6 @@ import {
   withViewerVerdict,
 } from '../review/review-verdict.js';
 import { errorMessage } from '../utils.js';
-import { useTabs } from '../tabs/tabs.js';
 import { keptNotice } from './removal-notice.js';
 import type {
   PlanCheckoutRequest,
@@ -129,7 +128,6 @@ const REMOVE_WORKTREE_KEY = ['remove-worktree'] as const;
 
 export function useRemoveWorktree(cwd: string) {
   const inv = useInvalidator(cwd);
-  const tabs = useTabs();
   return useMutation({
     mutationKey: REMOVE_WORKTREE_KEY,
     mutationFn: ({
@@ -138,17 +136,14 @@ export function useRemoveWorktree(cwd: string) {
     }: {
       branch: string;
       approved: WorktreeRemovalCheck;
-      /** The worktree's tab, closed once the worktree is gone. */
-      tabId?: string;
     }) => window.n10.removeWorktree(branch, approved),
     // Reported here rather than through `mutate`'s own callbacks: the
     // confirm dialog closes as soon as it fires, and per-call callbacks
     // are dropped when their component unmounts. Mutation-level ones run
     // either way, so the outcome is never swallowed.
-    onSuccess: (outcome, { branch, tabId }) => {
-      // A kept worktree keeps its tab: its agent may still be running.
-      const gone = outcome === 'removed' || outcome === 'kept-branch';
-      if (gone && tabId) tabs.close(tabId, cwd);
+    // A removed worktree's tab closes on discovery's report of it
+    // (`TabsProvider`), however it was removed.
+    onSuccess: (outcome, { branch }) => {
       const notice = keptNotice(branch, outcome);
       if (notice) toast.warning(notice);
       else toast.success(`Removed worktree ${branch}`);

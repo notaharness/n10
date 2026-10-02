@@ -5,11 +5,11 @@ import type { TabsState } from './tabs-model.js';
  * Taking a tab off the strip, and where focus goes when it was the
  * active one.
  *
- * Its own module because two transitions close tabs: the user's
- * `close`, and the terminal listing reporting that the process behind
- * a terminal tab has ended. Both must move focus by the same rule, or
- * a shell exiting would be the one way to land the workspace on
- * another repository.
+ * Its own module because several transitions close tabs: the user's
+ * `close`, the host reporting that the process behind a terminal tab
+ * has ended, and discovery reporting that a worktree is gone. All must
+ * move focus by the same rule, or a shell exiting would be the one way
+ * to land the workspace on another repository.
  */
 
 /**
@@ -29,6 +29,30 @@ export function closeTab(
     activeId = nextActive(tabs, idx, repo) ?? null;
   }
   return { ...state, tabs, activeId };
+}
+
+/**
+ * Close every tab of `repo` that belongs to one of `worktrees` — the
+ * checkouts discovery reported gone, however they went. A tab knows
+ * its worktree once a sync has seen the item there, so one opened for
+ * a worktree still being created is not among them.
+ */
+export function closeRemovedWorktrees(
+  state: TabsState,
+  repo: string,
+  worktrees: readonly string[]
+): TabsState {
+  const gone = new Set(worktrees);
+  return state.tabs.reduce(
+    (next, t) =>
+      t.kind === 'item' &&
+      t.repo === repo &&
+      t.worktree !== undefined &&
+      gone.has(t.worktree)
+        ? closeTab(next, t.id, repo)
+        : next,
+    state
+  );
 }
 
 /**

@@ -135,3 +135,45 @@ describe('a worktree that switches branch', () => {
     expect(s.tabs).toHaveLength(1);
   });
 });
+
+describe('a worktree that is removed', () => {
+  const removed = (state: TabsState, repo = REPO, worktrees = [WT]) =>
+    reduce(state, { type: 'worktrees-removed', repo, worktrees });
+
+  it('closes its tab, whichever branch and key the tab followed it to', () => {
+    let s = open(EMPTY_TABS, 'branch:feature');
+    s = sync(s, [worktree('feature')]);
+    s = sync(s, [worktree('other', { itemKey: 'pr:12' })]);
+    s = removed(s);
+    expect(s.tabs).toEqual([]);
+    expect(s.activeId).toBeNull();
+  });
+
+  it('hands focus to the neighbour, as a close does', () => {
+    let s = open(EMPTY_TABS, 'branch:feature');
+    s = sync(s, [worktree('feature')]);
+    s = open(s, 'branch:main');
+    s = reduce(s, {
+      type: 'activate',
+      id: itemTabId(REPO, 'branch:feature'),
+    });
+    s = removed(s);
+    expect(s.tabs.map((t) => t.id)).toEqual([itemTabId(REPO, 'branch:main')]);
+    expect(s.activeId).toBe(itemTabId(REPO, 'branch:main'));
+  });
+
+  // Opened optimistically while `git worktree add` runs: no sync has
+  // seen its item yet, so it has no checkout to be removed from.
+  it('leaves a tab alone that has not seen its worktree yet', () => {
+    const s = removed(open(EMPTY_TABS, 'branch:feature'));
+    expect(s.tabs).toHaveLength(1);
+  });
+
+  it('leaves the tabs of other checkouts and other repositories alone', () => {
+    let s = open(EMPTY_TABS, 'branch:feature');
+    s = sync(s, [worktree('feature')]);
+    s = removed(s, '/repos/beta');
+    s = removed(s, REPO, ['/repos/alpha/.claude/worktrees/elsewhere']);
+    expect(s.tabs).toHaveLength(1);
+  });
+});
