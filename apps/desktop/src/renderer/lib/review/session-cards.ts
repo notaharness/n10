@@ -35,13 +35,15 @@ export function sessionCards(
   }));
 }
 
+export interface CardStatus {
+  label: 'Running' | 'Waiting to reconnect' | 'Exited';
+  tone: 'success' | 'warning' | 'muted';
+}
+
 /** What a card says of its session, and in which tone: another
  *  machine's that cannot be reached is neither running here nor
  *  exited, and may well still be running there. */
-export function cardStatus(card: SessionCard): {
-  label: 'Running' | 'Waiting to reconnect' | 'Exited';
-  tone: 'success' | 'warning' | 'muted';
-} {
+export function cardStatus(card: SessionCard): CardStatus {
   if (!card.running) return { label: 'Exited', tone: 'muted' };
   if (card.connectionState && card.connectionState !== 'connected')
     return { label: 'Waiting to reconnect', tone: 'warning' };

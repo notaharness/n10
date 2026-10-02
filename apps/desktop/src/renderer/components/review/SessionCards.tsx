@@ -8,6 +8,7 @@ import {
 import { toast } from 'sonner';
 import {
   cardStatus,
+  type CardStatus,
   type SessionCard,
 } from '../../lib/review/session-cards.js';
 import { cn, errorMessage } from '../../lib/utils.js';
@@ -36,6 +37,13 @@ const SLOTS: readonly {
     another: 'Launch additional terminal',
   },
 ];
+
+/** The icon tile, in the card's status tone. */
+const TILE_TONES: Record<CardStatus['tone'], string> = {
+  success: 'bg-success/15 text-success',
+  warning: 'bg-warning/15 text-warning',
+  muted: 'bg-muted text-muted-foreground',
+};
 
 const ICONS: Record<Kind, typeof BotIcon> = {
   Agent: BotIcon,
@@ -214,9 +222,7 @@ function SessionCardView({
         <span
           className={cn(
             'relative flex size-9 shrink-0 items-center justify-center rounded-md',
-            card.running
-              ? 'bg-success/15 text-success'
-              : 'bg-muted text-muted-foreground'
+            TILE_TONES[status.tone]
           )}
         >
           <Icon className="size-5" />
