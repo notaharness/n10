@@ -188,9 +188,19 @@ resolution or fleet checks. A repository change before launch refuses the reques
 Identical requests join; incompatible requests resolving to one checkout cannot
 replace each other's PTY. Stopping observation on a repo switch disposes timers
 and listeners but preserves every connected agent. Exit notifications update
-session facts without spawning or reattaching. The process-level repository service
-retains observed connection identities after an explicit stop, so an existing
-pane remains a relaunch target even after switching away and back.
+session facts without spawning or reattaching.
+
+How an agent's session ended decides what its tab shows, following what tmux
+keeps. A process that exits or crashes leaves its dead pane (`remain-on-exit`):
+the agent stays listed as exited, across repository switches, and its pane is a
+read-only view of the final output with Resume. Nothing is sent to it, neither
+keystrokes nor resizes. A session that is gone — n10's Stop, `tmux kill-session`
+outside n10, a tmux server restart — leaves nothing to show: the backend reports
+`processState.gone`, the engine releases the agent as it ends, and its card and
+pane go, so the tab returns to its no-agent state (Launch Agent, the Overview).
+An exited agent's dead pane is not polled, so discovery is what sees its
+session go later, and releases it then. Keystrokes and resizes that race any of
+these are dropped and logged by the host, never thrown back to the renderer.
 
 Agent selection uses explicit `agentId`, defaulting to Claude. The hidden fixture
 runner requires `agentId: 'test'`; only that runner interprets `aiCommand`. No
@@ -434,6 +444,19 @@ succeeded; undecided otherwise. A draft is blocked by its lifecycle, as on
 GitHub. Reviewer and comment policies are not listed as items, since the review
 requirement and `MergeState.conversations` carry their verdicts; other
 policies, such as work item linking, are listed with `kind: 'policy'`.
+
+A worktree's tabs close when discovery reports its checkout gone
+(`worktrees-removed`), whoever removed it, and not when its row leaves the
+sidebar: a sidebar answer can belong to another repository mid-switch, and a
+tab opened while its worktree is being created has no row yet. Discovery
+abandons a scan whose listing failed, scans at once for any checkout the
+worktree resource lists that it has not seen, and a reopened repository's
+scanner starts from the last scan its previous handle saw. A worktree whose
+directory was deleted counts as removed; checking its branch out again clears
+the stale git registration. Git cannot tell a deleted directory from one on a
+volume that is not mounted: both are `prunable`. A worktree on such a volume
+reads as removed while it is away, and checking its branch out meanwhile
+unregisters it. `git worktree lock` keeps git from calling a worktree prunable.
 
 Optimistic removal drops a session row but retains a PR row with its session
 fields cleared: the PR outlives its checkout. Status indicators combine CI and

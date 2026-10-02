@@ -302,7 +302,23 @@ describe('hosted process lifecycle', () => {
     mock.state = { paneDead: true, exitCode: 7 };
     await vi.advanceTimersByTimeAsync(1000);
     expect(exit).toHaveBeenCalledExactlyOnceWith(7, undefined);
-    expect(backend.processState).toMatchObject({ running: false, exitCode: 7 });
+    expect(backend.processState).toEqual({
+      running: false,
+      exitCode: 7,
+      signal: undefined,
+    });
+  });
+  // `tmux kill-session`, n10's own stop or a server gone: no retained
+  // pane is left behind to show.
+  it('reports an exit with its session gone', async () => {
+    const backend = await launch();
+    const exit = vi.fn();
+    backend.onExit(exit);
+    await vi.advanceTimersByTimeAsync(500);
+    mock.state = null;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(exit).toHaveBeenCalledOnce();
+    expect(backend.processState).toMatchObject({ running: false, gone: true });
   });
   it('reports dead panes even when attaching after the process exited', async () => {
     mock.state = { paneDead: true, exitCode: 9 };

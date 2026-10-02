@@ -9,6 +9,7 @@ import {
   isSessionAlive,
   sessionNames,
   observeTmuxSessions,
+  releaseExitedSession,
   diffScans,
   type DiscoveredTerminal,
   type DiscoveredWorktree,
@@ -26,10 +27,11 @@ const WATCH_DEBOUNCE_MS = 200;
 const MAX_ADOPT_ATTEMPTS = 3;
 
 /** Offers alone are not changes: an adoption can lose a race without changing
- * anything a shell could display. `delta.changed` would refetch every such tick. */
-function worthAnnouncing(delta: DiscoveryDelta, adopted: number): boolean {
+ * anything a shell could display. `delta.changed` would refetch every such tick.
+ * `touched` counts the sessions this scan attached or released. */
+function worthAnnouncing(delta: DiscoveryDelta, touched: number): boolean {
   return (
-    adopted > 0 ||
+    touched > 0 ||
     delta.appeared.length > 0 ||
     delta.disappeared.length > 0 ||
     delta.switched.length > 0 ||
@@ -47,11 +49,17 @@ export interface SessionDiscoveryOptions {
   onChanged: (delta: DiscoveryDelta) => void;
   /** Abandon work between awaits when selection changes, before attaching a stale repo's sessions. */
   isCurrent?: () => boolean;
+  /** What an earlier scanner of this repository last saw (`lastScan()`).
+   *  The first scan diffs against it, so a worktree removed while no
+   *  scanner watched the repository is reported like any other removal. */
+  baseline?: DiscoveryScan | null;
 }
 
 export interface SessionDiscovery {
   scanNow(): Promise<void>;
   stop(): void;
+  /** What the last finished scan saw, or the baseline before one has. */
+  lastScan(): DiscoveryScan | null;
 }
 
 export function startSessionDiscovery(
@@ -66,7 +74,7 @@ export function startSessionDiscovery(
   } = opts;
   const intervalMs = opts.intervalMs ?? DISCOVERY_INTERVAL_MS;
 
-  let previous: DiscoveryScan | null = null;
+  let previous: DiscoveryScan | null = opts.baseline ?? null;
   const failures = new Map<string, number>();
   const retired = new Set<string>();
   let stopped = false;
@@ -76,7 +84,10 @@ export function startSessionDiscovery(
   let watchedBase: string | null = null;
   let watchTimer: ReturnType<typeof setTimeout> | null = null;
 
-  async function observe(): Promise<DiscoveryScan> {
+  async function observe(): Promise<{
+    scan: DiscoveryScan;
+    held: Set<string>;
+  }> {
     const worktrees: DiscoveredWorktree[] = (
       await listWorktrees(opts.scope())
     ).map((wt) => ({
@@ -86,10 +97,34 @@ export function startSessionDiscovery(
     }));
     const seen = observeTmuxSessions(repo, worktrees);
     return {
-      worktrees,
-      persisted: seen.persisted,
-      terminals: adoptTerminal ? seen.terminals : [],
+      scan: {
+        worktrees,
+        persisted: seen.persisted,
+        terminals: adoptTerminal ? seen.terminals : [],
+      },
+      held: seen.held,
     };
+  }
+
+  /** An agent that exited with its pane kept stays to be read and
+   *  resumed while tmux holds its session. Nothing polls a dead pane, so
+   *  only a scan sees the session go (killed, its server ended). */
+  function releaseGone(held: Set<string>): number {
+    let released = 0;
+    for (const name of sessionNames()) {
+      const identity = sessionIdentity(name);
+      if (
+        identity?.kind !== 'worktree' ||
+        identity.machine !== LOCAL_MACHINE ||
+        identity.repo !== repo ||
+        held.has(name) ||
+        isSessionAlive(name)
+      )
+        continue;
+      releaseExitedSession(name);
+      released += 1;
+    }
+    return released;
   }
 
   async function adoptOne<T extends { name: string }>(
@@ -142,7 +177,7 @@ export function startSessionDiscovery(
 
   async function runScan(): Promise<void> {
     if (stopped || !isCurrent()) return;
-    const next = await observe();
+    const { scan: next, held } = await observe();
     if (stopped || !isCurrent()) return;
     forgetFailuresFor(next);
     const delta = diffScans(
@@ -152,6 +187,7 @@ export function startSessionDiscovery(
       retired,
       hasSessionConnection
     );
+    const released = releaseGone(held);
     // A repo switch starts a fresh scanner, but terminal tabs are process-global.
     // Reconcile held terminal keys too, including final frames from an earlier scan.
     // The scan sees this machine's tmux only: another machine's terminal
@@ -172,14 +208,17 @@ export function startSessionDiscovery(
         ]),
       ];
     }
+    // A first scan has nothing to diff against, so it reports no
+    // worktree as appeared; a listing the shell read before it may lack
+    // one it sees, and nothing else would have the shell look again.
+    const first = previous === null && next.worktrees.length > 0;
     previous = next;
     // Attach first, announce second: the shell answers `changed` by
     // re-reading the registry, and it must see the sessions this scan
     // just adopted rather than the state from before them.
     const adopted = await adoptAll(delta);
-    if (worthAnnouncing(delta, adopted) && !stopped && isCurrent()) {
-      onChanged(delta);
-    }
+    const announce = first || worthAnnouncing(delta, adopted + released);
+    if (announce && !stopped && isCurrent()) onChanged(delta);
     ensureWatch();
   }
 
@@ -238,6 +277,7 @@ export function startSessionDiscovery(
 
   const handle: SessionDiscovery = {
     scanNow,
+    lastScan: () => previous,
     stop() {
       stopped = true;
       clearInterval(timer);

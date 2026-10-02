@@ -135,6 +135,9 @@ export interface FakeGitHub {
   /** The signed-in user. PRs they authored are "yours". */
   username?: string;
   prs: FakePr[];
+  /** Head branches of the signed-in user's merged pull requests: what
+   *  the merged-branch sweep finds. */
+  merged?: string[];
   /** Who `mentionableUsers` finds: a login or name containing the
    *  query, ignoring case, first eight. */
   mentionable?: { login: string; name?: string }[];

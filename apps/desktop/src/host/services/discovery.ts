@@ -3,11 +3,14 @@ import { adoptSession } from './session-registry.js';
 import { defaultPaneSize } from './sessions.js';
 import { machines } from './machines.js';
 import { adoptTerminal, forgetTerminal } from './terminals.js';
+import type { DiscoveryChangedEvent } from '../contract.js';
 
 let stop: (() => void) | undefined;
-let changed: (() => void) | null = null;
+let changed: ((event: DiscoveryChangedEvent) => void) | null = null;
 
-export function setDiscoveryNotifier(fn: (() => void) | null): void {
+export function setDiscoveryNotifier(
+  fn: ((event: DiscoveryChangedEvent) => void) | null
+): void {
   changed = fn;
 }
 
@@ -29,7 +32,12 @@ export function startDiscoveryForRepo(cwd: string): void {
     adoptTerminal,
     changed(delta) {
       for (const name of delta.endedTerminals) forgetTerminal(name);
-      changed?.();
+      // Named by checkout, which is what a worktree's tab remembers:
+      // its branch may have changed since, and its row is gone.
+      changed?.({
+        repo: repo.cwd,
+        removedWorktrees: delta.disappeared.map((wt) => wt.path),
+      });
     },
   });
 }

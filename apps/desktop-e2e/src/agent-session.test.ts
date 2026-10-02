@@ -54,14 +54,12 @@ test.describe('Agent sessions', () => {
 
     await launchAgent(page);
     await expect(sessionCard(page, 'Agent')).toContainText('Running');
-    // A stopped agent stays listed, to be launched again.
+    // Stopping ends its tmux session, so nothing is left to list.
     await page.evaluate(
       (name) => window.n10.killSession(name),
       await sessionKey(page, BRANCH)
     );
-    await expect(sessionCard(page, 'Agent')).toContainText('Exited', {
-      timeout: 15_000,
-    });
+    await expect(sessionCards(page)).toHaveCount(0, { timeout: 15_000 });
   });
 
   test('launching an agent starts a session and shows its output', async ({

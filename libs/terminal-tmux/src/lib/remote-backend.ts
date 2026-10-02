@@ -263,6 +263,7 @@ export class RemoteTmuxBackend implements SessionBackend {
       running: false,
       exitCode: info.found ? info.exitCode : undefined,
       signal: info.found ? info.exitSignal : undefined,
+      ...(info.found ? {} : { gone: true }),
     };
     this.unsubscribePoll();
     clearTimeout(this.reconnectTimer);

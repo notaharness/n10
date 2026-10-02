@@ -1,5 +1,6 @@
 import type { PullRequestInfo } from '@n10/vcs-core';
 import type {
+  DiscoveryChangedEvent,
   PullRequestComments,
   ReviewComment,
   SidebarItem,
@@ -17,7 +18,7 @@ import { Channel } from './hub.js';
  */
 export interface Channels {
   readonly remoteUpdated: Channel<void>;
-  readonly discovery: Channel<void>;
+  readonly discovery: Channel<DiscoveryChangedEvent>;
 }
 
 export class RepoState {
@@ -59,7 +60,8 @@ export class RepoState {
     this.sidebar = this.sidebar.map((item) =>
       match(item) ? change(item) : item
     );
-    this.channels.discovery.emit();
+    // The demo keeps its worktrees, so discovery never sees one go.
+    this.channels.discovery.emit({ repo: this.cwd, removedWorktrees: [] });
   }
 
   threadsOf(prId: number): PullRequestComments {
@@ -85,7 +87,7 @@ export class RepoState {
 
 export class DemoState implements Channels {
   readonly remoteUpdated = new Channel<void>();
-  readonly discovery = new Channel<void>();
+  readonly discovery = new Channel<DiscoveryChangedEvent>();
   readonly repos = new Map<string, RepoState>(
     REPOS.map((data) => [data.cwd, new RepoState(data, this)])
   );

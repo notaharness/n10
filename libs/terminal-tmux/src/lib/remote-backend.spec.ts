@@ -173,7 +173,7 @@ describe('RemoteTmuxBackend (D4)', () => {
     const exited = vi.fn();
     backend.onExit(exited);
     await flushMicrotasks();
-    expect(backend.processState?.running).toBe(false);
+    expect(backend.processState).toMatchObject({ running: false, gone: true });
     expect(backend.connectionState).toBe('connected');
     expect(exited).toHaveBeenCalled();
   });

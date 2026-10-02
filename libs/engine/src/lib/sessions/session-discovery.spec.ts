@@ -8,18 +8,22 @@ const {
   listWorktreesMock,
   listPersistedMock,
   listTerminalsMock,
+  listHeldMock,
   isSessionAliveMock,
   sessionNamesMock,
   watchMock,
   basePathMock,
+  released,
 } = vi.hoisted(() => ({
   listWorktreesMock: vi.fn<(scope: WorktreeScope) => Promise<WorktreeInfo[]>>(),
   listPersistedMock: vi.fn<() => Set<string>>(),
   listTerminalsMock: vi.fn<() => DiscoveredTerminal[]>(),
+  listHeldMock: vi.fn<() => Set<string>>(),
   isSessionAliveMock: vi.fn<(name: string) => boolean>(),
   sessionNamesMock: vi.fn<() => string[]>(),
   watchMock: vi.fn(),
   basePathMock: vi.fn<() => string>(),
+  released: [] as string[],
 }));
 
 vi.mock('node:fs', () => ({
@@ -40,7 +44,9 @@ vi.mock('@n10/core', async (original) => ({
   observeTmuxSessions: () => ({
     persisted: listPersistedMock(),
     terminals: listTerminalsMock(),
+    held: listHeldMock(),
   }),
+  releaseExitedSession: (name: string) => released.push(name),
 }));
 
 import { startSessionDiscovery } from './session-discovery.js';
@@ -86,9 +92,11 @@ beforeEach(() => {
   listWorktreesMock.mockReset().mockResolvedValue([]);
   listPersistedMock.mockReset().mockReturnValue(new Set());
   listTerminalsMock.mockReset().mockReturnValue([]);
+  listHeldMock.mockReset().mockReturnValue(new Set());
   isSessionAliveMock.mockReset().mockImplementation((name) => alive.has(name));
   basePathMock.mockReset().mockReturnValue('/repo/.claude/worktrees');
   watchMock.mockReset().mockReturnValue({ close: vi.fn(), on: vi.fn() });
+  released.length = 0;
 });
 
 afterEach(() => {
@@ -238,12 +246,35 @@ describe('startSessionDiscovery', () => {
     });
   });
 
+  // An exited agent's dead pane is not polled: the scan is what sees
+  // its session go, and nothing is left to read or resume.
+  // Its dead pane is no longer `persisted`, but tmux still holds it.
+  it('releases an exited agent once tmux no longer holds its session', async () => {
+    const exited = wtKey('feature-a');
+    const running = wtKey('feature-b');
+    alive.add(running);
+    sessionNamesMock.mockReturnValue([exited, running]);
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a', 'feature-b'));
+    listPersistedMock.mockReturnValue(new Set([running]));
+    listHeldMock.mockReturnValue(new Set([exited, running]));
+    const { discovery, onChanged } = start();
+    await discovery.scanNow();
+    expect(released).toEqual([]);
+    onChanged.mockClear();
+
+    listHeldMock.mockReturnValue(new Set([running]));
+    await discovery.scanNow();
+    expect(released).toEqual([exited]);
+    expect(onChanged).toHaveBeenCalledOnce();
+  });
+
   // The path is what a shell closes a tab by; the name alone would not
   // say which checkout went.
   it('announces a removed worktree with its checkout', async () => {
     listWorktreesMock.mockResolvedValue(worktrees('feature-a', 'feature-b'));
     const { discovery, onChanged } = start();
     await discovery.scanNow();
+    onChanged.mockClear();
 
     listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
     await discovery.scanNow();
@@ -259,10 +290,20 @@ describe('startSessionDiscovery', () => {
     });
   });
 
+  // A worktree added between the shell's first listing and this scan
+  // would otherwise never reach the shell: nothing reads as appeared.
+  it('announces a first scan that sees a worktree', async () => {
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    const { discovery, onChanged } = start();
+    await discovery.scanNow();
+    expect(onChanged).toHaveBeenCalledOnce();
+  });
+
   it('says nothing when nothing changed', async () => {
     listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
     const { discovery, onChanged } = start();
     await discovery.scanNow();
+    onChanged.mockClear();
     await discovery.scanNow();
     await discovery.scanNow();
     expect(onChanged).not.toHaveBeenCalled();
@@ -311,6 +352,7 @@ describe('startSessionDiscovery', () => {
         });
       const { discovery, onChanged } = start({ adopt });
       await discovery.scanNow();
+      onChanged.mockClear();
       await discovery.scanNow();
       expect(adopt).toHaveBeenCalledTimes(2);
       expect(onChanged).toHaveBeenCalledTimes(1);
@@ -324,7 +366,9 @@ describe('startSessionDiscovery', () => {
       listPersistedMock.mockReturnValue(new Set([wtKey('feature-a')]));
       const adopt = vi.fn().mockRejectedValue(new Error('no worktree'));
       const { discovery, onChanged } = start({ adopt });
-      for (let i = 0; i < 6; i++) await discovery.scanNow();
+      await discovery.scanNow();
+      onChanged.mockClear();
+      for (let i = 0; i < 5; i++) await discovery.scanNow();
       expect(onChanged).not.toHaveBeenCalled();
     });
 
@@ -468,6 +512,7 @@ describe('startSessionDiscovery', () => {
       listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
       const { discovery, onChanged } = start();
       await discovery.scanNow();
+      onChanged.mockClear();
 
       listWorktreesMock.mockResolvedValue([]);
       await discovery.scanNow();
@@ -485,6 +530,29 @@ describe('startSessionDiscovery', () => {
 
       await discovery.scanNow();
       expect(listWorktreesMock.mock.calls.length).toBe(before);
+    });
+  });
+
+  // A repository's scanner stops while another repository is open, and
+  // a fresh one starts on the way back.
+  describe('a baseline from an earlier scanner', () => {
+    it('reports on the first scan what went while nothing watched', async () => {
+      listWorktreesMock.mockResolvedValue(worktrees('feature-a', 'feature-b'));
+      const first = start();
+      await first.discovery.scanNow();
+      const baseline = first.discovery.lastScan();
+      first.discovery.stop();
+
+      listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+      const { discovery, onChanged } = start({ baseline });
+      await discovery.scanNow();
+      expect(onChanged).toHaveBeenCalledTimes(1);
+      expect(onChanged.mock.calls[0]![0]).toMatchObject({
+        disappeared: [expect.objectContaining({ name: wtKey('feature-b') })],
+      });
+      expect(discovery.lastScan()?.worktrees).toEqual([
+        expect.objectContaining({ name: wtKey('feature-a') }),
+      ]);
     });
   });
 

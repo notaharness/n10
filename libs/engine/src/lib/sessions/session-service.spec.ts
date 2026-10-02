@@ -1,6 +1,7 @@
 import type * as Primitive from '@n10/core';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { worktreeSessionKey } from '@n10/core';
+import type { DiscoveryScan } from '@n10/core';
 import type { AppConfig } from '@n10/vcs-core';
 import { worktreeScope } from '@n10/worktree-manager';
 import type { WorktreeService } from '../worktrees/api.js';
@@ -12,18 +13,33 @@ const state = vi.hoisted(() => ({
   scan: null as SessionDiscoveryOptions | null,
   scanNow: vi.fn(async () => undefined),
   stopScan: vi.fn(),
+  lastScan: vi.fn((): DiscoveryScan | null => null),
   launch: vi.fn(),
   stop: vi.fn(),
-  exit: (): void => undefined,
+  exits: new Set<(name: string) => void>(),
+  exit(name: string): void {
+    for (const listener of [...this.exits]) listener(name);
+  },
+  released: [] as string[],
   entries: new Map<
     string,
-    { exited: boolean; pty: { connectionState?: string } }
+    {
+      exited: boolean;
+      pty: {
+        connectionState?: string;
+        processState?: { running: boolean; gone?: boolean };
+      };
+    }
   >(),
 }));
 vi.mock('./session-discovery.js', () => ({
   startSessionDiscovery: (options: SessionDiscoveryOptions) => {
     state.scan = options;
-    return { scanNow: state.scanNow, stop: state.stopScan };
+    return {
+      scanNow: state.scanNow,
+      stop: state.stopScan,
+      lastScan: state.lastScan,
+    };
   },
 }));
 vi.mock('@n10/core', async (original) => ({
@@ -35,11 +51,15 @@ vi.mock('@n10/core', async (original) => ({
   isSessionAlive: (name: string) => state.entries.get(name)?.exited === false,
   hasSessionConnection: (name: string) => state.entries.has(name),
   getSpawnedAt: () => 42,
-  onSessionExit: (listener: () => void) => {
-    state.exit = listener;
+  onSessionExit: (listener: (name: string) => void) => {
+    state.exits.add(listener);
     return () => {
-      state.exit = () => undefined;
+      state.exits.delete(listener);
     };
+  },
+  releaseExitedSession: (name: string) => {
+    state.released.push(name);
+    state.entries.delete(name);
   },
 }));
 const wt = { branch: 'feature', path: '/repo/wt', bare: false };
@@ -51,7 +71,7 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
-function fixture() {
+function fixture(lastScans?: Map<string, DiscoveryScan>) {
   const selected = {
     current: true,
     config: {
@@ -92,13 +112,16 @@ function fixture() {
     config,
     worktrees,
     isCurrent: () => selected.current,
+    lastScans,
   });
   return { service, worktrees, selected };
 }
 beforeEach(() => {
   vi.clearAllMocks();
   state.scan = null;
+  state.lastScan.mockReset().mockReturnValue(null);
   state.entries.clear();
+  state.released = [];
   state.launch
     .mockReset()
     .mockImplementation(async ({ name }: { name: string }) => {
@@ -217,7 +240,7 @@ it('publishes exit facts without reattaching the agent', async () => {
   const changed = vi.fn();
   f.service.subscribe(changed);
   state.entries.get(key)!.exited = true;
-  state.exit();
+  state.exit(key);
   expect(changed).toHaveBeenCalledOnce();
   expect(f.service.getSnapshot().sessions[0].running).toBe(false);
   expect(state.launch).not.toHaveBeenCalled();
@@ -262,26 +285,36 @@ it('reports only this repository’s connections and hides local reconnect trans
   f.service.dispose();
 });
 
-it('retains a stopped launch across repository handle replacement', async () => {
+// Stopping ends the tmux session: nothing is left to read or resume.
+it('lists no agent once it is stopped', async () => {
+  const f = fixture();
+  await f.service.launch(request);
+  state.stop.mockImplementationOnce((name: string) =>
+    state.entries.delete(name)
+  );
+  f.service.stop(key);
+  expect(f.service.connections()).toEqual([]);
+  f.service.dispose();
+});
+// An agent that exited keeps its dead pane, to be read and resumed,
+// whichever handle the repository has by then.
+it('retains an exited agent across repository handle replacement', async () => {
   const connections = createSessionConnections();
   const f = fixture();
-  const config = {
-    repo: '/repo',
-    getSnapshot: () => ({ config: f.selected.config }),
-    subscribe: () => () => undefined,
-  };
   const options = {
-    config,
+    config: {
+      repo: '/repo',
+      getSnapshot: () => ({ config: f.selected.config }),
+      subscribe: () => () => undefined,
+    },
     worktrees: f.worktrees,
     connections,
     isCurrent: () => true,
   };
   const first = createSessionService(options);
   await first.launch(request);
-  state.stop.mockImplementationOnce((name: string) =>
-    state.entries.delete(name)
-  );
-  first.stop(key);
+  state.entries.get(key)!.exited = true;
+  state.exit(key);
   first.dispose();
   const reopened = createSessionService(options);
   expect(reopened.connections()).toEqual([
@@ -289,6 +322,18 @@ it('retains a stopped launch across repository handle replacement', async () => 
   ]);
   expect(connections.read('/other')).toEqual([]);
   reopened.dispose();
+  f.service.dispose();
+});
+// Killed from outside, or its tmux server gone: no pane is retained.
+it('releases an agent whose tmux session is gone as it ends', async () => {
+  const f = fixture();
+  await f.service.launch(request);
+  const entry = state.entries.get(key)!;
+  entry.exited = true;
+  entry.pty.processState = { running: false, gone: true };
+  state.exit(key);
+  expect(state.released).toEqual([key]);
+  expect(f.service.connections()).toEqual([]);
   f.service.dispose();
 });
 it('names the branch of a terminal in a linked checkout, never the main checkout’s', () => {
@@ -333,4 +378,48 @@ it('checks a branch out on another machine and knows its terminals there', async
   expect(
     service.terminalBranch({ machine: 'local', cwd: '/home/them/wt' })
   ).toBe(undefined);
+});
+
+const scanOf = (...listed: (typeof wt)[]): DiscoveryScan => ({
+  worktrees: listed.map((w) => ({
+    name: worktreeSessionKey(w.path, '/repo'),
+    branch: w.branch,
+    path: w.path,
+  })),
+  persisted: new Set(),
+  terminals: [],
+});
+
+// Another repository's handle replaces this one while it is open; the
+// next handle's scanner must still see what went meanwhile.
+it('starts a reopened repository’s discovery from its previous scan', () => {
+  const lastScans = new Map<string, DiscoveryScan>();
+  const before = scanOf(wt);
+  const first = fixture(lastScans);
+  first.service.watch({ size });
+  state.lastScan.mockReturnValue(before);
+  first.service.dispose();
+
+  fixture(lastScans).service.watch({ size });
+  expect(state.scan!.baseline).toBe(before);
+});
+
+// Discovery reports only the removal of a worktree it has seen, and a
+// shell can show (and open a tab for) any worktree the resource lists.
+it('scans at once for a listed worktree discovery has not seen', async () => {
+  const f = fixture();
+  f.service.watch({ size });
+  state.lastScan.mockReturnValue(scanOf());
+  state.scanNow.mockClear();
+  await f.service.refresh();
+  expect(state.scanNow).toHaveBeenCalled();
+});
+
+it('leaves discovery to its schedule when it has seen every listed worktree', async () => {
+  const f = fixture();
+  f.service.watch({ size });
+  state.lastScan.mockReturnValue(scanOf(wt));
+  state.scanNow.mockClear();
+  await f.service.refresh();
+  expect(state.scanNow).not.toHaveBeenCalled();
 });

@@ -102,4 +102,27 @@ describe('desktop session observation adapter', () => {
     expect(state.forget).toHaveBeenCalledWith('terminal');
     expect(notify).toHaveBeenCalledOnce();
   });
+
+  // A worktree's tab remembers its checkout, not its branch.
+  it('names the repository and the checkouts that are gone', () => {
+    const notify = vi.fn();
+    setDiscoveryNotifier(notify);
+    startDiscoveryForRepo('/repo-a');
+    const gone = {
+      name: 'wt',
+      branch: 'feature',
+      path: '/repo-a/.claude/worktrees/feature',
+    };
+    ports().changed?.(
+      diffScans(
+        { worktrees: [gone], persisted: new Set(), terminals: [] },
+        { worktrees: [], persisted: new Set(), terminals: [] },
+        () => false
+      )
+    );
+    expect(notify).toHaveBeenCalledWith({
+      repo: '/repo-a',
+      removedWorktrees: ['/repo-a/.claude/worktrees/feature'],
+    });
+  });
 });

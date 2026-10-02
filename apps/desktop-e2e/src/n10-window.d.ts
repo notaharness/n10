@@ -66,6 +66,7 @@ interface N10Bridge {
     cb: (event: { name: string; data: string; seq: number }) => void
   ): () => void;
   unwatchSession(name: string): Promise<void>;
+  onDiscoveryChanged(cb: () => void): () => void;
   listRecentRepos(): Promise<{ cwd: string; valid: boolean }[]>;
   listTerminals(): Promise<
     {

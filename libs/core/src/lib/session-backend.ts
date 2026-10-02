@@ -70,6 +70,10 @@ export interface TmuxObservation {
    *  repository it belongs to, plus this repository's orphaned worktree
    *  sessions — see {@link observeTmuxSessions}. */
   terminals: DiscoveredTerminal[];
+  /** The registry names of every worktree session of this repository
+   *  the server still has, its pane live or dead, whether or not git
+   *  still lists the checkout. */
+  held: Set<string>;
 }
 
 /**
@@ -116,13 +120,16 @@ export function observeTmuxSessions(
   };
   const persisted = new Set<string>();
   const terminals: DiscoveredTerminal[] = [];
+  const held = new Set<string>();
   for (const session of listOurSessions()) {
+    if (session.type === 'worktree' && session.repo === root)
+      held.add(registryNameOf(session));
     const found = classifySession(session, ctx);
     if (!found) continue;
     if (found.kind === 'terminal') terminals.push(found.terminal);
     else persisted.add(found.name);
   }
-  return { persisted, terminals };
+  return { persisted, terminals, held };
 }
 
 interface ClassifyContext {
