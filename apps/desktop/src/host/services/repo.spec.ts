@@ -221,3 +221,32 @@ it('refreshes config explicitly without making snapshot reads publish', () => {
   expect(refreshRepo()?.cwd).toBe(gitDir);
   expect(reload).toHaveBeenCalledOnce();
 });
+
+describe('the verdicts a repository can file', () => {
+  it('are the provider’s, once it can file a review there', () => {
+    execFileSync(
+      'git',
+      ['remote', 'add', 'origin', 'https://github.com/acme/app.git'],
+      { cwd: gitDir }
+    );
+    expect(openRepo(gitDir).reviewEvents).toEqual([
+      'COMMENT',
+      'APPROVE',
+      'REQUEST_CHANGES',
+    ]);
+  });
+
+  it('are none while the provider is not set up for the repository', () => {
+    // GitHub, but no remote to name the repository: nothing to file a
+    // review on.
+    openRepo(gitDir);
+    activeConfigService().updateField(
+      { label: 'Provider', key: 'vendor', configBag: 'project' },
+      'github'
+    );
+    const info = refreshRepo()!;
+    expect(info.providerId).toBe('github');
+    expect(info.vcsConfigured).toBe(false);
+    expect(info.reviewEvents).toEqual([]);
+  });
+});

@@ -1,4 +1,3 @@
-import type { ReviewVerdict } from '@n10/vcs-core';
 import { readResourceValue } from '@n10/engine';
 import { activeReviewService } from './repo.js';
 import type { ReplyRequest, ResolveRequest } from '../contract.js';
@@ -26,14 +25,16 @@ export async function setThreadResolved(req: ResolveRequest): Promise<void> {
 export async function fetchPrDescription(prId: number) {
   return readResourceValue(activeReviewService().description(prId));
 }
-export async function submitReviewVerdict(
-  prId: number,
-  verdict: ReviewVerdict
-) {
-  await activeReviewService().commands.verdict(prId, verdict);
+/** A pull request's comparison and file manifest at exact commits. */
+export function getPrDiffManifest(req: unknown) {
+  return readResourceValue(activeReviewService().diff.manifest(req));
 }
-export function getDiffText(sourceBranch: string, targetBranch: string) {
-  return readResourceValue(
-    activeReviewService().diff.full({ sourceBranch, targetBranch })
-  );
+/** The patch between a resolved comparison's commits. */
+export function getPrDiffPatch(req: unknown) {
+  return readResourceValue(activeReviewService().diff.patch(req));
+}
+/** Two revisions resolved to exact commits, and every file changed
+ *  between them. */
+export function getPrRangeManifest(req: unknown) {
+  return readResourceValue(activeReviewService().diff.rangeManifest(req));
 }

@@ -29,13 +29,22 @@ export interface GitOutput {
 
 export function runGit(
   args: readonly string[],
-  opts: { cwd?: string; maxBytes: number; timeoutMs?: number }
+  opts: {
+    cwd?: string;
+    maxBytes: number;
+    timeoutMs?: number;
+    input?: string;
+  }
 ): Promise<GitOutput> {
   return new Promise<GitOutput>((resolve, reject) => {
     const child = spawn('git', [...args], {
       cwd: opts.cwd,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
+    // A git that exits before reading all of its input (killed at the
+    // ceiling, say) breaks the pipe; `close` still settles the call.
+    child.stdin.on('error', () => undefined);
+    child.stdin.end(opts.input ?? '');
 
     const chunks: Buffer[] = [];
     const errChunks: Buffer[] = [];

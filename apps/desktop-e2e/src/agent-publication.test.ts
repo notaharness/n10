@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { test, expect } from './fixtures/desktop.js';
 import {
@@ -53,11 +54,11 @@ test.use({
   },
 });
 
-async function prepare(page: Page, homeDir: string) {
-  const head = await page.evaluate(
-    async (branch) => (await window.n10.fetchDiffText(branch, 'main')).head,
-    BRANCH
-  );
+function prepare(repoPath: string, homeDir: string) {
+  const head = execFileSync('git', ['rev-parse', BRANCH], {
+    cwd: repoPath,
+    encoding: 'utf8',
+  }).trim();
   updateFakeGh(homeDir, (scenario) => {
     scenario.prs[0].headRefOid = head;
   });
@@ -109,8 +110,8 @@ async function expectPublished(page: Page, homeDir: string, head: string) {
 }
 
 test('agent findings use the native review publisher', async ({ desktop }) => {
-  const { page, homeDir } = desktop;
-  const head = await prepare(page, homeDir);
+  const { page, homeDir, repoPath } = desktop;
+  const head = prepare(repoPath, homeDir);
   expect(await post(page, head)).toEqual({ count: 2 });
   await expectPublished(page, homeDir, head);
 });
@@ -118,8 +119,8 @@ test('agent findings use the native review publisher', async ({ desktop }) => {
 test('agent findings reconcile a lost answer without another write', async ({
   desktop,
 }) => {
-  const { page, homeDir } = desktop;
-  const head = await prepare(page, homeDir);
+  const { page, homeDir, repoPath } = desktop;
+  const head = prepare(repoPath, homeDir);
   updateFakeGh(homeDir, (scenario) => {
     scenario.loseAnswers = ['SubmitReview'];
   });

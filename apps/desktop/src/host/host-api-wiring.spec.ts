@@ -66,9 +66,10 @@ vi.mock('./services/reviews.js', () =>
     'replyToThread',
     'setThreadResolved',
     'fetchPrDescription',
-    'submitReviewVerdict',
     'getReviewViewer',
-    'getDiffText',
+    'getPrDiffManifest',
+    'getPrDiffPatch',
+    'getPrRangeManifest',
   ])
 );
 vi.mock('./services/sessions.js', () =>
@@ -114,6 +115,9 @@ vi.mock('./services/pr-checks.js', () =>
 );
 vi.mock('./services/pr-details.js', () =>
   recorder('prDetails', ['getPullRequestSnapshot'])
+);
+vi.mock('./services/pr-history.js', () =>
+  recorder('prHistory', ['getPullRequestHistory', 'recordPullRequestVisit'])
 );
 vi.mock('./services/pr-conversation.js', () =>
   recorder('prConversation', ['getPullRequestConversation'])
@@ -216,6 +220,16 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     'prDetails.getPullRequestSnapshot',
   ],
   [
+    'getPullRequestHistory',
+    [{ ref: { number: 7 }, visitId: 'v1' }],
+    'prHistory.getPullRequestHistory',
+  ],
+  [
+    'recordPullRequestVisit',
+    [{ ref: { number: 7 }, visit: {} }],
+    'prHistory.recordPullRequestVisit',
+  ],
+  [
     'getPullRequestChecks',
     [{ ref: { number: 7 } }],
     'prChecks.getPullRequestChecks',
@@ -244,9 +258,22 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     [{ prId: 7, thread: { id: 't' }, resolved: true }],
     'reviews.setThreadResolved',
   ],
-  ['submitReviewVerdict', [7, 'approve'], 'reviews.submitReviewVerdict'],
   ['getReviewViewer', [], 'reviews.getReviewViewer'],
-  ['fetchDiffText', ['feature', 'main'], 'reviews.getDiffText'],
+  [
+    'fetchPrDiffManifest',
+    [{ repo: '/r', sourceBranch: 'feature', targetBranch: 'main' }],
+    'reviews.getPrDiffManifest',
+  ],
+  [
+    'fetchPrDiffPatch',
+    [{ repo: '/r', mergeBaseOid: 'a', headOid: 'b' }],
+    'reviews.getPrDiffPatch',
+  ],
+  [
+    'fetchPrRangeManifest',
+    [{ repo: '/r', from: 'a', to: 'b', target: 'c' }],
+    'reviews.getPrRangeManifest',
+  ],
   [
     'fetchWorktreeDiffText',
     ['feature', 'main'],

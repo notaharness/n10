@@ -58,11 +58,14 @@ const shellOperationPaths = [
       'readPullRequestSnapshot',
       'readPullRequestChecks',
       'readPullRequestConversation',
-      'fetchDiffText',
-      'fetchFileDiffText',
       'fetchWorktreeDiffText',
-      'readDiffFiles',
-      'resolveRef',
+      'resolvePrComparison',
+      'readPrDiffManifest',
+      'readPrDiffPatch',
+      'readRevisionRangeManifest',
+      'readPullRequestHistory',
+      'recordPullRequestVisit',
+      'VisitBaselines',
     ],
     message:
       'Review resources and diff freshness belong to the engine review service.',
@@ -570,14 +573,34 @@ export default tseslint.config(
     },
   },
   {
+    // Checks the renderer's batch plan against core's diff reads in real
+    // Git: it tests what the primitives return, and coordinates nothing.
+    files: [
+      'apps/desktop/src/host/services/pr-diff-batches.integration.spec.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: shellOperationPaths.filter(
+            (entry) => !entry.importNames.includes('readPrDiffPatch')
+          ),
+        },
+      ],
+    },
+  },
+  {
     // The engine fixture replaces persisted config to isolate hook integration tests.
     files: ['apps/cli/src/hooks/review-engine-fixture.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
         {
+          // ...and gives the review service it builds its own visit record.
           paths: shellOperationPaths.filter(
-            (entry) => !entry.importNames.includes('readConfig')
+            (entry) =>
+              !entry.importNames.includes('readConfig') &&
+              !entry.importNames.includes('VisitBaselines')
           ),
         },
       ],
@@ -813,6 +836,7 @@ export default tseslint.config(
                 '!@n10/app-core/plan',
                 '!@n10/vcs-core/types',
                 '!@n10/vcs-core/pr-details',
+                '!@n10/vcs-core/review-publication',
                 '!@n10/review-comments/conventional',
               ],
               allowTypeImports: true,

@@ -12,8 +12,8 @@
  * single-repo-per-window, matching how the CLI runs inside a repo.
  */
 
-import type { AgentId, ReviewVerdict } from '@n10/vcs-core';
-export type { AgentId, ReviewVerdict };
+import type { AgentId, ReviewEvent } from '@n10/vcs-core';
+export type { AgentId, ReviewEvent };
 import type {
   SessionLaunchContext,
   SessionIncarnation,
@@ -75,6 +75,16 @@ import type {
   ForeignSessionSummary,
   SessionSummary,
 } from './contract-sessions.js';
+// Pull request diffs at exact commits.
+export type * from './contract-diff.js';
+import type {
+  PrDiffManifestRequest,
+  PrDiffManifestResult,
+  PrDiffPatchRequest,
+  PrDiffPatchResult,
+  PrRangeManifestRequest,
+  PrRangeManifestResult,
+} from '@n10/engine/contract';
 // Review requests — replies, resolutions, review launches, drafts.
 export type * from './contract-reviews.js';
 import type {
@@ -89,6 +99,8 @@ import type {
 // Pull request reads addressed by identity and exact commits.
 export type * from './contract-pull-requests.js';
 import type {
+  HistoryRequest,
+  PullRequestHistory,
   DiscardDraftRequest,
   DraftsRequest,
   MentionSearch,
@@ -100,10 +112,10 @@ import type {
   PullRequestSnapshot,
   RepositoryRef,
   ReviewDraft,
-  ReviewDiffText,
   ReviewDrafts,
   SaveDraftRequest,
   SnapshotRequest,
+  VisitRequest,
 } from './contract-pull-requests.js';
 import type {
   BabysitChangedEvent,
@@ -137,6 +149,9 @@ export interface RepoInfo {
   /** The account n10 acts as (GitHub login, Azure DevOps email): what
    *  per-account reads are keyed by and checked against. */
   viewer: string | null;
+  /** The verdicts a review can be filed with here, in the provider's
+   *  own terms and order; empty when reviews can't be filed. */
+  reviewEvents: readonly ReviewEvent[];
 }
 
 // ── Sessions (agent terminals) ───────────────────────────────────
@@ -397,6 +412,18 @@ export interface N10HostApi {
    *  and the exact commits its review compares. Rejects a ref from
    *  another repository or a caller that last saw another account. */
   getPullRequestSnapshot(req: SnapshotRequest): Promise<PullRequestSnapshot>;
+  /** What the pull request's history offers to compare against: the
+   *  provider's record of its heads and the viewer's latest review, and
+   *  the viewer's last visit before the one `visitId` names — the same
+   *  for every read that names it. */
+  getPullRequestHistory(req: HistoryRequest): Promise<PullRequestHistory>;
+  /** Record the commits the reader was shown in a visit, kept outside
+   *  the repository per account and pull request. Call once
+   *  `getPullRequestHistory` for the same `visitId` has resolved, in
+   *  this run of the app; it rejects otherwise. The record is kept
+   *  under the pull request that read confirmed: the id on `req.ref`
+   *  is not used. */
+  recordPullRequestVisit(req: VisitRequest): Promise<void>;
   /** What stands between one pull request and completion: its checks,
    *  the target's rules and the provider's merge state, with n10's
    *  reading of them. Identity-checked like the snapshot. */
@@ -421,8 +448,6 @@ export interface N10HostApi {
    *  reviewer read. Resolves to the drafts as they now stand; a failure
    *  leaves each draft saying where it got to. Refused like the snapshot. */
   submitReview(req: SubmitReviewRequest): Promise<SubmittedReview>;
-  /** Cast the current user's review verdict on a PR. */
-  submitReviewVerdict(prId: number, verdict: ReviewVerdict): Promise<void>;
   /** The reviewer-list identifier of the authenticated user (GitHub
    *  login / ADO email), for optimistic reviewer patches. */
   getReviewViewer(): Promise<{ identifier: string } | null>;
@@ -511,17 +536,25 @@ export interface N10HostApi {
   onLaunchStep(cb: (payload: LaunchStepEvent) => void): () => void;
 
   // ── Diff ─────────────────────────────────────────────────────
-  /** A pull request's diff, with the commit its new side was read at:
-   *  what a comment's line numbers belong to. */
-  fetchDiffText(
-    sourceBranch: string,
-    targetBranch: string
-  ): Promise<ReviewDiffText>;
   /** Diff of a branch's worktree against its base including uncommitted
    *  and untracked work — what an agent has done so far, as opposed to
    *  what it has committed. Empty string when the branch has no
    *  worktree. */
   fetchWorktreeDiffText(branch: string, targetBranch: string): Promise<string>;
+  /** Resolve a pull request to exact commits and list every file that
+   *  changed between them. Failures that describe the pull request
+   *  (a head this clone cannot produce, unrelated history) are data. */
+  fetchPrDiffManifest(
+    req: PrDiffManifestRequest
+  ): Promise<PrDiffManifestResult>;
+  /** The patch between a resolved comparison's commits. */
+  fetchPrDiffPatch(req: PrDiffPatchRequest): Promise<PrDiffPatchResult>;
+  /** Two revisions resolved to exact commits — fetched by id when the
+   *  clone lacks one — and every file changed from one to the other. A
+   *  revision nowhere to be had is data. */
+  fetchPrRangeManifest(
+    req: PrRangeManifestRequest
+  ): Promise<PrRangeManifestResult>;
 
   // ── Shell ────────────────────────────────────────────────────
   /** Open a URL in the user's default browser. */
@@ -632,6 +665,8 @@ export const IPC = {
   setThreadResolved: 'n10/reviews/resolve',
   fetchPrDescription: 'n10/reviews/pr-description',
   getPullRequestSnapshot: 'n10/pull-requests/snapshot',
+  getPullRequestHistory: 'n10/pull-requests/history',
+  recordPullRequestVisit: 'n10/pull-requests/visit',
   getPullRequestChecks: 'n10/pull-requests/checks',
   getPullRequestConversation: 'n10/pull-requests/conversation',
   listReviewDrafts: 'n10/review-drafts/list',
@@ -639,7 +674,6 @@ export const IPC = {
   discardReviewDraft: 'n10/review-drafts/discard',
   searchMentionCandidates: 'n10/pull-requests/mentions',
   submitReview: 'n10/review-drafts/submit',
-  submitReviewVerdict: 'n10/reviews/submit-verdict',
   getReviewViewer: 'n10/reviews/viewer',
   fetchCommentImage: 'n10/reviews/comment-image',
   listDraftComments: 'n10/drafts/list',
@@ -650,8 +684,10 @@ export const IPC = {
   listAgentOptions: 'n10/session/agent-options',
   getSessionLaunchContext: 'n10/session/launch-context',
   checkoutPlan: 'n10/session/checkout-plan',
-  fetchDiffText: 'n10/diff/text',
   fetchWorktreeDiffText: 'n10/diff/worktree-text',
+  fetchPrDiffManifest: 'n10/diff/pr-manifest',
+  fetchPrDiffPatch: 'n10/diff/pr-patch',
+  fetchPrRangeManifest: 'n10/diff/pr-range-manifest',
   openExternal: 'n10/shell/open-external',
   showContextMenu: 'n10/shell/context-menu',
   showAppMenu: 'n10/shell/app-menu',

@@ -66,6 +66,7 @@ describe('registerHostHandlers', () => {
           vcsConfigured: false,
           repository: null,
           viewer: null,
+          reviewEvents: [],
         });
       },
     };
@@ -88,6 +89,17 @@ describe('registerHostHandlers', () => {
     registerHostHandlers(registrar, createHostApi(), viewerApi);
     await registered.get(IPC.watchSession)!({ sender: { id: 4 } }, 'a');
     expect(seen).toEqual([[4, 'a']]);
+  });
+
+  it('refuses to start without an implementation for a contract channel', () => {
+    const { registrar } = collect();
+    const partial = { ...createHostApi(), getVersion: undefined };
+    expect(() =>
+      registerHostHandlers(
+        registrar,
+        partial as unknown as ReturnType<typeof createHostApi>
+      )
+    ).toThrow(`No host implementation for ${IPC.getVersion}`);
   });
 
   it('refuses a window-scoped call it cannot attribute to a window', async () => {

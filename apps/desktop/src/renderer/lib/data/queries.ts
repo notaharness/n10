@@ -199,28 +199,13 @@ export function useSettingsView(cwd: string) {
   });
 }
 
-export function useDiff(
-  cwd: string,
-  source: string,
-  target: string,
-  opts: { enabled?: boolean } = {}
-) {
-  return useQuery({
-    queryKey: keys.diff(cwd, source, target),
-    queryFn: () =>
-      measured('fetch', () => window.n10.fetchDiffText(source, target)),
-    enabled: opts.enabled ?? true,
-    staleTime: 0,
-  });
-}
-
 /**
  * The working state of a worktree, refreshed while its agent runs so
  * the diff tracks what the agent is doing instead of what it last
  * committed.
  *
- * This is deliberately a different query from `useDiff`, not a mode of
- * it. A pull request is reviewed against its commits — that is what the
+ * This is deliberately a different query from `usePrDiff`, not a mode
+ * of it. A pull request is reviewed against its commits — that is what the
  * comments anchor to and what the author asked to have read — so a PR
  * tab must not start showing somebody's uncommitted scratch work. Only
  * a worktree without a PR gets the live view.

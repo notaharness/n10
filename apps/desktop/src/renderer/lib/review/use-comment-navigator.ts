@@ -5,6 +5,8 @@ import type {
   ReviewComment,
 } from '../../../host/contract.js';
 import type { DiffJumpHandle } from '../../components/review/diff/VirtualDiffList.js';
+import type { RowPlace } from '../diff/use-diff-jumps.js';
+import type { DiffPlaceControls } from '../diff/use-single-file.js';
 import {
   buildCommentRows,
   navIndexOf,
@@ -56,6 +58,9 @@ export function useCommentNavigator({
     setSelectedFile(null);
   }
   useEffect(() => save({ file: selectedFile }), [selectedFile, save]);
+  // Whether the reader last went to the pull request's own conversation
+  // rather than a file: single-file mode shows that section.
+  const [conversation, setConversation] = useState(false);
   const [focusId, setFocusId] = useState<string | null>(null);
 
   // General (Conversation) comments first, then per file the remote
@@ -71,10 +76,15 @@ export function useCommentNavigator({
   const navIndex = navIndexOf(items, focusId);
 
   const jumpToFile = useCallback(
-    (path: string) => {
+    (path: string, at?: RowPlace) => {
       setSelectedFile(path);
+      setConversation(false);
       onShowDiff();
-      requestAnimationFrame(() => jumpRef.current?.jumpToFile(path));
+      requestAnimationFrame(() => {
+        const jump = jumpRef.current;
+        if (at && jump?.jumpToRow(at)) return;
+        jump?.jumpToFile(path);
+      });
     },
     [onShowDiff]
   );
@@ -86,16 +96,24 @@ export function useCommentNavigator({
     (id: string, file: string | null) => {
       setFocusId(id);
       onShowDiff();
+      setConversation(file === null);
       if (file) setSelectedFile(file);
       requestAnimationFrame(() => {
         const jump = jumpRef.current;
         if (jump?.jumpToId(id)) return;
         if (file && jump?.jumpToFile(file)) return;
-        scrollRef.current?.scrollTo({ top: 0 });
+        jump?.jumpToTop();
       });
     },
     [onShowDiff]
   );
+
+  // Through the list's handle, so it replaces any jump still pending.
+  const showConversation = useCallback(() => {
+    setConversation(true);
+    onShowDiff();
+    requestAnimationFrame(() => jumpRef.current?.jumpToTop());
+  }, [onShowDiff]);
 
   const step = useCallback(
     (delta: number) => {
@@ -106,6 +124,16 @@ export function useCommentNavigator({
     [items, navIndex, jumpToId]
   );
 
+  const place = useMemo<DiffPlaceControls>(
+    () => ({
+      file: selectedFile,
+      conversation,
+      select: jumpToFile,
+      showConversation,
+    }),
+    [selectedFile, conversation, jumpToFile, showConversation]
+  );
+
   return {
     scrollRef,
     jumpRef,
@@ -113,6 +141,7 @@ export function useCommentNavigator({
     navIndex,
     focusId,
     selectedFile,
+    place,
     jumpToFile,
     jumpToId,
     step,

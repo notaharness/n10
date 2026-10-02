@@ -1,7 +1,6 @@
 import type {
   PullRequestComments,
   RemoteCommentThread,
-  ReviewVerdict,
 } from '@n10/vcs-core';
 import type { PullRequestList } from '../pull-requests/api.js';
 import {
@@ -26,13 +25,6 @@ export interface ResolveReviewThread {
   threadId: string;
   resolved: boolean;
 }
-const VERDICTS: readonly ReviewVerdict[] = [
-  'approve',
-  'approve-with-suggestions',
-  'wait-for-author',
-  'reject',
-];
-
 function updateThread(
   data: PullRequestComments,
   id: string,
@@ -131,24 +123,6 @@ export function createReviewCommands(
       reads.invalidateRelated();
       await options.pullRequests.read(options.config.repo, { force: true });
       return true;
-    },
-    async verdict(prId: number, verdict: ReviewVerdict) {
-      requirePullRequestNumber(prId);
-      if (!VERDICTS.includes(verdict))
-        throw new TypeError('Invalid review verdict');
-      const { provider, vendorAuth, vendorProject } = configured();
-      if (!provider.submitReviewVerdict)
-        throw new Error(
-          "Review decisions aren't available for this repository"
-        );
-      await provider.submitReviewVerdict(
-        vendorAuth,
-        vendorProject,
-        prId,
-        verdict
-      );
-      reads.invalidateRelated();
-      await options.pullRequests.read(options.config.repo, { force: true });
     },
   };
 }

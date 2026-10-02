@@ -360,8 +360,18 @@ stays "not fully known" until those are read. Until a native requirement signal
 is read, an approval or a passing check is an observation, and a failing check
 or a holding verdict is a concern, not a block; only the provider's own
 lifecycle (open, draft) is a verdict. The next step's button is the Overview's
-one way into a review: there are no instant verdict buttons, so a verdict is
-given from the changes, where the reviewer has read them.
+way into the changes. It sits in the heading, at the end of the pull request's
+actions, on the very spot where the diff's toolbar puts Finish review, so a
+second click where the first one was opens the form: the heading spans the
+pane, the Overview keeps its scrollbar's gutter, and both rows are measured
+from the pane's top and end. Every verdict is filed as a review through one submit,
+in the provider's own terms, never as a separate vote. The diff's Finish
+review form files the summary, verdict and chosen drafts on the commit the
+diff read (a chosen range's end), and approves only when that is the
+provider's head. It is the only place a verdict is given, so every one is
+given from the changes, where the reviewer has read them. Like GitHub's, the
+form is a popover anchored to its button, not a modal: the diff still scrolls
+under it, and the summary autosaves, so closing it loses nothing.
 
 The Overview has no header bar; its heading carries the pull request's identity
 and actions. Every other pane keeps the bar across the rail and the pane, so the
@@ -605,7 +615,7 @@ the provider memo is cleared.
 Both shells issue reply, resolve and verdict commands through the engine. A
 confirmed thread change patches its unchanged base snapshot or invalidates a raced
 snapshot, and expires
-related checks/conversation reads; resolve/verdict commands refresh the captured
+related checks/conversation reads; resolve and review-submit commands refresh the captured
 repository's list. Draft save/discard/submission and mention search share the same
 identity context.
 
@@ -614,10 +624,14 @@ source refs when the PR head differs, shares the core target-fetch queue's five-
 freshness, and pins both commit IDs before reading file lists or patches. Full patches
 and per-file patches use the same comparison. Resolution caches expire on list
 changes; manifests and patches are keyed by exact commit IDs, with no time expiry.
+A manifest carries the comparison just resolved, never the one its listing was
+first read for: a target can move past the same merge base.
 The TUI carries its displayed manifest's refs into each patch request. Config
 identity checks compare disk values without invoking reload or publishing effects. Metadata overflow is an error, never
 an incomplete file list. Resource maps evict idle entries without evicting observed
-or active reads. Patch maps have smaller capacities than provider records.
+or active reads. A patch map keeps the two last finished reads beside those in
+flight: the renderer holds what is on screen, and each patch may reach the
+ceiling.
 
 No worker is added for orchestration or subprocess waits. Desktop diff parsing and
 syntax highlighting remain in their existing renderer workers; the final profiling
@@ -650,11 +664,13 @@ include index, working tree and untracked files. Build untracked patches without
 `git add -N`: displaying a diff must not modify the agent's index. Poll active
 worktrees; do not recursively watch a checkout and exhaust inotify on dependencies.
 
-Whole-file context (`-U99999`) supports comments on unchanged lines; fold it in
-the viewer. Stream Git output with `runGit`, which preserves partial output and
-reports truncation rather than discarding the entire buffer on overflow. This
-read transport kills a child after 30 seconds and rejects, releasing its resource
-lane; mutations use a separate transport and do not inherit this deadline.
+Whole-file context supports comments on unchanged lines; fold it in the
+viewer. A pull request's diff asks for Git's largest context, so no file is
+cut short; worktree diffs still ask for 99,999 lines. Stream Git output with
+`runGit`, which preserves partial output and reports truncation rather than
+discarding the entire buffer on overflow. This read transport kills a child
+after 30 seconds and rejects, releasing its resource lane; mutations use a
+separate transport and do not inherit this deadline.
 
 Bound worktree diffs before expensive reads. Use `lstat` for symlinks, churn to
 bound deleted files, and exclude both paths of an oversized rename. A content-free
@@ -663,6 +679,75 @@ and render symlinks as mode-120000 patches without following them. Trim total-ou
 overruns at complete file boundaries. The PR path retains files because review
 comments depend on them. Git-backed regression cases live in
 `worktree-diff.integration.spec.ts`.
+
+A PR diff resolves the provider's head and target to commits and never
+substitutes a local branch for a commit the clone lacks. Missing commits or
+branches trigger a real fetch, since an earlier one evidently missed them; a
+target the caller did not pin is fetched at most every five minutes. The
+engine's review reads own this for both shells: the TUI's file list is the
+same manifest, and its file view the same patch. Both
+reads pin git's output format against user config: no copy detection, which
+would present new code as a small edit of its source; every submodule change;
+fixed prefixes. The provider list polls, so the revision on screen is pinned
+per repository and pull request outside the pane, which unmounts in a
+background tab: head, target branch, and the target commit it resolved to, so a
+re-read after the cache expires resolves the same way. A closed tab reopened
+comes back at that revision with anything newer offered, not swapped in.
+Choosing what a new visit compares against belongs to revision selection.
+Loading the newer revision reads its file list and first batch before moving
+the pin, so a failed load leaves the diff in place. Only a pin whose read never reached the screen
+follows the provider without being asked: there is nothing to keep.
+
+A PR's file list comes from the manifest, never from a patch that may have been
+cut, so every file is listed however big the change. Bodies are read in batches
+of at most 4 MiB or 100 files, in list order, once the list settles with them in
+view; the first batch reads at once, so a small PR is read at once. A file
+showing only its collapsed header is read once opened. Deleted files, renamed
+or copied ones, and the rest batch apart: Git pairs renames among the paths a
+read names, keeping a few candidate sources for each file, so a subset can pair
+files otherwise than the whole-PR manifest did; a small PR that deletes or
+renames files takes a read per kind. Each read is checked against
+the manifest, and a file paired otherwise is read again by its own paths. What
+stays read is bounded — the first batch, those on screen, the last four that
+left the screen or were asked for elsewhere — and at most two reads run at
+once; a dropped read is cancelled or released, and read again when reached. A file past 2 MiB is read only when
+asked, by its changes or whole, so one file cannot hold the rest back. A file
+cut from a shared read is offered a read of its own; only a lone read past the
+ceiling is "too large". Counts Git never gave stay unknown rather than zero,
+and the Files header lists what cannot be shown. A jump into files not yet read
+stays pending while their bodies land above it, until no read is in flight and
+no file on screen waits for one — a jump lands before its file's batch is asked
+for — or the reader scrolls. Single-file mode hands the same list one section: fold,
+Viewed and comment state are shared, not copied, and a switch keeps the row on
+screen. It still virtualizes its section, so it is not yet the unvirtualized
+reading surface assistive technology needs; that belongs to keyboard and
+navigation work (I11).
+
+A pull request's history is compared at exact commits, never at whatever a
+branch holds now. The provider's record — GitHub's commits and force-pushes,
+and the latest review the account it answers as submitted — is read from the
+recent end; a history longer than one page, or with an event GitHub would not
+resolve, says it is incomplete, and a review read as another account than the
+one n10 acts as is not offered as the viewer's. GitHub sends each reply to a
+thread as a review of its own, with one comment, so a `COMMENTED` review with
+no summary and one reply is not counted as a review; one reply submitted as a
+whole review looks the same and is not counted either. When the newest review
+names no commit, or the reviews read do not reach it, the last review is
+unknown: an older one never stands in. A range between two revisions fetches
+each missing one by id and otherwise names it as unavailable. It reports
+whether the later revision builds on the earlier, and whether the target's own
+changes came in between, since a rebase or a merge of the target makes "since
+your last review" include them; when either revision shares no history with
+the target, it says it cannot tell. The reader's visits are kept outside the repository per account and pull
+request. "Since your last visit" is the last visit before the current one, and
+the renderer names the visit: looking again or refreshing within it must not
+move the baseline, a new visit must, and a first visit has none rather than
+one made up. A force-push can leave a reviewed head reachable from nothing, so
+the kept visits, the frozen baseline and the last reviewed head are held by
+refs under `refs/n10/retained/`, one set per account and pull request,
+replaced whole on each visit. Refs there are real refs: `git log --all` shows
+their commits and `git push --mirror` publishes them. Nothing yet lets them go
+when a pull request closes.
 
 File-tree collapse state follows each file's content revision, not poll timing
 or churn counts. Ignore temporary empty snapshots; unchanged snapshots preserve

@@ -49,8 +49,13 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
 - **Reviews** (`reviews/`): repository/account-scoped resources own freshness,
   coalescing and invalidation. Failures retain same-scope answers; identity changes
   reset them. Parse untrusted PR identity before provider work and check it again
-  after awaits. Diff resources pin source and target commits with explicit cwd;
-  parsing Git metadata stays a core primitive, rendering stays shell-specific.
+  after awaits. Diff reads (`diff-reads.ts`) resolve a request to exact commits
+  through core's `resolvePrComparison` and own the manifest and patches read
+  between them: commit-keyed reads never expire, branch resolution does. A
+  request names its repository and is answered `repo-changed` for any other.
+  History reads (`history-reads.ts`) share one `VisitBaselines` per repository
+  service, so a visit begun before a repository switch is the same visit after.
+  Parsing Git output stays a core primitive, rendering stays shell-specific.
 
 - **Review commands**: capture repo/account before awaiting, resolve thread ids
   from the scoped resource, and invalidate related resources after confirmed

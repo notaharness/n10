@@ -43,6 +43,7 @@ const REPO: RepoInfo = {
   vcsConfigured: false,
   repository: null,
   viewer: null,
+  reviewEvents: [],
 };
 
 /** The value of `p`, or 'pending' if it has not settled by the time
@@ -220,7 +221,15 @@ describe('refreshRepoInfo', () => {
       repository: 'acme/app',
     },
     viewer: 'bob',
+    reviewEvents: [],
   };
+
+  const HISTORY = keys.prHistory(
+    '/repo',
+    { ...GITHUB_REPO.repository!, number: 42 },
+    'bob',
+    'visit'
+  );
 
   function seeded(repo: RepoInfo) {
     const qc = new QueryClient();
@@ -228,7 +237,8 @@ describe('refreshRepoInfo', () => {
     qc.setQueryData(keys.threads('/repo', 42), { threads: [] });
     qc.setQueryData(keys.sidebar('/repo'), ['row']);
     qc.setQueryData(keys.settings('/repo'), { fields: [] });
-    qc.setQueryData(keys.diff('/repo', 'undo', 'main'), 'patch');
+    qc.setQueryData(keys.worktreeDiff('/repo', 'undo', 'main'), 'patch');
+    qc.setQueryData(HISTORY, { lastVisit: null });
     return qc;
   }
 
@@ -257,10 +267,13 @@ describe('refreshRepoInfo', () => {
       expect(qc.getQueryData(keys.repo)).toEqual(next);
       expect(qc.getQueryData(keys.threads('/repo', 42))).toBeUndefined();
       expect(qc.getQueryData(keys.sidebar('/repo'))).toBeUndefined();
+      expect(qc.getQueryData(HISTORY)).toBeUndefined();
       // The settings page that made the change keeps its answer, and
       // git's diff never came from the provider.
       expect(qc.getQueryData(keys.settings('/repo'))).toEqual({ fields: [] });
-      expect(qc.getQueryData(keys.diff('/repo', 'undo', 'main'))).toBe('patch');
+      expect(qc.getQueryData(keys.worktreeDiff('/repo', 'undo', 'main'))).toBe(
+        'patch'
+      );
     }
   );
 

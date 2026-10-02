@@ -102,11 +102,13 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `ReviewStepper`. The rail lists the engine's `branchSessions`: the agent in
   each of the branch's checkouts (one per machine; one that exited with its
   dead pane kept stays, read-only with Resume, while one whose tmux session is
-  gone leaves) and the terminals opened in them, with Launch Agent and Launch Terminal above. A launched session takes
+  gone leaves) and the terminals opened in them, the first agent and the first terminal each in a place of its own, shown not started until one is listed: pressing it launches the session, whose card takes that place (`SessionCards.tsx`). Further sessions list below, and a card's native menu launches one more of its kind. A launched session takes
   the pane. A terminal in a branch's checkout gets no strip tab of its own
   (`TerminalSummary.branch`). It opens on a running agent's terminal, else on the PR's
   Overview, whoever wrote it (`lib/review/overview-model.ts`). The diff toolbar lives in
-  `DiffPane`, not the tab header. Overview and header lay out by container
+  `DiffPane`, not the tab header: one row that wraps, Finish review at its
+  end on the spot of the Overview heading's next-step button (`OverviewPane`
+  `HEAD`; `review-finish.test.ts` holds the two together). Overview and header lay out by container
   width (`@container`), not viewport.
 - The Overview's activity reads the whole conversation by identity
   (`lib/data/pr-conversation-query.ts`, `lib/review/activity-model.ts`).
@@ -136,9 +138,26 @@ Every rule below has its reasoning in `docs/decisions.md`.
   vote is cast last, so a failure leaves what posted as posted. An
   inline draft being posted or maybe posted is shown, locked; a reply
   draft in that state is not yet shown in its thread.
-- Diffs are whole-file (`-U99999`), folded client-side
-  (`lib/diff/diff-model.ts`). A PR diffs commits; a bare worktree diffs its
-  working tree, polled at 2 s only while the agent runs. `FileTree` collapse
+- Every verdict is filed through that submit, in the provider's own
+  terms (`RepoInfo.reviewEvents`); there is no separate vote. The diff's
+  Finish review form (`components/review/finish/`), a popover anchored to
+  its button, files the summary
+  draft, the verdict and the chosen drafts on the commit the diff shows
+  (a chosen range's end), approving only when that is the provider's head.
+  It is the only way to give a verdict.
+- Diffs are whole-file (Git's largest `-U` for a PR), folded client-side
+  (`lib/diff/diff-model.ts`). A PR lists every file from the engine's manifest first
+  and reads bodies in batches as they come into view
+  (`lib/diff/diff-bodies.ts`), holding a bounded set (`lib/review/pr-diff-reads.ts`);
+  a file past 2 MiB waits to be asked for. Single-file
+  mode (`lib/diff/single-file.ts`) is a view of the same list, never a second
+  model. A PR diffs the exact commits the engine's review reads resolve
+  from the provider's head (`lib/review/use-pr-diff.ts`), never the local branch.
+  `lib/review/pinned-revisions.ts` holds each PR's revision outside its pane
+  until the reader loads a newer one, whose file list and first batch are read
+  before the pin moves; `revision-choice.ts` keeps the changes chosen beside
+  it, by the same key, so both outlive the tab. A bare worktree
+  diffs its working tree, polled at 2 s only while the agent runs. `FileTree` collapse
   state is reconciled from the per-file `revision` delta during render
   (`lib/diff/file-tree-model.ts`), never from the poll.
 - The plan is a cart of value snapshots (`@n10/core/plan`). The prompt is

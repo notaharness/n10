@@ -1,5 +1,6 @@
 import * as vcs from '@n10/vcs-core';
 import { expect, it, vi } from 'vitest';
+import { VisitBaselines } from '@n10/core';
 import { reviewReadFixture } from './review-read-fixture.js';
 import { readResourceValue } from './read-resource.js';
 import { createReviewService } from './review-service.js';
@@ -83,6 +84,7 @@ it('invalidates on account changes including Azure email and rejects answers fro
   const reviews = createReviewService({
     ...fixture.options,
     worktrees: { find: vi.fn() } as unknown as WorktreeService,
+    baselines: new VisitBaselines('/nonexistent'),
   });
   const resource = reviews.comments(1);
   const read = resource.read();
@@ -128,6 +130,7 @@ it('expires review reads when list facts move, preserving rows and ignoring othe
   const reviews = createReviewService({
     ...fixture.options,
     worktrees: { find: vi.fn() } as unknown as WorktreeService,
+    baselines: new VisitBaselines('/nonexistent'),
   });
   const resource = reviews.comments(1);
   await resource.read();

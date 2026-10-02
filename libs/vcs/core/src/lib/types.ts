@@ -2,11 +2,13 @@ import type { MentionCandidate } from './mentions.js';
 import type {
   LedgerStore,
   PublishedReview,
+  ReviewEvent,
   ReviewSubmission,
 } from './review-publication.js';
 import type { PullRequestChecks } from './pr-checks.js';
 import type { PullRequestConversation } from './pr-conversation.js';
 import type { PullRequestDetail, RepositoryRef } from './pr-details.js';
+import type { PullRequestRevisions } from './pr-revisions.js';
 
 export type ReviewDecision =
   | 'approved'
@@ -47,16 +49,6 @@ export function holdingVerdict<R extends { decision: ReviewDecision }>(
   return null;
 }
 export type BuildStatusState = 'succeeded' | 'failed' | 'pending' | 'none';
-
-/** The current user's review verdict on a PR, in ADO's vocabulary
- *  (votes 10 / 5 / −5 / −10). GitHub has a smaller one: both approve
- *  variants submit an approving review, and both wait-for-author and
- *  reject submit a changes-requested review. */
-export type ReviewVerdict =
-  | 'approve'
-  | 'approve-with-suggestions'
-  | 'wait-for-author'
-  | 'reject';
 
 export interface PullRequestReviewer {
   displayName: string;
@@ -286,6 +278,17 @@ export interface VcsProvider {
     prId: number
   ): Promise<PullRequestDetail>;
 
+  /** The pull request's heads over time and the viewer's latest
+   *  submitted review, read on demand for one pull request. */
+  fetchPullRequestRevisions?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestRevisions>;
+
+  /** The verdicts `publishReview` files, in the provider's order;
+   *  present with it. */
+  reviewEvents?: readonly ReviewEvent[];
   /**
    * File the reviewer's drafts as one native review (see
    * review-publication.ts). Progress goes to `ledger` step by step, so
@@ -306,13 +309,6 @@ export interface VcsProvider {
     prId: number
   ): Promise<PullRequestChecks>;
 
-  /** Cast the current user's review verdict on a PR. */
-  submitReviewVerdict?(
-    auth: Record<string, string>,
-    project: Record<string, string>,
-    prId: number,
-    verdict: ReviewVerdict
-  ): Promise<void>;
 }
 
 // ── Remote comment threads (fetched from VCS providers) ───────────

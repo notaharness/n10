@@ -1,5 +1,8 @@
 import type { DiffLine } from '@n10/diff';
-import type { RemoteCommentThread } from '../../../../host/contract.js';
+import type {
+  PrDiffManifestFile,
+  RemoteCommentThread,
+} from '../../../../host/contract.js';
 import type { FileStats, FlatRow } from '../../../lib/diff/diff-virtual.js';
 import {
   cellHighlight,
@@ -16,6 +19,8 @@ import { ConversationPanel } from '../comments/ConversationPanel.js';
 import { MyDraftCard } from '../comments/MyDraftCard.js';
 import { DiffFileHeader } from './DiffFileHeader.js';
 import { FoldRow, HunkRow, SplitCell, UnifiedRow } from './diff-rows.js';
+import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
+import { FileBodyNotice } from './FileBodyNotice.js';
 import type { GutterProps } from './LineGutter.js';
 
 /** Everything a row of the virtual diff draws from. */
@@ -44,13 +49,21 @@ export interface RowContext {
     | null;
   firstPoint: (file: string) => LinePoint | null;
   commentOnFile: ((file: string) => void) | null;
+  /** A pull request's listing and per-file reads; absent on a worktree. */
+  manifest: ReadonlyMap<string, PrDiffManifestFile>;
+  prDiff: PrDiffView | undefined;
+  /** Each mounted file header's toggle, where a file notice that
+   *  replaces itself hands the keyboard. */
+  headers: Map<string, HTMLButtonElement>;
+  /** Whether a comment can be written on this line (`linePoints`). */
+  commentable: (point: LinePoint) => boolean;
 }
 
 function gutter(
   ctx: RowContext,
   point: LinePoint | null
 ): GutterProps | undefined {
-  if (!point || !ctx.gutterFor) return undefined;
+  if (!point || !ctx.gutterFor || !ctx.commentable(point)) return undefined;
   return ctx.gutterFor(point, ctx.firstPoint(point.file));
 }
 
@@ -63,11 +76,18 @@ function FileHeaderRow({
 }) {
   const s = ctx.stats.get(row.file);
   if (!s) return null;
-  const { commentOnFile } = ctx;
+  const { commentOnFile, headers } = ctx;
+  const change = ctx.manifest.get(row.file);
+  const body = ctx.prDiff?.bodies.get(row.file);
   return (
     <div data-file={row.file} className="border-t border-border">
       <DiffFileHeader
+        toggleRef={(el) => {
+          if (el) headers.set(row.file, el);
+          else headers.delete(row.file);
+        }}
         filename={row.file}
+        change={change}
         open={s.open}
         onToggleOpen={() => ctx.patchFile(row.file, { open: !s.open })}
         viewed={s.viewed}
@@ -83,8 +103,34 @@ function FileHeaderRow({
         openThreads={s.openThreads}
         adds={s.adds}
         dels={s.dels}
+        binary={change?.kind === 'binary'}
+        readable={!body || body.state === 'loaded' || body.state === 'no-text'}
       />
     </div>
+  );
+}
+
+/** What stands in for a file's lines: see `FileBodyNotice`. */
+function FileNoticeRow({
+  row,
+  ctx,
+}: {
+  row: Extract<FlatRow, { kind: 'file-notice' }>;
+  ctx: RowContext;
+}) {
+  const { prDiff } = ctx;
+  const file = ctx.manifest.get(row.file);
+  const body = prDiff?.bodies.get(row.file);
+  if (!file || !body || !prDiff) return null;
+  return (
+    <FileBodyNotice
+      file={file}
+      body={body}
+      estimate={row.estimate}
+      onReadAlone={(scope) => prDiff.readAlone(row.file, scope)}
+      onRetry={() => prDiff.retryFile(row.file)}
+      focusAfter={() => ctx.headers.get(row.file)}
+    />
   );
 }
 
@@ -171,6 +217,8 @@ export function DiffRowView({ row, ctx }: { row: FlatRow; ctx: RowContext }) {
       );
     case 'file-header':
       return <FileHeaderRow row={row} ctx={ctx} />;
+    case 'file-notice':
+      return <FileNoticeRow row={row} ctx={ctx} />;
     case 'file-drafts':
       return (
         <div className="space-y-2 border-b border-border bg-muted/30 px-4 py-2">

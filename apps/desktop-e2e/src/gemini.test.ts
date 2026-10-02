@@ -2,7 +2,12 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
 import { fakeCli } from './setup/fake-cli.js';
-import { agentSpinner, createWorktree, sessionMenu } from './setup/app.js';
+import {
+  agentSpinner,
+  createWorktree,
+  openAgentMenuFromCard,
+  sessionMenu,
+} from './setup/app.js';
 import { findN10SessionFor, socketEnv, tagTmuxSession } from './setup/tmux.js';
 import {
   confirmNewTerminal,
@@ -23,7 +28,7 @@ test.use({
 test('Gemini worktree launch, activity and explicit fresh restart in Desktop', async ({
   desktop,
 }) => {
-  const { page, homeDir, repoPath } = desktop;
+  const { app, page, homeDir, repoPath } = desktop;
   const cwd = join(repoPath, '.claude/worktrees/gemini-life');
   await createWorktree(page, 'gemini-life');
   await page.getByRole('button', { name: 'Launch Agent', exact: true }).click();
@@ -57,7 +62,7 @@ test('Gemini worktree launch, activity and explicit fresh restart in Desktop', a
       )
     )
     .toEqual([false]);
-  await page.getByRole('button', { name: 'Launch Agent', exact: true }).click();
+  await openAgentMenuFromCard(app, page);
   const menu = sessionMenu(page);
   await expect(
     menu.getByRole('radio', { name: 'Continue', exact: true })

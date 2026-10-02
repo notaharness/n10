@@ -57,6 +57,9 @@ export interface DurableDraft {
   discard: (onUndo?: () => void, text?: string) => Promise<void>;
   /** The same, silently, for text that was sent. */
   clear: () => Promise<void>;
+  /** Drop the typed text and keep what is stored: it was sent with a
+   *  review, which records it as posted. */
+  forget: () => void;
   /** The stored drafts have not been read yet; editing waits, so the
    *  first save cannot replace a draft nobody has seen. */
   loading: boolean;
@@ -249,6 +252,7 @@ export function useReviewDraft(
     retry: () => edits.retry(key),
     discard: (onUndo, text) => remove(true, onUndo, text),
     clear: () => remove(false),
+    forget: () => edits.forget(key),
     loading: ref != null && drafts.isPending,
     readError: drafts.error ? readError(drafts.error) : null,
     durable: ref != null,

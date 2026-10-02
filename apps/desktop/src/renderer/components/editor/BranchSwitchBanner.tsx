@@ -1,4 +1,4 @@
-import { AlertTriangleIcon } from 'lucide-react';
+import { Banner } from '../ui/banner.js';
 
 /**
  * Shown at the top of a tab whose worktree is on a different branch
@@ -15,17 +15,10 @@ export function BranchSwitchBanner({
   original: string;
 }) {
   return (
-    <div
-      role="status"
-      aria-label="Branch switched"
-      className="flex shrink-0 items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-1.5 text-sm text-warning"
-    >
-      <AlertTriangleIcon className="size-4 shrink-0" />
-      <span className="min-w-0 flex-1 truncate">
-        <strong>Branch switched</strong> from{' '}
-        <code className="font-mono">{original}</code> to{' '}
-        <code className="font-mono">{current}</code>
-      </span>
-    </div>
+    <Banner aria-label="Branch switched">
+      <strong>Branch switched</strong> from{' '}
+      <code className="font-mono">{original}</code> to{' '}
+      <code className="font-mono">{current}</code>
+    </Banner>
   );
 }

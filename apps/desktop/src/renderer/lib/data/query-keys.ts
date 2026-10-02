@@ -41,8 +41,20 @@ export const keys = {
   machines: ['machines'] as const,
   beamStatus: ['beam-status'] as const,
   agentOptions: (cwd: string) => ['agent-options', cwd] as const,
-  diff: (cwd: string, source: string, target: string) =>
-    ['diff', cwd, source, target] as const,
+  /** A pull request resolved to commits: keyed by the head it was
+   *  asked to read, so a pinned head is one entry however often the
+   *  list reports a newer one. */
+  prDiffManifest: (
+    cwd: string,
+    prId: number,
+    source: string,
+    target: string,
+    head: string
+  ) => ['pr-diff-manifest', cwd, prId, source, target, head] as const,
+  /** One batch of a pull request's files, keyed by the commits it is
+   *  read between (`base..head`): what is between them never changes. */
+  prDiffBatch: (cwd: string, range: string, batch: string) =>
+    ['pr-diff-batch', cwd, range, batch] as const,
   worktreeDiff: (cwd: string, branch: string, target: string) =>
     ['worktree-diff', cwd, branch, target] as const,
   parsedDiff: (content: string) => ['parsed-diff', content] as const,
@@ -85,6 +97,26 @@ export const keys = {
       ref.id ?? null,
       viewer,
     ] as const,
+  /** A pull request's revision history, read for one visit: the last
+   *  visit it reports is fixed for that visit (`use-pr-history.ts`). */
+  prHistory: (
+    cwd: string,
+    ref: PullRequestRef,
+    viewer: string | null,
+    visitId: string
+  ) =>
+    [
+      'pr-history',
+      cwd,
+      pullRequestKey(ref),
+      ref.id ?? null,
+      viewer,
+      visitId,
+    ] as const,
+  /** The files between two revisions: what is between them never
+   *  changes, and the target commit only decides the base note. */
+  prRangeManifest: (cwd: string, from: string, to: string, target: string) =>
+    ['pr-range-manifest', cwd, from, to, target] as const,
   /** The reviewer's own drafts on one pull request, by identity. */
   reviewDrafts: (
     cwd: string,
@@ -155,6 +187,7 @@ const PROVIDER_KEYS: ReadonlySet<string> = new Set([
   'threads',
   'pr-description',
   'pr-snapshot',
+  'pr-history',
   'comment-image',
   'drafts',
   'review-viewer',

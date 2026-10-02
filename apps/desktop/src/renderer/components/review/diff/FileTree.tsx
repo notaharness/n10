@@ -15,19 +15,51 @@ import {
   type TreeCollapse,
   type TreeNode,
 } from '../../../lib/diff/file-tree-model.js';
+import type { Coverage, Unavailable } from '../../../lib/diff/coverage.js';
 import { cn } from '../../../lib/utils.js';
 import { ScrollArea } from '../../ui/scroll-area.js';
+import { ChangeKind, type ChangeStatus } from './ChangeKind.js';
+import { FileCoverage, UnavailableMark } from './FileCoverage.js';
 import { Skeleton } from '../../ui/skeleton.js';
 
 export interface FileEntry {
   path: string;
   /** Identity of this file's changed lines — see `fileRevision`. */
   revision: string;
-  additions: number;
-  deletions: number;
+  /** Changed lines, or null where Git's listing was cut before it
+   *  counted them. */
+  additions: number | null;
+  deletions: number | null;
   comments: number;
   /** Unposted agent drafts in this file. */
   drafts?: number;
+  /** What git says happened to it; absent for a worktree diff. */
+  change?: { status: ChangeStatus; oldPath: string };
+  /** Binary content: git counts no lines for it. */
+  binary?: boolean;
+  /** Why the diff does not show it, if it does not. */
+  unavailable?: Unavailable;
+}
+
+/** What the tree says about a pull request's listing as a whole. */
+export interface FileListing {
+  /** Git's listing was cut: files may be missing. */
+  incomplete: boolean;
+  coverage: Coverage;
+}
+
+/** The files' line counts added up, and whether that is all of them. */
+function totalsOf(entries: readonly FileEntry[], listing?: FileListing) {
+  let additions = 0;
+  let deletions = 0;
+  let complete = !listing?.incomplete;
+  for (const e of entries) {
+    if (e.binary) continue;
+    if (e.additions === null || e.deletions === null) complete = false;
+    additions += e.additions ?? 0;
+    deletions += e.deletions ?? 0;
+  }
+  return { additions, deletions, complete };
 }
 
 /**
@@ -43,11 +75,14 @@ export interface FileEntry {
  */
 export function FileTree({
   entries,
+  listing,
   loading,
   selected,
   onSelect,
 }: {
   entries: FileEntry[];
+  /** A pull request's listing; absent for a worktree diff. */
+  listing?: FileListing;
   loading: boolean;
   selected: string | null;
   onSelect: (path: string) => void;
@@ -55,17 +90,7 @@ export function FileTree({
   const [open, setOpen] = useState(true);
   const [collapse, setCollapse] = useState<TreeCollapse>(NO_COLLAPSE);
   const tree = useMemo(() => buildTree(entries), [entries]);
-  const totals = useMemo(
-    () =>
-      entries.reduce(
-        (acc, e) => ({
-          additions: acc.additions + e.additions,
-          deletions: acc.deletions + e.deletions,
-        }),
-        { additions: 0, deletions: 0 }
-      ),
-    [entries]
-  );
+  const totals = useMemo(() => totalsOf(entries, listing), [entries, listing]);
 
   // Adjusted during render rather than from an effect: React's own
   // "adjusting state when a prop changes" pattern. `collapseAfterRefresh`
@@ -100,12 +125,23 @@ export function FileTree({
         <FilesIcon className="size-3.5" />
         Files
         {entries.length > 0 && (
-          <span className="ml-auto font-mono font-normal normal-case tracking-normal tabular-nums">
+          <span
+            className="ml-auto font-mono font-normal normal-case tracking-normal tabular-nums"
+            title={
+              totals.complete
+                ? undefined
+                : 'At least: Git’s file list was cut before it counted every line'
+            }
+          >
+            {!totals.complete && '≥ '}
             <span className="text-success">+{totals.additions}</span>{' '}
             <span className="text-destructive">−{totals.deletions}</span>
           </span>
         )}
       </button>
+      {open && listing && (
+        <FileCoverage coverage={listing.coverage} onSelect={onSelect} />
+      )}
       {open && (
         <ScrollArea className="min-h-0 flex-1">
           {loading && (
@@ -219,10 +255,38 @@ function TreeRow({
           {entry.comments}
         </span>
       )}
-      <span className="shrink-0 font-mono text-xs tabular-nums">
-        <span className="text-success">+{entry.additions}</span>{' '}
-        <span className="text-destructive">−{entry.deletions}</span>
-      </span>
+      {entry.unavailable && <UnavailableMark kind={entry.unavailable} />}
+      <FileCounts entry={entry} />
+      {entry.change && (
+        <ChangeKind
+          status={entry.change.status}
+          oldPath={entry.change.oldPath}
+        />
+      )}
     </button>
+  );
+}
+
+function FileCounts({ entry }: { entry: FileEntry }) {
+  if (entry.binary) {
+    return (
+      <span className="shrink-0 text-xs text-muted-foreground">binary</span>
+    );
+  }
+  if (entry.additions === null || entry.deletions === null) {
+    return (
+      <span
+        className="shrink-0 text-xs text-muted-foreground"
+        title="Not counted: Git’s file list was cut first"
+      >
+        —
+      </span>
+    );
+  }
+  return (
+    <span className="shrink-0 font-mono text-xs tabular-nums">
+      <span className="text-success">+{entry.additions}</span>{' '}
+      <span className="text-destructive">−{entry.deletions}</span>
+    </span>
   );
 }

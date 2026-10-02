@@ -1,5 +1,11 @@
 import { basename } from 'node:path';
-import { expect, type Locator, type Page } from '@playwright/test';
+import {
+  expect,
+  type ElectronApplication,
+  type Locator,
+  type Page,
+} from '@playwright/test';
+import { armContextMenuChoice } from './menu.js';
 
 /**
  * Locators for the desktop shell, in one place.
@@ -229,13 +235,12 @@ export async function showOverview(page: Page): Promise<void> {
 
 /**
  * From a pull request's Overview, where it opens with no agent running,
- * on to its changes the way a reader goes: the next step's button,
- * which reads Review changes, View changes or Respond to feedback, and
- * leads to the diff whichever it is.
+ * on to its changes the way a reader goes: the next step's button in
+ * its heading, which reads Review changes, View changes or Respond to
+ * feedback, and leads to the diff whichever it is.
  */
 export async function showChanges(page: Page): Promise<void> {
   await page
-    .getByRole('region', { name: 'Next step' })
     .getByRole('button', {
       name: /^(Review changes|View changes|Respond to feedback)$/,
     })
@@ -273,11 +278,16 @@ export async function showFile(page: Page): Promise<void> {
  * the agent's output.
  */
 export async function launchAgentFromRail(page: Page): Promise<void> {
-  await page
+  const launch = page
     .getByRole('button', { name: /(Re)?launch agent/i })
     .filter({ visible: true })
-    .first()
-    .click();
+    .first();
+  // Right after a tab switch the tab left can still be on screen, its
+  // own Launch button with it, and a click waits on whichever button it
+  // found first even once that pane is hidden. Each try finds it again.
+  await expect(async () => {
+    await launch.click({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
   await startSessionFromMenu(page);
 }
 
@@ -313,4 +323,29 @@ export async function expectAdjoining(
   const [a, b] = await Promise.all([left.boundingBox(), right.boundingBox()]);
   if (!a || !b) throw new Error('tab is not laid out');
   expect(b.x).toBeCloseTo(a.x + a.width, 0);
+}
+
+/** Open the session menu from the agent card's native menu. */
+export async function openAgentMenuFromCard(
+  app: ElectronApplication,
+  page: Page
+): Promise<void> {
+  await armContextMenuChoice(app, 'Launch additional agent');
+  await sessionCard(page, 'Agent').click({ button: 'right' });
+}
+
+/** Size the window's content, below its own minimum if asked. */
+export async function resizeWindow(
+  app: ElectronApplication,
+  width: number,
+  height: number
+): Promise<void> {
+  await app.evaluate(
+    ({ BrowserWindow }, [w, h]) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      window.setMinimumSize(0, 0);
+      window.setContentSize(w, h);
+    },
+    [width, height]
+  );
 }

@@ -5,6 +5,19 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { parseUnifiedDiff } from '@n10/diff';
 import { interleaveComments, type ReviewComment } from '@n10/review-comments';
+import { resolvePrComparison } from './pr-comparison.js';
+import { readPrDiffPatch } from './pr-diff-manifest.js';
+
+async function patchText(cwd: string): Promise<string> {
+  const resolved = await resolvePrComparison({
+    cwd,
+    sourceBranch: 'feature',
+    targetBranch: 'master',
+    fetch: false,
+  });
+  if (!resolved.ok) throw new Error(resolved.error.message);
+  return (await readPrDiffPatch(cwd, resolved.comparison)).text;
+}
 
 function makeComment(
   overrides: Partial<ReviewComment> & { id: string }
@@ -22,15 +35,14 @@ function makeComment(
   };
 }
 
-describe('diff-fetcher integration', () => {
+describe('a pull request patch carries whole files', () => {
   let repoDir: string;
-  const originalCwd = process.cwd();
 
   beforeAll(() => {
     // Create a temp repo with master + feature branch
-    repoDir = mkdtempSync(join(tmpdir(), 'diff-fetcher-test-'));
+    repoDir = mkdtempSync(join(tmpdir(), 'pr-diff-context-test-'));
 
-    execSync('git init', { cwd: repoDir });
+    execSync('git init -b master', { cwd: repoDir });
     execSync('git config user.email "test@test.com"', { cwd: repoDir });
     execSync('git config user.name "Test"', { cwd: repoDir });
 
@@ -53,18 +65,14 @@ describe('diff-fetcher integration', () => {
     execSync('git add test.txt', { cwd: repoDir });
     execSync('git commit -m "modify lines 15-17"', { cwd: repoDir });
 
-    process.chdir(repoDir);
   });
 
   afterAll(() => {
-    process.chdir(originalCwd);
     rmSync(repoDir, { recursive: true, force: true });
   });
 
   it('diff includes full file context so comment-referenced lines are present', async () => {
-    // Dynamic import so it runs in the temp repo's cwd
-    const { fetchDiffText } = await import('./diff-fetcher.js');
-    const diffText = await fetchDiffText(process.cwd(), 'feature', 'master');
+    const diffText = await patchText(repoDir);
     const parsed = parseUnifiedDiff(diffText);
     const diffLines = parsed.get('test.txt');
 
@@ -108,8 +116,7 @@ describe('diff-fetcher integration', () => {
   });
 
   it('comment is placed at correct position when referenced lines are in diff', async () => {
-    const { fetchDiffText } = await import('./diff-fetcher.js');
-    const diffText = await fetchDiffText(process.cwd(), 'feature', 'master');
+    const diffText = await patchText(repoDir);
     const parsed = parseUnifiedDiff(diffText);
     const diffLines = parsed.get('test.txt')!;
 

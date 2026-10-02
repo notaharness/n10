@@ -8,9 +8,9 @@ import {
 
 /**
  * The review sidebar's sessions, pixel for pixel in the pinned
- * container (see `visual.test.ts`): Launch Agent and Launch Terminal
- * above a running agent and the terminal opened beside it, the
- * terminal's card the one on screen.
+ * container (see `visual.test.ts`): the agent's and the terminal's
+ * cards not started, then a running agent and the terminal opened
+ * beside it in their places, the terminal's card the one on screen.
  */
 
 const shot = {
@@ -51,6 +51,16 @@ for (const theme of ['dark', 'light'] as const) {
     }) => {
       const { page } = desktop;
       await sidebarRow(page, /#214/).first().click();
+      const sessions = page
+        .locator('[data-review-sessions]')
+        .filter({ visible: true });
+      await expect(
+        page.getByRole('button', { name: 'Launch Terminal', exact: true })
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(sessions).toHaveScreenshot(
+        `review-sessions-not-started-${theme}.png`,
+        shot
+      );
       await launchAgentFromRail(page);
       await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible({
         timeout: 30_000,
@@ -59,9 +69,10 @@ for (const theme of ['dark', 'light'] as const) {
         .getByRole('button', { name: 'Launch Terminal', exact: true })
         .click();
       await expect(sessionCards(page)).toHaveCount(2);
-      await expect(
-        page.locator('[data-review-sessions]').filter({ visible: true })
-      ).toHaveScreenshot(`review-sessions-${theme}.png`, shot);
+      await expect(sessions).toHaveScreenshot(
+        `review-sessions-${theme}.png`,
+        shot
+      );
     });
   });
 }

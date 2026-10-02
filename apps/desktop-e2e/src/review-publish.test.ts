@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { test, expect } from './fixtures/desktop.js';
 import { sidebarRow } from './setup/app.js';
@@ -7,12 +8,14 @@ import {
   updateFakeGh,
   type FakeGitHub,
 } from './setup/fake-gh.js';
+import { commitOnBranch } from './setup/pr-diff.js';
 
 /**
  * Filing the reviewer's drafts as one GitHub review (C6, F3): one
  * pending review on the commit read, its comments, one submit. An
- * answer lost on the way is looked for, never re-sent. The Finish
- * review form is I20's; these drive the bridge the form will call.
+ * answer lost on the way is looked for, never re-sent. These drive the
+ * bridge the Finish review form calls (`review-finish.test.ts`) with
+ * cases the form cannot reach.
  */
 
 const BRANCH = 'retry-budget';
@@ -41,6 +44,7 @@ test.use({
         branch: BRANCH,
         files: {
           [FILE]: 'export const RETRIES = 3;\nexport const WAIT = 250;\n',
+          'notes.txt': 'first version\n',
         },
       },
     ],
@@ -76,11 +80,19 @@ async function draftOn(
  * Open the pull request's diff, with GitHub reporting the fixture
  * branch's real commit as its head: the commit the diff is read at.
  */
-async function openDiff(page: Page, homeDir: string): Promise<string> {
-  const head = await page.evaluate(
-    async (branch) => (await window.n10.fetchDiffText(branch, 'main')).head,
-    BRANCH
-  );
+async function openDiff({
+  page,
+  homeDir,
+  repoPath,
+}: {
+  page: Page;
+  homeDir: string;
+  repoPath: string;
+}): Promise<string> {
+  const head = execFileSync('git', ['rev-parse', BRANCH], {
+    cwd: repoPath,
+    encoding: 'utf8',
+  }).trim();
   updateFakeGh(homeDir, (s) => {
     s.prs[0]!.headRefOid = head;
   });
@@ -132,7 +144,7 @@ test.describe('Publishing a review', () => {
     desktop,
   }) => {
     const { page, homeDir } = desktop;
-    const head = await openDiff(page, homeDir);
+    const head = await openDiff(desktop);
     await draftOn(page, 'RIGHT', 1, 'Why three?', 2);
     await draftOn(page, 'LEFT', 2, 'The old wait was fine.');
 
@@ -169,14 +181,14 @@ test.describe('Publishing a review', () => {
     updateFakeGh(homeDir, (s) => {
       s.loseAnswers = ['SubmitReview'];
     });
-    const head = await openDiff(page, homeDir);
+    const head = await openDiff(desktop);
     await draftOn(page, 'RIGHT', 1, 'Why three?');
 
     expect(await submit(page, head)).toEqual({
       error: expect.stringContaining('GitHub did not answer'),
     });
     await page.reload();
-    await openDiff(page, homeDir);
+    await openDiff(desktop);
     await expect(
       page.getByText(
         "This may already be posted. Retrying won't post it twice."
@@ -208,7 +220,7 @@ test.describe('Publishing a review', () => {
     updateFakeGh(homeDir, (s) => {
       s.loseAnswers = ['AddReviewThread'];
     });
-    const head = await openDiff(page, homeDir);
+    const head = await openDiff(desktop);
     await draftOn(page, 'RIGHT', 1, 'Why three?');
 
     expect(await submit(page, head)).toEqual({
@@ -230,18 +242,20 @@ test.describe('Publishing a review', () => {
   test('a pull request that moved on is not reviewed, and the drafts stay', async ({
     desktop,
   }) => {
-    const { page, homeDir } = desktop;
-    const head = await openDiff(page, homeDir);
+    const { page, homeDir, repoPath } = desktop;
+    const head = await openDiff(desktop);
     await draftOn(page, 'RIGHT', 1, 'Why three?');
+    // Pushed since: GitHub reports a commit the reviewer never read.
+    const pushed = commitOnBranch(repoPath, BRANCH, 'second version\n');
     updateFakeGh(homeDir, (s) => {
-      s.prs[0]!.headRefOid = 'e'.repeat(40);
+      s.prs[0]!.headRefOid = pushed;
     });
     expect(await submit(page, head)).toEqual({
       error: expect.stringContaining('new commits'),
     });
     expect(scenario(homeDir).reviewWrites).toBeUndefined();
     await page.reload();
-    await openDiff(page, homeDir);
+    await openDiff(desktop);
     await expect(
       page
         .locator('[data-my-draft]')
@@ -253,7 +267,7 @@ test.describe('Publishing a review', () => {
     desktop,
   }) => {
     const { page, homeDir } = desktop;
-    await openDiff(page, homeDir);
+    await openDiff(desktop);
     await draftOn(page, 'RIGHT', 2, 'Is 250 ms enough?');
     // Someone pushed; GitHub reports a commit n10 has not read, and the
     // caller asks to file on it.

@@ -10,8 +10,8 @@ import type {
   PullRequestConversation,
   RemoteCommentThread,
   RemoteCommentReply,
-  ReviewVerdict,
   BuildStatusState,
+  PullRequestRevisions,
   RepositoryRef,
   MentionCandidate,
   LedgerStore,
@@ -22,7 +22,10 @@ import type {
 } from '@n10/vcs-core';
 import { sanitizeBody, VcsError } from '@n10/vcs-core';
 import { searchGitHubMentions } from './mentions.js';
-import { publishGitHubReview } from './pr-review-publisher.js';
+import {
+  GITHUB_EVENTS,
+  publishGitHubReview,
+} from './pr-review-publisher.js';
 import { classifyGhError, parseGhJson } from './gh-errors.js';
 import { ghGraphQL, ghQuery } from './gh-graphql.js';
 import { GH_READ_OPTIONS } from './gh-read-deadline.js';
@@ -30,6 +33,7 @@ import { mapReviewState } from './gh-reviews.js';
 import { fetchPullRequestChecksGitHub } from './pr-checks.js';
 import { fetchGitHubConversation } from './pr-conversation.js';
 import { fetchPullRequestDetailGitHub } from './pr-details.js';
+import { readGitHubRevisions } from './pr-revisions.js';
 
 // ── gh CLI transport ──────────────────────────────────────────────
 
@@ -818,6 +822,8 @@ export const githubProvider: VcsProvider = {
     return searchGitHubMentions(ghQuery, repository, query);
   },
 
+  reviewEvents: GITHUB_EVENTS,
+
   async publishReview(
     _auth: Record<string, string>,
     project: Record<string, string>,
@@ -900,37 +906,13 @@ export const githubProvider: VcsProvider = {
     }
   },
 
-  async submitReviewVerdict(
+  async fetchPullRequestRevisions(
     _auth: Record<string, string>,
     project: Record<string, string>,
-    prId: number,
-    verdict: ReviewVerdict
-  ): Promise<void> {
+    prId: number
+  ): Promise<PullRequestRevisions> {
     const { owner, repo } = project;
     if (!owner || !repo) throw new Error('GitHub project not configured');
-    // GitHub's review vocabulary is smaller than ADO's votes: both
-    // approve variants are APPROVE, both negative verdicts are
-    // REQUEST_CHANGES (which requires a body).
-    const approving =
-      verdict === 'approve' || verdict === 'approve-with-suggestions';
-    const bodies: Record<ReviewVerdict, string | null> = {
-      approve: null,
-      'approve-with-suggestions': 'Approved with suggestions — see comments.',
-      'wait-for-author': 'Waiting for author — see comments.',
-      reject: 'Requesting changes — see comments.',
-    };
-    const args = [
-      'api',
-      `repos/${owner}/${repo}/pulls/${prId}/reviews`,
-      '-f',
-      `event=${approving ? 'APPROVE' : 'REQUEST_CHANGES'}`,
-    ];
-    const body = bodies[verdict];
-    if (body) args.push('-f', `body=${body}`);
-    try {
-      await execFile('gh', args);
-    } catch (err: unknown) {
-      throw classifyGhError(err);
-    }
+    return readGitHubRevisions(ghGraphQL, { owner, repo }, prId);
   },
 };

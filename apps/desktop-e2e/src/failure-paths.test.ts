@@ -18,7 +18,7 @@ import {
   tabs,
   visibleText,
 } from './setup/app.js';
-import { armContextMenuChoice } from './setup/menu.js';
+import { armContextMenuChoice, clickAppMenuItem } from './setup/menu.js';
 import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
 
 /**
@@ -404,24 +404,23 @@ test.describe('Pull request reads that fail', () => {
     await expect(retry).toBeFocused();
     await expect(retry).not.toHaveAttribute('aria-disabled', 'true');
 
-    // Once the branch exists, Retry reads it: an empty diff, now a fact.
+    // Once the branch exists, the provider reports its head. The failed
+    // read put nothing on screen to hold, so the tab reads that head:
+    // an empty diff, now a fact.
     execFileSync('git', ['branch', 'vanished'], { cwd: desktop.repoPath });
-    await retry.click();
-    await expect(failure).toHaveCount(0);
+    await clickAppMenuItem(desktop.app, 'Refresh Pull Requests');
+    await expect(failure).toHaveCount(0, { timeout: 30_000 });
     await expect(page.getByText(/No changes between/)).toBeVisible();
   });
 
-  test('a diff that cannot be read says so, not "No changes"', async ({
+  test('a path git quotes reads as its name, not a failure', async ({
     desktop,
   }) => {
     const { page } = desktop;
     await openPr(page, 'Accented path');
     await expect(
-      page.getByRole('alert').filter({ hasText: "Couldn't show the diff" })
+      page.locator('[data-diff-scroll]').getByText('café.txt').first()
     ).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/No changes between/)).toHaveCount(0);
-    // A failed read is finished: nothing, the file tree included, is
-    // left waiting on it.
-    await expect(page.locator('[data-slot="skeleton"]')).toHaveCount(0);
+    await expect(page.getByRole('alert')).toHaveCount(0);
   });
 });

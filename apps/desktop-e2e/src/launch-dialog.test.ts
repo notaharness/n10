@@ -40,7 +40,7 @@ async function openMenu(
     page.getByRole('button', { name: 'Open on GitHub', exact: true })
   ).toBeVisible();
   const sessions = await page.evaluate(() => window.n10.listSessions());
-  if (!sessions.some((s) => s.running)) {
+  if (sessions.length === 0) {
     await page
       .getByRole('button', { name: 'Launch Agent', exact: true })
       .click();

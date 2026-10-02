@@ -1,6 +1,6 @@
 import { Select as SelectPrimitive } from 'radix-ui';
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '../../lib/utils.js';
 
 function Select(props: ComponentProps<typeof SelectPrimitive.Root>) {
@@ -79,13 +79,18 @@ function SelectContent({
 function SelectItem({
   className,
   children,
+  description,
   ...props
-}: ComponentProps<typeof SelectPrimitive.Item>) {
+}: ComponentProps<typeof SelectPrimitive.Item> & {
+  /** A second line under the item, left out of the trigger's text. */
+  description?: ReactNode;
+}) {
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
         'relative flex w-full cursor-default select-none items-center gap-2 rounded-sm py-1 pr-7 pl-2 text-base outline-hidden focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+        description !== undefined && 'flex-col items-start gap-0',
         className
       )}
       {...props}
@@ -96,6 +101,9 @@ function SelectItem({
         </SelectPrimitive.ItemIndicator>
       </span>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      {description !== undefined && (
+        <span className="text-xs text-muted-foreground">{description}</span>
+      )}
     </SelectPrimitive.Item>
   );
 }

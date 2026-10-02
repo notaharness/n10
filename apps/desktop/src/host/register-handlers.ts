@@ -23,6 +23,7 @@ import * as mentions from './services/mentions.js';
 import * as prChecks from './services/pr-checks.js';
 import * as prConversation from './services/pr-conversation.js';
 import * as prDetails from './services/pr-details.js';
+import * as prHistory from './services/pr-history.js';
 import * as reviewDrafts from './services/review-drafts.js';
 import * as babysit from './services/babysit.js';
 import * as machines from './services/machines.js';
@@ -85,6 +86,8 @@ export function createHostApi(): HostApi {
     setThreadResolved: (req: ResolveRequest) => reviews.setThreadResolved(req),
     fetchPrDescription: (prId) => reviews.fetchPrDescription(prId),
     getPullRequestSnapshot: (req) => prDetails.getPullRequestSnapshot(req),
+    getPullRequestHistory: (req) => prHistory.getPullRequestHistory(req),
+    recordPullRequestVisit: (req) => prHistory.recordPullRequestVisit(req),
     getPullRequestChecks: (req) => prChecks.getPullRequestChecks(req),
     getPullRequestConversation: (req) =>
       prConversation.getPullRequestConversation(req),
@@ -93,8 +96,6 @@ export function createHostApi(): HostApi {
     discardReviewDraft: (req) => reviewDrafts.discardDraft(req),
     searchMentionCandidates: (req) => mentions.searchMentionCandidates(req),
     submitReview: (req) => reviewDrafts.submitReview(req),
-    submitReviewVerdict: (prId, verdict) =>
-      reviews.submitReviewVerdict(prId, verdict),
     getReviewViewer: () => Promise.resolve(reviews.getReviewViewer()),
     fetchCommentImage: (url) => commentImages.fetchCommentImage(url),
     listDraftComments: (prId) =>
@@ -138,10 +139,11 @@ export function createHostApi(): HostApi {
     onSessionExit: () => () => undefined,
     onLaunchStep: () => () => undefined,
 
-    fetchDiffText: (sourceBranch, targetBranch) =>
-      reviews.getDiffText(sourceBranch, targetBranch),
     fetchWorktreeDiffText: (branch, targetBranch) =>
       worktrees.getWorktreeDiffText(branch, targetBranch),
+    fetchPrDiffManifest: (req) => reviews.getPrDiffManifest(req),
+    fetchPrDiffPatch: (req) => reviews.getPrDiffPatch(req),
+    fetchPrRangeManifest: (req) => reviews.getPrRangeManifest(req),
 
     openExternal: (url) => externalOpener(url),
     showContextMenu: (items) => contextMenu(items),
@@ -240,86 +242,11 @@ export function registerHostHandlers(
   api: HostApi = createHostApi(),
   viewerApi: ViewerApi = createViewerApi()
 ): void {
-  const handlers: Record<string, HostMethod | undefined> = {
-    [IPC.getVersion]: api.getVersion as HostMethod,
-    [IPC.openRepo]: api.openRepo as HostMethod,
-    [IPC.getRepo]: api.getRepo as HostMethod,
-    [IPC.refreshRepo]: api.refreshRepo as HostMethod,
-    [IPC.listRecentRepos]: api.listRecentRepos as HostMethod,
-    [IPC.selectRepoDirectory]: api.selectRepoDirectory as HostMethod,
-    [IPC.selectFolder]: api.selectFolder as HostMethod,
-    [IPC.forgetRecent]: api.forgetRecent as HostMethod,
-    [IPC.getSettingsView]: api.getSettingsView as HostMethod,
-    [IPC.updateSettingsField]: api.updateSettingsField as HostMethod,
-    [IPC.getSidebarModel]: api.getSidebarModel as HostMethod,
-    [IPC.getSyncState]: api.getSyncState as HostMethod,
-    [IPC.refreshRemote]: api.refreshRemote as HostMethod,
-    [IPC.listWorktrees]: api.listWorktrees as HostMethod,
-    [IPC.listBranches]: api.listBranches as HostMethod,
-    [IPC.listAllBranches]: api.listAllBranches as HostMethod,
-    [IPC.createWorktree]: api.createWorktree as HostMethod,
-    [IPC.removeWorktree]: api.removeWorktree as HostMethod,
-    [IPC.checkWorktreeRemoval]: api.checkWorktreeRemoval as HostMethod,
-    [IPC.openInEditor]: api.openInEditor as HostMethod,
-    [IPC.launchAgent]: api.launchAgent as HostMethod,
-    [IPC.listSessions]: api.listSessions as HostMethod,
-    [IPC.listForeignSessions]: api.listForeignSessions as HostMethod,
-    [IPC.getSessionActivity]: api.getSessionActivity as HostMethod,
-    [IPC.writeSession]: api.writeSession as HostMethod,
-    [IPC.resizeSession]: api.resizeSession as HostMethod,
-    [IPC.killSession]: api.killSession as HostMethod,
-    [IPC.reconnectSession]: api.reconnectSession as HostMethod,
-    [IPC.saveClipboardImage]: api.saveClipboardImage as HostMethod,
-    [IPC.launchTerminal]: api.launchTerminal as HostMethod,
-    [IPC.listTerminals]: api.listTerminals as HostMethod,
-    [IPC.listBranchSessions]: api.listBranchSessions as HostMethod,
-    [IPC.launchBranchTerminal]: api.launchBranchTerminal as HostMethod,
-    [IPC.killTerminal]: api.killTerminal as HostMethod,
-    [IPC.fetchCommentThreads]: api.fetchCommentThreads as HostMethod,
-    [IPC.replyToThread]: api.replyToThread as HostMethod,
-    [IPC.setThreadResolved]: api.setThreadResolved as HostMethod,
-    [IPC.fetchPrDescription]: api.fetchPrDescription as HostMethod,
-    [IPC.getPullRequestSnapshot]: api.getPullRequestSnapshot as HostMethod,
-    [IPC.getPullRequestChecks]: api.getPullRequestChecks as HostMethod,
-    [IPC.getPullRequestConversation]:
-      api.getPullRequestConversation as HostMethod,
-    [IPC.listReviewDrafts]: api.listReviewDrafts as HostMethod,
-    [IPC.saveReviewDraft]: api.saveReviewDraft as HostMethod,
-    [IPC.discardReviewDraft]: api.discardReviewDraft as HostMethod,
-    [IPC.searchMentionCandidates]: api.searchMentionCandidates as HostMethod,
-    [IPC.submitReview]: api.submitReview as HostMethod,
-    [IPC.submitReviewVerdict]: api.submitReviewVerdict as HostMethod,
-    [IPC.getReviewViewer]: api.getReviewViewer as HostMethod,
-    [IPC.fetchCommentImage]: api.fetchCommentImage as HostMethod,
-    [IPC.listDraftComments]: api.listDraftComments as HostMethod,
-    [IPC.updateDraftComment]: api.updateDraftComment as HostMethod,
-    [IPC.deleteDraftComment]: api.deleteDraftComment as HostMethod,
-    [IPC.postDraftComments]: api.postDraftComments as HostMethod,
-    [IPC.launchReviewAgent]: api.launchReviewAgent as HostMethod,
-    [IPC.getSessionLaunchContext]: api.getSessionLaunchContext as HostMethod,
-    [IPC.listAgentOptions]: api.listAgentOptions as HostMethod,
-    [IPC.checkoutPlan]: api.checkoutPlan as HostMethod,
-    [IPC.fetchDiffText]: api.fetchDiffText as HostMethod,
-    [IPC.fetchWorktreeDiffText]: api.fetchWorktreeDiffText as HostMethod,
-    [IPC.openExternal]: api.openExternal as HostMethod,
-    [IPC.showContextMenu]: api.showContextMenu as HostMethod,
-    [IPC.showAppMenu]: api.showAppMenu as HostMethod,
-    [IPC.getDesktopPrefs]: api.getDesktopPrefs as HostMethod,
-    [IPC.setDesktopPrefs]: api.setDesktopPrefs as HostMethod,
-    [IPC.showAbout]: api.showAbout as HostMethod,
-    [IPC.startBabysit]: api.startBabysit as HostMethod,
-    [IPC.stopBabysit]: api.stopBabysit as HostMethod,
-    [IPC.listMachines]: api.listMachines as HostMethod,
-    [IPC.getBeamStatus]: api.getBeamStatus as HostMethod,
-    [IPC.setMachineAlias]: api.setMachineAlias as HostMethod,
-    [IPC.setMachineGrant]: api.setMachineGrant as HostMethod,
-    [IPC.runCeremony]: api.runCeremony as HostMethod,
-    [IPC.cancelCeremony]: api.cancelCeremony as HostMethod,
-    [IPC.resetFleet]: api.resetFleet as HostMethod,
-    [IPC.dismissInboundMail]: api.dismissInboundMail as HostMethod,
-  };
-
-  for (const [channel, fn] of Object.entries(handlers)) {
+  const viewer = viewerHandlers(viewerApi);
+  const methods = api as Partial<Record<string, HostMethod>>;
+  for (const [method, channel] of Object.entries(IPC)) {
+    if (channel in viewer) continue;
+    const fn = methods[method];
     if (!fn) throw new Error(`No host implementation for ${channel}`);
     // Electron's ipcMain.handle passes the IpcMainInvokeEvent as the
     // first listener arg; the contract methods only want the payload.
@@ -328,7 +255,7 @@ export function registerHostHandlers(
     );
   }
 
-  for (const [channel, fn] of Object.entries(viewerHandlers(viewerApi))) {
+  for (const [channel, fn] of Object.entries(viewer)) {
     register.handle(channel, (event, ...args: unknown[]) =>
       relayErrors(fn, [viewerOf(event), ...args])
     );

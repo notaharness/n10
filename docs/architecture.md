@@ -51,12 +51,13 @@ apps/desktop/                    — Electron GUI shell, shipped inside `@notaha
     components/review/comments/  — reviewer threads: ThreadCard, CommentMarkdown, ConversationPanel…
     components/review/diff/      — the viewer: DiffPane, VirtualDiffList, diff-rows, FileTree, SnippetView…
     components/review/drafts/    — the agent's drafts + walkthrough: DraftCard, DraftEditor, ReviewStepper…
+    components/review/finish/    — filing a review: FinishReview (the form in the diff), FinishParts
     lib/                         — grouped by subsystem, not one flat folder (see below)
     lib/data/                    — queries.ts (TanStack Query over window.n10), mutations.ts, query-keys.ts
     lib/diff/                    — diff-model.ts (fold, split pairing), diff-virtual.ts, word-diff.ts, highlight.ts, thread-model.ts
     lib/tabs/                    — tabs-model.ts (pure reducer: preview/pinned, `sync-items`), tabs.tsx, use-close-tabs.tsx
     lib/plan/                    — plan-model.ts (rows, numbering), plan.ts, use-plan-checkout.ts
-    lib/review/                  — review-model.ts (what the workspace shows), review-verdict.ts, severity.ts, use-comment-navigator.ts
+    lib/review/                  — review-model.ts (what the workspace shows), review-submission.ts, severity.ts, use-comment-navigator.ts
     lib/sidebar/                 — sidebar-model.ts, sidebar-row-menu.ts, attention.ts
     lib/*.ts                     — what belongs to no subsystem: utils, theme, terminal-grid, content-key, settings-*
     screens/                     — RepoOpen (repo picker) and Workspace (shell + shortcuts)
@@ -100,7 +101,7 @@ libs/core/                       — Shell-agnostic operations. No React, Ink, E
   src/lib/babysit/               — Pure observation model and briefing composition
   src/ui.ts                      — Browser-safe presentation and input models
   src/plan.ts                    — Browser-safe entry (`@n10/core/plan`) for the renderer
-  src/lib/utils/                 — Git reads and presentation helpers (diff-fetcher, sidebar-items, virtual-viewport…)
+  src/lib/utils/                 — Git reads and presentation helpers (worktree-diff, sidebar-items, virtual-viewport…)
   src/lib/settings/              — Settings field model, coercion and explicitly scoped config writes
   src/lib/agents/                — Agent registry
   src/lib/activity.ts            — Agent activity registry; pty-registry.ts — PTY session lifecycle

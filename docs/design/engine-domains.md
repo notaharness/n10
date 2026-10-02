@@ -163,7 +163,7 @@ backend files cannot import app-core. Host files cannot import Electron.
 Renderer and app-core rules deny Node builtins and Node-only package values,
 including their subpaths. App-core also rejects Node process globals. Browser-safe entries are explicitly
 allowed: core's `ui`, `plan` and `readiness`; review-comments' `ui` and
-`conventional`; vcs-core's `types` and `pr-details`; engine's type-only `contract`.
+`conventional`; vcs-core's `types`, `pr-details` and `review-publication`; engine's type-only `contract`.
 App-core consumes structural engine clients supplied by the shell. Desktop keeps
 its IPC/query bindings and uses the shared plan binding. Terminal I/O, activity
 presentation, running-tab registry reads and TTY dimensions live in the CLI.

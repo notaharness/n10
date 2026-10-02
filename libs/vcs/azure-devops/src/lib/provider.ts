@@ -9,7 +9,6 @@ import type {
   PullRequestRef,
   RemoteCommentThread,
   RemoteCommentReply,
-  ReviewVerdict,
   BuildStatusState,
   RepositoryRef,
   MentionCandidate,
@@ -48,7 +47,7 @@ import {
   type RawAdoThread,
 } from './pr-conversation.js';
 import { fetchPrBuildRunsBatch } from './builds.js';
-import { publishAzureReview } from './pr-review-publisher.js';
+import { AZURE_EVENTS, publishAzureReview } from './pr-review-publisher.js';
 import {
   forgetPrDetails,
   forgetRepoDetails,
@@ -989,6 +988,8 @@ export const azureDevOpsProvider: VcsProvider = {
     return searchAdoMentions(toAdoConfig(auth, project), query);
   },
 
+  reviewEvents: AZURE_EVENTS,
+
   async publishReview(
     auth: Record<string, string>,
     project: Record<string, string>,
@@ -1041,41 +1042,5 @@ export const azureDevOpsProvider: VcsProvider = {
     prId: number
   ) {
     return fetchPullRequestChecksAzure(toAdoConfig(auth, project), prId);
-  },
-
-  async submitReviewVerdict(
-    auth: Record<string, string>,
-    project: Record<string, string>,
-    prId: number,
-    verdict: ReviewVerdict
-  ): Promise<void> {
-    const config = toAdoConfig(auth, project);
-    const userId = await fetchAuthenticatedUserId(config);
-    const votes: Record<ReviewVerdict, ReviewerVote> = {
-      approve: 10,
-      'approve-with-suggestions': 5,
-      'wait-for-author': -5,
-      reject: -10,
-    };
-    const vote = votes[verdict];
-    const url = `${baseUrl(
-      config
-    )}/pullrequests/${prId}/reviewers/${userId}?api-version=7.1`;
-    await adoSend<unknown>('submitReviewVerdict', url, {
-      method: 'PUT',
-      headers: authHeaders(config.pat),
-      body: JSON.stringify({ id: userId, vote }),
-      bodyForLog: { vote },
-    });
-    // The selected pull request's detail carries votes, and its policy
-    // evaluations the reviewer policies' verdict on them; the list is
-    // fetched with a zero TTL, so it is deduped and never stored.
-    // Wiping the repository prefix would drop threads, statuses and
-    // descriptions to fix something they do not hold. The vote a user
-    // might still see is in the shell's own model — the desktop
-    // refreshes it from services/reviews.ts.
-    const repo = `${config.org}/${config.project}/${config.repo}`;
-    invalidateAdoKey(`${repo}/detail/${prId}`);
-    invalidateAdoKey(`${repo}/policies/${prId}`);
   },
 };

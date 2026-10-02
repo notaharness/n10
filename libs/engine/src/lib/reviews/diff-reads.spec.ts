@@ -1,153 +1,370 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchRefs,
-  resolveRef,
-  gitLine,
-  readDiffFiles,
-  fetchFileDiffText,
-  fetchDiffText,
   fetchWorktreeDiffText,
+  readPrDiffManifest,
+  readPrDiffPatch,
+  readRevisionRangeManifest,
+  resolvePrComparison,
 } from '@n10/core';
+import type { PrComparison } from '@n10/core';
 import { createDiffReads } from './diff-reads.js';
 import { readResourceValue } from './read-resource.js';
 
+/**
+ * Diff reads at exact commits. Resolution itself is core's, tested
+ * against real Git there; this is what the engine adds: request
+ * parsing, the repository a request may be answered for, and which
+ * reads are shared or read again.
+ */
+
 vi.mock('@n10/core', () => ({
+  WHOLE_FILE_CONTEXT: 2_147_483_647,
   fetchRefs: vi.fn(),
-  resolveRef: vi.fn(),
-  gitLine: vi.fn(),
-  readDiffFiles: vi.fn(),
-  fetchFileDiffText: vi.fn(),
-  fetchDiffText: vi.fn(),
   fetchWorktreeDiffText: vi.fn(),
+  readPrDiffManifest: vi.fn(),
+  readPrDiffPatch: vi.fn(),
+  readRevisionRangeManifest: vi.fn(),
+  resolvePrComparison: vi.fn(),
 }));
+
+const HEAD = 'b'.repeat(40);
+const TARGET = 'c'.repeat(40);
+const BASE = 'a'.repeat(40);
+const comparison = (headOid = HEAD): PrComparison => ({
+  headOid,
+  targetOid: TARGET,
+  mergeBaseOid: BASE,
+  sourceRef: 'origin/feature',
+  targetRef: 'origin/main',
+  headVerified: true,
+  targetVerified: true,
+});
 const request = {
+  repo: '/repo/a',
   sourceBranch: 'feature',
   targetBranch: 'main',
-  headSha: 'head',
+  expectedHeadOid: HEAD,
 };
+const patchRequest = { repo: '/repo/a', mergeBaseOid: BASE, headOid: HEAD };
 const find = vi.fn();
+let current = true;
+const reads = (repo = '/repo/a') =>
+  createDiffReads(repo, () => current, { find }, {});
+
 beforeEach(() => {
   vi.resetAllMocks();
+  current = true;
   vi.mocked(fetchRefs).mockResolvedValue(true);
-  vi.mocked(resolveRef).mockImplementation(
-    async (_cwd, branch) => `origin/${branch}`
-  );
-  vi.mocked(gitLine).mockImplementation(async (args) =>
-    args.at(-1)?.endsWith('^{commit}')
-      ? args.at(-1) === 'head^{commit}'
-        ? 'head'
-        : 'base'
-      : 'head'
-  );
-  vi.mocked(readDiffFiles).mockResolvedValue([
-    {
-      filename: 'a.ts',
-      status: 'modified',
-      additions: 1,
-      deletions: 0,
-      binary: false,
-    },
-  ]);
-  vi.mocked(fetchFileDiffText).mockResolvedValue('file patch');
-  vi.mocked(fetchDiffText).mockResolvedValue('full patch');
+  vi.mocked(resolvePrComparison).mockImplementation(async (req) => ({
+    ok: true,
+    comparison: comparison(req.expectedHeadOid),
+  }));
+  vi.mocked(readPrDiffManifest).mockImplementation(async (_cwd, c) => ({
+    comparison: c,
+    files: [],
+    complete: true,
+  }));
+  vi.mocked(readPrDiffPatch).mockResolvedValue({
+    text: 'patch',
+    truncated: false,
+    limitBytes: 1,
+  });
 });
 
-it('shares metadata and immutable commit refs across file and full patches', async () => {
-  const diff = createDiffReads('/repo/a', { find });
-  await readResourceValue(diff.files(request));
-  expect(fetchFileDiffText).not.toHaveBeenCalled();
-  expect(
+describe('manifest', () => {
+  it('resolves in its repository with the provider head and lists the files', async () => {
+    const diff = reads();
+    expect(await readResourceValue(diff.manifest(request))).toEqual({
+      ok: true,
+      manifest: { comparison: comparison(), files: [], complete: true },
+    });
+    expect(resolvePrComparison).toHaveBeenCalledWith({
+      cwd: '/repo/a',
+      sourceBranch: 'feature',
+      targetBranch: 'main',
+      expectedHeadOid: HEAD,
+    });
+    expect(readPrDiffManifest).toHaveBeenCalledWith(
+      '/repo/a',
+      comparison(),
+      {}
+    );
+  });
+
+  it('lists under the ceiling the environment sets', async () => {
+    const diff = createDiffReads(
+      '/repo/a',
+      () => true,
+      { find },
+      {
+        N10_DIFF_MANIFEST_MAX_BYTES: '400',
+      }
+    );
+    await readResourceValue(diff.manifest(request));
+    expect(readPrDiffManifest).toHaveBeenCalledWith('/repo/a', comparison(), {
+      maxBytes: 400,
+    });
+  });
+
+  it('keeps an unpinned target fresh, and fetches nothing for a pinned one', async () => {
+    const diff = reads();
+    await readResourceValue(diff.manifest(request));
+    expect(fetchRefs).toHaveBeenCalledExactlyOnceWith({
+      cwd: '/repo/a',
+      refs: ['main'],
+      maxAgeMs: 300_000,
+    });
+    vi.mocked(fetchRefs).mockClear();
     await readResourceValue(
-      diff.file({ sourceRef: 'head', targetRef: 'base' }, 'a.ts')
-    )
-  ).toBe('file patch');
-  expect(await readResourceValue(diff.full(request))).toEqual({
-    text: 'full patch',
-    head: 'head',
+      diff.manifest({ ...request, expectedTargetOid: TARGET })
+    );
+    expect(fetchRefs).not.toHaveBeenCalled();
   });
-  expect(readDiffFiles).toHaveBeenCalledExactlyOnceWith(
-    '/repo/a',
-    'head',
-    'base'
-  );
-  expect(fetchFileDiffText).toHaveBeenCalledWith(
-    '/repo/a',
-    'head',
-    'base',
-    'a.ts',
-    expect.objectContaining({ sourceRef: 'head', targetRef: 'base' })
-  );
-  expect(fetchDiffText).toHaveBeenCalledWith(
-    '/repo/a',
-    'head',
-    'base',
-    expect.objectContaining({ sourceRef: 'head', targetRef: 'base' })
-  );
+
+  it('answers a comparison failure as data, and reads it again', async () => {
+    const error = { code: 'head-unavailable' as const, message: 'gone' };
+    vi.mocked(resolvePrComparison).mockResolvedValueOnce({ ok: false, error });
+    const diff = reads();
+    expect(await readResourceValue(diff.manifest(request))).toEqual({
+      ok: false,
+      error,
+    });
+    expect(readPrDiffManifest).not.toHaveBeenCalled();
+    expect(await readResourceValue(diff.manifest(request))).toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('re-resolves branches on invalidation without listing the same commits twice', async () => {
+    const diff = reads();
+    await readResourceValue(diff.manifest(request));
+    diff.invalidate();
+    await readResourceValue(diff.manifest(request));
+    expect(resolvePrComparison).toHaveBeenCalledTimes(2);
+    expect(readPrDiffManifest).toHaveBeenCalledOnce();
+  });
+
+  it('answers with the comparison just resolved when a moved target shares the listing', async () => {
+    const diff = reads();
+    await readResourceValue(diff.manifest(request));
+    const moved = 'd'.repeat(40);
+    // A parent merged into the target: the merge base stays its tip.
+    vi.mocked(resolvePrComparison).mockResolvedValue({
+      ok: true,
+      comparison: {
+        ...comparison(),
+        targetOid: moved,
+        targetRef: 'origin/master',
+      },
+    });
+    const result = await readResourceValue(
+      diff.manifest({ ...request, expectedTargetOid: moved })
+    );
+    expect(readPrDiffManifest).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      ok: true,
+      manifest: {
+        comparison: { targetOid: moved, targetRef: 'origin/master' },
+      },
+    });
+  });
+
+  it('refuses a request for a repository that is not its own', async () => {
+    const diff = reads();
+    expect(
+      await readResourceValue(diff.manifest({ ...request, repo: '/repo/b' }))
+    ).toMatchObject({ ok: false, error: { code: 'repo-changed' } });
+    expect(resolvePrComparison).not.toHaveBeenCalled();
+  });
+
+  it('drops an answer when the repository closes during the read', async () => {
+    vi.mocked(readPrDiffManifest).mockImplementationOnce(async (_cwd, c) => {
+      current = false;
+      return { comparison: c, files: [], complete: true };
+    });
+    expect(await readResourceValue(reads().manifest(request))).toMatchObject({
+      ok: false,
+      error: { code: 'repo-changed' },
+    });
+  });
+
+  it.each([
+    [{ ...request, repo: 42 }, 'repo must be a string'],
+    [{ ...request, sourceBranch: ['x'] }, 'sourceBranch must be a string'],
+    [{ ...request, expectedHeadOid: 7 }, 'expectedHeadOid must be a string'],
+    [null, 'repo must be a string'],
+  ])('rejects a malformed request %#', (req, message) => {
+    expect(() => reads().manifest(req)).toThrow(message);
+  });
 });
 
-it('skips a matching source fetch but refreshes a changed source and bounds target freshness', async () => {
-  const diff = createDiffReads('/repo/a', { find });
-  await readResourceValue(diff.files(request));
-  expect(fetchRefs).toHaveBeenCalledExactlyOnceWith({
-    cwd: '/repo/a',
-    refs: ['main'],
-    maxAgeMs: 300_000,
+describe('patch', () => {
+  it('reads between the given commits, for the given paths, once', async () => {
+    const diff = reads();
+    const req = { ...patchRequest, paths: ['src/a.ts'], context: 3 };
+    expect(await readResourceValue(diff.patch(req))).toEqual({
+      ok: true,
+      patch: { text: 'patch', truncated: false, limitBytes: 1 },
+    });
+    diff.invalidate();
+    await readResourceValue(diff.patch(req));
+    expect(readPrDiffPatch).toHaveBeenCalledExactlyOnceWith(
+      '/repo/a',
+      { mergeBaseOid: BASE, headOid: HEAD },
+      { paths: ['src/a.ts'], context: 3 }
+    );
   });
-  await readResourceValue(diff.files({ ...request, headSha: 'new-head' }));
-  expect(fetchRefs).toHaveBeenCalledWith({ cwd: '/repo/a', refs: ['feature'] });
+
+  it('keeps the last two patches read, and joins one still being read', async () => {
+    const diff = reads();
+    const of = (path: string) => ({ ...patchRequest, paths: [path] });
+    const calls = (path: string) =>
+      vi
+        .mocked(readPrDiffPatch)
+        .mock.calls.filter(([, , o]) => o?.paths?.[0] === path).length;
+    await Promise.all([
+      readResourceValue(diff.patch(of('a'))),
+      readResourceValue(diff.patch(of('a'))),
+    ]);
+    expect(calls('a')).toBe(1);
+    for (const path of ['b', 'c'])
+      await readResourceValue(diff.patch(of(path)));
+    await readResourceValue(diff.patch(of('c')));
+    expect(calls('c')).toBe(1);
+    // Past the two kept: read again.
+    await readResourceValue(diff.patch(of('a')));
+    expect(calls('a')).toBe(2);
+  });
+
+  it('drops an answer when the repository closes mid-read', async () => {
+    vi.mocked(readPrDiffPatch).mockImplementationOnce(async () => {
+      current = false;
+      return { text: '', truncated: false, limitBytes: 1 };
+    });
+    expect(await readResourceValue(reads().patch(patchRequest))).toMatchObject({
+      ok: false,
+      error: { code: 'repo-changed' },
+    });
+  });
+
+  it.each([
+    [{ ...patchRequest, paths: 'src/a.ts' }],
+    [{ ...patchRequest, paths: [''] }],
+    [{ ...patchRequest, paths: [3] }],
+    [
+      {
+        ...patchRequest,
+        paths: Array.from({ length: 1001 }, (_, i) => `f${i}`),
+      },
+    ],
+    // Few paths, but more bytes than a command line should carry.
+    [
+      {
+        ...patchRequest,
+        paths: Array.from({ length: 3 }, () => 'x'.repeat(100_000)),
+      },
+    ],
+  ])('rejects malformed paths %#', (req) => {
+    expect(() => reads().patch(req)).toThrow('paths must');
+  });
+
+  it.each([-1, 1.5, '3', 2 ** 31])('rejects a context of %j', (context) => {
+    expect(() => reads().patch({ ...patchRequest, context })).toThrow(
+      'context must be'
+    );
+  });
+
+  it('rejects bounds that are not strings', () => {
+    expect(() => reads().patch({ ...patchRequest, headOid: 5 })).toThrow(
+      'headOid must be a string'
+    );
+  });
 });
 
-it('never shares results across repositories and reads live diffs from the resolved checkout', async () => {
-  const first = createDiffReads('/repo/a', { find });
-  const second = createDiffReads('/repo/b', { find });
-  await readResourceValue(first.files(request));
-  await readResourceValue(second.files(request));
-  expect(readDiffFiles).toHaveBeenCalledWith('/repo/b', 'head', 'base');
-  expect(gitLine).toHaveBeenCalledWith(expect.any(Array), { cwd: '/repo/b' });
+describe('rangeManifest', () => {
+  const range = { repo: '/repo/a', from: BASE, to: HEAD, target: TARGET };
+  beforeEach(() => {
+    vi.mocked(readRevisionRangeManifest).mockResolvedValue({
+      ok: true,
+      range: {
+        fromOid: BASE,
+        toOid: HEAD,
+        linear: true,
+        backwards: false,
+        base: { state: 'unchanged' },
+      },
+      manifest: { comparison: comparison(), files: [], complete: true },
+    });
+  });
+
+  it.each(['from', 'to', 'target'] as const)(
+    'refuses a %s that is not an object id',
+    (key) => {
+      expect(() => reads().rangeManifest({ ...range, [key]: 'main' })).toThrow(
+        `${key} must be an object id`
+      );
+      expect(readRevisionRangeManifest).not.toHaveBeenCalled();
+    }
+  );
+
+  it('answers only for its own repository', async () => {
+    expect(
+      await readResourceValue(
+        reads().rangeManifest({ ...range, repo: '/repo/b' })
+      )
+    ).toMatchObject({ ok: false, error: { code: 'repo-changed' } });
+    expect(readRevisionRangeManifest).not.toHaveBeenCalled();
+  });
+
+  it('drops an answer when the repository closes during the read', async () => {
+    vi.mocked(readRevisionRangeManifest).mockImplementationOnce(async () => {
+      current = false;
+      return { ok: false, error: { code: 'to-unavailable', message: 'x' } };
+    });
+    expect(await readResourceValue(reads().rangeManifest(range))).toMatchObject(
+      { ok: false, error: { code: 'repo-changed' } }
+    );
+  });
+
+  it('reads a range that failed again, rather than keeping the failure', async () => {
+    const diff = reads();
+    vi.mocked(readRevisionRangeManifest).mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'from-unavailable', message: 'not in this clone' },
+    });
+    expect(await readResourceValue(diff.rangeManifest(range))).toMatchObject({
+      ok: false,
+    });
+    expect(await readResourceValue(diff.rangeManifest(range))).toMatchObject({
+      ok: true,
+    });
+    expect(readRevisionRangeManifest).toHaveBeenCalledTimes(2);
+  });
+
+  it('reads the range in its repository, once', async () => {
+    const diff = reads();
+    expect(await readResourceValue(diff.rangeManifest(range))).toMatchObject({
+      ok: true,
+      range: { linear: true },
+    });
+    diff.invalidate();
+    await readResourceValue(diff.rangeManifest(range));
+    expect(readRevisionRangeManifest).toHaveBeenCalledExactlyOnceWith(
+      { cwd: '/repo/a', from: BASE, to: HEAD, target: TARGET },
+      {}
+    );
+  });
+});
+
+it('reads a live diff from the resolved checkout', async () => {
   find.mockResolvedValue({ path: '/checkouts/actual' });
   vi.mocked(fetchWorktreeDiffText).mockResolvedValue('live');
-  expect(await readResourceValue(second.worktree('feature', 'main'))).toBe(
+  expect(await readResourceValue(reads().worktree('feature', 'main'))).toBe(
     'live'
   );
   expect(fetchWorktreeDiffText).toHaveBeenCalledWith(
     '/checkouts/actual',
     'main'
   );
-});
-
-it('propagates metadata failures instead of claiming an empty diff', async () => {
-  vi.mocked(readDiffFiles).mockRejectedValue(new Error('Cannot read files'));
-  const diff = createDiffReads('/repo', { find });
-  await expect(readResourceValue(diff.full(request))).rejects.toThrow(
-    'Cannot read files'
-  );
-  expect(fetchDiffText).not.toHaveBeenCalled();
-});
-
-it('keeps patches tied to the displayed manifest when branch resolution moves', async () => {
-  const diff = createDiffReads('/repo', { find });
-  const old = await readResourceValue(diff.files(request));
-  expect(await readResourceValue(diff.file(old, 'a.ts'))).toBe('file patch');
-  vi.mocked(gitLine).mockResolvedValue('next');
-  vi.mocked(fetchFileDiffText).mockResolvedValue('new patch');
-  diff.invalidate();
-  const next = await readResourceValue(diff.files(request));
-  expect(next.sourceRef).toBe('next');
-  expect(await readResourceValue(diff.file(next, 'a.ts'))).toBe('new patch');
-  expect(await readResourceValue(diff.file(old, 'a.ts'))).toBe('file patch');
-  expect(fetchFileDiffText).toHaveBeenCalledTimes(2);
-});
-
-it('invalidates branch resolution without expiring content for unchanged commits', async () => {
-  const diff = createDiffReads('/repo', { find });
-  await readResourceValue(diff.full(request));
-  diff.invalidate();
-  await readResourceValue(diff.full(request));
-  expect(fetchRefs).toHaveBeenCalledTimes(2);
-  expect(readDiffFiles).toHaveBeenCalledOnce();
-  expect(fetchDiffText).toHaveBeenCalledOnce();
-  vi.mocked(gitLine).mockResolvedValue('next');
-  diff.invalidate();
-  expect((await readResourceValue(diff.full(request))).head).toBe('next');
-  expect(fetchDiffText).toHaveBeenCalledTimes(2);
 });

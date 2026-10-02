@@ -30,6 +30,8 @@ const info = (repo: RepoState): RepoInfo => ({
     repository: repo.data.slug,
   },
   viewer: VIEWER,
+  // GitHub's verdicts, as its provider declares them.
+  reviewEvents: ['COMMENT', 'APPROVE', 'REQUEST_CHANGES'],
 });
 
 const SETTINGS: SettingsFieldView[] = [

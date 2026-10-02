@@ -99,6 +99,10 @@ const api: N10HostApi = {
     ipcRenderer.invoke(IPC.fetchPrDescription, prId),
   getPullRequestSnapshot: (req) =>
     ipcRenderer.invoke(IPC.getPullRequestSnapshot, req),
+  getPullRequestHistory: (req) =>
+    ipcRenderer.invoke(IPC.getPullRequestHistory, req),
+  recordPullRequestVisit: (req) =>
+    ipcRenderer.invoke(IPC.recordPullRequestVisit, req),
   getPullRequestChecks: (req) =>
     ipcRenderer.invoke(IPC.getPullRequestChecks, req),
   getPullRequestConversation: (req) =>
@@ -109,8 +113,6 @@ const api: N10HostApi = {
   searchMentionCandidates: (req) =>
     ipcRenderer.invoke(IPC.searchMentionCandidates, req),
   submitReview: (req) => ipcRenderer.invoke(IPC.submitReview, req),
-  submitReviewVerdict: (prId, verdict) =>
-    ipcRenderer.invoke(IPC.submitReviewVerdict, prId, verdict),
   getReviewViewer: () => ipcRenderer.invoke(IPC.getReviewViewer),
 
   onSessionData: (cb) => {
@@ -129,10 +131,13 @@ const api: N10HostApi = {
     return () => ipcRenderer.removeListener(LAUNCH_EVENTS.step, listener);
   },
 
-  fetchDiffText: (sourceBranch, targetBranch) =>
-    ipcRenderer.invoke(IPC.fetchDiffText, sourceBranch, targetBranch),
   fetchWorktreeDiffText: (branch, targetBranch) =>
     ipcRenderer.invoke(IPC.fetchWorktreeDiffText, branch, targetBranch),
+  fetchPrDiffManifest: (req) =>
+    ipcRenderer.invoke(IPC.fetchPrDiffManifest, req),
+  fetchPrDiffPatch: (req) => ipcRenderer.invoke(IPC.fetchPrDiffPatch, req),
+  fetchPrRangeManifest: (req) =>
+    ipcRenderer.invoke(IPC.fetchPrRangeManifest, req),
 
   openExternal: (url) => ipcRenderer.invoke(IPC.openExternal, url),
   showContextMenu: (items) => ipcRenderer.invoke(IPC.showContextMenu, items),

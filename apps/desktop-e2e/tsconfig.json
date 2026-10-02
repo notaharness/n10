@@ -4,6 +4,9 @@
   "include": [],
   "references": [
     {
+      "path": "../../libs/vcs/core"
+    },
+    {
       "path": "../../libs/review-comments"
     },
     {

@@ -92,6 +92,26 @@ describe('review drafts service', () => {
     await expect(listDrafts(request)).rejects.toThrow(TypeError);
   });
 
+  it('reads the pull request list again after a submit, without waiting for it', async () => {
+    const read = vi.mocked(fixture.options.pullRequests.read);
+    read.mockClear();
+    // A list read still out: the submit's answer does not wait on it.
+    read.mockImplementationOnce(() => new Promise(() => undefined));
+    await saveDraft({ ref: REF, viewer: 'bea', target: REPLY, body: 'x' });
+    // No provider files reviews here, so the submit fails part-way, as
+    // a publication can after posting some of it.
+    await expect(
+      service.submit({
+        ref: REF,
+        viewer: 'bea',
+        head: 'a'.repeat(40),
+        event: 'COMMENT',
+        draftIds: ['reply:T-1'],
+      })
+    ).rejects.toThrow();
+    expect(read).toHaveBeenCalledExactlyOnceWith('/repo', { force: true });
+  });
+
   it('refuses a save with no target', async () => {
     await expect(
       saveDraft({ ref: REF, viewer: 'bea', body: 'x' })

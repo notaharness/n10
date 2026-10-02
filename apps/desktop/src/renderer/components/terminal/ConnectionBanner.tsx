@@ -1,4 +1,4 @@
-import { AlertTriangleIcon } from 'lucide-react';
+import { Banner } from '../ui/banner.js';
 import { Button } from '../ui/button.js';
 
 /**
@@ -29,26 +29,24 @@ export function ConnectionBanner({
   reconnecting?: boolean;
 }) {
   return (
-    <div
-      role="status"
-      className="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-1.5 text-sm text-warning"
+    <Banner
+      actions={
+        state === 'failed' &&
+        onReconnect && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={reconnecting}
+            onClick={onReconnect}
+          >
+            Reconnect
+          </Button>
+        )
+      }
     >
-      <AlertTriangleIcon className="size-4 shrink-0" />
-      <span className="flex-1">
-        {state === 'reconnecting'
-          ? `Reconnecting to ${machineLabel}…`
-          : `Disconnected from ${machineLabel}`}
-      </span>
-      {state === 'failed' && onReconnect && (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={reconnecting}
-          onClick={onReconnect}
-        >
-          Reconnect
-        </Button>
-      )}
-    </div>
+      {state === 'reconnecting'
+        ? `Reconnecting to ${machineLabel}…`
+        : `Disconnected from ${machineLabel}`}
+    </Banner>
   );
 }

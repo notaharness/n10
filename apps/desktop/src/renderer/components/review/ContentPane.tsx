@@ -1,18 +1,20 @@
 import type { DiffLine } from '@n10/diff';
 import type { PullRequestInfo } from '@n10/vcs-core';
-import { useState, type ReactNode, type Ref, type RefObject } from 'react';
+import { useState, type ReactNode, type RefObject } from 'react';
 import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
 import type { PlanItem } from '@n10/core/plan';
 import type { DiffReadState } from '../../lib/data/read-state.js';
+import type { DiffPlaceControls } from '../../lib/diff/use-single-file.js';
 import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { type Mode } from '../../lib/review/review-model.js';
 import { cn } from '../../lib/utils.js';
 import { SessionTerminal } from '../terminal/SessionTerminal.js';
 import { Button } from '../ui/button.js';
 import { ConnectionBanner } from '../terminal/ConnectionBanner.js';
+import type { PrDiffView } from '../../lib/review/use-pr-diff.js';
 import type { PrConnectionBanner } from './PrWorkspace.js';
 import { DiffPane } from './diff/DiffPane.js';
 import { type DiffJumpHandle } from './diff/VirtualDiffList.js';
@@ -151,9 +153,11 @@ export function ContentPane({
   diffRead,
   diffRetrying,
   onRetryDiff,
+  prDiff,
   focusThreadId,
   scrollRef,
   jumpRef,
+  place,
   navCount,
   navIndex,
   onPrev,
@@ -196,9 +200,14 @@ export function ContentPane({
   diffRead: DiffReadState;
   diffRetrying: boolean;
   onRetryDiff: () => void;
+  /** The comparison a pull request's diff was read at; absent on a
+   *  bare worktree tab, whose diff is its working tree. */
+  prDiff?: PrDiffView;
   focusThreadId: string | null;
   scrollRef: RefObject<HTMLDivElement | null>;
-  jumpRef: Ref<DiffJumpHandle>;
+  jumpRef: RefObject<DiffJumpHandle | null>;
+  /** Where the reader is in the diff: the file one-at-a-time shows. */
+  place: DiffPlaceControls;
   navCount: number;
   navIndex: number;
   onPrev: () => void;
@@ -254,6 +263,7 @@ export function ContentPane({
               fileOrder={fileOrder}
               onExit={onExitReview}
               onOpenInDiff={onOpenInDiff}
+              prDiff={prDiff}
             />
           )}
         </StackedPane>
@@ -302,9 +312,11 @@ export function ContentPane({
           read={diffRead}
           retrying={diffRetrying}
           onRetry={onRetryDiff}
+          prDiff={prDiff}
           focusThreadId={focusThreadId}
           scrollRef={scrollRef}
           jumpRef={jumpRef}
+          place={place}
           navCount={navCount}
           navIndex={navIndex}
           onPrev={onPrev}

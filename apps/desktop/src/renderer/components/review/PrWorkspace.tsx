@@ -15,6 +15,7 @@ import { refocusAfter } from '../../lib/focus.js';
 import { useRepo } from '../../lib/repo-context.js';
 import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { useCommentNavigator } from '../../lib/review/use-comment-navigator.js';
+import { useDiffShown } from '../../lib/review/use-diff-shown.js';
 import { useReviewDiff } from '../../lib/review/use-review-diff.js';
 import { useBackToReview } from '../../lib/review/use-review-mode.js';
 import { useReviewRail } from '../../lib/review/use-review-rail.js';
@@ -23,14 +24,13 @@ import { useSessionPane } from '../../lib/review/use-shown-session.js';
 import { usePlanCheckout } from '../../lib/plan/use-plan-checkout.js';
 import { usePostAll } from '../../lib/review/use-post-all.js';
 import {
-  buildFileEntries,
   groupDraftsByFile,
   groupThreadsByFile,
   resolveMode,
   unpostedDrafts,
 } from '../../lib/review/review-model.js';
+import { useFileEntries } from '../../lib/review/use-file-entries.js';
 import { ContentPane } from './ContentPane.js';
-import { type FileEntry } from './diff/FileTree.js';
 import { WorkspaceHeader } from './PrHeader.js';
 import { readNotice } from './ReadNotice.js';
 import { CollapsedRail, ReviewRail } from './ReviewRail.js';
@@ -91,14 +91,16 @@ export function PrWorkspace({
 }) {
   const { repo } = useRepo();
   const prId = pr?.id ?? 0;
+  const diffShown = useDiffShown();
   const diff = useReviewDiff({
     cwd: repo.cwd,
     branch,
     baseBranch,
-    isPr: pr != null,
+    pr,
     running,
+    shown: diffShown.shown,
   });
-  const files = diff.files;
+  const { files, prDiff } = diff;
   const comments = useThreads(repo.cwd, prId);
   const threads = useReadState(comments, keys.threads(repo.cwd, prId));
   const threadsRead = pr ? threads.state : NO_THREADS;
@@ -135,9 +137,11 @@ export function PrWorkspace({
 
   const hasDrafts = drafts.length > 0;
 
-  const entries = useMemo<FileEntry[]>(
-    () => buildFileEntries(files, threadsByFile, draftsByFile),
-    [files, threadsByFile, draftsByFile]
+  const { entries, listing } = useFileEntries(
+    files,
+    prDiff,
+    threadsByFile,
+    draftsByFile
   );
 
   const showDiff = useCallback(() => setMode('diff'), [setMode]);
@@ -199,6 +203,7 @@ export function PrWorkspace({
     changes: scrollRef,
     root: rootRef,
   });
+  diffShown.settle(effMode);
 
   return (
     <div ref={rootRef} className="flex h-full min-h-0 min-w-0 flex-col">
@@ -244,6 +249,7 @@ export function PrWorkspace({
                   planActive={effMode === 'plan'}
                   onPlan={openPlanPane}
                   entries={entries}
+                  listing={listing}
                   diffLoading={diff.pending}
                   selectedFile={effMode === 'diff' ? nav.selectedFile : null}
                   onSelectFile={nav.jumpToFile}
@@ -290,9 +296,11 @@ export function PrWorkspace({
               diffRead={diff.read}
               diffRetrying={diff.retrying}
               onRetryDiff={diff.retry}
+              prDiff={diff.prDiff}
               focusThreadId={nav.focusId}
               scrollRef={nav.scrollRef}
               jumpRef={nav.jumpRef}
+              place={nav.place}
               navCount={nav.items.length}
               navIndex={nav.navIndex}
               onPrev={() => nav.step(-1)}

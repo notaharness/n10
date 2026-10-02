@@ -148,10 +148,10 @@ export function UnifiedRow({
 }) {
   const numbers = (
     <>
-      <span className="w-11 pr-2 text-right tabular-nums">
+      <span className="w-[var(--gutter,2.75rem)] pr-2 text-right tabular-nums">
         {line.oldLine ?? ''}
       </span>
-      <span className="w-11 pr-2 text-right tabular-nums">
+      <span className="w-[var(--gutter,2.75rem)] pr-2 text-right tabular-nums">
         {line.newLine ?? ''}
       </span>
     </>
@@ -211,12 +211,14 @@ export function SplitCell({
       >
         {gutter ? (
           <LineGutter gutter={gutter}>
-            <span className="w-11 pr-2 text-right tabular-nums">
+            <span className="w-[var(--gutter,2.75rem)] pr-2 text-right tabular-nums">
               {num ?? ''}
             </span>
           </LineGutter>
         ) : (
-          <span className="w-11 pr-2 text-right tabular-nums">{num ?? ''}</span>
+          <span className="w-[var(--gutter,2.75rem)] pr-2 text-right tabular-nums">
+            {num ?? ''}
+          </span>
         )}
         <SignCell type={line.type} />
       </span>

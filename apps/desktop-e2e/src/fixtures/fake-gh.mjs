@@ -18,6 +18,7 @@
  * empty result rather than failing, so a test declares only what it
  * cares about.
  */
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { reviewGraphql } from './fake-gh-review.mjs';
 
@@ -118,6 +119,30 @@ function flags(args) {
 
 const page = { hasNextPage: false, endCursor: null };
 
+/**
+ * The head GitHub would report: the branch's real tip in the repository
+ * the app runs `gh` from, unless the scenario names one. The diff is
+ * read at exactly this commit, so a made-up id would be a head the
+ * clone does not have — which is its own test, declared explicitly.
+ */
+function headOid(pr) {
+  if (pr.headRefOid) return pr.headRefOid;
+  try {
+    return execFileSync(
+      'git',
+      [
+        'rev-parse',
+        '--verify',
+        '--quiet',
+        `refs/heads/${pr.headRefName}^{commit}`,
+      ],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    ).trim();
+  } catch {
+    return 'f'.repeat(40);
+  }
+}
+
 /** A review request as the scenario gives it: a login, or a person or
  *  team asked as a code owner. */
 function requestOf(entry) {
@@ -144,7 +169,7 @@ function searchNode(pr) {
     title: pr.title,
     headRefName: pr.headRefName,
     baseRefName: pr.baseRefName ?? 'main',
-    headRefOid: pr.headRefOid ?? 'f'.repeat(40),
+    headRefOid: headOid(pr),
     url: `https://github.com/${scenario.owner ?? 'n10'}/${
       scenario.repo ?? 'fixture'
     }/pull/${pr.number}`,
@@ -346,7 +371,7 @@ function checksNode(pr) {
         nodes: [
           {
             commit: {
-              oid: pr.headRefOid ?? 'f'.repeat(40),
+              oid: headOid(pr),
               statusCheckRollup: {
                 contexts: { totalCount: nodes.length, pageInfo: page, nodes },
               },
@@ -426,6 +451,45 @@ function rulesAnswer() {
     });
   }
   return answer;
+}
+
+const AT = '2026-01-01T00:00:00Z';
+
+/** The timeline and reviews `readGitHubRevisions` asks for. */
+function revisionsOf(pr) {
+  const history = pr.history ?? {};
+  const events = history.events ?? [{ commit: headOid(pr) }];
+  return {
+    timelineItems: {
+      pageInfo: { hasPreviousPage: false },
+      nodes: events.map((e) =>
+        e.forcePush
+          ? {
+              __typename: 'HeadRefForcePushedEvent',
+              createdAt: e.at ?? AT,
+              beforeCommit: e.forcePush.before
+                ? { oid: e.forcePush.before }
+                : null,
+              afterCommit: { oid: e.forcePush.after },
+            }
+          : {
+              __typename: 'PullRequestCommit',
+              commit: { oid: e.commit, committedDate: e.at ?? AT },
+            }
+      ),
+    },
+    reviews: {
+      pageInfo: { hasPreviousPage: false },
+      nodes: (history.reviews ?? []).map((r) => ({
+        state: 'APPROVED',
+        body: '',
+        viewerDidAuthor: r.mine !== false,
+        submittedAt: r.at ?? AT,
+        commit: { oid: r.commit },
+        comments: { totalCount: 0, nodes: [] },
+      })),
+    },
+  };
 }
 
 function threadNode(t, i) {
@@ -650,6 +714,23 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
               })),
             },
           },
+        },
+      },
+    });
+  }
+
+  // A pull request's revision history: its commits and force-pushes,
+  // and the reviews the signed-in user submitted (`history` in the
+  // scenario). Left out, the history is the head alone and no review.
+  if (query.includes('query PullRequestRevisions')) {
+    const pr = prs.find((p) => String(p.number) === String(vars.number));
+    if (failing(pr, 'history')) failLikeGitHub();
+    out({
+      data: {
+        viewer: { login: scenario.username ?? 'n10-tester' },
+        repository: {
+          id: 'R_fixture',
+          pullRequest: pr ? revisionsOf(pr) : null,
         },
       },
     });
