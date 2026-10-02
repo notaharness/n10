@@ -176,6 +176,51 @@ describe('RemoteSessionPoller (D3: one list-sessions call fans out to every back
     poller.dispose();
   });
 
+  // A transport to an offline peer may neither answer nor fail.
+  it('counts a listing that never settles as a failed poll', async () => {
+    run.mockReturnValue(new Promise(() => undefined));
+    const poller = new RemoteSessionPoller(executor, 1000, 3000);
+    const events: string[] = [];
+    poller.subscribe('a', {
+      onState: () => events.push('state'),
+      onUnreachable: () => events.push('unreachable'),
+    });
+    // The first listing fails at its deadline; the next tick starts a
+    // second, which fails at its own.
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(events).toEqual([]);
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(events).toEqual(['unreachable']);
+    poller.dispose();
+  });
+
+  // The fleet knows a peer went before any listing can say so.
+  it('tells every backend at once what the fleet says of the machine', async () => {
+    run.mockResolvedValue({
+      stdout: listSessionsOutput([{ name: 'a' }]),
+      stderr: '',
+      code: 0,
+    });
+    const poller = new RemoteSessionPoller(executor, 1000);
+    const events: string[] = [];
+    poller.subscribe('a', {
+      onState: () => events.push('state'),
+      onUnreachable: () => events.push('unreachable'),
+      onReachability: (reachable) =>
+        events.push(reachable ? 'online' : 'offline'),
+    });
+    await vi.advanceTimersByTimeAsync(10);
+    events.length = 0;
+    poller.setReachable(false);
+    expect(events).toEqual(['offline']);
+    poller.setReachable(true);
+    expect(events).toEqual(['offline', 'online']);
+    // It looks again at once, well before the next tick.
+    await vi.advanceTimersByTimeAsync(10);
+    expect(events).toEqual(['offline', 'online', 'state']);
+    poller.dispose();
+  });
+
   it('marks every subscribed backend unreachable when list-sessions resolves with a non-zero exit, not as an empty listing (finding 3)', async () => {
     run.mockResolvedValue({
       stdout: '',

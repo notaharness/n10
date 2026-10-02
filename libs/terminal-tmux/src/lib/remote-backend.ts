@@ -124,6 +124,10 @@ export class RemoteTmuxBackend implements SessionBackend {
   private finalFrame: string | null = null;
   private readonly draw = new ClientDraw();
   private reconnectAttempts = 0;
+  /** The fleet says the machine is offline: wait for it rather than
+   *  attach, since a transport may hand back a stream to a peer that is
+   *  not there, which would read as reconnected. */
+  private machineOffline = false;
   /** Whether anything has said the *connection* is in doubt, as opposed
    *  to this one stream having ended. Reset only once a re-attach has
    *  held for the stability window, so a link that keeps failing keeps
@@ -152,6 +156,7 @@ export class RemoteTmuxBackend implements SessionBackend {
       // The poller speaks to the machine, not to this stream: it going
       // quiet is evidence about the connection itself.
       onUnreachable: () => this.enterReconnecting('unreachable'),
+      onReachability: (reachable) => this.setMachineOffline(!reachable),
     });
   }
 
@@ -182,8 +187,23 @@ export class RemoteTmuxBackend implements SessionBackend {
     this.scheduleReconnect();
   }
 
+  private setMachineOffline(offline: boolean): void {
+    if (this.disposed || offline === this.machineOffline) return;
+    this.machineOffline = offline;
+    if (offline) {
+      clearTimeout(this.reconnectTimer);
+      this.enterReconnecting('unreachable');
+      return;
+    }
+    // Back: try at once, with a full set of attempts.
+    if (!this.state.running || this.connection === 'connected') return;
+    this.connection = 'reconnecting';
+    this.reconnectAttempts = 0;
+    void this.attemptReconnect();
+  }
+
   private scheduleReconnect(): void {
-    if (this.disposed || !this.state.running) return;
+    if (this.disposed || !this.state.running || this.machineOffline) return;
     if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       this.connection = 'failed';
       return;
@@ -208,7 +228,7 @@ export class RemoteTmuxBackend implements SessionBackend {
   }
 
   private async attemptReconnect(): Promise<void> {
-    if (this.disposed || !this.state.running) return;
+    if (this.disposed || !this.state.running || this.machineOffline) return;
     try {
       const handle = await this.machine.ptyOpener.open({
         argv: ['tmux', ...tmuxAttachArgs(this.name)],
@@ -222,7 +242,7 @@ export class RemoteTmuxBackend implements SessionBackend {
       // already awaiting `open()`. Adopting this handle on a backend
       // that was torn down (or whose process exited) meanwhile leaks
       // the remote pty stream — nothing would ever dispose it.
-      if (this.disposed || !this.state.running) {
+      if (this.disposed || !this.state.running || this.machineOffline) {
         handle.dispose();
         return;
       }

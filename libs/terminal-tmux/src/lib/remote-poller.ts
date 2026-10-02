@@ -25,9 +25,31 @@ export interface PollSubscriber {
   /** The list call itself failed — the machine could not be reached,
    *  not "this session exited". Must never be read as a process exit. */
   onUnreachable(): void;
+  /** What the fleet says of the machine (`setReachable`): whether it is
+   *  there to attach to at all. */
+  onReachability?(reachable: boolean): void;
 }
 
 const DEFAULT_INTERVAL_MS = 1000;
+
+/** How long one listing may take before it counts as a failed poll. A
+ *  transport to a peer that went offline may neither answer nor fail,
+ *  and a listing that never settles would end polling for good. */
+const DEFAULT_DEADLINE_MS = 5000;
+
+/** `promise`, or a rejection once `ms` have passed. The listing left
+ *  behind may still settle; nothing is waiting for it then. */
+function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
+  promise.catch(() => undefined);
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`list-sessions gave no answer in ${ms}ms`)),
+      ms
+    );
+    timer.unref?.();
+    promise.then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
 
 /** Consecutive failed polls required before a control-plane fault is
  *  reported to subscribers (finding 7, second pass): a single failed
@@ -50,8 +72,30 @@ export class RemoteSessionPoller {
 
   constructor(
     private readonly executor: MachineExecutor,
-    private readonly intervalMs: number = DEFAULT_INTERVAL_MS
+    private readonly intervalMs: number = DEFAULT_INTERVAL_MS,
+    private readonly deadlineMs: number = DEFAULT_DEADLINE_MS
   ) {}
+
+  /** What the fleet says of the machine, which knows before any listing
+   *  can, and is passed straight on; back online, it is listed again at
+   *  once. */
+  setReachable(reachable: boolean): void {
+    if (this.disposed) return;
+    if (reachable) this.consecutiveFailures = 0;
+    this.notify((subscriber) => subscriber.onReachability?.(reachable));
+    if (reachable && this.subscribers.size > 0) void this.poll();
+  }
+
+  private notify(call: (subscriber: PollSubscriber) => void): void {
+    for (const entries of [...this.subscribers.values()])
+      for (const subscriber of [...entries.keys()]) {
+        try {
+          call(subscriber);
+        } catch {
+          // One backend's failure must not keep the news from the rest.
+        }
+      }
+  }
 
   /** Subscribe one backend's session name. The timer runs only while
    *  there is something to poll, and the first poll fires immediately
@@ -114,7 +158,10 @@ export class RemoteSessionPoller {
   private async runOnePoll(requestedAt: number): Promise<void> {
     if (this.subscribers.size === 0) return;
     try {
-      const sessions = await tmuxListSessionsDetailedWith(this.executor);
+      const sessions = await withDeadline(
+        tmuxListSessionsDetailedWith(this.executor),
+        this.deadlineMs
+      );
       this.consecutiveFailures = 0;
       const byName = new Map(sessions.map((s) => [s.name, s]));
       for (const name of [...this.subscribers.keys()]) {
@@ -142,8 +189,7 @@ export class RemoteSessionPoller {
       // process having exited.
       this.consecutiveFailures += 1;
       if (this.consecutiveFailures < UNREACHABLE_AFTER_MISSES) return;
-      for (const entries of this.subscribers.values())
-        for (const subscriber of entries.keys()) subscriber.onUnreachable();
+      this.notify((subscriber) => subscriber.onUnreachable());
     }
   }
 

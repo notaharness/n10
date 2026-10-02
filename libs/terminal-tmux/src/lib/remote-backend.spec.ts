@@ -438,6 +438,43 @@ describe('RemoteTmuxBackend (D4)', () => {
     expect(opensAttempted).toBe(5);
   });
 
+  // The fleet knows first: no waiting out the poller's misses, and no
+  // Reconnect press once the machine is back. A transport may hand back
+  // a stream to a peer that is not there, so nothing is attached until
+  // the fleet says it is back.
+  it('waits to reconnect while the fleet says the machine is offline, and attaches as it returns', async () => {
+    run.mockImplementation(async (argv: string[]) => {
+      if (argv.includes('has-session'))
+        return { stdout: '', stderr: '', code: 1 };
+      if (argv.includes('list-sessions')) return aliveListing('wt');
+      return { stdout: '', stderr: '', code: 0 };
+    });
+    const backend = await createRemoteTmuxBackend(
+      spec,
+      { mode: 'create', label: 'wt', tags: {} },
+      machine,
+      poller
+    );
+    const open = vi.fn(async () => {
+      const opened = fakeHandle();
+      opens.push(opened);
+      return opened.handle;
+    });
+    machine.ptyOpener.open = open;
+    poller.setReachable(false);
+    expect(backend.connectionState).toBe('reconnecting');
+    await vi.advanceTimersByTimeAsync(10_000);
+    await flushMicrotasks();
+    expect(backend.connectionState).toBe('reconnecting');
+    expect(open).not.toHaveBeenCalled();
+
+    poller.setReachable(true);
+    await flushMicrotasks();
+    expect(open).toHaveBeenCalledOnce();
+    expect(backend.connectionState).toBe('connected');
+    expect(backend.processState?.running).toBe(true);
+  });
+
   // `dispose()` can only clear a *scheduled* retry. One already
   // awaiting `open()` resolves onto a backend whose handle, callbacks
   // and poll subscription are gone; adopting that handle leaks the
