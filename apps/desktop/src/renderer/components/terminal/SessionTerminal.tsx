@@ -51,6 +51,7 @@ export function SessionTerminal({
   name,
   epoch,
   disabled,
+  ended,
 }: {
   name: string;
   /** When the PTY behind `name` was spawned. Restarting an agent keeps
@@ -62,6 +63,10 @@ export function SessionTerminal({
    *  so they cannot land unseen either — a blocked prompt is better
    *  than one that silently drops what the user typed. */
   disabled?: boolean;
+  /** The process ended and tmux kept its dead pane: a read-only view of
+   *  its final output. Nothing is sent to the host, neither keystrokes
+   *  nor resizes, and the pane refuses focus. */
+  ended?: boolean;
 }) {
   const termRef = useRef<TerminalHandle>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -78,19 +83,22 @@ export function SessionTerminal({
     },
     [name]
   );
+  const blocked = disabled || ended;
   const write = useCallback(
     (data: string) => {
-      // Reconnecting: swallow keystrokes rather than send them nowhere.
-      if (disabled) return;
+      // Reconnecting or ended: swallow keystrokes rather than send them
+      // nowhere.
+      if (blocked) return;
       void window.n10.writeSession(name, data).catch(reportError);
     },
-    [name, reportError, disabled]
+    [name, reportError, blocked]
   );
   const resize = useCallback(
     (cols: number, rows: number) => {
+      if (ended) return;
       void window.n10.resizeSession(name, cols, rows).catch(reportError);
     },
-    [name, reportError]
+    [name, reportError, ended]
   );
 
   // A full repaint the fit effect owes the terminal, and how to ask it
@@ -211,7 +219,7 @@ export function SessionTerminal({
   // focus itself (a tab's lets go of it, a sidebar row's takes it).
   useEffect(() => {
     if (!ready) return undefined;
-    if (!disabled && shown) {
+    if (!blocked && shown) {
       const raf = requestAnimationFrame(() => termRef.current?.focus());
       return () => cancelAnimationFrame(raf);
     }
@@ -219,7 +227,7 @@ export function SessionTerminal({
     if (focused instanceof HTMLElement && wrapRef.current?.contains(focused))
       focused.blur();
     return undefined;
-  }, [ready, disabled, shown]);
+  }, [ready, blocked, shown]);
 
   // Fit the terminal grid to its pane. autoResize stays ON (with it off
   // the react wrapper pins an inline height of rows*17px and keeps

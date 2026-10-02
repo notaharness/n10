@@ -22,7 +22,14 @@ vi.mock('@n10/core', () => ({
 import { resizeSession, writeSession } from './session-io.js';
 
 function entry(exited = false) {
-  const e = { exited, pty: { write: vi.fn(), resize: vi.fn() } };
+  const e = {
+    exited,
+    pty: {
+      connectionState: undefined as string | undefined,
+      write: vi.fn(),
+      resize: vi.fn(),
+    },
+  };
   state.entries.set('agent', e);
   return e;
 }
@@ -62,6 +69,16 @@ describe('an ended session', () => {
   it('drops them for a session that is gone altogether', () => {
     expect(() => writeSession('gone', 'x')).not.toThrow();
     expect(() => resizeSession('gone', 80, 24)).not.toThrow();
+  });
+
+  it('drops input while another machine’s session waits to reconnect', () => {
+    const e = entry();
+    e.pty.connectionState = 'reconnecting';
+    expect(() => writeSession('agent', 'x')).not.toThrow();
+    expect(e.pty.write).not.toHaveBeenCalled();
+    expect(state.logged).toEqual([
+      '[desktop] dropped input for disconnected session agent',
+    ]);
   });
 
   it('logs a resize whose PTY closed before its exit was reported', () => {

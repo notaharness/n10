@@ -3,9 +3,10 @@ import { getSession, noteInput, noteResize } from '@n10/core';
 /**
  * Keystrokes and resizes from a session's terminal. A terminal can send
  * them after its session ended — the agent was stopped, or its tmux
- * session killed from outside — before the pane has heard. There is
- * nothing left to deliver them to and nothing the user can do about
- * it, so they are dropped and logged rather than thrown back over IPC.
+ * session killed from outside — or while another machine's is waiting
+ * to reconnect, before the pane has heard. There is nothing to deliver
+ * them to and nothing the user can do about it, so they are dropped and
+ * logged rather than thrown back over IPC.
  */
 
 export function writeSession(name: string, data: string): void {
@@ -15,9 +16,8 @@ export function writeSession(name: string, data: string): void {
     return;
   }
   if (entry.pty.connectionState && entry.pty.connectionState !== 'connected') {
-    throw new Error(
-      'The terminal is reconnecting. Try again when it reconnects.'
-    );
+    console.log(`[desktop] dropped input for disconnected session ${name}`);
+    return;
   }
   // Same as the TUI's input forwarder: without this, the terminal
   // echoing keystrokes back would count as agent activity.

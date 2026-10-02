@@ -264,6 +264,11 @@ export function PrWorkspace({
               sessionEpoch={pane.epoch}
               connectionBanner={pane.banner.connectionBanner}
               inputDisabled={pane.banner.inputDisabled}
+              exited={
+                pane.banner.ended
+                  ? { onResume: pane.shownIsAgent ? onLaunch : undefined }
+                  : null
+              }
               files={files}
               diffHead={diff.head}
               filesByName={filesByName}

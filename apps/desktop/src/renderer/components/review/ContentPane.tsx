@@ -11,6 +11,7 @@ import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { type Mode } from '../../lib/review/review-model.js';
 import { cn } from '../../lib/utils.js';
 import { SessionTerminal } from '../terminal/SessionTerminal.js';
+import { Button } from '../ui/button.js';
 import { ConnectionBanner } from '../terminal/ConnectionBanner.js';
 import type { PrConnectionBanner } from './PrWorkspace.js';
 import { DiffPane } from './diff/DiffPane.js';
@@ -53,6 +54,31 @@ function useMountedOnce(on: boolean): boolean {
   return seen || on;
 }
 
+/** The shown agent's process ended and tmux kept its dead pane. */
+export interface ExitedAgent {
+  /** Opens the session menu to continue it; absent where the pane has
+   *  no menu for that session. */
+  onResume?: () => void;
+}
+
+/** Above an exited agent's final output: it is not running, and how to
+ *  bring it back. */
+function ExitedAgentBar({ onResume }: ExitedAgent) {
+  return (
+    <div
+      role="status"
+      className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-sm"
+    >
+      <span className="flex-1 text-muted-foreground">Agent exited</span>
+      {onResume && (
+        <Button size="sm" onClick={onResume}>
+          Resume agent
+        </Button>
+      )}
+    </div>
+  );
+}
+
 /** The agent's terminal, plus its connection banner (ux-machines.md
  *  §6) when the session's connection is reconnecting/failed. Split out
  *  of `ContentPane` to keep its own complexity down. */
@@ -61,14 +87,17 @@ function AgentPane({
   sessionEpoch,
   connectionBanner,
   inputDisabled,
+  exited,
 }: {
   sessionName: string;
   sessionEpoch: number;
   connectionBanner?: PrConnectionBanner | null;
   inputDisabled?: boolean;
+  exited?: ExitedAgent | null;
 }) {
   return (
     <div className="relative flex h-full min-h-0 flex-col">
+      {exited && <ExitedAgentBar onResume={exited.onResume} />}
       {connectionBanner && (
         <ConnectionBanner
           state={connectionBanner.state}
@@ -83,6 +112,7 @@ function AgentPane({
           name={sessionName}
           epoch={sessionEpoch}
           disabled={inputDisabled}
+          ended={exited != null}
         />
       </div>
     </div>
@@ -105,6 +135,7 @@ export function ContentPane({
   sessionEpoch,
   connectionBanner,
   inputDisabled,
+  exited,
   files,
   diffHead,
   filesByName,
@@ -146,6 +177,8 @@ export function ContentPane({
    *  (ux-machines.md §6). */
   connectionBanner?: PrConnectionBanner | null;
   inputDisabled?: boolean;
+  /** Set while the shown agent has exited, its final output retained. */
+  exited?: ExitedAgent | null;
   files: [string, DiffLine[]][];
   /** The commit the diff was read at; what new comments anchor to. */
   diffHead: string | null;
@@ -206,6 +239,7 @@ export function ContentPane({
             sessionEpoch={sessionEpoch}
             connectionBanner={connectionBanner}
             inputDisabled={inputDisabled}
+            exited={exited}
           />
         </div>
       )}
