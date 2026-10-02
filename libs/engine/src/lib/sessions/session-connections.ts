@@ -3,15 +3,27 @@ import {
   getSpawnedAt,
   isSessionAlive,
   LOCAL_MACHINE,
+  onSessionExit,
+  releaseExitedSession,
   sessionIdentity,
   sessionNames,
 } from '@n10/core';
 
-/** Process-lifetime history preserves stopped agents as relaunch targets. */
+/**
+ * The worktree agents this process holds, across repository handles: a
+ * running one, and one whose process ended with its tmux session kept
+ * (its dead pane retained), which stays to be read and resumed. An
+ * agent whose session itself is gone — stopped, killed with `tmux
+ * kill-session`, its server ended — has nothing left to show, and is
+ * released as it ends, as the terminal service releases a terminal's.
+ */
 export function createSessionConnections() {
-  const observed = new Set<string>();
+  const offExit = onSessionExit((name) => {
+    if (sessionIdentity(name)?.kind !== 'worktree') return;
+    if (getSession(name)?.pty.processState?.gone) releaseExitedSession(name);
+  });
   function read(repo: string) {
-    return [...observed].flatMap((name) => {
+    return sessionNames().flatMap((name) => {
       const identity = sessionIdentity(name);
       if (identity?.kind !== 'worktree' || identity.repo !== repo) return [];
       const machine = identity.machine;
@@ -29,10 +41,5 @@ export function createSessionConnections() {
       ];
     });
   }
-  return {
-    observe() {
-      for (const name of sessionNames()) observed.add(name);
-    },
-    read,
-  };
+  return { read, dispose: offExit };
 }

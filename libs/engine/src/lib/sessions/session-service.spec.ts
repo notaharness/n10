@@ -16,10 +16,20 @@ const state = vi.hoisted(() => ({
   lastScan: vi.fn((): DiscoveryScan | null => null),
   launch: vi.fn(),
   stop: vi.fn(),
-  exit: (): void => undefined,
+  exits: new Set<(name: string) => void>(),
+  exit(name: string): void {
+    for (const listener of [...this.exits]) listener(name);
+  },
+  released: [] as string[],
   entries: new Map<
     string,
-    { exited: boolean; pty: { connectionState?: string } }
+    {
+      exited: boolean;
+      pty: {
+        connectionState?: string;
+        processState?: { running: boolean; gone?: boolean };
+      };
+    }
   >(),
 }));
 vi.mock('./session-discovery.js', () => ({
@@ -41,11 +51,15 @@ vi.mock('@n10/core', async (original) => ({
   isSessionAlive: (name: string) => state.entries.get(name)?.exited === false,
   hasSessionConnection: (name: string) => state.entries.has(name),
   getSpawnedAt: () => 42,
-  onSessionExit: (listener: () => void) => {
-    state.exit = listener;
+  onSessionExit: (listener: (name: string) => void) => {
+    state.exits.add(listener);
     return () => {
-      state.exit = () => undefined;
+      state.exits.delete(listener);
     };
+  },
+  releaseExitedSession: (name: string) => {
+    state.released.push(name);
+    state.entries.delete(name);
   },
 }));
 const wt = { branch: 'feature', path: '/repo/wt', bare: false };
@@ -107,6 +121,7 @@ beforeEach(() => {
   state.scan = null;
   state.lastScan.mockReset().mockReturnValue(null);
   state.entries.clear();
+  state.released = [];
   state.launch
     .mockReset()
     .mockImplementation(async ({ name }: { name: string }) => {
@@ -225,7 +240,7 @@ it('publishes exit facts without reattaching the agent', async () => {
   const changed = vi.fn();
   f.service.subscribe(changed);
   state.entries.get(key)!.exited = true;
-  state.exit();
+  state.exit(key);
   expect(changed).toHaveBeenCalledOnce();
   expect(f.service.getSnapshot().sessions[0].running).toBe(false);
   expect(state.launch).not.toHaveBeenCalled();
@@ -270,26 +285,36 @@ it('reports only this repository’s connections and hides local reconnect trans
   f.service.dispose();
 });
 
-it('retains a stopped launch across repository handle replacement', async () => {
+// Stopping ends the tmux session: nothing is left to read or resume.
+it('lists no agent once it is stopped', async () => {
+  const f = fixture();
+  await f.service.launch(request);
+  state.stop.mockImplementationOnce((name: string) =>
+    state.entries.delete(name)
+  );
+  f.service.stop(key);
+  expect(f.service.connections()).toEqual([]);
+  f.service.dispose();
+});
+// An agent that exited keeps its dead pane, to be read and resumed,
+// whichever handle the repository has by then.
+it('retains an exited agent across repository handle replacement', async () => {
   const connections = createSessionConnections();
   const f = fixture();
-  const config = {
-    repo: '/repo',
-    getSnapshot: () => ({ config: f.selected.config }),
-    subscribe: () => () => undefined,
-  };
   const options = {
-    config,
+    config: {
+      repo: '/repo',
+      getSnapshot: () => ({ config: f.selected.config }),
+      subscribe: () => () => undefined,
+    },
     worktrees: f.worktrees,
     connections,
     isCurrent: () => true,
   };
   const first = createSessionService(options);
   await first.launch(request);
-  state.stop.mockImplementationOnce((name: string) =>
-    state.entries.delete(name)
-  );
-  first.stop(key);
+  state.entries.get(key)!.exited = true;
+  state.exit(key);
   first.dispose();
   const reopened = createSessionService(options);
   expect(reopened.connections()).toEqual([
@@ -297,6 +322,18 @@ it('retains a stopped launch across repository handle replacement', async () => 
   ]);
   expect(connections.read('/other')).toEqual([]);
   reopened.dispose();
+  f.service.dispose();
+});
+// Killed from outside, or its tmux server gone: no pane is retained.
+it('releases an agent whose tmux session is gone as it ends', async () => {
+  const f = fixture();
+  await f.service.launch(request);
+  const entry = state.entries.get(key)!;
+  entry.exited = true;
+  entry.pty.processState = { running: false, gone: true };
+  state.exit(key);
+  expect(state.released).toEqual([key]);
+  expect(f.service.connections()).toEqual([]);
   f.service.dispose();
 });
 it('names the branch of a terminal in a linked checkout, never the main checkout’s', () => {

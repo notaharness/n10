@@ -62,6 +62,7 @@ export function createSessionService(options: {
   const { config, worktrees, isCurrent } = options;
   const lastScans = options.lastScans ?? new Map<string, DiscoveryScan>();
   const connections = options.connections ?? createSessionConnections();
+  const ownsConnections = !options.connections;
   let disposed = false;
   let discovery: SessionDiscovery | undefined;
   let stopWatch: (() => void) | undefined;
@@ -69,7 +70,6 @@ export function createSessionService(options: {
   const listeners = new Set<() => void>();
   function publish(): void {
     if (disposed) return;
-    connections.observe();
     const next = {
       sessions: worktrees
         .getSnapshot()
@@ -162,7 +162,6 @@ export function createSessionService(options: {
       branch: string,
       terminals: readonly BranchTerminal[]
     ): BranchSessions {
-      connections.observe();
       const agents = connections.read(config.repo);
       return branchSessions({
         branch,
@@ -174,7 +173,6 @@ export function createSessionService(options: {
     /** The branch whose checkout `terminal` is in: its review tab lists
      *  it. Undefined for any other directory, the main checkout's too. */
     terminalBranch(terminal: Pick<BranchTerminal, 'machine' | 'cwd'>) {
-      connections.observe();
       return terminalBranch(
         terminal,
         knownCheckouts(connections.read(config.repo))
@@ -194,7 +192,6 @@ export function createSessionService(options: {
       return snapshot.sessions;
     },
     connections() {
-      connections.observe();
       return connections.read(config.repo);
     },
     scanNow: async () => {
@@ -235,6 +232,7 @@ export function createSessionService(options: {
       disposed = true;
       stopWatch?.();
       unsubscribeWorktrees();
+      if (ownsConnections) connections.dispose();
       listeners.clear();
     },
   };

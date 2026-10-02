@@ -37,6 +37,9 @@ export interface SessionBackend {
     running: boolean;
     exitCode?: number;
     signal?: number;
+    /** Ended with the persistent session itself (killed, or its server
+     *  gone), so no retained pane is left to show or restart in. */
+    gone?: boolean;
   };
   /** The local connection ended while the hosted process remained alive. */
   onDisconnect?(cb: () => void): void;

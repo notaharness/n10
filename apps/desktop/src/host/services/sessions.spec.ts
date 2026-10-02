@@ -251,6 +251,8 @@ vi.mock('@n10/core', async (importOriginal) => {
         agent: spec.agent,
       });
     },
+    onSessionExit: () => () => undefined,
+    releaseExitedSession: () => undefined,
     getSession: (name: string) => {
       if (!state.alive.has(name)) return undefined;
       if (!state.entries.has(name))
