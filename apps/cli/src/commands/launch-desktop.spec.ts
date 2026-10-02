@@ -1,6 +1,8 @@
+import { execFileSync, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import {
   electronFailure,
+  electronSpawnOptions,
   exitStatus,
   sandboxArgs,
   superviseChild,
@@ -39,15 +41,30 @@ describe('sandboxArgs', () => {
     expect(sandboxArgs(ELECTRON, 'linux', missing)).toEqual(['--no-sandbox']);
   });
 
-  it('keeps the sandbox on an Electron the user supplies, whatever its helper', () => {
-    const env = { ELECTRON_OVERRIDE_DIST_PATH: '/nix/store/electron/bin' };
-    expect(sandboxArgs(ELECTRON, 'linux', helper(1000, 0o100755), env)).toEqual(
-      []
-    );
-    const missing = () => {
-      throw new Error('ENOENT');
-    };
-    expect(sandboxArgs(ELECTRON, 'linux', missing, env)).toEqual([]);
+  describe('with ELECTRON_OVERRIDE_DIST_PATH', () => {
+    const env = { ELECTRON_OVERRIDE_DIST_PATH: '/opt/electron' };
+
+    it('keeps the sandbox on a build with no helper, as a distribution ships', () => {
+      const missing = () => {
+        throw new Error('ENOENT');
+      };
+      expect(sandboxArgs(ELECTRON, 'linux', missing, env)).toEqual([]);
+    });
+
+    it('disables it for a stock dist whose helper is not set up', () => {
+      expect(
+        sandboxArgs(ELECTRON, 'linux', helper(1000, 0o100755), env)
+      ).toEqual(['--no-sandbox']);
+      expect(sandboxArgs(ELECTRON, 'linux', helper(0, 0o100755), env)).toEqual([
+        '--no-sandbox',
+      ]);
+    });
+
+    it('keeps it when the helper is setuid root', () => {
+      expect(sandboxArgs(ELECTRON, 'linux', helper(0, 0o104755), env)).toEqual(
+        []
+      );
+    });
   });
 
   it('leaves other platforms alone', () => {
@@ -56,6 +73,36 @@ describe('sandboxArgs', () => {
     };
     expect(sandboxArgs(ELECTRON, 'darwin', unused)).toEqual([]);
     expect(sandboxArgs(ELECTRON, 'win32', unused)).toEqual([]);
+  });
+});
+
+describe('electronSpawnOptions', () => {
+  it('keeps the terminal attached and passes the start directory', () => {
+    const options = electronSpawnOptions('1.2.3', { HOME: '/h' }, '/repo');
+    expect(options.stdio).toBe('inherit');
+    expect(options.env).toEqual({
+      HOME: '/h',
+      N10_START_DIR: '/repo',
+      N10_DESKTOP_VERSION: '1.2.3',
+    });
+  });
+
+  it('puts the child in its own process group, apart from the terminal signals', async () => {
+    const child = spawn(
+      process.execPath,
+      ['-e', 'setTimeout(() => {}, 30000)'],
+      { ...electronSpawnOptions('1'), stdio: 'ignore' }
+    );
+    try {
+      const group = (pid: number) =>
+        execFileSync('ps', ['-o', 'pgid=', '-p', String(pid)])
+          .toString()
+          .trim();
+      expect(group(child.pid as number)).toBe(String(child.pid));
+      expect(group(child.pid as number)).not.toBe(group(process.pid));
+    } finally {
+      child.kill();
+    }
   });
 });
 
@@ -100,11 +147,23 @@ describe('superviseChild', () => {
     expect(child.kill).not.toHaveBeenCalled();
   });
 
+  it('stops Electron when the launcher exits first, and not after it closed', async () => {
+    const first = setup();
+    first.host.emit('exit');
+    expect(first.child.kill).toHaveBeenCalledWith('SIGTERM');
+
+    const second = setup();
+    second.child.emit('close', 0, null);
+    await second.status;
+    second.host.emit('exit');
+    expect(second.child.kill).not.toHaveBeenCalled();
+  });
+
   it('removes its handlers once Electron has exited', async () => {
     const { child, host, status } = setup();
     child.emit('close', 0, null);
     await status;
-    for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
+    for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP', 'exit']) {
       expect(host.listenerCount(signal)).toBe(0);
     }
   });
