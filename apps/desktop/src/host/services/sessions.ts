@@ -1,8 +1,6 @@
 import {
   buildReviewLaunchRequest,
   getSession,
-  noteInput,
-  noteResize,
   snapshot as activitySnapshot,
 } from '@n10/core';
 import { activeRepository, requireRepo } from './repo.js';
@@ -30,6 +28,7 @@ import type {
 
 export type { SessionLaunchRequest, SessionSummary };
 export { isForeignSession, isOwnSessionAlive } from './session-registry.js';
+export { resizeSession, writeSession } from './session-io.js';
 
 /** What launching or reattaching an agent hands back to the caller. */
 interface LaunchResult {
@@ -135,28 +134,6 @@ export async function checkoutPlan(
 
 export function listSessions(): SessionSummary[] {
   return activeRepository().sessions.connections();
-}
-
-export function writeSession(name: string, data: string): void {
-  const entry = getSession(name);
-  if (!entry || entry.exited) throw new Error(`Session ${name} is not running`);
-  if (entry.pty.connectionState && entry.pty.connectionState !== 'connected') {
-    throw new Error(
-      'The terminal is reconnecting. Try again when it reconnects.'
-    );
-  }
-  // Same as the TUI's input forwarder: without this, the terminal
-  // echoing keystrokes back would count as agent activity.
-  noteInput(name);
-  entry.pty.write(data);
-}
-
-export function resizeSession(name: string, cols: number, rows: number): void {
-  const entry = getSession(name);
-  if (!entry) return;
-  // SIGWINCH redraws aren't agent activity either.
-  noteResize(name);
-  entry.pty.resize(cols, rows);
 }
 
 /** Debounced agent-activity snapshots for every session this host has
