@@ -576,13 +576,17 @@ if (argv[0] === 'api' && argv[1] === 'graphql') {
   }
 
   // The open-PR search is the other query asking for a check rollup; the
-  // merged-branch sweep asks for headRefName alone and gets nothing,
-  // which keeps the sync loop from deleting a test's branches.
+  // merged-branch sweep asks for headRefName alone and gets the
+  // scenario's `merged` heads, none unless a test names them, which
+  // keeps the sync loop from deleting other tests' branches.
   if (query.includes('statusCheckRollup')) {
     out({ data: { search: { pageInfo: page, nodes: prs.map(searchNode) } } });
   }
   if (query.includes('search(')) {
-    out({ data: { search: { pageInfo: page, nodes: [] } } });
+    const nodes = (scenario.merged ?? []).map((headRefName) => ({
+      headRefName,
+    }));
+    out({ data: { search: { pageInfo: page, nodes } } });
   }
 
   if (query.includes('query PullRequestDetail(')) {

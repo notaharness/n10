@@ -1,7 +1,8 @@
 import { sessionBranch } from './setup/session-keys.js';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import {
@@ -190,6 +191,52 @@ test.describe('Worktree removed outside n10', () => {
       expect(await sawPreparing()).toBe(false);
     });
   }
+});
+
+/**
+ * The merged-branch sweep removes a worktree through the same guarded
+ * command as the remove dialog, and its tab closes the same way.
+ */
+test.describe('Worktree removed by the merged-branch sweep', () => {
+  const branch = 'shipped';
+  test.use({
+    fakeGitHub: { prs: [], merged: [branch] },
+    n10Config: { autoDeleteOnMerge: true },
+  });
+
+  let remote: string;
+  test.beforeEach(() => {
+    remote = mkdtempSync(join(tmpdir(), 'n10-e2e-origin-'));
+    execFileSync('git', ['init', '-q', '--bare', remote]);
+  });
+  test.afterEach(() => {
+    rmSync(remote, { recursive: true, force: true });
+  });
+
+  test('closes its open tab and drops its row', async ({ desktop }) => {
+    const { page, repoPath } = desktop;
+    const git = (...args: string[]) =>
+      execFileSync('git', args, { cwd: repoPath, stdio: 'ignore' });
+    git('remote', 'add', 'origin', remote);
+    git('push', '-q', 'origin', 'main');
+    await createWorktree(page, branch);
+    // Pushed, so nothing would be lost: the sweep's guard lets it go.
+    git('push', '-q', '-u', 'origin', branch);
+    await expect(tab(page, branch)).toHaveAttribute('aria-selected', 'true');
+    const sawPreparing = await watchForPreparing(page, branch);
+
+    await page
+      .getByRole('button', { name: 'Refresh', exact: true })
+      .first()
+      .click();
+
+    await expect(
+      page.getByText(`Auto-deleted merged branch: ${branch}`)
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(tab(page, branch)).toHaveCount(0);
+    await expect(sidebarRow(page, branch)).toHaveCount(0);
+    expect(await sawPreparing()).toBe(false);
+  });
 });
 
 test.describe('Worktree removal (running agent)', () => {
