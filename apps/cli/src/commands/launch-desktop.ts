@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import {
   accessSync,
   constants as fsConstants,
@@ -14,13 +14,19 @@ import { dirname, join } from 'node:path';
  * Electron's setuid sandbox helper works only when root owns it with the
  * setuid bit. An npm install leaves it owned by the user, and Electron then
  * aborts with SIGTRAP, so the app runs unsandboxed instead.
+ *
+ * An Electron the user points at with ELECTRON_OVERRIDE_DIST_PATH (a
+ * distribution's own build, say) is not an npm install: its sandbox setup is
+ * its own, so Chromium's sandbox stays on.
  */
 export function sandboxArgs(
   electron: string,
   platform: NodeJS.Platform = process.platform,
-  stat: (path: string) => Pick<Stats, 'uid' | 'mode'> = statSync
+  stat: (path: string) => Pick<Stats, 'uid' | 'mode'> = statSync,
+  env: NodeJS.ProcessEnv = process.env
 ): string[] {
   if (platform !== 'linux') return [];
+  if (env.ELECTRON_OVERRIDE_DIST_PATH) return [];
   try {
     const helper = stat(join(dirname(electron), 'chrome-sandbox'));
     if (helper.uid === 0 && (helper.mode & 0o4755) === 0o4755) return [];
@@ -73,6 +79,37 @@ function isWritable(dir: string): boolean {
   }
 }
 
+const STOP_SIGNALS: NodeJS.Signals[] = ['SIGTERM', 'SIGINT', 'SIGHUP'];
+
+/**
+ * Waits for the Electron `child` and resolves with its exit status. Stop
+ * signals sent to the launcher are forwarded to it while it runs, so
+ * stopping n10 closes the window; the launcher then exits with Electron's
+ * status, as it does when Electron ends first.
+ */
+export function superviseChild(
+  child: Pick<ChildProcess, 'on' | 'kill'>,
+  host: Pick<NodeJS.Process, 'on' | 'off'> = process
+): Promise<number> {
+  const forwards = STOP_SIGNALS.map((signal) => {
+    const forward = () => child.kill(signal);
+    host.on(signal, forward);
+    return () => host.off(signal, forward);
+  });
+  const release = () => forwards.forEach((remove) => remove());
+  return new Promise((resolve) => {
+    child.on('error', (error) => {
+      release();
+      console.error(`n10: could not start Electron: ${error.message}`);
+      resolve(1);
+    });
+    child.on('close', (code, signal) => {
+      release();
+      resolve(exitStatus(code, signal));
+    });
+  });
+}
+
 /**
  * Runs Electron on the app in `root`, the package directory, whose manifest
  * names `desktop/main/main.js` as the main script. Resolves with Electron's
@@ -110,11 +147,5 @@ export function launchDesktop(root: string, version: string): Promise<number> {
       N10_DESKTOP_VERSION: version,
     },
   });
-  return new Promise((resolve) => {
-    child.on('error', (error) => {
-      console.error(`n10: could not start Electron: ${error.message}`);
-      resolve(1);
-    });
-    child.on('close', (code, signal) => resolve(exitStatus(code, signal)));
-  });
+  return superviseChild(child);
 }

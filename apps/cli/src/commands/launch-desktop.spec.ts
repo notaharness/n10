@@ -1,4 +1,10 @@
-import { electronFailure, exitStatus, sandboxArgs } from './launch-desktop.js';
+import { EventEmitter } from 'node:events';
+import {
+  electronFailure,
+  exitStatus,
+  sandboxArgs,
+  superviseChild,
+} from './launch-desktop.js';
 
 const ELECTRON = '/pkg/node_modules/electron/dist/electron';
 
@@ -33,6 +39,17 @@ describe('sandboxArgs', () => {
     expect(sandboxArgs(ELECTRON, 'linux', missing)).toEqual(['--no-sandbox']);
   });
 
+  it('keeps the sandbox on an Electron the user supplies, whatever its helper', () => {
+    const env = { ELECTRON_OVERRIDE_DIST_PATH: '/nix/store/electron/bin' };
+    expect(sandboxArgs(ELECTRON, 'linux', helper(1000, 0o100755), env)).toEqual(
+      []
+    );
+    const missing = () => {
+      throw new Error('ENOENT');
+    };
+    expect(sandboxArgs(ELECTRON, 'linux', missing, env)).toEqual([]);
+  });
+
   it('leaves other platforms alone', () => {
     const unused = () => {
       throw new Error('not consulted');
@@ -51,6 +68,56 @@ describe('exitStatus', () => {
   it('reports a signal death as 128 plus the signal, never success', () => {
     expect(exitStatus(null, 'SIGTRAP')).toBe(133);
     expect(exitStatus(null, 'SIGSEGV')).toBe(139);
+  });
+});
+
+describe('superviseChild', () => {
+  function setup() {
+    const child = Object.assign(new EventEmitter(), { kill: vi.fn() });
+    const host = new EventEmitter();
+    const [childArg, hostArg] = [child, host] as unknown as Parameters<
+      typeof superviseChild
+    >;
+    const status = superviseChild(childArg, hostArg);
+    return { child, host, status };
+  }
+
+  it.each(['SIGTERM', 'SIGINT', 'SIGHUP'] as const)(
+    'forwards %s to Electron and exits with its status',
+    async (signal) => {
+      const { child, host, status } = setup();
+      host.emit(signal);
+      expect(child.kill).toHaveBeenCalledWith(signal);
+      child.emit('close', null, signal);
+      await expect(status).resolves.toBe(exitStatus(null, signal));
+    }
+  );
+
+  it("ends with Electron's own exit code when Electron quits first", async () => {
+    const { child, status } = setup();
+    child.emit('close', 3, null);
+    await expect(status).resolves.toBe(3);
+    expect(child.kill).not.toHaveBeenCalled();
+  });
+
+  it('removes its handlers once Electron has exited', async () => {
+    const { child, host, status } = setup();
+    child.emit('close', 0, null);
+    await status;
+    for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
+      expect(host.listenerCount(signal)).toBe(0);
+    }
+  });
+
+  it('reports a failed start and removes its handlers', async () => {
+    const error = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    const { child, host, status } = setup();
+    child.emit('error', new Error('ENOENT'));
+    await expect(status).resolves.toBe(1);
+    expect(host.listenerCount('SIGTERM')).toBe(0);
+    error.mockRestore();
   });
 });
 
