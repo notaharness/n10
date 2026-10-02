@@ -8,6 +8,7 @@ const {
   listWorktreesMock,
   listPersistedMock,
   listTerminalsMock,
+  listHeldMock,
   isSessionAliveMock,
   sessionNamesMock,
   watchMock,
@@ -17,6 +18,7 @@ const {
   listWorktreesMock: vi.fn<(scope: WorktreeScope) => Promise<WorktreeInfo[]>>(),
   listPersistedMock: vi.fn<() => Set<string>>(),
   listTerminalsMock: vi.fn<() => DiscoveredTerminal[]>(),
+  listHeldMock: vi.fn<() => Set<string>>(),
   isSessionAliveMock: vi.fn<(name: string) => boolean>(),
   sessionNamesMock: vi.fn<() => string[]>(),
   watchMock: vi.fn(),
@@ -42,6 +44,7 @@ vi.mock('@n10/core', async (original) => ({
   observeTmuxSessions: () => ({
     persisted: listPersistedMock(),
     terminals: listTerminalsMock(),
+    held: listHeldMock(),
   }),
   releaseExitedSession: (name: string) => released.push(name),
 }));
@@ -89,6 +92,7 @@ beforeEach(() => {
   listWorktreesMock.mockReset().mockResolvedValue([]);
   listPersistedMock.mockReset().mockReturnValue(new Set());
   listTerminalsMock.mockReset().mockReturnValue([]);
+  listHeldMock.mockReset().mockReturnValue(new Set());
   isSessionAliveMock.mockReset().mockImplementation((name) => alive.has(name));
   basePathMock.mockReset().mockReturnValue('/repo/.claude/worktrees');
   watchMock.mockReset().mockReturnValue({ close: vi.fn(), on: vi.fn() });
@@ -244,17 +248,24 @@ describe('startSessionDiscovery', () => {
 
   // An exited agent's dead pane is not polled: the scan is what sees
   // its session go, and nothing is left to read or resume.
-  it('releases an exited agent once its tmux session is gone', async () => {
-    const terminal = terminalSessionKey('repo-shell');
-    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
-    listPersistedMock.mockReturnValue(new Set([wtKey('feature-a'), terminal]));
-    const { discovery } = start();
+  // Its dead pane is no longer `persisted`, but tmux still holds it.
+  it('releases an exited agent once tmux no longer holds its session', async () => {
+    const exited = wtKey('feature-a');
+    const running = wtKey('feature-b');
+    alive.add(running);
+    sessionNamesMock.mockReturnValue([exited, running]);
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a', 'feature-b'));
+    listPersistedMock.mockReturnValue(new Set([running]));
+    listHeldMock.mockReturnValue(new Set([exited, running]));
+    const { discovery, onChanged } = start();
     await discovery.scanNow();
     expect(released).toEqual([]);
+    onChanged.mockClear();
 
-    listPersistedMock.mockReturnValue(new Set());
+    listHeldMock.mockReturnValue(new Set([running]));
     await discovery.scanNow();
-    expect(released).toEqual([wtKey('feature-a')]);
+    expect(released).toEqual([exited]);
+    expect(onChanged).toHaveBeenCalledOnce();
   });
 
   // The path is what a shell closes a tab by; the name alone would not

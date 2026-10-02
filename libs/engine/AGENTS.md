@@ -67,7 +67,8 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   next handle's discovery starts from its last scan, so removals in between
   are reported. Connections list the agents the registry holds; one whose
   tmux session is gone (`processState.gone`) is released as it ends, while an
-  exited one with its dead pane kept stays until discovery's `ended` names it. Shells supply
+  exited one with its dead pane kept stays while tmux holds its session
+  (`observeTmuxSessions().held`); a dead pane is not `persisted`. Shells supply
   dimensions, relays and terminal-tab presentation. Core keeps pure observations,
   tags, PTY activity classification and native guarded launch/removal operations.
   `branchSessions` (`branch-sessions.ts`) decides which agents and terminals

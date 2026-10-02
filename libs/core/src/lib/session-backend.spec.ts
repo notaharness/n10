@@ -386,6 +386,7 @@ describe('observeTmuxSessions', () => {
     expect(observeTmuxSessions('/repo', [wt('feat-a', 'feat-a')])).toEqual({
       persisted: new Set(),
       terminals: [],
+      held: expect.any(Set),
     });
   });
 
@@ -396,6 +397,7 @@ describe('observeTmuxSessions', () => {
     expect(observeTmuxSessions('/repo', [wt('feat-a', 'feat-a')])).toEqual({
       persisted: new Set(),
       terminals: [],
+      held: expect.any(Set),
     });
   });
 
@@ -495,7 +497,33 @@ describe('observeTmuxSessions', () => {
     expect(observeTmuxSessions('/repo', [wt('done', 'done')])).toEqual({
       persisted: new Set(),
       terminals: [],
+      held: expect.any(Set),
     });
+  });
+
+  // An exited agent's dead pane is still its session; only this repo's
+  // worktree sessions count, whatever git lists.
+  it('names the worktree sessions the server holds, live or dead', () => {
+    tmuxListSessionsMock.mockReturnValue([
+      ours('repo-live', 'worktree', '/repo', 'live', dirOf('live')),
+      {
+        ...ours('repo-done', 'worktree', '/repo', 'done', dirOf('done')),
+        paneDead: true,
+      },
+      ours('repo-gone', 'worktree', '/repo', 'gone', dirOf('gone')),
+      ours('other', 'worktree', '/other', 'x', '/other/wt/x'),
+      ours('repo-shell', 'shell', '/repo', null, '/repo'),
+    ]);
+    expect(
+      observeTmuxSessions('/repo', [wt('live', 'live'), wt('done', 'done')])
+        .held
+    ).toEqual(
+      new Set([
+        worktreeSessionKey(dirOf('live')),
+        worktreeSessionKey(dirOf('done')),
+        worktreeSessionKey(dirOf('gone')),
+      ])
+    );
   });
 
   it('retains exited terminal metadata for restoration', () => {
@@ -543,6 +571,7 @@ describe('observeTmuxSessions', () => {
     expect(observeTmuxSessions('/repo', [wt('feat-a', 'feat-a')])).toEqual({
       persisted: new Set([worktreeSessionKey(dirOf('feat-a'), '/repo')]),
       terminals: [],
+      held: new Set([worktreeSessionKey(dirOf('feat-a'), '/repo')]),
     });
   });
 });
