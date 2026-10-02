@@ -105,18 +105,19 @@ describe('branchSessions', () => {
     expect(result.terminalMachine).toBe('local');
   });
 
-  it('keeps a stopped agent the registry no longer holds, as a relaunch target', () => {
+  // Which agents exist is the connections' answer; this only files
+  // the ones it is given under their checkouts.
+  it('lists an exited agent it is given without consulting the registry', () => {
     registry.clear();
-    const stopped = agent(localCheckout, 'local', { running: false });
-    registry.delete(stopped.name);
+    const exited = agent(localCheckout, 'local', { running: false });
     expect(
       branchSessions({
         branch: 'topic',
         checkouts,
-        agents: [stopped],
+        agents: [exited],
         terminals: [],
       }).sessions.map((s) => [s.name, s.running])
-    ).toEqual([[stopped.name, false]]);
+    ).toEqual([[exited.name, false]]);
   });
 });
 
