@@ -10,7 +10,7 @@ import {
   type WorktreeService,
   type WorktreeWatchers,
 } from '../worktrees/api.js';
-import { resolveRepositoryRoot } from '@n10/core';
+import { resolveRepositoryRoot, type DiscoveryScan } from '@n10/core';
 import { autoDetectProjectConfig } from '@n10/vcs-core';
 import {
   createConfigService,
@@ -42,6 +42,7 @@ export function createRepositoryService(
 ) {
   let current: RepositoryHandle | null = null;
   const connections = createSessionConnections();
+  const lastScans = new Map<string, DiscoveryScan>();
   return {
     getSnapshot: () => current,
     open(
@@ -77,6 +78,7 @@ export function createRepositoryService(
         });
         const sessions = createSessionService({
           connections,
+          lastScans,
           config,
           worktrees,
           isCurrent: () => current?.sessions === sessions,

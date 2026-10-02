@@ -17,6 +17,7 @@ import type {
   DiscoveredTerminal,
   DiscoveredWorktree,
   DiscoveryDelta,
+  DiscoveryScan,
 } from '@n10/core';
 import { logError } from '@n10/logger';
 import type { WorktreeConfig } from '../worktrees/api.js';
@@ -53,8 +54,13 @@ export function createSessionService(options: {
   worktrees: WorktreeService;
   isCurrent(): boolean;
   connections?: ReturnType<typeof createSessionConnections>;
+  /** Each repository's last discovery scan, kept across handles: a
+   *  reopened repository's scanner starts from it, so worktrees removed
+   *  while another repository was open are reported removed. */
+  lastScans?: Map<string, DiscoveryScan>;
 }) {
   const { config, worktrees, isCurrent } = options;
+  const lastScans = options.lastScans ?? new Map<string, DiscoveryScan>();
   const connections = options.connections ?? createSessionConnections();
   let disposed = false;
   let discovery: SessionDiscovery | undefined;
@@ -72,6 +78,7 @@ export function createSessionService(options: {
         ),
       error: worktrees.getSnapshot().error,
     };
+    scanUnseen();
     if (isDeepStrictEqual(next, snapshot)) return;
     snapshot = next;
     for (const listener of listeners) {
@@ -81,6 +88,18 @@ export function createSessionService(options: {
         logError('session observer', error);
       }
     }
+  }
+  /** Discovery reports only the removal of a worktree it has seen, and a
+   *  shell can show any worktree this resource lists. One discovery has
+   *  not seen yet is scanned for now rather than at the next tick, or a
+   *  removal before that tick would go unreported. */
+  function scanUnseen(): void {
+    const seen = discovery?.lastScan();
+    if (!seen) return;
+    const paths = new Set(seen.worktrees.map((wt) => wt.path));
+    const listed = worktrees.getSnapshot().worktrees;
+    // `scanNow` settles every scan itself and never rejects.
+    if (listed.some((wt) => !paths.has(wt.path))) void discovery?.scanNow();
   }
   const unsubscribeWorktrees = worktrees.subscribe(publish);
   async function refresh(): Promise<AgentSession[]> {
@@ -189,6 +208,7 @@ export function createSessionService(options: {
       const scanner = startSessionDiscovery({
         repo: config.repo,
         scope: worktrees.scope,
+        baseline: lastScans.get(config.repo),
         isCurrent: live,
         adopt: (wt) => adopt(wt, ports, live),
         adoptTerminal: ports.adoptTerminal,
@@ -202,6 +222,8 @@ export function createSessionService(options: {
       void refresh();
       const stop = () => {
         stopped = true;
+        const scan = scanner.lastScan();
+        if (scan) lastScans.set(config.repo, scan);
         scanner.stop();
         offExit();
         if (discovery === scanner) discovery = undefined;

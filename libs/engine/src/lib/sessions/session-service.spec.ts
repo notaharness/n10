@@ -1,6 +1,7 @@
 import type * as Primitive from '@n10/core';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { worktreeSessionKey } from '@n10/core';
+import type { DiscoveryScan } from '@n10/core';
 import type { AppConfig } from '@n10/vcs-core';
 import { worktreeScope } from '@n10/worktree-manager';
 import type { WorktreeService } from '../worktrees/api.js';
@@ -12,6 +13,7 @@ const state = vi.hoisted(() => ({
   scan: null as SessionDiscoveryOptions | null,
   scanNow: vi.fn(async () => undefined),
   stopScan: vi.fn(),
+  lastScan: vi.fn((): DiscoveryScan | null => null),
   launch: vi.fn(),
   stop: vi.fn(),
   exit: (): void => undefined,
@@ -23,7 +25,11 @@ const state = vi.hoisted(() => ({
 vi.mock('./session-discovery.js', () => ({
   startSessionDiscovery: (options: SessionDiscoveryOptions) => {
     state.scan = options;
-    return { scanNow: state.scanNow, stop: state.stopScan };
+    return {
+      scanNow: state.scanNow,
+      stop: state.stopScan,
+      lastScan: state.lastScan,
+    };
   },
 }));
 vi.mock('@n10/core', async (original) => ({
@@ -51,7 +57,7 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
-function fixture() {
+function fixture(lastScans?: Map<string, DiscoveryScan>) {
   const selected = {
     current: true,
     config: {
@@ -92,12 +98,14 @@ function fixture() {
     config,
     worktrees,
     isCurrent: () => selected.current,
+    lastScans,
   });
   return { service, worktrees, selected };
 }
 beforeEach(() => {
   vi.clearAllMocks();
   state.scan = null;
+  state.lastScan.mockReset().mockReturnValue(null);
   state.entries.clear();
   state.launch
     .mockReset()
@@ -333,4 +341,48 @@ it('checks a branch out on another machine and knows its terminals there', async
   expect(
     service.terminalBranch({ machine: 'local', cwd: '/home/them/wt' })
   ).toBe(undefined);
+});
+
+const scanOf = (...listed: (typeof wt)[]): DiscoveryScan => ({
+  worktrees: listed.map((w) => ({
+    name: worktreeSessionKey(w.path, '/repo'),
+    branch: w.branch,
+    path: w.path,
+  })),
+  persisted: new Set(),
+  terminals: [],
+});
+
+// Another repository's handle replaces this one while it is open; the
+// next handle's scanner must still see what went meanwhile.
+it('starts a reopened repository’s discovery from its previous scan', () => {
+  const lastScans = new Map<string, DiscoveryScan>();
+  const before = scanOf(wt);
+  const first = fixture(lastScans);
+  first.service.watch({ size });
+  state.lastScan.mockReturnValue(before);
+  first.service.dispose();
+
+  fixture(lastScans).service.watch({ size });
+  expect(state.scan!.baseline).toBe(before);
+});
+
+// Discovery reports only the removal of a worktree it has seen, and a
+// shell can show (and open a tab for) any worktree the resource lists.
+it('scans at once for a listed worktree discovery has not seen', async () => {
+  const f = fixture();
+  f.service.watch({ size });
+  state.lastScan.mockReturnValue(scanOf());
+  state.scanNow.mockClear();
+  await f.service.refresh();
+  expect(state.scanNow).toHaveBeenCalled();
+});
+
+it('leaves discovery to its schedule when it has seen every listed worktree', async () => {
+  const f = fixture();
+  f.service.watch({ size });
+  state.lastScan.mockReturnValue(scanOf(wt));
+  state.scanNow.mockClear();
+  await f.service.refresh();
+  expect(state.scanNow).not.toHaveBeenCalled();
 });

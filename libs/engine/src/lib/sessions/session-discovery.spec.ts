@@ -488,6 +488,29 @@ describe('startSessionDiscovery', () => {
     });
   });
 
+  // A repository's scanner stops while another repository is open, and
+  // a fresh one starts on the way back.
+  describe('a baseline from an earlier scanner', () => {
+    it('reports on the first scan what went while nothing watched', async () => {
+      listWorktreesMock.mockResolvedValue(worktrees('feature-a', 'feature-b'));
+      const first = start();
+      await first.discovery.scanNow();
+      const baseline = first.discovery.lastScan();
+      first.discovery.stop();
+
+      listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+      const { discovery, onChanged } = start({ baseline });
+      await discovery.scanNow();
+      expect(onChanged).toHaveBeenCalledTimes(1);
+      expect(onChanged.mock.calls[0]![0]).toMatchObject({
+        disappeared: [expect.objectContaining({ name: wtKey('feature-b') })],
+      });
+      expect(discovery.lastScan()?.worktrees).toEqual([
+        expect.objectContaining({ name: wtKey('feature-a') }),
+      ]);
+    });
+  });
+
   it('survives git failing', async () => {
     listWorktreesMock.mockRejectedValue(new Error('git exploded'));
     const { discovery, onChanged } = start();

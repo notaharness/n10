@@ -47,11 +47,17 @@ export interface SessionDiscoveryOptions {
   onChanged: (delta: DiscoveryDelta) => void;
   /** Abandon work between awaits when selection changes, before attaching a stale repo's sessions. */
   isCurrent?: () => boolean;
+  /** What an earlier scanner of this repository last saw (`lastScan()`).
+   *  The first scan diffs against it, so a worktree removed while no
+   *  scanner watched the repository is reported like any other removal. */
+  baseline?: DiscoveryScan | null;
 }
 
 export interface SessionDiscovery {
   scanNow(): Promise<void>;
   stop(): void;
+  /** What the last finished scan saw, or the baseline before one has. */
+  lastScan(): DiscoveryScan | null;
 }
 
 export function startSessionDiscovery(
@@ -66,7 +72,7 @@ export function startSessionDiscovery(
   } = opts;
   const intervalMs = opts.intervalMs ?? DISCOVERY_INTERVAL_MS;
 
-  let previous: DiscoveryScan | null = null;
+  let previous: DiscoveryScan | null = opts.baseline ?? null;
   const failures = new Map<string, number>();
   const retired = new Set<string>();
   let stopped = false;
@@ -238,6 +244,7 @@ export function startSessionDiscovery(
 
   const handle: SessionDiscovery = {
     scanNow,
+    lastScan: () => previous,
     stop() {
       stopped = true;
       clearInterval(timer);
