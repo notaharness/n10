@@ -63,6 +63,8 @@ export interface FakeAzureDevOps {
   pat?: string;
   /** Whose PAT it is — `/connectiondata`'s authenticated user. */
   user: { displayName: string; uniqueName: string };
+  /** The teams that user is in, by name: what `$mine=true` lists. */
+  teams?: string[];
   prs: FakeAdoPr[];
 }
 
@@ -198,6 +200,7 @@ function served(s: FakeAzureDevOps) {
       defaultBranch: 'refs/heads/main',
       project: { id: guid(project) },
     },
+    teams: (s.teams ?? []).map((name) => ({ id: guid(name), name })),
     prs: s.prs.map((pr) => pullRequest(s, pr)),
     evaluations: byId((pr) =>
       (pr.policies ?? []).map((p) => evaluation(s, pr, p))

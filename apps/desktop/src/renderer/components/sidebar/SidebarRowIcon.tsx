@@ -30,7 +30,10 @@ export function ItemIcon({
     <span className="relative flex size-4 shrink-0 items-center justify-center">
       <Icon className={cn('size-4', tone)} />
       {running && (
-        <span className="absolute -right-0.5 -bottom-0.5 flex size-2">
+        <span
+          data-agent-running
+          className="absolute -right-0.5 -bottom-0.5 flex size-2"
+        >
           <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
           <span className="relative inline-flex size-2 rounded-full bg-success ring-2 ring-sidebar" />
         </span>

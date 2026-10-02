@@ -10,6 +10,7 @@ import type {
 } from '@n10/vcs-core';
 import {
   findOrphanPrs,
+  findYourPrIds,
   categorizeReviews,
   buildSessionPrMap,
 } from './pr-utils.js';
@@ -77,6 +78,31 @@ describe('findOrphanPrs', () => {
     };
     const result = findOrphanPrs(prMap, new Set(), mockConfig, mockProvider);
     expect(result).toEqual([]);
+  });
+});
+
+describe('findYourPrIds', () => {
+  it('names the pull requests the provider says the viewer authored', () => {
+    // Reviewing a pull request, or checking out its branch, does not
+    // make it yours: only its author field does.
+    const prMap: BranchPrMap = {
+      'feature/branch-1': makePr({ id: 1 }),
+      'feature/branch-2': makePr({
+        id: 2,
+        createdByIdentifier: 'other@test.com',
+        reviewers: [
+          {
+            displayName: 'Me',
+            identifier: 'me@test.com',
+            decision: 'approved',
+          },
+        ],
+      }),
+      'feature/branch-3': null,
+    };
+    expect(findYourPrIds(prMap, mockConfig, mockProvider)).toEqual(
+      new Set([1])
+    );
   });
 });
 

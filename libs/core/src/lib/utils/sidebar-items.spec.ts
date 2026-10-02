@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { PullRequestInfo, CategorizedReviews } from '@n10/vcs-core';
-import type { AgentSession } from '../types.js';
-import { buildSidebarItems } from './sidebar-items.js';
+import type { AgentSession, SidebarItem } from '../types.js';
+import { buildSidebarItems, sidebarSection } from './sidebar-items.js';
 
 function makePr(
   overrides: Partial<PullRequestInfo> & { id: number }
@@ -16,6 +16,9 @@ function makePr(
     ...overrides,
   };
 }
+
+/** No pull request is the viewer's. */
+const NOT_YOURS: ReadonlySet<number> = new Set();
 
 const emptyReviews: CategorizedReviews = {
   needsReview: [],
@@ -39,6 +42,7 @@ describe('buildSidebarItems', () => {
       [],
       emptyReviews,
       sessionPrMap,
+      new Set([1]),
       mergedBranches,
       conflictCounts
     );
@@ -56,6 +60,7 @@ describe('buildSidebarItems', () => {
       kind: 'session',
       session: sessions[0],
       pr,
+      authored: true,
       branch: 'feature/foo',
       isMerged: false,
       conflictCount: 3,
@@ -80,6 +85,7 @@ describe('buildSidebarItems', () => {
       [],
       emptyReviews,
       sessionPrMap,
+      new Set([40, 41]),
       new Set(),
       new Map()
     );
@@ -98,6 +104,7 @@ describe('buildSidebarItems', () => {
       [activePr, draftPr],
       emptyReviews,
       new Map(),
+      NOT_YOURS,
       new Set(),
       new Map()
     );
@@ -125,6 +132,7 @@ describe('buildSidebarItems', () => {
       [],
       reviews,
       new Map(),
+      NOT_YOURS,
       new Set(),
       new Map()
     );
@@ -160,6 +168,7 @@ describe('buildSidebarItems', () => {
       [],
       { needsReview: [review], waitingForAuthor: [], approvedByYou: [] },
       new Map(),
+      NOT_YOURS,
       new Set(),
       new Map()
     );
@@ -175,6 +184,49 @@ describe('buildSidebarItems', () => {
     ]);
   });
 
+  it('files a checkout of someone else’s pull request by review state, never under your pull requests', () => {
+    // Reviewed or not, someone else's pull request is not yours: a
+    // worktree on it with an agent running stays in its review section,
+    // or files with the worktrees when no review section lists it — your
+    // review request was withdrawn, a teammate answered your team's, or
+    // you were never asked.
+    const sessions: AgentSession[] = [
+      { name: 'wt-review', running: true, branch: 'feature/branch-7' },
+      { name: 'wt-theirs', running: true, branch: 'feature/branch-8' },
+      { name: 'wt-draft', running: false, branch: 'feature/branch-9' },
+    ];
+    const review = makePr({ id: 7, createdByIdentifier: 'alex' });
+    const theirs = makePr({ id: 8, createdByIdentifier: 'alex' });
+    const theirDraft = makePr({
+      id: 9,
+      createdByIdentifier: 'alex',
+      isDraft: true,
+    });
+
+    const items = buildSidebarItems(
+      sessions,
+      [],
+      { needsReview: [review], waitingForAuthor: [], approvedByYou: [] },
+      new Map([
+        ['wt-review', review],
+        ['wt-theirs', theirs],
+        ['wt-draft', theirDraft],
+      ]),
+      NOT_YOURS,
+      new Set(),
+      new Map()
+    );
+
+    expect(items.map((i) => [i.pr?.id, sidebarSection(i)])).toEqual([
+      [8, 'worktrees'],
+      [9, 'worktrees'],
+      [7, 'needs-review'],
+    ]);
+    // The row keeps its pull request and its agent.
+    expect(items[0]).toMatchObject({ kind: 'session', pr: theirs });
+    expect(items[2]).toMatchObject({ running: true, sessionName: 'wt-review' });
+  });
+
   it('combines all sections in the correct order', () => {
     const session: AgentSession = { name: 'my-session', running: true };
     const orphan = makePr({ id: 5 });
@@ -185,6 +237,7 @@ describe('buildSidebarItems', () => {
       [orphan],
       { needsReview: [review], waitingForAuthor: [], approvedByYou: [] },
       new Map(),
+      NOT_YOURS,
       new Set(),
       new Map()
     );
@@ -230,6 +283,7 @@ describe('buildSidebarItems', () => {
       [orphan],
       { needsReview: [review], waitingForAuthor: [], approvedByYou: [] },
       new Map([['feature-branch-1', watched]]),
+      NOT_YOURS,
       new Set(),
       new Map(),
       babysat
@@ -245,9 +299,63 @@ describe('buildSidebarItems', () => {
       [],
       emptyReviews,
       new Map(),
+      NOT_YOURS,
       new Set(),
       new Map()
     );
     expect(items).toEqual([]);
+  });
+});
+
+describe('sidebarSection', () => {
+  const session = (over: Partial<SidebarItem & { kind: 'session' }> = {}) =>
+    ({
+      kind: 'session',
+      session: { name: 'wt', running: false },
+      isMerged: false,
+      ...over,
+    } as SidebarItem);
+
+  it('files a worktree on your pull request by that pull request', () => {
+    expect(sidebarSection(session())).toBe('worktrees');
+    expect(
+      sidebarSection(session({ pr: makePr({ id: 1 }), authored: true }))
+    ).toBe('pull-requests');
+    expect(
+      sidebarSection(
+        session({ pr: makePr({ id: 1, isDraft: true }), authored: true })
+      )
+    ).toBe('draft-pull-requests');
+  });
+
+  it('files a worktree on someone else’s pull request with the worktrees', () => {
+    expect(sidebarSection(session({ pr: makePr({ id: 1 }) }))).toBe(
+      'worktrees'
+    );
+    expect(
+      sidebarSection(session({ pr: makePr({ id: 1, isDraft: true }) }))
+    ).toBe('worktrees');
+  });
+
+  it('files a review PR under the category it was sorted into', () => {
+    const pr = makePr({ id: 1 });
+    expect(
+      sidebarSection({ kind: 'review-pr', pr, category: 'needs-review' })
+    ).toBe('needs-review');
+    expect(
+      sidebarSection({ kind: 'review-pr', pr, category: 'approved' })
+    ).toBe('approved');
+  });
+
+  it('sends a draft orphan PR to the draft section', () => {
+    expect(sidebarSection({ kind: 'orphan-pr', pr: makePr({ id: 1 }) })).toBe(
+      'pull-requests'
+    );
+    expect(
+      sidebarSection({
+        kind: 'orphan-pr',
+        pr: makePr({ id: 1, isDraft: true }),
+      })
+    ).toBe('draft-pull-requests');
   });
 });

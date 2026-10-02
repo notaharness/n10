@@ -85,6 +85,11 @@ The reasoning behind each rule is in `docs/decisions.md`.
 - **Babysit** (`babysit/`): pure baseline/observation model and prompt composition.
   The engine owns watch lifetime, freshness, polling and delivery coordination.
   The baseline records what the agent was told, not merely what was observed.
+- **Sidebar sections** (`utils/sidebar-items.ts` `sidebarSection`): both
+  shells group by it. The provider's author field (`findYourPrIds`) puts a
+  pull request under the viewer's own sections; a local worktree or agent
+  never does. Someone else's checked-out PR outside every review bucket is
+  a worktree row.
 - **Pull request lookup** (`pull-requests/pull-request-lookup.ts`): the
   `found`/`gone`/`unknown` answer a babysitter reads. The list behind it is
   `@n10/engine`'s.

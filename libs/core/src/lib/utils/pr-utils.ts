@@ -10,6 +10,31 @@ import {
   type CategorizedReviews,
 } from '@n10/vcs-core/types';
 
+/** The provider's own author field names the viewer. */
+function viewerAuthored(
+  pr: PullRequestInfo,
+  config: AppConfig,
+  provider: VcsProvider
+): boolean {
+  return provider.matchesUser(pr.createdByIdentifier, config);
+}
+
+/**
+ * The ids of the pull requests the viewer authored, by the provider's
+ * author field — never by whether a worktree has the branch checked out.
+ */
+export function findYourPrIds(
+  prMap: BranchPrMap,
+  config: AppConfig,
+  provider: VcsProvider
+): Set<number> {
+  return new Set(
+    Object.values(prMap).flatMap((pr) =>
+      pr && viewerAuthored(pr, config, provider) ? [pr.id] : []
+    )
+  );
+}
+
 /**
  * Find PRs created by the current user whose branch no worktree has
  * checked out.
@@ -24,7 +49,7 @@ export function findOrphanPrs(
     .filter(
       (pr): pr is PullRequestInfo =>
         pr != null &&
-        provider.matchesUser(pr.createdByIdentifier, config) &&
+        viewerAuthored(pr, config, provider) &&
         !checkedOut.has(pr.sourceBranch)
     )
     .sort((a, b) => b.id - a.id);
@@ -68,7 +93,7 @@ export function categorizeReviews(
   for (const pr of Object.values(prMap)) {
     if (!pr || !pr.reviewers) continue;
     // Skip PRs created by the current user — they belong in sessions, not reviews
-    if (provider.matchesUser(pr.createdByIdentifier, config)) continue;
+    if (viewerAuthored(pr, config, provider)) continue;
     const reviewer = viewerEntry(pr.reviewers, (r) =>
       provider.matchesUser(r.identifier, config)
     );
