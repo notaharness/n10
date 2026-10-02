@@ -38,6 +38,9 @@ export const fleetTest = base.extend<{
   workbox: async ({ workboxHome, kit }, provide, testInfo) => {
     const workbox = await startMachine(workboxHome, kit);
     await provide(workbox);
+    // A test that failed while it was frozen would leave the status
+    // call below waiting for good.
+    workbox.thaw();
     await attachLog(testInfo, 'workbox', workbox, panes(workboxHome));
     await workbox.stop();
     killFixtureSessions(workboxHome);

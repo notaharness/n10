@@ -30,6 +30,35 @@ async function launchOnWorkbox(page: Page) {
   await expect(menu).toBeHidden({ timeout: 60_000 });
 }
 
+/** Records, from now on, every status the Agent card reads, in order. */
+async function recordAgentStatus(page: Page) {
+  await page.evaluate(() => {
+    const w = window as { agentStatus?: string[] };
+    w.agentStatus = [];
+    const read = () => {
+      const card = Array.from(
+        document.querySelectorAll('[data-session-card]')
+      ).find((el) => el.textContent?.includes('Agent'));
+      const text = card?.textContent ?? '';
+      const status = ['Waiting to reconnect', 'Running', 'Exited'].find((s) =>
+        text.includes(s)
+      );
+      if (status && w.agentStatus?.at(-1) !== status)
+        w.agentStatus?.push(status);
+    };
+    read();
+    new MutationObserver(read).observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+  });
+  return () =>
+    page.evaluate(
+      () => (window as { agentStatus?: string[] }).agentStatus ?? []
+    );
+}
+
 /** The worktree sessions on the machine with `home`. */
 function remoteAgents(home: string) {
   return listTaggedSessions(home).filter((s) => s.type === 'worktree');
@@ -94,12 +123,25 @@ test.describe('Launching on another machine @beam', () => {
     });
     await focusTerminal(page);
 
-    // Its daemon stops: the fleet sees the peer go offline.
+    // Its daemon stops. A listing that never answers says so first, and
+    // the fleet later marks the peer offline; from the first, the card
+    // never reads Running again, whatever the transport hands back.
+    const statuses = await recordAgentStatus(page);
     await workbox.stop();
     await expect(sessionCard(page, 'Agent')).toContainText(
       'Waiting to reconnect',
       { timeout: 60_000 }
     );
+    await expect
+      .poll(
+        () =>
+          page.evaluate(async () =>
+            (await window.n10.listMachines()).map((m) => [m.label, m.state])
+          ),
+        { timeout: 60_000 }
+      )
+      .toContainEqual(['workbox', 'offline']);
+    expect(await statuses()).toEqual(['Running', 'Waiting to reconnect']);
     await expect(
       page.getByRole('status').filter({ hasText: 'workbox' })
     ).toBeVisible();
@@ -112,5 +154,53 @@ test.describe('Launching on another machine @beam', () => {
     });
     await expect(page.getByText(/Error invoking remote method/)).toHaveCount(0);
     await expect(sessionCard(page, 'Agent')).not.toContainText('Exited');
+  });
+
+  // It neither answers nor says goodbye, so the fleet notices only late:
+  // until then, only the deadline on its session listing does.
+  test('an agent on a machine that freezes waits to reconnect, and comes back when it thaws', async ({
+    desktop,
+    workbox,
+    workboxHome,
+  }) => {
+    const { page } = desktop;
+    execFileSync('git', [
+      'clone',
+      '-q',
+      desktop.repoPath,
+      join(workboxHome, 'app'),
+    ]);
+    await formFleet(page, workbox);
+    await launchOnWorkbox(page);
+    await expect(sessionCard(page, 'Agent')).toContainText('Running', {
+      timeout: 30_000,
+    });
+
+    const statuses = await recordAgentStatus(page);
+    workbox.freeze();
+    await expect(sessionCard(page, 'Agent')).toContainText(
+      'Waiting to reconnect',
+      { timeout: 30_000 }
+    );
+    await expect
+      .poll(
+        () =>
+          page.evaluate(async () =>
+            (await window.n10.listMachines()).map((m) => [m.label, m.state])
+          ),
+        { timeout: 90_000 }
+      )
+      .toContainEqual(['workbox', 'offline']);
+    expect(await statuses()).toEqual(['Running', 'Waiting to reconnect']);
+
+    workbox.thaw();
+    await expect(sessionCard(page, 'Agent')).toContainText('Running', {
+      timeout: 60_000,
+    });
+    expect(await statuses()).toEqual([
+      'Running',
+      'Waiting to reconnect',
+      'Running',
+    ]);
   });
 });
