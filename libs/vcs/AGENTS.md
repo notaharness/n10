@@ -33,6 +33,10 @@ ceiling: it is a REST surface. Reasoning: `docs/decisions.md`.
   `votedFor`, and tallies go through `reviewersToCount` so the pair counts
   once. `includesViewer` marks the caller's groups so `viewerEntry` can
   stand a pending one in for them; never copy a group's vote onto a person.
+- Azure authorship is the signed-in identity: the list sets `viewerIsAuthor`
+  from `createdBy.id` against connectiondata's `authenticatedUser.id`. Git's
+  email (`matchesUser`) answers only where Azure has not said. Identity reads
+  answer a failure with their last answer until credentials change.
 - GitHub's search returns the rollup and counts with the list, so it
   implements neither `forgetPullRequestCache` nor `resetCaches`.
 - Every `gh` read — `ghQuery`, `ghRest`, the provider's GETs, `gh auth

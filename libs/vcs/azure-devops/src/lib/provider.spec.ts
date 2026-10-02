@@ -1017,6 +1017,72 @@ describe('azureDevOpsProvider', () => {
       mockFetch.mockReset();
     });
 
+    it('marks the pull requests the signed-in account wrote, whatever its email', async () => {
+      // The configured email is git's, which need not be Azure's
+      // uniqueName (a personal address, a DOMAIN\\user name): the
+      // account is the authenticated identity, by id.
+      const author = (id: string, uniqueName: string) => ({ id, uniqueName });
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/_apis/connectiondata'))
+          return Promise.resolve(
+            jsonResponse({ authenticatedUser: { id: 'viewer-id' } })
+          );
+        if (url.includes('/pullrequests?'))
+          return Promise.resolve(
+            jsonResponse({
+              value: [
+                {
+                  pullRequestId: 42,
+                  sourceRefName: 'refs/heads/mine',
+                  createdBy: author('viewer-id', 'CORP\\robin'),
+                },
+                {
+                  pullRequestId: 43,
+                  sourceRefName: 'refs/heads/theirs',
+                  createdBy: author('other-id', 'robin@example.com'),
+                },
+              ],
+            })
+          );
+        return Promise.resolve(jsonResponse({ value: [] }));
+      });
+
+      const result = await azureDevOpsProvider.fetchPullRequests(
+        { pat: 'test-pat' },
+        testProject
+      );
+
+      expect(result['mine']?.viewerIsAuthor).toBe(true);
+      expect(result['theirs']?.viewerIsAuthor).toBe(false);
+    });
+
+    it('leaves authorship to the email when Azure has not said who the account is', async () => {
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/_apis/connectiondata'))
+          return Promise.resolve(jsonResponse({}, 500));
+        if (url.includes('/pullrequests?'))
+          return Promise.resolve(
+            jsonResponse({
+              value: [
+                {
+                  pullRequestId: 42,
+                  sourceRefName: 'refs/heads/mine',
+                  createdBy: { id: 'viewer-id' },
+                },
+              ],
+            })
+          );
+        return Promise.resolve(jsonResponse({ value: [] }));
+      });
+
+      const result = await azureDevOpsProvider.fetchPullRequests(
+        { pat: 'test-pat' },
+        testProject
+      );
+
+      expect(result['mine']).not.toHaveProperty('viewerIsAuthor');
+    });
+
     it('returns a map of branch to PR info with comment counts', async () => {
       // Answered by URL, not in call order: the provider dedupes and
       // batches, so which request goes out when is an implementation

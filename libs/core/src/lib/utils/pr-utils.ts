@@ -10,13 +10,16 @@ import {
   type CategorizedReviews,
 } from '@n10/vcs-core/types';
 
-/** The provider's own author field names the viewer. */
+/** The provider says the viewer wrote it: by the signed-in identity
+ *  where its list carries that, else by matching its author field. */
 function viewerAuthored(
   pr: PullRequestInfo,
   config: AppConfig,
   provider: VcsProvider
 ): boolean {
-  return provider.matchesUser(pr.createdByIdentifier, config);
+  return (
+    pr.viewerIsAuthor ?? provider.matchesUser(pr.createdByIdentifier, config)
+  );
 }
 
 /**

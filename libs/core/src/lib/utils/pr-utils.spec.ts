@@ -104,6 +104,25 @@ describe('findYourPrIds', () => {
       new Set([1])
     );
   });
+
+  it('takes the provider’s word on the signed-in account over the configured email', () => {
+    // Azure names the account by its authenticated identity; git's email
+    // need not be its uniqueName.
+    const prMap: BranchPrMap = {
+      'feature/branch-1': makePr({
+        id: 1,
+        createdByIdentifier: 'CORP\\me',
+        viewerIsAuthor: true,
+      }),
+      'feature/branch-2': makePr({ id: 2, viewerIsAuthor: false }),
+    };
+    expect(findYourPrIds(prMap, mockConfig, mockProvider)).toEqual(
+      new Set([1])
+    );
+    expect(
+      findOrphanPrs(prMap, new Set(), mockConfig, mockProvider).map((p) => p.id)
+    ).toEqual([1]);
+  });
 });
 
 describe('categorizeReviews', () => {

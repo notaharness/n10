@@ -108,6 +108,10 @@ export interface PullRequestInfo {
   url: string;
   createdByIdentifier: string;
   createdByDisplayName: string;
+  /** The signed-in account wrote it, as the provider identifies both.
+   *  Absent where the list does not say; `matchesUser` on
+   *  `createdByIdentifier` answers then. */
+  viewerIsAuthor?: boolean;
   isDraft?: boolean;
   reviewers?: PullRequestReviewer[];
   activeCommentCount?: number;

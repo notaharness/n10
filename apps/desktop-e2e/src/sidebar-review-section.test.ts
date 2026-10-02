@@ -1,6 +1,10 @@
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
-import { installFakeAdo, type FakeAzureDevOps } from './setup/fake-ado.js';
+import {
+  fakeAdoProjectConfig,
+  installFakeAdo,
+  type FakeAzureDevOps,
+} from './setup/fake-ado.js';
 import { launchAgentFromRail, sidebar, visibleText } from './setup/app.js';
 
 /**
@@ -132,5 +136,43 @@ test.describe('on Azure DevOps', () => {
       timeout: 15_000,
     });
     await expectRowIn(page, 'Worktrees', /#4211/);
+  });
+});
+
+test.describe('on Azure DevOps, with a git email that is not the account’s', () => {
+  // Git says who commits; Azure says who is signed in. Your pull
+  // request is yours by the account that wrote it, not by the email.
+  const own: FakeAzureDevOps = {
+    project: 'Fabrikam',
+    user: { displayName: 'Robin Tester', uniqueName: 'CORP\\robin.tester' },
+    prs: [{ id: 4212, title: 'Drain the upload queue', sourceBranch: BRANCH }],
+  };
+
+  test.use({
+    fakeAzureDevOps: own,
+    projectConfig: {
+      ...fakeAdoProjectConfig(own),
+      email: 'robin@personal.example',
+    },
+    repo: { branches: [BRANCH] },
+    n10Config: { aiCommand: fakeAgent() },
+  });
+
+  test('your own pull request stays under Pull Requests once an agent works on it', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    const row = section(page, 'Pull Requests').getByRole('button', {
+      name: /#4212/,
+    });
+    await expect(row).toBeVisible({ timeout: 30_000 });
+    await startAgentOn(page, row);
+    const mine = section(page, 'Pull Requests').getByRole('button', {
+      name: /#4212/,
+    });
+    await expect(mine.locator('[data-agent-running]')).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(section(page, 'Worktrees')).toHaveCount(0);
   });
 });
