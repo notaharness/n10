@@ -14,6 +14,9 @@ export type MachineResolver = (machineId: string) => RemoteMachine | undefined;
 
 let resolver: MachineResolver | null = null;
 const pollers = new Map<string, RemoteSessionPoller>();
+/** What the fleet last said of each machine (`setMachineReachable`),
+ *  for a poller made after it said so. */
+const reachability = new Map<string, boolean>();
 
 /** Installed once, or cleared (`null`) on shutdown/test teardown. A
  *  fresh resolver may back different executors than the last one, so
@@ -52,6 +55,7 @@ export function pollerFor(machine: RemoteMachine): RemoteSessionPoller {
   let poller = pollers.get(machine.id);
   if (!poller) {
     poller = new RemoteSessionPoller(machine.executor);
+    if (reachability.get(machine.id) === false) poller.setReachable(false);
     pollers.set(machine.id, poller);
   }
   return poller;
@@ -59,10 +63,11 @@ export function pollerFor(machine: RemoteMachine): RemoteSessionPoller {
 
 /** What the fleet says of a machine, ahead of any listing: the sessions
  *  on it wait to reconnect as it goes offline, and try again as it
- *  returns. Nothing to tell before a session on it has been opened. */
+ *  returns. Remembered for a session opened on it later. */
 export function setMachineReachable(
   machineId: string,
   reachable: boolean
 ): void {
+  reachability.set(machineId, reachable);
   pollers.get(machineId)?.setReachable(reachable);
 }

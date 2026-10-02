@@ -69,6 +69,9 @@ export class RemoteSessionPoller {
   private polling: Promise<void> | null = null;
   private disposed = false;
   private consecutiveFailures = 0;
+  /** What the fleet last said of the machine, for a subscriber that
+   *  joins after it went offline. */
+  private reachable = true;
 
   constructor(
     private readonly executor: MachineExecutor,
@@ -81,6 +84,7 @@ export class RemoteSessionPoller {
    *  once. */
   setReachable(reachable: boolean): void {
     if (this.disposed) return;
+    this.reachable = reachable;
     if (reachable) this.consecutiveFailures = 0;
     this.notify((subscriber) => subscriber.onReachability?.(reachable));
     if (reachable && this.subscribers.size > 0) void this.poll();
@@ -107,6 +111,7 @@ export class RemoteSessionPoller {
       this.subscribers.set(name, entries);
     }
     entries.set(subscriber, ++this.subscriptionSeq);
+    if (!this.reachable) subscriber.onReachability?.(false);
     this.ensureTimer();
     return () => {
       entries!.delete(subscriber);

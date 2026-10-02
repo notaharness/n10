@@ -176,6 +176,20 @@ describe('RemoteSessionPoller (D3: one list-sessions call fans out to every back
     poller.dispose();
   });
 
+  it('tells a backend that subscribes while the fleet has the machine offline', () => {
+    const poller = new RemoteSessionPoller(executor, 1000);
+    run.mockReturnValue(new Promise(() => undefined));
+    poller.setReachable(false);
+    const heard: boolean[] = [];
+    poller.subscribe('a', {
+      onState: () => undefined,
+      onUnreachable: () => undefined,
+      onReachability: (reachable) => heard.push(reachable),
+    });
+    expect(heard).toEqual([false]);
+    poller.dispose();
+  });
+
   // A transport to an offline peer may neither answer nor fail.
   it('counts a listing that never settles as a failed poll', async () => {
     run.mockReturnValue(new Promise(() => undefined));
