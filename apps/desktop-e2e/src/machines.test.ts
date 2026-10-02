@@ -75,8 +75,12 @@ test.describe('Machines over beam', () => {
 
       await row.getByRole('button', { name: 'Machine actions' }).click();
       await page.getByRole('menuitem', { name: 'Rename locally…' }).click();
-      await row.getByLabel('Local name').fill('build');
-      await row.getByLabel('Local name').press('Enter');
+      // The field is ready to type into once the menu has closed, not
+      // left behind the menu's trigger taking focus back.
+      const localName = row.getByLabel('Local name');
+      await expect(localName).toBeFocused();
+      await localName.fill('build');
+      await localName.press('Enter');
       await expect(row.getByText('build')).toBeVisible();
       expect(beam!.ops('peer.alias')[0]).toMatchObject({
         peer: WORKBOX,

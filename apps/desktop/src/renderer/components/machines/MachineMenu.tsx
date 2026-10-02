@@ -1,4 +1,5 @@
 import { MoreHorizontalIcon } from 'lucide-react';
+import { useRef } from 'react';
 import { toast } from 'sonner';
 import type { MachineGrant, MachineView } from '@n10/engine/contract';
 import { copyText } from '../../lib/copy-text.js';
@@ -48,6 +49,11 @@ export function MachineMenu({
 }) {
   const grant = useSetMachineGrant();
   const member = isFleetMember(machine);
+  // The alias field takes focus as it mounts, and a menu closing hands
+  // focus back to its trigger a moment later — which blurs the field,
+  // and a blurred field commits and closes. Rename opens it once the
+  // menu has finished closing, with focus left where the field puts it.
+  const renameChosen = useRef(false);
   const setGrant = (next: MachineGrant) =>
     grant.mutate(
       { peerId: machine.peerId, grant: next },
@@ -61,9 +67,22 @@ export function MachineMenu({
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        align="end"
+        onCloseAutoFocus={(e) => {
+          if (!renameChosen.current) return;
+          renameChosen.current = false;
+          e.preventDefault();
+          onRename();
+        }}
+      >
         {member && (
-          <DropdownMenuItem disabled={disabled} onSelect={onRename}>
+          <DropdownMenuItem
+            disabled={disabled}
+            onSelect={() => {
+              renameChosen.current = true;
+            }}
+          >
             Rename locally…
           </DropdownMenuItem>
         )}
