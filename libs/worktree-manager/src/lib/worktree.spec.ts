@@ -69,17 +69,20 @@ function resolve(stdout = '') {
  * every platform, which is what git's porcelain does.
  */
 function worktreeListPorcelain(
-  entries: { branch: string; dir?: string }[],
+  entries: { branch: string; dir?: string; deleted?: boolean }[],
   root = process.cwd()
 ) {
   const cwd = root.replace(/\\/g, '/');
-  const blocks = entries.map(({ branch, dir }) =>
+  const blocks = entries.map(({ branch, dir, deleted }) =>
     [
       `worktree ${cwd}/${
         dir ?? `.claude/worktrees/${branchToSessionName(branch)}`
       }`,
       'HEAD abc123',
       `branch refs/heads/${branch}`,
+      ...(deleted
+        ? ['prunable gitdir file points to non-existent location']
+        : []),
       '',
     ].join('\0')
   );
@@ -184,6 +187,38 @@ describe('createWorktree', () => {
     );
   });
 
+  // `rm -rf` leaves git's registration behind, which keeps the branch
+  // checked out and the directory taken as far as `git worktree add`
+  // is concerned.
+  it("clears a deleted worktree's registration before checking its branch out again", async () => {
+    mockExec
+      .mockResolvedValueOnce(
+        worktreeListPorcelain([{ branch: 'feature/auth', deleted: true }])
+      )
+      .mockResolvedValueOnce(resolve())
+      .mockResolvedValueOnce(resolve());
+    const result = await createWorktree('feature/auth', scope());
+    expect(result).toContain('.claude/worktrees/feature-auth');
+    expect(mockExec.mock.calls.map(([command]) => command)).toEqual([
+      'git worktree list --porcelain -z',
+      `git worktree remove "${process.cwd()}/.claude/worktrees/feature-auth"`,
+      'git worktree add ".claude/worktrees/feature-auth" "feature/auth"',
+    ]);
+  });
+
+  it("leaves another branch's deleted worktree registered", async () => {
+    mockExec
+      .mockResolvedValueOnce(
+        worktreeListPorcelain([{ branch: 'other', deleted: true }])
+      )
+      .mockResolvedValueOnce(resolve());
+    await createWorktree('feature/auth', scope());
+    expect(mockExec).not.toHaveBeenCalledWith(
+      expect.stringContaining('worktree remove'),
+      expect.anything()
+    );
+  });
+
   it('reuses only a checkout whose exact branch matches', async () => {
     mockExec.mockResolvedValueOnce(
       worktreeListPorcelain([{ branch: 'feature/auth' }])
@@ -210,6 +245,25 @@ describe('checkoutWorktree', () => {
       'git worktree add ".claude/worktrees/feature-auth" "feature/auth"',
       { encoding: 'utf8', cwd: '/repos/one' }
     );
+  });
+
+  it("clears a deleted worktree's registration for the branch first", async () => {
+    mockExec
+      .mockResolvedValueOnce(
+        worktreeListPorcelain(
+          [{ branch: 'feature/auth', deleted: true }],
+          '/repos/one'
+        )
+      )
+      .mockResolvedValueOnce(resolve())
+      .mockResolvedValueOnce(resolve());
+    const result = await checkoutWorktree('feature/auth', scope('/repos/one'));
+    expect(result).toBe('/repos/one/.claude/worktrees/feature-auth');
+    expect(mockExec.mock.calls.map(([command]) => command)).toEqual([
+      'git worktree list --porcelain -z',
+      'git worktree remove "/repos/one/.claude/worktrees/feature-auth"',
+      'git worktree add ".claude/worktrees/feature-auth" "feature/auth"',
+    ]);
   });
 
   it('never creates a branch: one git refuses is a failure', async () => {
@@ -886,6 +940,19 @@ describe('listWorktrees', () => {
     const result = await listWorktrees(scope());
     expect(result).toHaveLength(1);
     expect(result[0]!.branch).toBe('feature/auth');
+  });
+
+  // `rm -rf` leaves the registration, marked prunable: no checkout is
+  // left, so it is as gone as one `git worktree remove` took.
+  it('leaves out a worktree whose directory was deleted', async () => {
+    mockExec.mockResolvedValueOnce(
+      worktreeListPorcelain([
+        { branch: 'feature/auth', deleted: true },
+        { branch: 'fix/bug' },
+      ])
+    );
+    const result = await listWorktrees(scope());
+    expect(result.map((w) => w.branch)).toEqual(['fix/bug']);
   });
 
   it('should filter out bare worktrees', async () => {
