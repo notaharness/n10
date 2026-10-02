@@ -75,6 +75,10 @@ test.describe('Machines over beam', () => {
 
       await row.getByRole('button', { name: 'Machine actions' }).click();
       await page.getByRole('menuitem', { name: 'Rename locally…' }).click();
+      // The closing menu hands focus back to its button only once it
+      // is gone; the field must keep it, or it commits as it blurs.
+      await expect(page.getByRole('menu')).toBeHidden();
+      await expect(row.getByLabel('Local name')).toBeFocused();
       await row.getByLabel('Local name').fill('build');
       await row.getByLabel('Local name').press('Enter');
       await expect(row.getByText('build')).toBeVisible();
