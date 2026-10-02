@@ -21,6 +21,7 @@ const state = vi.hoisted(() => ({
     for (const listener of [...this.exits]) listener(name);
   },
   released: [] as string[],
+  stranded: [] as Primitive.AgentSession[],
   entries: new Map<
     string,
     {
@@ -57,6 +58,14 @@ vi.mock('@n10/core', async (original) => ({
       state.exits.delete(listener);
     };
   },
+  strandedSessionRows: (
+    _repo: string,
+    _isAlive: unknown,
+    keep: (name: string) => boolean
+  ) =>
+    state.stranded.filter(
+      (row) => !row.path?.startsWith('/back') || keep(row.name)
+    ),
   releaseExitedSession: (name: string) => {
     state.released.push(name);
     state.entries.delete(name);
@@ -386,6 +395,7 @@ const scanOf = (...listed: (typeof wt)[]): DiscoveryScan => ({
     branch: w.branch,
     path: w.path,
   })),
+  stranded: [],
   persisted: new Set(),
   terminals: [],
 });
@@ -413,6 +423,67 @@ it('scans at once for a listed worktree discovery has not seen', async () => {
   state.scanNow.mockClear();
   await f.service.refresh();
   expect(state.scanNow).toHaveBeenCalled();
+});
+
+// Its worktree is gone, so only this row lets the user see and stop it.
+it('lists an agent still running in a removed worktree', async () => {
+  const row = {
+    name: worktreeSessionKey('/repo/gone', '/repo'),
+    label: 'gone',
+    path: '/repo/gone',
+    running: true,
+    worktreeRemoved: true as const,
+  };
+  state.stranded = [row];
+  try {
+    const f = fixture();
+    f.service.watch({ size });
+    await f.service.read();
+    expect(f.service.getSnapshot().sessions).toContainEqual(row);
+    f.service.dispose();
+  } finally {
+    state.stranded = [];
+  }
+});
+
+// Its directory is back, but git does not list it and discovery holds
+// it stranded: the agent keeps its row.
+it('keeps the row of an agent discovery holds stranded', async () => {
+  const row = {
+    name: worktreeSessionKey('/back/wt', '/repo'),
+    label: 'wt',
+    path: '/back/wt',
+    running: true,
+    worktreeRemoved: true as const,
+  };
+  state.stranded = [row];
+  try {
+    const f = fixture();
+    f.service.watch({ size });
+    await f.service.read();
+    expect(f.service.getSnapshot().sessions).not.toContainEqual(row);
+    state.lastScan.mockReturnValue({
+      ...scanOf(wt),
+      stranded: [{ name: row.name, branch: '', path: row.path }],
+    });
+    await f.service.refresh();
+    expect(f.service.getSnapshot().sessions).toContainEqual(row);
+    f.service.dispose();
+  } finally {
+    state.stranded = [];
+    state.lastScan.mockReturnValue(null);
+  }
+});
+
+// Stop disposes the session without an exit to report.
+it('scans as soon as an agent is stopped', () => {
+  const f = fixture();
+  f.service.watch({ size });
+  state.scanNow.mockClear();
+  f.service.stop(key);
+  expect(state.stop).toHaveBeenCalledWith(key);
+  expect(state.scanNow).toHaveBeenCalled();
+  f.service.dispose();
 });
 
 it('leaves discovery to its schedule when it has seen every listed worktree', async () => {

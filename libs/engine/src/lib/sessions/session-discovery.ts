@@ -2,12 +2,16 @@ import { watch, type FSWatcher } from 'node:fs';
 import { log, logError } from '@n10/logger';
 import { listWorktrees, type WorktreeScope } from '@n10/worktree-manager';
 import {
+  canonicalWorktreePath,
   keyForWorktree,
   LOCAL_MACHINE,
   sessionIdentity,
   hasSessionConnection,
   isSessionAlive,
+  onSessionExit,
   sessionNames,
+  stopSession,
+  strandedSessionRows,
   observeTmuxSessions,
   releaseExitedSession,
   diffScans,
@@ -34,9 +38,32 @@ function worthAnnouncing(delta: DiscoveryDelta, touched: number): boolean {
     touched > 0 ||
     delta.appeared.length > 0 ||
     delta.disappeared.length > 0 ||
+    delta.stranded.length > 0 ||
     delta.switched.length > 0 ||
     delta.ended.length > 0 ||
     delta.endedTerminals.length > 0
+  );
+}
+
+/**
+ * An agent that outlived its worktree has ended too, so nothing is left
+ * to show or restart: end its tmux session, which keeps the dead pane,
+ * rather than let the pane come back as an orphan terminal.
+ */
+function endFinishedStranded(
+  previous: DiscoveryScan | null,
+  delta: DiscoveryDelta
+): void {
+  const stranded = new Set(previous?.stranded.map((wt) => wt.name));
+  // Never a running agent: only one that has ended leaves nothing to show.
+  const finished = delta.disappeared.filter(
+    (wt) => stranded.has(wt.name) && !isSessionAlive(wt.name)
+  );
+  if (finished.length === 0) return;
+  for (const wt of finished) stopSession(wt.name);
+  const gone = new Set(finished.map((wt) => canonicalWorktreePath(wt.path)));
+  delta.adoptableTerminals = delta.adoptableTerminals.filter(
+    (t) => !gone.has(canonicalWorktreePath(t.path))
   );
 }
 
@@ -86,7 +113,7 @@ export function startSessionDiscovery(
 
   async function observe(): Promise<{
     scan: DiscoveryScan;
-    held: Set<string>;
+    held: Set<string> | null;
   }> {
     const worktrees: DiscoveredWorktree[] = (
       await listWorktrees(opts.scope())
@@ -96,9 +123,21 @@ export function startSessionDiscovery(
       path: wt.path,
     }));
     const seen = observeTmuxSessions(repo, worktrees);
+    // Stays stranded while its agent runs and git does not list it, even
+    // if something recreates the directory.
+    const listed = new Set(worktrees.map((wt) => wt.name));
+    const wasStranded = new Set(previous?.stranded.map((wt) => wt.name));
+    const keep = (name: string) => wasStranded.has(name) && !listed.has(name);
     return {
       scan: {
         worktrees,
+        stranded: strandedSessionRows(repo, isSessionAlive, keep).map(
+          (row) => ({
+            name: row.name,
+            branch: '',
+            path: row.path ?? '',
+          })
+        ),
         persisted: seen.persisted,
         terminals: adoptTerminal ? seen.terminals : [],
       },
@@ -108,8 +147,10 @@ export function startSessionDiscovery(
 
   /** An agent that exited with its pane kept stays to be read and
    *  resumed while tmux holds its session. Nothing polls a dead pane, so
-   *  only a scan sees the session go (killed, its server ended). */
-  function releaseGone(held: Set<string>): number {
+   *  only a scan sees the session go (killed, its server ended). A
+   *  listing tmux could not give (`held` null) releases nothing. */
+  function releaseGone(held: Set<string> | null): number {
+    if (!held) return 0;
     let released = 0;
     for (const name of sessionNames()) {
       const identity = sessionIdentity(name);
@@ -188,6 +229,7 @@ export function startSessionDiscovery(
       hasSessionConnection
     );
     const released = releaseGone(held);
+    endFinishedStranded(previous, delta);
     // A repo switch starts a fresh scanner, but terminal tabs are process-global.
     // Reconcile held terminal keys too, including final frames from an earlier scan.
     // The scan sees this machine's tmux only: another machine's terminal
@@ -268,6 +310,12 @@ export function startSessionDiscovery(
     }
   }
 
+  // A stranded worktree is gone once its agent is: look now rather than
+  // at the next tick, so its tab goes when the agent ends.
+  const offExit = onSessionExit((name) => {
+    if (previous?.stranded.some((wt) => wt.name === name)) void scanNow();
+  });
+
   const timer = setInterval(() => void scanNow(), intervalMs);
   // Never a reason to hold the process open: discovery is something the
   // app does while it is running, not work that has to finish.
@@ -280,6 +328,7 @@ export function startSessionDiscovery(
     lastScan: () => previous,
     stop() {
       stopped = true;
+      offExit();
       clearInterval(timer);
       if (watchTimer) clearTimeout(watchTimer);
       watchTimer = null;

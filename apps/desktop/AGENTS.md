@@ -91,7 +91,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   answers to its opening id (`standsFor`/`tabIdFor`). Session keys are the
   checkout (core's `worktreeSessionRow`), so the row keeps its agent.
   A worktree discovery reports removed closes its tabs (`worktrees-removed`,
-  matched by checkout), whoever removed it.
+  matched by checkout), whoever removed it. An agent still running there
+  keeps its row (`removed:<session>`) and tab (`RemovedWorktreePane`) until
+  it exits or is stopped.
   `TabsProvider` sits above the repo gate in `App.tsx`.
   `tabs.properties.spec.ts` holds the invariants.
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
@@ -189,7 +191,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   outstanding. CI escalates but never vouches. The 4×4 grid is asserted whole
   in `sidebar-model.spec.ts`.
 - `applyPendingRemovals` drops a session row but keeps a PR row with
-  `sessionName`/`running` cleared.
+  `sessionName`/`running` cleared. It leaves a removed worktree's agent row
+  alone: its label may name the branch's new checkout.
 - Comment markdown paragraphs render as `<div>` (block images cannot nest in
   `<p>`); images are host-fetched with provider auth. `ErrorBoundary` wraps
   each tab.

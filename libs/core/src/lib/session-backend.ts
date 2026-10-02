@@ -20,7 +20,7 @@ import {
   type TaggedSession,
 } from './session-identity.js';
 import {
-  listOurSessions,
+  readOurSessions,
   resolveRegistrySession,
   resolveSessionByName,
 } from './session-resolver.js';
@@ -72,8 +72,8 @@ export interface TmuxObservation {
   terminals: DiscoveredTerminal[];
   /** The registry names of every worktree session of this repository
    *  the server still has, its pane live or dead, whether or not git
-   *  still lists the checkout. */
-  held: Set<string>;
+   *  still lists the checkout; `null` when tmux could not be asked. */
+  held: Set<string> | null;
 }
 
 /**
@@ -120,10 +120,11 @@ export function observeTmuxSessions(
   };
   const persisted = new Set<string>();
   const terminals: DiscoveredTerminal[] = [];
-  const held = new Set<string>();
-  for (const session of listOurSessions()) {
+  const listed = readOurSessions();
+  const held = listed && new Set<string>();
+  for (const session of listed ?? []) {
     if (session.type === 'worktree' && session.repo === root)
-      held.add(registryNameOf(session));
+      held?.add(registryNameOf(session));
     const found = classifySession(session, ctx);
     if (!found) continue;
     if (found.kind === 'terminal') terminals.push(found.terminal);

@@ -90,9 +90,15 @@ describe('desktop session observation adapter', () => {
     await ports().adoptTerminal?.(terminal);
     expect(state.terminal).toHaveBeenCalledWith(terminal);
     const delta = diffScans(
-      { worktrees: [], persisted: new Set(), terminals: [terminal] },
       {
         worktrees: [],
+        stranded: [],
+        persisted: new Set(),
+        terminals: [terminal],
+      },
+      {
+        worktrees: [],
+        stranded: [],
         persisted: new Set(),
         terminals: [],
       },
@@ -115,8 +121,13 @@ describe('desktop session observation adapter', () => {
     };
     ports().changed?.(
       diffScans(
-        { worktrees: [gone], persisted: new Set(), terminals: [] },
-        { worktrees: [], persisted: new Set(), terminals: [] },
+        {
+          worktrees: [gone],
+          stranded: [],
+          persisted: new Set(),
+          terminals: [],
+        },
+        { worktrees: [], stranded: [], persisted: new Set(), terminals: [] },
         () => false
       )
     );

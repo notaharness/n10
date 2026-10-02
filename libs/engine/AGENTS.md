@@ -68,7 +68,10 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   are reported. Connections list the agents the registry holds; one whose
   tmux session is gone (`processState.gone`) is released as it ends, while an
   exited one with its dead pane kept stays while tmux holds its session
-  (`observeTmuxSessions().held`); a dead pane is not `persisted`. Shells supply
+  (`observeTmuxSessions().held`); a dead pane is not `persisted`.
+  A worktree removed under a running local agent is `stranded`: its agent
+  keeps a row (`strandedSessionRows`) and discovery reports the worktree gone
+  only once the agent exits or is stopped, then ends its session. Shells supply
   dimensions, relays and terminal-tab presentation. Core keeps pure observations,
   tags, PTY activity classification and native guarded launch/removal operations.
   `branchSessions` (`branch-sessions.ts`) decides which agents and terminals

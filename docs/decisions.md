@@ -458,6 +458,21 @@ volume that is not mounted: both are `prunable`. A worktree on such a volume
 reads as removed while it is away, and checking its branch out meanwhile
 unregisters it. `git worktree lock` keeps git from calling a worktree prunable.
 
+An agent still running in a removed worktree keeps its row and its tab, both
+marked, until it exits or is stopped. Closing the tab would leave it running
+unseen: its PTY stays held, so it is never offered as an orphan terminal. The
+row comes from this process's PTY registry (`strandedSessionRows`): a live
+local agent whose checkout directory is gone. It has no branch, since the
+branch may be checked out in a new worktree, and is keyed by its session.
+Discovery holds the worktree as `stranded`, not removed, and reports it gone
+as soon as the agent exits or is stopped; it then ends the agent's tmux
+session, whose retained pane has nothing left to show or restart in. It stays
+stranded while its agent runs and git does not list it, even if something
+recreates the directory, and discovery never ends a running agent. The
+desktop tab shows the terminal with Stop agent; the TUI marks the row
+`worktree removed` and its tab-bar entry `removed`, and the kill-agent key
+stops it.
+
 Optimistic removal drops a session row but retains a PR row with its session
 fields cleared: the PR outlives its checkout. Status indicators combine CI and
 review status; CI can worsen the result, but passing CI does not imply approval.

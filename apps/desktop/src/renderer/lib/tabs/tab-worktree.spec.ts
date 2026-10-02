@@ -169,6 +169,23 @@ describe('a worktree that is removed', () => {
     expect(s.tabs).toHaveLength(1);
   });
 
+  // Its agent outlived it: the row stays, re-keyed by its session, and
+  // the tab follows it by checkout until discovery reports it gone.
+  it('keeps a tab whose agent still runs, until the worktree is reported gone', () => {
+    let s = open(EMPTY_TABS, 'branch:feature');
+    s = sync(s, [worktree('feature', { running: true })]);
+    s = sync(s, [
+      worktree('feature', { itemKey: 'removed:agent', running: true }),
+    ]);
+    expect(s.tabs).toEqual([
+      expect.objectContaining({
+        id: itemTabId(REPO, 'branch:feature'),
+        itemKey: 'removed:agent',
+      }),
+    ]);
+    expect(removed(s).tabs).toEqual([]);
+  });
+
   it('leaves the tabs of other checkouts and other repositories alone', () => {
     let s = open(EMPTY_TABS, 'branch:feature');
     s = sync(s, [worktree('feature')]);

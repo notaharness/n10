@@ -72,6 +72,9 @@ export function SessionTabBar() {
             >
               {tabLabel(tabNumber, item, pr)}
             </Text>
+            {item.session.worktreeRemoved ? (
+              <Text color="red"> removed</Text>
+            ) : null}
           </Box>
         );
       })}

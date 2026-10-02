@@ -7,6 +7,19 @@ function ids(...args: Parameters<typeof sidebarRowMenuItems>): string[] {
 }
 
 describe('sidebarRowMenuItems', () => {
+  // The checkout is gone and only its agent is left: nothing to launch,
+  // check out, open or remove.
+  it('offers only opening and stopping for an agent whose worktree is gone', () => {
+    expect(
+      ids({
+        hasWorktree: true,
+        running: true,
+        hasPr: false,
+        worktreeRemoved: true,
+      })
+    ).toEqual(['open', 'kill']);
+  });
+
   it('offers launching, stopping and removal only for a checked-out row', () => {
     // A PR nobody has checked out yet: there is no worktree to launch an
     // agent in, stop one in, or remove — only to create.

@@ -23,6 +23,7 @@ import { LaunchTerminalDialog } from '../review/LaunchTerminalDialog.js';
 import { PrWorkspace } from './lazy-panes.js';
 import { Button } from '../ui/button.js';
 import { LaunchDialog, type LaunchChoice } from './LaunchDialog.js';
+import { RemovedWorktreePane } from './RemovedWorktreePane.js';
 import { useItemLaunch } from './use-item-launch.js';
 
 /**
@@ -147,9 +148,11 @@ function useLaunchMenu(branch: string, active: boolean, state?: ItemState) {
 }
 
 function Preparing({ itemKey }: { itemKey: string }) {
-  // Either the worktree is still being created (optimistic tab) or the
-  // item left the sidebar; show a quiet loading state — the pane
-  // resolves itself on the next sidebar poll.
+  // The worktree is still being created (optimistic tab), or its item
+  // re-keyed and the next sync has not caught up; show a quiet loading
+  // state — the pane resolves itself on the next sidebar poll. A
+  // removed worktree's tab does not land here: its agent keeps a row
+  // while it runs, and discovery closes the tab once it has exited.
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
       <Loader2Icon className="size-6 animate-spin" />
@@ -158,13 +161,7 @@ function Preparing({ itemKey }: { itemKey: string }) {
   );
 }
 
-export function ItemView({
-  item,
-  items,
-  itemKey,
-  menuActive,
-  onPin,
-}: {
+interface ItemViewProps {
   item: SidebarItem | undefined;
   items: SidebarItem[];
   itemKey: string;
@@ -172,7 +169,23 @@ export function ItemView({
    *  (deferred) catches up — what a session menu request goes by. */
   menuActive: boolean;
   onPin: () => void;
-}) {
+}
+
+export function ItemView(props: ItemViewProps) {
+  const { item } = props;
+  // The checkout is gone and only its agent is left to show and stop.
+  if (item?.kind === 'session' && item.session.worktreeRemoved)
+    return <RemovedWorktreePane sessionName={item.session.name} />;
+  return <WorktreeItemView {...props} />;
+}
+
+function WorktreeItemView({
+  item,
+  items,
+  itemKey,
+  menuActive,
+  onPin,
+}: ItemViewProps) {
   const { repo } = useRepo();
   const paneRef = useRef<HTMLDivElement>(null);
   const { branch, state } = useItemState(repo.cwd, item, items);

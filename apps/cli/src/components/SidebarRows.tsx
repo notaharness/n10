@@ -44,6 +44,7 @@ function SessionTitleLine({
   flashing,
   merged,
   rebasing,
+  removed,
 }: {
   tabNumber: number | undefined;
   icon: string;
@@ -53,6 +54,8 @@ function SessionTitleLine({
   flashing: boolean;
   merged: boolean;
   rebasing: boolean;
+  /** The worktree is gone and its agent still runs. */
+  removed: boolean;
 }) {
   return (
     <Text wrap="truncate">
@@ -74,6 +77,7 @@ function SessionTitleLine({
         </Text>
       ) : null}
       {rebasing ? <Text color="yellow"> rebasing</Text> : null}
+      {removed ? <Text color="red"> worktree removed</Text> : null}
     </Text>
   );
 }
@@ -141,6 +145,7 @@ export const SessionItemRow = memo(function SessionItemRow({
             flashing={showFlash}
             merged={isMerged}
             rebasing={session.state === 'rebasing'}
+            removed={session.worktreeRemoved === true}
           />
         </Box>
         <Box flexShrink={0} marginLeft={1} width={1}>

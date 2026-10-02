@@ -29,6 +29,7 @@ vi.mock('@n10/terminal-tmux', () => ({
   isTmuxAvailable: vi.fn(),
   tmuxKillSession: vi.fn(),
   tmuxListSessionsDetailed: () => listMock(),
+  tmuxListSessionsRead: () => listMock(),
 }));
 vi.mock('@n10/worktree-manager', () => ({ listWorktrees: vi.fn() }));
 vi.mock('./pty-registry.js', () => ({
@@ -209,6 +210,7 @@ describe('a scan notices a worktree that switched branch', () => {
     const { diffScans } = await import('./discovery/discovery-model.js');
     const scan = (branch: string) => ({
       worktrees: [worktree(WT, branch)],
+      stranded: [],
       persisted: new Set<string>(),
       terminals: [],
     });

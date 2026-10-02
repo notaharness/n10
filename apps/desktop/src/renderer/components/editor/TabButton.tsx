@@ -1,4 +1,5 @@
 import {
+  FolderXIcon,
   GitBranchIcon,
   GitPullRequestIcon,
   SettingsIcon,
@@ -13,7 +14,10 @@ import type {
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { usePlanCount } from '../../lib/plan/plan.js';
 import { useHoverPrewarm } from '../../lib/tabs/prewarm.js';
-import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
+import {
+  itemRunning,
+  itemWorktreeRemoved,
+} from '../../lib/sidebar/sidebar-model.js';
 import {
   cutSide,
   tabPresentation,
@@ -86,6 +90,20 @@ function PlanCountBadge({ count }: { count: number }) {
       className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] font-medium tabular-nums text-primary"
     >
       {count}
+    </span>
+  );
+}
+
+/** The tab of an agent whose worktree is gone. */
+function RemovedMark({ item }: { item: SidebarItem | undefined }) {
+  if (!item || !itemWorktreeRemoved(item)) return null;
+  return (
+    <span
+      aria-label="Worktree removed"
+      title="Worktree removed"
+      className="flex shrink-0 text-warning"
+    >
+      <FolderXIcon className="size-3.5" />
     </span>
   );
 }
@@ -284,6 +302,7 @@ export function TabButton({
         cut={cutSide(face)}
       />
       <PlanCountBadge count={planCount} />
+      <RemovedMark item={item} />
       {unseen && <UnseenDot />}
       <TabCloseButton
         onClose={(e) => {

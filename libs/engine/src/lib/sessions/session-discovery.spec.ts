@@ -14,16 +14,25 @@ const {
   watchMock,
   basePathMock,
   released,
+  strandedMock,
+  exitSubscribers,
+  stopped,
 } = vi.hoisted(() => ({
   listWorktreesMock: vi.fn<(scope: WorktreeScope) => Promise<WorktreeInfo[]>>(),
   listPersistedMock: vi.fn<() => Set<string>>(),
   listTerminalsMock: vi.fn<() => DiscoveredTerminal[]>(),
-  listHeldMock: vi.fn<() => Set<string>>(),
+  listHeldMock: vi.fn<() => Set<string> | null>(),
   isSessionAliveMock: vi.fn<(name: string) => boolean>(),
   sessionNamesMock: vi.fn<() => string[]>(),
   watchMock: vi.fn(),
   basePathMock: vi.fn<() => string>(),
   released: [] as string[],
+  strandedMock:
+    vi.fn<
+      (keep: (name: string) => boolean) => { name: string; path?: string }[]
+    >(),
+  exitSubscribers: new Set<(name: string) => void>(),
+  stopped: [] as string[],
 }));
 
 vi.mock('node:fs', () => ({
@@ -47,6 +56,16 @@ vi.mock('@n10/core', async (original) => ({
     held: listHeldMock(),
   }),
   releaseExitedSession: (name: string) => released.push(name),
+  strandedSessionRows: (
+    _repo: string,
+    _isAlive: unknown,
+    keep: (name: string) => boolean
+  ) => strandedMock(keep),
+  stopSession: (name: string) => stopped.push(name),
+  onSessionExit: (cb: (name: string) => void) => {
+    exitSubscribers.add(cb);
+    return () => exitSubscribers.delete(cb);
+  },
 }));
 
 import { startSessionDiscovery } from './session-discovery.js';
@@ -97,6 +116,8 @@ beforeEach(() => {
   basePathMock.mockReset().mockReturnValue('/repo/.claude/worktrees');
   watchMock.mockReset().mockReturnValue({ close: vi.fn(), on: vi.fn() });
   released.length = 0;
+  strandedMock.mockReset().mockReturnValue([]);
+  stopped.length = 0;
 });
 
 afterEach(() => {
@@ -268,6 +289,17 @@ describe('startSessionDiscovery', () => {
     expect(onChanged).toHaveBeenCalledOnce();
   });
 
+  // A failed fork or a timeout says nothing about what tmux holds.
+  it('releases nothing when tmux could not be asked', async () => {
+    const exited = wtKey('feature-a');
+    sessionNamesMock.mockReturnValue([exited]);
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    listHeldMock.mockReturnValue(null);
+    const { discovery } = start();
+    await discovery.scanNow();
+    expect(released).toEqual([]);
+  });
+
   // The path is what a shell closes a tab by; the name alone would not
   // say which checkout went.
   it('announces a removed worktree with its checkout', async () => {
@@ -297,6 +329,105 @@ describe('startSessionDiscovery', () => {
     const { discovery, onChanged } = start();
     await discovery.scanNow();
     expect(onChanged).toHaveBeenCalledOnce();
+  });
+
+  // Nothing to have missed: no worktree, or a baseline to diff against.
+  it('says nothing on a first scan with no worktrees or from a baseline', async () => {
+    const empty = start();
+    await empty.discovery.scanNow();
+    expect(empty.onChanged).not.toHaveBeenCalled();
+    empty.discovery.stop();
+
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    const first = start();
+    await first.discovery.scanNow();
+    const baseline = first.discovery.lastScan();
+    first.discovery.stop();
+    const again = start({ baseline });
+    await again.discovery.scanNow();
+    expect(again.onChanged).not.toHaveBeenCalled();
+  });
+
+  /** A running agent's worktree, removed and stranded by one scan. */
+  async function strandedAgent() {
+    const key = wtKey('feature-a');
+    const path = '/repo/.claude/worktrees/feature-a';
+    alive.add(key);
+    sessionNamesMock.mockReturnValue([key]);
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    const started = start();
+    await started.discovery.scanNow();
+    listWorktreesMock.mockResolvedValue([]);
+    strandedMock.mockReturnValue([{ name: key, path }]);
+    await started.discovery.scanNow();
+    return { ...started, key, path };
+  }
+
+  // Something recreated the directory: git still does not list it, and
+  // the agent runs on.
+  it('keeps a worktree stranded while its agent runs, its directory back', async () => {
+    const { discovery, onChanged, key, path } = await strandedAgent();
+    onChanged.mockClear();
+    strandedMock.mockImplementation((keep) =>
+      keep(key) ? [{ name: key, path }] : []
+    );
+    await discovery.scanNow();
+    expect(onChanged).not.toHaveBeenCalled();
+    expect(stopped).toEqual([]);
+  });
+
+  // Whatever takes a worktree out of the stranded set, a running agent
+  // is never ended for it.
+  it('never ends a running agent whose worktree is no longer stranded', async () => {
+    const { discovery, key } = await strandedAgent();
+    strandedMock.mockReturnValue([]);
+    await discovery.scanNow();
+    expect(alive.has(key)).toBe(true);
+    expect(stopped).toEqual([]);
+  });
+
+  // Its agent outlived it, so the shells keep showing the agent until
+  // it exits — and learn it has gone as soon as it does.
+  it('holds back a removed worktree until its agent exits', async () => {
+    const key = wtKey('feature-a');
+    const path = '/repo/.claude/worktrees/feature-a';
+    alive.add(key);
+    sessionNamesMock.mockReturnValue([key]);
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    const { discovery, onChanged } = start();
+    await discovery.scanNow();
+    onChanged.mockClear();
+
+    listWorktreesMock.mockResolvedValue([]);
+    strandedMock.mockReturnValue([{ name: key, path }]);
+    await discovery.scanNow();
+    expect(onChanged).toHaveBeenCalledTimes(1);
+    expect(onChanged.mock.calls[0]![0]).toMatchObject({
+      disappeared: [],
+      stranded: [{ name: key, path }],
+    });
+
+    // tmux keeps the dead pane, which reads as an orphan agent terminal.
+    alive.delete(key);
+    strandedMock.mockReturnValue([]);
+    listTerminalsMock.mockReturnValue([
+      {
+        name: terminalSessionKey('repo-feature-a'),
+        kind: 'agent',
+        path,
+        running: false,
+      },
+    ]);
+    for (const cb of exitSubscribers) cb(key);
+    // Well short of the next tick: the exit itself prompts the scan.
+    await vi.advanceTimersByTimeAsync(1);
+    expect(onChanged).toHaveBeenCalledTimes(2);
+    expect(onChanged.mock.calls[1]![0]).toMatchObject({
+      disappeared: [{ name: key, path }],
+      adoptableTerminals: [],
+    });
+    // Nothing is left to show or restart in a worktree that is gone.
+    expect(stopped).toEqual([key]);
   });
 
   it('says nothing when nothing changed', async () => {

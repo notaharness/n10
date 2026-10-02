@@ -10,6 +10,7 @@ import {
   launchSession,
   LOCAL_MACHINE,
   onSessionExit,
+  strandedSessionRows,
   worktreeSessionRow,
 } from '@n10/core';
 import type {
@@ -70,12 +71,28 @@ export function createSessionService(options: {
   const listeners = new Set<() => void>();
   function publish(): void {
     if (disposed) return;
+    // A row per worktree, then one per agent still running in a
+    // worktree that is gone, so it can be seen and stopped. One
+    // discovery holds stranded stays so while git does not list it,
+    // whatever recreated its directory.
+    const rows = worktrees
+      .getSnapshot()
+      .worktrees.map((wt) =>
+        worktreeSessionRow(wt, isSessionAlive, config.repo)
+      );
+    const listed = new Set(rows.map((row) => row.name));
+    const stranded = new Set(
+      discovery?.lastScan()?.stranded.map((wt) => wt.name)
+    );
     const next = {
-      sessions: worktrees
-        .getSnapshot()
-        .worktrees.map((wt) =>
-          worktreeSessionRow(wt, isSessionAlive, config.repo)
+      sessions: [
+        ...rows,
+        ...strandedSessionRows(
+          config.repo,
+          isSessionAlive,
+          (name) => stranded.has(name) && !listed.has(name)
         ),
+      ],
       error: worktrees.getSnapshot().error,
     };
     scanUnseen();
@@ -157,6 +174,12 @@ export function createSessionService(options: {
       changed: refresh,
     }),
     ...commands,
+    /** Stopping kills the session without an exit to report, so
+     *  discovery looks at once: a stranded worktree is gone with it. */
+    stop(name: string): void {
+      commands.stop(name);
+      void discovery?.scanNow();
+    },
     /** The agents and `terminals` working in `branch`'s checkouts. */
     branchSessions(
       branch: string,

@@ -7,11 +7,10 @@ import {
   sessionCard,
   sessionCards,
   sessionMenu,
-  sidebarRow,
   tab,
   visibleText,
 } from './setup/app.js';
-import { addExternalWorktree } from './setup/external.js';
+import { rescan } from './setup/discovery.js';
 import { findN10SessionFor, killTmuxSession } from './setup/tmux.js';
 
 /**
@@ -54,29 +53,6 @@ async function typeAndResize(page: Page, app: ElectronApplication) {
     const [width = 1280, height = 800] = win.getSize();
     win.setSize(width - 120, height - 80);
   });
-}
-
-/**
- * Has discovery scan again, and waits for it: a worktree added from
- * outside reaches the renderer only through a scan's announcement.
- */
-async function rescan(page: Page, repoPath: string) {
-  await page.evaluate(() => {
-    const w = window as { discoveryEvents?: number };
-    w.discoveryEvents = 0;
-    window.n10.onDiscoveryChanged(() => {
-      w.discoveryEvents = (w.discoveryEvents ?? 0) + 1;
-    });
-  });
-  addExternalWorktree(repoPath, 'rescanned');
-  await expect(sidebarRow(page, 'rescanned')).toBeVisible({ timeout: 15_000 });
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () => (window as { discoveryEvents?: number }).discoveryEvents
-      )
-    )
-    .toBeGreaterThan(0);
 }
 
 async function launchAgent(page: Page) {

@@ -13,7 +13,7 @@ const {
   return {
     isTmuxAvailableMock: vi.fn<() => Promise<TmuxStatus>>(),
     tmuxKillSessionMock: vi.fn<(name: string) => void>(),
-    tmuxListSessionsMock: vi.fn<() => TmuxSessionInfo[]>(),
+    tmuxListSessionsMock: vi.fn<() => TmuxSessionInfo[] | null>(),
     execFileSyncMock: vi.fn(),
     // Stands in for the PTY registry's own bookkeeping: which bare
     // session names this process currently holds alive, independent of
@@ -29,7 +29,8 @@ vi.mock('node:child_process', () => ({
 vi.mock('@n10/terminal-tmux', () => ({
   isTmuxAvailable: () => isTmuxAvailableMock(),
   tmuxKillSession: (name: string) => tmuxKillSessionMock(name),
-  tmuxListSessionsDetailed: () => tmuxListSessionsMock(),
+  tmuxListSessionsDetailed: () => tmuxListSessionsMock() ?? [],
+  tmuxListSessionsRead: () => tmuxListSessionsMock(),
 }));
 vi.mock('@n10/worktree-manager', () => ({
   branchToSessionName: (branch: string) => branch.replace(/\//g, '-'),
@@ -523,6 +524,14 @@ describe('observeTmuxSessions', () => {
         worktreeSessionKey(dirOf('done')),
         worktreeSessionKey(dirOf('gone')),
       ])
+    );
+  });
+
+  // A listing tmux could not give says nothing about what it holds.
+  it('holds unknown sessions when tmux could not be asked', () => {
+    tmuxListSessionsMock.mockReturnValue(null);
+    expect(observeTmuxSessions('/repo', [wt('feat-a', 'feat-a')]).held).toBe(
+      null
     );
   });
 
