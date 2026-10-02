@@ -45,7 +45,7 @@ export function ConnectionBanner({
       }
     >
       {state === 'reconnecting'
-        ? `Reconnecting to ${machineLabel}…`
+        ? `Waiting to reconnect to ${machineLabel}…`
         : `Disconnected from ${machineLabel}`}
     </Banner>
   );
