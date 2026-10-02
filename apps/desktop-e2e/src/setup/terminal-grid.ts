@@ -111,21 +111,28 @@ export async function gridReckonings(
  * `notPid` is the agent that was there before. Without it a restart
  * reads the *previous* agent's last line — still on screen, and still
  * correct — and passes on a terminal that never resized at all.
+ *
+ * The pane is measured again on every look, not once up front: a
+ * restarted agent's terminal still holds its predecessor's scrollback,
+ * and the scrollbar that comes with it can appear just after a single
+ * measurement, taking a column from the grid the agent rightly gets.
  */
 export async function expectAgentFillsPane(
   page: Page,
   notPid?: string
 ): Promise<void> {
-  const expected = await paneGrid(page);
   await expect
     .poll(
       async () => {
         const last = (await reportedGrids(page))
           .filter((g) => g.pid !== notPid)
           .at(-1);
-        return last ? { cols: last.cols, rows: last.rows } : null;
+        const pane = await paneGrid(page);
+        return last?.cols === pane.cols && last.rows === pane.rows
+          ? 'fills the pane'
+          : { agent: last ?? null, pane };
       },
       { timeout: 20_000 }
     )
-    .toEqual(expected);
+    .toBe('fills the pane');
 }
