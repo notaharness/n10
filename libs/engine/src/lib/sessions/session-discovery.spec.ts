@@ -274,6 +274,7 @@ describe('startSessionDiscovery', () => {
     listWorktreesMock.mockResolvedValue(worktrees('feature-a', 'feature-b'));
     const { discovery, onChanged } = start();
     await discovery.scanNow();
+    onChanged.mockClear();
 
     listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
     await discovery.scanNow();
@@ -289,10 +290,20 @@ describe('startSessionDiscovery', () => {
     });
   });
 
+  // A worktree added between the shell's first listing and this scan
+  // would otherwise never reach the shell: nothing reads as appeared.
+  it('announces a first scan that sees a worktree', async () => {
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    const { discovery, onChanged } = start();
+    await discovery.scanNow();
+    expect(onChanged).toHaveBeenCalledOnce();
+  });
+
   it('says nothing when nothing changed', async () => {
     listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
     const { discovery, onChanged } = start();
     await discovery.scanNow();
+    onChanged.mockClear();
     await discovery.scanNow();
     await discovery.scanNow();
     expect(onChanged).not.toHaveBeenCalled();
@@ -341,6 +352,7 @@ describe('startSessionDiscovery', () => {
         });
       const { discovery, onChanged } = start({ adopt });
       await discovery.scanNow();
+      onChanged.mockClear();
       await discovery.scanNow();
       expect(adopt).toHaveBeenCalledTimes(2);
       expect(onChanged).toHaveBeenCalledTimes(1);
@@ -354,7 +366,9 @@ describe('startSessionDiscovery', () => {
       listPersistedMock.mockReturnValue(new Set([wtKey('feature-a')]));
       const adopt = vi.fn().mockRejectedValue(new Error('no worktree'));
       const { discovery, onChanged } = start({ adopt });
-      for (let i = 0; i < 6; i++) await discovery.scanNow();
+      await discovery.scanNow();
+      onChanged.mockClear();
+      for (let i = 0; i < 5; i++) await discovery.scanNow();
       expect(onChanged).not.toHaveBeenCalled();
     });
 
@@ -498,6 +512,7 @@ describe('startSessionDiscovery', () => {
       listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
       const { discovery, onChanged } = start();
       await discovery.scanNow();
+      onChanged.mockClear();
 
       listWorktreesMock.mockResolvedValue([]);
       await discovery.scanNow();

@@ -208,14 +208,17 @@ export function startSessionDiscovery(
         ]),
       ];
     }
+    // A first scan has nothing to diff against, so it reports no
+    // worktree as appeared; a listing the shell read before it may lack
+    // one it sees, and nothing else would have the shell look again.
+    const first = previous === null && next.worktrees.length > 0;
     previous = next;
     // Attach first, announce second: the shell answers `changed` by
     // re-reading the registry, and it must see the sessions this scan
     // just adopted rather than the state from before them.
     const adopted = await adoptAll(delta);
-    if (worthAnnouncing(delta, adopted + released) && !stopped && isCurrent()) {
-      onChanged(delta);
-    }
+    const announce = first || worthAnnouncing(delta, adopted + released);
+    if (announce && !stopped && isCurrent()) onChanged(delta);
     ensureWatch();
   }
 
