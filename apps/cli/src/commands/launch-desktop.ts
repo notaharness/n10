@@ -1,4 +1,8 @@
-import { spawn } from 'node:child_process';
+import {
+  spawn,
+  type ChildProcess,
+  type SpawnOptions,
+} from 'node:child_process';
 import {
   accessSync,
   constants as fsConstants,
@@ -14,20 +18,29 @@ import { dirname, join } from 'node:path';
  * Electron's setuid sandbox helper works only when root owns it with the
  * setuid bit. An npm install leaves it owned by the user, and Electron then
  * aborts with SIGTRAP, so the app runs unsandboxed instead.
+ *
+ * An Electron the user points at with ELECTRON_OVERRIDE_DIST_PATH may be a
+ * distribution's build, which has no helper and sandboxes through user
+ * namespaces, so Chromium's sandbox stays on. An unpacked stock release has
+ * the helper, and is held to the same rule as an npm install.
  */
 export function sandboxArgs(
   electron: string,
   platform: NodeJS.Platform = process.platform,
-  stat: (path: string) => Pick<Stats, 'uid' | 'mode'> = statSync
+  stat: (path: string) => Pick<Stats, 'uid' | 'mode'> = statSync,
+  env: NodeJS.ProcessEnv = process.env
 ): string[] {
   if (platform !== 'linux') return [];
   try {
     const helper = stat(join(dirname(electron), 'chrome-sandbox'));
-    if (helper.uid === 0 && (helper.mode & 0o4755) === 0o4755) return [];
+    return helper.uid === 0 && (helper.mode & 0o4755) === 0o4755
+      ? []
+      : ['--no-sandbox'];
   } catch {
-    // No helper: nothing to sandbox with.
+    // No helper: a supplied build sandboxes without it, and an npm one
+    // has nothing to sandbox with.
+    return env.ELECTRON_OVERRIDE_DIST_PATH ? [] : ['--no-sandbox'];
   }
-  return ['--no-sandbox'];
 }
 
 /** A shell's exit status for how Electron ended: its code, or 128 plus
@@ -73,6 +86,64 @@ function isWritable(dir: string): boolean {
   }
 }
 
+const STOP_SIGNALS: NodeJS.Signals[] = ['SIGTERM', 'SIGINT', 'SIGHUP'];
+
+/**
+ * How Electron is spawned. It gets its own process group: a terminal's
+ * Ctrl+C or hangup then reaches only the launcher, which forwards it once.
+ * In the launcher's group Electron would get the terminal's copy as well,
+ * and its second signal kills it before it has quit. Its stdio stays
+ * attached to the terminal.
+ */
+export function electronSpawnOptions(
+  version: string,
+  env: NodeJS.ProcessEnv = process.env,
+  cwd: string = process.cwd()
+): SpawnOptions {
+  return {
+    stdio: 'inherit',
+    detached: true,
+    // Launching from inside a repo opens that repo.
+    env: { ...env, N10_START_DIR: cwd, N10_DESKTOP_VERSION: version },
+  };
+}
+
+/**
+ * Waits for the Electron `child` and resolves with its exit status. Stop
+ * signals sent to the launcher are forwarded to it while it runs, so
+ * stopping n10 closes the window; the launcher then exits with Electron's
+ * status, as it does when Electron ends first. Its own process group would
+ * let Electron outlive a launcher that exits any other way, so the launcher
+ * stops it on its way out.
+ */
+export function superviseChild(
+  child: Pick<ChildProcess, 'on' | 'kill'>,
+  host: Pick<NodeJS.Process, 'on' | 'off'> = process
+): Promise<number> {
+  const forwards = STOP_SIGNALS.map((signal) => {
+    const forward = () => child.kill(signal);
+    host.on(signal, forward);
+    return () => host.off(signal, forward);
+  });
+  const stopOnExit = () => child.kill('SIGTERM');
+  host.on('exit', stopOnExit);
+  const release = () => {
+    forwards.forEach((remove) => remove());
+    host.off('exit', stopOnExit);
+  };
+  return new Promise((resolve) => {
+    child.on('error', (error) => {
+      release();
+      console.error(`n10: could not start Electron: ${error.message}`);
+      resolve(1);
+    });
+    child.on('close', (code, signal) => {
+      release();
+      resolve(exitStatus(code, signal));
+    });
+  });
+}
+
 /**
  * Runs Electron on the app in `root`, the package directory, whose manifest
  * names `desktop/main/main.js` as the main script. Resolves with Electron's
@@ -101,20 +172,6 @@ export function launchDesktop(root: string, version: string): Promise<number> {
       '[n10] SUID sandbox unavailable — launching with --no-sandbox'
     );
   }
-  const child = spawn(electron, [...args, root], {
-    stdio: 'inherit',
-    // Launching from inside a repo opens that repo.
-    env: {
-      ...process.env,
-      N10_START_DIR: process.cwd(),
-      N10_DESKTOP_VERSION: version,
-    },
-  });
-  return new Promise((resolve) => {
-    child.on('error', (error) => {
-      console.error(`n10: could not start Electron: ${error.message}`);
-      resolve(1);
-    });
-    child.on('close', (code, signal) => resolve(exitStatus(code, signal)));
-  });
+  const child = spawn(electron, [...args, root], electronSpawnOptions(version));
+  return superviseChild(child);
 }
