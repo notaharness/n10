@@ -331,6 +331,23 @@ describe('startSessionDiscovery', () => {
     expect(onChanged).toHaveBeenCalledOnce();
   });
 
+  // Nothing to have missed: no worktree, or a baseline to diff against.
+  it('says nothing on a first scan with no worktrees or from a baseline', async () => {
+    const empty = start();
+    await empty.discovery.scanNow();
+    expect(empty.onChanged).not.toHaveBeenCalled();
+    empty.discovery.stop();
+
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    const first = start();
+    await first.discovery.scanNow();
+    const baseline = first.discovery.lastScan();
+    first.discovery.stop();
+    const again = start({ baseline });
+    await again.discovery.scanNow();
+    expect(again.onChanged).not.toHaveBeenCalled();
+  });
+
   /** A running agent's worktree, removed and stranded by one scan. */
   async function strandedAgent() {
     const key = wtKey('feature-a');
