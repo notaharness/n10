@@ -124,10 +124,11 @@ export class RemoteTmuxBackend implements SessionBackend {
   private finalFrame: string | null = null;
   private readonly draw = new ClientDraw();
   private reconnectAttempts = 0;
-  /** The fleet says the machine is offline: wait for it rather than
-   *  attach, since a transport may hand back a stream to a peer that is
-   *  not there, which would read as reconnected. */
+  /** The fleet says the machine is offline. */
   private machineOffline = false;
+  /** The poller's last word on the machine is that it could not list
+   *  it; cleared by its next listing. */
+  private machineUnreachable = false;
   /** Whether anything has said the *connection* is in doubt, as opposed
    *  to this one stream having ended. Reset only once a re-attach has
    *  held for the stability window, so a link that keeps failing keeps
@@ -155,7 +156,10 @@ export class RemoteTmuxBackend implements SessionBackend {
       onState: (info) => this.handlePollState(info),
       // The poller speaks to the machine, not to this stream: it going
       // quiet is evidence about the connection itself.
-      onUnreachable: () => this.enterReconnecting('unreachable'),
+      onUnreachable: () => {
+        this.machineUnreachable = true;
+        this.enterReconnecting('unreachable');
+      },
       onReachability: (reachable) => this.setMachineOffline(!reachable),
     });
   }
@@ -187,6 +191,13 @@ export class RemoteTmuxBackend implements SessionBackend {
     this.scheduleReconnect();
   }
 
+  /** Whether anything says the machine is not there to attach to. A
+   *  transport may hand back a stream to a peer that is gone, which
+   *  would read as reconnected, so nothing is attached meanwhile. */
+  private get machineAway(): boolean {
+    return this.machineOffline || this.machineUnreachable;
+  }
+
   private setMachineOffline(offline: boolean): void {
     if (this.disposed || offline === this.machineOffline) return;
     this.machineOffline = offline;
@@ -195,15 +206,20 @@ export class RemoteTmuxBackend implements SessionBackend {
       this.enterReconnecting('unreachable');
       return;
     }
-    // Back: try at once, with a full set of attempts.
-    if (!this.state.running || this.connection === 'connected') return;
+    this.attachIfBack();
+  }
+
+  /** Back, by every account: try at once, with a full set of attempts. */
+  private attachIfBack(): void {
+    if (this.machineAway || !this.state.running) return;
+    if (this.connection === 'connected') return;
     this.connection = 'reconnecting';
     this.reconnectAttempts = 0;
     void this.attemptReconnect();
   }
 
   private scheduleReconnect(): void {
-    if (this.disposed || !this.state.running || this.machineOffline) return;
+    if (this.disposed || !this.state.running || this.machineAway) return;
     if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       this.connection = 'failed';
       return;
@@ -228,7 +244,7 @@ export class RemoteTmuxBackend implements SessionBackend {
   }
 
   private async attemptReconnect(): Promise<void> {
-    if (this.disposed || !this.state.running || this.machineOffline) return;
+    if (this.disposed || !this.state.running || this.machineAway) return;
     try {
       const handle = await this.machine.ptyOpener.open({
         argv: ['tmux', ...tmuxAttachArgs(this.name)],
@@ -242,7 +258,7 @@ export class RemoteTmuxBackend implements SessionBackend {
       // already awaiting `open()`. Adopting this handle on a backend
       // that was torn down (or whose process exited) meanwhile leaks
       // the remote pty stream — nothing would ever dispose it.
-      if (this.disposed || !this.state.running || this.machineOffline) {
+      if (this.disposed || !this.state.running || this.machineAway) {
         handle.dispose();
         return;
       }
@@ -278,6 +294,11 @@ export class RemoteTmuxBackend implements SessionBackend {
     exitSignal?: number;
   }): void {
     if (this.disposed || !this.state.running) return;
+    // A listing came back: the machine answers again.
+    if (this.machineUnreachable) {
+      this.machineUnreachable = false;
+      this.attachIfBack();
+    }
     if (info.found && !info.paneDead) return;
     this.state = {
       running: false,
