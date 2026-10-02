@@ -93,8 +93,8 @@ export function terminalBranch(
 
 /**
  * The sessions working in `branch`: the agent in each of its checkouts
- * (so one per machine), a stopped one too, which stays a relaunch
- * target, and the terminals opened inside any of them. Agents first,
+ * (so one per machine), an exited one too while tmux keeps its dead
+ * pane, and the terminals opened inside any of them. Agents first,
  * each kind oldest first.
  */
 export function branchSessions(input: {
