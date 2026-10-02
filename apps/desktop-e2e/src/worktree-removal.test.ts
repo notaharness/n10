@@ -1,7 +1,7 @@
 import { sessionBranch } from './setup/session-keys.js';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import {
@@ -126,6 +126,70 @@ test.describe('Worktree removal', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(sidebarRow(page, new RegExp(BRANCH))).toBeVisible();
   });
+});
+
+/**
+ * Records, from now on, whether the pane ever shows "Preparing <label>…",
+ * the placeholder a tab sits on while it waits for its sidebar row.
+ */
+async function watchForPreparing(page: Page, label: string) {
+  await page.evaluate((text) => {
+    const w = window as { sawPreparing?: boolean };
+    w.sawPreparing = false;
+    new MutationObserver(() => {
+      if (document.body.innerText.includes(text)) w.sawPreparing = true;
+    }).observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+  }, `Preparing ${label}`);
+  return () =>
+    page.evaluate(() => (window as { sawPreparing?: boolean }).sawPreparing);
+}
+
+/**
+ * Removing a worktree without n10 — from a shell, a script, another
+ * tool. The app has to notice on its own, and a tab left behind would
+ * sit on "Preparing…" forever, waiting for a row that is gone.
+ * Nothing is pressed after the removal: noticing is the whole point.
+ */
+test.describe('Worktree removed outside n10', () => {
+  // A branch with a slash, whose directory is named apart from it.
+  const branch = 'ci/release-workflow';
+  const dir = (repoPath: string) =>
+    join(repoPath, '.claude', 'worktrees', 'ci-release-workflow');
+  const removals: [string, (repoPath: string) => void][] = [
+    [
+      'git worktree remove',
+      (repoPath) =>
+        execFileSync('git', ['worktree', 'remove', dir(repoPath)], {
+          cwd: repoPath,
+          stdio: 'ignore',
+        }),
+    ],
+    [
+      'deleting its directory',
+      (repoPath) => rmSync(dir(repoPath), { recursive: true, force: true }),
+    ],
+  ];
+
+  for (const [how, remove] of removals) {
+    test(`${how} closes its open tab and drops its row`, async ({
+      desktop,
+    }) => {
+      const { page, repoPath } = desktop;
+      await createWorktree(page, branch);
+      await expect(tab(page, branch)).toHaveAttribute('aria-selected', 'true');
+      const sawPreparing = await watchForPreparing(page, branch);
+
+      remove(repoPath);
+
+      await expect(tab(page, branch)).toHaveCount(0, { timeout: 20_000 });
+      await expect(sidebarRow(page, branch)).toHaveCount(0);
+      expect(await sawPreparing()).toBe(false);
+    });
+  }
 });
 
 test.describe('Worktree removal (running agent)', () => {
