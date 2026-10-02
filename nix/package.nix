@@ -5,7 +5,7 @@
   makeWrapper,
   nodejs,
   python3,
-  electron,
+  electron_44,
   tmux,
   git,
   gh,
@@ -41,6 +41,9 @@ buildNpmPackage {
     NX_DAEMON = "false";
     NX_NO_CLOUD = "true";
     NX_ISOLATE_PLUGINS = "false";
+    # Nx's terminal UI and native task runner need a TTY, which the sandbox lacks.
+    NX_TUI = "false";
+    NX_NATIVE_COMMAND_RUNNER = "false";
   };
 
   buildPhase = ''
@@ -50,7 +53,9 @@ buildNpmPackage {
     runHook postBuild
   '';
 
-  # `dist` is the published package. Its runtime dependencies are the ones
+  # `dist` is the published package: what apps/cli's prepare-publish.mjs
+  # lists in `files`, plus the manifest and README npm always packs (dist also
+  # holds type declarations that don't ship). Its runtime dependencies are the ones
   # prepare-publish.mjs lists: node-pty (native, so external to both bundles),
   # the electron package (the launcher requires it for the binary's path) and
   # @notaharness/beam with its platform package.
@@ -58,7 +63,9 @@ buildNpmPackage {
     runHook preInstall
     app=$out/lib/n10
     mkdir -p $out/bin $app/node_modules
-    cp -r apps/cli/dist/. $app/
+    dist=apps/cli/dist
+    cp -r $dist/*.js $dist/webp.wasm $dist/desktop $dist/LICENSE $dist/README.md \
+      $dist/package.json $app/
     cp -r node_modules/node-pty node_modules/electron $app/node_modules/
     mkdir $app/node_modules/@notaharness
     cp -r node_modules/@notaharness/beam node_modules/@notaharness/beam-* \
@@ -75,7 +82,7 @@ buildNpmPackage {
           gh
         ]
       } \
-      --set-default ELECTRON_OVERRIDE_DIST_PATH ${electron}/bin
+      --set-default ELECTRON_OVERRIDE_DIST_PATH ${electron_44}/bin
     runHook postInstall
   '';
 
