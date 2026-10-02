@@ -65,3 +65,17 @@ jobs:
             apps/desktop-e2e/test-output
           if-no-files-found: ignore
           retention-days: 7
+
+  # The flake builds from package-lock.json's resolved URLs and integrity
+  # hashes alone, so this also fails when a locked package lacks either.
+  # nixpkgs' packages come from cache.nixos.org.
+  nix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v31
+
+      - run: nix build -L
+
+      - run: ./result/bin/n10 --version

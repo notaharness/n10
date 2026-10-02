@@ -31,6 +31,18 @@ npm install -g @notaharness/n10
 
 A .deb package and an AppImage for Linux are coming ([#122](https://github.com/notaharness/n10/issues/122)).
 
+### Nix
+
+On Linux, the flake builds `n10` offline, with `tmux`, `git` and `gh` on its `PATH`:
+
+```sh
+nix run github:notaharness/n10   # run it
+nix build                        # build ./result from a checkout
+nix develop                      # a shell with Node 24, tmux, gh and the node-pty toolchain
+```
+
+The wrapper points the `electron` package at nixpkgs' Electron through `ELECTRON_OVERRIDE_DIST_PATH`, so the desktop app does not download a binary. nixpkgs' Electron may be a different major version than the one n10 is tested against; `n10 --tui` does not use it.
+
 ## Use it
 
 From a repository:
