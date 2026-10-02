@@ -198,10 +198,9 @@ keystrokes nor resizes. A session that is gone — n10's Stop, `tmux kill-sessio
 outside n10, a tmux server restart — leaves nothing to show: the backend reports
 `processState.gone`, the engine releases the agent as it ends, and its card and
 pane go, so the tab returns to its no-agent state (Launch Agent, the Overview).
-Another machine that cannot be reached is neither: its agent is waiting to
-reconnect, shown on its card and the pane's banner. Keystrokes and resizes that
-race any of these are dropped and logged by the host, never thrown back to the
-renderer.
+An exited agent's dead pane is not polled, so discovery is what sees its
+session go later, and releases it then. Keystrokes and resizes that race any of
+these are dropped and logged by the host, never thrown back to the renderer.
 
 Agent selection uses explicit `agentId`, defaulting to Claude. The hidden fixture
 runner requires `agentId: 'test'`; only that runner interprets `aiCommand`. No
