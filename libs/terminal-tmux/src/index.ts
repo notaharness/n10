@@ -10,6 +10,7 @@ export {
   tmuxKillSession,
   tmuxListSessions,
   tmuxListSessionsDetailed,
+  tmuxListSessionsRead,
   tmuxNewSessionDetached,
   tmuxPaneState,
   tmuxSetOption,

@@ -21,7 +21,7 @@ const {
   listWorktreesMock: vi.fn<(scope: WorktreeScope) => Promise<WorktreeInfo[]>>(),
   listPersistedMock: vi.fn<() => Set<string>>(),
   listTerminalsMock: vi.fn<() => DiscoveredTerminal[]>(),
-  listHeldMock: vi.fn<() => Set<string>>(),
+  listHeldMock: vi.fn<() => Set<string> | null>(),
   isSessionAliveMock: vi.fn<(name: string) => boolean>(),
   sessionNamesMock: vi.fn<() => string[]>(),
   watchMock: vi.fn(),
@@ -287,6 +287,17 @@ describe('startSessionDiscovery', () => {
     await discovery.scanNow();
     expect(released).toEqual([exited]);
     expect(onChanged).toHaveBeenCalledOnce();
+  });
+
+  // A failed fork or a timeout says nothing about what tmux holds.
+  it('releases nothing when tmux could not be asked', async () => {
+    const exited = wtKey('feature-a');
+    sessionNamesMock.mockReturnValue([exited]);
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    listHeldMock.mockReturnValue(null);
+    const { discovery } = start();
+    await discovery.scanNow();
+    expect(released).toEqual([]);
   });
 
   // The path is what a shell closes a tab by; the name alone would not

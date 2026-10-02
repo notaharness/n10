@@ -1,6 +1,7 @@
 import {
   tmuxListSessionsDetailed,
   tmuxListSessionsDetailedWith,
+  tmuxListSessionsRead,
   type MachineExecutor,
   type TmuxSessionInfo,
 } from '@n10/terminal-tmux';
@@ -31,6 +32,17 @@ function sessionsFromListing(
     if (session) ours.push(session);
   }
   return ours;
+}
+
+/** {@link listOurSessions}, or `null` when tmux could not be asked —
+ *  for a caller that must not read a failed listing as no sessions. */
+export function readOurSessions(): TaggedSession[] | null {
+  try {
+    const listed = tmuxListSessionsRead(LISTED_TAGS);
+    return listed && sessionsFromListing(listed);
+  } catch {
+    return null;
+  }
 }
 
 /** Every session on the server that carries our tags, in tmux's

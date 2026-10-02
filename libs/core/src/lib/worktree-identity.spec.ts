@@ -29,6 +29,7 @@ vi.mock('@n10/terminal-tmux', () => ({
   isTmuxAvailable: vi.fn(),
   tmuxKillSession: vi.fn(),
   tmuxListSessionsDetailed: () => listMock(),
+  tmuxListSessionsRead: () => listMock(),
 }));
 vi.mock('@n10/worktree-manager', () => ({ listWorktrees: vi.fn() }));
 vi.mock('./pty-registry.js', () => ({

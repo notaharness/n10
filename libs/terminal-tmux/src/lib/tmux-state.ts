@@ -167,9 +167,19 @@ export function listSessionsArgv(options: readonly string[] = []): string[] {
 export function tmuxListSessionsDetailed(
   options: readonly string[] = []
 ): TmuxSessionInfo[] {
-  const { stdout, exitCode } = runTmux(listSessionsArgv(options));
-  if (exitCode !== 0) return [];
-  return stdout
+  return tmuxListSessionsRead(options) ?? [];
+}
+
+/** {@link tmuxListSessionsDetailed} for a caller that must tell an
+ *  empty server from one n10 could not ask: `null` when tmux could not
+ *  be run or answered with anything but "no server" (a failed fork, the
+ *  timeout kill), as {@link TmuxPaneRead}'s `'failed'`. */
+export function tmuxListSessionsRead(
+  options: readonly string[] = []
+): TmuxSessionInfo[] | null {
+  const result = runTmux(listSessionsArgv(options));
+  if (result.exitCode !== 0) return isNoServer(result) ? [] : null;
+  return result.stdout
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)

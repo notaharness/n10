@@ -113,7 +113,7 @@ export function startSessionDiscovery(
 
   async function observe(): Promise<{
     scan: DiscoveryScan;
-    held: Set<string>;
+    held: Set<string> | null;
   }> {
     const worktrees: DiscoveredWorktree[] = (
       await listWorktrees(opts.scope())
@@ -147,8 +147,10 @@ export function startSessionDiscovery(
 
   /** An agent that exited with its pane kept stays to be read and
    *  resumed while tmux holds its session. Nothing polls a dead pane, so
-   *  only a scan sees the session go (killed, its server ended). */
-  function releaseGone(held: Set<string>): number {
+   *  only a scan sees the session go (killed, its server ended). A
+   *  listing tmux could not give (`held` null) releases nothing. */
+  function releaseGone(held: Set<string> | null): number {
+    if (!held) return 0;
     let released = 0;
     for (const name of sessionNames()) {
       const identity = sessionIdentity(name);
