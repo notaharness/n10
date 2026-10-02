@@ -90,6 +90,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   banner. A tab that followed its worktree off its opening branch no longer
   answers to its opening id (`standsFor`/`tabIdFor`). Session keys are the
   checkout (core's `worktreeSessionRow`), so the row keeps its agent.
+  A worktree discovery reports removed closes its tabs (`worktrees-removed`,
+  matched by checkout), whoever removed it.
   `TabsProvider` sits above the repo gate in `App.tsx`.
   `tabs.properties.spec.ts` holds the invariants.
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a

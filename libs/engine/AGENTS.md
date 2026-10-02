@@ -63,7 +63,9 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   launch/stop commands. Discovery uses `worktrees.scope()` live; tmux observation
   takes the captured repository. Launches capture config before awaiting, reject
   a repository switch before spawning, and serialize by request and resolved key.
-  Repository disposal stops observation, never the connected agents. Shells supply
+  Repository disposal stops observation, never the connected agents; the
+  next handle's discovery starts from its last scan, so removals in between
+  are reported. Shells supply
   dimensions, relays and terminal-tab presentation. Core keeps pure observations,
   tags, PTY activity classification and native guarded launch/removal operations.
   `branchSessions` (`branch-sessions.ts`) decides which agents and terminals
