@@ -66,8 +66,8 @@ describe('fileAnalysisQuery', () => {
     const qc = client();
     const lines = [line('a'), line('b')];
 
-    const first = await qc.fetchQuery(fileAnalysisQuery('a.ts', lines, 'dark'));
-    const second = await qc.fetchQuery(
+    const first = await qc.query(fileAnalysisQuery('a.ts', lines, 'dark'));
+    const second = await qc.query(
       fileAnalysisQuery('a.ts', lines, 'dark')
     );
 
@@ -79,11 +79,11 @@ describe('fileAnalysisQuery', () => {
     const qc = client();
     const lines = [line('a')];
 
-    await qc.fetchQuery(fileAnalysisQuery('a.ts', lines, 'dark'));
+    await qc.query(fileAnalysisQuery('a.ts', lines, 'dark'));
     // Scrolled away: nothing observes the entry any more.
-    await qc.fetchQuery(fileAnalysisQuery('b.ts', [line('b')], 'dark'));
+    await qc.query(fileAnalysisQuery('b.ts', [line('b')], 'dark'));
     // ...and back.
-    await qc.fetchQuery(fileAnalysisQuery('a.ts', lines, 'dark'));
+    await qc.query(fileAnalysisQuery('a.ts', lines, 'dark'));
 
     expect(analyze.mock.calls.map((c) => c[0])).toEqual(['a.ts', 'b.ts']);
   });
@@ -95,8 +95,8 @@ describe('fileAnalysisQuery', () => {
     const near = [line('first hunk')];
     const far = [line('second hunk')];
 
-    const a = await qc.fetchQuery(fileAnalysisQuery('a.ts', near, 'dark'));
-    const b = await qc.fetchQuery(fileAnalysisQuery('a.ts', far, 'dark'));
+    const a = await qc.query(fileAnalysisQuery('a.ts', near, 'dark'));
+    const b = await qc.query(fileAnalysisQuery('a.ts', far, 'dark'));
 
     expect(a.tokens?.[0][0].content).toBe('first hunk');
     expect(b.tokens?.[0][0].content).toBe('second hunk');
@@ -106,8 +106,8 @@ describe('fileAnalysisQuery', () => {
     const qc = client();
     const lines = [line('a')];
 
-    await qc.fetchQuery(fileAnalysisQuery('a.ts', lines, 'dark'));
-    await qc.fetchQuery(fileAnalysisQuery('a.ts', lines, 'light'));
+    await qc.query(fileAnalysisQuery('a.ts', lines, 'dark'));
+    await qc.query(fileAnalysisQuery('a.ts', lines, 'light'));
 
     expect(analyze.mock.calls.map((c) => c[2])).toEqual(['dark', 'light']);
   });
@@ -116,8 +116,8 @@ describe('fileAnalysisQuery', () => {
     const qc = client();
     const lines = [line('a')];
 
-    await qc.fetchQuery(fileAnalysisQuery('a.ts', lines, 'dark'));
-    await qc.fetchQuery(fileAnalysisQuery('b.ts', lines, 'dark'));
+    await qc.query(fileAnalysisQuery('a.ts', lines, 'dark'));
+    await qc.query(fileAnalysisQuery('b.ts', lines, 'dark'));
 
     expect(analyze).toHaveBeenCalledTimes(2);
   });
@@ -134,8 +134,8 @@ describe('fileAnalysisQuery', () => {
       { type: 'add', content: 'const a = 1;', newLine: 1 },
     ];
 
-    await qc.fetchQuery(fileAnalysisQuery('a.ts', removed, 'dark'));
-    await qc.fetchQuery(fileAnalysisQuery('a.ts', added, 'dark'));
+    await qc.query(fileAnalysisQuery('a.ts', removed, 'dark'));
+    await qc.query(fileAnalysisQuery('a.ts', added, 'dark'));
 
     expect(analyze).toHaveBeenCalledTimes(2);
   });
@@ -145,9 +145,9 @@ describe('codeTokensQuery', () => {
   it('tokenizes one fenced block once and keys on its content', async () => {
     const qc = client();
 
-    await qc.fetchQuery(codeTokensQuery('const a = 1', 'ts', 'dark'));
-    await qc.fetchQuery(codeTokensQuery('const a = 1', 'ts', 'dark'));
-    await qc.fetchQuery(codeTokensQuery('const b = 2', 'ts', 'dark'));
+    await qc.query(codeTokensQuery('const a = 1', 'ts', 'dark'));
+    await qc.query(codeTokensQuery('const a = 1', 'ts', 'dark'));
+    await qc.query(codeTokensQuery('const b = 2', 'ts', 'dark'));
 
     expect(tokenize.mock.calls.map((c) => c[0])).toEqual([
       'const a = 1',
@@ -158,9 +158,9 @@ describe('codeTokensQuery', () => {
   it('keys on the language tag and the theme too', async () => {
     const qc = client();
 
-    await qc.fetchQuery(codeTokensQuery('x', 'ts', 'dark'));
-    await qc.fetchQuery(codeTokensQuery('x', 'py', 'dark'));
-    await qc.fetchQuery(codeTokensQuery('x', 'ts', 'light'));
+    await qc.query(codeTokensQuery('x', 'ts', 'dark'));
+    await qc.query(codeTokensQuery('x', 'py', 'dark'));
+    await qc.query(codeTokensQuery('x', 'ts', 'light'));
 
     expect(tokenize).toHaveBeenCalledTimes(3);
   });
@@ -236,7 +236,7 @@ describe('the review walkthrough snippet path', () => {
     // Five renders of one step: a keystroke in the draft editor, a
     // toast, a `drafts` refetch — none of them touch the snippet.
     for (let i = 0; i < 5; i++) {
-      await qc.fetchQuery(
+      await qc.query(
         fileAnalysisQuery('a.ts', renderSnippetLines(), 'dark')
       );
     }
@@ -250,8 +250,8 @@ describe('the review walkthrough snippet path', () => {
     const here = snippetAround(FILE, 'RIGHT', 1, 1).map((r) => r.line);
     const there = snippetAround(FILE, 'RIGHT', 5, 5).map((r) => r.line);
 
-    await qc.fetchQuery(fileAnalysisQuery('a.ts', here, 'dark'));
-    await qc.fetchQuery(fileAnalysisQuery('a.ts', there, 'dark'));
+    await qc.query(fileAnalysisQuery('a.ts', here, 'dark'));
+    await qc.query(fileAnalysisQuery('a.ts', there, 'dark'));
 
     expect(analyze).toHaveBeenCalledTimes(2);
   });
@@ -300,7 +300,7 @@ describe('the virtualized whole-file path', () => {
     ];
     for (const viewport of viewports) {
       for (const file of viewport) {
-        await qc.fetchQuery(fileAnalysisQuery(file, files.get(file)!, 'dark'));
+        await qc.query(fileAnalysisQuery(file, files.get(file)!, 'dark'));
       }
     }
 

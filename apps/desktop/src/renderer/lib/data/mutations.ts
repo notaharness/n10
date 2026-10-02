@@ -69,7 +69,7 @@ export function useSubmitVerdict(cwd: string, providerId?: string) {
     // row badges all derive from it) and roll back only on error.
     onMutate: async ({ prId, verdict }) => {
       const viewer = await qc
-        .fetchQuery({
+        .query({
           queryKey: keys.reviewViewer(cwd),
           queryFn: () => window.n10.getReviewViewer(),
           staleTime: Infinity,
