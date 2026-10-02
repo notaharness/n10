@@ -58,7 +58,14 @@ vi.mock('@n10/core', async (original) => ({
       state.exits.delete(listener);
     };
   },
-  strandedSessionRows: () => state.stranded,
+  strandedSessionRows: (
+    _repo: string,
+    _isAlive: unknown,
+    keep: (name: string) => boolean
+  ) =>
+    state.stranded.filter(
+      (row) => !row.path?.startsWith('/back') || keep(row.name)
+    ),
   releaseExitedSession: (name: string) => {
     state.released.push(name);
     state.entries.delete(name);
@@ -436,6 +443,35 @@ it('lists an agent still running in a removed worktree', async () => {
     f.service.dispose();
   } finally {
     state.stranded = [];
+  }
+});
+
+// Its directory is back, but git does not list it and discovery holds
+// it stranded: the agent keeps its row.
+it('keeps the row of an agent discovery holds stranded', async () => {
+  const row = {
+    name: worktreeSessionKey('/back/wt', '/repo'),
+    label: 'wt',
+    path: '/back/wt',
+    running: true,
+    worktreeRemoved: true as const,
+  };
+  state.stranded = [row];
+  try {
+    const f = fixture();
+    f.service.watch({ size });
+    await f.service.read();
+    expect(f.service.getSnapshot().sessions).not.toContainEqual(row);
+    state.lastScan.mockReturnValue({
+      ...scanOf(wt),
+      stranded: [{ name: row.name, branch: '', path: row.path }],
+    });
+    await f.service.refresh();
+    expect(f.service.getSnapshot().sessions).toContainEqual(row);
+    f.service.dispose();
+  } finally {
+    state.stranded = [];
+    state.lastScan.mockReturnValue(null);
   }
 });
 

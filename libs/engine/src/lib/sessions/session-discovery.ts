@@ -55,7 +55,10 @@ function endFinishedStranded(
   delta: DiscoveryDelta
 ): void {
   const stranded = new Set(previous?.stranded.map((wt) => wt.name));
-  const finished = delta.disappeared.filter((wt) => stranded.has(wt.name));
+  // Never a running agent: only one that has ended leaves nothing to show.
+  const finished = delta.disappeared.filter(
+    (wt) => stranded.has(wt.name) && !isSessionAlive(wt.name)
+  );
   if (finished.length === 0) return;
   for (const wt of finished) stopSession(wt.name);
   const gone = new Set(finished.map((wt) => canonicalWorktreePath(wt.path)));
@@ -120,14 +123,21 @@ export function startSessionDiscovery(
       path: wt.path,
     }));
     const seen = observeTmuxSessions(repo, worktrees);
+    // Stays stranded while its agent runs and git does not list it, even
+    // if something recreates the directory.
+    const listed = new Set(worktrees.map((wt) => wt.name));
+    const wasStranded = new Set(previous?.stranded.map((wt) => wt.name));
+    const keep = (name: string) => wasStranded.has(name) && !listed.has(name);
     return {
       scan: {
         worktrees,
-        stranded: strandedSessionRows(repo, isSessionAlive).map((row) => ({
-          name: row.name,
-          branch: '',
-          path: row.path ?? '',
-        })),
+        stranded: strandedSessionRows(repo, isSessionAlive, keep).map(
+          (row) => ({
+            name: row.name,
+            branch: '',
+            path: row.path ?? '',
+          })
+        ),
         persisted: seen.persisted,
         terminals: adoptTerminal ? seen.terminals : [],
       },

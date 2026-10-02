@@ -27,7 +27,10 @@ const {
   watchMock: vi.fn(),
   basePathMock: vi.fn<() => string>(),
   released: [] as string[],
-  strandedMock: vi.fn<() => { name: string; path?: string }[]>(),
+  strandedMock:
+    vi.fn<
+      (keep: (name: string) => boolean) => { name: string; path?: string }[]
+    >(),
   exitSubscribers: new Set<(name: string) => void>(),
   stopped: [] as string[],
 }));
@@ -53,7 +56,11 @@ vi.mock('@n10/core', async (original) => ({
     held: listHeldMock(),
   }),
   releaseExitedSession: (name: string) => released.push(name),
-  strandedSessionRows: () => strandedMock(),
+  strandedSessionRows: (
+    _repo: string,
+    _isAlive: unknown,
+    keep: (name: string) => boolean
+  ) => strandedMock(keep),
   stopSession: (name: string) => stopped.push(name),
   onSessionExit: (cb: (name: string) => void) => {
     exitSubscribers.add(cb);
@@ -311,6 +318,44 @@ describe('startSessionDiscovery', () => {
     const { discovery, onChanged } = start();
     await discovery.scanNow();
     expect(onChanged).toHaveBeenCalledOnce();
+  });
+
+  /** A running agent's worktree, removed and stranded by one scan. */
+  async function strandedAgent() {
+    const key = wtKey('feature-a');
+    const path = '/repo/.claude/worktrees/feature-a';
+    alive.add(key);
+    sessionNamesMock.mockReturnValue([key]);
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    const started = start();
+    await started.discovery.scanNow();
+    listWorktreesMock.mockResolvedValue([]);
+    strandedMock.mockReturnValue([{ name: key, path }]);
+    await started.discovery.scanNow();
+    return { ...started, key, path };
+  }
+
+  // Something recreated the directory: git still does not list it, and
+  // the agent runs on.
+  it('keeps a worktree stranded while its agent runs, its directory back', async () => {
+    const { discovery, onChanged, key, path } = await strandedAgent();
+    onChanged.mockClear();
+    strandedMock.mockImplementation((keep) =>
+      keep(key) ? [{ name: key, path }] : []
+    );
+    await discovery.scanNow();
+    expect(onChanged).not.toHaveBeenCalled();
+    expect(stopped).toEqual([]);
+  });
+
+  // Whatever takes a worktree out of the stranded set, a running agent
+  // is never ended for it.
+  it('never ends a running agent whose worktree is no longer stranded', async () => {
+    const { discovery, key } = await strandedAgent();
+    strandedMock.mockReturnValue([]);
+    await discovery.scanNow();
+    expect(alive.has(key)).toBe(true);
+    expect(stopped).toEqual([]);
   });
 
   // Its agent outlived it, so the shells keep showing the agent until

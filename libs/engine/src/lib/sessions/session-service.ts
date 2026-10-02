@@ -72,15 +72,26 @@ export function createSessionService(options: {
   function publish(): void {
     if (disposed) return;
     // A row per worktree, then one per agent still running in a
-    // worktree that is gone, so it can be seen and stopped.
+    // worktree that is gone, so it can be seen and stopped. One
+    // discovery holds stranded stays so while git does not list it,
+    // whatever recreated its directory.
+    const rows = worktrees
+      .getSnapshot()
+      .worktrees.map((wt) =>
+        worktreeSessionRow(wt, isSessionAlive, config.repo)
+      );
+    const listed = new Set(rows.map((row) => row.name));
+    const stranded = new Set(
+      discovery?.lastScan()?.stranded.map((wt) => wt.name)
+    );
     const next = {
       sessions: [
-        ...worktrees
-          .getSnapshot()
-          .worktrees.map((wt) =>
-            worktreeSessionRow(wt, isSessionAlive, config.repo)
-          ),
-        ...strandedSessionRows(config.repo, isSessionAlive),
+        ...rows,
+        ...strandedSessionRows(
+          config.repo,
+          isSessionAlive,
+          (name) => stranded.has(name) && !listed.has(name)
+        ),
       ],
       error: worktrees.getSnapshot().error,
     };

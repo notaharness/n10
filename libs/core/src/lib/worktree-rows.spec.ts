@@ -54,6 +54,20 @@ describe('strandedSessionRows', () => {
     expect(strandedSessionRows(REPO, () => true)).toEqual([]);
   });
 
+  // Already stranded, and something recreated the directory under it.
+  it('keeps an agent it is told to keep whose checkout is back', () => {
+    state.names = [key('back'), key('kept')];
+    state.present.add(checkout('back'));
+    state.present.add(checkout('kept'));
+    expect(
+      strandedSessionRows(
+        REPO,
+        () => true,
+        (name) => name === key('back')
+      )
+    ).toEqual([expect.objectContaining({ name: key('back') })]);
+  });
+
   it('leaves out an agent that has exited', () => {
     state.names = [key('done')];
     expect(strandedSessionRows(REPO, () => false)).toEqual([]);

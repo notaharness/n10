@@ -1,7 +1,7 @@
 import { sessionBranch } from './setup/session-keys.js';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
@@ -13,7 +13,9 @@ import {
   tab,
   visibleText,
 } from './setup/app.js';
+import { rescan } from './setup/discovery.js';
 import { armContextMenuChoice, armContextMenuDismiss } from './setup/menu.js';
+import { findN10SessionFor } from './setup/tmux.js';
 
 const BRANCH = 'doomed';
 
@@ -301,6 +303,28 @@ test.describe('Worktree removed outside n10 (running agent)', () => {
         expect(await agentRunning(page)).toBe(false);
       });
     }
+  });
+
+  test.describe('its directory recreated', () => {
+    test.use({ n10Config: { aiCommand: fakeAgent() } });
+
+    // `mkdir -p`, or a tool writing to a path under it: git still does
+    // not list the worktree, and the agent runs on.
+    test('keeps the agent running and its tab marked', async ({ desktop }) => {
+      const { page, repoPath, homeDir } = desktop;
+      await removeUnderAgent(page, repoPath, removals[1]![1]);
+
+      mkdirSync(join(repoPath, '.claude', 'worktrees', BRANCH), {
+        recursive: true,
+      });
+      await rescan(page, repoPath);
+
+      expect(findN10SessionFor(BRANCH, homeDir)).toBeDefined();
+      expect(await agentRunning(page)).toBe(true);
+      await expect(
+        tab(page, new RegExp(`${BRANCH}.*Worktree removed`))
+      ).toBeVisible();
+    });
   });
 
   test.describe('exiting on its own', () => {

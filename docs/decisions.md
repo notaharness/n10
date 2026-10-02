@@ -466,7 +466,9 @@ local agent whose checkout directory is gone. It has no branch, since the
 branch may be checked out in a new worktree, and is keyed by its session.
 Discovery holds the worktree as `stranded`, not removed, and reports it gone
 as soon as the agent exits or is stopped; it then ends the agent's tmux
-session, whose retained pane has nothing left to show or restart in. The
+session, whose retained pane has nothing left to show or restart in. It stays
+stranded while its agent runs and git does not list it, even if something
+recreates the directory, and discovery never ends a running agent. The
 desktop tab shows the terminal with Stop agent; the TUI marks the row
 `worktree removed` and its tab-bar entry `removed`, and the kill-agent key
 stops it.

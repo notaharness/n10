@@ -56,10 +56,15 @@ export function worktreeSessionRow(
  * must not claim that worktree's pull request or badges. It is labelled
  * with the branch its agent was created for. This machine's only: no
  * directory of another machine is ever looked for here.
+ *
+ * `keep` names agents to list even though their directory exists again:
+ * one already stranded whose checkout git still does not list, as when
+ * something recreates the directory under a running agent.
  */
 export function strandedSessionRows(
   repo: string,
-  isAlive: (name: string) => boolean
+  isAlive: (name: string) => boolean,
+  keep: (name: string) => boolean = () => false
 ): AgentSession[] {
   return sessionNames().flatMap((name): AgentSession[] => {
     const identity = sessionIdentity(name);
@@ -68,7 +73,7 @@ export function strandedSessionRows(
       identity.machine !== LOCAL_MACHINE ||
       identity.repo !== repo ||
       !isAlive(name) ||
-      existsSync(identity.path)
+      (existsSync(identity.path) && !keep(name))
     )
       return [];
     return [
