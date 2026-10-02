@@ -65,7 +65,9 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   a repository switch before spawning, and serialize by request and resolved key.
   Repository disposal stops observation, never the connected agents; the
   next handle's discovery starts from its last scan, so removals in between
-  are reported. Shells supply
+  are reported. Connections list the agents the registry holds; one whose
+  tmux session is gone (`processState.gone`) is released as it ends, while an
+  exited one with its dead pane kept stays. Shells supply
   dimensions, relays and terminal-tab presentation. Core keeps pure observations,
   tags, PTY activity classification and native guarded launch/removal operations.
   `branchSessions` (`branch-sessions.ts`) decides which agents and terminals

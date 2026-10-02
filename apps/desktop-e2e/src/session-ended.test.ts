@@ -2,17 +2,24 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import {
   createWorktree,
+  focusTerminal,
   launchAgentFromRail,
   sessionCard,
+  sessionCards,
+  sessionMenu,
+  tab,
   visibleText,
 } from './setup/app.js';
 import { findN10SessionFor, killTmuxSession } from './setup/tmux.js';
 
 /**
- * An agent's session can end under its open tab: stopped from the tab's
- * card, killed from outside with `tmux kill-session`, or exiting on its
- * own. The tab must follow without surfacing the dead PTY's errors to
- * the user, even for keystrokes and resizes already on their way.
+ * An agent's session can end under its open tab, and what the tab shows
+ * follows what tmux keeps. A process that exits leaves its dead pane:
+ * the tab keeps it, read-only, with Resume. A session that is gone —
+ * stopped from its card, or killed with `tmux kill-session` — leaves
+ * nothing: the tab goes back to its no-agent state. Either way the dead
+ * PTY's errors never reach the user, even for keystrokes and resizes
+ * already on their way.
  */
 
 const BRANCH = 'ending';
@@ -36,7 +43,7 @@ async function watchForIpcErrors(page: Page) {
     page.evaluate(() => (window as { ipcErrors?: string[] }).ipcErrors ?? []);
 }
 
-/** Keystrokes into the terminal, and a window resize to refit it. */
+/** Keystrokes, and a window resize that refits the terminal. */
 async function typeAndResize(page: Page, app: ElectronApplication) {
   await page.keyboard.type('after the end');
   await app.evaluate(({ BrowserWindow }) => {
@@ -45,12 +52,6 @@ async function typeAndResize(page: Page, app: ElectronApplication) {
     const [width = 1280, height = 800] = win.getSize();
     win.setSize(width - 120, height - 80);
   });
-}
-
-/** Put the keyboard in the agent's terminal, where it is still shown. */
-async function focusTerminal(page: Page) {
-  const terminal = page.locator('.wterm').filter({ visible: true }).first();
-  if (await terminal.isVisible()) await terminal.click();
 }
 
 async function launchAgent(page: Page) {
@@ -62,46 +63,78 @@ async function launchAgent(page: Page) {
   await focusTerminal(page);
 }
 
-test.use({ n10Config: { aiCommand: fakeAgent() } });
+/** The worktree tab, back to having no agent: no card, no terminal,
+ *  Launch Agent on offer. */
+async function expectNoAgent(page: Page) {
+  await expect(sessionCards(page)).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.locator('.wterm').filter({ visible: true })).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Launch Agent', exact: true })
+  ).toBeVisible();
+  await expect(tab(page, BRANCH)).toBeVisible();
+}
 
-test('a session killed from outside ends quietly under its tab', async ({
-  desktop,
-}) => {
-  const { page, app, homeDir } = desktop;
-  await launchAgent(page);
-  const ipcErrors = await watchForIpcErrors(page);
+test.describe('An agent whose process exits', () => {
+  test.use({ n10Config: { aiCommand: fakeAgent({ exitAfterMs: 3_000 }) } });
 
-  const name = findN10SessionFor(BRANCH, homeDir);
-  expect(name).toBeDefined();
-  killTmuxSession(name!, homeDir);
-  await page.keyboard.type('during the end');
-  await expect(sessionCard(page, 'Agent')).toContainText('Exited', {
-    timeout: 15_000,
+  test('keeps its final output, read-only, with Resume', async ({
+    desktop,
+  }) => {
+    const { page, app } = desktop;
+    await launchAgent(page);
+    const ipcErrors = await watchForIpcErrors(page);
+    await page.keyboard.type('during the end');
+
+    await expect(sessionCard(page, 'Agent')).toContainText('Exited', {
+      timeout: 15_000,
+    });
+    await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible();
+    const resume = page.getByRole('button', { name: 'Resume agent' });
+    await expect(resume).toBeVisible();
+    await focusTerminal(page);
+    await typeAndResize(page, app);
+    await expect.poll(ipcErrors, { timeout: 3_000 }).toEqual([]);
+
+    await resume.click();
+    await expect(sessionMenu(page)).toBeVisible();
   });
-  await focusTerminal(page);
-  await typeAndResize(page, app);
-
-  await expect.poll(ipcErrors, { timeout: 3_000 }).toEqual([]);
 });
 
-test('an agent stopped from its card ends quietly under its tab', async ({
-  desktop,
-}) => {
-  const { page, app } = desktop;
-  await launchAgent(page);
-  const ipcErrors = await watchForIpcErrors(page);
+test.describe('An agent whose tmux session is gone', () => {
+  test.use({ n10Config: { aiCommand: fakeAgent() } });
 
-  await page
-    .getByRole('button', { name: 'Stop agent' })
-    .filter({ visible: true })
-    .click();
-  await focusTerminal(page);
-  await page.keyboard.type('during the end');
-  await expect(sessionCard(page, 'Agent')).toContainText('Exited', {
-    timeout: 15_000,
+  test('killed from outside, leaves its tab with no agent', async ({
+    desktop,
+  }) => {
+    const { page, app, homeDir } = desktop;
+    await launchAgent(page);
+    const ipcErrors = await watchForIpcErrors(page);
+
+    const name = findN10SessionFor(BRANCH, homeDir);
+    expect(name).toBeDefined();
+    killTmuxSession(name!, homeDir);
+    await page.keyboard.type('during the end');
+
+    await expectNoAgent(page);
+    await typeAndResize(page, app);
+    await expect.poll(ipcErrors, { timeout: 3_000 }).toEqual([]);
   });
-  await focusTerminal(page);
-  await typeAndResize(page, app);
 
-  await expect.poll(ipcErrors, { timeout: 3_000 }).toEqual([]);
+  test('stopped from its card, leaves its tab with no agent', async ({
+    desktop,
+  }) => {
+    const { page, app } = desktop;
+    await launchAgent(page);
+    const ipcErrors = await watchForIpcErrors(page);
+
+    await page
+      .getByRole('button', { name: 'Stop agent' })
+      .filter({ visible: true })
+      .click();
+    await page.keyboard.type('during the end');
+
+    await expectNoAgent(page);
+    await typeAndResize(page, app);
+    await expect.poll(ipcErrors, { timeout: 3_000 }).toEqual([]);
+  });
 });

@@ -96,7 +96,9 @@ test.describe('An agent that exits immediately', () => {
     await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible();
   });
 
-  test('typing into an exited agent reports the failed delivery without a renderer exception', async ({
+  // Its pane is a read-only view of the final output: keystrokes go
+  // nowhere, and say nothing about it.
+  test('typing into an exited agent is ignored without an error', async ({
     desktop,
   }) => {
     const { page } = desktop;
@@ -106,8 +108,13 @@ test.describe('An agent that exits immediately', () => {
 
     await focusTerminal(page);
     await page.keyboard.type('hello');
+    await expect(
+      page.getByRole('button', { name: 'Resume agent' })
+    ).toBeVisible();
     expect(desktop.pageErrors).toEqual([]);
-    await expect(page.getByText(/Session .* is not running/)).toBeVisible();
+    await expect(page.getByText(/is not running|Error invoking/)).toHaveCount(
+      0
+    );
     await expect(tabs(page)).toHaveCount(1);
   });
 

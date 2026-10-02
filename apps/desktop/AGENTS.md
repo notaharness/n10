@@ -98,8 +98,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   collapsible rail (Sessions · Files) beside one content pane that
   swaps between Overview, diff, a session's terminal (mounted only while shown) and
   `ReviewStepper`. The rail lists the engine's `branchSessions`: the agent in
-  each of the branch's checkouts (one per machine, kept once it stops, so its
-  pane stays mounted for a relaunch) and the terminals opened in them, with Launch Agent and Launch Terminal above. A launched session takes
+  each of the branch's checkouts (one per machine; one that exited with its
+  dead pane kept stays, read-only with Resume, while one whose tmux session is
+  gone leaves) and the terminals opened in them, with Launch Agent and Launch Terminal above. A launched session takes
   the pane. A terminal in a branch's checkout gets no strip tab of its own
   (`TerminalSummary.branch`). It opens on a running agent's terminal, else on the PR's
   Overview, whoever wrote it (`lib/review/overview-model.ts`). The diff toolbar lives in

@@ -188,9 +188,20 @@ resolution or fleet checks. A repository change before launch refuses the reques
 Identical requests join; incompatible requests resolving to one checkout cannot
 replace each other's PTY. Stopping observation on a repo switch disposes timers
 and listeners but preserves every connected agent. Exit notifications update
-session facts without spawning or reattaching. The process-level repository service
-retains observed connection identities after an explicit stop, so an existing
-pane remains a relaunch target even after switching away and back.
+session facts without spawning or reattaching.
+
+How an agent's session ended decides what its tab shows, following what tmux
+keeps. A process that exits or crashes leaves its dead pane (`remain-on-exit`):
+the agent stays listed as exited, across repository switches, and its pane is a
+read-only view of the final output with Resume. Nothing is sent to it, neither
+keystrokes nor resizes. A session that is gone — n10's Stop, `tmux kill-session`
+outside n10, a tmux server restart — leaves nothing to show: the backend reports
+`processState.gone`, the engine releases the agent as it ends, and its card and
+pane go, so the tab returns to its no-agent state (Launch Agent, the Overview).
+Another machine that cannot be reached is neither: its agent is waiting to
+reconnect, shown on its card and the pane's banner. Keystrokes and resizes that
+race any of these are dropped and logged by the host, never thrown back to the
+renderer.
 
 Agent selection uses explicit `agentId`, defaulting to Claude. The hidden fixture
 runner requires `agentId: 'test'`; only that runner interprets `aiCommand`. No
