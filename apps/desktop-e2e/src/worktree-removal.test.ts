@@ -11,6 +11,7 @@ import {
   launchAgentFromRail,
   sidebarRow,
   tab,
+  visibleText,
 } from './setup/app.js';
 import { armContextMenuChoice, armContextMenuDismiss } from './setup/menu.js';
 
@@ -238,6 +239,91 @@ test.describe('Worktree removed by the merged-branch sweep', () => {
     expect(await sawPreparing()).toBe(false);
   });
 });
+
+/**
+ * The same, with an agent still running in the worktree. The agent
+ * outlives its directory, so its tab stays, says the worktree is gone
+ * and offers to stop it; it closes once the agent is gone.
+ */
+test.describe('Worktree removed outside n10 (running agent)', () => {
+  const removals: [string, (repoPath: string, dir: string) => void][] = [
+    [
+      'git worktree remove --force',
+      (repoPath, dir) =>
+        execFileSync('git', ['worktree', 'remove', '--force', dir], {
+          cwd: repoPath,
+          stdio: 'ignore',
+        }),
+    ],
+    [
+      'deleting its directory',
+      (_repoPath, dir) => rmSync(dir, { recursive: true, force: true }),
+    ],
+  ];
+
+  /** A worktree with an agent running in it, removed with `remove`. */
+  async function removeUnderAgent(
+    page: Page,
+    repoPath: string,
+    remove: (repoPath: string, dir: string) => void
+  ) {
+    await createWorktree(page, BRANCH);
+    await launchAgentFromRail(page);
+    await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible({
+      timeout: 30_000,
+    });
+    remove(repoPath, join(repoPath, '.claude', 'worktrees', BRANCH));
+    await expect(
+      tab(page, new RegExp(`${BRANCH}.*Worktree removed`))
+    ).toBeVisible({ timeout: 20_000 });
+  }
+
+  test.describe('stopped from its tab', () => {
+    test.use({ n10Config: { aiCommand: fakeAgent() } });
+
+    for (const [how, remove] of removals) {
+      test(`${how} keeps the agent's tab until it is stopped`, async ({
+        desktop,
+      }) => {
+        const { page, repoPath } = desktop;
+        await removeUnderAgent(page, repoPath, remove);
+        await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible();
+
+        await page
+          .getByRole('button', { name: 'Stop agent' })
+          .filter({ visible: true })
+          .click();
+
+        await expect(tab(page, new RegExp(BRANCH))).toHaveCount(0, {
+          timeout: 20_000,
+        });
+        await expect(sidebarRow(page, new RegExp(BRANCH))).toHaveCount(0);
+        expect(await agentRunning(page)).toBe(false);
+      });
+    }
+  });
+
+  test.describe('exiting on its own', () => {
+    test.use({ n10Config: { aiCommand: fakeAgent({ exitAfterMs: 12_000 }) } });
+
+    test('closes the tab when the agent exits', async ({ desktop }) => {
+      const { page, repoPath } = desktop;
+      await removeUnderAgent(page, repoPath, removals[1]![1]);
+
+      await expect(tab(page, new RegExp(BRANCH))).toHaveCount(0, {
+        timeout: 40_000,
+      });
+    });
+  });
+});
+
+/** Whether the host holds a live agent for `BRANCH`. */
+async function agentRunning(page: Page): Promise<boolean> {
+  const sessions = await page.evaluate(() => window.n10.listSessions());
+  return (
+    sessions.find((s) => sessionBranch(s.name) === BRANCH)?.running ?? false
+  );
+}
 
 test.describe('Worktree removal (running agent)', () => {
   test.use({ n10Config: { aiCommand: fakeAgent({ stream: true }) } });
