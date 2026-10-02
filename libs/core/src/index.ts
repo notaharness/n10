@@ -166,6 +166,7 @@ export {
   resolveMachine,
   requireMachine,
   pollerFor,
+  setMachineReachable,
   type MachineResolver,
 } from './lib/machine-registry.js';
 

@@ -105,7 +105,9 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   mail relay, reconnection and native daemon ownership stay in shell adapters.
   `refresh` retains last-good rows and an error; `listMachines` rejects that
   error for callers that require a successful read, including IPC and ownership
-  checks. Machine data types are exported by browser-safe `@n10/engine/contract`.
+  checks. A peer's change between connected and not is passed to core's
+  machine registry (`setMachineReachable`), so its sessions wait to reconnect.
+  Machine data types are exported by browser-safe `@n10/engine/contract`.
 
 - **Plans** (`plans/`): `sessions.checkoutPlan` captures config and scope before
   lookup, checks repository lifetime before mutation, coalesces identical sends

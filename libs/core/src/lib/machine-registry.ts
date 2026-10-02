@@ -56,3 +56,13 @@ export function pollerFor(machine: RemoteMachine): RemoteSessionPoller {
   }
   return poller;
 }
+
+/** What the fleet says of a machine, ahead of any listing: the sessions
+ *  on it wait to reconnect as it goes offline, and try again as it
+ *  returns. Nothing to tell before a session on it has been opened. */
+export function setMachineReachable(
+  machineId: string,
+  reachable: boolean
+): void {
+  pollers.get(machineId)?.setReachable(reachable);
+}

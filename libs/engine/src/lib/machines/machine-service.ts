@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import { setMachineReachable } from '@n10/core';
 import { logError } from '@n10/logger';
 import { createRemoteMachines } from './remote-machines.js';
 import { refuseIfRemoteOwns } from './remote-owner.js';
@@ -39,6 +40,22 @@ export function createMachineService() {
   let version = 0;
   let reported: MachineView[] = [];
   let active: Promise<MachineSnapshot> | undefined;
+  /** Whether each peer was last connected, to report changes only. */
+  const reachable = new Map<string, boolean>();
+  /** The fleet hears of a peer going or coming back before any listing
+   *  on it can: its sessions are told at once. */
+  function reportReachability(machines: MachineView[]): void {
+    for (const machine of machines) {
+      if (machine.isLocal) continue;
+      const now = machine.state === 'connected';
+      const before = reachable.get(machine.peerId);
+      if (before === now) continue;
+      reachable.set(machine.peerId, now);
+      // First heard of as connected: nothing has changed for anyone.
+      if (before !== undefined || !now)
+        setMachineReachable(machine.peerId, now);
+    }
+  }
   let snapshot: MachineSnapshot = {
     available: false,
     machines: [],
@@ -69,6 +86,7 @@ export function createMachineService() {
   function receiveMachines(machines: MachineView[]): void {
     version += 1;
     reported = machines;
+    reportReachability(machines);
     const recovered = snapshot.error !== null;
     if (recovered) {
       snapshot = { ...snapshot, error: null };
