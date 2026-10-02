@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeScenario } from './scenario-file.js';
 
 /**
  * An Azure DevOps scenario as a test declares it, and the config that
@@ -230,7 +231,7 @@ export function installFakeAdo(
   scenario: FakeAzureDevOps
 ): { N10_FAKE_ADO: string; N10_HOST_REQUIRE: string } {
   const path = join(homeDir, 'fake-ado.json');
-  writeFileSync(path, JSON.stringify(served(scenario), null, 2), 'utf8');
+  writeScenario(path, served(scenario));
   return { N10_FAKE_ADO: path, N10_HOST_REQUIRE: FAKE_ADO_PRELOAD };
 }
 
@@ -310,7 +311,7 @@ export function updateFakeAdo(
   const path = join(homeDir, 'fake-ado.json');
   const served = fakeAdoServed(homeDir);
   change(served);
-  writeFileSync(path, JSON.stringify(served, null, 2), 'utf8');
+  writeScenario(path, served);
 }
 
 /**

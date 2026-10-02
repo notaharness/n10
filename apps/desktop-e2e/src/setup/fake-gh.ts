@@ -1,12 +1,7 @@
-import {
-  chmodSync,
-  copyFileSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeScenario } from './scenario-file.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -215,7 +210,7 @@ export function updateFakeGh(
   const path = fakeGhScenarioPath(homeDir);
   const scenario = JSON.parse(readFileSync(path, 'utf8')) as FakeGitHub;
   mutate(scenario);
-  writeFileSync(path, JSON.stringify(scenario, null, 2), 'utf8');
+  writeScenario(path, scenario);
 }
 
 export function installFakeGh(
@@ -234,7 +229,7 @@ export function installFakeGh(
   );
 
   const scenarioPath = fakeGhScenarioPath(homeDir);
-  writeFileSync(scenarioPath, JSON.stringify(scenario, null, 2), 'utf8');
+  writeScenario(scenarioPath, scenario);
 
   return {
     PATH: binDir,
