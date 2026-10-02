@@ -12,6 +12,7 @@ const {
   sessionNamesMock,
   watchMock,
   basePathMock,
+  released,
 } = vi.hoisted(() => ({
   listWorktreesMock: vi.fn<(scope: WorktreeScope) => Promise<WorktreeInfo[]>>(),
   listPersistedMock: vi.fn<() => Set<string>>(),
@@ -20,6 +21,7 @@ const {
   sessionNamesMock: vi.fn<() => string[]>(),
   watchMock: vi.fn(),
   basePathMock: vi.fn<() => string>(),
+  released: [] as string[],
 }));
 
 vi.mock('node:fs', () => ({
@@ -41,6 +43,7 @@ vi.mock('@n10/core', async (original) => ({
     persisted: listPersistedMock(),
     terminals: listTerminalsMock(),
   }),
+  releaseExitedSession: (name: string) => released.push(name),
 }));
 
 import { startSessionDiscovery } from './session-discovery.js';
@@ -89,6 +92,7 @@ beforeEach(() => {
   isSessionAliveMock.mockReset().mockImplementation((name) => alive.has(name));
   basePathMock.mockReset().mockReturnValue('/repo/.claude/worktrees');
   watchMock.mockReset().mockReturnValue({ close: vi.fn(), on: vi.fn() });
+  released.length = 0;
 });
 
 afterEach(() => {
@@ -236,6 +240,21 @@ describe('startSessionDiscovery', () => {
     expect(onChanged.mock.calls[0]![0]).toMatchObject({
       ended: [wtKey('feature-a')],
     });
+  });
+
+  // An exited agent's dead pane is not polled: the scan is what sees
+  // its session go, and nothing is left to read or resume.
+  it('releases an exited agent once its tmux session is gone', async () => {
+    const terminal = terminalSessionKey('repo-shell');
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    listPersistedMock.mockReturnValue(new Set([wtKey('feature-a'), terminal]));
+    const { discovery } = start();
+    await discovery.scanNow();
+    expect(released).toEqual([]);
+
+    listPersistedMock.mockReturnValue(new Set());
+    await discovery.scanNow();
+    expect(released).toEqual([wtKey('feature-a')]);
   });
 
   // The path is what a shell closes a tab by; the name alone would not

@@ -81,15 +81,6 @@ export function SessionsSection({
   );
 }
 
-/** What a card says of its session: another machine's that cannot be
- *  reached is neither running here nor exited. */
-function cardStatus(card: SessionCard): string {
-  if (!card.running) return 'Exited';
-  return card.connectionState && card.connectionState !== 'connected'
-    ? 'Waiting to reconnect'
-    : 'Running';
-}
-
 function SessionCardView({
   card,
   active,
@@ -153,7 +144,7 @@ function SessionCardView({
               card.running ? 'text-success' : 'text-muted-foreground'
             )}
           >
-            {cardStatus(card)}
+            {card.running ? 'Running' : 'Exited'}
           </span>
         </span>
         <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />

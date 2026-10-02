@@ -36,7 +36,7 @@ export function ConnectionBanner({
       <AlertTriangleIcon className="size-4 shrink-0" />
       <span className="flex-1">
         {state === 'reconnecting'
-          ? `Waiting to reconnect to ${machineLabel}…`
+          ? `Reconnecting to ${machineLabel}…`
           : `Disconnected from ${machineLabel}`}
       </span>
       {state === 'failed' && onReconnect && (

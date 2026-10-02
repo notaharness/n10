@@ -9,6 +9,7 @@ import {
   isSessionAlive,
   sessionNames,
   observeTmuxSessions,
+  releaseExitedSession,
   diffScans,
   type DiscoveredTerminal,
   type DiscoveredWorktree,
@@ -158,6 +159,13 @@ export function startSessionDiscovery(
       retired,
       hasSessionConnection
     );
+    // An agent that exited with its pane kept stays to be read and
+    // resumed while its tmux session lasts. Nothing polls a dead pane,
+    // so only a scan sees the session go (killed, its server ended).
+    for (const name of delta.ended) {
+      if (sessionIdentity(name)?.kind === 'worktree')
+        releaseExitedSession(name);
+    }
     // A repo switch starts a fresh scanner, but terminal tabs are process-global.
     // Reconcile held terminal keys too, including final frames from an earlier scan.
     // The scan sees this machine's tmux only: another machine's terminal
