@@ -26,6 +26,13 @@ describe('the host environment', () => {
     expect('NODE_OPTIONS' in env).toBe(false);
   });
 
+  it('takes the preload back out when the fork dropped the empty original', () => {
+    const env = hostEnv({ N10_HOST_REQUIRE: '/t/a.cjs' }, '/data');
+    delete env.N10_HOST_NODE_OPTIONS;
+    restoreNodeOptions(env);
+    expect('NODE_OPTIONS' in env).toBe(false);
+  });
+
   it('touches nothing without N10_HOST_REQUIRE', () => {
     const env = hostEnv({ NODE_OPTIONS: '--inspect' }, '/data');
     restoreNodeOptions(env);

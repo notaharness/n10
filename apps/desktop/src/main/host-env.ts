@@ -12,10 +12,14 @@ export const HOST_REQUIRE = 'N10_HOST_REQUIRE';
 export const HOST_NODE_OPTIONS = 'N10_HOST_NODE_OPTIONS';
 
 export function restoreNodeOptions(env: NodeJS.ProcessEnv): void {
-  delete env.N10_HOST_REQUIRE;
-  if (!(HOST_NODE_OPTIONS in env)) return;
+  // The preload says the host's were changed: the fork drops an empty
+  // variable, so an app started without NODE_OPTIONS leaves no
+  // N10_HOST_NODE_OPTIONS behind to say so.
+  const changed = Boolean(env.N10_HOST_REQUIRE);
   const original = env.N10_HOST_NODE_OPTIONS;
+  delete env.N10_HOST_REQUIRE;
   delete env.N10_HOST_NODE_OPTIONS;
+  if (!changed) return;
   if (original) env.NODE_OPTIONS = original;
   else delete env.NODE_OPTIONS;
 }
