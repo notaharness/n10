@@ -178,7 +178,7 @@ describe('pull request snapshots', () => {
     // different one now. A fresh entry must be read, not the old one's.
     const qc = new QueryClient();
     const read = (ref: typeof REF & { id: string }) =>
-      qc.fetchQuery({
+      qc.query({
         queryKey: keys.prSnapshot('/repo', ref, 'alice'),
         queryFn: () => Promise.resolve({ ref }),
         staleTime: 0,
