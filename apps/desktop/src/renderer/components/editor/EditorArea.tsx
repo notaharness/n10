@@ -207,6 +207,9 @@ export function EditorArea({
     if (tab.kind === 'terminal') return tab.name;
     const item = itemFor(tab);
     if (!item) return undefined;
+    // A worktree row is its own session's; its branch may name
+    // another checkout's too.
+    if (item.kind === 'session') return item.session.name;
     const branch = itemBranch(item);
     for (const i of items) {
       const name = itemSessionName(i);

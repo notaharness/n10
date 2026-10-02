@@ -41,6 +41,10 @@ export const SECTION_LABEL: Record<SectionKey, string> = {
 export function itemKey(item: SidebarItem): string {
   const pr = item.pr;
   if (pr) return `pr:${pr.id}`;
+  // Its branch may be checked out in a new worktree by now, which has
+  // the `branch:` key; the agent's own session tells the two apart.
+  if (item.kind === 'session' && item.session.worktreeRemoved)
+    return `removed:${item.session.name}`;
   if (item.kind === 'session')
     return `branch:${item.branch ?? item.session.label ?? item.session.name}`;
   return `pr:${item.pr.id}`;
@@ -97,6 +101,11 @@ export function itemSessionName(item: SidebarItem): string | undefined {
   return item.sessionName;
 }
 
+/** The row of an agent still running in a worktree that is gone. */
+export function itemWorktreeRemoved(item: SidebarItem): boolean {
+  return item.kind === 'session' && item.session.worktreeRemoved === true;
+}
+
 export function itemHasWorktree(item: SidebarItem): boolean {
   if (item.kind === 'session') return true;
   return Boolean(item.sessionName);
@@ -125,7 +134,9 @@ export function applyPendingRemovals(
 ): SidebarItem[] {
   if (removing.size === 0) return items;
   return items.flatMap((item) => {
-    if (!removing.has(itemBranch(item))) return [item];
+    // Another checkout's agent, whatever its branch is called.
+    if (itemWorktreeRemoved(item) || !removing.has(itemBranch(item)))
+      return [item];
     if (item.kind === 'session') return [];
     return [{ ...item, sessionName: undefined, running: undefined }];
   });
