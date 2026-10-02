@@ -98,6 +98,23 @@ test.describe('An agent whose process exits', () => {
     await resume.click();
     await expect(sessionMenu(page)).toBeVisible();
   });
+
+  // Its dead pane lasts only as long as its tmux session.
+  test('then killed from outside, leaves its tab with no agent', async ({
+    desktop,
+  }) => {
+    const { page, homeDir } = desktop;
+    await launchAgent(page);
+    await expect(sessionCard(page, 'Agent')).toContainText('Exited', {
+      timeout: 15_000,
+    });
+
+    const name = findN10SessionFor(BRANCH, homeDir);
+    expect(name).toBeDefined();
+    killTmuxSession(name!, homeDir);
+
+    await expectNoAgent(page);
+  });
 });
 
 test.describe('An agent whose tmux session is gone', () => {
