@@ -203,11 +203,12 @@ session go later, and releases it then. Another machine that cannot be reached
 is neither: its agent waits to reconnect, said on its card (in warning, not
 Running's green) and in the pane's banner. Two things notice. The fleet sees the
 peer go offline: the engine's machine service tells core's machine registry,
-whose poller tells that machine's sessions, and they wait without attaching
-until the fleet says the peer is back, since beam can hand back a stream to a
-peer that is not there. And a session listing on the machine that does not
-settle within a deadline counts as a failed poll, for a transport that neither
-answers nor fails. Keystrokes and resizes that race any of these are dropped and
+which remembers it for sessions opened later and tells that machine's poller.
+And a session listing on the machine that does not settle within a deadline
+counts as a failed poll, for a transport that neither answers nor fails. Either
+way the sessions attach nothing until the machine is back by every account (the
+fleet says so, and a listing succeeds again), since beam can hand back a stream
+to a peer that is not there, which would read as reconnected. Keystrokes and resizes that race any of these are dropped and
 logged by the host, never thrown back to the renderer.
 
 Agent selection uses explicit `agentId`, defaulting to Claude. The hidden fixture

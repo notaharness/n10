@@ -19,8 +19,9 @@ process exit, including retained panes; `onDisconnect` reports a local client
 ending while the hosted process is still running. The backend reconnects its
 client with bounded backoff while preserving the local subscriptions and size.
 A remote machine's poller gives up on a listing after a deadline, and passes on
-what the fleet says (`setReachable`): a remote backend attaches nothing while
-its machine is offline, and tries at once when it returns. Native `pane_dead` and exit
+what the fleet says (`setReachable`), also to a backend that subscribes later. A
+remote backend attaches nothing while the fleet says its machine is offline or
+the poller's last listing failed, and tries at once when both clear. Native `pane_dead` and exit
 status drive lifecycle information; no global tmux hooks are installed.
 The local and remote backends replay a retained pane's final frame only once
 their client has first drawn (`ClientDraw`): its alternate screen would hide a
