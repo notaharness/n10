@@ -66,7 +66,6 @@ vi.mock('./services/reviews.js', () =>
     'replyToThread',
     'setThreadResolved',
     'fetchPrDescription',
-    'submitReviewVerdict',
     'getReviewViewer',
     'getPrDiffManifest',
     'getPrDiffPatch',
@@ -259,7 +258,6 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     [{ prId: 7, thread: { id: 't' }, resolved: true }],
     'reviews.setThreadResolved',
   ],
-  ['submitReviewVerdict', [7, 'approve'], 'reviews.submitReviewVerdict'],
   ['getReviewViewer', [], 'reviews.getReviewViewer'],
   [
     'fetchPrDiffManifest',

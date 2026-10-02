@@ -3,7 +3,12 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
 import { fakeCli } from './setup/fake-cli.js';
-import { agentSpinner, createWorktree, sessionMenu } from './setup/app.js';
+import {
+  agentSpinner,
+  createWorktree,
+  openAgentMenuFromCard,
+  sessionMenu,
+} from './setup/app.js';
 import { findN10SessionFor, socketEnv, tagTmuxSession } from './setup/tmux.js';
 import {
   confirmNewTerminal,
@@ -24,7 +29,7 @@ test.use({
 test('Codex worktree launch, activity and recorded-agent continuation in Desktop', async ({
   desktop,
 }) => {
-  const { page, homeDir, repoPath } = desktop;
+  const { app, page, homeDir, repoPath } = desktop;
   const cwd = join(repoPath, '.claude/worktrees/codex-life');
   await createWorktree(page, 'codex-life');
   await page.getByRole('button', { name: 'Launch Agent', exact: true }).click();
@@ -63,7 +68,7 @@ test('Codex worktree launch, activity and recorded-agent continuation in Desktop
     join(homeDir, '.n10/config.json'),
     JSON.stringify({ agentId: 'test', aiCommand: 'exit 42' })
   );
-  await page.getByRole('button', { name: 'Launch Agent', exact: true }).click();
+  await openAgentMenuFromCard(app, page);
   const menu = sessionMenu(page);
   await expect(
     menu.getByRole('button', { name: 'Continue with Codex', exact: true })

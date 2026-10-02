@@ -37,21 +37,90 @@ function json(body, status = 200) {
 
 const list = (value) => json({ count: value.length, value });
 
+const threadsOf = (s, id) => s.threads?.[id] ?? [];
+
+/** What an iteration changed: every path the test named, tracked by
+ *  its position. */
+function changes(s, id) {
+  const entries = (s.changes?.[id] ?? []).map((path, i) => ({
+    changeTrackingId: i + 1,
+    item: { path: `/${path}` },
+  }));
+  return json({ changeEntries: entries });
+}
+
 /** The pull request's own reads, by what follows its id. */
 function pullRequest(s, id, rest) {
   const pr = s.prs.find((p) => p.pullRequestId === id);
   if (!pr) return json({ message: `TF401180: pull request ${id}` }, 404);
   if (rest.length === 0) return json(pr);
+  const [kind, sub, more] = rest;
+  if (kind === 'threads' && sub !== undefined && rest.length === 2) {
+    const thread = threadsOf(s, id).find((t) => String(t.id) === sub);
+    return thread ? json(thread) : null;
+  }
+  if (kind === 'iterations' && more === 'changes') return changes(s, id);
   if (rest.length > 1) return null;
-  switch (rest[0]) {
+  switch (kind) {
     case 'iterations':
       return list(s.iterations[id] ?? []);
     case 'threads':
+      return list(threadsOf(s, id));
     case 'statuses':
       return list([]);
     default:
       return null;
   }
+}
+
+/** A write the scenario keeps, so later reads see it and the test can
+ *  assert on it: threads and replies, and the viewer's vote. */
+function write(s, method, path, body) {
+  const at = path.indexOf('pullrequests');
+  if (at < 0) return null;
+  const [, id, kind, sub, more] = path.slice(at);
+  const prId = Number(id);
+  const pr = s.prs.find((p) => p.pullRequestId === prId);
+  if (!pr) return null;
+  const me = { id: s.viewer.id, displayName: s.viewer.providerDisplayName };
+  s.writes = s.writes ?? [];
+  s.threads = s.threads ?? {};
+  const threads = (s.threads[prId] = threadsOf(s, prId));
+  const comment = (c, n) => ({ id: n, author: me, commentType: 'text', ...c });
+  if (method === 'POST' && kind === 'threads' && sub === undefined) {
+    const thread = {
+      ...body,
+      id: 100 + threads.length,
+      comments: body.comments.map((c, i) => comment(c, i + 1)),
+    };
+    threads.push(thread);
+    s.writes.push({ kind: 'thread', prId, thread });
+    return { id: thread.id };
+  }
+  if (method === 'POST' && kind === 'threads' && more === 'comments') {
+    const thread = threads.find((t) => String(t.id) === sub);
+    if (!thread) return null;
+    const reply = comment(body, thread.comments.length + 1);
+    thread.comments.push(reply);
+    s.writes.push({ kind: 'reply', prId, threadId: thread.id, reply });
+    return { id: reply.id };
+  }
+  if (method === 'PUT' && kind === 'reviewers' && sub === s.viewer.id) {
+    const mine = pr.reviewers.find((r) => r.id === s.viewer.id);
+    if (mine) mine.vote = body.vote;
+    else
+      pr.reviewers.push({
+        ...me,
+        uniqueName: s.viewer.properties.Account.$value,
+        vote: body.vote,
+        isRequired: false,
+        hasDeclined: false,
+        isFlagged: false,
+      });
+    s.writes.push({ kind: 'vote', prId, vote: body.vote });
+    return { id: s.viewer.id, vote: body.vote };
+  }
+  return null;
 }
 
 /** Under `/{org}/{project}/_apis/`. */
@@ -98,9 +167,27 @@ globalThis.fetch = async (input, init) => {
   if (!AZURE.test(url.hostname)) return passThrough(input, init);
   const method = (init?.method ?? request?.method ?? 'GET').toUpperCase();
   const s = JSON.parse(readFileSync(SCENARIO, 'utf8'));
-  // Reads only: a write it does not model must not pass for done.
-  const answer = method === 'GET' ? route(s, url) : null;
-  if (answer) return answer;
+  if (method === 'GET') {
+    const answer = route(s, url);
+    if (answer) return answer;
+  } else {
+    // A write it does not model must not pass for done.
+    const raw = init?.body ?? (request ? await request.text() : null);
+    const path = url.pathname
+      .split('/')
+      .filter(Boolean)
+      .map(decodeURIComponent);
+    const done = write(s, method, path, raw ? JSON.parse(raw) : {});
+    if (done) {
+      // A write the scenario loses is kept, and its answer never comes:
+      // the connection drops after Azure wrote it.
+      const lost = (s.loseWrites ?? []).indexOf(s.writes.at(-1).kind);
+      if (lost >= 0) s.loseWrites.splice(lost, 1);
+      writeFileSync(SCENARIO, JSON.stringify(s, null, 2), 'utf8');
+      if (lost >= 0) throw new TypeError('fetch failed');
+      return json(done);
+    }
+  }
   appendFileSync(`${SCENARIO}.misses`, `${method} ${url}\n`);
   return json({ message: `fake Azure DevOps has no route for ${url}` }, 404);
 };

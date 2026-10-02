@@ -5,16 +5,59 @@ import {
   SquareIcon,
   TerminalIcon,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { SessionCard } from '../../lib/review/session-cards.js';
-import { cn } from '../../lib/utils.js';
+import { cn, errorMessage } from '../../lib/utils.js';
 import { Button } from '../ui/button.js';
 import { Tip } from '../ui/tooltip.js';
 
+type Kind = SessionCard['title'];
+
+/** Each kind's place at the top of the rail, and how it launches. */
+const SLOTS: readonly {
+  title: Kind;
+  launch: string;
+  busy: string;
+  another: string;
+}[] = [
+  {
+    title: 'Agent',
+    launch: 'Launch Agent',
+    busy: 'Starting…',
+    another: 'Launch additional agent',
+  },
+  {
+    title: 'Terminal',
+    launch: 'Launch Terminal',
+    busy: 'Opening…',
+    another: 'Launch additional terminal',
+  },
+];
+
+const ICONS: Record<Kind, typeof BotIcon> = {
+  Agent: BotIcon,
+  Terminal: TerminalIcon,
+};
+
+/** One more session of a kind, from its card's native menu. */
+async function offerAnother(
+  kind: (typeof SLOTS)[number],
+  launch: () => void
+): Promise<void> {
+  const chosen = await window.n10.showContextMenu([
+    { id: 'another', label: kind.another },
+  ]);
+  if (chosen === 'another') launch();
+}
+
 /**
- * The top of the review rail: Launch Agent and Launch Terminal, then a
- * card per session working in this branch's checkouts. A card takes the
- * reader to its terminal, says whether it runs and, for another
- * machine's, which machine; Stop sits beside it.
+ * The top of the review rail: an agent's place and a terminal's, each
+ * holding its first session's card, or until one starts the card's
+ * "not started" state, which launches it. A launched session's card
+ * takes its place. Any further session, another machine's or one asked
+ * for from a card's menu, is listed below. A card takes the reader to
+ * its terminal, says whether it runs and, for another machine's, which
+ * machine; Stop sits beside it.
  */
 export function SessionsSection({
   cards,
@@ -36,48 +79,95 @@ export function SessionsSection({
   onOpen: (name: string) => void;
   onStop: (card: SessionCard) => void;
 }) {
+  const launch: Record<Kind, () => void> = {
+    Agent: onLaunchAgent,
+    Terminal: onLaunchTerminal,
+  };
+  const busy: Record<Kind, boolean> = {
+    Agent: agentBusy,
+    Terminal: terminalBusy,
+  };
+  const first = SLOTS.map((slot) => cards.find((c) => c.title === slot.title));
+  const rest = cards.filter((c) => !first.includes(c));
+  const view = (card: SessionCard) => {
+    const slot = SLOTS.find((s) => s.title === card.title)!;
+    return (
+      <li key={card.name}>
+        <SessionCardView
+          card={card}
+          active={card.name === activeName}
+          onOpen={() => onOpen(card.name)}
+          onStop={() => onStop(card)}
+          onMenu={() =>
+            offerAnother(slot, launch[slot.title]).catch((e: unknown) =>
+              toast.error(errorMessage(e))
+            )
+          }
+        />
+      </li>
+    );
+  };
   return (
-    <div data-review-sessions className="flex flex-col gap-2">
-      <div className="grid grid-cols-2 gap-2">
-        <Button
-          size="sm"
-          className="min-w-0"
-          onClick={onLaunchAgent}
-          disabled={agentBusy}
-        >
-          <PlayIcon />
-          <span className="truncate">
-            {agentBusy ? 'Working…' : 'Launch Agent'}
-          </span>
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="min-w-0"
-          onClick={onLaunchTerminal}
-          disabled={terminalBusy}
-        >
-          <TerminalIcon />
-          <span className="truncate">
-            {terminalBusy ? 'Opening…' : 'Launch Terminal'}
-          </span>
-        </Button>
-      </div>
-      {cards.length > 0 && (
-        <ul aria-label="Sessions" className="flex flex-col gap-1.5">
-          {cards.map((card) => (
-            <li key={card.name}>
-              <SessionCardView
-                card={card}
-                active={card.name === activeName}
-                onOpen={() => onOpen(card.name)}
-                onStop={() => onStop(card)}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <ul
+      data-review-sessions
+      aria-label="Sessions"
+      className="flex flex-col gap-1.5"
+    >
+      {SLOTS.map((slot, i) => {
+        const card = first[i];
+        if (card) return view(card);
+        return (
+          <li key={slot.title}>
+            <LaunchCard
+              title={slot.title}
+              label={slot.launch}
+              busy={busy[slot.title] ? slot.busy : null}
+              onLaunch={launch[slot.title]}
+            />
+          </li>
+        );
+      })}
+      {rest.map(view)}
+    </ul>
+  );
+}
+
+/** A session's card before it starts: the same card, not started, and
+ *  pressing it launches the session. */
+function LaunchCard({
+  title,
+  label,
+  busy,
+  onLaunch,
+}: {
+  title: Kind;
+  label: string;
+  /** What it says while launching, or null. */
+  busy: string | null;
+  onLaunch: () => void;
+}) {
+  const Icon = ICONS[title];
+  return (
+    <button
+      type="button"
+      data-launch-card={title}
+      aria-label={label}
+      aria-busy={busy !== null}
+      disabled={busy !== null}
+      onClick={onLaunch}
+      className="group flex w-full min-w-0 items-center gap-3 rounded-md border border-border px-2.5 py-2 text-left outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-70"
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        <Icon className="size-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-base font-medium">{title}</span>
+        <span className="block truncate text-xs text-muted-foreground">
+          {busy ?? 'Not started'}
+        </span>
+      </span>
+      <PlayIcon className="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+    </button>
   );
 }
 
@@ -86,17 +176,24 @@ function SessionCardView({
   active,
   onOpen,
   onStop,
+  onMenu,
 }: {
   card: SessionCard;
   active: boolean;
   onOpen: () => void;
   onStop: () => void;
+  /** The card's native menu: one more session of its kind. */
+  onMenu: () => void;
 }) {
-  const Icon = card.kind === 'agent' ? BotIcon : TerminalIcon;
+  const Icon = ICONS[card.title];
   const stopLabel = `Stop ${card.title.toLowerCase()}`;
   return (
     <div
       data-session-card={card.name}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onMenu();
+      }}
       className={cn(
         'flex items-stretch overflow-hidden rounded-md border transition-colors',
         active

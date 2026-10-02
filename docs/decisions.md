@@ -360,8 +360,18 @@ stays "not fully known" until those are read. Until a native requirement signal
 is read, an approval or a passing check is an observation, and a failing check
 or a holding verdict is a concern, not a block; only the provider's own
 lifecycle (open, draft) is a verdict. The next step's button is the Overview's
-one way into a review: there are no instant verdict buttons, so a verdict is
-given from the changes, where the reviewer has read them.
+way into the changes. It sits in the heading, at the end of the pull request's
+actions, on the very spot where the diff's toolbar puts Finish review, so a
+second click where the first one was opens the form: the heading spans the
+pane, the Overview keeps its scrollbar's gutter, and both rows are measured
+from the pane's top and end. Every verdict is filed as a review through one submit,
+in the provider's own terms, never as a separate vote. The diff's Finish
+review form files the summary, verdict and chosen drafts on the commit the
+diff read (a chosen range's end), and approves only when that is the
+provider's head. It is the only place a verdict is given, so every one is
+given from the changes, where the reviewer has read them. Like GitHub's, the
+form is a popover anchored to its button, not a modal: the diff still scrolls
+under it, and the summary autosaves, so closing it loses nothing.
 
 The Overview has no header bar; its heading carries the pull request's identity
 and actions. Every other pane keeps the bar across the rail and the pane, so the
@@ -590,7 +600,7 @@ the provider memo is cleared.
 Both shells issue reply, resolve and verdict commands through the engine. A
 confirmed thread change patches its unchanged base snapshot or invalidates a raced
 snapshot, and expires
-related checks/conversation reads; resolve/verdict commands refresh the captured
+related checks/conversation reads; resolve and review-submit commands refresh the captured
 repository's list. Draft save/discard/submission and mention search share the same
 identity context.
 

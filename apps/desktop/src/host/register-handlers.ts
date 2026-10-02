@@ -96,8 +96,6 @@ export function createHostApi(): HostApi {
     discardReviewDraft: (req) => reviewDrafts.discardDraft(req),
     searchMentionCandidates: (req) => mentions.searchMentionCandidates(req),
     submitReview: (req) => reviewDrafts.submitReview(req),
-    submitReviewVerdict: (prId, verdict) =>
-      reviews.submitReviewVerdict(prId, verdict),
     getReviewViewer: () => Promise.resolve(reviews.getReviewViewer()),
     fetchCommentImage: (url) => commentImages.fetchCommentImage(url),
     listDraftComments: (prId) =>

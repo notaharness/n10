@@ -8,12 +8,14 @@ import {
   updateFakeGh,
   type FakeGitHub,
 } from './setup/fake-gh.js';
+import { commitOnBranch } from './setup/pr-diff.js';
 
 /**
  * Filing the reviewer's drafts as one GitHub review (C6, F3): one
  * pending review on the commit read, its comments, one submit. An
- * answer lost on the way is looked for, never re-sent. The Finish
- * review form is I20's; these drive the bridge the form will call.
+ * answer lost on the way is looked for, never re-sent. These drive the
+ * bridge the Finish review form calls (`review-finish.test.ts`) with
+ * cases the form cannot reach.
  */
 
 const BRANCH = 'retry-budget';
@@ -42,6 +44,7 @@ test.use({
         branch: BRANCH,
         files: {
           [FILE]: 'export const RETRIES = 3;\nexport const WAIT = 250;\n',
+          'notes.txt': 'first version\n',
         },
       },
     ],
@@ -239,11 +242,13 @@ test.describe('Publishing a review', () => {
   test('a pull request that moved on is not reviewed, and the drafts stay', async ({
     desktop,
   }) => {
-    const { page, homeDir } = desktop;
+    const { page, homeDir, repoPath } = desktop;
     const head = await openDiff(desktop);
     await draftOn(page, 'RIGHT', 1, 'Why three?');
+    // Pushed since: GitHub reports a commit the reviewer never read.
+    const pushed = commitOnBranch(repoPath, BRANCH, 'second version\n');
     updateFakeGh(homeDir, (s) => {
-      s.prs[0]!.headRefOid = 'e'.repeat(40);
+      s.prs[0]!.headRefOid = pushed;
     });
     expect(await submit(page, head)).toEqual({
       error: expect.stringContaining('new commits'),

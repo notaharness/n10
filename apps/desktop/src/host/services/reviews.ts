@@ -1,4 +1,3 @@
-import type { ReviewVerdict } from '@n10/vcs-core';
 import { readResourceValue } from '@n10/engine';
 import { activeReviewService } from './repo.js';
 import type { ReplyRequest, ResolveRequest } from '../contract.js';
@@ -25,12 +24,6 @@ export async function setThreadResolved(req: ResolveRequest): Promise<void> {
 }
 export async function fetchPrDescription(prId: number) {
   return readResourceValue(activeReviewService().description(prId));
-}
-export async function submitReviewVerdict(
-  prId: number,
-  verdict: ReviewVerdict
-) {
-  await activeReviewService().commands.verdict(prId, verdict);
 }
 /** A pull request's comparison and file manifest at exact commits. */
 export function getPrDiffManifest(req: unknown) {

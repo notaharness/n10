@@ -66,6 +66,7 @@ describe('registerHostHandlers', () => {
           vcsConfigured: false,
           repository: null,
           viewer: null,
+          reviewEvents: [],
         });
       },
     };

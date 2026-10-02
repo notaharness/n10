@@ -17,7 +17,7 @@ export function PrIdentity({
   className,
 }: {
   pr: PullRequestInfo;
-  /** Beside the title: open, refresh, copy. */
+  /** Beside the title: open, refresh, copy, and the next step. */
   actions?: ReactNode;
   className?: string;
 }) {
@@ -33,9 +33,7 @@ export function PrIdentity({
           <span className="font-normal text-muted-foreground">#{pr.id}</span>
         </h1>
         {actions && (
-          <div className="-mr-2 flex shrink-0 items-center gap-1">
-            {actions}
-          </div>
+          <div className="flex shrink-0 items-center gap-1">{actions}</div>
         )}
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">

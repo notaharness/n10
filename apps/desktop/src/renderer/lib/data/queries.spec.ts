@@ -43,6 +43,7 @@ const REPO: RepoInfo = {
   vcsConfigured: false,
   repository: null,
   viewer: null,
+  reviewEvents: [],
 };
 
 /** The value of `p`, or 'pending' if it has not settled by the time
@@ -220,6 +221,7 @@ describe('refreshRepoInfo', () => {
       repository: 'acme/app',
     },
     viewer: 'bob',
+    reviewEvents: [],
   };
 
   const HISTORY = keys.prHistory(

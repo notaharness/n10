@@ -25,6 +25,7 @@ import type { DiffReadState } from '../../../lib/data/read-state.js';
 import { ReadFailure, StaleNotice } from '../ReadNotice.js';
 import { IncompleteManifestBanner } from './ComparisonIdentity.js';
 import { ComparisonBar } from './ComparisonBar.js';
+import { FinishReview } from '../finish/FinishReview.js';
 import { DiffEmpty, ShowAllChanges } from './DiffEmpty.js';
 import { DiffToolbar } from './DiffToolbar.js';
 import { MovedBanner } from './MovedBanner.js';
@@ -117,8 +118,13 @@ export function DiffPane({
   return (
     <SelectorFocus value={selectorRef}>
       <div className="flex h-full min-h-0 flex-col">
-        <ComparisonBar prDiff={prDiff} comparisonRef={comparisonRef} />
         <DiffToolbar
+          comparison={
+            <ComparisonBar prDiff={prDiff} comparisonRef={comparisonRef} />
+          }
+          finish={
+            <FinishReview prId={prId} prDiff={prDiff} providerHead={headSha} />
+          }
           navCount={navCount}
           navIndex={navIndex}
           onPrev={onPrev}
@@ -275,7 +281,6 @@ function PrDiffBanners({
       {prDiff.moved && prDiff.comparison && (
         <MovedBanner
           moved={prDiff.moved}
-          shownHead={prDiff.comparison.headOid}
           load={prDiff.loadMoved}
           focusAfter={focusAfter}
         />

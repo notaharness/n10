@@ -21,6 +21,11 @@
       "import": "./src/lib/pr-details.ts",
       "default": "./src/lib/pr-details.ts"
     },
+    "./review-publication": {
+      "types": "./src/lib/review-publication.ts",
+      "import": "./src/lib/review-publication.ts",
+      "default": "./src/lib/review-publication.ts"
+    },
     "./package.json": "./package.json"
   },
   "nx": {

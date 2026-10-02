@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ReviewLedger } from '@n10/vcs-core';
 import { getRequestCounters, resetRequestCounters } from '@n10/vcs-core';
 import { azureDevOpsProvider } from './provider.js';
 import { prDetailMemo } from './pr-details.js';
@@ -294,11 +295,18 @@ describe('a cycle over pull requests that have not moved', () => {
     await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 100);
     expect(policies()).toBe(2);
     // A vote is a write too: the reviewer policies' verdict moves with it.
-    await azureDevOpsProvider.submitReviewVerdict!(
+    let ledger: ReviewLedger | null = null;
+    await azureDevOpsProvider.publishReview!(
       AUTH,
       PROJECT,
-      100,
-      'approve'
+      {
+        prId: 100,
+        head: '0'.repeat(40),
+        event: 'APPROVE',
+        body: '',
+        items: [],
+      },
+      { read: () => ledger, write: (l) => (ledger = l) }
     );
     await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 100);
     expect(policies()).toBe(3);

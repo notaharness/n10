@@ -19,19 +19,31 @@ import { Button } from '../../ui/button.js';
 import { Tip } from '../../ui/tooltip.js';
 
 /**
- * The diff's settings — view, wrap, hide resolved, one file at a time —
- * the comparison it is reading, and comment navigation. Only
- * diff-specific controls live here; the pull request's own details are
- * in the tab header, so this bar goes when the terminal replaces the
- * pane.
+ * One row, wrapping when narrow: the comparison the diff is reading,
+ * its settings — view, wrap, hide resolved, one file at a time — and
+ * comment navigation, with the way to finish the review apart at the
+ * end. Only diff-specific controls live here; the pull request's own
+ * details are in the tab header, so this bar goes when the terminal
+ * replaces the pane.
+ *
+ * Finish review stays at the top of the row's end, where the Overview
+ * puts Review changes (`OverviewPane`'s `HEAD`): the bar's 40 px and
+ * this row's 6 px above it, and 24 px inside the 10 px the Overview
+ * keeps for its scrollbar to its right.
  */
 export function DiffToolbar({
+  comparison,
+  finish,
   navCount,
   navIndex,
   onPrev,
   onNext,
   onToggleLayout,
 }: {
+  /** Which changes are on screen, for a pull request. */
+  comparison?: ReactNode;
+  /** The way to file the review, for a pull request. */
+  finish?: ReactNode;
   navCount: number;
   navIndex: number;
   onPrev: () => void;
@@ -42,38 +54,48 @@ export function DiffToolbar({
   const o = useDiffOptions();
   const single = o.layout === 'single';
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border px-2 text-sm">
-      <ViewSwitch view={o.view} />
-      <Toggle
-        pressed={o.wrap}
-        tip={o.wrap ? 'Disable line wrapping' : 'Wrap long lines'}
-        onClick={() => setDiffOptions({ wrap: !o.wrap })}
-      >
-        <WrapTextIcon /> Wrap
-      </Toggle>
-      <Toggle
-        pressed={o.hideResolved}
-        tip={o.hideResolved ? 'Show resolved threads' : 'Hide resolved threads'}
-        onClick={() => setDiffOptions({ hideResolved: !o.hideResolved })}
-      >
-        <EyeOffIcon /> Hide resolved
-      </Toggle>
-      <Toggle
-        pressed={single}
-        tip={single ? 'Show all files' : 'Show one file at a time'}
-        onClick={onToggleLayout}
-      >
-        <FileIcon /> One file
-      </Toggle>
-      <div className="flex-1" />
-      {navCount > 0 && (
-        <CommentStepper
-          count={navCount}
-          index={navIndex}
-          onPrev={onPrev}
-          onNext={onNext}
-        />
-      )}
+    <div
+      data-testid="diff-toolbar"
+      className="flex shrink-0 items-start gap-4 border-b border-border py-1.5 pr-[34px] pl-2 text-sm"
+    >
+      <div className="flex min-h-7 min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+        {comparison}
+        <div className="flex items-center gap-1">
+          <ViewSwitch view={o.view} />
+          <Toggle
+            pressed={o.wrap}
+            tip={o.wrap ? 'Disable line wrapping' : 'Wrap long lines'}
+            onClick={() => setDiffOptions({ wrap: !o.wrap })}
+          >
+            <WrapTextIcon /> Wrap
+          </Toggle>
+          <Toggle
+            pressed={o.hideResolved}
+            tip={
+              o.hideResolved ? 'Show resolved threads' : 'Hide resolved threads'
+            }
+            onClick={() => setDiffOptions({ hideResolved: !o.hideResolved })}
+          >
+            <EyeOffIcon /> Hide resolved
+          </Toggle>
+          <Toggle
+            pressed={single}
+            tip={single ? 'Show all files' : 'Show one file at a time'}
+            onClick={onToggleLayout}
+          >
+            <FileIcon /> One file
+          </Toggle>
+        </div>
+        {navCount > 0 && (
+          <CommentStepper
+            count={navCount}
+            index={navIndex}
+            onPrev={onPrev}
+            onNext={onNext}
+          />
+        )}
+      </div>
+      {finish}
     </div>
   );
 }
@@ -147,7 +169,7 @@ function CommentStepper({
   onNext: () => void;
 }) {
   return (
-    <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
+    <div className="ml-auto flex items-center gap-0.5 text-xs text-muted-foreground">
       <MessageSquareIcon className="size-3.5" />
       <span className="tabular-nums">
         {index >= 0 ? index + 1 : '–'}/{count}

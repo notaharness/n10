@@ -836,6 +836,7 @@ export default tseslint.config(
                 '!@n10/app-core/plan',
                 '!@n10/vcs-core/types',
                 '!@n10/vcs-core/pr-details',
+                '!@n10/vcs-core/review-publication',
                 '!@n10/review-comments/conventional',
               ],
               allowTypeImports: true,

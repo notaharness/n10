@@ -22,6 +22,7 @@ const REPO: RepoInfo = {
     repository: 'acme/app',
   },
   viewer: 'bob',
+  reviewEvents: [],
 };
 
 describe('saving a setting', () => {

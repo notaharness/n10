@@ -1,7 +1,6 @@
 import { use, useLayoutEffect, useRef } from 'react';
 import { refocusAfter } from '../../../lib/focus.js';
 import type { DiffReadState } from '../../../lib/data/read-state.js';
-import { short } from '../../../lib/review/revision-model.js';
 import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
 import type { RevisionControls } from '../../../lib/review/use-pr-revisions.js';
 import { Button } from '../../ui/button.js';
@@ -52,9 +51,7 @@ function RangeEmpty({ revisions }: { revisions: RevisionControls }) {
       ) : (
         pair && (
           <p className="text-muted-foreground">
-            No changes between{' '}
-            <span className="font-mono">{short(pair.from)}</span> and{' '}
-            <span className="font-mono">{short(pair.to)}</span>.
+            No changes between the two revisions.
           </p>
         )
       )}

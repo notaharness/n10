@@ -77,7 +77,6 @@ type ReviewHost = Pick<
   | 'replyToThread'
   | 'setThreadResolved'
   | 'fetchPrDescription'
-  | 'submitReviewVerdict'
   | 'getReviewViewer'
   | 'fetchCommentImage'
   | 'listDraftComments'
@@ -126,18 +125,6 @@ export function createReviewHost(state: DemoState): ReviewHost {
       return later(undefined);
     },
     fetchPrDescription: (prId) => load(repo().data.descriptions[prId]),
-    submitReviewVerdict: (prId, verdict) => {
-      const pr = repo().pr(prId);
-      const decision = verdict.startsWith('approve')
-        ? 'approved'
-        : 'changes-requested';
-      repo().updatePr(prId, {
-        reviewers: (pr?.reviewers ?? []).map((r) =>
-          r.identifier === VIEWER ? { ...r, decision } : r
-        ),
-      });
-      return later(undefined);
-    },
     getReviewViewer: () => later({ identifier: VIEWER }),
     fetchCommentImage: () => later(null),
     listDraftComments: (prId) => later(drafts(prId)),

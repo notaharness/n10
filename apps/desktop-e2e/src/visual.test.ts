@@ -417,7 +417,9 @@ test.describe('Visual (overview) @visual', () => {
     // Electron updates the native control overlay after the content resize.
     // Its button width is unchanged; wait for CSS env() geometry to catch up.
     await expect(titlebar).toHaveCSS('padding-right', controlsInset);
-    await expect(page.getByText('Your review is requested')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Review changes' })
+    ).toBeVisible();
     await expect(page).toHaveScreenshot('pr-overview-narrow.png', shot);
   });
 });

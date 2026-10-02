@@ -75,7 +75,6 @@ test.describe('when the pull request moves', () => {
     desktop,
   }) => {
     const { page, repoPath } = desktop;
-    const first = git(repoPath, 'rev-parse', BRANCH);
 
     await openPr(page);
     await expect(diffText(page, 'first version')).toBeVisible({
@@ -85,10 +84,7 @@ test.describe('when the pull request moves', () => {
     const second = commitOnBranch(repoPath, BRANCH, 'second version\n');
     const banner = page.getByRole('status', { name: 'New commits' });
     await expect(banner).toContainText(
-      `The pull request moved to ${second.slice(
-        0,
-        7
-      )}. You are reading ${first.slice(0, 7)}.`,
+      'New commits were pushed since you opened this. You are still reading the changes without them.',
       { timeout: 30_000 }
     );
     // Still the diff the reader was reading.

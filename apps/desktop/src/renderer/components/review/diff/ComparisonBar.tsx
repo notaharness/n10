@@ -1,17 +1,14 @@
 import type { RefObject } from 'react';
 import type { RevisionRange } from '../../../../host/contract.js';
-import {
-  short,
-  type RevisionChoice,
-} from '../../../lib/review/revision-model.js';
+import type { RevisionChoice } from '../../../lib/review/revision-model.js';
 import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
 import { Badge } from '../../ui/badge.js';
 import { ComparisonIdentity } from './ComparisonIdentity.js';
 import { RevisionSelector } from './RevisionSelector.js';
 
 /**
- * Which changes of the pull request are on screen, above the diff's
- * view controls: the selector, the exact commits compared, and — for
+ * Which changes of the pull request are on screen, at the start of the
+ * diff's toolbar: the selector, the exact commits compared, and — for
  * two revisions — how many of the pull request's files changed between
  * them and what else came in: the target's own changes, or a rewrite.
  */
@@ -64,11 +61,9 @@ function Fact({
 /** What came in between the two revisions besides the branch's work. */
 function RangeFacts({
   range,
-  from,
   target,
 }: {
   range: RevisionRange;
-  from: string;
   target: string;
 }) {
   const { base } = range;
@@ -87,18 +82,14 @@ function RangeFacts({
         <Fact
           variant="outline"
           text="Runs backwards"
-          detail={`${short(range.toOid)} is older than ${short(
-            from
-          )}: the diff undoes the commits between them`}
+          detail="The second revision is older than the first: the diff undoes the commits between them"
         />
       )}
       {!range.linear && !range.backwards && (
         <Fact
           variant="outline"
           text="Rewritten"
-          detail={`Rewritten since ${short(
-            from
-          )}: the two trees are compared, not a list of new commits`}
+          detail="Rewritten since the first revision: the two trees are compared, not a list of new commits"
         />
       )}
     </>
@@ -123,7 +114,7 @@ export function ComparisonBar({
   return (
     <div
       data-testid="comparison-bar"
-      className="flex h-9 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2 text-xs"
+      className="flex min-w-0 max-w-full items-center gap-2 text-xs"
     >
       <RevisionSelector controls={revisions} />
       {bounded && (
@@ -140,7 +131,7 @@ export function ComparisonBar({
             total={revisions.total}
             incomplete={prDiff.incomplete}
           />
-          <RangeFacts range={range} from={pair.from} target={prDiff.target} />
+          <RangeFacts range={range} target={prDiff.target} />
         </>
       )}
     </div>

@@ -103,6 +103,10 @@ function repoInfo(current: RepositoryHandle): RepoInfo {
     vcsConfigured,
     repository,
     viewer,
+    reviewEvents:
+      vcsConfigured && provider?.publishReview
+        ? provider.reviewEvents ?? []
+        : [],
   };
 }
 

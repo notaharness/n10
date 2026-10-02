@@ -101,7 +101,7 @@ interface N10Bridge {
     ref: Record<string, unknown>;
     viewer?: string | null;
   }): Promise<{ drafts: FakeReviewDraft[] }>;
-  /** What the Finish review form calls (its UI is a later slice). */
+  /** What the Finish review form calls. */
   submitReview(req: {
     ref: Record<string, unknown>;
     viewer?: string | null;

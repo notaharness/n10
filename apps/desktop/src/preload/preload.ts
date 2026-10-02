@@ -113,8 +113,6 @@ const api: N10HostApi = {
   searchMentionCandidates: (req) =>
     ipcRenderer.invoke(IPC.searchMentionCandidates, req),
   submitReview: (req) => ipcRenderer.invoke(IPC.submitReview, req),
-  submitReviewVerdict: (prId, verdict) =>
-    ipcRenderer.invoke(IPC.submitReviewVerdict, prId, verdict),
   getReviewViewer: () => ipcRenderer.invoke(IPC.getReviewViewer),
 
   onSessionData: (cb) => {

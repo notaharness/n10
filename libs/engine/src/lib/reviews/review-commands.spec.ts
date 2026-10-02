@@ -23,7 +23,6 @@ function fixture() {
       .mockResolvedValue({ threads: [thread], generalComments: [] }),
     replyToThread: vi.fn().mockResolvedValue({ id: 'reply', body: 'reply' }),
     setThreadResolved: vi.fn().mockResolvedValue(undefined),
-    submitReviewVerdict: vi.fn().mockResolvedValue(undefined),
   };
   const read = reviewReadFixture(
     () => ({
@@ -102,28 +101,12 @@ it.each([-1, 0, 1.5, 'other/repo'])(
   'refuses invalid PR id %s before writing',
   async (prId) => {
     const f = fixture();
-    await expect(f.commands.verdict(prId as number, 'approve')).rejects.toThrow(
-      'Invalid PR id'
-    );
-    expect(f.provider.submitReviewVerdict).not.toHaveBeenCalled();
+    await expect(
+      f.commands.reply({ prId: prId as number, threadId: 't', body: 'x' })
+    ).rejects.toThrow('Invalid PR id');
+    expect(f.provider.replyToThread).not.toHaveBeenCalled();
   }
 );
-it('supports the review verdicts and rejects unknown verdicts', async () => {
-  const f = fixture();
-  for (const verdict of [
-    'approve',
-    'approve-with-suggestions',
-    'wait-for-author',
-    'reject',
-  ] as const)
-    await f.commands.verdict(7, verdict);
-  expect(f.provider.submitReviewVerdict).toHaveBeenCalledTimes(4);
-  await expect(f.commands.verdict(7, 'merge' as never)).rejects.toThrow(
-    'Invalid review verdict'
-  );
-  expect(f.provider.submitReviewVerdict).toHaveBeenCalledTimes(4);
-});
-
 it('rechecks scope after awaiting an already cached thread', async () => {
   const f = fixture();
   await f.service.comments(7).read();

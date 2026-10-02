@@ -11,6 +11,7 @@ import {
   uniqueExternalBranch,
 } from './setup/external.js';
 import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
+import { openFinishForm } from './setup/finish-form.js';
 import { diffText, git } from './setup/pr-diff.js';
 import { recordedVisits, seedLastVisit } from './setup/review-history.js';
 
@@ -297,6 +298,15 @@ test('a new head keeps the range on screen until it is loaded', async ({
   await expect(diffText(page, 'three')).toHaveCount(0);
   await expect(bounds(page)).toHaveText(`${short(h1)} → ${short(h2)}`);
 
+  // Not approvable until loaded, and the remedy is the banner's.
+  const form = await openFinishForm(page);
+  await expect(
+    form.getByRole('radio', { name: 'Approve' })
+  ).toHaveAccessibleDescription(
+    'New commits were pushed since you opened this. Load them to approve.'
+  );
+  await page.keyboard.press('Escape');
+
   await banner.getByRole('button', { name: /Load new commits/ }).click();
   await expect(bounds(page)).toHaveText(`${short(h1)} → ${short(h3)}`, {
     timeout: 30_000,
@@ -467,6 +477,54 @@ test('a comment numbered for the head stays off a range that ends before it', as
   await expect(orphans).toContainText('About the line one.', {
     timeout: 30_000,
   });
+});
+
+test('a chosen range that stops short of the head cannot be approved', async ({
+  desktop,
+}) => {
+  const { page, repoPath, homeDir } = desktop;
+  const h1 = git(repoPath, 'rev-parse', BRANCH);
+  const h2 = push(repoPath, 'b.txt', 'two\n');
+  const h3 = push(repoPath, 'c.txt', 'three-secret\n');
+  updateFakeGh(homeDir, (s) => {
+    s.prs[0]!.title = 'Revisions, three';
+    s.prs[0]!.headRefOid = h3;
+    s.prs[0]!.history = {
+      events: [{ commit: h1 }, { commit: h2 }, { commit: h3 }],
+    };
+  });
+  await openAs(page, /Revisions, three/);
+  await expect(diffText(page, 'three-secret')).toBeVisible({ timeout: 30_000 });
+
+  await choose(page, /Choose revisions/);
+  const dialog = page.getByRole('dialog', { name: 'Compare two revisions' });
+  await dialog.getByLabel('From').click();
+  await page.getByRole('option', { name: new RegExp(short(h1)) }).click();
+  await dialog.getByLabel('To').click();
+  await page.getByRole('option', { name: new RegExp(short(h2)) }).click();
+  await dialog.getByRole('button', { name: 'Compare' }).click();
+  await expect(bounds(page)).toHaveText(`${short(h1)} → ${short(h2)}`);
+  await expect(diffText(page, 'three-secret')).toHaveCount(0);
+
+  // What was read ends at H2: H3 is not approved unseen.
+  const form = await openFinishForm(page);
+  const approve = form.getByRole('radio', { name: 'Approve' });
+  await expect(approve).toBeDisabled();
+  await expect(approve).toHaveAccessibleDescription(
+    'Choose changes up to the latest commit to approve.'
+  );
+  await page.keyboard.press('Escape');
+
+  // Since H2 reaches the head: approvable.
+  await choose(page, /Choose revisions/);
+  await dialog.getByLabel('From').click();
+  await page.getByRole('option', { name: new RegExp(short(h2)) }).click();
+  await dialog.getByLabel('To').click();
+  await page.getByRole('option', { name: new RegExp(short(h3)) }).click();
+  await dialog.getByRole('button', { name: 'Compare' }).click();
+  await expect(bounds(page)).toHaveText(`${short(h2)} → ${short(h3)}`);
+  await page.getByRole('button', { name: 'Finish review' }).click();
+  await expect(form.getByRole('radio', { name: 'Approve' })).toBeEnabled();
 });
 
 test.describe('a pull request opened behind another tab', () => {
