@@ -126,11 +126,13 @@ function votedFor(raw: RawReviewer): { votedFor?: string[] } {
  * container — is its own row carrying its own vote, which is whichever
  * member voted for it; `myTeamIds` only marks the groups the signed-in
  * user belongs to, so that a request to the group reads as a request
- * to them.
+ * to them. `viewerId` marks that user's own row, by identity rather
+ * than by email.
  */
 export function parseReviewer(
   raw: RawReviewer,
-  myTeamIds: ReadonlySet<string> = new Set()
+  myTeamIds: ReadonlySet<string> = new Set(),
+  viewerId?: string | null
 ): PullRequestReviewer {
   const vote = raw.vote ?? 0;
   const validVotes: ReviewerVote[] = [10, 5, 0, -5, -10];
@@ -142,6 +144,7 @@ export function parseReviewer(
     displayName: raw.displayName ?? 'Unknown',
     identifier: raw.uniqueName ?? '',
     decision: voteToDecision(normalizedVote, raw.hasDeclined ?? false),
+    ...(viewerId ? { isViewer: raw.id === viewerId } : {}),
     ...(mine ? { includesViewer: true } : {}),
     ...votedFor(raw),
   };
@@ -201,7 +204,9 @@ export function parsePullRequest(
     sourceBranch,
     targetBranch,
     isDraft: raw.isDraft ?? false,
-    reviewers: (raw.reviewers ?? []).map((r) => parseReviewer(r, myTeamIds)),
+    reviewers: (raw.reviewers ?? []).map((r) =>
+      parseReviewer(r, myTeamIds, viewerId)
+    ),
     ...authorOf(raw.createdBy, viewerId),
     url: `https://dev.azure.com/${project.org}/${project.project}/_git/${project.repo}/pullrequest/${prId}`,
     headSha: raw.lastMergeSourceCommit?.commitId,

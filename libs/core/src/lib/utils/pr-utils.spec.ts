@@ -240,6 +240,26 @@ describe('categorizeReviews', () => {
     expect(result.waitingForAuthor).toEqual([]);
   });
 
+  it('files a request by the reviewer row the provider marks as the viewer', () => {
+    // An Azure uniqueName need not be git's email.
+    const prMap: BranchPrMap = {
+      'feature/branch-1': makePr({
+        id: 1,
+        createdByIdentifier: 'other@test.com',
+        reviewers: [
+          {
+            displayName: 'Me',
+            identifier: 'CORP\\me',
+            decision: 'no-response',
+            isViewer: true,
+          },
+        ],
+      }),
+    };
+    const reviews = categorizeReviews(prMap, mockConfig, mockProvider);
+    expect(reviews.needsReview.map((p) => p.id)).toEqual([1]);
+  });
+
   it('skips PRs where user is not a reviewer', () => {
     const prMap: BranchPrMap = {
       'branch-a': makePr({

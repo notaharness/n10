@@ -1056,6 +1056,44 @@ describe('azureDevOpsProvider', () => {
       expect(result['theirs']?.viewerIsAuthor).toBe(false);
     });
 
+    it('marks the signed-in account’s reviewer row, whatever its email', async () => {
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/_apis/connectiondata'))
+          return Promise.resolve(
+            jsonResponse({ authenticatedUser: { id: 'viewer-id' } })
+          );
+        if (url.includes('/pullrequests?'))
+          return Promise.resolve(
+            jsonResponse({
+              value: [
+                {
+                  pullRequestId: 43,
+                  sourceRefName: 'refs/heads/theirs',
+                  createdBy: { id: 'other-id' },
+                  reviewers: [
+                    { id: 'viewer-id', uniqueName: 'CORP\\robin', vote: 0 },
+                    { id: 'other-id', uniqueName: 'robin@example.com' },
+                  ],
+                },
+              ],
+            })
+          );
+        return Promise.resolve(jsonResponse({ value: [] }));
+      });
+
+      const result = await azureDevOpsProvider.fetchPullRequests(
+        { pat: 'test-pat' },
+        testProject
+      );
+
+      expect(
+        result['theirs']?.reviewers?.map((r) => [r.identifier, r.isViewer])
+      ).toEqual([
+        ['CORP\\robin', true],
+        ['robin@example.com', false],
+      ]);
+    });
+
     it('leaves authorship to the email when Azure has not said who the account is', async () => {
       mockFetch.mockImplementation((url: string) => {
         if (url.includes('/_apis/connectiondata'))
@@ -1214,10 +1252,13 @@ describe('azureDevOpsProvider', () => {
         testProject
       );
 
+      // Every row says whether it is the caller's own, by identity:
+      // the recorded "Me" carries the authenticated id.
       const coreTeam = {
         displayName: '[proj]\\Core Team',
         identifier:
           'vstfs:///Classification/TeamProject/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c\\Core Team',
+        isViewer: false,
         includesViewer: true,
       };
       expect(result['feat/teammate-approved']?.reviewers).toEqual([
@@ -1226,6 +1267,7 @@ describe('azureDevOpsProvider', () => {
           displayName: 'Teammate',
           identifier: 'teammate@example.com',
           decision: 'approved',
+          isViewer: false,
           votedFor: [coreTeam.identifier],
         },
         {
@@ -1233,6 +1275,7 @@ describe('azureDevOpsProvider', () => {
           identifier:
             'vstfs:///Classification/TeamProject/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c\\Release Approvers',
           decision: 'no-response',
+          isViewer: false,
         },
       ]);
       expect(result['feat/group-pending']?.reviewers).toEqual([
@@ -1244,6 +1287,7 @@ describe('azureDevOpsProvider', () => {
           displayName: 'Me',
           identifier: 'me@example.com',
           decision: 'approved',
+          isViewer: true,
           votedFor: [coreTeam.identifier],
         },
       ]);

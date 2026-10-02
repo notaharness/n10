@@ -145,7 +145,16 @@ test.describe('on Azure DevOps, with a git email that is not the account’s', (
   const own: FakeAzureDevOps = {
     project: 'Fabrikam',
     user: { displayName: 'Robin Tester', uniqueName: 'CORP\\robin.tester' },
-    prs: [{ id: 4212, title: 'Drain the upload queue', sourceBranch: BRANCH }],
+    prs: [
+      { id: 4212, title: 'Drain the upload queue', sourceBranch: BRANCH },
+      {
+        id: 4213,
+        title: 'Retry dropped uploads',
+        sourceBranch: 'retry-uploads',
+        author: 'Alex Doe',
+        reviewers: [{ name: 'Robin Tester', uniqueName: 'CORP\\robin.tester' }],
+      },
+    ],
   };
 
   test.use({
@@ -174,5 +183,14 @@ test.describe('on Azure DevOps, with a git email that is not the account’s', (
       timeout: 15_000,
     });
     await expect(section(page, 'Worktrees')).toHaveCount(0);
+  });
+
+  test('a request for your review is yours by the account, too', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await expect(
+      section(page, 'Needs Your Review').getByRole('button', { name: /#4213/ })
+    ).toBeVisible({ timeout: 30_000 });
   });
 });

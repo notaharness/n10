@@ -58,6 +58,10 @@ export interface PullRequestReviewer {
    *  after a verdict, where `decision` still holds that verdict. Absent
    *  where the list does not say. */
   requested?: boolean;
+  /** This reviewer is the signed-in account, as the provider identifies
+   *  both. Absent where the list does not say; the caller's own match
+   *  answers then (`viewerEntry`). */
+  isViewer?: boolean;
   /** A group reviewer the signed-in user belongs to. Asking the group
    *  asks the user, but its `decision` is whoever voted for the group,
    *  never the user's own. */
@@ -89,13 +93,15 @@ export function asksForReview(reviewer: PullRequestReviewer): boolean {
 
 /** The entry that speaks for the viewer: their own, or else a group
  *  they belong to that is still asked. A group that has voted was
- *  answered by another member, so its vote is never the viewer's. */
+ *  answered by another member, so its vote is never the viewer's. Their
+ *  own is the one the provider marks `isViewer`; `isViewer` here
+ *  decides only the rows it leaves unmarked. */
 export function viewerEntry(
   reviewers: readonly PullRequestReviewer[],
   isViewer: (reviewer: PullRequestReviewer) => boolean
 ): PullRequestReviewer | undefined {
   return (
-    reviewers.find(isViewer) ??
+    reviewers.find((r) => r.isViewer ?? isViewer(r)) ??
     reviewers.find((r) => r.includesViewer && asksForReview(r))
   );
 }
