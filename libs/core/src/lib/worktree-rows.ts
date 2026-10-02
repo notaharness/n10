@@ -1,10 +1,16 @@
+import { existsSync } from 'node:fs';
+import { basename } from 'node:path';
 import {
   listWorktrees,
   type WorktreeScope,
   type WorktreeInfo,
 } from '@n10/worktree-manager';
-import { getSession } from './pty-registry.js';
-import { keyForWorktree } from './session-key.js';
+import { getSession, sessionNames } from './pty-registry.js';
+import {
+  keyForWorktree,
+  LOCAL_MACHINE,
+  sessionIdentity,
+} from './session-key.js';
 import type { AgentSession } from './types.js';
 
 /**
@@ -34,6 +40,47 @@ export function worktreeSessionRow(
       ? { sessionBranch: createdFor }
       : {}),
   };
+}
+
+/**
+ * Rows for the agents this process runs in checkouts of `repo` that are
+ * gone: the directory was removed (`git worktree remove`, `rm -rf`, n10
+ * itself) while the agent ran, and the agent outlived it. Each lasts
+ * while `isAlive` says the agent runs, so it can be seen and stopped
+ * rather than run on unseen.
+ *
+ * Judged by the directory, not by a worktree listing: a listing that
+ * failed, has not been read yet or follows another path template must
+ * not strand every agent it leaves out. A stranded row has no branch:
+ * the branch may be checked out in a new worktree by now, and the row
+ * must not claim that worktree's pull request or badges. It is labelled
+ * with the branch its agent was created for. This machine's only: no
+ * directory of another machine is ever looked for here.
+ */
+export function strandedSessionRows(
+  repo: string,
+  isAlive: (name: string) => boolean
+): AgentSession[] {
+  return sessionNames().flatMap((name): AgentSession[] => {
+    const identity = sessionIdentity(name);
+    if (
+      identity?.kind !== 'worktree' ||
+      identity.machine !== LOCAL_MACHINE ||
+      identity.repo !== repo ||
+      !isAlive(name) ||
+      existsSync(identity.path)
+    )
+      return [];
+    return [
+      {
+        name,
+        label: getSession(name)?.createdFor || basename(identity.path),
+        path: identity.path,
+        running: true,
+        worktreeRemoved: true,
+      },
+    ];
+  });
 }
 
 /**

@@ -2,12 +2,16 @@ import { watch, type FSWatcher } from 'node:fs';
 import { log, logError } from '@n10/logger';
 import { listWorktrees, type WorktreeScope } from '@n10/worktree-manager';
 import {
+  canonicalWorktreePath,
   keyForWorktree,
   LOCAL_MACHINE,
   sessionIdentity,
   hasSessionConnection,
   isSessionAlive,
+  onSessionExit,
   sessionNames,
+  stopSession,
+  strandedSessionRows,
   observeTmuxSessions,
   releaseExitedSession,
   diffScans,
@@ -34,9 +38,29 @@ function worthAnnouncing(delta: DiscoveryDelta, touched: number): boolean {
     touched > 0 ||
     delta.appeared.length > 0 ||
     delta.disappeared.length > 0 ||
+    delta.stranded.length > 0 ||
     delta.switched.length > 0 ||
     delta.ended.length > 0 ||
     delta.endedTerminals.length > 0
+  );
+}
+
+/**
+ * An agent that outlived its worktree has ended too, so nothing is left
+ * to show or restart: end its tmux session, which keeps the dead pane,
+ * rather than let the pane come back as an orphan terminal.
+ */
+function endFinishedStranded(
+  previous: DiscoveryScan | null,
+  delta: DiscoveryDelta
+): void {
+  const stranded = new Set(previous?.stranded.map((wt) => wt.name));
+  const finished = delta.disappeared.filter((wt) => stranded.has(wt.name));
+  if (finished.length === 0) return;
+  for (const wt of finished) stopSession(wt.name);
+  const gone = new Set(finished.map((wt) => canonicalWorktreePath(wt.path)));
+  delta.adoptableTerminals = delta.adoptableTerminals.filter(
+    (t) => !gone.has(canonicalWorktreePath(t.path))
   );
 }
 
@@ -99,6 +123,11 @@ export function startSessionDiscovery(
     return {
       scan: {
         worktrees,
+        stranded: strandedSessionRows(repo, isSessionAlive).map((row) => ({
+          name: row.name,
+          branch: '',
+          path: row.path ?? '',
+        })),
         persisted: seen.persisted,
         terminals: adoptTerminal ? seen.terminals : [],
       },
@@ -188,6 +217,7 @@ export function startSessionDiscovery(
       hasSessionConnection
     );
     const released = releaseGone(held);
+    endFinishedStranded(previous, delta);
     // A repo switch starts a fresh scanner, but terminal tabs are process-global.
     // Reconcile held terminal keys too, including final frames from an earlier scan.
     // The scan sees this machine's tmux only: another machine's terminal
@@ -268,6 +298,12 @@ export function startSessionDiscovery(
     }
   }
 
+  // A stranded worktree is gone once its agent is: look now rather than
+  // at the next tick, so its tab goes when the agent ends.
+  const offExit = onSessionExit((name) => {
+    if (previous?.stranded.some((wt) => wt.name === name)) void scanNow();
+  });
+
   const timer = setInterval(() => void scanNow(), intervalMs);
   // Never a reason to hold the process open: discovery is something the
   // app does while it is running, not work that has to finish.
@@ -280,6 +316,7 @@ export function startSessionDiscovery(
     lastScan: () => previous,
     stop() {
       stopped = true;
+      offExit();
       clearInterval(timer);
       if (watchTimer) clearTimeout(watchTimer);
       watchTimer = null;

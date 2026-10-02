@@ -252,6 +252,7 @@ vi.mock('@n10/core', async (importOriginal) => {
       });
     },
     onSessionExit: () => () => undefined,
+    strandedSessionRows: () => [],
     releaseExitedSession: () => undefined,
     getSession: (name: string) => {
       if (!state.alive.has(name)) return undefined;

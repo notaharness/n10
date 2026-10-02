@@ -209,6 +209,7 @@ describe('a scan notices a worktree that switched branch', () => {
     const { diffScans } = await import('./discovery/discovery-model.js');
     const scan = (branch: string) => ({
       worktrees: [worktree(WT, branch)],
+      stranded: [],
       persisted: new Set<string>(),
       terminals: [],
     });

@@ -10,6 +10,7 @@ import {
   launchSession,
   LOCAL_MACHINE,
   onSessionExit,
+  strandedSessionRows,
   worktreeSessionRow,
 } from '@n10/core';
 import type {
@@ -70,12 +71,17 @@ export function createSessionService(options: {
   const listeners = new Set<() => void>();
   function publish(): void {
     if (disposed) return;
+    // A row per worktree, then one per agent still running in a
+    // worktree that is gone, so it can be seen and stopped.
     const next = {
-      sessions: worktrees
-        .getSnapshot()
-        .worktrees.map((wt) =>
-          worktreeSessionRow(wt, isSessionAlive, config.repo)
-        ),
+      sessions: [
+        ...worktrees
+          .getSnapshot()
+          .worktrees.map((wt) =>
+            worktreeSessionRow(wt, isSessionAlive, config.repo)
+          ),
+        ...strandedSessionRows(config.repo, isSessionAlive),
+      ],
       error: worktrees.getSnapshot().error,
     };
     scanUnseen();
@@ -157,6 +163,12 @@ export function createSessionService(options: {
       changed: refresh,
     }),
     ...commands,
+    /** Stopping kills the session without an exit to report, so
+     *  discovery looks at once: a stranded worktree is gone with it. */
+    stop(name: string): void {
+      commands.stop(name);
+      void discovery?.scanNow();
+    },
     /** The agents and `terminals` working in `branch`'s checkouts. */
     branchSessions(
       branch: string,

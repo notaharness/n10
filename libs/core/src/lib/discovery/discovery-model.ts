@@ -34,6 +34,10 @@ export interface DiscoveredTerminal {
 export interface DiscoveryScan {
   /** Every worktree git reports under the resolver's directory. */
   worktrees: DiscoveredWorktree[];
+  /** Worktrees whose checkout is gone while their agent still runs in
+   *  this process (`strandedSessionRows`). Not removed yet as far as
+   *  the shells are concerned: the agent is there to see and stop. */
+  stranded: DiscoveredWorktree[];
   /** The subset of those names that have a live tmux session belonging
    *  to this repository. */
   persisted: ReadonlySet<string>;
@@ -48,8 +52,12 @@ export interface DiscoveryDelta {
   appeared: DiscoveredWorktree[];
   /** Worktrees the previous scan reported and this one does not —
    *  removed by n10, by `git worktree remove`, or deleted from disk —
-   *  as that scan saw them. */
+   *  as that scan saw them. A worktree whose agent still runs is not
+   *  gone until the agent is: it is `stranded` first. */
   disappeared: DiscoveredWorktree[];
+  /** Worktrees gone since the previous scan whose agent still runs
+   *  here. */
+  stranded: DiscoveredWorktree[];
   /** Worktrees still there, now on another branch (`git switch`, a
    *  rename, a detached HEAD): same key, since a worktree is its
    *  checkout, but a row whose label and pull request have changed. */
@@ -73,6 +81,7 @@ export interface DiscoveryDelta {
 
 const EMPTY_SCAN: DiscoveryScan = {
   worktrees: [],
+  stranded: [],
   persisted: new Set(),
   terminals: [],
 };
@@ -107,13 +116,19 @@ export function diffScans(
 ): DiscoveryDelta {
   const base = previous ?? EMPTY_SCAN;
   const before = new Set(base.worktrees.map((wt) => wt.name));
-  const now = new Set(next.worktrees.map((wt) => wt.name));
+  const wasStranded = new Set(base.stranded.map((wt) => wt.name));
+  const now = new Set(
+    [...next.worktrees, ...next.stranded].map((wt) => wt.name)
+  );
 
   const appeared =
     previous === null
       ? []
       : next.worktrees.filter((wt) => !before.has(wt.name));
-  const disappeared = base.worktrees.filter((wt) => !now.has(wt.name));
+  const disappeared = [...base.worktrees, ...base.stranded].filter(
+    (wt) => !now.has(wt.name)
+  );
+  const stranded = next.stranded.filter((wt) => !wasStranded.has(wt.name));
   const branchBefore = new Map(
     base.worktrees.map((wt) => [wt.name, wt.branch])
   );
@@ -143,6 +158,7 @@ export function diffScans(
   return {
     appeared,
     disappeared,
+    stranded,
     switched,
     adoptable,
     ended,
@@ -151,6 +167,7 @@ export function diffScans(
     changed:
       appeared.length > 0 ||
       disappeared.length > 0 ||
+      stranded.length > 0 ||
       switched.length > 0 ||
       adoptable.length > 0 ||
       ended.length > 0 ||

@@ -21,6 +21,7 @@ const state = vi.hoisted(() => ({
     for (const listener of [...this.exits]) listener(name);
   },
   released: [] as string[],
+  stranded: [] as Primitive.AgentSession[],
   entries: new Map<
     string,
     {
@@ -57,6 +58,7 @@ vi.mock('@n10/core', async (original) => ({
       state.exits.delete(listener);
     };
   },
+  strandedSessionRows: () => state.stranded,
   releaseExitedSession: (name: string) => {
     state.released.push(name);
     state.entries.delete(name);
@@ -386,6 +388,7 @@ const scanOf = (...listed: (typeof wt)[]): DiscoveryScan => ({
     branch: w.branch,
     path: w.path,
   })),
+  stranded: [],
   persisted: new Set(),
   terminals: [],
 });
@@ -413,6 +416,38 @@ it('scans at once for a listed worktree discovery has not seen', async () => {
   state.scanNow.mockClear();
   await f.service.refresh();
   expect(state.scanNow).toHaveBeenCalled();
+});
+
+// Its worktree is gone, so only this row lets the user see and stop it.
+it('lists an agent still running in a removed worktree', async () => {
+  const row = {
+    name: worktreeSessionKey('/repo/gone', '/repo'),
+    label: 'gone',
+    path: '/repo/gone',
+    running: true,
+    worktreeRemoved: true as const,
+  };
+  state.stranded = [row];
+  try {
+    const f = fixture();
+    f.service.watch({ size });
+    await f.service.read();
+    expect(f.service.getSnapshot().sessions).toContainEqual(row);
+    f.service.dispose();
+  } finally {
+    state.stranded = [];
+  }
+});
+
+// Stop disposes the session without an exit to report.
+it('scans as soon as an agent is stopped', () => {
+  const f = fixture();
+  f.service.watch({ size });
+  state.scanNow.mockClear();
+  f.service.stop(key);
+  expect(state.stop).toHaveBeenCalledWith(key);
+  expect(state.scanNow).toHaveBeenCalled();
+  f.service.dispose();
 });
 
 it('leaves discovery to its schedule when it has seen every listed worktree', async () => {
