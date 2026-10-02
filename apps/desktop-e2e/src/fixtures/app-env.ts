@@ -60,6 +60,12 @@ export function appEnv(opts: {
     N10_START_DIR: opts.startWithoutRepo ? '' : opts.repoPath,
     N10_DESKTOP_VERSION: 'e2e',
     ...(opts.githubToken ? { GH_TOKEN: opts.githubToken } : {}),
+    // The real `gh` (the @integration tests) keeps a telemetry device id
+    // under this HOME, written by whichever call the app makes first. A
+    // read the app starts just before it quits writes it while the
+    // fixture removes the HOME, and that removal then fails. Nothing a
+    // test runs should send telemetry either.
+    GH_TELEMETRY: 'false',
     // The fake `gh` has to win the PATH lookup; the Azure DevOps
     // preload finds its scenario here.
     ...opts.ghEnv,
