@@ -145,28 +145,33 @@ export async function createWorktree(
   const createRow = page.getByRole('option', {
     name: new RegExp(`Create branch\\s*${branch}\\s*and open a worktree`),
   });
-  const checkoutRow = page
-    .getByRole('option', { name: new RegExp(`^${branch}$`) })
-    .first();
+  const exact = { name: new RegExp(`^${branch}$`) };
+  const checkoutRow = page.getByRole('option', exact).first();
   await createRow
     .or(checkoutRow)
     .first()
     .waitFor({ state: 'visible', timeout: 15_000 });
+  // Creating a branch, or checking out one listed under "Check out
+  // branch", makes a worktree; a row for an existing worktree is a jump.
+  const checksOut =
+    (await createRow.count()) > 0 ||
+    (await page
+      .getByRole('group', { name: 'Check out branch' })
+      .getByRole('option', exact)
+      .count()) > 0;
   await ((await createRow.count()) > 0 ? createRow : checkoutRow).click();
 
   await paletteInput(page).waitFor({ state: 'hidden' });
 
-  // A checkout lands in the new worktree's session menu, and a modal
-  // dialog hides the rest of the app from role queries (aria-hidden),
-  // sidebar included — so the menu has to go before the row can be
-  // waited on. Dismissing it here leaves the caller a quiet tab;
+  // A checkout lands in the new worktree's session menu once the
+  // worktree exists, and a modal dialog hides the rest of the app from
+  // role queries (aria-hidden), sidebar included. The sidebar can show
+  // the new row before then, so a checkout waits for the menu itself
+  // and dismisses it, leaving the caller a quiet tab;
   // `launchAgentFromRail` reopens it when the test wants an agent. A
-  // branch that already had a worktree is a jump, not a checkout, and
-  // opens no menu.
+  // jump opens no menu.
+  if (checksOut) await dismissSessionMenu(page, 30_000);
   const row = sidebarRow(page, new RegExp(branch));
-  const menu = sessionMenu(page);
-  await menu.or(row).first().waitFor({ state: 'visible', timeout: 30_000 });
-  if (await menu.isVisible()) await dismissSessionMenu(page);
   await row.waitFor({ state: 'visible', timeout: 30_000 });
 }
 
@@ -205,9 +210,12 @@ export async function startSessionFromMenu(page: Page): Promise<void> {
 }
 
 /** Close the open menu without launching anything. */
-export async function dismissSessionMenu(page: Page): Promise<void> {
+export async function dismissSessionMenu(
+  page: Page,
+  timeout = 15_000
+): Promise<void> {
   const menu = sessionMenu(page);
-  await menu.waitFor({ state: 'visible', timeout: 15_000 });
+  await menu.waitFor({ state: 'visible', timeout });
   await page.keyboard.press('Escape');
   await menu.waitFor({ state: 'hidden' });
 }
