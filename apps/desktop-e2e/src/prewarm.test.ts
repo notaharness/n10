@@ -19,6 +19,10 @@ const BANNER = 'n10-fake-agent-ready';
 /** Long enough for a pointer at rest to settle: hoverIntent samples
  *  every 100 ms. */
 const REST_MS = 300;
+/** How far ahead of the page's time `restOn` pauses its clock: well past
+ *  the time from reading it to the pause, which runs to some 100 ms on a
+ *  loaded box. */
+const PAUSE_LEAD_MS = 1_000;
 
 async function launch(page: Page, branch: string): Promise<void> {
   await createWorktree(page, branch);
@@ -36,11 +40,19 @@ async function moveTo(page: Page, target: Locator): Promise<void> {
   await page.mouse.move(...(await centre(target)), { steps: 4 });
 }
 
+/** A spot that is no tab or row: nothing waits to settle under it. */
+const NOWHERE: [number, number] = [5, 5];
+
 /**
  * Rest the pointer on `target` for exactly `ms` of the page's time:
  * the clock stands still while the pointer gets there, runs `ms`, and
  * goes on from there as usual. `away` moves the pointer off before the
  * clock goes on.
+ *
+ * The clock can only be paused at a time given in advance, and the
+ * page's time runs on while that call is made, so the pause is set well
+ * ahead of it. Getting there runs the page's timers early; with the
+ * pointer on nothing first, that is only idle time passing.
  */
 async function restOn(
   page: Page,
@@ -48,12 +60,14 @@ async function restOn(
   ms = REST_MS,
   { away = false } = {}
 ): Promise<void> {
-  // A little ahead of the page's time, which runs on during the call.
-  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 50);
+  await page.mouse.move(...NOWHERE);
+  await page.clock.pauseAt(
+    (await page.evaluate(() => Date.now())) + PAUSE_LEAD_MS
+  );
   await moveTo(page, target);
   await page.clock.runFor(ms);
   if (away) {
-    await page.mouse.move(5, 5);
+    await page.mouse.move(...NOWHERE);
     await page.clock.runFor(REST_MS);
   }
   await page.clock.resume();
