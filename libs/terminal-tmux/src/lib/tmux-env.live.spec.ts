@@ -2,13 +2,13 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { SessionBackend } from '@n10/terminal';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { assertScratchTmuxSocket } from '../../vitest.setup.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import { holdScratchTmuxServer } from '../../vitest.setup.js';
 import { createTmuxBackend } from './tmux-backend.js';
 
 const backends: SessionBackend[] = [];
 let dir: string;
-beforeAll(assertScratchTmuxSocket);
+holdScratchTmuxServer();
 afterEach(() => {
   for (const backend of backends.splice(0)) backend.kill();
   rmSync(dir, { recursive: true, force: true });

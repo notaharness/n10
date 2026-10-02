@@ -121,7 +121,9 @@ export function orchestraFixture() {
         // Only this fixture's server; the last individually killed
         // session shuts it down. Never kill-server, even on a scratch
         // socket. `list-sessions` throws (execFileSync) when the server
-        // is already gone — nothing left to kill, not a fixture failure.
+        // is already gone, or answers "server exited unexpectedly" while
+        // it is still going down after its last session — either way
+        // nothing is left to kill, not a fixture failure.
         // That is the only failure this scopes to: assertIsolated()
         // (inside every `tmux(...)` call, including this one) must keep
         // throwing through, or a lost isolation guarantee — $TMUX
@@ -133,7 +135,10 @@ export function orchestraFixture() {
             .split('\n')
             .filter(Boolean);
         } catch (error) {
-          if (!/no server running/.test(String(error))) throw error;
+          if (
+            !/no server running|server exited unexpectedly/.test(String(error))
+          )
+            throw error;
         }
         for (const name of names) tmux('kill-session', '-t', `=${name}:`);
       } finally {

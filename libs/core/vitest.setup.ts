@@ -1,6 +1,8 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterAll, beforeAll } from 'vitest';
 
 /**
  * Put any tmux command this project's tests run onto a throwaway
@@ -22,3 +24,24 @@ import { join } from 'node:path';
 process.env.TMUX_TMPDIR = mkdtempSync(join(tmpdir(), 'n10-core-tests-'));
 delete process.env.TMUX;
 delete process.env.TMUX_PANE;
+
+const ANCHOR = 'scratch-anchor';
+
+/**
+ * Keep the scratch server up from a spec's first test to its last.
+ *
+ * tmux exits with its last session, and a client that connects while
+ * it is going down fails with "server exited unexpectedly" (or "no
+ * server running"). A spec that kills every session it made after each
+ * test races that shutdown with the next test's first command; one
+ * idle session held for the whole file means the server only exits
+ * once the file is done with it.
+ */
+export function holdScratchTmuxServer(): void {
+  beforeAll(() => {
+    execFileSync('tmux', ['new-session', '-d', '-s', ANCHOR, 'sleep 3600']);
+  });
+  afterAll(() => {
+    execFileSync('tmux', ['kill-session', '-t', `=${ANCHOR}:`]);
+  });
+}

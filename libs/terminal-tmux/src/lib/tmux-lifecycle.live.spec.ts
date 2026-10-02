@@ -1,7 +1,7 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SessionBackend, SessionSpec } from '@n10/terminal';
 import { execFileSync } from 'node:child_process';
-import { assertScratchTmuxSocket } from '../../vitest.setup.js';
+import { holdScratchTmuxServer } from '../../vitest.setup.js';
 import * as tmuxCli from './tmux-cli.js';
 import { tmuxSessionSnapshot } from './tmux-snapshot.js';
 import { createTmuxBackend } from './tmux-backend.js';
@@ -37,7 +37,7 @@ async function retained(command: string): Promise<SessionBackend> {
   backends.push(backend);
   return backend;
 }
-beforeAll(assertScratchTmuxSocket);
+holdScratchTmuxServer();
 afterEach(() => {
   for (const backend of backends.splice(0)) backend.kill();
 });
