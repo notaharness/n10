@@ -17,7 +17,7 @@
  * Azure DevOps credentials and asks Azure nothing.
  */
 // A preload runs as CommonJS; built-ins are fetched without require.
-const { appendFileSync, existsSync, readFileSync, writeFileSync } =
+const { appendFileSync, existsSync, readFileSync, renameSync, writeFileSync } =
   process.getBuiltinModule('node:fs');
 const { join } = process.getBuiltinModule('node:path');
 
@@ -183,7 +183,7 @@ globalThis.fetch = async (input, init) => {
       // the connection drops after Azure wrote it.
       const lost = (s.loseWrites ?? []).indexOf(s.writes.at(-1).kind);
       if (lost >= 0) s.loseWrites.splice(lost, 1);
-      writeFileSync(SCENARIO, JSON.stringify(s, null, 2), 'utf8');
+      save(s);
       if (lost >= 0) throw new TypeError('fetch failed');
       return json(done);
     }
@@ -191,6 +191,14 @@ globalThis.fetch = async (input, init) => {
   appendFileSync(`${SCENARIO}.misses`, `${method} ${url}\n`);
   return json({ message: `fake Azure DevOps has no route for ${url}` }, 404);
 };
+
+/** Replaces the scenario in one step: the test reads it as the host
+ *  writes it (see setup/scenario-file.ts). */
+function save(s) {
+  const next = `${SCENARIO}.${process.pid}.tmp`;
+  writeFileSync(next, JSON.stringify(s, null, 2), 'utf8');
+  renameSync(next, SCENARIO);
+}
 
 /** The scenario's token, merged into the app's own config. */
 function writeToken() {
