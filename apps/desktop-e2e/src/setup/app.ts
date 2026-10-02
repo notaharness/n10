@@ -273,11 +273,16 @@ export async function showFile(page: Page): Promise<void> {
  * the agent's output.
  */
 export async function launchAgentFromRail(page: Page): Promise<void> {
-  await page
+  const launch = page
     .getByRole('button', { name: /(Re)?launch agent/i })
     .filter({ visible: true })
-    .first()
-    .click();
+    .first();
+  // Right after a tab switch the tab left can still be on screen, its
+  // own Launch button with it, and a click waits on whichever button it
+  // found first even once that pane is hidden. Each try finds it again.
+  await expect(async () => {
+    await launch.click({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
   await startSessionFromMenu(page);
 }
 
