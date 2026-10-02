@@ -24,6 +24,8 @@ npm ci
 
 Use `npm ci`, not `npm install`, so you get the locked dependency tree.
 
+CI checks that every package in `package-lock.json` records `resolved` and `integrity`, because Nix offline builds need both; if the check fails, regenerate the lockfile.
+
 ## Run and check
 
 ```sh

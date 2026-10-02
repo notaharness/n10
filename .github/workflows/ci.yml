@@ -23,6 +23,8 @@ jobs:
           node-version: 24
           cache: 'npm'
 
+      - run: node tools/check-lockfile-integrity.mjs
+
       - run: npm ci
 
       # Electron otherwise downloads its binary on the first e2e launch,
