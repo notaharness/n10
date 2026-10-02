@@ -264,23 +264,30 @@ export async function fetchAuthenticatedUserId(
   return id;
 }
 
+/** The teams Azure last named, per project: what a failed read answers. */
+const lastTeamIds = new Map<string, Set<string>>();
+
 export async function fetchMyTeamIds(config: AdoConfig): Promise<Set<string>> {
+  const key = `${config.org}/${config.project}/my-teams`;
   try {
     const data = await adoGet<{ value?: { id?: string }[] }>(
       'fetchMyTeamIds',
-      `${config.org}/${config.project}/my-teams`,
+      key,
       TTL.identity,
       `https://dev.azure.com/${config.org}/_apis/projects/${config.project}/teams?$mine=true&api-version=7.1`,
       authHeaders(config.pat),
       `teams in ${config.project}`
     );
-    return new Set(
+    const ids = new Set(
       (data.value ?? []).map((t) => t.id).filter((id): id is string => !!id)
     );
+    lastTeamIds.set(key, ids);
+    return ids;
   } catch {
-    // Team membership only enriches reviewer rows; a failure here must
-    // not take the pull request list down with it.
-    return new Set();
+    // A failure here must not take the pull request list down, nor
+    // move a request to the viewer's team out of their review sections
+    // for a cycle: membership changes far less often than reads fail.
+    return lastTeamIds.get(key) ?? new Set();
   }
 }
 
@@ -788,6 +795,8 @@ export const azureDevOpsProvider: VcsProvider = {
 
   resetCaches(): void {
     resetAdoTransport();
+    // Fetched as whoever the old credentials named.
+    lastTeamIds.clear();
   },
 
   forgetPullRequestCache(project: Record<string, string>): void {

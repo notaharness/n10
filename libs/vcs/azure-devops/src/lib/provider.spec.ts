@@ -7,7 +7,7 @@ import {
   fetchPrBuildStatus,
 } from './build-status.js';
 import { deriveBuildRunStatus } from './builds.js';
-import { resetAdoTransport } from './request.js';
+import { invalidateAdoKey, resetAdoTransport } from './request.js';
 import {
   parseReviewer,
   parsePullRequest,
@@ -62,7 +62,7 @@ function jsonResponse(data: unknown, status = 200): Response {
 // would let one test answer another's request. Every test starts from
 // an empty cache and an open throttle gate.
 beforeEach(() => {
-  resetAdoTransport();
+  azureDevOpsProvider.resetCaches?.();
 });
 
 const testAdoConfig = {
@@ -905,6 +905,23 @@ describe('fetchMyTeamIds', () => {
     mockFetch.mockRejectedValueOnce(new Error('network error'));
     const ids = await fetchMyTeamIds(testAdoConfig);
     expect(ids).toEqual(new Set());
+  });
+
+  it('answers a failed read with the teams last named', async () => {
+    // Membership is what files a request to the viewer's team under
+    // their review: one failed read must not move it for a cycle.
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ value: [{ id: 'team-1' }] })
+    );
+    await fetchMyTeamIds(testAdoConfig);
+    invalidateAdoKey('myorg/myproject/my-teams');
+    mockFetch.mockRejectedValueOnce(new Error('network error'));
+    expect(await fetchMyTeamIds(testAdoConfig)).toEqual(new Set(['team-1']));
+
+    // New credentials name someone else.
+    azureDevOpsProvider.resetCaches?.();
+    mockFetch.mockRejectedValueOnce(new Error('network error'));
+    expect(await fetchMyTeamIds(testAdoConfig)).toEqual(new Set());
   });
 });
 
