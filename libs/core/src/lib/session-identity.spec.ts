@@ -150,6 +150,26 @@ describe('taggedSession', () => {
     expect(taggedSession(listed('n10-feat-a', options))).toBeNull();
   });
 
+  // Orchestra's `spawn.sh --dir` tags a player `dir`, with a repo and
+  // no worktree path or branch: n10 shows it as an agent terminal.
+  it("reads Orchestra's dir session as an agent terminal", () => {
+    const session = taggedSession(
+      listed('nixos-config-dir', {
+        '@orchestra-spawner': 'orchestra',
+        '@orchestra-repo': '/home/h/nixos-config',
+        '@orchestra-session-type': 'dir',
+      })
+    );
+    expect(session).toMatchObject({
+      type: 'agent',
+      spawner: 'orchestra',
+      repo: '/home/h/nixos-config',
+      branch: '',
+      worktreePath: '',
+    });
+    expect(isTerminalSession(session!)).toBe(true);
+  });
+
   it('carries the Orchestra tags along when set, and leaves them out when not', () => {
     const session = taggedSession(
       listed('x', {

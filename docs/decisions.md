@@ -123,11 +123,12 @@ scripts create ordinary tmux sessions using the same user options:
 | -------------------------- | -------------------------------------------------------- |
 | `@orchestra-spawner`       | Creator, such as `n10` or `orchestra`                    |
 | `@orchestra-repo`          | Canonical main checkout path                             |
-| `@orchestra-session-type`  | `worktree`, `shell` or `agent`                           |
+| `@orchestra-session-type`  | `worktree`, `shell`, `agent`; `dir` is read as `agent`   |
 | `@orchestra-worktree-path` | A worktree session's checkout: its identity              |
 | `@orchestra-branch`        | Branch a worktree session was created for (task context) |
 | `@orchestra-agent`         | Agent used for the most recent launch                    |
 
+`dir` is Orchestra's name for an agent in a directory; n10 never writes it.
 The shared names live in `session-identity.ts`. Creator/reporting metadata
 survives attachment and restart; a successful new process updates its agent
 metadata. Tags contain data, never arbitrary commands to execute. They live
