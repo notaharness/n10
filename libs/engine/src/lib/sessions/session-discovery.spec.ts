@@ -50,11 +50,17 @@ vi.mock('@n10/core', async (original) => ({
   sessionNames: () => sessionNamesMock(),
   hasSessionConnection: (name: string) => isSessionAliveMock(name),
   isSessionAlive: (name: string) => isSessionAliveMock(name),
-  observeTmuxSessions: () => ({
-    persisted: listPersistedMock(),
-    terminals: listTerminalsMock(),
-    held: listHeldMock(),
-  }),
+  // A null `held` stands for a listing tmux could not give.
+  observeTmuxSessions: () => {
+    const held = listHeldMock();
+    return (
+      held && {
+        persisted: listPersistedMock(),
+        terminals: listTerminalsMock(),
+        held,
+      }
+    );
+  },
   releaseExitedSession: (name: string) => released.push(name),
   strandedSessionRows: (
     _repo: string,
@@ -289,15 +295,34 @@ describe('startSessionDiscovery', () => {
     expect(onChanged).toHaveBeenCalledOnce();
   });
 
-  // A failed fork or a timeout says nothing about what tmux holds.
-  it('releases nothing when tmux could not be asked', async () => {
+  // A failed fork or a timeout says nothing about what tmux holds: read
+  // as nothing, every terminal would end and never come back.
+  it('drops a scan tmux could not list, as for a failed git listing', async () => {
     const exited = wtKey('feature-a');
-    sessionNamesMock.mockReturnValue([exited]);
+    const terminal: DiscoveredTerminal = {
+      name: terminalSessionKey('repo-shell'),
+      kind: 'shell',
+      path: '/repo',
+    };
+    alive.add(terminal.name);
+    sessionNamesMock.mockReturnValue([exited, terminal.name]);
     listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
-    listHeldMock.mockReturnValue(null);
-    const { discovery } = start();
+    listTerminalsMock.mockReturnValue([terminal]);
+    listHeldMock.mockReturnValue(new Set([exited]));
+    const { discovery, onChanged } = start();
     await discovery.scanNow();
+    const before = discovery.lastScan();
+    onChanged.mockClear();
+
+    listHeldMock.mockReturnValue(null);
+    await expect(discovery.scanNow()).resolves.toBeUndefined();
+    expect(onChanged).not.toHaveBeenCalled();
     expect(released).toEqual([]);
+    expect(discovery.lastScan()).toBe(before);
+
+    listHeldMock.mockReturnValue(new Set([exited]));
+    await discovery.scanNow();
+    expect(onChanged).not.toHaveBeenCalled();
   });
 
   // The path is what a shell closes a tab by; the name alone would not
