@@ -1,6 +1,8 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterAll, beforeAll } from 'vitest';
 
 /**
  * Put every tmux command this project's tests run onto a throwaway
@@ -56,4 +58,29 @@ export function assertScratchTmuxSocket(): void {
       }, not this run's scratch dir ${SCRATCH_SOCKET_DIR}.`
     );
   }
+}
+
+const ANCHOR = 'scratch-anchor';
+
+/**
+ * For a suite that creates and kills real sessions: check the socket,
+ * then keep the scratch server up from the suite's first test to its
+ * last.
+ *
+ * tmux exits with its last session, and a client that connects while
+ * it is going down fails with "server exited unexpectedly" (or "no
+ * server running"). A suite that kills every session it made after
+ * each test races that shutdown with the next test's first command;
+ * one idle session held for the whole file means the server only
+ * exits once the file is done with it.
+ */
+export function holdScratchTmuxServer(): void {
+  beforeAll(() => {
+    assertScratchTmuxSocket();
+    execFileSync('tmux', ['new-session', '-d', '-s', ANCHOR, 'sleep 3600']);
+  });
+  afterAll(() => {
+    assertScratchTmuxSocket();
+    execFileSync('tmux', ['kill-session', '-t', `=${ANCHOR}:`]);
+  });
 }

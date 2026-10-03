@@ -7,6 +7,7 @@ import {
   resolveSessionByName,
   resolveWorktreeSession,
 } from './session-resolver.js';
+import { holdScratchTmuxServer } from '../../vitest.setup.js';
 
 /**
  * The resolver against a real tmux server — the scratch one
@@ -98,6 +99,7 @@ afterEach(() => {
 });
 
 describe.skipIf(SKIP)('session resolver', () => {
+  holdScratchTmuxServer();
   const REPO = `/repos/alpha-${RUN}`;
 
   it('finds a worktree session by its tags, whatever it is called', () => {

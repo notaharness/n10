@@ -14,11 +14,11 @@
  * this can reach the developer's own server. Skipped where tmux is not
  * installed, as the other live suites are.
  */
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import type { SessionBackend, SessionSpec } from '@n10/terminal';
 import { PtySession } from '@n10/terminal-pty';
-import { assertScratchTmuxSocket } from '../../vitest.setup.js';
+import { holdScratchTmuxServer } from '../../vitest.setup.js';
 import { createTmuxBackend } from './tmux-backend.js';
 import { tmuxHasSession, tmuxKillSession, tmuxShowOption } from './tmux-cli.js';
 
@@ -119,13 +119,13 @@ async function expectReplacementClient(
   );
 }
 
-beforeAll(assertScratchTmuxSocket);
 afterEach(() => {
   for (const client of extraClients.splice(0)) client.dispose();
   for (const backend of backends.splice(0)) backend.kill();
 });
 
 describe.skipIf(SKIP)('attaching, detaching and re-attaching', () => {
+  holdScratchTmuxServer();
   it('keeps the pane, its process and its scrollback across a detach', async () => {
     const backend = await retained("printf 'scrollback-marker\\n'; sleep 30");
     const name = backend.name!;
