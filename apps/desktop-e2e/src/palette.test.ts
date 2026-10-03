@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
 import {
@@ -17,10 +17,11 @@ import {
  * is reachable from a synthesized key event.
  */
 
+/** The host's stored preferences, or none before its first save. */
 function storedPrefs(homeDir: string): Record<string, unknown> {
-  return JSON.parse(
-    readFileSync(join(homeDir, '.n10', 'desktop-prefs.json'), 'utf8')
-  ) as Record<string, unknown>;
+  const path = join(homeDir, '.n10', 'desktop-prefs.json');
+  if (!existsSync(path)) return {};
+  return JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
 }
 
 test.describe('Command palette', () => {
