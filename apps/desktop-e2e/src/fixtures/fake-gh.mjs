@@ -19,7 +19,7 @@
  * cares about.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, writeSync } from 'node:fs';
+import { readFileSync, renameSync, writeFileSync, writeSync } from 'node:fs';
 import { reviewGraphql } from './fake-gh-review.mjs';
 
 const scenarioPath = process.env.N10_FAKE_GH;
@@ -49,7 +49,11 @@ if (latency > 0) {
  * only place that state can live.
  */
 function save() {
-  writeFileSync(scenarioPath, JSON.stringify(scenario, null, 2), 'utf8');
+  // Replaced in one step: the app's other `gh` processes read it as
+  // this one writes (see setup/scenario-file.ts).
+  const next = `${scenarioPath}.${process.pid}.tmp`;
+  writeFileSync(next, JSON.stringify(scenario, null, 2), 'utf8');
+  renameSync(next, scenarioPath);
 }
 
 /**
