@@ -35,6 +35,21 @@ export function sessionCards(
   }));
 }
 
+export interface CardStatus {
+  label: 'Running' | 'Waiting to reconnect' | 'Exited';
+  tone: 'success' | 'warning' | 'muted';
+}
+
+/** What a card says of its session, and in which tone: another
+ *  machine's that cannot be reached is neither running here nor
+ *  exited, and may well still be running there. */
+export function cardStatus(card: SessionCard): CardStatus {
+  if (!card.running) return { label: 'Exited', tone: 'muted' };
+  if (card.connectionState && card.connectionState !== 'connected')
+    return { label: 'Waiting to reconnect', tone: 'warning' };
+  return { label: 'Running', tone: 'success' };
+}
+
 /**
  * The session whose terminal the pane shows: the one the reader picked
  * while it is still listed, else the tab's own agent, else the first.

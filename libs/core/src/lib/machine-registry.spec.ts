@@ -3,6 +3,7 @@ import {
   pollerFor,
   requireMachine,
   resolveMachine,
+  setMachineReachable,
   setMachineResolver,
 } from './machine-registry.js';
 import type { RemoteMachine } from '@n10/terminal-tmux';
@@ -48,6 +49,27 @@ describe('machine-registry', () => {
     const b = pollerFor(machine);
     expect(a).toBe(b);
     a.dispose();
+  });
+
+  // A session opened, or reattached, while its machine is away.
+  it('tells a poller made later what the fleet last said of its machine', () => {
+    vi.useFakeTimers();
+    try {
+      setMachineReachable('peer-off', false);
+      const heard: boolean[] = [];
+      const poller = pollerFor(fakeMachine('peer-off'));
+      poller.subscribe('wt', {
+        onState: () => undefined,
+        onUnreachable: () => undefined,
+        onReachability: (reachable) => heard.push(reachable),
+      });
+      expect(heard).toEqual([false]);
+      setMachineReachable('peer-off', true);
+      expect(heard).toEqual([false, true]);
+      poller.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('drops cached pollers when a new resolver is installed', () => {

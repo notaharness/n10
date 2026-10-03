@@ -64,8 +64,18 @@ class Held {
       : `${this.name} running:\n${this.tail.join('\n')}`;
   }
 
+  /** Stops it answering anything, without a word to its peers. */
+  freeze(): void {
+    if (!this.exited) this.child.kill('SIGSTOP');
+  }
+
+  thaw(): void {
+    if (!this.exited) this.child.kill('SIGCONT');
+  }
+
   async stop(): Promise<void> {
     if (this.exited) return;
+    this.thaw();
     this.child.stdin?.end();
     this.child.kill('SIGTERM');
     const timer = setTimeout(() => this.child.kill('SIGKILL'), STOP_GRACE_MS);
@@ -177,6 +187,10 @@ export interface BeamMachine {
   peerId(): Promise<string>;
   /** The daemon's state and stderr tail, for a failed test. */
   log(): string;
+  /** The daemon stops answering, as a machine that hangs or loses its
+   *  network does, and tells no peer; `thaw` brings it back. */
+  freeze(): void;
+  thaw(): void;
   stop(): Promise<void>;
 }
 
@@ -250,6 +264,8 @@ export async function startMachine(
       return (JSON.parse(stdout) as { peerId: string }).peerId;
     },
     log: () => held.log(),
+    freeze: () => held.freeze(),
+    thaw: () => held.thaw(),
     stop: () => held.stop(),
   };
 }

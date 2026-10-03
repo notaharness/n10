@@ -180,6 +180,7 @@ vi.mock('./machines.js', async () => {
 vi.mock('@n10/core', async (importOriginal) => {
   const actual = await importOriginal<typeof CoreModule>();
   return {
+    setMachineReachable: () => undefined,
     worktreeSessionKey: actual.worktreeSessionKey,
     sessionLabel: actual.sessionLabel,
     sessionIdentity: actual.sessionIdentity,

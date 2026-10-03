@@ -199,8 +199,17 @@ outside n10, a tmux server restart — leaves nothing to show: the backend repor
 `processState.gone`, the engine releases the agent as it ends, and its card and
 pane go, so the tab returns to its no-agent state (Launch Agent, the Overview).
 An exited agent's dead pane is not polled, so discovery is what sees its
-session go later, and releases it then. Keystrokes and resizes that race any of
-these are dropped and logged by the host, never thrown back to the renderer.
+session go later, and releases it then. Another machine that cannot be reached
+is neither: its agent waits to reconnect, said on its card (in warning, not
+Running's green) and in the pane's banner. Two things notice. The fleet sees the
+peer go offline: the engine's machine service tells core's machine registry,
+which remembers it for sessions opened later and tells that machine's poller.
+And a session listing on the machine that does not settle within a deadline
+counts as a failed poll, for a transport that neither answers nor fails. Either
+way the sessions attach nothing until the machine is back by every account (the
+fleet says so, and a listing succeeds again), since beam can hand back a stream
+to a peer that is not there, which would read as reconnected. Keystrokes and resizes that race any of these are dropped and
+logged by the host, never thrown back to the renderer.
 
 Agent selection uses explicit `agentId`, defaulting to Claude. The hidden fixture
 runner requires `agentId: 'test'`; only that runner interprets `aiCommand`. No

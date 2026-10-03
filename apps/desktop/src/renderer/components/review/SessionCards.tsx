@@ -6,7 +6,11 @@ import {
   TerminalIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { SessionCard } from '../../lib/review/session-cards.js';
+import {
+  cardStatus,
+  type CardStatus,
+  type SessionCard,
+} from '../../lib/review/session-cards.js';
 import { cn, errorMessage } from '../../lib/utils.js';
 import { Button } from '../ui/button.js';
 import { Tip } from '../ui/tooltip.js';
@@ -33,6 +37,13 @@ const SLOTS: readonly {
     another: 'Launch additional terminal',
   },
 ];
+
+/** The icon tile, in the card's status tone. */
+const TILE_TONES: Record<CardStatus['tone'], string> = {
+  success: 'bg-success/15 text-success',
+  warning: 'bg-warning/15 text-warning',
+  muted: 'bg-muted text-muted-foreground',
+};
 
 const ICONS: Record<Kind, typeof BotIcon> = {
   Agent: BotIcon,
@@ -186,6 +197,7 @@ function SessionCardView({
   onMenu: () => void;
 }) {
   const Icon = ICONS[card.title];
+  const status = cardStatus(card);
   const stopLabel = `Stop ${card.title.toLowerCase()}`;
   return (
     <div
@@ -210,17 +222,18 @@ function SessionCardView({
         <span
           className={cn(
             'relative flex size-9 shrink-0 items-center justify-center rounded-md',
-            card.running
-              ? 'bg-success/15 text-success'
-              : 'bg-muted text-muted-foreground'
+            TILE_TONES[status.tone]
           )}
         >
           <Icon className="size-5" />
-          {card.running && (
+          {status.tone === 'success' && (
             <span className="absolute -right-0.5 -bottom-0.5 flex size-2.5">
               <span className="absolute inline-flex size-full rounded-full bg-success opacity-60 motion-safe:animate-ping" />
               <span className="relative inline-flex size-2.5 rounded-full bg-success ring-2 ring-sidebar" />
             </span>
+          )}
+          {status.tone === 'warning' && (
+            <span className="absolute -right-0.5 -bottom-0.5 inline-flex size-2.5 rounded-full bg-warning ring-2 ring-sidebar" />
           )}
         </span>
         <span className="min-w-0 flex-1">
@@ -238,10 +251,12 @@ function SessionCardView({
           <span
             className={cn(
               'block truncate text-xs',
-              card.running ? 'text-success' : 'text-muted-foreground'
+              status.tone === 'success' && 'text-success',
+              status.tone === 'warning' && 'text-warning',
+              status.tone === 'muted' && 'text-muted-foreground'
             )}
           >
-            {card.running ? 'Running' : 'Exited'}
+            {status.label}
           </span>
         </span>
         <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
