@@ -13,6 +13,7 @@ import {
 } from './setup/terminals.js';
 import {
   detachTmuxClients,
+  killFixtureSessions,
   tmuxClientPids,
   killN10Sessions,
   killTmuxSession,
@@ -255,6 +256,44 @@ test.describe('Terminal tabs surviving a restart', () => {
     });
     expect(await page.evaluate(() => window.n10.getRepo())).toMatchObject({
       cwd: other,
+    });
+  });
+});
+
+test.describe("Orchestra's directory players", () => {
+  const NAME = 'nixos-config-dir';
+
+  // A `dir` session has the type tag Orchestra's `spawn.sh --dir` writes
+  // and no worktree: it opens as a standalone agent terminal.
+  test.use({
+    liveTerminals: {
+      [NAME]: {
+        kind: 'dir',
+        cwd: tmpdir(),
+        command: `printf '%s\\n' dir-player-was-here; sleep 300`,
+      },
+    },
+  });
+
+  test.afterEach(({ desktop }) => {
+    killFixtureSessions(desktop.homeDir);
+  });
+
+  test('is adopted as an agent terminal tab', async ({ desktop }) => {
+    const { page } = desktop;
+    await expect(terminalTabs(page)).toHaveCount(1, { timeout: 30_000 });
+    await expect
+      .poll(() => page.evaluate(() => window.n10.listTerminals()))
+      .toEqual([
+        expect.objectContaining({
+          kind: 'agent',
+          cwd: tmpdir(),
+          running: true,
+        }),
+      ]);
+    await terminalTabs(page).click();
+    await expect(visibleText(page, 'dir-player-was-here')).toBeVisible({
+      timeout: 30_000,
     });
   });
 });

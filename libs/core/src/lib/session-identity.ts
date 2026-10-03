@@ -30,7 +30,8 @@ export const ORCHESTRA_TAG = {
   /** The absolute, symlink-resolved path of the main checkout — what
    *  `git rev-parse --show-toplevel` prints there. */
   repo: '@orchestra-repo',
-  /** `worktree`, `shell` or `agent` — see {@link SessionType}. */
+  /** `worktree`, `shell` or `agent` — see {@link SessionType}.
+   *  Orchestra's `dir` is read as `agent`. */
   sessionType: '@orchestra-session-type',
   /** `worktree` sessions only: the branch the session was spawned
    *  under, unsanitized (`feature/x`); a detached-HEAD worktree's
@@ -73,10 +74,13 @@ export const N10_SPAWNER = 'n10';
  */
 export type SessionType = 'worktree' | 'shell' | 'agent';
 
-const SESSION_TYPES: ReadonlySet<string> = new Set<SessionType>([
-  'worktree',
-  'shell',
-  'agent',
+/** Tag value to the type it is read as. `dir` is Orchestra's name for an
+ *  agent in a directory; n10 never writes it. */
+const SESSION_TYPES: ReadonlyMap<string, SessionType> = new Map([
+  ['worktree', 'worktree'],
+  ['shell', 'shell'],
+  ['agent', 'agent'],
+  ['dir', 'agent'],
 ]);
 
 /** One of our sessions, as the tags describe it. */
@@ -151,9 +155,9 @@ export function taggedSession(
 ): TaggedSession | null {
   const tags = info.options ?? {};
   const spawner = tags[ORCHESTRA_TAG.spawner];
-  const type = tags[ORCHESTRA_TAG.sessionType];
+  const type = SESSION_TYPES.get(tags[ORCHESTRA_TAG.sessionType] ?? '');
   const repo = tags[ORCHESTRA_TAG.repo];
-  if (!spawner || !type || !SESSION_TYPES.has(type)) return null;
+  if (!spawner || !type) return null;
   const worktreePath = checkoutTag(type, tags);
   if (worktreePath === null) return null;
   return {
@@ -164,7 +168,7 @@ export function taggedSession(
     path: info.path,
     spawner,
     repo: repo ?? '',
-    type: type as SessionType,
+    type,
     branch: tags[ORCHESTRA_TAG.branch] ?? '',
     worktreePath,
     machine,

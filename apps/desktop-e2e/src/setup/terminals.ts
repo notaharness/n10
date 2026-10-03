@@ -73,8 +73,9 @@ export function tmuxSessionPath(name: string, tmuxTmpdir: string): string {
 export interface TerminalSeed {
   cwd: string;
   command: string;
-  /** Shell unless said. */
-  kind?: 'shell' | 'agent';
+  /** Shell unless said. `dir` is the tag Orchestra's `--dir` players
+   *  carry, written the way Orchestra writes it: spawner `orchestra`. */
+  kind?: 'shell' | 'agent' | 'dir';
 }
 
 export function startSurvivingTerminal(
@@ -107,7 +108,7 @@ export function startSurvivingTerminal(
   tagTmuxSession(
     opts.name,
     {
-      '@orchestra-spawner': 'n10',
+      '@orchestra-spawner': opts.kind === 'dir' ? 'orchestra' : 'n10',
       '@orchestra-repo': opts.cwd,
       '@orchestra-session-type': opts.kind ?? 'shell',
     },
