@@ -20,8 +20,17 @@ import { listOurSessions, resolveWorktreeSession } from './session-resolver.js';
 const target = 'codex:11111111-2222-4333-8444-555555555555';
 const branch = 'feature/integration';
 
+// Each test runs Orchestra's real scripts, tmux and fake agent CLIs, and
+// waits on what those processes write. Alone a test takes 1–2.5 s and a
+// fake agent starts within ~100 ms; in a loaded full run the tests take
+// up to 7.5 s and an agent up to ~0.9 s to start, past vitest's 5 s test
+// and 1 s poll defaults.
+const TEST_TIMEOUT_MS = 20_000;
+const PROCESS_WAIT = { timeout: 5_000 };
+
 describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
   'installed Orchestra plugin',
+  { timeout: TEST_TIMEOUT_MS },
   () => {
     let fixture: ReturnType<typeof orchestraFixture>;
     beforeEach(() => {
@@ -49,7 +58,10 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         stderr: '',
       });
       await expect
-        .poll(() => existsSync(join(fixture.home, 'agent-start.json')))
+        .poll(
+          () => existsSync(join(fixture.home, 'agent-start.json')),
+          PROCESS_WAIT
+        )
         .toBe(true);
       // The pinned plugin (tests/fixtures/orchestra.tar.gz) predates
       // `@orchestra-worktree-path`, which notaharness/plugins#11 writes at
@@ -193,7 +205,10 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         stderr: '',
       });
       await expect
-        .poll(() => existsSync(join(fixture.home, 'report-result.json')))
+        .poll(
+          () => existsSync(join(fixture.home, 'report-result.json')),
+          PROCESS_WAIT
+        )
         .toBe(true);
       expect(JSON.parse(fixture.read('report-result.json')).status).toBe(0);
       expect(JSON.parse(fixture.read('deliveries.jsonl').trim())).toEqual([
@@ -221,7 +236,10 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         stderr: '',
       });
       await expect
-        .poll(() => existsSync(join(fixture.home, 'report-result.json')))
+        .poll(
+          () => existsSync(join(fixture.home, 'report-result.json')),
+          PROCESS_WAIT
+        )
         .toBe(true);
       const result = JSON.parse(fixture.read('report-result.json'));
       expect(result.status).toBe(1);
@@ -249,7 +267,8 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       await expect
         .poll(
           () =>
-            resolveWorktreeSession(fixture.repo, player.worktreePath)?.paneDead
+            resolveWorktreeSession(fixture.repo, player.worktreePath)?.paneDead,
+          PROCESS_WAIT
         )
         .toBe(true);
       expect(listLiveWorktreeSessions()).toEqual([]);
@@ -264,7 +283,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
           throw new Error('Discovery must not restart a stopped agent');
         },
       });
-      await expect.poll(() => attached.exited).toBe(true);
+      await expect.poll(() => attached.exited, PROCESS_WAIT).toBe(true);
       rmSync(join(fixture.home, 'agent-start.json'));
       const resumed = await launchSession({
         name: worktreeSessionKey(player.path, fixture.repo),
@@ -275,7 +294,10 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         request: { intent: 'continue-or-blank' },
       });
       await expect
-        .poll(() => existsSync(join(fixture.home, 'agent-start.json')))
+        .poll(
+          () => existsSync(join(fixture.home, 'agent-start.json')),
+          PROCESS_WAIT
+        )
         .toBe(true);
       const next = JSON.parse(fixture.read('agent-start.json'));
       expect(next.pid).not.toBe(first.pid);
@@ -349,7 +371,10 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         expected: context.incarnation,
       });
       await expect
-        .poll(() => existsSync(join(fixture.home, 'agent-start.json')))
+        .poll(
+          () => existsSync(join(fixture.home, 'agent-start.json')),
+          PROCESS_WAIT
+        )
         .toBe(true);
       expect(next.agent).toBe('claude');
       const current = resolveWorktreeSession(
@@ -369,7 +394,10 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         fixture.script('send.sh', branch, '--raw', 'orchestrator').status
       ).toBe(0);
       await expect
-        .poll(() => existsSync(join(fixture.home, 'report-result.json')))
+        .poll(
+          () => existsSync(join(fixture.home, 'report-result.json')),
+          PROCESS_WAIT
+        )
         .toBe(true);
       expect(JSON.parse(fixture.read('report-result.json'))).toMatchObject({
         status: 0,
@@ -386,7 +414,8 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       await expect
         .poll(
           () =>
-            resolveWorktreeSession(fixture.repo, player.worktreePath)?.paneDead
+            resolveWorktreeSession(fixture.repo, player.worktreePath)?.paneDead,
+          PROCESS_WAIT
         )
         .toBe(true);
       await launchSession({
@@ -422,7 +451,10 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         build: () => ({ spec: { cmd: 'codex', args: [] }, agent: 'codex' }),
       });
       await expect
-        .poll(() => existsSync(join(fixture.home, 'agent-start.json')))
+        .poll(
+          () => existsSync(join(fixture.home, 'agent-start.json')),
+          PROCESS_WAIT
+        )
         .toBe(true);
       const player = resolveWorktreeSession(fixture.repo, fixture.repo)!;
       expect(player.spawner).toBe('n10');
@@ -439,18 +471,23 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         status: 0,
         stderr: '',
       });
+      // The agent appends each line it reads; the file can exist
+      // before the line is in it.
       await expect
-        .poll(() => existsSync(join(fixture.home, 'agent-input.jsonl')))
-        .toBe(true);
-      expect(fixture.read('agent-input.jsonl')).toContain(
-        '$player handoff task'
-      );
+        .poll(
+          () =>
+            existsSync(join(fixture.home, 'agent-input.jsonl'))
+              ? fixture.read('agent-input.jsonl')
+              : '',
+          PROCESS_WAIT
+        )
+        .toContain('$player handoff task');
       expect(resolveWorktreeSession(fixture.repo, fixture.repo)).toMatchObject({
         spawner: 'n10',
         orchestrator: target,
       });
       expect(fixture.script('kill.sh', player.name).status).toBe(0);
-      await expect.poll(() => entry.exited).toBe(true);
+      await expect.poll(() => entry.exited, PROCESS_WAIT).toBe(true);
       expect(resolveWorktreeSession(fixture.repo, fixture.repo)).toBeNull();
     });
   }
