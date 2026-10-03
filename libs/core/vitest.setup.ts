@@ -25,6 +25,20 @@ process.env.TMUX_TMPDIR = mkdtempSync(join(tmpdir(), 'n10-core-tests-'));
 delete process.env.TMUX;
 delete process.env.TMUX_PANE;
 
+/**
+ * Keep the scratch servers off the developer's session bus. A tmux
+ * built with systemd support (Debian's and Ubuntu's are) asks the user
+ * manager over D-Bus for a new scope around every pane it spawns, and
+ * waits for the job: about 100 ms a pane on an idle machine, over a
+ * second once a full parallel run has many servers asking at once. A
+ * bus that answers nothing makes tmux skip the scope, and leaves no
+ * test units behind in the developer's systemd.
+ */
+process.env.DBUS_SESSION_BUS_ADDRESS = `unix:path=${join(
+  process.env.TMUX_TMPDIR,
+  'no-session-bus'
+)}`;
+
 const ANCHOR = 'scratch-anchor';
 
 /**

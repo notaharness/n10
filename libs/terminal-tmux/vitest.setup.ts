@@ -38,6 +38,20 @@ delete process.env.TMUX;
 delete process.env.TMUX_PANE;
 
 /**
+ * Keep the scratch server off the developer's session bus. A tmux
+ * built with systemd support (Debian's and Ubuntu's are) asks the user
+ * manager over D-Bus for a new scope around every pane it spawns, and
+ * waits for the job: about 100 ms a pane on an idle machine, over a
+ * second once a full parallel run has many servers asking at once. A
+ * bus that answers nothing makes tmux skip the scope, and leaves no
+ * test units behind in the developer's systemd.
+ */
+process.env.DBUS_SESSION_BUS_ADDRESS = `unix:path=${join(
+  FIXTURE_HOME,
+  'no-session-bus'
+)}`;
+
+/**
  * Fail loudly if the socket a test is about to use is not the scratch
  * one. Call it from any suite that creates or kills real tmux sessions:
  * the point is that a lost environment variable stops the suite instead
