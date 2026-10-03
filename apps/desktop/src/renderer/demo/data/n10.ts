@@ -122,6 +122,7 @@ export const N10_REPO: RepoData = {
       session: worktreeSession(N10, PR_FLEET.sourceBranch, true),
       branch: PR_FLEET.sourceBranch,
       pr: PR_FLEET,
+      authored: true,
       isMerged: false,
     },
     {
@@ -129,6 +130,7 @@ export const N10_REPO: RepoData = {
       session: worktreeSession(N10, PR_TABS.sourceBranch, false),
       branch: PR_TABS.sourceBranch,
       pr: PR_TABS,
+      authored: true,
       isMerged: false,
       babysit: babysitting(PR_TABS),
     },

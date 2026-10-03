@@ -126,11 +126,13 @@ function votedFor(raw: RawReviewer): { votedFor?: string[] } {
  * container — is its own row carrying its own vote, which is whichever
  * member voted for it; `myTeamIds` only marks the groups the signed-in
  * user belongs to, so that a request to the group reads as a request
- * to them.
+ * to them. `viewerId` marks that user's own row, by identity rather
+ * than by email.
  */
 export function parseReviewer(
   raw: RawReviewer,
-  myTeamIds: ReadonlySet<string> = new Set()
+  myTeamIds: ReadonlySet<string> = new Set(),
+  viewerId?: string | null
 ): PullRequestReviewer {
   const vote = raw.vote ?? 0;
   const validVotes: ReviewerVote[] = [10, 5, 0, -5, -10];
@@ -142,6 +144,7 @@ export function parseReviewer(
     displayName: raw.displayName ?? 'Unknown',
     identifier: raw.uniqueName ?? '',
     decision: voteToDecision(normalizedVote, raw.hasDeclined ?? false),
+    ...(viewerId ? { isViewer: raw.id === viewerId } : {}),
     ...(mine ? { includesViewer: true } : {}),
     ...votedFor(raw),
   };
@@ -160,6 +163,22 @@ export type ParsedPullRequest = Omit<
   mergeKey: string;
 };
 
+/** Who wrote a pull request, and whether it was the signed-in account:
+ *  said only once Azure has named that account. */
+function authorOf(
+  createdBy: { id?: string; uniqueName?: string; displayName?: string } = {},
+  viewerId: string | null | undefined
+): Pick<
+  PullRequestInfo,
+  'createdByIdentifier' | 'createdByDisplayName' | 'viewerIsAuthor'
+> {
+  return {
+    createdByIdentifier: createdBy.uniqueName ?? '',
+    createdByDisplayName: createdBy.displayName ?? '',
+    ...(viewerId ? { viewerIsAuthor: createdBy.id === viewerId } : {}),
+  };
+}
+
 export function parsePullRequest(
   raw: {
     pullRequestId?: number;
@@ -168,12 +187,13 @@ export function parsePullRequest(
     targetRefName?: string;
     isDraft?: boolean;
     reviewers?: RawReviewer[];
-    createdBy?: { uniqueName?: string; displayName?: string };
+    createdBy?: { id?: string; uniqueName?: string; displayName?: string };
     lastMergeSourceCommit?: { commitId?: string };
     lastMergeTargetCommit?: { commitId?: string };
   },
   project: Record<string, string>,
-  myTeamIds?: ReadonlySet<string>
+  myTeamIds?: ReadonlySet<string>,
+  viewerId?: string | null
 ): ParsedPullRequest {
   const sourceBranch = (raw.sourceRefName ?? '').replace(/^refs\/heads\//, '');
   const targetBranch = (raw.targetRefName ?? '').replace(/^refs\/heads\//, '');
@@ -184,9 +204,10 @@ export function parsePullRequest(
     sourceBranch,
     targetBranch,
     isDraft: raw.isDraft ?? false,
-    reviewers: (raw.reviewers ?? []).map((r) => parseReviewer(r, myTeamIds)),
-    createdByIdentifier: raw.createdBy?.uniqueName ?? '',
-    createdByDisplayName: raw.createdBy?.displayName ?? '',
+    reviewers: (raw.reviewers ?? []).map((r) =>
+      parseReviewer(r, myTeamIds, viewerId)
+    ),
+    ...authorOf(raw.createdBy, viewerId),
     url: `https://dev.azure.com/${project.org}/${project.project}/_git/${project.repo}/pullrequest/${prId}`,
     headSha: raw.lastMergeSourceCommit?.commitId,
     mergeKey: mergeIdentity(raw),
@@ -264,30 +285,66 @@ export async function fetchAuthenticatedUserId(
   return id;
 }
 
-export async function fetchMyTeamIds(config: AdoConfig): Promise<Set<string>> {
+/** What Azure last said of the signed-in account, by read: who it is
+ *  and its teams decide which pull requests are the viewer's. */
+const lastIdentity = new Map<string, unknown>();
+
+/**
+ * An identity read that answers a failure with its last answer, else
+ * `none`. A failure must not take the pull request list down, nor move
+ * the viewer's pull requests between sidebar sections for a cycle: an
+ * identity changes far less often than reads fail.
+ */
+async function lastGoodIdentity<T>(
+  key: string,
+  read: () => Promise<T>,
+  none: T
+): Promise<T> {
   try {
-    const data = await adoGet<{ value?: { id?: string }[] }>(
-      'fetchMyTeamIds',
-      `${config.org}/${config.project}/my-teams`,
-      TTL.identity,
-      `https://dev.azure.com/${config.org}/_apis/projects/${config.project}/teams?$mine=true&api-version=7.1`,
-      authHeaders(config.pat),
-      `teams in ${config.project}`
-    );
-    return new Set(
-      (data.value ?? []).map((t) => t.id).filter((id): id is string => !!id)
-    );
+    const answer = await read();
+    lastIdentity.set(key, answer);
+    return answer;
   } catch {
-    // Team membership only enriches reviewer rows; a failure here must
-    // not take the pull request list down with it.
-    return new Set();
+    return lastIdentity.has(key) ? (lastIdentity.get(key) as T) : none;
   }
+}
+
+export function fetchMyTeamIds(config: AdoConfig): Promise<Set<string>> {
+  const key = `${config.org}/${config.project}/my-teams`;
+  return lastGoodIdentity(
+    key,
+    async () => {
+      const data = await adoGet<{ value?: { id?: string }[] }>(
+        'fetchMyTeamIds',
+        key,
+        TTL.identity,
+        `https://dev.azure.com/${config.org}/_apis/projects/${config.project}/teams?$mine=true&api-version=7.1`,
+        authHeaders(config.pat),
+        `teams in ${config.project}`
+      );
+      return new Set(
+        (data.value ?? []).map((t) => t.id).filter((id): id is string => !!id)
+      );
+    },
+    new Set<string>()
+  );
+}
+
+/** The signed-in account's identity id, which a pull request's
+ *  `createdBy.id` is compared with; null when Azure has not said. */
+export function fetchViewerId(config: AdoConfig): Promise<string | null> {
+  return lastGoodIdentity<string | null>(
+    `${config.org}/connectiondata`,
+    () => fetchAuthenticatedUserId(config),
+    null
+  );
 }
 
 export async function fetchActivePullRequests(
   config: AdoConfig,
   project: Record<string, string>,
-  myTeamIds: ReadonlySet<string> = new Set()
+  myTeamIds: ReadonlySet<string> = new Set(),
+  viewerId: string | null = null
 ): Promise<ParsedPullRequest[]> {
   const data = await adoGet<{ value?: unknown[] }>(
     'fetchActivePullRequests',
@@ -302,7 +359,7 @@ export async function fetchActivePullRequests(
     `repository ${config.repo}`
   );
   return ((data.value ?? []) as Record<string, unknown>[]).map((raw) =>
-    parsePullRequest(raw, project, myTeamIds)
+    parsePullRequest(raw, project, myTeamIds, viewerId)
   );
 }
 
@@ -788,6 +845,8 @@ export const azureDevOpsProvider: VcsProvider = {
 
   resetCaches(): void {
     resetAdoTransport();
+    // Fetched as whoever the old credentials named.
+    lastIdentity.clear();
   },
 
   forgetPullRequestCache(project: Record<string, string>): void {
@@ -812,10 +871,16 @@ export const azureDevOpsProvider: VcsProvider = {
     const config = toAdoConfig(auth, project);
 
     return counted('fetchPullRequests', async () => {
-      // Cached by the transport at `TTL.identity`: a memory lookup on
-      // every poll but the first of each half hour.
+      // Both cached by the transport at `TTL.identity`: a memory lookup
+      // on every poll but the first of each half hour.
       const myTeamIds = await fetchMyTeamIds(config);
-      const prs = await fetchActivePullRequests(config, project, myTeamIds);
+      const viewerId = await fetchViewerId(config);
+      const prs = await fetchActivePullRequests(
+        config,
+        project,
+        myTeamIds,
+        viewerId
+      );
 
       // CI reaches a pull request by two unrelated routes and a repo
       // usually only uses one: pipelines run against the merge ref,

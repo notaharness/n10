@@ -7,7 +7,7 @@ import {
   fetchPrBuildStatus,
 } from './build-status.js';
 import { deriveBuildRunStatus } from './builds.js';
-import { resetAdoTransport } from './request.js';
+import { invalidateAdoKey, resetAdoTransport } from './request.js';
 import {
   parseReviewer,
   parsePullRequest,
@@ -62,7 +62,7 @@ function jsonResponse(data: unknown, status = 200): Response {
 // would let one test answer another's request. Every test starts from
 // an empty cache and an open throttle gate.
 beforeEach(() => {
-  resetAdoTransport();
+  azureDevOpsProvider.resetCaches?.();
 });
 
 const testAdoConfig = {
@@ -906,6 +906,23 @@ describe('fetchMyTeamIds', () => {
     const ids = await fetchMyTeamIds(testAdoConfig);
     expect(ids).toEqual(new Set());
   });
+
+  it('answers a failed read with the teams last named', async () => {
+    // Membership is what files a request to the viewer's team under
+    // their review: one failed read must not move it for a cycle.
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ value: [{ id: 'team-1' }] })
+    );
+    await fetchMyTeamIds(testAdoConfig);
+    invalidateAdoKey('myorg/myproject/my-teams');
+    mockFetch.mockRejectedValueOnce(new Error('network error'));
+    expect(await fetchMyTeamIds(testAdoConfig)).toEqual(new Set(['team-1']));
+
+    // New credentials name someone else.
+    azureDevOpsProvider.resetCaches?.();
+    mockFetch.mockRejectedValueOnce(new Error('network error'));
+    expect(await fetchMyTeamIds(testAdoConfig)).toEqual(new Set());
+  });
 });
 
 describe('azureDevOpsProvider', () => {
@@ -998,6 +1015,110 @@ describe('azureDevOpsProvider', () => {
       // a "cleanup hook", which it then calls — invoking fetch with no
       // arguments at teardown.
       mockFetch.mockReset();
+    });
+
+    it('marks the pull requests the signed-in account wrote, whatever its email', async () => {
+      // The configured email is git's, which need not be Azure's
+      // uniqueName (a personal address, a DOMAIN\\user name): the
+      // account is the authenticated identity, by id.
+      const author = (id: string, uniqueName: string) => ({ id, uniqueName });
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/_apis/connectiondata'))
+          return Promise.resolve(
+            jsonResponse({ authenticatedUser: { id: 'viewer-id' } })
+          );
+        if (url.includes('/pullrequests?'))
+          return Promise.resolve(
+            jsonResponse({
+              value: [
+                {
+                  pullRequestId: 42,
+                  sourceRefName: 'refs/heads/mine',
+                  createdBy: author('viewer-id', 'CORP\\robin'),
+                },
+                {
+                  pullRequestId: 43,
+                  sourceRefName: 'refs/heads/theirs',
+                  createdBy: author('other-id', 'robin@example.com'),
+                },
+              ],
+            })
+          );
+        return Promise.resolve(jsonResponse({ value: [] }));
+      });
+
+      const result = await azureDevOpsProvider.fetchPullRequests(
+        { pat: 'test-pat' },
+        testProject
+      );
+
+      expect(result['mine']?.viewerIsAuthor).toBe(true);
+      expect(result['theirs']?.viewerIsAuthor).toBe(false);
+    });
+
+    it('marks the signed-in account’s reviewer row, whatever its email', async () => {
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/_apis/connectiondata'))
+          return Promise.resolve(
+            jsonResponse({ authenticatedUser: { id: 'viewer-id' } })
+          );
+        if (url.includes('/pullrequests?'))
+          return Promise.resolve(
+            jsonResponse({
+              value: [
+                {
+                  pullRequestId: 43,
+                  sourceRefName: 'refs/heads/theirs',
+                  createdBy: { id: 'other-id' },
+                  reviewers: [
+                    { id: 'viewer-id', uniqueName: 'CORP\\robin', vote: 0 },
+                    { id: 'other-id', uniqueName: 'robin@example.com' },
+                  ],
+                },
+              ],
+            })
+          );
+        return Promise.resolve(jsonResponse({ value: [] }));
+      });
+
+      const result = await azureDevOpsProvider.fetchPullRequests(
+        { pat: 'test-pat' },
+        testProject
+      );
+
+      expect(
+        result['theirs']?.reviewers?.map((r) => [r.identifier, r.isViewer])
+      ).toEqual([
+        ['CORP\\robin', true],
+        ['robin@example.com', false],
+      ]);
+    });
+
+    it('leaves authorship to the email when Azure has not said who the account is', async () => {
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/_apis/connectiondata'))
+          return Promise.resolve(jsonResponse({}, 500));
+        if (url.includes('/pullrequests?'))
+          return Promise.resolve(
+            jsonResponse({
+              value: [
+                {
+                  pullRequestId: 42,
+                  sourceRefName: 'refs/heads/mine',
+                  createdBy: { id: 'viewer-id' },
+                },
+              ],
+            })
+          );
+        return Promise.resolve(jsonResponse({ value: [] }));
+      });
+
+      const result = await azureDevOpsProvider.fetchPullRequests(
+        { pat: 'test-pat' },
+        testProject
+      );
+
+      expect(result['mine']).not.toHaveProperty('viewerIsAuthor');
     });
 
     it('returns a map of branch to PR info with comment counts', async () => {
@@ -1131,10 +1252,13 @@ describe('azureDevOpsProvider', () => {
         testProject
       );
 
+      // Every row says whether it is the caller's own, by identity:
+      // the recorded "Me" carries the authenticated id.
       const coreTeam = {
         displayName: '[proj]\\Core Team',
         identifier:
           'vstfs:///Classification/TeamProject/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c\\Core Team',
+        isViewer: false,
         includesViewer: true,
       };
       expect(result['feat/teammate-approved']?.reviewers).toEqual([
@@ -1143,6 +1267,7 @@ describe('azureDevOpsProvider', () => {
           displayName: 'Teammate',
           identifier: 'teammate@example.com',
           decision: 'approved',
+          isViewer: false,
           votedFor: [coreTeam.identifier],
         },
         {
@@ -1150,6 +1275,7 @@ describe('azureDevOpsProvider', () => {
           identifier:
             'vstfs:///Classification/TeamProject/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c\\Release Approvers',
           decision: 'no-response',
+          isViewer: false,
         },
       ]);
       expect(result['feat/group-pending']?.reviewers).toEqual([
@@ -1161,6 +1287,7 @@ describe('azureDevOpsProvider', () => {
           displayName: 'Me',
           identifier: 'me@example.com',
           decision: 'approved',
+          isViewer: true,
           votedFor: [coreTeam.identifier],
         },
       ]);

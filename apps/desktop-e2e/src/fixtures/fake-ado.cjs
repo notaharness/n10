@@ -153,7 +153,7 @@ function route(s, url) {
     return json({ authenticatedUser: s.viewer });
   }
   if (second === '_apis' && third === 'projects' && sixth === undefined) {
-    return fourth && path[4] === 'teams' ? list([]) : null;
+    return fourth && path[4] === 'teams' ? list(s.teams) : null;
   }
   if (third === '_apis') return projectApi(s, url, path.slice(3));
   return null;

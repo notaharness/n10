@@ -9,6 +9,7 @@ import type {
 } from '@n10/vcs-core';
 import {
   findOrphanPrs,
+  findYourPrIds,
   categorizeReviews as categorizePrReviews,
   buildSessionPrMap,
 } from '@n10/core/ui';
@@ -33,6 +34,8 @@ export interface SessionDataContextValue {
   orphanPrs: PullRequestInfo[];
   categorizedReviews: CategorizedReviews;
   sessionPrMap: Map<string, PullRequestInfo>;
+  /** Ids of the pull requests the viewer authored. */
+  yourPrIds: ReadonlySet<number>;
   mergedBranches: Set<string>;
   conflictCounts: Map<string, number>;
   conflictsLoading: boolean;
@@ -107,6 +110,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return categorizePrReviews(prMap, config, provider);
   }, [prMap, config, provider]);
 
+  const yourPrIds = useMemo(
+    () =>
+      provider ? findYourPrIds(prMap, config, provider) : new Set<number>(),
+    [prMap, config, provider]
+  );
+
   const sessionPrMap = useMemo(
     () => buildSessionPrMap(prMap, sessionMgr.sessions),
     [prMap, sessionMgr.sessions]
@@ -126,6 +135,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       orphanPrs,
       categorizedReviews,
       sessionPrMap,
+      yourPrIds,
       mergedBranches,
       conflictCounts,
       conflictsLoading,
@@ -139,6 +149,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       orphanPrs,
       categorizedReviews,
       sessionPrMap,
+      yourPrIds,
       mergedBranches,
       conflictCounts,
       conflictsLoading,

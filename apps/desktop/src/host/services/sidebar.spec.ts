@@ -110,6 +110,7 @@ vi.mock('@n10/core', async (importOriginal) => ({
   ...(await importOriginal<typeof Core>()),
   isSessionAlive: () => false,
   findOrphanPrs: () => [],
+  findYourPrIds: () => new Set(),
   categorizeReviews: () => ({
     needsReview: [],
     waitingForAuthor: [],
@@ -121,6 +122,7 @@ vi.mock('@n10/core', async (importOriginal) => ({
     _orphans: unknown,
     _reviews: unknown,
     _sessionPrMap: unknown,
+    _yours: unknown,
     _merged: unknown,
     _conflicts: unknown,
     babysat: ReadonlyMap<number, unknown>

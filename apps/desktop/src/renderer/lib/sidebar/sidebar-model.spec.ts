@@ -12,9 +12,9 @@ import {
   itemSessionName,
   itemTitle,
   unresolvedCommentsLabel,
-  SECTION_ORDER,
   liveSessionName,
 } from './sidebar-model.js';
+import { SIDEBAR_SECTIONS } from '@n10/core/ui';
 
 /**
  * The desktop keys editor tabs by `itemKey`, and the tab strip survives
@@ -141,6 +141,7 @@ describe('groupSections', () => {
       kind: 'session',
       session: session('drafty'),
       pr: pr({ id: 2, isDraft: true }),
+      authored: true,
       isMerged: false,
     },
     { kind: 'orphan-pr', pr: pr({ id: 3 }) },
@@ -159,7 +160,7 @@ describe('groupSections', () => {
       'approved',
     ]);
     // …which is the declared order, filtered to what is present.
-    expect(keys).toEqual(SECTION_ORDER.filter((k) => keys.includes(k)));
+    expect(keys).toEqual(SIDEBAR_SECTIONS.filter((k) => keys.includes(k)));
   });
 
   it('omits empty sections rather than rendering headers with no rows', () => {

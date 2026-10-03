@@ -3,6 +3,7 @@ import {
   buildSessionPrMap,
   categorizeReviews,
   findOrphanPrs,
+  findYourPrIds,
   sortSessionsByPrId,
   type SidebarItem,
 } from '@n10/core';
@@ -71,6 +72,9 @@ export async function listSidebarItems(): Promise<SidebarItem[]> {
   const categorizedReviews = provider
     ? categorizeReviews(prMap, config, provider)
     : { needsReview: [], waitingForAuthor: [], approvedByYou: [] };
+  const yours = provider
+    ? findYourPrIds(prMap, config, provider)
+    : new Set<number>();
   const sessionPrMap = buildSessionPrMap(prMap, sessions);
   const sortedSessions = sortSessionsByPrId(sessions, sessionPrMap);
 
@@ -82,6 +86,7 @@ export async function listSidebarItems(): Promise<SidebarItem[]> {
     orphanPrs,
     categorizedReviews,
     sessionPrMap,
+    yours,
     sync.merged,
     sync.conflicts,
     babysatStatuses(cwd)

@@ -3,26 +3,14 @@ import {
   type PullRequestReviewer,
   type ReviewDecision,
 } from '@n10/vcs-core/types';
+import {
+  SIDEBAR_SECTIONS,
+  sidebarSection,
+  type SidebarSectionKey,
+} from '@n10/core/ui';
 import type { SidebarItem } from '../../../host/contract.js';
 
-export type SectionKey =
-  | 'worktrees'
-  | 'draft-pull-requests'
-  | 'pull-requests'
-  | 'needs-review'
-  | 'waiting'
-  | 'approved';
-
-export const SECTION_ORDER: SectionKey[] = [
-  'worktrees',
-  'draft-pull-requests',
-  'pull-requests',
-  'needs-review',
-  'waiting',
-  'approved',
-];
-
-export const SECTION_LABEL: Record<SectionKey, string> = {
+export const SECTION_LABEL: Record<SidebarSectionKey, string> = {
   worktrees: 'Worktrees',
   'draft-pull-requests': 'Draft Pull Requests',
   'pull-requests': 'Pull Requests',
@@ -48,19 +36,6 @@ export function itemKey(item: SidebarItem): string {
   if (item.kind === 'session')
     return `branch:${item.branch ?? item.session.label ?? item.session.name}`;
   return `pr:${item.pr.id}`;
-}
-
-export function sectionKey(item: SidebarItem): SectionKey {
-  if (item.kind === 'session') {
-    if (!item.pr) return 'worktrees';
-    return item.pr.isDraft ? 'draft-pull-requests' : 'pull-requests';
-  }
-  if (item.kind === 'orphan-pr') {
-    return item.pr.isDraft ? 'draft-pull-requests' : 'pull-requests';
-  }
-  if (item.category === 'needs-review') return 'needs-review';
-  if (item.category === 'waiting') return 'waiting';
-  return 'approved';
 }
 
 export function itemRunning(item: SidebarItem): boolean {
@@ -143,21 +118,21 @@ export function applyPendingRemovals(
 }
 
 export interface SidebarSection {
-  key: SectionKey;
+  key: SidebarSectionKey;
   label: string;
   items: SidebarItem[];
 }
 
 /** Group the ordered flat list into its sections (TUI order preserved). */
 export function groupSections(items: SidebarItem[]): SidebarSection[] {
-  const map = new Map<SectionKey, SidebarItem[]>();
+  const map = new Map<SidebarSectionKey, SidebarItem[]>();
   for (const item of items) {
-    const k = sectionKey(item);
+    const k = sidebarSection(item);
     const arr = map.get(k);
     if (arr) arr.push(item);
     else map.set(k, [item]);
   }
-  return SECTION_ORDER.filter((k) => map.has(k)).map((k) => ({
+  return SIDEBAR_SECTIONS.filter((k) => map.has(k)).map((k) => ({
     key: k,
     label: SECTION_LABEL[k],
     items: map.get(k) ?? [],

@@ -19,6 +19,10 @@ export type SidebarItem =
       kind: 'session';
       session: AgentSession;
       pr?: PullRequestInfo;
+      /** The viewer authored `pr`. Only then does the row file under the
+       *  pull request sections: a checkout of someone else's pull
+       *  request that no review section lists is a worktree row. */
+      authored?: boolean;
       branch?: string;
       isMerged: boolean;
       conflictCount?: number;

@@ -8,11 +8,8 @@ import { useState } from 'react';
 import type { SidebarItem } from '../../../host/contract.js';
 import { useRepo } from '../../lib/repo-context.js';
 import { useRefreshRemote } from '../../lib/data/mutations.js';
-import {
-  groupSections,
-  itemKey,
-  type SectionKey,
-} from '../../lib/sidebar/sidebar-model.js';
+import type { SidebarSectionKey } from '@n10/core/ui';
+import { groupSections, itemKey } from '../../lib/sidebar/sidebar-model.js';
 import { useRepoTabs } from '../../lib/tabs/tabs.js';
 import { basename, cn } from '../../lib/utils.js';
 import { FleetSection } from '../fleet/FleetSection.js';
@@ -56,7 +53,7 @@ export function Sidebar({
   const refresh = useRefreshRemote(repo.cwd);
   const sections = groupSections(items);
   const [collapsed, setCollapsed] = useState<
-    Partial<Record<SectionKey, boolean>>
+    Partial<Record<SidebarSectionKey, boolean>>
   >({});
 
   // Only this repository's active tab highlights a row here. Another
@@ -136,6 +133,7 @@ export function Sidebar({
         )}
         {sections.map((section) => {
           const isOpen = !collapsed[section.key];
+          const labelId = `sidebar-section-${section.key}`;
           return (
             <Collapsible
               key={section.key}
@@ -155,13 +153,15 @@ export function Sidebar({
                       isOpen && 'rotate-90'
                     )}
                   />
-                  <span className="truncate">{section.label}</span>
+                  <span id={labelId} className="truncate">
+                    {section.label}
+                  </span>
                   <span className="ml-auto mr-1 rounded-full bg-muted px-1.5 text-[10px] font-medium tabular-nums text-muted-foreground">
                     {section.items.length}
                   </span>
                 </button>
               </CollapsibleTrigger>
-              <CollapsibleContent>
+              <CollapsibleContent role="group" aria-labelledby={labelId}>
                 {section.items.map((item) => (
                   <SidebarRow
                     key={itemKey(item)}

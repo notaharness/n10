@@ -21,7 +21,8 @@ import { resetAdoTransport } from './request.js';
  *   N  comment threads, one per pull request (no batch endpoint)
  *   N  status list, one per pull request (no batch endpoint)
  *
- * plus, once per half hour: the caller's teams and the repository's id.
+ * plus, once per half hour: who the caller is, their teams and the
+ * repository's id.
  *
  * A *warm* cycle over pull requests that have not moved costs the list
  * and nothing else — not even the pipeline runs, which are only asked
@@ -158,10 +159,10 @@ describe('one sync cycle', () => {
   it('costs 2 per pull request plus a fixed handful', async () => {
     await syncCycle();
 
-    // 2 teams/repository reads + the list + the batched builds +
-    // (threads, statuses) per pull request.
-    expect(counts().network).toBe(2 + 1 + 1 + 2 * PR_COUNT);
-    expect(mockFetch).toHaveBeenCalledTimes(2 + 1 + 1 + 2 * PR_COUNT);
+    // 3 identity/teams/repository reads + the list + the batched
+    // builds + (threads, statuses) per pull request.
+    expect(counts().network).toBe(3 + 1 + 1 + 2 * PR_COUNT);
+    expect(mockFetch).toHaveBeenCalledTimes(3 + 1 + 1 + 2 * PR_COUNT);
   });
 
   it('asks for every pipeline run once, not once per row', async () => {
@@ -702,7 +703,7 @@ describe('the same data asked for twice', () => {
     // A forced refresh landing on top of a poll: without dedupe this
     // is two of everything, and they arrive together by definition.
     await Promise.all([syncCycle(), syncCycle()]);
-    expect(counts().network).toBe(2 + 1 + 1 + 2 * PR_COUNT);
+    expect(counts().network).toBe(3 + 1 + 1 + 2 * PR_COUNT);
     expect(counts().deduped).toBeGreaterThan(0);
   });
 });

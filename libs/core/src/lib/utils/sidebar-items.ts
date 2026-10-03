@@ -27,6 +27,36 @@ function collectReviewBranches(reviews: CategorizedReviews): Set<string> {
   );
 }
 
+/** A sidebar section, in the order the sidebar reads top to bottom. */
+export type SidebarSectionKey =
+  | 'worktrees'
+  | 'draft-pull-requests'
+  | 'pull-requests'
+  | ReviewCategory;
+
+export const SIDEBAR_SECTIONS: readonly SidebarSectionKey[] = [
+  'worktrees',
+  'draft-pull-requests',
+  'pull-requests',
+  'needs-review',
+  'waiting',
+  'approved',
+];
+
+/**
+ * The section an item files under. The pull request sections hold the
+ * viewer's own pull requests and the review sections the ones waiting
+ * on them; a worktree on any other pull request is a worktree, however
+ * much work happens in it.
+ */
+export function sidebarSection(item: SidebarItem): SidebarSectionKey {
+  if (item.kind === 'review-pr') return item.category;
+  if (item.kind === 'session' && !(item.pr && item.authored)) {
+    return 'worktrees';
+  }
+  return item.pr?.isDraft ? 'draft-pull-requests' : 'pull-requests';
+}
+
 /** The three session sections, in the order they are emitted. */
 interface SessionBuckets {
   noPr: SidebarItem[];
@@ -39,12 +69,15 @@ interface SessionBuckets {
  *
  * A session whose branch is under review is dropped here rather than
  * emitted: it appears in its review section instead, carrying the running
- * LED, and listing it twice would give the same worktree two rows.
+ * LED, and listing it twice would give the same worktree two rows. One
+ * on someone else's pull request that no review section lists keeps the
+ * pull request on its row but files with the worktrees.
  */
 function bucketSessions(
   sortedSessions: AgentSession[],
   reviewBranches: Set<string>,
   sessionPrMap: Map<string, PullRequestInfo>,
+  yours: ReadonlySet<number>,
   mergedBranches: Set<string>,
   conflictCounts: Map<string, number>,
   babysat: BabysatMap
@@ -61,15 +94,17 @@ function bucketSessions(
       kind: 'session',
       session,
       pr,
+      ...(pr && yours.has(pr.id) ? { authored: true } : {}),
       branch,
       isMerged: branch ? mergedBranches.has(branch) : false,
       conflictCount: branch ? conflictCounts.get(branch) : undefined,
       ...babysitOf(pr, babysat),
     };
 
-    if (!pr) buckets.noPr.push(item);
-    else if (pr.isDraft) buckets.draftPr.push(item);
-    else buckets.activePr.push(item);
+    const section = sidebarSection(item);
+    if (section === 'draft-pull-requests') buckets.draftPr.push(item);
+    else if (section === 'pull-requests') buckets.activePr.push(item);
+    else buckets.noPr.push(item);
   }
 
   return buckets;
@@ -77,15 +112,18 @@ function bucketSessions(
 
 /**
  * Build a flat, ordered list of sidebar items from all data sources.
+ * `yours` holds the ids of the pull requests the viewer authored
+ * (`findYourPrIds`).
  *
- * Section headers are NOT in the array — rendering determines them by
- * detecting kind/category transitions.
+ * Section headers are NOT in the array — rendering groups the items by
+ * `sidebarSection`.
  */
 export function buildSidebarItems(
   sortedSessions: AgentSession[],
   orphanPrs: PullRequestInfo[],
   categorizedReviews: CategorizedReviews,
   sessionPrMap: Map<string, PullRequestInfo>,
+  yours: ReadonlySet<number>,
   mergedBranches: Set<string>,
   conflictCounts: Map<string, number>,
   babysat: BabysatMap = new Map()
@@ -94,6 +132,7 @@ export function buildSidebarItems(
     sortedSessions,
     collectReviewBranches(categorizedReviews),
     sessionPrMap,
+    yours,
     mergedBranches,
     conflictCounts,
     babysat
@@ -135,7 +174,7 @@ export function buildSidebarItems(
   // sections, a request that has a worktree checked out sorts above one
   // that does not.
   return [
-    // 1. Worktrees — sessions with no PR
+    // 1. Worktrees — sessions with no PR of yours
     ...sessions.noPr,
 
     // 2. Draft pull requests

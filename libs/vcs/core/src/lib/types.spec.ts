@@ -83,6 +83,18 @@ describe('viewerEntry', () => {
     expect(viewerEntry([asked], isMe)).toBe(asked);
   });
 
+  it('takes the provider’s word on which row is theirs over the caller’s match', () => {
+    // Azure marks the signed-in account's row by identity; the caller
+    // matches by an email that need not be its uniqueName.
+    const marked = { ...me, identifier: 'CORP\\me', isViewer: true };
+    const lookalike = {
+      ...me,
+      decision: 'no-response' as const,
+      isViewer: false,
+    };
+    expect(viewerEntry([lookalike, marked], isMe)).toBe(marked);
+  });
+
   it('never gives them a group’s vote, or a group they are not in', () => {
     expect(viewerEntry([team('approved')], isMe)).toBeUndefined();
     expect(
