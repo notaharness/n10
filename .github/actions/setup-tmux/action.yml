@@ -14,11 +14,16 @@ runs:
         sudo apt-get update && sudo apt-get install -y --no-install-recommends
         libevent-dev libncurses-dev bison pkg-config
 
+    # The build links the release's libevent and ncurses: one per release.
+    - id: os
+      shell: bash
+      run: . /etc/os-release && echo "release=$ID-$VERSION_ID" >> "$GITHUB_OUTPUT"
+
     - id: cache
       uses: actions/cache@v4
       with:
         path: ~/.cache/n10-tmux
-        key: tmux-${{ env.ImageOS }}-${{ runner.arch }}-${{ hashFiles('tools/tmux/build-tmux.sh') }}
+        key: tmux-${{ steps.os.outputs.release }}-${{ runner.arch }}-${{ hashFiles('tools/tmux/build-tmux.sh') }}
 
     - name: Build tmux
       if: steps.cache.outputs.cache-hit != 'true'
