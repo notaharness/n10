@@ -20,6 +20,11 @@ import {
   type DiscoveryDelta,
   type DiscoveryScan,
 } from '@n10/core';
+import {
+  endedTerminals,
+  heldTerminals,
+  observeMachineTerminals,
+} from './terminal-discovery.js';
 
 /** Two batch listings per scan; measured cost and alternatives: docs/decisions.md. */
 const DISCOVERY_INTERVAL_MS = 4_000;
@@ -73,6 +78,9 @@ export interface SessionDiscoveryOptions {
   intervalMs?: number;
   adopt: (worktree: DiscoveredWorktree) => void | Promise<void>;
   adoptTerminal?: (terminal: DiscoveredTerminal) => void | Promise<void>;
+  /** The other machines whose terminals to list beside this machine's:
+   *  the beam peerIds the fleet says are connected. */
+  remoteMachines?: () => readonly string[];
   onChanged: (delta: DiscoveryDelta) => void;
   /** Abandon work between awaits when selection changes, before attaching a stale repo's sessions. */
   isCurrent?: () => boolean;
@@ -114,7 +122,12 @@ export function startSessionDiscovery(
   async function observe(): Promise<{
     scan: DiscoveryScan;
     held: Set<string>;
+    listed: Set<string>;
   }> {
+    // Never rejects, so nothing is left unhandled if git fails below.
+    const remote = observeMachineTerminals(
+      adoptTerminal ? opts.remoteMachines?.() ?? [] : []
+    );
     const worktrees: DiscoveredWorktree[] = (
       await listWorktrees(opts.scope())
     ).map((wt) => ({
@@ -132,6 +145,7 @@ export function startSessionDiscovery(
     const listed = new Set(worktrees.map((wt) => wt.name));
     const wasStranded = new Set(previous?.stranded.map((wt) => wt.name));
     const keep = (name: string) => wasStranded.has(name) && !listed.has(name);
+    const elsewhere = await remote;
     return {
       scan: {
         worktrees,
@@ -143,9 +157,12 @@ export function startSessionDiscovery(
           })
         ),
         persisted: seen.persisted,
-        terminals: adoptTerminal ? seen.terminals : [],
+        terminals: adoptTerminal
+          ? [...seen.terminals, ...elsewhere.terminals]
+          : [],
       },
       held: seen.held,
+      listed: new Set([LOCAL_MACHINE, ...elsewhere.listed]),
     };
   }
 
@@ -220,7 +237,8 @@ export function startSessionDiscovery(
 
   async function runScan(): Promise<void> {
     if (stopped || !isCurrent()) return;
-    const { scan: next, held } = await observe();
+    const before = heldTerminals();
+    const { scan: next, held, listed } = await observe();
     if (stopped || !isCurrent()) return;
     forgetFailuresFor(next);
     const delta = diffScans(
@@ -234,24 +252,8 @@ export function startSessionDiscovery(
     endFinishedStranded(previous, delta);
     // A repo switch starts a fresh scanner, but terminal tabs are process-global.
     // Reconcile held terminal keys too, including final frames from an earlier scan.
-    // The scan sees this machine's tmux only: another machine's terminal
-    // ends when its own connection does.
-    if (adoptTerminal) {
-      const present = new Set(next.terminals.map((terminal) => terminal.name));
-      delta.endedTerminals = [
-        ...new Set([
-          ...delta.endedTerminals,
-          ...sessionNames().filter((name) => {
-            const identity = sessionIdentity(name);
-            return (
-              identity?.kind === 'terminal' &&
-              identity.machine === LOCAL_MACHINE &&
-              !present.has(name)
-            );
-          }),
-        ]),
-      ];
-    }
+    if (adoptTerminal)
+      delta.endedTerminals = endedTerminals(delta, next, before, listed);
     // A first scan has nothing to diff against, so it reports no
     // worktree as appeared; a listing the shell read before it may lack
     // one it sees, and nothing else would have the shell look again.

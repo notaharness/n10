@@ -96,12 +96,12 @@ test.describe('A pull request worked on another machine @beam', () => {
     ).toBeVisible({ timeout: 30_000 });
     await expect(tabs(page)).toHaveCount(1);
 
-    // Discovery reads this machine's tmux, where the terminal is not.
-    // A session started here from outside gets a tab once a scan has
-    // adopted it; a second one's tab means a later scan has run too.
-    // The terminal on workbox outlives both and still answers. A
-    // terminal those scans ended would keep its card but no longer
-    // carry what is typed into it.
+    // Discovery lists workbox's tmux beside this machine's. A session
+    // started here from outside gets a tab once a scan has adopted it;
+    // a second one's tab means a later scan has run too. The terminal
+    // on workbox outlives both and still answers. A terminal those
+    // scans ended would keep its card but no longer carry what is
+    // typed into it.
     const adopted = async (branch: string) => {
       startExternalTmuxSession({
         repoPath: desktop.repoPath,

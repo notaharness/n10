@@ -9,6 +9,7 @@ const {
   listPersistedMock,
   listTerminalsMock,
   listHeldMock,
+  remoteTerminalsMock,
   isSessionAliveMock,
   sessionNamesMock,
   watchMock,
@@ -22,6 +23,8 @@ const {
   listPersistedMock: vi.fn<() => Set<string>>(),
   listTerminalsMock: vi.fn<() => DiscoveredTerminal[]>(),
   listHeldMock: vi.fn<() => Set<string> | null>(),
+  remoteTerminalsMock:
+    vi.fn<(machine: string) => Promise<DiscoveredTerminal[]>>(),
   isSessionAliveMock: vi.fn<(name: string) => boolean>(),
   sessionNamesMock: vi.fn<() => string[]>(),
   watchMock: vi.fn(),
@@ -61,6 +64,7 @@ vi.mock('@n10/core', async (original) => ({
       }
     );
   },
+  observeRemoteTerminals: (machine: string) => remoteTerminalsMock(machine),
   releaseExitedSession: (name: string) => released.push(name),
   strandedSessionRows: (
     _repo: string,
@@ -118,6 +122,7 @@ beforeEach(() => {
   listPersistedMock.mockReset().mockReturnValue(new Set());
   listTerminalsMock.mockReset().mockReturnValue([]);
   listHeldMock.mockReset().mockReturnValue(new Set());
+  remoteTerminalsMock.mockReset().mockResolvedValue([]);
   isSessionAliveMock.mockReset().mockImplementation((name) => alive.has(name));
   basePathMock.mockReset().mockReturnValue('/repo/.claude/worktrees');
   watchMock.mockReset().mockReturnValue({ close: vi.fn(), on: vi.fn() });
@@ -628,6 +633,80 @@ describe('startSessionDiscovery', () => {
       const { discovery, onChanged } = start();
       await discovery.scanNow();
       expect(onChanged).not.toHaveBeenCalled();
+    });
+
+    describe('on another machine', () => {
+      const PEER = 'a'.repeat(32);
+      const remoteTerm: DiscoveredTerminal = {
+        name: terminalSessionKey('n10-shell-9f8e7d', PEER),
+        kind: 'shell',
+        path: '/home/far/notes',
+      };
+      const connected = { remoteMachines: () => [PEER] };
+
+      // The restore path for a terminal opened on another machine: its
+      // tmux session there outlived this process, and nothing else
+      // brings its tab back.
+      it('attaches on the first scan to a terminal that outlived the last run', async () => {
+        remoteTerminalsMock.mockResolvedValue([remoteTerm]);
+        const { discovery, adoptTerminal } = start(connected);
+        await discovery.scanNow();
+        expect(remoteTerminalsMock).toHaveBeenCalledWith(PEER);
+        expect(adoptTerminal).toHaveBeenCalledWith(remoteTerm);
+      });
+
+      it('announces one killed from outside once its machine lists without it', async () => {
+        sessionNamesMock.mockReturnValue([remoteTerm.name]);
+        const { discovery, onChanged } = start(connected);
+        await discovery.scanNow();
+        expect(onChanged).toHaveBeenCalledWith(
+          expect.objectContaining({ endedTerminals: [remoteTerm.name] })
+        );
+      });
+
+      // An unreachable machine never says a session ended: the fleet
+      // not listing it as connected, or a listing that fails.
+      it('never ends one on a machine the fleet does not list', async () => {
+        sessionNamesMock.mockReturnValue([remoteTerm.name]);
+        const { discovery, onChanged } = start({ remoteMachines: () => [] });
+        await discovery.scanNow();
+        expect(onChanged).not.toHaveBeenCalled();
+      });
+
+      it('never ends one on a machine whose listing failed', async () => {
+        alive.add(remoteTerm.name);
+        sessionNamesMock.mockReturnValue([remoteTerm.name]);
+        remoteTerminalsMock.mockResolvedValue([remoteTerm]);
+        const { discovery, onChanged } = start(connected);
+        await discovery.scanNow();
+        remoteTerminalsMock.mockRejectedValue(new Error('timed out'));
+        await discovery.scanNow();
+        expect(onChanged).not.toHaveBeenCalled();
+      });
+
+      it('lists this machine’s sessions while another cannot be listed', async () => {
+        remoteTerminalsMock.mockRejectedValue(new Error('timed out'));
+        listTerminalsMock.mockReturnValue([shellTerm]);
+        const { discovery, adoptTerminal } = start(connected);
+        await discovery.scanNow();
+        expect(adoptTerminal).toHaveBeenCalledWith(shellTerm);
+      });
+
+      it('never ends one launched while the listing was out', async () => {
+        remoteTerminalsMock.mockImplementation(async () => {
+          sessionNamesMock.mockReturnValue([remoteTerm.name]);
+          return [];
+        });
+        const { discovery, onChanged } = start(connected);
+        await discovery.scanNow();
+        expect(onChanged).not.toHaveBeenCalled();
+      });
+
+      it('lists no machine for a shell that cannot adopt terminals', async () => {
+        start({ ...connected, adoptTerminal: undefined });
+        await vi.runOnlyPendingTimersAsync();
+        expect(remoteTerminalsMock).not.toHaveBeenCalled();
+      });
     });
 
     it('announces a terminal killed from outside', async () => {
