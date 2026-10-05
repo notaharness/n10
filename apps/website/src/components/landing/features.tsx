@@ -1,4 +1,8 @@
-import { BeamFeature, OrchestraFeature } from './companion-sections';
+import {
+  BeamFeature,
+  ConversationsFeature,
+  OrchestraFeature,
+} from './companion-sections';
 import { FeatureSection, type Feature } from './feature-section';
 
 const features: Feature[] = [
@@ -99,11 +103,12 @@ export function Features() {
       <div className="flex flex-col gap-24 sm:gap-32">
         <BeamFeature />
         <OrchestraFeature />
+        <ConversationsFeature />
         {features.map((feature, i) => (
           <FeatureSection
             key={feature.href}
             {...feature}
-            reverse={i % 2 === 1}
+            reverse={i % 2 === 0}
           />
         ))}
       </div>
