@@ -90,8 +90,9 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   a fresh remote terminal opens where its machine resolves the directory (D18).
   An old client's exit cannot drop its successor; agent panes remain while their
   native target exists. Shells adapt started/ended callbacks to output delivery.
-  Discovery lists connected machines' terminals too (`terminal-discovery.ts`);
-  only a successful listing of a machine ends its terminals.
+  Discovery lists connected machines' terminals too (`terminal-discovery.ts`),
+  each beside the local scan, never inside it; only a successful listing of a
+  machine ends its terminals.
 
 - **Babysitters** (`babysitters/`): one retained watch per repository/PR. Coalesce
   starts; stop and worktree removal cancel pending lookups before watch creation.

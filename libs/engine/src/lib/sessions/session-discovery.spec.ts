@@ -637,28 +637,38 @@ describe('startSessionDiscovery', () => {
 
     describe('on another machine', () => {
       const PEER = 'a'.repeat(32);
+      const SILENT = 'f'.repeat(32);
       const remoteTerm: DiscoveredTerminal = {
         name: terminalSessionKey('n10-shell-9f8e7d', PEER),
         kind: 'shell',
         path: '/home/far/notes',
       };
       const connected = { remoteMachines: () => [PEER] };
+      /** A machine's listing runs beside the scan, not inside it. */
+      const settle = () => vi.advanceTimersByTimeAsync(0);
+      /** A listing that never answers, as a peer that went quiet gives. */
+      const silent = () => new Promise<DiscoveredTerminal[]>(() => undefined);
 
       // The restore path for a terminal opened on another machine: its
       // tmux session there outlived this process, and nothing else
       // brings its tab back.
       it('attaches on the first scan to a terminal that outlived the last run', async () => {
         remoteTerminalsMock.mockResolvedValue([remoteTerm]);
-        const { discovery, adoptTerminal } = start(connected);
+        const { discovery, adoptTerminal, onChanged } = start(connected);
         await discovery.scanNow();
+        await settle();
         expect(remoteTerminalsMock).toHaveBeenCalledWith(PEER);
         expect(adoptTerminal).toHaveBeenCalledWith(remoteTerm);
+        expect(onChanged).toHaveBeenCalledWith(
+          expect.objectContaining({ adoptableTerminals: [remoteTerm] })
+        );
       });
 
       it('announces one killed from outside once its machine lists without it', async () => {
         sessionNamesMock.mockReturnValue([remoteTerm.name]);
         const { discovery, onChanged } = start(connected);
         await discovery.scanNow();
+        await settle();
         expect(onChanged).toHaveBeenCalledWith(
           expect.objectContaining({ endedTerminals: [remoteTerm.name] })
         );
@@ -670,6 +680,7 @@ describe('startSessionDiscovery', () => {
         sessionNamesMock.mockReturnValue([remoteTerm.name]);
         const { discovery, onChanged } = start({ remoteMachines: () => [] });
         await discovery.scanNow();
+        await settle();
         expect(onChanged).not.toHaveBeenCalled();
       });
 
@@ -679,17 +690,12 @@ describe('startSessionDiscovery', () => {
         remoteTerminalsMock.mockResolvedValue([remoteTerm]);
         const { discovery, onChanged } = start(connected);
         await discovery.scanNow();
+        await settle();
         remoteTerminalsMock.mockRejectedValue(new Error('timed out'));
         await discovery.scanNow();
+        await settle();
+        expect(remoteTerminalsMock).toHaveBeenCalledTimes(2);
         expect(onChanged).not.toHaveBeenCalled();
-      });
-
-      it('lists this machine’s sessions while another cannot be listed', async () => {
-        remoteTerminalsMock.mockRejectedValue(new Error('timed out'));
-        listTerminalsMock.mockReturnValue([shellTerm]);
-        const { discovery, adoptTerminal } = start(connected);
-        await discovery.scanNow();
-        expect(adoptTerminal).toHaveBeenCalledWith(shellTerm);
       });
 
       it('never ends one launched while the listing was out', async () => {
@@ -699,7 +705,69 @@ describe('startSessionDiscovery', () => {
         });
         const { discovery, onChanged } = start(connected);
         await discovery.scanNow();
+        await settle();
         expect(onChanged).not.toHaveBeenCalled();
+      });
+
+      // A peer the fleet still lists can stop answering; its listing
+      // then takes until its deadline.
+      it('holds back no scan of this machine while it does not answer', async () => {
+        remoteTerminalsMock.mockImplementation(silent);
+        listTerminalsMock.mockReturnValue([shellTerm]);
+        const { discovery, adoptTerminal } = start(connected);
+        const scanned = discovery.scanNow().then(() => true);
+        await settle();
+        expect(await Promise.race([scanned, Promise.resolve(false)])).toBe(
+          true
+        );
+        expect(adoptTerminal).toHaveBeenCalledWith(shellTerm);
+      });
+
+      it('holds back no other machine while it does not answer', async () => {
+        remoteTerminalsMock.mockImplementation((machine) =>
+          machine === SILENT ? silent() : Promise.resolve([remoteTerm])
+        );
+        const { discovery, adoptTerminal } = start({
+          remoteMachines: () => [SILENT, PEER],
+        });
+        await discovery.scanNow();
+        await settle();
+        expect(adoptTerminal).toHaveBeenCalledWith(remoteTerm);
+      });
+
+      it('is asked again only once its listing is done', async () => {
+        remoteTerminalsMock.mockImplementation(silent);
+        const { discovery } = start(connected);
+        for (let i = 0; i < 3; i++) await discovery.scanNow();
+        await settle();
+        expect(remoteTerminalsMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('is acted on when its answer arrives, after later scans', async () => {
+        let answer: (terminals: DiscoveredTerminal[]) => void = () => undefined;
+        remoteTerminalsMock.mockReturnValueOnce(
+          new Promise((resolve) => (answer = resolve))
+        );
+        const { discovery, adoptTerminal } = start(connected);
+        await discovery.scanNow();
+        await discovery.scanNow();
+        expect(adoptTerminal).not.toHaveBeenCalled();
+        answer([remoteTerm]);
+        await settle();
+        expect(adoptTerminal).toHaveBeenCalledWith(remoteTerm);
+      });
+
+      // This machine's scans list none of its sessions, so they must not
+      // forget its attach failures.
+      it('retires one that keeps failing to attach', async () => {
+        remoteTerminalsMock.mockResolvedValue([remoteTerm]);
+        const adoptTerminal = vi.fn().mockRejectedValue(new Error('gone'));
+        const { discovery } = start({ ...connected, adoptTerminal });
+        for (let i = 0; i < 6; i++) {
+          await discovery.scanNow();
+          await settle();
+        }
+        expect(adoptTerminal).toHaveBeenCalledTimes(3);
       });
 
       it('lists no machine for a shell that cannot adopt terminals', async () => {

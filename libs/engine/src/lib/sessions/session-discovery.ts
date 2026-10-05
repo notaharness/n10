@@ -21,9 +21,10 @@ import {
   type DiscoveryScan,
 } from '@n10/core';
 import {
-  endedTerminals,
+  createMachineScans,
+  endedLocalTerminals,
   heldTerminals,
-  observeMachineTerminals,
+  machineOf,
 } from './terminal-discovery.js';
 
 /** Two batch listings per scan; measured cost and alternatives: docs/decisions.md. */
@@ -122,12 +123,7 @@ export function startSessionDiscovery(
   async function observe(): Promise<{
     scan: DiscoveryScan;
     held: Set<string>;
-    listed: Set<string>;
   }> {
-    // Never rejects, so nothing is left unhandled if git fails below.
-    const remote = observeMachineTerminals(
-      adoptTerminal ? opts.remoteMachines?.() ?? [] : []
-    );
     const worktrees: DiscoveredWorktree[] = (
       await listWorktrees(opts.scope())
     ).map((wt) => ({
@@ -145,7 +141,6 @@ export function startSessionDiscovery(
     const listed = new Set(worktrees.map((wt) => wt.name));
     const wasStranded = new Set(previous?.stranded.map((wt) => wt.name));
     const keep = (name: string) => wasStranded.has(name) && !listed.has(name);
-    const elsewhere = await remote;
     return {
       scan: {
         worktrees,
@@ -157,12 +152,9 @@ export function startSessionDiscovery(
           })
         ),
         persisted: seen.persisted,
-        terminals: adoptTerminal
-          ? [...seen.terminals, ...elsewhere.terminals]
-          : [],
+        terminals: adoptTerminal ? seen.terminals : [],
       },
       held: seen.held,
-      listed: new Set([LOCAL_MACHINE, ...elsewhere.listed]),
     };
   }
 
@@ -226,25 +218,44 @@ export function startSessionDiscovery(
     return adopted;
   }
 
-  function forgetFailuresFor(next: DiscoveryScan): void {
-    const live = new Set(next.terminals.map((t) => t.name));
+  /** Forget the attach failures of `machine`'s names its listing lacks. */
+  function forgetFailures(machine: string, present: ReadonlySet<string>) {
     for (const name of [...failures.keys()]) {
-      if (next.persisted.has(name) || live.has(name)) continue;
+      if (machineOf(name) !== machine || present.has(name)) continue;
       failures.delete(name);
       retired.delete(name);
     }
   }
 
+  const live = () => !stopped && isCurrent();
+  const isAttached = (name: string) =>
+    isSessionAlive(name) && hasSessionConnection(name);
+  const machineScans = createMachineScans({
+    machines: () => (adoptTerminal ? opts.remoteMachines?.() ?? [] : []),
+    live,
+    isAlive: isAttached,
+    isHeld: hasSessionConnection,
+    retired,
+    forgetFailures,
+    adopt: (terminal) => adoptOne(terminal, adoptTerminal ?? (() => undefined)),
+    onChanged,
+  });
+
   async function runScan(): Promise<void> {
-    if (stopped || !isCurrent()) return;
-    const before = heldTerminals();
-    const { scan: next, held, listed } = await observe();
-    if (stopped || !isCurrent()) return;
-    forgetFailuresFor(next);
+    if (!live()) return;
+    // Other machines answer when they do, not as part of this scan.
+    void machineScans.scan();
+    const before = heldTerminals(LOCAL_MACHINE);
+    const { scan: next, held } = await observe();
+    if (!live()) return;
+    forgetFailures(
+      LOCAL_MACHINE,
+      new Set([...next.persisted, ...next.terminals.map((t) => t.name)])
+    );
     const delta = diffScans(
       previous,
       next,
-      (name) => isSessionAlive(name) && hasSessionConnection(name),
+      isAttached,
       retired,
       hasSessionConnection
     );
@@ -253,7 +264,7 @@ export function startSessionDiscovery(
     // A repo switch starts a fresh scanner, but terminal tabs are process-global.
     // Reconcile held terminal keys too, including final frames from an earlier scan.
     if (adoptTerminal)
-      delta.endedTerminals = endedTerminals(delta, next, before, listed);
+      delta.endedTerminals = endedLocalTerminals(delta, next, before);
     // A first scan has nothing to diff against, so it reports no
     // worktree as appeared; a listing the shell read before it may lack
     // one it sees, and nothing else would have the shell look again.
