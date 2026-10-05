@@ -48,7 +48,13 @@ export interface OpenSessionParams {
   build: (
     previousAgent?: string,
     restarting?: boolean
-  ) => { spec: LaunchSpec; agent?: string; fresh?: boolean };
+  ) => BuiltLaunch | Promise<BuiltLaunch>;
+}
+
+interface BuiltLaunch {
+  spec: LaunchSpec;
+  agent?: string;
+  fresh?: boolean;
 }
 
 /**
@@ -134,7 +140,7 @@ async function performOpen(params: OpenSessionParams): Promise<NamedPtyEntry> {
   const attaching = !params.fresh && shouldAttach(mode, existing);
   const launch = attaching
     ? { spec: { cmd: '', args: [] }, agent: existing!.agent, fresh: false }
-    : params.build(existing?.agent, !!existing);
+    : await params.build(existing?.agent, !!existing);
   const fresh = !attaching && (params.fresh || launch.fresh);
   const plan: TmuxLaunchPlan = attaching
     ? attachPlan(existing!, params.expected)

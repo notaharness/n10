@@ -71,6 +71,9 @@ The reasoning behind each rule is in `docs/decisions.md`.
   their explicit scope. Allocate the final tmux name before creating the registry
   key. Native pane state controls exit, not client disconnect. The engine owns
   agent retention and shell-exit cleanup; tab presentation belongs to the shell.
+  A shell terminal runs `resolveShell` (`terminal/shell.ts`): the Shell setting,
+  else `$SHELL`, else sh, probed on the machine the terminal opens on (its own
+  executor when remote), never this process's environment.
 
 - **Session launch** (`session/`) receives the resolved checkout and explicit
   config; it replaces a live session only with native incarnation approval. Force-remove is offered only

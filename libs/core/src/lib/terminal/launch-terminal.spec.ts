@@ -2,7 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppConfig } from '@n10/vcs-core';
 import type { OpenSessionParams } from '../session/open-session.js';
 import { terminalSessionKey } from '../session-key.js';
-const state = vi.hoisted(() => ({ calls: [] as OpenSessionParams[] }));
+const state = vi.hoisted(() => ({
+  calls: [] as OpenSessionParams[],
+  remoteShell: '',
+}));
+vi.mock('../machine-registry.js', () => ({
+  requireMachine: () => ({
+    executor: {
+      run: async () => ({ stdout: state.remoteShell, stderr: '', code: 0 }),
+    },
+  }),
+}));
 vi.mock('../repo-root.js', () => ({ getRepoRoot: () => '/repo' }));
 vi.mock('../session/open-session.js', () => ({
   openSession: (p: OpenSessionParams) => {
@@ -27,7 +37,29 @@ describe('terminal requests', () => {
       session: { type: 'terminal', kind: 'shell', repo: '/repo' },
       mode: 'create',
     });
-    expect(state.calls[0].build()).toEqual({ spec: { cmd: '', args: [] } });
+    expect(await state.calls[0].build()).toEqual({
+      spec: { cmd: expect.stringMatching(/^\//), args: ['-l'] },
+    });
+  });
+
+  it('runs the configured shell', async () => {
+    await launchTerminalSession({
+      ...base,
+      kind: 'shell',
+      config: { ...config, shell: 'sh' },
+    });
+    const { spec } = await state.calls[0].build();
+    expect(spec.cmd).toMatch(/\/sh$/);
+  });
+
+  it("resolves a remote terminal's shell on that machine", async () => {
+    state.remoteShell = '/usr/bin/fish';
+    await launchTerminalSession({
+      ...base,
+      kind: 'shell',
+      machine: 'peer-abc',
+    });
+    expect((await state.calls[0].build()).spec.cmd).toBe('/usr/bin/fish');
   });
   it('tags a standalone terminal with its own directory, independent of the selected repo', async () => {
     await launchTerminalSession({ ...base, cwd: '/elsewhere', kind: 'shell' });
