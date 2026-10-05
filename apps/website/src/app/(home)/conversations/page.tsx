@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { ConversationsGettingStarted } from '@/components/conversations/conversations-getting-started';
 import { ConversationsHero } from '@/components/conversations/conversations-hero';
 import { ConversationsHow } from '@/components/conversations/conversations-how';
 import {
@@ -23,7 +22,6 @@ export default function ConversationsPage() {
         <ConversationsHero />
         <ConversationsHow />
         <ConversationsRecordings />
-        <ConversationsGettingStarted />
       </div>
       <Footer />
     </main>

@@ -20,12 +20,6 @@ export function ConversationsHero() {
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <Link
-            href="#getting-started"
-            className={buttonVariants({ size: 'lg' })}
-          >
-            Get started
-          </Link>
-          <Link
             href="https://github.com/notaharness/plugins/tree/main/conversations"
             className={buttonVariants({ variant: 'outline', size: 'lg' })}
           >

@@ -1,9 +1,10 @@
+import { ConversationsInstall } from './conversations-install';
 import { TerminalRecording } from './terminal-recording';
 
 /** Both clips: real Claude Code sessions, recorded with asciinema, rendered with agg. */
 const SIZE = { width: 1458, height: 962 };
 
-/** The page's opening clip, above the fold. */
+/** The page's opening clip, above the fold, and how to install. */
 export function ConversationsIntro() {
   return (
     <section className="mx-auto w-full max-w-6xl px-4 pt-16 sm:pt-24">
@@ -22,6 +23,9 @@ export function ConversationsIntro() {
           eager
           {...SIZE}
         />
+      </div>
+      <div className="mt-8">
+        <ConversationsInstall />
       </div>
     </section>
   );
