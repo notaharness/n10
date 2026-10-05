@@ -11,7 +11,7 @@ function subscribeReduced(onChange: () => void) {
 }
 
 /**
- * A real terminal recording (`/media/context-switcher/<name>.{webm,mp4}`)
+ * A real terminal recording (`/media/conversations/<name>.{webm,mp4}`)
  * that loops muted while it is on screen. Nothing but the lazy poster
  * (`<name>-poster.webp`) loads until it scrolls into view, unless it is
  * `eager` (above the fold), and under prefers-reduced-motion the poster
@@ -51,7 +51,7 @@ export function TerminalRecording({
       video.pause();
     };
   }, [reduced]);
-  const src = `/media/context-switcher/${name}`;
+  const src = `/media/conversations/${name}`;
   return (
     // The video carries the alt text; the poster behind it is decoration.
     <div

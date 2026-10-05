@@ -5,7 +5,7 @@ const links = [
   { text: 'Docs', href: '/docs' },
   { text: 'Beam', href: '/beam' },
   { text: 'Orchestra', href: '/orchestra' },
-  { text: 'Context Switcher', href: '/context-switcher' },
+  { text: 'Conversations', href: '/conversations' },
   { text: 'GitHub', href: 'https://github.com/notaharness/n10' },
   { text: 'llms.txt', href: '/llms.txt' },
 ];

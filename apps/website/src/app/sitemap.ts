@@ -10,7 +10,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: 'https://n10.is' },
     { url: 'https://n10.is/beam' },
     { url: 'https://n10.is/orchestra' },
-    { url: 'https://n10.is/context-switcher' },
+    { url: 'https://n10.is/conversations' },
     ...docs,
   ];
 }

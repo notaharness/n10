@@ -6,8 +6,8 @@ import { SCENES, STILL, type Scene } from './stage-script';
 import {
   Badge,
   Bars,
-  CONTEXT_COLORS,
-  ContextRow,
+  TOPIC_COLORS,
+  ConversationRow,
   Mono,
   Pointer,
   PromptBox,
@@ -54,7 +54,7 @@ function useScene(playing: boolean): Scene {
 /** Fades and lifts its children in when `on`. */
 function Appear({ on, children }: { on: boolean; children: ReactNode }) {
   return (
-    <g className="switcher-appear" data-on={on}>
+    <g className="conversations-appear" data-on={on}>
       {children}
     </g>
   );
@@ -62,12 +62,12 @@ function Appear({ on, children }: { on: boolean; children: ReactNode }) {
 
 function MainView({ scene }: { scene: Scene }) {
   const pointers = [
-    { name: 'CI #312', color: CONTEXT_COLORS.ci, text: '2 checks failed' },
-    { name: 'Flaky test', color: CONTEXT_COLORS.tests, text: 'cause found' },
-    { name: 'Changelog', color: CONTEXT_COLORS.changelog, text: 'needs you' },
+    { name: 'CI #312', color: TOPIC_COLORS.ci, text: '2 checks failed' },
+    { name: 'Flaky test', color: TOPIC_COLORS.tests, text: 'cause found' },
+    { name: 'Changelog', color: TOPIC_COLORS.changelog, text: 'needs you' },
   ];
   return (
-    <g className="switcher-view" data-on={scene.view === 'main'}>
+    <g className="conversations-view" data-on={scene.view === 'main'}>
       <You x={16} y={54}>
         fix the login redirect
       </You>
@@ -83,8 +83,8 @@ function MainView({ scene }: { scene: Scene }) {
 
 function ChangelogView({ scene }: { scene: Scene }) {
   return (
-    <g className="switcher-view" data-on={scene.view === 'changelog'}>
-      <circle cx={20} cy={49.5} r={4} fill={CONTEXT_COLORS.changelog} />
+    <g className="conversations-view" data-on={scene.view === 'changelog'}>
+      <circle cx={20} cy={49.5} r={4} fill={TOPIC_COLORS.changelog} />
       <Mono x={32} y={54} weight={600}>
         Changelog
       </Mono>
@@ -115,7 +115,7 @@ function Typing({ scene }: { scene: Scene }) {
       <clipPath id={clip}>
         <rect x={38} y={280} width={248} height={24} />
       </clipPath>
-      <g className="switcher-view" data-on={shown}>
+      <g className="conversations-view" data-on={shown}>
         <Mono x={40} y={295.5}>
           yes, under Breaking
         </Mono>
@@ -126,7 +126,7 @@ function Typing({ scene }: { scene: Scene }) {
           y={280}
           width={160}
           height={24}
-          className="switcher-type-cover"
+          className="conversations-type-cover"
           data-on={shown}
           fill="var(--color-fd-background)"
         />
@@ -141,7 +141,7 @@ function Sidebar({ scene }: { scene: Scene }) {
     <g>
       <path d={`M${SIDEBAR - 8} 27V${H - 1}`} stroke="var(--color-fd-border)" />
       <Mono x={SIDEBAR + 4} y={52} size={11} muted>
-        Contexts
+        Conversations
       </Mono>
       <rect
         x={SIDEBAR}
@@ -150,21 +150,21 @@ function Sidebar({ scene }: { scene: Scene }) {
         height={26}
         rx={5}
         fill="var(--color-fd-accent)"
-        className="switcher-highlight"
-        style={{ '--switcher-y': `${selected}px` } as CSSProperties}
+        className="conversations-highlight"
+        style={{ '--conversations-y': `${selected}px` } as CSSProperties}
       />
-      <ContextRow
+      <ConversationRow
         x={SIDEBAR}
         y={ROWS.main}
         width={ROW_W}
-        color={CONTEXT_COLORS.main}
-        name="Main chat"
+        color={TOPIC_COLORS.main}
+        name="Main"
       />
-      <ContextRow
+      <ConversationRow
         x={SIDEBAR}
         y={ROWS.ci}
         width={ROW_W}
-        color={CONTEXT_COLORS.ci}
+        color={TOPIC_COLORS.ci}
         name="CI #312"
         marker={
           <Appear on={scene.ci > 0}>
@@ -176,11 +176,11 @@ function Sidebar({ scene }: { scene: Scene }) {
           </Appear>
         }
       />
-      <ContextRow
+      <ConversationRow
         x={SIDEBAR}
         y={ROWS.tests}
         width={ROW_W}
-        color={CONTEXT_COLORS.tests}
+        color={TOPIC_COLORS.tests}
         name="Flaky test"
         marker={
           <Appear on={scene.tests > 0}>
@@ -192,11 +192,11 @@ function Sidebar({ scene }: { scene: Scene }) {
           </Appear>
         }
       />
-      <ContextRow
+      <ConversationRow
         x={SIDEBAR}
         y={ROWS.changelog}
         width={ROW_W}
-        color={CONTEXT_COLORS.changelog}
+        color={TOPIC_COLORS.changelog}
         name="Changelog"
         marker={
           <Appear on={scene.needsYou}>
@@ -216,10 +216,13 @@ function Cursor({ scene }: { scene: Scene }) {
   const [x, y] = CURSOR[scene.cursor];
   return (
     <g
-      className="switcher-cursor"
+      className="conversations-cursor"
       data-on={scene.cursor !== 'away'}
       style={
-        { '--switcher-x': `${x}px`, '--switcher-y': `${y}px` } as CSSProperties
+        {
+          '--conversations-x': `${x}px`,
+          '--conversations-y': `${y}px`,
+        } as CSSProperties
       }
     >
       <path
@@ -235,12 +238,12 @@ function Cursor({ scene }: { scene: Scene }) {
 
 /**
  * A Claude Code session with the sidebar docked. Updates arrive in
- * three contexts while Main chat gets a pointer to each; the cursor
+ * three conversations while Main gets a pointer to each; the cursor
  * opens the one that needs you, a reply goes there, and it returns to
- * Main chat. Under prefers-reduced-motion it holds the moment every
+ * Main. Under prefers-reduced-motion it holds the moment every
  * marker is up.
  */
-export function SwitcherStage({ className }: { className?: string }) {
+export function ConversationsStage({ className }: { className?: string }) {
   const reduced = useSyncExternalStore(
     subscribeReduced,
     () => window.matchMedia(REDUCED).matches,
@@ -251,9 +254,9 @@ export function SwitcherStage({ className }: { className?: string }) {
     <figure className={className}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="switcher-stage h-auto w-full"
+        className="conversations-stage h-auto w-full"
         role="img"
-        aria-label="A Claude Code session with a sidebar listing Main chat, CI #312, Flaky test and Changelog. Updates arrive as unread badges, and Changelog is marked as needing you. Clicking Changelog shows only that conversation; a reply is typed there, then the view returns to Main chat, where each update appears as a one-line pointer."
+        aria-label="A Claude Code session with a sidebar listing Main, CI #312, Flaky test and Changelog. Updates arrive as unread badges, and Changelog is marked as needing you. Clicking Changelog shows only that conversation; a reply is typed there, then the view returns to Main, where each update appears as a one-line pointer."
       >
         <Window width={W} height={H}>
           <MainView scene={scene} />

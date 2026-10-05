@@ -3,14 +3,14 @@ import { BEAM_COLORS } from '@/components/beam/mesh/palette';
 
 /**
  * Flat drawings of a Claude Code terminal in fullscreen with the
- * Context Switcher sidebar docked on its right, shared by the hero's
+ * Conversations sidebar docked on its right, shared by the hero's
  * animated scene and the how-it-works figures. Text is Geist Mono at
  * a size that stays legible when the scene shrinks to a phone.
  */
 export const FONT = 13;
 export const LINE = 22;
 
-export const CONTEXT_COLORS = {
+export const TOPIC_COLORS = {
   main: 'var(--color-fd-primary)',
   ci: BEAM_COLORS.clay,
   tests: BEAM_COLORS.blue,
@@ -160,7 +160,7 @@ export function You({
   );
 }
 
-/** Main chat's one-line pointer to an update posted elsewhere. */
+/** Main's one-line pointer to an update posted elsewhere. */
 export function Pointer({
   x,
   y,
@@ -265,7 +265,7 @@ export function Badge({
 }
 
 /** One entry in the sidebar: a colour, a name and its marker. */
-export function ContextRow({
+export function ConversationRow({
   x,
   y,
   width,

@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 import {
   Badge,
   Bars,
-  CONTEXT_COLORS,
-  ContextRow,
+  TOPIC_COLORS,
+  ConversationRow,
   Mono,
   Pointer,
   PromptBox,
@@ -40,39 +40,39 @@ function Sidebar({ selected }: { selected: Selected }) {
   return (
     <g>
       <path d={`M${SIDEBAR - 8} 27V${H}`} stroke="var(--color-fd-border)" />
-      <ContextRow
+      <ConversationRow
         x={SIDEBAR}
         y={56}
         width={ROW_W}
-        color={CONTEXT_COLORS.main}
-        name="Main chat"
+        color={TOPIC_COLORS.main}
+        name="Main"
         selected={selected === 'main'}
       />
-      <ContextRow
+      <ConversationRow
         x={SIDEBAR}
         y={84}
         width={ROW_W}
-        color={CONTEXT_COLORS.ci}
+        color={TOPIC_COLORS.ci}
         name="CI #312"
         marker={
           <Badge x={right} y={84} marker={{ kind: 'unread', count: 1 }} />
         }
       />
-      <ContextRow
+      <ConversationRow
         x={SIDEBAR}
         y={112}
         width={ROW_W}
-        color={CONTEXT_COLORS.tests}
+        color={TOPIC_COLORS.tests}
         name="Flaky test"
         marker={
           <Badge x={right} y={112} marker={{ kind: 'unread', count: 1 }} />
         }
       />
-      <ContextRow
+      <ConversationRow
         x={SIDEBAR}
         y={140}
         width={ROW_W}
-        color={CONTEXT_COLORS.changelog}
+        color={TOPIC_COLORS.changelog}
         name="Changelog"
         selected={selected === 'changelog'}
       />
@@ -85,47 +85,47 @@ export function MarkersDrawing() {
   const width = 240;
   const right = x + width - 10;
   return (
-    <Figure label="The sidebar: Main chat, CI #312 with two unread updates, Flaky test with one, Changelog marked as needing you, and a quiet Docs context.">
+    <Figure label="The sidebar: Main, CI #312 with two unread updates, Flaky test with one, Changelog marked as needing you, and a quiet Docs conversation.">
       <Mono x={x + 4} y={60} size={11} muted>
-        Contexts
+        Conversations
       </Mono>
-      <ContextRow
+      <ConversationRow
         x={x}
         y={92}
         width={width}
-        color={CONTEXT_COLORS.main}
-        name="Main chat"
+        color={TOPIC_COLORS.main}
+        name="Main"
         selected
       />
-      <ContextRow
+      <ConversationRow
         x={x}
         y={124}
         width={width}
-        color={CONTEXT_COLORS.ci}
+        color={TOPIC_COLORS.ci}
         name="CI #312"
         marker={
           <Badge x={right} y={124} marker={{ kind: 'unread', count: 2 }} />
         }
       />
-      <ContextRow
+      <ConversationRow
         x={x}
         y={156}
         width={width}
-        color={CONTEXT_COLORS.tests}
+        color={TOPIC_COLORS.tests}
         name="Flaky test"
         marker={
           <Badge x={right} y={156} marker={{ kind: 'unread', count: 1 }} />
         }
       />
-      <ContextRow
+      <ConversationRow
         x={x}
         y={188}
         width={width}
-        color={CONTEXT_COLORS.changelog}
+        color={TOPIC_COLORS.changelog}
         name="Changelog"
         marker={<Badge x={right} y={188} marker={{ kind: 'you' }} />}
       />
-      <ContextRow
+      <ConversationRow
         x={x}
         y={220}
         width={width}
@@ -139,7 +139,7 @@ export function MarkersDrawing() {
 export function TopicDrawing() {
   return (
     <Figure label="Changelog is selected in the sidebar. The transcript shows only that conversation: Claude asks whether to mention the --strict flag, you answer under Breaking, and Claude adds it.">
-      <circle cx={20} cy={51.5} r={4} fill={CONTEXT_COLORS.changelog} />
+      <circle cx={20} cy={51.5} r={4} fill={TOPIC_COLORS.changelog} />
       <Mono x={32} y={56} weight={600}>
         Changelog
       </Mono>
@@ -161,7 +161,7 @@ export function TopicDrawing() {
 
 export function MainDrawing() {
   return (
-    <Figure label="Main chat is selected. Your conversation with Claude continues, with one-line pointers to updates in CI #312, Flaky test and Changelog between the messages.">
+    <Figure label="Main is selected. Your conversation with Claude continues, with one-line pointers to updates in CI #312, Flaky test and Changelog between the messages.">
       <You x={16} y={56}>
         fix the login redirect
       </You>
@@ -169,21 +169,21 @@ export function MainDrawing() {
       <Pointer
         x={16}
         y={130}
-        color={CONTEXT_COLORS.ci}
+        color={TOPIC_COLORS.ci}
         name="CI #312"
         text="2 failed"
       />
       <Pointer
         x={16}
         y={154}
-        color={CONTEXT_COLORS.tests}
+        color={TOPIC_COLORS.tests}
         name="Flaky test"
         text="found"
       />
       <Pointer
         x={16}
         y={178}
-        color={CONTEXT_COLORS.changelog}
+        color={TOPIC_COLORS.changelog}
         name="Changelog"
         text="done"
       />

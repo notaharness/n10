@@ -2,12 +2,12 @@ import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { BeamMesh } from '@/components/beam/mesh/beam-mesh';
-import { SwitcherStage } from '@/components/context-switcher/switcher-stage';
+import { ConversationsStage } from '@/components/conversations/conversations-stage';
 import { OrchestraStage } from '@/components/orchestra/orchestra-stage';
 import { cn } from '@/lib/cn';
 
 /**
- * Beam, Orchestra and Context Switcher, the notaharness tools that
+ * Beam, Orchestra and Conversations, the notaharness tools that
  * work on their own and compose with n10. They lead the feature list,
  * in the feature layout with their own page's scene in the frame
  * instead of a recording.
@@ -163,22 +163,22 @@ export function OrchestraFeature() {
   );
 }
 
-export function ContextSwitcherFeature() {
+export function ConversationsFeature() {
   return (
     <CompanionSection
-      label="Context Switcher"
+      label="Conversations"
       title="One session, many conversations"
       links={[
-        { text: 'Read the guide', href: '/docs/context-switcher' },
-        { text: 'About Context Switcher', href: '/context-switcher' },
+        { text: 'Read the guide', href: '/docs/conversations' },
+        { text: 'About Conversations', href: '/conversations' },
       ]}
-      scene={<SwitcherStage />}
+      scene={<ConversationsStage />}
     >
       <p>
-        Context Switcher is a Claude Code plugin that gives each topic in a busy
-        session its own context: a CI run, a subagent&apos;s task, a message
-        from another session. A sidebar marks unread updates and anything
-        waiting on you, and Main chat keeps your conversation with Claude.
+        Conversations is a Claude Code plugin that gives each topic in a busy
+        session its own conversation: a CI run, a subagent&apos;s task, a
+        message from another session. A sidebar marks unread updates and
+        anything waiting on you, and Main keeps your conversation with Claude.
       </p>
     </CompanionSection>
   );

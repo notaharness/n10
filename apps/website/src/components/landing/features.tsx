@@ -1,6 +1,6 @@
 import {
   BeamFeature,
-  ContextSwitcherFeature,
+  ConversationsFeature,
   OrchestraFeature,
 } from './companion-sections';
 import { FeatureSection, type Feature } from './feature-section';
@@ -103,7 +103,7 @@ export function Features() {
       <div className="flex flex-col gap-24 sm:gap-32">
         <BeamFeature />
         <OrchestraFeature />
-        <ContextSwitcherFeature />
+        <ConversationsFeature />
         {features.map((feature, i) => (
           <FeatureSection
             key={feature.href}

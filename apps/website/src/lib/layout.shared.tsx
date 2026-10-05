@@ -24,8 +24,8 @@ export function baseOptions(): BaseLayoutProps {
         url: '/orchestra',
       },
       {
-        text: 'Context Switcher',
-        url: '/context-switcher',
+        text: 'Conversations',
+        url: '/conversations',
       },
       {
         text: 'Roadmap',

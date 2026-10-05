@@ -7,7 +7,7 @@ const steps = [
     title: 'Install the plugin',
     lines: [
       '/plugin marketplace add notaharness/plugins',
-      '/plugin install context-switcher@notaharness',
+      '/plugin install conversations@notaharness',
     ],
   },
   {
@@ -17,11 +17,11 @@ const steps = [
   },
   {
     title: 'Open the sidebar',
-    lines: ['/contexts'],
+    lines: ['/conversations'],
   },
 ];
 
-export function ContextSwitcherGettingStarted() {
+export function ConversationsGettingStarted() {
   return (
     <section
       id="getting-started"
@@ -61,11 +61,10 @@ export function ContextSwitcherGettingStarted() {
         ))}
       </ol>
       <p className="text-fd-muted-foreground mt-10 max-w-2xl text-sm text-pretty">
-        Context Switcher runs in the Claude Code terminal only, not in the
-        desktop app or IDE extensions, and works with or without n10 and
-        Orchestra.{' '}
+        Conversations runs in the Claude Code terminal only, not in the desktop
+        app or IDE extensions, and works with or without n10 and Orchestra.{' '}
         <Link
-          href="https://github.com/notaharness/plugins/tree/main/context-switcher#readme"
+          href="https://github.com/notaharness/plugins/tree/main/conversations#readme"
           className="text-fd-foreground hover:text-fd-primary decoration-fd-border underline underline-offset-4 transition-colors"
         >
           Read the README

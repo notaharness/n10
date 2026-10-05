@@ -806,50 +806,50 @@
   opacity: 0.25;
 }
 
-/* The /context-switcher scene (src/components/context-switcher/). The
+/* The /conversations scene (src/components/conversations/). The
  * script only flips data-on and two custom properties; every motion is
  * a transition here, so reduced motion, which holds one scene, needs
  * nothing of its own. */
-.switcher-view,
-.switcher-appear {
+.conversations-view,
+.conversations-appear {
   transition: opacity 320ms ease, transform 320ms ease;
 }
 
 /* A switch fades the old view out before the new one comes in, so the
  * two transcripts never show on top of each other. */
-.switcher-view {
+.conversations-view {
   transition-duration: 180ms;
 }
 
-.switcher-view[data-on='true'] {
+.conversations-view[data-on='true'] {
   transition-delay: 180ms;
 }
 
-.switcher-view[data-on='false'],
-.switcher-appear[data-on='false'] {
+.conversations-view[data-on='false'],
+.conversations-appear[data-on='false'] {
   opacity: 0;
 }
 
-.switcher-appear[data-on='false'] {
+.conversations-appear[data-on='false'] {
   transform: translateY(4px);
 }
 
-.switcher-highlight {
-  transform: translateY(var(--switcher-y));
+.conversations-highlight {
+  transform: translateY(var(--conversations-y));
   transition: transform 260ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-.switcher-cursor {
-  transform: translate(var(--switcher-x), var(--switcher-y));
+.conversations-cursor {
+  transform: translate(var(--conversations-x), var(--conversations-y));
   transition: transform 850ms cubic-bezier(0.65, 0, 0.35, 1), opacity 300ms ease;
 }
 
-.switcher-cursor[data-on='false'] {
+.conversations-cursor[data-on='false'] {
   opacity: 0;
 }
 
 /* Slides right a character at a time, uncovering the typed reply. */
-.switcher-type-cover[data-on='true'] {
+.conversations-type-cover[data-on='true'] {
   transform: translateX(160px);
   transition: transform 1.2s steps(19, end);
 }

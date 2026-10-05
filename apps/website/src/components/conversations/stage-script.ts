@@ -1,13 +1,13 @@
 /**
  * The hero's loop, one scene per step. Updates arrive in three
- * contexts while you talk in Main chat, each as a pointer there and a
- * marker in the sidebar. You click the context that needs you, reply
- * in it, and click back to Main chat.
+ * conversations while you talk in Main, each as a pointer there and a
+ * marker in the sidebar. You click the conversation that needs you,
+ * reply in it, and click back to Main.
  */
 export interface Scene {
   ms: number;
   view: 'main' | 'changelog';
-  /** How many of Main chat's pointers have arrived. */
+  /** How many of Main's pointers have arrived. */
   pointers: number;
   ci: number;
   tests: number;
