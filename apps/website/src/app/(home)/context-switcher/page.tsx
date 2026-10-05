@@ -11,7 +11,7 @@ import { Footer } from '@/components/landing/footer';
 export const metadata: Metadata = {
   title: 'Context Switcher',
   description:
-    'A Claude Code plugin that splits one busy session into contexts, one per topic, with a sidebar of unread updates and Main chat kept for your conversation with Claude.',
+    'A Claude Code plugin that splits your main session into focused conversations. Meant to deal with the dreaded context switching in larger sessions by focusing your attention on a single topic at a time.',
 };
 
 export default function ContextSwitcherPage() {
