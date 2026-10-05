@@ -13,8 +13,9 @@ function subscribeReduced(onChange: () => void) {
 /**
  * A real terminal recording (`/media/context-switcher/<name>.{webm,mp4}`)
  * that loops muted while it is on screen. Nothing but the lazy poster
- * (`<name>-poster.webp`) loads until it scrolls into view, and under
- * prefers-reduced-motion the poster stays. Terminals have one theme, so
+ * (`<name>-poster.webp`) loads until it scrolls into view, unless it is
+ * `eager` (above the fold), and under prefers-reduced-motion the poster
+ * stays. Terminals have one theme, so
  * unlike `DemoVideo` there is one recording, not one per site theme.
  */
 export function TerminalRecording({
@@ -22,11 +23,13 @@ export function TerminalRecording({
   alt,
   width,
   height,
+  eager = false,
 }: {
   name: string;
   alt: string;
   width: number;
   height: number;
+  eager?: boolean;
 }) {
   const reduced = useSyncExternalStore(
     subscribeReduced,
@@ -60,7 +63,8 @@ export function TerminalRecording({
         alt=""
         width={width}
         height={height}
-        loading="lazy"
+        loading={eager ? 'eager' : 'lazy'}
+        fetchPriority={eager ? 'high' : undefined}
         className="absolute inset-0 size-full object-cover"
       />
       <video
@@ -69,7 +73,7 @@ export function TerminalRecording({
         muted
         loop
         playsInline
-        preload="none"
+        preload={eager ? 'auto' : 'none'}
         aria-label={alt}
       >
         <source src={`${src}.webm`} type="video/webm" />

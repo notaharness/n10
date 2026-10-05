@@ -4,14 +4,14 @@ import { buttonVariants } from '@/components/ui/button';
 
 export function ContextSwitcherHero() {
   return (
-    <section className="mx-auto grid w-full max-w-6xl items-center gap-x-14 gap-y-10 px-4 pt-16 sm:pt-24 lg:grid-cols-[1fr_1.15fr]">
+    <section className="mx-auto grid w-full max-w-6xl items-center gap-x-14 gap-y-10 px-4 lg:grid-cols-[1fr_1.15fr]">
       <div className="flex flex-col items-start gap-6">
         <span className="border-fd-border bg-fd-card text-fd-muted-foreground rounded-full border px-3 py-1 font-mono text-xs">
           context-switcher@notaharness
         </span>
-        <h1 className="text-4xl leading-[1.1] font-semibold tracking-tight text-balance sm:text-5xl">
+        <h2 className="text-4xl leading-[1.1] font-semibold tracking-tight text-balance sm:text-5xl">
           One session, many conversations
-        </h1>
+        </h2>
         <p className="text-fd-muted-foreground max-w-xl text-lg text-pretty">
           In a busy Claude Code session, subagent results, background tasks, CI
           runs and messages from other sessions all land in one chat. Context

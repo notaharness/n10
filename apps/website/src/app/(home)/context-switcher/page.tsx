@@ -2,7 +2,10 @@ import type { Metadata } from 'next';
 import { ContextSwitcherGettingStarted } from '@/components/context-switcher/context-switcher-getting-started';
 import { ContextSwitcherHero } from '@/components/context-switcher/context-switcher-hero';
 import { ContextSwitcherHow } from '@/components/context-switcher/context-switcher-how';
-import { ContextSwitcherRecordings } from '@/components/context-switcher/context-switcher-recordings';
+import {
+  ContextSwitcherIntro,
+  ContextSwitcherRecordings,
+} from '@/components/context-switcher/context-switcher-recordings';
 import { Footer } from '@/components/landing/footer';
 
 export const metadata: Metadata = {
@@ -16,6 +19,7 @@ export default function ContextSwitcherPage() {
     <main className="flex flex-1 flex-col">
       {/* Keep section spacing in one place rather than stacking child padding. */}
       <div className="flex flex-col gap-24 pb-24">
+        <ContextSwitcherIntro />
         <ContextSwitcherHero />
         <ContextSwitcherHow />
         <ContextSwitcherRecordings />
