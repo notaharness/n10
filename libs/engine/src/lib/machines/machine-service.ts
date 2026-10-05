@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { setMachineReachable } from '@n10/core';
 import { logError } from '@n10/logger';
-import { asSeenFromHere, isCutOff } from './fleet-reach.js';
+import { asSeenFromHere } from './fleet-reach.js';
 import { createRemoteMachines } from './remote-machines.js';
 import { refuseIfRemoteOwns } from './remote-owner.js';
 import type { InboundMailPort, MachinesPort } from './machine-ports.js';
@@ -97,9 +97,7 @@ export function createMachineService() {
     publishMachines(recovered);
   }
   function publishMachines(recovered = false): void {
-    const machines = overlay(
-      asSeenFromHere(reported, isCutOff(snapshot.status, online))
-    );
+    const machines = overlay(asSeenFromHere(reported, snapshot.status, online));
     reportReachability(machines);
     if (!recovered && isDeepStrictEqual(machines, snapshot.machines)) return;
     snapshot = { ...snapshot, machines };

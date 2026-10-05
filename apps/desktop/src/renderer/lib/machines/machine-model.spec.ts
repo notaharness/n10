@@ -80,7 +80,7 @@ describe('machinePresentation', () => {
     expect(machinePresentation(machine({ state: 'unknown' }))).toEqual({
       label: 'Unknown',
       tone: 'muted',
-      secondary: 'This machine is offline',
+      secondary: '',
     });
     expect(isMachineSelectable(machine({ state: 'unknown' }))).toBe(false);
   });

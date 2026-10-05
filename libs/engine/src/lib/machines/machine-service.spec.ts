@@ -189,7 +189,8 @@ describe('this machine cut off from its fleet', () => {
     service.receiveStatus(status('ready'));
     service.receiveMachines([localMachine(), peer('connected')]);
     service.receiveStatus(status('restarting'));
-    expect(seen.at(-1)?.map((m) => m.state)).toEqual(['offline', 'unknown']);
+    // n10's connection to beam, not this machine's network.
+    expect(seen.at(-1)?.map((m) => m.state)).toEqual(['connected', 'unknown']);
     expect(reachability).toEqual([[PEER, false]]);
     service.receiveStatus(status('ready'));
     expect(states()).toEqual([

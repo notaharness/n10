@@ -2,9 +2,9 @@
 
 /** beam's peer states, and `unknown`. `revoked-by-fleet` is the peer
  *  refusing this machine as revoked: it will not take this machine
- *  again. `unknown` is a peer this machine cannot vouch for while it is
- *  itself cut off from the fleet, whose own row is then `offline`
- *  (`fleet-reach.ts`). */
+ *  again. `unknown` is a peer this machine cannot vouch for: it has no
+ *  network, when its own row is `offline`, or n10 lost its connection
+ *  to beam (`fleet-reach.ts`). */
 export type MachineState =
   | 'connected'
   | 'offline'

@@ -50,8 +50,9 @@ function secondaryText(machine: MachineView): string {
       return machine.lastSeenAt == null
         ? 'Never connected'
         : `Last seen ${relativeTime(machine.lastSeenAt)}`;
+    // Why is told once: this machine's own row, or the Fleet panel's
+    // reconnecting notice.
     case 'unknown':
-      return 'This machine is offline';
     case 'revoked':
       return '';
     case 'revoked-by-fleet':
