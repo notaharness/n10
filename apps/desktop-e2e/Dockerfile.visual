@@ -1,4 +1,19 @@
 # Keep the browser, system libraries and fonts aligned with Playwright.
-FROM mcr.microsoft.com/playwright:v1.59.1-noble
-RUN apt-get update && apt-get install -y --no-install-recommends tmux \
+FROM mcr.microsoft.com/playwright:v1.59.1-noble AS base
+
+# tmux is part of the application runtime: the version CI runs n10
+# against, from tools/tmux (run-visual.mjs passes it in as `tmux-tools`).
+FROM base AS tmux
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential bison pkg-config libevent-dev libncurses-dev \
+    curl ca-certificates
+COPY --from=tmux-tools build-tmux.sh /
+RUN /build-tmux.sh /opt/tmux
+
+FROM base
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libevent-core-2.1-7t64 \
     && rm -rf /var/lib/apt/lists/*
+COPY --from=tmux /opt/tmux/bin/tmux /usr/local/bin/tmux
+COPY --from=tmux-tools require-tmux.sh /usr/local/bin/
+RUN require-tmux.sh

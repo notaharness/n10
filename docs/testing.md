@@ -110,6 +110,18 @@ fixture HOME and unset TMUX before any operation. All terminal tests require
 tmux 3.2 or newer. Never kill the default server or use `kill-server`.
 See `libs/terminal-tmux/AGENTS.md`.
 
+CI runs every tmux suite against tmux 3.7 or later. Earlier versions can
+lose what a fast-exiting pane last wrote, and its exit status. The pane
+reads as dead, but the output never reaches the pane and
+`pane_dead_status` never appears. On tmux 3.4, a pane running `exit 17`
+loses its status in 6 of 60 runs on an idle machine and 19 of 60 under
+load; 3.7 kept it every time. The tests assert both, so locally they can
+fail on an older tmux. The version is pinned in `tools/tmux/build-tmux.sh`,
+which `.github/actions/setup-tmux` builds and caches for the runner jobs and
+`apps/desktop-e2e/Dockerfile.visual` builds into the visual image.
+`tools/tmux/require-tmux.sh` fails the job on anything older. The product
+itself still requires only 3.2.
+
 Failures retain traces, screenshots and video in `test-output/`.
 `error-context.md` is useful for text inspection. Open a trace with
 `npx playwright show-trace <trace.zip>`. Keep Playwright `outputDir` aligned with
@@ -220,7 +232,7 @@ and failed report delivery. It does not exercise a model or CLI plugin manager.
 
 The archive, provenance, checksum and update instructions live in
 `libs/core/tests/fixtures/README.md`. Tests require no network or agent login;
-tmux is installed in CI, and the live suites skip locally when it is absent.
+tmux 3.7 is installed in CI (see above), and the live suites skip locally when it is absent.
 `terminal-allocation.integration.spec.ts` exercises names becoming occupied or
 free between a tab's preliminary name probe and the backend's allocation.
 

@@ -1,0 +1,38 @@
+name: Set up tmux
+description: >
+  Puts the tmux CI runs n10 against on PATH: tools/tmux/build-tmux.sh's
+  version, built once per runner image and cached, then checked.
+
+runs:
+  using: composite
+  steps:
+    # libevent's and ncurses' runtime libraries come with their
+    # development packages; bison is the build's yacc.
+    - name: Install tmux's build dependencies
+      shell: bash
+      run: >
+        sudo apt-get update && sudo apt-get install -y --no-install-recommends
+        libevent-dev libncurses-dev bison pkg-config
+
+    # The build links the release's libevent and ncurses: one per release.
+    - id: os
+      shell: bash
+      run: . /etc/os-release && echo "release=$ID-$VERSION_ID" >> "$GITHUB_OUTPUT"
+
+    - id: cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/n10-tmux
+        key: tmux-${{ steps.os.outputs.release }}-${{ runner.arch }}-${{ hashFiles('tools/tmux/build-tmux.sh') }}
+
+    - name: Build tmux
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: tools/tmux/build-tmux.sh ~/.cache/n10-tmux
+
+    - shell: bash
+      run: echo ~/.cache/n10-tmux/bin >> "$GITHUB_PATH"
+
+    - name: Check tmux
+      shell: bash
+      run: tools/tmux/require-tmux.sh

@@ -34,9 +34,12 @@ jobs:
 
       # xvfb: desktop-e2e drives the real Electron app, which has no
       # headless mode of its own and needs an X server on the runner.
-      # tmux is required by both application e2e suites.
-      - name: Install xvfb and tmux
-        run: sudo apt-get update && sudo apt-get install -y xvfb tmux
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      # tmux is required by the tmux, core and both application e2e
+      # suites, which run against 3.7 (docs/testing.md).
+      - uses: ./.github/actions/setup-tmux
 
       - uses: nrwl/nx-set-shas@v4
 

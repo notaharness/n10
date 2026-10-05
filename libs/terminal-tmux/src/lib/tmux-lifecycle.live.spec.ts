@@ -240,13 +240,9 @@ describe('retained tmux process lifecycle', () => {
     const backend = await retained('exit 17');
     const exit = vi.fn();
     backend.onExit(exit);
-    // The exit is concluded on a dead pane alone: under load tmux may
-    // not have reaped the process yet, so the status it reports with
-    // the exit can be missing. tmux retains it all the same.
-    await vi.waitFor(() => expect(exit).toHaveBeenCalled(), { timeout: 4000 });
-    await vi.waitFor(() =>
-      expect(tmuxPaneState(backend.name!)?.exitCode).toBe(17)
-    );
+    await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(17, undefined), {
+      timeout: 4000,
+    });
     expect(tmuxShowOption(backend.name!, '@test-agent')).toBe('first');
     expect(
       tmuxListSessionsDetailed(['@test-agent']).find(

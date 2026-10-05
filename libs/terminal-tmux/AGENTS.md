@@ -1,6 +1,8 @@
 # libs/terminal-tmux — persistent session transport
 
-Requires system tmux ≥ 3.2 for per-session environment flags. The package
+Requires system tmux ≥ 3.2 for per-session environment flags; CI tests
+against 3.7, which keeps a fast-exiting pane's last output and exit status
+that earlier versions can drop (`docs/testing.md`). The package
 contains no n10 identity, agent or Orchestra policy. Core supplies an
 explicit serializable `TmuxLaunchPlan` to async `createTmuxBackend`:
 
