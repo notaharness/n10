@@ -16,6 +16,8 @@ export const receiveDirectoryPublished = machines.receiveDirectory;
 export const refreshMailOverlay = machines.refreshMail;
 export const getLastKnownMachines = () => machines.getSnapshot().machines;
 export const getBeamStatus = async () => machines.getSnapshot().status;
+export const setNetworkOnline = async (online: boolean) =>
+  machines.receiveNetwork(online);
 export const setMachineAlias = machines.setAlias;
 export const setMachineGrant = machines.setGrant;
 export const runCeremony = machines.runCeremony;

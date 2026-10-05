@@ -61,6 +61,40 @@ test.describe('A fleet of real beam daemons @beam', () => {
     ).toBeVisible({ timeout: 30_000 });
   });
 
+  test('without a network this machine reads offline and its member unknown', async ({
+    desktop,
+    workbox,
+  }) => {
+    const { page } = desktop;
+    await formFleet(page, workbox);
+    await openFleet(desktop);
+    const rows = page.getByTestId('machine-row');
+    const laptopRow = rows.filter({ hasText: 'laptop' });
+    const workboxRow = rows.filter({ hasText: 'workbox' });
+
+    // The operating system's word, as Chromium hears it; beam's tunnel
+    // runs over loopback and stays up.
+    await page.context().setOffline(true);
+    await expect(laptopRow.getByText('Offline', { exact: true })).toBeVisible();
+    await expect(
+      laptopRow.getByText('This machine cannot reach the fleet')
+    ).toBeVisible();
+    await expect(
+      workboxRow.getByText('Unknown', { exact: true })
+    ).toBeVisible();
+    await expect(workboxRow.getByText('Offline', { exact: true })).toHaveCount(
+      0
+    );
+
+    await page.context().setOffline(false);
+    await expect(
+      workboxRow.getByText('Connected', { exact: true })
+    ).toBeVisible();
+    await expect(
+      laptopRow.getByText('This machine', { exact: true })
+    ).toBeVisible();
+  });
+
   test('a member granted only mail has its report refused, naming the grant', async ({
     desktop,
     laptop,

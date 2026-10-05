@@ -177,6 +177,7 @@ const api: N10HostApi = {
 
   listMachines: () => ipcRenderer.invoke(IPC.listMachines),
   getBeamStatus: () => ipcRenderer.invoke(IPC.getBeamStatus),
+  setNetworkOnline: (online) => ipcRenderer.invoke(IPC.setNetworkOnline, online),
   onBeamStatusChanged: (cb) => {
     const listener = (_e: unknown, payload: FleetStatus) => cb(payload);
     ipcRenderer.on(MACHINES_EVENTS.beamStatus, listener);

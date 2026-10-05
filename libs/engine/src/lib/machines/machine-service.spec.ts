@@ -145,6 +145,64 @@ describe('a peer going offline and back', () => {
   });
 });
 
+// beam's `offline` says no tunnel is up, not which end lost it.
+describe('this machine cut off from its fleet', () => {
+  const peer = (state: MachineView['state']): MachineView => ({
+    ...localMachine(),
+    peerId: PEER,
+    label: 'workbox',
+    isLocal: false,
+    state,
+  });
+  const revoked = { ...peer('revoked'), peerId: 'c'.repeat(32) };
+  const status = (state: FleetStatus['state']): FleetStatus => ({
+    state,
+    detail: null,
+    enrolled: true,
+    fleetId: 'f'.repeat(64),
+  });
+  const states = () =>
+    service.getSnapshot().machines.map((m) => [m.label, m.state]);
+
+  it('shows this machine offline and its peers unknown without a network', () => {
+    service.receiveStatus(status('ready'));
+    service.receiveMachines([localMachine(), peer('offline'), revoked]);
+    service.receiveNetwork(false);
+    expect(states()).toEqual([
+      ['my-mac', 'offline'],
+      ['workbox', 'unknown'],
+      ['workbox', 'revoked'],
+    ]);
+    service.receiveNetwork(true);
+    expect(states()).toEqual([
+      ['my-mac', 'connected'],
+      ['workbox', 'offline'],
+      ['workbox', 'revoked'],
+    ]);
+  });
+
+  it('distrusts the rows it last heard while beam’s connection is lost', () => {
+    const seen: MachineView[][] = [];
+    service.subscribe((event) => {
+      if (event.type === 'machines') seen.push(event.machines);
+    });
+    service.receiveStatus(status('ready'));
+    service.receiveMachines([localMachine(), peer('connected')]);
+    service.receiveStatus(status('restarting'));
+    expect(seen.at(-1)?.map((m) => m.state)).toEqual(['offline', 'unknown']);
+    expect(reachability).toEqual([[PEER, false]]);
+    service.receiveStatus(status('ready'));
+    expect(states()).toEqual([
+      ['my-mac', 'connected'],
+      ['workbox', 'connected'],
+    ]);
+    expect(reachability).toEqual([
+      [PEER, false],
+      [PEER, true],
+    ]);
+  });
+});
+
 describe('the push channel', () => {
   it('calls the installed notifier with exactly what it receives', () => {
     const seen: MachineView[][] = [];

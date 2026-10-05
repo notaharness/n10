@@ -583,6 +583,10 @@ export interface N10HostApi {
    *  this answers the same whatever repository (if any) is open. */
   listMachines(): Promise<MachineView[]>;
   getBeamStatus(): Promise<FleetStatus>;
+  /** Whether the operating system reports a network, as a window hears
+   *  it (`navigator.onLine`). Without one, this machine is offline and
+   *  no peer's state is known. */
+  setNetworkOnline(online: boolean): Promise<void>;
   onBeamStatusChanged(cb: (status: FleetStatus) => void): () => void;
   /** The name a peer goes by here only; `null` clears it. */
   setMachineAlias(peerId: string, alias: string | null): Promise<void>;
@@ -698,6 +702,7 @@ export const IPC = {
   stopBabysit: 'n10/babysit/stop',
   listMachines: 'n10/machines/list',
   getBeamStatus: 'n10/machines/beam-status',
+  setNetworkOnline: 'n10/machines/network-online',
   setMachineAlias: 'n10/machines/alias',
   setMachineGrant: 'n10/machines/grant',
   runCeremony: 'n10/machines/ceremony/run',

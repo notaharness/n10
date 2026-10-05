@@ -93,6 +93,25 @@ function useFleetPushes(): void {
   }, [qc]);
 }
 
+/** The operating system's word on the network, which beam cannot give:
+ *  its `offline` says no tunnel to a peer is up, not which end lost it.
+ *  A failed report waits for the next change; a host that restarts
+ *  reloads this window, which reports again. */
+function useNetworkReport(): void {
+  useEffect(() => {
+    const report = () => {
+      window.n10.setNetworkOnline(navigator.onLine).catch(() => undefined);
+    };
+    report();
+    window.addEventListener('online', report);
+    window.addEventListener('offline', report);
+    return () => {
+      window.removeEventListener('online', report);
+      window.removeEventListener('offline', report);
+    };
+  }, []);
+}
+
 function useFleetSection(): FleetSectionState {
   const [expanded, setExpandedState] = useState(readExpanded);
   const [revealSeq, setRevealSeq] = useState(0);
@@ -166,6 +185,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   }, [leave, clear, setAdding]);
   const reset = useFleetReset(afterReset);
   useFleetPushes();
+  useNetworkReport();
 
   const resetRevocation = revokeCeremony.reset;
   const openRevocation = useCallback(

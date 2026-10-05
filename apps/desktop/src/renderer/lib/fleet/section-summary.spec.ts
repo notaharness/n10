@@ -77,6 +77,20 @@ describe('fleetSectionSummary', () => {
     ).toEqual({ text: '2 machines · 1 offline', tone: 'warning' });
   });
 
+  it('names this machine as the one offline, not its unknown peers', () => {
+    expect(
+      fleetSectionSummary({
+        beam: ready,
+        machines: [
+          { ...self, state: 'offline' },
+          machine({ state: 'unknown' }),
+          machine({ peerId: 'c'.repeat(32), state: 'unknown' }),
+        ],
+        awaitingPasskey: false,
+      })
+    ).toEqual({ text: '3 machines · this machine offline', tone: 'warning' });
+  });
+
   it('warns when beam is unavailable', () => {
     expect(
       fleetSectionSummary({

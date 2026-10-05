@@ -151,6 +151,7 @@ vi.mock('./services/machines.js', () =>
   recorder('machines', [
     'listMachines',
     'getBeamStatus',
+    'setNetworkOnline',
     'setMachineAlias',
     'setMachineGrant',
     'runCeremony',
@@ -330,6 +331,7 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
 
   ['listMachines', [], 'machines.listMachines'],
   ['getBeamStatus', [], 'machines.getBeamStatus'],
+  ['setNetworkOnline', [false], 'machines.setNetworkOnline'],
   [
     'setMachineAlias',
     ['bbbbbbbbbbbbbbbb', 'workbox'],
