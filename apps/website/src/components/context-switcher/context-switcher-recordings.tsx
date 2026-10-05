@@ -11,9 +11,9 @@ export function ContextSwitcherIntro() {
         Context Switcher
       </h1>
       <p className="text-fd-muted-foreground mt-6 max-w-2xl text-lg text-pretty">
-        A Claude Code plugin that splits one session into smaller conversations,
-        one per topic. A sidebar lists them, so you deal with one topic at a
-        time.
+        A Claude Code plugin that splits your main session into focused
+        conversations. Meant to deal with the dreaded context switching in
+        larger sessions by focusing your attention on a single topic at a time.
       </p>
       <div className="mt-10">
         <TerminalRecording
