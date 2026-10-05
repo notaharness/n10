@@ -11,7 +11,7 @@ const recordings = [
   {
     name: 'needs-you',
     caption: 'Answer the context that needs you. Main chat gets one line.',
-    alt: 'The user opens Release notes, marked needs you, reads the draft summary and answers “Publish it”. Claude publishes and posts there, and back in Main chat the new post is one pointer line.',
+    alt: 'The user opens Release notes, marked needs you, reads the draft summary and answers “Looks right. Publish it.”. Claude publishes and posts there, and back in Main chat the new post is one pointer line.',
   },
 ];
 
