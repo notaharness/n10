@@ -24,7 +24,7 @@ export function ConversationsIntro() {
           {...SIZE}
         />
       </div>
-      <div className="mt-8">
+      <div className="mt-14">
         <ConversationsInstall />
       </div>
     </section>
