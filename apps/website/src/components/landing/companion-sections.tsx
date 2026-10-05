@@ -2,14 +2,15 @@ import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { BeamMesh } from '@/components/beam/mesh/beam-mesh';
+import { SwitcherStage } from '@/components/context-switcher/switcher-stage';
 import { OrchestraStage } from '@/components/orchestra/orchestra-stage';
 import { cn } from '@/lib/cn';
 
 /**
- * Beam and Orchestra, the two notaharness tools that work on their own
- * and compose with n10. They lead the feature list, in the feature
- * layout with their own page's scene in the frame instead of a
- * recording.
+ * Beam, Orchestra and Context Switcher, the notaharness tools that
+ * work on their own and compose with n10. They lead the feature list,
+ * in the feature layout with their own page's scene in the frame
+ * instead of a recording.
  */
 function CompanionSection({
   label,
@@ -157,6 +158,27 @@ export function OrchestraFeature() {
         code review, Beam connects machines, and Orchestra coordinates agents.
         n10 is agent-agnostic, not an agent harness: it runs whichever agent you
         configure.
+      </p>
+    </CompanionSection>
+  );
+}
+
+export function ContextSwitcherFeature() {
+  return (
+    <CompanionSection
+      label="Context Switcher"
+      title="One session, many conversations"
+      links={[
+        { text: 'Read the guide', href: '/docs/context-switcher' },
+        { text: 'About Context Switcher', href: '/context-switcher' },
+      ]}
+      scene={<SwitcherStage />}
+    >
+      <p>
+        Context Switcher is a Claude Code plugin that gives each topic in a busy
+        session its own context: a CI run, a subagent&apos;s task, a message
+        from another session. A sidebar marks unread updates and anything
+        waiting on you, and Main chat keeps your conversation with Claude.
       </p>
     </CompanionSection>
   );
