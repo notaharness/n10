@@ -11,6 +11,9 @@ export function ConversationsIntro() {
       <h1 className="text-4xl leading-[1.1] font-semibold tracking-tight sm:text-5xl">
         Conversations
       </h1>
+      <span className="border-fd-border bg-fd-card text-fd-muted-foreground mt-4 inline-block rounded-full border px-3 py-1 font-mono text-xs">
+        conversations@notaharness
+      </span>
       <p className="text-fd-muted-foreground mt-6 max-w-2xl text-lg text-pretty">
         A Claude Code plugin that splits your main session into focused
         conversations. Meant to deal with the dreaded context switching in
