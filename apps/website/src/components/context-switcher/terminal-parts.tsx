@@ -176,7 +176,7 @@ export function Pointer({
 }) {
   return (
     <Mono x={x} y={y} muted>
-      <tspan fill={color}>↳ {name}</tspan>: {text}
+      <tspan fill={color}>→ {name}</tspan>: {text}
     </Mono>
   );
 }

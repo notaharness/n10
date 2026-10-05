@@ -50,13 +50,14 @@ export function TerminalRecording({
   }, [reduced]);
   const src = `/media/context-switcher/${name}`;
   return (
+    // The video carries the alt text; the poster behind it is decoration.
     <div
       className="n10-frame relative overflow-hidden rounded-[10px] bg-black"
       style={{ aspectRatio: `${width} / ${height}` }}
     >
       <img
         src={`${src}-poster.webp`}
-        alt={alt}
+        alt=""
         width={width}
         height={height}
         loading="lazy"
@@ -74,19 +75,6 @@ export function TerminalRecording({
         <source src={`${src}.webm`} type="video/webm" />
         <source src={`${src}.mp4`} type="video/mp4" />
       </video>
-    </div>
-  );
-}
-
-/** Stands in for a recording until it exists. */
-export function RecordingPlaceholder({ alt }: { alt: string }) {
-  return (
-    <div
-      role="img"
-      aria-label={alt}
-      className="n10-frame bg-fd-card text-fd-muted-foreground flex aspect-[16/10] items-center justify-center rounded-[10px] font-mono text-sm"
-    >
-      Recording coming soon
     </div>
   );
 }

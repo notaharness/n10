@@ -24,8 +24,9 @@ export function ContextSwitcherHow() {
         illustrationSide="left"
       >
         <p className="text-fd-muted-foreground mt-4 leading-relaxed">
-          Click a context and the transcript shows only that topic. What you
-          type there goes to that context.
+          Click a context, or press <code>ctrl+x tab</code> and its number, and
+          the transcript shows only that topic. What you type there goes to that
+          context.
         </p>
       </BeamSectionRow>
       <BeamSectionRow
