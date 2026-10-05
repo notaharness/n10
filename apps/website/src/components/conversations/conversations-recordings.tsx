@@ -43,7 +43,7 @@ export function ConversationsRecordings() {
       <figure className="mt-10">
         <TerminalRecording
           name="needs-you"
-          alt="The user opens Release notes, marked needs you, reads the draft summary and answers “Looks right. Publish it.”. Claude publishes and posts there, and back in Main the new post is one pointer line."
+          alt="The user opens Release notes, marked needs you, reads the draft summary and answers “Looks right. Publish it.”. Claude publishes, posts there and archives the conversation, which moves to the sidebar's collapsed Archived section. Back in Main, the new post is one pointer line."
           {...SIZE}
         />
         <figcaption className="text-fd-muted-foreground mt-4 text-sm">
