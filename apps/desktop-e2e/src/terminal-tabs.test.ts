@@ -339,13 +339,13 @@ test.describe('Terminal shell', () => {
   }
 
   test.describe('configured', () => {
-    test.use({ env: { SHELL }, n10Config: { shell: 'sh' } });
+    test.use({ env: { SHELL: '/bin/sh' }, n10Config: { shell: 'bash' } });
 
     test('a new terminal runs the shell from the Shell setting', async ({
       desktop,
     }) => {
       const page = await openedShell(desktop);
-      await expect(visibleText(page, 'shell-sh')).toBeVisible({
+      await expect(visibleText(page, 'shell-bash')).toBeVisible({
         timeout: 15_000,
       });
     });
