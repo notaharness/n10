@@ -198,7 +198,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - `SessionTerminal` sends `resizeSession` on every fit and refits on the
   session's `spawnedAt` epoch. It reckons the grid exactly as wterm's own
   observer does (`terminalBox`, `measureTerminalGrid`); any other answer
-  makes the two resize the PTY back and forth. It bounces the grid for a
+  makes the two resize the PTY back and forth. Every grid is capped at
+  wterm's 256×256 (`fitWterm`): its core keeps no more, and an agent told
+  it has more overdraws its own lines. It bounces the grid for a
   full repaint only when the snapshot is `truncated`. `paneTerminalGrid`
   measures a hidden `.wterm` inside `[data-terminal-pane]` for the launch
   estimate.

@@ -4,6 +4,7 @@ import wasmUrl from '@wterm/core/wasm?url';
 import { toast } from 'sonner';
 import {
   estimateTerminalGrid,
+  fitWterm,
   measureTerminalGrid,
   terminalBox,
 } from '../../lib/terminal-grid.js';
@@ -95,6 +96,14 @@ export function SessionTerminal({
   );
   const resize = useCallback(
     (cols: number, rows: number) => {
+      // wterm's own observer resizes to the pane's full grid, past what
+      // it can hold. Its grid is cut back instead, and that resize is
+      // the one the host hears about.
+      const fit = fitWterm({ cols, rows });
+      if (fit.cols !== cols || fit.rows !== rows) {
+        termRef.current?.resize(fit.cols, fit.rows);
+        return;
+      }
       if (ended) return;
       void window.n10.resizeSession(name, cols, rows).catch(reportError);
     },

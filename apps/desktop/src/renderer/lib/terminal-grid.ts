@@ -15,6 +15,24 @@ export interface Grid {
 }
 
 /**
+ * The largest grid wterm holds. Its WASM core allocates 256 columns
+ * and rows and quietly keeps a larger resize to them, while its
+ * observer still reports the pane's full size. An agent told it has
+ * more draws past the edge: wterm wraps those lines and the next line
+ * lands on top of the wrapped part. A 4K display at 1x scaling has
+ * panes that wide; the terminal takes this much of them.
+ */
+export const MAX_GRID: Grid = { cols: 256, rows: 256 };
+
+/** `grid`, cut down to what wterm can hold. */
+export function fitWterm(grid: Grid): Grid {
+  return {
+    cols: Math.min(grid.cols, MAX_GRID.cols),
+    rows: Math.min(grid.rows, MAX_GRID.rows),
+  };
+}
+
+/**
  * Compute the grid for a pane from the wterm element's *measured* cell
  * metrics — the same probe wterm's own observer uses, one `W` wide, so
  * the two never disagree (the 7.8px estimate overflowed the pane
@@ -44,10 +62,10 @@ export function measureTerminalGrid(
     (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
   const padY =
     (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-  return {
+  return fitWterm({
     cols: Math.max(20, Math.floor((pane.width - padX) / charWidth)),
     rows: Math.max(5, Math.floor((pane.height - padY) / rowHeight)),
-  };
+  });
 }
 
 /**
@@ -93,7 +111,7 @@ export function estimateTerminalGrid(
     Math.floor((rect.width * widthFraction - PAD_X) / CHAR_WIDTH)
   );
   const rows = Math.max(5, Math.floor((rect.height - PAD_Y) / ROW_HEIGHT));
-  return { cols, rows };
+  return fitWterm({ cols, rows });
 }
 
 /**

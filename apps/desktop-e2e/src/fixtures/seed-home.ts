@@ -52,6 +52,9 @@ export function fakeAgent(
     printSeed?: boolean;
     /** Print the PTY grid as `size:<cols>x<rows>`, and again on resize. */
     printSize?: boolean;
+    /** Draw a full-width rule and a cursor-placed line under it, again
+     *  on resize. */
+    drawScreen?: boolean;
     /** End each streamed line with `@<checkout directory>`. */
     tag?: boolean;
   } = {}
@@ -62,6 +65,7 @@ export function fakeAgent(
   if (opts.echo) flags.push('--echo');
   if (opts.printSeed) flags.push('--print-seed');
   if (opts.printSize) flags.push('--print-size');
+  if (opts.drawScreen) flags.push('--draw-screen');
   if (opts.streamMs != null) flags.push(`--stream-ms=${opts.streamMs}`);
   if (opts.intervalMs != null) flags.push(`--interval-ms=${opts.intervalMs}`);
   if (opts.exitAfterMs != null)

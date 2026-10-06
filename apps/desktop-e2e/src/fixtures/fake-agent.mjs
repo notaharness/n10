@@ -36,6 +36,14 @@
 //                        tells one agent's lines from the next one's: a
 //                        restart under tmux repaints the screen, so
 //                        counting lines cannot say whose they are.
+//   --draw-screen        draw the screen the way a full-screen agent
+//                        does, on start and on every SIGWINCH: a rule of
+//                        `=` exactly as wide as the PTY on row ten, then
+//                        `below-the-rule` placed on row eleven by cursor
+//                        position rather than by a newline, and the
+//                        cursor put back. A terminal narrower than the
+//                        PTY wraps the rule onto row eleven and the
+//                        second line lands on top of it.
 //   --echo               echo each completed line of stdin back, so a test
 //                        can prove input travelled renderer → IPC → PTY →
 //                        agent → back. Line-buffered on purpose: a PTY in
@@ -76,6 +84,18 @@ if (args['print-size']) {
   };
   report();
   process.stdout.on('resize', report);
+}
+
+if (args['draw-screen']) {
+  const draw = () => {
+    const columns = process.stdout.columns ?? 0;
+    process.stdout.write(
+      `\x1b7\x1b[10;1H\x1b[K${'='.repeat(columns)}` +
+        `\x1b[11;1Hbelow-the-rule\x1b8`
+    );
+  };
+  draw();
+  process.stdout.on('resize', draw);
 }
 
 const timers = new Set();

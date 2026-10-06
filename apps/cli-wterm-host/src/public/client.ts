@@ -76,7 +76,22 @@ function sendBytes(data: string): void {
 }
 
 term.onData = (data) => sendBytes(data);
-term.onResize = (cols, rows) => sendControl({ type: 'resize', cols, rows });
+// wterm's core holds at most 256x256 but its observer resizes to the
+// page's full grid. A larger grid is cut back, and only that resize
+// reaches the PTY: n10 told it has more draws past what wterm shows.
+// Same limit as `MAX_GRID` in apps/desktop's terminal-grid.ts.
+const WTERM_MAX = 256;
+term.onResize = (cols, rows) => {
+  const fit = {
+    cols: Math.min(cols, WTERM_MAX),
+    rows: Math.min(rows, WTERM_MAX),
+  };
+  if (fit.cols !== cols || fit.rows !== rows) {
+    term.resize(fit.cols, fit.rows);
+    return;
+  }
+  sendControl({ type: 'resize', cols, rows });
+};
 
 interface WTermTestHandle {
   send(bytes: string): void;
@@ -88,7 +103,7 @@ interface WTermTestHandle {
   },
   resize(cols, rows) {
     term.resize(cols, rows);
-    sendControl({ type: 'resize', cols, rows });
+    sendControl({ type: 'resize', cols: term.cols, rows: term.rows });
   },
 };
 
