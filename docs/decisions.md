@@ -203,7 +203,7 @@ An exited agent's dead pane is not polled, so discovery is what sees its
 session go later, and releases it then. Another machine that cannot be reached
 is neither: its agent waits to reconnect, said on its card (in warning, not
 Running's green) and in the pane's banner. Two things notice. The fleet sees the
-peer go offline: the engine's machine service tells core's machine registry,
+peer become unreachable: the engine's machine service tells core's machine registry,
 which remembers it for sessions opened later and tells that machine's poller.
 And a session listing on the machine that does not settle within a deadline
 counts as a failed poll, for a transport that neither answers nor fails. Either

@@ -19,9 +19,12 @@ export interface MachinePresentation {
   secondary: string;
 }
 
+// beam's `offline` is a peer no tunnel reaches, which may be the peer or
+// this machine's route to it, so a peer reads "Unreachable". "Offline" is
+// for this machine's own row, when the operating system reports no network.
 const STATE_LABEL: Record<MachineState, string> = {
   connected: 'Connected',
-  offline: 'Offline',
+  offline: 'Unreachable',
   unknown: 'Unknown',
   revoked: 'Revoked',
   'revoked-by-fleet': 'Access revoked',
@@ -156,7 +159,7 @@ export function isFleetMember(machine: MachineView): boolean {
 
 /**
  * `3 machines`, or `3 machines · this machine offline` /
- * `3 machines · 1 offline` / `3 machines · 2 queued` when something
+ * `3 machines · 1 unreachable` / `3 machines · 2 queued` when something
  * needs attention, in that order. Counts this machine; `null` with no
  * other machine (D8).
  */
@@ -165,17 +168,17 @@ export function machinesSummary(
 ): { text: string; offline: boolean } | null {
   if (!hasPeerMachines(machines)) return null;
   const members = machines.filter(isFleetMember);
-  const offline = members.filter((m) => m.state === 'offline').length;
+  const unreachable = members.filter((m) => m.state === 'offline').length;
   const queued = members.reduce((sum, m) => sum + m.queued, 0);
   const cutOff = machines.some((m) => m.isLocal && m.state === 'offline');
   const count = members.length + 1; // + this machine
   let suffix = '';
   if (cutOff) suffix = ' · this machine offline';
-  else if (offline > 0) suffix = ` · ${offline} offline`;
+  else if (unreachable > 0) suffix = ` · ${unreachable} unreachable`;
   else if (queued > 0) suffix = ` · ${queued} queued`;
   return {
     text: `${count} machine${count === 1 ? '' : 's'}${suffix}`,
-    offline: cutOff || offline > 0,
+    offline: cutOff || unreachable > 0,
   };
 }
 

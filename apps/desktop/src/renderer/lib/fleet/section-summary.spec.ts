@@ -67,14 +67,14 @@ describe('fleetSectionSummary', () => {
     ).toBe('This machine');
   });
 
-  it('warns when a member is offline', () => {
+  it('warns when a member is unreachable', () => {
     expect(
       fleetSectionSummary({
         beam: ready,
         machines: [self, machine({ state: 'offline' })],
         awaitingPasskey: false,
       })
-    ).toEqual({ text: '2 machines · 1 offline', tone: 'warning' });
+    ).toEqual({ text: '2 machines · 1 unreachable', tone: 'warning' });
   });
 
   it('names this machine as the one offline, not its unknown peers', () => {
