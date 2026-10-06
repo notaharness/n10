@@ -125,7 +125,7 @@ function WorkspaceInner({
   const [sidebarHidden, setSidebarHidden] = useState(
     () => localStorage.getItem(SIDEBAR_KEY) === '1'
   );
-  const sidebarWidth = usePaneWidth('n10.sidebar.width', 280);
+  const sidebarWidth = usePaneWidth('sidebar', 280);
 
   const toggleSidebar = () =>
     setSidebarHidden((h) => {
@@ -287,8 +287,9 @@ function WorkspaceInner({
           {!sidebarHidden && (
             <>
               <Panel
-                id="sidebar"
+                id={sidebarWidth.id}
                 panelRef={sidebarWidth.panelRef}
+                elementRef={sidebarWidth.elementRef}
                 defaultSize={sidebarWidth.defaultSize}
                 groupResizeBehavior="preserve-pixel-size"
                 minSize="200px"

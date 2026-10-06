@@ -87,10 +87,15 @@ test.describe('Pane widths', () => {
       const before = await paneWidth(page, 'sidebar');
       await page.locator('[data-separator]').first().focus();
       await page.keyboard.press('ArrowRight');
-      await page.keyboard.press('ArrowRight');
       await expect
         .poll(() => paneWidth(page, 'sidebar'))
         .toBeGreaterThan(before);
+      const once = await paneWidth(page, 'sidebar');
+      // Each press moves it a step on: none is stored late and undone.
+      await page.keyboard.press('ArrowRight');
+      await expect
+        .poll(() => paneWidth(page, 'sidebar'))
+        .toBeGreaterThan(once + (once - before) / 2);
       const pressed = await paneWidth(page, 'sidebar');
 
       await switchRepo(page, otherRepo);

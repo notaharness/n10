@@ -156,7 +156,7 @@ export function PrWorkspace({
   });
 
   const rail = useReviewRail(nav, comments, rootRef);
-  const railWidth = usePaneWidth('n10.review-rail.width', 270);
+  const railWidth = usePaneWidth('review-rail', 270);
   const { showUnresolved } = rail;
   const { scrollRef } = nav;
   // The pressed button goes hidden with the Overview, so focus follows
@@ -229,8 +229,9 @@ export function PrWorkspace({
           {!rail.hidden && (
             <>
               <Panel
-                id="review-rail"
+                id={railWidth.id}
                 panelRef={railWidth.panelRef}
+                elementRef={railWidth.elementRef}
                 defaultSize={railWidth.defaultSize}
                 groupResizeBehavior="preserve-pixel-size"
                 minSize="200px"
