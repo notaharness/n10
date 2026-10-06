@@ -1,4 +1,4 @@
-import { rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
@@ -245,13 +245,16 @@ test('reads an image only once its frame nears the screen', async ({
   expect(await side(passed, 'after').getByRole('img').count()).toBe(0);
 });
 
-test('shows a binary file by its old image name, and refuses one that is not an image', async ({
+test('shows a renamed image, by either name, and refuses one that is not an image', async ({
   desktop,
 }) => {
   const { page, repoPath, homeDir } = desktop;
   const logo = disc(48, [...RED]);
-  seedMain(repoPath, { 'logo.png': logo });
+  seedMain(repoPath, { 'logo.png': logo, 'icon.png': disc(30, [...BLUE]) });
   const worktree = worktreeOf(repoPath);
+  // Moved unchanged: one blob on both sides.
+  mkdirSync(join(worktree, 'brand'));
+  renameSync(join(worktree, 'icon.png'), join(worktree, 'brand', 'icon.png'));
   // Renamed to a name no image has, its bytes nearly the same so git
   // pairs the two: shown as images, and sized as them from the start.
   rmSync(join(worktree, 'logo.png'));
@@ -289,4 +292,24 @@ test('shows a binary file by its old image name, and refuses one that is not an 
       )
     )
     .toBe('48×48');
+
+  const moved = compareOf(page, 'brand/icon.png');
+  await moved.scrollIntoViewIfNeeded();
+  expect(Math.round((await moved.boundingBox())!.height)).toBe(ROW_HEIGHT);
+  await expect
+    .poll(() =>
+      decoded(
+        side(moved, 'before').getByRole('img', { name: 'Before: icon.png' })
+      )
+    )
+    .toBe('30×30');
+  await expect
+    .poll(() =>
+      decoded(
+        side(moved, 'after').getByRole('img', {
+          name: 'After: brand/icon.png',
+        })
+      )
+    )
+    .toBe('30×30');
 });

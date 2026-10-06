@@ -154,7 +154,8 @@ function Side({
 }
 
 /** Each side is keyed by its blob: the row outlives a revision switch,
- *  and a size measured for one blob must not caption the next. */
+ *  and a size measured for one blob must not caption the next. The side
+ *  is in the key too: a pure rename is the same blob on both. */
 export function ImageCompare({
   cwd,
   file,
@@ -172,7 +173,7 @@ export function ImageCompare({
       style={{ height: IMAGE_ROW_HEIGHT }}
     >
       <Side
-        key={file.oldOid ?? 'none'}
+        key={`before:${file.oldOid ?? 'none'}`}
         cwd={cwd}
         label="Before"
         path={file.oldPath}
@@ -182,7 +183,7 @@ export function ImageCompare({
         inView={inView}
       />
       <Side
-        key={file.newOid ?? 'none'}
+        key={`after:${file.newOid ?? 'none'}`}
         cwd={cwd}
         label="After"
         path={file.path}
