@@ -169,7 +169,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
         if (outcome.ok) {
           setRevokeTarget(null);
           toast.success('Access revoked', {
-            description: 'Offline machines update when they reconnect.',
+            description: 'Unreachable machines update when they reconnect.',
           });
         }
       },

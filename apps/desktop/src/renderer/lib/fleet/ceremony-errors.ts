@@ -87,7 +87,7 @@ const CATALOGUE: Record<string, FailureCopy> = {
     actions: ['retry'],
   },
   offline: {
-    explanation: 'Machine offline. Retry when it reconnects.',
+    explanation: 'Machine unreachable. Retry when it reconnects.',
     actions: ['close'],
   },
   grant: {

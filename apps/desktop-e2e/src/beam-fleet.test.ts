@@ -82,9 +82,9 @@ test.describe('A fleet of real beam daemons @beam', () => {
     await expect(
       workboxRow.getByText('Unknown', { exact: true })
     ).toBeVisible();
-    await expect(workboxRow.getByText('Offline', { exact: true })).toHaveCount(
-      0
-    );
+    await expect(
+      workboxRow.getByText('Unreachable', { exact: true })
+    ).toHaveCount(0);
 
     await page.context().setOffline(false);
     await expect(
