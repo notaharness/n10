@@ -1,8 +1,8 @@
 import type { LaunchStep } from '../../../host/contract.js';
+import type { useMachineChoice } from '../../lib/machines/use-machine-choice.js';
 import {
   MachineChoiceSelect,
   RemoteLaunchProgress,
-  type useMachineChoice,
 } from '../terminal/NewTerminalMachineChoice.js';
 
 /**

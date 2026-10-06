@@ -16,7 +16,8 @@ import { errorMessage } from '../../lib/utils.js';
 import { Badge } from '../ui/badge.js';
 import { Tip } from '../ui/tooltip.js';
 import { InboundMailPanel } from './InboundMailPanel.js';
-import { MachineMenu, copyFingerprint } from './MachineMenu.js';
+import { copyFingerprint } from '../../lib/machines/copy-fingerprint.js';
+import { MachineMenu } from './MachineMenu.js';
 
 const DOT_CLASS: Record<MachineTone, string> = {
   success: 'bg-success',

@@ -10,7 +10,7 @@ import type {
 } from '../../../host/contract.js';
 import { useAgentOptions } from '../../lib/data/queries.js';
 import { agentIdForLaunch } from '../../lib/agent-pick.js';
-import { useMachineChoice } from '../terminal/NewTerminalMachineChoice.js';
+import { useMachineChoice } from '../../lib/machines/use-machine-choice.js';
 import { LaunchDialogBody } from './LaunchDialogBody.js';
 import { Button } from '../ui/button.js';
 import {
