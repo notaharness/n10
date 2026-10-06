@@ -32,6 +32,8 @@ import { MovedBanner } from './MovedBanner.js';
 import { SelectorFocus } from './selector-focus.js';
 import { SingleFileBar } from './SingleFileBar.js';
 import { VirtualDiffList, type DiffJumpHandle } from './VirtualDiffList.js';
+import { useDiffFind } from './use-diff-find.js';
+import { useDiffSelection } from './use-diff-selection.js';
 
 /**
  * The diff content pane: its toolbar (`DiffToolbar`), what can be said
@@ -99,6 +101,16 @@ export function DiffPane({
   const comparisonRef = useRef<HTMLButtonElement>(null);
   const selectorRef = useRef<HTMLButtonElement>(null);
   const single = useDiffOptions().layout === 'single';
+  const findPaneRef = useRef<HTMLDivElement>(null);
+  const find = useDiffFind(
+    files,
+    scrollRef,
+    findPaneRef,
+    place,
+    single,
+    prDiff
+  );
+  const selectionTerm = useDiffSelection(scrollRef);
   const view = useSingleFileView(
     files,
     generalThreads.length > 0,
@@ -117,7 +129,7 @@ export function DiffPane({
 
   return (
     <SelectorFocus value={selectorRef}>
-      <div className="flex h-full min-h-0 flex-col">
+      <div ref={findPaneRef} className="flex h-full min-h-0 flex-col">
         <DiffToolbar
           comparison={
             <ComparisonBar prDiff={prDiff} comparisonRef={comparisonRef} />
@@ -131,6 +143,7 @@ export function DiffPane({
           onNext={onNext}
           onToggleLayout={toggleLayout}
         />
+        {find.bar}
         {view.page && !loading && <SingleFileBar page={view.page} />}
         {stale && (
           <StaleNotice
@@ -170,6 +183,7 @@ export function DiffPane({
           {!loading && (
             <VirtualDiffList
               files={view.files}
+              searchFiles={files}
               diffHead={diffHead}
               threadsByFile={threadsByFile}
               draftsByFile={draftsByFile}
@@ -181,6 +195,10 @@ export function DiffPane({
               scrollRef={scrollRef}
               jumpRef={jumpRef}
               prDiff={prDiff}
+              searchTerm={find.term}
+              selectionTerm={selectionTerm}
+              searchTarget={find.target}
+              searchRequest={find.request}
             />
           )}
         </div>
