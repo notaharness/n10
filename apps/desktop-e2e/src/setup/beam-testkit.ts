@@ -109,6 +109,9 @@ function beamEnv(
     HOME: home,
     XDG_CONFIG_HOME: join(home, '.config'),
     TS_DEBUG_ALWAYS_USE_DERP: 'true',
+    // A terminal on this machine runs its `$SHELL`; pin one, not the
+    // developer's (zsh's first-run wizard eats typed input in a bare HOME).
+    SHELL: '/bin/bash',
     ...extra,
     TMUX_TMPDIR: home,
   };

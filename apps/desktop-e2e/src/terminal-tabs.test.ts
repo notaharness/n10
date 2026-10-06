@@ -316,3 +316,62 @@ test.describe('Agent terminals', () => {
     await expect(visibleText(page, /^seed:\s*$/)).toBeVisible();
   });
 });
+
+test.describe('Terminal shell', () => {
+  const SHELL = '/bin/bash';
+
+  /** Open a shell terminal and have it name the shell it is running. */
+  async function openedShell(desktop: {
+    app: Parameters<typeof openNewTerminalDialog>[0];
+    page: Parameters<typeof openNewTerminalDialog>[1];
+  }) {
+    const { app, page } = desktop;
+    await openNewTerminalDialog(app, page);
+    await confirmNewTerminal(page, 'Shell');
+    await expect(
+      page.locator('[data-terminal-pane]').getByText(/\S/).first()
+    ).toBeVisible({ timeout: 15_000 });
+    await focusTerminal(page);
+    await page.keyboard.type('echo shell-$(ps -o comm= -p $$)\n', {
+      delay: 20,
+    });
+    return page;
+  }
+
+  test.describe('configured', () => {
+    test.use({ env: { SHELL: '/bin/sh' }, n10Config: { shell: 'bash' } });
+
+    test('a new terminal runs the shell from the Shell setting', async ({
+      desktop,
+    }) => {
+      const page = await openedShell(desktop);
+      await expect(visibleText(page, 'shell-bash')).toBeVisible({
+        timeout: 15_000,
+      });
+    });
+  });
+
+  test.describe('auto', () => {
+    test.use({ env: { SHELL } });
+
+    test('a new terminal runs the login shell from $SHELL', async ({
+      desktop,
+    }) => {
+      const page = await openedShell(desktop);
+      await expect(visibleText(page, 'shell-bash')).toBeVisible({
+        timeout: 15_000,
+      });
+    });
+  });
+
+  test.describe('auto without a runnable $SHELL', () => {
+    test.use({ env: { SHELL: '/nonexistent/shell' } });
+
+    test('a new terminal runs sh', async ({ desktop }) => {
+      const page = await openedShell(desktop);
+      await expect(visibleText(page, 'shell-sh')).toBeVisible({
+        timeout: 15_000,
+      });
+    });
+  });
+});

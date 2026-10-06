@@ -410,6 +410,9 @@ export interface AppConfig {
   mergePollInterval?: number; // ms, default 3600000, min 300000
   editor?: string;
   worktreePath?: string;
+  /** Shell a new terminal runs: `auto` (the machine's login shell), or
+   *  `fish`, `zsh`, `bash`, `sh`. Unset means `auto`. */
+  shell?: string;
   keybindPreset?: string;
   keybindOverrides?: Record<string, KeyDescriptorConfig[]>;
   /** Recently opened repositories, newest first. Shared naming so any
