@@ -44,9 +44,12 @@ export function useMachineChoice() {
 export function MachineChoiceSelect({
   id,
   choice,
+  onSubmit,
 }: {
   id: string;
   choice: ReturnType<typeof useMachineChoice>;
+  /** See `MachineSelect`. */
+  onSubmit?: () => void;
 }) {
   if (!choice.show) return null;
   return (
@@ -55,6 +58,7 @@ export function MachineChoiceSelect({
       machines={choice.machines}
       value={choice.value}
       onChange={choice.setValue}
+      onSubmit={onSubmit}
     />
   );
 }

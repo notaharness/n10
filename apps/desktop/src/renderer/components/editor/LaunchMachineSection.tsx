@@ -20,15 +20,22 @@ export function LaunchMachineSection({
   step,
   error,
   what,
+  onSubmit,
 }: {
   choice: ReturnType<typeof useMachineChoice>;
   step?: LaunchStep | null;
   error?: string | null;
   what: string;
+  /** Enter on the machine picker launches, as on the agent picker. */
+  onSubmit: () => void;
 }) {
   return (
     <>
-      <MachineChoiceSelect id="launch-machine" choice={choice} />
+      <MachineChoiceSelect
+        id="launch-machine"
+        choice={choice}
+        onSubmit={onSubmit}
+      />
       <RemoteLaunchProgress
         step={step}
         error={error}
