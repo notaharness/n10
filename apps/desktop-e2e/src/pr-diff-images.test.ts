@@ -168,12 +168,25 @@ function gapBelowScreen(el: Element): number {
   return Math.round(top - scroller.clientHeight);
 }
 
-/** Scroll the diff until `el` starts `gap` pixels below its bottom. */
-function scrollShortOf(el: Element, gap: number): void {
+/** Scroll the diff until `el` starts `gap` pixels below its bottom, a
+ *  step a frame, as a drag through the list would. */
+async function sweepShortOf(el: Element, gap: number): Promise<void> {
   const scroller = el.closest('[data-diff-scroll]')!;
   const top =
     el.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-  scroller.scrollTop += top - scroller.clientHeight - gap;
+  const target = scroller.scrollTop + top - scroller.clientHeight - gap;
+  while (scroller.scrollTop < target) {
+    scroller.scrollTop = Math.min(target, scroller.scrollTop + 40);
+    await new Promise((resolve) => setTimeout(resolve, 16));
+  }
+}
+
+/** How far `el` ends above the top of the diff's scroll container. */
+function gapAboveScreen(el: Element): number {
+  const scroller = el.closest('[data-diff-scroll]')!;
+  return Math.round(
+    scroller.getBoundingClientRect().top - el.getBoundingClientRect().bottom
+  );
 }
 
 test('reads an image only once its frame nears the screen', async ({
@@ -210,10 +223,11 @@ test('reads an image only once its frame nears the screen', async ({
   ).toBeAttached();
   await expect(side(last, 'after').getByRole('img')).toHaveCount(0);
 
-  // Short of the screen, by less than the margin a read starts at: the
-  // margin reaches past the diff's own scroll container, not only the
-  // window's, which the container clips it to.
-  await last.evaluate(scrollShortOf, LEAD);
+  // Dragged through the list to short of the screen, by less than the
+  // margin a read starts at: the margin reaches past the diff's own
+  // scroll container, not only the window's, which the container clips
+  // it to.
+  await last.evaluate(sweepShortOf, LEAD);
   await expect
     .poll(() =>
       decoded(
@@ -223,6 +237,12 @@ test('reads an image only once its frame nears the screen', async ({
     .toBe('24×24');
   expect(await last.evaluate(gapBelowScreen)).toBe(LEAD);
   await expect(last).not.toBeInViewport();
+
+  // One the drag passed, never near the screen while it rested, is not
+  // read: a read waits for the scroll to settle.
+  const passed = compareOf(page, 'img-4.png');
+  expect(await passed.evaluate(gapAboveScreen)).toBeGreaterThan(200);
+  expect(await side(passed, 'after').getByRole('img').count()).toBe(0);
 });
 
 test('shows a binary file by its old image name, and refuses one that is not an image', async ({

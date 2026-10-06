@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 
+/** How long the scroll must rest with the element near before it counts:
+ *  the virtualizer's own `isScrolling` reset, which holds batch reads. */
+const SETTLE_MS = 150;
+
 /** The nearest ancestor that scrolls, or null for the viewport. */
 function scrollRoot(el: Element): Element | null {
   for (let at = el.parentElement; at; at = at.parentElement) {
@@ -15,6 +19,10 @@ function scrollRoot(el: Element): Element | null {
  * the edge of the element's scroll container, so a read starts a little
  * before the element scrolls in. Against the viewport the margin would
  * be lost: the container clips the element before it gets there.
+ *
+ * It counts only once the scroll settles with the element near, as the
+ * diff's batch reads do: a drag through the list would otherwise start
+ * a read for everything it passes.
  */
 export function useInView<T extends Element>(
   margin = '200px'
@@ -23,14 +31,29 @@ export function useInView<T extends Element>(
   const [el, setEl] = useState<T | null>(null);
   useEffect(() => {
     if (seen || !el) return;
+    const root = scrollRoot(el);
+    const scroller = root ?? window;
+    let near = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Every scroll while near starts the wait again.
+    const settle = () => {
+      clearTimeout(timer);
+      timer = near ? setTimeout(() => setSeen(true), SETTLE_MS) : undefined;
+    };
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) setSeen(true);
+        near = entries[entries.length - 1]?.isIntersecting ?? false;
+        settle();
       },
-      { root: scrollRoot(el), rootMargin: margin }
+      { root, rootMargin: margin }
     );
     io.observe(el);
-    return () => io.disconnect();
+    scroller.addEventListener('scroll', settle, { passive: true });
+    return () => {
+      io.disconnect();
+      scroller.removeEventListener('scroll', settle);
+      clearTimeout(timer);
+    };
   }, [el, seen, margin]);
   return [setEl, seen];
 }

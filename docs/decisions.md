@@ -750,6 +750,24 @@ screen. It still virtualizes its section, so it is not yet the unvirtualized
 reading surface assistive technology needs; that belongs to keyboard and
 navigation work (I11).
 
+A changed binary image shows its two sides in place of git's notice. Each
+side's frame has its final size before anything is read, and the row is
+estimated at that size, so an image arriving moves nothing below it. A side
+is read by the manifest's blob id, which names its bytes forever, and its
+format is decided by its leading bytes, not its name: a renamed or misnamed
+file shows as what it is, and anything but a raster format the renderer draws
+is refused — SVG included, which is markup that can carry script. A side
+crosses IPC as a data URL, so one past 10 MiB is not read, and the renderer
+takes that ceiling from core's browser-safe entry so the two cannot drift.
+The renderer caches what it shows and drops a side 30 seconds after no frame
+shows it; the host keeps only the last two reads, for a quick re-read and to
+join reads in flight, rather than every image the reader scrolled past at up
+to ~13 MB each. A side is read once its frame comes within 200px of its scroll
+container (the diff's or the review stepper's, whose clipping would otherwise
+swallow the margin) and the scroll has rested 150 ms with it there, as body
+batches wait for the list to settle: a drag through forty screenshots must
+not read forty blobs. A worktree's diff has no blob ids and shows no images.
+
 A pull request's history is compared at exact commits, never at whatever a
 branch holds now. The provider's record — GitHub's commits and force-pushes,
 and the latest review the account it answers as submitted — is read from the

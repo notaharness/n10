@@ -153,6 +153,8 @@ function Side({
   );
 }
 
+/** Each side is keyed by its blob: the row outlives a revision switch,
+ *  and a size measured for one blob must not caption the next. */
 export function ImageCompare({
   cwd,
   file,
@@ -170,6 +172,7 @@ export function ImageCompare({
       style={{ height: IMAGE_ROW_HEIGHT }}
     >
       <Side
+        key={file.oldOid ?? 'none'}
         cwd={cwd}
         label="Before"
         path={file.oldPath}
@@ -179,6 +182,7 @@ export function ImageCompare({
         inView={inView}
       />
       <Side
+        key={file.newOid ?? 'none'}
         cwd={cwd}
         label="After"
         path={file.path}
