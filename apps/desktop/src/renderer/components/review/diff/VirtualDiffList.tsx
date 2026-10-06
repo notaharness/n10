@@ -33,8 +33,8 @@ import {
 } from '../../../lib/diff/use-diff-jumps.js';
 import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
 import { useTheme } from '../../../lib/theme.js';
-import { rowGutter } from './code-gutter.js';
-import { DiffRowView, type RowContext } from './DiffRowView.js';
+import type { RowContext } from './DiffRowView.js';
+import { DiffVisibleRows } from './DiffVisibleRows.js';
 import { pointId } from './LineGutter.js';
 import { useDiffAnchor } from './use-diff-anchor.js';
 import { useDiffComments } from './use-diff-comments.js';
@@ -330,29 +330,14 @@ export function VirtualDiffList({
 
   return (
     <MyDraftsContext.Provider value={comments.scope}>
-      <div
-        className="relative font-mono text-sm leading-5"
-        style={{ height: virtualizer.getTotalSize() }}
-      >
-        {virtualItems.map((vi) => (
-          <div
-            key={vi.key}
-            data-index={vi.index}
-            // Which primitive this row is, for tests and the benchmarks:
-            // "is the code coloured yet" has to be asked of code rows,
-            // and a class name shared with the sidebar cannot answer it.
-            data-row-kind={rows[vi.index].kind}
-            ref={virtualizer.measureElement}
-            className="absolute top-0 left-0 w-full"
-            style={{
-              transform: `translateY(${vi.start}px)`,
-              ...rowGutter(rows[vi.index], linesByFile),
-            }}
-          >
-            <DiffRowView row={rows[vi.index]} ctx={ctx} />
-          </div>
-        ))}
-      </div>
+      <DiffVisibleRows
+        rows={rows}
+        items={virtualItems}
+        linesByFile={linesByFile}
+        ctx={ctx}
+        height={virtualizer.getTotalSize()}
+        measureElement={virtualizer.measureElement}
+      />
       <div role="status" aria-live="polite" className="sr-only">
         {comments.announcement}
       </div>
