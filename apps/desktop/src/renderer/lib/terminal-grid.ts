@@ -34,13 +34,17 @@ export function estimateTerminalGrid(
 /**
  * The grid a pane would give a terminal, measured before one is in it.
  *
- * A hidden terminal is opened inside the pane, by the same code and in
- * the same renderer as the one that will show the session, and asked
- * for the grid `FitAddon` would fit — the constants above are a last
- * resort, and half a column of error is the difference between an
- * agent's first frame fitting its pane and wrapping in it. `paneEl`
- * must establish a containing block (the content pane is `relative`),
- * or the probe escapes it.
+ * A hidden terminal is opened inside the pane, by the same code as the
+ * one that will show the session, and asked for the grid `FitAddon`
+ * would fit — the constants above are a last resort. It draws with the
+ * DOM renderer: a WebGL context per launch costs more than the probe
+ * is worth, and WebGL rounds cells down to device pixels, so the grid
+ * the DOM measures is, rounding aside, no wider than the one the
+ * terminal will draw.
+ * An agent's first frame fits its pane, and the terminal's first fit
+ * gives it any columns the DOM did not. `paneEl` must establish a
+ * containing block (the content pane is `relative`), or the probe
+ * escapes it.
  *
  * A pane with no box yet answers `null`: the minimums above would
  * otherwise turn an unlaid-out pane into a plausible-looking 20x5 and
@@ -62,7 +66,7 @@ export function paneTerminalGrid(paneEl: HTMLElement): Grid | null {
   const host = document.createElement('div');
   host.style.height = '100%';
   probe.appendChild(host);
-  const xterm = openTerminal(host, resolveTheme());
+  const xterm = openTerminal(host, resolveTheme(), { webgl: false });
   try {
     return xterm.fit.proposeDimensions() ?? estimateTerminalGrid(box);
   } finally {

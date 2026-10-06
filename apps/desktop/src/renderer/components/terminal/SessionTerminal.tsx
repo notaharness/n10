@@ -207,7 +207,10 @@ export function SessionTerminal({
         ?.getAsFile();
       if (!file) {
         // eslint-disable-next-line no-control-regex -- ESC is the point
-        xterm.term.paste(data.getData('text/plain').replace(/\x1b/g, ''));
+        const text = data.getData('text/plain').replace(/\x1b/g, '');
+        // Nothing a terminal takes (HTML alone, another kind of file):
+        // no paste, not an empty bracket.
+        if (text) xterm.term.paste(text);
         return;
       }
       void (async () => {

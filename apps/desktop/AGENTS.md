@@ -202,8 +202,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `SessionTerminal` sends `resizeSession` on every fit and refits on the
   session's `spawnedAt` epoch; `FitAddon` is the only grid reckoning. It
   bounces the grid for a full repaint only when the snapshot is `truncated`.
-  `paneTerminalGrid` opens a hidden terminal inside `[data-terminal-pane]`
-  for the launch estimate. Pastes go through `term.paste`, text without ESC.
+  `paneTerminalGrid` opens a hidden DOM-renderer terminal inside
+  `[data-terminal-pane]` for the launch estimate. A terminal releases its
+  WebGL context when it goes (`loadWebgl`): Chromium keeps 16 and evicts
+  the oldest. Pastes go through `term.paste`, text without ESC.
   Mouse tracking, any-motion (1003) included, is xterm's own, and so is the
   arrow pointer while the app takes the mouse (`enable-mouse-events`).
   Window shortcuts that must beat a focused terminal listen in the capture

@@ -8,8 +8,8 @@ import { errorMessage, isMac } from '../utils.js';
 
 /**
  * xterm.js as the desktop runs it: one place for the options, the
- * palette and the addons, so the terminal on screen and the probe that
- * sizes a launch (`paneTerminalGrid`) lay out the same grid.
+ * palette and the addons, shared by the terminal on screen and the
+ * probe that sizes a launch (`paneTerminalGrid`).
  */
 
 export interface DesktopTerminal {
@@ -123,12 +123,51 @@ function terminalKey(term: Terminal, event: KeyboardEvent): boolean {
 }
 
 /**
+ * Load the WebGL renderer, and return how to let it go again, context
+ * and all; null without WebGL2.
+ *
+ * Disposing the addon removes its canvas but leaves the canvas's WebGL
+ * context alive until the canvas is garbage collected
+ * (xtermjs/xterm.js#6068). Chromium keeps 16 contexts in a page and
+ * evicts the oldest past that, which can be the terminal on screen, so
+ * every mount and unmount would bring that closer. The context is
+ * released with `WEBGL_lose_context`, the platform's own call for it,
+ * on the canvases the addon added: asking any other canvas for a
+ * `webgl2` context could create one.
+ */
+function loadWebgl(
+  term: Terminal,
+  host: HTMLElement,
+  onContextLoss: () => void
+): (() => void) | null {
+  const before = new Set(host.querySelectorAll('canvas'));
+  const addon = new WebglAddon();
+  try {
+    term.loadAddon(addon);
+  } catch {
+    return null;
+  }
+  addon.onContextLoss(onContextLoss);
+  const own = [...host.querySelectorAll('canvas')].filter(
+    (c) => !before.has(c)
+  );
+  return () => {
+    addon.dispose();
+    for (const canvas of own) {
+      const gl = canvas.getContext('webgl2');
+      gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    }
+  };
+}
+
+/**
  * Open a terminal in `host`, sized by `FitAddon` against `host`'s box
  * less the padding `.xterm` carries in styles.css.
  *
- * WebGL draws it when the GPU allows. A context the browser takes away
- * (memory pressure, a suspend) disposes the addon, as its docs advise,
- * and xterm carries on with its DOM renderer.
+ * WebGL draws it when the GPU allows and `webgl` is not turned off. A
+ * context the browser takes away (memory pressure, a suspend) disposes
+ * the addon, as its docs advise, and xterm carries on with its DOM
+ * renderer.
  *
  * `host` says which renderer draws (`data-terminal-renderer`, `webgl`
  * or `dom`) and the grid (`data-terminal-grid`, `<cols>x<rows>`), for
@@ -136,7 +175,8 @@ function terminalKey(term: Terminal, event: KeyboardEvent): boolean {
  */
 export function openTerminal(
   host: HTMLElement,
-  theme: ResolvedTheme
+  theme: ResolvedTheme,
+  { webgl = true }: { webgl?: boolean } = {}
 ): DesktopTerminal {
   const term = new Terminal({
     allowProposedApi: true,
@@ -157,21 +197,21 @@ export function openTerminal(
   const stamp = (renderer: 'webgl' | 'dom') => {
     host.dataset.terminalRenderer = renderer;
   };
-  stamp('dom');
-  try {
-    const webgl = new WebglAddon();
-    term.loadAddon(webgl);
-    stamp('webgl');
-    webgl.onContextLoss(() => {
-      webgl.dispose();
+  let releaseWebgl: (() => void) | null = null;
+  const dropWebgl = () => {
+    releaseWebgl?.();
+    releaseWebgl = null;
+  };
+  if (webgl) {
+    releaseWebgl = loadWebgl(term, host, () => {
+      dropWebgl();
       stamp('dom');
       // WebGL rounds cells to device pixels and the DOM does not, so
       // the pane holds another grid now; `onResize` tells the PTY.
       fit.fit();
     });
-  } catch {
-    // No WebGL2 here: the DOM renderer it opened with stays.
   }
+  stamp(releaseWebgl ? 'webgl' : 'dom');
   const grid = () => {
     host.dataset.terminalGrid = `${term.cols}x${term.rows}`;
   };
@@ -184,6 +224,9 @@ export function openTerminal(
     setTheme: (next) => {
       term.options.theme = terminalTheme(next);
     },
-    dispose: () => term.dispose(),
+    dispose: () => {
+      dropWebgl();
+      term.dispose();
+    },
   };
 }

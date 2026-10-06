@@ -25,11 +25,27 @@ export interface Report extends Grid {
  * Scroll the terminal on screen to the top of its scrollback. xterm
  * puts only the rows in view in the page, so text that scrolled off the
  * top is not there to find until then.
+ *
+ * xterm moves a few lines per wheel event whatever its delta, so this
+ * turns the wheel until the rows drawn stop changing.
  */
 export async function scrollTerminalToTop(page: Page): Promise<void> {
+  const rows = page.locator(`${SHOWN_TERMINAL} .xterm-rows`);
   await page.locator(SHOWN_TERMINAL).hover();
-  // In steps, as a wheel turns: one leap leaves the rows undrawn.
-  for (let i = 0; i < 10; i++) await page.mouse.wheel(0, -500);
+  let drawn = await rows.innerText();
+  for (let i = 0; i < 500; i++) {
+    await page.mouse.wheel(0, -500);
+    // The rows are drawn on the next frame.
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve))
+        )
+    );
+    const now = await rows.innerText();
+    if (now === drawn) return;
+    drawn = now;
+  }
 }
 
 /** Every grid an agent has reported, oldest first. */
