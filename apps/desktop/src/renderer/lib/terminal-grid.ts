@@ -32,6 +32,10 @@ export function measureTerminalGrid(
   row.style.position = 'absolute';
   row.style.visibility = 'hidden';
   const probe = document.createElement('span');
+  // wterm's stylesheet sizes a cell's span by `--term-cell-width`, the
+  // last measurement (or `1ch` before there is one); its own probe
+  // measures the font itself, and so must this one.
+  probe.style.width = 'auto';
   probe.textContent = 'W';
   row.appendChild(probe);
   termEl.appendChild(row);

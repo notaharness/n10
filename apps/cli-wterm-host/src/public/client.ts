@@ -12,6 +12,22 @@ const term = new WTerm(root, {
 await term.init();
 term.focus();
 
+// This page stands in for the user's terminal, which never takes Tab
+// for itself. wterm reads Escape then Tab as leaving the terminal and
+// has no option for it, so the flag pairing the two is cleared before
+// its own listener sees the Tab (as the desktop's `keep-tab.ts` does).
+root.addEventListener(
+  'keydown',
+  (event) => {
+    if (event.key !== 'Tab') return;
+    const { input } = term as unknown as {
+      input?: { tabExitArmed?: boolean } | null;
+    };
+    if (input && 'tabExitArmed' in input) input.tabExitArmed = false;
+  },
+  true
+);
+
 // Auto-reconnecting WebSocket. The browser sometimes drops the initial WS
 // with code 1001 during cold start (especially under automation harnesses);
 // the server keeps the PTY alive and buffers output, so we just need to

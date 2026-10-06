@@ -246,6 +246,11 @@ function WorkspaceInner({
   // handled here: palette (⌘K). Tab cycling was removed for now — it
   // collided with Shift+Tab inside agent terminals (Claude Code's mode
   // switch).
+  //
+  // Capture phase: a focused terminal stops the propagation of every
+  // key it sends to its program, Ctrl+K among them, so a listener
+  // waiting for the bubble never hears it. The terminal still gets the
+  // key — an agent's prompt keeps its kill-line.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
@@ -255,8 +260,8 @@ function WorkspaceInner({
         setPaletteOpen((o) => !o);
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, []);
 
   return (

@@ -11,6 +11,7 @@ import {
   sessionFeed,
   type SessionFeed,
 } from '../../lib/terminals/session-feed.js';
+import { keepTabInTerminal } from '../../lib/terminals/keep-tab.js';
 import { usePaneShown } from '../../lib/tabs/pane-shown.js';
 import { useTheme } from '../../lib/theme.js';
 import { errorMessage } from '../../lib/utils.js';
@@ -165,6 +166,11 @@ export function SessionTerminal({
     if (grid) term.resize(grid.cols, grid.rows);
     feedRef.current?.attach((data) => term.write(data));
   }, [ready, name]);
+
+  useEffect(() => {
+    const inst = termRef.current?.instance;
+    return ready && inst ? keepTabInTerminal(inst) : undefined;
+  }, [ready]);
 
   // Pasting a picture into the terminal.
   //
