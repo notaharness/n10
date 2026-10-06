@@ -48,6 +48,12 @@ build target pins production). Full notes: `docs/testing.md`.
   `GH_TOKEN` handed in explicitly; the isolated HOME hides `gh` credentials.
 - The fake agent's `--print-size` reports the PTY grid with its pid, which
   tells one agent's report from the next when tmux repaints the screen.
+- Terminals run xterm's DOM renderer here (`--disable-gpu`, so no WebGL), so
+  their rows are text to assert on. The element xterm opens in carries
+  `data-terminal-grid` and `data-terminal-renderer` (`setup/terminal-grid.ts`).
+  The `webgl` option gives the window SwiftShader WebGL
+  (`terminal-webgl.test.ts`). xterm's textarea is zero-sized and off screen:
+  `focusTerminal` focuses it by class.
 - zsh greets a fresh HOME with its first-user wizard and eats the first
   keystroke; the fixture seeds an empty `.zshrc`. Playwright reads
   `[value, {…}]` as a fixture tuple, so `liveTerminals` is a record keyed by

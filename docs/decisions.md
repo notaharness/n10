@@ -300,6 +300,48 @@ terminals accept subsequent chunks. Resize on fit and when `spawnedAt` changes,
 even if the session name and dimensions are unchanged. `paneTerminalGrid`
 measures the actual font and padding; the first fit corrects startup estimates.
 
+The desktop draws terminals with xterm.js and its WebGL renderer
+(`@xterm/addon-webgl`), because drawing is where a terminal's cost goes. For an
+8 MiB burst of coloured log lines in 64 KiB chunks, the renderer's main thread
+was busy 305 ms where wterm's was 1,080 ms. For 300 full-screen redraws of a
+250×70 grid with a colour change every four cells, it was busy 1.0 s where
+wterm's was 9.4 s, and held 59 fps where wterm reached 32. xterm's DOM renderer
+falls between them: 469 ms, 8.0 s and 38 fps (Electron 44 on Intel Iris Xe,
+medians of three runs). A WebGL context the browser takes away (memory
+pressure, a suspend) disposes the addon, as its documentation advises, and
+xterm carries on with its DOM renderer. The grid is fitted again then, because
+WebGL rounds cells to device pixels and the DOM does not. Without a GPU there is
+no WebGL2 and the DOM renderer is what runs: the e2e suite (`--disable-gpu`
+under xvfb) and the visual baselines see that one, and `terminal-webgl.test.ts`
+gives the window SwiftShader to cover WebGL and its loss.
+
+`FitAddon` is the only reckoning of a terminal's grid. The session terminal
+fits whenever its pane's box changes, and the launch estimate opens a hidden
+terminal in the pane, with the same options and renderer, and asks it the same
+question. The terminal's boxes clip their overflow: a screen still drawn for
+the previous grid would otherwise bring in scrollbars, which the fit would then
+measure as lost room.
+
+Keys go to xterm, except those the window must see. Ctrl/Cmd+C with a selection
+and Ctrl/Cmd+V go on to the browser, whose copy and paste events xterm and the
+paste handler act on; without a selection Ctrl+C is the interrupt. The
+palette's Mod+K is taken in the capture phase, ahead of any terminal, so it
+opens the palette and sends nothing to the PTY. Pastes go through `term.paste`,
+so they are bracketed when the application asked for it, and a blocked terminal
+drops them as it drops keystrokes. Text loses its ESC bytes first, so a
+clipboard cannot end the bracket early and type the rest as commands. An image
+becomes a temporary file, whose path is pasted. OSC 8 links open externally on
+a modified click (Cmd on macOS, Ctrl elsewhere). `@xterm/addon-unicode11` gives
+emoji their two cells, which xterm's default Unicode 6 tables do not.
+
+Mouse tracking is xterm's own, any-motion (DECSET 1003) included, so an agent
+that highlights what is under the pointer is told where it is with no button
+held, and xterm shows the arrow rather than the I-beam while the application
+takes the mouse. A terminal that mounts from a ring-buffer snapshot no longer
+holding the application's mode sequences starts without them, mouse tracking
+included, until the application sets them again; tmux repeats modes only on
+attach or when they change.
+
 ## Desktop repositories and tabs
 
 The host serves one repository at a time; the tab strip can contain several.
@@ -337,7 +379,7 @@ Use native menus and dialogs where the OS supports the interaction. The review
 workspace has a navigation rail and one content pane. The diff owns its toolbar.
 
 The editor renders two panes at most: the active tab's and one spare, hidden
-and `inert`. A hidden wterm per open agent cost the renderer a terminal write
+and `inert`. A hidden terminal per open agent cost the renderer a terminal write
 for every chunk every agent printed, and bought nothing under tmux: the
 client's terminal accumulates no scrollback of its own, since tmux keeps the
 history. One spare buys an instant switch for the tab the user is about to
@@ -537,7 +579,7 @@ The four tab shortcuts act on the editor tab strip, the one strip of tabs that
 spans the window. The review workspace's rail (Sessions · Files) picks panes
 inside one tab; it is a list, not a strip, so the chords always mean the strip.
 `useTabSwitching` listens on the window in the capture phase and stops the
-event, because wterm and text boxes otherwise consume Ctrl+Tab; it stands
+event, because xterm and text boxes otherwise consume Ctrl+Tab; it stands
 aside inside a dialog and while Settings records a chord. Nothing else binds
 these chords: the native menu has no accelerator for them and Electron has no
 browser tab handling of its own. Plain Shift+Tab stays the terminal's (Claude
@@ -852,18 +894,9 @@ The wterm host keeps the PTY alive across WebSocket reconnects and replays a rin
 buffer. Use one build script for server and client to avoid output-directory
 cleaning conflicts. Playwright and Nx must agree on artifact output paths.
 
-Pin desktop and wterm-host packages to the same exact wterm version. Separate
-copies have incompatible constructor identities for `instanceof`. Import CSS
-from `@wterm/dom/css`; the React package's relative CSS import depends on hoisting.
-wterm drops DECSET 1003 (any-motion mouse tracking): its WASM ignores the mode
-and its input handler reports motion only with a button held. The desktop
-renderer rewrites 1003 to 1002 on the way in, so wterm still reports presses
-and drags, and reports button-less motion itself, once per cell. A terminal
-that mounts from a ring-buffer snapshot no longer holding the app's mode
-sequence starts with no mouse tracking until the app sets it again; tmux
-repeats modes only on attach or when they change.
-For pasted images, the host chooses the temporary-file suffix from its own MIME
-table and inserts the path into the PTY; text paste stays with wterm.
+The bridge's browser client draws n10 with `@wterm/dom`, pinned to an exact
+version. For pasted images in the desktop, the host chooses the temporary-file
+suffix from its own MIME table and the path is pasted into the PTY.
 
 Comment images use _virtual_ kitty placements (`U=1`) written out-of-band
 with `process.stdout.write`, the precedent being `apps/cli/src/utils/window-title.ts`;

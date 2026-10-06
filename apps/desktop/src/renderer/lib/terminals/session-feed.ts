@@ -5,7 +5,7 @@
  * Live chunks can arrive before the snapshot does (the watch lands on
  * the host first), so they wait, and the ones the snapshot already
  * holds (`seq` at or below its own) are dropped. The terminal can also
- * be slower than both — wterm loads its WASM before it takes a write —
+ * be slower than both — it opens only once its element is in the page —
  * so output is held until something is attached to write it to.
  */
 export interface SessionFeed {

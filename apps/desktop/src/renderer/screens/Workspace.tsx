@@ -247,18 +247,21 @@ function WorkspaceInner({
   // native menu accelerator reaches us through onMenuCommand instead;
   // handled here: palette (⌘K). Tab switching is `useTabSwitching`'s,
   // on rebindable Ctrl chords: a bare Shift+Tab belongs to the agent
-  // terminals (Claude Code's mode switch).
+  // terminals (Claude Code's mode switch). The palette's chord is taken
+  // in the capture phase, ahead of a focused terminal, which keeps every
+  // key it handles to itself.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
       if (e.key.toLowerCase() === 'k') {
         e.preventDefault();
+        e.stopPropagation();
         setPaletteOpen((o) => !o);
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, []);
 
   return (

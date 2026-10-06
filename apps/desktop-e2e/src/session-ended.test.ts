@@ -12,6 +12,7 @@ import {
 } from './setup/app.js';
 import { rescan } from './setup/discovery.js';
 import { findN10SessionFor, killTmuxSession } from './setup/tmux.js';
+import { scrollTerminalToTop } from './setup/terminal-grid.js';
 
 /**
  * An agent's session can end under its open tab, and what the tab shows
@@ -68,7 +69,9 @@ async function launchAgent(page: Page) {
  *  Launch Agent on offer. */
 async function expectNoAgent(page: Page) {
   await expect(sessionCards(page)).toHaveCount(0, { timeout: 15_000 });
-  await expect(page.locator('.wterm').filter({ visible: true })).toHaveCount(0);
+  await expect(
+    page.locator('[data-terminal-grid]').filter({ visible: true })
+  ).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: 'Launch Agent', exact: true })
   ).toBeVisible();
@@ -89,6 +92,9 @@ test.describe('An agent whose process exits', () => {
     await expect(sessionCard(page, 'Agent')).toContainText('Exited', {
       timeout: 15_000,
     });
+    // The retained frame is the PTY's height, taller than the pane under
+    // the exit bar, so its first line is up in the scrollback.
+    await scrollTerminalToTop(page);
     await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible();
     const resume = page.getByRole('button', { name: 'Resume agent' });
     await expect(resume).toBeVisible();

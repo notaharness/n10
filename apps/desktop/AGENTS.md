@@ -195,18 +195,19 @@ Every rule below has its reasoning in `docs/decisions.md`.
   lives beside the tabs in `TabViewsHost` (`lib/tabs/tab-views.tsx`) for this
   run, across repository switches: read once as initial state, written on
   change, dropped on close. Nothing persists it.
-- `SessionTerminal` sends `resizeSession` on every fit and refits on the
-  session's `spawnedAt` epoch. It reckons the grid exactly as wterm's own
-  observer does (`terminalBox`, `measureTerminalGrid`); any other answer
-  makes the two resize the PTY back and forth. It bounces the grid for a
-  full repaint only when the snapshot is `truncated`. `paneTerminalGrid`
-  measures a hidden `.wterm` inside `[data-terminal-pane]` for the launch
-  estimate.
-- Output reaches wterm only through `lib/terminals/mouse-modes.ts`: wterm
-  drops any-motion mouse tracking (DECSET 1003), so 1003 is handed to it as
-  1002 and `components/terminal/terminal-mouse.ts` reports motion with no
-  button held. That file also owns the `mouse-reporting` class (arrow
-  pointer) on the terminal's wrapper.
+- Terminals are xterm.js with its WebGL renderer, opened only through
+  `lib/terminals/xterm.ts` (options, palette, addons); a lost WebGL context
+  falls back to xterm's DOM renderer and refits. The element xterm opens in
+  carries `data-terminal-renderer` and `data-terminal-grid` for tests and QA.
+  `SessionTerminal` sends `resizeSession` on every fit and refits on the
+  session's `spawnedAt` epoch; `FitAddon` is the only grid reckoning. It
+  bounces the grid for a full repaint only when the snapshot is `truncated`.
+  `paneTerminalGrid` opens a hidden terminal inside `[data-terminal-pane]`
+  for the launch estimate. Pastes go through `term.paste`, text without ESC.
+  Mouse tracking, any-motion (1003) included, is xterm's own, and so is the
+  arrow pointer while the app takes the mouse (`enable-mouse-events`).
+  Window shortcuts that must beat a focused terminal listen in the capture
+  phase: xterm stops every key it handles.
 - A terminal exit event carries `retained`: retained agent tabs stay open
   for viewing and restart. `dropEnded` closes a terminal tab a defined
   listing omits; `undefined` means not asked yet.
@@ -234,10 +235,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
 
 ## Dependencies and packaging
 
-- `@wterm/dom`, `@wterm/react` here and `@wterm/dom` in `apps/cli-wterm-host`
-  are pinned to one exact version. Upgrade all together and check
-  `npm ls @wterm/dom @wterm/react @wterm/core` shows one copy each. Import the
-  stylesheet from `@wterm/dom/css`, never `@wterm/react/css`.
+- `@xterm/xterm` and its addons are pinned to exact versions; an addon
+  release targets one xterm release, so upgrade them together. The
+  stylesheet is `@xterm/xterm/css/xterm.css`, imported in `main.tsx`.
 - Ships inside `@notaharness/n10`: `apps/cli`'s `prepare-publish` copies
   `dist/{main,preload,renderer}` under `desktop/`, and plain `n10` runs
   Electron on the package. Nothing here is published on its own. See the
