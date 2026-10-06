@@ -157,6 +157,27 @@ test.describe('Pane widths', () => {
     await expect.poll(() => paneWidth(page, 'sidebar')).toBe(dragged);
   });
 
+  test('worktree tabs open in a narrow window without the rail throwing', async ({
+    desktop,
+  }) => {
+    const { app, page } = desktop;
+    await app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      // 950 - 280px sidebar leaves the review workspace well under its
+      // 720px narrow breakpoint, so the rail mounts shown, then hides.
+      win.setContentSize(950, 600);
+    });
+    // The fixture fails the test on any renderer throw.
+    for (const branch of ['first-work', 'second-work', 'third-work']) {
+      await createWorktree(page, branch);
+    }
+    await expect(tab(page, /third-work/)).toBeVisible();
+    // The workspace was narrow enough to put the rail away once shown.
+    await expect(
+      page.getByRole('button', { name: 'Show review sidebar' })
+    ).toBeVisible();
+  });
+
   test('the review rail keeps its dragged width across worktree tabs', async ({
     desktop,
   }) => {

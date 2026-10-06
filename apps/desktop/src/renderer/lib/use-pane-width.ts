@@ -4,8 +4,6 @@ import {
   useLayoutEffect,
   useRef,
   useSyncExternalStore,
-  type Dispatch,
-  type SetStateAction,
 } from 'react';
 import {
   usePanelCallbackRef,
@@ -45,7 +43,7 @@ function subscribe(key: string, notify: () => void): () => void {
 export interface PaneWidth {
   /** For the Panel: the remembered width, or the built-in one. */
   defaultSize: string;
-  panelRef: Dispatch<SetStateAction<PanelImperativeHandle | null>>;
+  panelRef: (handle: PanelImperativeHandle | null) => void;
   /** For the Group: remembers the width the user dragged to. */
   onLayoutChanged: (layout: unknown, meta: LayoutChangedMeta) => void;
   /** For the Separator, with the library's own reset disabled: a
@@ -68,13 +66,18 @@ export function usePaneWidth(key: string, fallbackPx: number): PaneWidth {
   // State, not a ref: the effect below must run when the pane mounts,
   // shown again too, where the Group would restore a cached percentage.
   // The Group has laid the pane out by then, and it is not yet painted.
-  const [panel, panelRef] = usePanelCallbackRef();
-  useLayoutEffect(() => {
-    panel?.resize(`${width}px`);
-  }, [panel, width]);
-
-  // One read per frame, dropped when superseded, reset or unmounted:
-  // a detached pane throws on getSize().
+  const [panel, setPanel] = usePanelCallbackRef();
+  // The handle as of now: the state above lags a pane that just left,
+  // whose getSize() throws, by a render.
+  const live = useRef<PanelImperativeHandle | null>(null);
+  const panelRef = useCallback(
+    (handle: PanelImperativeHandle | null) => {
+      live.current = handle;
+      setPanel(handle);
+    },
+    [setPanel]
+  );
+  // One read per frame, dropped when superseded, reset or unmounted.
   const pending = useRef(0);
   const later = useCallback((read: () => void) => {
     cancelAnimationFrame(pending.current);
@@ -82,12 +85,19 @@ export function usePaneWidth(key: string, fallbackPx: number): PaneWidth {
   }, []);
   useEffect(() => () => cancelAnimationFrame(pending.current), []);
 
+  useLayoutEffect(() => {
+    // A pane that just left is still in the state, its handle detached.
+    if (!panel || panel !== live.current) return;
+    panel.resize(`${width}px`);
+  }, [panel, width]);
+
   const onLayoutChanged = useCallback(
     (_layout: unknown, meta: LayoutChangedMeta) => {
-      if (!panel) return;
       // The new size reaches the DOM on React's next commit; a key press
       // reports before it, so read the pane once it has been painted.
       later(() => {
+        const panel = live.current;
+        if (!panel) return;
         const px = panel.getSize().inPixels;
         if (meta.isUserInteraction) {
           if (px > 0) storeWidth(key, px);
@@ -98,7 +108,7 @@ export function usePaneWidth(key: string, fallbackPx: number): PaneWidth {
         }
       });
     },
-    [key, later, panel, width]
+    [key, later, width]
   );
   const onReset = useCallback(() => {
     cancelAnimationFrame(pending.current);
