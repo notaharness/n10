@@ -67,6 +67,24 @@ describe('machinePresentation', () => {
     expect(machinePresentation(machine()).secondary).toBe('Never connected');
   });
 
+  it('this machine cut off: it is the one offline, and a peer is unknown', () => {
+    expect(
+      machinePresentation(
+        machine({ state: 'offline', isLocal: true, path: null })
+      )
+    ).toEqual({
+      label: 'Offline',
+      tone: 'destructive',
+      secondary: 'This machine cannot reach the fleet',
+    });
+    expect(machinePresentation(machine({ state: 'unknown' }))).toEqual({
+      label: 'Unknown',
+      tone: 'muted',
+      secondary: '',
+    });
+    expect(isMachineSelectable(machine({ state: 'unknown' }))).toBe(false);
+  });
+
   it('revoked here and revoked by the fleet are both destructive, and read apart', () => {
     const here = machinePresentation(machine({ state: 'revoked' }));
     const there = machinePresentation(machine({ state: 'revoked-by-fleet' }));
@@ -86,6 +104,7 @@ describe('machinePresentation', () => {
     const states = [
       'connected',
       'offline',
+      'unknown',
       'revoked',
       'revoked-by-fleet',
     ] as const;

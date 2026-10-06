@@ -166,6 +166,7 @@ export function createHostApi(): HostApi {
 
     listMachines: () => machines.listMachines(),
     getBeamStatus: () => machines.getBeamStatus(),
+    setNetworkOnline: (online) => machines.setNetworkOnline(online),
     onBeamStatusChanged: () => () => undefined,
     setMachineAlias: (peerId, alias) => machines.setMachineAlias(peerId, alias),
     setMachineGrant: (peerId, grant) => machines.setMachineGrant(peerId, grant),

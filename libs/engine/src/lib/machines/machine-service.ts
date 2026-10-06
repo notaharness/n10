@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { setMachineReachable } from '@n10/core';
 import { logError } from '@n10/logger';
+import { asSeenFromHere } from './fleet-reach.js';
 import { createRemoteMachines } from './remote-machines.js';
 import { refuseIfRemoteOwns } from './remote-owner.js';
 import type { InboundMailPort, MachinesPort } from './machine-ports.js';
@@ -39,6 +40,8 @@ export function createMachineService() {
   let mail: InboundMailPort | null = null;
   let version = 0;
   let reported: MachineView[] = [];
+  /** The operating system's word on the network, from the shell. */
+  let online = true;
   let active: Promise<MachineSnapshot> | undefined;
   /** Whether each peer was last connected, to report changes only. */
   const reachable = new Map<string, boolean>();
@@ -86,7 +89,6 @@ export function createMachineService() {
   function receiveMachines(machines: MachineView[]): void {
     version += 1;
     reported = machines;
-    reportReachability(machines);
     const recovered = snapshot.error !== null;
     if (recovered) {
       snapshot = { ...snapshot, error: null };
@@ -95,7 +97,8 @@ export function createMachineService() {
     publishMachines(recovered);
   }
   function publishMachines(recovered = false): void {
-    const machines = overlay(reported);
+    const machines = overlay(asSeenFromHere(reported, snapshot.status, online));
+    reportReachability(machines);
     if (!recovered && isDeepStrictEqual(machines, snapshot.machines)) return;
     snapshot = { ...snapshot, machines };
     emit({ type: 'machines', machines: snapshot.machines });
@@ -103,6 +106,14 @@ export function createMachineService() {
   function receiveStatus(status: FleetStatus): void {
     snapshot = { ...snapshot, status };
     emit({ type: 'status', status });
+    publishMachines();
+  }
+  /** Whether the operating system reports a network, as the shell
+   *  hears it. */
+  function receiveNetwork(next: boolean): void {
+    if (next === online) return;
+    online = next;
+    publishMachines();
   }
   function refresh(): Promise<MachineSnapshot> {
     if (active) return active;
@@ -167,6 +178,7 @@ export function createMachineService() {
     listMachines,
     receiveMachines,
     receiveStatus,
+    receiveNetwork,
     receiveDirectory(landed: DirectoryPublished): void {
       emit({ type: 'directory', landed });
     },

@@ -1,10 +1,14 @@
 /** Fleet state and commands shared by engine consumers and transport adapters. */
 
-/** beam's peer states. `revoked-by-fleet` is the peer refusing this
- *  machine as revoked: it will not take this machine again. */
+/** beam's peer states, and `unknown`. `revoked-by-fleet` is the peer
+ *  refusing this machine as revoked: it will not take this machine
+ *  again. `unknown` is a peer this machine cannot vouch for: it has no
+ *  network, when its own row is `offline`, or n10 lost its connection
+ *  to beam (`fleet-reach.ts`). */
 export type MachineState =
   | 'connected'
   | 'offline'
+  | 'unknown'
   | 'revoked'
   | 'revoked-by-fleet';
 

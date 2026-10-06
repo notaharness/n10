@@ -110,6 +110,10 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   error for callers that require a successful read, including IPC and ownership
   checks. A peer's change between connected and not is passed to core's
   machine registry (`setMachineReachable`), so its sessions wait to reconnect.
+  beam's `offline` says no tunnel is up, not which end lost it: with no
+  network as the shell reports it (`receiveNetwork`), this machine's row
+  is `offline`; with that or beam's connection lost (`restarting`), every
+  peer's is `unknown` (`fleet-reach.ts`). Revocations stand.
   Machine data types are exported by browser-safe `@n10/engine/contract`.
 
 - **Plans** (`plans/`): `sessions.checkoutPlan` captures config and scope before
