@@ -373,8 +373,24 @@ switch, and dropped when the tab closes. Nothing is written to disk or to tmux:
 a reload starts every tab fresh. A saved file or line no longer in the diff is
 not guessed at: the view starts from the top.
 
-Each tab has an ErrorBoundary. Markdown paragraphs render as `div` when they may
-contain block images; the host fetches protected images with provider auth.
+Render errors are caught at three levels, each showing the error's message with
+Try again (remount) and Reload window. The root boundary sits in `main.tsx`,
+outside every provider, so no render error can unmount the whole tree into a
+blank window. The workspace boundary sits below the providers, so a failed
+workspace keeps the tab strip's state, toasts and a pending revocation, and Try
+again remounts it with them. Each tab has its own, so one broken pane leaves the
+rest usable. Reload window is there for a failure a remount would only repeat.
+
+Vite's React plugin swaps a module in place only when it exports nothing but
+components ([consistent components exports](https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports)).
+A module that also exports a hook or a context is re-run instead, which mints a
+new context object while the provider from the old one stays mounted, so every
+consumer throws. Contexts, hooks and helpers therefore live in modules of
+their own (`lib/fleet/fleet-context.ts` beside `fleet-provider.tsx`) in new and
+touched code; older modules that mix them are split when next changed.
+
+Markdown paragraphs render as `div` when they may contain block images; the
+host fetches protected images with provider auth.
 
 A pull request tab opens on its Overview, whoever wrote it (`initialMode`): the
 Overview is the pull request's main page, and Review changes leads on to the

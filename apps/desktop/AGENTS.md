@@ -219,8 +219,11 @@ Every rule below has its reasoning in `docs/decisions.md`.
   error shows its message with Try again and Reload window, never a blank
   window. Vite's Fast Refresh swaps a module in place only when it exports
   nothing but components; otherwise it re-runs it, reminting any context
-  in it under a provider still mounted. Keep contexts and hooks out of
-  component modules (`lib/fleet/fleet-context.ts` beside `fleet-provider.tsx`).
+  in it under a provider still mounted. New and touched modules keep
+  contexts, hooks and helpers out of component modules
+  (`lib/fleet/fleet-context.ts` beside `fleet-provider.tsx`); older ones
+  that still mix them (`lib/tabs/tabs.tsx`, `lib/repo-context.tsx`, …)
+  are accepted until they are next changed.
 - Components use design tokens from `styles.css` and the primitives in
   `components/ui` only. Check visual work with `scripts/qa-shots.mjs`.
 

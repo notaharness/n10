@@ -13,6 +13,15 @@ function Broken(): never {
   throw new Error('useFleet must be used inside FleetProvider');
 }
 
+const failure = { on: true };
+
+/** Throws while `failure.on`, as a module out of step with its provider
+ *  would until the window reloads. */
+function Flaky() {
+  if (failure.on) throw new Error('not yet');
+  return <p>Workspace</p>;
+}
+
 describe('ErrorBoundary', () => {
   let container: HTMLElement;
   let root: Root;
@@ -67,11 +76,32 @@ describe('ErrorBoundary', () => {
       )
     );
 
-    const button = [...container.querySelectorAll('button')].find(
-      (b) => b.textContent?.trim() === 'Reload window'
-    );
-    act(() => button?.click());
+    act(() => button('Reload window')?.click());
 
     expect(reload).toHaveBeenCalledOnce();
   });
+
+  it('remounts on Try again, showing the error again until it clears', () => {
+    failure.on = true;
+    act(() =>
+      root.render(
+        <ErrorBoundary>
+          <Flaky />
+        </ErrorBoundary>
+      )
+    );
+
+    act(() => button('Try again')?.click());
+    expect(container.textContent).toContain('not yet');
+
+    failure.on = false;
+    act(() => button('Try again')?.click());
+    expect(container.textContent).toBe('Workspace');
+  });
+
+  function button(name: string): HTMLButtonElement | undefined {
+    return [...container.querySelectorAll('button')].find(
+      (b) => b.textContent?.trim() === name
+    );
+  }
 });
