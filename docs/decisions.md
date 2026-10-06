@@ -217,7 +217,22 @@ runner requires `agentId: 'test'`; only that runner interprets `aiCommand`. No
 command-prefix inference or migration fallback exists.
 
 A tagged worktree process is running only while its pane is alive. Standalone
-terminal tabs are found globally by their session type and tmux `session_path`.
+terminal tabs are found globally by their session type and tmux `session_path`,
+on this machine and on each machine the fleet says is connected: every scan
+asks those machines for their tmux listing through their executors, one
+`list-sessions` each. A listing goes over the network and can take until its
+deadline, so it runs beside the scan rather than in it: a machine that has gone
+quiet holds back neither this machine's scan nor another machine's, its answer
+is acted on when it arrives, and it is not asked again while one listing there
+is out. The tags make a session a tab, not who started it, so a terminal
+another machine's n10 or Orchestra started is listed like any other. Only a
+listing that succeeded ends a machine's terminals; one that fails or times out,
+or a machine the fleet does not list, ends none, and they wait to reconnect as
+its agents do. A terminal launched while a listing was out is not missing from
+it. Another machine's tmux cannot be asked synchronously, so
+whether it still holds an exited agent's pane is its backend's last listing.
+That backend stops polling a dead pane, so discovery's listing there is what
+sees the session go.
 An orphaned worktree session appears as an agent terminal when its tagged checkout
 no longer matches a listed worktree; attachment preserves its original tags.
 The process-wide engine terminal service owns directory/kind identity, launch

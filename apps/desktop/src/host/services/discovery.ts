@@ -30,6 +30,11 @@ export function startDiscoveryForRepo(cwd: string): void {
     },
     started: adoptSession,
     adoptTerminal,
+    remoteMachines: () =>
+      machines
+        .getSnapshot()
+        .machines.filter((m) => !m.isLocal && m.state === 'connected')
+        .map((m) => m.peerId),
     changed(delta) {
       for (const name of delta.endedTerminals) forgetTerminal(name);
       // Named by checkout, which is what a worktree's tab remembers:

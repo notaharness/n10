@@ -158,6 +158,20 @@ it('keeps an ended agent while tmux retains it and forgets it only after the nat
   expect(ports.ended).toHaveBeenCalledExactlyOnceWith(local);
 });
 
+// Its backend stops polling a dead pane, so it keeps saying the session
+// is there; discovery's listing on that machine is the word that it went.
+it('forgets another machine’s retained agent when discovery finds its session gone', async () => {
+  const { service, ports } = fixture();
+  await service.adopt({ name: remote, kind: 'agent', path: '/far/repo' });
+  state.persisted.add(remote);
+  state.exits[0]();
+  expect(service.has(remote)).toBe(true);
+  service.forget(remote);
+  expect(service.has(remote)).toBe(false);
+  expect(state.detach).toHaveBeenCalledExactlyOnceWith(remote);
+  expect(ports.ended).toHaveBeenCalledExactlyOnceWith(remote);
+});
+
 it('ignores an old client’s exit after replacing the same terminal', async () => {
   const { service, ports } = fixture();
   await service.adopt({ name: local, kind: 'shell', path: '/repo' });

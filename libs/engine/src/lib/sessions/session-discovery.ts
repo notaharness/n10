@@ -20,6 +20,12 @@ import {
   type DiscoveryDelta,
   type DiscoveryScan,
 } from '@n10/core';
+import {
+  createMachineScans,
+  endedLocalTerminals,
+  heldTerminals,
+  machineOf,
+} from './terminal-discovery.js';
 
 /** Two batch listings per scan; measured cost and alternatives: docs/decisions.md. */
 const DISCOVERY_INTERVAL_MS = 4_000;
@@ -73,6 +79,9 @@ export interface SessionDiscoveryOptions {
   intervalMs?: number;
   adopt: (worktree: DiscoveredWorktree) => void | Promise<void>;
   adoptTerminal?: (terminal: DiscoveredTerminal) => void | Promise<void>;
+  /** The other machines whose terminals to list beside this machine's:
+   *  the beam peerIds the fleet says are connected. */
+  remoteMachines?: () => readonly string[];
   onChanged: (delta: DiscoveryDelta) => void;
   /** Abandon work between awaits when selection changes, before attaching a stale repo's sessions. */
   isCurrent?: () => boolean;
@@ -209,24 +218,44 @@ export function startSessionDiscovery(
     return adopted;
   }
 
-  function forgetFailuresFor(next: DiscoveryScan): void {
-    const live = new Set(next.terminals.map((t) => t.name));
+  /** Forget the attach failures of `machine`'s names its listing lacks. */
+  function forgetFailures(machine: string, present: ReadonlySet<string>) {
     for (const name of [...failures.keys()]) {
-      if (next.persisted.has(name) || live.has(name)) continue;
+      if (machineOf(name) !== machine || present.has(name)) continue;
       failures.delete(name);
       retired.delete(name);
     }
   }
 
+  const live = () => !stopped && isCurrent();
+  const isAttached = (name: string) =>
+    isSessionAlive(name) && hasSessionConnection(name);
+  const machineScans = createMachineScans({
+    machines: () => (adoptTerminal ? opts.remoteMachines?.() ?? [] : []),
+    live,
+    isAlive: isAttached,
+    isHeld: hasSessionConnection,
+    retired,
+    forgetFailures,
+    adopt: (terminal) => adoptOne(terminal, adoptTerminal ?? (() => undefined)),
+    onChanged,
+  });
+
   async function runScan(): Promise<void> {
-    if (stopped || !isCurrent()) return;
+    if (!live()) return;
+    // Other machines answer when they do, not as part of this scan.
+    void machineScans.scan();
+    const before = heldTerminals(LOCAL_MACHINE);
     const { scan: next, held } = await observe();
-    if (stopped || !isCurrent()) return;
-    forgetFailuresFor(next);
+    if (!live()) return;
+    forgetFailures(
+      LOCAL_MACHINE,
+      new Set([...next.persisted, ...next.terminals.map((t) => t.name)])
+    );
     const delta = diffScans(
       previous,
       next,
-      (name) => isSessionAlive(name) && hasSessionConnection(name),
+      isAttached,
       retired,
       hasSessionConnection
     );
@@ -234,24 +263,8 @@ export function startSessionDiscovery(
     endFinishedStranded(previous, delta);
     // A repo switch starts a fresh scanner, but terminal tabs are process-global.
     // Reconcile held terminal keys too, including final frames from an earlier scan.
-    // The scan sees this machine's tmux only: another machine's terminal
-    // ends when its own connection does.
-    if (adoptTerminal) {
-      const present = new Set(next.terminals.map((terminal) => terminal.name));
-      delta.endedTerminals = [
-        ...new Set([
-          ...delta.endedTerminals,
-          ...sessionNames().filter((name) => {
-            const identity = sessionIdentity(name);
-            return (
-              identity?.kind === 'terminal' &&
-              identity.machine === LOCAL_MACHINE &&
-              !present.has(name)
-            );
-          }),
-        ]),
-      ];
-    }
+    if (adoptTerminal)
+      delta.endedTerminals = endedLocalTerminals(delta, next, before);
     // A first scan has nothing to diff against, so it reports no
     // worktree as appeared; a listing the shell read before it may lack
     // one it sees, and nothing else would have the shell look again.
