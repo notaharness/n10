@@ -1,5 +1,8 @@
 import { isOid } from '@n10/vcs-core';
 import { runGitBytes } from '../utils/git-run.js';
+import { BLOB_IMAGE_MAX_BYTES } from './blob-image-limit.js';
+
+export { BLOB_IMAGE_MAX_BYTES };
 
 /**
  * One side of a changed image, read from the repository by blob id, so
@@ -10,9 +13,6 @@ import { runGitBytes } from '../utils/git-run.js';
  * name, so a renamed or misnamed file is shown as what it is, and
  * anything that is not a raster image the renderer can draw is refused.
  */
-
-/** Past this, a side is not read: it would cross IPC as a data URL. */
-export const BLOB_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
 /** Leading bytes that identify a format, as `[offset, byte]` pairs. */
 const IMAGE_MAGIC: { type: string; signature: [number, number][] }[] = [

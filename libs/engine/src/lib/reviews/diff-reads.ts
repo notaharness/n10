@@ -70,8 +70,8 @@ function manifestCeiling(env: Record<string, string | undefined>) {
 }
 const RESOLUTION_TTL_MS = 30_000;
 const PATCHES_KEPT = 2;
-/** Images on screen at once, both sides: up to 10 MB each as data URLs. */
-const IMAGES_KEPT = 16;
+/** Finished image reads kept: each is up to ~13 MB as a data URL. */
+const IMAGES_KEPT = 2;
 
 /**
  * A pull request's diff at exact commits: a request resolves once to
@@ -109,7 +109,9 @@ export function createDiffReads(
     8,
     (result) => result.ok
   );
-  // A blob id names its bytes forever.
+  // A blob id names its bytes forever, but the renderer caches what it
+  // shows: this joins reads in flight and keeps the last two finished,
+  // for a quick re-read, never every image the reader scrolled past.
   const images = createResourceCache<PrDiffImageResult>(
     Infinity,
     IMAGES_KEPT,

@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
+import { BLOB_IMAGE_MAX_BYTES } from '@n10/core/ui';
 import { useState, type ReactNode } from 'react';
 import type { PrDiffManifestFile } from '../../../../host/contract.js';
 import { keys } from '../../../lib/data/query-keys.js';
 import {
   IMAGE_FRAME_HEIGHT,
-  IMAGE_MAX_BYTES,
   IMAGE_ROW_HEIGHT,
 } from '../../../lib/diff/diff-bodies.js';
+import { readError } from '../../../lib/data/read-state.js';
+import { imageSideView } from '../../../lib/diff/image-side.js';
 import { useInView } from '../../../lib/use-in-view.js';
 import { Skeleton } from '../../ui/skeleton.js';
 import { formatBytes } from './FileBodyNotice.js';
@@ -31,6 +33,7 @@ const RELEASED_IMAGE_MS = 30_000;
 function Frame({ children }: { children: ReactNode }) {
   return (
     <div
+      data-image-frame
       className="flex items-center justify-center overflow-hidden rounded-md border border-border"
       style={{ height: IMAGE_FRAME_HEIGHT, ...CHECKERBOARD }}
     >
@@ -68,7 +71,9 @@ function SideImage({
     gcTime: RELEASED_IMAGE_MS,
   });
   if (image.error) {
-    return <Message>Couldn’t load this image: {image.error.message}</Message>;
+    return (
+      <Message>Couldn’t load this image: {readError(image.error)}</Message>
+    );
   }
   if (!image.data) {
     return (
@@ -116,7 +121,7 @@ function Side({
   inView: boolean;
 }) {
   const [dimensions, setDimensions] = useState<string | null>(null);
-  const tooLarge = bytes !== null && bytes > IMAGE_MAX_BYTES;
+  const view = imageSideView(oid, bytes);
   const caption = [
     label,
     bytes === null ? null : formatBytes(bytes),
@@ -128,11 +133,11 @@ function Side({
         {caption.join(' · ')}
       </figcaption>
       <Frame>
-        {oid === null ? (
+        {view === 'absent' || oid === null ? (
           <Message>{absent}</Message>
-        ) : tooLarge ? (
+        ) : view === 'too-large' ? (
           <Message>
-            Too large to preview (over {formatBytes(IMAGE_MAX_BYTES)}).
+            Too large to preview (over {formatBytes(BLOB_IMAGE_MAX_BYTES)}).
           </Message>
         ) : (
           <SideImage

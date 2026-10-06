@@ -16,7 +16,7 @@ import { disc, gradient } from './setup/png.js';
 
 const BRANCH = 'images';
 /** `IMAGE_ROW_HEIGHT` and `IMAGE_FRAME_HEIGHT` in the renderer. */
-const ROW_HEIGHT = 372;
+const ROW_HEIGHT = 366;
 const FRAME_HEIGHT = 320;
 
 test.use({
@@ -115,7 +115,7 @@ test('shows a changed image’s two sides, each in its own frame', async ({
   const row = await compare.boundingBox();
   expect(Math.round(row!.height)).toBe(ROW_HEIGHT);
   for (const which of ['before', 'after'] as const) {
-    const frame = side(compare, which).locator('figcaption + div');
+    const frame = side(compare, which).locator('[data-image-frame]');
     expect(Math.round((await frame.boundingBox())!.height)).toBe(FRAME_HEIGHT);
   }
 
@@ -157,6 +157,25 @@ test('shows an added image beside nothing, and a deleted one', async ({
     .toBe('32×32');
 });
 
+/** Less than `useInView`'s 200px margin. */
+const LEAD = 100;
+
+/** How far below the bottom of the diff's scroll container `el` starts. */
+function gapBelowScreen(el: Element): number {
+  const scroller = el.closest('[data-diff-scroll]')!;
+  const top =
+    el.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+  return Math.round(top - scroller.clientHeight);
+}
+
+/** Scroll the diff until `el` starts `gap` pixels below its bottom. */
+function scrollShortOf(el: Element, gap: number): void {
+  const scroller = el.closest('[data-diff-scroll]')!;
+  const top =
+    el.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+  scroller.scrollTop += top - scroller.clientHeight - gap;
+}
+
 test('reads an image only once its frame nears the screen', async ({
   desktop,
 }) => {
@@ -191,7 +210,10 @@ test('reads an image only once its frame nears the screen', async ({
   ).toBeAttached();
   await expect(side(last, 'after').getByRole('img')).toHaveCount(0);
 
-  await last.scrollIntoViewIfNeeded();
+  // Short of the screen, by less than the margin a read starts at: the
+  // margin reaches past the diff's own scroll container, not only the
+  // window's, which the container clips it to.
+  await last.evaluate(scrollShortOf, LEAD);
   await expect
     .poll(() =>
       decoded(
@@ -199,4 +221,52 @@ test('reads an image only once its frame nears the screen', async ({
       )
     )
     .toBe('24×24');
+  expect(await last.evaluate(gapBelowScreen)).toBe(LEAD);
+  await expect(last).not.toBeInViewport();
+});
+
+test('shows a binary file by its old image name, and refuses one that is not an image', async ({
+  desktop,
+}) => {
+  const { page, repoPath, homeDir } = desktop;
+  const logo = disc(48, [...RED]);
+  seedMain(repoPath, { 'logo.png': logo });
+  const worktree = worktreeOf(repoPath);
+  // Renamed to a name no image has, its bytes nearly the same so git
+  // pairs the two: shown as images, and sized as them from the start.
+  rmSync(join(worktree, 'logo.png'));
+  writeFileSync(
+    join(worktree, 'logo.dat'),
+    Buffer.concat([logo, Buffer.from('trailing')])
+  );
+  // Named as an image, binary to git, but no image format's bytes.
+  writeFileSync(join(worktree, 'fake.png'), Buffer.from('not an image\0junk'));
+  commitBranch(repoPath, 'rename and fake');
+
+  await pushAndOpen(page, homeDir);
+
+  const fake = compareOf(page, 'fake.png');
+  await expect(fake).toBeVisible({ timeout: 30_000 });
+  await expect(side(fake, 'after')).toContainText(
+    'Can’t show this image: not an image format n10 shows'
+  );
+  await expect(side(fake, 'after').getByRole('img')).toHaveCount(0);
+
+  const renamed = compareOf(page, 'logo.dat');
+  await renamed.scrollIntoViewIfNeeded();
+  expect(Math.round((await renamed.boundingBox())!.height)).toBe(ROW_HEIGHT);
+  await expect
+    .poll(() =>
+      decoded(
+        side(renamed, 'before').getByRole('img', { name: 'Before: logo.png' })
+      )
+    )
+    .toBe('48×48');
+  await expect
+    .poll(() =>
+      decoded(
+        side(renamed, 'after').getByRole('img', { name: 'After: logo.dat' })
+      )
+    )
+    .toBe('48×48');
 });

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { DiffLine } from '@n10/diff';
-import type { RemoteCommentThread } from '../../../host/contract.js';
+import type {
+  PrDiffManifestFile,
+  RemoteCommentThread,
+} from '../../../host/contract.js';
 import type { InlineTarget } from '../review/my-drafts.js';
-import { IMAGE_ROW_HEIGHT, type FileBody } from './diff-bodies.js';
+import { bodyOf, IMAGE_ROW_HEIGHT, type FileBody } from './diff-bodies.js';
 import { filesOnScreen, noticeRow, type FileStats } from './diff-rows-model.js';
 import { buildFlatDiff, type FlatRow } from './diff-virtual.js';
 
@@ -187,16 +190,37 @@ describe('the files on screen', () => {
 
 describe('an image’s notice row', () => {
   const stats = { adds: null, dels: null } as unknown as FileStats;
-  const binary: FileBody = { state: 'no-text', reason: 'binary' };
+  /** A binary file's body, as the reads give it. */
+  const binaryBody = (path: string, oldPath = path): FileBody =>
+    bodyOf(
+      {
+        path,
+        oldPath,
+        status: path === oldPath ? 'modified' : 'renamed',
+        kind: 'binary',
+        additions: null,
+        deletions: null,
+        oldSize: 100,
+        newSize: 100,
+      } as PrDiffManifestFile,
+      null
+    );
 
   it('is the height of its frames from the start', () => {
-    expect(noticeRow('logo.png', stats, binary)).toMatchObject({
+    expect(noticeRow('logo.png', stats, binaryBody('logo.png'))).toMatchObject({
       estimate: IMAGE_ROW_HEIGHT,
     });
   });
 
+  it('is its frames’ height when only its old name is an image’s', () => {
+    // It shows as images (`showsImages`), so it is sized as them.
+    expect(
+      noticeRow('logo.dat', stats, binaryBody('logo.dat', 'logo.png'))
+    ).toMatchObject({ estimate: IMAGE_ROW_HEIGHT });
+  });
+
   it('is a notice’s height for any other binary file', () => {
-    expect(noticeRow('blob.bin', stats, binary)).toMatchObject({
+    expect(noticeRow('blob.bin', stats, binaryBody('blob.bin'))).toMatchObject({
       estimate: 36,
     });
     expect(noticeRow('logo.png', stats, { state: 'loading' })).toMatchObject({

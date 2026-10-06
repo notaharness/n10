@@ -56,8 +56,14 @@ export type FileBody =
   /** Lines to show. `changes` is a large file read by its changes. */
   | { state: 'loaded'; lines: DiffLine[]; scope: LargeScope }
   | { state: 'loading' }
-  /** git has no lines for it: nothing to read. */
-  | { state: 'no-text'; reason: 'binary' | 'no-content-changes' }
+  /** git has no lines for it: nothing to read. `images`: binary content
+   *  shown as its two sides (`showsImages`), the one test both the row's
+   *  height and what renders in it go by. */
+  | {
+      state: 'no-text';
+      reason: 'binary' | 'no-content-changes';
+      images?: true;
+    }
   /** Too big to read unasked; `bytes` is its larger side. */
   | { state: 'large'; bytes: number }
   /** `cut`: its batch's read stopped before it; read alone, it may fit. */
@@ -108,11 +114,13 @@ export function showsImages(file: PrDiffManifestFile): boolean {
 /** Each side's frame, fixed before either image is read so nothing
  *  below moves when one arrives. */
 export const IMAGE_FRAME_HEIGHT = 320;
+/** A side's caption: one `text-xs` line (16) and its `mb-1.5` (6). */
+const IMAGE_CAPTION_HEIGHT = 16 + 6;
+/** The row's `py-3`. */
+const IMAGE_ROW_PADDING = 2 * 12;
 /** The frame, its caption and the row's padding. */
-export const IMAGE_ROW_HEIGHT = IMAGE_FRAME_HEIGHT + 52;
-/** The host's ceiling on a side it reads (core's `BLOB_IMAGE_MAX_BYTES`):
- *  a larger one is not asked for. */
-export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+export const IMAGE_ROW_HEIGHT =
+  IMAGE_ROW_PADDING + IMAGE_CAPTION_HEIGHT + IMAGE_FRAME_HEIGHT;
 
 export function isLarge(file: PrDiffManifestFile): boolean {
   return noTextReason(file) === null && fileBytes(file) > LARGE_FILE_BYTES;
@@ -236,7 +244,11 @@ export function bodyOf(
   read: BatchRead | null
 ): FileBody {
   const reason = noTextReason(file);
-  if (reason) return { state: 'no-text', reason };
+  if (reason) {
+    return showsImages(file)
+      ? { state: 'no-text', reason, images: true }
+      : { state: 'no-text', reason };
+  }
   if (read === null) return { state: 'large', bytes: fileBytes(file) };
   if (read.status === 'error') return { state: 'error', message: read.message };
   if (read.status !== 'success') return { state: 'loading' };

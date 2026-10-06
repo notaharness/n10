@@ -305,6 +305,19 @@ describe('image', () => {
     expect(readBlobImage).toHaveBeenCalledWith('/repo/a', OID);
   });
 
+  it('keeps only the last few images, which the renderer caches', async () => {
+    vi.mocked(readBlobImage).mockResolvedValue({ ok: true, image });
+    const diff = reads();
+    const oids = ['1', '2', '3'].map((c) => c.repeat(40));
+    for (const oid of oids) {
+      await readResourceValue(diff.image({ repo: '/repo/a', oid }));
+    }
+    await readResourceValue(diff.image({ repo: '/repo/a', oid: oids[2] }));
+    expect(readBlobImage).toHaveBeenCalledTimes(3);
+    await readResourceValue(diff.image({ repo: '/repo/a', oid: oids[0] }));
+    expect(readBlobImage).toHaveBeenCalledTimes(4);
+  });
+
   it('reads a refusal again rather than keeping it', async () => {
     vi.mocked(readBlobImage).mockResolvedValue({
       ok: false,

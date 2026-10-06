@@ -16,7 +16,7 @@ import {
   usePostDrafts,
   useUpdateDraft,
 } from '../../../lib/data/mutations.js';
-import { showsImages, type FileBody } from '../../../lib/diff/diff-bodies.js';
+import type { FileBody } from '../../../lib/diff/diff-bodies.js';
 import { useRepo } from '../../../lib/repo-context.js';
 import { useTabView } from '../../../lib/tabs/tab-views.js';
 import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
@@ -179,7 +179,7 @@ function UnreadCode({
   const { path } = file;
   return (
     <div className="overflow-hidden rounded-md border border-border bg-muted/30">
-      {body.state === 'no-text' && showsImages(file) ? (
+      {body.state === 'no-text' && body.images ? (
         <ImageCompare cwd={prDiff.cwd} file={file} />
       ) : (
         <FileBodyNotice
