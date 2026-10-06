@@ -28,14 +28,6 @@ async function launchKeysAgent(page: Page) {
   });
 }
 
-async function pressAndRead(page: Page, key: string, bytes: string) {
-  await focusTerminal(page);
-  await page.keyboard.press(key);
-  await expect(visibleText(page, `key:${bytes}`)).toBeVisible({
-    timeout: 15_000,
-  });
-}
-
 test.describe('Modified keys in the terminal', () => {
   test.use({ n10Config: { aiCommand: fakeAgent({ keys: true }) } });
 
@@ -53,10 +45,15 @@ test.describe('Modified keys in the terminal', () => {
     const { page } = desktop;
     await launchKeysAgent(page);
 
-    // The unmodified key first, so a pass below is not the fake agent
-    // printing something for every press.
-    await pressAndRead(page, 'ArrowLeft', '\\e[D');
-    for (const [key, bytes] of cases) await pressAndRead(page, key, bytes);
+    // The unmodified key first, so a pass is not the fake agent printing
+    // something for every press.
+    for (const [key, bytes] of [['ArrowLeft', '\\e[D'], ...cases]) {
+      await focusTerminal(page);
+      await page.keyboard.press(key);
+      await expect(visibleText(page, `key:${bytes}`)).toBeVisible({
+        timeout: 15_000,
+      });
+    }
   });
 
   test('Tab after Escape reaches the agent', async ({ desktop }) => {
