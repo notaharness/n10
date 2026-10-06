@@ -20,7 +20,9 @@ import { MyDraftCard } from '../comments/MyDraftCard.js';
 import { DiffFileHeader } from './DiffFileHeader.js';
 import { FoldRow, HunkRow, SplitCell, UnifiedRow } from './diff-rows.js';
 import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
+import { showsImages } from '../../../lib/diff/diff-bodies.js';
 import { FileBodyNotice } from './FileBodyNotice.js';
+import { ImageCompare } from './ImageCompare.js';
 import type { GutterProps } from './LineGutter.js';
 
 /** Everything a row of the virtual diff draws from. */
@@ -122,6 +124,9 @@ function FileNoticeRow({
   const file = ctx.manifest.get(row.file);
   const body = prDiff?.bodies.get(row.file);
   if (!file || !body || !prDiff) return null;
+  if (body.state === 'no-text' && showsImages(file)) {
+    return <ImageCompare cwd={prDiff.cwd} file={file} />;
+  }
   return (
     <FileBodyNotice
       file={file}

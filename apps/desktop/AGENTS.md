@@ -149,7 +149,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
   (`lib/diff/diff-model.ts`). A PR lists every file from the engine's manifest first
   and reads bodies in batches as they come into view
   (`lib/diff/diff-bodies.ts`), holding a bounded set (`lib/review/pr-diff-reads.ts`);
-  a file past 2 MiB waits to be asked for. Single-file
+  a file past 2 MiB waits to be asked for. A binary image shows its two
+  sides (`diff/ImageCompare.tsx`), each read by the manifest's blob id
+  (`fetchPrDiffImage`) only once its frame, sized before any read, nears
+  the screen; a worktree's diff has no blob ids and shows none. Single-file
   mode (`lib/diff/single-file.ts`) is a view of the same list, never a second
   model. A PR diffs the exact commits the engine's review reads resolve
   from the provider's head (`lib/review/use-pr-diff.ts`), never the local branch.

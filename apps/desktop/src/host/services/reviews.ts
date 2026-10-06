@@ -33,6 +33,10 @@ export function getPrDiffManifest(req: unknown) {
 export function getPrDiffPatch(req: unknown) {
   return readResourceValue(activeReviewService().diff.patch(req));
 }
+/** One side of a changed image, by blob id. */
+export function getPrDiffImage(req: unknown) {
+  return readResourceValue(activeReviewService().diff.image(req));
+}
 /** Two revisions resolved to exact commits, and every file changed
  *  between them. */
 export function getPrRangeManifest(req: unknown) {

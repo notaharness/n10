@@ -79,6 +79,41 @@ export function noTextReason(
   return null;
 }
 
+/** File names whose binary content the diff shows as pictures: the
+ *  formats the host recognises by their leading bytes. */
+const IMAGE_EXTENSIONS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'bmp',
+  'ico',
+]);
+
+export function isImagePath(path: string): boolean {
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  const dot = name.lastIndexOf('.');
+  return dot > 0 && IMAGE_EXTENSIONS.has(name.slice(dot + 1).toLowerCase());
+}
+
+/** A binary file shown as its two images instead of a notice. */
+export function showsImages(file: PrDiffManifestFile): boolean {
+  return (
+    file.kind === 'binary' &&
+    (isImagePath(file.path) || isImagePath(file.oldPath))
+  );
+}
+
+/** Each side's frame, fixed before either image is read so nothing
+ *  below moves when one arrives. */
+export const IMAGE_FRAME_HEIGHT = 320;
+/** The frame, its caption and the row's padding. */
+export const IMAGE_ROW_HEIGHT = IMAGE_FRAME_HEIGHT + 52;
+/** The host's ceiling on a side it reads (core's `BLOB_IMAGE_MAX_BYTES`):
+ *  a larger one is not asked for. */
+export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+
 export function isLarge(file: PrDiffManifestFile): boolean {
   return noTextReason(file) === null && fileBytes(file) > LARGE_FILE_BYTES;
 }

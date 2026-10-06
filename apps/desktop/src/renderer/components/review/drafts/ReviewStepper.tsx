@@ -16,13 +16,14 @@ import {
   usePostDrafts,
   useUpdateDraft,
 } from '../../../lib/data/mutations.js';
-import type { FileBody } from '../../../lib/diff/diff-bodies.js';
+import { showsImages, type FileBody } from '../../../lib/diff/diff-bodies.js';
 import { useRepo } from '../../../lib/repo-context.js';
 import { useTabView } from '../../../lib/tabs/tab-views.js';
 import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
 import { errorMessage } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { FileBodyNotice } from '../diff/FileBodyNotice.js';
+import { ImageCompare } from '../diff/ImageCompare.js';
 import { StepCard } from './ReviewStepCard.js';
 
 /**
@@ -178,14 +179,18 @@ function UnreadCode({
   const { path } = file;
   return (
     <div className="overflow-hidden rounded-md border border-border bg-muted/30">
-      <FileBodyNotice
-        file={file}
-        body={body}
-        estimate={56}
-        onReadAlone={(scope) => prDiff.readAlone(path, scope)}
-        onRetry={() => prDiff.retryFile(path)}
-        focusAfter={focusAfter}
-      />
+      {body.state === 'no-text' && showsImages(file) ? (
+        <ImageCompare cwd={prDiff.cwd} file={file} />
+      ) : (
+        <FileBodyNotice
+          file={file}
+          body={body}
+          estimate={56}
+          onReadAlone={(scope) => prDiff.readAlone(path, scope)}
+          onRetry={() => prDiff.retryFile(path)}
+          focusAfter={focusAfter}
+        />
+      )}
     </div>
   );
 }

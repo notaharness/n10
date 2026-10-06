@@ -69,6 +69,7 @@ vi.mock('./services/reviews.js', () =>
     'getReviewViewer',
     'getPrDiffManifest',
     'getPrDiffPatch',
+    'getPrDiffImage',
     'getPrRangeManifest',
   ])
 );
@@ -270,6 +271,7 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     [{ repo: '/r', mergeBaseOid: 'a', headOid: 'b' }],
     'reviews.getPrDiffPatch',
   ],
+  ['fetchPrDiffImage', [{ repo: '/r', oid: 'a' }], 'reviews.getPrDiffImage'],
   [
     'fetchPrRangeManifest',
     [{ repo: '/r', from: 'a', to: 'b', target: 'c' }],

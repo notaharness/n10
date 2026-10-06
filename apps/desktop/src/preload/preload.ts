@@ -136,6 +136,7 @@ const api: N10HostApi = {
   fetchPrDiffManifest: (req) =>
     ipcRenderer.invoke(IPC.fetchPrDiffManifest, req),
   fetchPrDiffPatch: (req) => ipcRenderer.invoke(IPC.fetchPrDiffPatch, req),
+  fetchPrDiffImage: (req) => ipcRenderer.invoke(IPC.fetchPrDiffImage, req),
   fetchPrRangeManifest: (req) =>
     ipcRenderer.invoke(IPC.fetchPrRangeManifest, req),
 
@@ -177,7 +178,8 @@ const api: N10HostApi = {
 
   listMachines: () => ipcRenderer.invoke(IPC.listMachines),
   getBeamStatus: () => ipcRenderer.invoke(IPC.getBeamStatus),
-  setNetworkOnline: (online) => ipcRenderer.invoke(IPC.setNetworkOnline, online),
+  setNetworkOnline: (online) =>
+    ipcRenderer.invoke(IPC.setNetworkOnline, online),
   onBeamStatusChanged: (cb) => {
     const listener = (_e: unknown, payload: FleetStatus) => cb(payload);
     ipcRenderer.on(MACHINES_EVENTS.beamStatus, listener);

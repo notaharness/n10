@@ -5,9 +5,11 @@ import type { PrDiffManifestFile } from '../../../host/contract.js';
 import {
   aloneBatch,
   bodyOf,
+  isImagePath,
   LARGE_FILE_BYTES,
   mispaired,
   planBatches,
+  showsImages,
   type BatchRead,
 } from './diff-bodies.js';
 
@@ -258,5 +260,38 @@ describe('bodyOf', () => {
     expect(
       bodyOf(manifestFile('i', { kind: 'binary', additions: null }), null)
     ).toEqual({ state: 'no-text', reason: 'binary' });
+  });
+});
+
+describe('images', () => {
+  it.each([
+    ['logo.png', true],
+    ['assets/Photo.JPEG', true],
+    ['a/b.c/icon.ico', true],
+    ['anim.gif', true],
+    ['x.webp', true],
+    ['x.bmp', true],
+    ['drawing.svg', false],
+    ['.png', false],
+    ['dir.png/file', false],
+    ['png', false],
+  ])('%s is an image path: %s', (path, image) => {
+    expect(isImagePath(path)).toBe(image);
+  });
+
+  it('shows a binary file with an image name, by either of its paths', () => {
+    expect(showsImages(manifestFile('a.png', { kind: 'binary' }))).toBe(true);
+    expect(
+      showsImages(
+        manifestFile('a.dat', {
+          kind: 'binary',
+          oldPath: 'a.png',
+          status: 'renamed',
+        })
+      )
+    ).toBe(true);
+    expect(showsImages(manifestFile('a.bin', { kind: 'binary' }))).toBe(false);
+    // Text git can diff keeps its lines, whatever it is called.
+    expect(showsImages(manifestFile('a.png'))).toBe(false);
   });
 });

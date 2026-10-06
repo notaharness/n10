@@ -1,12 +1,15 @@
 import {
   fetchRefs,
   fetchWorktreeDiffText,
+  readBlobImage,
   readPrDiffManifest,
   readPrDiffPatch,
   resolvePrComparison,
   readRevisionRangeManifest,
 } from '@n10/core';
 import type {
+  BlobImage,
+  BlobImageError,
   PrComparison,
   PrComparisonError,
   PrDiffManifest,
@@ -18,15 +21,18 @@ import type { WorktreeService } from '../worktrees/api.js';
 import { createResourceCache } from './resource-cache.js';
 import { readResourceValue } from './read-resource.js';
 import {
+  parseImageRequest,
   parseManifestRequest,
   parsePatchRequest,
   parseRangeRequest,
+  type PrDiffImageRequest,
   type PrDiffManifestRequest,
   type PrDiffPatchRequest,
   type PrRangeManifestRequest,
 } from './diff-requests.js';
 
 export type {
+  PrDiffImageRequest,
   PrDiffManifestRequest,
   PrDiffPatchRequest,
   PrRangeManifestRequest,
@@ -47,6 +53,9 @@ export type PrRangeManifestResult =
 export type PrDiffPatchResult =
   | { ok: true; patch: PrDiffPatch }
   | { ok: false; error: RepoChangedError };
+export type PrDiffImageResult =
+  | { ok: true; image: BlobImage }
+  | { ok: false; error: BlobImageError | RepoChangedError };
 
 const TARGET_FETCH_TTL_MS = 5 * 60 * 1000;
 
@@ -61,6 +70,8 @@ function manifestCeiling(env: Record<string, string | undefined>) {
 }
 const RESOLUTION_TTL_MS = 30_000;
 const PATCHES_KEPT = 2;
+/** Images on screen at once, both sides: up to 10 MB each as data URLs. */
+const IMAGES_KEPT = 16;
 
 /**
  * A pull request's diff at exact commits: a request resolves once to
@@ -98,6 +109,12 @@ export function createDiffReads(
     8,
     (result) => result.ok
   );
+  // A blob id names its bytes forever.
+  const images = createResourceCache<PrDiffImageResult>(
+    Infinity,
+    IMAGES_KEPT,
+    (result) => result.ok
+  );
   const live = createResourceCache<string>(1_000, 2);
   const changed = (asked: string): RepoChangedError | null =>
     asked === repo && isCurrent()
@@ -130,7 +147,7 @@ export function createDiffReads(
       }
     );
   }
-  const caches = [manifests, listings, patches, ranges, live];
+  const caches = [manifests, listings, patches, ranges, images, live];
   return {
     /** Resolve a pull request to commits and list every changed file.
      *  Failures that describe the pull request are data. Branches are
@@ -168,6 +185,20 @@ export function createDiffReads(
           });
           const after = changed(asked);
           return after ? { ok: false, error: after } : { ok: true, patch };
+        }
+      );
+    },
+    /** One side of a changed image, by blob id. */
+    image(value: unknown) {
+      const { repo: asked, oid } = parseImageRequest(value);
+      return images.get(
+        JSON.stringify([asked, oid]),
+        async (): Promise<PrDiffImageResult> => {
+          const before = changed(asked);
+          if (before) return { ok: false, error: before };
+          const result = await readBlobImage(repo, oid);
+          const after = changed(asked);
+          return after ? { ok: false, error: after } : result;
         }
       );
     },

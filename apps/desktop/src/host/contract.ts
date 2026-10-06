@@ -78,6 +78,8 @@ import type {
 // Pull request diffs at exact commits.
 export type * from './contract-diff.js';
 import type {
+  PrDiffImageRequest,
+  PrDiffImageResult,
   PrDiffManifestRequest,
   PrDiffManifestResult,
   PrDiffPatchRequest,
@@ -549,6 +551,9 @@ export interface N10HostApi {
   ): Promise<PrDiffManifestResult>;
   /** The patch between a resolved comparison's commits. */
   fetchPrDiffPatch(req: PrDiffPatchRequest): Promise<PrDiffPatchResult>;
+  /** One side of a changed image, by the blob id the manifest lists,
+   *  as a data URL. Too large or not an image is data. */
+  fetchPrDiffImage(req: PrDiffImageRequest): Promise<PrDiffImageResult>;
   /** Two revisions resolved to exact commits — fetched by id when the
    *  clone lacks one — and every file changed from one to the other. A
    *  revision nowhere to be had is data. */
@@ -691,6 +696,7 @@ export const IPC = {
   fetchWorktreeDiffText: 'n10/diff/worktree-text',
   fetchPrDiffManifest: 'n10/diff/pr-manifest',
   fetchPrDiffPatch: 'n10/diff/pr-patch',
+  fetchPrDiffImage: 'n10/diff/pr-image',
   fetchPrRangeManifest: 'n10/diff/pr-range-manifest',
   openExternal: 'n10/shell/open-external',
   showContextMenu: 'n10/shell/context-menu',
