@@ -47,6 +47,7 @@ import { useTerminalTabs } from '../lib/terminals/use-terminal-tabs.js';
 import { NewTerminalDialog } from '../components/terminal/NewTerminalDialog.js';
 import { setThemePreference, type ThemePreference } from '../lib/theme.js';
 import { errorMessage } from '../lib/utils.js';
+import { usePaneWidth } from '../lib/use-pane-width.js';
 import { useHostEvents } from './use-host-events.js';
 
 const SIDEBAR_KEY = 'n10.sidebar.hidden';
@@ -124,6 +125,7 @@ function WorkspaceInner({
   const [sidebarHidden, setSidebarHidden] = useState(
     () => localStorage.getItem(SIDEBAR_KEY) === '1'
   );
+  const sidebarWidth = usePaneWidth('n10.sidebar.width', 280);
 
   const toggleSidebar = () =>
     setSidebarHidden((h) => {
@@ -280,12 +282,15 @@ function WorkspaceInner({
           orientation="horizontal"
           className="min-h-0 flex-1"
           id="workspace"
+          onLayoutChanged={sidebarWidth.onLayoutChanged}
         >
           {!sidebarHidden && (
             <>
               <Panel
                 id="sidebar"
-                defaultSize="280px"
+                panelRef={sidebarWidth.panelRef}
+                defaultSize={sidebarWidth.defaultSize}
+                groupResizeBehavior="preserve-pixel-size"
                 minSize="200px"
                 maxSize="45%"
                 className="min-w-0"
@@ -299,7 +304,11 @@ function WorkspaceInner({
                   onCollapse={toggleSidebar}
                 />
               </Panel>
-              <PanelSeparator className="relative w-px bg-border transition-colors after:absolute after:inset-y-0 after:-left-1 after:w-2 hover:bg-primary data-[resize-handle-state=drag]:bg-primary" />
+              <PanelSeparator
+                disableDoubleClick
+                onDoubleClick={sidebarWidth.onReset}
+                className="relative w-px bg-border transition-colors after:absolute after:inset-y-0 after:-left-1 after:w-2 hover:bg-primary data-[resize-handle-state=drag]:bg-primary"
+              />
             </>
           )}
           <Panel id="editor" minSize="40%" className="min-w-0">
