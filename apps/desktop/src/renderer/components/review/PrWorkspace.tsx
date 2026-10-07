@@ -13,6 +13,7 @@ import { keys } from '../../lib/data/query-keys.js';
 import { useReadState } from '../../lib/data/use-read-state.js';
 import { refocusAfter } from '../../lib/focus.js';
 import { useRepo } from '../../lib/repo-context.js';
+import { usePaneWidth } from '../../lib/use-pane-width.js';
 import type { AttentionAction } from '../../lib/review/overview-model.js';
 import { useCommentNavigator } from '../../lib/review/use-comment-navigator.js';
 import { useDiffShown } from '../../lib/review/use-diff-shown.js';
@@ -155,6 +156,7 @@ export function PrWorkspace({
   });
 
   const rail = useReviewRail(nav, comments, rootRef);
+  const railWidth = usePaneWidth('review-rail', 270);
   const { showUnresolved } = rail;
   const { scrollRef } = nav;
   // The pressed button goes hidden with the Overview, so focus follows
@@ -219,12 +221,19 @@ export function PrWorkspace({
       <div className="flex min-h-0 min-w-0 flex-1">
         {rail.hidden && <CollapsedRail onShow={() => rail.setHidden(false)} />}
 
-        <Group orientation="horizontal" className="min-h-0 min-w-0 flex-1">
+        <Group
+          orientation="horizontal"
+          className="min-h-0 min-w-0 flex-1"
+          onLayoutChanged={railWidth.onLayoutChanged}
+        >
           {!rail.hidden && (
             <>
               <Panel
-                id="review-rail"
-                defaultSize="270px"
+                id={railWidth.id}
+                panelRef={railWidth.panelRef}
+                elementRef={railWidth.elementRef}
+                defaultSize={railWidth.defaultSize}
+                groupResizeBehavior="preserve-pixel-size"
                 minSize="200px"
                 maxSize="45%"
                 className="min-w-0"
@@ -255,7 +264,11 @@ export function PrWorkspace({
                   onSelectFile={nav.jumpToFile}
                 />
               </Panel>
-              <PanelSeparator className="relative w-px bg-border transition-colors after:absolute after:inset-y-0 after:-left-1 after:w-2 hover:bg-primary data-[resize-handle-state=drag]:bg-primary" />
+              <PanelSeparator
+                disableDoubleClick
+                onDoubleClick={railWidth.onReset}
+                className="relative w-px bg-border transition-colors after:absolute after:inset-y-0 after:-left-1 after:w-2 hover:bg-primary data-[resize-handle-state=drag]:bg-primary"
+              />
             </>
           )}
 
