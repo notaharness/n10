@@ -31,6 +31,7 @@ export type { SettingsField } from './lib/settings/fields.js';
 export {
   persistConfigField,
   persistKeybindFields,
+  withKeybindOverride,
 } from './lib/settings/persistence.js';
 export type { KeybindFields } from './lib/settings/persistence.js';
 
