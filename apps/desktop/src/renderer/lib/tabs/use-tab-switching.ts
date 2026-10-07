@@ -9,17 +9,18 @@ import { useTabs } from './tabs.js';
  * desktop shortcuts (Ctrl+PgDn/PgUp positional, Ctrl+Tab/Ctrl+Shift+Tab
  * positional or most-recently-used per the `tabCycleMru` pref). Mount
  * it above the repository gate, beside the strip; `tab-switching.ts`
- * holds the order and the listeners.
+ * holds the order and the listeners. `enabled` is false while no
+ * repository is open, when the strip is not on screen.
  */
-export function useTabSwitching(): void {
+export function useTabSwitching(enabled: boolean): void {
   const tabs = useTabs();
   const bindings = useDesktopBindings();
   const { tabCycleMru } = useDesktopPrefs();
-  const latest = useRef({ tabs, bindings, tabCycleMru });
+  const latest = useRef({ tabs, bindings, tabCycleMru, enabled });
 
   const tabIds = tabs.tabs.map((t) => t.id).join('\n');
   useEffect(() => {
-    latest.current = { tabs, bindings, tabCycleMru };
+    latest.current = { tabs, bindings, tabCycleMru, enabled };
   });
   useEffect(() => {
     noteStrip(tabIds ? tabIds.split('\n') : [], tabs.activeId);
@@ -28,6 +29,7 @@ export function useTabSwitching(): void {
   useEffect(
     () =>
       listenForTabSwitching(window, {
+        enabled: () => latest.current.enabled,
         bindings: () => latest.current.bindings,
         byRecentUse: () => latest.current.tabCycleMru,
         recording: isRecordingShortcut,

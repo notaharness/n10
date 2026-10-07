@@ -99,8 +99,9 @@ function Gate() {
   // A tab from another repository is shown by opening that repository.
   useRepoFollowsTabs(repo?.cwd ?? null, openRepoAsync);
   // Above the workspace, which a repository switch remounts: a walk
-  // onto another repository's tab is what switches it.
-  useTabSwitching();
+  // onto another repository's tab is what switches it. Off on the
+  // repository picker and while connecting, where no strip is shown.
+  useTabSwitching(Boolean(repo));
 
   const pickRepoFolder = useCallback(() => {
     window.n10

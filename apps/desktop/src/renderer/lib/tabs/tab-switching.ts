@@ -23,6 +23,10 @@ let mru: TabMru = EMPTY_MRU;
 
 /** What a key press needs to know about the app, read at press time. */
 export interface TabSwitchingDeps {
+  /** A repository is open and the strip on screen. On the repository
+   *  picker or while connecting, the keys do nothing and the order and
+   *  any walk are left as they are. */
+  enabled(): boolean;
   bindings(): DesktopBindings;
   /** Ctrl+Tab walks by recent use (the `tabCycleMru` pref). */
   byRecentUse(): boolean;
@@ -91,7 +95,7 @@ function commit(): void {
 }
 
 function onKeyDown(e: KeyEvent, deps: TabSwitchingDeps): void {
-  if (deps.recording() || inModal(e.target)) return;
+  if (!deps.enabled() || deps.recording() || inModal(e.target)) return;
   const action = resolveDesktopAction(e, deps.bindings());
   if (!action) return;
   e.preventDefault();

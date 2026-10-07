@@ -543,9 +543,14 @@ neighbour in the direction pressed rather than back to the front.
 Recording refuses a chord without Ctrl or Alt (it would be taken from every
 text box and terminal), one of the app's own shortcuts (`host/app-shortcuts.ts`,
 the list the native menu's accelerators and the shortcuts dialog are built
-from) and another tab action's. While recording, the window ignores menu
-accelerators (`webContents.setIgnoreMenuShortcuts`), so Ctrl+W reaches the
-recorder instead of closing Settings. Nothing pushes config changes to the
+from), the page's own chords (find in diff, the tab lift) and another tab
+action's. On macOS the menu holds Cmd, which no tab shortcut can, so only the
+page's chords that answer to Ctrl as well are refused there. While recording,
+the window ignores menu accelerators (`webContents.setIgnoreMenuShortcuts`), so
+Ctrl+W reaches the recorder instead of closing Settings; Electron keeps that on
+the webContents across a reload, so main releases it whenever a page starts
+loading. The shortcuts do nothing while no repository is open (the picker,
+connecting), leaving the order and any walk as they were. Nothing pushes config changes to the
 renderer, so the bindings are read again when the window comes to the front
 and when Settings → Keyboard opens; a read begun before a write is dropped.
 

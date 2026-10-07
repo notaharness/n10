@@ -39,11 +39,13 @@ function keyEvent(type: string, key: string, mods: Keys = {}): Event {
 class Strip {
   ids = ['a', 'b', 'c', 'd'];
   active = 'a';
+  enabled = true;
   byRecentUse = true;
   recording = false;
   bindings: DesktopBindings = desktopBindings(undefined);
 
   deps: TabSwitchingDeps = {
+    enabled: () => this.enabled,
     bindings: () => this.bindings,
     byRecentUse: () => this.byRecentUse,
     recording: () => this.recording,
@@ -134,6 +136,20 @@ describe('keyboard tab switching', () => {
     const e = press('Tab', { ctrl: true });
     expect(strip.active).toBe('d');
     expect(e.defaultPrevented).toBe(false);
+  });
+
+  it('does nothing while no repository is open, and keeps the order', () => {
+    press('Tab', { ctrl: true }); // a walk, on c
+    const before = currentMru();
+    strip.enabled = false; // back on the repository picker
+    const e = press('Tab', { ctrl: true });
+    press('PageDown', { ctrl: true });
+    expect(strip.active).toBe('c');
+    expect(e.defaultPrevented).toBe(false);
+    expect(currentMru()).toBe(before);
+    strip.enabled = true;
+    press('Tab', { ctrl: true });
+    expect(strip.active).toBe('b'); // the same walk carries on
   });
 
   it('commits a walk when the window loses focus', () => {
