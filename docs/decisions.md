@@ -800,6 +800,13 @@ cleaning conflicts. Playwright and Nx must agree on artifact output paths.
 Pin desktop and wterm-host packages to the same exact wterm version. Separate
 copies have incompatible constructor identities for `instanceof`. Import CSS
 from `@wterm/dom/css`; the React package's relative CSS import depends on hoisting.
+wterm drops DECSET 1003 (any-motion mouse tracking): its WASM ignores the mode
+and its input handler reports motion only with a button held. The desktop
+renderer rewrites 1003 to 1002 on the way in, so wterm still reports presses
+and drags, and reports button-less motion itself, once per cell. A terminal
+that mounts from a ring-buffer snapshot no longer holding the app's mode
+sequence starts with no mouse tracking until the app sets it again; tmux
+repeats modes only on attach or when they change.
 For pasted images, the host chooses the temporary-file suffix from its own MIME
 table and inserts the path into the PTY; text paste stays with wterm.
 

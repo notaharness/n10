@@ -202,6 +202,11 @@ Every rule below has its reasoning in `docs/decisions.md`.
   full repaint only when the snapshot is `truncated`. `paneTerminalGrid`
   measures a hidden `.wterm` inside `[data-terminal-pane]` for the launch
   estimate.
+- Output reaches wterm only through `lib/terminals/mouse-modes.ts`: wterm
+  drops any-motion mouse tracking (DECSET 1003), so 1003 is handed to it as
+  1002 and `components/terminal/terminal-mouse.ts` reports motion with no
+  button held. That file also owns the `mouse-reporting` class (arrow
+  pointer) on the terminal's wrapper.
 - A terminal exit event carries `retained`: retained agent tabs stay open
   for viewing and restart. `dropEnded` closes a terminal tab a defined
   listing omits; `undefined` means not asked yet.

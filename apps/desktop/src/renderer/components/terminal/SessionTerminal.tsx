@@ -11,6 +11,11 @@ import {
   sessionFeed,
   type SessionFeed,
 } from '../../lib/terminals/session-feed.js';
+import {
+  mouseModes,
+  type MouseModes,
+} from '../../lib/terminals/mouse-modes.js';
+import { syncMousePointer, useMouseMotion } from './terminal-mouse.js';
 import { usePaneShown } from '../../lib/tabs/pane-shown.js';
 import { useTheme } from '../../lib/theme.js';
 import { errorMessage } from '../../lib/utils.js';
@@ -113,6 +118,8 @@ export function SessionTerminal({
   // Watching starts on mount, not once wterm is ready: its WASM loads
   // in the meantime, and the host's answer is held until it has.
   const feedRef = useRef<SessionFeed | null>(null);
+  const modesRef = useRef<MouseModes | null>(null);
+  const endedRef = useRef(ended);
   useEffect(() => {
     const feed = sessionFeed();
     feedRef.current = feed;
@@ -163,8 +170,21 @@ export function SessionTerminal({
     if (!ready || !term || !el) return;
     const grid = paneGrid(el, term);
     if (grid) term.resize(grid.cols, grid.rows);
-    feedRef.current?.attach((data) => term.write(data));
+    // wterm drops any-motion mouse tracking; `modes` keeps it.
+    const modes = mouseModes();
+    modesRef.current = modes;
+    feedRef.current?.attach((data) => {
+      term.write(modes.filter(data));
+      syncMousePointer(el, term, endedRef.current);
+    });
   }, [ready, name]);
+
+  useEffect(() => {
+    endedRef.current = ended;
+    syncMousePointer(wrapRef.current, termRef.current, ended);
+  }, [ended]);
+
+  useMouseMotion(termRef, modesRef, ready, write);
 
   // Pasting a picture into the terminal.
   //
