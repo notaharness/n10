@@ -134,13 +134,18 @@ function terminalKey(term: Terminal, event: KeyboardEvent): boolean {
  * released with `WEBGL_lose_context`, the platform's own call for it,
  * on the canvases the addon added: asking any other canvas for a
  * `webgl2` context could create one.
+ *
+ * The terminal must be open. Loaded before `open`, the addon waits for
+ * it and adds its canvas then, after the look for new canvases, so the
+ * context would never be released.
  */
 function loadWebgl(
   term: Terminal,
-  host: HTMLElement,
   onContextLoss: () => void
 ): (() => void) | null {
-  const before = new Set(host.querySelectorAll('canvas'));
+  const root = term.element;
+  if (!root) throw new Error('loadWebgl needs an open terminal');
+  const before = new Set(root.querySelectorAll('canvas'));
   const addon = new WebglAddon();
   try {
     term.loadAddon(addon);
@@ -148,7 +153,7 @@ function loadWebgl(
     return null;
   }
   addon.onContextLoss(onContextLoss);
-  const own = [...host.querySelectorAll('canvas')].filter(
+  const own = [...root.querySelectorAll('canvas')].filter(
     (c) => !before.has(c)
   );
   return () => {
@@ -203,7 +208,7 @@ export function openTerminal(
     releaseWebgl = null;
   };
   if (webgl) {
-    releaseWebgl = loadWebgl(term, host, () => {
+    releaseWebgl = loadWebgl(term, () => {
       dropWebgl();
       stamp('dom');
       // WebGL rounds cells to device pixels and the DOM does not, so
