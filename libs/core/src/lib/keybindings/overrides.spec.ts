@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { withKeybindOverride } from './persistence.js';
+import { withKeybindOverride } from './overrides.js';
 
 describe('withKeybindOverride', () => {
   it('sets one action and keeps the others and the preset', () => {

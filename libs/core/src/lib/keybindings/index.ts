@@ -32,11 +32,16 @@ export {
   DESKTOP_ACTIONS,
   DESKTOP_DEFAULT_BINDINGS,
   isDesktopActionId,
-  keyPressFromDom,
   resolveDesktopAction,
   descriptorFromDom,
   desktopConflict,
+  desktopBindingRefusal,
   desktopOverrides,
   desktopBindings,
 } from './desktop.js';
-export type { DesktopActionId, DesktopBindings, DomKey } from './desktop.js';
+export type {
+  DesktopActionId,
+  DesktopBindings,
+  ReservedChord,
+} from './desktop.js';
+export { withKeybindOverride } from './overrides.js';

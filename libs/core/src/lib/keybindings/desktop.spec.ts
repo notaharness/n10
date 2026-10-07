@@ -3,6 +3,7 @@ import {
   DESKTOP_DEFAULT_BINDINGS,
   descriptorFromDom,
   desktopBindings,
+  desktopBindingRefusal,
   desktopConflict,
   desktopOverrides,
   resolveDesktopAction,
@@ -120,5 +121,33 @@ describe('desktopConflict', () => {
         flags: { pageDown: true },
       })
     ).toBeNull();
+  });
+});
+
+describe('desktopBindingRefusal', () => {
+  const reserved = [
+    { label: 'Close tab', descriptor: { ctrl: true, input: 'w' } },
+  ];
+  const refusal = (descriptor: Parameters<typeof desktopBindingRefusal>[2]) =>
+    desktopBindingRefusal(defaults, 'desktop.tabs.next', descriptor, reserved);
+
+  it('needs Ctrl or Alt', () => {
+    expect(refusal({ input: 'j' })).toMatch(/needs Ctrl or Alt/);
+    expect(refusal({ shift: true, flags: { tab: true } })).toMatch(
+      /needs Ctrl or Alt/
+    );
+    expect(refusal({ ctrl: true, input: 'j' })).toBeNull();
+    expect(refusal({ meta: true, input: 'j' })).toBeNull();
+  });
+
+  it('keeps the app its own shortcuts', () => {
+    const fromDom = descriptorFromDom(press('w', { ctrlKey: true }))!;
+    expect(refusal(fromDom)).toBe('Ctrl+w is already “Close tab”');
+  });
+
+  it('names the tab action already on a chord', () => {
+    expect(refusal({ ctrl: true, flags: { tab: true } })).toBe(
+      'Ctrl+Tab is already “Cycle tabs”'
+    );
   });
 });

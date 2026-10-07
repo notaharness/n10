@@ -90,7 +90,7 @@ const MODIFIER_KEYS = new Set(['Control', 'Shift', 'Alt', 'Meta', 'AltGraph']);
  * and as the hints print it; the platform key (Cmd, Win) is `super`,
  * which no descriptor can ask for.
  */
-export function keyPressFromDom(event: DomKey): {
+function keyPressFromDom(event: DomKey): {
   input: string;
   key: KeyPress;
 } {
@@ -157,6 +157,38 @@ export function desktopConflict(
       bindings[action.id].some((d) => keyDescriptorToString(d) === label)
   );
   return hit?.id ?? null;
+}
+
+/** A chord the app keeps for itself, by the name it shows. */
+export interface ReservedChord {
+  label: string;
+  descriptor: KeyDescriptor;
+}
+
+/**
+ * Why `descriptor` cannot be recorded for `actionId`, in words for the
+ * user, or null when it can. A tab shortcut is heard wherever focus is
+ * and stopped there, so it needs Ctrl or Alt — a bare key or Shift
+ * chord would be taken from every text box and terminal — and must not
+ * take over one of the app's own (`reserved`) or another tab action's.
+ */
+export function desktopBindingRefusal(
+  bindings: DesktopBindings,
+  actionId: DesktopActionId,
+  descriptor: KeyDescriptor,
+  reserved: readonly ReservedChord[] = []
+): string | null {
+  const chord = keyDescriptorToString(descriptor);
+  if (!descriptor.ctrl && !descriptor.meta) {
+    return `${chord} needs Ctrl or Alt: without one it would be taken from typing`;
+  }
+  const app = reserved.find(
+    (r) => keyDescriptorToString(r.descriptor) === chord
+  );
+  if (app) return `${chord} is already “${app.label}”`;
+  const other = desktopConflict(bindings, actionId, descriptor);
+  const label = DESKTOP_ACTIONS.find((a) => a.id === other)?.label;
+  return label ? `${chord} is already “${label}”` : null;
 }
 
 function isDescriptor(value: unknown): value is KeyDescriptor {
