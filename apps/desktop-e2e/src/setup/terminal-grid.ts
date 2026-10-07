@@ -76,6 +76,8 @@ export async function gridReckonings(
     probe.style.position = 'absolute';
     probe.style.visibility = 'hidden';
     const span = document.createElement('span');
+    // As wterm's probe: the font's width, not the cell's styled one.
+    span.style.width = 'auto';
     span.textContent = 'W';
     probe.appendChild(span);
     el.appendChild(probe);

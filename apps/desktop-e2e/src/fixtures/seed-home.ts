@@ -46,6 +46,8 @@ export function fakeAgent(
     exitAfterMs?: number;
     /** Echo stdin back, for testing the input round trip. */
     echo?: boolean;
+    /** Print each stdin chunk as `key:<bytes>`, control bytes spelled out. */
+    keys?: boolean;
     /** Stop streaming after this long, but stay alive. */
     streamMs?: number;
     /** Print the seed prompt the launcher handed it, `seed:`-prefixed. */
@@ -60,6 +62,7 @@ export function fakeAgent(
   if (opts.stream) flags.push('--stream');
   if (opts.tag) flags.push('--tag');
   if (opts.echo) flags.push('--echo');
+  if (opts.keys) flags.push('--keys');
   if (opts.printSeed) flags.push('--print-seed');
   if (opts.printSize) flags.push('--print-size');
   if (opts.streamMs != null) flags.push(`--stream-ms=${opts.streamMs}`);

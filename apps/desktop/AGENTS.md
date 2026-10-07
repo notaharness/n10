@@ -224,6 +224,12 @@ Every rule below has its reasoning in `docs/decisions.md`.
   are pinned to one exact version. Upgrade all together and check
   `npm ls @wterm/dom @wterm/react @wterm/core` shows one copy each. Import the
   stylesheet from `@wterm/dom/css`, never `@wterm/react/css`.
+- wterm encodes keys, modifiers included; n10 does not translate them.
+  A focused terminal stops propagation of every key it sends, so a
+  window-level shortcut listens in the capture phase. A cell probe sets
+  its span's `width: auto` as wterm's own does, or it measures the
+  stylesheet's `--term-cell-width` instead of the font. Escape then Tab
+  stays with the program (`lib/terminals/keep-tab.ts`).
 - Ships inside `@notaharness/n10`: `apps/cli`'s `prepare-publish` copies
   `dist/{main,preload,renderer}` under `desktop/`, and plain `n10` runs
   Electron on the package. Nothing here is published on its own. See the

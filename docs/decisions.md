@@ -803,6 +803,19 @@ from `@wterm/dom/css`; the React package's relative CSS import depends on hoisti
 For pasted images, the host chooses the temporary-file suffix from its own MIME
 table and inserts the path into the PTY; text paste stays with wterm.
 
+wterm encodes keys, modifiers included (xterm's `CSI 1;<mod>` and `CSI n;<mod>~`;
+Ctrl+Backspace is `^H`). Before 0.5.1 it dropped Ctrl and Shift on named keys,
+so word motion and deletion in an agent arrived as single-character keys; n10
+does not translate keys around it. wterm stops propagation of every key it
+sends, so the palette's window listener is in the capture phase; it does not
+stop the key, which still reaches the agent (Ctrl+K is kill-line there).
+wterm sizes a cell's span by `--term-cell-width`, so a grid probe sets
+`width: auto` as wterm's own probe does. wterm reads Escape then Tab as leaving
+the terminal, with no option to turn it off; to an agent the pair is typing, so
+`keep-tab.ts` (and the wterm host's page) clears the private flag that pairs
+them and drops the hint from the input's description. A wterm that renames the
+flag fails `terminal-keys.test.ts`.
+
 Comment images use _virtual_ kitty placements (`U=1`) written out-of-band
 with `process.stdout.write`, the precedent being `apps/cli/src/utils/window-title.ts`;
 `CommentProse` then renders U+10EEEE placeholder rows as ordinary Ink `<Text>`,

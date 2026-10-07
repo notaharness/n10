@@ -42,6 +42,10 @@
 //                        raw mode delivers one keystroke at a time, so an
 //                        immediate echo would answer "hello" with five
 //                        separate lines.
+//   --keys               print each chunk of stdin as `key:<bytes>`, ESC
+//                        as `\e` and other control bytes as `^X`, so a
+//                        test can see exactly what a keypress encoded to
+//                        — Ctrl+Left and Left look alike on screen.
 
 const args = Object.fromEntries(
   process.argv
@@ -99,6 +103,21 @@ if (args.echo) {
         line += ch;
       }
     }
+  });
+  process.stdin.resume();
+}
+
+if (args.keys) {
+  if (process.stdin.isTTY) process.stdin.setRawMode(true);
+  const show = (ch) => {
+    const code = ch.charCodeAt(0);
+    if (code === 0x1b) return '\\e';
+    if (code === 0x7f) return '^?';
+    if (code < 0x20) return '^' + String.fromCharCode(code + 64);
+    return ch;
+  };
+  process.stdin.on('data', (chunk) => {
+    process.stdout.write(`key:${[...chunk.toString()].map(show).join('')}\r\n`);
   });
   process.stdin.resume();
 }
