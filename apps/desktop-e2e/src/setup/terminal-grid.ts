@@ -74,27 +74,23 @@ export async function currentPid(page: Page): Promise<string> {
  * the app computes a grid, only how much of the pane the agent covers.
  *
  * Reckoned as `FitAddon` fits: the box xterm opened in, in whole
- * pixels, less `.xterm`'s padding and the scrollbar xterm reserves,
- * over the size of one cell. A cell is the drawn screen over the grid
+ * pixels, less the scrollbar xterm reserves, over the size of one
+ * cell. A cell is the drawn screen over the grid
  * it was drawn for, read off the renderer's own output rather than the
  * font, which WebGL rounds to device pixels and the DOM does not.
  */
 export async function paneGrid(page: Page): Promise<Grid> {
   return page.evaluate((shown) => {
     const host = document.querySelector<HTMLElement>(shown);
-    const xterm = host?.querySelector<HTMLElement>('.xterm');
     const screen = host?.querySelector<HTMLElement>('.xterm-screen');
-    if (!host || !xterm || !screen) throw new Error('no terminal on screen');
+    if (!host || !screen) throw new Error('no terminal on screen');
     const [cols, rows] = host.dataset.terminalGrid!.split('x').map(Number);
     const drawn = screen.getBoundingClientRect();
     const box = getComputedStyle(host);
-    const pad = getComputedStyle(xterm);
-    const px = (v: string) => parseInt(v, 10) || 0;
     // xterm's default scrollbar width, which FitAddon keeps clear.
     const scrollbar = 14;
-    const width =
-      px(box.width) - px(pad.paddingLeft) - px(pad.paddingRight) - scrollbar;
-    const height = px(box.height) - px(pad.paddingTop) - px(pad.paddingBottom);
+    const width = parseInt(box.width, 10) - scrollbar;
+    const height = parseInt(box.height, 10);
     return {
       cols: Math.floor(width / (drawn.width / cols)),
       rows: Math.floor(height / (drawn.height / rows)),
