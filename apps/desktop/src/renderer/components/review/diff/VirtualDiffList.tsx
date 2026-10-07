@@ -24,7 +24,6 @@ import {
   type FileDisplayState,
 } from '../../../lib/diff/diff-virtual.js';
 import { useFileAnalyses } from '../../../lib/diff/highlight.js';
-import { focusIsLost } from '../../../lib/focus.js';
 import { MyDraftsContext } from '../../../lib/review/my-drafts-context.js';
 import {
   readsSettled,
@@ -34,11 +33,14 @@ import {
 } from '../../../lib/diff/use-diff-jumps.js';
 import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
 import { useTheme } from '../../../lib/theme.js';
-import { rowGutter } from './code-gutter.js';
-import { DiffRowView, type RowContext } from './DiffRowView.js';
+import type { RowContext } from './DiffRowView.js';
+import { DiffVisibleRows } from './DiffVisibleRows.js';
 import { pointId } from './LineGutter.js';
 import { useDiffAnchor } from './use-diff-anchor.js';
 import { useDiffComments } from './use-diff-comments.js';
+import type { TextMatch } from '../../../lib/diff/text-matches.js';
+import { useDiffSearchTarget } from './use-diff-search-target.js';
+import { focusDiffRow } from './diff-focus.js';
 
 const NO_MANIFEST: ReadonlyMap<string, PrDiffManifestFile> = new Map();
 
@@ -52,6 +54,7 @@ export type { DiffJumpHandle };
  */
 export function VirtualDiffList({
   files,
+  searchFiles,
   diffHead,
   threadsByFile,
   draftsByFile,
@@ -63,8 +66,14 @@ export function VirtualDiffList({
   scrollRef,
   jumpRef,
   prDiff,
+  searchTerm,
+  selectionTerm,
+  searchTarget,
+  searchRequest,
 }: {
   files: [string, DiffLine[]][];
+  /** The complete comparison, including files outside single-file mode. */
+  searchFiles: [string, DiffLine[]][];
   /** The commit the diff was read at; what new comments anchor to. */
   diffHead: string | null;
   threadsByFile: Map<string, RemoteCommentThread[]>;
@@ -79,6 +88,10 @@ export function VirtualDiffList({
   /** A pull request's manifest and file bodies; absent for a worktree,
    *  whose files all arrive with their lines. */
   prDiff?: PrDiffView;
+  searchTerm: string;
+  selectionTerm: string;
+  searchTarget: TextMatch | null;
+  searchRequest: number;
 }) {
   const options = useDiffOptions();
   const { resolved } = useTheme();
@@ -181,8 +194,23 @@ export function VirtualDiffList({
   const showFiles = prDiff?.showFiles;
   const scrolling = virtualizer.isScrolling;
   useEffect(() => {
-    if (!scrolling) showFiles?.(toRead);
-  }, [showFiles, toRead, scrolling]);
+    if (!scrolling)
+      showFiles?.(searchTerm ? searchFiles.map(([path]) => path) : toRead);
+  }, [showFiles, toRead, scrolling, searchTerm, searchFiles]);
+
+  const scrollToSearch = useCallback(
+    (index: number) => virtualizer.scrollToIndex(index, { align: 'center' }),
+    [virtualizer]
+  );
+  useDiffSearchTarget(
+    searchTarget,
+    searchRequest,
+    rows,
+    linesByFile,
+    setFileState,
+    scrollToSearch,
+    scrollRef
+  );
 
   const patchFile = useCallback(
     (file: string, patch: Partial<FileDisplayState>) =>
@@ -228,38 +256,15 @@ export function VirtualDiffList({
     const focusIn = (
       selector: string,
       index: number | undefined,
-      // A closing control hands the keyboard on only once it has gone;
-      // never take it from where the reader is (a toast's Undo gives it
-      // back itself).
       onlyIfLost = false
-    ) => {
-      const find = () =>
-        scrollRef.current?.querySelector<HTMLElement>(selector);
-      const free = () => !onlyIfLost || focusIsLost();
-      const here = find();
-      // A neighbour is almost always mounted: focus it now, so the
-      // next key press already starts from it.
-      if (here && free()) {
-        here.focus();
-        here.scrollIntoView({ block: 'nearest' });
-        return;
-      }
-      // Otherwise wait a frame: a card replacing its composer renders
-      // in place. Only a target still missing then is scrolled to.
-      const retry = (left: number) => {
-        const el = find();
-        if (el && free()) {
-          el.focus({ preventScroll: true });
-          el.scrollIntoView({ block: 'nearest' });
-          return;
-        }
-        if (!el && left === 10 && index != null) {
-          virtualizer.scrollToIndex(index, { align: 'auto' });
-        }
-        if (left > 0) requestAnimationFrame(() => retry(left - 1));
-      };
-      requestAnimationFrame(() => retry(10));
-    };
+    ) =>
+      focusDiffRow(
+        scrollRef,
+        (i) => virtualizer.scrollToIndex(i, { align: 'auto' }),
+        selector,
+        index,
+        onlyIfLost
+      );
     const file = (f: string) => `[data-file="${CSS.escape(f)}"]`;
     nav.current = {
       pointsOf: (f) => points.byFile.get(f) ?? [],
@@ -302,6 +307,9 @@ export function VirtualDiffList({
     analyses,
     stats: flat.stats,
     wrap: options.wrap,
+    searchTerm,
+    searchTarget,
+    selectionTerm,
     prId,
     headSha,
     focusThreadId,
@@ -322,29 +330,14 @@ export function VirtualDiffList({
 
   return (
     <MyDraftsContext.Provider value={comments.scope}>
-      <div
-        className="relative font-mono text-sm leading-5"
-        style={{ height: virtualizer.getTotalSize() }}
-      >
-        {virtualItems.map((vi) => (
-          <div
-            key={vi.key}
-            data-index={vi.index}
-            // Which primitive this row is, for tests and the benchmarks:
-            // "is the code coloured yet" has to be asked of code rows,
-            // and a class name shared with the sidebar cannot answer it.
-            data-row-kind={rows[vi.index].kind}
-            ref={virtualizer.measureElement}
-            className="absolute top-0 left-0 w-full"
-            style={{
-              transform: `translateY(${vi.start}px)`,
-              ...rowGutter(rows[vi.index], linesByFile),
-            }}
-          >
-            <DiffRowView row={rows[vi.index]} ctx={ctx} />
-          </div>
-        ))}
-      </div>
+      <DiffVisibleRows
+        rows={rows}
+        items={virtualItems}
+        linesByFile={linesByFile}
+        ctx={ctx}
+        height={virtualizer.getTotalSize()}
+        measureElement={virtualizer.measureElement}
+      />
       <div role="status" aria-live="polite" className="sr-only">
         {comments.announcement}
       </div>

@@ -111,6 +111,60 @@ test.describe('many files', () => {
       ratio: 1,
     });
   });
+
+  test('Find reads a match beyond the first lazy PR batch', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await sidebarRow(page, /Large/).first().click();
+    await showChanges(page);
+    await expect(diffText(page, 'content 000')).toBeVisible({
+      timeout: 30_000,
+    });
+
+    await page.locator('[data-diff-scroll]').click();
+    await page.keyboard.press('Control+f');
+    const find = page.getByRole('searchbox', { name: 'Find in diff' });
+    await find.fill('content 230');
+    const count = page.getByTestId('diff-find-count');
+    await expect(count).toHaveText('1 of 1', { timeout: 30_000 });
+    await expect(diffText(page, 'content 230')).toBeInViewport();
+    await expect(
+      page.locator('[data-diff-scroll] [data-diff-search-match]')
+    ).toHaveText('content 230');
+  });
+
+  test('One file Find follows its first lazy match, then allows manual paging', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await sidebarRow(page, /Large/).first().click();
+    await showChanges(page);
+    await expect(diffText(page, 'content 000')).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.getByRole('button', { name: 'One file' }).click();
+    const pager = page.getByRole('navigation', { name: 'Files' });
+    await expect(pager).toContainText('File 1 of 250');
+
+    await page.locator('[data-diff-scroll]').click();
+    await page.keyboard.press('Control+f');
+    await page
+      .getByRole('searchbox', { name: 'Find in diff' })
+      .fill('content 230');
+    await expect(page.getByTestId('diff-find-count')).toHaveText('1 of 1', {
+      timeout: 30_000,
+    });
+    await expect(pager).toContainText('File 231 of 250');
+    await expect(diffText(page, 'content 230')).toBeInViewport();
+
+    await pager.getByRole('button', { name: 'Previous file' }).click();
+    await expect(pager).toContainText('File 230 of 250');
+    await expect(diffText(page, 'content 229')).toBeInViewport();
+    await expect(
+      page.getByRole('searchbox', { name: 'Find in diff' })
+    ).toHaveValue('content 230');
+  });
 });
 
 const pad4 = (i: number) => String(i).padStart(4, '0');
@@ -477,6 +531,14 @@ test('a large file loads its changes, then all of it, on request', async ({
   await pushAndOpen(page, homeDir);
   const notLoaded = page.getByText(/Not loaded: this file is 2\.\d MB\./);
   await expect(notLoaded).toBeVisible({ timeout: 30_000 });
+
+  // Search cannot count a file whose body is deliberately withheld.
+  await page.locator('[data-diff-scroll]').click();
+  await page.keyboard.press('Control+f');
+  await page
+    .getByRole('searchbox', { name: 'Find in diff' })
+    .fill('the one edit');
+  await expect(page.getByTestId('diff-find-count')).toHaveText('0 of 0+');
 
   // By keyboard: each button goes with its notice, and focus lands on
   // the file's header, not the page.
