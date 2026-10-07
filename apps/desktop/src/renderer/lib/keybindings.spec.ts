@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  descriptorFromDom,
+  desktopBindingRefusal,
+  desktopBindings,
+} from '@n10/core/ui';
 import type { DesktopKeybindings } from '../../host/contract.js';
 
 const CTRL_J: DesktopKeybindings = {
@@ -94,5 +99,42 @@ describe('chordKeys', () => {
     ).toEqual(['Ctrl', '⇧', 'Tab']);
     expect(chordKeys({ ctrl: true, input: '+' })).toEqual(['Ctrl', '+']);
     expect(chordKeys({ meta: true, input: 'J' })).toEqual(['⇧', 'Alt', 'j']);
+  });
+});
+
+describe('reserved chords', () => {
+  const press = (key: string, shift = false) => ({
+    key,
+    ctrlKey: true,
+    shiftKey: shift,
+    altKey: false,
+    metaKey: false,
+  });
+
+  it.each([
+    ['Ctrl+F', press('f'), 'Find in diff'],
+    ['Ctrl+Shift+F', press('F', true), 'Find in diff'],
+    ['Ctrl+Shift+Space', press(' ', true), 'Move tab'],
+  ] as const)('%s is kept for %s', async (_chord, event, label) => {
+    const { reservedChords } = await load();
+    for (const mod of ['Ctrl', 'Cmd'] as const) {
+      expect(
+        desktopBindingRefusal(
+          desktopBindings(undefined),
+          'desktop.tabs.next',
+          descriptorFromDom(event)!,
+          reservedChords(mod)
+        )
+      ).toContain(`“${label}”`);
+    }
+  });
+
+  it('on macOS leaves Ctrl+W free: the menu holds Cmd+W', async () => {
+    const { reservedChords } = await load();
+    const labels = (mod: 'Cmd' | 'Ctrl') =>
+      reservedChords(mod).map((r) => r.label);
+    expect(labels('Ctrl')).toContain('Close tab');
+    expect(labels('Cmd')).not.toContain('Close tab');
+    expect(labels('Cmd')).toContain('Search & commands');
   });
 });

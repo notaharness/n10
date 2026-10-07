@@ -1,5 +1,9 @@
 import type { MenuItemConstructorOptions } from 'electron';
-import { appAccelerator, type AppShortcutId } from './app-shortcuts.js';
+import {
+  appAccelerator,
+  menuModifier,
+  type AppShortcutId,
+} from './app-shortcuts.js';
 import type { MenuCommand, ThemePreference } from './contract.js';
 
 /**
@@ -27,7 +31,7 @@ export function buildMenuTemplate(
   send: (command: MenuCommand, arg?: string) => void
 ): MenuItemConstructorOptions[] {
   const isMac = env.platform === 'darwin';
-  const mod = isMac ? 'Cmd' : 'Ctrl';
+  const mod = menuModifier(isMac);
   const keys = (id: AppShortcutId) => appAccelerator(id, mod);
 
   const appMenu: MenuItemConstructorOptions[] = isMac

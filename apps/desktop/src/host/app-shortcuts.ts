@@ -27,10 +27,13 @@ export interface AppShortcut {
   /** The key as an Electron accelerator names it. */
   key: string;
   shift?: true;
+  /** Heard by the page itself, on Ctrl as well as Cmd, rather than
+   *  being a menu accelerator on the platform modifier alone. */
+  page?: true;
 }
 
 export const APP_SHORTCUTS: readonly AppShortcut[] = [
-  { id: 'search', label: 'Search & commands', key: 'K' },
+  { id: 'search', label: 'Search & commands', key: 'K', page: true },
   { id: 'command-palette', label: 'Command palette', key: 'P', shift: true },
   { id: 'toggle-sidebar', label: 'Toggle sidebar', key: 'B' },
   { id: 'new-worktree', label: 'New worktree', key: 'N' },
@@ -40,7 +43,12 @@ export const APP_SHORTCUTS: readonly AppShortcut[] = [
   { id: 'settings', label: 'Settings', key: ',' },
   { id: 'close-tab', label: 'Close tab', key: 'W' },
   { id: 'refresh-remote', label: 'Refresh pull requests', key: 'R' },
-  { id: 'send-reply', label: 'Send reply (in a comment box)', key: 'Enter' },
+  {
+    id: 'send-reply',
+    label: 'Send reply (in a comment box)',
+    key: 'Enter',
+    page: true,
+  },
 ];
 
 function shortcut(id: AppShortcutId): AppShortcut {
@@ -49,14 +57,28 @@ function shortcut(id: AppShortcutId): AppShortcut {
   return found;
 }
 
+/** The platform modifier the menu's accelerators hold. */
+export function menuModifier(isMac: boolean): 'Cmd' | 'Ctrl' {
+  return isMac ? 'Cmd' : 'Ctrl';
+}
+
 /** The menu accelerator for `id` on `mod` ('Cmd' or 'Ctrl'). */
 export function appAccelerator(id: AppShortcutId, mod: 'Cmd' | 'Ctrl'): string {
   const { key, shift } = shortcut(id);
   return [mod, ...(shift ? ['Shift'] : []), key].join('+');
 }
 
-/** The shortcut as the Ctrl chord a tab shortcut could be bound to. */
-export function appShortcutDescriptor(s: AppShortcut): KeyDescriptor {
+/**
+ * The Ctrl chord a tab shortcut bound to it would take from `s`, on a
+ * platform whose menu modifier is `mod`; null when there is none. Tab
+ * shortcuts never hold Cmd, so on macOS only the page's own shortcuts,
+ * which answer to Ctrl too, can be taken.
+ */
+export function appShortcutDescriptor(
+  s: AppShortcut,
+  mod: 'Cmd' | 'Ctrl'
+): KeyDescriptor | null {
+  if (mod === 'Cmd' && !s.page) return null;
   const desc: KeyDescriptor =
     s.key === 'Enter'
       ? { flags: { return: true } }

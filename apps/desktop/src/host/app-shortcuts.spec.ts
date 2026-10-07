@@ -36,7 +36,7 @@ describe('app shortcuts', () => {
       expect(pressed).not.toBeNull();
       const reserved = APP_SHORTCUTS.map((r) => ({
         label: r.label,
-        descriptor: appShortcutDescriptor(r),
+        descriptor: appShortcutDescriptor(r, 'Ctrl')!,
       }));
       expect(
         desktopBindingRefusal(
@@ -48,4 +48,12 @@ describe('app shortcuts', () => {
       ).toContain(`“${s.label}”`);
     }
   );
+
+  it('on macOS keeps only the page’s own Ctrl chords', () => {
+    const onMac = APP_SHORTCUTS.filter(
+      (s) => appShortcutDescriptor(s, 'Cmd') !== null
+    ).map((s) => s.id);
+    // The menu's Cmd+W, Cmd+N, … leave Ctrl+W, Ctrl+N, … free there.
+    expect(onMac).toEqual(['search', 'send-reply']);
+  });
 });

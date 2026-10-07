@@ -10,7 +10,11 @@ import {
 import {
   APP_SHORTCUTS,
   appShortcutDescriptor,
+  menuModifier,
 } from '../../host/app-shortcuts.js';
+import { LIFT_CHORD } from '../components/editor/tab-keyboard.js';
+import { FIND_KEY } from '../components/review/diff/use-diff-find.js';
+import { isMac } from './utils.js';
 import type { DesktopKeybindings } from '../../host/contract.js';
 
 /**
@@ -90,8 +94,11 @@ export function setRecordingShortcut(on: boolean): void {
   if (recording === on) return;
   recording = on;
   window.n10.holdMenuShortcuts(on).catch(() => {
-    // Best effort: with the host restarting the menu keeps its
-    // accelerators, and the recorder still refuses those chords.
+    // Best effort. A hold that fails leaves the menu its accelerators,
+    // and the recorder still refuses those chords. A release that fails
+    // would strand the menu, but main releases it on every page load
+    // (`releaseMenuShortcutsOnLoad`), and the next recording ends with
+    // another release.
   });
 }
 
@@ -115,7 +122,27 @@ export function chordKeys(d: KeyDescriptor): string[] {
   ];
 }
 
-/** The app's own shortcuts, as chords a tab shortcut may not take. */
-export const RESERVED_CHORDS: readonly ReservedChord[] = APP_SHORTCUTS.map(
-  (s) => ({ label: s.label, descriptor: appShortcutDescriptor(s) })
-);
+/** Chords the page hears for itself, in no menu or shortcut list. */
+const PAGE_CHORDS: readonly ReservedChord[] = [
+  { label: 'Find in diff', descriptor: { ctrl: true, input: FIND_KEY } },
+  {
+    label: 'Find in diff',
+    descriptor: { ctrl: true, shift: true, input: FIND_KEY },
+  },
+  { label: 'Move tab', descriptor: LIFT_CHORD },
+];
+
+/** Every chord a tab shortcut may not take, on a platform whose menu
+ *  holds `mod`: the app's shortcuts that answer to Ctrl there, and the
+ *  page's own. A tab shortcut is heard first, so it would win. */
+export function reservedChords(mod: 'Cmd' | 'Ctrl'): readonly ReservedChord[] {
+  return [
+    ...APP_SHORTCUTS.flatMap((s) => {
+      const descriptor = appShortcutDescriptor(s, mod);
+      return descriptor ? [{ label: s.label, descriptor }] : [];
+    }),
+    ...PAGE_CHORDS,
+  ];
+}
+
+export const RESERVED_CHORDS = reservedChords(menuModifier(isMac));

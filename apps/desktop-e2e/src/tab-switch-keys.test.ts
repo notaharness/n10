@@ -232,6 +232,13 @@ test.describe('Tab switching keys', () => {
     expect(globalOverrides(homeDir)).toBeUndefined();
     // Recording over, the menu has its accelerators back.
     await expect.poll(menuHolds).toEqual([true, false]);
+
+    // A page reloaded mid-recording never ends it, so main lets go of
+    // the hold as the new page loads.
+    await recorder.click();
+    await expect.poll(menuHolds).toEqual([true, false, true]);
+    await page.reload();
+    await expect.poll(menuHolds).toEqual([true, false, true, false]);
   });
 });
 

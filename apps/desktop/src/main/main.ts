@@ -1,6 +1,9 @@
 import { join } from 'node:path';
 import { app, BrowserWindow, dialog, Menu, nativeTheme, shell } from 'electron';
-import { holdMenuShortcuts } from './menu-shortcuts.js';
+import {
+  holdMenuShortcuts,
+  releaseMenuShortcutsOnLoad,
+} from './menu-shortcuts.js';
 import {
   MENU_EVENTS,
   type ContextMenuItem,
@@ -173,6 +176,7 @@ function createMainWindow(): BrowserWindow {
   });
 
   installRendererRecovery(win);
+  releaseMenuShortcutsOnLoad(win.webContents);
   installUnsavedGuard(win);
   return win;
 }
