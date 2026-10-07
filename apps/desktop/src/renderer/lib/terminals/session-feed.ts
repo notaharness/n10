@@ -42,3 +42,46 @@ export function sessionFeed(): SessionFeed {
     },
   };
 }
+
+/**
+ * Watch `name` on the host into a new feed: listening first, so a
+ * chunk pushed the moment the watch lands waits for the snapshot it
+ * follows, then asking for the snapshot. `stop` ends the watch, and
+ * nothing lands after it: React StrictMode mounts twice in
+ * development, so a second snapshot would duplicate the screen, and a
+ * pane closing mid-fetch would write into a disposed terminal.
+ */
+export function watchSessionFeed(
+  name: string,
+  handlers: {
+    /** The snapshot no longer starts at the attach's full redraw. */
+    onTruncated: () => void;
+    /** The host holds no watch, so nothing will arrive. */
+    onError: (error: unknown) => void;
+  }
+): { feed: SessionFeed; stop: () => void } {
+  const feed = sessionFeed();
+  const offData = window.n10.onSessionData(({ name: n, data, seq }) => {
+    if (n === name) feed.live(seq, data);
+  });
+  let stopped = false;
+  void window.n10
+    .watchSession(name)
+    .then(({ data, seq, truncated }) => {
+      if (stopped) return;
+      feed.snapshot(data, seq);
+      if (truncated) handlers.onTruncated();
+    })
+    .catch((error: unknown) => {
+      if (!stopped) handlers.onError(error);
+    });
+  return {
+    feed,
+    stop: () => {
+      stopped = true;
+      offData();
+      // Every watch is counted; this one ends with the terminal.
+      void window.n10.unwatchSession(name).catch(handlers.onError);
+    },
+  };
+}

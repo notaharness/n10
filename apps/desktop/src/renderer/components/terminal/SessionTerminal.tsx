@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  sessionFeed,
+  watchSessionFeed,
   type SessionFeed,
 } from '../../lib/terminals/session-feed.js';
 import {
@@ -65,22 +65,6 @@ export function SessionTerminal({
   const { resolved } = useTheme();
   const shown = usePaneShown();
 
-  // xterm owns the element it opens in, so it is opened from the
-  // element's ref and disposed when React lets the element go.
-  const hostRef = useCallback((host: HTMLDivElement | null) => {
-    if (!host) return undefined;
-    const opened = openTerminal(host, resolveTheme());
-    setXterm(opened);
-    return () => {
-      setXterm(null);
-      opened.dispose();
-    };
-  }, []);
-
-  useEffect(() => {
-    xterm?.setTheme(resolved);
-  }, [xterm, resolved]);
-
   // Terminal responses and user input can race a session ending. Keep
   // the host's refusal visible without throwing an unhandled rejection
   // for every keystroke or automatic terminal-protocol response.
@@ -90,6 +74,45 @@ export function SessionTerminal({
     },
     [name]
   );
+
+  // A full repaint the fit effect owes the terminal, and how to ask it
+  // for one once it is running.
+  const repaintRef = useRef(false);
+  const fitRef = useRef<(() => void) | null>(null);
+  const requestRepaint = useCallback(() => {
+    repaintRef.current = true;
+    fitRef.current?.();
+  }, []);
+
+  // The terminal's life: watching its session and the xterm drawing it
+  // start and end with the element xterm opens in. The watch is asked
+  // for first, so the host's answer is on its way while xterm and its
+  // WebGL renderer set themselves up, rather than after.
+  const feedRef = useRef<SessionFeed | null>(null);
+  const hostRef = useCallback(
+    (host: HTMLDivElement | null) => {
+      if (!host) return undefined;
+      const watch = watchSessionFeed(name, {
+        onTruncated: requestRepaint,
+        onError: reportError,
+      });
+      feedRef.current = watch.feed;
+      const opened = openTerminal(host, resolveTheme());
+      setXterm(opened);
+      return () => {
+        setXterm(null);
+        watch.stop();
+        if (feedRef.current === watch.feed) feedRef.current = null;
+        opened.dispose();
+      };
+    },
+    [name, reportError, requestRepaint]
+  );
+
+  useEffect(() => {
+    xterm?.setTheme(resolved);
+  }, [xterm, resolved]);
+
   const blocked = disabled || ended;
   const write = useCallback(
     (data: string) => {
@@ -117,52 +140,6 @@ export function SessionTerminal({
       resized.dispose();
     };
   }, [xterm, write, resize]);
-
-  // A full repaint the fit effect owes the terminal, and how to ask it
-  // for one once it is running.
-  const repaintRef = useRef(false);
-  const fitRef = useRef<(() => void) | null>(null);
-  const requestRepaint = useCallback(() => {
-    repaintRef.current = true;
-    fitRef.current?.();
-  }, []);
-
-  // Watching starts on mount, not once the terminal is open, so the
-  // host's answer is on its way while xterm lays itself out.
-  const feedRef = useRef<SessionFeed | null>(null);
-  useEffect(() => {
-    const feed = sessionFeed();
-    feedRef.current = feed;
-    // Listening before watching: a chunk pushed the moment the watch
-    // lands waits for the snapshot it follows.
-    const offData = window.n10.onSessionData(({ name: n, data, seq }) => {
-      if (n === name) feed.live(seq, data);
-    });
-    // Nothing may land after this effect is torn down: React StrictMode
-    // mounts twice in development, so a second snapshot would duplicate
-    // the screen, and a pane closing mid-fetch would write into a
-    // disposed terminal.
-    let cancelled = false;
-    void window.n10
-      .watchSession(name)
-      .then(({ data, seq, truncated }) => {
-        if (cancelled) return;
-        feed.snapshot(data, seq);
-        if (truncated) requestRepaint();
-      })
-      .catch((error: unknown) => {
-        // The host holds no watch, so nothing will arrive: say so
-        // rather than leave a blank terminal.
-        if (!cancelled) reportError(error);
-      });
-    return () => {
-      cancelled = true;
-      offData();
-      if (feedRef.current === feed) feedRef.current = null;
-      // Every watch is counted; this one ends with the terminal.
-      void window.n10.unwatchSession(name).catch(reportError);
-    };
-  }, [name, reportError, requestRepaint]);
 
   useEffect(() => {
     if (!shown) return;
