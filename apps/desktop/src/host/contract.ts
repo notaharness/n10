@@ -74,6 +74,7 @@ export type * from './contract-sessions.js';
 import type {
   ForeignSessionSummary,
   SessionSummary,
+  WorktreeResume,
 } from './contract-sessions.js';
 // Pull request diffs at exact commits.
 export type * from './contract-diff.js';
@@ -187,6 +188,8 @@ export interface SessionLaunchRequest {
    *  — never shows the wrong one's progress. Ignored for a local
    *  launch, which emits no steps. */
   launchId?: string;
+  /** Only for explicit resume of a dormant saved worktree tab. */
+  restore?: WorktreeResume;
 }
 
 /**
@@ -338,6 +341,9 @@ export interface SessionActivitySnapshot {
 
 /** The API surface exposed on `window.n10`. */
 export interface N10HostApi {
+  /** Tabs kept across app and machine restarts in ~/.n10/open-tabs.json. */
+  loadOpenTabs(): Promise<unknown>;
+  saveOpenTabs(snapshot: unknown): Promise<void>;
   getVersion(): Promise<N10VersionInfo>;
 
   // ── Repo ─────────────────────────────────────────────────────
@@ -626,6 +632,8 @@ export interface N10HostApi {
 
 /** IPC channel names — single source of truth for main and preload. */
 export const IPC = {
+  loadOpenTabs: 'n10/tabs/load',
+  saveOpenTabs: 'n10/tabs/save',
   getVersion: 'n10/version',
   openRepo: 'n10/repo/open',
   listRecentRepos: 'n10/repo/recents',

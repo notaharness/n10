@@ -10,13 +10,14 @@ import { terminalLaunchRequest } from './terminal-launch-request.js';
 import { errorMessage } from '../utils.js';
 
 /** The host's summary, as the tab model keeps it. */
-function toEntry(t: TerminalSummary): TerminalEntry {
+export function toEntry(t: TerminalSummary): TerminalEntry {
   return {
     name: t.name,
     kind: t.kind,
     cwd: t.cwd,
     displayPath: t.displayPath,
     repo: t.repo,
+    ...(t.restore ? { restore: t.restore } : {}),
     ...(t.branch ? { branch: t.branch } : {}),
   };
 }

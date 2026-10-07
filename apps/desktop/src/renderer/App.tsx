@@ -96,7 +96,7 @@ function Gate() {
   );
 
   // A tab from another repository is shown by opening that repository.
-  useRepoFollowsTabs(repo?.cwd ?? null, openRepoAsync);
+  useRepoFollowsTabs(repo?.cwd ?? null, openRepoAsync, !isPending);
 
   const pickRepoFolder = useCallback(() => {
     window.n10

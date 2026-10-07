@@ -45,6 +45,9 @@ vi.mock('./services/repo.js', () =>
 vi.mock('./services/settings.js', () =>
   recorder('settings', ['getSettingsView', 'updateSettingsFromView'])
 );
+vi.mock('./services/open-tabs.js', () =>
+  recorder('openTabs', ['loadOpenTabs', 'saveOpenTabs'])
+);
 vi.mock('./services/sidebar.js', () =>
   recorder('sidebar', ['getSidebarSnapshot', 'getSyncState', 'refreshRemote'])
 );
@@ -325,6 +328,8 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ],
 
   ['getDesktopPrefs', [], 'prefs.loadDesktopPrefs'],
+  ['loadOpenTabs', [], 'openTabs.loadOpenTabs'],
+  ['saveOpenTabs', [{ version: 1 }], 'openTabs.saveOpenTabs'],
 
   ['startBabysit', [7], 'babysit.startBabysit'],
   ['stopBabysit', [7], 'babysit.stopBabysit'],

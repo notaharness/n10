@@ -47,6 +47,12 @@ vi.mock('@n10/vcs-core', () => ({
 }));
 
 vi.mock('@n10/core', () => ({
+  sessionTags: (repo: string, identity: { type: string }) => ({
+    '@orchestra-spawner': 'n10',
+    '@orchestra-repo': repo,
+    '@orchestra-session-type': identity.type,
+  }),
+  ORCHESTRA_TAG: { agent: '@orchestra-agent' },
   isGitRepo: (cwd: string) => state.repoRoots.has(cwd),
   // The remote machine has every directory asked for (the engine's spec
   // covers resolving it there).
@@ -93,7 +99,7 @@ vi.mock('@n10/core', () => ({
           state.onExit.get(name)?.push(cb),
       },
     });
-    return { name };
+    return { name, pty: state.sessions.get(name)!.pty };
   },
   hasPersistedTerminalSession: (name: string) => state.tmuxHolds.has(name),
   getSession: (name: string) => state.sessions.get(name),
@@ -110,6 +116,7 @@ vi.mock('@n10/core', () => ({
   getSpawnedAt: () => 1000,
   LOCAL_MACHINE: 'local',
   sessionIdentity: () => null,
+  captureTmuxRuntime: () => ({}),
 }));
 
 let terminals: typeof TerminalsModule;

@@ -58,7 +58,11 @@ export interface AgentDefinition {
   /** Start a blank interactive session. */
   blank(): LaunchSpec;
   /** Resume an exited agent without silently starting a new conversation. */
-  resume?(prompt?: string, opts?: SeedOptions): LaunchSpec;
+  resume?(
+    prompt?: string,
+    opts?: SeedOptions,
+    conversationId?: string
+  ): LaunchSpec;
   /**
    * Start a fresh interactive session pre-seeded with a prompt.
    * `undefined` ⇒ the agent cannot seed an interactive session; the
@@ -103,10 +107,10 @@ const CLAUDE: AgentDefinition = {
   name: 'Claude',
   supportsAppendSystemPrompt: true,
   blank: () => ({ cmd: 'claude', args: [] }),
-  resume: (prompt, opts) => ({
+  resume: (prompt, opts, conversationId) => ({
     cmd: 'claude',
     args: [
-      '--continue',
+      ...(conversationId ? ['--resume', conversationId] : ['--continue']),
       ...(opts?.appendSystemPrompt
         ? ['--append-system-prompt', opts.appendSystemPrompt]
         : []),
@@ -155,9 +159,13 @@ const CODEX: AgentDefinition = {
   name: 'Codex',
   supportsAppendSystemPrompt: false,
   blank: () => ({ cmd: 'codex', args: [] }),
-  resume: (prompt) => ({
+  resume: (prompt, _opts, conversationId) => ({
     cmd: 'codex',
-    args: ['resume', '--last', ...(prompt ? ['--', prompt] : [])],
+    args: [
+      'resume',
+      ...(conversationId ? [conversationId] : ['--last']),
+      ...(prompt ? ['--', prompt] : []),
+    ],
   }),
   // Protect prompts beginning with a flag or a Codex subcommand name.
   seed: (prompt) => ({ cmd: 'codex', args: ['--', prompt] }),

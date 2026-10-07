@@ -22,6 +22,13 @@ export interface TerminalLaunchParams {
    *  meaningful for a fresh terminal — `params.name`, when qualified
    *  (D2's key), already carries whatever machine it was created on. */
   machine?: string;
+  restore?: {
+    tmuxName: string;
+    tags: Record<string, string>;
+    agent?: string;
+    env?: Record<string, string>;
+    conversationId?: string;
+  };
 }
 
 /** A restart's key (when qualified) always wins over the request's own
@@ -69,16 +76,25 @@ export async function launchTerminalSession(
     cwd: params.cwd,
     cols: params.cols,
     rows: params.rows,
+    restore: params.restore,
     build: (previous, restarting) =>
       params.kind === 'shell'
         ? shellLaunch(params.config, identity.machine)
         : buildAgentLaunch(
             {
-              config: params.config,
-              request: { intent: params.fresh ? 'blank' : 'continue-or-blank' },
+              config: params.restore?.agent
+                ? {
+                    ...params.config,
+                    agentId: params.restore.agent as AppConfig['agentId'],
+                  }
+                : params.config,
+              request: {
+                intent: params.fresh ? 'blank' : 'continue-or-blank',
+                conversationId: params.restore?.conversationId,
+              },
             },
-            previous,
-            restarting
+            previous ?? params.restore?.agent,
+            restarting || !!params.restore
           ),
   });
 }

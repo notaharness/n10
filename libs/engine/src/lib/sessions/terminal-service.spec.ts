@@ -27,6 +27,7 @@ const state = vi.hoisted(() => ({
   release: vi.fn(),
   detach: vi.fn(),
   remoteRun: vi.fn(),
+  capture: vi.fn(),
 }));
 vi.mock('node:fs', async (original) => ({
   ...(await original<typeof Fs>()),
@@ -50,6 +51,7 @@ vi.mock('@n10/core', async (original) => ({
     id,
     executor: { run: state.remoteRun },
   }),
+  captureTmuxRuntime: state.capture,
 }));
 const local = terminalSessionKey('terminal');
 const remote = terminalSessionKey('terminal', 'peer');
@@ -74,6 +76,7 @@ beforeEach(() => {
   state.persisted.clear();
   state.exits = [];
   state.next = 0;
+  state.capture.mockReset().mockReturnValue({});
   state.stat.mockReset().mockReturnValue({ isDirectory: () => true });
   state.kill
     .mockReset()
@@ -156,6 +159,38 @@ it('keeps an ended agent while tmux retains it and forgets it only after the nat
   expect(state.detach).toHaveBeenCalledExactlyOnceWith(local);
   expect(state.kill).not.toHaveBeenCalled();
   expect(ports.ended).toHaveBeenCalledExactlyOnceWith(local);
+});
+
+it('refreshes the owning agent runtime and retains it after the pane exits', async () => {
+  const { service } = fixture();
+  const conversationId = '123e4567-e89b-12d3-a456-426614174000';
+  state.capture
+    .mockReturnValueOnce({})
+    .mockReturnValueOnce({
+      env: { CLAUDE_CONFIG_DIR: '/session/claude' },
+      conversationId,
+    })
+    .mockReturnValue({});
+  state.launch.mockImplementationOnce(async () => {
+    const entry = register(local);
+    return {
+      ...entry,
+      agent: 'claude',
+      pty: { ...entry.pty, name: 'real-tmux' },
+    };
+  });
+  await service.launch({ kind: 'agent', cwd: '/repo' });
+  expect(state.capture).toHaveBeenCalledWith('real-tmux', undefined, 'claude');
+  expect(service.list()[0].restore).toMatchObject({
+    env: { CLAUDE_CONFIG_DIR: '/session/claude' },
+    conversationId,
+  });
+  state.persisted.add(local);
+  state.exits[0]();
+  expect(service.list()[0].restore).toMatchObject({
+    env: { CLAUDE_CONFIG_DIR: '/session/claude' },
+    conversationId,
+  });
 });
 
 // Its backend stops polling a dead pane, so it keeps saying the session

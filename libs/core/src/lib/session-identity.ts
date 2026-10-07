@@ -114,6 +114,8 @@ export interface TaggedSession {
    *  carry no machine — `@orchestra-repo` holds the path as it exists
    *  on this machine, whichever one that is. */
   machine: string;
+  /** Original listed option values, retained for an explicit reboot resume. */
+  tags?: Record<string, string>;
 }
 
 /** Orchestra's own tags, carried along only when set. Split out of
@@ -172,6 +174,7 @@ export function taggedSession(
     branch: tags[ORCHESTRA_TAG.branch] ?? '',
     worktreePath,
     machine,
+    tags: { ...tags },
     ...orchestraTagFields(tags),
   };
 }

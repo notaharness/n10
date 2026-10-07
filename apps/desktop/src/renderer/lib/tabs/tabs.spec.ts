@@ -37,6 +37,138 @@ const sync = (
 const empty: TabsState = EMPTY_TABS;
 
 describe('sync-items', () => {
+  it('keeps saved terminal tabs dormant until a live listing or explicit resume', () => {
+    const original = reduce(empty, {
+      type: 'open-terminal',
+      terminal: {
+        name: 'terminal:old',
+        kind: 'agent',
+        cwd: '/tmp/project',
+        displayPath: '/tmp/project',
+        repo: null,
+      },
+    });
+    const saved = reduce(original, { type: 'hydrate', saved: original });
+    const afterScan = sync(saved, [], REPO, []);
+    expect(afterScan.tabs).toHaveLength(1);
+    expect(afterScan.tabs[0]).toMatchObject({
+      kind: 'terminal',
+      resumeRequired: true,
+    });
+    const reattached = sync(afterScan, [], REPO, [
+      {
+        name: 'terminal:old',
+        kind: 'agent',
+        cwd: '/tmp/project',
+        displayPath: '/tmp/project',
+        repo: null,
+      },
+    ]);
+    expect(reattached.tabs[0]).toMatchObject({ resumeRequired: false });
+  });
+  it('keeps a saved worktree agent tab dormant until its session is found', () => {
+    const opened = open(empty, 'branch:feature');
+    const withSession = sync(opened, [
+      {
+        itemKey: 'branch:feature',
+        branch: 'feature',
+        worktree: '/repo/feature',
+        running: true,
+        sessionName: 'worktree-key',
+        restore: {
+          sessionName: 'worktree-key',
+          tmuxName: 'old',
+          tags: { '@orchestra-repo': REPO },
+        },
+      },
+    ]);
+    const saved = reduce(withSession, { type: 'hydrate', saved: withSession });
+    expect(saved.tabs[0]).toMatchObject({ resumeRequired: true });
+    const missing = sync(saved, [
+      {
+        itemKey: 'branch:feature',
+        branch: 'feature',
+        worktree: '/repo/feature',
+        running: false,
+        sessionName: 'worktree-key',
+      },
+    ]);
+    expect(missing.tabs[0]).toMatchObject({ resumeRequired: true });
+    const found = sync(missing, [
+      {
+        itemKey: 'branch:feature',
+        branch: 'feature',
+        worktree: '/repo/feature',
+        running: true,
+        sessionName: 'worktree-key',
+        restore: {
+          sessionName: 'worktree-key',
+          tmuxName: 'old',
+          tags: { '@orchestra-repo': REPO },
+        },
+      },
+    ]);
+    expect(found.tabs[0]).toMatchObject({ resumeRequired: false });
+  });
+
+  it('replaces a dormant tab when its original tmux name was taken', () => {
+    const terminal = {
+      name: 'terminal:old',
+      kind: 'agent' as const,
+      cwd: '/repo',
+      displayPath: '/repo',
+      repo: null,
+    };
+    const opened = reduce(empty, { type: 'open-terminal', terminal });
+    const dormant = reduce(opened, { type: 'hydrate', saved: opened });
+    const resumed = reduce(dormant, {
+      type: 'resume-terminal',
+      previous: terminal.name,
+      terminal: { ...terminal, name: 'terminal:new' },
+    });
+    expect(resumed.tabs.map((t) => t.id)).toEqual([
+      terminalTabId('terminal:new'),
+    ]);
+    expect(resumed.activeId).toBe(terminalTabId('terminal:new'));
+  });
+  it('does not attach a saved tab to a different tagged session using its old name', () => {
+    const previous = {
+      name: 'terminal:old',
+      kind: 'agent' as const,
+      cwd: '/repo',
+      displayPath: '/repo',
+      repo: null,
+      restore: {
+        tmuxName: 'old',
+        tags: {
+          '@orchestra-spawner': 'n10',
+          '@orchestra-repo': '/repo',
+          '@orchestra-session-type': 'agent',
+        },
+      },
+    };
+    const opened = reduce(empty, { type: 'open-terminal', terminal: previous });
+    const dormant = reduce(opened, { type: 'hydrate', saved: opened });
+    const conflict = sync(dormant, [], REPO, [
+      {
+        ...previous,
+        cwd: '/other',
+        restore: {
+          tmuxName: 'old',
+          tags: {
+            '@orchestra-spawner': 'n10',
+            '@orchestra-repo': '/other',
+            '@orchestra-session-type': 'agent',
+          },
+        },
+      },
+    ]);
+    expect(conflict.tabs[0]).toMatchObject({
+      cwd: '/repo',
+      resumeRequired: true,
+      restore: previous.restore,
+    });
+  });
   it('re-keys a worktree tab when its branch grows a PR', () => {
     let s = open(empty, 'branch:feat-x');
     s = sync(s, [{ itemKey: 'pr:42', branch: 'feat-x' }]);
@@ -1085,6 +1217,12 @@ describe('terminal tabs', () => {
       let s = syncTerminals(empty, [plain, inAlpha]);
       s = ended(s, plain.name);
       expect(s.tabs.map((t) => t.id)).toEqual([terminalTabId(inAlpha.name)]);
+    });
+
+    it('keeps a dormant saved tab when a conflicting same-name session exits', () => {
+      const opened = openTerminal(empty, plain);
+      const dormant = reduce(empty, { type: 'hydrate', saved: opened });
+      expect(ended(dormant, plain.name)).toBe(dormant);
     });
 
     it('never hands focus to another repository', () => {

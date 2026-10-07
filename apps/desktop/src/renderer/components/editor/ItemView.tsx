@@ -1,6 +1,11 @@
 import { Loader2Icon, PlayIcon, TerminalIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { SessionSummary, SidebarItem } from '../../../host/contract.js';
+import type {
+  SessionSummary,
+  SidebarItem,
+  WorktreeResume,
+} from '../../../host/contract.js';
+import type { ItemTab } from '../../lib/tabs/tabs.js';
 import { useRepo } from '../../lib/repo-context.js';
 import { useAllBranches, useSessions } from '../../lib/data/queries.js';
 import { useBranchSessionRail } from '../../lib/review/use-branch-session-rail.js';
@@ -24,6 +29,7 @@ import { PrWorkspace } from './lazy-panes.js';
 import { Button } from '../ui/button.js';
 import { LaunchDialog, type LaunchChoice } from './LaunchDialog.js';
 import { RemovedWorktreePane } from './RemovedWorktreePane.js';
+import { ResumeWorktreePane } from './ResumeWorktreePane.js';
 import { useItemLaunch } from './use-item-launch.js';
 
 /**
@@ -162,6 +168,7 @@ function Preparing({ itemKey }: { itemKey: string }) {
 }
 
 interface ItemViewProps {
+  tab: ItemTab;
   item: SidebarItem | undefined;
   items: SidebarItem[];
   itemKey: string;
@@ -179,7 +186,65 @@ export function ItemView(props: ItemViewProps) {
   return <WorktreeItemView {...props} />;
 }
 
+function shouldResumeWorktree(
+  tab: ItemTab
+): tab is ItemTab & { restore: WorktreeResume } {
+  return !!tab.resumeRequired && !!tab.restore;
+}
+
+function resumePresentation(tab: ItemTab, branch: string) {
+  return {
+    title: tab.title ?? tab.branch ?? tab.itemKey,
+    branch: tab.branch ?? branch,
+  };
+}
+
+function terminalLaunchDialog(
+  sessions: ReturnType<typeof useBranchSessionRail>,
+  branch: string
+) {
+  const choice = sessions.choice;
+  if (!choice) return null;
+  return (
+    <LaunchTerminalDialog
+      branch={branch}
+      defaultMachine={sessions.terminalMachine}
+      busy={sessions.terminalBusy}
+      remoteStep={choice.remoteStep}
+      remoteError={choice.remoteError}
+      onLaunch={choice.launchOn}
+      onClose={choice.close}
+    />
+  );
+}
+
+function launchDialog(
+  menu: ReturnType<typeof useLaunchMenu>,
+  state: ItemState,
+  branch: string,
+  cwd: string,
+  launch: ReturnType<typeof useItemLaunch>,
+  onChoose: (choice: LaunchChoice) => void,
+  onClose: () => void
+) {
+  if (!menu.open) return null;
+  return (
+    <LaunchDialog
+      pr={state.pr}
+      branch={branch}
+      hasWorktree={state.hasWorktree}
+      cwd={cwd}
+      busy={launch.busy}
+      remoteStep={launch.remoteStep}
+      remoteError={launch.remoteError}
+      onChoose={onChoose}
+      onClose={onClose}
+    />
+  );
+}
+
 function WorktreeItemView({
+  tab,
   item,
   items,
   itemKey,
@@ -211,17 +276,30 @@ function WorktreeItemView({
     // the moment it mounts.
     return estimateTerminalGrid(tab.getBoundingClientRect(), 0.6);
   };
-  const { choose, busy, remoteStep, remoteError, resetRemote } = useItemLaunch(
+  const launch = useItemLaunch(
     repo.cwd,
     launchTarget(branch, state),
     estimateGrid,
     menu.close
   );
+  const { choose, busy, resetRemote } = launch;
   const sessions = useBranchSessionRail(
     repo.cwd,
     state?.pr?.sourceBranch ?? branch,
     estimateGrid
   );
+
+  if (shouldResumeWorktree(tab)) {
+    return (
+      <ResumeWorktreePane
+        {...resumePresentation(tab, branch)}
+        repo={repo.cwd}
+        restore={tab.restore}
+        paneRef={paneRef}
+        estimateGrid={estimateGrid}
+      />
+    );
+  }
 
   if (!item || !state) return <Preparing itemKey={itemKey} />;
   const { sessionName, running, hasWorktree, pr } = state;
@@ -243,29 +321,18 @@ function WorktreeItemView({
     if (!choice.machine) closeMenu();
     choose(choice);
   };
-  const terminalDialog = sessions.choice && (
-    <LaunchTerminalDialog
-      branch={pr?.sourceBranch ?? branch}
-      defaultMachine={sessions.terminalMachine}
-      busy={sessions.terminalBusy}
-      remoteStep={sessions.choice.remoteStep}
-      remoteError={sessions.choice.remoteError}
-      onLaunch={sessions.choice.launchOn}
-      onClose={sessions.choice.close}
-    />
+  const terminalDialog = terminalLaunchDialog(
+    sessions,
+    pr?.sourceBranch ?? branch
   );
-  const dialog = menu.open && (
-    <LaunchDialog
-      pr={pr}
-      branch={branch}
-      hasWorktree={hasWorktree}
-      cwd={repo.cwd}
-      busy={busy}
-      remoteStep={remoteStep}
-      remoteError={remoteError}
-      onChoose={onChoose}
-      onClose={closeMenu}
-    />
+  const dialog = launchDialog(
+    menu,
+    state,
+    branch,
+    repo.cwd,
+    launch,
+    onChoose,
+    closeMenu
   );
 
   // A pull request is the full review workspace (its own merged header,

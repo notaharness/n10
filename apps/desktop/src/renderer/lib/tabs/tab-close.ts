@@ -1,4 +1,4 @@
-import { isForeignTab, type Tab } from './tab-identity.js';
+import { isForeignTab, terminalTabId, type Tab } from './tab-identity.js';
 import type { TabsState } from './tabs-model.js';
 
 /**
@@ -29,6 +29,17 @@ export function closeTab(
     activeId = nextActive(tabs, idx, repo) ?? null;
   }
   return { ...state, tabs, activeId };
+}
+
+/** An exit for a different session using a saved name cannot dismiss its tab. */
+export function closeEndedTerminal(
+  state: TabsState,
+  name: string,
+  repo: string | undefined
+): TabsState {
+  const tab = state.tabs.find((entry) => entry.id === terminalTabId(name));
+  if (tab?.kind === 'terminal' && tab.resumeRequired) return state;
+  return closeTab(state, terminalTabId(name), repo);
 }
 
 /**

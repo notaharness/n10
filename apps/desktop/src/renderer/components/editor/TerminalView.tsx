@@ -7,6 +7,8 @@ import { resolveMachineLabel } from '../../lib/machines/machine-model.js';
 import { terminalPaneState } from '../../lib/terminals/terminal-pane-state.js';
 import { errorMessage } from '../../lib/utils.js';
 import type { TerminalTab } from '../../lib/tabs/tabs.js';
+import { useTabs } from '../../lib/tabs/tabs.js';
+import { toEntry } from '../../lib/terminals/use-terminal-tabs.js';
 import type { TerminalSummary } from '../../../host/contract.js';
 import { useMachines, useTerminals } from '../../lib/data/queries.js';
 import { SessionTerminal } from '../terminal/SessionTerminal.js';
@@ -60,6 +62,43 @@ function ExitedAgentBar({ session }: { session: TerminalSummary }) {
  * `epoch` is the session's spawn time from the host's listing, which is
  * what makes the pane re-fit when the process behind the name changes.
  */
+function ResumeTerminalPane({ tab }: { tab: TerminalTab }) {
+  const tabs = useTabs();
+  const launch = useLaunchTerminal();
+  return (
+    <div
+      className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3"
+      data-terminal-pane
+    >
+      <p className="text-sm text-muted-foreground">{tab.displayPath}</p>
+      <Button
+        disabled={launch.isPending || !tab.restore}
+        onClick={() =>
+          launch.mutate(
+            {
+              sessionName: tab.name,
+              kind: tab.terminalKind,
+              cwd: tab.cwd,
+              restore: tab.restore,
+            },
+            {
+              onSuccess: (summary) =>
+                tabs.resumeTerminal(tab.name, toEntry(summary)),
+            }
+          )
+        }
+      >
+        Resume session
+      </Button>
+      {launch.error && (
+        <p role="alert" className="text-sm text-destructive">
+          {errorMessage(launch.error)}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function TerminalView({ tab }: { tab: TerminalTab }) {
   const terminals = useTerminals();
   const session = terminals.data?.find((t) => t.name === tab.name);
@@ -73,6 +112,9 @@ export function TerminalView({ tab }: { tab: TerminalTab }) {
   const pane = session
     ? terminalPaneState(session)
     : { bannerState: null, inputDisabled: false, showExitedBar: false };
+  if (tab.resumeRequired) {
+    return <ResumeTerminalPane tab={tab} />;
+  }
   return (
     <div className="relative flex min-h-0 flex-1 flex-col" data-terminal-pane>
       {pane.bannerState && (

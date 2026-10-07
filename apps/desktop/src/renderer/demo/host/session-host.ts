@@ -80,6 +80,15 @@ function terminalSummary(state: DemoState, s: DemoSession): TerminalSummary {
     running: s.running,
     spawnedAt: s.spawnedAt,
     machine: s.meta.machine,
+    restore: {
+      tmuxName: (JSON.parse(s.name) as string[])[1],
+      tags: {
+        '@orchestra-spawner': 'n10',
+        '@orchestra-repo': cwd,
+        '@orchestra-session-type': kind,
+      },
+      ...(kind === 'agent' ? { agent: 'claude' } : {}),
+    },
   };
 }
 

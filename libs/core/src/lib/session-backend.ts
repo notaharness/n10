@@ -193,6 +193,7 @@ function discoveredTerminal(
     path: session.path,
     running: !session.paneDead,
     agent: session.agent,
+    tags: session.tags,
   };
 }
 

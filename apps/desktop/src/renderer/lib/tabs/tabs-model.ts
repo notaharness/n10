@@ -20,18 +20,24 @@ import {
   standsFor,
   tabHome,
   tabIdFor,
-  terminalTabId,
   type Tab,
 } from './tab-identity.js';
+import type { WorktreeResume } from '../../../host/contract.js';
 
 export type { ItemTab, Tab, TerminalTab } from './tab-identity.js';
 export type { TerminalEntry } from './tab-terminals.js';
 export type { ForeignSessionEntry } from './tab-foreign.js';
-import { closeRemovedWorktrees, closeTab } from './tab-close.js';
+import {
+  closeEndedTerminal,
+  closeRemovedWorktrees,
+  closeTab,
+} from './tab-close.js';
+import { hydrateTabs } from './tab-hydrate.js';
 import { openForeign, type ForeignSessionEntry } from './tab-foreign.js';
 import { pinLive, rekey } from './tab-sync.js';
 import {
   openTerminal,
+  resumeTerminal,
   syncTerminals,
   type TerminalEntry,
 } from './tab-terminals.js';
@@ -48,6 +54,7 @@ export interface ItemEntry {
    *  worktree row whether or not an agent was ever started, so it says
    *  nothing about liveness on its own — `running` does. */
   sessionName?: string;
+  restore?: WorktreeResume;
   /** The worktree checkout the item lives in, when it has one. */
   worktree?: string;
   /** The branch the item's agent session was created for, when the
@@ -92,6 +99,7 @@ export const EMPTY_TABS: TabsState = {
 };
 
 export type TabsAction =
+  | { type: 'hydrate'; saved: TabsState }
   | { type: 'open-item'; repo: string; itemKey: string; preview: boolean }
   | { type: 'open-settings' }
   | { type: 'pin'; id: string }
@@ -126,6 +134,7 @@ export type TabsAction =
     }
   /** Open (or activate) the tab for a terminal the host just started. */
   | { type: 'open-terminal'; terminal: TerminalEntry }
+  | { type: 'resume-terminal'; previous: string; terminal: TerminalEntry }
   /** The host says the process behind a terminal ended, by name — the
    *  shell exited, the agent quit, tmux ended the session. Its tab
    *  closes on that word alone, whether or not a listing ever named it:
@@ -262,7 +271,7 @@ function applyClose(state: TabsState, action: CloseAction): TabsState {
     case 'close':
       return closeTab(state, action.id, action.repo);
     case 'terminal-ended':
-      return closeTab(state, terminalTabId(action.name), action.repo);
+      return closeEndedTerminal(state, action.name, action.repo);
     case 'worktrees-removed':
       return closeRemovedWorktrees(state, action.repo, action.worktrees);
     case 'close-others':
@@ -281,11 +290,20 @@ function applyClose(state: TabsState, action: CloseAction): TabsState {
  *  `repo`/`entries`, and the `terminals` field rides along for
  *  {@link apply} to hand to `syncTerminals` once the item passes have
  *  settled. */
-type StripAction = Exclude<TabsAction, { type: 'open-terminal' } | CloseAction>;
+type StripAction = Exclude<
+  TabsAction,
+  { type: 'open-terminal' | 'resume-terminal' | 'hydrate' } | CloseAction
+>;
 
 function apply(state: TabsState, action: TabsAction): TabsState {
+  if (action.type === 'hydrate') {
+    return hydrateTabs(action.saved);
+  }
   if (action.type === 'open-terminal') {
     return openTerminal(state, action.terminal);
+  }
+  if (action.type === 'resume-terminal') {
+    return resumeTerminal(state, action.previous, action.terminal);
   }
   if (isCloseAction(action)) {
     return applyClose(state, action);

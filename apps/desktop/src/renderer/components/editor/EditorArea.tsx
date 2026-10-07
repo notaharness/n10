@@ -54,6 +54,7 @@ function PaneBody({
   if (tab.kind === 'terminal') return <TerminalView tab={tab} />;
   return (
     <ItemView
+      tab={tab}
       item={item}
       items={items}
       itemKey={tab.itemKey}

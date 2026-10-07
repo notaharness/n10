@@ -26,6 +26,7 @@ export interface DiscoveredTerminal {
   kind: 'shell' | 'agent';
   running?: boolean;
   agent?: string;
+  tags?: Record<string, string>;
   /** Absolute directory the session runs in. */
   path: string;
 }

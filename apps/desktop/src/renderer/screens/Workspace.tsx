@@ -28,7 +28,11 @@ import { ShortcutsDialog } from '../components/ShortcutsDialog.js';
 import { Sidebar } from '../components/sidebar/Sidebar.js';
 import { StatusBar } from '../components/StatusBar.js';
 import { TitleBar } from '../components/TitleBar.js';
-import { useForeignSessions, useSidebarModel } from '../lib/data/queries.js';
+import {
+  useForeignSessions,
+  useSessions,
+  useSidebarModel,
+} from '../lib/data/queries.js';
 import { useFleet } from '../lib/fleet/fleet-context.js';
 import {
   useRefreshRemote,
@@ -95,6 +99,7 @@ function WorkspaceInner({
   const { repo } = useRepo();
   const tabs = useRepoTabs();
   const model = useSidebarModel(repo.cwd);
+  const sessions = useSessions(repo.cwd);
   const refresh = useRefreshRemote(repo.cwd);
   // Worktrees being removed drop out of the model right away — every
   // consumer below (sidebar, tabs, attention rail) derives from this one
@@ -117,6 +122,7 @@ function WorkspaceInner({
         branch: s.branch,
         worktree: s.worktree,
         sessionName: s.sessionName,
+        restore: s.restore,
       })),
     [foreignSessions.data]
   );
@@ -144,20 +150,19 @@ function WorkspaceInner({
   }, [setRevealHost]);
 
   // The sidebar as the tab model sees it.
-  const entries: ItemEntry[] = useMemo(
-    () =>
-      items.map((i) => ({
-        itemKey: itemKey(i),
-        branch: itemBranch(i),
-        title: itemTitle(i),
-        running: itemRunning(i),
-        sessionName: itemSessionName(i),
-        worktree: itemWorktree(i),
-        sessionBranch:
-          i.kind === 'session' ? i.session.sessionBranch : undefined,
-      })),
-    [items]
-  );
+  const entries: ItemEntry[] = useMemo(() => {
+    const byName = new Map(sessions.data?.map((s) => [s.name, s.restore]));
+    return items.map((i) => ({
+      itemKey: itemKey(i),
+      branch: itemBranch(i),
+      title: itemTitle(i),
+      running: itemRunning(i),
+      sessionName: itemSessionName(i),
+      restore: byName.get(itemSessionName(i) ?? ''),
+      worktree: itemWorktree(i),
+      sessionBranch: i.kind === 'session' ? i.session.sessionBranch : undefined,
+    }));
+  }, [items, sessions.data]);
 
   // The one place every store the strip depends on is reconciled: the
   // sidebar items, the host's terminal listing *and* its listing of

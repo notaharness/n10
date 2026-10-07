@@ -1,4 +1,5 @@
 import { pairKey } from './tab-identity.js';
+import { retainRuntime, sameSavedTarget } from './tab-restore.js';
 import type { ItemEntry, ItemTab, Tab, TabsState } from './tabs-model.js';
 
 /**
@@ -90,6 +91,21 @@ function followedKey(
  * Returns the same tab when nothing changed, so a quiet poll does not
  * re-render the strip.
  */
+function savedRestore(tab: ItemTab, entry: ItemEntry) {
+  const matchesSaved =
+    !tab.resumeRequired ||
+    !tab.restore ||
+    (entry.restore && sameSavedTarget(tab.restore, entry.restore));
+  const restore =
+    entry.restore && matchesSaved
+      ? retainRuntime(entry.restore, tab.restore)
+      : tab.restore;
+  return {
+    restore,
+    resumeRequired: entry.restore && matchesSaved ? false : tab.resumeRequired,
+  };
+}
+
 function stamp(tab: ItemTab, entry: ItemEntry | undefined): ItemTab {
   if (!entry) return tab;
   const next: ItemTab = {
@@ -99,10 +115,20 @@ function stamp(tab: ItemTab, entry: ItemEntry | undefined): ItemTab {
     originBranch:
       tab.originBranch ?? (entry.sessionBranch || entry.branch || undefined),
     title: entry.title ?? tab.title,
+    sessionName: entry.sessionName ?? tab.sessionName,
+    ...savedRestore(tab, entry),
   };
-  const same = (['branch', 'worktree', 'originBranch', 'title'] as const).every(
-    (k) => next[k] === tab[k]
-  );
+  const same = (
+    [
+      'branch',
+      'worktree',
+      'originBranch',
+      'title',
+      'sessionName',
+      'restore',
+      'resumeRequired',
+    ] as const
+  ).every((k) => next[k] === tab[k]);
   return same ? tab : next;
 }
 

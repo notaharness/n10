@@ -5,25 +5,14 @@ import {
   type TmuxLaunchPlan,
 } from '@n10/terminal-tmux';
 import type { SessionBackend, SessionSpec } from '@n10/terminal';
-import {
-  sessionNames,
-  spawnSession,
-  type NamedPtyEntry,
-} from '../pty-registry.js';
+import { spawnSession, type NamedPtyEntry } from '../pty-registry.js';
 import {
   LOCAL_MACHINE,
-  sessionIdentity,
   terminalSessionKey,
   worktreeSessionKey,
 } from '../session-key.js';
 import { pollerFor, requireMachine } from '../machine-registry.js';
-import {
-  ORCHESTRA_TAG,
-  sessionTags,
-  terminalSessionLabel,
-  worktreeSessionLabel,
-  type TaggedSession,
-} from '../session-identity.js';
+import { ORCHESTRA_TAG, type TaggedSession } from '../session-identity.js';
 import {
   listOurSessionsWith,
   resolveSessionByName,
@@ -33,7 +22,7 @@ import { readWorktreeHead } from '../discovery/worktree-origin.js';
 import type { LaunchSpec } from '../agents/registry.js';
 import type { SessionRequest } from './session-request.js';
 import { localSessionEnv } from './local-session-env.js';
-import { worktreeIdentity } from './worktree-identity.js';
+import { attachPlan, launchPlan } from './session-open-plan.js';
 
 export interface OpenSessionParams {
   session: SessionRequest;
@@ -44,6 +33,12 @@ export interface OpenSessionParams {
   cwd: string;
   cols: number;
   rows: number;
+  /** A dormant tab's exact tmux identity and launch environment. */
+  restore?: {
+    tmuxName: string;
+    tags: Record<string, string>;
+    env?: Record<string, string>;
+  };
   /** Called only when a process must start, never during attachment. */
   build: (
     previousAgent?: string,
@@ -150,7 +145,8 @@ async function performOpen(params: OpenSessionParams): Promise<NamedPtyEntry> {
         launch.agent,
         fresh,
         params.expected,
-        params.cwd
+        params.cwd,
+        params.restore
       );
   const machineId = session.machine ?? LOCAL_MACHINE;
   const spec = sessionSpec(params, launch.spec, !!fresh, machineId);
@@ -160,17 +156,6 @@ async function performOpen(params: OpenSessionParams): Promise<NamedPtyEntry> {
       : await createRemoteBackend(spec, plan, machineId);
   const { key, createdFor } = registration(params, backend, existing, plan);
   return spawnSession(key, backend, cols, rows, launch.agent, createdFor);
-}
-
-function attachPlan(
-  existing: TaggedSession,
-  expected: TmuxSessionIncarnation | undefined
-): TmuxLaunchPlan {
-  return {
-    mode: 'attach',
-    target: existing.name,
-    ...(expected ? { expected, expectedTags: identityGuard(existing) } : {}),
-  };
 }
 
 /** The registry key the opened session answers to, and — for a
@@ -212,7 +197,8 @@ async function resolveOpenTarget(
 ): Promise<TaggedSession | null> {
   const { session, cwd, mode = 'open' } = params;
   validateCheckout(session, cwd);
-  const existing = mode === 'create' ? null : await findSession(session);
+  const found = mode === 'create' ? null : await findSession(session);
+  const existing = matchingSavedSession(found, params);
   if (mode === 'attach' && !existing)
     throw new Error('Session ended before it could be attached');
   if (params.expected && (!existing || params.expected.name !== existing.name))
@@ -224,6 +210,41 @@ async function resolveOpenTarget(
       'This session is running; reopen the launch dialog to replace it.'
     );
   return existing;
+}
+
+function matchingSavedSession(
+  found: TaggedSession | null,
+  params: OpenSessionParams
+): TaggedSession | null {
+  if (!found || !params.restore) return found;
+  if (params.session.type === 'worktree') {
+    if (found.name !== params.restore.tmuxName)
+      throw new Error(
+        'Session changed while n10 was closed; reopen the launch dialog.'
+      );
+    return found;
+  }
+  return sameRestoredSession(found, params) ? found : null;
+}
+
+/** A saved tmux label may now be owned by someone else's tagged session. */
+function sameRestoredSession(
+  found: TaggedSession,
+  params: OpenSessionParams
+): boolean {
+  const restore = params.restore;
+  if (!restore || !found.tags) return false;
+  const identityTags = [
+    ORCHESTRA_TAG.spawner,
+    ORCHESTRA_TAG.repo,
+    ORCHESTRA_TAG.sessionType,
+    ORCHESTRA_TAG.branch,
+    ORCHESTRA_TAG.worktreePath,
+    ORCHESTRA_TAG.agent,
+  ];
+  if (identityTags.some((tag) => found.tags?.[tag] !== restore.tags[tag]))
+    return false;
+  return params.session.type === 'worktree' || found.path === params.cwd;
 }
 
 /**
@@ -254,11 +275,18 @@ function sessionSpec(
   const additions: Record<string, string | undefined> = {
     ...local?.vars,
     ...launch.env,
+    ...params.restore?.env,
     ...(fresh ? { ORCHESTRA_SESSION: '', ORCHESTRA_SOCKET: '' } : {}),
   };
   const env: Record<string, string | undefined> = local
     ? { ...process.env, ...additions, PATH: local.path }
     : { ...additions };
+  if (
+    params.restore?.env &&
+    Object.hasOwn(params.restore.env, 'CLAUDE_CONFIG_DIR') &&
+    params.restore.env['CLAUDE_CONFIG_DIR'] === ''
+  )
+    delete env.CLAUDE_CONFIG_DIR;
   delete env.TMUX;
   delete env.TMUX_PANE;
   return {
@@ -271,79 +299,6 @@ function sessionSpec(
   };
 }
 
-function launchPlan(
-  request: SessionRequest,
-  existing: TaggedSession | null,
-  agent: string | undefined,
-  fresh: boolean | undefined,
-  expected: TmuxSessionIncarnation | undefined,
-  cwd: string
-): TmuxLaunchPlan {
-  const worktree =
-    request.type === 'worktree' ? worktreeIdentity(request, cwd) : null;
-  const identity = worktree ?? {
-    type: (request as Extract<SessionRequest, { type: 'terminal' }>).kind,
-  };
-  const agentTags: Record<string, string> = agent
-    ? { [ORCHESTRA_TAG.agent]: agent }
-    : {};
-  const retainOnExit = request.type === 'worktree' || request.kind === 'agent';
-  if (existing) {
-    const tags = {
-      ...agentTags,
-      ...(fresh
-        ? {
-            [ORCHESTRA_TAG.orchestrator]: null,
-            [ORCHESTRA_TAG.orchestratorConfig]: null,
-            [ORCHESTRA_TAG.lastReport]: null,
-          }
-        : {}),
-    };
-    if (fresh && expected)
-      return {
-        mode: 'replace',
-        target: existing.name,
-        expected,
-        retainOnExit,
-        tags,
-        expectedTags: identityGuard(existing),
-      };
-    // Unconfirmed restarts never use -k. An external live winner is left alone.
-    return {
-      mode: 'restart',
-      target: existing.name,
-      tags,
-      retainOnExit,
-      ...(expected ? { expected, expectedTags: identityGuard(existing) } : {}),
-    };
-  }
-  return {
-    mode: 'create',
-    label:
-      request.type === 'worktree'
-        ? worktreeSessionLabel(request.repo, worktree!.branch)
-        : terminalSessionLabel(request.repo, request.kind),
-    tags: { ...sessionTags(request.repo, identity), ...agentTags },
-    retainOnExit,
-    excludedNames:
-      request.type === 'terminal'
-        ? sessionNames().flatMap((key) => {
-            const identity = sessionIdentity(key);
-            return identity?.kind === 'terminal' ? [identity.id] : [];
-          })
-        : undefined,
-  };
-}
-
 function shouldAttach(mode: string, session: TaggedSession | null): boolean {
   return session !== null && (mode === 'attach' || !session.paneDead);
-}
-
-function identityGuard(session: TaggedSession): Record<string, string> {
-  return {
-    [ORCHESTRA_TAG.repo]: session.repo,
-    [ORCHESTRA_TAG.sessionType]: session.type,
-    [ORCHESTRA_TAG.branch]: session.branch,
-    [ORCHESTRA_TAG.spawner]: session.spawner,
-  };
 }

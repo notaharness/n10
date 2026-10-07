@@ -5,6 +5,7 @@ import {
   hasSessionConnection,
   isSessionAlive,
   launchSession,
+  LOCAL_MACHINE,
   resolveAgent,
   resolveRemoteWorktreePath,
   sessionIncarnationMatches,
@@ -28,6 +29,15 @@ export interface SessionLaunch {
   cols?: number;
   rows?: number;
   remote?: { id: string; machine: Machine };
+  restore?: {
+    sessionName: string;
+    tmuxName: string;
+    tags: Record<string, string>;
+    agent?: string;
+    aiCommand?: string;
+    env?: Record<string, string>;
+    conversationId?: string;
+  };
 }
 export interface SessionLaunchPorts {
   /** Fleet ownership policy, applied before creating a local checkout. */
@@ -35,6 +45,23 @@ export interface SessionLaunchPorts {
   started?(name: string, repo: string): void;
   progress?(step: 'worktree' | 'start'): void;
 }
+type SavedIdentity = Extract<
+  NonNullable<ReturnType<typeof sessionIdentity>>,
+  { kind: 'worktree' }
+>;
+
+function selectedConfig(req: SessionLaunch, stored: AppConfig): AppConfig {
+  if (!req.restore)
+    return req.agentId ? { ...stored, agentId: req.agentId } : stored;
+  return {
+    ...stored,
+    ...(req.restore.agent
+      ? { agentId: req.restore.agent as AppConfig['agentId'] }
+      : {}),
+    ...(req.restore.aiCommand ? { aiCommand: req.restore.aiCommand } : {}),
+  };
+}
+
 function canReuse(req: SessionLaunch, name: string): boolean {
   return (
     !req.fresh &&
@@ -56,6 +83,7 @@ function joinLaunch(
     req.agentId,
     req.fresh,
     req.expected,
+    req.restore,
   ]);
   const active = pending.get(key);
   if (active)
@@ -90,6 +118,13 @@ export function createSessionCommands(options: {
         'The repository changed. Open it again to launch this session.'
       );
   }
+  function savedIdentity(req: SessionLaunch): SavedIdentity | null {
+    if (!req.restore) return null;
+    const identity = sessionIdentity(req.restore.sessionName);
+    if (identity?.kind !== 'worktree' || identity.repo !== repo)
+      throw new Error('Saved session belongs to another repository.');
+    return identity;
+  }
   async function resolveLocal(
     req: SessionLaunch,
     ports: SessionLaunchPorts
@@ -119,6 +154,27 @@ export function createSessionCommands(options: {
     ports.progress?.('worktree');
     return remoteCheckout(req.target.branch, req.remote);
   }
+  async function resolveSavedLocal(
+    name: string,
+    ports: SessionLaunchPorts
+  ): Promise<void> {
+    const found = await worktrees.find({ session: name });
+    assertCurrent();
+    if (!found)
+      throw new Error('The saved session worktree is no longer available.');
+    await ports.beforeLaunch?.(found.branch, name);
+    assertCurrent();
+  }
+  async function launchPath(
+    req: SessionLaunch,
+    ports: SessionLaunchPorts,
+    identity: SavedIdentity | null
+  ): Promise<string> {
+    if (!identity) return resolve(req, ports);
+    if (identity.machine === LOCAL_MACHINE)
+      await resolveSavedLocal(req.restore!.sessionName, ports);
+    return identity.path;
+  }
   async function remoteCheckout(
     branch: string,
     remote: NonNullable<SessionLaunch['remote']>
@@ -145,20 +201,23 @@ export function createSessionCommands(options: {
     assertCurrent();
     if (canReuse(req, name)) return name;
     ports.progress?.('start');
-    const selected = req.agentId ? { ...stored, agentId: req.agentId } : stored;
+    const selected = selectedConfig(req, stored);
     const explicit = req.fresh || req.agentId || req.request.intent === 'blank';
     const before = getSession(name);
     const entry = await launchSession({
       name,
       cwd,
-      ...('branch' in req.target ? { branch: req.target.branch } : {}),
+      ...(!req.restore && 'branch' in req.target
+        ? { branch: req.target.branch }
+        : {}),
       cols: paneDimension(req.cols, 120),
       rows: paneDimension(req.rows, 40),
       config: selected,
       agent: explicit ? resolveAgent(selected) : undefined,
-      request: req.request,
+      request: { ...req.request, conversationId: req.restore?.conversationId },
       fresh: req.fresh,
       expected: req.expected,
+      restore: req.restore,
     });
     if (entry !== before) ports.started?.(name, repo);
     changed();
@@ -170,9 +229,12 @@ export function createSessionCommands(options: {
   ): Promise<string> {
     assertCurrent();
     const stored = config.getSnapshot().config;
-    const cwd = await resolve(req, ports);
+    const identity = savedIdentity(req);
+    const cwd = await launchPath(req, ports, identity);
     assertCurrent();
-    const name = worktreeSessionKey(cwd, repo, req.remote?.id);
+    const name = identity
+      ? req.restore!.sessionName
+      : worktreeSessionKey(cwd, repo, req.remote?.id);
     // A branch request and a checkout request can resolve to the same PTY.
     return joinLaunch(resolved, name, req, () =>
       start(req, ports, cwd, name, stored)

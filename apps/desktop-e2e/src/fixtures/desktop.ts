@@ -98,10 +98,13 @@ export interface DesktopApp {
   pageErrors: string[];
   /** Evaluate in the main process (e.g. to inspect host services). */
   main: ElectronApplication['evaluate'];
-  /** Quit the app and start it again on the same HOME, tmux socket and
-   *  environment, as a user closing and reopening n10 would. `app`,
-   *  `page` and `main` then answer for the new process. */
-  relaunch(): Promise<void>;
+  /** Quit and reopen on the same HOME and tmux socket. The optional
+   *  callback runs while the app is closed, to simulate a computer
+   *  restart or changed environment before the next launch. */
+  relaunch(options?: {
+    whileClosed?: () => void;
+    env?: Record<string, string>;
+  }): Promise<void>;
 }
 
 export const test = base.extend<
@@ -211,12 +214,22 @@ export const test = base.extend<
       homeDir,
       pageErrors,
       main: app.evaluate.bind(app),
-      async relaunch() {
+      async relaunch(options) {
         await closeDesktopApp(app);
+        options?.whileClosed?.();
+        const nextEnv: Record<string, string> = {
+          ...launchEnv,
+          ...options?.env,
+          HOME: launchEnv.HOME,
+          XDG_CONFIG_HOME: launchEnv.XDG_CONFIG_HOME,
+          TMUX_TMPDIR: launchEnv.TMUX_TMPDIR,
+        };
+        delete nextEnv.TMUX;
+        delete nextEnv.TMUX_PANE;
         app = await electron.launch({
           args: launchArgs(),
           cwd: WORKSPACE_ROOT,
-          env: launchEnv,
+          env: nextEnv,
           timeout: 60_000,
         });
         const next = await app.firstWindow();

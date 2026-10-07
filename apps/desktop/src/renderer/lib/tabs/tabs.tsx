@@ -5,8 +5,11 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
+  useState,
   type ReactNode,
 } from 'react';
+import { toast } from 'sonner';
 import {
   EMPTY_TABS,
   reduce,
@@ -18,6 +21,7 @@ import {
 } from './tabs-model.js';
 import { useRepo } from '../repo-context.js';
 import { tabOpening } from './tab-identity.js';
+import { decodeTabs, encodeTabs } from './tabs-persistence.js';
 
 export type {
   ForeignSessionEntry,
@@ -88,6 +92,7 @@ interface TabsApi extends TabsState {
   repoOpened: (repo: string) => void;
   /** Open (or activate) the tab for a terminal the host just started. */
   openTerminal: (terminal: TerminalEntry) => void;
+  resumeTerminal: (previous: string, terminal: TerminalEntry) => void;
   /** The host says the terminal's process ended: close its tab, listed
    *  or not. `repo` is the one in view, for the close-focus rules. */
   terminalEnded: (name: string, repo?: string) => void;
@@ -102,6 +107,38 @@ const TabsContext = createContext<TabsApi | null>(null);
 
 export function TabsProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reduce, EMPTY_TABS);
+  const [loaded, setLoaded] = useState(false);
+  const saves = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    let live = true;
+    window.n10.loadOpenTabs().then(
+      (saved) => {
+        if (!live) return;
+        const decoded = decodeTabs(saved);
+        if (decoded) dispatch({ type: 'hydrate', saved: decoded });
+        setLoaded(true);
+      },
+      (error: unknown) => {
+        if (!live) return;
+        toast.error(`Could not load open tabs: ${String(error)}`);
+        setLoaded(true);
+      }
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    const snapshot = encodeTabs(state);
+    saves.current = saves.current
+      .then(() => window.n10.saveOpenTabs(snapshot))
+      .catch((error: unknown) => {
+        toast.error(`Could not save open tabs: ${String(error)}`);
+      });
+  }, [state, loaded]);
 
   // A removed worktree takes its tabs with it, whoever removed it: n10,
   // `git worktree remove` or `rm -rf`. Heard here, above the repo gate,
@@ -183,6 +220,11 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     (terminal: TerminalEntry) => dispatch({ type: 'open-terminal', terminal }),
     []
   );
+  const resumeTerminal = useCallback(
+    (previous: string, terminal: TerminalEntry) =>
+      dispatch({ type: 'resume-terminal', previous, terminal }),
+    []
+  );
   const terminalEnded = useCallback(
     (name: string, repo?: string) =>
       dispatch({ type: 'terminal-ended', name, repo }),
@@ -209,6 +251,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       syncItems,
       repoOpened,
       openTerminal,
+      resumeTerminal,
       terminalEnded,
       forgetAutoOpened,
     }),
@@ -227,12 +270,17 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       syncItems,
       repoOpened,
       openTerminal,
+      resumeTerminal,
       terminalEnded,
       forgetAutoOpened,
     ]
   );
 
-  return <TabsContext.Provider value={api}>{children}</TabsContext.Provider>;
+  return (
+    <TabsContext.Provider value={api}>
+      {loaded && children}
+    </TabsContext.Provider>
+  );
 }
 
 export function useTabs(): TabsApi {

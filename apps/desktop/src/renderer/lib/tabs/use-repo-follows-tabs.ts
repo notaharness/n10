@@ -21,11 +21,14 @@ import { activeTabRepo, useTabs } from './tabs.js';
  */
 export function useRepoFollowsTabs(
   repoCwd: string | null,
-  openRepo: (cwd: string) => Promise<boolean>
+  openRepo: (cwd: string) => Promise<boolean>,
+  ready = true
 ): void {
   const tabs = useTabs();
   const target = activeTabRepo(tabs);
   const lastActiveId = useRef(tabs.activeId);
+  const initialTarget = useRef(target);
+  const initialRepoHandled = useRef(false);
   const repoOpened = tabs.repoOpened;
 
   // The other direction: the repository in view decides which tab is in
@@ -33,8 +36,19 @@ export function useRepoFollowsTabs(
   // otherwise, so the workspace you asked for would open onto a pane
   // about the one you did not.
   useEffect(() => {
+    if (!ready) return;
+    if (!initialRepoHandled.current) {
+      initialRepoHandled.current = true;
+      const savedRepo = initialTarget.current;
+      if (repoCwd && savedRepo && savedRepo !== repoCwd) {
+        void openRepo(savedRepo).then((opened) => {
+          if (!opened) repoOpened(repoCwd);
+        });
+        return;
+      }
+    }
     if (repoCwd !== null) repoOpened(repoCwd);
-  }, [repoCwd, repoOpened]);
+  }, [ready, repoCwd, repoOpened, openRepo]);
 
   useEffect(() => {
     const activeId = tabs.activeId;
