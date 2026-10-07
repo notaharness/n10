@@ -1,6 +1,15 @@
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, focusTerminal, tab, tabs } from './setup/app.js';
+import {
+  createWorktree,
+  focusTerminal,
+  switchRepo,
+  tab,
+  tabs,
+} from './setup/app.js';
+import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 import { clickAppMenuItem } from './setup/menu.js';
 import {
   confirmNewTerminal,
@@ -26,7 +35,29 @@ async function openSettings(
   await expectActive(page, /Settings/);
 }
 
+/** What each project's config file says, by file. */
+function projectConfigs(homeDir: string): Record<string, string> {
+  const root = join(homeDir, '.n10', 'projects');
+  if (!existsSync(root)) return {};
+  return Object.fromEntries(
+    readdirSync(root)
+      .map((key) => join(root, key, 'config.json'))
+      .filter((file) => existsSync(file))
+      .map((file) => [file, readFileSync(file, 'utf8')])
+  );
+}
+
+function globalOverrides(homeDir: string): unknown {
+  const config = JSON.parse(
+    readFileSync(join(homeDir, '.n10', 'config.json'), 'utf8')
+  ) as { keybindOverrides?: unknown };
+  return config.keybindOverrides;
+}
+
 test.describe('Tab switching keys', () => {
+  // A project config of its own, to show the shortcuts never land there.
+  test.use({ projectConfig: { email: 'tabs@example.com' } });
+
   test('Ctrl+PgUp/PgDn step along the strip and wrap, from inside a terminal', async ({
     desktop,
   }) => {
@@ -121,10 +152,12 @@ test.describe('Tab switching keys', () => {
   test('a rebound chord takes over and is kept in the global config', async ({
     desktop,
   }) => {
-    const { app, page } = desktop;
+    const { app, page, homeDir } = desktop;
     await createWorktree(page, 'alpha');
     await createWorktree(page, 'beta');
     await openSettings(app, page);
+    const projects = projectConfigs(homeDir);
+    expect(Object.keys(projects)).toHaveLength(1);
 
     const recorder = page.getByTestId('shortcut-desktop.tabs.next');
     await expect(recorder).toHaveText('Ctrl+PgDn');
@@ -135,6 +168,11 @@ test.describe('Tab switching keys', () => {
     expect(await page.evaluate(() => window.n10.getKeybindings())).toEqual({
       'desktop.tabs.next': [{ ctrl: true, input: 'j' }],
     });
+    // n10-wide: in ~/.n10/config.json, and the project's file untouched.
+    expect(globalOverrides(homeDir)).toEqual({
+      'desktop.tabs.next': [{ ctrl: true, input: 'j' }],
+    });
+    expect(projectConfigs(homeDir)).toEqual(projects);
 
     // The strip order is alpha, beta, Settings.
     await page.keyboard.press('Control+PageDown');
@@ -147,5 +185,102 @@ test.describe('Tab switching keys', () => {
     await page.getByRole('button', { name: 'Reset' }).click();
     await expect(recorder).toHaveText('Ctrl+PgDn');
     expect(await page.evaluate(() => window.n10.getKeybindings())).toEqual({});
+    expect(globalOverrides(homeDir)).toBeUndefined();
+    expect(projectConfigs(homeDir)).toEqual(projects);
+  });
+
+  test('the recorder refuses bare keys and the app’s own shortcuts', async ({
+    desktop,
+  }) => {
+    const { app, page, homeDir } = desktop;
+    await openSettings(app, page);
+    const recorder = page.getByTestId('shortcut-desktop.tabs.next');
+
+    await recorder.click();
+    await page.keyboard.press('j');
+    await expect(
+      page.getByText(
+        'j needs Ctrl or Alt: without one it would be taken from typing'
+      )
+    ).toBeVisible();
+    await expect(recorder).toHaveText('Ctrl+PgDn');
+
+    // Ctrl+W is the menu's Close Tab: while recording, the window
+    // ignores menu accelerators, and the chord reaches the recorder to be
+    // refused. (Playwright's keys never reach the native menu, so the
+    // hold is watched where it is made.)
+    await desktop.main(({ BrowserWindow }) => {
+      const contents = BrowserWindow.getAllWindows()[0]!.webContents;
+      const held: boolean[] = [];
+      (globalThis as { menuHolds?: boolean[] }).menuHolds = held;
+      const original = contents.setIgnoreMenuShortcuts.bind(contents);
+      contents.setIgnoreMenuShortcuts = (ignore: boolean) => {
+        held.push(ignore);
+        original(ignore);
+      };
+    });
+    const menuHolds = () =>
+      desktop.main(
+        () => (globalThis as { menuHolds?: boolean[] }).menuHolds ?? []
+      );
+    await recorder.click();
+    await expect.poll(menuHolds).toEqual([true]);
+    await page.keyboard.press('Control+w');
+    await expect(page.getByText('Ctrl+w is already “Close tab”')).toBeVisible();
+    await expectActive(page, /Settings/);
+    await expect(recorder).toHaveText('Ctrl+PgDn');
+    expect(globalOverrides(homeDir)).toBeUndefined();
+    // Recording over, the menu has its accelerators back.
+    await expect.poll(menuHolds).toEqual([true, false]);
+  });
+});
+
+test.describe('Tab switching across repositories', () => {
+  test.use({
+    repo: { name: 'repo-alpha' },
+    desktopPrefs: { tabCycleMru: true },
+  });
+
+  let otherRepo: string;
+  test.beforeEach(() => {
+    otherRepo = createTestRepo({ name: 'repo-beta' });
+  });
+  test.afterEach(() => cleanupTestRepo(otherRepo));
+
+  test('a walk carries on through the repository switch it causes', async ({
+    desktop,
+  }) => {
+    const { page, repoPath } = desktop;
+    await createWorktree(page, 'one');
+    await switchRepo(page, otherRepo);
+    await createWorktree(page, 'two');
+    await createWorktree(page, 'three');
+    await expectActive(page, /three/);
+
+    // Most recent first: three, two, one (in repo-alpha).
+    await page.keyboard.down('Control');
+    await page.keyboard.press('Tab');
+    await expectActive(page, /two/);
+    await page.keyboard.press('Tab');
+    await expectActive(page, /one/);
+    // Landing on one opened repo-alpha, remounting the workspace.
+    await expect
+      .poll(() => page.evaluate(() => window.n10.getRepo()), {
+        timeout: 30_000,
+      })
+      .toMatchObject({ cwd: repoPath });
+    // Still the same walk: on to the end of it, wrapping to three.
+    await page.keyboard.press('Tab');
+    await expectActive(page, /three/);
+    await page.keyboard.up('Control');
+    await expect
+      .poll(() => page.evaluate(() => window.n10.getRepo()), {
+        timeout: 30_000,
+      })
+      .toMatchObject({ cwd: otherRepo });
+
+    // Landing back on three left the order as it was.
+    await page.keyboard.press('Control+Tab');
+    await expectActive(page, /two/);
   });
 });
