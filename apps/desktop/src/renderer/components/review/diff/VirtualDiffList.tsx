@@ -16,6 +16,7 @@ import type {
 } from '../../../../host/contract.js';
 import { expandIndices } from '../../../lib/diff/diff-model.js';
 import { useDiffOptions } from '../../../lib/diff/diff-options.js';
+import { useReportVisibleDiffFiles } from '../../../lib/diff/visible-files-context.js';
 import { filesOnScreen } from '../../../lib/diff/diff-rows-model.js';
 import { linePoints, pointKey } from '../../../lib/diff/diff-points.js';
 import {
@@ -167,6 +168,7 @@ export function VirtualDiffList({
     scrollToFn: scrollTelling(scrolledRef),
   });
   const virtualItems = virtualizer.getVirtualItems();
+  useReportVisibleDiffFiles(rows, virtualizer);
   useDiffAnchor({
     ready: files.length > 0,
     points,
@@ -252,7 +254,6 @@ export function VirtualDiffList({
   // Moving through lines, or back from a closed composer, may land on
   // a row the list has not mounted: scroll it into view, then focus it
   // once it renders, which can take the virtualizer a few frames.
-  const { nav } = comments;
   useEffect(() => {
     const focusIn = (
       selector: string,
@@ -267,7 +268,7 @@ export function VirtualDiffList({
         onlyIfLost
       );
     const file = (f: string) => `[data-file="${CSS.escape(f)}"]`;
-    nav.current = {
+    comments.nav.current = {
       pointsOf: (f) => points.byFile.get(f) ?? [],
       rowOf: (p) => points.rowOf.get(pointKey(p)),
       focus: (p, onlyIfLost) =>
