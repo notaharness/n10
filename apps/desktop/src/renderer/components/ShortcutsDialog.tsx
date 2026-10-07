@@ -1,3 +1,5 @@
+import { DESKTOP_ACTIONS, keyDescriptorToString } from '@n10/core/ui';
+import { useDesktopBindings } from '../lib/keybindings.js';
 import { MOD } from '../lib/utils.js';
 import {
   Dialog,
@@ -28,17 +30,30 @@ export function ShortcutsDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
+  const bindings = useDesktopBindings();
+  // The tab shortcuts are rebindable (Settings → Keyboard), so they
+  // read from the live bindings rather than a fixed table.
+  const rows: [string, string[]][] = [
+    ...ROWS,
+    ...DESKTOP_ACTIONS.flatMap(({ id, label }): [string, string[]][] => {
+      const first = bindings[id][0];
+      if (!first) return [];
+      const keys = keyDescriptorToString(first).split('+');
+      return [[label, keys.map((k) => (k === 'Shift' ? '⇧' : k))]];
+    }),
+  ];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
           <DialogDescription>
-            The same shortcuts are available from the application menu.
+            Most are also in the application menu; change the tab shortcuts in
+            Settings → Keyboard.
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-2 text-base">
-          {ROWS.map(([label, keys]) => (
+          {rows.map(([label, keys]) => (
             <div key={label} className="contents">
               <span className="text-muted-foreground">{label}</span>
               <span className="flex items-center gap-1">

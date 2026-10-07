@@ -48,6 +48,7 @@ describe('loadDesktopPrefs', () => {
       theme: 'system',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
     });
   });
 
@@ -59,6 +60,7 @@ describe('loadDesktopPrefs', () => {
       theme: 'system',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
     });
   });
 
@@ -70,6 +72,7 @@ describe('loadDesktopPrefs', () => {
       theme: 'dark',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
     });
   });
 
@@ -79,12 +82,14 @@ describe('loadDesktopPrefs', () => {
         theme: 'light',
         nativeFrame: true,
         tabOverflow: 'scroll',
+        tabCycleMru: true,
       })
     );
     expect(loadDesktopPrefs()).toEqual({
       theme: 'light',
       nativeFrame: true,
       tabOverflow: 'scroll',
+      tabCycleMru: true,
     });
   });
 });
@@ -96,11 +101,13 @@ describe('saveDesktopPrefs', () => {
       theme: 'dark',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
     });
     expect(JSON.parse(readFileSync(prefsPath(), 'utf8'))).toEqual({
       theme: 'dark',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
     });
   });
 
@@ -112,6 +119,7 @@ describe('saveDesktopPrefs', () => {
       theme: 'light',
       nativeFrame: true,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
     });
   });
 
@@ -122,6 +130,7 @@ describe('saveDesktopPrefs', () => {
       theme: 'system',
       nativeFrame: true,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
     });
   });
 
@@ -131,6 +140,7 @@ describe('saveDesktopPrefs', () => {
       theme: 'dark',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
     });
     expect(loadDesktopPrefs().theme).toBe('dark');
   });

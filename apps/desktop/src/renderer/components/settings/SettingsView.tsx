@@ -9,12 +9,13 @@ import { cn } from '../../lib/utils.js';
 import { Skeleton } from '../ui/skeleton.js';
 import { AppearanceRows } from './AppearanceRows.js';
 import { FieldRow } from './FieldRow.js';
+import { KeyboardRows } from './KeyboardRows.js';
 import { MachineRows } from './MachineRows.js';
 
 /**
  * Settings page: group navigation on the left, one card per group on
- * the right. Fields come from the CLI's own catalog (host-side); only
- * the Appearance group is desktop-local.
+ * the right. Fields come from the CLI's own catalog (host-side); the
+ * Appearance, Keyboard and Machines groups are desktop-local.
  */
 export function SettingsView() {
   const { repo } = useRepo();
@@ -82,6 +83,8 @@ export function SettingsView() {
               <div className="divide-y divide-border rounded-lg border border-border bg-card">
                 {g.key === 'appearance' ? (
                   <AppearanceRows />
+                ) : g.key === 'keyboard' ? (
+                  <KeyboardRows />
                 ) : g.key === 'machines' ? (
                   <MachineRows />
                 ) : (

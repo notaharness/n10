@@ -70,6 +70,7 @@ describe('loadRepoGate', () => {
           theme: 'system' as const,
           nativeFrame: false,
           tabOverflow: 'wrap' as const,
+          tabCycleMru: false,
         }),
     });
 
@@ -92,7 +93,12 @@ describe('loadRepoGate', () => {
     // with are not — resolving now would paint the wrong one first.
     expect(await state(gate)).toBe('pending');
 
-    prefs.resolve({ theme: 'system', nativeFrame: false, tabOverflow: 'wrap' });
+    prefs.resolve({
+      theme: 'system',
+      nativeFrame: false,
+      tabOverflow: 'wrap',
+      tabCycleMru: false,
+    });
     expect(await gate).toEqual(REPO);
   });
 

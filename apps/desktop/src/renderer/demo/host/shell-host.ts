@@ -1,5 +1,6 @@
 import type { MenuCommandEvent } from '../../../host/contract-events.js';
 import type {
+  DesktopKeybindings,
   DesktopPrefs,
   N10HostApi,
   RepoInfo,
@@ -94,6 +95,8 @@ type ShellHost = Pick<
   | 'onMenuCommand'
   | 'getDesktopPrefs'
   | 'setDesktopPrefs'
+  | 'getKeybindings'
+  | 'setKeybinding'
   | 'showAbout'
 >;
 
@@ -102,7 +105,9 @@ export function createShellHost(state: DemoState): ShellHost {
     theme: requestedTheme() ?? 'system',
     nativeFrame: false,
     tabOverflow: 'wrap',
+    tabCycleMru: false,
   };
+  let keybindings: DesktopKeybindings = {};
   const menuCommands = new Channel<MenuCommandEvent>();
   return {
     getVersion: () =>
@@ -140,6 +145,14 @@ export function createShellHost(state: DemoState): ShellHost {
     setDesktopPrefs: (patch) => {
       prefs = { ...prefs, ...patch };
       return later(prefs);
+    },
+    getKeybindings: () => later(keybindings),
+    setKeybinding: (actionId, descriptors) => {
+      const rest = Object.fromEntries(
+        Object.entries(keybindings).filter(([id]) => id !== actionId)
+      );
+      keybindings = descriptors ? { ...rest, [actionId]: descriptors } : rest;
+      return later(keybindings);
     },
     showAbout: () => later(undefined),
   };

@@ -165,6 +165,9 @@ const api: N10HostApi = {
   },
   getDesktopPrefs: () => ipcRenderer.invoke(IPC.getDesktopPrefs),
   setDesktopPrefs: (patch) => ipcRenderer.invoke(IPC.setDesktopPrefs, patch),
+  getKeybindings: () => ipcRenderer.invoke(IPC.getKeybindings),
+  setKeybinding: (actionId, descriptors) =>
+    ipcRenderer.invoke(IPC.setKeybinding, actionId, descriptors),
   showAbout: () => ipcRenderer.invoke(IPC.showAbout),
 
   startBabysit: (prId) => ipcRenderer.invoke(IPC.startBabysit, prId),
@@ -177,7 +180,8 @@ const api: N10HostApi = {
 
   listMachines: () => ipcRenderer.invoke(IPC.listMachines),
   getBeamStatus: () => ipcRenderer.invoke(IPC.getBeamStatus),
-  setNetworkOnline: (online) => ipcRenderer.invoke(IPC.setNetworkOnline, online),
+  setNetworkOnline: (online) =>
+    ipcRenderer.invoke(IPC.setNetworkOnline, online),
   onBeamStatusChanged: (cb) => {
     const listener = (_e: unknown, payload: FleetStatus) => cb(payload);
     ipcRenderer.on(MACHINES_EVENTS.beamStatus, listener);

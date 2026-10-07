@@ -127,6 +127,8 @@ interface N10Bridge {
       | { state: 'failed'; kind: string; reason: string }
       | { state: 'unsupported'; reason: string };
   }>;
+  getDesktopPrefs(): Promise<Record<string, unknown>>;
+  getKeybindings(): Promise<Record<string, Record<string, unknown>[]>>;
   /** Used by the perf probes to time the host half of a tab open. */
   fetchWorktreeDiffText(branch: string, target: string): Promise<string>;
 }

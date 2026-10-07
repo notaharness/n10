@@ -45,6 +45,9 @@ vi.mock('./services/repo.js', () =>
 vi.mock('./services/settings.js', () =>
   recorder('settings', ['getSettingsView', 'updateSettingsFromView'])
 );
+vi.mock('./services/keybindings.js', () =>
+  recorder('keybindings', ['getDesktopKeybindings', 'setDesktopKeybinding'])
+);
 vi.mock('./services/sidebar.js', () =>
   recorder('sidebar', ['getSidebarSnapshot', 'getSyncState', 'refreshRemote'])
 );
@@ -325,6 +328,12 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ],
 
   ['getDesktopPrefs', [], 'prefs.loadDesktopPrefs'],
+  ['getKeybindings', [], 'keybindings.getDesktopKeybindings'],
+  [
+    'setKeybinding',
+    ['desktop.tabs.next', null],
+    'keybindings.setDesktopKeybinding',
+  ],
 
   ['startBabysit', [7], 'babysit.startBabysit'],
   ['stopBabysit', [7], 'babysit.stopBabysit'],

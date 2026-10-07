@@ -9,6 +9,7 @@ import { IPC } from './contract.js';
 import * as repo from './services/repo.js';
 import * as prefs from './services/desktop-prefs.js';
 import * as settings from './services/settings.js';
+import * as keybindings from './services/keybindings.js';
 import * as sidebar from './services/sidebar.js';
 import * as worktrees from './services/worktrees.js';
 import * as reviews from './services/reviews.js';
@@ -158,6 +159,9 @@ export function createHostApi(): HostApi {
       prefsChanged(next);
       return Promise.resolve(next);
     },
+    getKeybindings: () => Promise.resolve(keybindings.getDesktopKeybindings()),
+    setKeybinding: (actionId, descriptors) =>
+      Promise.resolve(keybindings.setDesktopKeybinding(actionId, descriptors)),
     showAbout: () => aboutBox(),
 
     startBabysit: (prId) => babysit.startBabysit(prId),
