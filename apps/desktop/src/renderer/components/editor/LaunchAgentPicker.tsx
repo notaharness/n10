@@ -1,5 +1,6 @@
 import type { AgentOptionView } from '../../../host/contract.js';
 import { Label } from '../ui/label.js';
+import { selectKey } from '../ui/select-keys.js';
 import {
   Select,
   SelectContent,
@@ -13,10 +14,13 @@ export function LaunchAgentPicker({
   agents,
   index,
   onChange,
+  onSubmit,
 }: {
   agents: AgentOptionView[];
   index: number;
   onChange: (index: number) => void;
+  /** Enter on the closed picker launches with the agent it shows. */
+  onSubmit: () => void;
 }) {
   return (
     <div className="min-w-0 space-y-2">
@@ -29,6 +33,15 @@ export function LaunchAgentPicker({
         <SelectTrigger
           id="launch-agent"
           aria-label="Agent"
+          onKeyDown={(e) =>
+            selectKey(
+              e,
+              agents.map((_, i) => String(i)),
+              String(index),
+              (value) => onChange(Number(value)),
+              onSubmit
+            )
+          }
           className="w-full min-w-0"
         >
           <SelectValue placeholder="Loading…" />

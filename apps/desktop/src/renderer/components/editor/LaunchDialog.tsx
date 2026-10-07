@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { PlayIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import type {
   AgentId,
@@ -12,6 +12,8 @@ import { useAgentOptions } from '../../lib/data/queries.js';
 import { agentIdForLaunch } from '../../lib/agent-pick.js';
 import { useMachineChoice } from '../terminal/NewTerminalMachineChoice.js';
 import { LaunchDialogBody } from './LaunchDialogBody.js';
+import { firstField, useLaunchFocus } from './launch-keyboard.js';
+import { focusAfter } from '../../lib/focus.js';
 import { Button } from '../ui/button.js';
 import {
   Dialog,
@@ -109,6 +111,14 @@ export function LaunchDialog({
     );
   };
   const action = actionLabel(mode, info, replacing);
+  const content = useRef<HTMLDivElement>(null);
+  useLaunchFocus(content, mode === 'continue', !disabled);
+  // From the keyboard, choosing a mode moves on to its first field.
+  const choose = (next: Mode, fromKeyboard: boolean) => {
+    setSelected(next);
+    if (fromKeyboard)
+      focusAfter(() => firstField(content.current, next === 'continue'));
+  };
 
   return (
     <Dialog
@@ -118,7 +128,14 @@ export function LaunchDialog({
       }}
     >
       <DialogContent
+        ref={content}
         data-launch-dialog
+        // Its fields are disabled until loaded; `useLaunchFocus` moves
+        // focus on to them from here.
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          content.current?.focus();
+        }}
         className="flex max-h-[calc(100dvh-2rem)] min-w-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
       >
         <div className="min-h-0 min-w-0 overflow-y-auto">
@@ -126,13 +143,22 @@ export function LaunchDialog({
           <ToggleGroup
             type="single"
             value={mode}
-            onValueChange={(value) => value && setSelected(value as Mode)}
             aria-label="Session action"
             className="gap-1 border-b px-5 pb-4"
           >
-            {canContinue && <Action value="continue">Continue</Action>}
-            <Action value="new">New session</Action>
-            {pr && <Action value="review">Review</Action>}
+            {canContinue && (
+              <Action value="continue" onChoose={choose}>
+                Continue
+              </Action>
+            )}
+            <Action value="new" onChoose={choose}>
+              New session
+            </Action>
+            {pr && (
+              <Action value="review" onChoose={choose}>
+                Review
+              </Action>
+            )}
           </ToggleGroup>
           <LaunchDialogBody
             mode={mode}
@@ -157,6 +183,7 @@ export function LaunchDialog({
             Cancel
           </Button>
           <Button
+            data-launch-action
             onClick={go}
             disabled={disabled}
             className="h-auto min-h-8 whitespace-normal text-left"
@@ -170,10 +197,26 @@ export function LaunchDialog({
   );
 }
 
-function Action({ value, children }: { value: Mode; children: string }) {
+function Action({
+  value,
+  onChoose,
+  children,
+}: {
+  value: Mode;
+  onChoose: (mode: Mode, fromKeyboard: boolean) => void;
+  children: string;
+}) {
   return (
     <ToggleGroupItem
       value={value}
+      // Chosen here, not by the group's own toggle, as in the new
+      // terminal dialog: a second press on the chosen mode — Enter,
+      // Space or a click — must not clear it. A click from a key has
+      // no pointer `detail`.
+      onClick={(e) => {
+        e.preventDefault();
+        onChoose(value, e.detail === 0);
+      }}
       className="min-w-0 flex-1 rounded-md border border-transparent px-2 py-2 text-sm data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:text-primary"
     >
       {children}

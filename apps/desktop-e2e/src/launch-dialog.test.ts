@@ -224,3 +224,33 @@ test('Review sends its selected agent and instructions to the same guarded workt
   expect(await pane(homeDir, name, '#{@orchestra-last-report}')).toBe('');
   expect(await page.evaluate(() => window.n10.listSessions())).toHaveLength(1);
 });
+
+test('Enter or Space on a mode chooses it and moves on to the agent, rather than switching it off', async ({
+  desktop,
+}) => {
+  const { app, page } = desktop;
+  const menu = await openMenu(page, app);
+  const picker = menu.getByRole('combobox', { name: 'Agent' });
+  await expect(picker).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(
+    menu.getByRole('radio', { name: 'New session', exact: true })
+  ).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  const review = menu.getByRole('radio', { name: 'Review', exact: true });
+  // The arrows only move focus; Enter chooses.
+  await expect(review).toBeFocused();
+  await expect(review).not.toBeChecked();
+  await page.keyboard.press('Enter');
+  await expect(review).toBeChecked();
+  await expect(picker).toBeFocused();
+  await expect(menu.getByLabel('Additional instructions')).toBeVisible();
+  // Enter or Space on the mode already chosen keeps it.
+  for (const key of ['Enter', 'Space']) {
+    await page.keyboard.press('Shift+Tab');
+    await expect(review).toBeFocused();
+    await page.keyboard.press(key);
+    await expect(review).toBeChecked();
+    await expect(picker).toBeFocused();
+  }
+});

@@ -63,12 +63,14 @@ export function LaunchDialogBody({
             agents={agents}
             index={agentIndex}
             onChange={onAgentIndexChange}
+            onSubmit={onSubmit}
           />
           <LaunchMachineSection
             choice={machineChoice}
             step={remoteStep}
             error={remoteError}
             what={whatLabel(mode, info, agents, agentIndex)}
+            onSubmit={onSubmit}
           />
         </>
       )}
