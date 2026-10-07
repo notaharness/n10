@@ -166,10 +166,9 @@ function loadWebgl(
 }
 
 /**
- * Open a terminal in `host`, sized by `FitAddon` against `host`'s box
- * less the padding `.xterm` carries in styles.css.
+ * Open a terminal in `host`, sized by `FitAddon` against `host`'s box.
  *
- * WebGL draws it when the GPU allows and `webgl` is not turned off. A
+ * WebGL draws it when the GPU allows. A
  * context the browser takes away (memory pressure, a suspend) disposes
  * the addon, as its docs advise, and xterm carries on with its DOM
  * renderer.
@@ -180,8 +179,7 @@ function loadWebgl(
  */
 export function openTerminal(
   host: HTMLElement,
-  theme: ResolvedTheme,
-  { webgl = true }: { webgl?: boolean } = {}
+  theme: ResolvedTheme
 ): DesktopTerminal {
   const term = new Terminal({
     allowProposedApi: true,
@@ -207,15 +205,13 @@ export function openTerminal(
     releaseWebgl?.();
     releaseWebgl = null;
   };
-  if (webgl) {
-    releaseWebgl = loadWebgl(term, () => {
-      dropWebgl();
-      stamp('dom');
-      // WebGL rounds cells to device pixels and the DOM does not, so
-      // the pane holds another grid now; `onResize` tells the PTY.
-      fit.fit();
-    });
-  }
+  releaseWebgl = loadWebgl(term, () => {
+    dropWebgl();
+    stamp('dom');
+    // WebGL rounds cells to device pixels and the DOM does not, so
+    // the pane holds another grid now; `onResize` tells the PTY.
+    fit.fit();
+  });
   stamp(releaseWebgl ? 'webgl' : 'dom');
   const grid = () => {
     host.dataset.terminalGrid = `${term.cols}x${term.rows}`;

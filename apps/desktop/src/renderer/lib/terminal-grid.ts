@@ -3,14 +3,14 @@ import { resolveTheme } from './theme.js';
 
 /**
  * Estimate a terminal's column/row grid from its pane in pixels. Char
- * metrics mirror the terminal's in styles.css and `terminals/xterm.ts`
- * (13px mono ≈ 7.8px wide, 18px rows, 8/12px padding). The last resort
- * for sizing a PTY at launch.
+ * metrics mirror the terminal's in `terminals/xterm.ts` (13px mono ≈
+ * 7.8px wide, 18px rows), less the scrollbar `FitAddon` keeps clear. The
+ * last resort for sizing a PTY at launch.
  */
 const CHAR_WIDTH = 7.8;
 const ROW_HEIGHT = 18;
-const PAD_X = 24;
-const PAD_Y = 16;
+const PAD_X = 14;
+const PAD_Y = 0;
 
 export interface Grid {
   cols: number;
@@ -34,17 +34,13 @@ export function estimateTerminalGrid(
 /**
  * The grid a pane would give a terminal, measured before one is in it.
  *
- * A hidden terminal is opened inside the pane, by the same code as the
- * one that will show the session, and asked for the grid `FitAddon`
- * would fit — the constants above are a last resort. It draws with the
- * DOM renderer: a WebGL context per launch costs more than the probe
- * is worth, and WebGL rounds cells down to device pixels, so the grid
- * the DOM measures is, rounding aside, no wider than the one the
- * terminal will draw.
- * An agent's first frame fits its pane, and the terminal's first fit
- * gives it any columns the DOM did not. `paneEl` must establish a
- * containing block (the content pane is `relative`), or the probe
- * escapes it.
+ * A hidden terminal is opened inside the pane, by the same code and in
+ * the same renderer as the one that will show the session, and asked
+ * for the grid `FitAddon` would fit, so the agent starts at the width
+ * it will be drawn at: WebGL rounds cells to device pixels, and a DOM
+ * probe would start it narrower. The constants above are a last
+ * resort. `paneEl` must establish a containing block (the content pane
+ * is `relative`), or the probe escapes it.
  *
  * A pane with no box yet answers `null`: the minimums above would
  * otherwise turn an unlaid-out pane into a plausible-looking 20x5 and
@@ -66,7 +62,7 @@ export function paneTerminalGrid(paneEl: HTMLElement): Grid | null {
   const host = document.createElement('div');
   host.style.height = '100%';
   probe.appendChild(host);
-  const xterm = openTerminal(host, resolveTheme(), { webgl: false });
+  const xterm = openTerminal(host, resolveTheme());
   try {
     return xterm.fit.proposeDimensions() ?? estimateTerminalGrid(box);
   } finally {

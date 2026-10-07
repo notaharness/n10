@@ -319,20 +319,21 @@ Each terminal releases its WebGL context when it goes. Disposing the addon
 removes its canvas but leaves the context alive until the canvas is garbage
 collected (xtermjs/xterm.js#6068), and Chromium keeps 16 contexts in a page,
 evicting the oldest past that. Every mount makes one (a switch, a pre-warmed
-spare, a review pane), so without the release a terminal kept on screen while
+spare, a review pane, a launch's probe), so without the release a terminal kept on screen while
 the user moved through some sixteen others lost its context and dropped to the
 DOM renderer. The release is `WEBGL_lose_context`, the platform's own call, on
 the canvases the addon added; `terminal-webgl.test.ts` keeps every canvas from
 collection and checks the terminal on screen keeps WebGL through twenty mounts.
 
-`FitAddon` is the only reckoning of a terminal's grid. The session terminal
-fits whenever its pane's box changes, and the launch estimate opens a hidden
-terminal in the pane, with the same options, and asks it the same question.
-The probe draws with the DOM renderer: a WebGL context per launch cost some
-100 ms on first use and was one more context to hold. WebGL rounds cells down
-to device pixels, so the DOM's grid is no wider than the one the terminal will
-draw; the agent's first frame fits, and the terminal's first fit gives it the
-remaining columns. The terminal's boxes clip their overflow: a screen still
+`FitAddon` is the only reckoning of a terminal's grid, and the grid takes the
+whole pane: no padding, only the scrollbar the addon keeps clear and the part
+of a cell left over at the right and bottom. The session terminal fits whenever
+its pane's box changes, and the launch estimate opens a hidden terminal in the
+pane, with the same options and renderer, and asks it the same question. A
+probe on the DOM renderer would start an agent narrower than it is drawn,
+because WebGL rounds cells down to device pixels; the WebGL probe costs some
+100 ms for a window's first launch and about 16 ms after, and releases its
+context like any other terminal. The terminal's boxes clip their overflow: a screen still
 drawn for the previous grid would otherwise bring in scrollbars, which the fit
 would then measure as lost room.
 

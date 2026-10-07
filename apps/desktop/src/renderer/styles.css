@@ -293,11 +293,11 @@
 }
 
 /* ── Terminal (xterm.js) ───────────────────────────────────────────
- * The pane paints the app's terminal background edge to edge; `.xterm`
- * carries the padding, which `FitAddon` takes off the pane's box. The
- * renderers draw with the palette in lib/terminals/xterm.ts. A screen
- * drawn for the old grid can be wider than the pane until the next fit;
- * clipped, it cannot bring in scrollbars that the fit would measure.
+ * The grid takes the whole pane, as `FitAddon` fits it; the pane paints
+ * the app's terminal background under what is left over. The renderers
+ * draw with the palette in lib/terminals/xterm.ts. A screen drawn for
+ * the old grid can be wider than the pane until the next fit; clipped,
+ * it cannot bring in scrollbars that the fit would measure.
  */
 .terminal-pane,
 .terminal-pane > * {
@@ -306,11 +306,8 @@
 .terminal-pane {
   background: var(--term-bg-app);
 }
-.terminal-pane .xterm {
-  padding: 8px 12px;
-}
-/* xterm.css paints the viewport black under the padding; the theme's
-   background covers only the rows. */
+/* xterm.css paints the viewport black; the theme's background covers
+   only the rows. */
 .terminal-pane .xterm .xterm-viewport {
   background-color: transparent;
 }
