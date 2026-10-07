@@ -42,7 +42,6 @@ import {
   type ItemEntry,
 } from '../lib/tabs/tabs.js';
 import { useCloseTabs } from '../lib/tabs/use-close-tabs.js';
-import { useTabSwitching } from '../lib/tabs/use-tab-switching.js';
 import { REMOTE_HOME_CWD } from '../lib/terminals/terminal-launch-request.js';
 import { useTerminalTabs } from '../lib/terminals/use-terminal-tabs.js';
 import { NewTerminalDialog } from '../components/terminal/NewTerminalDialog.js';
@@ -95,7 +94,6 @@ function WorkspaceInner({
 }) {
   const { repo } = useRepo();
   const tabs = useRepoTabs();
-  useTabSwitching();
   const model = useSidebarModel(repo.cwd);
   const refresh = useRefreshRemote(repo.cwd);
   // Worktrees being removed drop out of the model right away — every

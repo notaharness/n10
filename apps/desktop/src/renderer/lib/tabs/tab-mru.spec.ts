@@ -78,6 +78,22 @@ describe('tab MRU', () => {
     expect(next.target).toBe('b');
   });
 
+  it('closing the tab the walk is on carries on from its place', () => {
+    // Snapshot d c b a; the walk is on c when c closes.
+    const start = visited('a', 'b', 'c', 'd');
+    const onC = stepMru(start, STRIP, 'd', 1);
+    expect(onC.target).toBe('c');
+    const remaining = ['a', 'b', 'd'];
+    // Onwards goes to c's next neighbour, not back to the front…
+    expect(stepMru(onC.mru, remaining, 'd', 1).target).toBe('b');
+    // …and backwards to the one before it.
+    expect(stepMru(onC.mru, remaining, 'd', -1).target).toBe('d');
+    // The walk then continues through what is left.
+    const onB = stepMru(onC.mru, remaining, 'd', 1);
+    expect(stepMru(onB.mru, remaining, 'b', 1).target).toBe('a');
+    expect(commitMru(onB.mru).order[0]).toBe('b');
+  });
+
   it('has nowhere to go with fewer than two tabs', () => {
     expect(stepMru(EMPTY_MRU, ['a'], 'a', 1).target).toBeNull();
     expect(commitMru(EMPTY_MRU)).toBe(EMPTY_MRU);

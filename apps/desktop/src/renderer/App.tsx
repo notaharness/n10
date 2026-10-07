@@ -20,6 +20,7 @@ import { PrewarmProvider } from './lib/tabs/prewarm.js';
 import { TabViewsHost } from './lib/tabs/tab-views.js';
 import { TabsProvider } from './lib/tabs/tabs.js';
 import { useRepoFollowsTabs } from './lib/tabs/use-repo-follows-tabs.js';
+import { useTabSwitching } from './lib/tabs/use-tab-switching.js';
 
 declare global {
   interface Window {
@@ -97,6 +98,9 @@ function Gate() {
 
   // A tab from another repository is shown by opening that repository.
   useRepoFollowsTabs(repo?.cwd ?? null, openRepoAsync);
+  // Above the workspace, which a repository switch remounts: a walk
+  // onto another repository's tab is what switches it.
+  useTabSwitching();
 
   const pickRepoFolder = useCallback(() => {
     window.n10

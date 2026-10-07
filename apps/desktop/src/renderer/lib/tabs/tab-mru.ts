@@ -71,9 +71,31 @@ function startCycle(
 }
 
 /**
+ * The first live tab `delta` steps on from `index`, walking the
+ * snapshot the walk began with, closed tabs included. A tab closed
+ * mid-walk — even the one the walk is on — therefore keeps its place:
+ * the walk carries on to its live neighbour in the direction pressed,
+ * rather than starting over from the front.
+ */
+function nextLive(
+  snapshot: readonly string[],
+  index: number,
+  delta: 1 | -1,
+  live: ReadonlySet<string>
+): string | null {
+  const n = snapshot.length;
+  for (let k = 1; k <= n; k++) {
+    const id = snapshot[(((index + k * delta) % n) + n) % n];
+    if (id !== undefined && live.has(id)) return id;
+  }
+  return null;
+}
+
+/**
  * One press: start a walk if none is under way, then step `delta`
  * through its snapshot, wrapping. Answers the tab to show, or null when
- * there is nowhere to go.
+ * there is nowhere to go. Closed tabs drop out of the snapshot; see
+ * `nextLive` for where a walk goes when its own tab is closed.
  */
 export function stepMru(
   mru: TabMru,
@@ -83,16 +105,16 @@ export function stepMru(
 ): { mru: TabMru; target: string | null } {
   const live = new Set(tabIds);
   const base = mru.cycle ?? startCycle(mru.order, tabIds, activeId);
-  // A tab closed mid-walk drops out; the walk carries on from the tab
-  // it was on.
-  const current = base.snapshot[base.index];
   const snapshot = base.snapshot.filter((id) => live.has(id));
   if (snapshot.length < 2) return { mru, target: null };
-  const at = current ? Math.max(snapshot.indexOf(current), 0) : 0;
-  const index = (at + delta + snapshot.length) % snapshot.length;
+  const target = nextLive(base.snapshot, base.index, delta, live);
+  if (target === null) return { mru, target: null };
   return {
-    mru: { order: mru.order, cycle: { snapshot, index } },
-    target: snapshot[index] ?? null,
+    mru: {
+      order: mru.order,
+      cycle: { snapshot, index: snapshot.indexOf(target) },
+    },
+    target,
   };
 }
 
