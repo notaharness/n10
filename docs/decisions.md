@@ -533,6 +533,21 @@ resolves, written through the engine config service. Most-recently-used
 cycling is a desktop pref (`tabCycleMru`, off by default so Ctrl+Tab matches
 Ctrl+PgDn until asked): a walk snapshots the order on the first press and
 commits when no Ctrl, Alt or Cmd is held any longer, or the window loses focus.
+The order and a walk in progress live at module level in
+`lib/tabs/tab-switching.ts`, and the hook is mounted in `App.tsx`'s gate, above
+the workspace: a walk onto another repository's tab switches repositories,
+which remounts the workspace, and the walk must carry on. A tab closed under
+the walk keeps its place in the snapshot, so the next press goes to its live
+neighbour in the direction pressed rather than back to the front.
+
+Recording refuses a chord without Ctrl or Alt (it would be taken from every
+text box and terminal), one of the app's own shortcuts (`host/app-shortcuts.ts`,
+the list the native menu's accelerators and the shortcuts dialog are built
+from) and another tab action's. While recording, the window ignores menu
+accelerators (`webContents.setIgnoreMenuShortcuts`), so Ctrl+W reaches the
+recorder instead of closing Settings. Nothing pushes config changes to the
+renderer, so the bindings are read again when the window comes to the front
+and when Settings → Keyboard opens; a read begun before a write is dropped.
 
 ## Plans and babysitting
 

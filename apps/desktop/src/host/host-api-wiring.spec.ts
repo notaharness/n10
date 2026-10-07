@@ -408,6 +408,14 @@ describe('host API wiring', () => {
     }
   );
 
+  it('holdMenuShortcuts asks the main process for the asking window', async () => {
+    const { setMenuShortcutHold } = await import('./viewer-api.js');
+    const hold = vi.fn(async () => undefined);
+    setMenuShortcutHold(hold);
+    await createViewerApi().holdMenuShortcuts(7, true);
+    expect(hold).toHaveBeenCalledWith(7, true);
+  });
+
   it('reports the running versions rather than a service call', () => {
     // getVersion is the one method that answers from the process
     // itself; it must not start delegating by accident.

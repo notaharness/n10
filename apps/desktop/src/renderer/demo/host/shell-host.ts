@@ -97,6 +97,7 @@ type ShellHost = Pick<
   | 'setDesktopPrefs'
   | 'getKeybindings'
   | 'setKeybinding'
+  | 'holdMenuShortcuts'
   | 'showAbout'
 >;
 
@@ -154,6 +155,8 @@ export function createShellHost(state: DemoState): ShellHost {
       keybindings = descriptors ? { ...rest, [actionId]: descriptors } : rest;
       return later(keybindings);
     },
+    // The demo's menu is web-rendered and has no accelerators.
+    holdMenuShortcuts: () => later(undefined),
     showAbout: () => later(undefined),
   };
 }

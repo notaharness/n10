@@ -1,5 +1,6 @@
-import { DESKTOP_ACTIONS, keyDescriptorToString } from '@n10/core/ui';
-import { useDesktopBindings } from '../lib/keybindings.js';
+import { DESKTOP_ACTIONS } from '@n10/core/ui';
+import { APP_SHORTCUTS } from '../../host/app-shortcuts.js';
+import { chordKeys, useDesktopBindings } from '../lib/keybindings.js';
 import { MOD } from '../lib/utils.js';
 import {
   Dialog,
@@ -10,18 +11,11 @@ import {
 } from './ui/dialog.js';
 import { Kbd } from './ui/kbd.js';
 
-const ROWS: [string, string[]][] = [
-  ['Search & commands', [MOD, 'K']],
-  ['Command palette', [MOD, '⇧', 'P']],
-  ['Toggle sidebar', [MOD, 'B']],
-  ['New worktree', [MOD, 'N']],
-  ['New terminal', [MOD, '⇧', 'T']],
-  ['Open repository', [MOD, 'O']],
-  ['Settings', [MOD, ',']],
-  ['Close tab', [MOD, 'W']],
-  ['Refresh pull requests', [MOD, 'R']],
-  ['Send reply (in a comment box)', [MOD, '↵']],
-];
+/** The app's fixed shortcuts, from the list the menu is built from. */
+const ROWS: [string, string[]][] = APP_SHORTCUTS.map((s) => [
+  s.label,
+  [MOD, ...(s.shift ? ['⇧'] : []), s.key === 'Enter' ? '↵' : s.key],
+]);
 
 export function ShortcutsDialog({
   open,
@@ -38,8 +32,7 @@ export function ShortcutsDialog({
     ...DESKTOP_ACTIONS.flatMap(({ id, label }): [string, string[]][] => {
       const first = bindings[id][0];
       if (!first) return [];
-      const keys = keyDescriptorToString(first).split('+');
-      return [[label, keys.map((k) => (k === 'Shift' ? '⇧' : k))]];
+      return [[label, chordKeys(first)]];
     }),
   ];
   return (
@@ -57,8 +50,9 @@ export function ShortcutsDialog({
             <div key={label} className="contents">
               <span className="text-muted-foreground">{label}</span>
               <span className="flex items-center gap-1">
-                {keys.map((k) => (
-                  <Kbd key={k}>{k}</Kbd>
+                {keys.map((k, i) => (
+                  // eslint-disable-next-line react/no-array-index-key -- a chord's keys are fixed and may repeat
+                  <Kbd key={i}>{k}</Kbd>
                 ))}
               </span>
             </div>

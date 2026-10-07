@@ -168,6 +168,7 @@ const api: N10HostApi = {
   getKeybindings: () => ipcRenderer.invoke(IPC.getKeybindings),
   setKeybinding: (actionId, descriptors) =>
     ipcRenderer.invoke(IPC.setKeybinding, actionId, descriptors),
+  holdMenuShortcuts: (held) => ipcRenderer.invoke(IPC.holdMenuShortcuts, held),
   showAbout: () => ipcRenderer.invoke(IPC.showAbout),
 
   startBabysit: (prId) => ipcRenderer.invoke(IPC.startBabysit, prId),

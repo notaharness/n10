@@ -636,6 +636,9 @@ export interface N10HostApi {
     actionId: string,
     descriptors: KeyDescriptor[] | null
   ): Promise<DesktopKeybindings>;
+  /** While held, this window's application menu accelerators stand
+   *  aside (Ctrl+W, Ctrl+N, …), so recording a shortcut hears them. */
+  holdMenuShortcuts(held: boolean): Promise<void>;
   /** Native about box. */
   showAbout(): Promise<void>;
 }
@@ -715,6 +718,7 @@ export const IPC = {
   setDesktopPrefs: 'n10/shell/prefs/set',
   getKeybindings: 'n10/keybindings/get',
   setKeybinding: 'n10/keybindings/set',
+  holdMenuShortcuts: 'n10/keybindings/hold-menu',
   showAbout: 'n10/shell/about',
   startBabysit: 'n10/babysit/start',
   stopBabysit: 'n10/babysit/stop',

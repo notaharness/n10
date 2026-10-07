@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { app, BrowserWindow, dialog, Menu, nativeTheme, shell } from 'electron';
+import { holdMenuShortcuts } from './menu-shortcuts.js';
 import {
   MENU_EVENTS,
   type ContextMenuItem,
@@ -256,6 +257,7 @@ function startHost(): HostProcess {
         nativeTheme.themeSource = next.theme; // recolors overlay + native menus
         installAppMenu(); // theme radio state lives in the menu
       },
+      holdMenuShortcuts,
     },
     // The new host has no watches; reloaded pages watch again.
     onRespawn: () => {

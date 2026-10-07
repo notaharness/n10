@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import {
   DESKTOP_ACTIONS,
   descriptorFromDom,
-  desktopConflict,
+  desktopBindingRefusal,
   keysToDisplayString,
   type DesktopActionId,
 } from '@n10/core/ui';
@@ -12,6 +12,8 @@ import {
   useDesktopPrefs,
 } from '../../lib/desktop-prefs.js';
 import {
+  RESERVED_CHORDS,
+  refreshDesktopBindings,
   setDesktopBinding,
   setRecordingShortcut,
   useDesktopBindings,
@@ -28,12 +30,18 @@ const ACTION = new Map(DESKTOP_ACTIONS.map((a) => [a.id, a]));
  *  rebindable shortcut. Both are n10-wide. */
 export function KeyboardRows() {
   const prefs = useDesktopPrefs();
+  const bindings = useDesktopBindings();
+  // Another n10, or a hand edit, may have rebound them meanwhile.
+  useEffect(refreshDesktopBindings, []);
+  const cycle = keysToDisplayString(bindings['desktop.tabs.cycle-next']);
+  const next = keysToDisplayString(bindings['desktop.tabs.next']);
+  const previous = keysToDisplayString(bindings['desktop.tabs.previous']);
   return (
     <>
       <RowShell
         htmlFor="pref-tab-cycle-mru"
-        label="Ctrl+Tab cycles most recently used tabs"
-        description="Hold Ctrl and press Tab to step back through recently used tabs; letting go of Ctrl picks the tab. Off: Ctrl+Tab goes to the next tab along the strip. Ctrl+PgDn and Ctrl+PgUp always go along the strip."
+        label={`${cycle} cycles most recently used tabs`}
+        description={`Keep the modifier held and press ${cycle} again to step back through recently used tabs; letting go picks the tab. Off: ${cycle} goes to the next tab along the strip. ${next} and ${previous} always go along the strip.`}
         control={
           <Checkbox
             id="pref-tab-cycle-mru"
@@ -84,9 +92,14 @@ function ShortcutRow({ actionId }: { actionId: DesktopActionId }) {
     const descriptor = descriptorFromDom(e.nativeEvent);
     if (!descriptor) return;
     stop();
-    const taken = desktopConflict(bindings, actionId, descriptor);
-    if (taken) {
-      toast.error(`Already used by “${ACTION.get(taken)?.label ?? taken}”`);
+    const refusal = desktopBindingRefusal(
+      bindings,
+      actionId,
+      descriptor,
+      RESERVED_CHORDS
+    );
+    if (refusal) {
+      toast.error(refusal);
       return;
     }
     save([descriptor]);
