@@ -288,6 +288,12 @@ class TmuxBackend implements SessionBackend {
   offDisconnect(cb: () => void): void {
     this.disconnects.delete(cb);
   }
+  onAttach(cb: () => void): void {
+    this.draw.onStart(cb);
+  }
+  offAttach(cb: () => void): void {
+    this.draw.offStart(cb);
+  }
 
   /** Detach the local client without terminating the hosted process. A
    *  deliberate detach is not a connection failure (finding 10):
@@ -303,6 +309,7 @@ class TmuxBackend implements SessionBackend {
     this.data.clear();
     this.exits.clear();
     this.disconnects.clear();
+    this.draw.clear();
     this.inner.dispose();
   }
 
