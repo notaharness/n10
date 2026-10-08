@@ -177,6 +177,15 @@ export function seedHome(
   };
 }
 
+/** Per-project config for another repository a test opens. */
+export function seedRepoConfig(
+  homeDir: string,
+  repoPath: string,
+  projectConfig: Record<string, unknown>
+): void {
+  seedProjectConfig(join(homeDir, '.n10'), repoPath, { projectConfig });
+}
+
 function seedProjectConfig(
   n10: string,
   repoPath: string,

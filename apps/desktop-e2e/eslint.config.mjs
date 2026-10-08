@@ -30,6 +30,13 @@ export default [
     rules: { 'playwright/no-wait-for-timeout': 'off' },
   },
   {
+    // The host's TTLs run on its own clock, which `page.clock` cannot
+    // move: a test crossing one waits in real time, through the one
+    // helper that owns the wait. Scoped here for the same reason.
+    files: ['src/setup/host-time.ts'],
+    rules: { 'playwright/no-wait-for-timeout': 'off' },
+  },
+  {
     // A test gated on a missing capability — no GH_TOKEN, no tmux — is
     // a capability check, not a disabled test: the same suite runs for
     // real in the integration job, and on a machine that has the thing.
