@@ -363,10 +363,13 @@ Unicode 6 tables do not.
 Mouse tracking is xterm's own, any-motion (DECSET 1003) included, so an agent
 that highlights what is under the pointer is told where it is with no button
 held, and xterm shows the arrow rather than the I-beam while the application
-takes the mouse. A terminal that mounts from a ring-buffer snapshot no longer
-holding the application's mode sequences starts without them, mouse tracking
-included, until the application sets them again; tmux repeats modes only on
-attach or when they change.
+takes the mouse. Selecting still works then: Shift-drag on Linux and Windows,
+and Option-drag on macOS (`macOptionClickForcesSelection`), as iTerm and VS Code
+have it. xterm has no Shift-drag on macOS, where wterm took Shift everywhere. A
+terminal that mounts from a ring-buffer snapshot no longer holding the
+application's mode sequences starts without them, mouse tracking included, until
+the application sets them again; tmux repeats modes only on attach or when they
+change.
 
 ## Desktop repositories and tabs
 

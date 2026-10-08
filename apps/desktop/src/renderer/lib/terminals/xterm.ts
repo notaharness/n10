@@ -205,6 +205,9 @@ export function openTerminal(
     lineHeight: LINE_HEIGHT,
     theme: terminalTheme(theme),
     linkHandler: { activate: openLink },
+    // Shift-drag selects past an app's mouse tracking everywhere but
+    // macOS, where xterm offers Option-drag instead, behind this.
+    macOptionClickForcesSelection: true,
   });
   term.attachCustomKeyEventHandler((event) => terminalKey(term, event));
   const fit = new FitAddon();
