@@ -682,6 +682,45 @@ connecting), leaving the order and any walk as they were. Nothing pushes config 
 renderer, so the bindings are read again when the window comes to the front
 and when Settings → Keyboard opens; a read begun before a write is dropped.
 
+### Orchestrator tabs
+
+An Orchestra orchestrator's tab carries the Brain icon, and its players' tabs
+stand under it rather than beside it. Which session is an orchestrator, and
+whose players, comes from tags alone (core `discovery/orchestrator-groups.ts`).
+A player's `@orchestra-orchestrator` of `tmux:<session>` names its session.
+`claude:<id>` and `codex:<thread>` name a conversation, which the tmux server
+cannot tie to a session. Orchestra closes that gap explicitly: `spawn.sh` and
+`adopt.sh`, run inside tmux with the orchestrator's own identity as the
+target, write it as `@orchestra-target` on the session they run in. That is
+how a terminal tab where `claude` was run by hand becomes an orchestrator.
+n10 does not infer the link from process trees, Claude's session registry or
+transcripts. Under `beam:<peerId>/` the target is on that machine. The host
+lists this machine's server only, so a player on another machine, or an
+orchestrator outside tmux (Claude Desktop, a daemon), groups nothing: such a
+player keeps its own tab, and its launch context still shows where it
+reports. Orchestra keeps one claimant per target on a server, but another
+server can hold a stale copy, so of two sessions claiming a target the one
+created last wins. A session marked with a target is an orchestrator with or
+without players. A fresh agent launch clears the mark with the other
+supervisor tags.
+
+The strip changes how tabs are shown, not what they are
+(`lib/tabs/orchestrator-tabs.ts`). Player tabs open, close and activate as
+before and stay in `TabsState`; the strip leaves out each one whose
+orchestrator has a tab. A tab matches a session by its registry key, or, from
+another repository, by repository and checkout. An orchestrator that is
+another's player keeps its place, so its own players stay reachable. Where an
+orchestrator tab's close button sits, it shows the count of its player tabs,
+and keeps the X when it has none; middle click, Delete and its menu still
+close it. While one of its players is active, the orchestrator tab is the
+strip's selection. Hovering the tab opens a Radix hover card listing the
+player tabs as tab-styled rows. Choosing a row activates that tab; a row's X
+is that tab's own close, with its confirmation and agent stop. The list holds
+tabs, not sessions: a player whose tab was closed is not listed and not
+reopened from here. A hover card is pointer-only, so the tab's native menu
+lists the same players under a disabled "Players" heading (the contract's
+menus have no submenus).
+
 ## Plans and babysitting
 
 Plan items are value snapshots taken when queued. Later comment edits or
