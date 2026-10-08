@@ -48,13 +48,13 @@ const request = {
 };
 const patchRequest = { repo: '/repo/a', mergeBaseOid: BASE, headOid: HEAD };
 const find = vi.fn();
-let current = true;
-const reads = (repo = '/repo/a') =>
-  createDiffReads(repo, () => current, { find }, {});
+const reads = (
+  repo = '/repo/a',
+  freshness?: Parameters<typeof createDiffReads>[1]
+) => createDiffReads(repo, freshness, { find }, {});
 
 beforeEach(() => {
   vi.resetAllMocks();
-  current = true;
   vi.mocked(fetchRefs).mockResolvedValue(true);
   vi.mocked(resolvePrComparison).mockImplementation(async (req) => ({
     ok: true,
@@ -95,7 +95,7 @@ describe('manifest', () => {
   it('lists under the ceiling the environment sets', async () => {
     const diff = createDiffReads(
       '/repo/a',
-      () => true,
+      undefined,
       { find },
       {
         N10_DIFF_MANIFEST_MAX_BYTES: '400',
@@ -174,19 +174,8 @@ describe('manifest', () => {
     const diff = reads();
     expect(
       await readResourceValue(diff.manifest({ ...request, repo: '/repo/b' }))
-    ).toMatchObject({ ok: false, error: { code: 'repo-changed' } });
+    ).toMatchObject({ ok: false, error: { code: 'other-repo' } });
     expect(resolvePrComparison).not.toHaveBeenCalled();
-  });
-
-  it('drops an answer when the repository closes during the read', async () => {
-    vi.mocked(readPrDiffManifest).mockImplementationOnce(async (_cwd, c) => {
-      current = false;
-      return { comparison: c, files: [], complete: true };
-    });
-    expect(await readResourceValue(reads().manifest(request))).toMatchObject({
-      ok: false,
-      error: { code: 'repo-changed' },
-    });
   });
 
   it.each([
@@ -216,6 +205,17 @@ describe('patch', () => {
     );
   });
 
+  it('lets go of its patches when its repository is parked, and keeps the manifest', async () => {
+    const diff = reads();
+    await readResourceValue(diff.manifest(request));
+    await readResourceValue(diff.patch(patchRequest));
+    diff.park();
+    await readResourceValue(diff.patch(patchRequest));
+    await readResourceValue(diff.manifest(request));
+    expect(readPrDiffPatch).toHaveBeenCalledTimes(2);
+    expect(resolvePrComparison).toHaveBeenCalledOnce();
+  });
+
   it('keeps the last two patches read, and joins one still being read', async () => {
     const diff = reads();
     const of = (path: string) => ({ ...patchRequest, paths: [path] });
@@ -235,17 +235,6 @@ describe('patch', () => {
     // Past the two kept: read again.
     await readResourceValue(diff.patch(of('a')));
     expect(calls('a')).toBe(2);
-  });
-
-  it('drops an answer when the repository closes mid-read', async () => {
-    vi.mocked(readPrDiffPatch).mockImplementationOnce(async () => {
-      current = false;
-      return { text: '', truncated: false, limitBytes: 1 };
-    });
-    expect(await readResourceValue(reads().patch(patchRequest))).toMatchObject({
-      ok: false,
-      error: { code: 'repo-changed' },
-    });
   });
 
   it.each([
@@ -313,18 +302,8 @@ describe('rangeManifest', () => {
       await readResourceValue(
         reads().rangeManifest({ ...range, repo: '/repo/b' })
       )
-    ).toMatchObject({ ok: false, error: { code: 'repo-changed' } });
+    ).toMatchObject({ ok: false, error: { code: 'other-repo' } });
     expect(readRevisionRangeManifest).not.toHaveBeenCalled();
-  });
-
-  it('drops an answer when the repository closes during the read', async () => {
-    vi.mocked(readRevisionRangeManifest).mockImplementationOnce(async () => {
-      current = false;
-      return { ok: false, error: { code: 'to-unavailable', message: 'x' } };
-    });
-    expect(await readResourceValue(reads().rangeManifest(range))).toMatchObject(
-      { ok: false, error: { code: 'repo-changed' } }
-    );
   });
 
   it('reads a range that failed again, rather than keeping the failure', async () => {
@@ -367,4 +346,19 @@ it('reads a live diff from the resolved checkout', async () => {
     '/checkouts/actual',
     'main'
   );
+});
+
+describe('worktree', () => {
+  it('keeps its one-second TTL while its repository is parked', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    find.mockResolvedValue(null);
+    const diff = reads('/repo/a', { parked: () => true, parkedTtl: 3_600_000 });
+    await readResourceValue(diff.worktree('feature', 'main'));
+    await readResourceValue(diff.worktree('feature', 'main'));
+    expect(find).toHaveBeenCalledOnce();
+    vi.setSystemTime(Date.now() + 1_001);
+    await readResourceValue(diff.worktree('feature', 'main'));
+    expect(find).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
 });

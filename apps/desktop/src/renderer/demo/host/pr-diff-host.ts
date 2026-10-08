@@ -59,7 +59,7 @@ export function createPrDiffHost(state: DemoState): PrDiffHost {
       : {
           ok: false as const,
           error: {
-            code: 'repo-changed' as const,
+            code: 'other-repo' as const,
             message: `${repo} is not the open repository`,
           },
         };

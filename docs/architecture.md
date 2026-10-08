@@ -156,5 +156,6 @@ Both shells observe or read that snapshot and call its commands. The
 `worktree-manager` package implements Git operations over an immutable
 `WorktreeScope` (repository, path resolver and optional remote machine), without
 a process-wide selected resolver. Config path edits invalidate the resource;
-repository switches dispose its subscription without detaching session clients.
+repository switches park the handle, keeping its resources, without detaching
+session clients.
 ESLint forbids shells from calling these Git reads, mutations or scope factories.

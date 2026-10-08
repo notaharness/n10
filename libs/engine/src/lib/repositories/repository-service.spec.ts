@@ -8,7 +8,10 @@ import type { VcsProvider } from '@n10/vcs-core';
 import { EMPTY_PULL_REQUEST_LIST } from '../pull-requests/api.js';
 import type * as Reviews from '../reviews/api.js';
 import { createReviewService } from '../reviews/api.js';
-import { createRepositoryService } from './repository-service.js';
+import {
+  createRepositoryService,
+  PARKED_REPOSITORY_TTL_MS,
+} from './repository-service.js';
 
 vi.mock('../reviews/api.js', async (original) => {
   const actual = await original<typeof Reviews>();
@@ -63,6 +66,7 @@ function harness(registry = providers) {
     lookupPullRequest: vi.fn(async () => ({ kind: 'gone' as const })),
     credentialsChanged: vi.fn(),
     read: vi.fn(async () => ({})),
+    refreshInBackground: vi.fn(),
   };
   const service = createRepositoryService({
     providers: registry,
@@ -94,7 +98,7 @@ describe('repository scope', () => {
     expect(current.config.getSnapshot().provider?.id).toBe('github');
   });
 
-  it('shares a handle for aliases and replaces it on repository selection', () => {
+  it('shares a handle for aliases and parks it on repository selection', () => {
     const cwd = repo('canonical');
     const link = join(fixture.home, 'alias');
     symlinkSync(cwd, link);
@@ -102,11 +106,67 @@ describe('repository scope', () => {
     const current = service.open(link);
     expect(current.cwd).toBe(cwd);
     expect(service.open(cwd)).toBe(current);
-    const dispose = vi.spyOn(current.worktrees, 'dispose');
+    const park = vi.spyOn(current.sessions, 'park');
+    const release = vi.spyOn(current.reviews, 'park');
     const next = service.open(repo('another'));
-    expect(dispose).toHaveBeenCalledOnce();
+    expect(park).toHaveBeenCalledOnce();
+    expect(release).toHaveBeenCalledOnce();
     expect(next).not.toBe(current);
     expect(next.config).not.toBe(current.config);
+    expect(current.parked()).toBe(true);
+    expect(next.parked()).toBe(false);
+    // Selected again, the parked handle comes back with what it held.
+    expect(service.open(cwd)).toBe(current);
+    expect(current.parked()).toBe(false);
+  });
+
+  it('reads a repository without selecting it', () => {
+    const { service } = harness([]);
+    const selected = service.open(repo('selected'));
+    const other = service.get(repo('read-only'));
+    expect(service.getSnapshot()).toBe(selected);
+    expect(other.parked()).toBe(true);
+    expect(service.get(other.cwd)).toBe(other);
+    expect(service.open(other.cwd)).toBe(other);
+    expect(service.get(selected.cwd)).toBe(selected);
+  });
+
+  it('refuses writes through a handle read without selecting it', async () => {
+    const { service } = harness([]);
+    service.open(repo('writes-selected'));
+    const parked = service.get(repo('writes-parked'));
+    expect(() =>
+      parked.config.updateField(
+        { key: 'editor', label: 'Editor', configBag: 'project' },
+        'vim'
+      )
+    ).toThrow('not open');
+    expect(() => parked.config.updateKeybindFields((prev) => prev)).toThrow(
+      'not open'
+    );
+    await expect(parked.worktrees.create('topic')).rejects.toThrow('not open');
+    await expect(parked.worktrees.fetchBranches()).rejects.toThrow('not open');
+    // Selected, the same handle takes them.
+    service.open(parked.cwd);
+    parked.config.updateField(
+      { key: 'editor', label: 'Editor', configBag: 'project' },
+      'vim'
+    );
+    expect(readConfig(parked.cwd).editor).toBe('vim');
+  });
+
+  it('prewarms a parked repository’s rows, and its list with the parked max age', () => {
+    const { service, pullRequests } = harness([]);
+    const selected = service.open(repo('prewarm-selected'));
+    const parked = service.get(repo('prewarm-parked'));
+    const rows = vi.spyOn(parked.sessions, 'read');
+    selected.prewarm();
+    parked.prewarm();
+    expect(pullRequests.refreshInBackground.mock.calls).toEqual([
+      [selected.cwd, undefined],
+      [parked.cwd, { maxAge: PARKED_REPOSITORY_TTL_MS }],
+    ]);
+    expect(rows).toHaveBeenCalledOnce();
   });
 
   it('keeps one visit record across repository switches', () => {
@@ -116,7 +176,7 @@ describe('repository scope', () => {
     service.open(repo('first'));
     const baselines = vi
       .mocked(createReviewService)
-      .mock.calls.slice(-3)
+      .mock.calls.slice(-2)
       .map(([options]) => options.baselines);
     // A visit begun before a switch is the same visit after it.
     expect(new Set(baselines).size).toBe(1);

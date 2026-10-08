@@ -18,7 +18,7 @@ export type {
   PrDiffManifestResult,
   PrDiffPatchResult,
   PrDiffError,
-  RepoChangedError,
+  OtherRepoError,
   ReadResource,
   ReadSnapshot,
   SyncNotice,

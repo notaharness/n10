@@ -132,7 +132,6 @@ describe('history', () => {
     expect(await readResourceValue(flaky.history(REQ))).toMatchObject({
       lastVisit: { state: 'read', value: null },
     });
-    flaky.dispose();
   });
 });
 
@@ -150,7 +149,6 @@ describe('history in the review service', () => {
     fixture.listChanged({ feature: { id: 42 } as never });
     await readResourceValue(reviews.history(REQ));
     expect(env.revisions).toHaveLength(2);
-    reviews.dispose();
   });
 
   it('forgets what one set of credentials was told when they change', async () => {
@@ -163,6 +161,5 @@ describe('history in the review service', () => {
       { token: 't' },
       { token: 't2' },
     ]);
-    reviews.dispose();
   });
 });

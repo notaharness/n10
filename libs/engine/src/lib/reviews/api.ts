@@ -11,7 +11,7 @@ export type {
   PrDiffManifestResult,
   PrDiffPatchResult,
   PrDiffError,
-  RepoChangedError,
+  OtherRepoError,
 } from './diff-reads.js';
 export type {
   ReplyToReviewThread,
