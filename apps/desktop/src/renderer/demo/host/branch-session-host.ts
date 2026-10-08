@@ -32,8 +32,7 @@ export function createBranchSessionHost(
   launchTerminal: N10HostApi['launchTerminal']
 ): BranchSessionHost {
   return {
-    listBranchSessions: (branch) => {
-      const repo = state.repo().cwd;
+    listBranchSessions: (repo, branch) => {
       const dir = worktreeDir(repo, branch);
       const all = hub.all();
       const agents = all.filter(

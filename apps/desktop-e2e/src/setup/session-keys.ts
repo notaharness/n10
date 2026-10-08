@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { openSessions } from './app.js';
 
 /**
  * The worktree a session key names, by its directory's name — for
@@ -14,7 +15,7 @@ export function sessionBranch(key: string): string {
 }
 
 export async function sessionKey(page: Page, branch: string): Promise<string> {
-  const sessions = await page.evaluate(() => window.n10.listSessions());
+  const sessions = await openSessions(page);
   const session = sessions.find((s) => sessionBranch(s.name) === branch);
   if (!session) throw new Error(`No session for ${branch}`);
   return session.name;

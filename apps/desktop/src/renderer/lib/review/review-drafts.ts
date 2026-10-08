@@ -104,10 +104,11 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 async function loadDrafts(
+  cwd: string,
   ref: PullRequestRef,
   viewer: string | null
 ): Promise<ReviewDrafts> {
-  const answer = await window.n10.listReviewDrafts({ ref, viewer });
+  const answer = await window.n10.listReviewDrafts(cwd, { ref, viewer });
   assertAnswerFor(ref, viewer, answer);
   return answer;
 }
@@ -116,7 +117,7 @@ export function useReviewDrafts(ref: PullRequestRef | null) {
   const { repo } = useRepo();
   return useQuery({
     queryKey: keys.reviewDrafts(repo.cwd, ref, repo.viewer),
-    queryFn: () => loadDrafts(ref!, repo.viewer),
+    queryFn: () => loadDrafts(repo.cwd, ref!, repo.viewer),
     enabled: ref != null,
     // Only this renderer writes them; every write updates the entry.
     staleTime: Infinity,
@@ -145,7 +146,7 @@ export function useInlineDraftTargets(
   const { repo } = useRepo();
   const { data } = useQuery({
     queryKey: keys.reviewDrafts(repo.cwd, ref, repo.viewer),
-    queryFn: () => loadDrafts(ref!, repo.viewer),
+    queryFn: () => loadDrafts(repo.cwd, ref!, repo.viewer),
     enabled: ref != null,
     staleTime: Infinity,
     select: inlineTargetsOf,

@@ -10,7 +10,7 @@ import { keys } from './query-keys.js';
 export function useBranchSessions(cwd: string, branch: string) {
   return useQuery({
     queryKey: keys.branchSessions(cwd, branch),
-    queryFn: () => window.n10.listBranchSessions(branch),
+    queryFn: () => window.n10.listBranchSessions(cwd, branch),
     refetchInterval: 2_000,
     placeholderData: (prev) => prev,
     enabled: branch !== '',

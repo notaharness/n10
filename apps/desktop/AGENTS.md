@@ -27,7 +27,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   Chromium's descriptors to the persistent server, as spawning straight
   from the main process on Linux would.
 - `services/repo.ts` opens an engine repository handle; session and worktree
-  commands capture that handle before awaiting. Discovery observes its live scope. The host
+  commands capture that handle before awaiting. `repository(cwd)` hands out
+  any repository's handle, selected or parked, for reads. Discovery observes its live scope. The host
   awaits the tmux probe and validates the requirement before opening a
   repo; missing tmux is a startup error with an installation hint.
 - `main/beam/` is a client of the beam daemon's control socket (beam's
@@ -47,9 +48,17 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `@orchestra-repo` every tmux session it creates is tagged with). The tab
   strip spans repos: activating a foreign tab opens its repo
   (`useRepoFollowsTabs`); nothing renders another repo's content in place.
-- Sidebar answers are stamped with the repo they describe
-  (`getSidebarSnapshot`) and the renderer drops answers for a repo it is not
-  showing (`loadSidebarModel`). A switch is in flight for several awaits.
+- The reads a pane or the sidebar makes name the repository they read
+  (`getSidebarModel(repo)`, sync state, branch lists, the review reads,
+  sessions, branch sessions, agent options, worktree diffs; diff requests
+  carry `repo`) and resolve it
+  through `repository(cwd)`; so does the visit record beside the history
+  read, and a comment image takes its repository's Azure DevOps PAT. Writes
+  stay on the selected repository. `read-routing.spec.ts` asks each read
+  about a parked repository. A parked repository's sidebar keeps its sync
+  loop's last decorations, frozen and not loading, until it is opened again
+  (`getSyncDecorations(cwd)`). Sidebar answers are stamped with the repo they
+  describe and the renderer drops answers for another (`loadSidebarModel`).
 - The pull request list is `@n10/engine`'s, one instance in
   `services/pull-requests.ts`; `services/sidebar.ts`, babysitters, the sync
   loop and settings effects all go through it. The renderer is told only of

@@ -353,6 +353,12 @@ export interface N10HostApi {
   openRepo(cwd: string): Promise<RepoInfo>;
   getRepo(): Promise<RepoInfo | null>;
   refreshRepo(): Promise<RepoInfo | null>;
+  /** What `getRepo` says, for any repository, open or not. */
+  getRepoInfo(repo: string): Promise<RepoInfo>;
+  /** Bring a repository's worktrees, sessions and pull request list up
+   *  to date behind what the host holds, unless a repository that is
+   *  not open was read within the hour. Resolves at once. */
+  prewarmRepo(repo: string): Promise<void>;
 
   // ── Recent repos ─────────────────────────────────────────────
   listRecentRepos(): Promise<RecentRepoEntry[]>;
@@ -379,10 +385,10 @@ export interface N10HostApi {
   ): Promise<void>;
 
   // ── Sidebar (unified worktrees + PRs + reviews, TUI order) ────
-  /** The sidebar of the open repository, stamped with which one that
-   *  is — see `SidebarModel`. */
-  getSidebarModel(): Promise<SidebarModel>;
-  getSyncState(): Promise<SyncState>;
+  /** The sidebar of `repo`, open or not, stamped with the repository
+   *  it describes — see `SidebarModel`. */
+  getSidebarModel(repo: string): Promise<SidebarModel>;
+  getSyncState(repo: string): Promise<SyncState>;
   /** Drop the remote PR cache and re-fetch now. */
   refreshRemote(): Promise<void>;
 
@@ -390,7 +396,7 @@ export interface N10HostApi {
   listWorktrees(): Promise<WorktreeInfo[]>;
   listBranches(): Promise<string[]>;
   /** All local + remote branch names (checkout candidates). */
-  listAllBranches(): Promise<string[]>;
+  listAllBranches(repo: string): Promise<string[]>;
   createWorktree(branch: string): Promise<string>;
   /** Remove with the verdict the user confirmed; core's outcome says
    *  what was kept, if anything. */
@@ -409,42 +415,53 @@ export interface N10HostApi {
 
   // ── Reviews ──────────────────────────────────────────────────
   fetchCommentThreads(
+    repo: string,
     prId: number,
     force?: boolean
   ): Promise<PullRequestComments>;
   replyToThread(req: ReplyRequest): Promise<void>;
   setThreadResolved(req: ResolveRequest): Promise<void>;
   /** Full PR description (list payloads truncate or omit it). */
-  fetchPrDescription(prId: number): Promise<string>;
+  fetchPrDescription(repo: string, prId: number): Promise<string>;
   /** One pull request by identity: the list row, the provider's detail
    *  and the exact commits its review compares. Rejects a ref from
    *  another repository or a caller that last saw another account. */
-  getPullRequestSnapshot(req: SnapshotRequest): Promise<PullRequestSnapshot>;
+  getPullRequestSnapshot(
+    repo: string,
+    req: SnapshotRequest
+  ): Promise<PullRequestSnapshot>;
   /** What the pull request's history offers to compare against: the
    *  provider's record of its heads and the viewer's latest review, and
    *  the viewer's last visit before the one `visitId` names — the same
    *  for every read that names it. */
-  getPullRequestHistory(req: HistoryRequest): Promise<PullRequestHistory>;
+  getPullRequestHistory(
+    repo: string,
+    req: HistoryRequest
+  ): Promise<PullRequestHistory>;
   /** Record the commits the reader was shown in a visit, kept outside
    *  the repository per account and pull request. Call once
    *  `getPullRequestHistory` for the same `visitId` has resolved, in
    *  this run of the app; it rejects otherwise. The record is kept
    *  under the pull request that read confirmed: the id on `req.ref`
    *  is not used. */
-  recordPullRequestVisit(req: VisitRequest): Promise<void>;
+  recordPullRequestVisit(repo: string, req: VisitRequest): Promise<void>;
   /** What stands between one pull request and completion: its checks,
    *  the target's rules and the provider's merge state, with n10's
    *  reading of them. Identity-checked like the snapshot. */
-  getPullRequestChecks(req: SnapshotRequest): Promise<PullRequestChecksAnswer>;
+  getPullRequestChecks(
+    repo: string,
+    req: SnapshotRequest
+  ): Promise<PullRequestChecksAnswer>;
   /** One pull request's whole conversation by identity: threads with
    *  every reply, conversation comments, reviews and events, with how
    *  much of each was read. Refused like the snapshot. */
   getPullRequestConversation(
+    repo: string,
     req: SnapshotRequest
   ): Promise<PullRequestConversationRead>;
   /** The reviewer's own unpublished drafts on one pull request, kept on
    *  this machine for the configured account. Refused like the snapshot. */
-  listReviewDrafts(req: DraftsRequest): Promise<ReviewDrafts>;
+  listReviewDrafts(repo: string, req: DraftsRequest): Promise<ReviewDrafts>;
   /** Store the draft for a target; an empty body removes it. Resolves
    *  to the stored draft, or null when it was removed. */
   saveReviewDraft(req: SaveDraftRequest): Promise<ReviewDraft | null>;
@@ -456,15 +473,15 @@ export interface N10HostApi {
    *  reviewer read. Resolves to the drafts as they now stand; a failure
    *  leaves each draft saying where it got to. Refused like the snapshot. */
   submitReview(req: SubmitReviewRequest): Promise<SubmittedReview>;
-  /** The reviewer-list identifier of the authenticated user (GitHub
-   *  login / ADO email), for optimistic reviewer patches. */
-  getReviewViewer(): Promise<{ identifier: string } | null>;
   /** Download a comment image with the provider's credentials (Azure
    *  DevOps PAT / GitHub token) and return it as a data URL. */
-  fetchCommentImage(url: string): Promise<CommentImagePayload | null>;
+  fetchCommentImage(
+    repo: string,
+    url: string
+  ): Promise<CommentImagePayload | null>;
 
   // ── Draft review comments (from the review agent) ─────────────
-  listDraftComments(prId: number): Promise<ReviewComment[]>;
+  listDraftComments(repo: string, prId: number): Promise<ReviewComment[]>;
   updateDraftComment(
     prId: number,
     id: string,
@@ -480,13 +497,13 @@ export interface N10HostApi {
    *  session seeded with the shared review prompt + guidance. */
   launchReviewAgent(req: ReviewLaunchRequest): Promise<{ name: string }>;
   /** The agents the session menu offers, configured default first. */
-  listAgentOptions(): Promise<AgentOptionView[]>;
+  listAgentOptions(repo: string): Promise<AgentOptionView[]>;
   getSessionLaunchContext(branch: string): Promise<SessionLaunchView>;
   /** Send a composed plan to the PR's agent, creating the worktree and
    *  starting one when there is none. Rejects with the reason on
    *  failure, leaving the plan intact for a retry. */
   checkoutPlan(req: PlanCheckoutRequest): Promise<PlanCheckoutResult>;
-  listSessions(): Promise<SessionSummary[]>;
+  listSessions(repo: string): Promise<SessionSummary[]>;
   /** Agents alive in other repositories, for the tab strip to give
    *  each a tab in its own group. The open repository's own are left
    *  out — the sidebar describes those. */
@@ -531,7 +548,7 @@ export interface N10HostApi {
   /** The agents and terminals working in `branch`'s checkouts of the
    *  open repository, on every machine, and the machine a new terminal
    *  opens on by default. */
-  listBranchSessions(branch: string): Promise<BranchSessions>;
+  listBranchSessions(repo: string, branch: string): Promise<BranchSessions>;
   /** Open a shell in the branch's checkout on the requested machine. */
   launchBranchTerminal(req: BranchTerminalRequest): Promise<TerminalSummary>;
   /** PTY output of the sessions this window watches (`watchSession`).
@@ -548,7 +565,11 @@ export interface N10HostApi {
    *  and untracked work — what an agent has done so far, as opposed to
    *  what it has committed. Empty string when the branch has no
    *  worktree. */
-  fetchWorktreeDiffText(branch: string, targetBranch: string): Promise<string>;
+  fetchWorktreeDiffText(
+    repo: string,
+    branch: string,
+    targetBranch: string
+  ): Promise<string>;
   /** Resolve a pull request to exact commits and list every file that
    *  changed between them. Failures that describe the pull request
    *  (a head this clone cannot produce, unrelated history) are data. */
@@ -652,6 +673,8 @@ export const IPC = {
   selectFolder: 'n10/shell/select-folder',
   forgetRecent: 'n10/repo/forget',
   getRepo: 'n10/repo/get',
+  getRepoInfo: 'n10/repo/info',
+  prewarmRepo: 'n10/repo/prewarm',
   refreshRepo: 'n10/repo/refresh',
   getSettingsView: 'n10/settings/view',
   updateSettingsField: 'n10/config/update-field',
@@ -697,7 +720,6 @@ export const IPC = {
   discardReviewDraft: 'n10/review-drafts/discard',
   searchMentionCandidates: 'n10/pull-requests/mentions',
   submitReview: 'n10/review-drafts/submit',
-  getReviewViewer: 'n10/reviews/viewer',
   fetchCommentImage: 'n10/reviews/comment-image',
   listDraftComments: 'n10/drafts/list',
   updateDraftComment: 'n10/drafts/update',

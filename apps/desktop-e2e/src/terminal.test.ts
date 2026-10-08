@@ -17,6 +17,7 @@ import {
   tab,
   tabs,
   visibleText,
+  openSessions,
 } from './setup/app.js';
 
 /**
@@ -104,7 +105,7 @@ test.describe('Two agents at once', () => {
       page.getByText(/echo:from-beta/).filter({ visible: true })
     ).toHaveCount(0);
 
-    const sessions = await page.evaluate(() => window.n10.listSessions());
+    const sessions = await openSessions(page);
     expect(
       sessions
         .filter((s) => s.running)
@@ -151,7 +152,7 @@ test.describe('Two agents at once', () => {
     await expect
       .poll(
         async () => {
-          const s = await page.evaluate(() => window.n10.listSessions());
+          const s = await openSessions(page);
           return s.filter((x) => x.running).map((x) => sessionBranch(x.name));
         },
         { timeout: 20_000 }
@@ -335,7 +336,7 @@ test.describe('Terminal fit', () => {
     await expect
       .poll(
         async () => {
-          const s = await page.evaluate(() => window.n10.listSessions());
+          const s = await openSessions(page);
           return s.filter((x) => x.running).length;
         },
         { timeout: 20_000 }

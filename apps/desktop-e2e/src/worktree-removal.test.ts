@@ -12,6 +12,7 @@ import {
   sidebarRow,
   tab,
   visibleText,
+  openSessions,
 } from './setup/app.js';
 import { rescan } from './setup/discovery.js';
 import { armContextMenuChoice, armContextMenuDismiss } from './setup/menu.js';
@@ -343,7 +344,7 @@ test.describe('Worktree removed outside n10 (running agent)', () => {
 
 /** Whether the host holds a live agent for `BRANCH`. */
 async function agentRunning(page: Page): Promise<boolean> {
-  const sessions = await page.evaluate(() => window.n10.listSessions());
+  const sessions = await openSessions(page);
   return (
     sessions.find((s) => sessionBranch(s.name) === BRANCH)?.running ?? false
   );
@@ -373,7 +374,7 @@ test.describe('Worktree removal (running agent)', () => {
     await expect
       .poll(
         async () => {
-          const sessions = await page.evaluate(() => window.n10.listSessions());
+          const sessions = await openSessions(page);
           return (
             sessions.find((s) => sessionBranch(s.name) === BRANCH)?.running ??
             false

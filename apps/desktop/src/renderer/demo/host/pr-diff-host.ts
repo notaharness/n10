@@ -30,8 +30,8 @@ async function load(loader: (() => Promise<{ default: string }>) | undefined) {
 }
 
 /** The demo pull request and push `oid` is, if any. */
-function pushOf(state: DemoState, oid: string) {
-  for (const pr of state.repo().pullRequests()) {
+function pushOf(state: DemoState, repo: string, oid: string) {
+  for (const pr of state.repoAt(repo).pullRequests()) {
     const index = demoPushes(pr).findIndex((p) => p.oid === oid);
     if (index >= 0) return { pr, index };
   }
@@ -53,20 +53,22 @@ const missing = (code: 'from-unavailable' | 'to-unavailable', oid: string) => ({
 export function createPrDiffHost(state: DemoState): PrDiffHost {
   // Which branch's patch two commits stand for, once they are handed out.
   const branches = new Map<string, string>();
-  const repoChanged = (repo: string) =>
-    repo === state.repo().cwd
+  // Answered for whichever repository the request names, open or not.
+  const unknownRepo = (repo: string) =>
+    state.repos.has(repo)
       ? null
       : {
           ok: false as const,
           error: {
             code: 'other-repo' as const,
-            message: `${repo} is not the open repository`,
+            message: `${repo} is not a demo repository`,
           },
         };
-  const patchOf = (branch: string) => load(state.repo().data.diffs[branch]);
+  const patchOf = (repo: string, branch: string) =>
+    load(state.repoAt(repo).data.diffs[branch]);
   return {
     fetchPrDiffManifest: async (req) => {
-      const refused = repoChanged(req.repo);
+      const refused = unknownRepo(req.repo);
       if (refused) return refused;
       const comparison: PrComparison = {
         headOid: req.expectedHeadOid ?? standInOid(`${req.sourceBranch}:head`),
@@ -81,25 +83,25 @@ export function createPrDiffHost(state: DemoState): PrDiffHost {
         `${comparison.mergeBaseOid}..${comparison.headOid}`,
         req.sourceBranch
       );
-      const files = patchSections(await patchOf(req.sourceBranch)).map(
-        manifestFile
-      );
+      const files = patchSections(
+        await patchOf(req.repo, req.sourceBranch)
+      ).map(manifestFile);
       return later(
         { ok: true, manifest: { comparison, files, complete: true } },
         120
       );
     },
     fetchPrRangeManifest: async ({ repo, from, to, target }) => {
-      const refused = repoChanged(repo);
+      const refused = unknownRepo(repo);
       if (refused) return refused;
-      const older = pushOf(state, from);
+      const older = pushOf(state, repo, from);
       if (!older) return later(missing('from-unavailable', from));
-      const newer = pushOf(state, to);
+      const newer = pushOf(state, repo, to);
       if (!newer) return later(missing('to-unavailable', to));
       const branch = newer.pr.sourceBranch;
       branches.set(`${from}..${to}`, branch);
       const [lo, hi] = [older.index, newer.index].sort((a, b) => a - b);
-      const files = patchSections(await patchOf(branch))
+      const files = patchSections(await patchOf(repo, branch))
         .map(manifestFile)
         .filter((_, i) => pushOfFile(i) > lo! && pushOfFile(i) <= hi!);
       return later(
@@ -130,10 +132,12 @@ export function createPrDiffHost(state: DemoState): PrDiffHost {
       );
     },
     fetchPrDiffPatch: async (req) => {
-      const refused = repoChanged(req.repo);
+      const refused = unknownRepo(req.repo);
       if (refused) return refused;
       const branch = branches.get(`${req.mergeBaseOid}..${req.headOid}`);
-      const text = branch ? sectionsFor(await patchOf(branch), req.paths) : '';
+      const text = branch
+        ? sectionsFor(await patchOf(req.repo, branch), req.paths)
+        : '';
       return later(
         {
           ok: true,

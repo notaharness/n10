@@ -24,7 +24,7 @@ describe('the demo history host', () => {
   };
 
   it('gives someone else’s pull request a last review and an older last visit', async () => {
-    const history = await setup().getPullRequestHistory({
+    const history = await setup().getPullRequestHistory(N10, {
       ref,
       viewer: null,
       visitId: 'v1',
@@ -40,24 +40,24 @@ describe('the demo history host', () => {
 
   it('keeps a visit’s baseline while it records, and moves it for the next visit', async () => {
     const host = setup();
-    const first = await host.getPullRequestHistory({
+    const first = await host.getPullRequestHistory(N10, {
       ref,
       viewer: null,
       visitId: 'v1',
     });
-    await host.recordPullRequestVisit({
+    await host.recordPullRequestVisit(N10, {
       ref,
       viewer: null,
       visitId: 'v1',
       visit,
     });
-    const again = await host.getPullRequestHistory({
+    const again = await host.getPullRequestHistory(N10, {
       ref,
       viewer: null,
       visitId: 'v1',
     });
     expect(again.lastVisit).toEqual(first.lastVisit);
-    const next = await host.getPullRequestHistory({
+    const next = await host.getPullRequestHistory(N10, {
       ref,
       viewer: null,
       visitId: 'v2',
@@ -70,7 +70,7 @@ describe('the demo history host', () => {
 
   it('refuses to record a visit whose history was never read', async () => {
     await expect(
-      setup().recordPullRequestVisit({
+      setup().recordPullRequestVisit(N10, {
         ref,
         viewer: null,
         visitId: 'v9',

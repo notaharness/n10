@@ -8,6 +8,7 @@ import {
   sessionCard,
   sessionCards,
   tab,
+  openSessions,
 } from './setup/app.js';
 
 const BRANCH = 'agent-work';
@@ -28,7 +29,7 @@ function closeTabButton(page: Page) {
 }
 
 async function sessionRunning(page: Page): Promise<boolean> {
-  const sessions = await page.evaluate(() => window.n10.listSessions());
+  const sessions = await openSessions(page);
   return (
     sessions.find((s) => sessionBranch(s.name) === SESSION)?.running ?? false
   );
@@ -69,7 +70,7 @@ test.describe('Agent sessions', () => {
     await createWorktree(page, BRANCH);
     await launchAgent(page);
 
-    const sessions = await page.evaluate(() => window.n10.listSessions());
+    const sessions = await openSessions(page);
     expect(sessions.map((s) => sessionBranch(s.name))).toContain(SESSION);
     expect(
       sessions.find((s) => sessionBranch(s.name) === SESSION)?.running

@@ -59,6 +59,8 @@ export function createHostApi(): HostApi {
 
     openRepo: (cwd) => Promise.resolve(repo.openRepo(cwd)),
     getRepo: () => Promise.resolve(repo.getRepo()),
+    getRepoInfo: (cwd) => Promise.resolve(repo.getRepoInfo(cwd)),
+    prewarmRepo: (cwd) => Promise.resolve(repo.prewarmRepo(cwd)),
     refreshRepo: () => Promise.resolve(repo.refreshRepo()),
     listRecentRepos: () => Promise.resolve(repo.listRecentRepos()),
     selectRepoDirectory: () => pickFolder('Open repository'),
@@ -69,38 +71,39 @@ export function createHostApi(): HostApi {
     updateSettingsField: (ref, value) =>
       Promise.resolve(settings.updateSettingsFromView(ref, value)),
 
-    getSidebarModel: () => sidebar.getSidebarSnapshot(),
-    getSyncState: () => Promise.resolve(sidebar.getSyncState()),
+    getSidebarModel: (cwd) => sidebar.getSidebarSnapshot(cwd),
+    getSyncState: (cwd) => Promise.resolve(sidebar.getSyncState(cwd)),
     refreshRemote: () => sidebar.refreshRemote(),
     listWorktrees: () => worktrees.listWorktrees(),
     listBranches: () => worktrees.listBranches(),
-    listAllBranches: () => worktrees.listAllBranches(),
+    listAllBranches: (cwd) => worktrees.listAllBranches(cwd),
     createWorktree: (branch) => worktrees.createWorktree(branch),
     removeWorktree: (branch, approved) =>
       worktrees.removeWorktree(branch, approved),
     checkWorktreeRemoval: (branch) => worktrees.checkWorktreeRemoval(branch),
     openInEditor: (branch) => worktrees.openInEditor(branch),
 
-    fetchCommentThreads: (prId, force) =>
-      reviews.fetchCommentThreads(prId, force),
+    fetchCommentThreads: (cwd, prId, force) =>
+      reviews.fetchCommentThreads(cwd, prId, force),
     replyToThread: (req: ReplyRequest) => reviews.replyToThread(req),
     setThreadResolved: (req: ResolveRequest) => reviews.setThreadResolved(req),
-    fetchPrDescription: (prId) => reviews.fetchPrDescription(prId),
-    getPullRequestSnapshot: (req) => prDetails.getPullRequestSnapshot(req),
-    getPullRequestHistory: (req) => prHistory.getPullRequestHistory(req),
-    recordPullRequestVisit: (req) => prHistory.recordPullRequestVisit(req),
-    getPullRequestChecks: (req) => prChecks.getPullRequestChecks(req),
-    getPullRequestConversation: (req) =>
-      prConversation.getPullRequestConversation(req),
-    listReviewDrafts: (req) => reviewDrafts.listDrafts(req),
+    fetchPrDescription: (cwd, prId) => reviews.fetchPrDescription(cwd, prId),
+    getPullRequestSnapshot: (cwd, req) =>
+      prDetails.getPullRequestSnapshot(cwd, req),
+    getPullRequestHistory: (cwd, req) =>
+      prHistory.getPullRequestHistory(cwd, req),
+    recordPullRequestVisit: (cwd, req) =>
+      prHistory.recordPullRequestVisit(cwd, req),
+    getPullRequestChecks: (cwd, req) => prChecks.getPullRequestChecks(cwd, req),
+    getPullRequestConversation: (cwd, req) =>
+      prConversation.getPullRequestConversation(cwd, req),
+    listReviewDrafts: (cwd, req) => reviewDrafts.listDrafts(cwd, req),
     saveReviewDraft: (req) => reviewDrafts.saveDraft(req),
     discardReviewDraft: (req) => reviewDrafts.discardDraft(req),
     searchMentionCandidates: (req) => mentions.searchMentionCandidates(req),
     submitReview: (req) => reviewDrafts.submitReview(req),
-    getReviewViewer: () => Promise.resolve(reviews.getReviewViewer()),
-    fetchCommentImage: (url) => commentImages.fetchCommentImage(url),
-    listDraftComments: (prId) =>
-      Promise.resolve(drafts.listDraftComments(prId)),
+    fetchCommentImage: (cwd, url) => commentImages.fetchCommentImage(cwd, url),
+    listDraftComments: (cwd, prId) => drafts.listDraftComments(cwd, prId),
     updateDraftComment: (prId, id, patch) =>
       Promise.resolve(drafts.updateDraftComment(prId, id, patch)),
     deleteDraftComment: (prId, id) =>
@@ -111,9 +114,9 @@ export function createHostApi(): HostApi {
     launchReviewAgent: (req) => sessions.launchReviewAgent(req),
     getSessionLaunchContext: (branch) =>
       sessions.getSessionLaunchContext(branch),
-    listAgentOptions: () => Promise.resolve(sessions.listAgentOptions()),
+    listAgentOptions: (cwd) => Promise.resolve(sessions.listAgentOptions(cwd)),
     checkoutPlan: (req) => sessions.checkoutPlan(req),
-    listSessions: () => Promise.resolve(sessions.listSessions()),
+    listSessions: (cwd) => Promise.resolve(sessions.listSessions(cwd)),
     listForeignSessions: () =>
       Promise.resolve(foreignSessions.listForeignSessions()),
     getSessionActivity: () => Promise.resolve(sessions.getSessionActivity()),
@@ -129,8 +132,8 @@ export function createHostApi(): HostApi {
     launchTerminal: (req) => terminals.launchTerminal(req),
     listTerminals: () => Promise.resolve(branchSessions.listTerminals()),
     killTerminal: (name) => Promise.resolve(terminals.killTerminal(name)),
-    listBranchSessions: (branch) =>
-      Promise.resolve(branchSessions.listBranchSessions(branch)),
+    listBranchSessions: (cwd, branch) =>
+      Promise.resolve(branchSessions.listBranchSessions(cwd, branch)),
     launchBranchTerminal: (req) => branchSessions.launchBranchTerminal(req),
     onSessionData: () => {
       // Events are pushed via setSessionBroadcaster; the preload side
@@ -140,8 +143,8 @@ export function createHostApi(): HostApi {
     onSessionExit: () => () => undefined,
     onLaunchStep: () => () => undefined,
 
-    fetchWorktreeDiffText: (branch, targetBranch) =>
-      worktrees.getWorktreeDiffText(branch, targetBranch),
+    fetchWorktreeDiffText: (cwd, branch, targetBranch) =>
+      worktrees.getWorktreeDiffText(cwd, branch, targetBranch),
     fetchPrDiffManifest: (req) => reviews.getPrDiffManifest(req),
     fetchPrDiffPatch: (req) => reviews.getPrDiffPatch(req),
     fetchPrRangeManifest: (req) => reviews.getPrRangeManifest(req),

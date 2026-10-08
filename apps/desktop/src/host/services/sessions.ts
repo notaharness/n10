@@ -3,7 +3,7 @@ import {
   getSession,
   snapshot as activitySnapshot,
 } from '@n10/core';
-import { activeRepository, requireRepo } from './repo.js';
+import { activeRepository, repository, requireRepo } from './repo.js';
 import { machines } from './machines.js';
 import { machineFor } from './remote-machines.js';
 import { broadcastLaunchStep } from './session-relay.js';
@@ -132,8 +132,8 @@ export async function checkoutPlan(
   return result.outcome;
 }
 
-export function listSessions(): SessionSummary[] {
-  return activeRepository().sessions.connections();
+export function listSessions(repo: string): SessionSummary[] {
+  return repository(repo).sessions.connections();
 }
 
 /** Debounced agent-activity snapshots for every session this host has

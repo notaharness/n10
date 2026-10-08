@@ -175,7 +175,8 @@ async function activeLines(page: Page): Promise<number> {
 async function largestBufferKb(page: Page): Promise<number> {
   return page.evaluate(async () => {
     let most = 0;
-    for (const { name } of await window.n10.listSessions()) {
+    const repo = (await window.n10.getRepo())!.cwd;
+    for (const { name } of await window.n10.listSessions(repo)) {
       const { data } = await window.n10.watchSession(name);
       await window.n10.unwatchSession(name);
       most = Math.max(most, data.length);

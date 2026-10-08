@@ -102,10 +102,16 @@ export class DemoState implements Channels {
     return this.repos.get(this.current) as RepoState;
   }
 
-  /** Open a repository the demo knows; anything else is not one. */
-  open(cwd: string): RepoState {
+  /** A repository the demo knows, open or not. */
+  repoAt(cwd: string): RepoState {
     const repo = this.repos.get(cwd);
     if (!repo) throw new Error(`${cwd} is not a git repository`);
+    return repo;
+  }
+
+  /** Open a repository the demo knows; anything else is not one. */
+  open(cwd: string): RepoState {
+    const repo = this.repoAt(cwd);
     this.current = cwd;
     if (!this.recent.includes(cwd)) {
       this.recent.unshift(cwd);

@@ -1,9 +1,11 @@
 import type { ReviewComment } from '@n10/review-comments';
 import { readResourceValue, type PostAgentCommentsRequest } from '@n10/engine';
-import { activeReviewService } from './repo.js';
+import { activeReviewService, repository } from './repo.js';
 
-export async function listDraftComments(prId: number) {
-  return readResourceValue(activeReviewService().agentComments.resource(prId));
+export async function listDraftComments(repo: string, prId: number) {
+  return readResourceValue(
+    repository(repo).reviews.agentComments.resource(prId)
+  );
 }
 export function updateDraftComment(
   prId: number,

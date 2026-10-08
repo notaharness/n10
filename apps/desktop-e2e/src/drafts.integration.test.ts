@@ -110,12 +110,8 @@ test.describe('@integration Agent draft comments', () => {
   }) => {
     const { page } = desktop;
     const listed = await page.evaluate(
-      (id) =>
-        (
-          window.n10 as never as {
-            listDraftComments(prId: number): Promise<{ id: string }[]>;
-          }
-        ).listDraftComments(id),
+      async (id) =>
+        window.n10.listDraftComments((await window.n10.getRepo())!.cwd, id),
       PR_ID
     );
     expect(listed.map((c) => c.id).sort()).toEqual([
@@ -169,12 +165,8 @@ test.describe('@integration Agent draft comments', () => {
     );
 
     const listed = await page.evaluate(
-      (id) =>
-        (
-          window.n10 as never as {
-            listDraftComments(prId: number): Promise<{ id: string }[]>;
-          }
-        ).listDraftComments(id),
+      async (id) =>
+        window.n10.listDraftComments((await window.n10.getRepo())!.cwd, id),
       PR_ID
     );
     expect(listed.map((c) => c.id)).toEqual(['draft-major']);

@@ -92,6 +92,24 @@ export function openRepo(path: string): RepoInfo {
   return repoInfo(opened);
 }
 
+/** The repository at `cwd` for reading, selected or parked: the reads
+ *  a pane makes name the repository its tab belongs to. */
+export function repository(cwd: string): RepositoryHandle {
+  return repositories.get(cwd);
+}
+
+/** What `getRepo` says, for any repository: a pane of one that is not
+ *  open needs its provider and account too. */
+export function getRepoInfo(cwd: string): RepoInfo {
+  return repoInfo(repository(cwd));
+}
+
+/** Bring `cwd`'s data up to date behind what it holds, unless a parked
+ *  repository's is still warm. Returns at once. */
+export function prewarmRepo(cwd: string): void {
+  repository(cwd).prewarm();
+}
+
 export function getRepo(): RepoInfo | null {
   const current = repositories.getSnapshot();
   if (!current) return null;

@@ -357,3 +357,11 @@ export async function resizeWindow(
     [width, height]
   );
 }
+
+/** The open repository's sessions, as the host lists them. */
+export function openSessions(page: Page) {
+  return page.evaluate(async () => {
+    const repo = await window.n10.getRepo();
+    return repo ? window.n10.listSessions(repo.cwd) : [];
+  });
+}

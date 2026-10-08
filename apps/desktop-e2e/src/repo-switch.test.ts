@@ -1,6 +1,10 @@
 import { sessionBranch, sessionKey } from './setup/session-keys.js';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, launchAgentFromRail } from './setup/app.js';
+import {
+  createWorktree,
+  launchAgentFromRail,
+  openSessions,
+} from './setup/app.js';
 import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 
 /** Repository switches preserve independent agents, even on the same branch. */
@@ -37,7 +41,7 @@ test.describe('Switching repository with an agent running', () => {
     await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
       timeout: 30_000,
     });
-    const before = await page.evaluate(() => window.n10.listSessions());
+    const before = await openSessions(page);
     expect(before.map((s) => sessionBranch(s.name))).toContain(BRANCH);
 
     const firstKey = await sessionKey(page, BRANCH);
@@ -49,7 +53,7 @@ test.describe('Switching repository with an agent running', () => {
     });
 
     // The agent belongs to the first repo: invisible here…
-    expect(await page.evaluate(() => window.n10.listSessions())).toEqual([]);
+    expect(await openSessions(page)).toEqual([]);
     expect(await page.evaluate(() => window.n10.getSessionActivity())).toEqual(
       {}
     );
@@ -63,9 +67,9 @@ test.describe('Switching repository with an agent running', () => {
       BRANCH
     );
     expect(second.name).not.toBe(firstKey);
-    expect(
-      (await page.evaluate(() => window.n10.listSessions())).map((s) => s.name)
-    ).toEqual([second.name]);
+    expect((await openSessions(page)).map((s) => s.name)).toEqual([
+      second.name,
+    ]);
 
     // …and neither does killing it.
     await expect(
@@ -85,13 +89,13 @@ test.describe('Switching repository with an agent running', () => {
     });
 
     await page.evaluate((cwd) => window.n10.openRepo(cwd), otherRepo);
-    expect(await page.evaluate(() => window.n10.listSessions())).toEqual([]);
+    expect(await openSessions(page)).toEqual([]);
 
     await page.evaluate((cwd) => window.n10.openRepo(cwd), repoPath);
 
     // The agent kept running the whole time — entries for other repos
     // stay in the map precisely so switching back reattaches.
-    const sessions = await page.evaluate(() => window.n10.listSessions());
+    const sessions = await openSessions(page);
     expect(
       sessions.find((s) => sessionBranch(s.name) === BRANCH)?.running
     ).toBe(true);

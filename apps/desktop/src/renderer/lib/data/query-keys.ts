@@ -147,9 +147,9 @@ export const keys = {
       query.toLowerCase(),
     ] as const,
   activity: (cwd: string) => ['session-activity', cwd] as const,
-  commentImage: (url: string) => ['comment-image', url] as const,
+  commentImage: (cwd: string, url: string) =>
+    ['comment-image', cwd, url] as const,
   drafts: (cwd: string, prId: number) => ['drafts', cwd, prId] as const,
-  reviewViewer: (cwd: string) => ['review-viewer', cwd] as const,
   branchRemoval: (cwd: string, branch: string) =>
     ['branch-removal', cwd, branch] as const,
   // Diff-worker results (see lib/highlight.ts). `linesKey` is a hash of
@@ -190,7 +190,6 @@ const PROVIDER_KEYS: ReadonlySet<string> = new Set([
   'pr-history',
   'comment-image',
   'drafts',
-  'review-viewer',
 ]);
 
 /**

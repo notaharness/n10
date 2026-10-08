@@ -25,9 +25,12 @@ import {
   refreshRepo,
   forgetRecentRepo,
   getRepo,
+  getRepoInfo,
   listRecentRepos,
   openRepo,
   openStartupRepo,
+  prewarmRepo,
+  repository,
 } from './repo.js';
 import { saveRecents } from './recent-repos.js';
 import type { RecentRepo } from '@n10/vcs-core';
@@ -121,6 +124,26 @@ describe('opening a repository', () => {
     // A failed switch must not strand the app between two repos.
     expect(getRepo()?.cwd).toBe(gitDir);
     expect(activeRepoIs(gitDir)).toBe(true);
+  });
+
+  it('describes and warms another repository without opening it', () => {
+    const opened = vi.fn();
+    setRepoOpenedListener(opened);
+    openRepo(gitDir);
+    opened.mockClear();
+    const other = join(gitDir, '..', 'other');
+    execFileSync('git', ['init', '--quiet', other]);
+    expect(getRepoInfo(other).cwd).toBe(realpathSync(other));
+    prewarmRepo(other);
+    expect(repository(other).parked()).toBe(true);
+    expect(getRepo()?.cwd).toBe(gitDir);
+    expect(activeRepoIs(gitDir)).toBe(true);
+    expect(opened).not.toHaveBeenCalled();
+    // Opened later, it is the handle that was read.
+    const read = repository(other);
+    openRepo(other);
+    expect(repository(other)).toBe(read);
+    expect(read.parked()).toBe(false);
   });
 
   it('tracks which repo long-running work belongs to', () => {
