@@ -25,10 +25,20 @@ import type {
 } from '@n10/core';
 import type {
   CommentSeverity,
+  GuideFile,
+  GuideSlide,
+  GuideVisual,
   GuidedReview,
   ReviewComment,
 } from '@n10/review-comments';
-export type { CommentSeverity, GuidedReview, ReviewComment };
+export type {
+  CommentSeverity,
+  GuideFile,
+  GuideSlide,
+  GuideVisual,
+  GuidedReview,
+  ReviewComment,
+};
 import type { WorktreeInfo } from '@n10/worktree-manager';
 import type { DesktopBindings, KeyDescriptor } from '@n10/core';
 import type {

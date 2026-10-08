@@ -1,11 +1,15 @@
 import { PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react';
-import type { ReviewComment } from '../../../host/contract.js';
+import type { GuidedReview, ReviewComment } from '../../../host/contract.js';
 import { Button } from '../ui/button.js';
 import { ScrollArea } from '../ui/scroll-area.js';
 import { Tip } from '../ui/tooltip.js';
 import { FileTree, type FileEntry, type FileListing } from './diff/FileTree.js';
 import type { SessionCard } from '../../lib/review/session-cards.js';
-import { PlanSection, ReviewReadySection } from './ReviewRailSections.js';
+import {
+  GuideSection,
+  PlanSection,
+  ReviewReadySection,
+} from './ReviewRailSections.js';
 import { SessionsSection } from './SessionCards.js';
 
 /** What is left of the rail while it is hidden: the button back. */
@@ -27,7 +31,7 @@ export function CollapsedRail({ onShow }: { onShow: () => void }) {
 }
 
 /**
- * The review rail: the sessions, the review and plan when they have
+ * The review rail: the sessions, the guide, the review and plan when they have
  * something, and the files. The Overview is the top of the review
  * and where every Back leads, and it carries the conversation, so the
  * rail lists neither.
@@ -42,6 +46,9 @@ export function ReviewRail({
   onLaunchTerminal,
   onStopSession,
   onHide,
+  guide,
+  guideActive,
+  onGuide,
   drafts,
   reviewActive,
   onReview,
@@ -67,6 +74,9 @@ export function ReviewRail({
   onLaunchTerminal: () => void;
   onStopSession: (card: SessionCard) => void;
   onHide: () => void;
+  guide: GuidedReview | null;
+  guideActive: boolean;
+  onGuide: () => void;
   drafts: ReviewComment[];
   reviewActive: boolean;
   onReview: () => void;
@@ -114,6 +124,8 @@ export function ReviewRail({
           onStop={onStopSession}
         />
       </div>
+
+      <GuideSection guide={guide} active={guideActive} onOpen={onGuide} />
 
       <ReviewReadySection
         drafts={drafts}

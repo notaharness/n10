@@ -2,6 +2,7 @@ import type { DiffLine } from '@n10/diff';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import { useState, type ReactNode, type RefObject } from 'react';
 import type {
+  GuidedReview,
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
@@ -22,6 +23,7 @@ import { OverviewPane } from './OverviewPane.js';
 import { terminalInset } from './PrHeader.js';
 import { PlanPane } from './PlanPane.js';
 import { ReviewStepper } from './drafts/ReviewStepper.js';
+import { GuideLayer } from './guide/GuidePane.js';
 
 /**
  * One layer of the stack. Hidden rather than unmounted, so a pane's
@@ -148,6 +150,7 @@ export function ContentPane({
   hideResolved,
   drafts,
   hasDrafts,
+  guide,
   commentsLoading,
   threadsNotice,
   diffRead,
@@ -194,6 +197,8 @@ export function ContentPane({
   hideResolved: boolean;
   drafts: ReviewComment[];
   hasDrafts: boolean;
+  /** The review agent's guided review, once it wrote one. */
+  guide: GuidedReview | null;
   commentsLoading: boolean;
   /** Why the diff's threads are missing or out of date. */
   threadsNotice?: ReactNode;
@@ -268,6 +273,12 @@ export function ContentPane({
           )}
         </StackedPane>
       )}
+      <GuideLayer
+        guide={effMode === 'guide' ? guide : null}
+        headSha={headSha}
+        onOpenFile={onOpenInDiff}
+        onDone={onExitReview}
+      />
       {plan && effMode === 'plan' && (
         <div className="absolute inset-0">
           <PlanPane

@@ -1,10 +1,11 @@
 import {
+  BookOpenIcon,
   ClipboardCheckIcon,
   ClipboardListIcon,
   Loader2Icon,
   SendIcon,
 } from 'lucide-react';
-import type { ReviewComment } from '../../../host/contract.js';
+import type { GuidedReview, ReviewComment } from '../../../host/contract.js';
 import { severityCounts } from '../../lib/diff/diff-model.js';
 import { formatSeverityBreakdown } from '../../lib/review/severity.js';
 import { cn } from '../../lib/utils.js';
@@ -15,6 +16,44 @@ import { Button } from '../ui/button.js';
  * component because each appears on its own condition — there is no
  * order or state shared between them, only a column.
  */
+
+/** The way in to the review agent's guided review, once it wrote one. */
+export function GuideSection({
+  guide,
+  active,
+  onOpen,
+}: {
+  guide: GuidedReview | null;
+  active: boolean;
+  onOpen: () => void;
+}) {
+  if (!guide) return null;
+  return (
+    <div className="shrink-0 border-b border-border px-2 py-2">
+      <button
+        type="button"
+        onClick={onOpen}
+        className={cn(
+          'flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors',
+          active
+            ? 'border-primary bg-primary/10'
+            : 'border-border hover:bg-sidebar-accent'
+        )}
+      >
+        <BookOpenIcon className="size-4 shrink-0 text-primary" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-base font-medium">Guided review</span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {guide.title}
+          </span>
+        </span>
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+          {guide.slides.length} slides
+        </span>
+      </button>
+    </div>
+  );
+}
 
 /** The way in to the draft walkthrough, plus a post-everything escape. */
 export function ReviewReadySection({
