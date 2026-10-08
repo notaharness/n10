@@ -311,6 +311,14 @@
   --term-bg: var(--term-bg-app);
 }
 
+/* The app takes the mouse (terminal-mouse.ts): a click is its, not a
+ * selection, so the arrow rather than the I-beam. A link held with its
+ * modifier keeps wterm's pointer, a more specific rule. */
+.mouse-reporting .wterm,
+.mouse-reporting .wterm * {
+  cursor: default;
+}
+
 /* ── Fleet first-run illustration ──────────────────────────────────
  * The website's beam mesh (apps/website/src/app/global.css), trimmed to
  * two machines and one beam. Box faces are three tones of the theme's

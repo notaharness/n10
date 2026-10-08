@@ -42,6 +42,11 @@
 //                        raw mode delivers one keystroke at a time, so an
 //                        immediate echo would answer "hello" with five
 //                        separate lines.
+//   --mouse=<mode>       turn on mouse tracking mode <mode> (1000 clicks,
+//                        1002 drags, 1003 any motion) with SGR encoding,
+//                        and print each mouse report it receives as
+//                        `mouse:<code>;<col>;<row><M|m>`, so a test can see
+//                        which pointer events the terminal forwarded.
 
 const args = Object.fromEntries(
   process.argv
@@ -99,6 +104,24 @@ if (args.echo) {
         line += ch;
       }
     }
+  });
+  process.stdin.resume();
+}
+
+if (args.mouse) {
+  if (process.stdin.isTTY) process.stdin.setRawMode(true);
+  process.stdout.write(`\x1b[?${args.mouse}h\x1b[?1006h`);
+  process.stdout.write(`mouse-ready:${args.mouse}\r\n`);
+  let pending = '';
+  process.stdin.on('data', (chunk) => {
+    pending += chunk.toString();
+    // eslint-disable-next-line no-control-regex -- mouse reports are escape sequences
+    for (const m of pending.matchAll(/\x1b\[<(\d+;\d+;\d+[Mm])/g)) {
+      process.stdout.write(`mouse:${m[1]}\r\n`);
+    }
+    // Keep only a report still arriving in pieces.
+    // eslint-disable-next-line no-control-regex -- mouse reports are escape sequences
+    pending = pending.match(/\x1b(\[(<[\d;]*)?)?$/)?.[0] ?? '';
   });
   process.stdin.resume();
 }

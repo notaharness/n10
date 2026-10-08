@@ -54,6 +54,8 @@ export function fakeAgent(
     printSize?: boolean;
     /** End each streamed line with `@<checkout directory>`. */
     tag?: boolean;
+    /** Turn on this mouse tracking mode (SGR) and print `mouse:` reports. */
+    mouse?: 1000 | 1002 | 1003;
   } = {}
 ): string {
   const flags = [`--banner=n10-fake-agent-ready`];
@@ -62,6 +64,7 @@ export function fakeAgent(
   if (opts.echo) flags.push('--echo');
   if (opts.printSeed) flags.push('--print-seed');
   if (opts.printSize) flags.push('--print-size');
+  if (opts.mouse != null) flags.push(`--mouse=${opts.mouse}`);
   if (opts.streamMs != null) flags.push(`--stream-ms=${opts.streamMs}`);
   if (opts.intervalMs != null) flags.push(`--interval-ms=${opts.intervalMs}`);
   if (opts.exitAfterMs != null)

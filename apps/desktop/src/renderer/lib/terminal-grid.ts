@@ -27,6 +27,25 @@ export function measureTerminalGrid(
   termEl: HTMLElement,
   pane: { width: number; height: number }
 ): Grid | null {
+  const cell = measureCell(termEl);
+  if (!cell) return null;
+  const { charWidth, rowHeight } = cell;
+  const cs = getComputedStyle(termEl);
+  const padX =
+    (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+  const padY =
+    (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+  return {
+    cols: Math.max(20, Math.floor((pane.width - padX) / charWidth)),
+    rows: Math.max(5, Math.floor((pane.height - padY) / rowHeight)),
+  };
+}
+
+/** One cell of a `.wterm` element, by wterm's own probe: a row holding
+ *  one `W`. Null when the element is not laid out. */
+export function measureCell(
+  termEl: HTMLElement
+): { charWidth: number; rowHeight: number } | null {
   const row = document.createElement('div');
   row.className = 'term-row';
   row.style.position = 'absolute';
@@ -38,16 +57,7 @@ export function measureTerminalGrid(
   const charWidth = probe.getBoundingClientRect().width;
   const rowHeight = row.getBoundingClientRect().height;
   row.remove();
-  if (charWidth <= 0 || rowHeight <= 0) return null;
-  const cs = getComputedStyle(termEl);
-  const padX =
-    (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
-  const padY =
-    (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-  return {
-    cols: Math.max(20, Math.floor((pane.width - padX) / charWidth)),
-    rows: Math.max(5, Math.floor((pane.height - padY) / rowHeight)),
-  };
+  return charWidth > 0 && rowHeight > 0 ? { charWidth, rowHeight } : null;
 }
 
 /**
