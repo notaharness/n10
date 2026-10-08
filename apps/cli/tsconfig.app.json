@@ -9,8 +9,7 @@
     "outDir": "out-tsc/app",
     "types": ["node"],
     "rootDir": "src",
-    "tsBuildInfoFile": "out-tsc/app/tsconfig.app.tsbuildinfo",
-    "ignoreDeprecations": "6.0"
+    "tsBuildInfoFile": "out-tsc/app/tsconfig.app.tsbuildinfo"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": [

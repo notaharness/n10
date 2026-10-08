@@ -28,12 +28,5 @@
   "nx": {
     "addTypecheckTarget": false
   },
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    }
-  ],
-  "compilerOptions": {
-    "ignoreDeprecations": "6.0"
-  }
+  "references": [{ "path": "./tsconfig.app.json" }]
 }

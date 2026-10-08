@@ -9,9 +9,7 @@
       "node",
       "vitest"
     ],
-    "forceConsistentCasingInFileNames": true,
-    "ignoreDeprecations": "6.0",
-    "rootDir": "."
+    "forceConsistentCasingInFileNames": true
   },
   "include": [
     "vitest.setup.ts",

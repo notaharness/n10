@@ -5,9 +5,7 @@
     "outDir": "out-tsc/playwright",
     "sourceMap": false,
     "lib": ["es2022", "dom"],
-    "types": ["node"],
-    "ignoreDeprecations": "6.0",
-    "rootDir": "."
+    "types": ["node"]
   },
   "include": ["**/*.ts", "**/*.js", "playwright.config.ts"],
   "exclude": [

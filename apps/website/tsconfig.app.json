@@ -26,7 +26,6 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "types": ["node"],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
@@ -35,9 +34,7 @@
         "name": "next"
       }
     ],
-    "tsBuildInfoFile": "node_modules/.cache/website.tsbuildinfo",
-    "noUncheckedSideEffectImports": false,
-    "ignoreDeprecations": "6.0"
+    "tsBuildInfoFile": "node_modules/.cache/website.tsbuildinfo"
   },
   "include": [
     "next-env.d.ts",

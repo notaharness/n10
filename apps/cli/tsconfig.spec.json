@@ -3,9 +3,7 @@
   "compilerOptions": {
     "outDir": "./out-tsc/vitest",
     "types": ["vitest/globals", "vitest/importMeta", "vite/client", "node"],
-    "forceConsistentCasingInFileNames": true,
-    "ignoreDeprecations": "6.0",
-    "rootDir": "."
+    "forceConsistentCasingInFileNames": true
   },
   // Deliberately no `references` to tsconfig.app.json, and the app's own
   // sources are included instead.
