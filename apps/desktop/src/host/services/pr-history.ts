@@ -6,9 +6,9 @@ export function getPullRequestHistory(repo: string, request: unknown) {
   return readResourceValue(repository(repo).reviews.history(request));
 }
 
-/** Record the commits the reader was shown, and keep them in the clone. */
-/** Local bookkeeping beside the history read, not a provider write:
- *  recorded for the repository the pane shows, open or parked. */
+/** Record the commits the reader was shown, and keep them in the clone:
+ *  local bookkeeping beside the history read, not a provider write, so
+ *  it is recorded for the repository the pane shows, open or parked. */
 export function recordPullRequestVisit(repo: string, request: unknown) {
   return repository(repo).reviews.recordVisit(request);
 }

@@ -97,10 +97,10 @@ vi.mock('./babysit.js', () => ({
 
 vi.mock('./remote-sync.js', () => ({
   refreshRemoteSync: () => Promise.resolve(),
-  getSyncDecorations: () => ({
+  getSyncDecorations: (cwd: string) => ({
     merged: new Set<string>(),
     conflicts: new Map<string, number>(),
-    lastGitSyncAt: 42,
+    lastGitSyncAt: cwd === '/parked' ? 7 : 42,
     error: null,
     loading: false,
   }),
@@ -205,6 +205,10 @@ describe('sync state', () => {
     // The cached timestamp belongs to the other checkout; reporting it
     // here would claim this repo had just synced.
     expect(sidebar.getSyncState(env.cwd).lastRemoteSyncAt).toBeNull();
+  });
+
+  it('reports the repository it names, not the open one', () => {
+    expect(sidebar.getSyncState('/parked').lastGitSyncAt).toBe(7);
   });
 
   it('reports the interval the config sets', () => {

@@ -26,7 +26,6 @@ export async function setThreadResolved(req: ResolveRequest): Promise<void> {
 export async function fetchPrDescription(repo: string, prId: number) {
   return readResourceValue(repository(repo).reviews.description(prId));
 }
-/** A pull request's comparison and file manifest at exact commits. */
 /** A diff request names its repository; the engine parses the rest,
  *  and reports a malformed one. */
 function diffReads(req: unknown) {
@@ -34,6 +33,7 @@ function diffReads(req: unknown) {
   if (typeof repo !== 'string') throw new TypeError('repo must be a string');
   return repository(repo).reviews.diff;
 }
+/** A pull request's comparison and file manifest at exact commits. */
 export function getPrDiffManifest(req: unknown) {
   return readResourceValue(diffReads(req).manifest(req));
 }

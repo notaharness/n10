@@ -208,6 +208,25 @@ describe('caching', () => {
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('downloads a URL again for another repository, with its credentials', async () => {
+    creds.config = { vendorAuth: { pat: 'ado_secret' } };
+    stubFetch();
+    const url = 'https://dev.azure.com/org/_apis/attachment';
+    await fetchCommentImage('/repo', url);
+    await fetchCommentImage('/other', url);
+    const { calls } = (
+      globalThis.fetch as unknown as {
+        mock: { calls: [string, { headers: Record<string, string> }][] };
+      }
+    ).mock;
+    // One answer per repository: the image read with one repository's
+    // PAT is not the other's to see.
+    expect(calls.map(([, init]) => init.headers.authorization)).toEqual([
+      `Basic ${Buffer.from(':ado_secret').toString('base64')}`,
+      `Basic ${Buffer.from(':x').toString('base64')}`,
+    ]);
+  });
+
   it('forgets a failure so a retry can succeed', async () => {
     stubFetch({ status: 500 });
     await expect(
