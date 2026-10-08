@@ -450,7 +450,10 @@ reverts it if the open fails, and `Workspace` is not keyed by repository, so
 the pane on screen is the one held, not a new mount behind a notice. A
 repository the host cannot read (moved or deleted) shows `ForeignRepoPane`
 with a retry; a failed open reads its info again, since a hover may have
-cached it before the checkout moved.
+cached it before the checkout moved. A parked repository's agent terminal starts
+from the host's buffer for that session: a buffer is read by the session's
+name, which is qualified by its repository, whichever one is selected. Kills
+still refuse another repository's session.
 
 Writes name no repository: the host applies them to the one it has selected.
 The host opens a repository synchronously, and one window's requests reach it

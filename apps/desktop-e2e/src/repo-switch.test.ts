@@ -57,9 +57,10 @@ test.describe('Switching repository with an agent running', () => {
     expect(await page.evaluate(() => window.n10.getSessionActivity())).toEqual(
       {}
     );
-    // …its scrollback is not handed over…
+    // …its scrollback answers only to its own name, which says whose it
+    // is: a held pane of the first repository starts from it…
     const buffer = await page.evaluate(readBuffer, firstKey);
-    expect(buffer.data).toBe('');
+    expect(buffer.data).toContain('n10-fake-agent-ready');
 
     const second = await page.evaluate(
       (branch) =>
