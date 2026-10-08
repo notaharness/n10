@@ -34,7 +34,8 @@ export function GuidePane({
   headSha?: string;
   /** The agent's unposted draft comments. */
   drafts: ReviewComment[];
-  onOpenFile: (path: string) => void;
+  /** Opens a file in the diff, at `line` when there is one. */
+  onOpenFile: (path: string, line?: number) => void;
   onOpenDraft: (id: string, path: string) => void;
   /** Leaves the guide for the changes. */
   onDone: () => void;

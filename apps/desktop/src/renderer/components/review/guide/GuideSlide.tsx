@@ -24,7 +24,8 @@ import { InlineMarkdown } from './InlineMarkdown.js';
 
 /** What a slide's place opens: the agent's comment there, else the file. */
 export interface GuideOpen {
-  file: (path: string) => void;
+  /** The file, at `line` when the slide names one. */
+  file: (path: string, line?: number) => void;
   draft: (id: string, path: string) => void;
   drafts: readonly ReviewComment[];
 }
@@ -39,7 +40,9 @@ function FileChip({ file, open }: { file: GuideFile; open: GuideOpen }) {
     <button
       type="button"
       onClick={() =>
-        draft ? open.draft(draft.id, file.path) : open.file(file.path)
+        draft
+          ? open.draft(draft.id, file.path)
+          : open.file(file.path, file.lineStart)
       }
       title={
         draft

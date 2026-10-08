@@ -89,6 +89,21 @@ export function useCommentNavigator({
     [onShowDiff]
   );
 
+  // A place a guide names: a line in the new version of a file, or
+  // the file.
+  const jumpToPlace = useCallback(
+    (path: string, line?: number) => {
+      if (line === undefined) return jumpToFile(path);
+      setSelectedFile(path);
+      setConversation(false);
+      onShowDiff();
+      requestAnimationFrame(() =>
+        jumpRef.current?.jumpToLine({ file: path, side: 'RIGHT', line })
+      );
+    },
+    [onShowDiff, jumpToFile]
+  );
+
   // Scroll to any comment or draft by id, falling back to its file.
   // Goes through the virtual list's imperative handle — the target row
   // may not be materialized as DOM yet.
@@ -143,6 +158,7 @@ export function useCommentNavigator({
     selectedFile,
     place,
     jumpToFile,
+    jumpToPlace,
     jumpToId,
     step,
   };

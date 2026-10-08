@@ -332,6 +332,7 @@ export function PrWorkspace({
               onNext={() => nav.step(1)}
               onExitReview={showDiff}
               onReviewDrafts={openDrafts}
+              onOpenPlace={nav.jumpToPlace}
               onOpenInDiff={nav.jumpToFile}
               onOverviewAction={onOverviewAction}
               onOpenThread={nav.jumpToId}

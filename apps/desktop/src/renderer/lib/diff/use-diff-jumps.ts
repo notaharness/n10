@@ -4,12 +4,15 @@ import {
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   type Ref,
   type RefObject,
 } from 'react';
 import type { FileBody } from './diff-bodies.js';
+import { pointKey } from './diff-points.js';
 import type { FlatRow } from './diff-virtual.js';
+import type { LinePoint } from './range-selection.js';
 
 /** A place in the list: a row, and how far into it the viewport starts.
  *  Rows keep their keys across layouts, so the place survives a switch
@@ -28,6 +31,9 @@ export interface DiffJumpHandle {
   jumpToId(id: string): boolean;
   /** Scroll a file's header row into view. */
   jumpToFile(file: string): boolean;
+  /** Scroll a line into view; until its file's lines are read, or while
+   *  a fold hides it, its file's header stands in. */
+  jumpToLine(point: LinePoint): boolean;
   /** Scroll back to a place `topRow` gave. */
   jumpToRow(place: RowPlace): boolean;
   /** Scroll to the top of the list. */
@@ -41,6 +47,7 @@ type Place = Pick<RowPlace, 'key' | 'offset'>;
 type Target =
   | { id: string }
   | { file: string }
+  | { line: LinePoint }
   | { row: Place }
   | { top: true };
 
@@ -74,6 +81,8 @@ export function scrollTelling(
 interface RowIndex {
   indexById: ReadonlyMap<string, number>;
   fileIndex: ReadonlyMap<string, number>;
+  /** The row each shown line is on, by `pointKey`. */
+  rowOf: ReadonlyMap<string, number>;
 }
 
 /** Where the reader is: the row at the top of the viewport and, for when
@@ -90,6 +99,11 @@ function indexOf(
 ): number | undefined {
   if ('id' in target) return index.indexById.get(target.id);
   if ('file' in target) return index.fileIndex.get(target.file);
+  if ('line' in target)
+    return (
+      index.rowOf.get(pointKey(target.line)) ??
+      index.fileIndex.get(target.line.file)
+    );
   if ('row' in target) {
     const i = rows.findIndex((r) => r.key === target.row.key);
     return i < 0 ? undefined : i;
@@ -145,13 +159,19 @@ function placeAt(
  */
 export function useDiffJumps(
   jumpRef: Ref<DiffJumpHandle> | undefined,
-  index: RowIndex,
+  flat: Omit<RowIndex, 'rowOf'>,
+  rowOf: RowIndex['rowOf'],
   rows: readonly FlatRow[],
   virtualizer: Virtualizer<HTMLDivElement, Element>,
   scrollRef: RefObject<HTMLDivElement | null>,
   scrolledRef: RefObject<(() => void) | null>,
   settled: boolean
 ) {
+  const { indexById, fileIndex } = flat;
+  const index = useMemo(
+    () => ({ indexById, fileIndex, rowOf }),
+    [indexById, fileIndex, rowOf]
+  );
   const pending = useRef<Target | null>(null);
   const kept = useRef<Kept | null>(null);
   const laidOut = useRef({ rows, index });
@@ -246,6 +266,7 @@ export function useDiffJumps(
       return {
         jumpToId: (id) => jump({ id }),
         jumpToFile: (file) => jump({ file }),
+        jumpToLine: (line) => jump({ line }),
         jumpToRow: (row) => jump({ row }),
         jumpToTop: () => {
           jump({ top: true });

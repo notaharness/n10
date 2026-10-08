@@ -167,6 +167,7 @@ export function ContentPane({
   onNext,
   onExitReview,
   onReviewDrafts,
+  onOpenPlace,
   onOpenInDiff,
   onOverviewAction,
   onOpenThread,
@@ -221,6 +222,8 @@ export function ContentPane({
   onExitReview: () => void;
   /** Opens the walkthrough of the agent's drafts. */
   onReviewDrafts: () => void;
+  /** Shows a file in the diff, at a line of its new version if given. */
+  onOpenPlace: (file: string, line?: number) => void;
   onOpenInDiff: (file: string) => void;
   /** The Overview's next-step button. */
   onOverviewAction: (action: AttentionAction) => void;
@@ -280,7 +283,7 @@ export function ContentPane({
         guide={effMode === 'guide' ? guide : null}
         headSha={headSha}
         drafts={drafts}
-        onOpenFile={onOpenInDiff}
+        onOpenFile={onOpenPlace}
         onOpenDraft={onOpenThread}
         onDone={onExitReview}
         onReviewDrafts={onReviewDrafts}
