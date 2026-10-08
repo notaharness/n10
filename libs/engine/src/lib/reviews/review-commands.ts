@@ -59,10 +59,6 @@ export function createReviewCommands(
     return { resource, base: resource.getSnapshot(), value };
   }
   return {
-    viewer() {
-      const identifier = context.current().viewer;
-      return identifier ? { identifier } : null;
-    },
     async reply(req: ReplyToReviewThread) {
       if (typeof req.body !== 'string' || !req.body.trim())
         throw new TypeError('A reply needs a body');

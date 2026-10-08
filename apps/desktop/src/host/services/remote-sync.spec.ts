@@ -27,7 +27,7 @@ vi.mock('@n10/engine', () => ({
       stop: vi.fn(async () => undefined),
       refresh: vi.fn(async () => undefined),
       notify: vi.fn() as (notice: SyncNotice) => void,
-      getSnapshot: () => ({ lastGitSyncAt: 42 }),
+      getSnapshot: () => ({ lastGitSyncAt: 42, loading: true }),
       subscribeNotices(listener: (notice: SyncNotice) => void) {
         instance.notify = listener;
         return () => undefined;
@@ -93,8 +93,15 @@ it('keeps a parked repository’s last decorations, and the selected one’s liv
   host.startRemoteSyncLoop('/repo-a');
   state.config = { repo: '/repo-b' };
   host.startRemoteSyncLoop('/repo-b');
-  expect(host.getSyncDecorations('/repo-a').lastGitSyncAt).toBe(42);
-  expect(host.getSyncDecorations('/repo-b').lastGitSyncAt).toBe(42);
+  // A pass the switch cut short is not still loading.
+  expect(host.getSyncDecorations('/repo-a')).toMatchObject({
+    lastGitSyncAt: 42,
+    loading: false,
+  });
+  expect(host.getSyncDecorations('/repo-b')).toMatchObject({
+    lastGitSyncAt: 42,
+    loading: true,
+  });
   expect(host.getSyncDecorations('/repo-c').lastGitSyncAt).toBeNull();
 });
 

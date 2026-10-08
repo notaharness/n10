@@ -693,6 +693,14 @@ host; the renderer keeps the batches it shows, and reading one again is a
 local Git read between fixed commits. Manifests and listings, which are small
 and what a pane needs first, stay.
 
+The desktop host answers a pane's reads for the repository the pane belongs
+to, open or parked, and records a visit there too: it is bookkeeping beside the
+history read, not a provider write. The sync loop runs only for the selected
+repository, since it fetches and removes merged worktrees, so a parked
+repository's merge and conflict marks are the ones its loop last reported, not
+loading, until it is opened again; meanwhile its pull request list can move on
+through `prewarm()`.
+
 Only the selected repository takes writes; a parked handle refuses them before
 any work: review replies, resolutions, submissions, mention searches, review
 draft saves and discards, agent findings' edits and publication, worktree

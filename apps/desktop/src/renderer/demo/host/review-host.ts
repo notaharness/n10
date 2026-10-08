@@ -77,7 +77,6 @@ type ReviewHost = Pick<
   | 'replyToThread'
   | 'setThreadResolved'
   | 'fetchPrDescription'
-  | 'getReviewViewer'
   | 'fetchCommentImage'
   | 'listDraftComments'
   | 'updateDraftComment'
@@ -127,7 +126,6 @@ export function createReviewHost(state: DemoState): ReviewHost {
     },
     fetchPrDescription: (cwd, prId) =>
       load(state.repoAt(cwd).data.descriptions[prId]),
-    getReviewViewer: () => later({ identifier: VIEWER }),
     fetchCommentImage: () => later(null),
     listDraftComments: (cwd, prId) =>
       later(state.repoAt(cwd).drafts[prId] ?? []),

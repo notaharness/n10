@@ -92,7 +92,8 @@ export function createHostApi(): HostApi {
       prDetails.getPullRequestSnapshot(cwd, req),
     getPullRequestHistory: (cwd, req) =>
       prHistory.getPullRequestHistory(cwd, req),
-    recordPullRequestVisit: (req) => prHistory.recordPullRequestVisit(req),
+    recordPullRequestVisit: (cwd, req) =>
+      prHistory.recordPullRequestVisit(cwd, req),
     getPullRequestChecks: (cwd, req) => prChecks.getPullRequestChecks(cwd, req),
     getPullRequestConversation: (cwd, req) =>
       prConversation.getPullRequestConversation(cwd, req),
@@ -101,8 +102,7 @@ export function createHostApi(): HostApi {
     discardReviewDraft: (req) => reviewDrafts.discardDraft(req),
     searchMentionCandidates: (req) => mentions.searchMentionCandidates(req),
     submitReview: (req) => reviewDrafts.submitReview(req),
-    getReviewViewer: (cwd) => Promise.resolve(reviews.getReviewViewer(cwd)),
-    fetchCommentImage: (url) => commentImages.fetchCommentImage(url),
+    fetchCommentImage: (cwd, url) => commentImages.fetchCommentImage(cwd, url),
     listDraftComments: (cwd, prId) => drafts.listDraftComments(cwd, prId),
     updateDraftComment: (prId, id, patch) =>
       Promise.resolve(drafts.updateDraftComment(prId, id, patch)),

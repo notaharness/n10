@@ -22,8 +22,12 @@ const creds = vi.hoisted(() => ({
 }));
 
 vi.mock('./repo.js', () => ({
-  activeRepository: () => ({
-    config: { getSnapshot: () => ({ config: creds.config }) },
+  repository: (cwd: string) => ({
+    config: {
+      getSnapshot: () => ({
+        config: cwd === '/repo' ? creds.config : { vendorAuth: { pat: 'x' } },
+      }),
+    },
   }),
 }));
 vi.mock('node:child_process', () => ({
@@ -123,7 +127,7 @@ describe('size cap', () => {
   it('refuses before reading a body that declares itself too large', async () => {
     stubFetch({ contentLength: String(MAX_BYTES + 1) });
     await expect(
-      fetchCommentImage('https://example.test/a.png')
+      fetchCommentImage('/repo', 'https://example.test/a.png')
     ).rejects.toThrow(/too large/);
     // Declared size is enough to refuse: no need to read a byte.
     expect(reads).toBe(0);
@@ -138,7 +142,7 @@ describe('size cap', () => {
     stubFetch({ chunks: Array.from({ length: 25 }, () => megabyte) });
 
     await expect(
-      fetchCommentImage('https://example.test/b.png')
+      fetchCommentImage('/repo', 'https://example.test/b.png')
     ).rejects.toThrow(/too large/);
     // Cancelled rather than left draining a hostile response.
     expect(cancelled).toBe(1);
@@ -147,7 +151,7 @@ describe('size cap', () => {
 
   it('accepts a body that stays under the cap', async () => {
     stubFetch({ chunks: [PNG.slice(0, 4), PNG.slice(4)] });
-    const out = await fetchCommentImage('https://example.test/c.png');
+    const out = await fetchCommentImage('/repo', 'https://example.test/c.png');
     expect(out?.contentType).toBe('image/png');
     expect(out?.bytes).toBe(PNG.length);
     expect(out?.dataUrl.startsWith('data:image/png;base64,')).toBe(true);
@@ -156,7 +160,7 @@ describe('size cap', () => {
   it('caps the no-stream fallback too', async () => {
     stubFetch({ noStream: true, body: new Uint8Array(MAX_BYTES + 1) });
     await expect(
-      fetchCommentImage('https://example.test/d.png')
+      fetchCommentImage('/repo', 'https://example.test/d.png')
     ).rejects.toThrow(/too large/);
   });
 });
@@ -170,20 +174,20 @@ describe('what counts as an image', () => {
       body: new Uint8Array([0x68, 0x74, 0x6d, 0x6c]),
     });
     await expect(
-      fetchCommentImage('https://example.test/e.html')
+      fetchCommentImage('/repo', 'https://example.test/e.html')
     ).rejects.toThrow(/not an image/);
   });
 
   it('sniffs the type when the server does not say', async () => {
     stubFetch({ contentType: null });
-    const out = await fetchCommentImage('https://example.test/f');
+    const out = await fetchCommentImage('/repo', 'https://example.test/f');
     expect(out?.contentType).toBe('image/png');
   });
 
   it('reports a failed request', async () => {
     stubFetch({ status: 404 });
     await expect(
-      fetchCommentImage('https://example.test/g.png')
+      fetchCommentImage('/repo', 'https://example.test/g.png')
     ).rejects.toThrow('HTTP 404');
   });
 
@@ -191,7 +195,7 @@ describe('what counts as an image', () => {
     stubFetch();
     // file: and data: URLs would read the user's disk, or bypass the
     // fetch path entirely.
-    expect(await fetchCommentImage('file:///etc/passwd')).toBeNull();
+    expect(await fetchCommentImage('/repo', 'file:///etc/passwd')).toBeNull();
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });
@@ -199,21 +203,21 @@ describe('what counts as an image', () => {
 describe('caching', () => {
   it('downloads a repeated URL once', async () => {
     stubFetch();
-    await fetchCommentImage('https://example.test/h.png');
-    await fetchCommentImage('https://example.test/h.png');
+    await fetchCommentImage('/repo', 'https://example.test/h.png');
+    await fetchCommentImage('/repo', 'https://example.test/h.png');
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('forgets a failure so a retry can succeed', async () => {
     stubFetch({ status: 500 });
     await expect(
-      fetchCommentImage('https://example.test/i.png')
+      fetchCommentImage('/repo', 'https://example.test/i.png')
     ).rejects.toThrow();
 
     stubFetch();
     // A cached rejection would make one flaky request permanent for the
     // life of the process.
-    const out = await fetchCommentImage('https://example.test/i.png');
+    const out = await fetchCommentImage('/repo', 'https://example.test/i.png');
     expect(out?.contentType).toBe('image/png');
   });
 });
@@ -230,6 +234,7 @@ describe('which credential reaches which host', () => {
     creds.ghToken = 'gho_secret';
     stubFetch();
     await fetchCommentImage(
+      '/repo',
       'https://user-images.githubusercontent.com/1/a.png'
     );
     expect(sentAuth()).toBe('Bearer gho_secret');
@@ -238,17 +243,30 @@ describe('which credential reaches which host', () => {
   it('sends the Azure PAT as basic auth to Azure hosts', async () => {
     creds.config = { vendorAuth: { pat: 'ado_secret' } };
     stubFetch();
-    await fetchCommentImage('https://dev.azure.com/org/_apis/attachment');
+    await fetchCommentImage(
+      '/repo',
+      'https://dev.azure.com/org/_apis/attachment'
+    );
     expect(sentAuth()).toBe(
       `Basic ${Buffer.from(':ado_secret').toString('base64')}`
     );
+  });
+
+  it('sends the Azure PAT of the repository the comment belongs to', async () => {
+    creds.config = { vendorAuth: { pat: 'ado_secret' } };
+    stubFetch();
+    await fetchCommentImage(
+      '/other',
+      'https://dev.azure.com/org/_apis/attachment'
+    );
+    expect(sentAuth()).toBe(`Basic ${Buffer.from(':x').toString('base64')}`);
   });
 
   it('sends nothing at all to any other host', async () => {
     creds.ghToken = 'gho_secret';
     creds.config = { vendorAuth: { pat: 'ado_secret' } };
     stubFetch();
-    await fetchCommentImage('https://attacker.example/pixel.png');
+    await fetchCommentImage('/repo', 'https://attacker.example/pixel.png');
     expect(sentAuth()).toBeUndefined();
   });
 
@@ -256,12 +274,12 @@ describe('which credential reaches which host', () => {
     creds.ghToken = 'gho_secret';
     stubFetch();
     // `notgithub.com` and `github.com.evil.test` are not GitHub.
-    await fetchCommentImage('https://github.com.evil.test/a.png');
+    await fetchCommentImage('/repo', 'https://github.com.evil.test/a.png');
     expect(sentAuth()).toBeUndefined();
 
     resetCommentImageCache();
     stubFetch();
-    await fetchCommentImage('https://notgithubusercontent.com/a.png');
+    await fetchCommentImage('/repo', 'https://notgithubusercontent.com/a.png');
     expect(sentAuth()).toBeUndefined();
   });
 
@@ -269,7 +287,7 @@ describe('which credential reaches which host', () => {
     // Signed-out users still see public images rather than an error.
     creds.ghToken = null;
     stubFetch();
-    const out = await fetchCommentImage('https://github.com/a.png');
+    const out = await fetchCommentImage('/repo', 'https://github.com/a.png');
     expect(sentAuth()).toBeUndefined();
     expect(out?.contentType).toBe('image/png');
   });

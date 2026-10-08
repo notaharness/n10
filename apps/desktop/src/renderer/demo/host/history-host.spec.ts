@@ -45,7 +45,7 @@ describe('the demo history host', () => {
       viewer: null,
       visitId: 'v1',
     });
-    await host.recordPullRequestVisit({
+    await host.recordPullRequestVisit(N10, {
       ref,
       viewer: null,
       visitId: 'v1',
@@ -70,7 +70,7 @@ describe('the demo history host', () => {
 
   it('refuses to record a visit whose history was never read', async () => {
     await expect(
-      setup().recordPullRequestVisit({
+      setup().recordPullRequestVisit(N10, {
         ref,
         viewer: null,
         visitId: 'v9',

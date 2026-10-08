@@ -392,10 +392,10 @@ export function usePrDescription(cwd: string, prId: number) {
 }
 
 /** Comment image bytes (as a data URL), fetched host-side with auth. */
-export function useCommentImage(url: string) {
+export function useCommentImage(cwd: string, url: string) {
   return useQuery({
-    queryKey: keys.commentImage(url),
-    queryFn: () => window.n10.fetchCommentImage(url),
+    queryKey: keys.commentImage(cwd, url),
+    queryFn: () => window.n10.fetchCommentImage(cwd, url),
     enabled: url.length > 0,
     staleTime: Infinity,
     gcTime: 10 * 60_000,

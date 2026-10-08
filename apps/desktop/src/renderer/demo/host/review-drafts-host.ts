@@ -25,20 +25,25 @@ function idOf(target: DraftTarget): string {
 }
 
 export function createDraftsHost(): DraftsHost {
-  const byPr = new Map<number, ReviewDraft[]>();
-  const drafts = (number: number) => byPr.get(number) ?? [];
+  // By repository and number: two demo repositories can share a pull
+  // request number.
+  const byPr = new Map<string, ReviewDraft[]>();
+  const prKey = (ref: { repository: string; number: number }) =>
+    `${ref.repository}#${ref.number}`;
+  const drafts = (ref: { repository: string; number: number }) =>
+    byPr.get(prKey(ref)) ?? [];
   return {
     listReviewDrafts: (_cwd, { ref }) =>
-      later({ ref, viewer: VIEWER, drafts: drafts(ref.number) }),
+      later({ ref, viewer: VIEWER, drafts: drafts(ref) }),
     saveReviewDraft: ({ ref, target, body }) => {
       const id = idOf(target);
-      const others = drafts(ref.number).filter((d) => d.id !== id);
+      const others = drafts(ref).filter((d) => d.id !== id);
       if (body === '') {
-        byPr.set(ref.number, others);
+        byPr.set(prKey(ref), others);
         return later(null);
       }
       const now = Date.now();
-      const found = drafts(ref.number).find((d) => d.id === id);
+      const found = drafts(ref).find((d) => d.id === id);
       const draft: ReviewDraft = {
         id,
         target,
@@ -47,14 +52,14 @@ export function createDraftsHost(): DraftsHost {
         updatedAt: now,
         publication: { state: 'unpublished' },
       };
-      byPr.set(ref.number, [...others, draft]);
+      byPr.set(prKey(ref), [...others, draft]);
       return later(draft);
     },
     discardReviewDraft: ({ ref, target }) => {
       const id = idOf(target);
       byPr.set(
-        ref.number,
-        drafts(ref.number).filter((d) => d.id !== id)
+        prKey(ref),
+        drafts(ref).filter((d) => d.id !== id)
       );
       return later(undefined);
     },
@@ -62,8 +67,8 @@ export function createDraftsHost(): DraftsHost {
       const at = Date.now();
       const attempt = `demo-${at}`;
       byPr.set(
-        ref.number,
-        drafts(ref.number).map((d) =>
+        prKey(ref),
+        drafts(ref).map((d) =>
           draftIds.includes(d.id)
             ? {
                 ...d,
@@ -78,7 +83,7 @@ export function createDraftsHost(): DraftsHost {
         )
       );
       return later(
-        { ref, viewer: VIEWER, drafts: drafts(ref.number), resumed: null },
+        { ref, viewer: VIEWER, drafts: drafts(ref), resumed: null },
         400
       );
     },

@@ -444,7 +444,7 @@ export interface N10HostApi {
    *  this run of the app; it rejects otherwise. The record is kept
    *  under the pull request that read confirmed: the id on `req.ref`
    *  is not used. */
-  recordPullRequestVisit(req: VisitRequest): Promise<void>;
+  recordPullRequestVisit(repo: string, req: VisitRequest): Promise<void>;
   /** What stands between one pull request and completion: its checks,
    *  the target's rules and the provider's merge state, with n10's
    *  reading of them. Identity-checked like the snapshot. */
@@ -473,12 +473,12 @@ export interface N10HostApi {
    *  reviewer read. Resolves to the drafts as they now stand; a failure
    *  leaves each draft saying where it got to. Refused like the snapshot. */
   submitReview(req: SubmitReviewRequest): Promise<SubmittedReview>;
-  /** The reviewer-list identifier of the authenticated user (GitHub
-   *  login / ADO email), for optimistic reviewer patches. */
-  getReviewViewer(repo: string): Promise<{ identifier: string } | null>;
   /** Download a comment image with the provider's credentials (Azure
    *  DevOps PAT / GitHub token) and return it as a data URL. */
-  fetchCommentImage(url: string): Promise<CommentImagePayload | null>;
+  fetchCommentImage(
+    repo: string,
+    url: string
+  ): Promise<CommentImagePayload | null>;
 
   // ── Draft review comments (from the review agent) ─────────────
   listDraftComments(repo: string, prId: number): Promise<ReviewComment[]>;
@@ -720,7 +720,6 @@ export const IPC = {
   discardReviewDraft: 'n10/review-drafts/discard',
   searchMentionCandidates: 'n10/pull-requests/mentions',
   submitReview: 'n10/review-drafts/submit',
-  getReviewViewer: 'n10/reviews/viewer',
   fetchCommentImage: 'n10/reviews/comment-image',
   listDraftComments: 'n10/drafts/list',
   updateDraftComment: 'n10/drafts/update',

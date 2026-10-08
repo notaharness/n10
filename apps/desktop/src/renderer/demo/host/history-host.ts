@@ -66,7 +66,7 @@ export function createHistoryHost(state: DemoState): HistoryHost {
         150
       );
     },
-    recordPullRequestVisit: ({ ref, visitId, visit }) => {
+    recordPullRequestVisit: (_cwd, { ref, visitId, visit }) => {
       const key = keyOf(ref);
       if (!baselines.has(`${visitId}:${key}`)) {
         return Promise.reject(new Error('Read the history before recording'));

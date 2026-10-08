@@ -52,8 +52,11 @@ Every rule below has its reasoning in `docs/decisions.md`.
   (`getSidebarModel(repo)`, sync state, branch lists, the review reads,
   sessions, branch sessions, agent options, worktree diffs; diff requests
   carry `repo`) and resolve it
-  through `repository(cwd)`; writes stay on the selected repository. A parked
-  repository's sidebar keeps its sync loop's last decorations
+  through `repository(cwd)`; so does the visit record beside the history
+  read, and a comment image takes its repository's Azure DevOps PAT. Writes
+  stay on the selected repository. `read-routing.spec.ts` asks each read
+  about a parked repository. A parked repository's sidebar keeps its sync
+  loop's last decorations, frozen and not loading, until it is opened again
   (`getSyncDecorations(cwd)`). Sidebar answers are stamped with the repo they
   describe and the renderer drops answers for another (`loadSidebarModel`).
 - The pull request list is `@n10/engine`'s, one instance in

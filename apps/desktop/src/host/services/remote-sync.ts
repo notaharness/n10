@@ -21,7 +21,10 @@ function stop(service: RemoteSync): Promise<void> {
 let config: ConfigService | undefined;
 let sync: RemoteSync | undefined;
 // What each repository's loop last said when another was opened: a
-// pane of a parked repository shows its rows as they were decorated.
+// parked repository's rows keep the marks they had. The loop is not run
+// for a parked repository (it fetches and auto-removes merged
+// worktrees), so these stay as they were until it is opened again; a
+// pass cut short by the switch is not still loading.
 const parked = new Map<string, SyncSnapshot>();
 let notifier: ((notice: SyncNoticeEvent) => void) | null = null;
 
@@ -62,7 +65,7 @@ export function startRemoteSyncLoop(cwd: string): void {
   if (current.repo !== cwd) return;
   if (config !== current) {
     if (sync && config) {
-      parked.set(config.repo, sync.getSnapshot());
+      parked.set(config.repo, { ...sync.getSnapshot(), loading: false });
       void stop(sync);
     }
     parked.delete(current.repo);

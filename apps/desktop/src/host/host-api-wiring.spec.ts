@@ -71,7 +71,6 @@ vi.mock('./services/reviews.js', () =>
     'replyToThread',
     'setThreadResolved',
     'fetchPrDescription',
-    'getReviewViewer',
     'getPrDiffManifest',
     'getPrDiffPatch',
     'getPrRangeManifest',
@@ -234,7 +233,7 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ],
   [
     'recordPullRequestVisit',
-    [{ ref: { number: 7 }, visit: {} }],
+    ['/repo', { ref: { number: 7 }, visit: {} }],
     'prHistory.recordPullRequestVisit',
   ],
   [
@@ -270,7 +269,6 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     [{ prId: 7, thread: { id: 't' }, resolved: true }],
     'reviews.setThreadResolved',
   ],
-  ['getReviewViewer', ['/repo'], 'reviews.getReviewViewer'],
   [
     'fetchPrDiffManifest',
     [{ repo: '/r', sourceBranch: 'feature', targetBranch: 'main' }],
@@ -292,7 +290,11 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     'worktrees.getWorktreeDiffText',
   ],
 
-  ['fetchCommentImage', ['https://x/y.png'], 'commentImages.fetchCommentImage'],
+  [
+    'fetchCommentImage',
+    ['/repo', 'https://x/y.png'],
+    'commentImages.fetchCommentImage',
+  ],
   [
     'saveClipboardImage',
     [new Uint8Array([1, 2]), 'image/png'],

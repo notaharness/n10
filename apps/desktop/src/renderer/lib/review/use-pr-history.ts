@@ -85,6 +85,8 @@ const NO_REF: PullRequestRef = {
 };
 
 export interface PrHistory {
+  /** The repository it was read in, where the visit is recorded. */
+  cwd: string;
   read: HistoryRead;
   viewer: string | null;
   visitId: string;
@@ -118,7 +120,7 @@ export function usePrHistory(
   const { refetch } = query;
   // Its outcome lands in the query's own state.
   const retry = useCallback(() => void refetch(), [refetch]);
-  return { read, viewer, visitId, retry };
+  return { cwd, read, viewer, visitId, retry };
 }
 
 /**
@@ -135,14 +137,14 @@ export function useRecordVisit(
   const reviewed =
     review?.state === 'read' ? review.value?.head ?? null : undefined;
   const ref = value?.ref ?? null;
-  const { viewer, visitId } = history;
+  const { cwd, viewer, visitId } = history;
   const head = comparison?.headOid;
   const target = comparison?.targetOid;
   const mergeBase = comparison?.mergeBaseOid;
   useEffect(() => {
     if (!ref || !head || !target || !mergeBase) return;
     window.n10
-      .recordPullRequestVisit({
+      .recordPullRequestVisit(cwd, {
         ref,
         viewer,
         visitId,
@@ -154,5 +156,5 @@ export function useRecordVisit(
           id: `record-visit:${visitId}`,
         })
       );
-  }, [ref, viewer, visitId, head, target, mergeBase, reviewed]);
+  }, [cwd, ref, viewer, visitId, head, target, mergeBase, reviewed]);
 }

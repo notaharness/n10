@@ -61,7 +61,8 @@ const api: N10HostApi = {
     ipcRenderer.invoke(IPC.fetchCommentThreads, repo, prId, force),
   replyToThread: (req) => ipcRenderer.invoke(IPC.replyToThread, req),
   setThreadResolved: (req) => ipcRenderer.invoke(IPC.setThreadResolved, req),
-  fetchCommentImage: (url) => ipcRenderer.invoke(IPC.fetchCommentImage, url),
+  fetchCommentImage: (repo, url) =>
+    ipcRenderer.invoke(IPC.fetchCommentImage, repo, url),
   listDraftComments: (repo, prId) =>
     ipcRenderer.invoke(IPC.listDraftComments, repo, prId),
   updateDraftComment: (prId, id, patch) =>
@@ -104,8 +105,8 @@ const api: N10HostApi = {
     ipcRenderer.invoke(IPC.getPullRequestSnapshot, repo, req),
   getPullRequestHistory: (repo, req) =>
     ipcRenderer.invoke(IPC.getPullRequestHistory, repo, req),
-  recordPullRequestVisit: (req) =>
-    ipcRenderer.invoke(IPC.recordPullRequestVisit, req),
+  recordPullRequestVisit: (repo, req) =>
+    ipcRenderer.invoke(IPC.recordPullRequestVisit, repo, req),
   getPullRequestChecks: (repo, req) =>
     ipcRenderer.invoke(IPC.getPullRequestChecks, repo, req),
   getPullRequestConversation: (repo, req) =>
@@ -117,7 +118,6 @@ const api: N10HostApi = {
   searchMentionCandidates: (req) =>
     ipcRenderer.invoke(IPC.searchMentionCandidates, req),
   submitReview: (req) => ipcRenderer.invoke(IPC.submitReview, req),
-  getReviewViewer: (repo) => ipcRenderer.invoke(IPC.getReviewViewer, repo),
 
   onSessionData: (cb) => {
     const listener = (_e: unknown, payload: SessionDataEvent) => cb(payload);
