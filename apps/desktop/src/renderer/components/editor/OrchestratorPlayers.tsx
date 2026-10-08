@@ -1,10 +1,11 @@
-import { XIcon } from 'lucide-react';
-import { useState, type ReactElement } from 'react';
+import { useState, type PointerEvent, type ReactElement } from 'react';
 import type {
   SessionActivitySnapshot,
   SidebarItem,
 } from '../../../host/contract.js';
+import { usePlanCount } from '../../lib/plan/plan.js';
 import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
+import { useHoverPrewarm } from '../../lib/tabs/prewarm.js';
 import { cutSide, tabPresentation } from '../../lib/tabs/tab-presentation.js';
 import { useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import { cn } from '../../lib/utils.js';
@@ -13,6 +14,14 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from '../ui/hover-card.js';
+import {
+  PlanCountBadge,
+  RemovedMark,
+  RepoBand,
+  TabCloseButton,
+  tabStateClassName,
+  UnseenDot,
+} from './tab-marks.js';
 import { FACE_ICON, TabIcon } from './TabIcon.js';
 import { TabLabel } from './TabLabel.js';
 
@@ -25,11 +34,19 @@ export interface PlayerRow {
   running: boolean;
   foreignRepo: string | null;
   machineLabel: string | null;
+  repoColor: string | null;
   active: boolean;
+  unseen: boolean;
 }
 
-/** One player tab, styled as the strip's tabs are: choosing it opens
- *  the tab, its X does what the tab's own X does. */
+/** A plain primary press, which chooses a tab as it goes down. */
+function choosesOnPress(e: PointerEvent): boolean {
+  return e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey;
+}
+
+/** One player tab, drawn as the strip's tabs are: chosen on a press,
+ *  its pane held ready while the pointer rests on it, its X revealed on
+ *  hover and doing what the tab's own X does. */
 function PlayerRowView({
   row,
   onOpen,
@@ -40,22 +57,37 @@ function PlayerRowView({
   onClose: () => void;
 }) {
   const { label, face } = tabPresentation(row.tab, row.item, row.machineLabel);
+  const planCount = usePlanCount(row.item?.pr?.id);
+  // As on the strip, another repository's tab included.
+  const hover = useHoverPrewarm(() => (row.active ? null : row.tab), true);
+  const open = () => {
+    hover.pressed();
+    onOpen();
+  };
   return (
     <li
       data-player-row
+      data-unseen={row.unseen || undefined}
       aria-current={row.active || undefined}
+      {...hover.handlers}
       className={cn(
         'group relative flex h-9 items-center border-b border-border text-base transition-colors last:border-b-0',
-        row.active
-          ? 'bg-tab-active text-foreground'
-          : 'bg-tab text-muted-foreground hover:bg-tab-hover hover:text-foreground'
+        tabStateClassName({
+          active: row.active,
+          unseen: row.unseen,
+          flashing: row.snapshot?.flashing ?? false,
+        })
       )}
     >
       <button
         type="button"
-        onClick={onOpen}
+        tabIndex={-1}
+        onPointerDown={(e) => {
+          if (choosesOnPress(e)) open();
+        }}
+        onClick={open}
         title={label}
-        className="flex min-w-0 flex-1 items-center gap-2 self-stretch pr-1 pl-3 text-left outline-none focus-visible:bg-tab-hover"
+        className="flex min-w-0 flex-1 items-center gap-2 self-stretch px-3 text-left outline-none"
       >
         <TabIcon
           Icon={FACE_ICON[face]}
@@ -69,23 +101,27 @@ function PlayerRowView({
           foreignRepo={row.foreignRepo}
           cut={cutSide(face)}
         />
+        <PlanCountBadge count={planCount} />
+        <RemovedMark item={row.item} />
+        {row.unseen && <UnseenDot />}
       </button>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label={`Close ${label}`}
-        className="mr-1.5 flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-      >
-        <XIcon className="size-3.5" />
-      </button>
+      <TabCloseButton
+        label={`Close ${label}`}
+        onClose={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+      />
+      <RepoBand color={row.repoColor} />
     </li>
   );
 }
 
 /**
  * An orchestrator tab's player tabs, in a hover card under the tab.
- * Pointer only, as Radix's hover card is; the tab's context menu lists
- * the same players for the keyboard.
+ * Pointer only: the trigger does not open it on keyboard focus, and the
+ * tab's context menu lists the same players for the keyboard. With no
+ * player tabs there is no card, though the tab stays the trigger.
  */
 export function OrchestratorPlayers({
   players,
@@ -100,27 +136,30 @@ export function OrchestratorPlayers({
   const tabs = useTabs();
   const [open, setOpen] = useState(false);
   return (
-    <HoverCard open={open} onOpenChange={setOpen}>
+    <HoverCard open={open && players.length > 0} onOpenChange={setOpen}>
       <HoverCardTrigger asChild>{children}</HoverCardTrigger>
-      <HoverCardContent
-        data-orchestrator-players
-        aria-label="Players"
-        className="w-64 overflow-hidden p-0"
-      >
-        <ul>
-          {players.map((row) => (
-            <PlayerRowView
-              key={row.tab.id}
-              row={row}
-              onOpen={() => {
-                setOpen(false);
-                tabs.activate(row.tab.id);
-              }}
-              onClose={() => onClose(row.tab.id)}
-            />
-          ))}
-        </ul>
-      </HoverCardContent>
+      {players.length > 0 && (
+        <HoverCardContent
+          data-orchestrator-players
+          role="group"
+          aria-label="Players"
+          className="w-64 overflow-hidden p-0"
+        >
+          <ul>
+            {players.map((row) => (
+              <PlayerRowView
+                key={row.tab.id}
+                row={row}
+                onOpen={() => {
+                  setOpen(false);
+                  tabs.activate(row.tab.id);
+                }}
+                onClose={() => onClose(row.tab.id)}
+              />
+            ))}
+          </ul>
+        </HoverCardContent>
+      )}
     </HoverCard>
   );
 }

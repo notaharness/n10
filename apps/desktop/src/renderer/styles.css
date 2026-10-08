@@ -290,23 +290,6 @@
   .tab-attention {
     animation: tab-attention 1.4s steps(1, end) infinite;
   }
-
-  /* A hover card unfolds from its trigger: a short fade and drop, from
-     the edge Radix placed it against. */
-  @keyframes hover-card-open {
-    from {
-      opacity: 0;
-      transform: translateY(-4px) scale(0.98);
-    }
-  }
-  .hover-card-content[data-state='open'] {
-    animation: hover-card-open 120ms ease-out;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .hover-card-content[data-state='open'] {
-      animation: none;
-    }
-  }
 }
 
 /* ── Terminal (xterm.js) ───────────────────────────────────────────

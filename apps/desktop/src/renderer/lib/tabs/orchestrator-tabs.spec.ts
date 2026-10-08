@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { OrchestratorGroupSummary } from '../../../host/contract.js';
 import { itemTabId, terminalTabId, type Tab } from './tab-identity.js';
-import { orchestratorTabs } from './orchestrator-tabs.js';
+import {
+  orchestratorTabs,
+  playerMarks,
+  presentedOrder,
+  stripSelection,
+  stripTabs,
+} from './orchestrator-tabs.js';
 
 /**
  * Finding Orchestra's groups among the tabs: an orchestrator's tab by
@@ -92,5 +98,51 @@ describe('orchestratorTabs', () => {
     expect(ids(view.players.get(orch.id))).toEqual([]);
     expect(ids(view.players.get(sub.id))).toEqual([a.id]);
     expect(view.grouped.has(sub.id)).toBe(false);
+  });
+
+  it('selects the orchestrator tab for an active player, and makes it the Tab stop', () => {
+    const view = orchestratorTabs([a, orch, loose, b], [group], sessionOf);
+    const strip = stripTabs([a, orch, loose, b], view);
+    expect(strip.map((t) => t.id)).toEqual([orch.id, loose.id]);
+    expect(stripSelection(strip, view, b.id)).toEqual({
+      selectedId: orch.id,
+      tabStopId: orch.id,
+    });
+    expect(stripSelection(strip, view, loose.id)).toEqual({
+      selectedId: loose.id,
+      tabStopId: loose.id,
+    });
+    // Nothing on the strip active: the first tab is the Tab stop.
+    expect(stripSelection(strip, view, null)).toEqual({
+      selectedId: null,
+      tabStopId: orch.id,
+    });
+  });
+
+  it('presents each orchestrator followed by its players', () => {
+    const tabs = [a, orch, loose, b];
+    const view = orchestratorTabs(tabs, [group], sessionOf);
+    expect(presentedOrder(tabs, view)).toEqual([orch.id, a.id, b.id, loose.id]);
+  });
+
+  it("carries its players' selection, unseen mark and blink to the orchestrator tab", () => {
+    const quiet = {
+      active: false,
+      unseen: false,
+      snapshot: { flashing: false },
+    };
+    expect(playerMarks(undefined)).toEqual({
+      active: false,
+      unseen: false,
+      flashing: false,
+    });
+    expect(playerMarks([quiet, { ...quiet, unseen: true }]).unseen).toBe(true);
+    expect(
+      playerMarks([quiet, { ...quiet, snapshot: { flashing: true } }]).flashing
+    ).toBe(true);
+    // The active player's blink is already being looked at.
+    expect(
+      playerMarks([{ ...quiet, active: true, snapshot: { flashing: true } }])
+    ).toEqual({ active: true, unseen: false, flashing: false });
   });
 });

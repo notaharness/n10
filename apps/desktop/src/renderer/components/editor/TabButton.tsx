@@ -1,4 +1,4 @@
-import { BrainIcon, FolderXIcon, XIcon } from 'lucide-react';
+import { BrainIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { toast } from 'sonner';
 import type {
@@ -8,85 +8,28 @@ import type {
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { usePlanCount } from '../../lib/plan/plan.js';
 import { useHoverPrewarm } from '../../lib/tabs/prewarm.js';
-import {
-  itemRunning,
-  itemWorktreeRemoved,
-} from '../../lib/sidebar/sidebar-model.js';
+import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
 import { cutSide, tabPresentation } from '../../lib/tabs/tab-presentation.js';
 import { useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import type { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { cn, errorMessage } from '../../lib/utils.js';
 import { pressWithoutFocus } from './tab-keyboard.js';
 import { runTabMenu } from './tab-menu.js';
+import { playerMarks } from '../../lib/tabs/orchestrator-tabs.js';
 import { OrchestratorPlayers, type PlayerRow } from './OrchestratorPlayers.js';
 import { FACE_ICON, TabIcon } from './TabIcon.js';
+import {
+  PlanCountBadge,
+  RemovedMark,
+  RepoBand,
+  TabCloseButton,
+  tabStateClassName,
+  UnseenDot,
+} from './tab-marks.js';
 import { TabLabel } from './TabLabel.js';
 import { useSortableTab } from './TabStrip.js';
 
 type Closer = ReturnType<typeof useCloseTabs>;
-
-/** How many comments this tab's PR has queued in the plan. */
-function PlanCountBadge({ count }: { count: number }) {
-  if (count <= 0) return null;
-  return (
-    <span
-      aria-label={`${count} comment${count === 1 ? '' : 's'} in the plan`}
-      className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] font-medium tabular-nums text-primary"
-    >
-      {count}
-    </span>
-  );
-}
-
-/** The tab of an agent whose worktree is gone. */
-function RemovedMark({ item }: { item: SidebarItem | undefined }) {
-  if (!item || !itemWorktreeRemoved(item)) return null;
-  return (
-    <span
-      aria-label="Worktree removed"
-      title="Worktree removed"
-      className="flex shrink-0 text-warning"
-    >
-      <FolderXIcon className="size-3.5" />
-    </span>
-  );
-}
-
-/** A tab that opened in the background and has not been looked at. */
-function UnseenDot() {
-  return (
-    <span
-      aria-label="Not yet opened"
-      className="size-1.5 shrink-0 rounded-full bg-primary"
-    />
-  );
-}
-
-/**
- * Always rendered, revealed on hover over the end of the tab, in the
- * tab's own colour: the label keeps the whole width the rest of the
- * time. Out of the Tab order: the row is one Tab stop, and Delete
- * closes the focused tab.
- */
-function TabCloseButton({
-  onClose,
-}: {
-  onClose: (e: React.MouseEvent) => void;
-}) {
-  return (
-    <span className="absolute inset-y-0 right-0 flex items-center bg-inherit pr-1.5 pl-1 opacity-0 transition-opacity group-hover:opacity-100">
-      <button
-        type="button"
-        tabIndex={-1}
-        onClick={onClose}
-        aria-label="Close tab"
-        className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-      >
-        <XIcon className="size-3.5" />
-      </button>
-    </span>
-  );
-}
 
 /** An orchestrator tab's player count, where its close button would
  *  be: the tab closes from its menu, middle click or Delete instead. */
@@ -102,23 +45,16 @@ function PlayerCount({ count }: { count: number }) {
   );
 }
 
-/** The tab's repository, as a band of its colour along the bottom. */
-function RepoBand({ color }: { color: string | null }) {
-  if (!color) return null;
-  return (
-    <span
-      data-repo-band
-      aria-hidden
-      className="absolute inset-x-0 bottom-0 h-0.5"
-      style={{ backgroundColor: color }}
-    />
-  );
-}
-
 /** The hover title: the full path, for telling two checkouts of the
  *  same repo apart — and a terminal's absolute directory, where its
- *  label shows it from home. */
-function tabTitle(tab: Tab, foreignRepo: string | null): string | undefined {
+ *  label shows it from home. None over an orchestrator's player list,
+ *  which opens where the native tooltip would. */
+function tabTitle(
+  tab: Tab,
+  foreignRepo: string | null,
+  players: readonly PlayerRow[] | undefined
+): string | undefined {
+  if (players?.length) return undefined;
   if (foreignRepo) return foreignRepo;
   return tab.kind === 'terminal' ? tab.cwd : undefined;
 }
@@ -143,15 +79,23 @@ function tabClassName({
     wrap ? 'grow' : 'max-w-56',
     // Lifted above the tabs it slides over.
     dragging && 'z-10',
-    // Opaque in every state: the close button takes it to cover the
-    // end of the label.
-    active
-      ? 'bg-tab-active text-foreground'
-      : 'bg-tab text-muted-foreground hover:bg-tab-hover hover:text-foreground',
-    unseen && 'text-foreground',
-    // The agent finished a work streak and nobody has looked yet.
-    flashing && !active && 'tab-attention'
+    tabStateClassName({ active, unseen, flashing })
   );
+}
+
+/** The tab's own state, with an orchestrator's players' folded in. */
+function tabState(
+  active: boolean,
+  unseen: boolean,
+  snapshot: SessionActivitySnapshot | undefined,
+  players: readonly PlayerRow[] | undefined
+): { selected: boolean; unseen: boolean; flashing: boolean } {
+  const group = playerMarks(players);
+  return {
+    selected: active || group.active,
+    unseen: unseen || group.unseen,
+    flashing: (snapshot?.flashing ?? false) || group.flashing,
+  };
 }
 
 /** What follows the label: the plan count, the removed and unseen
@@ -190,13 +134,15 @@ function TabEnd({
   );
 }
 
-/** An orchestrator's tab with player tabs opens their list on hover. */
+/** An orchestrator's tab opens its player tabs' list on hover. Wrapped
+ *  whether or not it has any, so its first player coming or its last
+ *  going does not remount the tab. */
 function withPlayers(
   tab: ReactElement,
   players: readonly PlayerRow[] | undefined,
   onClose: (id: string) => void
 ): ReactElement {
-  if (!players?.length) return tab;
+  if (!players) return tab;
   return (
     <OrchestratorPlayers players={players} onClose={onClose}>
       {tab}
@@ -217,7 +163,6 @@ export function TabButton({
   machineLabel,
   repoColor = null,
   players,
-  playerActive = false,
 }: {
   tab: Tab;
   item: SidebarItem | undefined;
@@ -240,17 +185,15 @@ export function TabButton({
   /** Its repository's colour, or null for a tab with none. */
   repoColor?: string | null;
   /** Set on an Orchestra orchestrator's tab: its player tabs, which the
-   *  strip shows under it rather than beside it. */
+   *  strip shows under it rather than beside it. Their selection,
+   *  unseen mark and attention blink show on this tab. */
   players?: readonly PlayerRow[];
-  /** One of `players` is the active tab: the strip's selection is this
-   *  tab's. */
-  playerActive?: boolean;
 }) {
   const tabs = useTabs();
   const { tabOverflow } = useDesktopPrefs();
   const { label, face } = tabPresentation(tab, item, machineLabel);
   const Icon = players ? BrainIcon : FACE_ICON[face];
-  const selected = active || playerActive;
+  const state = tabState(active, unseen, snapshot, players);
   // Resting on a tab renders its pane ahead of the press, another
   // repository's against what the app holds for that one.
   const hover = useHoverPrewarm(() => (active ? null : tab), true);
@@ -273,7 +216,7 @@ export function TabButton({
       {...props}
       {...hover.handlers}
       style={style}
-      aria-selected={selected}
+      aria-selected={state.selected}
       onMouseDown={(e) => {
         pressWithoutFocus(e);
         if (e.button === 1) {
@@ -289,15 +232,15 @@ export function TabButton({
           (err: unknown) => toast.error(errorMessage(err))
         );
       }}
-      title={tabTitle(tab, foreignRepo)}
+      title={tabTitle(tab, foreignRepo, players)}
       data-face={face}
-      data-unseen={unseen || undefined}
+      data-unseen={state.unseen || undefined}
       data-orchestrator={players ? true : undefined}
       className={tabClassName({
-        active: selected,
-        unseen,
+        active: state.selected,
+        unseen: state.unseen,
         dragging: isDragging,
-        flashing: snapshot?.flashing ?? false,
+        flashing: state.flashing,
         wrap: tabOverflow === 'wrap',
       })}
     >
@@ -305,7 +248,7 @@ export function TabButton({
         Icon={Icon}
         running={item ? itemRunning(item) : running}
         snapshot={snapshot}
-        active={selected}
+        active={state.selected}
       />
       <TabLabel
         label={label}
@@ -315,7 +258,7 @@ export function TabButton({
       />
       <TabEnd
         item={item}
-        unseen={unseen}
+        unseen={state.unseen}
         players={players}
         onClose={() => closer.close(tab.id)}
       />

@@ -74,3 +74,67 @@ export function orchestratorTabs(
   }
   return { players, grouped: new Set(orchestratorOf.keys()), orchestratorOf };
 }
+
+/** The tabs the strip shows, in their order. */
+export function stripTabs(
+  tabs: readonly Tab[],
+  grouping: OrchestratorTabs
+): Tab[] {
+  return tabs.filter((tab) => !grouping.grouped.has(tab.id));
+}
+
+/**
+ * The order the strip presents every tab in: each tab it shows, an
+ * orchestrator's followed by its player tabs. What positional keyboard
+ * switching walks, so the selection never jumps back to an
+ * orchestrator it already passed.
+ */
+export function presentedOrder(
+  tabs: readonly Tab[],
+  grouping: OrchestratorTabs
+): string[] {
+  return stripTabs(tabs, grouping).flatMap((tab) => [
+    tab.id,
+    ...(grouping.players.get(tab.id) ?? []).map((player) => player.id),
+  ]);
+}
+
+/**
+ * Which strip tab stands for the active tab — itself, or the
+ * orchestrator tab a grouped player is shown under — and which tab is
+ * the strip's one Tab stop: that one, else the first.
+ */
+export function stripSelection(
+  strip: readonly Tab[],
+  grouping: OrchestratorTabs,
+  activeId: string | null
+): { selectedId: string | null; tabStopId: string | undefined } {
+  const standing = activeId
+    ? grouping.orchestratorOf.get(activeId) ?? activeId
+    : null;
+  const selectedId = strip.some((t) => t.id === standing) ? standing : null;
+  return { selectedId, tabStopId: selectedId ?? strip[0]?.id };
+}
+
+/** What an orchestrator's tab shows of its players, which the strip
+ *  does not: one of them is the active tab, one opened in the
+ *  background unseen, one finished a work streak nobody has looked at. */
+export function playerMarks(
+  players:
+    | readonly {
+        active: boolean;
+        unseen: boolean;
+        snapshot?: { flashing: boolean };
+      }[]
+    | undefined
+): {
+  active: boolean;
+  unseen: boolean;
+  flashing: boolean;
+} {
+  return {
+    active: players?.some((p) => p.active) ?? false,
+    unseen: players?.some((p) => p.unseen) ?? false,
+    flashing: players?.some((p) => !p.active && p.snapshot?.flashing) ?? false,
+  };
+}

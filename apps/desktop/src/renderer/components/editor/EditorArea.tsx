@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { SidebarItem } from '../../../host/contract.js';
 import { useRepo } from '../../lib/repo-context.js';
 import {
@@ -19,10 +19,14 @@ import {
 import {
   NO_ORCHESTRATOR_TABS,
   orchestratorTabs,
+  presentedOrder,
+  stripSelection,
+  stripTabs,
 } from '../../lib/tabs/orchestrator-tabs.js';
 import { useRepoColors } from '../../lib/tabs/repo-colors.js';
 import { indexItems, tabItem } from '../../lib/tabs/tab-item.js';
 import { tabRepo } from '../../lib/tabs/tab-presentation.js';
+import { notePresentedOrder } from '../../lib/tabs/tab-switching.js';
 import { foreignRepoOf, useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { EditorPane } from './EditorPane.js';
@@ -120,6 +124,8 @@ export function EditorArea({
       foreignRepo: foreignRepoOf(tab, repo.cwd),
       running: tab.kind === 'terminal' && terminalRunning.has(tab.name),
       machineLabel: machineLabelFor(tab),
+      repoColor: colorOf(tab),
+      unseen: tabs.unseen.includes(tab.id),
     };
   };
 
@@ -127,17 +133,17 @@ export function EditorArea({
   const grouping = orchestration.data
     ? orchestratorTabs(tabs.tabs, orchestration.data, sessionNameFor)
     : NO_ORCHESTRATOR_TABS;
-  const strip = tabs.tabs.filter((t) => !grouping.grouped.has(t.id));
+  const strip = stripTabs(tabs.tabs, grouping);
+  const { tabStopId } = stripSelection(strip, grouping, tabs.activeId);
+  // Positional keyboard switching walks the order the strip shows.
+  const presented = presentedOrder(tabs.tabs, grouping).join('\n');
+  useEffect(() => {
+    notePresentedOrder(presented ? presented.split('\n') : []);
+  }, [presented]);
 
   // No blanket overlay while a pane mounts: the virtualized diff and
   // the rail each show their own skeletons, and the terminal renders
   // in the first frame.
-  const activeInStrip = tabs.activeId
-    ? grouping.orchestratorOf.get(tabs.activeId) ?? tabs.activeId
-    : null;
-  const tabStopId = strip.some((t) => t.id === activeInStrip)
-    ? activeInStrip
-    : strip[0]?.id;
   const { activePane, paneActiveId, panes } = useEditorPanes(
     tabs.tabs,
     tabs.activeId
@@ -166,10 +172,7 @@ export function EditorArea({
               active={tab.id === tabs.activeId}
               closer={closer}
               tabStop={tab.id === tabStopId}
-              unseen={tabs.unseen.includes(tab.id)}
-              repoColor={colorOf(tab)}
               players={players}
-              playerActive={players?.some((p) => p.active) ?? false}
             />
           );
         })}
