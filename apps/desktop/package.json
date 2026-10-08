@@ -214,5 +214,12 @@
     "tailwindcss": "^4.1.14",
     "vite": "^7.1.11"
   },
-  "main": "dist/main/main.js"
+  "main": "dist/main/main.js",
+  "exports": {
+    ".": "./dist/main/main.js",
+    "./contract": {
+      "types": "./src/host/contract.ts",
+      "default": "./src/host/contract.ts"
+    }
+  }
 }

@@ -58,20 +58,12 @@ const REF = {
   number: 214,
 };
 
-interface Bridge {
-  n10: {
-    getRepo(): Promise<{ cwd: string } | null>;
-    getPullRequestChecks(cwd: string, req: unknown): Promise<unknown>;
-  };
-}
-
 function checks(page: Page, number = REF.number, viewer = 'n10-tester') {
   return page.evaluate(
     async (req) => {
-      const { n10 } = window as unknown as Bridge;
-      const repo = await n10.getRepo();
+      const repo = await window.n10.getRepo();
       if (!repo) throw new Error('no open repository');
-      return n10.getPullRequestChecks(repo.cwd, req);
+      return window.n10.getPullRequestChecks(repo.cwd, req);
     },
     { ref: { ...REF, number }, viewer }
   );

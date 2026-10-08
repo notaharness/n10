@@ -36,9 +36,7 @@ async function readConversation(page: Page, number: number) {
 }
 
 /** The conversation a read produced; throws on any other outcome. */
-function conversationOf(
-  read: Awaited<ReturnType<typeof readConversation>>
-): FakeConversation {
+function conversationOf(read: Awaited<ReturnType<typeof readConversation>>) {
   const outcome = read.conversation;
   if (outcome.state === 'read') return outcome.value;
   throw new Error(`conversation not read: ${JSON.stringify(outcome)}`);
