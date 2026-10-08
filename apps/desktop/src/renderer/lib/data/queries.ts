@@ -365,6 +365,21 @@ export function useForeignSessions() {
   });
 }
 
+/**
+ * Orchestra orchestrators and their players, for the tab strip to
+ * group under. Orchestra tags a player as it spawns or adopts one,
+ * which no discovery event announces, so this polls on the same
+ * cadence as the foreign listing.
+ */
+export function useOrchestratorGroups() {
+  return useQuery({
+    queryKey: keys.orchestratorGroups,
+    queryFn: () => window.n10.listOrchestratorGroups(),
+    refetchInterval: 4_000,
+    placeholderData: (prev) => prev,
+  });
+}
+
 /** The safety net under `onMachinesChanged`, not the way the list is
  *  kept current: a real change is pushed straight into the cache, so
  *  this only has to catch a push that never arrived. `StatusBar` is
