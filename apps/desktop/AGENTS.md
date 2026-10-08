@@ -218,6 +218,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `SessionTerminal` sends `resizeSession` on every fit and refits on the
   session's `spawnedAt` epoch; `FitAddon` is the only grid reckoning. It
   bounces the grid for a full repaint only when the snapshot is `truncated`.
+  The snapshot starts with the tmux client's first output, its terminal
+  setup, kept ahead of the ring (`session-relay.ts`, decisions.md).
   `paneTerminalGrid` opens a hidden terminal inside `[data-terminal-pane]`
   for the launch estimate. The grid takes the whole pane: no padding. A terminal releases its
   WebGL context when it goes (`loadWebgl`): Chromium keeps 16 and evicts

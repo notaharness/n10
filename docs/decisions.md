@@ -365,11 +365,26 @@ that highlights what is under the pointer is told where it is with no button
 held, and xterm shows the arrow rather than the I-beam while the application
 takes the mouse. Selecting still works then: Shift-drag on Linux and Windows,
 and Option-drag on macOS (`macOptionClickForcesSelection`), as iTerm and VS Code
-have it. xterm has no Shift-drag on macOS, where wterm took Shift everywhere. A
-terminal that mounts from a ring-buffer snapshot no longer holding the
-application's mode sequences starts without them, mouse tracking included, until
-the application sets them again; tmux repeats modes only on attach or when they
-change.
+have it. xterm has no Shift-drag on macOS, where wterm took Shift everywhere.
+
+A terminal mounts from the host's snapshot of its session
+(`services/session-relay.ts`): the tmux client's first output, then the last
+512 KiB after it. tmux sets its client's terminal up once, in that first output
+(the alternate screen, application cursor keys and bracketed paste) whatever
+the application in the pane asks for, and undoes it only when the client
+detaches or is suspended. It brackets pastes and encodes cursor keys for each
+pane itself, and neither `refresh-client` nor a resize sends the setup again;
+only a pane's own modes, mouse tracking among them, come back with a resize. So
+the relay keeps that output whole ahead of the ring rather than reconstruct
+modes from the stream, and starts over at each new client's first output
+(`SessionBackend.onAttach`): that client's output, its setup and then a full
+redraw, supersedes what came before. The head is the client's first read,
+locally or over beam. tmux writes the setup, a few hundred bytes, in a write of
+its own before the first redraw, so the first read holds it whole unless the
+reader splits it; nothing checks for that. A first read that is something else
+leaves the setup in the ring, where it can be dropped as before. A snapshot whose
+ring has dropped output still bounces the grid so the application repaints the
+screen the ring no longer holds.
 
 ## Desktop repositories and tabs
 
