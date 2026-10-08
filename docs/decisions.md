@@ -968,6 +968,46 @@ Completed findings stay posted after a later failure. An uncertain outcome retai
 its ledger and account binding, blocks edits, and is reconciled on retry. Restarted
 processes can retry findings left posting without inventing a second write path.
 
+## Guided review
+
+The review agent writes a guided review beside its draft comments: a short
+slideshow that walks the reader through the pull request before the diff.
+It is stored as `guide.json` next to `comments.json`, one per repository and
+pull request, so it shares the findings' identity and every linked checkout
+reads the same guide. Running `n10 util add-guide` again replaces it.
+
+The agent learns the format from n10, not from a plugin. `n10 util guide-help`
+prints the authoring instructions and the review prompt points to it. Every
+agent n10 runs can call a command, so Claude, Codex, Gemini and Copilot need
+nothing installed, and the instructions ship in the same release as the
+renderer that draws them, so the format they describe is always the one
+shown. A skill in `notaharness/plugins`, offered through an install prompt
+when it is missing, was considered and deferred: it makes a feature depend
+on per-agent installation and lets the instructions drift from the renderer.
+
+Consistency comes from structure and limits rather than from a long
+rulebook. The agent writes JSON with a fixed set of primitives: markdown
+prose, a picture beside it (a mermaid diagram or a few lines of code), or a
+before and an after. `add-guide` validates it and stores nothing on a
+failure, naming what to cut: 2 to 8 slides, a 280-character lede and
+summary, 600 characters of body prose (fenced code does not count), and
+diagrams in the visual fields, not in the body. The reader opens on a cover
+n10 draws from the title, summary and slide titles, so the titles are the
+outline. `add-guide` records the commit checked out where the agent ran;
+the desktop says when the pull request has moved past it.
+
+Only the desktop asks for a guide (`buildReviewLaunchRequest`'s `guide`
+option). The TUI cannot show slides, so its reviewer does not spend time on
+one.
+
+Diagrams are agent output, so mermaid draws them at its `strict` security
+level with HTML labels off, and its `secure` list stops a diagram's
+`%%{init}%%` from changing the theme, fonts or security level. The theme
+comes from the design tokens. A diagram mermaid cannot parse shows its
+source. Mermaid loads on the first diagram; nothing else in the renderer
+needs it. The desktop pins the website's version, so the workspace holds one
+copy.
+
 ## Diff generation and rendering
 
 PR diffs compare commits so review anchors remain stable. Bare worktree diffs
