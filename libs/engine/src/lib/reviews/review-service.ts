@@ -1,4 +1,5 @@
 import { createAgentComments } from './agent-comments.js';
+import { createAgentGuide } from './agent-guide.js';
 import { isDeepStrictEqual } from 'node:util';
 import type { VisitBaselines } from '@n10/core';
 import { configEffects } from '../config/api.js';
@@ -55,6 +56,7 @@ export function createReviewService(
   return {
     repo: options.config.repo,
     agentComments,
+    agentGuide: createAgentGuide(options.config.repo),
     commands: createReviewCommands(options, provider),
     drafts: createReviewDraftCommands(options, provider.invalidate),
     comments: provider.comments,

@@ -246,6 +246,18 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - `applyPendingRemovals` drops a session row but keeps a PR row with
   `sessionName`/`running` cleared. It leaves a removed worktree's agent row
   alone: its label may name the branch's new checkout.
+- The guided review (`components/review/guide/`) is the review agent's
+  `guide.json`, read through `engine/reviews/agent-guide.ts`. It opens on a
+  cover drawn from the guide's own title, summary and slide titles, then
+  its slides; the step lives in the tab's view. A slide's place opens the diff
+  at the agent's comment on those lines when there is one (`draftAt`), else
+  at its first line (`jumpToLine`), and
+  the last step opens the drafts walkthrough when there are drafts. A review
+  asks for a guide only while the launch dialog's Guided review box is
+  checked (`guidedReview` desktop pref, `ReviewLaunchRequest.guide`). Diagrams go only through
+  `lib/guide/mermaid.ts` (strict, no HTML labels, token theme, `secure`
+  keys), and one that does not parse shows its source. Prose and code reuse
+  `CommentMarkdown`. Format and limits: decisions.md "Guided review".
 - Comment markdown paragraphs render as `<div>` (block images cannot nest in
   `<p>`); images are host-fetched with provider auth.
 - `ErrorBoundary` wraps the root (`main.tsx`, outside every provider), the

@@ -101,7 +101,9 @@ export async function launchReviewAgent(req: ReviewLaunchRequest): Promise<{
 }> {
   requireRepo();
   const branch = req.pr.sourceBranch;
-  const request = buildReviewLaunchRequest(req.pr, req.instruction);
+  const request = buildReviewLaunchRequest(req.pr, req.instruction, {
+    guide: req.guide,
+  });
   return launchAgent({
     branch,
     intent: 'seed',

@@ -43,6 +43,7 @@ export function sessionLaunchRequest(
 export function reviewLaunchRequest(
   pr: PullRequestInfo,
   instruction: string | undefined,
+  guide: boolean,
   pane: Grid,
   expected?: SessionIncarnation,
   agentId?: AgentId,
@@ -52,6 +53,7 @@ export function reviewLaunchRequest(
   const base: ReviewLaunchRequest = {
     pr,
     instruction,
+    guide,
     expected,
     agentId,
     ...pane,

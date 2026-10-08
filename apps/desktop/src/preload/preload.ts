@@ -69,6 +69,8 @@ const api: N10HostApi = {
   deleteDraftComment: (prId, id) =>
     ipcRenderer.invoke(IPC.deleteDraftComment, prId, id),
   postDraftComments: (req) => ipcRenderer.invoke(IPC.postDraftComments, req),
+  getGuidedReview: (repo, prId) =>
+    ipcRenderer.invoke(IPC.getGuidedReview, repo, prId),
 
   launchAgent: (req) => ipcRenderer.invoke(IPC.launchAgent, req),
   launchReviewAgent: (req) => ipcRenderer.invoke(IPC.launchReviewAgent, req),

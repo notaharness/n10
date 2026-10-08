@@ -7,7 +7,11 @@ import {
 import type { PlanItem } from '@n10/core/plan';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import { useDiffOptions } from '../../lib/diff/diff-options.js';
-import { useDraftComments, useThreads } from '../../lib/data/queries.js';
+import {
+  useDraftComments,
+  useGuidedReview,
+  useThreads,
+} from '../../lib/data/queries.js';
 import type { ReadState } from '../../lib/data/read-state.js';
 import { keys } from '../../lib/data/query-keys.js';
 import { useReadState } from '../../lib/data/use-read-state.js';
@@ -46,7 +50,8 @@ const NO_THREADS: ReadState<unknown> = {
 /**
  * The review workspace for a PR: a collapsible left rail (Sessions ·
  * Files) beside a single content pane that swaps between the Overview,
- * the diff, a session's terminal, the plan and the walkthrough.
+ * the diff, a session's terminal, the plan, the guided review and the
+ * walkthrough.
  * Selecting a file shows the diff; selecting a session's card shows its
  * terminal, which is mounted only while it shows (`SessionTerminal`). The diff's own
  * toolbar lives inside the diff pane, so it's gone while the terminal
@@ -106,6 +111,7 @@ export function PrWorkspace({
   const threads = useReadState(comments, keys.threads(repo.cwd, prId));
   const threadsRead = pr ? threads.state : NO_THREADS;
   const draftsQuery = useDraftComments(repo.cwd, prId);
+  const guide = useGuidedReview(repo.cwd, prId);
   const postAll = usePostAll(repo.cwd, prId, pr?.headSha);
   const options = useDiffOptions();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -177,6 +183,7 @@ export function PrWorkspace({
     [nav]
   );
   const backToAgent = useCallback(() => setMode('agent'), [setMode]);
+  const openDrafts = useCallback(() => setMode('review'), [setMode]);
   const openPlanPane = useCallback(() => setMode('plan'), [setMode]);
   const plan = usePlanCheckout({
     cwd: repo.cwd,
@@ -193,6 +200,7 @@ export function PrWorkspace({
   const effMode = resolveMode(mode, {
     hasSession: pane.hasSession,
     hasDrafts,
+    hasGuide: guide != null,
     hasPr: pr != null,
     // A plan belongs to a pull request: it is a queue of *its* review
     // comments, and the prompt names them. A bare worktree has none.
@@ -248,9 +256,12 @@ export function PrWorkspace({
                   onLaunchTerminal={sessions.launchTerminal}
                   onStopSession={sessions.stop}
                   onHide={() => rail.setHidden(true)}
+                  guide={guide}
+                  guideActive={effMode === 'guide'}
+                  onGuide={() => setMode('guide')}
                   drafts={drafts}
                   reviewActive={effMode === 'review'}
-                  onReview={() => setMode('review')}
+                  onReview={openDrafts}
                   postingAll={postAll.pending}
                   onPostAll={postAll.post}
                   planCount={plan.count}
@@ -298,6 +309,7 @@ export function PrWorkspace({
               hideResolved={options.hideResolved}
               drafts={drafts}
               hasDrafts={hasDrafts}
+              guide={guide}
               commentsLoading={comments.isLoading}
               threadsNotice={readNotice(
                 'comments',
@@ -319,6 +331,8 @@ export function PrWorkspace({
               onPrev={() => nav.step(-1)}
               onNext={() => nav.step(1)}
               onExitReview={showDiff}
+              onReviewDrafts={openDrafts}
+              onOpenPlace={nav.jumpToPlace}
               onOpenInDiff={nav.jumpToFile}
               onOverviewAction={onOverviewAction}
               onOpenThread={nav.jumpToId}

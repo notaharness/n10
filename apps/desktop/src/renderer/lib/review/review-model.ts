@@ -18,7 +18,7 @@ import type { FileEntry } from '../../components/review/diff/FileTree.js';
  */
 
 /** Which pane of the review workspace is showing. */
-export type Mode = 'diff' | 'agent' | 'review' | 'overview' | 'plan';
+export type Mode = 'diff' | 'agent' | 'review' | 'guide' | 'overview' | 'plan';
 
 /** What each mode needs in order to be showable at all. */
 export interface ModeContext {
@@ -26,6 +26,8 @@ export interface ModeContext {
   hasSession: boolean;
   /** At least one unposted agent draft. */
   hasDrafts: boolean;
+  /** The review agent wrote a guided review. */
+  hasGuide: boolean;
   /** The tab is a pull request, not a bare worktree. */
   hasPr: boolean;
   /** At least one comment queued in this PR's plan. */
@@ -45,6 +47,7 @@ export interface ModeContext {
 export function resolveMode(mode: Mode, ctx: ModeContext): Mode {
   if (mode === 'agent' && ctx.hasSession) return 'agent';
   if (mode === 'review' && ctx.hasDrafts) return 'review';
+  if (mode === 'guide' && ctx.hasGuide) return 'guide';
   if (mode === 'overview' && ctx.hasPr) return 'overview';
   if (mode === 'plan' && ctx.hasPlan) return 'plan';
   return 'diff';

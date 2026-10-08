@@ -13,6 +13,7 @@ import { keys, resetProviderScopedCache } from './query-keys.js';
 import { errorMessage } from '../utils.js';
 import { repositoryKey } from '@n10/vcs-core/pr-details';
 import type {
+  GuidedReview,
   MachineView,
   RepoInfo,
   SidebarItem,
@@ -448,6 +449,22 @@ export function useCommentImage(cwd: string, url: string) {
     staleTime: Infinity,
     gcTime: 10 * 60_000,
   });
+}
+
+/** The review agent's guided review; polled so it appears when the
+ *  agent stores it. */
+export function useGuidedReview(
+  cwd: string,
+  prId: number
+): GuidedReview | null {
+  const read = useQuery({
+    queryKey: keys.guide(cwd, prId),
+    queryFn: () => window.n10.getGuidedReview(cwd, prId),
+    refetchInterval: 2_000,
+    placeholderData: keepRepoAnswer(cwd),
+    enabled: prId > 0,
+  });
+  return read.data ?? null;
 }
 
 /** Draft review comments written by the review agent; polled so they

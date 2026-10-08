@@ -160,6 +160,10 @@ export const keys = {
   commentImage: (cwd: string, url: string) =>
     ['comment-image', cwd, url] as const,
   drafts: (cwd: string, prId: number) => ['drafts', cwd, prId] as const,
+  guide: (cwd: string, prId: number) => ['guide', cwd, prId] as const,
+  /** A drawn diagram: the same source draws once per theme. */
+  diagram: (theme: string, source: string) =>
+    ['diagram', theme, source] as const,
   branchRemoval: (cwd: string, branch: string) =>
     ['branch-removal', cwd, branch] as const,
   // Diff-worker results (see lib/highlight.ts). `linesKey` is a hash of

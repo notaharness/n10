@@ -7,6 +7,13 @@ export async function listDraftComments(repo: string, prId: number) {
     repository(repo).reviews.agentComments.resource(prId)
   );
 }
+/** The pull request's guided review, or null before the agent writes one. */
+export async function getGuidedReview(repo: string, prId: number) {
+  const read = await readResourceValue(
+    repository(repo).reviews.agentGuide.resource(prId)
+  );
+  return read.guide;
+}
 export function updateDraftComment(
   prId: number,
   id: string,

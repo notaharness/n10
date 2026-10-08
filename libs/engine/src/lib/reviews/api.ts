@@ -18,3 +18,4 @@ export type {
   ResolveReviewThread,
 } from './review-commands.js';
 export type { PostAgentCommentsRequest } from './agent-publication.js';
+export type { AgentGuideRead } from './agent-guide.js';

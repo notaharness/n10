@@ -226,10 +226,14 @@ vi.mock('@n10/core', async (importOriginal) => {
       return state.alive.has(name);
     },
     buildAgentOptions: actual.buildAgentOptions,
-    buildReviewLaunchRequest: (pr: { id: number }, instruction?: string) => ({
+    buildReviewLaunchRequest: (
+      pr: { id: number },
+      instruction?: string,
+      options: { guide?: boolean } = {}
+    ) => ({
       intent: 'review',
       prompt: `review #${pr.id}${instruction ? `: ${instruction}` : ''}`,
-      systemGuidance: 'guidance',
+      systemGuidance: options.guide ? 'guidance, guide' : 'guidance',
     }),
     launchSession: async (spec: {
       name: string;
@@ -888,6 +892,7 @@ describe('launchReviewAgent', () => {
     await launchReviewAgent({
       pr: { id: 42, sourceBranch: 'feature/review' },
       instruction: 'focus on error handling',
+      guide: false,
     } as Parameters<typeof launchReviewAgent>[0]);
 
     expect(state.spawns).toHaveLength(1);
@@ -903,9 +908,9 @@ describe('launchReviewAgent', () => {
     const pr = { id: 1, sourceBranch: 'dup' } as Parameters<
       typeof launchReviewAgent
     >[0]['pr'];
-    const first = launchReviewAgent({ pr, instruction: 'first' });
+    const first = launchReviewAgent({ pr, instruction: 'first', guide: false });
     await expect(
-      launchReviewAgent({ pr, instruction: 'second' })
+      launchReviewAgent({ pr, instruction: 'second', guide: false })
     ).rejects.toThrow('Another launch is in progress');
     await first;
     expect(state.spawns[0].request).toMatchObject({
@@ -917,7 +922,7 @@ describe('launchReviewAgent', () => {
     const pr = { id: 1, sourceBranch: 'selected' } as Parameters<
       typeof launchReviewAgent
     >[0]['pr'];
-    await launchReviewAgent({ pr, agentId: 'codex' });
+    await launchReviewAgent({ pr, agentId: 'codex', guide: false });
     expect(state.spawns[0]).toMatchObject({
       fresh: true,
       agent: { id: 'codex' },
@@ -932,10 +937,24 @@ describe('launchReviewAgent', () => {
   it('goes through the same de-duplication as a plain launch', async () => {
     const pr = { id: 1, sourceBranch: 'dup' };
     await Promise.all([
-      launchReviewAgent({ pr } as Parameters<typeof launchReviewAgent>[0]),
-      launchReviewAgent({ pr } as Parameters<typeof launchReviewAgent>[0]),
+      launchReviewAgent({ pr, guide: false } as Parameters<
+        typeof launchReviewAgent
+      >[0]),
+      launchReviewAgent({ pr, guide: false } as Parameters<
+        typeof launchReviewAgent
+      >[0]),
     ]);
     expect(state.spawns).toHaveLength(1);
+  });
+
+  it('asks for a guided review exactly when the request does', async () => {
+    const pr = { id: 7, sourceBranch: 'guided' } as Parameters<
+      typeof launchReviewAgent
+    >[0]['pr'];
+    await launchReviewAgent({ pr, guide: true });
+    expect(state.spawns[0].request).toMatchObject({
+      systemGuidance: 'guidance, guide',
+    });
   });
 });
 

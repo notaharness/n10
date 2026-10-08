@@ -1,6 +1,7 @@
 import type { PullRequestInfo } from '@n10/vcs-core';
 import type {
   DiscoveryChangedEvent,
+  GuidedReview,
   PullRequestComments,
   ReviewComment,
   SidebarItem,
@@ -25,6 +26,7 @@ export class RepoState {
   sidebar: SidebarItem[];
   threads: Record<number, PullRequestComments>;
   drafts: Record<number, ReviewComment[]> = {};
+  guides: Record<number, GuidedReview> = {};
   readonly worktrees: Set<string>;
 
   constructor(readonly data: RepoData, private readonly channels: Channels) {

@@ -69,4 +69,17 @@ describe('buildReviewLaunchRequest', () => {
       expect(guidance()).toContain('(thread <id>)');
     });
   });
+
+  /** The desktop shows a guided review; the TUI cannot, so it does not
+   *  spend the agent's time on one. */
+  it('asks for a guided review only when the shell shows one', () => {
+    const plain = buildReviewLaunchRequest(pr);
+    expect(plain.prompt).not.toContain('guided review');
+    expect(plain.systemGuidance).not.toContain('guide-help');
+    const guided = buildReviewLaunchRequest(pr, undefined, { guide: true });
+    expect(guided.prompt).toContain('Then write a guided review');
+    expect(guided.systemGuidance).toContain(
+      `n10 util guide-help --pr=${pr.id}`
+    );
+  });
 });
