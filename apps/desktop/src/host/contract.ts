@@ -26,6 +26,7 @@ import type {
 import type { CommentSeverity, ReviewComment } from '@n10/review-comments';
 export type { CommentSeverity, ReviewComment };
 import type { WorktreeInfo } from '@n10/worktree-manager';
+import type { DesktopBindings, KeyDescriptor } from '@n10/core';
 import type {
   BranchPrMap,
   PullRequestComments,
@@ -310,9 +311,16 @@ export interface DesktopPrefs {
   /** What the tab strip does with more tabs than fit: wrap onto more
    *  rows, or scroll the one row sideways. */
   tabOverflow: TabOverflow;
+  /** Ctrl+Tab / Ctrl+Shift+Tab (or their rebinding) walk the tabs in
+   *  most-recently-used order instead of strip order. */
+  tabCycleMru: boolean;
 }
 
 export type TabOverflow = 'wrap' | 'scroll';
+
+/** The desktop shortcuts the user rebound, by action id; an action
+ *  missing here has its default (`DESKTOP_DEFAULT_BINDINGS`). */
+export type DesktopKeybindings = Partial<DesktopBindings>;
 
 /** One entry of a native context menu. */
 export type ContextMenuItem =
@@ -620,6 +628,17 @@ export interface N10HostApi {
   onBabysitChanged(cb: (event: BabysitChangedEvent) => void): () => void;
   getDesktopPrefs(): Promise<DesktopPrefs>;
   setDesktopPrefs(patch: Partial<DesktopPrefs>): Promise<DesktopPrefs>;
+  /** The rebound desktop shortcuts, kept in the global config. */
+  getKeybindings(): Promise<DesktopKeybindings>;
+  /** Rebind one desktop shortcut, or with null restore its default.
+   *  Answers with every rebound shortcut after the write. */
+  setKeybinding(
+    actionId: string,
+    descriptors: KeyDescriptor[] | null
+  ): Promise<DesktopKeybindings>;
+  /** While held, this window's application menu accelerators stand
+   *  aside (Ctrl+W, Ctrl+N, …), so recording a shortcut hears them. */
+  holdMenuShortcuts(held: boolean): Promise<void>;
   /** Native about box. */
   showAbout(): Promise<void>;
 }
@@ -697,6 +716,9 @@ export const IPC = {
   showAppMenu: 'n10/shell/app-menu',
   getDesktopPrefs: 'n10/shell/prefs/get',
   setDesktopPrefs: 'n10/shell/prefs/set',
+  getKeybindings: 'n10/keybindings/get',
+  setKeybinding: 'n10/keybindings/set',
+  holdMenuShortcuts: 'n10/keybindings/hold-menu',
   showAbout: 'n10/shell/about',
   startBabysit: 'n10/babysit/start',
   stopBabysit: 'n10/babysit/stop',

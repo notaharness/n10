@@ -245,9 +245,9 @@ function WorkspaceInner({
 
   // In-page shortcuts for the web-rendered UI. Anything that is also a
   // native menu accelerator reaches us through onMenuCommand instead;
-  // handled here: palette (⌘K). Tab cycling was removed for now — it
-  // collided with Shift+Tab inside agent terminals (Claude Code's mode
-  // switch).
+  // handled here: palette (⌘K). Tab switching is `useTabSwitching`'s,
+  // on rebindable Ctrl chords: a bare Shift+Tab belongs to the agent
+  // terminals (Claude Code's mode switch).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;

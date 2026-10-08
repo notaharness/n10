@@ -45,6 +45,9 @@ vi.mock('./services/repo.js', () =>
 vi.mock('./services/settings.js', () =>
   recorder('settings', ['getSettingsView', 'updateSettingsFromView'])
 );
+vi.mock('./services/keybindings.js', () =>
+  recorder('keybindings', ['getDesktopKeybindings', 'setDesktopKeybinding'])
+);
 vi.mock('./services/sidebar.js', () =>
   recorder('sidebar', ['getSidebarSnapshot', 'getSyncState', 'refreshRemote'])
 );
@@ -325,6 +328,12 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ],
 
   ['getDesktopPrefs', [], 'prefs.loadDesktopPrefs'],
+  ['getKeybindings', [], 'keybindings.getDesktopKeybindings'],
+  [
+    'setKeybinding',
+    ['desktop.tabs.next', null],
+    'keybindings.setDesktopKeybinding',
+  ],
 
   ['startBabysit', [7], 'babysit.startBabysit'],
   ['stopBabysit', [7], 'babysit.stopBabysit'],
@@ -398,6 +407,14 @@ describe('host API wiring', () => {
       expect(calls).toEqual([{ fn: expected, args: [7, 'b'] }]);
     }
   );
+
+  it('holdMenuShortcuts asks the main process for the asking window', async () => {
+    const { setMenuShortcutHold } = await import('./viewer-api.js');
+    const hold = vi.fn(async () => undefined);
+    setMenuShortcutHold(hold);
+    await createViewerApi().holdMenuShortcuts(7, true);
+    expect(hold).toHaveBeenCalledWith(7, true);
+  });
 
   it('reports the running versions rather than a service call', () => {
     // getVersion is the one method that answers from the process

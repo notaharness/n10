@@ -1,5 +1,14 @@
 import { KeyboardSensor } from '@dnd-kit/core';
+import type { KeyDescriptor } from '@n10/core/ui';
 import type { KeyboardEvent, MouseEvent } from 'react';
+
+/** The lift chord in descriptor terms (Space's DOM key is ' '), for
+ *  the shortcut recorder to keep it off a tab shortcut. */
+export const LIFT_CHORD: KeyDescriptor = {
+  ctrl: true,
+  shift: true,
+  input: ' ',
+};
 
 /** Ctrl+Shift+Space lifts the focused tab; Enter and Space are left to
  *  the tab pattern, where they activate it. */

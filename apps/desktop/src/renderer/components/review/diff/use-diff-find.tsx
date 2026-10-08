@@ -23,12 +23,15 @@ function isVisibleDiffTarget(
   );
 }
 
+/** With Ctrl or Cmd, Shift or not, this key opens find in the diff. */
+export const FIND_KEY = 'f';
+
 function isFindShortcut(
   event: KeyboardEvent,
   target: HTMLElement,
   input: HTMLInputElement | null
 ): boolean {
-  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'f')
+  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== FIND_KEY)
     return false;
   return (
     target === input ||

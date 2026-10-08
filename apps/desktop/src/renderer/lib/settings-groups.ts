@@ -5,9 +5,11 @@ import type { SettingsFieldView, SettingsGroup } from '../../host/contract.js';
  * host-side fields, because the theme and the window frame are
  * properties of this shell rather than of the repository. `'machines'`
  * is desktop-local too, in the same sense: it belongs to this app
- * instance, not to whichever repository happens to be open.
+ * instance, not to whichever repository happens to be open. `'keyboard'`
+ * is drawn here as well: its shortcuts and the recently-used switch are
+ * n10-wide (the global config and desktop prefs), not the repository's.
  */
-export type GroupKey = 'appearance' | 'machines' | SettingsGroup;
+export type GroupKey = 'appearance' | 'keyboard' | 'machines' | SettingsGroup;
 
 export interface SettingsGroupMeta {
   key: GroupKey;
@@ -18,6 +20,11 @@ export interface SettingsGroupMeta {
 /** Section order on the page, and in the jump nav beside it. */
 export const GROUPS: SettingsGroupMeta[] = [
   { key: 'appearance', label: 'Appearance', blurb: 'How n10 Desktop looks.' },
+  {
+    key: 'keyboard',
+    label: 'Keyboard',
+    blurb: 'Shortcuts for switching tabs, for every repository.',
+  },
   {
     key: 'general',
     label: 'General',
@@ -50,6 +57,9 @@ export const GROUPS: SettingsGroupMeta[] = [
   },
 ];
 
+/** Sections this shell draws itself, shown whatever the host sends. */
+const LOCAL_GROUPS = new Set<GroupKey>(['appearance', 'keyboard', 'machines']);
+
 export interface SettingsSection extends SettingsGroupMeta {
   fields: SettingsFieldView[];
 }
@@ -75,9 +85,6 @@ export function visibleSettingsGroups(
     byGroup.set(f.group, arr);
   }
   return GROUPS.filter(
-    (g) =>
-      g.key === 'appearance' ||
-      g.key === 'machines' ||
-      (byGroup.get(g.key)?.length ?? 0) > 0
+    (g) => LOCAL_GROUPS.has(g.key) || (byGroup.get(g.key)?.length ?? 0) > 0
   ).map((g) => ({ ...g, fields: byGroup.get(g.key) ?? [] }));
 }

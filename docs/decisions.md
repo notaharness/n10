@@ -515,6 +515,45 @@ fields cleared: the PR outlives its checkout. Status indicators combine CI and
 review status; CI can worsen the result, but passing CI does not imply approval.
 The status matrix and tab invariants are covered by model tests.
 
+### Keyboard tab switching
+
+The four tab shortcuts act on the editor tab strip, the one strip of tabs that
+spans the window. The review workspace's rail (Sessions · Files) picks panes
+inside one tab; it is a list, not a strip, so the chords always mean the strip.
+`useTabSwitching` listens on the window in the capture phase and stops the
+event, because wterm and text boxes otherwise consume Ctrl+Tab; it stands
+aside inside a dialog and while Settings records a chord. Nothing else binds
+these chords: the native menu has no accelerator for them and Electron has no
+browser tab handling of its own. Plain Shift+Tab stays the terminal's (Claude
+Code's mode switch), which is why the defaults all hold Ctrl.
+
+The bindings are the TUI's `KeyDescriptor`s in the global config's
+`keybindOverrides`, under `desktop.`-prefixed ids the TUI catalog never
+resolves, written through the engine config service. Most-recently-used
+cycling is a desktop pref (`tabCycleMru`, off by default so Ctrl+Tab matches
+Ctrl+PgDn until asked): a walk snapshots the order on the first press and
+commits when no Ctrl, Alt or Cmd is held any longer, or the window loses focus.
+The order and a walk in progress live at module level in
+`lib/tabs/tab-switching.ts`, and the hook is mounted in `App.tsx`'s gate, above
+the workspace: a walk onto another repository's tab switches repositories,
+which remounts the workspace, and the walk must carry on. A tab closed under
+the walk keeps its place in the snapshot, so the next press goes to its live
+neighbour in the direction pressed rather than back to the front.
+
+Recording refuses a chord without Ctrl or Alt (it would be taken from every
+text box and terminal), one of the app's own shortcuts (`host/app-shortcuts.ts`,
+the list the native menu's accelerators and the shortcuts dialog are built
+from), the page's own chords (find in diff, the tab lift) and another tab
+action's. On macOS the menu holds Cmd, which no tab shortcut can, so only the
+page's chords that answer to Ctrl as well are refused there. While recording,
+the window ignores menu accelerators (`webContents.setIgnoreMenuShortcuts`), so
+Ctrl+W reaches the recorder instead of closing Settings; Electron keeps that on
+the webContents across a reload, so main releases it whenever a page starts
+loading. The shortcuts do nothing while no repository is open (the picker,
+connecting), leaving the order and any walk as they were. Nothing pushes config changes to the
+renderer, so the bindings are read again when the window comes to the front
+and when Settings → Keyboard opens; a read begun before a write is dropped.
+
 ## Plans and babysitting
 
 Plan items are value snapshots taken when queued. Later comment edits or
