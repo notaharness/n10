@@ -101,7 +101,10 @@ export async function launchReviewAgent(req: ReviewLaunchRequest): Promise<{
 }> {
   requireRepo();
   const branch = req.pr.sourceBranch;
-  const request = buildReviewLaunchRequest(req.pr, req.instruction);
+  // The desktop shows a guided review, so its reviewer writes one.
+  const request = buildReviewLaunchRequest(req.pr, req.instruction, {
+    guide: true,
+  });
   return launchAgent({
     branch,
     intent: 'seed',

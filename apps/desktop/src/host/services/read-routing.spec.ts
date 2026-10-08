@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { listBranchSessions } from './branch-sessions.js';
-import { listDraftComments } from './drafts.js';
+import { getGuidedReview, listDraftComments } from './drafts.js';
 import { getPullRequestChecks } from './pr-checks.js';
 import { getPullRequestConversation } from './pr-conversation.js';
 import { getPullRequestSnapshot } from './pr-details.js';
@@ -57,6 +57,10 @@ vi.mock('./repo.js', () => {
         recordVisit: () => touch(undefined),
         drafts: { list: () => touch({}) },
         agentComments: { resource },
+        agentGuide: {
+          resource: () =>
+            touch({ read: async () => ({ data: { guide: cwd }, error: null }) }),
+        },
         diff: {
           manifest: resource,
           patch: resource,
@@ -97,6 +101,7 @@ const READS: [string, () => unknown][] = [
   ['diff patch', () => getPrDiffPatch(req)],
   ['diff range manifest', () => getPrRangeManifest(req)],
   ['agent findings', () => listDraftComments(PARKED, 7)],
+  ['guided review', () => getGuidedReview(PARKED, 7)],
   ['review drafts', () => listDrafts(PARKED, {})],
   ['sessions', () => listSessions(PARKED)],
   ['branch sessions', () => listBranchSessions(PARKED, 'feature')],

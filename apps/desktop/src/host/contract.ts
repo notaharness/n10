@@ -23,8 +23,12 @@ import type {
   WorktreeRemovalCheck,
   WorktreeRemovalOutcome,
 } from '@n10/core';
-import type { CommentSeverity, ReviewComment } from '@n10/review-comments';
-export type { CommentSeverity, ReviewComment };
+import type {
+  CommentSeverity,
+  GuidedReview,
+  ReviewComment,
+} from '@n10/review-comments';
+export type { CommentSeverity, GuidedReview, ReviewComment };
 import type { WorktreeInfo } from '@n10/worktree-manager';
 import type { DesktopBindings, KeyDescriptor } from '@n10/core';
 import type {
@@ -487,6 +491,8 @@ export interface N10HostApi {
   deleteDraftComment(prId: number, id: string): Promise<void>;
   /** Resolves to the number of comments posted. */
   postDraftComments(req: PostDraftsRequest): Promise<number>;
+  /** The review agent's guided review of the pull request, if it wrote one. */
+  getGuidedReview(repo: string, prId: number): Promise<GuidedReview | null>;
 
   // ── Sessions ─────────────────────────────────────────────────
   launchAgent(req: SessionLaunchRequest): Promise<{ name: string }>;
@@ -725,6 +731,7 @@ export const IPC = {
   updateDraftComment: 'n10/drafts/update',
   deleteDraftComment: 'n10/drafts/delete',
   postDraftComments: 'n10/drafts/post',
+  getGuidedReview: 'n10/drafts/guide',
   launchReviewAgent: 'n10/session/launch-review',
   listAgentOptions: 'n10/session/agent-options',
   getSessionLaunchContext: 'n10/session/launch-context',

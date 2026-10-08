@@ -145,6 +145,7 @@ vi.mock('./services/drafts.js', () =>
     'updateDraftComment',
     'deleteDraftComment',
     'postDraftComments',
+    'getGuidedReview',
   ])
 );
 vi.mock('./services/babysit.js', () =>
@@ -306,6 +307,7 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ['updateDraftComment', [7, 'id', { body: 'x' }], 'drafts.updateDraftComment'],
   ['deleteDraftComment', [7, 'id'], 'drafts.deleteDraftComment'],
   ['postDraftComments', [{ prId: 7 }], 'drafts.postDraftComments'],
+  ['getGuidedReview', ['/repo', 7], 'drafts.getGuidedReview'],
 
   ['launchAgent', [{ branch: 'b' }], 'sessions.launchAgent'],
   ['launchReviewAgent', [{ pr: {} }], 'sessions.launchReviewAgent'],

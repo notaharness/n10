@@ -82,6 +82,7 @@ type ReviewHost = Pick<
   | 'updateDraftComment'
   | 'deleteDraftComment'
   | 'postDraftComments'
+  | 'getGuidedReview'
   | 'fetchWorktreeDiffText'
 >;
 
@@ -129,6 +130,8 @@ export function createReviewHost(state: DemoState): ReviewHost {
     fetchCommentImage: () => later(null),
     listDraftComments: (cwd, prId) =>
       later(state.repoAt(cwd).drafts[prId] ?? []),
+    getGuidedReview: (cwd, prId) =>
+      later(state.repoAt(cwd).guides[prId] ?? null),
     updateDraftComment: (prId, id, patch) => {
       setDrafts(
         prId,

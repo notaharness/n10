@@ -104,6 +104,7 @@ export function createHostApi(): HostApi {
     submitReview: (req) => reviewDrafts.submitReview(req),
     fetchCommentImage: (cwd, url) => commentImages.fetchCommentImage(cwd, url),
     listDraftComments: (cwd, prId) => drafts.listDraftComments(cwd, prId),
+    getGuidedReview: (cwd, prId) => drafts.getGuidedReview(cwd, prId),
     updateDraftComment: (prId, id, patch) =>
       Promise.resolve(drafts.updateDraftComment(prId, id, patch)),
     deleteDraftComment: (prId, id) =>
