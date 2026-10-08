@@ -8,7 +8,9 @@ description: What n10 needs, and how to install it.
 - Linux or macOS. n10 runs every agent and terminal in tmux, which has no
   native Windows build.
 - Git 2.38 or newer, and Node.js 22.12 or newer with npm.
-- tmux 3.2 or newer.
+- tmux 3.2 or newer. On tmux 3.5 or newer, add `set -s extended-keys on` to
+  `~/.tmux.conf`, or Shift+Enter in n10 Desktop submits instead of starting a
+  new line ([#335](https://github.com/notaharness/n10/issues/335)).
 - At least one agent CLI on your `PATH`, signed in: `claude`, `codex`,
   `gemini`, `copilot` or `opencode`.
 - For GitHub, the [`gh` CLI](https://cli.github.com), signed in with
