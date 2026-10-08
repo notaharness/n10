@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BranchTerminalRequest } from '../../../host/contract.js';
+import { keepRepoAnswer } from './queries.js';
 import { keys } from './query-keys.js';
 
 /**
@@ -12,7 +13,7 @@ export function useBranchSessions(cwd: string, branch: string) {
     queryKey: keys.branchSessions(cwd, branch),
     queryFn: () => window.n10.listBranchSessions(cwd, branch),
     refetchInterval: 2_000,
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
     enabled: branch !== '',
   });
 }

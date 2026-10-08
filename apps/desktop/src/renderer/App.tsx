@@ -7,11 +7,7 @@ import { TabDragProvider } from './components/editor/TabStrip.js';
 import { RevokeMachineDialog } from './components/machines/RevokeMachineDialog.js';
 import { Toaster } from './components/ui/sonner.js';
 import { TooltipProvider } from './components/ui/tooltip.js';
-import {
-  keys,
-  queryClient,
-  resetRepoScopedCache,
-} from './lib/data/query-keys.js';
+import { keys, queryClient } from './lib/data/query-keys.js';
 import { useRepoGate } from './lib/data/queries.js';
 import { useFleet } from './lib/fleet/fleet-context.js';
 import { FleetProvider } from './lib/fleet/fleet-provider.js';
@@ -20,7 +16,7 @@ import { RepoOpen } from './screens/RepoOpen.js';
 import { Workspace } from './screens/Workspace.js';
 import { PrewarmProvider } from './lib/tabs/prewarm.js';
 import { TabViewsHost } from './lib/tabs/tab-views.js';
-import { TabsProvider } from './lib/tabs/tabs.js';
+import { TabsProvider, useTabs } from './lib/tabs/tabs.js';
 import { useRepoFollowsTabs } from './lib/tabs/use-repo-follows-tabs.js';
 import { useTabSwitching } from './lib/tabs/use-tab-switching.js';
 
@@ -67,30 +63,54 @@ function RevocationDialog() {
 function Gate() {
   const qc = useQueryClient();
   const { data: repo, isPending } = useRepoGate();
+  const { repoOpened } = useTabs();
 
-  /** Adopt a repository the host has already switched to. Opening it
-   *  put it on the recents list, with its colour if it is new there. */
+  /**
+   * Adopt a repository the host has already switched to. Every other
+   * repository's cache stays; this one's is read again behind what it
+   * shows. Pending writes go: a worktree removal pending in the
+   * repository left would otherwise hide a same-named row in this one.
+   * Opening it put it on the recents list, with its colour if it is new
+   * there. Its tab comes to the front, if one of another repository
+   * is: opened from the picker or the palette, it is what was asked for.
+   */
   const adoptRepo = useCallback(
     (r: RepoInfo) => {
-      resetRepoScopedCache(qc);
+      qc.getMutationCache().clear();
       qc.setQueryData(keys.repo, r);
+      qc.setQueryData(keys.repoInfo(r.cwd), r);
+      repoOpened(r.cwd);
+      // Refetches settle into each query's own state; neither rejects.
+      void qc.invalidateQueries({
+        predicate: ({ queryKey }) => queryKey[1] === r.cwd,
+      });
       void qc.invalidateQueries({ queryKey: keys.recents });
     },
-    [qc]
+    [qc, repoOpened]
   );
 
-  /** Open a repository in place, reporting whether it worked. */
+  /**
+   * Open a repository in place, reporting whether it worked. One shown
+   * before this run is shown at once from what was cached for it, while
+   * the host opens it; the answer then refreshes it. A failed open
+   * returns to the repository that was open, and leaves the tab that
+   * asked for it in front, saying so.
+   */
   const openRepoAsync = useCallback(
     async (cwd: string): Promise<boolean> => {
+      const previous = qc.getQueryData<RepoInfo | null>(keys.repo);
+      const cached = qc.getQueryData<RepoInfo>(keys.repoInfo(cwd));
+      if (cached) qc.setQueryData(keys.repo, cached);
       try {
         adoptRepo(await window.n10.openRepo(cwd));
         return true;
       } catch (err: unknown) {
+        if (cached && previous) qc.setQueryData(keys.repo, previous);
         toast.error(errorMessage(err));
         return false;
       }
     },
-    [adoptRepo]
+    [qc, adoptRepo]
   );
 
   const openRepo = useCallback(
@@ -100,9 +120,9 @@ function Gate() {
 
   // A tab from another repository is shown by opening that repository.
   useRepoFollowsTabs(repo?.cwd ?? null, openRepoAsync);
-  // Above the workspace, which a repository switch remounts: a walk
-  // onto another repository's tab is what switches it. Off on the
-  // repository picker and while connecting, where no strip is shown.
+  // Above the workspace, which the repository picker unmounts: a walk
+  // onto another repository's tab is what switches repository. Off on
+  // the picker and while connecting, where no strip is shown.
   useTabSwitching(Boolean(repo));
 
   const pickRepoFolder = useCallback(() => {
@@ -137,7 +157,6 @@ function Gate() {
       label="This repository's workspace failed to render."
     >
       <Workspace
-        key={repo.cwd}
         repo={repo}
         onSwitchRepo={() => qc.setQueryData(keys.repo, null)}
         onOpenRepo={openRepo}

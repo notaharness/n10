@@ -44,10 +44,14 @@ Every rule below has its reasoning in `docs/decisions.md`.
   in both `build-main` and `scripts/dev.mjs`. Ownership rules: D15.
 - `main/n10-shim.ts` is an entry point in both `build-main` and
   `scripts/dev.mjs`. The shim gets no `beam` subcommand (D16).
-- The host holds one repo (`requireRepo`, memoized root, the
-  `@orchestra-repo` every tmux session it creates is tagged with). The tab
-  strip spans repos: activating a foreign tab opens its repo
-  (`useRepoFollowsTabs`); nothing renders another repo's content in place.
+- The host selects one repo (`requireRepo`, memoized root, the
+  `@orchestra-repo` every tmux session it creates is tagged with) and keeps
+  the others it has read parked. The tab strip spans repos: a foreign tab's
+  pane renders against its own repo (`EditorPane`, a `RepoProvider` over
+  `useRepoInfo` and that repo's sidebar rows), and activating it opens that
+  repo (`useRepoFollowsTabs`). `openRepoAsync` (`App.tsx`) switches
+  optimistically from the cached `repoInfo`, and `Workspace` is not keyed by
+  repo, so the pane stays mounted across the switch.
 - The reads a pane or the sidebar makes name the repository they read
   (`getSidebarModel(repo)`, sync state, branch lists, the review reads,
   sessions, branch sessions, agent options, worktree diffs; diff requests
@@ -178,8 +182,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   hover settled on (`lib/tabs/prewarm.tsx`, by hoverIntent's rule in
   `hover-intent.ts`; one at a time, superseded rather than queued, and
   dropped while a pane let go of is still reading,
-  `lib/tabs/orphaned-fetch.ts`), else the tab left last. Pressing the
-  spare's tab shows the same pane; anything that acts without an event on it
+  `lib/tabs/orphaned-fetch.ts`), else the tab left last, of any repo.
+  Pressing the spare's tab shows the same pane; anything that acts without an event on it
   asks `usePaneShown`. Tabs and sidebar rows are chosen on a plain primary
   press (`useSortableTab` composes it after the drag sensor's own
   `onPointerDown`). A mounted `SessionTerminal` watches its session

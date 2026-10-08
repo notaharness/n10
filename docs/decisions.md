@@ -373,13 +373,15 @@ change.
 
 ## Desktop repositories and tabs
 
-The host serves one repository at a time; the tab strip can contain several.
-Activating a foreign tab opens its repository through `useRepoFollowsTabs`.
+The host selects one repository and keeps the others it has read parked
+(see Parked repositories); the tab strip can contain tabs from several.
+Activating a foreign tab opens its repository through `useRepoFollowsTabs`, so
+the sidebar, status bar and writes follow the tab in front.
 Use canonical real paths for repository identity so symlinked paths cannot
 produce duplicate tabs or disagree with Git and tmux names.
 
-`TabsProvider` lives above the repository gate because `Workspace` remounts on
-switch. Keep one reconciliation step: `Workspace` sends `sync-items` to the pure
+`TabsProvider` lives above the repository gate because the gate unmounts
+`Workspace` when no repository is open. Keep one reconciliation step: `Workspace` sends `sync-items` to the pure
 `tabs-model.ts` reducer. It handles stale identities, previews, new agents,
 foreign sessions and terminals. Reconcile only the repo described by the update.
 Agent auto-open history is repo-qualified; closing a tab must not reopen it on
@@ -387,9 +389,10 @@ an unchanged poll. Store titles on tabs because foreign items may be unavailable
 
 The tab strip's `DndContext` (`TabDragProvider`) lives above the gate for the
 same reason. A tab is chosen on press, and choosing a foreign tab opens its
-repository, which remounts `Workspace`. Inside it, the remount dropped the
-pointer sensor watching the press, so a foreign tab could never be dragged.
-Above it, the sensor outlives the remount and lifts the remounted tab by id.
+repository, which remounts what keeps state about one repository (the sidebar,
+and the status bar and command palette under one key: siblings sharing a key
+are left behind on a switch). The pointer sensor watching the press must
+outlive the switch, and it lifts the tab by id.
 
 Wrapped, full rows share their width and the last row keeps its tabs' own: an
 end piece after the last tab grows far faster than the tabs, so only the last
@@ -434,6 +437,25 @@ the session's output, and nothing for sessions no window watches. Only a
 terminal on screen shows its session (`showSession`), which holds core's
 `showTerminal`, the same seen-signal the TUI's pane holds; a spare sees
 nothing. Tab switches never detach or kill sessions.
+
+Another repository's tab is held ready the same way. Its pane renders under a
+`RepoProvider` for that repository (`EditorPane`), against what the renderer
+holds for it: its `repoInfo` and sidebar rows, read from the host, which
+answers for a parked repository as the engine does, from what it holds, and
+refreshes behind it only once that is older than the parked TTL. The rows
+read is what applies the rule (`handle.prewarm()`), so a hover asks the host
+nothing of its own. Pressing the tab shows that pane while the repository
+opens: `openRepoAsync` sets the cached `repoInfo` before the host answers and
+reverts it if the open fails, and `Workspace` is not keyed by repository, so
+the pane on screen is the one held, not a new mount behind a notice. A
+repository the host cannot read (moved or deleted) shows `ForeignRepoPane`
+with a retry. The renderer keeps what a repository's panes and sidebar are
+drawn from for as long as the app is open (`RETAINED_KEYS`, `gcTime:
+Infinity`): a repository left hours ago is shown at once and refreshed behind.
+Diff text and worker results keep the default collection, since they are large
+and read again locally. Placeholders hold an answer only within its
+repository (`keepRepoAnswer`), so a pane never shows another repository's
+rows while its own load. A view with nothing held shows its loading state.
 
 A tab that mounts again opens where the user left it: the pane they picked,
 the diff's picked file and top line, and the walkthrough step. A pane they
@@ -623,7 +645,8 @@ commits when no Ctrl, Alt or Cmd is held any longer, or the window loses focus.
 The order and a walk in progress live at module level in
 `lib/tabs/tab-switching.ts`, and the hook is mounted in `App.tsx`'s gate, above
 the workspace: a walk onto another repository's tab switches repositories,
-which remounts the workspace, and the walk must carry on. A tab closed under
+which remounts the sidebar and the parts keyed by repository, and the walk
+must carry on. A tab closed under
 the walk keeps its place in the snapshot, so the next press goes to its live
 neighbour in the direction pressed rather than back to the front.
 
