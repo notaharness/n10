@@ -45,6 +45,9 @@ first, then the guide.
 ## How to write it
 
 - Plain, active, specific. Say what the code does now, not how it got there.
+- Read the summary, titles and ledes against the whole guide: make no
+  absolute claim ("nothing is lost", "everything stays") that a later
+  slide qualifies. Readers remember those lines best.
 - A title is the slide's point in a few words (≤ ${title} characters); the
   titles read in order should tell the story.
 - A lede is the one sentence the reader keeps (≤ ${lede} characters), like
