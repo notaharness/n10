@@ -58,20 +58,20 @@ export function fakeAgent(
     mouse?: 1000 | 1002 | 1003;
     /** Ask for modifyOtherKeys and print each input chunk as `key:`. */
     keys?: boolean;
+    /** Turn on bracketed paste and application cursor keys. */
+    modes?: boolean;
+    /** On the first input, print this many bytes in paced slices, then
+     *  `flood-done`. */
+    flood?: number;
   } = {}
 ): string {
   const flags = [`--banner=n10-fake-agent-ready`];
-  if (opts.stream) flags.push('--stream');
-  if (opts.tag) flags.push('--tag');
-  if (opts.echo) flags.push('--echo');
-  if (opts.printSeed) flags.push('--print-seed');
-  if (opts.printSize) flags.push('--print-size');
-  if (opts.mouse != null) flags.push(`--mouse=${opts.mouse}`);
-  if (opts.keys) flags.push('--keys');
-  if (opts.streamMs != null) flags.push(`--stream-ms=${opts.streamMs}`);
-  if (opts.intervalMs != null) flags.push(`--interval-ms=${opts.intervalMs}`);
-  if (opts.exitAfterMs != null)
-    flags.push(`--exit-after-ms=${opts.exitAfterMs}`);
+  // Each option is the agent's flag of the same name, in kebab case.
+  for (const [key, value] of Object.entries(opts)) {
+    const flag = `--${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+    if (value === true) flags.push(flag);
+    else if (typeof value === 'number') flags.push(`${flag}=${value}`);
+  }
   return ['node', FAKE_AGENT, ...flags].join(' ');
 }
 

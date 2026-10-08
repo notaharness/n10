@@ -50,7 +50,9 @@ build target pins production). Full notes: `docs/testing.md`.
   tells one agent's report from the next when tmux repaints the screen.
 - Terminals run xterm's DOM renderer here (`--disable-gpu`, so no WebGL), so
   their rows are text to assert on. The element xterm opens in carries
-  `data-terminal-grid` and `data-terminal-renderer` (`setup/terminal-grid.ts`).
+  `data-terminal-grid` and `data-terminal-renderer` (`setup/terminal-grid.ts`),
+  and the screen and cursor-key mode (`data-terminal-buffer`,
+  `data-terminal-cursor-keys`).
   The `webgl` option gives the window SwiftShader WebGL
   (`terminal-webgl.test.ts`). xterm's textarea is zero-sized and off screen:
   `focusTerminal` focuses it by class.
