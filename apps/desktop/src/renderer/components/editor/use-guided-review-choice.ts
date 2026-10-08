@@ -18,7 +18,9 @@ export function useGuidedReviewChoice(): [boolean, (guide: boolean) => void] {
   const choose = (next: boolean) => {
     setGuide(next);
     updateDesktopPrefs({ guidedReview: next }).catch((e: unknown) => {
-      toast.error(`Could not remember the choice: ${errorMessage(e)}`);
+      toast.error(
+        `Could not remember the Guided review choice: ${errorMessage(e)}`
+      );
     });
   };
   return [guide, choose];

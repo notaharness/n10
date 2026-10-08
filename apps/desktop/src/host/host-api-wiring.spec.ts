@@ -310,7 +310,11 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ['getGuidedReview', ['/repo', 7], 'drafts.getGuidedReview'],
 
   ['launchAgent', [{ branch: 'b' }], 'sessions.launchAgent'],
-  ['launchReviewAgent', [{ pr: {} }], 'sessions.launchReviewAgent'],
+  [
+    'launchReviewAgent',
+    [{ pr: {}, guide: true }],
+    'sessions.launchReviewAgent',
+  ],
   ['listAgentOptions', ['/repo'], 'sessions.listAgentOptions'],
   ['getSessionLaunchContext', ['feature'], 'sessions.getSessionLaunchContext'],
   [

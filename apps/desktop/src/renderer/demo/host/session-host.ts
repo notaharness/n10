@@ -151,7 +151,7 @@ export function createSessionHost(
       start(
         req,
         req.pr.sourceBranch,
-        PROGRAMS.reviewer(req.pr, state.repo(), req.guide === true)
+        PROGRAMS.reviewer(req.pr, state.repo(), req.guide)
       ),
     listAgentOptions: () => later(AGENTS),
     getSessionLaunchContext: (branch) => {

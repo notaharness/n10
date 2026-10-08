@@ -34,8 +34,9 @@ export interface ReviewLaunchRequest {
   /** Extra user instruction appended to the review task prompt. */
   instruction?: string;
   /** Ask the reviewer for a guided review too (`buildReviewLaunchRequest`'s
-   *  `guide`); left out, its prompt says nothing of one. */
-  guide?: boolean;
+   *  `guide`); false, its prompt says nothing of one. Required: the
+   *  launch dialog decides, never a default in the host. */
+  guide: boolean;
   cols?: number;
   rows?: number;
   /** A beam peerId to launch on, or omitted for local (decisions.md
