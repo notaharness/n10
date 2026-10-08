@@ -94,6 +94,9 @@ export interface HomeSeed {
    * `n10 util add-comment` would have left them.
    */
   drafts?: Record<number, unknown[]>;
+  /** Guided reviews, keyed by pull request id, as `n10 util add-guide`
+   *  would have stored them. */
+  guides?: Record<number, unknown>;
   /**
    * Serve the app a pull request (and its review threads) from a fake
    * `gh` on PATH, with the matching project config written for it.
@@ -156,6 +159,7 @@ export function seedHome(
 
   seedProjectConfig(n10, repoPath, opts);
   seedDrafts(n10, repoPath, opts.drafts);
+  seedGuides(n10, repoPath, opts.guides);
 
   if (opts.tmuxConf !== undefined) {
     writeFileSync(join(homeDir, '.tmux.conf'), opts.tmuxConf, 'utf8');
@@ -221,6 +225,22 @@ function seedDrafts(
     writeFileSync(
       join(dir, 'comments.json'),
       JSON.stringify({ prId: Number(prId), comments }, null, 2),
+      'utf8'
+    );
+  }
+}
+
+function seedGuides(
+  n10: string,
+  repoPath: string,
+  guides: Record<number, unknown> | undefined
+): void {
+  for (const [prId, guide] of Object.entries(guides ?? {})) {
+    const dir = agentDraftDirectory(dirname(n10), repoPath, Number(prId));
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'guide.json'),
+      JSON.stringify(guide, null, 2),
       'utf8'
     );
   }
