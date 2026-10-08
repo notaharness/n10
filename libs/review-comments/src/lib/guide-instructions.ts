@@ -1,6 +1,7 @@
 import { GUIDE_LIMITS } from './guide.js';
 
-const { minSlides, maxSlides, title, lede, summary, body } = GUIDE_LIMITS;
+const { minSlides, maxSlides, title, lede, summary, body, files } =
+  GUIDE_LIMITS;
 
 /**
  * What `n10 util guide-help` prints: everything an agent needs to
@@ -35,18 +36,19 @@ guide explains the change, the comments judge it.
    that went and came.
 6. Finish with what to look at closely: the risky parts, where your draft
    comments are (if you left any), and what was not checked. If that does
-   not fit one slide, give it two.
+   not fit one slide, give it two, each titled by its own point.
 
 ## How to write it
 
 - Plain, active, specific. Say what the code does now, not how it got there.
 - A slide's lede is the one sentence the reader keeps (≤ ${lede} characters).
+  Write it like a post in a thread: the point, not the evidence.
 - A body is a few short lines or a short list (≤ ${body} characters of
   prose; fenced code does not count). Inline \`code\` for identifiers.
 - Titles are short (≤ ${title} characters). The summary says why the pull
   request exists (≤ ${summary} characters).
-- Name the files a slide is about in "files", so the reader can open them.
-  A path may appear more than once, with different lines.
+- Name the files a slide is about in "files" (at most ${files}), so the reader
+  can open them. A path may appear more than once, with different lines.
 
 ## Format
 
@@ -82,9 +84,9 @@ Detail that does not fit belongs in a draft comment, or nowhere.
   ]
 }
 
-Each slide has a "title" and any of: "lede", "body" (markdown), "files"
+Each slide has a "title" and any of: "lede" (most slides want one), "body" (markdown), "files"
 ([{ "path", "lineStart"?, "lineEnd"? }], paths relative to the repository
-root, lines in the commit you reviewed), and one picture: "visual", or
+root, lines in the pull request's head commit), and one picture: "visual", or
 "before" and "after" together. A body and a picture go side by side. A visual is { "mermaid": "<diagram>" } or
 { "code": "<lines>", "language": "<name>" }, each with an optional
 "caption".
@@ -95,7 +97,8 @@ Mermaid diagrams, themed by n10: write no colours, style, classDef or
 %%{init}%% lines. Edge kinds (-->, -.->, ==>) and subgraphs are fine. Keep
 one to about a dozen nodes.
 
-- flowchart LR or TD for structure and data flow
+- flowchart LR or TD for structure and data flow; "before" and "after"
+  sit side by side, so draw them TD
 - sequenceDiagram for who calls whom, in order
 - stateDiagram-v2 for states and transitions
 - Quote labels with punctuation: A["save()"]; HTML in labels is not shown.

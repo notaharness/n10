@@ -70,7 +70,7 @@ describe('validateGuide', () => {
     const lede = 'x'.repeat(GUIDE_LIMITS.lede + 20);
     expect(
       issues(guide({ slides: [{ title: 'A', lede }, slide('B')] }))
-    ).toEqual(['slides[0].lede: 300 characters, cut it to 280 or fewer']);
+    ).toEqual(['slides[0].lede: 180 characters, cut it to 160 or fewer']);
   });
 
   it('counts prose, not fenced code, against the body', () => {
@@ -83,7 +83,7 @@ describe('validateGuide', () => {
     expect(
       issues(guide({ slides: [{ title: 'A', body: long }, slide('B')] }))
     ).toEqual([
-      'slides[0].body: 749 characters of prose, cut it to 600 or fewer, or split the slide',
+      'slides[0].body: 749 characters of prose, cut it to 400 or fewer, or split the slide',
     ]);
   });
 
@@ -94,6 +94,13 @@ describe('validateGuide', () => {
     ).toEqual([
       'slides[0].body: move the diagram to "visual", or "before" and "after"',
     ]);
+  });
+
+  it('asks for the files that matter most past the cap', () => {
+    const files = ['a', 'b', 'c', 'd', 'e'].map((path) => ({ path }));
+    expect(
+      issues(guide({ slides: [{ title: 'A', files }, slide('B')] }))
+    ).toEqual(['slides[0].files: 5 files, name the 4 that matter most']);
   });
 
   it('wants before and after together, and not beside a visual', () => {

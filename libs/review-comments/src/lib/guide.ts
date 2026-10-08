@@ -54,11 +54,13 @@ export const GUIDE_LIMITS = {
   minSlides: 2,
   maxSlides: 8,
   title: 80,
-  /** A tweet. */
-  lede: 280,
-  summary: 280,
+  /** One sentence. */
+  lede: 160,
+  summary: 200,
   /** Prose only: fenced code in the body is not counted. */
-  body: 600,
+  body: 400,
+  /** Files named per slide: the ones that matter most. */
+  files: 4,
 } as const;
 
 type Issues = string[];
@@ -127,6 +129,10 @@ function files(
     issues.push(`${at}: write it as a list of { "path": … }`);
     return undefined;
   }
+  if (value.length > GUIDE_LIMITS.files)
+    issues.push(
+      `${at}: ${value.length} files, name the ${GUIDE_LIMITS.files} that matter most`
+    );
   return value.flatMap((file, i): GuideFile[] => {
     const where = `${at}[${i}]`;
     if (!isRecord(file) || typeof file.path !== 'string' || !file.path) {
