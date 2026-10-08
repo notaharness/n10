@@ -1,5 +1,6 @@
 import type { PullRequestInfo } from '@n10/vcs-core';
 import { REVIEW_DRAFTS } from '../../data/drafts.js';
+import { REVIEW_GUIDE } from '../../data/guide.js';
 import { displayDir } from '../../data/identity.js';
 import { N10, PR_REVIEW } from '../../data/n10.js';
 import type { RepoState } from '../../host/state.js';
@@ -9,7 +10,8 @@ import type { Beat, ClaudeScript } from './claude-code.js';
  * The review agent n10 starts on a pull request. Its first turn is
  * core's review prompt (`buildReviewLaunchRequest`); it records each
  * finding with `n10 util add-comment`, which is what makes the drafts
- * appear in the diff viewer one by one while it works.
+ * appear in the diff viewer one by one while it works, then stores its
+ * guided review with `n10 util add-guide`.
  */
 const IDS = [
   '3f6b1c2e-8d4a-4f0e-9a51-7c2d9e6b4a10',
@@ -41,13 +43,37 @@ function addComment(repo: RepoState, pr: PullRequestInfo, i: number): Beat {
   };
 }
 
-/** Core's review prompt, as the agent's first turn shows it. */
+function addGuide(repo: RepoState, pr: PullRequestInfo): Beat {
+  return {
+    after: 3200,
+    effect: () => {
+      repo.guides[pr.id] = {
+        ...REVIEW_GUIDE,
+        prId: pr.id,
+        createdAt: new Date().toISOString(),
+      };
+    },
+    blocks: [
+      {
+        kind: 'tool',
+        name: 'Bash',
+        arg: `n10 util add-guide --pr=${pr.id} --file=/tmp/guide-${pr.id}.json`,
+        out: [
+          `Stored the guide for #${pr.id}: ${REVIEW_GUIDE.slides.length} slides.`,
+        ],
+      },
+    ],
+  };
+}
+
+/** Core's desktop review prompt, as the agent's first turn shows it. */
 function reviewPrompt(pr: PullRequestInfo) {
   return {
     kind: 'prompt' as const,
     text:
       `Review PR #${pr.id} ("${pr.title}") merging ${pr.sourceBranch} → ${pr.targetBranch} by ${pr.createdByDisplayName}.\n\n` +
-      'Review all changed files thoroughly. Add comments for any issues found.',
+      'Review all changed files thoroughly. Add comments for any issues found.' +
+      ' Then write a guided review of the pull request.',
   };
 }
 
@@ -108,6 +134,7 @@ export function reviewScript(
       },
       { after: 2600, blocks: [{ kind: 'read', files: 8 }] },
       ...REVIEW_DRAFTS.map((_, i) => addComment(repo, pr, i)),
+      addGuide(repo, pr),
       {
         after: 2400,
         working: null,
@@ -115,7 +142,7 @@ export function reviewScript(
           {
             kind: 'say',
             paragraphs: [
-              'The feature does what it says: the count is a real button, and a click that lands before the threads load is held and replayed. I left four drafts, none blocking:',
+              'The feature does what it says: the count is a real button, and a click that lands before the threads load is held and replayed. I left four drafts, none blocking, and a guided review that walks through the change:',
               '1. `firstUnresolvedThread` relies on the rail being sorted by file and line.',
               '2. A single animation frame can be too early to find the row after unhiding the rail.',
               '3. A failed refetch drops the click silently.',
