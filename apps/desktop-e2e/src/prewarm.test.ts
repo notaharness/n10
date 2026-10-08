@@ -77,8 +77,9 @@ async function restOn(
 function spareText(page: Page): Promise<string | null> {
   return page.evaluate(
     () =>
-      document.querySelector<HTMLElement>('[data-spare-pane] .wterm')
-        ?.textContent ?? null
+      document.querySelector<HTMLElement>(
+        '[data-spare-pane] [data-terminal-grid]'
+      )?.textContent ?? null
   );
 }
 
@@ -104,14 +105,16 @@ test.describe('A pane held ready', () => {
     await expect.poll(() => spareText(page)).toContain('@alpha');
     await page.evaluate(() => {
       const el = document.querySelector<HTMLElement>(
-        '[data-spare-pane] .wterm'
+        '[data-spare-pane] [data-terminal-grid]'
       );
       if (el) el.dataset.heldReady = 'yes';
     });
 
     await page.mouse.down();
     await expect(tab(page, /alpha/)).toHaveAttribute('aria-selected', 'true');
-    const shown = page.locator('.wterm').filter({ visible: true });
+    const shown = page
+      .locator('[data-terminal-grid]')
+      .filter({ visible: true });
     await expect(shown).toHaveCount(1);
     await expect(shown).toHaveAttribute('data-held-ready', 'yes');
     await page.mouse.up();
@@ -137,7 +140,7 @@ test.describe('A pane held ready', () => {
       const count = () =>
         w.held.push(
           document.querySelectorAll('[data-spare-pane]').length,
-          document.querySelectorAll('.wterm').length - 1
+          document.querySelectorAll('[data-terminal-grid]').length - 1
         );
       new MutationObserver(count).observe(document.body, {
         childList: true,
@@ -163,7 +166,7 @@ test.describe('A pane held ready', () => {
     await page.mouse.down();
     await expect(
       page
-        .locator('.wterm')
+        .locator('[data-terminal-grid]')
         .filter({ visible: true })
         .getByText('@alpha')
         .first()

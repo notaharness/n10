@@ -292,31 +292,24 @@
   }
 }
 
-/* ── Terminal (wterm) ──────────────────────────────────────────────
- * Flatten the library's "widget" look (radius, shadow, padding) so the
- * terminal fills its pane edge-to-edge and follows the app theme.
+/* ── Terminal (xterm.js) ───────────────────────────────────────────
+ * The grid takes the whole pane, as `FitAddon` fits it; the pane paints
+ * the app's terminal background under what is left over. The renderers
+ * draw with the palette in lib/terminals/xterm.ts. A screen drawn for
+ * the old grid can be wider than the pane until the next fit; clipped,
+ * it cannot bring in scrollbars that the fit would measure.
  */
-.wterm {
-  --term-bg: var(--term-bg-app);
-  --term-font-family: var(--font-mono);
-  --term-font-size: 13px;
-  --term-row-height: 18px;
-  border-radius: 0;
-  box-shadow: none;
-  padding: 8px 12px;
-  height: 100%;
-  width: 100%;
+.terminal-pane,
+.terminal-pane > * {
+  overflow: hidden;
 }
-.wterm.theme-light {
-  --term-bg: var(--term-bg-app);
+.terminal-pane {
+  background: var(--term-bg-app);
 }
-
-/* The app takes the mouse (terminal-mouse.ts): a click is its, not a
- * selection, so the arrow rather than the I-beam. A link held with its
- * modifier keeps wterm's pointer, a more specific rule. */
-.mouse-reporting .wterm,
-.mouse-reporting .wterm * {
-  cursor: default;
+/* xterm.css paints the viewport black; the theme's background covers
+   only the rows. */
+.terminal-pane .xterm .xterm-viewport {
+  background-color: transparent;
 }
 
 /* ── Fleet first-run illustration ──────────────────────────────────

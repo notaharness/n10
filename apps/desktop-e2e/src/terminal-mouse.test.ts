@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
+import { SHOWN_TERMINAL } from './setup/terminal-grid.js';
 import { killN10Sessions } from './setup/tmux.js';
 import {
   createWorktree,
@@ -30,36 +31,53 @@ async function launch(page: Page, branch: string, mode: number) {
   });
 }
 
+/**
+ * The row of the terminal on screen holding `text`, read in one go:
+ * xterm's DOM renderer replaces a row's element whenever it redraws the
+ * row, so an element found first and read after can be gone by then.
+ * `cell` is the width of the cells xterm draws: its screen over its grid.
+ */
+function rowWith(page: Page, text: string) {
+  return page.evaluate(
+    ({ selector, text }) => {
+      const host = document.querySelector<HTMLElement>(selector);
+      const screen = host?.querySelector('.xterm-screen');
+      // No `dom.iterable` here: a NodeList is read as an array-like.
+      const rows = host
+        ? Array.from(host.querySelectorAll('.xterm-rows > div'))
+        : [];
+      const row = rows.find((r) => r.textContent?.includes(text));
+      if (!host || !screen || !row) throw new Error(`no row holds "${text}"`);
+      const cols = Number(host.dataset.terminalGrid?.split('x')[0]);
+      const box = screen.getBoundingClientRect();
+      const line = row.getBoundingClientRect();
+      return {
+        left: box.left,
+        cell: box.width / cols,
+        middle: line.top + line.height / 2,
+        cursor: getComputedStyle(row).cursor,
+      };
+    },
+    { selector: SHOWN_TERMINAL, text }
+  );
+}
+
 /** Centre of the cell `dx` columns right of the start of the row
- *  holding `text`, measured with wterm's own probe: one `W`. */
+ *  holding `text`. */
 async function pointAt(page: Page, text: string, dx = 0) {
-  const row = visibleText(page, text);
-  const box = await row.boundingBox();
-  if (!box) throw new Error(`"${text}" has no box`);
-  const charWidth = await row.evaluate((el) => {
-    const probe = document.createElement('span');
-    probe.textContent = 'W';
-    el.appendChild(probe);
-    const width = probe.getBoundingClientRect().width;
-    probe.remove();
-    return width;
-  });
-  return {
-    x: box.x + charWidth * (dx + 0.5),
-    y: box.y + box.height / 2,
-  };
+  const row = await rowWith(page, text);
+  return { x: row.left + row.cell * (dx + 0.5), y: row.middle };
 }
 
 /** The pointer shape over the text. */
-function cursorOver(page: Page, text: string): Promise<string> {
-  return visibleText(page, text).evaluate((el) => getComputedStyle(el).cursor);
+async function cursorOver(page: Page, text: string): Promise<string> {
+  return (await rowWith(page, text)).cursor;
 }
 
 /** Every mouse report the agent has printed, in order. */
 async function reports(page: Page): Promise<string[]> {
   const rows = await page
-    .locator('.wterm .term-row')
-    .filter({ visible: true })
+    .locator(`${SHOWN_TERMINAL} .xterm-rows > div`)
     .allTextContents();
   return rows.flatMap((r) => r.match(/mouse:\d+;\d+;\d+[Mm]/g) ?? []);
 }
@@ -166,7 +184,7 @@ test.describe('Terminal mouse reporting', () => {
       await createWorktree(page, 'select');
       await launchAgentFromRail(page);
       await expect(visibleText(page, BANNER)).toBeVisible({ timeout: 30_000 });
-      expect(await cursorOver(page, BANNER)).toBe('auto');
+      expect(await cursorOver(page, BANNER)).toBe('text');
     });
   });
 });

@@ -106,7 +106,7 @@ test.describe('Terminal tabs under tmux', () => {
     const tabs = terminalTabs(page);
     await expect(tabs).toHaveCount(1);
     await expect(
-      page.locator('[data-terminal-pane]').getByText(/\S/).first()
+      page.locator('[data-terminal-pane] .xterm-rows').getByText(/\S/).first()
     ).toBeVisible({ timeout: 15_000 });
     await expect
       .poll(() => terminalSessions(homeDir), { timeout: 15_000 })

@@ -69,7 +69,7 @@ async function openTerminals(page: Page): Promise<void> {
     await page.waitForFunction(
       (b) =>
         Array.from(
-          document.querySelectorAll('[data-editor-panes] .wterm .term-row')
+          document.querySelectorAll('[data-editor-panes] .xterm-rows > div')
         ).some((row) => row.textContent?.includes(`@${b}`)),
       branch,
       { timeout: 60_000 }

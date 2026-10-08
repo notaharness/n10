@@ -169,9 +169,9 @@ test.describe('Pasting an image', () => {
 
   /**
    * A PTY carries text, so an image on the clipboard has to become a
-   * file the agent can open. wterm's own paste handler reads only
-   * `getData('text')` and silently drops everything else, which is what
-   * made pasting a screenshot look like a no-op.
+   * file the agent can open; a terminal's own paste handling reads
+   * only the text and drops everything else, which makes pasting a
+   * screenshot look like a no-op.
    *
    * Playwright cannot put an image on the real system clipboard, so the
    * paste event is synthesised — that still exercises the whole path
@@ -182,7 +182,7 @@ test.describe('Pasting an image', () => {
   async function pasteImage(page: Page, type = 'image/png') {
     await focusTerminal(page);
     await page.evaluate((mimeType) => {
-      const target = document.querySelector('textarea') ?? document.body;
+      const target = document.activeElement ?? document.body;
       const data = new DataTransfer();
       // A one-pixel PNG's worth of bytes — the host stores whatever it
       // is handed, so the content only has to be non-empty.
@@ -221,15 +221,13 @@ test.describe('Pasting an image', () => {
     }).toPass({ timeout: 30_000 });
   });
 
-  test('leaves an ordinary text paste to the terminal', async ({ desktop }) => {
-    const { page } = desktop;
-    await launch(page, 'pasting-text');
-
+  /** Paste `text` into the terminal on screen, as the clipboard would. */
+  async function pasteText(page: Page, text: string) {
     await focusTerminal(page);
-    await page.evaluate(() => {
-      const target = document.querySelector('textarea') ?? document.body;
+    await page.evaluate((t) => {
+      const target = document.activeElement ?? document.body;
       const data = new DataTransfer();
-      data.setData('text/plain', 'plain-text-paste');
+      data.setData('text/plain', t);
       target.dispatchEvent(
         new ClipboardEvent('paste', {
           clipboardData: data,
@@ -237,12 +235,34 @@ test.describe('Pasting an image', () => {
           cancelable: true,
         })
       );
-    });
+    }, text);
+  }
+
+  test('pastes ordinary text into the terminal', async ({ desktop }) => {
+    const { page } = desktop;
+    await launch(page, 'pasting-text');
+
+    await pasteText(page, 'plain-text-paste');
     // Same race as the image case: the pasted text reaches the PTY over
     // IPC, so a single Enter can beat it there.
     await expect(async () => {
       await page.keyboard.press('Enter');
       await expect(visibleText(page, /echo:plain-text-paste/)).toBeVisible({
+        timeout: 2_000,
+      });
+    }).toPass({ timeout: 30_000 });
+  });
+
+  test('pastes text without its escape bytes', async ({ desktop }) => {
+    const { page } = desktop;
+    await launch(page, 'pasting-escape');
+
+    // An ESC would let a clipboard end a bracketed paste early and
+    // type the rest as commands; without it the sequence is text.
+    await pasteText(page, 'before\x1b[201~after');
+    await expect(async () => {
+      await page.keyboard.press('Enter');
+      await expect(visibleText(page, 'echo:before[201~after')).toBeVisible({
         timeout: 2_000,
       });
     }).toPass({ timeout: 30_000 });
@@ -294,7 +314,7 @@ test.describe('Terminal fit', () => {
 
   // Resumed from the exited agent's bar, the terminal stays mounted
   // and nothing about it changes size, so a fit that only speaks up
-  // when wterm's own grid moved has nothing to say, and the new PTY
+  // when the terminal's own grid moved has nothing to say, and the new PTY
   // keeps whatever the launch request guessed.
   test.describe('restarted in place', () => {
     test.use({

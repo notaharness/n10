@@ -6,10 +6,11 @@ import { expect, type Page } from '@playwright/test';
  * can actually show.
  */
 
-/** The terminal on screen: not the one in the pane the editor holds
- *  ready for a switch, which is rendered too, hidden. */
+/** The element the terminal on screen opened in: not the one in the
+ *  pane the editor holds ready for a switch, which is rendered too,
+ *  hidden. It carries the grid xterm draws (`data-terminal-grid`). */
 export const SHOWN_TERMINAL =
-  '[data-editor-panes] > :not([data-spare-pane]) .wterm';
+  '[data-editor-panes] > :not([data-spare-pane]) [data-terminal-grid]';
 
 export interface Grid {
   cols: number;
@@ -18,6 +19,33 @@ export interface Grid {
 export interface Report extends Grid {
   /** Which agent said so. */
   pid: string;
+}
+
+/**
+ * Scroll the terminal on screen to the top of its scrollback. xterm
+ * puts only the rows in view in the page, so text that scrolled off the
+ * top is not there to find until then.
+ *
+ * xterm moves a few lines per wheel event whatever its delta, so this
+ * turns the wheel until the rows drawn stop changing.
+ */
+export async function scrollTerminalToTop(page: Page): Promise<void> {
+  const rows = page.locator(`${SHOWN_TERMINAL} .xterm-rows`);
+  await page.locator(SHOWN_TERMINAL).hover();
+  let drawn = await rows.innerText();
+  for (let i = 0; i < 500; i++) {
+    await page.mouse.wheel(0, -500);
+    // The rows are drawn on the next frame.
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve))
+        )
+    );
+    const now = await rows.innerText();
+    if (now === drawn) return;
+    drawn = now;
+  }
 }
 
 /** Every grid an agent has reported, oldest first. */
@@ -42,65 +70,30 @@ export async function currentPid(page: Page): Promise<string> {
 
 /**
  * The grid that fills the terminal on screen, measured off its own
- * box and cell metrics — so this says nothing about how the app
- * computes a grid, only how much of the pane the agent covers.
+ * box and the cells its renderer draws — so this says nothing about how
+ * the app computes a grid, only how much of the pane the agent covers.
  *
- * Reckoned the way wterm lays out its own grid: its observer's
- * `contentRect` (fractional, inside borders, scrollbar and padding)
- * over the width of one glyph. Any other reckoning can land a column
- * away from wterm's, and its observer then resizes the PTY back to its
- * own answer.
+ * Reckoned as `FitAddon` fits: the box xterm opened in, in whole
+ * pixels, less the scrollbar xterm reserves, over the size of one
+ * cell. A cell is the drawn screen over the grid
+ * it was drawn for, read off the renderer's own output rather than the
+ * font, which WebGL rounds to device pixels and the DOM does not.
  */
 export async function paneGrid(page: Page): Promise<Grid> {
-  return (await gridReckonings(page)).contentRect;
-}
-
-/**
- * The terminal's grid by wterm's reckoning, and by one that reads the
- * box from `clientWidth`/`clientHeight`, which round to whole pixels.
- * They differ when a column (or row) boundary falls within that
- * rounding — the pane widths where an app reckoning the second way
- * and wterm resize the PTY back and forth.
- */
-export async function gridReckonings(
-  page: Page
-): Promise<{ contentRect: Grid; clientBox: Grid }> {
   return page.evaluate((shown) => {
-    const el = document.querySelector<HTMLElement>(shown);
-    const row = el?.querySelector<HTMLElement>('.term-row');
-    if (!el || !row) throw new Error('no terminal on screen');
-    const cs = getComputedStyle(el);
-    const px = (v: string) => parseFloat(v) || 0;
-    const probe = document.createElement('div');
-    probe.className = 'term-row';
-    probe.style.position = 'absolute';
-    probe.style.visibility = 'hidden';
-    const span = document.createElement('span');
-    span.textContent = 'W';
-    probe.appendChild(span);
-    el.appendChild(probe);
-    const charWidth = span.getBoundingClientRect().width;
-    const rowHeight = probe.getBoundingClientRect().height;
-    probe.remove();
-    const padX = px(cs.paddingLeft) + px(cs.paddingRight);
-    const padY = px(cs.paddingTop) + px(cs.paddingBottom);
-    const bordersX = px(cs.borderLeftWidth) + px(cs.borderRightWidth);
-    const bordersY = px(cs.borderTopWidth) + px(cs.borderBottomWidth);
-    const rect = el.getBoundingClientRect();
-    const grid = (width: number, height: number) => ({
-      cols: Math.floor((width - padX) / charWidth),
-      rows: Math.floor((height - padY) / rowHeight),
-    });
+    const host = document.querySelector<HTMLElement>(shown);
+    const screen = host?.querySelector<HTMLElement>('.xterm-screen');
+    if (!host || !screen) throw new Error('no terminal on screen');
+    const [cols, rows] = host.dataset.terminalGrid!.split('x').map(Number);
+    const drawn = screen.getBoundingClientRect();
+    const box = getComputedStyle(host);
+    // xterm's default scrollbar width, which FitAddon keeps clear.
+    const scrollbar = 14;
+    const width = parseInt(box.width, 10) - scrollbar;
+    const height = parseInt(box.height, 10);
     return {
-      contentRect: grid(
-        rect.width -
-          bordersX -
-          Math.round(el.offsetWidth - el.clientWidth - bordersX),
-        rect.height -
-          bordersY -
-          Math.round(el.offsetHeight - el.clientHeight - bordersY)
-      ),
-      clientBox: grid(el.clientWidth, el.clientHeight),
+      cols: Math.floor(width / (drawn.width / cols)),
+      rows: Math.floor(height / (drawn.height / rows)),
     };
   }, SHOWN_TERMINAL);
 }

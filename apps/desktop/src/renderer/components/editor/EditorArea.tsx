@@ -125,7 +125,7 @@ function Pane({
  * Tab strip + the active tab's pane, and at most one spare.
  *
  * A pane is expensive to keep — a diff can hold tens of thousands of
- * nodes and a terminal a wterm instance fed by its session's output —
+ * nodes and a terminal an xterm instance fed by its session's output —
  * so the editor keeps two at most: the one on screen and one spare,
  * rendered off screen. The spare is the tab the pointer rests on
  * (`usePrewarm`, from a tab or a sidebar row), or else the one on

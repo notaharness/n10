@@ -47,6 +47,11 @@
 //                        and print each mouse report it receives as
 //                        `mouse:<code>;<col>;<row><M|m>`, so a test can see
 //                        which pointer events the terminal forwarded.
+//   --keys               ask for modifyOtherKeys (`CSI >4;2m`), as Claude
+//                        Code does, so tmux passes modified keys on, and
+//                        print each chunk of input as `key:<bytes>`, with
+//                        ESC as `ESC` and CR as `CR`, so a test can see the
+//                        exact sequence a key sent.
 
 const args = Object.fromEntries(
   process.argv
@@ -122,6 +127,20 @@ if (args.mouse) {
     // Keep only a report still arriving in pieces.
     // eslint-disable-next-line no-control-regex -- mouse reports are escape sequences
     pending = pending.match(/\x1b(\[(<[\d;]*)?)?$/)?.[0] ?? '';
+  });
+  process.stdin.resume();
+}
+
+if (args.keys) {
+  if (process.stdin.isTTY) process.stdin.setRawMode(true);
+  process.stdout.write('\x1b[>4;2m');
+  process.stdout.write('keys-ready\r\n');
+  process.stdin.on('data', (chunk) => {
+    const shown = chunk
+      .toString()
+      .replaceAll('\x1b', 'ESC')
+      .replaceAll('\r', 'CR');
+    process.stdout.write(`key:${shown}\r\n`);
   });
   process.stdin.resume();
 }
