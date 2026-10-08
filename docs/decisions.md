@@ -991,8 +991,9 @@ prose, a picture beside it (a mermaid diagram or a few lines of code), or a
 before and an after. `add-guide` validates it and stores nothing on a
 failure, naming what to cut: 2 to 8 slides, a one-sentence lede (160
 characters), a 200-character summary, 400 characters of body prose (fenced
-code does not count), at most four files per slide, and diagrams in the
-visual fields, not in the body. Agents given looser limits wrote accurate but
+code does not count), at most four files per slide with their lines in
+order, one picture per visual with a 120-character caption, and diagrams in
+the visual fields, not in the body. Agents given looser limits wrote accurate but
 dense slides that read as a document, not a thread. The reader opens on a cover
 n10 draws from the title, summary and slide titles, so the titles are the
 outline. `add-guide` records the commit checked out where the agent ran;
@@ -1020,10 +1021,11 @@ option). The TUI cannot show slides, so its reviewer does not spend time on
 one.
 
 Diagrams are agent output, so mermaid draws them at its `strict` security
-level with HTML labels off, and its `secure` list stops a diagram's
-`%%{init}%%` from changing the theme, fonts or security level. The theme
-comes from the design tokens. A diagram mermaid cannot parse shows its
-source. Mermaid loads on the first diagram; nothing else in the renderer
+level with HTML labels off. n10 adds the theme, fonts and HTML labels to
+mermaid's own `secure` keys (the security level and the edge cap among
+them), so a diagram's `%%{init}%%` changes none of them. The theme comes
+from the design tokens. A diagram mermaid cannot parse shows its source;
+mermaid's own error drawing is suppressed, so none is left in the page. Mermaid loads on the first diagram; nothing else in the renderer
 needs it. The desktop pins the website's version, so the workspace holds one
 copy.
 
