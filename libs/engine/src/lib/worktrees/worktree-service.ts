@@ -139,7 +139,11 @@ export function createWorktreeService(options: {
       if (freshness.parked() && fetchedAt !== null) {
         // `refresh` settles every pass itself and never rejects.
         if (!active && !parkedWarm(freshness, fetchedAt, 1_000)) void refresh();
-        return Promise.resolve(snapshot);
+        // A failed refresh does not fail a read that holds data: it is
+        // answered with the data, and the error stays for observers.
+        return Promise.resolve(
+          snapshot.error ? { ...snapshot, error: null } : snapshot
+        );
       }
       if (active) return active;
       return fetchedAt !== null && Date.now() - fetchedAt < 1_000

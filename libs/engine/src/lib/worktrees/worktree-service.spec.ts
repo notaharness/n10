@@ -147,6 +147,25 @@ describe('worktree resources', () => {
     await flush();
     expect(service.getSnapshot().worktrees).toHaveLength(2);
   });
+  it('answers a parked read with what it holds after a failed refresh', async () => {
+    let parked = false;
+    const { service } = harness('/repo', {
+      parked: () => parked,
+      parkedTtl: 3_600_000,
+    });
+    await service.read();
+    ports.list.mockRejectedValueOnce(new Error('Git unavailable'));
+    await service.refresh();
+    parked = true;
+    // Warm: answered from what it holds, the error left for observers.
+    expect(await service.read()).toMatchObject({
+      worktrees: [row],
+      allBranches: ['main', 'topic', 'remote-topic'],
+      error: null,
+    });
+    expect(service.getSnapshot().error).toMatch(/Git unavailable/);
+    expect(ports.list).toHaveBeenCalledTimes(2);
+  });
   it('coalesces explicit refreshes into one follow-up, without queuing ordinary readers', async () => {
     const a = deferred<WorktreeInfo[]>(),
       b = deferred<WorktreeInfo[]>();
