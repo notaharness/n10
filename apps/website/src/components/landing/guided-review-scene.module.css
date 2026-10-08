@@ -1,0 +1,77 @@
+/* Three six-second holds. Each slide and its dot share a phase; the
+ * small lift and fade use the same distance as the Conversations scene. */
+.slide,
+.dot {
+  animation: show 18s linear infinite;
+  animation-delay: var(--guide-delay);
+}
+
+.slide {
+  animation-name: slide;
+}
+
+.trace {
+  stroke-dasharray: 1;
+  animation: draw 18s ease-out infinite;
+  animation-delay: var(--guide-delay);
+}
+
+@keyframes show {
+  0%,
+  30%,
+  100% {
+    opacity: 1;
+  }
+  32%,
+  98% {
+    opacity: 0;
+  }
+}
+
+@keyframes slide {
+  0%,
+  30%,
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  32% {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  98% {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+}
+
+@keyframes draw {
+  0%,
+  98%,
+  100% {
+    stroke-dashoffset: 1;
+  }
+  7%,
+  32% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* A complete diagram, with its matching dot, even before hydration. */
+@media (prefers-reduced-motion: reduce) {
+  .slide,
+  .dot,
+  .trace {
+    animation: none;
+  }
+
+  .slide,
+  .dot {
+    opacity: 0;
+  }
+
+  .slide[data-still='true'],
+  .dot[data-still='true'] {
+    opacity: 1;
+  }
+}

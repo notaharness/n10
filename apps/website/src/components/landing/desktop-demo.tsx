@@ -92,7 +92,7 @@ export function DesktopDemo({ className }: { className?: string }) {
   }, [resolvedTheme]);
 
   return (
-    <div className={cn('relative', className)}>
+    <div id="desktop-demo" className={cn('relative scroll-mt-24', className)}>
       <p className="border-fd-border bg-fd-card text-fd-muted-foreground absolute -top-3 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap">
         <MousePointerClick className="size-3.5" aria-hidden />
         Try a preview
