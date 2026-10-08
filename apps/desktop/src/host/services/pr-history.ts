@@ -1,9 +1,9 @@
 import { readResourceValue } from '@n10/engine';
-import { activeReviewService } from './repo.js';
+import { activeReviewService, repository } from './repo.js';
 
 /** What the pull request's history offers to compare against. */
-export function getPullRequestHistory(request: unknown) {
-  return readResourceValue(activeReviewService().history(request));
+export function getPullRequestHistory(repo: string, request: unknown) {
+  return readResourceValue(repository(repo).reviews.history(request));
 }
 
 /** Record the commits the reader was shown, and keep them in the clone. */

@@ -69,7 +69,7 @@ it('composes the selected config/cache/removal services and adapts notices', asy
     "Couldn't fetch from origin; checking merge status with the provider";
   state.instances[0].notify({ type: 'failed', repo: '/repo-a', error });
   expect(notify).toHaveBeenLastCalledWith({ message: error, kind: 'warning' });
-  expect(host.getSyncDecorations().lastGitSyncAt).toBe(42);
+  expect(host.getSyncDecorations('/repo-a').lastGitSyncAt).toBe(42);
 });
 
 it('reuses the same scope and stops it when selecting another config handle', async () => {
@@ -86,6 +86,16 @@ it('reuses the same scope and stops it when selecting another config handle', as
   expect(state.instances[1].refresh).toHaveBeenCalledOnce();
   await host.stopRemoteSyncLoop();
   expect(state.instances[1].stop).toHaveBeenCalledOnce();
+});
+
+it('keeps a parked repository’s last decorations, and the selected one’s live', async () => {
+  const host = await import('./remote-sync.js');
+  host.startRemoteSyncLoop('/repo-a');
+  state.config = { repo: '/repo-b' };
+  host.startRemoteSyncLoop('/repo-b');
+  expect(host.getSyncDecorations('/repo-a').lastGitSyncAt).toBe(42);
+  expect(host.getSyncDecorations('/repo-b').lastGitSyncAt).toBe(42);
+  expect(host.getSyncDecorations('/repo-c').lastGitSyncAt).toBeNull();
 });
 
 it('ignores a request for a repository that is no longer selected', async () => {

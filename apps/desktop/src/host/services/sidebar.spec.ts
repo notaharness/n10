@@ -4,6 +4,8 @@ import type * as SidebarModule from './sidebar.js';
 import type * as PullRequestsModule from './pull-requests.js';
 import type * as ProgramModule from './program.js';
 import type * as Core from '@n10/core';
+import type { RepositoryHandle } from '@n10/engine';
+import { repository } from './repo.js';
 
 /**
  * The renderer polls the sidebar model continuously; the pull request
@@ -52,38 +54,42 @@ const env = vi.hoisted(() => ({
   lastBabysat: null as ReadonlyMap<number, unknown> | null,
   /** cwd → babysit statuses the babysit service answers with. */
   babysat: new Map<string, Map<number, unknown>>(),
+  /** The pull request list's background read, as a handle prewarms. */
+  refreshInBackground: null as ((cwd: string) => void) | null,
 }));
 
-vi.mock('./repo.js', () => ({
-  requireRepo: () => env.cwd,
-  activeRepository: () => {
-    const cwd = env.cwd;
-    return {
-      cwd,
-      sessions: {
-        read: async () => {
-          const worktrees = env.holdWorktrees
-            ? await new Promise<typeof env.worktrees>((resolve) => {
-                env.holdWorktrees = false;
-                env.releaseWorktrees = (list) => resolve(list ?? env.worktrees);
-              })
-            : env.worktrees;
-          return worktrees.map((wt) =>
-            worktreeSessionRow(
-              { ...wt, branch: wt.branch ?? '' } as Parameters<
-                typeof worktreeSessionRow
-              >[0],
-              () => false,
-              cwd
-            )
-          );
-        },
+vi.mock('./repo.js', () => {
+  /** A repository handle as the sidebar uses one: its rows, and the
+   *  prewarm that has the list read in the background. */
+  const handle = (cwd: string) => ({
+    cwd,
+    prewarm: () => env.refreshInBackground?.(cwd),
+    sessions: {
+      read: async () => {
+        const worktrees = env.holdWorktrees
+          ? await new Promise<typeof env.worktrees>((resolve) => {
+              env.holdWorktrees = false;
+              env.releaseWorktrees = (list) => resolve(list ?? env.worktrees);
+            })
+          : env.worktrees;
+        return worktrees.map((wt) =>
+          worktreeSessionRow(
+            { ...wt, branch: wt.branch ?? '' } as Parameters<
+              typeof worktreeSessionRow
+            >[0],
+            () => false,
+            cwd
+          )
+        );
       },
-    };
-  },
-  activeReviewService: () => ({ invalidateProvider: vi.fn() }),
-  activeRepoIs: (cwd: string) => cwd === env.cwd,
-}));
+    },
+  });
+  return {
+    requireRepo: () => env.cwd,
+    repository: handle,
+    activeReviewService: () => ({ invalidateProvider: vi.fn() }),
+  };
+});
 
 vi.mock('./babysit.js', () => ({
   babysatStatuses: (cwd: string) => env.babysat.get(cwd) ?? new Map(),
@@ -162,7 +168,16 @@ beforeEach(async () => {
   sidebar = await import('./sidebar.js');
   pullRequests = await import('./pull-requests.js');
   program = await import('./program.js');
+  env.refreshInBackground = (cwd) =>
+    program.pullRequests.refreshInBackground(cwd);
 });
+
+/** The open repository's rows. */
+function listSidebarItems() {
+  return sidebar.listSidebarItems(
+    repository(env.cwd) as unknown as RepositoryHandle
+  );
+}
 
 /** Resolve the nth outstanding provider fetch. */
 function settle(index = 0, value: Record<string, unknown> = {}) {
@@ -199,7 +214,7 @@ describe('sync state', () => {
 
   it('does not call the provider at all when it is not configured', async () => {
     env.configured = false;
-    await sidebar.listSidebarItems();
+    await listSidebarItems();
     expect(env.fetchCount).toBe(0);
     expect(sidebar.getSyncState().providerConfigured).toBe(false);
   });
@@ -232,7 +247,7 @@ describe('refreshing', () => {
     // refresh. Forgetting at the press lets that read write its per-row
     // answers straight back into the provider's memo, and the refresh
     // then answers from them.
-    await sidebar.listSidebarItems();
+    await listSidebarItems();
     const refreshed = sidebar.refreshRemote();
     expect(env.events).toEqual(['start']);
 
@@ -287,7 +302,7 @@ describe('after the credentials change', () => {
  */
 describe('lookupPullRequest', () => {
   it('answers from the same list the sidebar shows', async () => {
-    const model = sidebar.listSidebarItems();
+    const model = listSidebarItems();
     await flush();
     settle(0, { feature: { id: 7 } });
     await model;
@@ -311,7 +326,7 @@ describe('sidebar model', () => {
     // The row carries its branch whether or not the branch has a PR —
     // so a PR-less `feat/foo` still displays as `feat/foo`.
     env.worktrees = [checkout('feat/foo')];
-    const model = sidebar.listSidebarItems();
+    const model = listSidebarItems();
     await flush();
     settle(0);
     const rows = (await model) as unknown as Core.AgentSession[];
@@ -324,7 +339,7 @@ describe('sidebar model', () => {
 
   it('carries a mid-rebase worktree state through to its session', async () => {
     env.worktrees = [checkout('rebasing-one', '/repo-a', 'rebasing')];
-    const model = sidebar.listSidebarItems();
+    const model = listSidebarItems();
     await flush();
     settle(0);
     const items = (await model) as { state?: string }[];
@@ -334,7 +349,7 @@ describe('sidebar model', () => {
   it('decorates the rows with the babysitters of the open repository', async () => {
     env.babysat.set('/repo-a', new Map([[7, { prId: 7 }]]));
     env.babysat.set('/repo-b', new Map([[8, { prId: 8 }]]));
-    const model = sidebar.listSidebarItems();
+    const model = listSidebarItems();
     await flush();
     settle(0);
     await model;
@@ -343,7 +358,7 @@ describe('sidebar model', () => {
 
   it('omits the state key entirely for a normal worktree', async () => {
     env.worktrees = [checkout('normal')];
-    const model = sidebar.listSidebarItems();
+    const model = listSidebarItems();
     await flush();
     settle(0);
     const items = (await model) as Record<string, unknown>[];
@@ -365,7 +380,7 @@ describe('the model never waits for the provider', () => {
 
     // No `settle` anywhere: if this ever awaits the fetch again, the
     // await below never resolves and the test times out.
-    const model = (await sidebar.listSidebarItems()) as unknown[];
+    const model = (await listSidebarItems()) as unknown[];
 
     expect(model).toHaveLength(1);
     expect(env.fetchCount).toBe(1);
@@ -374,11 +389,11 @@ describe('the model never waits for the provider', () => {
 
   it('serves the pull requests on the next call, once they have landed', async () => {
     env.worktrees = [checkout('feature')];
-    await sidebar.listSidebarItems();
+    await listSidebarItems();
     settle(0, { feature: { id: 7 } });
     await flush();
 
-    await sidebar.listSidebarItems();
+    await listSidebarItems();
     // Still one request: the second call read the cache the first
     // call's fetch filled, rather than starting another.
     expect(env.fetchCount).toBe(1);
@@ -388,7 +403,7 @@ describe('the model never waits for the provider', () => {
     let announced = 0;
     pullRequests.setRemoteUpdatedNotifier(() => announced++);
 
-    await sidebar.listSidebarItems();
+    await listSidebarItems();
     // Nothing to say yet — the model that just went out is local-only.
     expect(announced).toBe(0);
 
@@ -400,13 +415,13 @@ describe('the model never waits for the provider', () => {
   });
 
   it('stays quiet when the cache was already fresh', async () => {
-    await sidebar.listSidebarItems();
+    await listSidebarItems();
     settle(0);
     await flush();
 
     let announced = 0;
     pullRequests.setRemoteUpdatedNotifier(() => announced++);
-    await sidebar.listSidebarItems();
+    await listSidebarItems();
     await flush();
 
     expect(env.fetchCount).toBe(1);
@@ -417,29 +432,22 @@ describe('the model never waits for the provider', () => {
 describe('getSidebarSnapshot', () => {
   it('stamps the rows with the repository they describe', async () => {
     env.worktrees = [checkout('feature')];
-    const snapshot = await sidebar.getSidebarSnapshot();
+    const snapshot = await sidebar.getSidebarSnapshot('/repo-a');
     expect(snapshot.cwd).toBe('/repo-a');
     expect(snapshot.items).toHaveLength(1);
   });
 
-  it('answers for the repository the host is on once a switch lands mid-call', async () => {
-    // The worktree list is where the call awaits; the host moves to
-    // another repository while it is out. Stamping the rows that come
-    // back with either repo would be wrong — they were listed under
-    // one and had their sessions judged under the other — so the
-    // snapshot is the new repository's, computed whole.
-    const listedUnderA = [checkout('from-a')];
-    env.holdWorktrees = true;
-    const pending = sidebar.getSidebarSnapshot();
-    await flush();
+  it('answers for the repository asked, whichever is open', async () => {
+    env.worktrees = [checkout('feature')];
     env.cwd = '/repo-b';
-    env.worktrees = [checkout('from-b', '/repo-b')];
-    env.releaseWorktrees?.(listedUnderA);
-    const snapshot = await pending;
-    expect(snapshot.cwd).toBe('/repo-b');
+    const snapshot = await sidebar.getSidebarSnapshot('/repo-a');
+    expect(snapshot.cwd).toBe('/repo-a');
     expect(snapshot.items).toEqual([
       expect.objectContaining({
-        name: worktreeSessionKey('/repo-b/.claude/worktrees/from-b', '/repo-b'),
+        name: worktreeSessionKey(
+          '/repo-a/.claude/worktrees/feature',
+          '/repo-a'
+        ),
       }),
     ]);
   });

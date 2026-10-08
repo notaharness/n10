@@ -38,6 +38,8 @@ vi.mock('./services/repo.js', () =>
     'openRepo',
     'getRepo',
     'refreshRepo',
+    'getRepoInfo',
+    'prewarmRepo',
     'listRecentRepos',
     'forgetRecentRepo',
   ])
@@ -182,6 +184,8 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ['openRepo', ['/repo'], 'repo.openRepo'],
   ['getRepo', [], 'repo.getRepo'],
   ['refreshRepo', [], 'repo.refreshRepo'],
+  ['getRepoInfo', ['/repo'], 'repo.getRepoInfo'],
+  ['prewarmRepo', ['/repo'], 'repo.prewarmRepo'],
   ['listRecentRepos', [], 'repo.listRecentRepos'],
   ['forgetRecent', ['/repo'], 'repo.forgetRecentRepo'],
 
@@ -192,7 +196,7 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     'settings.updateSettingsFromView',
   ],
 
-  ['getSidebarModel', [], 'sidebar.getSidebarSnapshot'],
+  ['getSidebarModel', ['/repo'], 'sidebar.getSidebarSnapshot'],
   ['getSyncState', [], 'sidebar.getSyncState'],
   ['refreshRemote', [], 'sidebar.refreshRemote'],
 
@@ -216,16 +220,16 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ['checkWorktreeRemoval', ['feature'], 'worktrees.checkWorktreeRemoval'],
   ['openInEditor', ['feature'], 'worktrees.openInEditor'],
 
-  ['fetchCommentThreads', [7, true], 'reviews.fetchCommentThreads'],
-  ['fetchPrDescription', [7], 'reviews.fetchPrDescription'],
+  ['fetchCommentThreads', ['/repo', 7, true], 'reviews.fetchCommentThreads'],
+  ['fetchPrDescription', ['/repo', 7], 'reviews.fetchPrDescription'],
   [
     'getPullRequestSnapshot',
-    [{ ref: { number: 7 } }],
+    ['/repo', { ref: { number: 7 } }],
     'prDetails.getPullRequestSnapshot',
   ],
   [
     'getPullRequestHistory',
-    [{ ref: { number: 7 }, visitId: 'v1' }],
+    ['/repo', { ref: { number: 7 }, visitId: 'v1' }],
     'prHistory.getPullRequestHistory',
   ],
   [
@@ -235,15 +239,19 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ],
   [
     'getPullRequestChecks',
-    [{ ref: { number: 7 } }],
+    ['/repo', { ref: { number: 7 } }],
     'prChecks.getPullRequestChecks',
   ],
   [
     'getPullRequestConversation',
-    [{ ref: { number: 7 } }],
+    ['/repo', { ref: { number: 7 } }],
     'prConversation.getPullRequestConversation',
   ],
-  ['listReviewDrafts', [{ ref: { number: 7 } }], 'reviewDrafts.listDrafts'],
+  [
+    'listReviewDrafts',
+    ['/repo', { ref: { number: 7 } }],
+    'reviewDrafts.listDrafts',
+  ],
   ['saveReviewDraft', [{ ref: { number: 7 } }], 'reviewDrafts.saveDraft'],
   ['discardReviewDraft', [{ ref: { number: 7 } }], 'reviewDrafts.discardDraft'],
   ['submitReview', [{ ref: { number: 7 } }], 'reviewDrafts.submitReview'],
@@ -262,7 +270,7 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     [{ prId: 7, thread: { id: 't' }, resolved: true }],
     'reviews.setThreadResolved',
   ],
-  ['getReviewViewer', [], 'reviews.getReviewViewer'],
+  ['getReviewViewer', ['/repo'], 'reviews.getReviewViewer'],
   [
     'fetchPrDiffManifest',
     [{ repo: '/r', sourceBranch: 'feature', targetBranch: 'main' }],
@@ -280,7 +288,7 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ],
   [
     'fetchWorktreeDiffText',
-    ['feature', 'main'],
+    ['/repo', 'feature', 'main'],
     'worktrees.getWorktreeDiffText',
   ],
 
@@ -291,21 +299,21 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     'clipboardImage.saveClipboardImage',
   ],
 
-  ['listDraftComments', [7], 'drafts.listDraftComments'],
+  ['listDraftComments', ['/repo', 7], 'drafts.listDraftComments'],
   ['updateDraftComment', [7, 'id', { body: 'x' }], 'drafts.updateDraftComment'],
   ['deleteDraftComment', [7, 'id'], 'drafts.deleteDraftComment'],
   ['postDraftComments', [{ prId: 7 }], 'drafts.postDraftComments'],
 
   ['launchAgent', [{ branch: 'b' }], 'sessions.launchAgent'],
   ['launchReviewAgent', [{ pr: {} }], 'sessions.launchReviewAgent'],
-  ['listAgentOptions', [], 'sessions.listAgentOptions'],
+  ['listAgentOptions', ['/repo'], 'sessions.listAgentOptions'],
   ['getSessionLaunchContext', ['feature'], 'sessions.getSessionLaunchContext'],
   [
     'checkoutPlan',
     [{ pr: {}, prompt: 'p', mode: 'inject' }],
     'sessions.checkoutPlan',
   ],
-  ['listSessions', [], 'sessions.listSessions'],
+  ['listSessions', ['/repo'], 'sessions.listSessions'],
   ['listForeignSessions', [], 'foreignSessions.listForeignSessions'],
   ['getSessionActivity', [], 'sessions.getSessionActivity'],
   ['writeSession', ['b', 'ls\n'], 'sessions.writeSession'],
@@ -320,7 +328,11 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ],
   ['listTerminals', [], 'branchSessions.listTerminals'],
   ['killTerminal', ['n10-shell'], 'terminals.killTerminal'],
-  ['listBranchSessions', ['feature'], 'branchSessions.listBranchSessions'],
+  [
+    'listBranchSessions',
+    ['/repo', 'feature'],
+    'branchSessions.listBranchSessions',
+  ],
   [
     'launchBranchTerminal',
     [{ branch: 'feature', machine: 'peer' }],

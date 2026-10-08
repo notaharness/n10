@@ -84,6 +84,8 @@ type ShellHost = Pick<
   | 'openRepo'
   | 'getRepo'
   | 'refreshRepo'
+  | 'getRepoInfo'
+  | 'prewarmRepo'
   | 'listRecentRepos'
   | 'selectRepoDirectory'
   | 'selectFolder'
@@ -119,6 +121,8 @@ export function createShellHost(state: DemoState): ShellHost {
     },
     getRepo: () => later(info(state.repo())),
     refreshRepo: () => later(info(state.repo())),
+    getRepoInfo: (cwd) => later(info(state.repoAt(cwd))),
+    prewarmRepo: () => later(undefined),
     listRecentRepos: () =>
       later(
         state.recent.map((cwd, i) => ({

@@ -7,13 +7,8 @@ import {
   sortSessionsByPrId,
   type SidebarItem,
 } from '@n10/core';
-import { pullRequestPollIntervalMs } from '@n10/engine';
-import {
-  activeRepository,
-  activeRepoIs,
-  activeReviewService,
-  requireRepo,
-} from './repo.js';
+import { pullRequestPollIntervalMs, type RepositoryHandle } from '@n10/engine';
+import { activeReviewService, repository, requireRepo } from './repo.js';
 import { babysatStatuses } from './babysit.js';
 import { getSyncDecorations, refreshRemoteSync } from './remote-sync.js';
 import { pullRequests, resolveProvider } from './program.js';
@@ -51,15 +46,17 @@ import type { SidebarModel, SyncState } from '../contract.js';
 
 /** The rows alone. Exported for its tests; the bridge serves
  *  `getSidebarSnapshot`, which says which repository they are of. */
-export async function listSidebarItems(): Promise<SidebarItem[]> {
-  const repo = activeRepository();
+export async function listSidebarItems(
+  repo: RepositoryHandle
+): Promise<SidebarItem[]> {
   const cwd = repo.cwd;
   const { config, provider } = resolveProvider(cwd);
 
   // Local git first and on its own: worktrees are the rows the user is
   // most likely looking for, and they must not queue behind a provider
-  // call that may be a network round trip away.
-  pullRequests.refreshInBackground(cwd);
+  // call that may be a network round trip away. A parked repository
+  // answers what it holds, refreshed behind it once that is old.
+  repo.prewarm();
   const sessions = await repo.sessions.read();
   const prMap = pullRequests.getSnapshot(cwd).prMap;
 
@@ -80,7 +77,7 @@ export async function listSidebarItems(): Promise<SidebarItem[]> {
 
   // Merged/conflict decorations come from the host's remote sync loop
   // (the same engine service the TUI observes).
-  const sync = getSyncDecorations();
+  const sync = getSyncDecorations(cwd);
   return buildSidebarItems(
     sortedSessions,
     orphanPrs,
@@ -93,33 +90,25 @@ export async function listSidebarItems(): Promise<SidebarItem[]> {
   );
 }
 
-/**
- * The sidebar stamped with the repository it describes — what the
- * renderer is handed.
- *
- * A repository switch can land while the captured engine handle reads local
- * state. Recompute for the selected handle before stamping a response.
- */
-export async function getSidebarSnapshot(): Promise<SidebarModel> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const cwd = requireRepo();
-    const items = await listSidebarItems();
-    if (activeRepoIs(cwd)) return { cwd, items };
-  }
-  throw new Error('The open repository kept changing while listing it');
+/** The sidebar of `cwd`, open or parked, stamped with the repository
+ *  it describes — what the renderer is handed. */
+export async function getSidebarSnapshot(cwd: string): Promise<SidebarModel> {
+  const repo = repository(cwd);
+  return { cwd: repo.cwd, items: await listSidebarItems(repo) };
 }
 
 export function getSyncState(): SyncState {
   const cwd = requireRepo();
   const { config, provider, configured } = resolveProvider(cwd);
   const remote = pullRequests.getSnapshot(cwd);
+  const decorations = getSyncDecorations(cwd);
   return {
     providerId: provider?.id ?? null,
     providerConfigured: configured,
     lastRemoteSyncAt: remote.fetchedAt,
-    lastGitSyncAt: getSyncDecorations().lastGitSyncAt,
-    remoteError: remote.error ?? getSyncDecorations().error,
-    remoteSyncing: remote.refreshing || getSyncDecorations().loading,
+    lastGitSyncAt: decorations.lastGitSyncAt,
+    remoteError: remote.error ?? decorations.error,
+    remoteSyncing: remote.refreshing || decorations.loading,
     remoteIntervalMs: pullRequestPollIntervalMs(config.prPollInterval),
     remoteFetches: pullRequests.fetchCount(),
   };

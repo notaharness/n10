@@ -36,8 +36,8 @@ export function createHistoryHost(state: DemoState): HistoryHost {
     return baselines.get(id) ?? null;
   };
   return {
-    getPullRequestHistory: ({ ref, visitId }) => {
-      const pr = state.repo().pr(ref.number);
+    getPullRequestHistory: (cwd, { ref, visitId }) => {
+      const pr = state.repoAt(cwd).pr(ref.number);
       if (!pr) {
         return Promise.reject(new Error(`#${ref.number} is not in the demo`));
       }

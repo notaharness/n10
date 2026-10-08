@@ -130,12 +130,14 @@ describe('pull request snapshots', () => {
   it('asks as the account it knows, and keeps an answer about that pull request', async () => {
     const asked: unknown[] = [];
     stubHost({
-      getPullRequestSnapshot: (req) => {
+      getPullRequestSnapshot: (_repo, req) => {
         asked.push(req);
         return Promise.resolve({ ref: req.ref, viewer: 'bob' } as never);
       },
     });
-    await expect(loadPullRequestSnapshot(REF, 'bob')).resolves.toMatchObject({
+    await expect(
+      loadPullRequestSnapshot('/repo', REF, 'bob')
+    ).resolves.toMatchObject({
       ref: REF,
     });
     expect(asked).toEqual([{ ref: REF, viewer: 'bob' }]);
@@ -144,24 +146,24 @@ describe('pull request snapshots', () => {
   it('says so when it knows no account, rather than leaving the account open', async () => {
     const asked: unknown[] = [];
     stubHost({
-      getPullRequestSnapshot: (req) => {
+      getPullRequestSnapshot: (_repo, req) => {
         asked.push(req);
         return Promise.resolve({ ref: req.ref, viewer: null } as never);
       },
     });
-    await loadPullRequestSnapshot(REF, null);
+    await loadPullRequestSnapshot('/repo', REF, null);
     expect(asked).toEqual([{ ref: REF, viewer: null }]);
   });
 
   it('refuses an answer read as another account (Q8)', async () => {
     stubHost({
-      getPullRequestSnapshot: (req) =>
+      getPullRequestSnapshot: (_repo, req) =>
         Promise.resolve({ ref: req.ref, viewer: 'carol' } as never),
     });
-    await expect(loadPullRequestSnapshot(REF, 'bob')).rejects.toThrow(
+    await expect(loadPullRequestSnapshot('/repo', REF, 'bob')).rejects.toThrow(
       'Expected an answer read as bob, got one read as carol'
     );
-    await expect(loadPullRequestSnapshot(REF, null)).rejects.toThrow(
+    await expect(loadPullRequestSnapshot('/repo', REF, null)).rejects.toThrow(
       'Expected an answer read as no account, got one read as carol'
     );
   });
@@ -210,7 +212,7 @@ describe('pull request snapshots', () => {
       getPullRequestSnapshot: () =>
         Promise.resolve({ ref: { ...REF, repository: 'acme/lib' } } as never),
     });
-    await expect(loadPullRequestSnapshot(REF, null)).rejects.toThrow(
+    await expect(loadPullRequestSnapshot('/repo', REF, null)).rejects.toThrow(
       'Expected an answer about github.com/acme/app#42, got one about github.com/acme/lib#42'
     );
   });
@@ -320,7 +322,7 @@ describe('pull request conversations', () => {
   it('resolves with a conversation the provider read', async () => {
     const asked: unknown[] = [];
     stubHost({
-      getPullRequestConversation: (req) => {
+      getPullRequestConversation: (_repo, req) => {
         asked.push(req);
         return Promise.resolve({
           ref: req.ref,
@@ -331,14 +333,14 @@ describe('pull request conversations', () => {
       },
     });
     await expect(
-      loadPullRequestConversation(REF, 'bob')
+      loadPullRequestConversation('/repo', REF, 'bob')
     ).resolves.toMatchObject({ conversation: { state: 'read' } });
     expect(asked).toEqual([{ ref: REF, viewer: 'bob' }]);
   });
 
   it('rejects a failed read with its kind and retry time, never empty data', async () => {
     stubHost({
-      getPullRequestConversation: (req) =>
+      getPullRequestConversation: (_repo, req) =>
         Promise.resolve({
           ref: req.ref,
           viewer: 'bob',
@@ -351,7 +353,7 @@ describe('pull request conversations', () => {
           },
         } as never),
     });
-    const failure = loadPullRequestConversation(REF, 'bob');
+    const failure = loadPullRequestConversation('/repo', REF, 'bob');
     await expect(failure).rejects.toBeInstanceOf(ProviderReadError);
     await expect(failure).rejects.toMatchObject({
       message: 'GitHub is rate limiting n10',
@@ -365,19 +367,19 @@ describe('pull request conversations', () => {
       getPullRequestConversation: () =>
         Promise.resolve({ ref: { ...REF, number: 43 } } as never),
     });
-    await expect(loadPullRequestConversation(REF, null)).rejects.toThrow(
-      /got one about github.com\/acme\/app#43/
-    );
+    await expect(
+      loadPullRequestConversation('/repo', REF, null)
+    ).rejects.toThrow(/got one about github.com\/acme\/app#43/);
   });
 
   it('refuses an answer read as another account', async () => {
     stubHost({
-      getPullRequestConversation: (req) =>
+      getPullRequestConversation: (_repo, req) =>
         Promise.resolve({ ref: req.ref, viewer: 'carol' } as never),
     });
-    await expect(loadPullRequestConversation(REF, 'bob')).rejects.toThrow(
-      /read as carol/
-    );
+    await expect(
+      loadPullRequestConversation('/repo', REF, 'bob')
+    ).rejects.toThrow(/read as carol/);
   });
 
   it('does not ask again straight away after a rate limit or a rejected credential', () => {

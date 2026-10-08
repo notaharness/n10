@@ -1,5 +1,10 @@
 import { createRemoteSync, EMPTY_SYNC_SNAPSHOT } from '@n10/engine';
-import type { ConfigService, RemoteSync, SyncNotice } from '@n10/engine';
+import type {
+  ConfigService,
+  RemoteSync,
+  SyncNotice,
+  SyncSnapshot,
+} from '@n10/engine';
 import { activeConfigService, activeWorktreeService } from './repo.js';
 import { pullRequests } from './program.js';
 import type { SyncNoticeEvent } from '../contract.js';
@@ -15,6 +20,9 @@ function stop(service: RemoteSync): Promise<void> {
 
 let config: ConfigService | undefined;
 let sync: RemoteSync | undefined;
+// What each repository's loop last said when another was opened: a
+// pane of a parked repository shows its rows as they were decorated.
+const parked = new Map<string, SyncSnapshot>();
 let notifier: ((notice: SyncNoticeEvent) => void) | null = null;
 
 function present(notice: SyncNotice): SyncNoticeEvent {
@@ -43,8 +51,9 @@ export function setSyncNotifier(fn: (notice: SyncNoticeEvent) => void): void {
   notifier = fn;
 }
 
-export function getSyncDecorations() {
-  return sync?.getSnapshot() ?? EMPTY_SYNC_SNAPSHOT;
+export function getSyncDecorations(cwd: string): SyncSnapshot {
+  if (sync && config?.repo === cwd) return sync.getSnapshot();
+  return parked.get(cwd) ?? EMPTY_SYNC_SNAPSHOT;
 }
 
 /** Bind repository selection to engine lifetime; settings scheduling is internal. */
@@ -52,7 +61,11 @@ export function startRemoteSyncLoop(cwd: string): void {
   const current = activeConfigService();
   if (current.repo !== cwd) return;
   if (config !== current) {
-    if (sync) void stop(sync);
+    if (sync && config) {
+      parked.set(config.repo, sync.getSnapshot());
+      void stop(sync);
+    }
+    parked.delete(current.repo);
     config = current;
     sync = createRemoteSync({
       config,

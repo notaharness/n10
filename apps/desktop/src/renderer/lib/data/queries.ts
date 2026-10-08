@@ -107,23 +107,21 @@ export function useRecentRepos() {
 }
 
 /**
- * The sidebar rows for `cwd`, from a host that answers for whichever
- * repository it has open.
+ * The sidebar rows for `cwd`, open or not, as the host answers for the
+ * repository asked.
  *
- * An answer about another repository is not this workspace's, however
- * it arrived: the host moves on before the renderer does during a
- * switch, and the workspace being left keeps polling until it unmounts.
- * Reconciling such an answer into this repo's tabs opens a tab stamped
- * with this repo for a branch that exists only in the other one — a
- * tab that then reads as the other repo's and opens it when clicked.
- * So the rows stay what they were, and a first poll with nothing to
- * keep shows nothing rather than someone else's rows.
+ * An answer stamped with another repository is not this one's, however
+ * it arrived. Reconciling it into this repo's tabs would open a tab
+ * stamped with this repo for a branch that exists only in the other one
+ * — a tab that then reads as the other repo's and opens it when
+ * clicked. So the rows stay what they were, and a first answer with
+ * nothing to keep shows nothing rather than someone else's rows.
  */
 export async function loadSidebarModel(
   cwd: string,
   previous: SidebarItem[] | undefined
 ): Promise<SidebarItem[]> {
-  const answer = await window.n10.getSidebarModel();
+  const answer = await window.n10.getSidebarModel(cwd);
   if (answer.cwd !== cwd) return previous ?? [];
   return answer.items;
 }
@@ -225,7 +223,9 @@ export function useWorktreeDiff(
   return useQuery({
     queryKey: keys.worktreeDiff(cwd, branch, target),
     queryFn: () =>
-      measured('fetch', () => window.n10.fetchWorktreeDiffText(branch, target)),
+      measured('fetch', () =>
+        window.n10.fetchWorktreeDiffText(cwd, branch, target)
+      ),
     enabled: opts.enabled,
     refetchInterval: opts.live ? 2_000 : false,
     // Keep the previous patch on screen while the next one is in
@@ -269,6 +269,7 @@ export function useThreads(cwd: string, prId: number) {
     queryKey: keys.threads(cwd, prId),
     queryFn: ({ client, queryKey }) =>
       window.n10.fetchCommentThreads(
+        cwd,
         prId,
         client.getQueryState(queryKey)?.isInvalidated ?? false
       ),
@@ -282,7 +283,7 @@ export function useThreads(cwd: string, prId: number) {
 export function useAgentOptions(cwd: string) {
   return useQuery({
     queryKey: keys.agentOptions(cwd),
-    queryFn: () => window.n10.listAgentOptions(),
+    queryFn: () => window.n10.listAgentOptions(cwd),
   });
 }
 
@@ -295,7 +296,7 @@ export function useAgentOptions(cwd: string) {
 export function useSessions(cwd: string) {
   return useQuery({
     queryKey: keys.sessions(cwd),
-    queryFn: () => window.n10.listSessions(),
+    queryFn: () => window.n10.listSessions(cwd),
     refetchInterval: 2_000,
     placeholderData: (prev) => prev,
   });
@@ -384,7 +385,7 @@ export function useSessionActivity(cwd: string) {
 export function usePrDescription(cwd: string, prId: number) {
   return useQuery({
     queryKey: keys.prDescription(cwd, prId),
-    queryFn: () => window.n10.fetchPrDescription(prId),
+    queryFn: () => window.n10.fetchPrDescription(cwd, prId),
     staleTime: 5 * 60_000,
     enabled: prId > 0,
   });
@@ -406,7 +407,7 @@ export function useCommentImage(url: string) {
 export function useDraftComments(cwd: string, prId: number) {
   return useQuery({
     queryKey: keys.drafts(cwd, prId),
-    queryFn: () => window.n10.listDraftComments(prId),
+    queryFn: () => window.n10.listDraftComments(cwd, prId),
     refetchInterval: 2_000,
     placeholderData: (prev) => prev,
     enabled: prId > 0,

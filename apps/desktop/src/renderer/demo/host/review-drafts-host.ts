@@ -28,7 +28,7 @@ export function createDraftsHost(): DraftsHost {
   const byPr = new Map<number, ReviewDraft[]>();
   const drafts = (number: number) => byPr.get(number) ?? [];
   return {
-    listReviewDrafts: ({ ref }) =>
+    listReviewDrafts: (_cwd, { ref }) =>
       later({ ref, viewer: VIEWER, drafts: drafts(ref.number) }),
     saveReviewDraft: ({ ref, target, body }) => {
       const id = idOf(target);

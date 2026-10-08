@@ -82,7 +82,7 @@ export function useSubmitReview(ref: PullRequestRef) {
       const drafts = await queryClient
         .query({
           queryKey: draftsKey,
-          queryFn: () => window.n10.listReviewDrafts(scope),
+          queryFn: () => window.n10.listReviewDrafts(repo.cwd, scope),
           staleTime: 0,
         })
         .then((d) => d.drafts)

@@ -57,11 +57,12 @@ export function visitIdFor(key: string): string {
 }
 
 async function loadHistory(
+  cwd: string,
   ref: PullRequestRef,
   viewer: string | null,
   visitId: string
 ): Promise<PullRequestHistory> {
-  const answer = await window.n10.getPullRequestHistory({
+  const answer = await window.n10.getPullRequestHistory(cwd, {
     ref,
     viewer,
     visitId,
@@ -103,7 +104,7 @@ export function usePrHistory(
   const visitId = visitIdFor(key);
   const query = useQuery({
     queryKey: keys.prHistory(cwd, ref ?? NO_REF, viewer, visitId),
-    queryFn: () => loadHistory(ref!, viewer, visitId),
+    queryFn: () => loadHistory(cwd, ref!, viewer, visitId),
     enabled: enabled && ref !== null,
     staleTime: 60_000,
   });

@@ -20,7 +20,7 @@ describe('the demo pull request host', () => {
   });
 
   it('reads a demo pull request’s detail, with its head', async () => {
-    const snapshot = await host.getPullRequestSnapshot({ ref: ref(177) });
+    const snapshot = await host.getPullRequestSnapshot(N10, { ref: ref(177) });
     expect(snapshot.detail).toMatchObject({
       state: 'read',
       value: {
@@ -61,7 +61,7 @@ describe('the demo pull request host', () => {
   });
 
   it('says a number the demo does not have is not found', async () => {
-    const snapshot = await host.getPullRequestSnapshot({ ref: ref(1) });
+    const snapshot = await host.getPullRequestSnapshot(N10, { ref: ref(1) });
     expect(snapshot.summary).toEqual({ kind: 'gone' });
     expect(snapshot.detail).toMatchObject({
       state: 'failed',
@@ -79,7 +79,7 @@ describe('the demo checks read', () => {
     const host = createPullRequestHost(state);
     const slug = repo.data.slug;
     const read = (number: number) =>
-      host.getPullRequestChecks({
+      host.getPullRequestChecks(cwd, {
         ref: {
           provider: 'github',
           host: 'github.com',
@@ -234,7 +234,7 @@ describe('the demo conversation read', () => {
     state.open(N10);
     const { conversation } = await createPullRequestHost(
       state
-    ).getPullRequestConversation({ ref });
+    ).getPullRequestConversation(N10, { ref });
     expect(conversation.state).toBe('read');
     if (conversation.state !== 'read') return;
     const c = conversation.value;
@@ -273,7 +273,7 @@ describe('the demo conversation read', () => {
     });
     const { conversation } = await createPullRequestHost(
       state
-    ).getPullRequestConversation({ ref });
+    ).getPullRequestConversation(N10, { ref });
     if (conversation.state !== 'read') throw new Error('not read');
     const [thread] = conversation.value.threads;
     expect(thread?.status).toMatchObject({
@@ -296,7 +296,7 @@ describe('the demo conversation read', () => {
     await review.replyToThread({ prId: 177, thread: general, body: 'On it.' });
     const { conversation } = await createPullRequestHost(
       state
-    ).getPullRequestConversation({ ref });
+    ).getPullRequestConversation(N10, { ref });
     if (conversation.state !== 'read') throw new Error('not read');
     // Each comment is known by the id the diff's read gives its thread,
     // which is what the Overview's actions look it up by.

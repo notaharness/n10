@@ -3,8 +3,8 @@ import { readResourceValue } from '@n10/engine';
 import type { WorktreeRemovalCheck } from '@n10/core';
 import {
   activeConfigService,
-  activeReviewService,
   activeWorktreeService,
+  repository,
 } from './repo.js';
 
 async function read() {
@@ -39,11 +39,12 @@ export function checkWorktreeRemoval(branch: string) {
  * commit-range diff.
  */
 export async function getWorktreeDiffText(
+  repo: string,
   branch: string,
   targetBranch: string
 ): Promise<string> {
   return readResourceValue(
-    activeReviewService().diff.worktree(branch, targetBranch)
+    repository(repo).reviews.diff.worktree(branch, targetBranch)
   );
 }
 

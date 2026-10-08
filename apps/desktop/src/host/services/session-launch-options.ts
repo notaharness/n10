@@ -1,10 +1,10 @@
 import { buildAgentOptions } from '@n10/core';
 import type { AgentOptionView, SessionLaunchView } from '../contract.js';
-import { activeRepository } from './repo.js';
+import { activeRepository, repository } from './repo.js';
 
 /** Present the captured repository’s configured agent first. */
-export function listAgentOptions(): AgentOptionView[] {
-  const { config } = activeRepository().config.getSnapshot();
+export function listAgentOptions(repo: string): AgentOptionView[] {
+  const { config } = repository(repo).config.getSnapshot();
   return buildAgentOptions(config).map(({ agent, name }) => ({
     id: agent.id,
     name,

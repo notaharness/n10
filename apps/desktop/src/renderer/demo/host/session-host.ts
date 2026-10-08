@@ -172,10 +172,10 @@ export function createSessionHost(
       await start(req, req.pr.sourceBranch, program);
       return 'spawned' as const;
     },
-    listSessions: () =>
+    listSessions: (cwd) =>
       later(
         agents()
-          .filter((s) => s.meta.repo === state.current)
+          .filter((s) => s.meta.repo === cwd)
           .map((s) => ({
             name: s.name,
             running: s.running,

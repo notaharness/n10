@@ -107,7 +107,8 @@ export function createReviewHost(state: DemoState): ReviewHost {
     repo().drafts[prId] = next;
   };
   return {
-    fetchCommentThreads: (prId) => later(repo().threadsOf(prId), 120),
+    fetchCommentThreads: (cwd, prId) =>
+      later(state.repoAt(cwd).threadsOf(prId), 120),
     replyToThread: ({ prId, thread, body }) => {
       if (thread.replyKind === 'github-issue-comment') {
         const current = repo().threadsOf(prId);
@@ -124,10 +125,12 @@ export function createReviewHost(state: DemoState): ReviewHost {
       editThreads(prId, (t) => ({ ...t, isResolved: resolved }), thread.id);
       return later(undefined);
     },
-    fetchPrDescription: (prId) => load(repo().data.descriptions[prId]),
+    fetchPrDescription: (cwd, prId) =>
+      load(state.repoAt(cwd).data.descriptions[prId]),
     getReviewViewer: () => later({ identifier: VIEWER }),
     fetchCommentImage: () => later(null),
-    listDraftComments: (prId) => later(drafts(prId)),
+    listDraftComments: (cwd, prId) =>
+      later(state.repoAt(cwd).drafts[prId] ?? []),
     updateDraftComment: (prId, id, patch) => {
       setDrafts(
         prId,

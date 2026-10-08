@@ -80,8 +80,7 @@ vi.mock('./repo.js', async () => {
     '@n10/engine'
   );
   const handles = state.handles;
-  function activeRepository() {
-    const repo = state.cwd;
+  function repository(repo: string) {
     let sessions = handles.get(repo);
     if (!sessions) {
       // The engine resolves a remote machine's own clone (its spec).
@@ -130,7 +129,8 @@ vi.mock('./repo.js', async () => {
   return {
     requireRepo: () => state.cwd,
     activeRepoIs: (cwd: string) => cwd === state.cwd,
-    activeRepository,
+    activeRepository: () => repository(state.cwd),
+    repository,
   };
 });
 
@@ -731,7 +731,7 @@ describe('listSessions: a local session never carries a connectionState (finding
     // concern than the remote D4 banner) can legitimately report this
     // — it must still never reach the renderer for a local session.
     state.connectionStateByName.set(name, 'reconnecting');
-    const summary = listSessions().find((s) => s.name === name);
+    const summary = listSessions(state.cwd).find((s) => s.name === name);
     expect(summary?.connectionState).toBeUndefined();
   });
 
@@ -744,7 +744,7 @@ describe('listSessions: a local session never carries a connectionState (finding
       machine: 'bbbbbbbbbbbbbbbb',
     });
     state.connectionStateByName.set(name, 'reconnecting');
-    const summary = listSessions().find((s) => s.name === name);
+    const summary = listSessions(state.cwd).find((s) => s.name === name);
     expect(summary?.connectionState).toBe('reconnecting');
   });
 });
@@ -767,7 +767,7 @@ describe('another repository owns the name', () => {
     expect(second.name).toBe(keyFor('shared', '/repo-b'));
     expect(state.spawns).toHaveLength(2);
     expect(state.alive.has(keyFor('shared', '/repo-a'))).toBe(true);
-    expect(listSessions().map((s) => s.name)).toEqual([second.name]);
+    expect(listSessions(state.cwd).map((s) => s.name)).toEqual([second.name]);
   });
 
   it('refuses to kill it', async () => {
@@ -780,9 +780,9 @@ describe('another repository owns the name', () => {
 
   it('hides it from the session list', async () => {
     await launchInAThenSwitch();
-    expect(listSessions()).toEqual([]);
+    expect(listSessions(state.cwd)).toEqual([]);
     state.cwd = '/repo-a';
-    expect(listSessions().map((s) => s.name)).toEqual([
+    expect(listSessions(state.cwd).map((s) => s.name)).toEqual([
       keyFor('shared', '/repo-a'),
     ]);
   });
@@ -954,7 +954,7 @@ describe('checkoutPlan', () => {
     expect(getSessionBuffer(keyFor('feature/x', '/repo-a')).data).toBe(
       'agent says hello'
     );
-    expect(listSessions().map((s) => s.name)).toEqual([
+    expect(listSessions(state.cwd).map((s) => s.name)).toEqual([
       keyFor('feature/x', '/repo-a'),
     ]);
   });
@@ -967,7 +967,9 @@ describe('checkoutPlan', () => {
     await expect(checkoutPlan(request)).resolves.toBe('injected');
     emit(name, 'persisted agent output');
     expect(getSessionBuffer(name).data).toBe('persisted agent output');
-    expect(listSessions().map((session) => session.name)).toContain(name);
+    expect(listSessions(state.cwd).map((session) => session.name)).toContain(
+      name
+    );
   });
 
   it('injecting neither spawns nor disturbs the scrollback', async () => {
@@ -1109,11 +1111,11 @@ describe('checkoutPlan', () => {
 describe('listAgentOptions', () => {
   it('lists the repo config default first, then the rest of the registry', () => {
     state.configByCwd['/repo-a'] = { agentId: 'claude' };
-    expect(sessions.listAgentOptions()[0]).toEqual({
+    expect(sessions.listAgentOptions(state.cwd)[0]).toEqual({
       id: 'claude',
       name: 'Claude (default)',
     });
-    expect(sessions.listAgentOptions()).toContainEqual({
+    expect(sessions.listAgentOptions(state.cwd)).toContainEqual({
       id: 'codex',
       name: 'Codex',
     });
@@ -1124,7 +1126,7 @@ describe('listAgentOptions', () => {
       agentId: 'test',
       aiCommand: 'node fake.mjs',
     };
-    expect(sessions.listAgentOptions()[0]).toEqual({
+    expect(sessions.listAgentOptions(state.cwd)[0]).toEqual({
       id: 'test',
       name: 'Custom (default)',
     });

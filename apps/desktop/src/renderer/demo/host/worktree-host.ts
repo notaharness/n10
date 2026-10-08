@@ -56,7 +56,7 @@ export function createWorktreeHost(
   const scripted = new Map<number, () => void>();
   const repo = () => state.repo();
   return {
-    getSidebarModel: () => later({ cwd: repo().cwd, items: repo().sidebar }),
+    getSidebarModel: (cwd) => later({ cwd, items: state.repoAt(cwd).sidebar }),
     getSyncState: () => later(syncState()),
     refreshRemote: () => later(undefined, 500),
     listWorktrees: () => {
