@@ -5,7 +5,7 @@ import { commentDirPath } from './comment-store.js';
 import { validateGuide, type GuideInput, type GuidedReview } from './guide.js';
 
 /** Beside the pull request's draft comments: one guide per pull request. */
-export function guideFilePath(repository: string, prId: number): string {
+function guideFilePath(repository: string, prId: number): string {
   return join(commentDirPath(repository, prId), 'guide.json');
 }
 
