@@ -3,6 +3,7 @@ import type { SidebarItem } from '../../../host/contract.js';
 import { useRepo } from '../../lib/repo-context.js';
 import {
   useMachines,
+  useOrchestratorGroups,
   useSessionActivity,
   useSessions,
   useTerminals,
@@ -15,6 +16,10 @@ import {
   itemBranch,
   itemSessionName,
 } from '../../lib/sidebar/sidebar-model.js';
+import {
+  NO_ORCHESTRATOR_TABS,
+  orchestratorTabs,
+} from '../../lib/tabs/orchestrator-tabs.js';
 import { useRepoColors } from '../../lib/tabs/repo-colors.js';
 import { indexItems, tabItem } from '../../lib/tabs/tab-item.js';
 import { tabRepo } from '../../lib/tabs/tab-presentation.js';
@@ -55,6 +60,7 @@ export function EditorArea({
   const terminals = useTerminals();
   const sessions = useSessions(repo.cwd);
   const machines = useMachines();
+  const orchestration = useOrchestratorGroups();
   const showMachines = hasPeerMachines(machines.data ?? []);
   const terminalRunning = useMemo(
     () =>
@@ -103,12 +109,35 @@ export function EditorArea({
     return (r && repoColors.get(r)) ?? null;
   };
 
+  // What a tab's button shows, whether it stands in the strip or as a
+  // row under its orchestrator's tab.
+  const faceOf = (tab: Tab) => {
+    const sessionName = sessionNameFor(tab);
+    return {
+      tab,
+      item: itemFor(tab),
+      snapshot: sessionName ? activity.data?.[sessionName] : undefined,
+      foreignRepo: foreignRepoOf(tab, repo.cwd),
+      running: tab.kind === 'terminal' && terminalRunning.has(tab.name),
+      machineLabel: machineLabelFor(tab),
+    };
+  };
+
+  // Orchestra's players stand under their orchestrator's tab.
+  const grouping = orchestration.data
+    ? orchestratorTabs(tabs.tabs, orchestration.data, sessionNameFor)
+    : NO_ORCHESTRATOR_TABS;
+  const strip = tabs.tabs.filter((t) => !grouping.grouped.has(t.id));
+
   // No blanket overlay while a pane mounts: the virtualized diff and
   // the rail each show their own skeletons, and the terminal renders
   // in the first frame.
-  const tabStopId = tabs.tabs.some((t) => t.id === tabs.activeId)
-    ? tabs.activeId
-    : tabs.tabs[0]?.id;
+  const activeInStrip = tabs.activeId
+    ? grouping.orchestratorOf.get(tabs.activeId) ?? tabs.activeId
+    : null;
+  const tabStopId = strip.some((t) => t.id === activeInStrip)
+    ? activeInStrip
+    : strip[0]?.id;
   const { activePane, paneActiveId, panes } = useEditorPanes(
     tabs.tabs,
     tabs.activeId
@@ -124,23 +153,23 @@ export function EditorArea({
 
   return (
     <div className="flex h-full min-w-0 flex-col bg-background">
-      <TabStrip ids={tabs.tabs.map((t) => t.id)}>
-        {tabs.tabs.map((tab) => {
-          const sessionName = sessionNameFor(tab);
+      <TabStrip ids={strip.map((t) => t.id)}>
+        {strip.map((tab) => {
+          const players = grouping.players.get(tab.id)?.map((player) => ({
+            ...faceOf(player),
+            active: player.id === tabs.activeId,
+          }));
           return (
             <TabButton
               key={tab.id}
-              tab={tab}
-              item={itemFor(tab)}
+              {...faceOf(tab)}
               active={tab.id === tabs.activeId}
               closer={closer}
-              snapshot={sessionName ? activity.data?.[sessionName] : undefined}
-              foreignRepo={foreignRepoOf(tab, repo.cwd)}
               tabStop={tab.id === tabStopId}
-              running={tab.kind === 'terminal' && terminalRunning.has(tab.name)}
               unseen={tabs.unseen.includes(tab.id)}
-              machineLabel={machineLabelFor(tab)}
               repoColor={colorOf(tab)}
+              players={players}
+              playerActive={players?.some((p) => p.active) ?? false}
             />
           );
         })}
