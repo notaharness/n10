@@ -51,7 +51,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `useRepoInfo` and that repo's sidebar rows), and activating it opens that
   repo (`useRepoFollowsTabs`). `openRepoAsync` (`App.tsx`) switches
   optimistically from the cached `repoInfo`, and `Workspace` is not keyed by
-  repo, so the pane stays mounted across the switch.
+  repo, so the pane stays mounted across the switch. Repository writes wait
+  on `writable()` (`lib/data/repo-switch.ts`): mutations do through the
+  `MutationCache`; a direct bridge write must call it.
 - The reads a pane or the sidebar makes name the repository they read
   (`getSidebarModel(repo)`, sync state, branch lists, the review reads,
   sessions, branch sessions, agent options, worktree diffs; diff requests

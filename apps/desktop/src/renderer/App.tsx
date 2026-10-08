@@ -1,5 +1,5 @@
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import type { N10HostApi, RepoInfo } from '../host/contract.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
@@ -9,6 +9,7 @@ import { Toaster } from './components/ui/sonner.js';
 import { TooltipProvider } from './components/ui/tooltip.js';
 import { keys, queryClient } from './lib/data/query-keys.js';
 import { useRepoGate } from './lib/data/queries.js';
+import { repoShown, switchStarted } from './lib/data/repo-switch.js';
 import { useFleet } from './lib/fleet/fleet-context.js';
 import { FleetProvider } from './lib/fleet/fleet-provider.js';
 import { errorMessage } from './lib/utils.js';
@@ -64,6 +65,11 @@ function Gate() {
   const qc = useQueryClient();
   const { data: repo, isPending } = useRepoGate();
   const { repoOpened } = useTabs();
+  const shownCwd = repo?.cwd;
+  // Committed, so on screen: what a failed switch refused may go again.
+  useEffect(() => {
+    if (shownCwd) repoShown(shownCwd);
+  }, [shownCwd]);
 
   /**
    * Adopt a repository the host has already switched to. Every other
@@ -92,20 +98,26 @@ function Gate() {
   /**
    * Open a repository in place, reporting whether it worked. One shown
    * before this run is shown at once from what was cached for it, while
-   * the host opens it; the answer then refreshes it. A failed open
-   * returns to the repository that was open, and leaves the tab that
-   * asked for it in front, saying so.
+   * the host opens it; the answer then refreshes it. Writes wait for
+   * that answer (`repo-switch.ts`). A failed open returns to the
+   * repository that was open, and leaves the tab that asked for it in
+   * front, saying so.
    */
   const openRepoAsync = useCallback(
     async (cwd: string): Promise<boolean> => {
       const previous = qc.getQueryData<RepoInfo | null>(keys.repo);
       const cached = qc.getQueryData<RepoInfo>(keys.repoInfo(cwd));
       if (cached) qc.setQueryData(keys.repo, cached);
+      const open = window.n10.openRepo(cwd);
+      if (cached) switchStarted(open, previous?.cwd ?? null);
       try {
-        adoptRepo(await window.n10.openRepo(cwd));
+        adoptRepo(await open);
         return true;
       } catch (err: unknown) {
-        if (cached && previous) qc.setQueryData(keys.repo, previous);
+        if (cached) qc.setQueryData(keys.repo, previous ?? null);
+        // What was held for it may be fresh, from before it moved: read
+        // it again, so its tabs say it cannot be opened.
+        void qc.invalidateQueries({ queryKey: keys.repoInfo(cwd) });
         toast.error(errorMessage(err));
         return false;
       }

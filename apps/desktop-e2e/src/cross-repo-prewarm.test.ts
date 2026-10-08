@@ -1,3 +1,4 @@
+import { renameSync } from 'node:fs';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
 import { seedRepoConfig } from './fixtures/seed-home.js';
@@ -116,6 +117,31 @@ test.describe("Another repository's tab", () => {
       'true'
     );
     expect(await editorGaps(page)).toEqual([]);
+  });
+
+  test('pressing it once its checkout has moved says so, though a hover read it first', async ({
+    desktop,
+  }) => {
+    const { page, repoPath } = desktop;
+    const alpha = tab(page, /^repo-alpha\/alpha-work/);
+    await tab(page, /^beta-work/).click();
+    await restOn(page, alpha);
+    await expect(page.locator('[data-spare-pane]')).toContainText('alpha-work');
+
+    const moved = `${repoPath}-moved`;
+    renameSync(repoPath, moved);
+    try {
+      await alpha.click();
+      await expect(page.getByText(/This tab belongs to/)).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: /Open repo-alpha/ })
+      ).toBeVisible();
+      expect(
+        await page.evaluate(() => window.n10.getRepo().then((r) => r?.cwd))
+      ).toBe(otherRepo);
+    } finally {
+      renameSync(moved, repoPath);
+    }
   });
 
   test('switching back and forth leaves one status bar and one palette, for the open repository', async ({

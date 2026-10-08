@@ -449,11 +449,26 @@ opens: `openRepoAsync` sets the cached `repoInfo` before the host answers and
 reverts it if the open fails, and `Workspace` is not keyed by repository, so
 the pane on screen is the one held, not a new mount behind a notice. A
 repository the host cannot read (moved or deleted) shows `ForeignRepoPane`
-with a retry. The renderer keeps what a repository's panes and sidebar are
-drawn from for as long as the app is open (`RETAINED_KEYS`, `gcTime:
-Infinity`): a repository left hours ago is shown at once and refreshed behind.
-Diff text and worker results keep the default collection, since they are large
-and read again locally. Placeholders hold an answer only within its
+with a retry; a failed open reads its info again, since a hover may have
+cached it before the checkout moved.
+
+Writes name no repository: the host applies them to the one it has selected.
+The host opens a repository synchronously, and one window's requests reach it
+in order, so a write sent after the open lands on the repository opened. A
+failed open leaves a gap: the window still shows the repository it asked for
+until the answer comes back and the revert is on screen. Every write waits on
+`writable()` (`lib/data/repo-switch.ts`; mutations through the
+`MutationCache`'s `onMutate`, and the direct review-draft and submit calls),
+which resolves once the host has answered the open and, behind a failed one,
+refuses until the repository returned to is on screen.
+
+The renderer keeps what a repository's panes and sidebar are drawn from for as
+long as the app is open (`RETAINED_KEYS`, `gcTime: Infinity`): a repository
+left hours ago is shown at once and refreshed behind. Kinds keyed by a head or
+a range (checks, diff manifests) go an hour after the last pane lets go of
+them: each push leaves an entry nothing shows again. Diff text and worker
+results keep the default collection, since they are large and read again
+locally. Placeholders hold an answer only within its
 repository (`keepRepoAnswer`), so a pane never shows another repository's
 rows while its own load. A view with nothing held shows its loading state.
 

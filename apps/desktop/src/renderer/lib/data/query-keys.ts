@@ -1,12 +1,16 @@
-import { QueryClient } from '@tanstack/react-query';
+import { MutationCache, QueryClient } from '@tanstack/react-query';
 import { pullRequestKey, type PullRequestRef } from '@n10/vcs-core/pr-details';
+import { writable } from './repo-switch.js';
 
 /**
  * The renderer's data layer: every host call is a TanStack Query so
  * refetch cadence, caching, dedupe and invalidation live in one place
- * instead of ad-hoc setInterval/useEffect pairs in components.
+ * instead of ad-hoc setInterval/useEffect pairs in components. Every
+ * mutation waits out an optimistic repository switch first
+ * (`repo-switch.ts`).
  */
 export const queryClient = new QueryClient({
+  mutationCache: new MutationCache({ onMutate: () => writable() }),
   defaultOptions: {
     queries: {
       retry: false,
@@ -215,12 +219,19 @@ const RETAINED_KEYS = [
   keys.prDescription('', 0)[0],
   keys.drafts('', 0)[0],
   'pr-snapshot',
-  'pr-checks',
   'pr-conversation',
   'pr-history',
-  'pr-diff-manifest',
-  'pr-range-manifest',
   'review-drafts',
 ];
 for (const kind of RETAINED_KEYS)
   queryClient.setQueryDefaults([kind], { gcTime: Infinity });
+
+/**
+ * Kinds keyed by a head or a range: every push leaves an entry the key
+ * has moved on from, which nothing shows again. They go an hour after
+ * the last pane let go of them, the span past which a parked
+ * repository's data is read again anyway.
+ */
+const HEAD_KEYED = ['pr-checks', 'pr-diff-manifest', 'pr-range-manifest'];
+for (const kind of HEAD_KEYED)
+  queryClient.setQueryDefaults([kind], { gcTime: 60 * 60_000 });
