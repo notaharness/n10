@@ -21,6 +21,11 @@ import {
  */
 let mru: TabMru = EMPTY_MRU;
 
+/** The order the strip presents its tabs in (`presentedOrder`): an
+ *  orchestrator's player tabs, shown under it, come right after it.
+ *  Noted by the strip; the positional shortcuts walk it. */
+let presented: readonly string[] = [];
+
 /** What a key press needs to know about the app, read at press time. */
 export interface TabSwitchingDeps {
   /** A repository is open and the strip on screen. On the repository
@@ -34,7 +39,6 @@ export interface TabSwitchingDeps {
   recording(): boolean;
   tabIds(): readonly string[];
   activeId(): string | null;
-  cycle(delta: 1 | -1): void;
   activate(id: string): void;
 }
 
@@ -80,14 +84,42 @@ export function noteStrip(
   mru = noteTabs(mru, tabIds, activeId);
 }
 
+/** The strip presented its tabs in this order. */
+export function notePresentedOrder(ids: readonly string[]): void {
+  presented = ids;
+}
+
+/**
+ * The tab `delta` steps from `activeId` along the order the strip
+ * presents, `null` with fewer than two tabs. A tab the strip has not
+ * presented yet (opened since it last drew) follows in tab order.
+ */
+export function stepPresented(
+  order: readonly string[],
+  tabIds: readonly string[],
+  activeId: string | null,
+  delta: 1 | -1
+): string | null {
+  const open = new Set(tabIds);
+  const shown = new Set(order);
+  const walk = [
+    ...order.filter((id) => open.has(id)),
+    ...tabIds.filter((id) => !shown.has(id)),
+  ];
+  if (walk.length < 2) return null;
+  const at = walk.indexOf(activeId ?? '');
+  return walk[(at + delta + walk.length) % walk.length]!;
+}
+
 /** The order and any walk in progress, for tests. */
 export function currentMru(): TabMru {
   return mru;
 }
 
-/** Forget the order; tests only. */
+/** Forget the orders; tests only. */
 export function resetTabMru(): void {
   mru = EMPTY_MRU;
+  presented = [];
 }
 
 function commit(): void {
@@ -102,7 +134,13 @@ function onKeyDown(e: KeyEvent, deps: TabSwitchingDeps): void {
   e.stopImmediatePropagation();
   const delta = STEP[action];
   if (!deps.byRecentUse() || !MRU_CAPABLE.has(action)) {
-    deps.cycle(delta);
+    const next = stepPresented(
+      presented,
+      deps.tabIds(),
+      deps.activeId(),
+      delta
+    );
+    if (next) deps.activate(next);
     return;
   }
   const step = stepMru(mru, deps.tabIds(), deps.activeId(), delta);

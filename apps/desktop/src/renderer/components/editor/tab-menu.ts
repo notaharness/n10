@@ -77,7 +77,11 @@ export async function runTabMenu(
   );
   if (chosen?.startsWith(PLAYER)) tabs.activate(chosen.slice(PLAYER.length));
   else if (chosen === 'close') closer.close(tab.id);
-  else if (chosen === 'close-others') closer.closeOthers(tab.id);
+  else if (chosen === 'close-others')
+    closer.closeOthers(
+      tab.id,
+      players.map((row) => row.tab.id)
+    );
   else if (chosen === 'close-all') closer.closeAll();
   else if (chosen === 'pin') tabs.pin(tab.id);
   else if (chosen && chosen in OVERFLOW) {
