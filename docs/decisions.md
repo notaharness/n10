@@ -1023,7 +1023,12 @@ Unchecked, the prompt says nothing of a guide. The box starts checked and
 remembers the last choice in the desktop prefs (`guidedReview`), as the tab
 strip's overflow does, rather than in Settings: it is a choice made at
 launch, not a setting. The choice travels on the launch request
-(`ReviewLaunchRequest.guide`); the host does not decide it. The TUI cannot
+(`ReviewLaunchRequest.guide`, required); the host does not decide it. A
+review launched unchecked leaves any earlier `guide.json` in place: only
+`add-guide` replaces it, and that guide still describes the commit it was
+written for. Once the pull request moves past that commit the guide says so;
+at the same commit it shows as current, and a place it names opens whichever
+draft comment now covers those lines. The TUI cannot
 show slides, so its reviewer does not spend time on one.
 
 Diagrams are agent output, so mermaid draws them at its `strict` security
