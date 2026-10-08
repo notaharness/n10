@@ -221,7 +221,11 @@ export default tseslint.config(
       '@nx/enforce-module-boundaries': [
         'error',
         {
-          allow: [],
+          // The desktop suite types `window.n10` from the app's own
+          // bridge contract, so a caller cannot drift from the host. The
+          // rule rejects every import of an app before it reads tags, so
+          // the exception is the import path.
+          allow: ['@n10/desktop/contract'],
           depConstraints: [
             {
               sourceTag: 'type:app',
@@ -231,11 +235,9 @@ export default tseslint.config(
               sourceTag: 'type:lib',
               onlyDependOnLibsWithTags: ['type:lib'],
             },
-            // The desktop suite types `window.n10` from the app's own
-            // bridge contract, so a caller cannot drift from the host.
             {
               sourceTag: 'type:e2e',
-              onlyDependOnLibsWithTags: ['type:lib', 'scope:desktop'],
+              onlyDependOnLibsWithTags: ['type:lib'],
             },
             // @n10/core is the shell-agnostic half of the app: git,
             // worktrees, PTYs, config, providers and pure helpers. The
