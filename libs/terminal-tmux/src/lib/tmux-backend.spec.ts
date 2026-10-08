@@ -471,6 +471,20 @@ describe('hosted process lifecycle', () => {
     expect(mock.data).toHaveBeenLastCalledWith(data);
     expect(backend.processState?.running).toBe(true);
   });
+  it('announces each client just before its first output', async () => {
+    mock.clientSilent = true;
+    const backend = await launch();
+    const seen: string[] = [];
+    backend.onAttach?.(() => seen.push('attach'));
+    backend.onData((data) => seen.push(data));
+    mock.client?.draw('setup');
+    mock.client?.draw('more');
+    mock.clientExit?.();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(backend.connectionState).toBe('connected');
+    mock.client?.draw('setup again');
+    expect(seen).toEqual(['attach', 'setup', 'more', 'attach', 'setup again']);
+  });
   it('resizes while the client is gone without throwing, and re-attaches at the new size', async () => {
     const backend = await launch();
     mock.clientExit?.();

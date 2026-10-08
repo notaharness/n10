@@ -51,6 +51,7 @@ apps/desktop/                    — Electron GUI shell, shipped inside `@notaha
     components/review/comments/  — reviewer threads: ThreadCard, CommentMarkdown, ConversationPanel…
     components/review/diff/      — the viewer: DiffPane, VirtualDiffList, diff-rows, FileTree, SnippetView…
     components/review/drafts/    — the agent's drafts + walkthrough: DraftCard, DraftEditor, ReviewStepper…
+    components/review/guide/     — the agent's guided review: GuidePane (cover, slides, steps), GuideSlide, MermaidDiagram
     components/review/finish/    — filing a review: FinishReview (the form in the diff), FinishParts
     lib/                         — grouped by subsystem, not one flat folder (see below)
     lib/data/                    — queries.ts (TanStack Query over window.n10), mutations.ts, query-keys.ts
@@ -58,6 +59,7 @@ apps/desktop/                    — Electron GUI shell, shipped inside `@notaha
     lib/tabs/                    — tabs-model.ts (pure reducer: preview/pinned, `sync-items`), tabs.tsx, use-close-tabs.tsx
     lib/plan/                    — plan-model.ts (rows, numbering), plan.ts, use-plan-checkout.ts
     lib/review/                  — review-model.ts (what the workspace shows), review-submission.ts, severity.ts, use-comment-navigator.ts
+    lib/guide/                   — guide-model.ts (layout, steps, staleness), mermaid.ts (lazy, strict, themed by tokens)
     lib/sidebar/                 — sidebar-model.ts, sidebar-row-menu.ts, attention.ts
     lib/*.ts                     — what belongs to no subsystem: utils, theme, terminal-grid, content-key, settings-*
     screens/                     — RepoOpen (repo picker) and Workspace (shell + shortcuts)
@@ -156,5 +158,6 @@ Both shells observe or read that snapshot and call its commands. The
 `worktree-manager` package implements Git operations over an immutable
 `WorktreeScope` (repository, path resolver and optional remote machine), without
 a process-wide selected resolver. Config path edits invalidate the resource;
-repository switches dispose its subscription without detaching session clients.
+repository switches park the handle, keeping its resources, without detaching
+session clients.
 ESLint forbids shells from calling these Git reads, mutations or scope factories.

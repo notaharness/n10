@@ -13,10 +13,11 @@ export type {
   PrDiffManifestResult,
   PrDiffPatchResult,
   PrDiffError,
-  RepoChangedError,
+  OtherRepoError,
 } from './diff-reads.js';
 export type {
   ReplyToReviewThread,
   ResolveReviewThread,
 } from './review-commands.js';
 export type { PostAgentCommentsRequest } from './agent-publication.js';
+export type { AgentGuideRead } from './agent-guide.js';

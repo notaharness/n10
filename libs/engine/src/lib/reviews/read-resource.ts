@@ -1,4 +1,9 @@
 import { logError } from '@n10/logger';
+import {
+  ALWAYS_SELECTED,
+  parkedWarm,
+  type ReadFreshness,
+} from '../kernel/read-freshness.js';
 
 export interface ReadSnapshot<T> {
   data: T | null;
@@ -22,11 +27,14 @@ export interface ReadResource<T> {
   observed(): boolean;
 }
 
-/** A bounded read lane: ordinary readers join, forced readers share one follow-up. */
+/** A bounded read lane: ordinary readers join, forced readers share one
+ *  follow-up. A parked repository's readers are answered from what is
+ *  held, with a read behind it once that is old (`ReadFreshness`). */
 export function createReadResource<T>(
   load: () => Promise<T>,
   ttl: number,
-  cacheable: (value: T) => boolean = () => true
+  cacheable: (value: T) => boolean = () => true,
+  freshness: ReadFreshness = ALWAYS_SELECTED
 ): ReadResource<T> {
   let snapshot: ReadSnapshot<T> = {
     data: null,
@@ -77,17 +85,32 @@ export function createReadResource<T>(
     active = undefined;
     return snapshot;
   }
+  function start(): Promise<ReadSnapshot<T>> {
+    active = Promise.resolve().then(drain);
+    publish({ loading: true });
+    return active;
+  }
+  /** A parked repository's held answer, with a read behind it once old.
+   *  A refresh behind it that failed does not fail the answer: the data
+   *  is served, and observers see the error in the snapshot. */
+  function serveParked(): Promise<ReadSnapshot<T>> {
+    // `drain` settles every pass itself and never rejects.
+    if (!active && !parkedWarm(freshness, attemptedAt, ttl)) void start();
+    return Promise.resolve(
+      snapshot.error ? { ...snapshot, error: null } : snapshot
+    );
+  }
   function read(force = false): Promise<ReadSnapshot<T>> {
     if (disposed) return Promise.resolve(snapshot);
+    if (!force && freshness.parked() && snapshot.data !== null)
+      return serveParked();
     if (active) {
       if (force) queued = true;
       return active;
     }
     if (!force && attemptedAt !== null && Date.now() - attemptedAt < ttl)
       return Promise.resolve(snapshot);
-    active = Promise.resolve().then(drain);
-    publish({ loading: true });
-    return active;
+    return start();
   }
   return {
     getSnapshot: () => snapshot,

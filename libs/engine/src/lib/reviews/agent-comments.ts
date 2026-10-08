@@ -78,7 +78,7 @@ export function createAgentComments(
     return value;
   }
   function existing(prId: number, id: string) {
-    context.current();
+    context.selected();
     const comment = read(prId).find((item) => item.id === id);
     if (!comment) throw new Error('Draft comment no longer exists');
     publication.requireEditable(prId, comment);
@@ -106,12 +106,6 @@ export function createAgentComments(
       existing(prId, id);
       removeComment(repo(), prId, id);
       resources.get(prId)?.invalidate();
-    },
-    dispose() {
-      for (const watcher of watchers.values()) watcher.close();
-      for (const value of resources.values()) value.dispose();
-      watchers.clear();
-      resources.clear();
     },
   };
 }

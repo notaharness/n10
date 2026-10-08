@@ -1,7 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
-import { sessionMenu, sidebarRow, startSessionFromMenu } from './setup/app.js';
+import {
+  sessionMenu,
+  sidebarRow,
+  startSessionFromMenu,
+  openSessions,
+} from './setup/app.js';
 import { armContextMenuChoice } from './setup/menu.js';
 import type { ElectronApplication } from '@playwright/test';
 import { findN10SessionFor, socketEnv, tagTmuxSession } from './setup/tmux.js';
@@ -39,7 +44,7 @@ async function openMenu(
   await expect(
     page.getByRole('button', { name: 'Open on GitHub', exact: true })
   ).toBeVisible();
-  const sessions = await page.evaluate(() => window.n10.listSessions());
+  const sessions = await openSessions(page);
   if (sessions.length === 0) {
     await page
       .getByRole('button', { name: 'Launch Agent', exact: true })
@@ -222,5 +227,35 @@ test('Review sends its selected agent and instructions to the same guarded workt
   expect(await pane(homeDir, name, '#{@orchestra-spawner}')).toBe('orchestra');
   expect(await pane(homeDir, name, '#{@orchestra-orchestrator}')).toBe('');
   expect(await pane(homeDir, name, '#{@orchestra-last-report}')).toBe('');
-  expect(await page.evaluate(() => window.n10.listSessions())).toHaveLength(1);
+  expect(await openSessions(page)).toHaveLength(1);
+});
+
+test('Enter or Space on a mode chooses it and moves on to the agent, rather than switching it off', async ({
+  desktop,
+}) => {
+  const { app, page } = desktop;
+  const menu = await openMenu(page, app);
+  const picker = menu.getByRole('combobox', { name: 'Agent' });
+  await expect(picker).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(
+    menu.getByRole('radio', { name: 'New session', exact: true })
+  ).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  const review = menu.getByRole('radio', { name: 'Review', exact: true });
+  // The arrows only move focus; Enter chooses.
+  await expect(review).toBeFocused();
+  await expect(review).not.toBeChecked();
+  await page.keyboard.press('Enter');
+  await expect(review).toBeChecked();
+  await expect(picker).toBeFocused();
+  await expect(menu.getByLabel('Additional instructions')).toBeVisible();
+  // Enter or Space on the mode already chosen keeps it.
+  for (const key of ['Enter', 'Space']) {
+    await page.keyboard.press('Shift+Tab');
+    await expect(review).toBeFocused();
+    await page.keyboard.press(key);
+    await expect(review).toBeChecked();
+    await expect(picker).toBeFocused();
+  }
 });

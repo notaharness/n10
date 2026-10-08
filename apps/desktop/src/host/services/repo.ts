@@ -1,7 +1,12 @@
 import { startBabysitForRepo, stopBabysitForBranch } from './babysit.js';
 import { canonicalRepoPath, isGitRepo, resetRepoRoot } from '@n10/core';
-import type { ConfigService, RepositoryHandle } from '@n10/engine';
-import { repositories } from './program.js';
+import {
+  createRepositoryService,
+  type ConfigService,
+  type RepositoryHandle,
+} from '@n10/engine';
+import { pullRequests } from './program.js';
+import { PROVIDERS } from './providers.js';
 import {
   NoActiveRepoError,
   type RecentRepoEntry,
@@ -15,6 +20,22 @@ import {
   withColors,
   type RecentRepo,
 } from './recent-repos.js';
+
+// The babysit module imports this one: its bindings are read on call,
+// not while the modules load.
+const repositories = createRepositoryService({
+  providers: PROVIDERS,
+  pullRequests,
+  // Tests cross the hour a parked repository's data stays warm for.
+  ...(Number(process.env.N10_PARKED_TTL_MS) > 0
+    ? { parkedTtl: Number(process.env.N10_PARKED_TTL_MS) }
+    : {}),
+  worktreeWatchers: {
+    suspend: (repo, branch) => stopBabysitForBranch(repo, branch),
+    resume: (repo, id) => startBabysitForRepo(repo, id),
+    isCurrent: activeRepoIs,
+  },
+});
 
 let repoOpenedListener: ((cwd: string) => void) | null = null;
 
@@ -61,13 +82,7 @@ export function activeRepoIs(cwd: string): boolean {
 
 export function openRepo(path: string): RepoInfo {
   const previous = repositories.getSnapshot();
-  const opened = repositories.open(path, {
-    worktreeWatchers: {
-      suspend: stopBabysitForBranch,
-      resume: startBabysitForRepo,
-      isCurrent: activeRepoIs,
-    },
-  });
+  const opened = repositories.open(path);
   // Plan delivery still resolves the process repo root.
   // Keep their ambient scope aligned until those domains take explicit handles.
   process.chdir(opened.cwd);
@@ -79,6 +94,18 @@ export function openRepo(path: string): RepoInfo {
   }
   if (opened !== previous) repoOpenedListener?.(opened.cwd);
   return repoInfo(opened);
+}
+
+/** The repository at `cwd` for reading, selected or parked: the reads
+ *  a pane makes name the repository its tab belongs to. */
+export function repository(cwd: string): RepositoryHandle {
+  return repositories.get(cwd);
+}
+
+/** What `getRepo` says, for any repository: a pane of one that is not
+ *  open needs its provider and account too. */
+export function getRepoInfo(cwd: string): RepoInfo {
+  return repoInfo(repository(cwd));
 }
 
 export function getRepo(): RepoInfo | null {

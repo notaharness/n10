@@ -1,4 +1,5 @@
 import { createAgentComments } from './agent-comments.js';
+import { createAgentGuide } from './agent-guide.js';
 import { isDeepStrictEqual } from 'node:util';
 import type { VisitBaselines } from '@n10/core';
 import { configEffects } from '../config/api.js';
@@ -25,11 +26,11 @@ export function createReviewService(
   const agentComments = createAgentComments(options, provider.invalidate);
   const diff = createDiffReads(
     options.config.repo,
-    options.isCurrent,
+    options.freshness,
     options.worktrees
   );
   let rows = options.pullRequests.getSnapshot(options.config.repo).prMap;
-  const unsubscribeRows = options.pullRequests.subscribe((repo) => {
+  options.pullRequests.subscribe((repo) => {
     if (repo !== options.config.repo) return;
     const next = options.pullRequests.getSnapshot(repo).prMap;
     if (isDeepStrictEqual(rows, next)) return;
@@ -39,7 +40,7 @@ export function createReviewService(
     diff.invalidate();
   });
   let snapshot = options.config.getSnapshot();
-  const unsubscribe = options.config.subscribe(() => {
+  options.config.subscribe(() => {
     const next = options.config.getSnapshot();
     const credentials =
       configEffects(snapshot.config, next.config).credentials ||
@@ -55,6 +56,7 @@ export function createReviewService(
   return {
     repo: options.config.repo,
     agentComments,
+    agentGuide: createAgentGuide(options.config.repo),
     commands: createReviewCommands(options, provider),
     drafts: createReviewDraftCommands(options, provider.invalidate),
     comments: provider.comments,
@@ -68,13 +70,10 @@ export function createReviewService(
     invalidateProvider() {
       provider.invalidate();
     },
-    dispose() {
-      agentComments.dispose();
-      unsubscribeRows();
-      unsubscribe();
-      provider.dispose();
-      history.dispose();
-      diff.dispose();
+    /** Another repository was selected: drop what is only worth holding
+     *  while this one is on screen. */
+    park() {
+      diff.park();
     },
   };
 }

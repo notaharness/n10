@@ -42,6 +42,26 @@
 //                        raw mode delivers one keystroke at a time, so an
 //                        immediate echo would answer "hello" with five
 //                        separate lines.
+//   --mouse=<mode>       turn on mouse tracking mode <mode> (1000 clicks,
+//                        1002 drags, 1003 any motion) with SGR encoding,
+//                        and print each mouse report it receives as
+//                        `mouse:<code>;<col>;<row><M|m>`, so a test can see
+//                        which pointer events the terminal forwarded.
+//   --keys               ask for modifyOtherKeys (`CSI >4;2m`), as Claude
+//                        Code does, so tmux passes modified keys on, and
+//                        print each chunk of input as `key:<bytes>`, with
+//                        ESC as `ESC` and CR as `CR`, so a test can see the
+//                        exact sequence a key sent.
+//   --modes              turn on bracketed paste (2004) and application
+//                        cursor keys (DECCKM), as Claude Code does, so tmux
+//                        brackets pastes for it and sends it `ESC O A`.
+//   --flood=<bytes>      on the first input, print that many bytes of
+//                        numbered lines, 16 KiB every 5 ms, then
+//                        `flood-done`: enough output to overrun the host's
+//                        ring buffer. Waiting for input lets a tmux client
+//                        attach first, and pacing keeps it drawing every
+//                        line. Without either, the client would be drawn
+//                        only the screen the flood ended on.
 
 const args = Object.fromEntries(
   process.argv
@@ -100,6 +120,64 @@ if (args.echo) {
       }
     }
   });
+  process.stdin.resume();
+}
+
+if (args.mouse) {
+  if (process.stdin.isTTY) process.stdin.setRawMode(true);
+  process.stdout.write(`\x1b[?${args.mouse}h\x1b[?1006h`);
+  process.stdout.write(`mouse-ready:${args.mouse}\r\n`);
+  let pending = '';
+  process.stdin.on('data', (chunk) => {
+    pending += chunk.toString();
+    // eslint-disable-next-line no-control-regex -- mouse reports are escape sequences
+    for (const m of pending.matchAll(/\x1b\[<(\d+;\d+;\d+[Mm])/g)) {
+      process.stdout.write(`mouse:${m[1]}\r\n`);
+    }
+    // Keep only a report still arriving in pieces.
+    // eslint-disable-next-line no-control-regex -- mouse reports are escape sequences
+    pending = pending.match(/\x1b(\[(<[\d;]*)?)?$/)?.[0] ?? '';
+  });
+  process.stdin.resume();
+}
+
+if (args.modes) {
+  process.stdout.write('\x1b[?2004h\x1b[?1h');
+  process.stdout.write('modes-ready\r\n');
+}
+
+if (args.keys) {
+  if (process.stdin.isTTY) process.stdin.setRawMode(true);
+  process.stdout.write('\x1b[>4;2m');
+  process.stdout.write('keys-ready\r\n');
+  process.stdin.on('data', (chunk) => {
+    const shown = chunk
+      .toString()
+      .replaceAll('\x1b', 'ESC')
+      .replaceAll('\r', 'CR');
+    process.stdout.write(`key:${shown}\r\n`);
+  });
+  process.stdin.resume();
+}
+
+if (args.flood) {
+  const total = parseInt(args.flood, 10);
+  let written = 0;
+  let n = 0;
+  // A slice at a time: tmux draws a client that falls behind only the
+  // screen it ends on, and the flood is meant to reach the client.
+  const slice = () => {
+    for (const end = written + 16 * 1024; written < end && written < total; ) {
+      n += 1;
+      const line = `flood ${n} ${'.'.repeat(70)}\r\n`;
+      written += line.length;
+      process.stdout.write(line);
+    }
+    if (written < total) timers.add(setTimeout(slice, 5));
+    else process.stdout.write('flood-done\r\n');
+  };
+  if (process.stdin.isTTY) process.stdin.setRawMode(true);
+  process.stdin.once('data', slice);
   process.stdin.resume();
 }
 

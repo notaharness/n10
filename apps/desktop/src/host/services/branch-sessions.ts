@@ -3,15 +3,18 @@ import type {
   BranchTerminalRequest,
   TerminalSummary,
 } from '../contract.js';
-import { activeRepository, openRepository } from './repo.js';
+import { activeRepository, openRepository, repository } from './repo.js';
 import { machineFor } from './remote-machines.js';
 import { broadcastLaunchStep } from './session-relay.js';
 import { launchTerminal, listTerminals as terminals } from './terminals.js';
 
 /** The engine decides which sessions are the branch's; the host
  *  supplies the terminals it holds. */
-export function listBranchSessions(branch: string): BranchSessions {
-  return activeRepository().sessions.branchSessions(branch, terminals());
+export function listBranchSessions(
+  repo: string,
+  branch: string
+): BranchSessions {
+  return repository(repo).sessions.branchSessions(branch, terminals());
 }
 
 /** Every terminal, each named with the open repository's branch whose

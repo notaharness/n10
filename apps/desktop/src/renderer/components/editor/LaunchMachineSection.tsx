@@ -1,8 +1,8 @@
 import type { LaunchStep } from '../../../host/contract.js';
+import type { useMachineChoice } from '../../lib/machines/use-machine-choice.js';
 import {
   MachineChoiceSelect,
   RemoteLaunchProgress,
-  type useMachineChoice,
 } from '../terminal/NewTerminalMachineChoice.js';
 
 /**
@@ -20,15 +20,22 @@ export function LaunchMachineSection({
   step,
   error,
   what,
+  onSubmit,
 }: {
   choice: ReturnType<typeof useMachineChoice>;
   step?: LaunchStep | null;
   error?: string | null;
   what: string;
+  /** Enter on the machine picker launches, as on the agent picker. */
+  onSubmit: () => void;
 }) {
   return (
     <>
-      <MachineChoiceSelect id="launch-machine" choice={choice} />
+      <MachineChoiceSelect
+        id="launch-machine"
+        choice={choice}
+        onSubmit={onSubmit}
+      />
       <RemoteLaunchProgress
         step={step}
         error={error}

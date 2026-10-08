@@ -75,18 +75,38 @@ export function useCommentNavigator({
   const items = visibleComments(allItems, hideResolved);
   const navIndex = navIndexOf(items, focusId);
 
-  const jumpToFile = useCallback(
-    (path: string, at?: RowPlace) => {
+  // The diff, on `path`'s file; where in it is each jump's own.
+  const showFile = useCallback(
+    (path: string) => {
       setSelectedFile(path);
       setConversation(false);
       onShowDiff();
+    },
+    [onShowDiff]
+  );
+
+  const jumpToFile = useCallback(
+    (path: string, at?: RowPlace) => {
+      showFile(path);
       requestAnimationFrame(() => {
         const jump = jumpRef.current;
         if (at && jump?.jumpToRow(at)) return;
         jump?.jumpToFile(path);
       });
     },
-    [onShowDiff]
+    [showFile]
+  );
+  // A place a guide names: a line in the new version of a file, or
+  // the file.
+  const jumpToPlace = useCallback(
+    (path: string, line?: number) => {
+      if (line === undefined) return jumpToFile(path);
+      showFile(path);
+      requestAnimationFrame(() =>
+        jumpRef.current?.jumpToLine({ file: path, side: 'RIGHT', line })
+      );
+    },
+    [showFile, jumpToFile]
   );
 
   // Scroll to any comment or draft by id, falling back to its file.
@@ -143,6 +163,7 @@ export function useCommentNavigator({
     selectedFile,
     place,
     jumpToFile,
+    jumpToPlace,
     jumpToId,
     step,
   };

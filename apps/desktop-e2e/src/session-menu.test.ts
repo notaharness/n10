@@ -9,6 +9,7 @@ import {
   sidebarRow,
   startSessionFromMenu,
   visibleText,
+  openSessions,
 } from './setup/app.js';
 
 test.describe('Session menu', () => {
@@ -54,7 +55,7 @@ test.describe('Session menu', () => {
     await page.keyboard.press('Enter');
     await startSessionFromMenu(page);
     await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible();
-    const before = (await page.evaluate(() => window.n10.listSessions())).find(
+    const before = (await openSessions(page)).find(
       (s) => sessionBranch(s.name) === 'enter-branch'
     );
     expect(before?.running).toBe(true);
@@ -82,7 +83,7 @@ test.describe('Session menu', () => {
       .getByRole('button', { name: 'Open Custom', exact: true })
       .click();
     await expect(menu).toBeHidden();
-    const after = (await page.evaluate(() => window.n10.listSessions())).find(
+    const after = (await openSessions(page)).find(
       (s) => s.name === before?.name
     );
     expect(after?.running).toBe(true);
@@ -97,7 +98,7 @@ test.describe('Session menu', () => {
     await sidebarRow(page, /fresh-branch/).dblclick();
     await startSessionFromMenu(page);
     await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible();
-    const [before] = await page.evaluate(() => window.n10.listSessions());
+    const [before] = await openSessions(page);
     await sidebarRow(page, /fresh-branch/).dblclick();
     const menu = sessionMenu(page);
     await menu.getByRole('radio', { name: 'New session', exact: true }).click();
@@ -109,14 +110,9 @@ test.describe('Session menu', () => {
       .click();
     await expect(menu).toBeHidden();
     await expect
-      .poll(
-        async () =>
-          (
-            await page.evaluate(() => window.n10.listSessions())
-          )[0]?.spawnedAt
-      )
+      .poll(async () => (await openSessions(page))[0]?.spawnedAt)
       .not.toBe(before.spawnedAt);
-    const sessions = await page.evaluate(() => window.n10.listSessions());
+    const sessions = await openSessions(page);
     expect(sessions).toHaveLength(1);
     expect(sessions[0]).toMatchObject({ name: before.name, running: true });
   });

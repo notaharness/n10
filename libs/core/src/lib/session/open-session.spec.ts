@@ -181,6 +181,7 @@ describe('session launch boundary', () => {
         '@orchestra-orchestrator': null,
         '@orchestra-orchestrator-config': null,
         '@orchestra-last-report': null,
+        '@orchestra-target': null,
       },
     });
     expect(state.create.mock.calls[0][0]).toMatchObject({

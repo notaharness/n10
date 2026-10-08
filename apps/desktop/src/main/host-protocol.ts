@@ -17,6 +17,8 @@ export interface ShellCalls {
   appMenuPopup(): Promise<void>;
   aboutBox(): Promise<void>;
   prefsChanged(next: DesktopPrefs): Promise<void>;
+  /** `viewer`'s window ignores (or again obeys) menu accelerators. */
+  holdMenuShortcuts(viewer: number, held: boolean): Promise<void>;
   /** Forks a beam daemon the host will know as `daemon`; its end
    *  arrives as `daemon-exit`. */
   spawnDaemon(daemon: number, env: Record<string, string>): Promise<void>;

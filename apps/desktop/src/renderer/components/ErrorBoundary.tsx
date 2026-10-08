@@ -1,4 +1,4 @@
-import { AlertTriangleIcon, RotateCcwIcon } from 'lucide-react';
+import { AlertTriangleIcon, RefreshCwIcon, RotateCcwIcon } from 'lucide-react';
 import { Component, type ReactNode } from 'react';
 import { Button } from './ui/button.js';
 
@@ -12,7 +12,9 @@ interface State {
   error: Error | null;
 }
 
-/** Keeps one crashing tab/pane from blanking the whole window. */
+/** Keeps one crashing tab, pane or screen from blanking the whole
+ *  window. Try again remounts what failed; Reload window starts the
+ *  renderer over, for a failure a remount would only repeat. */
 export class ErrorBoundary extends Component<Props, State> {
   override state: State = { error: null };
 
@@ -39,13 +41,22 @@ export class ErrorBoundary extends Component<Props, State> {
             {this.state.error.message}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => this.setState({ error: null })}
-        >
-          <RotateCcwIcon /> Try again
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => this.setState({ error: null })}
+          >
+            <RotateCcwIcon /> Try again
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.location.reload()}
+          >
+            <RefreshCwIcon /> Reload window
+          </Button>
+        </div>
       </div>
     );
   }

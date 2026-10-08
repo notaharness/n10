@@ -26,14 +26,13 @@ export function createHistoryReads(
 ) {
   const context = createReviewContext(options);
   const { baselines } = options;
-  const histories = createResourceCache<PullRequestHistory>(
-    HISTORY_TTL_MS,
-    32,
+  const histories = createResourceCache<PullRequestHistory>(HISTORY_TTL_MS, {
+    freshness: options.freshness,
     // A failed read is read again; a last visit that failed froze no
     // baseline, so the visit could not be recorded until it is.
-    ({ revisions, lastVisit }) =>
-      revisions.state !== 'failed' && lastVisit.state !== 'failed'
-  );
+    cacheable: ({ revisions, lastVisit }) =>
+      revisions.state !== 'failed' && lastVisit.state !== 'failed',
+  });
   return {
     history(value: unknown) {
       const parsed = parseHistoryRequest(value);
@@ -68,9 +67,6 @@ export function createHistoryReads(
     },
     reset() {
       histories.reset();
-    },
-    dispose() {
-      histories.dispose();
     },
   };
 }

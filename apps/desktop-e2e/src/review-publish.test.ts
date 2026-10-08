@@ -111,7 +111,7 @@ function submit(page: Page, head: string) {
   return page.evaluate(async (head) => {
     const repo = (await window.n10.getRepo())!;
     const ref = { ...repo.repository!, number: 321 };
-    const { drafts } = await window.n10.listReviewDrafts({
+    const { drafts } = await window.n10.listReviewDrafts(repo.cwd, {
       ref,
       viewer: repo.viewer,
     });

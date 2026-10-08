@@ -7,12 +7,13 @@ import { activeTabRepo, useTabs } from './tabs.js';
  *
  * The tab strip outlives a repo switch, so the active tab can belong to
  * a repository that is not open — the user clicked it, cycled onto it,
- * or the tab beside it closed and handed it focus. The host holds one
- * repository at a time (`requireRepo`, the memoized repo root, the
- * session-ownership guard), so the way to show that tab's content again
- * is to open its repo: the sidebar and status bar then describe the
- * same repository the editor is showing, which is the only arrangement
- * where "which repo am I in?" has one answer.
+ * or the tab beside it closed and handed it focus. Its pane renders
+ * against that repository either way (`EditorPane`), but the host takes
+ * writes and launches only for the selected one (`requireRepo`, the
+ * session-ownership guard), so its repo is opened: the sidebar and
+ * status bar then describe the same repository the editor is showing,
+ * which is the only arrangement where "which repo am I in?" has one
+ * answer.
  *
  * It reacts to a change of *active tab*, never to a change of
  * repository. Opening a repo from the picker while a foreign tab
@@ -27,13 +28,17 @@ export function useRepoFollowsTabs(
   const target = activeTabRepo(tabs);
   const lastActiveId = useRef(tabs.activeId);
   const repoOpened = tabs.repoOpened;
+  const shown = useRef<string | null>(null);
 
-  // The other direction: the repository in view decides which tab is in
-  // front. Opening one leaves the tab of the repo being left active
-  // otherwise, so the workspace you asked for would open onto a pane
-  // about the one you did not.
+  // The other direction: the repository the workspace comes up on —
+  // at start, or from the picker — decides which tab is in front, or it
+  // would open onto a pane about another one. A switch between two
+  // repositories leaves it to the open that succeeded (`adoptRepo`): a
+  // failed one returns here, and must not take the tab that asked.
   useEffect(() => {
-    if (repoCwd !== null) repoOpened(repoCwd);
+    const was = shown.current;
+    shown.current = repoCwd;
+    if (was === null && repoCwd !== null) repoOpened(repoCwd);
   }, [repoCwd, repoOpened]);
 
   useEffect(() => {

@@ -117,16 +117,18 @@ describe('focusesAgent', () => {
 // ── resolveMode ──────────────────────────────────────────────────
 
 describe('resolveMode', () => {
-  const ALL: Mode[] = ['diff', 'agent', 'review', 'overview', 'plan'];
+  const ALL: Mode[] = ['diff', 'agent', 'review', 'guide', 'overview', 'plan'];
   const NOTHING = {
     hasSession: false,
     hasDrafts: false,
+    hasGuide: false,
     hasPr: false,
     hasPlan: false,
   };
   const EVERYTHING = {
     hasSession: true,
     hasDrafts: true,
+    hasGuide: true,
     hasPr: true,
     hasPlan: true,
   };
@@ -149,16 +151,18 @@ describe('resolveMode', () => {
     const grid = ALL.map((mode) => [
       resolveMode(mode, { ...NOTHING, hasSession: true }),
       resolveMode(mode, { ...NOTHING, hasDrafts: true }),
+      resolveMode(mode, { ...NOTHING, hasGuide: true }),
       resolveMode(mode, { ...NOTHING, hasPr: true }),
       resolveMode(mode, { ...NOTHING, hasPlan: true }),
     ]);
     expect(grid).toEqual([
-      // requested       session-only  drafts-only  pr-only   plan-only
-      /* diff     */ ['diff', 'diff', 'diff', 'diff'],
-      /* agent    */ ['agent', 'diff', 'diff', 'diff'],
-      /* review   */ ['diff', 'review', 'diff', 'diff'],
-      /* overview */ ['diff', 'diff', 'overview', 'diff'],
-      /* plan     */ ['diff', 'diff', 'diff', 'plan'],
+      // requested     session  drafts  guide  pr  plan (only)
+      /* diff     */ ['diff', 'diff', 'diff', 'diff', 'diff'],
+      /* agent    */ ['agent', 'diff', 'diff', 'diff', 'diff'],
+      /* review   */ ['diff', 'review', 'diff', 'diff', 'diff'],
+      /* guide    */ ['diff', 'diff', 'guide', 'diff', 'diff'],
+      /* overview */ ['diff', 'diff', 'diff', 'overview', 'diff'],
+      /* plan     */ ['diff', 'diff', 'diff', 'diff', 'plan'],
     ]);
   });
 
@@ -170,6 +174,7 @@ describe('resolveMode', () => {
       resolveMode('review', {
         hasSession: true,
         hasDrafts: false,
+        hasGuide: false,
         hasPr: true,
         hasPlan: false,
       })
@@ -187,6 +192,7 @@ describe('resolveMode', () => {
       resolveMode('plan', {
         hasSession: true,
         hasDrafts: true,
+        hasGuide: true,
         hasPr: true,
         hasPlan: false,
       })

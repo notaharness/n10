@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   Group,
   Panel,
@@ -47,6 +47,7 @@ import { useTerminalTabs } from '../lib/terminals/use-terminal-tabs.js';
 import { NewTerminalDialog } from '../components/terminal/NewTerminalDialog.js';
 import { setThemePreference, type ThemePreference } from '../lib/theme.js';
 import { errorMessage } from '../lib/utils.js';
+import { usePaneWidth } from '../lib/use-pane-width.js';
 import { useHostEvents } from './use-host-events.js';
 
 const SIDEBAR_KEY = 'n10.sidebar.hidden';
@@ -55,6 +56,11 @@ const SIDEBAR_KEY = 'n10.sidebar.hidden';
  * The main window once a repo is open: title bar, resizable sidebar +
  * tabbed editor area, status bar. Owns global shortcuts, native menu
  * command routing and the command palette.
+ *
+ * It stays mounted across a repository switch, so the editor keeps the
+ * pane it holds ready for the tab being switched to. What keeps state
+ * about the open repository — the sidebar, the status bar and the
+ * palette — is keyed by it and starts fresh.
  */
 export function Workspace({
   repo,
@@ -124,6 +130,7 @@ function WorkspaceInner({
   const [sidebarHidden, setSidebarHidden] = useState(
     () => localStorage.getItem(SIDEBAR_KEY) === '1'
   );
+  const sidebarWidth = usePaneWidth('sidebar', 280);
 
   const toggleSidebar = () =>
     setSidebarHidden((h) => {
@@ -243,20 +250,23 @@ function WorkspaceInner({
 
   // In-page shortcuts for the web-rendered UI. Anything that is also a
   // native menu accelerator reaches us through onMenuCommand instead;
-  // handled here: palette (⌘K). Tab cycling was removed for now — it
-  // collided with Shift+Tab inside agent terminals (Claude Code's mode
-  // switch).
+  // handled here: palette (⌘K). Tab switching is `useTabSwitching`'s,
+  // on rebindable Ctrl chords: a bare Shift+Tab belongs to the agent
+  // terminals (Claude Code's mode switch). The palette's chord is taken
+  // in the capture phase, ahead of a focused terminal, which keeps every
+  // key it handles to itself.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
       if (e.key.toLowerCase() === 'k') {
         e.preventDefault();
+        e.stopPropagation();
         setPaletteOpen((o) => !o);
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, []);
 
   return (
@@ -280,17 +290,22 @@ function WorkspaceInner({
           orientation="horizontal"
           className="min-h-0 flex-1"
           id="workspace"
+          onLayoutChanged={sidebarWidth.onLayoutChanged}
         >
           {!sidebarHidden && (
             <>
               <Panel
-                id="sidebar"
-                defaultSize="280px"
+                id={sidebarWidth.id}
+                panelRef={sidebarWidth.panelRef}
+                elementRef={sidebarWidth.elementRef}
+                defaultSize={sidebarWidth.defaultSize}
+                groupResizeBehavior="preserve-pixel-size"
                 minSize="200px"
                 maxSize="45%"
                 className="min-w-0"
               >
                 <Sidebar
+                  key={repo.cwd}
                   items={items}
                   loading={model.isLoading}
                   updatedAt={model.dataUpdatedAt}
@@ -299,7 +314,11 @@ function WorkspaceInner({
                   onCollapse={toggleSidebar}
                 />
               </Panel>
-              <PanelSeparator className="relative w-px bg-border transition-colors after:absolute after:inset-y-0 after:-left-1 after:w-2 hover:bg-primary data-[resize-handle-state=drag]:bg-primary" />
+              <PanelSeparator
+                disableDoubleClick
+                onDoubleClick={sidebarWidth.onReset}
+                className="relative w-px bg-border transition-colors after:absolute after:inset-y-0 after:-left-1 after:w-2 hover:bg-primary data-[resize-handle-state=drag]:bg-primary"
+              />
             </>
           )}
           <Panel id="editor" minSize="40%" className="min-w-0">
@@ -311,19 +330,23 @@ function WorkspaceInner({
         </Group>
       </div>
 
-      <StatusBar items={items} onOpenSettings={() => tabs.openSettings()} />
+      {/* One key for both: keys only tell siblings apart, and two
+          siblings sharing one leave the old ones behind on a switch. */}
+      <Fragment key={repo.cwd}>
+        <StatusBar items={items} onOpenSettings={() => tabs.openSettings()} />
 
-      <CommandPalette
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
-        items={items}
-        onToggleSidebar={toggleSidebar}
-        onSwitchRepo={onSwitchRepo}
-        onNewTerminal={terminalTabs.openDialog}
-        onOpenTerminalOnMachine={(machine) =>
-          terminalTabs.launchTerminal('shell', REMOTE_HOME_CWD, machine)
-        }
-      />
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          items={items}
+          onToggleSidebar={toggleSidebar}
+          onSwitchRepo={onSwitchRepo}
+          onNewTerminal={terminalTabs.openDialog}
+          onOpenTerminalOnMachine={(machine) =>
+            terminalTabs.launchTerminal('shell', REMOTE_HOME_CWD, machine)
+          }
+        />
+      </Fragment>
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       {terminalTabs.dialogOpen && (
         <NewTerminalDialog

@@ -24,14 +24,16 @@ export function createReviewDraftCommands(
       return listReviewDrafts(parseDraftsRequest(request), context.sources);
     },
     async save(request: unknown) {
+      context.selected();
       return saveReviewDraft(parseSaveDraftRequest(request), context.sources);
     },
     async discard(request: unknown) {
+      context.selected();
       discardReviewDraft(parseDiscardDraftRequest(request), context.sources);
     },
     async submit(request: unknown) {
       const req = parseSubmitReviewRequest(request);
-      const start = context.current();
+      const start = context.selected();
       const { provider, config, vcsConfigured } = start;
       const publish = vcsConfigured
         ? provider?.publishReview?.bind(provider)
@@ -42,7 +44,7 @@ export function createReviewDraftCommands(
           publish:
             publish &&
             ((submission, ledger) => {
-              context.assertUnchanged(start);
+              context.assertWritable(start);
               return publish(
                 config.vendorAuth,
                 config.vendorProject,
@@ -63,7 +65,7 @@ export function createReviewDraftCommands(
     },
     async mentions(request: unknown) {
       const req = parseMentionSearchRequest(request);
-      const { config, provider, vcsConfigured } = context.current();
+      const { config, provider, vcsConfigured } = context.selected();
       const search = vcsConfigured
         ? provider?.searchMentionCandidates?.bind(provider)
         : undefined;

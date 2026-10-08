@@ -75,13 +75,17 @@ export function visibleText(page: Page, text: string | RegExp): Locator {
 /**
  * Focus the on-screen terminal so keystrokes reach the agent.
  *
- * wterm keeps a hidden textarea and focuses it itself; clicking the
- * rendered output instead moves focus off it, and everything typed
- * afterwards goes nowhere.
+ * xterm takes keys through a textarea it keeps out of sight, zero-sized
+ * and off to the left, so it is found by its class rather than by
+ * being visible.
  */
 export async function focusTerminal(page: Page): Promise<void> {
-  const input = page.locator('textarea').filter({ visible: true }).first();
-  await input.waitFor({ state: 'visible' });
+  const input = page
+    .locator(
+      '[data-editor-panes] > :not([data-spare-pane]) .xterm-helper-textarea'
+    )
+    .first();
+  await input.waitFor({ state: 'attached' });
   await input.focus();
 }
 
@@ -356,4 +360,12 @@ export async function resizeWindow(
     },
     [width, height]
   );
+}
+
+/** The open repository's sessions, as the host lists them. */
+export function openSessions(page: Page) {
+  return page.evaluate(async () => {
+    const repo = await window.n10.getRepo();
+    return repo ? window.n10.listSessions(repo.cwd) : [];
+  });
 }

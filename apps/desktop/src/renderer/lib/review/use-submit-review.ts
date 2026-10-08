@@ -6,6 +6,7 @@ import type {
 } from '../../../host/contract.js';
 import { readError } from '../data/read-state.js';
 import { keys, queryClient } from '../data/query-keys.js';
+import { writable } from '../data/repo-switch.js';
 import { useRepo } from '../repo-context.js';
 import {
   failureOf,
@@ -68,6 +69,7 @@ export function useSubmitReview(ref: PullRequestRef) {
     let ids = choice.draftIds;
     let next: SubmitOutcome;
     try {
+      await writable();
       ids = [...(await summaryId(choice.summary)), ...ids];
       const result = await window.n10.submitReview({
         ...scope,
@@ -82,7 +84,7 @@ export function useSubmitReview(ref: PullRequestRef) {
       const drafts = await queryClient
         .query({
           queryKey: draftsKey,
-          queryFn: () => window.n10.listReviewDrafts(scope),
+          queryFn: () => window.n10.listReviewDrafts(repo.cwd, scope),
           staleTime: 0,
         })
         .then((d) => d.drafts)

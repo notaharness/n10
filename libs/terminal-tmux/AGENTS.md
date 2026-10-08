@@ -18,8 +18,10 @@ explicit serializable `TmuxLaunchPlan` to async `createTmuxBackend`:
 `dispose()` releases the local PTY client and polling timer; the hosted process
 survives. `kill()` terminates the exact tmux session. `onExit` reports hosted
 process exit, including retained panes; `onDisconnect` reports a local client
-ending while the hosted process is still running. The backend reconnects its
-client with bounded backoff while preserving the local subscriptions and size.
+ending while the hosted process is still running, and `onAttach` fires just
+before each client's first output, the first client's included. The backend
+reconnects its client with bounded backoff while preserving the local
+subscriptions and size.
 A remote machine's poller gives up on a listing after a deadline, and passes on
 what the fleet says (`setReachable`), also to a backend that subscribes later. A
 remote backend attaches nothing while the fleet says its machine is offline or

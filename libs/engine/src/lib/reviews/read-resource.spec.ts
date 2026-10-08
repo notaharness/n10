@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createReadResource } from './read-resource.js';
+import { createReadResource, readResourceValue } from './read-resource.js';
 import { createResourceCache } from './resource-cache.js';
 
 function deferred<T>() {
@@ -107,7 +107,7 @@ it('never publishes after disposal, even when a read finishes', async () => {
 });
 
 it('evicts idle resources while retaining a resource observed on screen', () => {
-  const cache = createResourceCache<string>(100, 2);
+  const cache = createResourceCache<string>(100, { capacity: 2 });
   const watched = cache.get('watched', async () => 'watched');
   const unsubscribe = watched.subscribe(() => undefined);
   const idle = cache.get('idle', async () => 'idle');
@@ -115,5 +115,88 @@ it('evicts idle resources while retaining a resource observed on screen', () => 
   expect(cache.get('watched', async () => 'wrong')).toBe(watched);
   expect(cache.get('idle', async () => 'new')).not.toBe(idle);
   unsubscribe();
-  cache.dispose();
+});
+
+it('releases every idle answer, keeping what is observed or loading', async () => {
+  const cache = createResourceCache<string>(100);
+  const watched = cache.get('watched', async () => 'watched');
+  const unsubscribe = watched.subscribe(() => undefined);
+  const idle = cache.get('idle', async () => 'idle');
+  await idle.read();
+  const pending = deferred<string>();
+  const loading = cache.get('loading', () => pending.promise);
+  void loading.read();
+  cache.release();
+  expect(cache.get('watched', async () => 'wrong')).toBe(watched);
+  expect(cache.get('loading', async () => 'wrong')).toBe(loading);
+  expect(cache.get('idle', async () => 'new')).not.toBe(idle);
+  pending.resolve('done');
+  unsubscribe();
+});
+
+it('serves a parked repository what it holds, reading behind it only past the parked TTL', async () => {
+  vi.useFakeTimers();
+  let parked = false;
+  const freshness = { parked: () => parked, parkedTtl: 3_600_000 };
+  const later = deferred<string>();
+  const load = vi
+    .fn()
+    .mockResolvedValueOnce('first')
+    .mockReturnValueOnce(later.promise);
+  const resource = createReadResource<string>(
+    load,
+    30_000,
+    undefined,
+    freshness
+  );
+  await resource.read();
+  parked = true;
+  // Past its own TTL, inside the parked one: served, nothing read.
+  vi.advanceTimersByTime(60_000);
+  expect((await resource.read()).data).toBe('first');
+  expect(load).toHaveBeenCalledOnce();
+  // Past the parked TTL: served at once, with a read behind it.
+  vi.advanceTimersByTime(3_600_000);
+  const served = await resource.read();
+  expect(served.data).toBe('first');
+  expect(load).toHaveBeenCalledTimes(2);
+  later.resolve('second');
+  await flush();
+  expect(resource.getSnapshot().data).toBe('second');
+});
+
+it('waits for a parked repository read that has nothing to serve', async () => {
+  const freshness = { parked: () => true, parkedTtl: 3_600_000 };
+  const resource = createReadResource<string>(
+    async () => 'answer',
+    30_000,
+    undefined,
+    freshness
+  );
+  expect((await resource.read()).data).toBe('answer');
+});
+
+it('serves a parked repository its data after a refresh behind it failed', async () => {
+  vi.useFakeTimers();
+  const freshness = { parked: () => true, parkedTtl: 3_600_000 };
+  const load = vi
+    .fn()
+    .mockResolvedValueOnce('first')
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValueOnce('second');
+  const resource = createReadResource<string>(
+    load,
+    30_000,
+    undefined,
+    freshness
+  );
+  await resource.read();
+  vi.advanceTimersByTime(3_600_001);
+  expect(await readResourceValue(resource)).toBe('first');
+  await flush();
+  expect(resource.getSnapshot().error).toBe('offline');
+  // The failure stays in the snapshot; the next read still answers.
+  expect(await readResourceValue(resource)).toBe('first');
+  await flush();
+  expect(resource.getSnapshot().data).toBe('second');
 });

@@ -17,6 +17,7 @@ describe('visibleSettingsGroups', () => {
     // nothing to wait on in the first place.
     expect(visibleSettingsGroups(undefined).map((g) => g.key)).toEqual([
       'appearance',
+      'keyboard',
       'machines',
     ]);
     expect(visibleSettingsGroups([])[0]?.fields).toEqual([]);
@@ -26,6 +27,7 @@ describe('visibleSettingsGroups', () => {
     const groups = visibleSettingsGroups([field('agentCommand', 'agent')]);
     expect(groups.map((g) => g.key)).toEqual([
       'appearance',
+      'keyboard',
       'agent',
       'machines',
     ]);
@@ -42,6 +44,7 @@ describe('visibleSettingsGroups', () => {
     // the nav around whenever the catalog was reordered.
     expect(groups.map((g) => g.key)).toEqual([
       'appearance',
+      'keyboard',
       'general',
       'terminal',
       'provider',
@@ -68,6 +71,7 @@ describe('visibleSettingsGroups', () => {
     const groups = visibleSettingsGroups([rogue, field('editor', 'general')]);
     expect(groups.map((g) => g.key)).toEqual([
       'appearance',
+      'keyboard',
       'general',
       'machines',
     ]);

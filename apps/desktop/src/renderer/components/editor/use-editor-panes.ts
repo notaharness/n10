@@ -7,7 +7,7 @@ import {
   type Shown,
 } from '../../lib/tabs/editor-panes.js';
 import { usePrewarm } from '../../lib/tabs/prewarm.js';
-import { foreignRepoOf, type Tab } from '../../lib/tabs/tabs.js';
+import type { Tab } from '../../lib/tabs/tabs.js';
 
 /**
  * Which panes the editor renders: the one on screen, and the spare
@@ -17,11 +17,7 @@ import { foreignRepoOf, type Tab } from '../../lib/tabs/tabs.js';
  * blocking the click. A pane already rendered as the spare is shown at
  * once: there is nothing to defer.
  */
-export function useEditorPanes(
-  tabs: readonly Tab[],
-  activeId: string | null,
-  repo: string
-) {
+export function useEditorPanes(tabs: readonly Tab[], activeId: string | null) {
   const paneTabs = useDeferredValue(tabs);
   const paneActiveId = useDeferredValue(activeId);
   const prewarm = usePrewarm();
@@ -41,11 +37,6 @@ export function useEditorPanes(
   return {
     activePane,
     paneActiveId: shownId,
-    // The active tab's repository, when it is not the open one. Its
-    // pane cannot be rendered from here — every query and every host
-    // call is scoped to the open repo — so a notice stands in until the
-    // repo switch that activating it kicked off lands.
-    foreignCwd: activePane ? foreignRepoOf(activePane, repo) : null,
-    panes: panesFor(activePane, spare, repo),
+    panes: panesFor(activePane, spare),
   };
 }

@@ -1,10 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import type { SessionSpec } from '@n10/terminal';
-import {
-  createRemoteTmuxBackend,
-  type RemoteMachine,
-  type RemotePtyHandle,
-} from './remote-backend.js';
+import { createRemoteTmuxBackend } from './remote-backend.js';
+import type { RemoteMachine, RemotePtyHandle } from './remote-pty.js';
 import { RemoteSessionPoller } from './remote-poller.js';
 import type { MachineExecutor } from './tmux-cli.js';
 
@@ -255,6 +252,35 @@ describe('RemoteTmuxBackend (D4)', () => {
     expect(backend.connectionState).toBe('connected');
     expect(opens).toHaveLength(2);
     expect(chunks.some((c) => c.includes('replayed screen'))).toBe(true);
+  });
+
+  it('announces each stream just before its first output', async () => {
+    run.mockImplementation(async (argv: string[]) => {
+      if (argv.includes('has-session'))
+        return { stdout: '', stderr: '', code: 1 };
+      if (argv.includes('list-sessions')) return aliveListing('wt');
+      // No screen to replay: only the streams' own output is seen.
+      if (argv.includes('capture-pane'))
+        return { stdout: '', stderr: '', code: 1 };
+      return { stdout: '', stderr: '', code: 0 };
+    });
+    const backend = await createRemoteTmuxBackend(
+      spec,
+      { mode: 'create', label: 'wt', tags: {} },
+      machine,
+      poller
+    );
+    const seen: string[] = [];
+    backend.onAttach?.(() => seen.push('attach'));
+    backend.onData((data) => seen.push(data));
+    opens[0]!.push('setup');
+    opens[0]!.push('more');
+    opens[0]!.close();
+    await vi.advanceTimersByTimeAsync(500);
+    await flushMicrotasks();
+    expect(backend.connectionState).toBe('connected');
+    opens[1]!.push('setup again');
+    expect(seen).toEqual(['attach', 'setup', 'more', 'attach', 'setup again']);
   });
 
   it('re-attaches over the pooled connection when only the stream ended', async () => {

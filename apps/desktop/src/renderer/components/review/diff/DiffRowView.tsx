@@ -23,6 +23,7 @@ import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
 import { FileBodyNotice } from './FileBodyNotice.js';
 import { ImageCompare } from './ImageCompare.js';
 import type { GutterProps } from './LineGutter.js';
+import type { TextMatch } from '../../../lib/diff/text-matches.js';
 
 /** Everything a row of the virtual diff draws from. */
 export interface RowContext {
@@ -30,6 +31,9 @@ export interface RowContext {
   analyses: ReadonlyMap<string, FileAnalysis>;
   stats: ReadonlyMap<string, FileStats>;
   wrap: boolean;
+  searchTerm: string;
+  searchTarget: TextMatch | null;
+  selectionTerm: string;
   prId: number;
   headSha: string | undefined;
   focusThreadId: string | null;
@@ -66,6 +70,17 @@ function gutter(
 ): GutterProps | undefined {
   if (!point || !ctx.gutterFor || !ctx.commentable(point)) return undefined;
   return ctx.gutterFor(point, ctx.firstPoint(point.file));
+}
+
+function activeStart(
+  ctx: RowContext,
+  file: string,
+  index: number
+): number | undefined {
+  const target = ctx.searchTarget;
+  return target?.file === file && target.index === index
+    ? target.start
+    : undefined;
 }
 
 function FileHeaderRow({
@@ -155,6 +170,9 @@ function CodeRow({
         tokens={hl.tokens}
         ranges={hl.ranges}
         wrap={ctx.wrap}
+        searchTerm={ctx.searchTerm}
+        activeSearchStart={activeStart(ctx, row.file, row.index)}
+        selectionTerm={ctx.selectionTerm}
         gutter={gutter(ctx, unifiedPoint(row.file, line))}
       />
     );
@@ -170,6 +188,8 @@ function CodeRow({
           tokens={tokens}
           side="L"
           wrap
+          searchTerm={ctx.searchTerm}
+          selectionTerm={ctx.selectionTerm}
           gutter={gutter(ctx, splitPoint(row.file, line, 'L'))}
         />
         <SplitCell
@@ -177,6 +197,9 @@ function CodeRow({
           tokens={tokens}
           side="R"
           wrap
+          searchTerm={ctx.searchTerm}
+          activeSearchStart={activeStart(ctx, row.file, row.index)}
+          selectionTerm={ctx.selectionTerm}
           gutter={gutter(ctx, splitPoint(row.file, line, 'R'))}
         />
       </div>
@@ -193,6 +216,11 @@ function CodeRow({
         ranges={hlLeft.ranges}
         side="L"
         wrap
+        searchTerm={ctx.searchTerm}
+        activeSearchStart={
+          left ? activeStart(ctx, row.file, left.index) : undefined
+        }
+        selectionTerm={ctx.selectionTerm}
         gutter={gutter(ctx, left && splitPoint(row.file, left.line, 'L'))}
       />
       <SplitCell
@@ -201,6 +229,11 @@ function CodeRow({
         ranges={hlRight.ranges}
         side="R"
         wrap
+        searchTerm={ctx.searchTerm}
+        activeSearchStart={
+          right ? activeStart(ctx, row.file, right.index) : undefined
+        }
+        selectionTerm={ctx.selectionTerm}
         gutter={gutter(ctx, right && splitPoint(row.file, right.line, 'R'))}
       />
     </div>

@@ -10,6 +10,7 @@ import {
   tab,
   tabs,
   visibleText,
+  openSessions,
 } from './setup/app.js';
 import { cleanupExternalSessions, tmuxAvailable } from './setup/external.js';
 import { listTaggedSessions } from './setup/tmux.js';
@@ -91,7 +92,7 @@ test.describe('A worktree session belongs to its checkout', () => {
     });
 
     // The agent is still the switched worktree's, and only its.
-    const sessions = await page.evaluate(() => window.n10.listSessions());
+    const sessions = await openSessions(page);
     expect(sessions.filter((s) => s.running)).toHaveLength(1);
     const [running] = sessions.filter((s) => s.running);
     expect(JSON.parse(running.name)[2]).toBe(

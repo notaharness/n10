@@ -48,6 +48,8 @@ describe('loadDesktopPrefs', () => {
       theme: 'system',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
     });
   });
 
@@ -59,6 +61,8 @@ describe('loadDesktopPrefs', () => {
       theme: 'system',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
     });
   });
 
@@ -70,6 +74,8 @@ describe('loadDesktopPrefs', () => {
       theme: 'dark',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
     });
   });
 
@@ -79,12 +85,16 @@ describe('loadDesktopPrefs', () => {
         theme: 'light',
         nativeFrame: true,
         tabOverflow: 'scroll',
+        tabCycleMru: true,
+        guidedReview: true,
       })
     );
     expect(loadDesktopPrefs()).toEqual({
       theme: 'light',
       nativeFrame: true,
       tabOverflow: 'scroll',
+      tabCycleMru: true,
+      guidedReview: true,
     });
   });
 });
@@ -96,11 +106,15 @@ describe('saveDesktopPrefs', () => {
       theme: 'dark',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
     });
     expect(JSON.parse(readFileSync(prefsPath(), 'utf8'))).toEqual({
       theme: 'dark',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
     });
   });
 
@@ -112,6 +126,8 @@ describe('saveDesktopPrefs', () => {
       theme: 'light',
       nativeFrame: true,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
     });
   });
 
@@ -122,6 +138,8 @@ describe('saveDesktopPrefs', () => {
       theme: 'system',
       nativeFrame: true,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
     });
   });
 
@@ -131,6 +149,8 @@ describe('saveDesktopPrefs', () => {
       theme: 'dark',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
     });
     expect(loadDesktopPrefs().theme).toBe('dark');
   });

@@ -187,8 +187,8 @@ rediscovery without pretending their hosted agents exited.
 A launch captures one repository handle and its config before awaiting worktree
 resolution or fleet checks. A repository change before launch refuses the request.
 Identical requests join; incompatible requests resolving to one checkout cannot
-replace each other's PTY. Stopping observation on a repo switch disposes timers
-and listeners but preserves every connected agent. Exit notifications update
+replace each other's PTY. Parking a repository on a switch stops its observation
+timers and listeners but preserves every connected agent. Exit notifications update
 session facts without spawning or reattaching.
 
 How an agent's session ended decides what its tab shows, following what tmux
@@ -300,15 +300,103 @@ terminals accept subsequent chunks. Resize on fit and when `spawnedAt` changes,
 even if the session name and dimensions are unchanged. `paneTerminalGrid`
 measures the actual font and padding; the first fit corrects startup estimates.
 
+The desktop draws terminals with xterm.js and its WebGL renderer
+(`@xterm/addon-webgl`), because drawing is where a terminal's cost goes. For an
+8 MiB burst of coloured log lines in 64 KiB chunks, the renderer's main thread
+was busy 305 ms where wterm's was 1,080 ms. For 300 full-screen redraws of a
+250×70 grid with a colour change every four cells, it was busy 1.0 s where
+wterm's was 9.4 s, and held 59 fps where wterm reached 32. xterm's DOM renderer
+falls between them: 469 ms, 8.0 s and 38 fps (Electron 44 on Intel Iris Xe,
+medians of three runs). A WebGL context the browser takes away (memory
+pressure, a suspend) disposes the addon, as its documentation advises, and
+xterm carries on with its DOM renderer. The grid is fitted again then, because
+WebGL rounds cells to device pixels and the DOM does not. Without a GPU there is
+no WebGL2 and the DOM renderer is what runs: the e2e suite (`--disable-gpu`
+under xvfb) and the visual baselines see that one, and `terminal-webgl.test.ts`
+gives the window SwiftShader to cover WebGL and its loss.
+
+Each terminal releases its WebGL context when it goes. Disposing the addon
+removes its canvas but leaves the context alive until the canvas is garbage
+collected (xtermjs/xterm.js#6068), and Chromium keeps 16 contexts in a page,
+evicting the oldest past that. Every mount makes one (a switch, a pre-warmed
+spare, a review pane, a launch's probe), so without the release a terminal kept on screen while
+the user moved through some sixteen others lost its context and dropped to the
+DOM renderer. The release is `WEBGL_lose_context`, the platform's own call, on
+the canvases the addon added; `terminal-webgl.test.ts` keeps every canvas from
+collection and checks the terminal on screen keeps WebGL through twenty mounts.
+
+`FitAddon` is the only reckoning of a terminal's grid, and the grid takes the
+whole pane: no padding, only the scrollbar the addon keeps clear and the part
+of a cell left over at the right and bottom. The session terminal fits whenever
+its pane's box changes, and the launch estimate opens a hidden terminal in the
+pane, with the same options and renderer, and asks it the same question. A
+probe on the DOM renderer would start an agent narrower than it is drawn,
+because WebGL rounds cells down to device pixels; the WebGL probe costs some
+100 ms for a window's first launch and about 16 ms after, and releases its
+context like any other terminal. The terminal's boxes clip their overflow: a screen still
+drawn for the previous grid would otherwise bring in scrollbars, which the fit
+would then measure as lost room.
+
+Keys go to xterm, except those the window must see. Ctrl/Cmd+C with a selection
+and Ctrl/Cmd+V go on to the browser, whose copy and paste events xterm and the
+paste handler act on; without a selection Ctrl+C is the interrupt. The palette's
+Mod+K is taken in the capture phase, ahead of any terminal, so it opens the
+palette and sends nothing to the PTY. Shift+Enter sends `ESC[13;2u`, the key as
+the kitty and fixterms keyboard protocols spell it, where xterm would send the
+plain Enter's CR, so an agent can take it as a new line rather than a submit.
+xterm 6 implements neither protocol; the sequence is the one wterm sent. tmux
+passes it on only to an application that asked for extended keys, as Claude Code
+does (modifyOtherKeys), and re-encodes it: 3.4 hands `ESC[13;2u` on, while 3.5
+and later ignore the request unless the server's `extended-keys` is on, and then
+write the key in `extended-keys-format` (`ESC[27;2;13~` by default). On tmux 3.5
+or later without `set -s extended-keys on`, Shift+Enter reaches the agent as CR
+and submits. n10 leaves the user's tmux options alone; setting it itself is
+[#335](https://github.com/notaharness/n10/issues/335). Pastes go through
+`term.paste`, so they are bracketed when the application asked for it, and a
+blocked terminal drops them as it drops keystrokes. Text loses its ESC bytes
+first, so a clipboard cannot end the bracket early and type the rest as
+commands. An image becomes a temporary file, whose path is pasted. OSC 8 links
+open externally on a modified click (Cmd on macOS, Ctrl elsewhere).
+`@xterm/addon-unicode11` gives emoji their two cells, which xterm's default
+Unicode 6 tables do not.
+
+Mouse tracking is xterm's own, any-motion (DECSET 1003) included, so an agent
+that highlights what is under the pointer is told where it is with no button
+held, and xterm shows the arrow rather than the I-beam while the application
+takes the mouse. Selecting still works then: Shift-drag on Linux and Windows,
+and Option-drag on macOS (`macOptionClickForcesSelection`), as iTerm and VS Code
+have it. xterm has no Shift-drag on macOS, where wterm took Shift everywhere.
+
+A terminal mounts from the host's snapshot of its session
+(`services/session-relay.ts`): the tmux client's first output, then the last
+512 KiB after it. tmux sets its client's terminal up once, in that first output
+(the alternate screen, application cursor keys and bracketed paste) whatever
+the application in the pane asks for, and undoes it only when the client
+detaches or is suspended. It brackets pastes and encodes cursor keys for each
+pane itself, and neither `refresh-client` nor a resize sends the setup again;
+only a pane's own modes, mouse tracking among them, come back with a resize. So
+the relay keeps that output whole ahead of the ring rather than reconstruct
+modes from the stream, and starts over at each new client's first output
+(`SessionBackend.onAttach`): that client's output, its setup and then a full
+redraw, supersedes what came before. The head is the client's first read,
+locally or over beam. tmux writes the setup, a few hundred bytes, in a write of
+its own before the first redraw, so the first read holds it whole unless the
+reader splits it; nothing checks for that. A first read that is something else
+leaves the setup in the ring, where it can be dropped as before. A snapshot whose
+ring has dropped output still bounces the grid so the application repaints the
+screen the ring no longer holds.
+
 ## Desktop repositories and tabs
 
-The host serves one repository at a time; the tab strip can contain several.
-Activating a foreign tab opens its repository through `useRepoFollowsTabs`.
+The host selects one repository and keeps the others it has read parked
+(see Parked repositories); the tab strip can contain tabs from several.
+Activating a foreign tab opens its repository through `useRepoFollowsTabs`, so
+the sidebar, status bar and writes follow the tab in front.
 Use canonical real paths for repository identity so symlinked paths cannot
 produce duplicate tabs or disagree with Git and tmux names.
 
-`TabsProvider` lives above the repository gate because `Workspace` remounts on
-switch. Keep one reconciliation step: `Workspace` sends `sync-items` to the pure
+`TabsProvider` lives above the repository gate because the gate unmounts
+`Workspace` when no repository is open. Keep one reconciliation step: `Workspace` sends `sync-items` to the pure
 `tabs-model.ts` reducer. It handles stale identities, previews, new agents,
 foreign sessions and terminals. Reconcile only the repo described by the update.
 Agent auto-open history is repo-qualified; closing a tab must not reopen it on
@@ -316,9 +404,10 @@ an unchanged poll. Store titles on tabs because foreign items may be unavailable
 
 The tab strip's `DndContext` (`TabDragProvider`) lives above the gate for the
 same reason. A tab is chosen on press, and choosing a foreign tab opens its
-repository, which remounts `Workspace`. Inside it, the remount dropped the
-pointer sensor watching the press, so a foreign tab could never be dragged.
-Above it, the sensor outlives the remount and lifts the remounted tab by id.
+repository, which remounts what keeps state about one repository (the sidebar,
+and the status bar and command palette under one key: siblings sharing a key
+are left behind on a switch). The pointer sensor watching the press must
+outlive the switch, and it lifts the tab by id.
 
 Wrapped, full rows share their width and the last row keeps its tabs' own: an
 end piece after the last tab grows far faster than the tabs, so only the last
@@ -337,7 +426,7 @@ Use native menus and dialogs where the OS supports the interaction. The review
 workspace has a navigation rail and one content pane. The diff owns its toolbar.
 
 The editor renders two panes at most: the active tab's and one spare, hidden
-and `inert`. A hidden wterm per open agent cost the renderer a terminal write
+and `inert`. A hidden terminal per open agent cost the renderer a terminal write
 for every chunk every agent printed, and bought nothing under tmux: the
 client's terminal accumulates no scrollback of its own, since tmux keeps the
 history. One spare buys an instant switch for the tab the user is about to
@@ -364,6 +453,43 @@ terminal on screen shows its session (`showSession`), which holds core's
 `showTerminal`, the same seen-signal the TUI's pane holds; a spare sees
 nothing. Tab switches never detach or kill sessions.
 
+Another repository's tab is held ready the same way. Its pane renders under a
+`RepoProvider` for that repository (`EditorPane`), against what the renderer
+holds for it: its `repoInfo` and sidebar rows, read from the host, which
+answers for a parked repository as the engine does, from what it holds, and
+refreshes behind it only once that is older than the parked TTL. The rows
+read is what applies the rule (`handle.prewarm()`), so a hover asks the host
+nothing of its own. Pressing the tab shows that pane while the repository
+opens: `openRepoAsync` sets the cached `repoInfo` before the host answers and
+reverts it if the open fails, and `Workspace` is not keyed by repository, so
+the pane on screen is the one held, not a new mount behind a notice. A
+repository the host cannot read (moved or deleted) shows `ForeignRepoPane`
+with a retry; a failed open reads its info again, since a hover may have
+cached it before the checkout moved. A parked repository's agent terminal starts
+from the host's buffer for that session: a buffer is read by the session's
+name, which is qualified by its repository, whichever one is selected. Kills
+still refuse another repository's session.
+
+Writes name no repository: the host applies them to the one it has selected.
+The host opens a repository synchronously, and one window's requests reach it
+in order, so a write sent after the open lands on the repository opened. A
+failed open leaves a gap: the window still shows the repository it asked for
+until the answer comes back and the revert is on screen. Every write waits on
+`writable()` (`lib/data/repo-switch.ts`; mutations through the
+`MutationCache`'s `onMutate`, and the direct review-draft and submit calls),
+which resolves once the host has answered the open and, behind a failed one,
+refuses until the repository returned to is on screen.
+
+The renderer keeps what a repository's panes and sidebar are drawn from for as
+long as the app is open (`RETAINED_KEYS`, `gcTime: Infinity`): a repository
+left hours ago is shown at once and refreshed behind. Kinds keyed by a head or
+a range (checks, diff manifests) go an hour after the last pane lets go of
+them: each push leaves an entry nothing shows again. Diff text and worker
+results keep the default collection, since they are large and read again
+locally. Placeholders hold an answer only within its
+repository (`keepRepoAnswer`), so a pane never shows another repository's
+rows while its own load. A view with nothing held shows its loading state.
+
 A tab that mounts again opens where the user left it: the pane they picked,
 the diff's picked file and top line, and the walkthrough step. A pane they
 never picked follows the landing rule again, so an agent started since shows.
@@ -373,8 +499,24 @@ switch, and dropped when the tab closes. Nothing is written to disk or to tmux:
 a reload starts every tab fresh. A saved file or line no longer in the diff is
 not guessed at: the view starts from the top.
 
-Each tab has an ErrorBoundary. Markdown paragraphs render as `div` when they may
-contain block images; the host fetches protected images with provider auth.
+Render errors are caught at three levels, each showing the error's message with
+Try again (remount) and Reload window. The root boundary sits in `main.tsx`,
+outside every provider, so no render error can unmount the whole tree into a
+blank window. The workspace boundary sits below the providers, so a failed
+workspace keeps the tab strip's state, toasts and a pending revocation, and Try
+again remounts it with them. Each tab has its own, so one broken pane leaves the
+rest usable. Reload window is there for a failure a remount would only repeat.
+
+Vite's React plugin swaps a module in place only when it exports nothing but
+components ([consistent components exports](https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports)).
+A module that also exports a hook or a context is re-run instead, which mints a
+new context object while the provider from the old one stays mounted, so every
+consumer throws. Contexts, hooks and helpers therefore live in modules of
+their own (`lib/fleet/fleet-context.ts` beside `fleet-provider.tsx`) in new and
+touched code; older modules that mix them are split when next changed.
+
+Markdown paragraphs render as `div` when they may contain block images; the
+host fetches protected images with provider auth.
 
 A pull request tab opens on its Overview, whoever wrote it (`initialMode`): the
 Overview is the pull request's main page, and Review changes leads on to the
@@ -515,6 +657,98 @@ fields cleared: the PR outlives its checkout. Status indicators combine CI and
 review status; CI can worsen the result, but passing CI does not imply approval.
 The status matrix and tab invariants are covered by model tests.
 
+### Keyboard tab switching
+
+The four tab shortcuts act on the editor tab strip, the one strip of tabs that
+spans the window. The review workspace's rail (Sessions · Files) picks panes
+inside one tab; it is a list, not a strip, so the chords always mean the strip.
+`useTabSwitching` listens on the window in the capture phase and stops the
+event, because xterm and text boxes otherwise consume Ctrl+Tab; it stands
+aside inside a dialog and while Settings records a chord. Nothing else binds
+these chords: the native menu has no accelerator for them and Electron has no
+browser tab handling of its own. Plain Shift+Tab stays the terminal's (Claude
+Code's mode switch), which is why the defaults all hold Ctrl.
+
+The bindings are the TUI's `KeyDescriptor`s in the global config's
+`keybindOverrides`, under `desktop.`-prefixed ids the TUI catalog never
+resolves, written through the engine config service. Most-recently-used
+cycling is a desktop pref (`tabCycleMru`, off by default so Ctrl+Tab matches
+Ctrl+PgDn until asked): a walk snapshots the order on the first press and
+commits when no Ctrl, Alt or Cmd is held any longer, or the window loses focus.
+The order and a walk in progress live at module level in
+`lib/tabs/tab-switching.ts`, and the hook is mounted in `App.tsx`'s gate, above
+the workspace: a walk onto another repository's tab switches repositories,
+which remounts the sidebar and the parts keyed by repository, and the walk
+must carry on. A tab closed under
+the walk keeps its place in the snapshot, so the next press goes to its live
+neighbour in the direction pressed rather than back to the front.
+
+Recording refuses a chord without Ctrl or Alt (it would be taken from every
+text box and terminal), one of the app's own shortcuts (`host/app-shortcuts.ts`,
+the list the native menu's accelerators and the shortcuts dialog are built
+from), the page's own chords (find in diff, the tab lift) and another tab
+action's. On macOS the menu holds Cmd, which no tab shortcut can, so only the
+page's chords that answer to Ctrl as well are refused there. While recording,
+the window ignores menu accelerators (`webContents.setIgnoreMenuShortcuts`), so
+Ctrl+W reaches the recorder instead of closing Settings; Electron keeps that on
+the webContents across a reload, so main releases it whenever a page starts
+loading. The shortcuts do nothing while no repository is open (the picker,
+connecting), leaving the order and any walk as they were. Nothing pushes config changes to the
+renderer, so the bindings are read again when the window comes to the front
+and when Settings → Keyboard opens; a read begun before a write is dropped.
+
+### Orchestrator tabs
+
+An Orchestra orchestrator's tab carries the Brain icon, and its players' tabs
+stand under it rather than beside it. Which session is an orchestrator, and
+whose players, comes from tags alone (core `discovery/orchestrator-groups.ts`).
+A player's `@orchestra-orchestrator` of `tmux:<session>` names its session.
+`claude:<id>` and `codex:<thread>` name a conversation, which the tmux server
+cannot tie to a session. Orchestra closes that gap explicitly: `spawn.sh` and
+`adopt.sh`, run inside tmux with the orchestrator's own identity as the
+target, write it as `@orchestra-target` on the session they run in, and take
+it off every other session of that server. That is how a terminal tab where
+`claude` was run by hand becomes an orchestrator. n10 does not infer the link
+from process trees, Claude's session registry or transcripts. Repositories
+play no part: a player in another repository, open or not, or a dir player
+in a directory of its own, groups like any other. The host lists this
+machine's server only. So a `beam:` target (an orchestrator on another
+machine), a player on another machine, and an orchestrator outside tmux
+(Claude Desktop, a daemon) group nothing; such a player keeps its own tab,
+and its launch context still shows where it reports. A session marked with a
+target is an orchestrator with or without players. A fresh agent launch
+clears the mark with the other supervisor tags.
+
+The strip changes how tabs are shown, not what they are
+(`lib/tabs/orchestrator-tabs.ts`). Player tabs open, close and activate as
+before and stay in `TabsState`; the strip leaves out each one whose
+orchestrator has a tab. A tab matches a session by its registry key, or, from
+another repository, by repository and checkout. An orchestrator that is
+another's player keeps its place, so its own players stay reachable. Where an
+orchestrator tab's close button sits, it shows the count of its player tabs,
+and keeps the X when it has none; middle click, Delete and its menu still
+close it. The tab carries what its hidden players would show: it is the
+strip's selection while one of them is active, and takes their unseen dot.
+A hidden player's attention blink moves to the count, in the primary colour:
+the tab's own blink shades toward the selected tab's background, so it would
+not show while the orchestrator or another of its players is selected. Hovering the tab opens a Radix hover card listing the player
+tabs as tab rows, with each tab's marks, repository band and hover-revealed
+X. Resting on a row holds its pane ready as resting on a strip tab does, and
+a press chooses it. A row's X is that tab's own close, with its confirmation
+and agent stop. The list holds tabs, not sessions: a player whose tab was
+closed is not listed and not reopened from here. The card is pointer-only, so
+the trigger cancels Radix's open on keyboard focus, and the tab's native menu
+lists the same players under a disabled "Players" heading (the contract's
+menus have no submenus). The tab is one element from its first player to its
+last, so the card's coming and going never remounts it.
+
+Positional keyboard switching (Ctrl+PgDn/PgUp, and Ctrl+Tab without
+most-recently-used order) walks the order the strip presents: each tab it
+shows, an orchestrator's followed by its player tabs, which the strip notes in
+`tab-switching.ts`. Close Others on an orchestrator's tab keeps its player
+tabs, which the strip shows as part of it; from any other tab, and Close All,
+they close like every tab.
+
 ## Plans and babysitting
 
 Plan items are value snapshots taken when queued. Later comment edits or
@@ -622,6 +856,53 @@ Babysitter thread reads use the provider throttle and TTL outside the list-cycle
 budget. GitHub gets rollup and counts with its list query and needs no equivalent
 per-row cache-reset methods. `request-budget.spec.ts` checks request counts.
 
+## Parked repositories
+
+`engine/repositories` keeps a handle for every repository opened or read this
+run, and selects one. Selecting another parks the one before: its discovery
+stops, and its config, worktrees, session rows, review reads and pull request
+list stay for the life of the process. A repository left hours ago is still
+worth showing at once, and nothing a person opened in one run is enough to
+need a bound. `get(path)` hands out a handle for reading without selecting it.
+
+A parked repository's reads are stale-while-revalidate with one threshold,
+`PARKED_REPOSITORY_TTL_MS` (an hour, `kernel/read-freshness.ts` applies it).
+Inside it, they answer what is held and read nothing; past it, they answer
+what is held and start a read behind it; with nothing held, they read and wait,
+as the selected repository does. The selected repository keeps each
+resource's own TTL. `prewarm()` applies the same rule to what a repository's
+panes all need: its worktrees and session rows, and its pull request list
+(`refreshInBackground` with a `maxAge`). The pull request list never evicts a
+scope a repository shows; past its bound it drops only scopes a config change
+left behind. Within one repository, each review resource kind still holds 32
+entries, never evicting one observed or loading. A refresh behind a parked
+read that fails does not fail the next read: it is answered with the data, and
+the error stays in the snapshot for observers.
+
+Two diff reads are exempt. A checkout's live diff keeps its one-second TTL:
+agents in a parked repository keep editing, and it is a local Git read. Patches
+are let go when their repository is parked (`reviews.park()`): each may be as
+large as the 64 MiB patch ceiling and two are held per repository, so keeping
+them would let every repository visited in a run hold up to 128 MiB in the
+host; the renderer keeps the batches it shows, and reading one again is a
+local Git read between fixed commits. Manifests and listings, which are small
+and what a pane needs first, stay.
+
+The desktop host answers a pane's reads for the repository the pane belongs
+to, open or parked, and records a visit there too: it is bookkeeping beside the
+history read, not a provider write. The sync loop runs only for the selected
+repository, since it fetches and removes merged worktrees, so a parked
+repository's merge and conflict marks are the ones its loop last reported, not
+loading, until it is opened again; meanwhile its pull request list can move on
+through `prewarm()`.
+
+Only the selected repository takes writes; a parked handle refuses them before
+any work: review replies, resolutions, submissions, mention searches, review
+draft saves and discards, agent findings' edits and publication, worktree
+creation, removal, rebase and fetch, config writes and session launches. The
+review writes and launches check again after their awaits, before the provider
+or tmux is asked.
+
 ## Review read ownership
 
 The repository handle owns `engine/reviews`: thread, description, detail, checks,
@@ -630,7 +911,9 @@ answers, and a forced read queues one follow-up. Provider data and branch resolu
 are fresh for 30 seconds; live checkout diffs for one second. A failed read retains
 same-scope data and permits immediate retry. Explicit thread invalidation (including
 opening a composer) forces an engine read. Account/config changes clear data
-and reject obsolete publication; disposing a repository prevents late publication.
+and reject obsolete publication. Reads answer whichever repository they are asked
+of, selected or parked; writes refuse any but the selected one (see Parked
+repositories).
 The desktop RPC rejects a failed answer and its query cache retains the last good
 view. TUI hooks subscribe directly. Frontends own visibility and error presentation,
 not another freshness policy.
@@ -671,7 +954,8 @@ filesystem observation. The common Git directory identifies the repository, so
 linked worktrees share findings while equal PR numbers in different repositories
 do not. Files live under `~/.n10/reviews/<repository hash>/pr-<number>`; no legacy
 unscoped path is read. The standalone utility resolves this identity through core.
-Only observed resources attach a nonrecursive watcher; disposal closes it.
+Only observed resources attach a nonrecursive watcher; the last observer
+leaving closes it.
 
 Agent publication uses core’s draft submission machinery in the separate
 `~/.n10/agent-review-publications` store, keyed by provider repository, PR and
@@ -683,6 +967,78 @@ error reports how many findings were posted.
 Completed findings stay posted after a later failure. An uncertain outcome retains
 its ledger and account binding, blocks edits, and is reconciled on retry. Restarted
 processes can retry findings left posting without inventing a second write path.
+
+## Guided review
+
+The review agent writes a guided review beside its draft comments: a short
+slideshow that walks the reader through the pull request before the diff.
+It is stored as `guide.json` next to `comments.json`, one per repository and
+pull request, so it shares the findings' identity and every linked checkout
+reads the same guide. Running `n10 util add-guide` again replaces it.
+
+The agent learns the format from n10, not from a plugin. `n10 util guide-help`
+prints the authoring instructions and the review prompt points to it. Every
+agent n10 runs can call a command, so Claude, Codex, Gemini and Copilot need
+nothing installed, and the instructions ship in the same release as the
+renderer that draws them, so the format they describe is always the one
+shown. A skill in `notaharness/plugins`, offered through an install prompt
+when it is missing, was considered and deferred: it makes a feature depend
+on per-agent installation and lets the instructions drift from the renderer.
+
+Consistency comes from structure and limits rather than from a long
+rulebook. The agent writes JSON with a fixed set of primitives: markdown
+prose, a picture beside it (a mermaid diagram or a few lines of code), or a
+before and an after. `add-guide` validates it and stores nothing on a
+failure, naming what to cut: 2 to 8 slides, a one-sentence lede (160
+characters), a 200-character summary, 400 characters of body prose (fenced
+code does not count), at most four files per slide with their lines in
+order, one picture per visual with a 120-character caption, and diagrams in
+the visual fields, not in the body. Agents given looser limits wrote accurate but
+dense slides that read as a document, not a thread. The reader opens on a cover
+n10 draws from the title, summary and slide titles, so the titles are the
+outline. `add-guide` records the commit checked out where the agent ran;
+the desktop says when the pull request has moved past it.
+
+The guide hands the reader on to the review rather than standing beside it.
+A place a slide names opens the diff at the agent's draft comment when one
+covers those lines (`draftAt`), so a suspected problem reads as code with
+its comment, through the comment navigator's existing jump, and otherwise
+at its first line (the diff's `jumpToLine`, which resolves rows through
+the same line map the tab's saved place uses); and the last
+step opens the drafts walkthrough when there are drafts. `guide-help` has
+the agent write its comments first and name their lines on the closing
+slide, which ranks suspected problems, intended tradeoffs and what was not
+verified.
+
+A diagram on its own spans the slide under the words at its natural size,
+labels at 16px, and is never shrunk to fit a column or a height; a tall
+flowchart squeezed beside the text was unreadable at 1600×900. Before and
+after sit side by side, so `guide-help` asks for those narrow (TD) and for a
+lone diagram wide (LR), each one idea of at most eight nodes.
+
+Only the desktop asks for a guide (`buildReviewLaunchRequest`'s `guide`
+option), and only when the review launch dialog's **Guided review** box is
+checked: a guide costs the agent time, and some reviews do not need one.
+Unchecked, the prompt says nothing of a guide. The box starts checked and
+remembers the last choice in the desktop prefs (`guidedReview`), as the tab
+strip's overflow does, rather than in Settings: it is a choice made at
+launch, not a setting. The choice travels on the launch request
+(`ReviewLaunchRequest.guide`, required); the host does not decide it. A
+review launched unchecked leaves any earlier `guide.json` in place: only
+`add-guide` replaces it, and that guide still describes the commit it was
+written for. Once the pull request moves past that commit the guide says so;
+at the same commit it shows as current, and a place it names opens whichever
+draft comment now covers those lines. The TUI cannot
+show slides, so its reviewer does not spend time on one.
+
+Diagrams are agent output, so mermaid draws them at its `strict` security
+level with HTML labels off. n10 adds the theme, fonts and HTML labels to
+mermaid's own `secure` keys (the security level and the edge cap among
+them), so a diagram's `%%{init}%%` changes none of them. The theme comes
+from the design tokens. A diagram mermaid cannot parse shows its source;
+mermaid's own error drawing is suppressed, so none is left in the page. Mermaid loads on the first diagram; nothing else in the renderer
+needs it. The desktop pins the website's version, so the workspace holds one
+copy.
 
 ## Diff generation and rendering
 
@@ -815,11 +1171,9 @@ The wterm host keeps the PTY alive across WebSocket reconnects and replays a rin
 buffer. Use one build script for server and client to avoid output-directory
 cleaning conflicts. Playwright and Nx must agree on artifact output paths.
 
-Pin desktop and wterm-host packages to the same exact wterm version. Separate
-copies have incompatible constructor identities for `instanceof`. Import CSS
-from `@wterm/dom/css`; the React package's relative CSS import depends on hoisting.
-For pasted images, the host chooses the temporary-file suffix from its own MIME
-table and inserts the path into the PTY; text paste stays with wterm.
+The bridge's browser client draws n10 with `@wterm/dom`, pinned to an exact
+version. For pasted images in the desktop, the host chooses the temporary-file
+suffix from its own MIME table and the path is pasted into the PTY.
 
 Comment images use _virtual_ kitty placements (`U=1`) written out-of-band
 with `process.stdout.write`, the precedent being `apps/cli/src/utils/window-title.ts`;
@@ -925,8 +1279,9 @@ Session targets resolve from checkout identity; PR targets ensure a checkout
 exists. Editor process launching and selection/focus remain shell adapters.
 
 Discovery captures its repository and replaces its non-recursive filesystem
-watch when the configured worktree base changes. Switching repositories disposes
-the old resource subscription; it does not detach retained session clients.
+watch when the configured worktree base changes. Switching repositories parks
+the old handle: its resources stay, its observation stops, and retained session
+clients are untouched.
 
 ## Engine fleet boundary
 
