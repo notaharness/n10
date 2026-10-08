@@ -164,6 +164,44 @@ const browserRuntimePaths = [
     'Browser bindings receive engine clients and import pure presentation entries.',
 }));
 
+const moduleBoundaries = {
+  allow: [],
+  depConstraints: [
+    {
+      sourceTag: 'type:app',
+      onlyDependOnLibsWithTags: ['type:lib'],
+    },
+    {
+      sourceTag: 'type:lib',
+      onlyDependOnLibsWithTags: ['type:lib'],
+    },
+    {
+      sourceTag: 'type:e2e',
+      onlyDependOnLibsWithTags: ['type:lib'],
+    },
+    // @n10/core is the shell-agnostic half of the app: git,
+    // worktrees, PTYs, config, providers and pure helpers. The
+    // React layer (@n10/app-core) depends on it and never the
+    // reverse, so a hook can never be reached from a git call.
+    // This is a tag constraint rather than a comment because
+    // the rule it replaces — "keep the TUI and desktop
+    // converged" — was a paragraph in CLAUDE.md, and it did not
+    // hold.
+    {
+      sourceTag: 'scope:core',
+      notDependOnLibsWithTags: ['scope:app-core', 'scope:engine'],
+    },
+    // @n10/engine is the program both shells run: state,
+    // scheduling, caching. It sits on core and under the React
+    // layer, so neither a git call nor a hook can reach back
+    // into it from the wrong side.
+    {
+      sourceTag: 'scope:engine',
+      notDependOnLibsWithTags: ['scope:app-core'],
+    },
+  ],
+};
+
 export default tseslint.config(
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
@@ -218,49 +256,20 @@ export default tseslint.config(
           ],
         },
       ],
+      '@nx/enforce-module-boundaries': ['error', moduleBoundaries],
+    },
+  },
+  {
+    // desktop-e2e types `window.n10` from the app's own bridge contract,
+    // so a caller cannot drift from the host. The rule rejects every
+    // import of an app before it reads tags, so the exception is the
+    // import path, in this one file. The glob is unanchored so it also
+    // matches under desktop-e2e's spread of this config.
+    files: ['**/src/n10-window.d.ts'],
+    rules: {
       '@nx/enforce-module-boundaries': [
         'error',
-        {
-          // The desktop suite types `window.n10` from the app's own
-          // bridge contract, so a caller cannot drift from the host. The
-          // rule rejects every import of an app before it reads tags, so
-          // the exception is the import path.
-          allow: ['@n10/desktop/contract'],
-          depConstraints: [
-            {
-              sourceTag: 'type:app',
-              onlyDependOnLibsWithTags: ['type:lib'],
-            },
-            {
-              sourceTag: 'type:lib',
-              onlyDependOnLibsWithTags: ['type:lib'],
-            },
-            {
-              sourceTag: 'type:e2e',
-              onlyDependOnLibsWithTags: ['type:lib'],
-            },
-            // @n10/core is the shell-agnostic half of the app: git,
-            // worktrees, PTYs, config, providers and pure helpers. The
-            // React layer (@n10/app-core) depends on it and never the
-            // reverse, so a hook can never be reached from a git call.
-            // This is a tag constraint rather than a comment because
-            // the rule it replaces — "keep the TUI and desktop
-            // converged" — was a paragraph in CLAUDE.md, and it did not
-            // hold.
-            {
-              sourceTag: 'scope:core',
-              notDependOnLibsWithTags: ['scope:app-core', 'scope:engine'],
-            },
-            // @n10/engine is the program both shells run: state,
-            // scheduling, caching. It sits on core and under the React
-            // layer, so neither a git call nor a hook can reach back
-            // into it from the wrong side.
-            {
-              sourceTag: 'scope:engine',
-              notDependOnLibsWithTags: ['scope:app-core'],
-            },
-          ],
-        },
+        { ...moduleBoundaries, allow: ['@n10/desktop/contract'] },
       ],
     },
   },
