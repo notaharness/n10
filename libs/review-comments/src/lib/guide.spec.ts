@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { guideInstructions } from './guide-instructions.js';
 import { GUIDE_LIMITS, proseLength, validateGuide } from './guide.js';
 
 /**
@@ -138,5 +139,17 @@ describe('validateGuide', () => {
 
   it('refuses what is not a guide at all', () => {
     expect(issues([])).toEqual(['write the guide as a JSON object']);
+  });
+});
+
+describe('guide-help', () => {
+  /** The example is what agents copy: it must be a guide n10 stores. */
+  it('shows an example the validator accepts', () => {
+    const text = guideInstructions(7);
+    const example = text.slice(
+      text.indexOf('\n{\n'),
+      text.indexOf('\n}\n') + 2
+    );
+    expect(validateGuide(JSON.parse(example))).toMatchObject({ ok: true });
   });
 });
