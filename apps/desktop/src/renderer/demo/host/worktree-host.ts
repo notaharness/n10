@@ -71,8 +71,10 @@ export function createWorktreeHost(
       ]);
     },
     listBranches: () => later([...repo().data.branches]),
-    listAllBranches: () =>
-      later([...repo().data.branches, `origin/${repo().data.defaultBranch}`]),
+    listAllBranches: (cwd) => {
+      const { data } = state.repoAt(cwd);
+      return later([...data.branches, `origin/${data.defaultBranch}`]);
+    },
     createWorktree: (branch) => {
       repo().worktrees.add(branch);
       return later(worktreeDir(repo().cwd, branch), 300);

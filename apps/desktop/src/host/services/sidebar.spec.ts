@@ -190,7 +190,7 @@ describe('sync state', () => {
     await flush();
     settle(0);
     await first;
-    expect(sidebar.getSyncState()).toMatchObject({
+    expect(sidebar.getSyncState(env.cwd)).toMatchObject({
       providerId: 'github',
       providerConfigured: true,
       lastRemoteSyncAt: 1_000_000,
@@ -204,19 +204,19 @@ describe('sync state', () => {
     env.cwd = '/repo-b';
     // The cached timestamp belongs to the other checkout; reporting it
     // here would claim this repo had just synced.
-    expect(sidebar.getSyncState().lastRemoteSyncAt).toBeNull();
+    expect(sidebar.getSyncState(env.cwd).lastRemoteSyncAt).toBeNull();
   });
 
   it('reports the interval the config sets', () => {
     env.config = { prPollInterval: 5_000 };
-    expect(sidebar.getSyncState().remoteIntervalMs).toBe(5_000);
+    expect(sidebar.getSyncState(env.cwd).remoteIntervalMs).toBe(5_000);
   });
 
   it('does not call the provider at all when it is not configured', async () => {
     env.configured = false;
     await listSidebarItems();
     expect(env.fetchCount).toBe(0);
-    expect(sidebar.getSyncState().providerConfigured).toBe(false);
+    expect(sidebar.getSyncState(env.cwd).providerConfigured).toBe(false);
   });
 
   it('reports the failure the cache recorded', async () => {
@@ -224,7 +224,7 @@ describe('sync state', () => {
     await flush();
     env.pending[0].reject(new Error('provider exploded'));
     await bad;
-    expect(sidebar.getSyncState().remoteError).toBe('provider exploded');
+    expect(sidebar.getSyncState(env.cwd).remoteError).toBe('provider exploded');
   });
 });
 
@@ -290,7 +290,7 @@ describe('after the credentials change', () => {
     // The cleared list and error are themselves a change worth
     // painting, before any fetch has landed.
     expect(announced).toBe(1);
-    expect(sidebar.getSyncState().lastRemoteSyncAt).toBeNull();
+    expect(sidebar.getSyncState(env.cwd).lastRemoteSyncAt).toBeNull();
     pullRequests.setRemoteUpdatedNotifier(null);
   });
 });

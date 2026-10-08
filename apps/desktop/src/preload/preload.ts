@@ -45,11 +45,11 @@ const api: N10HostApi = {
     ipcRenderer.invoke(IPC.updateSettingsField, ref, value),
 
   getSidebarModel: (repo) => ipcRenderer.invoke(IPC.getSidebarModel, repo),
-  getSyncState: () => ipcRenderer.invoke(IPC.getSyncState),
+  getSyncState: (repo) => ipcRenderer.invoke(IPC.getSyncState, repo),
   refreshRemote: () => ipcRenderer.invoke(IPC.refreshRemote),
   listWorktrees: () => ipcRenderer.invoke(IPC.listWorktrees),
   listBranches: () => ipcRenderer.invoke(IPC.listBranches),
-  listAllBranches: () => ipcRenderer.invoke(IPC.listAllBranches),
+  listAllBranches: (repo) => ipcRenderer.invoke(IPC.listAllBranches, repo),
   createWorktree: (branch) => ipcRenderer.invoke(IPC.createWorktree, branch),
   removeWorktree: (branch, approved) =>
     ipcRenderer.invoke(IPC.removeWorktree, branch, approved),

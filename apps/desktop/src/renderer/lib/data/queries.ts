@@ -142,7 +142,7 @@ export function useSidebarModel(cwd: string) {
 export function useSyncState(cwd: string) {
   return useQuery({
     queryKey: keys.sync(cwd),
-    queryFn: () => window.n10.getSyncState(),
+    queryFn: () => window.n10.getSyncState(cwd),
     refetchInterval: 4_000,
     placeholderData: (prev) => prev,
   });
@@ -151,7 +151,7 @@ export function useSyncState(cwd: string) {
 export function useAllBranches(cwd: string, enabled = true) {
   return useQuery({
     queryKey: keys.branches(cwd),
-    queryFn: () => window.n10.listAllBranches(),
+    queryFn: () => window.n10.listAllBranches(cwd),
     enabled,
     staleTime: 30_000,
   });

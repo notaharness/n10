@@ -197,12 +197,12 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ],
 
   ['getSidebarModel', ['/repo'], 'sidebar.getSidebarSnapshot'],
-  ['getSyncState', [], 'sidebar.getSyncState'],
+  ['getSyncState', ['/repo'], 'sidebar.getSyncState'],
   ['refreshRemote', [], 'sidebar.refreshRemote'],
 
   ['listWorktrees', [], 'worktrees.listWorktrees'],
   ['listBranches', [], 'worktrees.listBranches'],
-  ['listAllBranches', [], 'worktrees.listAllBranches'],
+  ['listAllBranches', ['/repo'], 'worktrees.listAllBranches'],
   ['createWorktree', ['feature'], 'worktrees.createWorktree'],
   [
     'removeWorktree',

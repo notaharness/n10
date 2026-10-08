@@ -97,8 +97,7 @@ export async function getSidebarSnapshot(cwd: string): Promise<SidebarModel> {
   return { cwd: repo.cwd, items: await listSidebarItems(repo) };
 }
 
-export function getSyncState(): SyncState {
-  const cwd = requireRepo();
+export function getSyncState(cwd: string): SyncState {
   const { config, provider, configured } = resolveProvider(cwd);
   const remote = pullRequests.getSnapshot(cwd);
   const decorations = getSyncDecorations(cwd);

@@ -49,8 +49,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   strip spans repos: activating a foreign tab opens its repo
   (`useRepoFollowsTabs`); nothing renders another repo's content in place.
 - The reads a pane or the sidebar makes name the repository they read
-  (`getSidebarModel(repo)`, the review reads, sessions, branch sessions,
-  agent options, worktree diffs; diff requests carry `repo`) and resolve it
+  (`getSidebarModel(repo)`, sync state, branch lists, the review reads,
+  sessions, branch sessions, agent options, worktree diffs; diff requests
+  carry `repo`) and resolve it
   through `repository(cwd)`; writes stay on the selected repository. A parked
   repository's sidebar keeps its sync loop's last decorations
   (`getSyncDecorations(cwd)`). Sidebar answers are stamped with the repo they

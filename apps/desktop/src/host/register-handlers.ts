@@ -72,11 +72,11 @@ export function createHostApi(): HostApi {
       Promise.resolve(settings.updateSettingsFromView(ref, value)),
 
     getSidebarModel: (cwd) => sidebar.getSidebarSnapshot(cwd),
-    getSyncState: () => Promise.resolve(sidebar.getSyncState()),
+    getSyncState: (cwd) => Promise.resolve(sidebar.getSyncState(cwd)),
     refreshRemote: () => sidebar.refreshRemote(),
     listWorktrees: () => worktrees.listWorktrees(),
     listBranches: () => worktrees.listBranches(),
-    listAllBranches: () => worktrees.listAllBranches(),
+    listAllBranches: (cwd) => worktrees.listAllBranches(cwd),
     createWorktree: (branch) => worktrees.createWorktree(branch),
     removeWorktree: (branch, approved) =>
       worktrees.removeWorktree(branch, approved),

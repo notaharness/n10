@@ -388,7 +388,7 @@ export interface N10HostApi {
   /** The sidebar of `repo`, open or not, stamped with the repository
    *  it describes — see `SidebarModel`. */
   getSidebarModel(repo: string): Promise<SidebarModel>;
-  getSyncState(): Promise<SyncState>;
+  getSyncState(repo: string): Promise<SyncState>;
   /** Drop the remote PR cache and re-fetch now. */
   refreshRemote(): Promise<void>;
 
@@ -396,7 +396,7 @@ export interface N10HostApi {
   listWorktrees(): Promise<WorktreeInfo[]>;
   listBranches(): Promise<string[]>;
   /** All local + remote branch names (checkout candidates). */
-  listAllBranches(): Promise<string[]>;
+  listAllBranches(repo: string): Promise<string[]>;
   createWorktree(branch: string): Promise<string>;
   /** Remove with the verdict the user confirmed; core's outcome says
    *  what was kept, if anything. */
