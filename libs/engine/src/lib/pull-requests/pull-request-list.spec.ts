@@ -481,16 +481,24 @@ describe('snapshots and subscriptions', () => {
     expect(list.getSnapshot('/x').prMap).toEqual({ x: null });
   });
 
-  it('tells a repository its scope was evicted', async () => {
+  it('keeps every list a repository shows, however many and however old', async () => {
     await sync('/first', { a: null });
-    const heard: string[] = [];
-    list.subscribe((cwd) => heard.push(cwd));
-    for (let i = 0; i < 8; i++) {
-      now += 1_000;
+    for (let i = 0; i < 12; i++) {
+      now += 3_600_000;
       await sync(`/repo-${i}`, {});
     }
-    expect(list.getSnapshot('/first').fetchedAt).toBeNull();
-    expect(heard).toContain('/first');
+    expect(list.getSnapshot('/first').prMap).toEqual({ a: null });
+  });
+
+  it('lets a list within the max age serve without a read past its TTL', async () => {
+    await sync('/a', {});
+    now += 120_000;
+    list.refreshInBackground('/a', { maxAge: 3_600_000 });
+    expect(fetchCount()).toBe(1);
+    now += 3_600_000;
+    list.refreshInBackground('/a', { maxAge: 3_600_000 });
+    expect(fetchCount()).toBe(2);
+    settle(1);
   });
 
   it('stays quiet when the list was already fresh', async () => {
@@ -693,16 +701,6 @@ describe('across repositories', () => {
       await sync('/active', {});
     }
     expect(list.getSnapshot('/active').fetchedAt).not.toBeNull();
-  });
-
-  it('forgets the least recently used repo rather than growing forever', async () => {
-    for (let i = 0; i < 9; i++) {
-      now += 1_000;
-      await sync(`/repo-${i}`, {});
-    }
-    expect(fetchCount()).toBe(9);
-    expect(list.getSnapshot('/repo-1').fetchedAt).not.toBeNull();
-    expect(list.getSnapshot('/repo-0').fetchedAt).toBeNull();
   });
 });
 

@@ -25,7 +25,7 @@ export function createReviewService(
   const agentComments = createAgentComments(options, provider.invalidate);
   const diff = createDiffReads(
     options.config.repo,
-    options.isCurrent,
+    options.freshness,
     options.worktrees
   );
   let rows = options.pullRequests.getSnapshot(options.config.repo).prMap;

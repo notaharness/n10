@@ -7,6 +7,7 @@ import type {
 } from '@n10/worktree-manager';
 import { createWorktreeService } from './worktree-service.js';
 import type { WorktreeService } from './worktree-service.js';
+import type { ReadFreshness } from '../kernel/read-freshness.js';
 
 const ports = vi.hoisted(() => ({
   list: vi.fn<(scope: WorktreeScope) => Promise<WorktreeInfo[]>>(),
@@ -56,7 +57,7 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
-function harness(repo = '/repo') {
+function harness(repo = '/repo', freshness?: ReadFreshness) {
   let snapshot = {
     config: {
       vendorAuth: {},
@@ -76,6 +77,7 @@ function harness(repo = '/repo') {
         };
       },
     },
+    freshness,
   });
   services.push(service);
   return {
@@ -125,6 +127,24 @@ describe('worktree resources', () => {
     vi.setSystemTime(Date.now() + 1_001);
     await service.read();
     expect(ports.list).toHaveBeenCalledTimes(2);
+  });
+  it('serves a parked repository what it holds, reading behind it past the parked TTL', async () => {
+    let parked = false;
+    const { service } = harness('/repo', {
+      parked: () => parked,
+      parkedTtl: 3_600_000,
+    });
+    const held = await service.read();
+    parked = true;
+    vi.setSystemTime(Date.now() + 60_000);
+    expect(await service.read()).toBe(held);
+    expect(ports.list).toHaveBeenCalledOnce();
+    vi.setSystemTime(Date.now() + 3_600_000);
+    ports.list.mockResolvedValue([row, { ...row, branch: 'next' }]);
+    expect((await service.read()).worktrees).toBe(held.worktrees);
+    expect(ports.list).toHaveBeenCalledTimes(2);
+    await flush();
+    expect(service.getSnapshot().worktrees).toHaveLength(2);
   });
   it('coalesces explicit refreshes into one follow-up, without queuing ordinary readers', async () => {
     const a = deferred<WorktreeInfo[]>(),

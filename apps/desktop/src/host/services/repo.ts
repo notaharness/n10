@@ -1,7 +1,12 @@
 import { startBabysitForRepo, stopBabysitForBranch } from './babysit.js';
 import { canonicalRepoPath, isGitRepo, resetRepoRoot } from '@n10/core';
-import type { ConfigService, RepositoryHandle } from '@n10/engine';
-import { repositories } from './program.js';
+import {
+  createRepositoryService,
+  type ConfigService,
+  type RepositoryHandle,
+} from '@n10/engine';
+import { pullRequests } from './program.js';
+import { PROVIDERS } from './providers.js';
 import {
   NoActiveRepoError,
   type RecentRepoEntry,
@@ -15,6 +20,18 @@ import {
   withColors,
   type RecentRepo,
 } from './recent-repos.js';
+
+// The babysit module imports this one: its bindings are read on call,
+// not while the modules load.
+const repositories = createRepositoryService({
+  providers: PROVIDERS,
+  pullRequests,
+  worktreeWatchers: {
+    suspend: (repo, branch) => stopBabysitForBranch(repo, branch),
+    resume: (repo, id) => startBabysitForRepo(repo, id),
+    isCurrent: activeRepoIs,
+  },
+});
 
 let repoOpenedListener: ((cwd: string) => void) | null = null;
 
@@ -61,13 +78,7 @@ export function activeRepoIs(cwd: string): boolean {
 
 export function openRepo(path: string): RepoInfo {
   const previous = repositories.getSnapshot();
-  const opened = repositories.open(path, {
-    worktreeWatchers: {
-      suspend: stopBabysitForBranch,
-      resume: startBabysitForRepo,
-      isCurrent: activeRepoIs,
-    },
-  });
+  const opened = repositories.open(path);
   // Plan delivery still resolves the process repo root.
   // Keep their ambient scope aligned until those domains take explicit handles.
   process.chdir(opened.cwd);

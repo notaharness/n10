@@ -187,8 +187,8 @@ rediscovery without pretending their hosted agents exited.
 A launch captures one repository handle and its config before awaiting worktree
 resolution or fleet checks. A repository change before launch refuses the request.
 Identical requests join; incompatible requests resolving to one checkout cannot
-replace each other's PTY. Stopping observation on a repo switch disposes timers
-and listeners but preserves every connected agent. Exit notifications update
+replace each other's PTY. Parking a repository on a switch stops its observation
+timers and listeners but preserves every connected agent. Exit notifications update
 session facts without spawning or reattaching.
 
 How an agent's session ended decides what its tab shows, following what tmux
@@ -661,6 +661,27 @@ Babysitter thread reads use the provider throttle and TTL outside the list-cycle
 budget. GitHub gets rollup and counts with its list query and needs no equivalent
 per-row cache-reset methods. `request-budget.spec.ts` checks request counts.
 
+## Parked repositories
+
+`engine/repositories` keeps a handle for every repository opened or read this
+run, and selects one. Selecting another parks the one before: its discovery
+stops, and its config, worktrees, session rows, review reads and pull request
+list stay for the life of the process. A repository left hours ago is still
+worth showing at once, and nothing a person opened in one run is enough to
+need a bound. `get(path)` hands out a handle for reading without selecting it.
+
+A parked repository's reads are stale-while-revalidate with one threshold,
+`PARKED_REPOSITORY_TTL_MS` (an hour, `kernel/read-freshness.ts` applies it).
+Inside it, they answer what is held and read nothing; past it, they answer
+what is held and start a read behind it; with nothing held, they read and wait,
+as the selected repository does. The selected repository keeps each
+resource's own TTL. `prewarm()` applies the same rule to what a repository's
+panes all need: its worktrees and session rows, and its pull request list
+(`refreshInBackground` with a `maxAge`). The pull request list never evicts a
+scope a repository shows; past its bound it drops only scopes a config change
+left behind. Within one repository, each review resource kind still holds 32
+entries, never evicting one observed or loading.
+
 ## Review read ownership
 
 The repository handle owns `engine/reviews`: thread, description, detail, checks,
@@ -669,7 +690,9 @@ answers, and a forced read queues one follow-up. Provider data and branch resolu
 are fresh for 30 seconds; live checkout diffs for one second. A failed read retains
 same-scope data and permits immediate retry. Explicit thread invalidation (including
 opening a composer) forces an engine read. Account/config changes clear data
-and reject obsolete publication; disposing a repository prevents late publication.
+and reject obsolete publication. Reads answer whichever repository they are asked
+of, selected or parked; replies, resolutions, submissions, mention searches and
+agent publications refuse any but the selected one, before and after their awaits.
 The desktop RPC rejects a failed answer and its query cache retains the last good
 view. TUI hooks subscribe directly. Frontends own visibility and error presentation,
 not another freshness policy.
@@ -953,8 +976,9 @@ Session targets resolve from checkout identity; PR targets ensure a checkout
 exists. Editor process launching and selection/focus remain shell adapters.
 
 Discovery captures its repository and replaces its non-recursive filesystem
-watch when the configured worktree base changes. Switching repositories disposes
-the old resource subscription; it does not detach retained session clients.
+watch when the configured worktree base changes. Switching repositories parks
+the old handle: its resources stay, its observation stops, and retained session
+clients are untouched.
 
 ## Engine fleet boundary
 

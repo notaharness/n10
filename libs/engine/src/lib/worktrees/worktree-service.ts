@@ -7,6 +7,11 @@ import {
 } from '@n10/worktree-manager';
 import type { WorktreeInfo, WorktreeScope } from '@n10/worktree-manager';
 import { logError } from '@n10/logger';
+import {
+  ALWAYS_SELECTED,
+  parkedWarm,
+  type ReadFreshness,
+} from '../kernel/read-freshness.js';
 import { createWorktreeCommands } from './worktree-commands.js';
 import type {
   WorktreeCommands,
@@ -25,7 +30,8 @@ export interface WorktreeService extends WorktreeCommands {
   scope(): WorktreeScope;
   getSnapshot(): WorktreeSnapshot;
   subscribe(listener: () => void): () => void;
-  /** Cached for one second; reads never reject and failures preserve known data. */
+  /** Cached for one second, or served as held while the repository is
+   *  parked; reads never reject and failures preserve known data. */
   read(): Promise<WorktreeSnapshot>;
   /** Concurrent refreshes join one follow-up after the active read. */
   refresh(): Promise<WorktreeSnapshot>;
@@ -46,8 +52,9 @@ export function createWorktreeService(options: {
   config: WorktreeConfig;
   watchers?: WorktreeWatchers;
   rescanSessions?(): Promise<void>;
+  freshness?: ReadFreshness;
 }): WorktreeService {
-  const { config } = options;
+  const { config, freshness = ALWAYS_SELECTED } = options;
   let snapshot: WorktreeSnapshot = {
     worktrees: [],
     branches: [],
@@ -130,6 +137,11 @@ export function createWorktreeService(options: {
       };
     },
     read() {
+      if (freshness.parked() && fetchedAt !== null) {
+        // `refresh` settles every pass itself and never rejects.
+        if (!active && !parkedWarm(freshness, fetchedAt, 1_000)) void refresh();
+        return Promise.resolve(snapshot);
+      }
       if (active) return active;
       return fetchedAt !== null && Date.now() - fetchedAt < 1_000
         ? Promise.resolve(snapshot)

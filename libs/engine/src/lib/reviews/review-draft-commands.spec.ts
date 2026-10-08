@@ -77,11 +77,12 @@ describe('review drafts service', () => {
     ).resolves.toMatchObject({ drafts: [] });
   });
 
-  it('refuses a repository that is no longer open', async () => {
+  it('lists a parked repository’s drafts', async () => {
+    await saveDraft({ ref: REF, viewer: 'bea', target: REPLY, body: 'mine' });
     env.open = false;
-    await expect(listDrafts({ ref: REF, viewer: 'bea' })).rejects.toThrow(
-      /no longer open/
-    );
+    await expect(
+      listDrafts({ ref: REF, viewer: 'bea' })
+    ).resolves.toMatchObject({ drafts: [{ body: 'mine' }] });
   });
 
   it.each([

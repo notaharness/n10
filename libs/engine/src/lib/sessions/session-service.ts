@@ -51,7 +51,8 @@ export interface SessionWatchPorts extends SessionLaunchPorts {
 }
 export type SessionService = ReturnType<typeof createSessionService>;
 
-/** Observation ends with the repository handle; existing PTY clients survive. */
+/** Observation ends when the repository is parked or the handle disposed;
+ *  existing PTY clients survive both. */
 export function createSessionService(options: {
   config: WorktreeConfig;
   worktrees: WorktreeService;
@@ -244,6 +245,7 @@ export function createSessionService(options: {
       const offExit = onSessionExit(publish);
       void refresh();
       const stop = () => {
+        if (stopped) return;
         stopped = true;
         const scan = scanner.lastScan();
         if (scan) lastScans.set(config.repo, scan);
@@ -253,6 +255,11 @@ export function createSessionService(options: {
       };
       stopWatch = stop;
       return stop;
+    },
+    /** Another repository was selected: stop observing this one. Its
+     *  rows stay; the next watch starts from its last scan. */
+    park() {
+      stopWatch?.();
     },
     dispose() {
       disposed = true;

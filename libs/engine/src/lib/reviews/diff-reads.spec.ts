@@ -48,13 +48,11 @@ const request = {
 };
 const patchRequest = { repo: '/repo/a', mergeBaseOid: BASE, headOid: HEAD };
 const find = vi.fn();
-let current = true;
 const reads = (repo = '/repo/a') =>
-  createDiffReads(repo, () => current, { find }, {});
+  createDiffReads(repo, undefined, { find }, {});
 
 beforeEach(() => {
   vi.resetAllMocks();
-  current = true;
   vi.mocked(fetchRefs).mockResolvedValue(true);
   vi.mocked(resolvePrComparison).mockImplementation(async (req) => ({
     ok: true,
@@ -95,7 +93,7 @@ describe('manifest', () => {
   it('lists under the ceiling the environment sets', async () => {
     const diff = createDiffReads(
       '/repo/a',
-      () => true,
+      undefined,
       { find },
       {
         N10_DIFF_MANIFEST_MAX_BYTES: '400',
@@ -178,17 +176,6 @@ describe('manifest', () => {
     expect(resolvePrComparison).not.toHaveBeenCalled();
   });
 
-  it('drops an answer when the repository closes during the read', async () => {
-    vi.mocked(readPrDiffManifest).mockImplementationOnce(async (_cwd, c) => {
-      current = false;
-      return { comparison: c, files: [], complete: true };
-    });
-    expect(await readResourceValue(reads().manifest(request))).toMatchObject({
-      ok: false,
-      error: { code: 'repo-changed' },
-    });
-  });
-
   it.each([
     [{ ...request, repo: 42 }, 'repo must be a string'],
     [{ ...request, sourceBranch: ['x'] }, 'sourceBranch must be a string'],
@@ -235,17 +222,6 @@ describe('patch', () => {
     // Past the two kept: read again.
     await readResourceValue(diff.patch(of('a')));
     expect(calls('a')).toBe(2);
-  });
-
-  it('drops an answer when the repository closes mid-read', async () => {
-    vi.mocked(readPrDiffPatch).mockImplementationOnce(async () => {
-      current = false;
-      return { text: '', truncated: false, limitBytes: 1 };
-    });
-    expect(await readResourceValue(reads().patch(patchRequest))).toMatchObject({
-      ok: false,
-      error: { code: 'repo-changed' },
-    });
   });
 
   it.each([
@@ -315,16 +291,6 @@ describe('rangeManifest', () => {
       )
     ).toMatchObject({ ok: false, error: { code: 'repo-changed' } });
     expect(readRevisionRangeManifest).not.toHaveBeenCalled();
-  });
-
-  it('drops an answer when the repository closes during the read', async () => {
-    vi.mocked(readRevisionRangeManifest).mockImplementationOnce(async () => {
-      current = false;
-      return { ok: false, error: { code: 'to-unavailable', message: 'x' } };
-    });
-    expect(await readResourceValue(reads().rangeManifest(range))).toMatchObject(
-      { ok: false, error: { code: 'repo-changed' } }
-    );
   });
 
   it('reads a range that failed again, rather than keeping the failure', async () => {

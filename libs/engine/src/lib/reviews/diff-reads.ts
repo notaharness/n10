@@ -15,6 +15,7 @@ import type {
   RevisionRangeError,
 } from '@n10/core';
 import type { WorktreeService } from '../worktrees/api.js';
+import type { ReadFreshness } from '../kernel/read-freshness.js';
 import { createResourceCache } from './resource-cache.js';
 import { readResourceValue } from './read-resource.js';
 import {
@@ -32,7 +33,7 @@ export type {
   PrRangeManifestRequest,
 };
 
-/** The repository changed between the request and the answer. */
+/** The request named another repository than the one it was asked of. */
 export interface RepoChangedError {
   code: 'repo-changed';
   message: string;
@@ -69,42 +70,39 @@ const PATCHES_KEPT = 2;
  */
 export function createDiffReads(
   repo: string,
-  isCurrent: () => boolean,
+  freshness: ReadFreshness | undefined,
   worktrees: Pick<WorktreeService, 'find'>,
   env: Record<string, string | undefined> = process.env
 ) {
   const ceiling = manifestCeiling(env);
   const manifests = createResourceCache<PrDiffManifestResult>(
     RESOLUTION_TTL_MS,
-    32,
-    (result) => result.ok
+    { capacity: 32, cacheable: (result) => result.ok, freshness }
   );
   // What the commits determine. The comparison is the one just resolved:
   // a target that moves past the same merge base lists the same files.
   const listings = createResourceCache<Omit<PrDiffManifest, 'comparison'>>(
     Infinity,
-    8
+    { capacity: 8 }
   );
   // Patches are the reader's batches, up to the patch ceiling each, and
   // the renderer holds the set on screen: this joins reads in flight and
   // keeps the last two finished, never evicting one still loading.
-  const patches = createResourceCache<PrDiffPatchResult>(
-    Infinity,
-    PATCHES_KEPT,
-    (result) => result.ok
-  );
-  const ranges = createResourceCache<PrRangeManifestResult>(
-    Infinity,
-    8,
-    (result) => result.ok
-  );
-  const live = createResourceCache<string>(1_000, 2);
+  const patches = createResourceCache<PrDiffPatchResult>(Infinity, {
+    capacity: PATCHES_KEPT,
+    cacheable: (result) => result.ok,
+  });
+  const ranges = createResourceCache<PrRangeManifestResult>(Infinity, {
+    capacity: 8,
+    cacheable: (result) => result.ok,
+  });
+  const live = createResourceCache<string>(1_000, { capacity: 2, freshness });
   const changed = (asked: string): RepoChangedError | null =>
-    asked === repo && isCurrent()
+    asked === repo
       ? null
       : {
           code: 'repo-changed',
-          message: `${asked} is no longer the open repository`,
+          message: `${asked} is not this repository`,
         };
   async function resolve(req: Omit<PrDiffManifestRequest, 'repo'>) {
     // A target the provider did not pin is this clone's idea of it;
@@ -140,16 +138,13 @@ export function createDiffReads(
       return manifests.get(
         JSON.stringify([asked, req]),
         async (): Promise<PrDiffManifestResult> => {
-          const before = changed(asked);
-          if (before) return { ok: false, error: before };
+          const foreign = changed(asked);
+          if (foreign) return { ok: false, error: foreign };
           const resolved = await resolve(req);
           if (!resolved.ok) return resolved;
           const { comparison } = resolved;
           const listed = await readResourceValue(listing(comparison));
-          const after = changed(asked);
-          return after
-            ? { ok: false, error: after }
-            : { ok: true, manifest: { ...listed, comparison } };
+          return { ok: true, manifest: { ...listed, comparison } };
         }
       );
     },
@@ -159,15 +154,14 @@ export function createDiffReads(
       return patches.get(
         JSON.stringify([asked, req]),
         async (): Promise<PrDiffPatchResult> => {
-          const before = changed(asked);
-          if (before) return { ok: false, error: before };
+          const foreign = changed(asked);
+          if (foreign) return { ok: false, error: foreign };
           const { paths, context, ...bounds } = req;
           const patch = await readPrDiffPatch(repo, bounds, {
             ...(paths ? { paths } : {}),
             ...(context === undefined ? {} : { context }),
           });
-          const after = changed(asked);
-          return after ? { ok: false, error: after } : { ok: true, patch };
+          return { ok: true, patch };
         }
       );
     },
@@ -179,14 +173,9 @@ export function createDiffReads(
       return ranges.get(
         JSON.stringify([asked, req]),
         async (): Promise<PrRangeManifestResult> => {
-          const before = changed(asked);
-          if (before) return { ok: false, error: before };
-          const result = await readRevisionRangeManifest(
-            { cwd: repo, ...req },
-            ceiling
-          );
-          const after = changed(asked);
-          return after ? { ok: false, error: after } : result;
+          const foreign = changed(asked);
+          if (foreign) return { ok: false, error: foreign };
+          return readRevisionRangeManifest({ cwd: repo, ...req }, ceiling);
         }
       );
     },

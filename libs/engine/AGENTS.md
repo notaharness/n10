@@ -17,21 +17,27 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   project, credentials generation) — never by secrets. One request per scope;
   a forced read queues exactly one request behind the one out. `refresh`
   forgets the provider memo when its own request starts. Failures keep the last
-  good list with the error. Eviction never takes the scope a watched repository
-  shows: its watch would read it back and evict the next. Tests drive time with fake timers and a matching
-  `now`.
+  good list with the error. Eviction never takes a scope a repository shows;
+  past its bound it drops only scopes a config change left behind. Tests drive
+  time with fake timers and a matching `now`.
 
 - **Config** (`config/`): one explicit repo per service, stable snapshots and
   synchronous commands. Persist and re-read effective config before invalidating
   PR caches or notifying subscribers. A no-op reload preserves snapshot identity;
   a failed write publishes nothing. The sync service observes syncRevision directly. Keep secrets in Node; only the host's masked form crosses IPC.
 
-- **Repositories** (`repositories/`): canonicalize Git’s root before replacing
-  the selected handle. Each handle owns one config service; its subscription is
-  the sole channel for config-derived metadata. Selection returns a handle
-  synchronously and does not keep another metadata store. Detection and config reads use that path, never process cwd.
-  Shells select startup repositories and own recents; opening must not detach
-  sessions belonging to the previously selected repository.
+- **Repositories** (`repositories/`): canonicalize Git’s root before selecting
+  or reading a handle. Every handle opened or read (`get`) stays for the life of
+  the service; selecting another parks the previous one, stopping its
+  observation and keeping its data. A parked handle's reads serve what they
+  hold and refresh behind it past `PARKED_REPOSITORY_TTL_MS`
+  (`kernel/read-freshness.ts`); writes refuse any but the selected handle.
+  Each handle owns one config service; its subscription is the sole channel
+  for config-derived metadata. Selection returns a handle synchronously and
+  does not keep another metadata store. Detection and config reads use that
+  path, never process cwd. Shells select startup repositories and own
+  recents; opening must not detach sessions belonging to the previously
+  selected repository.
 
 - **Sync** (`sync/`): one captured repository, one active pass and at most one
   queued manual refresh. Skip busy timer ticks. Config revisions cancel stale
@@ -68,8 +74,8 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   launch/stop commands. Discovery uses `worktrees.scope()` live; tmux observation
   takes the captured repository. Launches capture config before awaiting, reject
   a repository switch before spawning, and serialize by request and resolved key.
-  Repository disposal stops observation, never the connected agents; the
-  next handle's discovery starts from its last scan, so removals in between
+  Parking or disposal stops observation, never the connected agents; the
+  next watch's discovery starts from the last scan, so removals in between
   are reported. Connections list the agents the registry holds; one whose
   tmux session is gone (`processState.gone`) is released as it ends, while an
   exited one with its dead pane kept stays while tmux holds its session

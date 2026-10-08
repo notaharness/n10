@@ -78,7 +78,7 @@ export function createAgentComments(
     return value;
   }
   function existing(prId: number, id: string) {
-    context.current();
+    context.selected();
     const comment = read(prId).find((item) => item.id === id);
     if (!comment) throw new Error('Draft comment no longer exists');
     publication.requireEditable(prId, comment);
