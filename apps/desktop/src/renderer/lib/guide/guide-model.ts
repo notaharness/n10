@@ -3,6 +3,7 @@ import type {
   GuideSlide,
   GuideVisual,
   GuidedReview,
+  ReviewComment,
 } from '../../../host/contract.js';
 
 /**
@@ -15,14 +16,38 @@ import type {
 export type SlideLayout =
   /** Words only, set wide and large. */
   | 'text'
-  /** Words beside one picture. */
+  /** Words beside a few lines of code. */
   | 'split'
+  /** Words above a diagram as wide as the slide, so its labels are
+   *  drawn at their own size rather than squeezed into a column. */
+  | 'stack'
   /** Words above a before and an after, side by side. */
   | 'compare';
 
 export function slideLayout(slide: GuideSlide): SlideLayout {
   if (slide.before && slide.after) return 'compare';
-  return slide.visual ? 'split' : 'text';
+  if (!slide.visual) return 'text';
+  return 'mermaid' in slide.visual ? 'stack' : 'split';
+}
+
+/**
+ * The agent's draft comment on the lines a slide names, if there is
+ * one: opening the place shows the code with the comment beside it.
+ */
+export function draftAt(
+  file: GuideFile,
+  drafts: readonly ReviewComment[]
+): ReviewComment | undefined {
+  const { lineStart } = file;
+  if (lineStart === undefined) return undefined;
+  const lineEnd = file.lineEnd ?? lineStart;
+  return drafts.find(
+    (draft) =>
+      draft.file === file.path &&
+      draft.side === 'RIGHT' &&
+      draft.lineStart <= lineEnd &&
+      draft.lineEnd >= lineStart
+  );
 }
 
 /** How many steps the guide has, its cover included. */

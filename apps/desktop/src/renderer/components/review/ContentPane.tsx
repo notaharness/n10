@@ -166,6 +166,7 @@ export function ContentPane({
   onPrev,
   onNext,
   onExitReview,
+  onReviewDrafts,
   onOpenInDiff,
   onOverviewAction,
   onOpenThread,
@@ -218,6 +219,8 @@ export function ContentPane({
   onPrev: () => void;
   onNext: () => void;
   onExitReview: () => void;
+  /** Opens the walkthrough of the agent's drafts. */
+  onReviewDrafts: () => void;
   onOpenInDiff: (file: string) => void;
   /** The Overview's next-step button. */
   onOverviewAction: (action: AttentionAction) => void;
@@ -276,8 +279,11 @@ export function ContentPane({
       <GuideLayer
         guide={effMode === 'guide' ? guide : null}
         headSha={headSha}
+        drafts={drafts}
         onOpenFile={onOpenInDiff}
+        onOpenDraft={onOpenThread}
         onDone={onExitReview}
+        onReviewDrafts={onReviewDrafts}
       />
       {plan && effMode === 'plan' && (
         <div className="absolute inset-0">

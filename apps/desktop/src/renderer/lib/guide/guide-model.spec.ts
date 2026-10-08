@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { GuidedReview } from '../../../host/contract.js';
+import type { GuidedReview, ReviewComment } from '../../../host/contract.js';
 import {
   clampStep,
   codeFence,
+  draftAt,
   fileLabel,
   isGuideStale,
   slideLayout,
@@ -22,7 +23,8 @@ describe('slideLayout', () => {
   it('lays a slide out by what it has', () => {
     const diagram = { mermaid: 'flowchart LR\n a' };
     expect(slideLayout({ title: 'a' })).toBe('text');
-    expect(slideLayout({ title: 'a', visual: diagram })).toBe('split');
+    expect(slideLayout({ title: 'a', visual: diagram })).toBe('stack');
+    expect(slideLayout({ title: 'a', visual: { code: 'x' } })).toBe('split');
     expect(slideLayout({ title: 'a', before: diagram, after: diagram })).toBe(
       'compare'
     );
@@ -77,5 +79,34 @@ describe('fileLabel', () => {
       lines: '3',
     });
     expect(fileLabel({ path: 'b.ts' }).lines).toBeNull();
+  });
+});
+
+describe('draftAt', () => {
+  const draft = (lineStart: number, lineEnd: number, side = 'RIGHT') =>
+    ({
+      id: `d${lineStart}`,
+      file: 'src/a.ts',
+      lineStart,
+      lineEnd,
+      side,
+    } as ReviewComment);
+
+  /** A slide's place opens at the agent's comment when one is on it. */
+  it('finds the comment on the lines a slide names', () => {
+    const drafts = [draft(3, 4), draft(20, 22)];
+    const at = (lineStart?: number, lineEnd?: number) =>
+      draftAt({ path: 'src/a.ts', lineStart, lineEnd }, drafts)?.id;
+    expect(at(21)).toBe('d20');
+    expect(at(1, 3)).toBe('d3');
+    expect(at(5, 19)).toBeUndefined();
+    expect(at()).toBeUndefined();
+    expect(draftAt({ path: 'src/b.ts', lineStart: 3 }, drafts)).toBeUndefined();
+  });
+
+  it('ignores a comment on removed lines', () => {
+    expect(
+      draftAt({ path: 'src/a.ts', lineStart: 3 }, [draft(3, 3, 'LEFT')])
+    ).toBeUndefined();
   });
 });

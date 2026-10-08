@@ -46,7 +46,7 @@ export function MermaidDiagram({
       data-diagram
       role="img"
       aria-label={label}
-      className="flex justify-center [&_svg]:h-auto [&_svg]:max-h-[60vh] [&_svg]:max-w-full"
+      className="flex justify-center [&_svg]:h-auto [&_svg]:max-w-full"
       // Mermaid's own output at its strict security level, which
       // sanitizes every label it draws.
       dangerouslySetInnerHTML={{ __html: drawn.data }}

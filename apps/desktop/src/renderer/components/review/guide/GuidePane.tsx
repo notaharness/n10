@@ -1,6 +1,6 @@
 import { ArrowLeftIcon, ArrowRightIcon, HistoryIcon } from 'lucide-react';
-import { useEffect, useState, type ComponentProps } from 'react';
-import type { GuidedReview } from '../../../../host/contract.js';
+import { useEffect, useMemo, useState, type ComponentProps } from 'react';
+import type { GuidedReview, ReviewComment } from '../../../../host/contract.js';
 import {
   clampStep,
   guideSteps,
@@ -10,26 +10,36 @@ import {
 import { useTabView } from '../../../lib/tabs/tab-views.js';
 import { cn } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
-import { GuideCover, GuideSlide } from './GuideSlide.js';
+import { GuideCover, GuideSlide, type GuideOpen } from './GuideSlide.js';
 import { useGuideKeys } from './use-guide-keys.js';
 
 /**
  * The guided review: the review agent's walk through the pull request,
  * one step at a time, before the reader opens the changes. The cover
- * comes first; the last step hands the reader to the diff.
+ * comes first. A place a slide names opens in the diff, at the agent's
+ * comment when it left one there; the last step hands the reader to the
+ * agent's findings, or to the changes when there are none.
  */
 export function GuidePane({
   guide,
   headSha,
+  drafts,
   onOpenFile,
+  onOpenDraft,
   onDone,
+  onReviewDrafts,
 }: {
   guide: GuidedReview;
   /** The pull request's head, to tell a guide written for an older one. */
   headSha?: string;
+  /** The agent's unposted draft comments. */
+  drafts: ReviewComment[];
   onOpenFile: (path: string) => void;
+  onOpenDraft: (id: string, path: string) => void;
   /** Leaves the guide for the changes. */
   onDone: () => void;
+  /** Leaves the guide for the walkthrough of the agent's drafts. */
+  onReviewDrafts: () => void;
 }) {
   // The step the reader was on when they left the tab.
   const { saved, save } = useTabView();
@@ -40,7 +50,13 @@ export function GuidePane({
   const last = step === steps - 1;
   const go = (to: number) => setStep(clampStep(to, guide));
   const prev = () => go(step - 1);
-  const next = () => (last ? onDone() : go(step + 1));
+  const findings = drafts.length;
+  const finish = findings > 0 ? onReviewDrafts : onDone;
+  const next = () => (last ? finish() : go(step + 1));
+  const open = useMemo<GuideOpen>(
+    () => ({ file: onOpenFile, draft: onOpenDraft, drafts }),
+    [onOpenFile, onOpenDraft, drafts]
+  );
   useGuideKeys({ onPrev: prev, onNext: () => go(step + 1) });
   const slide = step > 0 ? guide.slides[step - 1] : undefined;
 
@@ -64,7 +80,7 @@ export function GuidePane({
           className="mx-auto flex min-h-full w-full max-w-6xl flex-col justify-center px-10 py-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
         >
           {slide ? (
-            <GuideSlide slide={slide} onOpenFile={onOpenFile} />
+            <GuideSlide slide={slide} open={open} />
           ) : (
             <GuideCover guide={guide} onGo={go} />
           )}
@@ -99,12 +115,18 @@ export function GuidePane({
           {step} / {steps - 1}
         </span>
         <Button size="sm" onClick={next}>
-          {last ? 'Open the changes' : step === 0 ? 'Start' : 'Next'}
+          {nextLabel(step, last, findings)}
           <ArrowRightIcon />
         </Button>
       </nav>
     </section>
   );
+}
+
+function nextLabel(step: number, last: boolean, findings: number): string {
+  if (!last) return step === 0 ? 'Start' : 'Next';
+  if (findings === 0) return 'Open the changes';
+  return findings === 1 ? 'Review the finding' : `Review ${findings} findings`;
 }
 
 /** The guided review, mounted only while it shows. */

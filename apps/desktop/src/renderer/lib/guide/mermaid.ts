@@ -36,7 +36,7 @@ function config(theme: ResolvedTheme): MermaidConfig {
     themeVariables: {
       darkMode: theme === 'dark',
       fontFamily,
-      fontSize: '14px',
+      fontSize: '16px',
       background: token('--background'),
       primaryColor: token('--secondary'),
       primaryTextColor: token('--foreground'),

@@ -1,10 +1,12 @@
-import { FileCodeIcon } from 'lucide-react';
+import { FileCodeIcon, MessageSquareIcon } from 'lucide-react';
 import type {
   GuideFile,
   GuideSlide as Slide,
   GuidedReview,
+  ReviewComment,
 } from '../../../../host/contract.js';
 import {
+  draftAt,
   fileLabel,
   slideLayout,
   stepLabels,
@@ -20,23 +22,38 @@ import { InlineMarkdown } from './InlineMarkdown.js';
  * and a picture, laid out by what it has (`slideLayout`).
  */
 
-/** Opens a file the slide is about in the diff. */
-function FileChip({
-  file,
-  onOpen,
-}: {
-  file: GuideFile;
-  onOpen: (path: string) => void;
-}) {
+/** What a slide's place opens: the agent's comment there, else the file. */
+export interface GuideOpen {
+  file: (path: string) => void;
+  draft: (id: string, path: string) => void;
+  drafts: readonly ReviewComment[];
+}
+
+/** Opens a place the slide names in the diff; where the agent left a
+ *  comment on those lines, it opens at the comment. */
+function FileChip({ file, open }: { file: GuideFile; open: GuideOpen }) {
   const { dir, name, lines } = fileLabel(file);
+  const draft = draftAt(file, open.drafts);
+  const Icon = draft ? MessageSquareIcon : FileCodeIcon;
   return (
     <button
       type="button"
-      onClick={() => onOpen(file.path)}
-      title={`Show ${file.path} in the changes`}
+      onClick={() =>
+        draft ? open.draft(draft.id, file.path) : open.file(file.path)
+      }
+      title={
+        draft
+          ? `Show the comment on ${file.path} in the changes`
+          : `Show ${file.path} in the changes`
+      }
       className="flex max-w-full items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-left font-mono text-xs transition-colors hover:bg-accent"
     >
-      <FileCodeIcon className="size-3.5 shrink-0 text-muted-foreground" />
+      <Icon
+        className={cn(
+          'size-3.5 shrink-0',
+          draft ? 'text-primary' : 'text-muted-foreground'
+        )}
+      />
       <span className="min-w-0 truncate">
         <span className="text-muted-foreground">{dir}</span>
         <span className="font-semibold">{name}</span>
@@ -46,13 +63,7 @@ function FileChip({
   );
 }
 
-function SlideWords({
-  slide,
-  onOpenFile,
-}: {
-  slide: Slide;
-  onOpenFile: (path: string) => void;
-}) {
+function SlideWords({ slide, open }: { slide: Slide; open: GuideOpen }) {
   return (
     <div className="flex min-w-0 flex-col gap-4">
       {slide.body && (
@@ -66,7 +77,7 @@ function SlideWords({
             <FileChip
               key={`${file.path}:${file.lineStart ?? ''}`}
               file={file}
-              onOpen={onOpenFile}
+              open={open}
             />
           ))}
         </div>
@@ -75,13 +86,7 @@ function SlideWords({
   );
 }
 
-export function GuideSlide({
-  slide,
-  onOpenFile,
-}: {
-  slide: Slide;
-  onOpenFile: (path: string) => void;
-}) {
+export function GuideSlide({ slide, open }: { slide: Slide; open: GuideOpen }) {
   const layout = slideLayout(slide);
   return (
     <article
@@ -102,11 +107,12 @@ export function GuideSlide({
           'grid gap-6',
           layout === 'split' &&
             '@3xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] @3xl:items-start',
-          layout === 'text' && 'max-w-3xl'
+          (layout === 'text' || layout === 'stack') &&
+            '[&>:not(figure)]:max-w-3xl'
         )}
       >
         {(slide.body || slide.files) && (
-          <SlideWords slide={slide} onOpenFile={onOpenFile} />
+          <SlideWords slide={slide} open={open} />
         )}
         {slide.visual && (
           <GuideVisual visual={slide.visual} label={slide.title} />

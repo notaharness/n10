@@ -183,6 +183,7 @@ export function PrWorkspace({
     [nav]
   );
   const backToAgent = useCallback(() => setMode('agent'), [setMode]);
+  const openDrafts = useCallback(() => setMode('review'), [setMode]);
   const openPlanPane = useCallback(() => setMode('plan'), [setMode]);
   const plan = usePlanCheckout({
     cwd: repo.cwd,
@@ -260,7 +261,7 @@ export function PrWorkspace({
                   onGuide={() => setMode('guide')}
                   drafts={drafts}
                   reviewActive={effMode === 'review'}
-                  onReview={() => setMode('review')}
+                  onReview={openDrafts}
                   postingAll={postAll.pending}
                   onPostAll={postAll.post}
                   planCount={plan.count}
@@ -330,6 +331,7 @@ export function PrWorkspace({
               onPrev={() => nav.step(-1)}
               onNext={() => nav.step(1)}
               onExitReview={showDiff}
+              onReviewDrafts={openDrafts}
               onOpenInDiff={nav.jumpToFile}
               onOverviewAction={onOverviewAction}
               onOpenThread={nav.jumpToId}
