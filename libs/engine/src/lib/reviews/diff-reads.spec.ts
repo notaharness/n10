@@ -172,7 +172,7 @@ describe('manifest', () => {
     const diff = reads();
     expect(
       await readResourceValue(diff.manifest({ ...request, repo: '/repo/b' }))
-    ).toMatchObject({ ok: false, error: { code: 'repo-changed' } });
+    ).toMatchObject({ ok: false, error: { code: 'other-repo' } });
     expect(resolvePrComparison).not.toHaveBeenCalled();
   });
 
@@ -201,6 +201,17 @@ describe('patch', () => {
       { mergeBaseOid: BASE, headOid: HEAD },
       { paths: ['src/a.ts'], context: 3 }
     );
+  });
+
+  it('lets go of its patches when its repository is parked, and keeps the manifest', async () => {
+    const diff = reads();
+    await readResourceValue(diff.manifest(request));
+    await readResourceValue(diff.patch(patchRequest));
+    diff.park();
+    await readResourceValue(diff.patch(patchRequest));
+    await readResourceValue(diff.manifest(request));
+    expect(readPrDiffPatch).toHaveBeenCalledTimes(2);
+    expect(resolvePrComparison).toHaveBeenCalledOnce();
   });
 
   it('keeps the last two patches read, and joins one still being read', async () => {
@@ -289,7 +300,7 @@ describe('rangeManifest', () => {
       await readResourceValue(
         reads().rangeManifest({ ...range, repo: '/repo/b' })
       )
-    ).toMatchObject({ ok: false, error: { code: 'repo-changed' } });
+    ).toMatchObject({ ok: false, error: { code: 'other-repo' } });
     expect(readRevisionRangeManifest).not.toHaveBeenCalled();
   });
 

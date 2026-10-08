@@ -90,11 +90,15 @@ export function createReadResource<T>(
     publish({ loading: true });
     return active;
   }
-  /** A parked repository's held answer, with a read behind it once old. */
+  /** A parked repository's held answer, with a read behind it once old.
+   *  A refresh behind it that failed does not fail the answer: the data
+   *  is served, and observers see the error in the snapshot. */
   function serveParked(): Promise<ReadSnapshot<T>> {
     // `drain` settles every pass itself and never rejects.
     if (!active && !parkedWarm(freshness, attemptedAt, ttl)) void start();
-    return Promise.resolve(snapshot);
+    return Promise.resolve(
+      snapshot.error ? { ...snapshot, error: null } : snapshot
+    );
   }
   function read(force = false): Promise<ReadSnapshot<T>> {
     if (disposed) return Promise.resolve(snapshot);

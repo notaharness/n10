@@ -68,8 +68,5 @@ export function createHistoryReads(
     reset() {
       histories.reset();
     },
-    dispose() {
-      histories.dispose();
-    },
   };
 }

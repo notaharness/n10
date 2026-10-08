@@ -680,7 +680,25 @@ panes all need: its worktrees and session rows, and its pull request list
 (`refreshInBackground` with a `maxAge`). The pull request list never evicts a
 scope a repository shows; past its bound it drops only scopes a config change
 left behind. Within one repository, each review resource kind still holds 32
-entries, never evicting one observed or loading.
+entries, never evicting one observed or loading. A refresh behind a parked
+read that fails does not fail the next read: it is answered with the data, and
+the error stays in the snapshot for observers.
+
+Two diff reads are exempt. A checkout's live diff keeps its one-second TTL:
+agents in a parked repository keep editing, and it is a local Git read. Patches
+are let go when their repository is parked (`reviews.park()`): each may be as
+large as the 64 MiB patch ceiling and two are held per repository, so keeping
+them would let every repository visited in a run hold up to 128 MiB in the
+host; the renderer keeps the batches it shows, and reading one again is a
+local Git read between fixed commits. Manifests and listings, which are small
+and what a pane needs first, stay.
+
+Only the selected repository takes writes; a parked handle refuses them before
+any work: review replies, resolutions, submissions, mention searches, review
+draft saves and discards, agent findings' edits and publication, worktree
+creation, removal, rebase and fetch, config writes and session launches. The
+review writes and launches check again after their awaits, before the provider
+or tmux is asked.
 
 ## Review read ownership
 
@@ -691,8 +709,8 @@ are fresh for 30 seconds; live checkout diffs for one second. A failed read reta
 same-scope data and permits immediate retry. Explicit thread invalidation (including
 opening a composer) forces an engine read. Account/config changes clear data
 and reject obsolete publication. Reads answer whichever repository they are asked
-of, selected or parked; replies, resolutions, submissions, mention searches and
-agent publications refuse any but the selected one, before and after their awaits.
+of, selected or parked; writes refuse any but the selected one (see Parked
+repositories).
 The desktop RPC rejects a failed answer and its query cache retains the last good
 view. TUI hooks subscribe directly. Frontends own visibility and error presentation,
 not another freshness policy.
@@ -733,7 +751,8 @@ filesystem observation. The common Git directory identifies the repository, so
 linked worktrees share findings while equal PR numbers in different repositories
 do not. Files live under `~/.n10/reviews/<repository hash>/pr-<number>`; no legacy
 unscoped path is read. The standalone utility resolves this identity through core.
-Only observed resources attach a nonrecursive watcher; disposal closes it.
+Only observed resources attach a nonrecursive watcher; the last observer
+leaving closes it.
 
 Agent publication uses core’s draft submission machinery in the separate
 `~/.n10/agent-review-publications` store, keyed by provider repository, PR and

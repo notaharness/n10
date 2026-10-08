@@ -35,7 +35,6 @@ export interface WorktreeService extends WorktreeCommands {
   read(): Promise<WorktreeSnapshot>;
   /** Concurrent refreshes join one follow-up after the active read. */
   refresh(): Promise<WorktreeSnapshot>;
-  dispose(): void;
 }
 
 function readError(error: unknown): string {
@@ -52,6 +51,8 @@ export function createWorktreeService(options: {
   config: WorktreeConfig;
   watchers?: WorktreeWatchers;
   rescanSessions?(): Promise<void>;
+  /** Whether the repository is the selected one: only it takes writes. */
+  isCurrent?(): boolean;
   freshness?: ReadFreshness;
 }): WorktreeService {
   const { config, freshness = ALWAYS_SELECTED } = options;
@@ -65,7 +66,6 @@ export function createWorktreeService(options: {
   let fetchedAt: number | null = null;
   let template = config.getSnapshot().config.worktreePath;
   let generation = 0;
-  let disposed = false;
   let queued = false;
   let active: Promise<WorktreeSnapshot> | undefined;
   const listeners = new Set<() => void>();
@@ -91,26 +91,25 @@ export function createWorktreeService(options: {
         listBranches(scope.cwd),
         listAllBranches(scope.cwd),
       ]);
-      if (disposed || gen !== generation) return;
+      if (gen !== generation) return;
       fetchedAt = Date.now();
       publish({ worktrees, branches, allBranches });
     } catch (error) {
       logError('worktree read', error);
-      if (!disposed && gen === generation) publish({ error: readError(error) });
+      if (gen === generation) publish({ error: readError(error) });
     } finally {
-      if (!disposed && gen === generation) publish({ loading: false });
+      if (gen === generation) publish({ loading: false });
     }
   }
   async function drain(): Promise<WorktreeSnapshot> {
     do {
       queued = false;
       await pass();
-    } while (queued && !disposed);
+    } while (queued);
     active = undefined;
     return snapshot;
   }
   function refresh(): Promise<WorktreeSnapshot> {
-    if (disposed) return Promise.resolve(snapshot);
     if (active) {
       queued = true;
       return active;
@@ -118,7 +117,7 @@ export function createWorktreeService(options: {
     active = drain();
     return active;
   }
-  const unsubscribeConfig = config.subscribe(() => {
+  config.subscribe(() => {
     const next = config.getSnapshot().config.worktreePath;
     if (next === template) return;
     template = next;
@@ -148,12 +147,5 @@ export function createWorktreeService(options: {
         : refresh();
     },
     refresh,
-    dispose() {
-      disposed = true;
-      generation += 1;
-      queued = false;
-      unsubscribeConfig();
-      listeners.clear();
-    },
   };
 }

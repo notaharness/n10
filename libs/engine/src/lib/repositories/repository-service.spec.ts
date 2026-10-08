@@ -106,11 +106,11 @@ describe('repository scope', () => {
     const current = service.open(link);
     expect(current.cwd).toBe(cwd);
     expect(service.open(cwd)).toBe(current);
-    const dispose = vi.spyOn(current.worktrees, 'dispose');
     const park = vi.spyOn(current.sessions, 'park');
+    const release = vi.spyOn(current.reviews, 'park');
     const next = service.open(repo('another'));
     expect(park).toHaveBeenCalledOnce();
-    expect(dispose).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledOnce();
     expect(next).not.toBe(current);
     expect(next.config).not.toBe(current.config);
     expect(current.parked()).toBe(true);
@@ -131,16 +131,18 @@ describe('repository scope', () => {
     expect(service.get(selected.cwd)).toBe(selected);
   });
 
-  it('prewarms a parked repository only once its list is past the parked TTL', () => {
+  it('prewarms a parked repository’s rows, and its list with the parked max age', () => {
     const { service, pullRequests } = harness([]);
     const selected = service.open(repo('prewarm-selected'));
     const parked = service.get(repo('prewarm-parked'));
+    const rows = vi.spyOn(parked.sessions, 'read');
     selected.prewarm();
     parked.prewarm();
     expect(pullRequests.refreshInBackground.mock.calls).toEqual([
       [selected.cwd, undefined],
       [parked.cwd, { maxAge: PARKED_REPOSITORY_TTL_MS }],
     ]);
+    expect(rows).toHaveBeenCalledOnce();
   });
 
   it('keeps one visit record across repository switches', () => {

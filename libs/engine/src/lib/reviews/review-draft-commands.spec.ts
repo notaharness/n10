@@ -14,7 +14,17 @@ const REF = {
 };
 const REPLY = { kind: 'reply', threadId: 'T-1' };
 
-const env = vi.hoisted(() => ({ open: true, username: 'bea' }));
+const env = vi.hoisted(() => ({
+  open: true,
+  username: 'bea',
+  /** Park the repository right after the next selection check. */
+  parkAfterCheck: false,
+}));
+const isOpen = () => {
+  const open = env.open;
+  if (env.parkAfterCheck) env.open = false;
+  return open;
+};
 
 const fixture = reviewReadFixture(
   () => ({
@@ -26,9 +36,26 @@ const fixture = reviewReadFixture(
     viewer: env.username,
     vcsConfigured: false,
   }),
-  () => env.open
+  isOpen
 );
 const service = createReviewDraftCommands(fixture.options, vi.fn());
+const publishReview = vi.fn();
+const publishing = createReviewDraftCommands(
+  reviewReadFixture(
+    () => ({
+      repository: {
+        provider: 'github',
+        host: 'github.com',
+        repository: 'acme/app',
+      },
+      viewer: env.username,
+      vcsConfigured: true,
+      provider: { id: 'github', publishReview },
+    }),
+    isOpen
+  ).options,
+  vi.fn()
+);
 const { list: listDrafts, save: saveDraft, discard: discardDraft } = service;
 
 let home: string;
@@ -39,6 +66,8 @@ beforeEach(() => {
   process.env['HOME'] = home;
   env.open = true;
   env.username = 'bea';
+  env.parkAfterCheck = false;
+  publishReview.mockReset();
 });
 afterEach(() => {
   process.env['HOME'] = realHome;
@@ -111,6 +140,40 @@ describe('review drafts service', () => {
       })
     ).rejects.toThrow();
     expect(read).toHaveBeenCalledExactlyOnceWith('/repo', { force: true });
+  });
+
+  it('refuses to save or discard a parked repository’s drafts', async () => {
+    env.open = false;
+    await expect(
+      saveDraft({ ref: REF, viewer: 'bea', target: REPLY, body: 'x' })
+    ).rejects.toThrow(/no longer open/);
+    await expect(
+      discardDraft({ ref: REF, viewer: 'bea', target: REPLY })
+    ).rejects.toThrow(/no longer open/);
+  });
+
+  const submission = {
+    ref: REF,
+    viewer: 'bea',
+    head: 'a'.repeat(40),
+    event: 'COMMENT',
+    draftIds: ['reply:T-1'],
+  };
+
+  it('refuses to submit for a parked repository', async () => {
+    await saveDraft({ ref: REF, viewer: 'bea', target: REPLY, body: 'x' });
+    env.open = false;
+    await expect(publishing.submit(submission)).rejects.toThrow(
+      /no longer open/
+    );
+    expect(publishReview).not.toHaveBeenCalled();
+  });
+
+  it('refuses to publish once the repository is parked mid-submit', async () => {
+    await saveDraft({ ref: REF, viewer: 'bea', target: REPLY, body: 'x' });
+    env.parkAfterCheck = true;
+    await expect(publishing.submit(submission)).rejects.toThrow();
+    expect(publishReview).not.toHaveBeenCalled();
   });
 
   it('refuses a save with no target', async () => {

@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createReadResource } from './read-resource.js';
+import { createReadResource, readResourceValue } from './read-resource.js';
 import { createResourceCache } from './resource-cache.js';
 
 function deferred<T>() {
@@ -115,7 +115,23 @@ it('evicts idle resources while retaining a resource observed on screen', () => 
   expect(cache.get('watched', async () => 'wrong')).toBe(watched);
   expect(cache.get('idle', async () => 'new')).not.toBe(idle);
   unsubscribe();
-  cache.dispose();
+});
+
+it('releases every idle answer, keeping what is observed or loading', async () => {
+  const cache = createResourceCache<string>(100);
+  const watched = cache.get('watched', async () => 'watched');
+  const unsubscribe = watched.subscribe(() => undefined);
+  const idle = cache.get('idle', async () => 'idle');
+  await idle.read();
+  const pending = deferred<string>();
+  const loading = cache.get('loading', () => pending.promise);
+  void loading.read();
+  cache.release();
+  expect(cache.get('watched', async () => 'wrong')).toBe(watched);
+  expect(cache.get('loading', async () => 'wrong')).toBe(loading);
+  expect(cache.get('idle', async () => 'new')).not.toBe(idle);
+  pending.resolve('done');
+  unsubscribe();
 });
 
 it('serves a parked repository what it holds, reading behind it only past the parked TTL', async () => {
@@ -158,4 +174,29 @@ it('waits for a parked repository read that has nothing to serve', async () => {
     freshness
   );
   expect((await resource.read()).data).toBe('answer');
+});
+
+it('serves a parked repository its data after a refresh behind it failed', async () => {
+  vi.useFakeTimers();
+  const freshness = { parked: () => true, parkedTtl: 3_600_000 };
+  const load = vi
+    .fn()
+    .mockResolvedValueOnce('first')
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValueOnce('second');
+  const resource = createReadResource<string>(
+    load,
+    30_000,
+    undefined,
+    freshness
+  );
+  await resource.read();
+  vi.advanceTimersByTime(3_600_001);
+  expect(await readResourceValue(resource)).toBe('first');
+  await flush();
+  expect(resource.getSnapshot().error).toBe('offline');
+  // The failure stays in the snapshot; the next read still answers.
+  expect(await readResourceValue(resource)).toBe('first');
+  await flush();
+  expect(resource.getSnapshot().data).toBe('second');
 });

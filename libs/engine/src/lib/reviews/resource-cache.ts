@@ -42,9 +42,13 @@ export function createResourceCache<T>(
     reset() {
       for (const resource of resources.values()) resource.reset();
     },
-    dispose() {
-      for (const resource of resources.values()) resource.dispose();
-      resources.clear();
+    /** Let go of every answer nobody observes or is still reading. */
+    release() {
+      for (const [key, resource] of resources) {
+        if (resource.observed() || resource.getSnapshot().loading) continue;
+        resource.dispose();
+        resources.delete(key);
+      }
     },
   };
 }

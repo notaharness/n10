@@ -51,8 +51,8 @@ export interface SessionWatchPorts extends SessionLaunchPorts {
 }
 export type SessionService = ReturnType<typeof createSessionService>;
 
-/** Observation ends when the repository is parked or the handle disposed;
- *  existing PTY clients survive both. */
+/** Observation ends when the repository is parked; existing PTY clients
+ *  survive it. */
 export function createSessionService(options: {
   config: WorktreeConfig;
   worktrees: WorktreeService;
@@ -66,14 +66,11 @@ export function createSessionService(options: {
   const { config, worktrees, isCurrent } = options;
   const lastScans = options.lastScans ?? new Map<string, DiscoveryScan>();
   const connections = options.connections ?? createSessionConnections();
-  const ownsConnections = !options.connections;
-  let disposed = false;
   let discovery: SessionDiscovery | undefined;
   let stopWatch: (() => void) | undefined;
   let snapshot: SessionSnapshot = { sessions: [], error: null };
   const listeners = new Set<() => void>();
   function publish(): void {
-    if (disposed) return;
     // A row per worktree, then one per agent still running in a
     // worktree that is gone, so it can be seen and stopped. One
     // discovery holds stranded stays so while git does not list it,
@@ -121,7 +118,7 @@ export function createSessionService(options: {
     // `scanNow` settles every scan itself and never rejects.
     if (listed.some((wt) => !paths.has(wt.path))) void discovery?.scanNow();
   }
-  const unsubscribeWorktrees = worktrees.subscribe(publish);
+  worktrees.subscribe(publish);
   async function refresh(): Promise<AgentSession[]> {
     await worktrees.refresh();
     publish();
@@ -168,12 +165,12 @@ export function createSessionService(options: {
   const commands = createSessionCommands({
     ...options,
     changed: publish,
-    isCurrent: () => !disposed && isCurrent(),
+    isCurrent,
   });
   return {
     ...createPlanCommands({
       config,
-      isCurrent: () => !disposed && isCurrent(),
+      isCurrent,
       changed: refresh,
     }),
     ...commands,
@@ -225,9 +222,8 @@ export function createSessionService(options: {
     },
     watch(ports: SessionWatchPorts): () => void {
       stopWatch?.();
-      if (disposed) return () => undefined;
       let stopped = false;
-      const live = () => !stopped && !disposed && isCurrent();
+      const live = () => !stopped && isCurrent();
       const scanner = startSessionDiscovery({
         repo: config.repo,
         scope: worktrees.scope,
@@ -260,13 +256,6 @@ export function createSessionService(options: {
      *  rows stay; the next watch starts from its last scan. */
     park() {
       stopWatch?.();
-    },
-    dispose() {
-      disposed = true;
-      stopWatch?.();
-      unsubscribeWorktrees();
-      if (ownsConnections) connections.dispose();
-      listeners.clear();
     },
   };
 }

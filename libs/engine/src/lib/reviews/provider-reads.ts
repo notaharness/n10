@@ -162,8 +162,5 @@ export function createProviderReads(options: ReviewContextOptions) {
     reset() {
       for (const cache of caches) cache.reset();
     },
-    dispose() {
-      for (const cache of caches) cache.dispose();
-    },
   };
 }

@@ -34,20 +34,20 @@ export type {
 };
 
 /** The request named another repository than the one it was asked of. */
-export interface RepoChangedError {
-  code: 'repo-changed';
+export interface OtherRepoError {
+  code: 'other-repo';
   message: string;
 }
-export type PrDiffError = PrComparisonError | RepoChangedError;
+export type PrDiffError = PrComparisonError | OtherRepoError;
 export type PrDiffManifestResult =
   | { ok: true; manifest: PrDiffManifest }
   | { ok: false; error: PrDiffError };
 export type PrRangeManifestResult =
   | { ok: true; range: RevisionRange; manifest: PrDiffManifest }
-  | { ok: false; error: RevisionRangeError | RepoChangedError };
+  | { ok: false; error: RevisionRangeError | OtherRepoError };
 export type PrDiffPatchResult =
   | { ok: true; patch: PrDiffPatch }
-  | { ok: false; error: RepoChangedError };
+  | { ok: false; error: OtherRepoError };
 
 const TARGET_FETCH_TTL_MS = 5 * 60 * 1000;
 
@@ -96,12 +96,14 @@ export function createDiffReads(
     capacity: 8,
     cacheable: (result) => result.ok,
   });
-  const live = createResourceCache<string>(1_000, { capacity: 2, freshness });
-  const changed = (asked: string): RepoChangedError | null =>
+  // A checkout changes under a running agent whether or not its
+  // repository is selected: its diff keeps its own second.
+  const live = createResourceCache<string>(1_000, { capacity: 2 });
+  const otherRepo = (asked: string): OtherRepoError | null =>
     asked === repo
       ? null
       : {
-          code: 'repo-changed',
+          code: 'other-repo',
           message: `${asked} is not this repository`,
         };
   async function resolve(req: Omit<PrDiffManifestRequest, 'repo'>) {
@@ -138,7 +140,7 @@ export function createDiffReads(
       return manifests.get(
         JSON.stringify([asked, req]),
         async (): Promise<PrDiffManifestResult> => {
-          const foreign = changed(asked);
+          const foreign = otherRepo(asked);
           if (foreign) return { ok: false, error: foreign };
           const resolved = await resolve(req);
           if (!resolved.ok) return resolved;
@@ -154,7 +156,7 @@ export function createDiffReads(
       return patches.get(
         JSON.stringify([asked, req]),
         async (): Promise<PrDiffPatchResult> => {
-          const foreign = changed(asked);
+          const foreign = otherRepo(asked);
           if (foreign) return { ok: false, error: foreign };
           const { paths, context, ...bounds } = req;
           const patch = await readPrDiffPatch(repo, bounds, {
@@ -173,7 +175,7 @@ export function createDiffReads(
       return ranges.get(
         JSON.stringify([asked, req]),
         async (): Promise<PrRangeManifestResult> => {
-          const foreign = changed(asked);
+          const foreign = otherRepo(asked);
           if (foreign) return { ok: false, error: foreign };
           return readRevisionRangeManifest({ cwd: repo, ...req }, ceiling);
         }
@@ -187,15 +189,18 @@ export function createDiffReads(
           : '';
       });
     },
+    /** The repository was parked: let go of the patches. They can be
+     *  as large as the patch ceiling, the renderer holds the ones it
+     *  shows, and reading one again is a local Git read. */
+    park() {
+      patches.release();
+    },
     /** Branches may have moved: resolve them again. Commit reads stay. */
     invalidate() {
       manifests.invalidate();
     },
     reset() {
       for (const cache of caches) cache.reset();
-    },
-    dispose() {
-      for (const cache of caches) cache.dispose();
     },
   };
 }

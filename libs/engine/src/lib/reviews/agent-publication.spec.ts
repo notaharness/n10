@@ -13,7 +13,7 @@ import {
 import { reviewReadFixture } from './review-read-fixture.js';
 import { createAgentComments } from './agent-comments.js';
 
-const env = vi.hoisted(() => ({ home: '', viewer: 'alice' }));
+const env = vi.hoisted(() => ({ home: '', viewer: 'alice', open: true }));
 vi.mock('node:os', async (original) => ({
   ...(await original<Record<string, unknown>>()),
   homedir: () => env.home,
@@ -34,13 +34,12 @@ const comment: ReviewComment = {
   status: 'draft',
   createdAt: '2026-01-01',
 };
-const closed: (() => void)[] = [];
 beforeEach(() => {
   env.home = mkdtempSync(join(tmpdir(), 'n10-agent-publication-'));
   env.viewer = 'alice';
+  env.open = true;
 });
 afterEach(() => {
-  for (const close of closed.splice(0)) close();
   rmSync(env.home, { recursive: true, force: true });
 });
 function setup() {
@@ -60,28 +59,30 @@ function setup() {
     ),
     resumed: null,
   }));
-  const fixture = reviewReadFixture(() => ({
-    config: { vendorAuth: { token: 't' }, vendorProject: { repo: 'app' } },
-    repository: {
-      provider: 'github',
-      host: 'github.com',
-      repository: 'owner/app',
-    },
-    viewer: env.viewer,
-    vcsConfigured: true,
-    provider: {
-      id: 'github',
-      publishReview: (
-        _auth: unknown,
-        _project: unknown,
-        submission: ReviewSubmission,
-        ledger: LedgerStore
-      ) => publish(submission, ledger),
-    },
-  }));
+  const fixture = reviewReadFixture(
+    () => ({
+      config: { vendorAuth: { token: 't' }, vendorProject: { repo: 'app' } },
+      repository: {
+        provider: 'github',
+        host: 'github.com',
+        repository: 'owner/app',
+      },
+      viewer: env.viewer,
+      vcsConfigured: true,
+      provider: {
+        id: 'github',
+        publishReview: (
+          _auth: unknown,
+          _project: unknown,
+          submission: ReviewSubmission,
+          ledger: LedgerStore
+        ) => publish(submission, ledger),
+      },
+    }),
+    () => env.open
+  );
   const changed = vi.fn();
   const service = createAgentComments(fixture.options, changed);
-  closed.push(() => service.dispose());
   appendComment('/repo/.git', 7, comment);
   return { service, publish, changed };
 }
@@ -256,4 +257,32 @@ it('keeps a comment posted when the publisher confirms it before a later failure
   expect(() => f.service.update(7, 'one', { body: 'retry' })).toThrow(
     'already posted'
   );
+});
+
+it('refuses to post or edit findings of a parked repository', async () => {
+  const f = setup();
+  env.open = false;
+  await expect(f.service.post({ prId: 7, headSha: head })).rejects.toThrow(
+    'no longer open'
+  );
+  expect(() => f.service.update(7, 'one', { body: 'changed' })).toThrow(
+    'no longer open'
+  );
+  expect(() => f.service.remove(7, 'one')).toThrow('no longer open');
+  // Refused before anything is marked as being posted.
+  expect(f.changed).not.toHaveBeenCalled();
+  expect(f.publish).not.toHaveBeenCalled();
+  expect(f.service.read(7)[0]).toMatchObject({ status: 'draft' });
+});
+
+it('refuses to publish once the repository is parked mid-post', async () => {
+  const f = setup();
+  // Parked between the post's start and its provider call.
+  f.changed.mockImplementationOnce(() => {
+    env.open = false;
+  });
+  await expect(f.service.post({ prId: 7, headSha: head })).rejects.toThrow(
+    'no longer open'
+  );
+  expect(f.publish).not.toHaveBeenCalled();
 });

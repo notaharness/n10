@@ -19,6 +19,7 @@ import type {
 } from '@n10/worktree-manager';
 import { logError } from '@n10/logger';
 import type { ConfigSnapshot } from '../config/api.js';
+import { assertSelected } from '../kernel/selection.js';
 
 export interface WorktreeConfig {
   repo: string;
@@ -48,18 +49,23 @@ export interface WorktreeCommands {
   rebase(target: WorktreeTarget): Promise<'success' | 'conflict' | 'error'>;
 }
 
-/** Commands capture path policy before their first await. Core guards deletion. */
+/** Commands capture path policy before their first await. Core guards
+ *  deletion. Every command that changes a checkout or the refs refuses
+ *  a parked repository (`isCurrent`). */
 export function createWorktreeCommands(options: {
   config: Pick<WorktreeConfig, 'repo' | 'getSnapshot'>;
   watchers?: WorktreeWatchers;
+  isCurrent?(): boolean;
   changed(): Promise<unknown>;
   rescanSessions?(): Promise<void>;
 }): WorktreeCommands {
   const { config, watchers, changed } = options;
+  const writable = () => assertSelected(options.isCurrent);
   const repo = config.repo;
   const scope = () =>
     worktreeScope(repo, { template: config.getSnapshot().config.worktreePath });
   async function create(branch: string, machine?: Machine): Promise<string> {
+    writable();
     const at = scope();
     const target = machine
       ? await remoteWorktreeScope(
@@ -99,6 +105,7 @@ export function createWorktreeCommands(options: {
     find: (target) => locate(target, scope()),
     checkRemoval: (branch) => checkWorktreeRemoval(branch, scope()),
     async remove(branch, approved) {
+      writable();
       const at = scope();
       const stopped = watchers?.suspend(repo, branch) ?? [];
       let gone = false;
@@ -119,11 +126,13 @@ export function createWorktreeCommands(options: {
         : (await locate(target, scope()))?.path ?? null;
     },
     async fetchBranches() {
+      writable();
       if (!(await fetchRefs({ cwd: repo, refs: 'all' })))
         throw new Error(`Failed to fetch repository refs: ${repo}`);
       await changed();
     },
     async rebase(target) {
+      writable();
       const at = scope();
       const checkout = await locate(target, at);
       if (!checkout) throw new Error('No worktree found for selected session');

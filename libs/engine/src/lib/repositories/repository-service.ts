@@ -50,7 +50,7 @@ export interface RepositoryHandle {
  * service and changes through its subscription, never a second store.
  */
 export function createRepositoryService(
-  options: Omit<ConfigServiceOptions, 'repo' | 'pullRequests'> & {
+  options: Omit<ConfigServiceOptions, 'repo' | 'pullRequests' | 'isCurrent'> & {
     pullRequests: Pick<
       PullRequestList,
       | 'credentialsChanged'
@@ -78,10 +78,15 @@ export function createRepositoryService(
     const isCurrent = () => current?.cwd === cwd;
     const parked = () => !isCurrent();
     const freshness = { parked, parkedTtl: PARKED_REPOSITORY_TTL_MS };
-    const config = createConfigService({ ...configOptions, repo: cwd });
+    const config = createConfigService({
+      ...configOptions,
+      repo: cwd,
+      isCurrent,
+    });
     const worktrees = createWorktreeService({
       config,
       watchers: worktreeWatchers,
+      isCurrent,
       freshness,
       rescanSessions: async () => {
         await sessions.scanNow();
@@ -138,6 +143,7 @@ export function createRepositoryService(
       const next = known ?? create(cwd);
       if (next !== current) {
         current?.sessions.park();
+        current?.reviews.park();
         current = next;
       }
       return next;

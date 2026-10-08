@@ -107,11 +107,5 @@ export function createAgentComments(
       removeComment(repo(), prId, id);
       resources.get(prId)?.invalidate();
     },
-    dispose() {
-      for (const watcher of watchers.values()) watcher.close();
-      for (const value of resources.values()) value.dispose();
-      watchers.clear();
-      resources.clear();
-    },
   };
 }

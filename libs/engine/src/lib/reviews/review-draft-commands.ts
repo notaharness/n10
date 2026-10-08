@@ -24,9 +24,11 @@ export function createReviewDraftCommands(
       return listReviewDrafts(parseDraftsRequest(request), context.sources);
     },
     async save(request: unknown) {
+      context.selected();
       return saveReviewDraft(parseSaveDraftRequest(request), context.sources);
     },
     async discard(request: unknown) {
+      context.selected();
       discardReviewDraft(parseDiscardDraftRequest(request), context.sources);
     },
     async submit(request: unknown) {

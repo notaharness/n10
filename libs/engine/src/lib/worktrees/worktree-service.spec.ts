@@ -6,7 +6,6 @@ import type {
   Machine,
 } from '@n10/worktree-manager';
 import { createWorktreeService } from './worktree-service.js';
-import type { WorktreeService } from './worktree-service.js';
 import type { ReadFreshness } from '../kernel/read-freshness.js';
 
 const ports = vi.hoisted(() => ({
@@ -46,7 +45,6 @@ vi.mock('@n10/core', () => ({
 }));
 vi.mock('@n10/logger', () => ({ logError: vi.fn() }));
 const row = { branch: 'topic', path: '/repo/trees/topic', bare: false };
-const services: WorktreeService[] = [];
 const flush = async () => {
   for (let n = 0; n < 12; n++) await Promise.resolve();
 };
@@ -57,7 +55,11 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
-function harness(repo = '/repo', freshness?: ReadFreshness) {
+function harness(
+  repo = '/repo',
+  freshness?: ReadFreshness,
+  isCurrent?: () => boolean
+) {
   let snapshot = {
     config: {
       vendorAuth: {},
@@ -78,8 +80,8 @@ function harness(repo = '/repo', freshness?: ReadFreshness) {
       },
     },
     freshness,
+    isCurrent,
   });
-  services.push(service);
   return {
     service,
     listeners,
@@ -101,7 +103,6 @@ beforeEach(() => {
   ports.rebase.mockReset().mockResolvedValue('success');
 });
 afterEach(() => {
-  for (const service of services.splice(0)) service.dispose();
   vi.useRealTimers();
 });
 
@@ -204,24 +205,27 @@ describe('worktree resources', () => {
     expect(service.getSnapshot().worktrees).toEqual([next]);
     expect(notifications).toHaveBeenCalled();
   });
-  it('cancels publication and drops the config subscription when its repo is retired', async () => {
-    const pending = deferred<WorktreeInfo[]>();
-    ports.list.mockReturnValue(pending.promise);
-    const { service, listeners } = harness();
-    const listener = vi.fn();
-    service.subscribe(listener);
-    const active = service.read();
-    service.dispose();
-    listener.mockClear();
-    pending.resolve([row]);
-    await active;
-    expect(listener).not.toHaveBeenCalled();
-    expect(listeners.size).toBe(0);
-    expect(service.getSnapshot().worktrees).toEqual([]);
-  });
 });
 
 describe('worktree commands', () => {
+  it('refuses to change a parked repository’s checkouts or refs', async () => {
+    const { service } = harness('/repo', undefined, () => false);
+    const approved = { verdict: 'clear' } as never;
+    for (const write of [
+      () => service.create('topic'),
+      () => service.remove('topic', approved),
+      () => service.rebase({ branch: 'topic' }),
+      () => service.fetchBranches(),
+      () => service.resolve({ branch: 'topic' }),
+    ])
+      await expect(write()).rejects.toThrow('not open');
+    expect(ports.create).not.toHaveBeenCalled();
+    expect(ports.remove).not.toHaveBeenCalled();
+    expect(ports.rebase).not.toHaveBeenCalled();
+    expect(ports.fetch).not.toHaveBeenCalled();
+    // Reads still answer.
+    expect((await service.read()).worktrees).toEqual([row]);
+  });
   it('creates under the captured template and refreshes shared resources after success', async () => {
     const { service, configure } = harness();
     const pending = deferred<string | null>();

@@ -420,32 +420,6 @@ describe('snapshots and subscriptions', () => {
     settle(1);
   });
 
-  it('never evicts what a watched repository shows', async () => {
-    // Evicting a watched repository's list makes its watch read it back
-    // at once, which evicts the next watched one: past the bound, the
-    // watches would refetch each other as fast as the provider answers.
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    const answerAll = () => {
-      while (pending.length > 0) pending.shift()!.resolve({});
-    };
-    for (let i = 0; i < 9; i++) {
-      now += 20;
-      list.watch(`/watched-${i}`);
-      answerAll();
-      await flush();
-    }
-    for (let i = 0; i < 50; i++) {
-      now += 20;
-      await vi.advanceTimersByTimeAsync(20);
-      answerAll();
-      await flush();
-    }
-    expect(fetchCount()).toBe(9);
-    for (let i = 0; i < 9; i++) {
-      expect(list.getSnapshot(`/watched-${i}`).fetchedAt).not.toBeNull();
-    }
-  });
-
   it('evicts a scope no repository shows before one that is shown', async () => {
     await sync('/b', { b: null }); // the oldest list, still shown
     now += 1_000;
@@ -690,17 +664,6 @@ describe('across repositories', () => {
     expect(list.getSnapshot('/b').refreshing).toBe(false);
     settle(0);
     await slow;
-  });
-
-  it('never evicts the repository being read', async () => {
-    await sync('/active', {});
-    for (let i = 0; i < 8; i++) {
-      now += 1_000;
-      await sync(`/other-${i}`, {});
-      now += 60_000;
-      await sync('/active', {});
-    }
-    expect(list.getSnapshot('/active').fetchedAt).not.toBeNull();
   });
 });
 

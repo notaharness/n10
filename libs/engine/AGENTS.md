@@ -31,7 +31,9 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   the service; selecting another parks the previous one, stopping its
   observation and keeping its data. A parked handle's reads serve what they
   hold and refresh behind it past `PARKED_REPOSITORY_TTL_MS`
-  (`kernel/read-freshness.ts`); writes refuse any but the selected handle.
+  (`kernel/read-freshness.ts`), except the live checkout diff; parking lets
+  go of diff patches. Writes refuse any but the selected handle
+  (`kernel/selection.ts`, review context `selected`/`assertWritable`).
   Each handle owns one config service; its subscription is the sole channel
   for config-derived metadata. Selection returns a handle synchronously and
   does not keep another metadata store. Detection and config reads use that
@@ -58,7 +60,7 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   after awaits. Diff reads (`diff-reads.ts`) resolve a request to exact commits
   through core's `resolvePrComparison` and own the manifest and patches read
   between them: commit-keyed reads never expire, branch resolution does. A
-  request names its repository and is answered `repo-changed` for any other.
+  request names its repository and is answered `other-repo` for any other.
   History reads (`history-reads.ts`) share one `VisitBaselines` per repository
   service, so a visit begun before a repository switch is the same visit after.
   Parsing Git output stays a core primitive, rendering stays shell-specific.
@@ -74,7 +76,7 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   launch/stop commands. Discovery uses `worktrees.scope()` live; tmux observation
   takes the captured repository. Launches capture config before awaiting, reject
   a repository switch before spawning, and serialize by request and resolved key.
-  Parking or disposal stops observation, never the connected agents; the
+  Parking stops observation, never the connected agents; the
   next watch's discovery starts from the last scan, so removals in between
   are reported. Connections list the agents the registry holds; one whose
   tmux session is gone (`processState.gone`) is released as it ends, while an

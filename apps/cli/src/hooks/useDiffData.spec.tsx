@@ -110,10 +110,7 @@ function mountProbe(initialPr: number | null, headSha?: string) {
     commits,
     set: (pr: number | null, filename: string | null = null) =>
       ui.rerender(tree(pr, filename)),
-    unmount: () => {
-      ui.unmount();
-      engine.reviews.dispose();
-    },
+    unmount: () => ui.unmount(),
   };
 }
 beforeEach(() => {
