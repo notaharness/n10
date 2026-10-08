@@ -15,6 +15,7 @@ import * as worktrees from './services/worktrees.js';
 import * as reviews from './services/reviews.js';
 import * as sessions from './services/sessions.js';
 import * as foreignSessions from './services/foreign-sessions.js';
+import * as orchestrators from './services/orchestrators.js';
 import * as terminals from './services/terminals.js';
 import * as branchSessions from './services/branch-sessions.js';
 import * as commentImages from './services/comment-images.js';
@@ -118,6 +119,8 @@ export function createHostApi(): HostApi {
     listSessions: (cwd) => Promise.resolve(sessions.listSessions(cwd)),
     listForeignSessions: () =>
       Promise.resolve(foreignSessions.listForeignSessions()),
+    listOrchestratorGroups: () =>
+      Promise.resolve(orchestrators.listOrchestratorGroups()),
     getSessionActivity: () => Promise.resolve(sessions.getSessionActivity()),
     writeSession: (name, data) =>
       Promise.resolve(sessions.writeSession(name, data)),

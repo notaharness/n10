@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import {
   createWorktree,
@@ -7,6 +7,14 @@ import {
   tab,
   visibleText,
 } from './setup/app.js';
+import {
+  centre,
+  markHeldReady,
+  moveTo,
+  restOn,
+  shownTerminal,
+  spareText,
+} from './setup/prewarm.js';
 
 /**
  * The editor keeps one pane besides the one on screen: the tab the
@@ -16,71 +24,10 @@ import {
  */
 
 const BANNER = 'n10-fake-agent-ready';
-/** Long enough for a pointer at rest to settle: hoverIntent samples
- *  every 100 ms. */
-const REST_MS = 300;
-/** How far ahead of the page's time `restOn` pauses its clock: well past
- *  the time from reading it to the pause, which runs to some 100 ms on a
- *  loaded box. */
-const PAUSE_LEAD_MS = 1_000;
-
 async function launch(page: Page, branch: string): Promise<void> {
   await createWorktree(page, branch);
   await launchAgentFromRail(page);
   await expect(visibleText(page, BANNER)).toBeVisible({ timeout: 30_000 });
-}
-
-async function centre(target: Locator): Promise<[number, number]> {
-  const box = await target.boundingBox();
-  if (!box) throw new Error('not laid out');
-  return [box.x + box.width / 2, box.y + box.height / 2];
-}
-
-async function moveTo(page: Page, target: Locator): Promise<void> {
-  await page.mouse.move(...(await centre(target)), { steps: 4 });
-}
-
-/** A spot that is no tab or row: nothing waits to settle under it. */
-const NOWHERE: [number, number] = [5, 5];
-
-/**
- * Rest the pointer on `target` for exactly `ms` of the page's time:
- * the clock stands still while the pointer gets there, runs `ms`, and
- * goes on from there as usual. `away` moves the pointer off before the
- * clock goes on.
- *
- * The clock can only be paused at a time given in advance, and the
- * page's time runs on while that call is made, so the pause is set well
- * ahead of it. Getting there runs the page's timers early; with the
- * pointer on nothing first, that is only idle time passing.
- */
-async function restOn(
-  page: Page,
-  target: Locator,
-  ms = REST_MS,
-  { away = false } = {}
-): Promise<void> {
-  await page.mouse.move(...NOWHERE);
-  await page.clock.pauseAt(
-    (await page.evaluate(() => Date.now())) + PAUSE_LEAD_MS
-  );
-  await moveTo(page, target);
-  await page.clock.runFor(ms);
-  if (away) {
-    await page.mouse.move(...NOWHERE);
-    await page.clock.runFor(REST_MS);
-  }
-  await page.clock.resume();
-}
-
-/** The terminal in the pane held ready, if any, and what it shows. */
-function spareText(page: Page): Promise<string | null> {
-  return page.evaluate(
-    () =>
-      document.querySelector<HTMLElement>(
-        '[data-spare-pane] [data-terminal-grid]'
-      )?.textContent ?? null
-  );
 }
 
 test.describe('A pane held ready', () => {
@@ -103,18 +50,11 @@ test.describe('A pane held ready', () => {
     const { page } = desktop;
     await restOn(page, tab(page, /alpha/));
     await expect.poll(() => spareText(page)).toContain('@alpha');
-    await page.evaluate(() => {
-      const el = document.querySelector<HTMLElement>(
-        '[data-spare-pane] [data-terminal-grid]'
-      );
-      if (el) el.dataset.heldReady = 'yes';
-    });
+    await markHeldReady(page);
 
     await page.mouse.down();
     await expect(tab(page, /alpha/)).toHaveAttribute('aria-selected', 'true');
-    const shown = page
-      .locator('[data-terminal-grid]')
-      .filter({ visible: true });
+    const shown = shownTerminal(page);
     await expect(shown).toHaveCount(1);
     await expect(shown).toHaveAttribute('data-held-ready', 'yes');
     await page.mouse.up();

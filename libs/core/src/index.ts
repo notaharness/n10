@@ -108,6 +108,7 @@ export * from './lib/babysit/babysit-model.js';
 export * from './lib/babysit/babysit-prompt.js';
 export * from './lib/discovery/worktree-origin.js';
 export * from './lib/discovery/live-worktree-sessions.js';
+export * from './lib/discovery/orchestrator-groups.js';
 
 // ── Pure utilities ───────────────────────────────────────────────
 export * from './lib/utils/sidebar-items.js';

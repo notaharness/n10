@@ -290,6 +290,18 @@
   .tab-attention {
     animation: tab-attention 1.4s steps(1, end) infinite;
   }
+  /* The same blink on an orchestrator tab's player count, for a hidden
+     player: in the primary colour, so it shows on a selected tab, whose
+     background the tab's own blink would not change. */
+  @keyframes count-attention {
+    50% {
+      background-color: var(--primary);
+      color: var(--primary-foreground);
+    }
+  }
+  .count-attention {
+    animation: count-attention 1.4s steps(1, end) infinite;
+  }
 }
 
 /* ── Terminal (xterm.js) ───────────────────────────────────────────

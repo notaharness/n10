@@ -74,6 +74,7 @@ import type {
 export type * from './contract-sessions.js';
 import type {
   ForeignSessionSummary,
+  OrchestratorGroupSummary,
   SessionSummary,
 } from './contract-sessions.js';
 // Pull request diffs at exact commits.
@@ -504,6 +505,9 @@ export interface N10HostApi {
    *  each a tab in its own group. The open repository's own are left
    *  out — the sidebar describes those. */
   listForeignSessions(): Promise<ForeignSessionSummary[]>;
+  /** This machine's Orchestra orchestrators and their players, for the
+   *  tab strip to group player tabs under their orchestrator's tab. */
+  listOrchestratorGroups(): Promise<OrchestratorGroupSummary[]>;
   /** Debounced per-session agent activity (same registry as the TUI's
    *  sidebar spinner): `active` = producing output now, `flashing` =
    *  went idle after a real work streak and the user hasn't looked. */
@@ -686,6 +690,7 @@ export const IPC = {
   launchAgent: 'n10/session/launch',
   listSessions: 'n10/session/list',
   listForeignSessions: 'n10/session/list-foreign',
+  listOrchestratorGroups: 'n10/session/list-orchestrators',
   getSessionActivity: 'n10/session/activity',
   watchSession: 'n10/session/watch',
   unwatchSession: 'n10/session/unwatch',

@@ -78,6 +78,7 @@ const api: N10HostApi = {
   checkoutPlan: (req) => ipcRenderer.invoke(IPC.checkoutPlan, req),
   listSessions: (repo) => ipcRenderer.invoke(IPC.listSessions, repo),
   listForeignSessions: () => ipcRenderer.invoke(IPC.listForeignSessions),
+  listOrchestratorGroups: () => ipcRenderer.invoke(IPC.listOrchestratorGroups),
   getSessionActivity: () => ipcRenderer.invoke(IPC.getSessionActivity),
   watchSession: (name) => ipcRenderer.invoke(IPC.watchSession, name),
   unwatchSession: (name) => ipcRenderer.invoke(IPC.unwatchSession, name),

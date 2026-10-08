@@ -3,6 +3,7 @@ import { desktopBindings, type DesktopBindings } from '@n10/core/ui';
 import {
   currentMru,
   listenForTabSwitching,
+  notePresentedOrder,
   noteStrip,
   resetTabMru,
   type TabSwitchingDeps,
@@ -51,10 +52,6 @@ class Strip {
     recording: () => this.recording,
     tabIds: () => this.ids,
     activeId: () => this.active,
-    cycle: (delta) => {
-      const i = this.ids.indexOf(this.active);
-      this.show(this.ids[(i + delta + this.ids.length) % this.ids.length]!);
-    },
     activate: (id) => this.show(id),
   };
 
@@ -106,6 +103,23 @@ describe('keyboard tab switching', () => {
     press('PageUp', { ctrl: true });
     press('PageUp', { ctrl: true });
     expect(strip.active).toBe('d');
+  });
+
+  it('Ctrl+PgDn walks the order the strip presents, players after their orchestrator', () => {
+    // State order a b c d p q; the strip shows a, o(rchestrator) with
+    // players p and q under it, then b.
+    strip.ids = ['a', 'o', 'b', 'p', 'q'];
+    notePresentedOrder(['a', 'o', 'p', 'q', 'b']);
+    strip.byRecentUse = false;
+    strip.visit('a');
+    const seen: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      press('PageDown', { ctrl: true });
+      seen.push(strip.active);
+    }
+    expect(seen).toEqual(['o', 'p', 'q', 'b', 'a']);
+    press('PageUp', { ctrl: true });
+    expect(strip.active).toBe('b');
   });
 
   it('Ctrl+Tab walks by recent use while Ctrl is held, commits on release', () => {

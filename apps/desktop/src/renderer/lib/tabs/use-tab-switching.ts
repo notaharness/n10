@@ -35,7 +35,6 @@ export function useTabSwitching(enabled: boolean): void {
         recording: isRecordingShortcut,
         tabIds: () => latest.current.tabs.tabs.map((t) => t.id),
         activeId: () => latest.current.tabs.activeId,
-        cycle: (delta) => latest.current.tabs.cycle(delta),
         activate: (id) => latest.current.tabs.activate(id),
       }),
     []
