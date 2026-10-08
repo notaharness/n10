@@ -1,9 +1,9 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { tab } from './setup/app.js';
+import { createWorktree, tab } from './setup/app.js';
 import {
   addExternalWorktree,
   cleanupExternalSessions,
@@ -11,6 +11,15 @@ import {
   tmuxAvailable,
   uniqueExternalBranch,
 } from './setup/external.js';
+import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
+import {
+  centre,
+  markHeldReady,
+  moveTo,
+  restOn,
+  shownTerminal,
+  spareText,
+} from './setup/prewarm.js';
 import { startSurvivingTerminal } from './setup/terminals.js';
 import {
   killFixtureSessions,
@@ -27,8 +36,10 @@ import {
  */
 test.skip(!tmuxAvailable(), 'tmux is not installed');
 
-const TARGET = 'claude:7c0ffee0-1234-4abc-8def-0123456789ab';
+const CLAUDE = 'claude:7c0ffee0-1234-4abc-8def-0123456789ab';
+const CODEX = 'codex:01a10ed5-da8b-7120-bf36-8325cc735440';
 const ORCHESTRATOR = 'conductor-shell';
+const CONDUCTOR_READY = 'conductor-ready';
 
 function orchestratorTab(page: Page) {
   return page.locator('[role=tab][data-orchestrator]');
@@ -36,10 +47,15 @@ function orchestratorTab(page: Page) {
 function playerList(page: Page) {
   return page.locator('[data-orchestrator-players]');
 }
+function playerRows(page: Page) {
+  return playerList(page).locator('[data-player-row]');
+}
+const ready = (branch: string) => `player-${branch}-ready`;
 
 test.describe('Orchestrator tab', () => {
   let folder = '';
   let branches: string[] = [];
+  const others: { repo: string; branches: string[] }[] = [];
 
   test.beforeEach(({ desktop }) => {
     folder = mkdtempSync(join(tmpdir(), 'n10-conductor-'));
@@ -47,40 +63,59 @@ test.describe('Orchestrator tab', () => {
     startSurvivingTerminal({
       name: ORCHESTRATOR,
       cwd: folder,
-      command: 'sleep 300',
+      command: `printf '%s\\n' ${CONDUCTOR_READY}; sleep 300`,
       homeDir: desktop.homeDir,
     });
   });
 
   test.afterEach(({ desktop }) => {
     cleanupExternalSessions(desktop.repoPath, branches, desktop.homeDir);
+    for (const other of others.splice(0)) {
+      cleanupExternalSessions(other.repo, other.branches, desktop.homeDir);
+      cleanupTestRepo(other.repo);
+    }
     killFixtureSessions(desktop.homeDir);
     rmSync(folder, { recursive: true, force: true });
   });
 
   /** A player spawned from the orchestrator: a worktree session made
-   *  outside the app, reporting to `TARGET`. */
-  function spawnPlayer(repoPath: string, homeDir: string): string {
+   *  outside the app in `repoPath`, reporting to `target`. It prints
+   *  its name once, unless `quiet`: output makes an agent active for a
+   *  moment, and closing an active agent asks first. */
+  function spawnPlayer(
+    repoPath: string,
+    homeDir: string,
+    { target = CLAUDE, quiet = false } = {}
+  ): string {
     const branch = uniqueExternalBranch();
-    branches.push(branch);
     const name = startExternalTmuxSession({
       repoPath,
       homeDir,
       branch,
       worktreePath: addExternalWorktree(repoPath, branch),
-      command: 'sleep 300',
+      command: quiet
+        ? 'sleep 300'
+        : `printf '%s\\n' ${ready(branch)}; sleep 300`,
     });
-    tagTmuxSession(name, { '@orchestra-orchestrator': TARGET }, homeDir);
+    tagTmuxSession(name, { '@orchestra-orchestrator': target }, homeDir);
     return branch;
+  }
+
+  function markOrchestrator(homeDir: string, target = CLAUDE): void {
+    tagTmuxSession(ORCHESTRATOR, { '@orchestra-target': target }, homeDir);
   }
 
   test('groups its players under it, counted where the X was, listed on hover', async ({
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;
+    // In front, so the players open behind it.
+    await createWorktree(page, 'alpha');
     const first = spawnPlayer(repoPath, homeDir);
+    branches.push(first);
     const second = spawnPlayer(repoPath, homeDir);
-    tagTmuxSession(ORCHESTRATOR, { '@orchestra-target': TARGET }, homeDir);
+    branches.push(second);
+    markOrchestrator(homeDir);
 
     const orchestrator = orchestratorTab(page);
     await expect(orchestrator).toBeVisible({ timeout: 30_000 });
@@ -94,17 +129,23 @@ test.describe('Orchestrator tab', () => {
     // The players' tabs leave the strip for the orchestrator's list.
     await expect(tab(page, new RegExp(first))).toHaveCount(0);
     await expect(tab(page, new RegExp(second))).toHaveCount(0);
+    // They opened in the background, unseen: the orchestrator says so.
+    await expect(orchestrator).toHaveAttribute('data-unseen', 'true');
 
     await orchestrator.hover();
-    const rows = playerList(page).locator('[data-player-row]');
+    const rows = playerRows(page);
     await expect(rows).toHaveCount(2);
-    await expect(rows.filter({ hasText: first })).toBeVisible();
+    await expect(rows.filter({ hasText: first })).toHaveAttribute(
+      'data-unseen',
+      'true'
+    );
     await expect(rows.filter({ hasText: second })).toBeVisible();
 
     // Choosing a row opens that player's tab: the strip's selection is
     // the orchestrator tab it stands under.
     await rows.filter({ hasText: second }).getByRole('button').first().click();
     await expect(orchestrator).toHaveAttribute('aria-selected', 'true');
+    await expect(shownTerminal(page)).toContainText(ready(second));
     await page.mouse.move(0, 400);
     await orchestrator.hover();
     await expect(
@@ -112,20 +153,61 @@ test.describe('Orchestrator tab', () => {
     ).toHaveText(new RegExp(second));
   });
 
+  test('groups players of other repositories and directories, under a Codex orchestrator', async ({
+    desktop,
+  }) => {
+    const { page, homeDir } = desktop;
+    // A worktree of a repository that is not open, and an Orchestra dir
+    // player in a directory of its own.
+    const other = createTestRepo({ name: 'transloco' });
+    const elsewhere = spawnPlayer(other, homeDir, { target: CODEX });
+    others.push({ repo: other, branches: [elsewhere] });
+    const dir = mkdtempSync(join(tmpdir(), 'n10-dir-player-'));
+    startSurvivingTerminal({
+      name: 'transloco-dir',
+      kind: 'dir',
+      cwd: dir,
+      command: 'sleep 300',
+      homeDir,
+    });
+    tagTmuxSession(
+      'transloco-dir',
+      { '@orchestra-orchestrator': CODEX },
+      homeDir
+    );
+    markOrchestrator(homeDir, CODEX);
+
+    const orchestrator = orchestratorTab(page);
+    await expect(orchestrator.locator('[data-player-count]')).toHaveText('2', {
+      timeout: 30_000,
+    });
+    await expect(tab(page, new RegExp(elsewhere))).toHaveCount(0);
+    await expect(tab(page, new RegExp(basename(dir)))).toHaveCount(0);
+    await orchestrator.hover();
+    await expect(playerRows(page).filter({ hasText: elsewhere })).toBeVisible();
+    await expect(
+      playerRows(page).filter({ hasText: basename(dir) })
+    ).toBeVisible();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   test("a row's X closes that player as its tab's X would", async ({
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;
-    const doomed = spawnPlayer(repoPath, homeDir);
-    const kept = spawnPlayer(repoPath, homeDir);
-    tagTmuxSession(ORCHESTRATOR, { '@orchestra-target': TARGET }, homeDir);
+    const doomed = spawnPlayer(repoPath, homeDir, { quiet: true });
+    branches.push(doomed);
+    const kept = spawnPlayer(repoPath, homeDir, { quiet: true });
+    branches.push(kept);
+    markOrchestrator(homeDir);
 
     const orchestrator = orchestratorTab(page);
     await expect(orchestrator.locator('[data-player-count]')).toHaveText('2', {
       timeout: 30_000,
     });
     await orchestrator.hover();
-    const rows = playerList(page).locator('[data-player-row]');
+    const rows = playerRows(page);
+    await rows.filter({ hasText: doomed }).hover();
     await rows
       .filter({ hasText: doomed })
       .getByRole('button', { name: new RegExp(`^Close .*${doomed}`) })
@@ -141,7 +223,7 @@ test.describe('Orchestrator tab', () => {
 
   test('with no players it keeps its X', async ({ desktop }) => {
     const { page, homeDir } = desktop;
-    tagTmuxSession(ORCHESTRATOR, { '@orchestra-target': TARGET }, homeDir);
+    markOrchestrator(homeDir);
 
     const orchestrator = orchestratorTab(page);
     await expect(orchestrator).toBeVisible({ timeout: 30_000 });
@@ -152,5 +234,121 @@ test.describe('Orchestrator tab', () => {
     ).toHaveCount(1);
     await orchestrator.hover();
     await expect(playerList(page)).toHaveCount(0);
+  });
+
+  test('the keyboard walks its players after it, and focus opens no list', async ({
+    desktop,
+  }) => {
+    const { page, repoPath, homeDir } = desktop;
+    // The orchestrator's tab first, then alpha in front, so the players
+    // open behind alpha: [orchestrator, alpha, player, player] in the
+    // tabs' own order, which is not the order the strip shows.
+    await expect(tab(page, /n10-conductor-/)).toBeVisible({ timeout: 30_000 });
+    await createWorktree(page, 'alpha');
+    const first = spawnPlayer(repoPath, homeDir);
+    branches.push(first);
+    const second = spawnPlayer(repoPath, homeDir);
+    branches.push(second);
+    markOrchestrator(homeDir);
+    const orchestrator = orchestratorTab(page);
+    await expect(orchestrator.locator('[data-player-count]')).toHaveText('2', {
+      timeout: 30_000,
+    });
+
+    // Arrowing onto the tab moves focus there, and no card opens, though
+    // a hover's would have in the same time.
+    await page.clock.install();
+    await orchestrator.hover();
+    await page.clock.runFor(400);
+    await expect(playerList(page)).toBeVisible();
+    await page.mouse.move(0, 400);
+    await page.clock.runFor(400);
+    await expect(playerList(page)).toHaveCount(0);
+    await tab(page, /alpha/).focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(orchestrator).toBeFocused();
+    await page.clock.runFor(400);
+    await expect(playerList(page)).toHaveCount(0);
+    await page.clock.resume();
+
+    // From alpha, Ctrl+PgDn goes to the orchestrator, then through both
+    // its players, the orchestrator selected all the while, then back.
+    await tab(page, /alpha/).click();
+    await page.keyboard.press('Control+PageDown');
+    await expect(orchestrator).toHaveAttribute('aria-selected', 'true');
+    await expect(shownTerminal(page)).toContainText(CONDUCTOR_READY);
+    const player = /player-(e2e-ext-[0-9a-f]+)-ready/;
+    const showing = async () =>
+      player.exec((await shownTerminal(page).textContent()) ?? '')?.at(1);
+    // One player's terminal, then the other's: each read waits out the
+    // switch, when no player's terminal is on screen.
+    await page.keyboard.press('Control+PageDown');
+    await expect(orchestrator).toHaveAttribute('aria-selected', 'true');
+    let one: string | undefined;
+    await expect.poll(async () => (one = await showing())).toMatch(/^e2e-ext-/);
+    expect([first, second]).toContain(one);
+    await page.keyboard.press('Control+PageDown');
+    await expect(orchestrator).toHaveAttribute('aria-selected', 'true');
+    await expect
+      .poll(showing)
+      .toBe([first, second].find((branch) => branch !== one));
+    await page.keyboard.press('Control+PageDown');
+    await expect(tab(page, /alpha/)).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('a tap on it selects it', async ({ desktop }) => {
+    const { page, repoPath, homeDir } = desktop;
+    await createWorktree(page, 'alpha');
+    branches.push(spawnPlayer(repoPath, homeDir));
+    markOrchestrator(homeDir);
+    const orchestrator = orchestratorTab(page);
+    await expect(orchestrator.locator('[data-player-count]')).toHaveText('1', {
+      timeout: 30_000,
+    });
+    await expect(tab(page, /alpha/)).toHaveAttribute('aria-selected', 'true');
+
+    const [x, y] = await centre(orchestrator);
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x, y }],
+    });
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: [],
+    });
+    await expect(orchestrator).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('resting on a row holds its pane ready, and pressing it shows that terminal', async ({
+    desktop,
+  }) => {
+    const { page, repoPath, homeDir } = desktop;
+    // In front, so the players open behind it.
+    await createWorktree(page, 'alpha');
+    const first = spawnPlayer(repoPath, homeDir);
+    branches.push(first);
+    const second = spawnPlayer(repoPath, homeDir);
+    branches.push(second);
+    markOrchestrator(homeDir);
+    const orchestrator = orchestratorTab(page);
+    await expect(orchestrator.locator('[data-player-count]')).toHaveText('2', {
+      timeout: 30_000,
+    });
+
+    await page.clock.install();
+    await moveTo(page, orchestrator);
+    await page.clock.runFor(400);
+    const row = playerRows(page).filter({ hasText: second });
+    await expect(row).toBeVisible();
+    await restOn(page, row, undefined, { fromHere: true });
+    await expect.poll(() => spareText(page)).toContain(ready(second));
+    await markHeldReady(page);
+
+    await page.mouse.down();
+    await expect(orchestrator).toHaveAttribute('aria-selected', 'true');
+    await expect(shownTerminal(page)).toHaveCount(1);
+    await expect(shownTerminal(page)).toHaveAttribute('data-held-ready', 'yes');
+    await page.mouse.up();
   });
 });
