@@ -85,3 +85,7 @@ docs/media/raw
 
 # Personal agent instructions
 CLAUDE.local.md
+
+.claude/worktrees
+.nx/polygraph
+.nx/self-healing
