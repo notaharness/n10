@@ -109,6 +109,7 @@ export function createShellHost(state: DemoState): ShellHost {
     tabOverflow: 'wrap',
     tabCycleMru: false,
     guidedReview: true,
+    imageCompare: 'side-by-side',
   };
   let keybindings: DesktopKeybindings = {};
   const menuCommands = new Channel<MenuCommandEvent>();

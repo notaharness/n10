@@ -1,10 +1,21 @@
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { showChanges, sidebarRow } from './setup/app.js';
-import { updateFakeGh } from './setup/fake-gh.js';
-import { git } from './setup/pr-diff.js';
+import {
+  BLUE,
+  commitBranch,
+  compareOf,
+  decoded,
+  FRAME_HEIGHT,
+  IMAGES_FIXTURE,
+  ONE_SIDED_HEIGHT,
+  pushAndOpen,
+  RED,
+  seedMain,
+  side,
+  TWO_SIDED_HEIGHT,
+  worktreeOf,
+} from './setup/image-diff.js';
 import { disc, gradient } from './setup/png.js';
 
 /**
@@ -14,69 +25,7 @@ import { disc, gradient } from './setup/png.js';
  * image is read only once its frame nears the screen.
  */
 
-const BRANCH = 'images';
-/** `IMAGE_ROW_HEIGHT` and `IMAGE_FRAME_HEIGHT` in the renderer. */
-const ROW_HEIGHT = 366;
-const FRAME_HEIGHT = 320;
-
-test.use({
-  n10Config: { prPollInterval: 1_000 },
-  fakeGitHub: {
-    username: 'n10-tester',
-    prs: [{ number: 41, title: 'Images', headRefName: BRANCH }],
-  },
-  repo: {
-    worktrees: [{ branch: BRANCH, files: { 'notes.txt': 'notes\n' } }],
-  },
-});
-
-const worktreeOf = (repoPath: string) =>
-  join(repoPath, '.claude', 'worktrees', BRANCH);
-
-const RED = [220, 38, 38, 255] as const;
-const BLUE = [37, 99, 235, 255] as const;
-
-/** Put `files` on main and bring them into the branch, so the pull
- *  request's merge base has them. */
-function seedMain(repoPath: string, files: Record<string, Buffer>): void {
-  for (const [name, bytes] of Object.entries(files)) {
-    writeFileSync(join(repoPath, name), bytes);
-  }
-  git(repoPath, 'add', '--', ...Object.keys(files));
-  git(repoPath, 'commit', '-q', '-m', 'images on main');
-  git(worktreeOf(repoPath), 'merge', '-q', '--no-edit', 'main');
-}
-
-function commitBranch(repoPath: string, message: string): void {
-  const worktree = worktreeOf(repoPath);
-  git(worktree, 'add', '-A');
-  git(worktree, 'commit', '-q', '-m', message);
-}
-
-/** Push what was committed and open the pull request's diff once the
- *  app has the new head: the retitle arrives in the same list read. */
-async function pushAndOpen(page: Page, homeDir: string) {
-  updateFakeGh(homeDir, (s) => {
-    s.prs[0]!.title = 'Images, pushed';
-  });
-  const row = sidebarRow(page, /Images, pushed/);
-  await expect(row).toBeVisible({ timeout: 30_000 });
-  await row.click();
-  await showChanges(page);
-}
-
-/** The before-and-after row under a file's header. */
-const compareOf = (page: Page, file: string) =>
-  page.locator('[data-diff-scroll]').locator(`[data-image-compare="${file}"]`);
-
-const side = (compare: Locator, which: 'before' | 'after') =>
-  compare.locator(`[data-image-side="${which}"]`);
-
-/** Whether the image has decoded, and its intrinsic size. */
-const decoded = (img: Locator) =>
-  img.evaluate((el: HTMLImageElement) =>
-    el.complete ? `${el.naturalWidth}×${el.naturalHeight}` : null
-  );
+test.use(IMAGES_FIXTURE);
 
 test('shows a changed image’s two sides, each in its own frame', async ({
   desktop,
@@ -113,7 +62,7 @@ test('shows a changed image’s two sides, each in its own frame', async ({
   // The frames keep the size they were given before anything was read:
   // a small image does not shrink them.
   const row = await compare.boundingBox();
-  expect(Math.round(row!.height)).toBe(ROW_HEIGHT);
+  expect(Math.round(row!.height)).toBe(TWO_SIDED_HEIGHT);
   for (const which of ['before', 'after'] as const) {
     const frame = side(compare, which).locator('[data-image-frame]');
     expect(Math.round((await frame.boundingBox())!.height)).toBe(FRAME_HEIGHT);
@@ -215,7 +164,7 @@ test('reads an image only once its frame nears the screen', async ({
   // Mounted, its frame already its full size, but not read.
   const last = compareOf(page, 'img-8.png');
   await expect(last).toBeAttached();
-  expect(Math.round((await last.boundingBox())!.height)).toBe(ROW_HEIGHT);
+  expect(Math.round((await last.boundingBox())!.height)).toBe(ONE_SIDED_HEIGHT);
   await expect(
     side(last, 'after').getByRole('status', {
       name: 'Loading After: img-8.png',
@@ -277,7 +226,9 @@ test('shows a renamed image, by either name, and refuses one that is not an imag
 
   const renamed = compareOf(page, 'logo.dat');
   await renamed.scrollIntoViewIfNeeded();
-  expect(Math.round((await renamed.boundingBox())!.height)).toBe(ROW_HEIGHT);
+  expect(Math.round((await renamed.boundingBox())!.height)).toBe(
+    TWO_SIDED_HEIGHT
+  );
   await expect
     .poll(() =>
       decoded(
@@ -295,7 +246,9 @@ test('shows a renamed image, by either name, and refuses one that is not an imag
 
   const moved = compareOf(page, 'brand/icon.png');
   await moved.scrollIntoViewIfNeeded();
-  expect(Math.round((await moved.boundingBox())!.height)).toBe(ROW_HEIGHT);
+  expect(Math.round((await moved.boundingBox())!.height)).toBe(
+    TWO_SIDED_HEIGHT
+  );
   await expect
     .poll(() =>
       decoded(

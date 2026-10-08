@@ -334,9 +334,13 @@ export interface DesktopPrefs {
   /** Whether a review started from the launch dialog asks for a guided
    *  review: the dialog's checkbox, remembered from the last choice. */
   guidedReview: boolean;
+  /** How a changed image's two sides are compared in a diff: the last
+   *  choice made from an image's row, not a setting. */
+  imageCompare: ImageCompareMode;
 }
 
 export type TabOverflow = 'wrap' | 'scroll';
+export type ImageCompareMode = 'side-by-side' | 'toggle' | 'slider';
 
 /** The desktop shortcuts the user rebound, by action id; an action
  *  missing here has its default (`DESKTOP_DEFAULT_BINDINGS`). */

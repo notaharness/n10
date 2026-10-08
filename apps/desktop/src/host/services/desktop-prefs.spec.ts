@@ -50,6 +50,7 @@ describe('loadDesktopPrefs', () => {
       tabOverflow: 'wrap',
       tabCycleMru: false,
       guidedReview: true,
+      imageCompare: 'side-by-side',
     });
   });
 
@@ -63,6 +64,7 @@ describe('loadDesktopPrefs', () => {
       tabOverflow: 'wrap',
       tabCycleMru: false,
       guidedReview: true,
+      imageCompare: 'side-by-side',
     });
   });
 
@@ -76,6 +78,7 @@ describe('loadDesktopPrefs', () => {
       tabOverflow: 'wrap',
       tabCycleMru: false,
       guidedReview: true,
+      imageCompare: 'side-by-side',
     });
   });
 
@@ -87,6 +90,7 @@ describe('loadDesktopPrefs', () => {
         tabOverflow: 'scroll',
         tabCycleMru: true,
         guidedReview: true,
+        imageCompare: 'slider',
       })
     );
     expect(loadDesktopPrefs()).toEqual({
@@ -95,6 +99,7 @@ describe('loadDesktopPrefs', () => {
       tabOverflow: 'scroll',
       tabCycleMru: true,
       guidedReview: true,
+      imageCompare: 'slider',
     });
   });
 });
@@ -108,6 +113,7 @@ describe('saveDesktopPrefs', () => {
       tabOverflow: 'wrap',
       tabCycleMru: false,
       guidedReview: true,
+      imageCompare: 'side-by-side',
     });
     expect(JSON.parse(readFileSync(prefsPath(), 'utf8'))).toEqual({
       theme: 'dark',
@@ -115,6 +121,7 @@ describe('saveDesktopPrefs', () => {
       tabOverflow: 'wrap',
       tabCycleMru: false,
       guidedReview: true,
+      imageCompare: 'side-by-side',
     });
   });
 
@@ -128,6 +135,7 @@ describe('saveDesktopPrefs', () => {
       tabOverflow: 'wrap',
       tabCycleMru: false,
       guidedReview: true,
+      imageCompare: 'side-by-side',
     });
   });
 
@@ -140,6 +148,7 @@ describe('saveDesktopPrefs', () => {
       tabOverflow: 'wrap',
       tabCycleMru: false,
       guidedReview: true,
+      imageCompare: 'side-by-side',
     });
   });
 
@@ -151,6 +160,7 @@ describe('saveDesktopPrefs', () => {
       tabOverflow: 'wrap',
       tabCycleMru: false,
       guidedReview: true,
+      imageCompare: 'side-by-side',
     });
     expect(loadDesktopPrefs().theme).toBe('dark');
   });

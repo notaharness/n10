@@ -1124,6 +1124,23 @@ swallow the margin) and the scroll has rested 150 ms with it there, as body
 batches wait for the list to settle: a drag through forty screenshots must
 not read forty blobs. A worktree's diff has no blob ids and shows no images.
 
+Two sides are compared side by side, in turn in one frame, or split in one
+frame by a divider. The choice sits on the image's row and is the last one made
+there, kept as the `imageCompare` desktop pref, like the tab strip's overflow:
+it holds for every image row after it and across restarts, and Settings does
+not list it. An added or deleted image has nothing to compare, so its row
+offers no choice and keeps its one side beside the other's absence; the row is
+sized by its side count, since only two sides carry the choice's line. Stacked
+sides each lie on their own checkerboard, so the side on top hides the one
+beneath even where it is transparent, and both stay mounted, so neither has to
+decode again when it comes back. The toggle swaps sides every second and holds
+still under `prefers-reduced-motion`, where a button flips it. The divider is
+Radix's slider thumb over the whole frame: pressing anywhere moves it there,
+dragging works by mouse, pen or touch (`touch-action: none`), the keyboard
+moves it once focused, and it reads as a slider with its position. The thumb
+is as thin as the line, so Radix's keep-in-bounds nudge, which shifts a thumb
+by up to half its width near the ends, cannot move it off the edge it reveals.
+
 A pull request's history is compared at exact commits, never at whatever a
 branch holds now. The provider's record — GitHub's commits and force-pushes,
 and the latest review the account it answers as submitted — is read from the

@@ -57,12 +57,13 @@ export type FileBody =
   | { state: 'loaded'; lines: DiffLine[]; scope: LargeScope }
   | { state: 'loading' }
   /** git has no lines for it: nothing to read. `images`: binary content
-   *  shown as its two sides (`showsImages`), the one test both the row's
-   *  height and what renders in it go by. */
+   *  shown as pictures (`showsImages`), and how many sides it has: one
+   *  when the change added or deleted the file. The one test both the
+   *  row's height and what renders in it go by. */
   | {
       state: 'no-text';
       reason: 'binary' | 'no-content-changes';
-      images?: true;
+      images?: ImageSides;
     }
   /** Too big to read unasked; `bytes` is its larger side. */
   | { state: 'large'; bytes: number }
@@ -103,7 +104,7 @@ export function isImagePath(path: string): boolean {
   return dot > 0 && IMAGE_EXTENSIONS.has(name.slice(dot + 1).toLowerCase());
 }
 
-/** A binary file shown as its two images instead of a notice. */
+/** A binary file shown as its images instead of a notice. */
 export function showsImages(file: PrDiffManifestFile): boolean {
   return (
     file.kind === 'binary' &&
@@ -111,16 +112,35 @@ export function showsImages(file: PrDiffManifestFile): boolean {
   );
 }
 
+/** How many sides a changed image has: before and after, or only one
+ *  when the change added or deleted it. */
+export type ImageSides = 1 | 2;
+
+export function imageSides(file: PrDiffManifestFile): ImageSides {
+  return file.oldOid !== null && file.newOid !== null ? 2 : 1;
+}
+
 /** Each side's frame, fixed before either image is read so nothing
  *  below moves when one arrives. */
 export const IMAGE_FRAME_HEIGHT = 320;
-/** A side's caption: one `text-xs` line (16) and its `mb-1.5` (6). */
+/** A side's caption: one `h-4` line and its `mb-1.5` (6). */
 const IMAGE_CAPTION_HEIGHT = 16 + 6;
 /** The row's `py-3`. */
 const IMAGE_ROW_PADDING = 2 * 12;
-/** The frame, its caption and the row's padding. */
-export const IMAGE_ROW_HEIGHT =
-  IMAGE_ROW_PADDING + IMAGE_CAPTION_HEIGHT + IMAGE_FRAME_HEIGHT;
+/** The choice of how two sides are compared: one `h-7` line (28) and
+ *  its `mb-2` (8). A one-sided image has nothing to compare. */
+const IMAGE_MODES_HEIGHT = 28 + 8;
+
+/** The frame, its caption, the row's padding and, for two sides, the
+ *  choice of how they are compared. */
+export function imageRowHeight(sides: ImageSides): number {
+  return (
+    IMAGE_ROW_PADDING +
+    (sides === 2 ? IMAGE_MODES_HEIGHT : 0) +
+    IMAGE_CAPTION_HEIGHT +
+    IMAGE_FRAME_HEIGHT
+  );
+}
 
 export function isLarge(file: PrDiffManifestFile): boolean {
   return noTextReason(file) === null && fileBytes(file) > LARGE_FILE_BYTES;
@@ -246,7 +266,7 @@ export function bodyOf(
   const reason = noTextReason(file);
   if (reason) {
     return showsImages(file)
-      ? { state: 'no-text', reason, images: true }
+      ? { state: 'no-text', reason, images: imageSides(file) }
       : { state: 'no-text', reason };
   }
   if (read === null) return { state: 'large', bytes: fileBytes(file) };

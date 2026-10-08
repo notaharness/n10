@@ -174,7 +174,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   sides (`diff/ImageCompare.tsx`), each read by the manifest's blob id
   (`fetchPrDiffImage`) only once its frame, sized before any read, nears
   the screen and the scroll settles; a worktree's diff has no blob ids and
-  shows none. Single-file
+  shows none. Two sides compare side by side, in turn or by a divider
+  (`diff/ImageStack.tsx`), as the `imageCompare` desktop pref says, chosen
+  from the row: a remembered choice, not a setting. Single-file
   mode (`lib/diff/single-file.ts`) is a view of the same list, never a second
   model. A PR diffs the exact commits the engine's review reads resolve
   from the provider's head (`lib/review/use-pr-diff.ts`), never the local branch.
