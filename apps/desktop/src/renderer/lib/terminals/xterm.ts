@@ -190,8 +190,10 @@ function loadWebgl(
  * renderer.
  *
  * `host` says which renderer draws (`data-terminal-renderer`, `webgl`
- * or `dom`) and the grid (`data-terminal-grid`, `<cols>x<rows>`), for
- * whoever inspects the page.
+ * or `dom`), the grid (`data-terminal-grid`, `<cols>x<rows>`), the
+ * screen (`data-terminal-buffer`, `normal` or `alternate`) and how
+ * cursor keys are sent (`data-terminal-cursor-keys`, `normal` or
+ * `application`), for whoever inspects the page.
  */
 export function openTerminal(
   host: HTMLElement,
@@ -237,6 +239,16 @@ export function openTerminal(
   };
   grid();
   term.onResize(grid);
+  // Modes the output sets, read once each write has been parsed: xterm
+  // has no event for a mode changing.
+  const modes = () => {
+    host.dataset.terminalBuffer = term.buffer.active.type;
+    host.dataset.terminalCursorKeys = term.modes.applicationCursorKeysMode
+      ? 'application'
+      : 'normal';
+  };
+  modes();
+  term.onWriteParsed(modes);
 
   return {
     term,
