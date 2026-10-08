@@ -132,15 +132,21 @@ test.describe('Guided review', () => {
     await expect(page.getByText('export const retries = 1;')).toBeVisible();
   });
 
-  test('a slide opens the file it names in the changes', async ({
+  test('a slide opens the lines it names in the changes', async ({
     desktop,
   }) => {
     const { page } = desktop;
     const pane = await openGuide(page);
     await pane.getByRole('button', { name: 'Start' }).click();
-    await pane.getByRole('button', { name: /blob\.ts/ }).click();
+    await pane.getByRole('button', { name: /blob\.ts\s*180–181/ }).click();
     await expect(pane).toBeHidden();
-    await expect(page.getByText('export const retries = 1;')).toBeVisible();
+    // Line 180, far down the file: not the file's top.
+    await expect(
+      page.getByText('export const line180 = 178;')
+    ).toBeInViewport();
+    await expect(
+      page.getByText('export const retries = 1;')
+    ).not.toBeInViewport();
   });
 });
 
