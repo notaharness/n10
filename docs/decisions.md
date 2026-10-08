@@ -1017,8 +1017,14 @@ after sit side by side, so `guide-help` asks for those narrow (TD) and for a
 lone diagram wide (LR), each one idea of at most eight nodes.
 
 Only the desktop asks for a guide (`buildReviewLaunchRequest`'s `guide`
-option). The TUI cannot show slides, so its reviewer does not spend time on
-one.
+option), and only when the review launch dialog's **Guided review** box is
+checked: a guide costs the agent time, and some reviews do not need one.
+Unchecked, the prompt says nothing of a guide. The box starts checked and
+remembers the last choice in the desktop prefs (`guidedReview`), as the tab
+strip's overflow does, rather than in Settings: it is a choice made at
+launch, not a setting. The choice travels on the launch request
+(`ReviewLaunchRequest.guide`); the host does not decide it. The TUI cannot
+show slides, so its reviewer does not spend time on one.
 
 Diagrams are agent output, so mermaid draws them at its `strict` security
 level with HTML labels off. n10 adds the theme, fonts and HTML labels to
