@@ -998,6 +998,21 @@ n10 draws from the title, summary and slide titles, so the titles are the
 outline. `add-guide` records the commit checked out where the agent ran;
 the desktop says when the pull request has moved past it.
 
+The guide hands the reader on to the review rather than standing beside it.
+A place a slide names opens the diff at the agent's draft comment when one
+covers those lines (`draftAt`), so a suspected problem reads as code with
+its comment, through the comment navigator's existing jump; and the last
+step opens the drafts walkthrough when there are drafts. `guide-help` has
+the agent write its comments first and name their lines on the closing
+slide, which ranks suspected problems, intended tradeoffs and what was not
+verified.
+
+A diagram on its own spans the slide under the words at its natural size,
+labels at 16px, and is never shrunk to fit a column or a height; a tall
+flowchart squeezed beside the text was unreadable at 1600×900. Before and
+after sit side by side, so `guide-help` asks for those narrow (TD) and for a
+lone diagram wide (LR), each one idea of at most eight nodes.
+
 Only the desktop asks for a guide (`buildReviewLaunchRequest`'s `guide`
 option). The TUI cannot show slides, so its reviewer does not spend time on
 one.
