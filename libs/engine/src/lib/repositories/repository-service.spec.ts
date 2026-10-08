@@ -131,6 +131,30 @@ describe('repository scope', () => {
     expect(service.get(selected.cwd)).toBe(selected);
   });
 
+  it('refuses writes through a handle read without selecting it', async () => {
+    const { service } = harness([]);
+    service.open(repo('writes-selected'));
+    const parked = service.get(repo('writes-parked'));
+    expect(() =>
+      parked.config.updateField(
+        { key: 'editor', label: 'Editor', configBag: 'project' },
+        'vim'
+      )
+    ).toThrow('not open');
+    expect(() => parked.config.updateKeybindFields((prev) => prev)).toThrow(
+      'not open'
+    );
+    await expect(parked.worktrees.create('topic')).rejects.toThrow('not open');
+    await expect(parked.worktrees.fetchBranches()).rejects.toThrow('not open');
+    // Selected, the same handle takes them.
+    service.open(parked.cwd);
+    parked.config.updateField(
+      { key: 'editor', label: 'Editor', configBag: 'project' },
+      'vim'
+    );
+    expect(readConfig(parked.cwd).editor).toBe('vim');
+  });
+
   it('prewarms a parked repository’s rows, and its list with the parked max age', () => {
     const { service, pullRequests } = harness([]);
     const selected = service.open(repo('prewarm-selected'));

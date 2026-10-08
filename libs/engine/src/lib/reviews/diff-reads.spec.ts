@@ -48,8 +48,10 @@ const request = {
 };
 const patchRequest = { repo: '/repo/a', mergeBaseOid: BASE, headOid: HEAD };
 const find = vi.fn();
-const reads = (repo = '/repo/a') =>
-  createDiffReads(repo, undefined, { find }, {});
+const reads = (
+  repo = '/repo/a',
+  freshness?: Parameters<typeof createDiffReads>[1]
+) => createDiffReads(repo, freshness, { find }, {});
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -344,4 +346,19 @@ it('reads a live diff from the resolved checkout', async () => {
     '/checkouts/actual',
     'main'
   );
+});
+
+describe('worktree', () => {
+  it('keeps its one-second TTL while its repository is parked', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    find.mockResolvedValue(null);
+    const diff = reads('/repo/a', { parked: () => true, parkedTtl: 3_600_000 });
+    await readResourceValue(diff.worktree('feature', 'main'));
+    await readResourceValue(diff.worktree('feature', 'main'));
+    expect(find).toHaveBeenCalledOnce();
+    vi.setSystemTime(Date.now() + 1_001);
+    await readResourceValue(diff.worktree('feature', 'main'));
+    expect(find).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
 });
