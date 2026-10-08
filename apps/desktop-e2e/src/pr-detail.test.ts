@@ -42,20 +42,12 @@ const REF = {
   number: 214,
 };
 
-interface Bridge {
-  n10: {
-    getRepo(): Promise<{ cwd: string } | null>;
-    getPullRequestSnapshot(cwd: string, req: unknown): Promise<unknown>;
-  };
-}
-
 function snapshot(page: Page, viewer: string | null, number = REF.number) {
   return page.evaluate(
     async (req) => {
-      const { n10 } = window as unknown as Bridge;
-      const repo = await n10.getRepo();
+      const repo = await window.n10.getRepo();
       if (!repo) throw new Error('no open repository');
-      return n10.getPullRequestSnapshot(repo.cwd, req);
+      return window.n10.getPullRequestSnapshot(repo.cwd, req);
     },
     { ref: { ...REF, number }, viewer }
   );

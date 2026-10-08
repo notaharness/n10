@@ -26,6 +26,10 @@ import {
 const repositories = createRepositoryService({
   providers: PROVIDERS,
   pullRequests,
+  // Tests cross the hour a parked repository's data stays warm for.
+  ...(Number(process.env.N10_PARKED_TTL_MS) > 0
+    ? { parkedTtl: Number(process.env.N10_PARKED_TTL_MS) }
+    : {}),
   worktreeWatchers: {
     suspend: (repo, branch) => stopBabysitForBranch(repo, branch),
     resume: (repo, id) => startBabysitForRepo(repo, id),
@@ -102,12 +106,6 @@ export function repository(cwd: string): RepositoryHandle {
  *  open needs its provider and account too. */
 export function getRepoInfo(cwd: string): RepoInfo {
   return repoInfo(repository(cwd));
-}
-
-/** Bring `cwd`'s data up to date behind what it holds, unless a parked
- *  repository's is still warm. Returns at once. */
-export function prewarmRepo(cwd: string): void {
-  repository(cwd).prewarm();
 }
 
 export function getRepo(): RepoInfo | null {

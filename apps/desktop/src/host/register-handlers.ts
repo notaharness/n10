@@ -60,7 +60,6 @@ export function createHostApi(): HostApi {
     openRepo: (cwd) => Promise.resolve(repo.openRepo(cwd)),
     getRepo: () => Promise.resolve(repo.getRepo()),
     getRepoInfo: (cwd) => Promise.resolve(repo.getRepoInfo(cwd)),
-    prewarmRepo: (cwd) => Promise.resolve(repo.prewarmRepo(cwd)),
     refreshRepo: () => Promise.resolve(repo.refreshRepo()),
     listRecentRepos: () => Promise.resolve(repo.listRecentRepos()),
     selectRepoDirectory: () => pickFolder('Open repository'),

@@ -1,4 +1,21 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { listBranchSessions } from './branch-sessions.js';
+import { listDraftComments } from './drafts.js';
+import { getPullRequestChecks } from './pr-checks.js';
+import { getPullRequestConversation } from './pr-conversation.js';
+import { getPullRequestSnapshot } from './pr-details.js';
+import { getPullRequestHistory, recordPullRequestVisit } from './pr-history.js';
+import { listDrafts } from './review-drafts.js';
+import {
+  fetchCommentThreads,
+  fetchPrDescription,
+  getPrDiffManifest,
+  getPrDiffPatch,
+  getPrRangeManifest,
+} from './reviews.js';
+import { listAgentOptions } from './session-launch-options.js';
+import { listSessions } from './sessions.js';
+import { getWorktreeDiffText, listAllBranches } from './worktrees.js';
 
 /**
  * Every read a pane or the sidebar makes answers for the repository it
@@ -24,7 +41,7 @@ vi.mock('./repo.js', () => {
       cwd,
       config: { getSnapshot: () => touch({ config: {} }) },
       worktrees: {
-        read: async () => touch({ allBranches: [cwd], error: null }),
+        read: () => touch({ allBranches: [cwd], error: null }),
       },
       sessions: {
         connections: () => touch([]),
@@ -37,8 +54,8 @@ vi.mock('./repo.js', () => {
         checks: resource,
         conversation: resource,
         history: resource,
-        recordVisit: async () => touch(undefined),
-        drafts: { list: async () => touch({}) },
+        recordVisit: () => touch(undefined),
+        drafts: { list: () => touch({}) },
         agentComments: { resource },
         diff: {
           manifest: resource,
@@ -68,93 +85,24 @@ vi.mock('./terminals.js', () => ({
 const PARKED = '/parked';
 const req = { repo: PARKED };
 
-const READS: [string, () => Promise<unknown>][] = [
-  [
-    'pull request snapshot',
-    async () =>
-      (await import('./pr-details.js')).getPullRequestSnapshot(PARKED, {}),
-  ],
-  [
-    'pull request checks',
-    async () =>
-      (await import('./pr-checks.js')).getPullRequestChecks(PARKED, {}),
-  ],
-  [
-    'pull request conversation',
-    async () =>
-      (await import('./pr-conversation.js')).getPullRequestConversation(
-        PARKED,
-        {}
-      ),
-  ],
-  [
-    'pull request history',
-    async () =>
-      (await import('./pr-history.js')).getPullRequestHistory(PARKED, {}),
-  ],
-  [
-    'visit record',
-    async () =>
-      (await import('./pr-history.js')).recordPullRequestVisit(PARKED, {}),
-  ],
-  [
-    'comment threads',
-    async () => (await import('./reviews.js')).fetchCommentThreads(PARKED, 7),
-  ],
-  [
-    'description',
-    async () => (await import('./reviews.js')).fetchPrDescription(PARKED, 7),
-  ],
-  [
-    'diff manifest',
-    async () => (await import('./reviews.js')).getPrDiffManifest(req),
-  ],
-  [
-    'diff patch',
-    async () => (await import('./reviews.js')).getPrDiffPatch(req),
-  ],
-  [
-    'diff range manifest',
-    async () => (await import('./reviews.js')).getPrRangeManifest(req),
-  ],
-  [
-    'agent findings',
-    async () => (await import('./drafts.js')).listDraftComments(PARKED, 7),
-  ],
-  [
-    'review drafts',
-    async () => (await import('./review-drafts.js')).listDrafts(PARKED, {}),
-  ],
-  [
-    'sessions',
-    async () => (await import('./sessions.js')).listSessions(PARKED),
-  ],
-  [
-    'branch sessions',
-    async () =>
-      (await import('./branch-sessions.js')).listBranchSessions(
-        PARKED,
-        'feature'
-      ),
-  ],
-  [
-    'agent options',
-    async () =>
-      (await import('./session-launch-options.js')).listAgentOptions(PARKED),
-  ],
-  [
-    'worktree diff',
-    async () =>
-      (await import('./worktrees.js')).getWorktreeDiffText(
-        PARKED,
-        'feature',
-        'main'
-      ),
-  ],
-  [
-    'all branches',
-    async () => (await import('./worktrees.js')).listAllBranches(PARKED),
-  ],
+const READS: [string, () => unknown][] = [
+  ['pull request snapshot', () => getPullRequestSnapshot(PARKED, {})],
+  ['pull request checks', () => getPullRequestChecks(PARKED, {})],
+  ['pull request conversation', () => getPullRequestConversation(PARKED, {})],
+  ['pull request history', () => getPullRequestHistory(PARKED, {})],
+  ['visit record', () => recordPullRequestVisit(PARKED, {})],
+  ['comment threads', () => fetchCommentThreads(PARKED, 7)],
+  ['description', () => fetchPrDescription(PARKED, 7)],
+  ['diff manifest', () => getPrDiffManifest(req)],
+  ['diff patch', () => getPrDiffPatch(req)],
+  ['diff range manifest', () => getPrRangeManifest(req)],
+  ['agent findings', () => listDraftComments(PARKED, 7)],
+  ['review drafts', () => listDrafts(PARKED, {})],
+  ['sessions', () => listSessions(PARKED)],
+  ['branch sessions', () => listBranchSessions(PARKED, 'feature')],
+  ['agent options', () => listAgentOptions(PARKED)],
+  ['worktree diff', () => getWorktreeDiffText(PARKED, 'feature', 'main')],
+  ['all branches', () => listAllBranches(PARKED)],
 ];
 
 beforeEach(() => {

@@ -231,6 +231,12 @@ export default tseslint.config(
               sourceTag: 'type:lib',
               onlyDependOnLibsWithTags: ['type:lib'],
             },
+            // The desktop suite types `window.n10` from the app's own
+            // bridge contract, so a caller cannot drift from the host.
+            {
+              sourceTag: 'type:e2e',
+              onlyDependOnLibsWithTags: ['type:lib', 'scope:desktop'],
+            },
             // @n10/core is the shell-agnostic half of the app: git,
             // worktrees, PTYs, config, providers and pure helpers. The
             // React layer (@n10/app-core) depends on it and never the

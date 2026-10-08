@@ -28,6 +28,19 @@ import type {
  */
 
 /**
+ * A query's last answer, kept on screen while the next one loads — for
+ * the same repository only. The workspace stays mounted across a switch,
+ * and another repository's rows must never stand in for this one's.
+ * Repository-scoped keys name their repository second.
+ */
+export function keepRepoAnswer(cwd: string) {
+  return <T>(
+    prev: T | undefined,
+    query: { queryKey: readonly unknown[] } | undefined
+  ): T | undefined => (query?.queryKey[1] === cwd ? prev : undefined);
+}
+
+/**
  * The boot read behind the repo gate: which repository the host is on,
  * and the one-time load of the desktop prefs.
  *
@@ -76,8 +89,9 @@ export async function refreshRepoInfo(qc: QueryClient): Promise<void> {
   // The host moved to another repository meanwhile: that is the
   // gate's switch to adopt, not this.
   if (!prev || !next || prev.cwd !== next.cwd) return;
-  if (!sameRepoIdentity(prev, next)) resetProviderScopedCache(qc);
+  if (!sameRepoIdentity(prev, next)) resetProviderScopedCache(qc, next.cwd);
   qc.setQueryData(keys.repo, next);
+  qc.setQueryData(keys.repoInfo(next.cwd), next);
 }
 
 export function useRepoGate() {
@@ -86,6 +100,20 @@ export function useRepoGate() {
     queryFn: loadRepoGate,
     // Written by hand when the user opens or leaves a repository; there
     // is nothing to re-poll, and a refetch would re-run the prefs load.
+    staleTime: Infinity,
+  });
+}
+
+/**
+ * Any repository's info, for a pane of a repository that is not open.
+ * Written whenever a repository is opened; read from the host for one
+ * that has not been this run.
+ */
+export function useRepoInfo(cwd: string, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.repoInfo(cwd),
+    queryFn: () => window.n10.getRepoInfo(cwd),
+    enabled,
     staleTime: Infinity,
   });
 }
@@ -128,14 +156,19 @@ export async function loadSidebarModel(
 
 /** Sidebar model. Local state (worktrees, alive PTYs) is cheap so we
  *  poll it every few seconds; remote PR data is cached host-side and
- *  only re-fetched on its own interval or an explicit refresh. */
-export function useSidebarModel(cwd: string) {
+ *  only re-fetched on its own interval or an explicit refresh. A pane of
+ *  a repository that is not open reads it once (`poll: false`). */
+export function useSidebarModel(
+  cwd: string,
+  { enabled = true, poll = true }: { enabled?: boolean; poll?: boolean } = {}
+) {
   const qc = useQueryClient();
   return useQuery({
     queryKey: keys.sidebar(cwd),
     queryFn: () => loadSidebarModel(cwd, qc.getQueryData(keys.sidebar(cwd))),
-    refetchInterval: 4_000,
-    placeholderData: (prev) => prev,
+    enabled,
+    refetchInterval: poll ? 4_000 : false,
+    placeholderData: keepRepoAnswer(cwd),
   });
 }
 
@@ -144,7 +177,7 @@ export function useSyncState(cwd: string) {
     queryKey: keys.sync(cwd),
     queryFn: () => window.n10.getSyncState(cwd),
     refetchInterval: 4_000,
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
   });
 }
 
@@ -230,7 +263,7 @@ export function useWorktreeDiff(
     refetchInterval: opts.live ? 2_000 : false,
     // Keep the previous patch on screen while the next one is in
     // flight, so a poll does not blank the viewer every two seconds.
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
     staleTime: 0,
   });
 }
@@ -298,7 +331,7 @@ export function useSessions(cwd: string) {
     queryKey: keys.sessions(cwd),
     queryFn: () => window.n10.listSessions(cwd),
     refetchInterval: 2_000,
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
   });
 }
 
@@ -343,7 +376,7 @@ const MACHINES_POLL_MS = 5 * 60_000;
 
 /**
  * Every machine: this one first, then fleet members. Not repo-
- * scoped — survives a repo switch (CROSS_REPO_KEYS). Pushed on every
+ * scoped. Pushed on every
  * change (`onMachinesChanged` in fleet-context.tsx writes straight
  * into this cache), so the poll here is only the fallback for the
  * first load and for a missed push.
@@ -378,7 +411,7 @@ export function useSessionActivity(cwd: string) {
     queryKey: keys.activity(cwd),
     queryFn: () => window.n10.getSessionActivity(),
     refetchInterval: 1_000,
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
   });
 }
 
@@ -409,7 +442,7 @@ export function useDraftComments(cwd: string, prId: number) {
     queryKey: keys.drafts(cwd, prId),
     queryFn: () => window.n10.listDraftComments(cwd, prId),
     refetchInterval: 2_000,
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
     enabled: prId > 0,
   });
 }

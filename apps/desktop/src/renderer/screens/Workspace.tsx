@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   Group,
   Panel,
@@ -56,6 +56,11 @@ const SIDEBAR_KEY = 'n10.sidebar.hidden';
  * The main window once a repo is open: title bar, resizable sidebar +
  * tabbed editor area, status bar. Owns global shortcuts, native menu
  * command routing and the command palette.
+ *
+ * It stays mounted across a repository switch, so the editor keeps the
+ * pane it holds ready for the tab being switched to. What keeps state
+ * about the open repository — the sidebar, the status bar and the
+ * palette — is keyed by it and starts fresh.
  */
 export function Workspace({
   repo,
@@ -300,6 +305,7 @@ function WorkspaceInner({
                 className="min-w-0"
               >
                 <Sidebar
+                  key={repo.cwd}
                   items={items}
                   loading={model.isLoading}
                   updatedAt={model.dataUpdatedAt}
@@ -324,19 +330,23 @@ function WorkspaceInner({
         </Group>
       </div>
 
-      <StatusBar items={items} onOpenSettings={() => tabs.openSettings()} />
+      {/* One key for both: keys only tell siblings apart, and two
+          siblings sharing one leave the old ones behind on a switch. */}
+      <Fragment key={repo.cwd}>
+        <StatusBar items={items} onOpenSettings={() => tabs.openSettings()} />
 
-      <CommandPalette
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
-        items={items}
-        onToggleSidebar={toggleSidebar}
-        onSwitchRepo={onSwitchRepo}
-        onNewTerminal={terminalTabs.openDialog}
-        onOpenTerminalOnMachine={(machine) =>
-          terminalTabs.launchTerminal('shell', REMOTE_HOME_CWD, machine)
-        }
-      />
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          items={items}
+          onToggleSidebar={toggleSidebar}
+          onSwitchRepo={onSwitchRepo}
+          onNewTerminal={terminalTabs.openDialog}
+          onOpenTerminalOnMachine={(machine) =>
+            terminalTabs.launchTerminal('shell', REMOTE_HOME_CWD, machine)
+          }
+        />
+      </Fragment>
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       {terminalTabs.dialogOpen && (
         <NewTerminalDialog

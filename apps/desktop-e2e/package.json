@@ -6,7 +6,7 @@
   "nx": {
     "name": "desktop-e2e",
     "tags": [
-      "type:app",
+      "type:e2e",
       "scope:desktop-e2e"
     ],
     "implicitDependencies": [

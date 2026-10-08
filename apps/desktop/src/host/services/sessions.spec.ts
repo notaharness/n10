@@ -792,14 +792,15 @@ describe('another repository owns the name', () => {
     expect(getSessionActivity()).toEqual({});
   });
 
-  it('does not hand over its scrollback', async () => {
+  it('hands over its scrollback by its own name, and only that', async () => {
     await launchInAThenSwitch();
-    // The buffer holds whatever the other repo's agent printed.
-    expect(getSessionBuffer(keyFor('shared', '/repo-a')).data).toBe('');
-    state.cwd = '/repo-a';
+    // A pane of the parked repository, held ready, starts from it: the
+    // name says which repository's agent it is.
     expect(getSessionBuffer(keyFor('shared', '/repo-a')).data).toBe(
       'repo-a secrets'
     );
+    // The same branch here is another session, with none of it.
+    expect(getSessionBuffer(keyFor('shared', '/repo-b')).data).toBe('');
   });
 
   it('reports it as not alive here, so this repo does not show it running', () => {

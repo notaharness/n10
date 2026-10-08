@@ -1,12 +1,16 @@
-import { QueryClient } from '@tanstack/react-query';
+import { MutationCache, QueryClient } from '@tanstack/react-query';
 import { pullRequestKey, type PullRequestRef } from '@n10/vcs-core/pr-details';
+import { writable } from './repo-switch.js';
 
 /**
  * The renderer's data layer: every host call is a TanStack Query so
  * refetch cadence, caching, dedupe and invalidation live in one place
- * instead of ad-hoc setInterval/useEffect pairs in components.
+ * instead of ad-hoc setInterval/useEffect pairs in components. Every
+ * mutation waits out an optimistic repository switch first
+ * (`repo-switch.ts`).
  */
 export const queryClient = new QueryClient({
+  mutationCache: new MutationCache({ onMutate: () => writable() }),
   defaultOptions: {
     queries: {
       retry: false,
@@ -17,7 +21,11 @@ export const queryClient = new QueryClient({
 });
 
 export const keys = {
+  /** The open repository: what the workspace shows. */
   repo: ['repo'] as const,
+  /** Any repository's info, open or not: a pane of one that is not
+   *  open renders against it. */
+  repoInfo: (cwd: string) => ['repo-info', cwd] as const,
   version: ['version'] as const,
   recents: ['recents'] as const,
   sidebar: (cwd: string) => ['sidebar', cwd] as const,
@@ -37,7 +45,7 @@ export const keys = {
    *  same answer whichever repository is open. */
   foreignSessions: ['foreign-sessions'] as const,
   /** Not repo-scoped: machines belong to this app instance, not to a
-   *  repository — must survive a repo switch (CROSS_REPO_KEYS below). */
+   *  repository. */
   machines: ['machines'] as const,
   beamStatus: ['beam-status'] as const,
   agentOptions: (cwd: string) => ['agent-options', cwd] as const,
@@ -163,18 +171,6 @@ export const keys = {
     ['code-tokens', tag, theme, code] as const,
 };
 
-/** Keys that survive a repository switch. */
-const CROSS_REPO_KEYS: ReadonlySet<string> = new Set([
-  keys.repo[0],
-  // The app's repositories, whatever one is open; the tab strip
-  // colours every tab by them.
-  keys.recents[0],
-  keys.terminals[0],
-  keys.foreignSessions[0],
-  keys.machines[0],
-  keys.beamStatus[0],
-]);
-
 /**
  * Keys whose answers came from the pull request provider, read as the
  * configured account. A change of provider, repository or account makes
@@ -193,35 +189,49 @@ const PROVIDER_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Drop what the provider answered for the open repository, which now
- * names another provider, repository or account. Narrower than a
- * repository switch: the page that made the change — Settings — keeps
- * its own answer and stays on screen.
+ * Drop what the provider answered for `cwd`, which now names another
+ * provider, repository or account. Other repositories' answers stay,
+ * and so does the page that made the change — Settings — on screen.
  */
-export function resetProviderScopedCache(qc: QueryClient): void {
+export function resetProviderScopedCache(qc: QueryClient, cwd: string): void {
   qc.removeQueries({
-    predicate: (query) => PROVIDER_KEYS.has(String(query.queryKey[0])),
+    predicate: ({ queryKey: [kind, scope] }) =>
+      PROVIDER_KEYS.has(String(kind)) && scope === cwd,
   });
 }
 
 /**
- * Drop everything cached for the repository being left.
- *
- * Every other key is repo-scoped — sidebar, diffs, threads, settings —
- * and in-flight mutation state goes too, so a worktree removal pending
- * in the old repo cannot hide a same-named row in the new one.
- *
- * Two entries are deliberately spared. The repo entry: the gate
- * observes it, and removing it would drop that observer into its
- * pending state for a frame, flashing the loading screen between two
- * workspaces. And the two cross-repository listings — terminals, which
- * belong to directories rather than to the repository being left, and
- * agents alive in other repositories — since the tab strip is
- * reconciled against both wherever the user goes.
+ * What a repository's panes and sidebar are drawn from, kept for as
+ * long as the app is open: a repository left hours ago is shown from
+ * these at once, and refreshed behind them. Diff text and worker
+ * results are left to the default collection: they are large, and
+ * read again locally.
  */
-export function resetRepoScopedCache(qc: QueryClient): void {
-  qc.removeQueries({
-    predicate: (query) => !CROSS_REPO_KEYS.has(String(query.queryKey[0])),
-  });
-  qc.getMutationCache().clear();
-}
+const RETAINED_KEYS = [
+  keys.repoInfo('')[0],
+  keys.sidebar('')[0],
+  keys.sync('')[0],
+  keys.sessions('')[0],
+  keys.branchSessionsAll[0],
+  keys.agentOptions('')[0],
+  keys.activity('')[0],
+  keys.threads('', 0)[0],
+  keys.prDescription('', 0)[0],
+  keys.drafts('', 0)[0],
+  'pr-snapshot',
+  'pr-conversation',
+  'pr-history',
+  'review-drafts',
+];
+for (const kind of RETAINED_KEYS)
+  queryClient.setQueryDefaults([kind], { gcTime: Infinity });
+
+/**
+ * Kinds keyed by a head or a range: every push leaves an entry the key
+ * has moved on from, which nothing shows again. They go an hour after
+ * the last pane let go of them, the span past which a parked
+ * repository's data is read again anyway.
+ */
+const HEAD_KEYED = ['pr-checks', 'pr-diff-manifest', 'pr-range-manifest'];
+for (const kind of HEAD_KEYED)
+  queryClient.setQueryDefaults([kind], { gcTime: 60 * 60_000 });

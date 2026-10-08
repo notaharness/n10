@@ -61,9 +61,15 @@ export function createRepositoryService(
       | 'refreshInBackground'
     >;
     worktreeWatchers?: WorktreeWatchers;
+    /** `PARKED_REPOSITORY_TTL_MS` unless a shell's tests shorten it. */
+    parkedTtl?: number;
   }
 ) {
-  const { worktreeWatchers, ...configOptions } = options;
+  const {
+    worktreeWatchers,
+    parkedTtl = PARKED_REPOSITORY_TTL_MS,
+    ...configOptions
+  } = options;
   const handles = new Map<string, RepositoryHandle>();
   let current: RepositoryHandle | null = null;
   const connections = createSessionConnections();
@@ -77,7 +83,7 @@ export function createRepositoryService(
     }
     const isCurrent = () => current?.cwd === cwd;
     const parked = () => !isCurrent();
-    const freshness = { parked, parkedTtl: PARKED_REPOSITORY_TTL_MS };
+    const freshness = { parked, parkedTtl };
     const config = createConfigService({
       ...configOptions,
       repo: cwd,
@@ -120,7 +126,7 @@ export function createRepositoryService(
         void sessions.read();
         options.pullRequests.refreshInBackground(
           cwd,
-          parked() ? { maxAge: PARKED_REPOSITORY_TTL_MS } : undefined
+          parked() ? { maxAge: parkedTtl } : undefined
         );
       },
     };

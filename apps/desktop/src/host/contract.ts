@@ -355,10 +355,6 @@ export interface N10HostApi {
   refreshRepo(): Promise<RepoInfo | null>;
   /** What `getRepo` says, for any repository, open or not. */
   getRepoInfo(repo: string): Promise<RepoInfo>;
-  /** Bring a repository's worktrees, sessions and pull request list up
-   *  to date behind what the host holds, unless a repository that is
-   *  not open was read within the hour. Resolves at once. */
-  prewarmRepo(repo: string): Promise<void>;
 
   // ── Recent repos ─────────────────────────────────────────────
   listRecentRepos(): Promise<RecentRepoEntry[]>;
@@ -674,7 +670,6 @@ export const IPC = {
   forgetRecent: 'n10/repo/forget',
   getRepo: 'n10/repo/get',
   getRepoInfo: 'n10/repo/info',
-  prewarmRepo: 'n10/repo/prewarm',
   refreshRepo: 'n10/repo/refresh',
   getSettingsView: 'n10/settings/view',
   updateSettingsField: 'n10/config/update-field',

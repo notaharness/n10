@@ -7,6 +7,9 @@
       "path": "../../libs/vcs/core"
     },
     {
+      "path": "../desktop"
+    },
+    {
       "path": "../../libs/review-comments"
     },
     {

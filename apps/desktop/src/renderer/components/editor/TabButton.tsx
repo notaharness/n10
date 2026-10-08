@@ -237,12 +237,9 @@ export function TabButton({
   // A plan is built inside a tab and then navigated away from, so the
   // count has to be visible from wherever the user ends up.
   const planCount = usePlanCount(item?.pr?.id);
-  // Resting on a tab renders its pane ahead of the press; another
-  // repository's tab has no pane here to render.
-  const hover = useHoverPrewarm(
-    () => (active || foreignRepo ? null : tab),
-    true
-  );
+  // Resting on a tab renders its pane ahead of the press, another
+  // repository's against what the app holds for that one.
+  const hover = useHoverPrewarm(() => (active ? null : tab), true);
   const { setNode, props, style, isDragging } = useSortableTab({
     id: tab.id,
     label,
