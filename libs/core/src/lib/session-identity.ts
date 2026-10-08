@@ -57,6 +57,10 @@ export const ORCHESTRA_TAG = {
   orchestratorConfig: '@orchestra-orchestrator-config',
   /** Orchestra's: `<KIND> <ISO-8601 UTC>` of the last delivered report. */
   lastReport: '@orchestra-last-report',
+  /** Orchestra's, on an orchestrator's own session: the `claude:` or
+   *  `codex:` target its players carry in `@orchestra-orchestrator`,
+   *  which names a conversation, not a session. Never beam-qualified. */
+  target: '@orchestra-target',
 } as const;
 
 /** Every tag a listing asks tmux for, in the one fork. */
@@ -108,6 +112,8 @@ export interface TaggedSession {
   agent?: string;
   orchestrator?: string;
   lastReport?: string;
+  /** Set on an orchestrator's own session — see `ORCHESTRA_TAG.target`. */
+  target?: string;
   /** The machine this session lives on — a beam `peerId`, or `'local'`.
    *  Set by whoever listed the session: the local resolver always says
    *  `'local'`; a remote poller (D3) stamps its peerId. Tags themselves
@@ -120,14 +126,16 @@ export interface TaggedSession {
  *  {@link taggedSession} to keep its own complexity within budget. */
 function orchestraTagFields(
   tags: Record<string, string>
-): Pick<TaggedSession, 'agent' | 'orchestrator' | 'lastReport'> {
+): Pick<TaggedSession, 'agent' | 'orchestrator' | 'lastReport' | 'target'> {
   const agent = tags[ORCHESTRA_TAG.agent];
   const orchestrator = tags[ORCHESTRA_TAG.orchestrator];
   const lastReport = tags[ORCHESTRA_TAG.lastReport];
+  const target = tags[ORCHESTRA_TAG.target];
   return {
     ...(agent ? { agent } : {}),
     ...(orchestrator ? { orchestrator } : {}),
     ...(lastReport ? { lastReport } : {}),
+    ...(target ? { target } : {}),
   };
 }
 
