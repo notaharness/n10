@@ -206,6 +206,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   for the launch estimate. The grid takes the whole pane: no padding. A terminal releases its
   WebGL context when it goes (`loadWebgl`): Chromium keeps 16 and evicts
   the oldest. Pastes go through `term.paste`, text without ESC.
+  Shift+Enter sends wterm's `ESC[13;2u` (`terminalKey`); through tmux 3.5+
+  it reaches the agent only with `set -s extended-keys on` (#335).
   Mouse tracking, any-motion (1003) included, is xterm's own, and so is the
   arrow pointer while the app takes the mouse (`enable-mouse-events`).
   Window shortcuts that must beat a focused terminal listen in the capture

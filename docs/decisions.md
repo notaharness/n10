@@ -339,15 +339,26 @@ would then measure as lost room.
 
 Keys go to xterm, except those the window must see. Ctrl/Cmd+C with a selection
 and Ctrl/Cmd+V go on to the browser, whose copy and paste events xterm and the
-paste handler act on; without a selection Ctrl+C is the interrupt. The
-palette's Mod+K is taken in the capture phase, ahead of any terminal, so it
-opens the palette and sends nothing to the PTY. Pastes go through `term.paste`,
-so they are bracketed when the application asked for it, and a blocked terminal
-drops them as it drops keystrokes. Text loses its ESC bytes first, so a
-clipboard cannot end the bracket early and type the rest as commands. An image
-becomes a temporary file, whose path is pasted. OSC 8 links open externally on
-a modified click (Cmd on macOS, Ctrl elsewhere). `@xterm/addon-unicode11` gives
-emoji their two cells, which xterm's default Unicode 6 tables do not.
+paste handler act on; without a selection Ctrl+C is the interrupt. The palette's
+Mod+K is taken in the capture phase, ahead of any terminal, so it opens the
+palette and sends nothing to the PTY. Shift+Enter sends `ESC[13;2u`, the key as
+the kitty and fixterms keyboard protocols spell it, where xterm would send the
+plain Enter's CR, so an agent can take it as a new line rather than a submit.
+xterm 6 implements neither protocol; the sequence is the one wterm sent. tmux
+passes it on only to an application that asked for extended keys, as Claude Code
+does (modifyOtherKeys), and re-encodes it: 3.4 hands `ESC[13;2u` on, while 3.5
+and later ignore the request unless the server's `extended-keys` is on, and then
+write the key in `extended-keys-format` (`ESC[27;2;13~` by default). On tmux 3.5
+or later without `set -s extended-keys on`, Shift+Enter reaches the agent as CR
+and submits. n10 leaves the user's tmux options alone; setting it itself is
+[#335](https://github.com/notaharness/n10/issues/335). Pastes go through
+`term.paste`, so they are bracketed when the application asked for it, and a
+blocked terminal drops them as it drops keystrokes. Text loses its ESC bytes
+first, so a clipboard cannot end the bracket early and type the rest as
+commands. An image becomes a temporary file, whose path is pasted. OSC 8 links
+open externally on a modified click (Cmd on macOS, Ctrl elsewhere).
+`@xterm/addon-unicode11` gives emoji their two cells, which xterm's default
+Unicode 6 tables do not.
 
 Mouse tracking is xterm's own, any-motion (DECSET 1003) included, so an agent
 that highlights what is under the pointer is told where it is with no button

@@ -108,18 +108,34 @@ function openLink(event: MouseEvent, uri: string): void {
  * paste handler act on; Ctrl+C copies only while there is a selection,
  * and without one it is the interrupt. Cmd+Backspace erases the line,
  * as macOS terminals have it.
+ *
+ * Shift+Enter sends `ESC[13;2u`, the key as the kitty and fixterms
+ * protocols spell it, where xterm would send the plain Enter's CR. An
+ * agent takes it as a new line rather than a submit (Claude Code's
+ * multi-line prompt). xterm 6 implements neither keyboard protocol;
+ * this is the sequence wterm sent.
  */
 function terminalKey(term: Terminal, event: KeyboardEvent): boolean {
   if (event.type !== 'keydown') return true;
   const mod = event.ctrlKey || event.metaKey;
   if (mod && event.key === 'c' && term.hasSelection()) return false;
   if (mod && event.key === 'v') return false;
-  if (event.metaKey && !event.ctrlKey && event.key === 'Backspace') {
-    event.preventDefault();
-    term.input('\x15');
-    return false;
+  const sequence = ownSequence(event);
+  if (sequence === null) return true;
+  // Prevented, so no keypress follows to send xterm's own as well.
+  event.preventDefault();
+  term.input(sequence);
+  return false;
+}
+
+/** What a key sends in place of xterm's sequence, if anything. */
+function ownSequence(event: KeyboardEvent): string | null {
+  const { key, shiftKey, ctrlKey, altKey, metaKey } = event;
+  if (key === 'Enter' && shiftKey && !ctrlKey && !altKey && !metaKey) {
+    return '\x1b[13;2u';
   }
-  return true;
+  if (key === 'Backspace' && metaKey && !ctrlKey) return '\x15';
+  return null;
 }
 
 /**

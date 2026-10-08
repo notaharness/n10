@@ -133,6 +133,7 @@ export const test = base.extend<
   drafts: [undefined, { option: true }],
   fakeGitHub: [undefined, { option: true }],
   fakeAzureDevOps: [undefined, { option: true }],
+  tmuxConf: [undefined, { option: true }],
   liveSessions: [undefined, { option: true }],
   env: [undefined, { option: true }],
   liveTerminals: [undefined, { option: true }],
@@ -151,6 +152,7 @@ export const test = base.extend<
       drafts,
       fakeGitHub,
       fakeAzureDevOps,
+      tmuxConf,
       liveSessions,
       env,
       liveTerminals,
@@ -178,6 +180,7 @@ export const test = base.extend<
       drafts,
       fakeGitHub,
       fakeAzureDevOps,
+      tmuxConf,
     });
 
     seedTmux(repoPath, homeDir, liveSessions, liveTerminals);

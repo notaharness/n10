@@ -56,6 +56,8 @@ export function fakeAgent(
     tag?: boolean;
     /** Turn on this mouse tracking mode (SGR) and print `mouse:` reports. */
     mouse?: 1000 | 1002 | 1003;
+    /** Ask for modifyOtherKeys and print each input chunk as `key:`. */
+    keys?: boolean;
   } = {}
 ): string {
   const flags = [`--banner=n10-fake-agent-ready`];
@@ -65,6 +67,7 @@ export function fakeAgent(
   if (opts.printSeed) flags.push('--print-seed');
   if (opts.printSize) flags.push('--print-size');
   if (opts.mouse != null) flags.push(`--mouse=${opts.mouse}`);
+  if (opts.keys) flags.push('--keys');
   if (opts.streamMs != null) flags.push(`--stream-ms=${opts.streamMs}`);
   if (opts.intervalMs != null) flags.push(`--interval-ms=${opts.intervalMs}`);
   if (opts.exitAfterMs != null)
@@ -104,6 +107,11 @@ export interface HomeSeed {
    * matching config written for it.
    */
   fakeAzureDevOps?: FakeAzureDevOps;
+  /**
+   * Written to $HOME/.tmux.conf, which the test's tmux server reads when
+   * the app starts it.
+   */
+  tmuxConf?: string;
 }
 
 /**
@@ -148,6 +156,10 @@ export function seedHome(
 
   seedProjectConfig(n10, repoPath, opts);
   seedDrafts(n10, repoPath, opts.drafts);
+
+  if (opts.tmuxConf !== undefined) {
+    writeFileSync(join(homeDir, '.tmux.conf'), opts.tmuxConf, 'utf8');
+  }
 
   if (opts.desktopPrefs) {
     writeFileSync(
