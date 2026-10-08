@@ -104,12 +104,6 @@ export function getRepoInfo(cwd: string): RepoInfo {
   return repoInfo(repository(cwd));
 }
 
-/** Bring `cwd`'s data up to date behind what it holds, unless a parked
- *  repository's is still warm. Returns at once. */
-export function prewarmRepo(cwd: string): void {
-  repository(cwd).prewarm();
-}
-
 export function getRepo(): RepoInfo | null {
   const current = repositories.getSnapshot();
   if (!current) return null;

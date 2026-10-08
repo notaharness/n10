@@ -39,7 +39,6 @@ vi.mock('./services/repo.js', () =>
     'getRepo',
     'refreshRepo',
     'getRepoInfo',
-    'prewarmRepo',
     'listRecentRepos',
     'forgetRecentRepo',
   ])
@@ -184,7 +183,6 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ['getRepo', [], 'repo.getRepo'],
   ['refreshRepo', [], 'repo.refreshRepo'],
   ['getRepoInfo', ['/repo'], 'repo.getRepoInfo'],
-  ['prewarmRepo', ['/repo'], 'repo.prewarmRepo'],
   ['listRecentRepos', [], 'repo.listRecentRepos'],
   ['forgetRecent', ['/repo'], 'repo.forgetRecentRepo'],
 

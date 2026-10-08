@@ -29,7 +29,6 @@ import {
   listRecentRepos,
   openRepo,
   openStartupRepo,
-  prewarmRepo,
   repository,
 } from './repo.js';
 import { saveRecents } from './recent-repos.js';
@@ -126,7 +125,7 @@ describe('opening a repository', () => {
     expect(activeRepoIs(gitDir)).toBe(true);
   });
 
-  it('describes and warms another repository without opening it', () => {
+  it('describes and reads another repository without opening it', () => {
     const opened = vi.fn();
     setRepoOpenedListener(opened);
     openRepo(gitDir);
@@ -134,7 +133,6 @@ describe('opening a repository', () => {
     const other = join(gitDir, '..', 'other');
     execFileSync('git', ['init', '--quiet', other]);
     expect(getRepoInfo(other).cwd).toBe(realpathSync(other));
-    prewarmRepo(other);
     expect(repository(other).parked()).toBe(true);
     expect(getRepo()?.cwd).toBe(gitDir);
     expect(activeRepoIs(gitDir)).toBe(true);
