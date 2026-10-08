@@ -1,0 +1,102 @@
+{
+  "title": "Park repositories instead of disposing them",
+  "summary": "Switching repositories threw the old one's data away, so going back read everything again. The engine now keeps every repository it has seen.",
+  "slides": [
+    {
+      "title": "What changes",
+      "lede": "Switching repositories parks the old one instead of disposing it, so going back to it shows its data at once.",
+      "body": "1. The service keeps a handle per repository and selects one\n2. Parked reads serve what they hold\n3. Parking stops discovery and drops diff patches, nothing else\n4. Writes refuse a parked repository\n5. The pull request list keeps every scope on show",
+      "files": [
+        { "path": "libs/engine/src/lib/repositories/repository-service.ts", "lineStart": 52, "lineEnd": 160 }
+      ]
+    },
+    {
+      "title": "Many handles, one selected",
+      "lede": "`open()` moves the selection and parks the handle before it; `get()` hands out a parked handle without selecting it.",
+      "before": {
+        "mermaid": "flowchart TD\n  O[\"open(B)\"] --> S[repository service]\n  S --> B[\"B: current\"]\n  S -.->|dispose| A[\"A: gone\"]",
+        "caption": "Before: one handle at a time"
+      },
+      "after": {
+        "mermaid": "flowchart TD\n  O[\"open(B)\"] --> S[repository service]\n  G[\"get(C)\"] --> S\n  S --> B[\"B: selected\"]\n  S --> A[\"A: parked\"]\n  S --> C[\"C: parked\"]",
+        "caption": "After: every handle stays"
+      },
+      "files": [
+        { "path": "libs/engine/src/lib/repositories/repository-service.ts", "lineStart": 133, "lineEnd": 155 },
+        { "path": "apps/desktop/src/host/services/repo.ts" }
+      ]
+    },
+    {
+      "title": "Parked reads answer from what they hold",
+      "lede": "A parked repository serves held data at once and refreshes behind it only after an hour; with nothing held, it reads and waits.",
+      "body": "The selected repository keeps each resource's own TTL. A failed background refresh does not fail the answer; the error stays in the snapshot.",
+      "visual": {
+        "mermaid": "flowchart TD\n  R[\"read()\"] --> P{parked?}\n  P -->|no| T[own TTL]\n  P -->|yes| H{data held?}\n  H -->|no| W[read and wait]\n  H -->|yes| F{\"older than 1 h?\"}\n  F -->|no| S[serve held]\n  F -->|yes| B[serve held, read behind]"
+      },
+      "files": [
+        { "path": "libs/engine/src/lib/kernel/read-freshness.ts" },
+        { "path": "libs/engine/src/lib/reviews/read-resource.ts", "lineStart": 96, "lineEnd": 115 },
+        { "path": "libs/engine/src/lib/worktrees/worktree-service.ts", "lineStart": 138, "lineEnd": 152 }
+      ]
+    },
+    {
+      "title": "Parking lets go of two things",
+      "lede": "A parked repository stops session discovery and drops its diff patches; everything else stays, and no handle is ever disposed.",
+      "body": "Patches go because each can be 64 MiB and re-reading one is a local Git read. The live checkout diff keeps its one-second TTL: agents keep editing a parked repository.",
+      "visual": {
+        "code": "if (next !== current) {\n  current?.sessions.park();\n  current?.reviews.park();\n  current = next;\n}",
+        "language": "ts"
+      },
+      "files": [
+        { "path": "libs/engine/src/lib/sessions/session-service.ts" },
+        { "path": "libs/engine/src/lib/reviews/diff-reads.ts" }
+      ]
+    },
+    {
+      "title": "Only the selected repository takes writes",
+      "lede": "Reads answer any repository; every write checks the handle is selected before it starts, and review writes check again before calling the provider.",
+      "body": "Review writes use `selected()` and `assertWritable()`; worktree and config writes use `assertSelected()`.",
+      "visual": {
+        "code": "  const target = await thread(req.prId, req.threadId);\n- context.assertUnchanged(snapshot);\n+ context.assertWritable(snapshot);\n  const reply = await provider.replyToThread(",
+        "language": "diff"
+      },
+      "files": [
+        { "path": "libs/engine/src/lib/reviews/review-context.ts", "lineStart": 26, "lineEnd": 68 },
+        { "path": "libs/engine/src/lib/kernel/selection.ts" },
+        { "path": "libs/engine/src/lib/worktrees/worktree-commands.ts" },
+        { "path": "libs/engine/src/lib/config/config-service.ts" }
+      ]
+    },
+    {
+      "title": "The pull request list keeps every scope on show",
+      "lede": "The list never evicts a scope a repository shows; past its bound it drops only scopes a config change left behind.",
+      "body": "`refreshInBackground(cwd, { maxAge })` lets `prewarm()` skip the read while a parked list is under an hour old.",
+      "files": [
+        { "path": "libs/engine/src/lib/pull-requests/pull-request-list.ts", "lineStart": 166, "lineEnd": 185 },
+        { "path": "libs/engine/src/lib/pull-requests/pull-request-list.ts", "lineStart": 355, "lineEnd": 362 }
+      ]
+    },
+    {
+      "title": "Look closely: get() writes config",
+      "lede": "Creating a handle runs `autoDetectProjectConfig`, which writes the project config, so `get()` writes for a repository nobody selected.",
+      "body": "This sits outside the rule that parked handles refuse writes.",
+      "visual": {
+        "code": "function create(cwd: string): RepositoryHandle {\n  try {\n    autoDetectProjectConfig(cwd, options.providers);",
+        "language": "ts"
+      },
+      "files": [
+        { "path": "libs/engine/src/lib/repositories/repository-service.ts", "lineStart": 72, "lineEnd": 80 },
+        { "path": "libs/vcs/core/src/lib/config-store.ts", "lineStart": 227, "lineEnd": 247 }
+      ]
+    },
+    {
+      "title": "Look closely: memory and edges",
+      "lede": "Handles, their subscriptions and every shown pull request scope live as long as the process; that is by design and is unbounded.",
+      "body": "- `serveParked` returns data without its error, so callers see stale data instead of a failure\n- `mentions` is a read, but refused while parked\n- Worktree commands check selection only before their first await\n- Not checked: a real cross-repository switch in the desktop. No draft comments.",
+      "files": [
+        { "path": "libs/engine/src/lib/reviews/read-resource.ts", "lineStart": 96, "lineEnd": 102 },
+        { "path": "docs/decisions.md" }
+      ]
+    }
+  ]
+}
