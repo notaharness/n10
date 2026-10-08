@@ -250,7 +250,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `guide.json`, read through `engine/reviews/agent-guide.ts`. It opens on a
   cover drawn from the guide's own title, summary and slide titles, then
   its slides; the step lives in the tab's view. A slide's place opens the diff
-  at the agent's comment on those lines when there is one (`draftAt`), and
+  at the agent's comment on those lines when there is one (`draftAt`), else
+  at its first line (`jumpToLine`), and
   the last step opens the drafts walkthrough when there are drafts. Diagrams go only through
   `lib/guide/mermaid.ts` (strict, no HTML labels, token theme, `secure`
   keys), and one that does not parse shows its source. Prose and code reuse

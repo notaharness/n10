@@ -1001,7 +1001,9 @@ the desktop says when the pull request has moved past it.
 The guide hands the reader on to the review rather than standing beside it.
 A place a slide names opens the diff at the agent's draft comment when one
 covers those lines (`draftAt`), so a suspected problem reads as code with
-its comment, through the comment navigator's existing jump; and the last
+its comment, through the comment navigator's existing jump, and otherwise
+at its first line (the diff's `jumpToLine`, which resolves rows through
+the same line map the tab's saved place uses); and the last
 step opens the drafts walkthrough when there are drafts. `guide-help` has
 the agent write its comments first and name their lines on the closing
 slide, which ranks suspected problems, intended tradeoffs and what was not
