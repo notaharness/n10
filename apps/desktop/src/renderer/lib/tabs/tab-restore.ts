@@ -22,15 +22,34 @@ export function sameSavedTarget(a: SavedTarget, b: SavedTarget): boolean {
   );
 }
 
+function sameValues(a: object, b: object): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...keys].every((key) => {
+    const left = (a as Record<string, unknown>)[key];
+    const right = (b as Record<string, unknown>)[key];
+    if (left === right) return true;
+    if (
+      !left ||
+      !right ||
+      typeof left !== 'object' ||
+      typeof right !== 'object'
+    ) {
+      return false;
+    }
+    return sameValues(left, right);
+  });
+}
+
 /** A dead pane cannot be sampled; keep the last verified runtime facts. */
 export function retainRuntime<T extends SavedTarget>(
   observed: T,
   previous: SavedTarget | undefined
 ): T & SavedTarget {
   if (!previous || !sameSavedTarget(previous, observed)) return observed;
-  return {
+  const next = {
     ...observed,
     env: observed.env ?? previous.env,
     conversationId: observed.conversationId ?? previous.conversationId,
   };
+  return sameValues(next, previous) ? (previous as T & SavedTarget) : next;
 }

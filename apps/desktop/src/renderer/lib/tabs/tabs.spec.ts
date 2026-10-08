@@ -220,6 +220,27 @@ describe('sync-items', () => {
     expect(again).toBe(s);
   });
 
+  it('keeps state stable when session metadata is observed again', () => {
+    const entry = (): ItemEntry => ({
+      itemKey: 'branch:feat-x',
+      branch: 'feat-x',
+      running: true,
+      worktree: '/repos/alpha/feat-x',
+      sessionName: 'feat-x',
+      restore: {
+        sessionName: 'feat-x',
+        tmuxName: 'feat-x',
+        tags: {
+          '@orchestra-repo': REPO,
+          '@orchestra-branch': 'feat-x',
+        },
+        env: { CLAUDE_CONFIG_DIR: '/tmp/claude' },
+      },
+    });
+    const first = sync(open(empty, 'branch:feat-x'), [entry()]);
+    expect(sync(first, [entry()])).toBe(first);
+  });
+
   it('leaves a tab alone when its item vanished entirely', () => {
     let s = open(empty, 'branch:feat-x');
     s = sync(s, [{ itemKey: 'branch:other', branch: 'other' }]);
