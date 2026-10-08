@@ -32,7 +32,7 @@ export function GuideVisual({
           {heading}
         </span>
       )}
-      <div className="min-w-0 flex-1 content-center overflow-auto">
+      <div className="min-w-0 flex-1 content-center overflow-auto [&_pre]:text-lg">
         {'mermaid' in visual ? (
           <MermaidDiagram
             source={visual.mermaid}

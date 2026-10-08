@@ -12,6 +12,7 @@ import {
 import { cn } from '../../../lib/utils.js';
 import { CommentMarkdown } from '../comments/CommentMarkdown.js';
 import { GuideVisual } from './GuideVisual.js';
+import { InlineMarkdown } from './InlineMarkdown.js';
 
 /**
  * One step of the guided review. The cover (step 0) is the guide's
@@ -91,7 +92,9 @@ export function GuideSlide({
       <header className="flex max-w-3xl flex-col gap-2">
         <h2 className="text-2xl font-semibold tracking-tight">{slide.title}</h2>
         {slide.lede && (
-          <p className="text-xl text-muted-foreground">{slide.lede}</p>
+          <p className="text-xl text-muted-foreground">
+            <InlineMarkdown text={slide.lede} />
+          </p>
         )}
       </header>
       <div
@@ -143,7 +146,9 @@ export function GuideCover({
           Guided review
         </span>
         <h2 className="text-2xl font-semibold tracking-tight">{guide.title}</h2>
-        <p className="text-xl text-muted-foreground">{guide.summary}</p>
+        <p className="text-xl text-muted-foreground">
+          <InlineMarkdown text={guide.summary} />
+        </p>
       </header>
       <ol className="flex flex-col gap-1" aria-label="Outline">
         {guide.slides.map((slide, i) => (
