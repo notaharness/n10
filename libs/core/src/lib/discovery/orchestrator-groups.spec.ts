@@ -6,13 +6,13 @@ import { orchestratorGroups } from './orchestrator-groups.js';
 /**
  * An orchestrator is the session its players' `@orchestra-orchestrator`
  * names: by name for `tmux:`, by its `@orchestra-target` for a
- * conversation, on the machine a `beam:` prefix says. Nothing else
- * makes a session one.
+ * conversation. Nothing else makes a session one.
  */
 
 const CLAUDE = 'claude:7c0ffee0-1234-4abc-8def-0123456789ab';
 const CODEX = 'codex:11111111-2222-3333-4444-555555555555';
 const PEER = '1234567890abcdef1234567890abcdef';
+const TRANSLOCO = '/home/u/transloco';
 
 let created = 0;
 function terminal(
@@ -112,30 +112,48 @@ describe('orchestratorGroups', () => {
     expect(orchestratorGroups([player('a', 'tmux:gone')])).toEqual([]);
   });
 
-  it('gives a target two sessions carry to the newer one', () => {
-    const older = terminal('first', { target: CLAUDE });
-    const newer = terminal('resumed', { target: CLAUDE });
-    expect(orchestratorGroups([newer, older, player('a', CLAUDE)])).toEqual([
-      { orchestrator: tab('resumed'), players: [wt('a')] },
-    ]);
-    expect(orchestratorGroups([older, newer])).toEqual([
-      { orchestrator: tab('resumed'), players: [] },
+  it('groups players whatever repository they work in', () => {
+    // A worktree of another repository, and a dir player (Orchestra's
+    // `dir`, read as an agent terminal) in a directory of its own.
+    const other = player('x', CLAUDE, {
+      repo: TRANSLOCO,
+      worktreePath: `${TRANSLOCO}/.claude/worktrees/x`,
+    });
+    const dir = terminal('transloco-dir', {
+      spawner: 'orchestra',
+      type: 'agent',
+      repo: TRANSLOCO,
+      path: TRANSLOCO,
+      orchestrator: CLAUDE,
+    });
+    expect(
+      orchestratorGroups([terminal('mc-shell', { target: CLAUDE }), other, dir])
+    ).toEqual([
+      {
+        orchestrator: tab('mc-shell'),
+        players: [
+          {
+            key: worktreeSessionKey(
+              `${TRANSLOCO}/.claude/worktrees/x`,
+              TRANSLOCO,
+              'local'
+            ),
+            repo: TRANSLOCO,
+            worktree: `${TRANSLOCO}/.claude/worktrees/x`,
+          },
+          { ...tab('transloco-dir'), repo: TRANSLOCO },
+        ],
+      },
     ]);
   });
 
-  it('reads a beam target on the machine it names', () => {
-    const remote = terminal('far-shell', { machine: PEER, target: CLAUDE });
-    const local = terminal('near-shell', { target: CLAUDE });
-    expect(
-      orchestratorGroups([remote, local, player('a', `beam:${PEER}/${CLAUDE}`)])
-    ).toEqual([
-      { orchestrator: tab('far-shell', PEER), players: [wt('a')] },
+  it('leaves a beam target, an orchestrator on another machine, alone', () => {
+    const sessions = [
+      terminal('near-shell', { target: CLAUDE }),
+      player('a', `beam:${PEER}/${CLAUDE}`),
+    ];
+    expect(orchestratorGroups(sessions)).toEqual([
       { orchestrator: tab('near-shell'), players: [] },
-    ]);
-    // Unprefixed, a target is on the player's own machine.
-    expect(orchestratorGroups([remote, local, player('b', CLAUDE)])).toEqual([
-      { orchestrator: tab('far-shell', PEER), players: [] },
-      { orchestrator: tab('near-shell'), players: [wt('b')] },
     ]);
   });
 
