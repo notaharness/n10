@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { Page } from '@playwright/test';
@@ -81,11 +81,12 @@ test.describe('Orchestrator tab', () => {
   /** A player spawned from the orchestrator: a worktree session made
    *  outside the app in `repoPath`, reporting to `target`. It prints
    *  its name once, unless `quiet`: output makes an agent active for a
-   *  moment, and closing an active agent asks first. */
+   *  moment, and closing an active agent asks first. Then it runs
+   *  `then`, if given, before it sleeps. */
   function spawnPlayer(
     repoPath: string,
     homeDir: string,
-    { target = CLAUDE, quiet = false } = {}
+    { target = CLAUDE, quiet = false, then = '' } = {}
   ): string {
     const branch = uniqueExternalBranch();
     const name = startExternalTmuxSession({
@@ -93,9 +94,11 @@ test.describe('Orchestrator tab', () => {
       homeDir,
       branch,
       worktreePath: addExternalWorktree(repoPath, branch),
-      command: quiet
-        ? 'sleep 300'
-        : `printf '%s\\n' ${ready(branch)}; sleep 300`,
+      command: [
+        quiet ? '' : `printf '%s\\n' ${ready(branch)}; `,
+        then && `${then}; `,
+        'sleep 300',
+      ].join(''),
     });
     tagTmuxSession(name, { '@orchestra-orchestrator': target }, homeDir);
     return branch;
@@ -350,5 +353,47 @@ test.describe('Orchestrator tab', () => {
     await expect(shownTerminal(page)).toHaveCount(1);
     await expect(shownTerminal(page)).toHaveAttribute('data-held-ready', 'yes');
     await page.mouse.up();
+  });
+
+  test("a hidden player that finishes blinks the count of the selected orchestrator's tab", async ({
+    desktop,
+  }) => {
+    const { page, repoPath, homeDir } = desktop;
+    await createWorktree(page, 'alpha');
+    // Works a streak once told to: long enough to count as work, then
+    // quiet, which is what asks for attention.
+    const go = join(folder, 'go');
+    const worker = spawnPlayer(repoPath, homeDir, {
+      then: `while [ ! -e ${go} ]; do sleep 0.2; done; for i in $(seq 50); do echo working-$i; sleep 0.12; done`,
+    });
+    branches.push(worker);
+    markOrchestrator(homeDir);
+
+    const orchestrator = orchestratorTab(page);
+    const count = orchestrator.locator('[data-player-count]');
+    await expect(count).toHaveText('1', { timeout: 30_000 });
+    await orchestrator.hover();
+    await playerRows(page).getByRole('button').first().click();
+    await expect(shownTerminal(page)).toContainText(ready(worker));
+    // Away from the player, onto the orchestrator's own terminal: the
+    // tab stays selected, so only the count can show the player.
+    await page.mouse.move(0, 400);
+    await orchestrator.click();
+    await expect(shownTerminal(page)).toContainText(CONDUCTOR_READY);
+    await expect(count).not.toHaveAttribute('data-attention');
+
+    writeFileSync(go, '');
+    await expect(count).toHaveAttribute('data-attention', 'true', {
+      timeout: 30_000,
+    });
+    await expect(count).toHaveClass(/count-attention/);
+    await expect(orchestrator).toHaveAttribute('aria-selected', 'true');
+
+    // Looking at the player clears it.
+    await orchestrator.hover();
+    await playerRows(page).getByRole('button').first().click();
+    await expect(count).not.toHaveAttribute('data-attention', {
+      timeout: 20_000,
+    });
   });
 });

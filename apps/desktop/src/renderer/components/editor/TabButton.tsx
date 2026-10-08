@@ -32,13 +32,27 @@ import { useSortableTab } from './TabStrip.js';
 type Closer = ReturnType<typeof useCloseTabs>;
 
 /** An orchestrator tab's player count, where its close button would
- *  be: the tab closes from its menu, middle click or Delete instead. */
-function PlayerCount({ count }: { count: number }) {
+ *  be: the tab closes from its menu, middle click or Delete instead.
+ *  It blinks for a hidden player that finished, which the tab's own
+ *  blink cannot show while the tab is selected. */
+function PlayerCount({
+  count,
+  attention,
+}: {
+  count: number;
+  attention: boolean;
+}) {
   return (
     <span
       data-player-count
-      aria-label={`${count} player${count === 1 ? '' : 's'}`}
-      className="-mr-1.5 flex h-5 min-w-5 shrink-0 items-center justify-center rounded px-1 text-xs font-medium tabular-nums"
+      data-attention={attention || undefined}
+      aria-label={`${count} player${count === 1 ? '' : 's'}${
+        attention ? ', needs attention' : ''
+      }`}
+      className={cn(
+        '-mr-1.5 flex h-5 min-w-5 shrink-0 items-center justify-center rounded px-1 text-xs font-medium tabular-nums',
+        attention && 'count-attention'
+      )}
     >
       {count}
     </span>
@@ -89,12 +103,18 @@ function tabState(
   unseen: boolean,
   snapshot: SessionActivitySnapshot | undefined,
   players: readonly PlayerRow[] | undefined
-): { selected: boolean; unseen: boolean; flashing: boolean } {
+): {
+  selected: boolean;
+  unseen: boolean;
+  flashing: boolean;
+  playerFlashing: boolean;
+} {
   const group = playerMarks(players);
   return {
     selected: active || group.active,
     unseen: unseen || group.unseen,
-    flashing: (snapshot?.flashing ?? false) || group.flashing,
+    flashing: snapshot?.flashing ?? false,
+    playerFlashing: group.flashing,
   };
 }
 
@@ -105,11 +125,13 @@ function TabEnd({
   item,
   unseen,
   players,
+  playerFlashing,
   onClose,
 }: {
   item: SidebarItem | undefined;
   unseen: boolean;
   players: readonly PlayerRow[] | undefined;
+  playerFlashing: boolean;
   onClose: () => void;
 }) {
   // A plan is built inside a tab and then navigated away from, so the
@@ -121,7 +143,7 @@ function TabEnd({
       <RemovedMark item={item} />
       {unseen && <UnseenDot />}
       {players?.length ? (
-        <PlayerCount count={players.length} />
+        <PlayerCount count={players.length} attention={playerFlashing} />
       ) : (
         <TabCloseButton
           onClose={(e) => {
@@ -260,6 +282,7 @@ export function TabButton({
         item={item}
         unseen={state.unseen}
         players={players}
+        playerFlashing={state.playerFlashing}
         onClose={() => closer.close(tab.id)}
       />
       {/* After the close button, so its cover leaves the band whole. */}

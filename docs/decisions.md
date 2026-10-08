@@ -713,8 +713,10 @@ another's player keeps its place, so its own players stay reachable. Where an
 orchestrator tab's close button sits, it shows the count of its player tabs,
 and keeps the X when it has none; middle click, Delete and its menu still
 close it. The tab carries what its hidden players would show: it is the
-strip's selection while one of them is active, and takes their unseen dot and
-attention blink. Hovering the tab opens a Radix hover card listing the player
+strip's selection while one of them is active, and takes their unseen dot.
+A hidden player's attention blink moves to the count, in the primary colour:
+the tab's own blink shades toward the selected tab's background, so it would
+not show while the orchestrator or another of its players is selected. Hovering the tab opens a Radix hover card listing the player
 tabs as tab rows, with each tab's marks, repository band and hover-revealed
 X. Resting on a row holds its pane ready as resting on a strip tab does, and
 a press chooses it. A row's X is that tab's own close, with its confirmation
