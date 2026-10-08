@@ -5,7 +5,8 @@
     "types": ["node"],
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/tsc/tsconfig.app.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsc/tsconfig.app.tsbuildinfo",
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "src/host/**/*.ts",

@@ -66,5 +66,8 @@
     {
       "path": "./libs/engine"
     }
-  ]
+  ],
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0"
+  }
 }

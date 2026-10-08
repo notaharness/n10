@@ -15,5 +15,8 @@
     {
       "path": "./tsconfig.e2e.json"
     }
-  ]
+  ],
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0"
+  }
 }

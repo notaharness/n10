@@ -35,7 +35,9 @@
         "name": "next"
       }
     ],
-    "tsBuildInfoFile": "node_modules/.cache/website.tsbuildinfo"
+    "tsBuildInfoFile": "node_modules/.cache/website.tsbuildinfo",
+    "noUncheckedSideEffectImports": false,
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "next-env.d.ts",
