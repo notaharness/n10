@@ -52,6 +52,16 @@
 //                        print each chunk of input as `key:<bytes>`, with
 //                        ESC as `ESC` and CR as `CR`, so a test can see the
 //                        exact sequence a key sent.
+//   --modes              turn on bracketed paste (2004) and application
+//                        cursor keys (DECCKM), as Claude Code does, so tmux
+//                        brackets pastes for it and sends it `ESC O A`.
+//   --flood=<bytes>      on the first input, print that many bytes of
+//                        numbered lines, 16 KiB every 5 ms, then
+//                        `flood-done`: enough output to overrun the host's
+//                        ring buffer. Waiting for input lets a tmux client
+//                        attach first, and pacing keeps it drawing every
+//                        line. Without either, the client would be drawn
+//                        only the screen the flood ended on.
 
 const args = Object.fromEntries(
   process.argv
@@ -131,6 +141,11 @@ if (args.mouse) {
   process.stdin.resume();
 }
 
+if (args.modes) {
+  process.stdout.write('\x1b[?2004h\x1b[?1h');
+  process.stdout.write('modes-ready\r\n');
+}
+
 if (args.keys) {
   if (process.stdin.isTTY) process.stdin.setRawMode(true);
   process.stdout.write('\x1b[>4;2m');
@@ -142,6 +157,27 @@ if (args.keys) {
       .replaceAll('\r', 'CR');
     process.stdout.write(`key:${shown}\r\n`);
   });
+  process.stdin.resume();
+}
+
+if (args.flood) {
+  const total = parseInt(args.flood, 10);
+  let written = 0;
+  let n = 0;
+  // A slice at a time: tmux draws a client that falls behind only the
+  // screen it ends on, and the flood is meant to reach the client.
+  const slice = () => {
+    for (const end = written + 16 * 1024; written < end && written < total; ) {
+      n += 1;
+      const line = `flood ${n} ${'.'.repeat(70)}\r\n`;
+      written += line.length;
+      process.stdout.write(line);
+    }
+    if (written < total) timers.add(setTimeout(slice, 5));
+    else process.stdout.write('flood-done\r\n');
+  };
+  if (process.stdin.isTTY) process.stdin.setRawMode(true);
+  process.stdin.once('data', slice);
   process.stdin.resume();
 }
 

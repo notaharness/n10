@@ -850,18 +850,20 @@ describe('session buffer', () => {
     });
   });
 
-  it('drops the oldest output once the buffer is full', async () => {
+  it("drops the oldest output after the client's first once the ring is full", async () => {
     await launchAgent({ branch: 'big', intent: 'continue-or-blank' });
     const chunk = 'x'.repeat(256 * 1024);
+    emit(keyFor('big', '/repo-a'), 'setup');
     emit(keyFor('big', '/repo-a'), chunk);
     emit(keyFor('big', '/repo-a'), chunk);
     emit(keyFor('big', '/repo-a'), chunk);
 
-    // Bounded at 512 KiB: the scrollback stays useful without letting a
-    // chatty agent grow the main process without limit.
-    const { data } = getSessionBuffer(keyFor('big', '/repo-a'));
-    expect(data.length).toBeLessThanOrEqual(512 * 1024);
-    expect(data.length).toBeGreaterThan(0);
+    // The ring is bounded at 512 KiB: the scrollback stays useful without
+    // letting a chatty agent grow the host without limit. The client's
+    // first output, its terminal setup, stays ahead of it.
+    const { data, truncated } = getSessionBuffer(keyFor('big', '/repo-a'));
+    expect(data).toBe('setup' + chunk + chunk);
+    expect(truncated).toBe(true);
   });
 });
 

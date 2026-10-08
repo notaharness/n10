@@ -27,11 +27,13 @@ export { tmuxListSessionsDetailedWith } from './lib/tmux-cli-remote.js';
 export {
   createRemoteTmuxBackend,
   RemoteTmuxBackend,
-  type RemoteMachine,
-  type RemotePtyHandle,
-  type RemotePtyOpener,
-  type RemotePtyOpenParams,
 } from './lib/remote-backend.js';
+export type {
+  RemoteMachine,
+  RemotePtyHandle,
+  RemotePtyOpener,
+  RemotePtyOpenParams,
+} from './lib/remote-pty.js';
 export {
   RemoteSessionPoller,
   type PollState,

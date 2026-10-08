@@ -219,10 +219,13 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - Terminals are xterm.js with its WebGL renderer, opened only through
   `lib/terminals/xterm.ts` (options, palette, addons); a lost WebGL context
   falls back to xterm's DOM renderer and refits. The element xterm opens in
-  carries `data-terminal-renderer` and `data-terminal-grid` for tests and QA.
+  carries `data-terminal-renderer`, `data-terminal-grid`, `data-terminal-buffer`
+  and `data-terminal-cursor-keys` for tests and QA.
   `SessionTerminal` sends `resizeSession` on every fit and refits on the
   session's `spawnedAt` epoch; `FitAddon` is the only grid reckoning. It
   bounces the grid for a full repaint only when the snapshot is `truncated`.
+  The snapshot starts with the tmux client's first output, its terminal
+  setup, kept ahead of the ring (`session-relay.ts`, decisions.md).
   `paneTerminalGrid` opens a hidden terminal inside `[data-terminal-pane]`
   for the launch estimate. The grid takes the whole pane: no padding. A terminal releases its
   WebGL context when it goes (`loadWebgl`): Chromium keeps 16 and evicts
