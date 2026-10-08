@@ -112,7 +112,9 @@ test.describe('An agent whose process exits', () => {
 
     expect(
       await page.evaluate(async () =>
-        (await window.n10.listSessions()).map((s) => s.running)
+        (
+          await window.n10.listSessions((await window.n10.getRepo())!.cwd)
+        ).map((s) => s.running)
       )
     ).toEqual([false]);
   });

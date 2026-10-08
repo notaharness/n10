@@ -21,9 +21,9 @@ interface N10Bridge {
     node: string;
     chrome: string;
   }>;
-  listSessions(): Promise<
-    { name: string; running: boolean; spawnedAt: number }[]
-  >;
+  listSessions(
+    repo: string
+  ): Promise<{ name: string; running: boolean; spawnedAt: number }[]>;
   createWorktree(branch: string): Promise<string>;
   listWorktrees(): Promise<{ branch: string; path: string; state?: string }[]>;
   getSessionActivity(): Promise<
@@ -44,7 +44,8 @@ interface N10Bridge {
     ref: { label: string; key: string },
     value: string
   ): Promise<void>;
-  getSyncState(): Promise<{
+  getSyncState(repo: string): Promise<{
+    lastRemoteSyncAt: number | null;
     remoteError: string | null;
     remoteSyncing: boolean;
     remoteIntervalMs: number;
@@ -94,14 +95,18 @@ interface N10Bridge {
     patch: { body?: string; severity?: string }
   ): Promise<void>;
   listDraftComments(
+    repo: string,
     prId: number
   ): Promise<
     { id: string; body: string; status: 'draft' | 'posting' | 'posted' }[]
   >;
-  listReviewDrafts(req: {
-    ref: Record<string, unknown>;
-    viewer?: string | null;
-  }): Promise<{ drafts: FakeReviewDraft[] }>;
+  listReviewDrafts(
+    repo: string,
+    req: {
+      ref: Record<string, unknown>;
+      viewer?: string | null;
+    }
+  ): Promise<{ drafts: FakeReviewDraft[] }>;
   /** What the Finish review form calls. */
   submitReview(req: {
     ref: Record<string, unknown>;
@@ -117,10 +122,13 @@ interface N10Bridge {
       | 'RESET_VOTE';
     draftIds: string[];
   }): Promise<{ drafts: FakeReviewDraft[]; resumed: { state: string } | null }>;
-  getPullRequestConversation(req: {
-    ref: Record<string, unknown>;
-    viewer?: string;
-  }): Promise<{
+  getPullRequestConversation(
+    repo: string,
+    req: {
+      ref: Record<string, unknown>;
+      viewer?: string;
+    }
+  ): Promise<{
     ref: { number: number };
     conversation:
       | { state: 'read'; value: FakeConversation }
@@ -130,7 +138,11 @@ interface N10Bridge {
   getDesktopPrefs(): Promise<Record<string, unknown>>;
   getKeybindings(): Promise<Record<string, Record<string, unknown>[]>>;
   /** Used by the perf probes to time the host half of a tab open. */
-  fetchWorktreeDiffText(branch: string, target: string): Promise<string>;
+  fetchWorktreeDiffText(
+    repo: string,
+    branch: string,
+    target: string
+  ): Promise<string>;
 }
 
 interface FakeConversationCoverage {

@@ -17,6 +17,7 @@ import {
   sidebarRow,
   tabs,
   visibleText,
+  openSessions,
 } from './setup/app.js';
 import { armContextMenuChoice, clickAppMenuItem } from './setup/menu.js';
 import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
@@ -65,7 +66,7 @@ async function expectAgentExited(page: Page, branch: string): Promise<void> {
   await expect
     .poll(
       async () => {
-        const sessions = await page.evaluate(() => window.n10.listSessions());
+        const sessions = await openSessions(page);
         return (
           sessions.find((s) => sessionBranch(s.name) === branch)?.running ??
           true
@@ -211,7 +212,7 @@ test.describe('An agent command that does not exist', () => {
     await expect
       .poll(
         async () => {
-          const sessions = await page.evaluate(() => window.n10.listSessions());
+          const sessions = await openSessions(page);
           return (
             sessions.find((s) => sessionBranch(s.name) === 'broken-agent')
               ?.running ?? false

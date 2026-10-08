@@ -77,7 +77,9 @@ function post(page: Page, head: string) {
   );
 }
 async function expectPublished(page: Page, homeDir: string, head: string) {
-  const findings = await page.evaluate(() => window.n10.listDraftComments(321));
+  const findings = await page.evaluate(async () =>
+    window.n10.listDraftComments((await window.n10.getRepo())!.cwd, 321)
+  );
   expect(findings.map((finding) => finding.status)).toEqual([
     'posted',
     'posted',

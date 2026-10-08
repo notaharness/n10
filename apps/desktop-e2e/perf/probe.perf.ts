@@ -84,16 +84,17 @@ test('probe: what opening a tab costs', async () => {
       .waitFor({ state: 'visible', timeout: 30_000 });
 
     const timings = await page.evaluate(async (branch: string) => {
+      const repo = (await window.n10.getRepo())!.cwd;
       const time = async (fn: () => Promise<string>) => {
         const t0 = performance.now();
         const value = await fn();
         return { ms: performance.now() - t0, length: value.length };
       };
       const cold = await time(() =>
-        window.n10.fetchWorktreeDiffText(branch, 'main')
+        window.n10.fetchWorktreeDiffText(repo, branch, 'main')
       );
       const warm = await time(() =>
-        window.n10.fetchWorktreeDiffText(branch, 'main')
+        window.n10.fetchWorktreeDiffText(repo, branch, 'main')
       );
       return {
         hostColdMs: Math.round(cold.ms),

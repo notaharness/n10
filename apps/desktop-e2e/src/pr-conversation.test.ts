@@ -29,7 +29,7 @@ async function readConversation(page: Page, number: number) {
   return page.evaluate(async (n) => {
     const repo = await window.n10.getRepo();
     if (!repo?.repository) throw new Error('no provider for the open repo');
-    return window.n10.getPullRequestConversation({
+    return window.n10.getPullRequestConversation(repo.cwd, {
       ref: { ...repo.repository, number: n },
     });
   }, number);

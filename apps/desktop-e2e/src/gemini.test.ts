@@ -58,7 +58,9 @@ test('Gemini worktree launch, activity and explicit fresh restart in Desktop', a
   await expect
     .poll(() =>
       page.evaluate(async () =>
-        (await window.n10.listSessions()).map((session) => session.running)
+        (
+          await window.n10.listSessions((await window.n10.getRepo())!.cwd)
+        ).map((session) => session.running)
       )
     )
     .toEqual([false]);

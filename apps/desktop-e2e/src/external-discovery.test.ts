@@ -1,6 +1,6 @@
 import { sessionBranch } from './setup/session-keys.js';
 import { test, expect } from './fixtures/desktop.js';
-import { sidebarRow } from './setup/app.js';
+import { sidebarRow, openSessions } from './setup/app.js';
 import {
   addExternalWorktree,
   cleanupExternalSessions,
@@ -70,7 +70,7 @@ test.describe('Discovering work created outside the app', () => {
     await expect
       .poll(
         async () => {
-          const sessions = await page.evaluate(() => window.n10.listSessions());
+          const sessions = await openSessions(page);
           return (
             sessions.find((s) => sessionBranch(s.name) === branch)?.running ??
             false

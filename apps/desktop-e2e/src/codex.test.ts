@@ -59,7 +59,9 @@ test('Codex worktree launch, activity and recorded-agent continuation in Desktop
   await expect
     .poll(() =>
       page.evaluate(async () =>
-        (await window.n10.listSessions()).map((session) => session.running)
+        (
+          await window.n10.listSessions((await window.n10.getRepo())!.cwd)
+        ).map((session) => session.running)
       )
     )
     .toEqual([false]);
