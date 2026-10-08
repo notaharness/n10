@@ -1,0 +1,38 @@
+{
+  "prId": 333,
+  "comments": [
+    {
+      "id": "deaf8300-d10a-4a49-9ea3-944b0e4aca12",
+      "file": "libs/engine/src/lib/reviews/diff-reads.ts",
+      "lineStart": 192,
+      "lineEnd": 197,
+      "severity": "major",
+      "body": "issue (non-blocking): patches read while a repository is already parked are never let go\n\n`park()` is the only place patches are released, and it runs once, on the selected → parked transition (`repository-service.ts` `open()`). Two paths escape it:\n\n- A handle created by `get()` is parked from birth and `park()` is never called on it, so any patch read through it stays in `patches` until the process exits.\n- `release()` skips a resource that is `loading`; a patch still loading when its repository is parked lands afterwards and is kept until the repository is selected and parked again.\n\n`docs/decisions.md` sizes this at up to 128 MiB per repository, which is exactly what the release is there to prevent, and the follow-up PRs read by repository through `get()`. Not caching a patch result while `freshness.parked()` (or releasing once a parked patch read settles) would cover both paths without a second trigger.",
+      "side": "RIGHT",
+      "status": "draft",
+      "createdAt": "2026-10-08T04:52:31.685Z"
+    },
+    {
+      "id": "b05f1a65-3f32-4105-a182-6d84d6ab5461",
+      "file": "libs/engine/src/lib/repositories/repository-service.ts",
+      "lineStart": 72,
+      "lineEnd": 77,
+      "severity": "minor",
+      "body": "question (non-blocking): should `get()` write a repository's project config?\n\n`create()` runs `autoDetectProjectConfig` for every new handle, `get()`'s included. That spawns `git` through `execSync` on the host's main thread and, when it detects anything, writes the project config to disk, for a repository the user has not opened. Everywhere else this PR makes a parked handle refuse writes before doing any work.\n\nFor `open()` this is the long-standing behaviour. For `get()` (a read, and the path the follow-ups use for other repositories' tabs) I'd expect either no detection, or detection deferred to the first `open()`, which already re-runs `config.detect()` for a known handle.",
+      "side": "RIGHT",
+      "status": "draft",
+      "createdAt": "2026-10-08T04:52:56.486Z"
+    },
+    {
+      "id": "12396194-6586-43cb-b93e-1e8911e07124",
+      "file": "libs/engine/src/lib/reviews/review-context.ts",
+      "lineStart": 43,
+      "lineEnd": 47,
+      "severity": "nit",
+      "body": "nitpick: two refusal messages for one rule, and this one is wrong for a `get()` handle\n\nA parked handle refuses writes with \"This repository is no longer open\" here and \"This repository is not open. Open it to change it.\" from `kernel/selection.ts`. A handle from `get()` that was never selected was never open, so \"no longer\" misleads. `selected()` could throw the same message, keeping `PullRequestIdentityError` as the type.",
+      "side": "RIGHT",
+      "status": "draft",
+      "createdAt": "2026-10-08T04:52:57.272Z"
+    }
+  ]
+}
