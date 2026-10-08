@@ -3,7 +3,7 @@ import type {
   ReviewComment,
 } from '../../../host/contract.js';
 import type { InlineTarget } from '../review/my-drafts.js';
-import type { FileBody } from './diff-bodies.js';
+import { imageRowHeight, type FileBody } from './diff-bodies.js';
 import type { CollapseReason, SplitRow } from './diff-model.js';
 
 // ── Flat rows for the virtualized all-files diff ─────────────────
@@ -112,13 +112,18 @@ export interface FlatDiff {
 
 /** A notice row, sized for what it stands in for so a file that loads
  *  under the reader moves the rest as little as it can. */
-export function noticeRow(file: string, stats: FileStats): FlatRow {
+export function noticeRow(
+  file: string,
+  stats: FileStats,
+  body?: FileBody
+): FlatRow {
   const lines = (stats.adds ?? 0) + (stats.dels ?? 0);
+  const images = body?.state === 'no-text' ? body.images : undefined;
   return {
     key: `n:${file}`,
     kind: 'file-notice',
     file,
-    estimate: Math.min(36 + lines * 20, 1200),
+    estimate: images ? imageRowHeight(images) : Math.min(36 + lines * 20, 1200),
   };
 }
 

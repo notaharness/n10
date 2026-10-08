@@ -15,7 +15,10 @@ import type { DemoState } from './state.js';
 
 type PrDiffHost = Pick<
   N10HostApi,
-  'fetchPrDiffManifest' | 'fetchPrDiffPatch' | 'fetchPrRangeManifest'
+  | 'fetchPrDiffManifest'
+  | 'fetchPrDiffPatch'
+  | 'fetchPrDiffImage'
+  | 'fetchPrRangeManifest'
 >;
 
 /** Which of a pull request's three pushes first touched each file of
@@ -131,6 +134,16 @@ export function createPrDiffHost(state: DemoState): PrDiffHost {
         120
       );
     },
+    // The demo's patches carry no binary files.
+    fetchPrDiffImage: async (req) =>
+      unknownRepo(req.repo) ??
+      later({
+        ok: false as const,
+        error: {
+          code: 'not-an-image' as const,
+          message: 'the demo has no images',
+        },
+      }),
     fetchPrDiffPatch: async (req) => {
       const refused = unknownRepo(req.repo);
       if (refused) return refused;

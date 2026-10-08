@@ -95,6 +95,7 @@ export type * from './lib/pull-requests/pull-request-lookup.js';
 export * from './lib/pull-requests/pr-comparison.js';
 export * from './lib/pull-requests/pr-diff-manifest.js';
 export * from './lib/pull-requests/blob-sizes.js';
+export * from './lib/pull-requests/blob-image.js';
 export * from './lib/pull-requests/pr-history.js';
 export * from './lib/pull-requests/pr-revision-range.js';
 export * from './lib/pull-requests/pr-store-file.js';

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { DiffLine } from '@n10/diff';
-import type { RemoteCommentThread } from '../../../host/contract.js';
+import type {
+  PrDiffManifestFile,
+  RemoteCommentThread,
+} from '../../../host/contract.js';
 import type { InlineTarget } from '../review/my-drafts.js';
-import type { FileBody } from './diff-bodies.js';
-import { filesOnScreen } from './diff-rows-model.js';
+import { bodyOf, imageRowHeight, type FileBody } from './diff-bodies.js';
+import { filesOnScreen, noticeRow, type FileStats } from './diff-rows-model.js';
 import { buildFlatDiff, type FlatRow } from './diff-virtual.js';
 
 /**
@@ -182,5 +185,71 @@ describe('the files on screen', () => {
       { key: 'fd:lock.json', kind: 'file-drafts', file: 'lock.json' },
     ] as unknown as FlatRow[];
     expect([...filesOnScreen(rows, [0, 1]).toRead]).toEqual([]);
+  });
+});
+
+describe('an image’s notice row', () => {
+  const stats = { adds: null, dels: null } as unknown as FileStats;
+  /** A binary file's body, as the reads give it. */
+  const binaryBody = (
+    path: string,
+    oldPath = path,
+    oids: Pick<PrDiffManifestFile, 'oldOid' | 'newOid'> = {
+      oldOid: 'a'.repeat(40),
+      newOid: 'b'.repeat(40),
+    }
+  ): FileBody =>
+    bodyOf(
+      {
+        path,
+        oldPath,
+        status: path === oldPath ? 'modified' : 'renamed',
+        kind: 'binary',
+        additions: null,
+        deletions: null,
+        oldSize: 100,
+        newSize: 100,
+        ...oids,
+      } as PrDiffManifestFile,
+      null
+    );
+
+  it('is the height of its frames from the start', () => {
+    expect(noticeRow('logo.png', stats, binaryBody('logo.png'))).toMatchObject({
+      estimate: imageRowHeight(2),
+    });
+  });
+
+  it('is its frames’ height when only its old name is an image’s', () => {
+    // It shows as images (`showsImages`), so it is sized as them.
+    expect(
+      noticeRow('logo.dat', stats, binaryBody('logo.dat', 'logo.png'))
+    ).toMatchObject({ estimate: imageRowHeight(2) });
+  });
+
+  it('has no room for a choice of comparison with only one side', () => {
+    const added = binaryBody('new.png', 'new.png', {
+      oldOid: null,
+      newOid: 'b'.repeat(40),
+    });
+    const deleted = binaryBody('old.png', 'old.png', {
+      oldOid: 'a'.repeat(40),
+      newOid: null,
+    });
+    for (const body of [added, deleted]) {
+      expect(noticeRow('x.png', stats, body)).toMatchObject({
+        estimate: imageRowHeight(1),
+      });
+    }
+    expect(imageRowHeight(1)).toBeLessThan(imageRowHeight(2));
+  });
+
+  it('is a notice’s height for any other binary file', () => {
+    expect(noticeRow('blob.bin', stats, binaryBody('blob.bin'))).toMatchObject({
+      estimate: 36,
+    });
+    expect(noticeRow('logo.png', stats, { state: 'loading' })).toMatchObject({
+      estimate: 36,
+    });
   });
 });

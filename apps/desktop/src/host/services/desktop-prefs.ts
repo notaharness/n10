@@ -23,6 +23,7 @@ const DEFAULTS: DesktopPrefs = {
   tabOverflow: 'wrap',
   tabCycleMru: false,
   guidedReview: true,
+  imageCompare: 'side-by-side',
 };
 
 function prefsPath(): string {

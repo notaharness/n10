@@ -11,6 +11,8 @@ export type {
   WorktreeService,
   ReviewService,
   SessionService,
+  PrDiffImageRequest,
+  PrDiffImageResult,
   PrDiffManifestRequest,
   PrDiffPatchRequest,
   PrRangeManifestRequest,

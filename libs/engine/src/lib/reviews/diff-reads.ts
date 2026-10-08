@@ -1,12 +1,15 @@
 import {
   fetchRefs,
   fetchWorktreeDiffText,
+  readBlobImage,
   readPrDiffManifest,
   readPrDiffPatch,
   resolvePrComparison,
   readRevisionRangeManifest,
 } from '@n10/core';
 import type {
+  BlobImage,
+  BlobImageError,
   PrComparison,
   PrComparisonError,
   PrDiffManifest,
@@ -19,15 +22,18 @@ import type { ReadFreshness } from '../kernel/read-freshness.js';
 import { createResourceCache } from './resource-cache.js';
 import { readResourceValue } from './read-resource.js';
 import {
+  parseImageRequest,
   parseManifestRequest,
   parsePatchRequest,
   parseRangeRequest,
+  type PrDiffImageRequest,
   type PrDiffManifestRequest,
   type PrDiffPatchRequest,
   type PrRangeManifestRequest,
 } from './diff-requests.js';
 
 export type {
+  PrDiffImageRequest,
   PrDiffManifestRequest,
   PrDiffPatchRequest,
   PrRangeManifestRequest,
@@ -48,6 +54,9 @@ export type PrRangeManifestResult =
 export type PrDiffPatchResult =
   | { ok: true; patch: PrDiffPatch }
   | { ok: false; error: OtherRepoError };
+export type PrDiffImageResult =
+  | { ok: true; image: BlobImage }
+  | { ok: false; error: BlobImageError | OtherRepoError };
 
 const TARGET_FETCH_TTL_MS = 5 * 60 * 1000;
 
@@ -62,6 +71,8 @@ function manifestCeiling(env: Record<string, string | undefined>) {
 }
 const RESOLUTION_TTL_MS = 30_000;
 const PATCHES_KEPT = 2;
+/** Finished image reads kept: each is up to ~13 MB as a data URL. */
+const IMAGES_KEPT = 2;
 
 /**
  * A pull request's diff at exact commits: a request resolves once to
@@ -94,6 +105,13 @@ export function createDiffReads(
   });
   const ranges = createResourceCache<PrRangeManifestResult>(Infinity, {
     capacity: 8,
+    cacheable: (result) => result.ok,
+  });
+  // A blob id names its bytes forever, but the renderer caches what it
+  // shows: this joins reads in flight and keeps the last two finished,
+  // for a quick re-read, never every image the reader scrolled past.
+  const images = createResourceCache<PrDiffImageResult>(Infinity, {
+    capacity: IMAGES_KEPT,
     cacheable: (result) => result.ok,
   });
   // A checkout changes under a running agent whether or not its
@@ -130,7 +148,7 @@ export function createDiffReads(
       }
     );
   }
-  const caches = [manifests, listings, patches, ranges, live];
+  const caches = [manifests, listings, patches, ranges, images, live];
   return {
     /** Resolve a pull request to commits and list every changed file.
      *  Failures that describe the pull request are data. Branches are
@@ -164,6 +182,18 @@ export function createDiffReads(
             ...(context === undefined ? {} : { context }),
           });
           return { ok: true, patch };
+        }
+      );
+    },
+    /** One side of a changed image, by blob id. */
+    image(value: unknown) {
+      const { repo: asked, oid } = parseImageRequest(value);
+      return images.get(
+        JSON.stringify([asked, oid]),
+        async (): Promise<PrDiffImageResult> => {
+          const foreign = otherRepo(asked);
+          if (foreign) return { ok: false, error: foreign };
+          return readBlobImage(repo, oid);
         }
       );
     },

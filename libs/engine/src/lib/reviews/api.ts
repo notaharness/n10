@@ -4,6 +4,8 @@ export type { ReviewService } from './review-service.js';
 export { readResourceValue } from './read-resource.js';
 export type { ReadResource, ReadSnapshot } from './read-resource.js';
 export type {
+  PrDiffImageRequest,
+  PrDiffImageResult,
   PrDiffManifestRequest,
   PrDiffPatchRequest,
   PrRangeManifestRequest,

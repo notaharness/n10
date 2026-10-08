@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchRefs,
   fetchWorktreeDiffText,
+  readBlobImage,
   readPrDiffManifest,
   readPrDiffPatch,
   readRevisionRangeManifest,
@@ -22,6 +23,7 @@ vi.mock('@n10/core', () => ({
   WHOLE_FILE_CONTEXT: 2_147_483_647,
   fetchRefs: vi.fn(),
   fetchWorktreeDiffText: vi.fn(),
+  readBlobImage: vi.fn(),
   readPrDiffManifest: vi.fn(),
   readPrDiffPatch: vi.fn(),
   readRevisionRangeManifest: vi.fn(),
@@ -267,6 +269,74 @@ describe('patch', () => {
   it('rejects bounds that are not strings', () => {
     expect(() => reads().patch({ ...patchRequest, headOid: 5 })).toThrow(
       'headOid must be a string'
+    );
+  });
+});
+
+describe('image', () => {
+  const OID = 'd'.repeat(40);
+  const image = {
+    dataUrl: 'data:image/png;base64,AA==',
+    contentType: 'image/png',
+    bytes: 1,
+  };
+
+  it('reads a blob in its repository once, by id', async () => {
+    vi.mocked(readBlobImage).mockResolvedValue({ ok: true, image });
+    const diff = reads();
+    const req = { repo: '/repo/a', oid: OID };
+    expect(await readResourceValue(diff.image(req))).toEqual({
+      ok: true,
+      image,
+    });
+    await readResourceValue(diff.image(req));
+    expect(readBlobImage).toHaveBeenCalledTimes(1);
+    expect(readBlobImage).toHaveBeenCalledWith('/repo/a', OID);
+  });
+
+  it('keeps only the last few images, which the renderer caches', async () => {
+    vi.mocked(readBlobImage).mockResolvedValue({ ok: true, image });
+    const diff = reads();
+    const oids = ['1', '2', '3'].map((c) => c.repeat(40));
+    for (const oid of oids) {
+      await readResourceValue(diff.image({ repo: '/repo/a', oid }));
+    }
+    await readResourceValue(diff.image({ repo: '/repo/a', oid: oids[2] }));
+    expect(readBlobImage).toHaveBeenCalledTimes(3);
+    await readResourceValue(diff.image({ repo: '/repo/a', oid: oids[0] }));
+    expect(readBlobImage).toHaveBeenCalledTimes(4);
+  });
+
+  it('reads a refusal again rather than keeping it', async () => {
+    vi.mocked(readBlobImage).mockResolvedValue({
+      ok: false,
+      error: { code: 'too-large', message: 'larger than 10 MB' },
+    });
+    const diff = reads();
+    const req = { repo: '/repo/a', oid: OID };
+    await readResourceValue(diff.image(req));
+    await readResourceValue(diff.image(req));
+    expect(readBlobImage).toHaveBeenCalledTimes(2);
+  });
+
+  it('answers only for its own repository', async () => {
+    const diff = reads();
+    const result = await readResourceValue(
+      diff.image({ repo: '/repo/b', oid: OID })
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'other-repo' },
+    });
+    expect(readBlobImage).not.toHaveBeenCalled();
+  });
+
+  it('rejects an id that is not an object id', () => {
+    expect(() =>
+      reads().image({ repo: '/repo/a', oid: 'HEAD:secret' })
+    ).toThrow('oid must be an object id');
+    expect(() => reads().image({ repo: '/repo/a' })).toThrow(
+      'oid must be an object id'
     );
   });
 });

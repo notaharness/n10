@@ -150,6 +150,7 @@ export function createHostApi(): HostApi {
       worktrees.getWorktreeDiffText(cwd, branch, targetBranch),
     fetchPrDiffManifest: (req) => reviews.getPrDiffManifest(req),
     fetchPrDiffPatch: (req) => reviews.getPrDiffPatch(req),
+    fetchPrDiffImage: (req) => reviews.getPrDiffImage(req),
     fetchPrRangeManifest: (req) => reviews.getPrRangeManifest(req),
 
     openExternal: (url) => externalOpener(url),

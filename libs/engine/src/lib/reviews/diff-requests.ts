@@ -49,6 +49,12 @@ export interface PrRangeManifestRequest {
   target: string;
 }
 
+/** One side of a changed image, by its blob id from the manifest. */
+export interface PrDiffImageRequest {
+  repo: string;
+  oid: string;
+}
+
 /**
  * The most paths one patch read may name, in count and in bytes: they
  * go to git as arguments, and a command line has a ceiling of its own.
@@ -145,5 +151,13 @@ export function parseRangeRequest(value: unknown): PrRangeManifestRequest {
     from: requireOid(req.from, 'from'),
     to: requireOid(req.to, 'to'),
     target: requireOid(req.target, 'target'),
+  };
+}
+
+export function parseImageRequest(value: unknown): PrDiffImageRequest {
+  const req = fields(value);
+  return {
+    repo: requireString(req.repo, 'repo'),
+    oid: requireOid(req.oid, 'oid'),
   };
 }

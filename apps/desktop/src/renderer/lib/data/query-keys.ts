@@ -65,6 +65,9 @@ export const keys = {
    *  read between (`base..head`): what is between them never changes. */
   prDiffBatch: (cwd: string, range: string, batch: string) =>
     ['pr-diff-batch', cwd, range, batch] as const,
+  /** One side of a changed image, by blob id: it never changes. */
+  prDiffImage: (cwd: string, oid: string) =>
+    ['pr-diff-image', cwd, oid] as const,
   worktreeDiff: (cwd: string, branch: string, target: string) =>
     ['worktree-diff', cwd, branch, target] as const,
   parsedDiff: (content: string) => ['parsed-diff', content] as const,

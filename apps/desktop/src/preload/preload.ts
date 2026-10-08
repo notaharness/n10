@@ -142,6 +142,7 @@ const api: N10HostApi = {
   fetchPrDiffManifest: (req) =>
     ipcRenderer.invoke(IPC.fetchPrDiffManifest, req),
   fetchPrDiffPatch: (req) => ipcRenderer.invoke(IPC.fetchPrDiffPatch, req),
+  fetchPrDiffImage: (req) => ipcRenderer.invoke(IPC.fetchPrDiffImage, req),
   fetchPrRangeManifest: (req) =>
     ipcRenderer.invoke(IPC.fetchPrRangeManifest, req),
 

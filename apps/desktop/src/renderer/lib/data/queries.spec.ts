@@ -73,6 +73,7 @@ describe('loadRepoGate', () => {
           tabOverflow: 'wrap' as const,
           tabCycleMru: false,
           guidedReview: true,
+          imageCompare: 'side-by-side' as const,
         }),
     });
 
@@ -101,6 +102,7 @@ describe('loadRepoGate', () => {
       tabOverflow: 'wrap',
       tabCycleMru: false,
       guidedReview: true,
+      imageCompare: 'side-by-side',
     });
     expect(await gate).toEqual(REPO);
   });

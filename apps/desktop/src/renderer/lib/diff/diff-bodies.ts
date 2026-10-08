@@ -56,8 +56,15 @@ export type FileBody =
   /** Lines to show. `changes` is a large file read by its changes. */
   | { state: 'loaded'; lines: DiffLine[]; scope: LargeScope }
   | { state: 'loading' }
-  /** git has no lines for it: nothing to read. */
-  | { state: 'no-text'; reason: 'binary' | 'no-content-changes' }
+  /** git has no lines for it: nothing to read. `images`: binary content
+   *  shown as pictures (`showsImages`), and how many sides it has: one
+   *  when the change added or deleted the file. The one test both the
+   *  row's height and what renders in it go by. */
+  | {
+      state: 'no-text';
+      reason: 'binary' | 'no-content-changes';
+      images?: ImageSides;
+    }
   /** Too big to read unasked; `bytes` is its larger side. */
   | { state: 'large'; bytes: number }
   /** `cut`: its batch's read stopped before it; read alone, it may fit. */
@@ -77,6 +84,62 @@ export function noTextReason(
   if (file.kind === 'binary') return 'binary';
   if (file.additions === 0 && file.deletions === 0) return 'no-content-changes';
   return null;
+}
+
+/** File names whose binary content the diff shows as pictures: the
+ *  formats the host recognises by their leading bytes. */
+const IMAGE_EXTENSIONS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'bmp',
+  'ico',
+]);
+
+export function isImagePath(path: string): boolean {
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  const dot = name.lastIndexOf('.');
+  return dot > 0 && IMAGE_EXTENSIONS.has(name.slice(dot + 1).toLowerCase());
+}
+
+/** A binary file shown as its images instead of a notice. */
+export function showsImages(file: PrDiffManifestFile): boolean {
+  return (
+    file.kind === 'binary' &&
+    (isImagePath(file.path) || isImagePath(file.oldPath))
+  );
+}
+
+/** How many sides a changed image has: before and after, or only one
+ *  when the change added or deleted it. */
+export type ImageSides = 1 | 2;
+
+export function imageSides(file: PrDiffManifestFile): ImageSides {
+  return file.oldOid !== null && file.newOid !== null ? 2 : 1;
+}
+
+/** Each side's frame, fixed before either image is read so nothing
+ *  below moves when one arrives. */
+export const IMAGE_FRAME_HEIGHT = 320;
+/** A side's caption: one `h-4` line and its `mb-1.5` (6). */
+const IMAGE_CAPTION_HEIGHT = 16 + 6;
+/** The row's `py-3`. */
+const IMAGE_ROW_PADDING = 2 * 12;
+/** The choice of how two sides are compared: one `h-7` line (28) and
+ *  its `mb-2` (8). A one-sided image has nothing to compare. */
+const IMAGE_MODES_HEIGHT = 28 + 8;
+
+/** The frame, its caption, the row's padding and, for two sides, the
+ *  choice of how they are compared. */
+export function imageRowHeight(sides: ImageSides): number {
+  return (
+    IMAGE_ROW_PADDING +
+    (sides === 2 ? IMAGE_MODES_HEIGHT : 0) +
+    IMAGE_CAPTION_HEIGHT +
+    IMAGE_FRAME_HEIGHT
+  );
 }
 
 export function isLarge(file: PrDiffManifestFile): boolean {
@@ -201,7 +264,11 @@ export function bodyOf(
   read: BatchRead | null
 ): FileBody {
   const reason = noTextReason(file);
-  if (reason) return { state: 'no-text', reason };
+  if (reason) {
+    return showsImages(file)
+      ? { state: 'no-text', reason, images: imageSides(file) }
+      : { state: 'no-text', reason };
+  }
   if (read === null) return { state: 'large', bytes: fileBytes(file) };
   if (read.status === 'error') return { state: 'error', message: read.message };
   if (read.status !== 'success') return { state: 'loading' };
