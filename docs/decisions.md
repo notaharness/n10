@@ -989,9 +989,11 @@ Consistency comes from structure and limits rather than from a long
 rulebook. The agent writes JSON with a fixed set of primitives: markdown
 prose, a picture beside it (a mermaid diagram or a few lines of code), or a
 before and an after. `add-guide` validates it and stores nothing on a
-failure, naming what to cut: 2 to 8 slides, a 280-character lede and
-summary, 600 characters of body prose (fenced code does not count), and
-diagrams in the visual fields, not in the body. The reader opens on a cover
+failure, naming what to cut: 2 to 8 slides, a one-sentence lede (160
+characters), a 200-character summary, 400 characters of body prose (fenced
+code does not count), at most four files per slide, and diagrams in the
+visual fields, not in the body. Agents given looser limits wrote accurate but
+dense slides that read as a document, not a thread. The reader opens on a cover
 n10 draws from the title, summary and slide titles, so the titles are the
 outline. `add-guide` records the commit checked out where the agent ran;
 the desktop says when the pull request has moved past it.
