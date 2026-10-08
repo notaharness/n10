@@ -83,7 +83,7 @@ describe('validateGuide', () => {
     expect(
       issues(guide({ slides: [{ title: 'A', body: long }, slide('B')] }))
     ).toEqual([
-      'slides[0].body: 749 characters of prose, cut it to 600 or fewer; detail belongs in a draft comment',
+      'slides[0].body: 749 characters of prose, cut it to 600 or fewer, or split the slide',
     ]);
   });
 

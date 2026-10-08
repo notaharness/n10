@@ -18,21 +18,24 @@ guide explains the change, the comments judge it.
 
 ## What to put in it
 
-1. Start with an overview slide: the problem the pull request solves, in
-   the user's terms, and the 3–5 steps it takes to solve it. The steps are
-   the spine of the guide: each later slide covers one of them.
-2. Cover what matters, not every file. Skip renames, generated files,
+1. n10 opens the guide on a cover: your title, your summary, and your
+   slide titles as a numbered outline. Write titles that tell the story
+   in order on their own; they are the guide's spine.
+2. Start with what changes: the problem the pull request solves, in the
+   user's terms, and the 3–5 steps it takes. Each later slide covers one.
+3. Cover what matters, not every file. Skip renames, generated files,
    lockfiles, formatting and test scaffolding unless they are the point.
    Six files touched for one idea is one slide.
-3. When the design changes (new module, moved responsibility, new data
+4. When the design changes (new module, moved responsibility, new data
    flow, new state), draw it. Use "before" and "after" to show what the
    structure was and what it is. A reader should see the change in the
    diagram before reading a word.
-4. Show code only when the lines are the point: a few lines, trimmed to
+5. Show code only when the lines are the point: a few lines, trimmed to
    what matters, not a whole hunk. Use the "diff" language to mark lines
    that went and came.
-5. Finish with what to look at closely: the risky parts, where your draft
-   comments are, and what was not checked.
+6. Finish with what to look at closely: the risky parts, where your draft
+   comments are (if you left any), and what was not checked. If that does
+   not fit one slide, give it two.
 
 ## How to write it
 
@@ -43,6 +46,7 @@ guide explains the change, the comments judge it.
 - Titles are short (≤ ${title} characters). The summary says why the pull
   request exists (≤ ${summary} characters).
 - Name the files a slide is about in "files", so the reader can open them.
+  A path may appear more than once, with different lines.
 
 ## Format
 
@@ -52,6 +56,7 @@ Write the guide as a JSON file, then store it:
 
 Running it again replaces the guide. If the guide breaks a rule, the
 command says what to cut and stores nothing; fix it and run it again.
+Detail that does not fit belongs in a draft comment, or nowhere.
 
 {
   "title": "Retry blob reads once before failing",
@@ -79,15 +84,16 @@ command says what to cut and stores nothing; fix it and run it again.
 
 Each slide has a "title" and any of: "lede", "body" (markdown), "files"
 ([{ "path", "lineStart"?, "lineEnd"? }], paths relative to the repository
-root, lines in the new version), and either "visual" or both "before" and
-"after". A visual is { "mermaid": "<diagram>" } or
+root, lines in the commit you reviewed), and one picture: "visual", or
+"before" and "after" together. A body and a picture go side by side. A visual is { "mermaid": "<diagram>" } or
 { "code": "<lines>", "language": "<name>" }, each with an optional
 "caption".
 
 ## Diagrams
 
-Mermaid diagrams, themed by n10: write no colours, styles, classDef or
-%%{init}%% lines. Keep one to about a dozen nodes.
+Mermaid diagrams, themed by n10: write no colours, style, classDef or
+%%{init}%% lines. Edge kinds (-->, -.->, ==>) and subgraphs are fine. Keep
+one to about a dozen nodes.
 
 - flowchart LR or TD for structure and data flow
 - sequenceDiagram for who calls whom, in order

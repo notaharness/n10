@@ -165,7 +165,7 @@ function slideText(
   const prose = proseLength(body);
   if (prose > bodyLimit)
     issues.push(
-      `${at}.body: ${prose} characters of prose, cut it to ${bodyLimit} or fewer; detail belongs in a draft comment`
+      `${at}.body: ${prose} characters of prose, cut it to ${bodyLimit} or fewer, or split the slide`
     );
   if (/^(```|~~~)\s*mermaid/m.test(body))
     issues.push(
