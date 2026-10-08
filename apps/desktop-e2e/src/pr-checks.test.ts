@@ -59,12 +59,20 @@ const REF = {
 };
 
 interface Bridge {
-  n10: { getPullRequestChecks(req: unknown): Promise<unknown> };
+  n10: {
+    getRepo(): Promise<{ cwd: string } | null>;
+    getPullRequestChecks(cwd: string, req: unknown): Promise<unknown>;
+  };
 }
 
 function checks(page: Page, number = REF.number, viewer = 'n10-tester') {
   return page.evaluate(
-    (req) => (window as unknown as Bridge).n10.getPullRequestChecks(req),
+    async (req) => {
+      const { n10 } = window as unknown as Bridge;
+      const repo = await n10.getRepo();
+      if (!repo) throw new Error('no open repository');
+      return n10.getPullRequestChecks(repo.cwd, req);
+    },
     { ref: { ...REF, number }, viewer }
   );
 }
