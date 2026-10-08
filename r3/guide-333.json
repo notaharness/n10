@@ -1,0 +1,130 @@
+{
+  "title": "Park repositories instead of disposing them",
+  "summary": "Switching repositories threw the one you left away, so going back read it all again. Now it is parked: its handle and reads stay, they answer at once, and only the open one takes writes.",
+  "slides": [
+    {
+      "title": "Leaving a repository keeps its handle alive",
+      "lede": "Going back returns the same handle, its lists already read; get() reads a repository without selecting it.",
+      "before": {
+        "mermaid": "flowchart TD\n  O[\"open(B)\"] --> D[\"dispose A: caches, watchers, rows\"]\n  D --> N[new handle for B]",
+        "caption": "One live handle; the old one is disposed"
+      },
+      "after": {
+        "mermaid": "flowchart TD\n  O[\"open(B)\"] --> M[handles map]\n  M --> S[B selected]\n  M --> P[\"A parked: discovery off, data kept\"]\n  G[\"get(C)\"] --> M",
+        "caption": "Every handle kept for the life of the process"
+      },
+      "files": [
+        {
+          "path": "libs/engine/src/lib/repositories/repository-service.ts",
+          "lineStart": 130,
+          "lineEnd": 157
+        },
+        {
+          "path": "libs/engine/src/lib/sessions/session-service.ts",
+          "lineStart": 255,
+          "lineEnd": 259
+        }
+      ]
+    },
+    {
+      "title": "A parked repository answers at once from what it holds",
+      "lede": "Within an hour it reads nothing; past it, it still answers and reads behind; with nothing held, it reads and waits.",
+      "body": "One rule, `parkedWarm`, applied in the review read lane, the worktree service and the pull request list (`refreshInBackground` with a `maxAge`). A failed refresh behind a parked read still answers with the data; the error stays in the snapshot.",
+      "visual": {
+        "mermaid": "flowchart LR\n  R[parked read] --> H{data held?}\n  H -- no --> W[read and wait]\n  H -- yes --> A{\"older than 1 h?\"}\n  A -- no --> S[serve held]\n  A -- yes --> B[serve held, read behind]",
+        "caption": "The selected repository keeps each resource's own TTL"
+      },
+      "files": [
+        {
+          "path": "libs/engine/src/lib/kernel/read-freshness.ts",
+          "lineStart": 20,
+          "lineEnd": 28
+        },
+        {
+          "path": "libs/engine/src/lib/reviews/read-resource.ts",
+          "lineStart": 93,
+          "lineEnd": 114
+        },
+        {
+          "path": "libs/engine/src/lib/worktrees/worktree-service.ts",
+          "lineStart": 138,
+          "lineEnd": 152
+        },
+        {
+          "path": "libs/engine/src/lib/pull-requests/pull-request-list.ts",
+          "lineStart": 355,
+          "lineEnd": 362
+        }
+      ]
+    },
+    {
+      "title": "Reads go anywhere; writes only to the selected repository",
+      "lede": "A parked handle refuses every write before any work, and review writes check again after their awaits.",
+      "body": "- Config writes, worktree create, remove, rebase and fetch: `assertSelected`.\n- Review replies, resolutions, submissions, drafts, mentions and agent findings: `selected()`, then `assertWritable()` before the provider is asked.\n- Diff reads refuse only a request naming another repository (`other-repo`).",
+      "files": [
+        {
+          "path": "libs/engine/src/lib/kernel/selection.ts",
+          "lineStart": 1,
+          "lineEnd": 6
+        },
+        {
+          "path": "libs/engine/src/lib/reviews/review-context.ts",
+          "lineStart": 43,
+          "lineEnd": 67
+        },
+        {
+          "path": "libs/engine/src/lib/worktrees/worktree-commands.ts",
+          "lineStart": 63,
+          "lineEnd": 68
+        }
+      ]
+    },
+    {
+      "title": "Parking stops observation and drops only diff patches",
+      "lede": "Discovery stops and patches (up to 64 MiB each) are released; the pull request list never evicts a list a repository shows.",
+      "body": "Manifests, listings and the live checkout diff (still a one-second TTL) stay. Past `MAX_CACHED_SCOPES`, only scopes a config change left behind are dropped.",
+      "files": [
+        {
+          "path": "libs/engine/src/lib/reviews/diff-reads.ts",
+          "lineStart": 192,
+          "lineEnd": 197
+        },
+        {
+          "path": "libs/engine/src/lib/reviews/resource-cache.ts",
+          "lineStart": 45,
+          "lineEnd": 52
+        },
+        {
+          "path": "libs/engine/src/lib/pull-requests/pull-request-list.ts",
+          "lineStart": 164,
+          "lineEnd": 181
+        }
+      ]
+    },
+    {
+      "title": "Look closely: patches can outlive parking",
+      "lede": "One suspected problem and one question; the unbounded handle set is by design.",
+      "body": "**Suspected:** patches read through a `get()` handle, or still loading at park time, are never released.\n\n**Question:** `get()` runs config auto-detection, which can write to disk for an unopened repository.\n\n**Nit:** two refusal messages for one rule.\n\n**By design:** handles and shown PR lists are kept for the process's life.\n\n**Not verified:** tests not run; the follow-up PRs' callers.",
+      "files": [
+        {
+          "path": "libs/engine/src/lib/reviews/diff-reads.ts",
+          "lineStart": 192,
+          "lineEnd": 197
+        },
+        {
+          "path": "libs/engine/src/lib/repositories/repository-service.ts",
+          "lineStart": 72,
+          "lineEnd": 77
+        },
+        {
+          "path": "libs/engine/src/lib/reviews/review-context.ts",
+          "lineStart": 43,
+          "lineEnd": 47
+        }
+      ]
+    }
+  ],
+  "prId": 333,
+  "commit": "2efa91d6918ffe4040b98f1dd78b810d4b071645",
+  "createdAt": "2026-10-08T05:08:20.681Z"
+}
