@@ -34,7 +34,7 @@ const guide = (diagram: string) => ({
       title: 'What changes',
       lede: 'A blob read retries once, and only successes are cached.',
       body: '1. `fetchBlob` retries on a network error\n2. The cache keeps successes',
-      files: [{ path: 'blob.ts', lineStart: 1, lineEnd: 2 }],
+      files: [{ path: 'blob.ts', lineStart: 180, lineEnd: 181 }],
     },
     {
       title: 'Where the retry sits',
@@ -52,6 +52,15 @@ const guide = (diagram: string) => ({
   ],
 });
 
+/** Long enough that the comment far down it is off screen at the top. */
+const BLOB =
+  'export const retries = 1;\n' +
+  Array.from(
+    { length: 200 },
+    (_, i) => `export const line${i + 2} = ${i};`
+  ).join('\n') +
+  '\n';
+
 const DIAGRAM =
   'flowchart LR\n  load[loadBlob] --> cache --> retry[withRetry] --> fetch[fetchBlob]';
 
@@ -61,7 +70,7 @@ test.use({
     worktrees: [
       {
         branch: BRANCH,
-        files: { 'blob.ts': 'export const retries = 1;\nexport {};\n' },
+        files: { 'blob.ts': BLOB },
       },
     ],
   },
@@ -132,6 +141,49 @@ test.describe('Guided review', () => {
     await pane.getByRole('button', { name: /blob\.ts/ }).click();
     await expect(pane).toBeHidden();
     await expect(page.getByText('export const retries = 1;')).toBeVisible();
+  });
+});
+
+test.describe("A guide beside the agent's findings", () => {
+  test.use({
+    guides: { 31: guide(DIAGRAM) },
+    drafts: {
+      31: [
+        {
+          id: 'd-retries',
+          file: 'blob.ts',
+          lineStart: 180,
+          lineEnd: 180,
+          severity: 'major',
+          body: 'issue: one retry hides a dead network',
+          side: 'RIGHT',
+          status: 'draft',
+          createdAt: '2026-01-01T00:00:00Z',
+        },
+      ],
+    },
+  });
+
+  test('a slide opens the comment on its lines, and the guide ends at the findings', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    const pane = await openGuide(page);
+    await pane.getByRole('button', { name: 'Start' }).click();
+    await pane.getByRole('button', { name: /blob\.ts/ }).click();
+    await expect(pane).toBeHidden();
+    // At the comment, far down the file, not at the file's top.
+    await expect(page.locator('[data-draft="d-retries"]')).toBeInViewport();
+
+    // Back in the guide, on the slide it left.
+    await page.getByRole('button', { name: /Guided review/ }).click();
+    await expect(slideTitle(page)).toHaveText('What changes');
+    await pane
+      .getByRole('button', { name: 'Slide 3: The line to check' })
+      .click();
+    await pane.getByRole('button', { name: 'Review the finding' }).click();
+    await expect(pane).toBeHidden();
+    await expect(page.getByText('1 / 1', { exact: true })).toBeVisible();
   });
 });
 
