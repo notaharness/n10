@@ -1,6 +1,6 @@
 import { GUIDE_LIMITS } from './guide.js';
 
-const { maxSlides, title, lede, summary, body, files } = GUIDE_LIMITS;
+const { maxSlides, title, lede, summary, body, files, caption } = GUIDE_LIMITS;
 
 /**
  * What `n10 util guide-help` prints: everything an agent needs to
@@ -98,7 +98,8 @@ Each slide has a "title" and any of: "lede" (most slides want one),
 relative to the repository root, lines in the pull request's head
 commit), and one picture: "visual", or "before" and "after" together. A
 visual is { "mermaid": "<diagram>" } or { "code": "<lines>",
-"language": "<name>" }, each with an optional "caption".
+"language": "<name>" }, each with an optional "caption" (≤ ${caption}
+characters).
 
 ## Diagrams
 

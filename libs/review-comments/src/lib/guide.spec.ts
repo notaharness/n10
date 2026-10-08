@@ -119,6 +119,29 @@ describe('validateGuide', () => {
     ]);
   });
 
+  it('names a visual with two pictures, and lines that run backwards', () => {
+    expect(
+      issues(
+        guide({
+          slides: [
+            { title: 'A', visual: { mermaid: 'flowchart LR\n a', code: 'x' } },
+            {
+              title: 'B',
+              files: [
+                { path: 'a', lineStart: 9, lineEnd: 3 },
+                { path: 'b', lineEnd: 3 },
+              ],
+            },
+          ],
+        })
+      )
+    ).toEqual([
+      'slides[0].visual: give it a "mermaid" or a "code" field, not both',
+      'slides[1].files[0]: "lineEnd" comes after "lineStart"',
+      'slides[1].files[1]: give "lineStart" with "lineEnd"',
+    ]);
+  });
+
   it('names every problem at once', () => {
     expect(
       issues({

@@ -61,6 +61,7 @@ export const GUIDE_LIMITS = {
   body: 400,
   /** Files named per slide: the ones that matter most. */
   files: 4,
+  caption: 120,
 } as const;
 
 type Issues = string[];
@@ -103,17 +104,28 @@ function visual(
     issues.push(`${at}: give it a "mermaid" or a "code" field`);
     return undefined;
   }
-  const caption = text(issues, `${at}.caption`, value.caption, 120, false);
+  const caption = text(
+    issues,
+    `${at}.caption`,
+    value.caption,
+    GUIDE_LIMITS.caption,
+    false
+  );
   const extra = caption === undefined ? {} : { caption };
-  if (typeof value.mermaid === 'string' && value.mermaid.trim() !== '')
-    return { mermaid: value.mermaid, ...extra };
-  if (typeof value.code === 'string' && value.code.trim() !== '') {
-    const language =
-      typeof value.language === 'string' ? { language: value.language } : {};
-    return { code: value.code, ...language, ...extra };
+  const filled = (field: unknown): field is string =>
+    typeof field === 'string' && field.trim() !== '';
+  const { mermaid, code, language } = value;
+  if (filled(mermaid) === filled(code)) {
+    const both = filled(mermaid) ? ', not both' : '';
+    issues.push(`${at}: give it a "mermaid" or a "code" field${both}`);
+    return undefined;
   }
-  issues.push(`${at}: give it a "mermaid" or a "code" field`);
-  return undefined;
+  if (filled(mermaid)) return { mermaid, ...extra };
+  return {
+    code: code as string,
+    ...(typeof language === 'string' ? { language } : {}),
+    ...extra,
+  };
 }
 
 const line = (value: unknown) =>
@@ -133,25 +145,34 @@ function files(
     issues.push(
       `${at}: ${value.length} files, name the ${GUIDE_LIMITS.files} that matter most`
     );
-  return value.flatMap((file, i): GuideFile[] => {
-    const where = `${at}[${i}]`;
-    if (!isRecord(file) || typeof file.path !== 'string' || !file.path) {
-      issues.push(`${where}: give it a "path" relative to the repository`);
-      return [];
-    }
-    const { lineStart, lineEnd } = file;
-    if (!line(lineStart) || !line(lineEnd)) {
-      issues.push(`${where}: lines are whole numbers from 1`);
-      return [];
-    }
-    return [
-      {
-        path: file.path,
-        ...(lineStart === undefined ? {} : { lineStart: Number(lineStart) }),
-        ...(lineEnd === undefined ? {} : { lineEnd: Number(lineEnd) }),
-      },
-    ];
-  });
+  return value.flatMap((file, i) => place(issues, `${at}[${i}]`, file) ?? []);
+}
+
+/** One place a slide names: a path, and the lines in it if any. */
+function place(issues: Issues, at: string, file: unknown): GuideFile | null {
+  if (!isRecord(file) || typeof file.path !== 'string' || !file.path) {
+    issues.push(`${at}: give it a "path" relative to the repository`);
+    return null;
+  }
+  const { lineStart, lineEnd } = file;
+  if (!line(lineStart) || !line(lineEnd)) {
+    issues.push(`${at}: lines are whole numbers from 1`);
+    return null;
+  }
+  if (lineStart === undefined) {
+    if (lineEnd === undefined) return { path: file.path };
+    issues.push(`${at}: give "lineStart" with "lineEnd"`);
+    return null;
+  }
+  if (lineEnd !== undefined && Number(lineEnd) < Number(lineStart)) {
+    issues.push(`${at}: "lineEnd" comes after "lineStart"`);
+    return null;
+  }
+  return {
+    path: file.path,
+    lineStart: Number(lineStart),
+    ...(lineEnd === undefined ? {} : { lineEnd: Number(lineEnd) }),
+  };
 }
 
 /** A slide's words: its title, lede and body. */
