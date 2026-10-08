@@ -691,18 +691,18 @@ A player's `@orchestra-orchestrator` of `tmux:<session>` names its session.
 `claude:<id>` and `codex:<thread>` name a conversation, which the tmux server
 cannot tie to a session. Orchestra closes that gap explicitly: `spawn.sh` and
 `adopt.sh`, run inside tmux with the orchestrator's own identity as the
-target, write it as `@orchestra-target` on the session they run in. That is
-how a terminal tab where `claude` was run by hand becomes an orchestrator.
-n10 does not infer the link from process trees, Claude's session registry or
-transcripts. Under `beam:<peerId>/` the target is on that machine. The host
-lists this machine's server only, so a player on another machine, or an
-orchestrator outside tmux (Claude Desktop, a daemon), groups nothing: such a
-player keeps its own tab, and its launch context still shows where it
-reports. Orchestra keeps one claimant per target on a server, but another
-server can hold a stale copy, so of two sessions claiming a target the one
-created last wins. A session marked with a target is an orchestrator with or
-without players. A fresh agent launch clears the mark with the other
-supervisor tags.
+target, write it as `@orchestra-target` on the session they run in, and take
+it off every other session of that server. That is how a terminal tab where
+`claude` was run by hand becomes an orchestrator. n10 does not infer the link
+from process trees, Claude's session registry or transcripts. Repositories
+play no part: a player in another repository, open or not, or a dir player
+in a directory of its own, groups like any other. The host lists this
+machine's server only. So a `beam:` target (an orchestrator on another
+machine), a player on another machine, and an orchestrator outside tmux
+(Claude Desktop, a daemon) group nothing; such a player keeps its own tab,
+and its launch context still shows where it reports. A session marked with a
+target is an orchestrator with or without players. A fresh agent launch
+clears the mark with the other supervisor tags.
 
 The strip changes how tabs are shown, not what they are
 (`lib/tabs/orchestrator-tabs.ts`). Player tabs open, close and activate as
@@ -712,14 +712,25 @@ another repository, by repository and checkout. An orchestrator that is
 another's player keeps its place, so its own players stay reachable. Where an
 orchestrator tab's close button sits, it shows the count of its player tabs,
 and keeps the X when it has none; middle click, Delete and its menu still
-close it. While one of its players is active, the orchestrator tab is the
-strip's selection. Hovering the tab opens a Radix hover card listing the
-player tabs as tab-styled rows. Choosing a row activates that tab; a row's X
-is that tab's own close, with its confirmation and agent stop. The list holds
-tabs, not sessions: a player whose tab was closed is not listed and not
-reopened from here. A hover card is pointer-only, so the tab's native menu
+close it. The tab carries what its hidden players would show: it is the
+strip's selection while one of them is active, and takes their unseen dot and
+attention blink. Hovering the tab opens a Radix hover card listing the player
+tabs as tab rows, with each tab's marks, repository band and hover-revealed
+X. Resting on a row holds its pane ready as resting on a strip tab does, and
+a press chooses it. A row's X is that tab's own close, with its confirmation
+and agent stop. The list holds tabs, not sessions: a player whose tab was
+closed is not listed and not reopened from here. The card is pointer-only, so
+the trigger cancels Radix's open on keyboard focus, and the tab's native menu
 lists the same players under a disabled "Players" heading (the contract's
-menus have no submenus).
+menus have no submenus). The tab is one element from its first player to its
+last, so the card's coming and going never remounts it.
+
+Positional keyboard switching (Ctrl+PgDn/PgUp, and Ctrl+Tab without
+most-recently-used order) walks the order the strip presents: each tab it
+shows, an orchestrator's followed by its player tabs, which the strip notes in
+`tab-switching.ts`. Close Others on an orchestrator's tab keeps its player
+tabs, which the strip shows as part of it; from any other tab, and Close All,
+they close like every tab.
 
 ## Plans and babysitting
 

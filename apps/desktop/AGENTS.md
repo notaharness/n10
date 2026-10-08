@@ -115,7 +115,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   (`lib/tabs/orchestrator-tabs.ts`, over core's `orchestratorGroups` via
   `listOrchestratorGroups`): presentation only. The strip omits them; they stay
   ordinary tabs in `TabsState`, listed in the orchestrator tab's hover card
-  (`OrchestratorPlayers.tsx`) and its context menu.
+  (`OrchestratorPlayers.tsx`) and its context menu. Positional tab switching
+  walks the order the strip presents (`presentedOrder`), not `TabsState`'s.
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
   collapsible rail (Sessions · Files) beside one content pane that
   swaps between Overview, diff, a session's terminal (mounted only while shown) and
