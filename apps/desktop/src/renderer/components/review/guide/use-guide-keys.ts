@@ -1,9 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent } from 'react';
+import { inField } from '../../../lib/field-keys.js';
 import { usePaneShown } from '../../../lib/tabs/pane-shown.js';
-
-/** Fields and controls that take these keys for themselves. */
-const OWN_KEYS =
-  'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="slider"], [role="tablist"]';
 
 const STEPS: Record<string, -1 | 1> = {
   ArrowLeft: -1,
@@ -23,21 +20,18 @@ export function useGuideKeys(handlers: {
   onNext: () => void;
 }): void {
   const shown = usePaneShown();
-  // The latest handlers, so the listener is bound once per showing.
-  const latest = useRef(handlers);
-  useEffect(() => {
-    latest.current = handlers;
-  });
+  const prev = useEffectEvent(handlers.onPrev);
+  const next = useEffectEvent(handlers.onNext);
   useEffect(() => {
     if (!shown) return;
     const onKey = (e: KeyboardEvent) => {
       const step = STEPS[e.key];
       if (!step || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey)
         return;
-      if ((e.target as HTMLElement | null)?.closest(OWN_KEYS)) return;
+      if (inField(e.target)) return;
       e.preventDefault();
-      if (step < 0) latest.current.onPrev();
-      else latest.current.onNext();
+      if (step < 0) prev();
+      else next();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
