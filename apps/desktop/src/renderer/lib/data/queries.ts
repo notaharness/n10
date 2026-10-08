@@ -461,7 +461,7 @@ export function useGuidedReview(
     queryKey: keys.guide(cwd, prId),
     queryFn: () => window.n10.getGuidedReview(cwd, prId),
     refetchInterval: 2_000,
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
     enabled: prId > 0,
   });
   return read.data ?? null;
