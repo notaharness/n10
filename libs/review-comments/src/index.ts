@@ -73,4 +73,15 @@ export {
   estimateReplyInputRows,
   EDIT_INPUT_SLACK_ROWS,
 } from './lib/comment-rows.js';
-export { handleUtilCommand } from './lib/util-command.js';
+export { handleUtilCommand, type UtilContext } from './lib/util-command.js';
+export {
+  GUIDE_LIMITS,
+  validateGuide,
+  type GuideFile,
+  type GuideInput,
+  type GuideSlide,
+  type GuideVisual,
+  type GuidedReview,
+} from './lib/guide.js';
+export { guideFilePath, readGuide, writeGuide } from './lib/guide-store.js';
+export { guideInstructions } from './lib/guide-instructions.js';
