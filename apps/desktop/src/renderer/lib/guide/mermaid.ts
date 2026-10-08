@@ -6,7 +6,11 @@ import type { ResolvedTheme } from '../theme.js';
  * writing, so it is drawn at mermaid's `strict` security level (no
  * script, no click handlers, sanitized labels) with HTML labels off,
  * and themed by n10's own tokens: a diagram's `%%{init}%%` cannot
- * change the theme, the security level or the fonts (`secure`).
+ * change the theme, the fonts or HTML labels, nor anything mermaid
+ * itself keeps from it: `initialize` adds the `secure` keys given to
+ * mermaid's own (`securityLevel`, `maxEdges`, …). A diagram
+ * mermaid cannot parse is the caller's to show (`suppressErrorRendering`),
+ * so mermaid leaves no error drawing behind in the page.
  *
  * Mermaid is a large library used only here, so it is loaded the first
  * time a diagram is drawn.
@@ -23,11 +27,23 @@ function token(name: string): string {
     .trim();
 }
 
+/** Settings a diagram's `%%{init}%%` may not change, besides those
+ *  mermaid already keeps from it. */
+const THEMED: string[] = [
+  'theme',
+  'themeVariables',
+  'themeCSS',
+  'darkMode',
+  'fontFamily',
+  'htmlLabels',
+];
+
 function config(theme: ResolvedTheme): MermaidConfig {
   const fontFamily = getComputedStyle(document.body).fontFamily;
   return {
     startOnLoad: false,
     securityLevel: 'strict',
+    suppressErrorRendering: true,
     htmlLabels: false,
     flowchart: { htmlLabels: false },
     theme: 'base',
@@ -46,18 +62,7 @@ function config(theme: ResolvedTheme): MermaidConfig {
       lineColor: token('--muted-foreground'),
       textColor: token('--foreground'),
     },
-    secure: [
-      'secure',
-      'securityLevel',
-      'startOnLoad',
-      'maxTextSize',
-      'theme',
-      'themeVariables',
-      'themeCSS',
-      'darkMode',
-      'fontFamily',
-      'htmlLabels',
-    ],
+    secure: THEMED,
   };
 }
 

@@ -205,5 +205,37 @@ test.describe('A diagram mermaid cannot draw', () => {
     const failed = pane.locator('[data-diagram-failed]');
     await expect(failed).toContainText('This diagram could not be drawn.');
     await expect(failed).toContainText('a --> (((');
+    // Mermaid leaves no error drawing of its own in the page.
+    await expect(page.locator('body > [id^="dn10-guide-diagram"]')).toHaveCount(
+      0
+    );
+  });
+});
+
+test.describe('A diagram that asks for its own settings', () => {
+  test.use({
+    guides: {
+      31: guide(
+        '%%{init: {"securityLevel": "loose", "theme": "base", "themeVariables": ' +
+          '{"primaryColor": "#ff00ff"}, "maxEdges": 1}}%%\n' +
+          DIAGRAM
+      ),
+    },
+  });
+
+  /**
+   * The diagram asks for magenta nodes; n10's own theme has none.
+   * It has three edges, so it is drawn only while mermaid's own
+   * `maxEdges` stays out of the diagram's reach.
+   */
+  test("is drawn in n10's theme all the same", async ({ desktop }) => {
+    const { page } = desktop;
+    const pane = await openGuide(page);
+    await pane
+      .getByRole('button', { name: 'Slide 2: Where the retry sits' })
+      .click();
+    const svg = pane.locator('[data-diagram] svg');
+    await expect(svg).toContainText('withRetry');
+    expect((await svg.innerHTML()).toLowerCase()).not.toContain('#ff00ff');
   });
 });
