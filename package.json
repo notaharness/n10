@@ -49,7 +49,7 @@
   ],
   "lint-staged": {
     "*": "npx nx format:write --files",
-    "*.{ts,tsx}": "eslint --fix --max-warnings 0"
+    "*.{ts,tsx}": "eslint --flag v10_config_lookup_from_file --fix --max-warnings 0"
   },
   "dependencies": {
     "@xterm/headless": "^6.0.0",

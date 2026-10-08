@@ -13,8 +13,23 @@ the extending config: `apps/**/*.ts` becomes `apps/cli-e2e/apps/**/*.ts` there
 and matches nothing. Shared blocks use `**/*.{ts,tsx}` or `**/src/**/*.{ts,tsx}`.
 Keep project-specific blocks, such as Ink and renderer imports, anchored.
 
-Verify a new block with `npx eslint --print-config <file>` from the directory
-owning that file's config. Running ESLint from the root can miss e2e rules.
+Plain `npx eslint` resolves one config from the working directory, so run it
+from the directory owning a file's config; from the root it applies the root
+config to e2e files and misses their rules. Verify a new block with
+`npx eslint --print-config <file>` from that directory.
+
+## Pre-commit
+
+`.husky/pre-commit` runs lint-staged, which runs
+`eslint --flag v10_config_lookup_from_file --fix --max-warnings 0` on staged
+`*.{ts,tsx}` files from the root. The flag makes ESLint use the nearest
+`eslint.config.mjs` above each file, so every file is linted under its owning
+config. It is ESLint 10's default lookup, opted into early; drop the flag when
+upgrading. Configs that read the working directory, such as the Next plugin's
+app discovery, must anchor to their own directory instead.
+
+The website's type-aware rules need the generated `.source` types:
+run `npx nx run website:typegen` in a fresh worktree before committing there.
 
 ## Budgets and exceptions
 
@@ -26,7 +41,7 @@ owning that file's config. Running ESLint from the root can miss e2e rules.
 
 Refactor before adding an exception. Inline suppressions need a `--` rationale
 explaining why the rule does not apply. Put plugin-rule exceptions in the owning
-ESLint config: lint-staged may run without that plugin registered.
+ESLint config, beside the plugin that defines the rule.
 
 ## Async and type safety
 
