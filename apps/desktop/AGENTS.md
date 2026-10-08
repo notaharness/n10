@@ -252,7 +252,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   its slides; the step lives in the tab's view. A slide's place opens the diff
   at the agent's comment on those lines when there is one (`draftAt`), else
   at its first line (`jumpToLine`), and
-  the last step opens the drafts walkthrough when there are drafts. Diagrams go only through
+  the last step opens the drafts walkthrough when there are drafts. A review
+  asks for a guide only while the launch dialog's Guided review box is
+  checked (`guidedReview` desktop pref, `ReviewLaunchRequest.guide`). Diagrams go only through
   `lib/guide/mermaid.ts` (strict, no HTML labels, token theme, `secure`
   keys), and one that does not parse shows its source. Prose and code reuse
   `CommentMarkdown`. Format and limits: decisions.md "Guided review".

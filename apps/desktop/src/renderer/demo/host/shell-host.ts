@@ -108,6 +108,7 @@ export function createShellHost(state: DemoState): ShellHost {
     nativeFrame: false,
     tabOverflow: 'wrap',
     tabCycleMru: false,
+    guidedReview: true,
   };
   let keybindings: DesktopKeybindings = {};
   const menuCommands = new Channel<MenuCommandEvent>();

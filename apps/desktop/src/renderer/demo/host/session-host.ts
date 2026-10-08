@@ -148,7 +148,11 @@ export function createSessionHost(
     launchAgent: (req) =>
       start(req, req.branch, PROGRAMS.agent(req, state.repo())),
     launchReviewAgent: (req) =>
-      start(req, req.pr.sourceBranch, PROGRAMS.reviewer(req.pr, state.repo())),
+      start(
+        req,
+        req.pr.sourceBranch,
+        PROGRAMS.reviewer(req.pr, state.repo(), req.guide === true)
+      ),
     listAgentOptions: () => later(AGENTS),
     getSessionLaunchContext: (branch) => {
       const session = inRepo(state.current, branch);

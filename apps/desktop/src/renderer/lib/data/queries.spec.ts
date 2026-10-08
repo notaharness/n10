@@ -72,6 +72,7 @@ describe('loadRepoGate', () => {
           nativeFrame: false,
           tabOverflow: 'wrap' as const,
           tabCycleMru: false,
+          guidedReview: true,
         }),
     });
 
@@ -99,6 +100,7 @@ describe('loadRepoGate', () => {
       nativeFrame: false,
       tabOverflow: 'wrap',
       tabCycleMru: false,
+      guidedReview: true,
     });
     expect(await gate).toEqual(REPO);
   });

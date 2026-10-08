@@ -22,6 +22,7 @@ const DEFAULTS: DesktopPrefs = {
   nativeFrame: false,
   tabOverflow: 'wrap',
   tabCycleMru: false,
+  guidedReview: true,
 };
 
 function prefsPath(): string {

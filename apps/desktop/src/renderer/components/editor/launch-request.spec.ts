@@ -81,13 +81,14 @@ describe('reviewLaunchRequest', () => {
 
   it('a local review launch submits exactly the request it submits today (pinned)', () => {
     expect(
-      reviewLaunchRequest(thePr, 'Check module boundaries.', {
+      reviewLaunchRequest(thePr, 'Check module boundaries.', true, {
         cols: 80,
         rows: 24,
       })
     ).toStrictEqual({
       pr: thePr,
       instruction: 'Check module boundaries.',
+      guide: true,
       expected: undefined,
       agentId: undefined,
       cols: 80,
@@ -96,7 +97,7 @@ describe('reviewLaunchRequest', () => {
   });
 
   it('a local review launch never carries a machine or a launchId', () => {
-    const req = reviewLaunchRequest(thePr, undefined, {});
+    const req = reviewLaunchRequest(thePr, undefined, false, {});
     expect(req).not.toHaveProperty('machine');
     expect(req).not.toHaveProperty('launchId');
   });
@@ -106,6 +107,7 @@ describe('reviewLaunchRequest', () => {
       reviewLaunchRequest(
         thePr,
         undefined,
+        false,
         { cols: 80, rows: 24 },
         undefined,
         undefined,
@@ -115,6 +117,7 @@ describe('reviewLaunchRequest', () => {
     ).toStrictEqual({
       pr: thePr,
       instruction: undefined,
+      guide: false,
       expected: undefined,
       agentId: undefined,
       machine: 'dddddddddddddddd',

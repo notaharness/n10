@@ -1,14 +1,19 @@
 import type { SessionLaunchView } from '../../../host/contract.js';
+import { Checkbox } from '../ui/checkbox.js';
 import { Label } from '../ui/label.js';
 import { Textarea } from '../ui/textarea.js';
 
 export function ReviewInstructions({
   value,
   onChange,
+  guide,
+  onGuideChange,
   onSubmit,
 }: {
   value: string;
   onChange: (value: string) => void;
+  guide: boolean;
+  onGuideChange: (guide: boolean) => void;
   onSubmit: () => void;
 }) {
   return (
@@ -35,6 +40,22 @@ export function ReviewInstructions({
             }
           }}
         />
+      </div>
+      <div className="flex items-start gap-2">
+        <Checkbox
+          id="review-guide"
+          checked={guide}
+          onCheckedChange={(on) => onGuideChange(on === true)}
+          aria-describedby="review-guide-note"
+          className="mt-0.5"
+        />
+        <div className="grid gap-0.5">
+          <Label htmlFor="review-guide">Guided review</Label>
+          <p id="review-guide-note" className="text-muted-foreground">
+            The agent also writes a short slideshow that walks you through the
+            pull request before the diff.
+          </p>
+        </div>
       </div>
     </>
   );

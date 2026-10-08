@@ -66,22 +66,26 @@ function addGuide(repo: RepoState, pr: PullRequestInfo): Beat {
   };
 }
 
-/** Core's desktop review prompt, as the agent's first turn shows it. */
-function reviewPrompt(pr: PullRequestInfo) {
+/** Core's review prompt, as the agent's first turn shows it. */
+function reviewPrompt(pr: PullRequestInfo, guide: boolean) {
   return {
     kind: 'prompt' as const,
     text:
       `Review PR #${pr.id} ("${pr.title}") merging ${pr.sourceBranch} → ${pr.targetBranch} by ${pr.createdByDisplayName}.\n\n` +
       'Review all changed files thoroughly. Add comments for any issues found.' +
-      ' Then write a guided review of the pull request.',
+      (guide ? ' Then write a guided review of the pull request.' : ''),
   };
 }
 
 /** A pull request with no scripted findings: a clean read. */
-function cleanReview(pr: PullRequestInfo, repo: RepoState): ClaudeScript {
+function cleanReview(
+  pr: PullRequestInfo,
+  repo: RepoState,
+  guide: boolean
+): ClaudeScript {
   return {
     cwd: displayDir(repo.cwd, pr.sourceBranch),
-    history: [reviewPrompt(pr)],
+    history: [reviewPrompt(pr, guide)],
     beats: [
       {
         after: 700,
@@ -107,12 +111,14 @@ function cleanReview(pr: PullRequestInfo, repo: RepoState): ClaudeScript {
 
 export function reviewScript(
   pr: PullRequestInfo,
-  repo: RepoState
+  repo: RepoState,
+  guide: boolean
 ): ClaudeScript {
-  if (repo.cwd !== N10 || pr.id !== PR_REVIEW.id) return cleanReview(pr, repo);
+  if (repo.cwd !== N10 || pr.id !== PR_REVIEW.id)
+    return cleanReview(pr, repo, guide);
   return {
     cwd: displayDir(repo.cwd, pr.sourceBranch),
-    history: [reviewPrompt(pr)],
+    history: [reviewPrompt(pr, guide)],
     beats: [
       {
         after: 700,
@@ -134,7 +140,7 @@ export function reviewScript(
       },
       { after: 2600, blocks: [{ kind: 'read', files: 8 }] },
       ...REVIEW_DRAFTS.map((_, i) => addComment(repo, pr, i)),
-      addGuide(repo, pr),
+      ...(guide ? [addGuide(repo, pr)] : []),
       {
         after: 2400,
         working: null,
@@ -142,7 +148,11 @@ export function reviewScript(
           {
             kind: 'say',
             paragraphs: [
-              'The feature does what it says: the count is a real button, and a click that lands before the threads load is held and replayed. I left four drafts, none blocking, and a guided review that walks through the change:',
+              `The feature does what it says: the count is a real button, and a click that lands before the threads load is held and replayed. I left four drafts, none blocking${
+                guide
+                  ? ', and a guided review that walks through the change'
+                  : ''
+              }:`,
               '1. `firstUnresolvedThread` relies on the rail being sorted by file and line.',
               '2. A single animation frame can be too early to find the row after unhiding the rail.',
               '3. A failed refetch drops the click silently.',

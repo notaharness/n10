@@ -49,6 +49,7 @@ describe('loadDesktopPrefs', () => {
       nativeFrame: false,
       tabOverflow: 'wrap',
       tabCycleMru: false,
+      guidedReview: true,
     });
   });
 
@@ -61,6 +62,7 @@ describe('loadDesktopPrefs', () => {
       nativeFrame: false,
       tabOverflow: 'wrap',
       tabCycleMru: false,
+      guidedReview: true,
     });
   });
 
@@ -73,6 +75,7 @@ describe('loadDesktopPrefs', () => {
       nativeFrame: false,
       tabOverflow: 'wrap',
       tabCycleMru: false,
+      guidedReview: true,
     });
   });
 
@@ -83,6 +86,7 @@ describe('loadDesktopPrefs', () => {
         nativeFrame: true,
         tabOverflow: 'scroll',
         tabCycleMru: true,
+        guidedReview: true,
       })
     );
     expect(loadDesktopPrefs()).toEqual({
@@ -90,6 +94,7 @@ describe('loadDesktopPrefs', () => {
       nativeFrame: true,
       tabOverflow: 'scroll',
       tabCycleMru: true,
+      guidedReview: true,
     });
   });
 });
@@ -102,12 +107,14 @@ describe('saveDesktopPrefs', () => {
       nativeFrame: false,
       tabOverflow: 'wrap',
       tabCycleMru: false,
+      guidedReview: true,
     });
     expect(JSON.parse(readFileSync(prefsPath(), 'utf8'))).toEqual({
       theme: 'dark',
       nativeFrame: false,
       tabOverflow: 'wrap',
       tabCycleMru: false,
+      guidedReview: true,
     });
   });
 
@@ -120,6 +127,7 @@ describe('saveDesktopPrefs', () => {
       nativeFrame: true,
       tabOverflow: 'wrap',
       tabCycleMru: false,
+      guidedReview: true,
     });
   });
 
@@ -131,6 +139,7 @@ describe('saveDesktopPrefs', () => {
       nativeFrame: true,
       tabOverflow: 'wrap',
       tabCycleMru: false,
+      guidedReview: true,
     });
   });
 
@@ -141,6 +150,7 @@ describe('saveDesktopPrefs', () => {
       nativeFrame: false,
       tabOverflow: 'wrap',
       tabCycleMru: false,
+      guidedReview: true,
     });
     expect(loadDesktopPrefs().theme).toBe('dark');
   });

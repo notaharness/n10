@@ -329,6 +329,9 @@ export interface DesktopPrefs {
   /** Ctrl+Tab / Ctrl+Shift+Tab (or their rebinding) walk the tabs in
    *  most-recently-used order instead of strip order. */
   tabCycleMru: boolean;
+  /** Whether a review started from the launch dialog asks for a guided
+   *  review: the dialog's checkbox, remembered from the last choice. */
+  guidedReview: boolean;
 }
 
 export type TabOverflow = 'wrap' | 'scroll';
