@@ -2,9 +2,7 @@ import { toast } from 'sonner';
 import { useAddMachine } from './use-add-machine.js';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -13,10 +11,11 @@ import {
 } from 'react';
 import type { MachineView } from '../../../host/contract.js';
 import { keys } from '../data/query-keys.js';
-import { useCeremony, type Ceremony } from './use-ceremony.js';
-import { useEnrolment, type Enrolment } from './use-enrolment.js';
+import { FleetContext, type FleetSectionState } from './fleet-context.js';
+import { useCeremony } from './use-ceremony.js';
+import { useEnrolment } from './use-enrolment.js';
 import { useFleetReset } from './use-fleet-reset.js';
-import { usePublication, type Publication } from './publication.js';
+import { usePublication } from './publication.js';
 
 const EXPANDED_KEY = 'n10.fleet.expanded';
 
@@ -36,44 +35,6 @@ function storeExpanded(expanded: boolean): void {
     // A convenience only: the section opens expanded next time.
   }
 }
-
-/** The sidebar's Fleet section: whether it is open, and a request to
- *  bring it into view from elsewhere (the status bar, Settings). */
-export interface FleetSectionState {
-  expanded: boolean;
-  setExpanded: (expanded: boolean) => void;
-  /** Open the section, show the sidebar holding it and focus it. */
-  reveal: () => void;
-  /** Bumped by `reveal`; the section focuses itself when it changes. */
-  revealSeq: number;
-  /** Whether a reveal is still waiting for the section to take focus;
-   *  true once per reveal, so a remounted section does not steal it. */
-  takeRevealFocus: () => boolean;
-  /** Registers what shows the sidebar (the workspace's), for `reveal`. */
-  setRevealHost: (show: (() => void) | null) => void;
-}
-
-interface FleetContextValue {
-  section: FleetSectionState;
-  /** Add-a-machine instructions showing in the section. */
-  adding: boolean;
-  setAdding: (adding: boolean) => void;
-  /** The first run: its choice, form values and ceremony. Owned here,
-   *  above the repository gate, so collapsing the sidebar or switching
-   *  repositories keeps them. */
-  enrolment: Enrolment;
-  /** The revocation dialog's machine and ceremony, kept the same way. */
-  revocation: {
-    target: MachineView | null;
-    ceremony: Ceremony;
-    open: (machine: MachineView) => void;
-    close: () => void;
-  };
-  reset: ReturnType<typeof useFleetReset>;
-  publication: Publication;
-}
-
-const FleetContext = createContext<FleetContextValue | null>(null);
 
 /** The machines list and beam's status are pushed whole on every
  *  change; they go straight into the cache, whatever screen is up. */
@@ -227,10 +188,4 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   return (
     <FleetContext.Provider value={value}>{children}</FleetContext.Provider>
   );
-}
-
-export function useFleet(): FleetContextValue {
-  const ctx = useContext(FleetContext);
-  if (!ctx) throw new Error('useFleet must be used inside FleetProvider');
-  return ctx;
 }

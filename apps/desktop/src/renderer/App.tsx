@@ -2,6 +2,7 @@ import { QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import type { N10HostApi, RepoInfo } from '../host/contract.js';
+import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { TabDragProvider } from './components/editor/TabStrip.js';
 import { RevokeMachineDialog } from './components/machines/RevokeMachineDialog.js';
 import { Toaster } from './components/ui/sonner.js';
@@ -12,7 +13,8 @@ import {
   resetRepoScopedCache,
 } from './lib/data/query-keys.js';
 import { useRepoGate } from './lib/data/queries.js';
-import { FleetProvider, useFleet } from './lib/fleet/fleet-context.js';
+import { useFleet } from './lib/fleet/fleet-context.js';
+import { FleetProvider } from './lib/fleet/fleet-provider.js';
 import { errorMessage } from './lib/utils.js';
 import { RepoOpen } from './screens/RepoOpen.js';
 import { Workspace } from './screens/Workspace.js';
@@ -126,13 +128,21 @@ function Gate() {
     return <RepoOpen onOpened={adoptRepo} />;
   }
 
+  // Below the providers, so a workspace that fails to render leaves the
+  // open tabs, toasts and a pending revocation in place, and Try again
+  // remounts it with them.
   return (
-    <Workspace
-      key={repo.cwd}
-      repo={repo}
-      onSwitchRepo={() => qc.setQueryData(keys.repo, null)}
-      onOpenRepo={openRepo}
-      onPickRepoFolder={pickRepoFolder}
-    />
+    <ErrorBoundary
+      resetKey={repo.cwd}
+      label="This repository's workspace failed to render."
+    >
+      <Workspace
+        key={repo.cwd}
+        repo={repo}
+        onSwitchRepo={() => qc.setQueryData(keys.repo, null)}
+        onOpenRepo={openRepo}
+        onPickRepoFolder={pickRepoFolder}
+      />
+    </ErrorBoundary>
   );
 }

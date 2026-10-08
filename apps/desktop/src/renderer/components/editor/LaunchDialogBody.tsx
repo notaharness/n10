@@ -3,7 +3,7 @@ import type {
   LaunchStep,
   SessionLaunchView,
 } from '../../../host/contract.js';
-import type { useMachineChoice } from '../terminal/NewTerminalMachineChoice.js';
+import type { useMachineChoice } from '../../lib/machines/use-machine-choice.js';
 import { ContinueContext } from './LaunchSessionContext.js';
 import { LaunchAgentPicker } from './LaunchAgentPicker.js';
 import { LaunchMachineSection } from './LaunchMachineSection.js';

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
+import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { BOOT_MARKS, markOnce } from './lib/perf.js';
 import { initTheme } from './lib/theme.js';
 import './styles.css';
@@ -22,8 +23,12 @@ initTheme();
 const root = document.getElementById('root');
 if (!root) throw new Error('#root not found');
 
+// Outside every provider, so whatever throws while rendering, the
+// window shows the error rather than going blank.
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary label="n10 hit an error drawing this window.">
+      <App />
+    </ErrorBoundary>
   </StrictMode>
 );
