@@ -108,7 +108,7 @@ test.describe('Orchestrator tab', () => {
     tagTmuxSession(ORCHESTRATOR, { '@orchestra-target': target }, homeDir);
   }
 
-  test('groups its players under it, counted where the X was, listed on hover', async ({
+  test('groups its players under it, counted where the X was, listed on hover @tmux', async ({
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;
@@ -156,7 +156,7 @@ test.describe('Orchestrator tab', () => {
     ).toHaveText(new RegExp(second));
   });
 
-  test('groups players of other repositories and directories, under a Codex orchestrator', async ({
+  test('groups players of other repositories and directories, under a Codex orchestrator @tmux', async ({
     desktop,
   }) => {
     const { page, homeDir } = desktop;
@@ -194,7 +194,7 @@ test.describe('Orchestrator tab', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test("a row's X closes that player as its tab's X would", async ({
+  test("a row's X closes that player as its tab's X would @tmux", async ({
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;
@@ -224,7 +224,7 @@ test.describe('Orchestrator tab', () => {
     expect(n10SessionExists(kept, homeDir)).toBe(true);
   });
 
-  test('with no players it keeps its X', async ({ desktop }) => {
+  test('with no players it keeps its X @tmux', async ({ desktop }) => {
     const { page, homeDir } = desktop;
     markOrchestrator(homeDir);
 
@@ -239,7 +239,7 @@ test.describe('Orchestrator tab', () => {
     await expect(playerList(page)).toHaveCount(0);
   });
 
-  test('the keyboard walks its players after it, and focus opens no list', async ({
+  test('the keyboard walks its players after it, and focus opens no list @tmux', async ({
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;
@@ -299,7 +299,7 @@ test.describe('Orchestrator tab', () => {
     await expect(tab(page, /alpha/)).toHaveAttribute('aria-selected', 'true');
   });
 
-  test('a tap on it selects it', async ({ desktop }) => {
+  test('a tap on it selects it @tmux', async ({ desktop }) => {
     const { page, repoPath, homeDir } = desktop;
     await createWorktree(page, 'alpha');
     branches.push(spawnPlayer(repoPath, homeDir));
@@ -323,7 +323,7 @@ test.describe('Orchestrator tab', () => {
     await expect(orchestrator).toHaveAttribute('aria-selected', 'true');
   });
 
-  test('resting on a row holds its pane ready, and pressing it shows that terminal', async ({
+  test('resting on a row holds its pane ready, and pressing it shows that terminal @tmux', async ({
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;
@@ -355,7 +355,7 @@ test.describe('Orchestrator tab', () => {
     await page.mouse.up();
   });
 
-  test("a hidden player that finishes blinks the count of the selected orchestrator's tab", async ({
+  test("a hidden player that finishes blinks the count of the selected orchestrator's tab @tmux", async ({
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;

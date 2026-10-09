@@ -119,7 +119,7 @@ test.describe('Discovered sessions across a repo switch', () => {
     cleanupTestRepo(otherRepo);
   });
 
-  test('clicking the open repo’s own tab does not switch repository', async ({
+  test('clicking the open repo’s own tab does not switch repository @tmux', async ({
     desktop,
   }) => {
     const { page, homeDir } = desktop;
@@ -165,7 +165,7 @@ test.describe('Discovered sessions across a repo switch', () => {
     ).toHaveAttribute('aria-selected', 'false');
   });
 
-  test('round trips through the recent-repositories menu stay put', async ({
+  test('round trips through the recent-repositories menu stay put @tmux', async ({
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;

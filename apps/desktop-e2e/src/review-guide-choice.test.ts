@@ -74,7 +74,7 @@ test('a review asks for a guided review while its box is checked, as it is at fi
   expect(prompt).toContain(GUIDE_HELP);
 });
 
-test('an unchecked box leaves the guide out of the prompt, and stays unchecked after a restart', async ({
+test('an unchecked box leaves the guide out of the prompt, and stays unchecked after a restart @tmux', async ({
   desktop,
 }) => {
   const { repoPath, homeDir } = desktop;

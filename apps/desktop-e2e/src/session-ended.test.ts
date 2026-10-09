@@ -126,7 +126,7 @@ test.describe('An agent whose process exits', () => {
   });
 
   // Its dead pane lasts only as long as its tmux session.
-  test('then killed from outside, leaves its tab with no agent', async ({
+  test('then killed from outside, leaves its tab with no agent @tmux', async ({
     desktop,
   }) => {
     const { page, homeDir } = desktop;
@@ -146,7 +146,7 @@ test.describe('An agent whose process exits', () => {
 test.describe('An agent whose tmux session is gone', () => {
   test.use({ n10Config: { aiCommand: fakeAgent() } });
 
-  test('killed from outside, leaves its tab with no agent', async ({
+  test('killed from outside, leaves its tab with no agent @tmux', async ({
     desktop,
   }) => {
     const { page, app, homeDir } = desktop;

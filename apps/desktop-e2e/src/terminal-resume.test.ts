@@ -10,7 +10,7 @@ import { socketEnv } from './setup/tmux.js';
 
 test.use({ n10Config: { aiCommand: fakeAgent({ exitAfterMs: 5000 }) } });
 
-test('an exited agent terminal resumes in its existing tab and tmux session', async ({
+test('an exited agent terminal resumes in its existing tab and tmux session @tmux', async ({
   desktop,
 }) => {
   const { app, page, homeDir } = desktop;

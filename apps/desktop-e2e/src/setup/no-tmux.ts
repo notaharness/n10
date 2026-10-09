@@ -2,7 +2,7 @@ import { mkdirSync, readdirSync, symlinkSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 
 /** Whether this run hides tmux from the app (`N10_E2E_NO_TMUX=1`): the
- *  no-tmux CI job runs the `@owner` tests this way. */
+ *  `e2e:no-tmux` target runs the suite, minus `@tmux` tests, this way. */
 export const RUN_WITHOUT_TMUX = process.env.N10_E2E_NO_TMUX === '1';
 
 /**

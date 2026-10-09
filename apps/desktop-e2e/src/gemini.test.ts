@@ -25,7 +25,7 @@ test.use({
   },
 });
 
-test('Gemini worktree launch, activity and explicit fresh restart in Desktop', async ({
+test('Gemini worktree launch, activity and explicit fresh restart in Desktop @tmux', async ({
   desktop,
 }) => {
   const { app, page, homeDir, repoPath } = desktop;

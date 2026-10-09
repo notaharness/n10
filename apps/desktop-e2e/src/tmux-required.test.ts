@@ -10,12 +10,12 @@ import {
 } from './setup/tmux.js';
 
 for (const legacyBackend of [undefined, 'pty']) {
-  test.describe(`Required tmux (stored backend: ${
+  test.describe(`tmux when installed (stored backend: ${
     legacyBackend ?? 'absent'
   })`, () => {
     test.use({ n10Config: { terminalBackend: legacyBackend } });
 
-    test('launches an agent in tmux without a backend selector', async ({
+    test('launches an agent in tmux without a backend selector @tmux', async ({
       desktop,
     }) => {
       const { page, homeDir, app } = desktop;
@@ -35,7 +35,7 @@ for (const legacyBackend of [undefined, 'pty']) {
   });
 }
 
-test('quitting detaches the app and leaves its agent session running', async ({
+test('quitting detaches the app and leaves its agent session running @tmux', async ({
   desktop,
 }) => {
   const { page, app, homeDir } = desktop;

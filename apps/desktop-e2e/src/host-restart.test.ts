@@ -43,7 +43,7 @@ test.describe('A host that dies', () => {
     n10Config: { aiCommand: fakeAgent({ stream: true, intervalMs: 100 }) },
   });
 
-  test('is started again, and the agent it left running shows current output', async ({
+  test('is started again, and the agent it left running shows current output @tmux', async ({
     desktop,
   }) => {
     const { app, page, homeDir } = desktop;
