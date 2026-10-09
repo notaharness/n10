@@ -9,7 +9,8 @@ export function UpdateAction({ update }: { update: UpdateSnapshot }) {
   const command = update.command;
   if (
     update.installation.kind === 'unknown' ||
-    (update.installation.kind === 'npm-global' && !command)
+    (['npm-global', 'npm-local'].includes(update.installation.kind) &&
+      !update.availableVersion)
   )
     return null;
   if (!command)

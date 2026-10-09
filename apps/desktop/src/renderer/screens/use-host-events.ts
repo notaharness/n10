@@ -1,3 +1,4 @@
+import { useUpdateEvents } from '../lib/data/updates.js';
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -17,6 +18,7 @@ export function useHostEvents(
   terminalEnded: (name: string) => void
 ): void {
   const qc = useQueryClient();
+  useUpdateEvents();
 
   // The host's remote sync loop toasts its events (auto-deleted merged
   // branch, blocked auto-delete) and the sidebar refetches to match.
