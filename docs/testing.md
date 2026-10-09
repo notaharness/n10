@@ -47,7 +47,9 @@ isolated Applications directory, checks its ad-hoc or Developer ID signature,
 then opens a Git repository, loads the renderer, starts a shell PTY through
 the packaged host, captures the installed app, and quits. Git and tmux 3.2+
 must be available; the GitHub runners install tmux with Homebrew. The tmux
-socket lives under the test's temporary HOME.
+socket lives under the test's temporary HOME. The script captures 1600×900
+light and dark PNGs beside the requested screenshot path, with `-light` and
+`-dark` suffixes.
 
 ```sh
 NX_DAEMON=false npx nx package-macos desktop

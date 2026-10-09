@@ -32,16 +32,16 @@ npm install -g @notaharness/n10
 Desktop .deb and AppImage packages for Linux and DMG installers for macOS are
 attached to [GitHub releases](https://github.com/notaharness/n10/releases).
 On macOS, download the DMG for your Mac's architecture, open it, and drag
-`n10.app` to Applications. The app needs Git and tmux 3.2+ on your `PATH`;
+`n10-desktop.app` to Applications. The app needs Git and tmux 3.2+ on your `PATH`;
 `brew install git tmux` provides them.
 
 Until the macOS app has a Developer ID signature and Apple notarization, a
 downloaded copy may show “Apple cannot check ‘n10’ for malicious software” or
 “the developer cannot be verified.” If you trust the release, try opening the
 app once, then choose **System Settings → Privacy & Security → Open Anyway**
-and confirm **Open**. On versions that offer it, right-click `n10.app` in
+and confirm **Open**. On versions that offer it, right-click `n10-desktop.app` in
 Applications and choose **Open**. From a terminal, the equivalent explicit
-quarantine override is `xattr -cr /Applications/n10.app`. Only do this for a
+quarantine override is `xattr -cr /Applications/n10-desktop.app`. Only do this for a
 copy whose [SHA256SUMS](https://github.com/notaharness/n10/releases/latest)
 matches the downloaded DMG.
 

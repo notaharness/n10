@@ -47,6 +47,9 @@ jobs:
       # signing and notarization when the complete credential set exists.
       - run: NX_DAEMON=false npx nx package-macos desktop
         env:
+          # electron-builder otherwise skips even explicit ad-hoc signing
+          # for pull requests. Signing credentials are never passed to PRs.
+          CSC_FOR_PULL_REQUEST: 'true'
           CSC_LINK: ${{ github.event_name == 'push' && secrets.CSC_LINK || '' }}
           CSC_KEY_PASSWORD: ${{ github.event_name == 'push' && secrets.CSC_KEY_PASSWORD || '' }}
           APPLE_ID: ${{ github.event_name == 'push' && secrets.APPLE_ID || '' }}
