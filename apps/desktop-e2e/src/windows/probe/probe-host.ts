@@ -15,7 +15,7 @@
  * list, and tells main it is ready.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { joinKillOnCloseJob, PtySession } from '@n10/terminal-pty';
 
@@ -83,7 +83,10 @@ async function run(): Promise<void> {
       "$a = Start-Process ping.exe -ArgumentList '-t','127.0.0.1' -NoNewWindow -PassThru",
       "$d = Start-Process ping.exe -ArgumentList '-t','127.0.0.1' -WindowStyle Hidden -PassThru",
       '$g = Start-Process notepad.exe -PassThru',
-      `Set-Content -LiteralPath '${childrenFile}' -Value "$($a.Id) $($d.Id) $($g.Id)"`,
+      // Written beside and renamed into place: the file appears whole,
+      // never while Set-Content still holds it open.
+      `Set-Content -LiteralPath '${childrenFile}.tmp' -Value "$($a.Id) $($d.Id) $($g.Id)"`,
+      `Move-Item -LiteralPath '${childrenFile}.tmp' -Destination '${childrenFile}'`,
     ].join('; ') + '\r'
   );
   const [attached, shellDetached, shellGui] = await until(
@@ -102,15 +105,21 @@ async function run(): Promise<void> {
     hostDetached: detached('ping.exe', ['-t', '127.0.0.1']),
     hostGui: detached('notepad.exe', []),
   };
-  writeFileSync(
+  publish(
     join(stateDir!, 'descendants.json'),
     JSON.stringify({ descendants, job: job.processIds() })
   );
   parent.postMessage({ t: 'ready' });
 }
 
+/** The test polls for these files: each appears whole, by rename. */
+function publish(path: string, text: string): void {
+  writeFileSync(`${path}.tmp`, text);
+  renameSync(`${path}.tmp`, path);
+}
+
 run().catch((err: unknown) => {
-  writeFileSync(
+  publish(
     join(stateDir, 'host-error.txt'),
     `${err instanceof Error ? err.stack : String(err)}\n\n${output}`
   );
