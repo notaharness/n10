@@ -1,10 +1,12 @@
 import type { RefObject } from 'react';
 import type { WorktreeResume } from '../../../host/contract.js';
 import { useLaunchAgent } from '../../lib/data/mutations.js';
+import { useTabs } from '../../lib/tabs/tabs.js';
 import { errorMessage } from '../../lib/utils.js';
 import { Button } from '../ui/button.js';
 
 export function ResumeWorktreePane({
+  tabId,
   title,
   repo,
   branch,
@@ -12,6 +14,7 @@ export function ResumeWorktreePane({
   paneRef,
   estimateGrid,
 }: {
+  tabId: string;
   title: string;
   repo: string;
   branch: string;
@@ -20,6 +23,7 @@ export function ResumeWorktreePane({
   estimateGrid: () => { cols?: number; rows?: number };
 }) {
   const resume = useLaunchAgent(repo);
+  const tabs = useTabs();
   return (
     <div
       ref={paneRef}
@@ -30,12 +34,15 @@ export function ResumeWorktreePane({
       <Button
         disabled={resume.isPending}
         onClick={() =>
-          resume.mutate({
-            branch,
-            intent: 'continue-or-blank',
-            ...estimateGrid(),
-            restore,
-          })
+          resume.mutate(
+            {
+              branch,
+              intent: 'continue-or-blank',
+              ...estimateGrid(),
+              restore,
+            },
+            { onSuccess: () => tabs.resumeItem(tabId) }
+          )
         }
       >
         Resume session

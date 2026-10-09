@@ -92,6 +92,8 @@ interface TabsApi extends TabsState {
   /** Open (or activate) the tab for a terminal the host just started. */
   openTerminal: (terminal: TerminalEntry) => void;
   resumeTerminal: (previous: string, terminal: TerminalEntry) => void;
+  /** A waiting worktree tab was resumed: it takes the session started. */
+  resumeItem: (id: string) => void;
   /** The host says the terminal's process ended: close its tab, listed
    *  or not. `repo` is the one in view, for the close-focus rules. */
   terminalEnded: (name: string, repo?: string) => void;
@@ -215,6 +217,10 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'resume-terminal', previous, terminal }),
     []
   );
+  const resumeItem = useCallback(
+    (id: string) => dispatch({ type: 'resume-item', id }),
+    []
+  );
   const terminalEnded = useCallback(
     (name: string, repo?: string) =>
       dispatch({ type: 'terminal-ended', name, repo }),
@@ -241,6 +247,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       repoOpened,
       openTerminal,
       resumeTerminal,
+      resumeItem,
       terminalEnded,
       forgetAutoOpened,
     }),
@@ -259,6 +266,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       repoOpened,
       openTerminal,
       resumeTerminal,
+      resumeItem,
       terminalEnded,
       forgetAutoOpened,
     ]
