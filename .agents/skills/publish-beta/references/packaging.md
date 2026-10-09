@@ -79,8 +79,9 @@ Every release run, a rehearsal included, builds the Linux packages
 is published unless every package built.
 
 The `github-release` job creates the GitHub release with generated notes,
-attaches every file named in `apps/desktop/release-assets.json` and the
-manifest itself, and fails before release creation if an asset is missing.
+attaches every file named in `apps/desktop/release-assets.json`, the manifest,
+and `SHA256SUMS`. A rehearsal checks every package file and its digest too;
+missing files fail before release creation.
 During the beta-only period (`LATEST_FOLLOWS_BETA=true`), beta releases are
 marked latest so `releases/latest/download/<name>` resolves. After that
 setting becomes false, beta releases are GitHub prereleases and stable

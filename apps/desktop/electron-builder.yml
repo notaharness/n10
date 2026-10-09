@@ -31,7 +31,7 @@ linux:
 appImage:
   artifactName: n10-desktop-${arch}.AppImage
 # The default FUSE2 runtime needs an unversioned libz.so on arm64. The static
-# runtime runs without that development-library symlink or a host FUSE library.
+# runtime avoids that symlink and libfuse2; normal launch still needs FUSE 3.
 toolsets:
   appimage: '1.0.3'
 deb:

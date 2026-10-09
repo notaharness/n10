@@ -132,9 +132,17 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: [version, package, linux-packages]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       DIST_TAG: ${{ needs.version.outputs.dist-tag }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            apps/desktop/release-assets.json
+            apps/desktop/scripts/prepare-release-assets.sh
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -142,10 +150,16 @@ jobs:
         with:
           name: package
           path: package
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: assets
+          merge-multiple: true
+      - run: bash apps/desktop/scripts/prepare-release-assets.sh apps/desktop/release-assets.json assets
       - run: npm publish --dry-run --tag "$DIST_TAG" ./package/*.tgz
 
   # Attach every file release-assets.json names from release-* artifacts,
-  # plus the manifest itself so the release records its download names.
+  # plus the manifest and per-file checksums for user verification.
   github-release:
     if: github.event_name == 'push'
     needs: [version, publish]
@@ -155,7 +169,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: apps/desktop/release-assets.json
+          sparse-checkout: |
+            apps/desktop/release-assets.json
+            apps/desktop/scripts/prepare-release-assets.sh
           sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v4
         with:
@@ -164,9 +180,9 @@ jobs:
           merge-multiple: true
       - run: |
           manifest=apps/desktop/release-assets.json
-          assets=("$manifest")
+          bash apps/desktop/scripts/prepare-release-assets.sh "$manifest" assets
+          assets=("$manifest" assets/SHA256SUMS)
           for name in $(jq -er '.[][][]' "$manifest"); do
-            [ -f "assets/$name" ] || { echo "::error::$name was not built"; exit 1; }
             assets+=("assets/$name")
           done
           if [ "$PRERELEASE" = true ] && [ "$MOVE_LATEST" != true ]; then

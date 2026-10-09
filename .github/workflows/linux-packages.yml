@@ -12,6 +12,7 @@ on:
       - 'apps/desktop/release-assets.json'
       - 'apps/desktop/scripts/package-linux.mjs'
       - 'apps/desktop/scripts/test-linux-packages.sh'
+      - 'apps/desktop/scripts/installer-qa.js'
       - 'apps/desktop/build/**'
       - 'package-lock.json'
       - '.github/workflows/linux-packages.yml'
