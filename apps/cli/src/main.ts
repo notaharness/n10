@@ -36,7 +36,7 @@ async function run(command: Command): Promise<number | undefined> {
     }
     case 'tui': {
       const { runTui } = await import('./tui.js');
-      await runTui(command.args);
+      await runTui(command.args, root);
       return undefined;
     }
     case 'desktop':

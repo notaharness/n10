@@ -21,6 +21,7 @@ import { machinesSummary } from '../lib/machines/machine-model.js';
 import { providerName } from '../lib/provider-name.js';
 import { itemRunning } from '../lib/sidebar/sidebar-model.js';
 import { basename, cn, relativeTime } from '../lib/utils.js';
+import { UpdateNotice } from './UpdateNotice.js';
 import { Tip } from './ui/tooltip.js';
 
 /**
@@ -69,6 +70,7 @@ export function StatusBar({
 
       <div className="flex-1" />
 
+      <UpdateNotice onOpen={onOpenSettings} />
       <MachinesSegment
         machines={machines.data}
         onOpenFleet={fleet.section.reveal}

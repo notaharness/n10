@@ -141,6 +141,7 @@ const engineDomains = [
   'sessions',
   'sync',
   'worktrees',
+  'updates',
 ];
 const browserRuntimePaths = [
   ...builtinModules,
