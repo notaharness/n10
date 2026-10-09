@@ -60,8 +60,11 @@ test('Updates: notification, command copy, channel persistence and light/dark pr
     desktop.page.getByRole('button', { name: 'Copied', exact: true })
   ).toBeVisible();
   expect(await desktop.main(({ clipboard }) => clipboard.readText())).toBe(
-    'npm i -g @notaharness/n10@beta'
+    'npm i -g @notaharness/n10@1.0.0-beta.10'
   );
+  await expect(
+    desktop.page.getByText(/n10 doesn’t have a non-beta release yet/)
+  ).toHaveCount(0);
   await desktop.page.getByRole('combobox', { name: 'Release channel' }).click();
   await desktop.page.screenshot({
     path: info.outputPath('flow-3-channel.png'),

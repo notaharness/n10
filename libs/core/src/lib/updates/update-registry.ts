@@ -23,8 +23,7 @@ function retryTime(headers: Headers, now: number): number {
     after && Number.isFinite(seconds)
       ? now + Math.max(0, seconds) * 1000
       : Date.parse(after ?? '');
-  const reset = Number(headers.get('x-ratelimit-reset')) * 1000;
-  return Math.max(now + 60_000, Number.isFinite(delay) ? delay : 0, reset);
+  return Math.max(now + 60_000, Number.isFinite(delay) ? delay : 0);
 }
 
 /** No npm config or VCS credentials are consulted or forwarded. */
@@ -44,7 +43,7 @@ export async function readRegistryVersion(
     redirect: 'error',
   });
   if (response.status === 304 && previous) return previous;
-  if (response.status === 429 || response.status === 403) {
+  if (response.status === 429) {
     throw new UpdateCheckError(
       'Update checks are rate limited. Try again later.',
       retryTime(response.headers, Date.now())

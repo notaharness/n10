@@ -1,6 +1,6 @@
 import { Box, Text, useInput } from 'ink';
 import type { UpdateSnapshot } from '@n10/engine/contract';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useUpdates } from '../hooks/useUpdates.js';
 
 export function UpdatesPanel({ onClose }: { onClose: () => void }) {
@@ -18,7 +18,7 @@ export function UpdatesPanel({ onClose }: { onClose: () => void }) {
         });
       if (input === 'a')
         service.setPreferences({ automatic: !update.preferences.automatic });
-      if (input === 'q' && update.command) quit();
+      if (input === 'q' && update.command) quit(update.command);
     } catch (e) {
       setError(String(e));
     }
@@ -34,10 +34,9 @@ export function UpdatesPanel({ onClose }: { onClose: () => void }) {
           Release channel:{' '}
           {update.preferences.channel === 'preview' ? 'Preview' : 'Stable'}
         </Text>
-        <Text>n10 doesn’t have a non-beta release yet.</Text>
-        <Text dimColor>
-          Both choices receive Preview builds for now. Your preference is saved.
-        </Text>
+        {update.preferences.channel === 'stable' && (
+          <Text>n10 doesn’t have a non-beta release yet.</Text>
+        )}
         <Text>
           Check automatically: {update.preferences.automatic ? 'On' : 'Off'}
         </Text>
@@ -55,9 +54,13 @@ export function UpdatesPanel({ onClose }: { onClose: () => void }) {
           </>
         ) : (
           <Text dimColor>
-            {update.installation.kind === 'development'
+            {update.installation.kind === 'unknown'
+              ? 'Identifying installation…'
+              : update.installation.kind === 'development'
               ? 'Development build: update your checkout.'
-              : 'Update using the package manager and location you installed with.'}
+              : update.installation.kind === 'npm-global'
+              ? ''
+              : 'Update n10 the same way you installed it.'}
           </Text>
         )}
         {update.releaseNotesUrl && (
@@ -73,7 +76,13 @@ export function UpdatesPanel({ onClose }: { onClose: () => void }) {
         <Text>
           <Text color="cyan">c</Text> Check now · <Text color="cyan">p</Text>{' '}
           channel · <Text color="cyan">a</Text> automatic
-          {update.command ? ' · q Quit to update' : ''} · Esc back
+          {update.command && (
+            <>
+              {' '}
+              · <Text color="cyan">q</Text> Quit to update
+            </>
+          )}{' '}
+          · Esc back
         </Text>
       </Box>
     </Box>
@@ -87,6 +96,16 @@ function UpdateDetails({
   update: UpdateSnapshot;
   error: string | null;
 }) {
+  const [expired, setExpired] = useState<number | null>(null);
+  useEffect(() => {
+    const retryAt = update.retryAt;
+    if (!retryAt) return;
+    const timer = setTimeout(
+      () => setExpired(retryAt),
+      Math.max(0, retryAt - Date.now())
+    );
+    return () => clearTimeout(timer);
+  }, [update.retryAt]);
   return (
     <>
       <Text>Current version: {update.installation.version}</Text>
@@ -107,7 +126,7 @@ function UpdateDetails({
       {(error || update.error) && (
         <Text color="yellow">{error ?? update.error}</Text>
       )}
-      {update.retryAt && (
+      {update.retryAt && update.retryAt !== expired && (
         <Text dimColor>
           Retry after {new Date(update.retryAt).toLocaleTimeString()}
         </Text>

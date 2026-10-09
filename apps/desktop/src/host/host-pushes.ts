@@ -1,3 +1,4 @@
+import { setUpdatesNotifier } from './services/updates.js';
 /**
  * Everything the host pushes to windows without being asked, plus the
  * per-repo background work that produces most of it. Each service
@@ -10,6 +11,7 @@ import {
   DISCOVERY_EVENTS,
   MACHINES_EVENTS,
   SYNC_EVENTS,
+  UPDATE_EVENTS,
 } from './contract.js';
 import { setRepoOpenedListener } from './services/repo.js';
 import {
@@ -42,6 +44,7 @@ export interface HostPushes {
  *  Call once, before the first repo is opened. */
 export function installHostPushes({ broadcast, sendTo }: HostPushes): void {
   setSessionBroadcaster(broadcast, sendTo);
+  setUpdatesNotifier((snapshot) => broadcast(UPDATE_EVENTS.changed, snapshot));
 
   // Per-repo background work, (re)started whenever a repo is opened.
   // The sync loop's user-facing events (auto-deleted merged branch, …)

@@ -1,4 +1,4 @@
-import { newerRelease, readRegistryVersion, UpdateCheckError } from '@n10/core';
+import { newerRelease, UpdateCheckError } from '@n10/core';
 import type { RegistryVersion, UpdateCache } from '@n10/core';
 import type {
   UpdateInstallation,
@@ -8,10 +8,13 @@ import type {
 } from './update-types.js';
 
 const DAY = 24 * 60 * 60 * 1000;
+const cacheKey = (cache: UpdateCache) =>
+  JSON.stringify(cache, Object.keys(cache).sort());
 interface Options {
   installation: UpdateInstallation;
   store: UpdateStore;
-  read?: (
+  resolveInstallation?: () => Promise<UpdateInstallation>;
+  read: (
     previous: RegistryVersion | undefined,
     signal: AbortSignal
   ) => Promise<RegistryVersion>;
@@ -21,15 +24,14 @@ interface Options {
 
 /** One check owner per shell, independent of repository selection and UI lifetime. */
 export function createUpdateService(options: Options): UpdateService {
-  const { store, installation } = options;
+  const { store, read } = options;
+  let installation = options.installation;
   const now = options.now ?? Date.now;
-  const read =
-    options.read ??
-    ((previous, signal) => readRegistryVersion(undefined, previous, signal));
   // Packaged distribution gets its own GitHub provider in the packaging stack.
-  const enabled =
+  let enabled =
     installation.kind === 'npm-global' || installation.kind === 'npm-local';
   let cache: UpdateCache = enabled ? store.readCache() : {};
+  let observedCache = cacheKey(cache);
   let snapshot: UpdateSnapshot = {
     installation,
     preferences: store.readPreferences(),
@@ -38,10 +40,7 @@ export function createUpdateService(options: Options): UpdateService {
     checkedAt: cache.checkedAt ?? null,
     retryAt: cache.retryAt ?? null,
     error: cache.error ?? null,
-    command:
-      installation.kind === 'npm-global'
-        ? 'npm i -g @notaharness/n10@beta'
-        : null,
+    command: null,
     releaseNotesUrl: null,
   };
   const listeners = new Set<() => void>();
@@ -60,6 +59,10 @@ export function createUpdateService(options: Options): UpdateService {
         : null;
     return {
       availableVersion: version,
+      command:
+        version && installation.kind === 'npm-global'
+          ? `npm i -g @notaharness/n10@${version}`
+          : null,
       checkedAt: cache.checkedAt ?? null,
       retryAt: cache.retryAt ?? null,
       releaseNotesUrl: version
@@ -79,9 +82,19 @@ export function createUpdateService(options: Options): UpdateService {
     )
       publish({ preferences });
   }
+  function reloadCache() {
+    if (!enabled || pending) return;
+    const saved = store.readCache();
+    const key = cacheKey(saved);
+    if (key === observedCache) return;
+    observedCache = key;
+    cache = saved;
+    publish({ ...cacheView(), error: cache.error ?? null });
+  }
   function persistCache() {
     try {
       store.writeCache(cache);
+      observedCache = cacheKey(cache);
     } catch {
       publish({
         error:
@@ -133,6 +146,7 @@ export function createUpdateService(options: Options): UpdateService {
   function check() {
     reloadPreferences();
     if (pending) return pending;
+    reloadCache();
     // Explicit checks bypass freshness, but not a server/error retry deadline.
     if (!enabled || (cache.retryAt ?? 0) > now()) return Promise.resolve();
     controller = new AbortController();
@@ -144,8 +158,9 @@ export function createUpdateService(options: Options): UpdateService {
   function tick() {
     if (!running) return;
     reloadPreferences();
+    reloadCache();
     const due = cache.retryAt ?? cache.nextCheckAt ?? 0;
-    if (snapshot.preferences.automatic && now() >= due) {
+    if (enabled && snapshot.preferences.automatic && now() >= due) {
       // check settles failures into the snapshot. Keep a rejected subscriber from becoming unhandled.
       check().catch(() => publish({ error: 'Could not check for updates.' }));
     }
@@ -176,8 +191,32 @@ export function createUpdateService(options: Options): UpdateService {
       publish({ preferences });
     },
     start() {
-      if (running || !enabled) return;
+      if (running) return;
       running = true;
+      if (installation.kind === 'unknown' && options.resolveInstallation) {
+        options
+          .resolveInstallation()
+          .then((resolved) => {
+            if (!running) return;
+            installation = resolved;
+            enabled =
+              resolved.kind === 'npm-global' || resolved.kind === 'npm-local';
+            cache = enabled ? store.readCache() : {};
+            observedCache = cacheKey(cache);
+            publish({
+              installation,
+              ...cacheView(),
+              error: cache.error ?? null,
+            });
+          })
+          .catch(() => {
+            if (running)
+              publish({
+                error:
+                  'Could not identify this installation. Update n10 the same way you installed it.',
+              });
+          });
+      }
       timer = setTimeout(tick, 2000);
       timer.unref();
     },

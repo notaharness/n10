@@ -1,10 +1,15 @@
 import type { N10HostApi, UpdatePreferences } from '../../../host/contract.js';
 export function createUpdatesHost(): Pick<
   N10HostApi,
-  'getUpdates' | 'checkUpdates' | 'setUpdatePreferences' | 'quitForUpdate'
+  | 'onUpdatesChanged'
+  | 'getUpdates'
+  | 'checkUpdates'
+  | 'setUpdatePreferences'
+  | 'quitForUpdate'
 > {
   let preferences: UpdatePreferences = { channel: 'preview', automatic: false };
   return {
+    onUpdatesChanged: () => () => undefined,
     getUpdates: async () => ({
       installation: { version: 'demo', kind: 'development' },
       preferences,
