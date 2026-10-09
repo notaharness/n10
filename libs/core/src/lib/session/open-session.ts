@@ -1,9 +1,4 @@
-import {
-  createRemoteTmuxBackend,
-  createTmuxBackend,
-  type TmuxSessionIncarnation,
-  type TmuxLaunchPlan,
-} from '@n10/terminal-tmux';
+import { createRemoteTmuxBackend } from '@n10/terminal-tmux';
 import type { SessionBackend, SessionSpec, SessionTarget } from '@n10/terminal';
 import { spawnSession, type NamedPtyEntry } from '../pty-registry.js';
 import {
@@ -13,6 +8,14 @@ import {
 } from '../session-key.js';
 import { pollerFor, requireMachine } from '../machine-registry.js';
 import { ORCHESTRA_TAG, type TaggedSession } from '../session-identity.js';
+import {
+  incarnationTarget,
+  localCatalog,
+  sameSessionTarget,
+  type SessionIncarnation,
+  type SessionLaunchPlan,
+} from '../session-catalog.js';
+import { tmuxLaunchPlan } from '../tmux-catalog.js';
 import {
   listOurSessionsWith,
   resolveSessionByName,
@@ -29,11 +32,11 @@ export interface OpenSessionParams {
   mode?: 'open' | 'create' | 'attach';
   fresh?: boolean;
   intent?: 'fresh' | 'continue';
-  expected?: TmuxSessionIncarnation;
+  expected?: SessionIncarnation;
   cwd: string;
   cols: number;
   rows: number;
-  /** A dormant tab's exact tmux identity and launch environment. */
+  /** A dormant tab's exact session target and launch environment. */
   restore?: {
     target: SessionTarget;
     tags: Record<string, string>;
@@ -54,7 +57,7 @@ interface BuiltLaunch {
 
 /**
  * The tagged session `request` already names, found on whichever
- * machine it lives on — local tmux directly, or one `list-sessions`
+ * machine it lives on — the local catalog directly, or one `list-sessions`
  * round trip through the machine's own executor for a remote request
  * (finding 7). Without this, a remote launch could never find what it
  * already has: `launchPlan`'s `!existing` branch always won, so
@@ -137,7 +140,7 @@ async function performOpen(params: OpenSessionParams): Promise<NamedPtyEntry> {
     ? { spec: { cmd: '', args: [] }, agent: existing!.agent, fresh: false }
     : await params.build(existing?.agent, !!existing);
   const fresh = !attaching && (params.fresh || launch.fresh);
-  const plan: TmuxLaunchPlan = attaching
+  const plan: SessionLaunchPlan = attaching
     ? attachPlan(existing!, params.expected)
     : launchPlan(
         session,
@@ -152,7 +155,7 @@ async function performOpen(params: OpenSessionParams): Promise<NamedPtyEntry> {
   const spec = sessionSpec(params, launch.spec, !!fresh, machineId);
   const backend: SessionBackend =
     machineId === LOCAL_MACHINE
-      ? await createTmuxBackend(spec, plan)
+      ? await localCatalog().open(spec, plan)
       : await createRemoteBackend(spec, plan, machineId);
   const { key, createdFor } = registration(params, backend, existing, plan);
   return spawnSession(key, backend, cols, rows, launch.agent, createdFor);
@@ -165,12 +168,12 @@ function registration(
   params: OpenSessionParams,
   backend: SessionBackend,
   existing: TaggedSession | null,
-  plan: TmuxLaunchPlan
+  plan: SessionLaunchPlan
 ): { key: string; createdFor?: string } {
   const { session } = params;
   const machineId = session.machine ?? LOCAL_MACHINE;
   if (session.type !== 'worktree')
-    return { key: terminalSessionKey(backend.target!.name, machineId) };
+    return { key: terminalSessionKey(backend.target.name, machineId) };
   const written =
     plan.mode === 'create' ? plan.tags[ORCHESTRA_TAG.branch] : undefined;
   return {
@@ -179,17 +182,22 @@ function registration(
   };
 }
 
-/** The remote twin of `createTmuxBackend`: the same plan, executed on
+/** The remote twin of the local catalog's `open`: the same plan, executed on
  *  `machineId` (decisions.md D5). `requireMachine` throws loudly
  *  (rather than falling back to a local launch) when the machine is
  *  not available — "the one thing that must not happen". */
 function createRemoteBackend(
   spec: SessionSpec,
-  plan: TmuxLaunchPlan,
+  plan: SessionLaunchPlan,
   machineId: string
 ): Promise<SessionBackend> {
   const machine = requireMachine(machineId);
-  return createRemoteTmuxBackend(spec, plan, machine, pollerFor(machine));
+  return createRemoteTmuxBackend(
+    spec,
+    tmuxLaunchPlan(plan),
+    machine,
+    pollerFor(machine)
+  );
 }
 
 async function resolveOpenTarget(
@@ -201,11 +209,15 @@ async function resolveOpenTarget(
   const existing = matchingSavedSession(found, params);
   if (mode === 'attach' && !existing)
     throw new Error('Session ended before it could be attached');
-  if (params.expected && (!existing || params.expected.name !== existing.name))
+  if (
+    params.expected &&
+    (!existing ||
+      !sameSessionTarget(incarnationTarget(params.expected), existing.target))
+  )
     throw new Error(
       'Session changed before replacement; reopen the launch dialog.'
     );
-  if (params.fresh && existing && !existing.paneDead && !params.expected)
+  if (params.fresh && existing && !existing.exited && !params.expected)
     throw new Error(
       'This session is running; reopen the launch dialog to replace it.'
     );
@@ -218,7 +230,7 @@ function matchingSavedSession(
 ): TaggedSession | null {
   if (!found || !params.restore) return found;
   if (params.session.type === 'worktree') {
-    if (found.name !== params.restore.target.name)
+    if (!sameSessionTarget(found.target, params.restore.target))
       throw new Error(
         'Session changed while n10 was closed; reopen the launch dialog.'
       );
@@ -227,7 +239,7 @@ function matchingSavedSession(
   return sameRestoredSession(found, params) ? found : null;
 }
 
-/** A saved tmux label may now be owned by someone else's tagged session. */
+/** A saved label may now be owned by someone else's tagged session. */
 function sameRestoredSession(
   found: TaggedSession,
   params: OpenSessionParams
@@ -300,5 +312,5 @@ function sessionSpec(
 }
 
 function shouldAttach(mode: string, session: TaggedSession | null): boolean {
-  return session !== null && (mode === 'attach' || !session.paneDead);
+  return session !== null && (mode === 'attach' || !session.exited);
 }

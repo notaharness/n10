@@ -139,7 +139,7 @@ the physical path as resolved on the machine holding it (`pwd -P` there,
 `realpath` locally). The branch never identifies a checkout: a `git switch`,
 a rename or a restart keeps the session its worktree's, and a second worktree
 on the original branch never claims it. A terminal lookup uses its actual
-allocated tmux target. `session-resolver.ts` obtains one listing and applies
+allocated session target. `session-resolver.ts` obtains one catalog listing and applies
 those rules for attach, discovery, liveness and cleanup. A session lacking a
 spawner or recognized type is foreign; worktree sessions also require repo
 and worktree-path tags, with no fallback to `#{session_path}` or the branch

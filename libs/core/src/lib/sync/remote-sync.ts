@@ -10,7 +10,7 @@ import {
 import { logError } from '@n10/logger';
 import type { AppConfig, BranchPrMap, VcsProvider } from '@n10/vcs-core';
 import { isSessionAlive } from '../pty-registry.js';
-import { hasLiveTmuxSession } from '../session-backend.js';
+import { hasLiveSession } from '../session-backend.js';
 import {
   clearVerdictAt,
   type WorktreeRemovalCheck,
@@ -92,7 +92,7 @@ async function autoDeleteMerged(args: {
     const checkout = checkouts.find((w) => w.branch === branch);
     if (!checkout) continue;
     const sessionName = keyForWorktree(checkout, cwd);
-    if (isSessionAlive(sessionName) || hasLiveTmuxSession(sessionName)) {
+    if (isSessionAlive(sessionName) || hasLiveSession(sessionName)) {
       logError(
         'sweepMergedBranches',
         `Skipping auto-delete of ${branch}: agent session is running`

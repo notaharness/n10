@@ -188,7 +188,7 @@ vi.mock('@n10/core', async (importOriginal) => {
     registryNameOf: actual.registryNameOf,
     ORCHESTRA_TAG: actual.ORCHESTRA_TAG,
     listOurSessions: () => [],
-    captureTmuxRuntime: () => ({}),
+    captureSessionRuntime: () => ({}),
     LOCAL_MACHINE: actual.LOCAL_MACHINE,
     resolveAgent: actual.resolveAgent,
     sessionIncarnationMatches: (
@@ -294,7 +294,7 @@ vi.mock('@n10/core', async (importOriginal) => {
     },
     isSessionAlive: (name: string) => state.alive.has(name),
     hasSessionConnection: (name: string) => state.alive.has(name),
-    hasLiveTmuxSession: (name: string) => state.persisted.has(name),
+    hasLiveSession: (name: string) => state.persisted.has(name),
     getSpawnedAt: () => 1000,
     sessionNames: () => [...state.entries.keys()],
     noteInput: () => undefined,
@@ -395,9 +395,9 @@ function remoteWorktreeSession(
   machine: string
 ): TaggedSession {
   return {
-    name: `n10-${branch.replace(/\//g, '-')}`,
+    target: { kind: 'tmux', name: `n10-${branch.replace(/\//g, '-')}` },
     created: 1,
-    paneDead: false,
+    exited: false,
     path: '/wherever',
     worktreePath: '/wherever',
     spawner: 'kirby',
@@ -551,6 +551,7 @@ describe('launchAgent', () => {
   it('forwards an explicit fresh replacement and selected agent for a live session', async () => {
     await launchAgent({ branch: 'fresh', intent: 'continue-or-blank' });
     const expected = {
+      kind: 'tmux' as const,
       name: 'native',
       sessionId: '$1',
       paneId: '%2',
@@ -637,6 +638,7 @@ describe('reusing an already-attached connection', () => {
   // reuse the connection instead of tearing down and re-attaching the PTY.
   const name = () => keyFor('reuse', '/repo-a');
   const incarnationFor = (nativeName: string) => ({
+    kind: 'tmux' as const,
     name: nativeName,
     sessionId: '$1',
     paneId: '%2',

@@ -1,4 +1,4 @@
-import { tmuxListSessions } from '@n10/terminal-tmux';
+import { localCatalog } from '../session-catalog.js';
 import { getSession, sessionNames } from '../pty-registry.js';
 import { sessionIdentity } from '../session-key.js';
 
@@ -55,6 +55,14 @@ function refused(reason: string): LocalDeliveryTarget {
   return { kind: 'refused', reason };
 }
 
+/** Whether this machine has a tmux session by that name at all, tagged
+ *  or not: the refusal says which. */
+function heldByCatalog(name: string): boolean {
+  return (localCatalog().list([]) ?? []).some(
+    ({ target }) => target.kind === 'tmux' && target.name === name
+  );
+}
+
 /** The registry entry (if any) whose live backend answers to `name` on
  *  this machine — the tmux name the registry itself allocated, not the
  *  internal registry key. Every registry entry is checked, local and
@@ -66,7 +74,7 @@ function findRegistryMatch(
 ): { key: string; entry: NonNullable<ReturnType<typeof getSession>> } | null {
   for (const key of sessionNames()) {
     const entry = getSession(key);
-    if (entry && entry.pty.target?.name === name) return { key, entry };
+    if (entry && entry.pty.target.name === name) return { key, entry };
   }
   return null;
 }
@@ -99,7 +107,7 @@ export function resolveLocalRelayTarget(target: string): LocalDeliveryTarget {
   const name = target.slice('tmux:'.length);
   const match = findRegistryMatch(name);
   if (!match) {
-    return tmuxListSessions().includes(name)
+    return heldByCatalog(name)
       ? refused('that tmux session exists but is not managed by n10')
       : refused('no session by that name is known here');
   }

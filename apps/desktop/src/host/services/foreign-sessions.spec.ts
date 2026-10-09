@@ -10,7 +10,7 @@ import type * as Module from './foreign-sessions.js';
 const state = vi.hoisted(() => ({
   open: '/repos/alpha',
   live: [] as {
-    tmuxName: string;
+    target: { kind: 'tmux'; name: string };
     path: string;
     repoRoot: string;
     branch: string;
@@ -39,7 +39,7 @@ vi.mock('./recent-repos.js', () => ({
 let foreign: typeof Module;
 
 const ALPHA_AGENT = {
-  tmuxName: 'alpha-feat-a',
+  target: { kind: 'tmux' as const, name: 'alpha-feat-a' },
   path: '/repos/alpha/.claude/worktrees/feat-a',
   repoRoot: '/repos/alpha',
   branch: 'feat-a',
@@ -47,7 +47,7 @@ const ALPHA_AGENT = {
   sessionName: 'feat-a',
 };
 const BETA_AGENT = {
-  tmuxName: 'beta-feat-b',
+  target: { kind: 'tmux' as const, name: 'beta-feat-b' },
   path: '/repos/beta/.claude/worktrees/feat-b',
   repoRoot: '/repos/beta',
   branch: 'feat/b',
@@ -56,7 +56,7 @@ const BETA_AGENT = {
 };
 /** A worktree on a detached HEAD, named after its directory. */
 const BETA_DETACHED = {
-  tmuxName: 'beta-hotfix',
+  target: { kind: 'tmux' as const, name: 'beta-hotfix' },
   path: '/repos/beta/.claude/worktrees/hotfix',
   repoRoot: '/repos/beta',
   branch: 'hotfix',
@@ -104,7 +104,11 @@ describe('listForeignSessions', () => {
     expect(state.recents).toEqual([]);
     state.live = [
       BETA_AGENT,
-      { ...BETA_AGENT, tmuxName: 'gamma-x', repoRoot: '/repos/gamma' },
+      {
+        ...BETA_AGENT,
+        target: { kind: 'tmux' as const, name: 'gamma-x' },
+        repoRoot: '/repos/gamma',
+      },
     ];
     foreign.listForeignSessions();
     expect(state.recents).toEqual(['/repos/beta', '/repos/gamma']);

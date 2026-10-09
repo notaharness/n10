@@ -1,26 +1,27 @@
 import { LOCAL_MACHINE, worktreeSessionKey } from '../session-key.js';
 import { existsSync } from 'node:fs';
+import type { SessionTarget } from '@n10/terminal';
 
 import type { TaggedSession } from '../session-identity.js';
 import { listOurSessions } from '../session-resolver.js';
 import { readWorktreeHead, type WorktreeHead } from './worktree-origin.js';
 
 /**
- * Every worktree agent session alive in tmux, whichever repository it
- * belongs to.
+ * Every worktree agent session alive on this machine, whichever
+ * repository it belongs to.
  *
  * The scanner in `session-discovery.ts` answers for the open repository
  * only, and it attaches what it finds. This is the wider question a
  * tab strip that spans repositories asks at launch: which agents are
  * running *anywhere*, so each can have its tab back in its own group
- * without being attached to. The tmux server is the whole record: the
+ * without being attached to. The session catalog is the whole record: the
  * tags say the session is ours, which repository it belongs to and
  * which checkout (`TaggedSession.worktreePath`), and the checkout's HEAD
  * says which branch it is on now.
  */
 export interface LiveWorktreeSession {
-  /** The tmux session name — a label, never parsed. */
-  tmuxName: string;
+  /** What addresses the session; its name is a label, never parsed. */
+  target: SessionTarget;
   /** The worktree directory the session belongs to, from its tags. */
   path: string;
   /** The main checkout the worktree belongs to — real path, as `git
@@ -57,9 +58,8 @@ export interface LiveWorktreeSessionDeps {
 }
 
 /**
- * List them. Empty when tmux is not the backend in force — the same
- * gate the scanner uses, read from the config handed in — or there is
- * no server.
+ * List them. Empty when the catalog has no sessions or cannot be
+ * read.
  *
  * A session counts only when it is a tagged `worktree` session whose
  * checkout still exists and has a HEAD to read. Whichever branch that
@@ -89,10 +89,10 @@ function describeSession(
   session: TaggedSession,
   deps: Required<Omit<LiveWorktreeSessionDeps, 'sessions'>>
 ): LiveWorktreeSession | null {
-  if (session.paneDead || session.type !== 'worktree' || !session.worktreePath)
+  if (session.exited || session.type !== 'worktree' || !session.worktreePath)
     return null;
   // `exists`/`readHead` are this machine's filesystem, synchronously —
-  // fine while `deps.sessions` only ever lists local tmux (the default
+  // fine while `deps.sessions` only ever lists this machine (the default
   // above), but `session.path` is meaningless read locally for a
   // session whose own tag says it lives elsewhere (finding 11): a
   // remote `listOurSessionsWith` feeding this would otherwise have
@@ -101,14 +101,14 @@ function describeSession(
   // until this can honour the machine (an async stat/HEAD read through
   // its executor) — refusing loudly beats reading the wrong
   // filesystem, and this function's own contract already excludes for
-  // ordinary reasons (paneDead, wrong type, no path) the same way.
+  // ordinary reasons (exited, wrong type, no path) the same way.
   if (session.machine !== LOCAL_MACHINE) return null;
   const path = session.worktreePath;
   if (!deps.exists(path)) return null;
   const head = deps.readHead(path);
   if (!head) return null;
   return {
-    tmuxName: session.name,
+    target: session.target,
     path,
     repoRoot: session.repo,
     branch: head.branch,

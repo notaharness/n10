@@ -32,7 +32,7 @@ export interface SessionSpec {
 export interface SessionBackend {
   /** The persistent session this connection addresses, after
    *  allocation or resolution. */
-  readonly target?: SessionTarget;
+  readonly target: SessionTarget;
   /** Local client health, independent of the hosted process lifetime. */
   readonly connectionState?: 'connected' | 'reconnecting' | 'failed';
   /** Logical process status, independent of the local transport client. */

@@ -1,24 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
-import { tmuxSessionSnapshot } from '@n10/terminal-tmux';
-
-export function tmuxPanePid(
-  name: string,
-  snapshot: typeof tmuxSessionSnapshot = tmuxSessionSnapshot
-): number | null {
-  const observed = snapshot(name);
-  return observed && !observed.paneDead ? observed.incarnation.panePid : null;
-}
+import type { SessionTarget } from '@n10/terminal';
+import { localCatalog } from '../session-catalog.js';
 
 interface RuntimeSource {
-  panePid(name: string): number | null;
+  /** The process the session runs; none once it exited, since a
+   *  retained session's PID may have been reused. */
+  processId(target: SessionTarget): number | null;
   read(path: string): string | null;
   defaultClaudeDir: string;
 }
 
 const nativeSource: RuntimeSource = {
-  panePid: tmuxPanePid,
+  processId: (target) => localCatalog().snapshot(target)?.pid ?? null,
   read: (path) => {
     try {
       return readFileSync(path, 'utf8');
@@ -123,14 +118,14 @@ function candidate(
   };
 }
 
-/** Read the actual pane process tree, rather than n10's current environment.
- *  Select the owning agent before its tools or subagents. */
-export function captureTmuxRuntime(
-  tmuxName: string,
+/** Read the session's actual process tree, rather than n10's current
+ *  environment. Select the owning agent before its tools or subagents. */
+export function captureSessionRuntime(
+  target: SessionTarget,
   source: RuntimeSource = nativeSource,
   agent?: string
 ): { env?: Record<string, string>; conversationId?: string } {
-  const root = source.panePid(tmuxName);
+  const root = source.processId(target);
   if (!root || process.platform !== 'linux') return {};
   const candidates = processTree(root, source.read)
     .map((pid) => candidate(pid, source, agent))

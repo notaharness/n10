@@ -48,7 +48,7 @@ vi.mock('../session-resolver.js', () => ({
   resolveSessionByName: (name: string, sessions?: TaggedSession[]) =>
     sessions === undefined
       ? state.existing
-      : sessions.find((s) => s.name === name) ?? null,
+      : sessions.find((s) => s.target.name === name) ?? null,
   resolveWorktreeSession: (
     repo: string,
     worktreePath: string,
@@ -88,7 +88,7 @@ const base: OpenSessionParams = {
   build,
 };
 const found: TaggedSession = {
-  name: 'unrelated-label',
+  target: { kind: 'tmux', name: 'unrelated-label' },
   repo: '/repo',
   branch: 'feature/x',
   path: base.cwd,
@@ -98,7 +98,7 @@ const found: TaggedSession = {
   agent: 'claude',
   machine: 'local',
   created: 1,
-  paneDead: false,
+  exited: false,
 };
 beforeEach(() => {
   vi.clearAllMocks();
@@ -110,7 +110,7 @@ describe('session launch boundary', () => {
   it('does not attach an unrelated tagged session using a saved terminal name', async () => {
     state.existing = {
       ...found,
-      name: 'old',
+      target: { kind: 'tmux', name: 'old' },
       type: 'agent',
       repo: '/other',
       path: '/other',
@@ -152,7 +152,7 @@ describe('session launch boundary', () => {
     };
     state.existing = {
       ...found,
-      name: 'old',
+      target: { kind: 'tmux', name: 'old' },
       type: 'agent',
       path: '/repo',
       agent: 'codex',
@@ -199,7 +199,7 @@ describe('session launch boundary', () => {
     expect(build).not.toHaveBeenCalled();
     expect(state.create.mock.calls[0][1]).toEqual({
       mode: 'attach',
-      target: found.name,
+      target: found.target.name,
     });
     expect(state.register).toHaveBeenCalledWith(
       '["worktree","/repo","/repo/worktree"]',
@@ -211,18 +211,18 @@ describe('session launch boundary', () => {
     );
   });
   it('attaches an exited pane for discovery without restarting it', async () => {
-    state.existing = { ...found, paneDead: true };
+    state.existing = { ...found, exited: true };
     await openSession({ ...base, mode: 'attach' });
     expect(build).not.toHaveBeenCalled();
     expect(state.create.mock.calls[0][1]).toMatchObject({ mode: 'attach' });
   });
   it('restarts an exited agent with its recorded identity and preserves creator tags', async () => {
-    state.existing = { ...found, paneDead: true };
+    state.existing = { ...found, exited: true };
     await openSession(base);
     expect(build).toHaveBeenCalledWith('claude', true);
     expect(state.create.mock.calls[0][1]).toEqual({
       mode: 'restart',
-      target: found.name,
+      target: found.target.name,
       tags: { '@orchestra-agent': 'codex' },
       retainOnExit: true,
     });
@@ -239,7 +239,8 @@ describe('session launch boundary', () => {
       openSession({
         ...base,
         expected: {
-          name: found.name,
+          kind: 'tmux',
+          name: found.target.name,
           sessionId: '$1',
           paneId: '%2',
           panePid: 300,
@@ -251,11 +252,11 @@ describe('session launch boundary', () => {
     expect(build).not.toHaveBeenCalled();
   });
   it('uses non-k restart for unconfirmed dead fresh launches and clears only reporting metadata', async () => {
-    state.existing = { ...found, paneDead: true };
+    state.existing = { ...found, exited: true };
     await openSession({ ...base, build: () => ({ ...build(), fresh: true }) });
     expect(state.create.mock.calls[0][1]).toEqual({
       mode: 'restart',
-      target: found.name,
+      target: found.target.name,
       retainOnExit: true,
       tags: {
         '@orchestra-agent': 'codex',
@@ -433,7 +434,7 @@ describe('remote sessions (D2/D4/D5): the machine in the request reaches the pla
     );
     expect(state.createRemote.mock.calls[0][1]).toMatchObject({
       mode: 'attach',
-      target: found.name,
+      target: found.target.name,
     });
     expect(state.createRemote).toHaveBeenCalledOnce();
   });

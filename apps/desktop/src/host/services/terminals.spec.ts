@@ -92,6 +92,7 @@ vi.mock('@n10/core', () => ({
     state.sessions.set(name, {
       exited: false,
       pty: {
+        target: { kind: 'tmux', name },
         cols: actual.cols,
         rows: actual.rows,
         onData: (cb: (data: string) => void) => state.onData.set(name, cb),
@@ -116,7 +117,7 @@ vi.mock('@n10/core', () => ({
   getSpawnedAt: () => 1000,
   LOCAL_MACHINE: 'local',
   sessionIdentity: () => null,
-  captureTmuxRuntime: () => ({}),
+  captureSessionRuntime: () => ({}),
 }));
 
 let terminals: typeof TerminalsModule;

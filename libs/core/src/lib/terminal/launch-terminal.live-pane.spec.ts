@@ -33,7 +33,7 @@ const config = {
 } as AppConfig;
 const base = { cwd: '/repo', cols: 80, rows: 24, config };
 const liveAgentPane: TaggedSession = {
-  name: 'saved-label',
+  target: { kind: 'tmux', name: 'saved-label' },
   repo: '/repo',
   branch: '',
   worktreePath: '',
@@ -42,7 +42,7 @@ const liveAgentPane: TaggedSession = {
   spawner: 'orchestra',
   agent: 'codex',
   created: 1,
-  paneDead: false,
+  exited: false,
   machine: 'local',
 };
 

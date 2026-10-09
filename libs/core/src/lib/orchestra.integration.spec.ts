@@ -126,7 +126,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         'Literal $(touch SHOULD_NOT_EXIST) `echo nope`\n' +
         'task '.repeat(4000);
       const player = await spawnPlayer(prompt);
-      expect(player.name).toBe('shop-feature-integration-2');
+      expect(player.target.name).toBe('shop-feature-integration-2');
       const started = JSON.parse(fixture.read('agent-start.json')) as {
         args: string[];
         tmux: string | null;
@@ -136,7 +136,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       expect(existsSync(join(player.path, 'SHOULD_NOT_EXIST'))).toBe(false);
       expect(listLiveWorktreeSessions()).toEqual([
         expect.objectContaining({
-          tmuxName: player.name,
+          target: player.target,
           repoRoot: fixture.repo,
           branch,
           agent: 'codex',
@@ -147,7 +147,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         'display-message',
         '-p',
         '-t',
-        `=${player.name}:`,
+        `=${player.target.name}:`,
         '#{pane_pid}'
       );
       const entry = await openSession({
@@ -164,13 +164,16 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       expect(getSession(worktreeSessionKey(player.path, fixture.repo))).toBe(
         entry
       );
-      expect(entry.pty.target).toEqual({ kind: 'tmux', name: player.name });
+      expect(entry.pty.target).toEqual({
+        kind: 'tmux',
+        name: player.target.name,
+      });
       expect(
         fixture.tmux(
           'display-message',
           '-p',
           '-t',
-          `=${player.name}:`,
+          `=${player.target.name}:`,
           '#{pane_pid}'
         )
       ).toBe(beforePid);
@@ -216,7 +219,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         '--thread',
         target.slice(6),
         '--message',
-        `[player ${player.name}] PROGRESS: first update`,
+        `[player ${player.target.name}] PROGRESS: first update`,
       ]);
       const lastReport = resolveWorktreeSession(
         fixture.repo,
@@ -248,7 +251,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         'Reason: Codex queue refused the message'
       );
       expect(result.stderr).toContain(
-        `Report: [player ${player.name}] PROGRESS: complete failed message`
+        `Report: [player ${player.target.name}] PROGRESS: complete failed message`
       );
       expect(
         resolveWorktreeSession(fixture.repo, player.worktreePath)?.lastReport
@@ -267,7 +270,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       await expect
         .poll(
           () =>
-            resolveWorktreeSession(fixture.repo, player.worktreePath)?.paneDead,
+            resolveWorktreeSession(fixture.repo, player.worktreePath)?.exited,
           PROCESS_WAIT
         )
         .toBe(true);
@@ -302,12 +305,15 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       const next = JSON.parse(fixture.read('agent-start.json'));
       expect(next.pid).not.toBe(first.pid);
       expect(next.args).toEqual(['resume', '--last']);
-      expect(resumed.pty.target).toEqual({ kind: 'tmux', name: player.name });
+      expect(resumed.pty.target).toEqual({
+        kind: 'tmux',
+        name: player.target.name,
+      });
       expect(resumed.agent).toBe('codex');
       expect(
         resolveWorktreeSession(fixture.repo, player.worktreePath)
       ).toMatchObject({
-        paneDead: false,
+        exited: false,
         agent: 'codex',
         spawner: 'orchestra',
         orchestrator: target,
@@ -325,7 +331,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       fixture.tmux(
         'set-option',
         '-t',
-        `=${player.name}:`,
+        `=${player.target.name}:`,
         '@orchestra-last-report',
         'PROGRESS 2026-01-01T00:00:00Z delivered'
       );
@@ -341,14 +347,14 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       fixture.tmux(
         'set-environment',
         '-t',
-        `=${player.name}:`,
+        `=${player.target.name}:`,
         'ORCHESTRA_SESSION',
         'fixture-anchor'
       );
       fixture.tmux(
         'set-environment',
         '-t',
-        `=${player.name}:`,
+        `=${player.target.name}:`,
         'ORCHESTRA_SOCKET',
         fixture.tmux('display-message', '-p', '#{socket_path}')
       );
@@ -382,7 +388,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         player.worktreePath
       )!;
       expect(current).toMatchObject({
-        name: player.name,
+        target: player.target,
         repo: fixture.repo,
         branch,
         spawner: 'orchestra',
@@ -414,7 +420,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       await expect
         .poll(
           () =>
-            resolveWorktreeSession(fixture.repo, player.worktreePath)?.paneDead,
+            resolveWorktreeSession(fixture.repo, player.worktreePath)?.exited,
           PROCESS_WAIT
         )
         .toBe(true);
@@ -460,7 +466,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       expect(player.spawner).toBe('n10');
       const adopted = fixture.script(
         'adopt.sh',
-        player.name,
+        player.target.name,
         '--agent',
         'codex',
         '--orchestrator',
@@ -486,7 +492,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         spawner: 'n10',
         orchestrator: target,
       });
-      expect(fixture.script('kill.sh', player.name).status).toBe(0);
+      expect(fixture.script('kill.sh', player.target.name).status).toBe(0);
       await expect.poll(() => entry.exited, PROCESS_WAIT).toBe(true);
       expect(resolveWorktreeSession(fixture.repo, fixture.repo)).toBeNull();
     });

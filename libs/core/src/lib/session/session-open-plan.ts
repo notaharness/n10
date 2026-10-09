@@ -1,7 +1,7 @@
 import type {
-  TmuxLaunchPlan,
-  TmuxSessionIncarnation,
-} from '@n10/terminal-tmux';
+  SessionIncarnation,
+  SessionLaunchPlan,
+} from '../session-catalog.js';
 import { sessionNames } from '../pty-registry.js';
 import { sessionIdentity } from '../session-key.js';
 import {
@@ -17,11 +17,11 @@ import { worktreeIdentity } from './worktree-identity.js';
 
 export function attachPlan(
   existing: TaggedSession,
-  expected: TmuxSessionIncarnation | undefined
-): TmuxLaunchPlan {
+  expected: SessionIncarnation | undefined
+): SessionLaunchPlan {
   return {
     mode: 'attach',
-    target: existing.name,
+    target: existing.target,
     ...(expected ? { expected, expectedTags: identityGuard(existing) } : {}),
   };
 }
@@ -31,10 +31,10 @@ export function launchPlan(
   existing: TaggedSession | null,
   agent: string | undefined,
   fresh: boolean | undefined,
-  expected: TmuxSessionIncarnation | undefined,
+  expected: SessionIncarnation | undefined,
   cwd: string,
   restore?: OpenSessionParams['restore']
-): TmuxLaunchPlan {
+): SessionLaunchPlan {
   const retainOnExit = request.type === 'worktree' || request.kind === 'agent';
   const agentTags: Record<string, string> = agent
     ? { [ORCHESTRA_TAG.agent]: agent }
@@ -54,7 +54,7 @@ export function launchPlan(
     if (fresh && expected)
       return {
         mode: 'replace',
-        target: existing.name,
+        target: existing.target,
         expected,
         retainOnExit,
         tags,
@@ -63,7 +63,7 @@ export function launchPlan(
     // Unconfirmed restarts never use -k. An external live winner is left alone.
     return {
       mode: 'restart',
-      target: existing.name,
+      target: existing.target,
       tags,
       retainOnExit,
       ...(expected ? { expected, expectedTags: identityGuard(existing) } : {}),
@@ -78,7 +78,7 @@ function createPlan(
   restore: OpenSessionParams['restore'],
   agentTags: Record<string, string>,
   retainOnExit: boolean
-): TmuxLaunchPlan {
+): SessionLaunchPlan {
   const worktree =
     request.type === 'worktree' ? worktreeIdentity(request, cwd) : null;
   const identity = worktree ?? {

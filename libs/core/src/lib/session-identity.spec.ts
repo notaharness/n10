@@ -1,6 +1,6 @@
 import { worktreeSessionKey, terminalSessionKey } from './session-key.js';
 import { describe, expect, it } from 'vitest';
-import type { TmuxSessionInfo } from '@n10/terminal-tmux';
+import type { CatalogSession } from './session-catalog.js';
 import {
   isTerminalSession,
   isWorktreeSessionFor,
@@ -78,10 +78,17 @@ describe('session labels', () => {
 
 function listed(
   name: string,
-  options: Record<string, string> | undefined,
-  extra: Partial<TmuxSessionInfo> = {}
-): TmuxSessionInfo {
-  return { name, created: 10, path: '/p', paneDead: false, options, ...extra };
+  tags: Record<string, string> | undefined,
+  extra: Partial<CatalogSession> = {}
+): CatalogSession {
+  return {
+    target: { kind: 'tmux', name },
+    created: 10,
+    path: '/p',
+    exited: false,
+    tags: tags ?? {},
+    ...extra,
+  };
 }
 
 const WT = '/repos/alpha/.worktrees/feat-a';
@@ -97,9 +104,9 @@ const OURS = {
 describe('taggedSession', () => {
   it('reads one of ours from its tags, never from its name', () => {
     expect(taggedSession(listed('anything-at-all', OURS))).toMatchObject({
-      name: 'anything-at-all',
+      target: { kind: 'tmux', name: 'anything-at-all' },
       created: 10,
-      paneDead: false,
+      exited: false,
       path: '/p',
       spawner: 'n10',
       repo: '/repos/alpha',

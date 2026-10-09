@@ -10,8 +10,8 @@ vi.mock('../pty-registry.js', () => ({
   hasSession: () => false,
 }));
 vi.mock('../session-backend.js', () => ({
-  hasLiveTmuxSession: () => false,
-  killPersistedTmuxSession: () => undefined,
+  hasLiveSession: () => false,
+  killPersistedSession: () => undefined,
 }));
 vi.mock('@n10/logger', () => ({
   log: () => undefined,

@@ -1,16 +1,14 @@
-import { expect, it } from 'vitest';
-import { captureTmuxRuntime, tmuxPanePid } from './session-runtime.js';
-import type { tmuxSessionSnapshot } from '@n10/terminal-tmux';
+import { expect, it, vi } from 'vitest';
+import { captureSessionRuntime } from './session-runtime.js';
 
-it('does not sample a retained dead pane whose PID may have been reused', () => {
-  const snapshot = (paneDead: boolean) => () =>
-    ({
-      paneDead,
-      incarnation: { panePid: 100 },
-    } as NonNullable<ReturnType<typeof tmuxSessionSnapshot>>);
-  expect(tmuxPanePid('old', snapshot(true))).toBeNull();
-  expect(tmuxPanePid('old', snapshot(false))).toBe(100);
-});
+const catalog = vi.hoisted(() => ({ pid: undefined as number | undefined }));
+vi.mock('../session-catalog.js', () => ({
+  localCatalog: () => ({
+    snapshot: () => (catalog.pid ? { pid: catalog.pid } : null),
+  }),
+}));
+
+const pane = { kind: 'tmux', name: 'pane' } as const;
 
 it('captures the agent child environment and its exact Claude conversation', () => {
   const files: Record<string, string> = {
@@ -24,10 +22,10 @@ it('captures the agent child environment and its exact Claude conversation', () 
       procStart: '987',
     }),
   };
-  const captured = captureTmuxRuntime(
-    'old',
+  const captured = captureSessionRuntime(
+    pane,
     {
-      panePid: () => 100,
+      processId: () => 100,
       read: (path) => files[path] ?? null,
       defaultClaudeDir: '/default',
     },
@@ -61,10 +59,10 @@ it('keeps the owning Claude conversation when its child runs another Claude', ()
     }),
   };
   expect(
-    captureTmuxRuntime(
-      'pane',
+    captureSessionRuntime(
+      pane,
       {
-        panePid: () => 100,
+        processId: () => 100,
         read: (path) => files[path] ?? null,
         defaultClaudeDir: '/default',
       },
@@ -91,10 +89,10 @@ it('does not apply a child Claude ID to a Codex pane', () => {
     }),
   };
   expect(
-    captureTmuxRuntime(
-      'pane',
+    captureSessionRuntime(
+      pane,
       {
-        panePid: () => 100,
+        processId: () => 100,
         read: (path) => files[path] ?? null,
         defaultClaudeDir: '/default',
       },
@@ -102,3 +100,13 @@ it('does not apply a child Claude ID to a Codex pane', () => {
     )
   ).toEqual({ env: { CLAUDE_CONFIG_DIR: '/codex' } });
 });
+
+it.runIf(process.platform === 'linux')(
+  'reads the process tree of the process the local catalog reports',
+  () => {
+    catalog.pid = undefined;
+    expect(captureSessionRuntime(pane)).toEqual({});
+    catalog.pid = process.pid;
+    expect(captureSessionRuntime(pane).env).toHaveProperty('CLAUDE_CONFIG_DIR');
+  }
+);

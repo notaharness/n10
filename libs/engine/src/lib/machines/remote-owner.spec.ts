@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@n10/core', async (original) => ({
   ...(await original<typeof Core>()),
   isSessionAlive: mocks.alive,
-  hasLiveTmuxSession: mocks.persisted,
+  hasLiveSession: mocks.persisted,
   listOurSessionsWith: mocks.sessions,
 }));
 const machine = (
@@ -80,7 +80,7 @@ it('matches repository and branch and ignores dead panes and terminals', async (
   mocks.sessions.mockResolvedValue([
     session({ repo: '/other' }),
     session({ branch: 'other' }),
-    session({ paneDead: true }),
+    session({ exited: true }),
     session({ type: 'shell' }),
   ]);
   await expect(

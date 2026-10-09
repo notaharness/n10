@@ -16,12 +16,13 @@ vi.mock('@n10/terminal-tmux', async (original) => ({
   tmuxSessionSnapshot: state.snapshot,
 }));
 const expected = {
+  kind: 'tmux',
   name: 'player',
   sessionId: '$1',
   paneId: '%2',
   panePid: 42,
   serverPid: 10,
-};
+} as const;
 const local = worktreeSessionKey('/repo/wt', '/repo');
 beforeEach(() => {
   state.native = 'player';
@@ -29,7 +30,7 @@ beforeEach(() => {
 });
 it('compares the connected native target rather than the registry key', () => {
   expect(sessionIncarnationMatches(local, expected)).toBe(true);
-  expect(state.snapshot).toHaveBeenCalledWith('player');
+  expect(state.snapshot).toHaveBeenCalledWith('player', undefined);
   state.snapshot.mockReturnValue({ incarnation: { ...expected, panePid: 99 } });
   expect(sessionIncarnationMatches(local, expected)).toBe(false);
 });

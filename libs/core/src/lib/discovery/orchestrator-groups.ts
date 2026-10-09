@@ -50,9 +50,9 @@ export function orchestratorGroups(
   const homes = new Map<string, TaggedSession>();
   const groups = new Map<TaggedSession, OrchestraMember[]>();
   for (const session of sessions) {
-    homes.set(`tmux:${session.name}`, session);
-    if (!session.target) continue;
-    homes.set(session.target, session);
+    homes.set(`tmux:${session.target.name}`, session);
+    if (!session.orchestraTarget) continue;
+    homes.set(session.orchestraTarget, session);
     groups.set(session, []);
   }
   for (const player of sessions) {

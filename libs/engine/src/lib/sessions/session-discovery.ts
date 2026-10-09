@@ -12,7 +12,7 @@ import {
   sessionNames,
   stopSession,
   strandedSessionRows,
-  observeTmuxSessions,
+  observeSessions,
   releaseExitedSession,
   diffScans,
   type DiscoveredTerminal,
@@ -131,7 +131,7 @@ export function startSessionDiscovery(
       branch: wt.branch,
       path: wt.path,
     }));
-    const seen = observeTmuxSessions(repo, worktrees);
+    const seen = observeSessions(repo, worktrees);
     // As for a failed git listing, the scan is dropped: read as no
     // sessions, it would end every terminal and release every exited
     // agent, and the next scan would not bring them back.

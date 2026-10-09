@@ -37,9 +37,10 @@ vi.mock('./pty-registry.js', () => ({
   getSession: (name: string) => entries.get(name),
 }));
 
-import { observeTmuxSessions, resetRepoRoot } from './session-backend.js';
+import { observeSessions, resetRepoRoot } from './session-backend.js';
 import { resolveWorktreeSession } from './session-resolver.js';
 import { taggedSession } from './session-identity.js';
+import { tmuxCatalogSession } from './tmux-catalog.js';
 import {
   keyForWorktree,
   resolveRemoteWorktreePath,
@@ -49,9 +50,9 @@ import { worktreeSessionRow } from './worktree-rows.js';
 
 /** The observation, for a listing tmux gave. */
 function observed(
-  ...args: Parameters<typeof observeTmuxSessions>
-): NonNullable<ReturnType<typeof observeTmuxSessions>> {
-  const seen = observeTmuxSessions(...args);
+  ...args: Parameters<typeof observeSessions>
+): NonNullable<ReturnType<typeof observeSessions>> {
+  const seen = observeSessions(...args);
   if (!seen) throw new Error('tmux could not list its sessions');
   return seen;
 }
@@ -149,7 +150,8 @@ describe('discovery matches a session to its checkout', () => {
 });
 
 describe('resolving a checkout’s session', () => {
-  const tagged = (info: TmuxSessionInfo) => taggedSession(info)!;
+  const tagged = (info: TmuxSessionInfo) =>
+    taggedSession(tmuxCatalogSession(info))!;
 
   it('finds it whichever branch it was created for', () => {
     const s = tagged(session({ branch: 'feature', path: WT, tag: WT }));
@@ -161,7 +163,9 @@ describe('resolving a checkout’s session', () => {
     expect(
       tagged(session({ branch: 'b', path: '/p', tag: WT })).worktreePath
     ).toBe(WT);
-    expect(taggedSession(session({ branch: 'b', path: WT }))).toBeNull();
+    expect(
+      taggedSession(tmuxCatalogSession(session({ branch: 'b', path: WT })))
+    ).toBeNull();
     const terminal = session({ branch: 'b', path: WT });
     terminal.options!['@orchestra-session-type'] = 'shell';
     expect(tagged(terminal).worktreePath).toBe('');

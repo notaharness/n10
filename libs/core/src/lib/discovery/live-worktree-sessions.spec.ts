@@ -48,9 +48,9 @@ function session(
   extra: Partial<TaggedSession> = {}
 ): TaggedSession {
   return {
-    name,
+    target: { kind: 'tmux', name },
     created: 1,
-    paneDead: false,
+    exited: false,
     path,
     spawner: 'n10',
     repo,
@@ -86,7 +86,7 @@ describe('listLiveWorktreeSessions', () => {
     state.sessions = [ALPHA, BETA];
     expect(list()).toEqual([
       {
-        tmuxName: 'alpha-feat-a',
+        target: { kind: 'tmux', name: 'alpha-feat-a' },
         path: ALPHA.path,
         repoRoot: '/repos/alpha',
         branch: 'feat/a',
@@ -95,7 +95,7 @@ describe('listLiveWorktreeSessions', () => {
         machine: 'local',
       },
       {
-        tmuxName: 'beta-feat-b',
+        target: { kind: 'tmux', name: 'beta-feat-b' },
         path: BETA.path,
         repoRoot: '/repos/beta',
         branch: 'feat-b',
@@ -132,9 +132,11 @@ describe('listLiveWorktreeSessions', () => {
   // The repository is the tag's to say: the name is not consulted, and
   // a session created under any label is filed where its tag says.
   it('takes the repository from the tag, not from the name', () => {
-    state.sessions = [{ ...ALPHA, name: 'beta-feat-a-2' }];
+    state.sessions = [
+      { ...ALPHA, target: { kind: 'tmux', name: 'beta-feat-a-2' } },
+    ];
     expect(list()[0]).toMatchObject({
-      tmuxName: 'beta-feat-a-2',
+      target: { kind: 'tmux', name: 'beta-feat-a-2' },
       repoRoot: '/repos/alpha',
     });
   });
@@ -220,7 +222,7 @@ describe('listLiveWorktreeSessions', () => {
   });
 
   it('leaves out a retained pane whose agent exited', () => {
-    state.sessions = [{ ...ALPHA, paneDead: true }];
+    state.sessions = [{ ...ALPHA, exited: true }];
     expect(list()).toEqual([]);
   });
 });

@@ -110,8 +110,10 @@ libs/core/                       — Shell-agnostic operations. No React, Ink, E
   src/lib/agents/                — Agent registry
   src/lib/activity.ts            — Agent activity registry; pty-registry.ts — PTY session lifecycle
   src/lib/session-backend.ts     — Required tmux availability, tagged-session observations and cleanup
+  src/lib/session-catalog.ts     — The local session catalog seam: listing, snapshots, kills, launch plans, incarnations
+  src/lib/tmux-catalog.ts        — The tmux catalog, and launch plans in tmux's terms for local and remote servers
   src/lib/session-identity.ts    — `@orchestra-*` tag names, session labels and matching rules shared with Orchestra
-  src/lib/session-resolver.ts    — The one `list-sessions` fork every tmux lookup goes through
+  src/lib/session-resolver.ts    — The one catalog listing every session lookup goes through
   src/lib/session/open-session.ts — Explicit session requests → create, attach or restart plans
   src/lib/discovery/             — Pure observation diff, live worktree lookup and worktree HEAD reader
   src/lib/keybindings/           — Customizable keybinding system

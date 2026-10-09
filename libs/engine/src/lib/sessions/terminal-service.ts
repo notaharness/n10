@@ -17,7 +17,7 @@ import {
   type DiscoveredTerminal,
   type SessionTarget,
   type TerminalKind,
-  captureTmuxRuntime,
+  captureSessionRuntime,
 } from '@n10/core';
 import { readConfig } from '@n10/vcs-core';
 import { terminalFacts, type TerminalRecord } from './terminal-facts.js';
@@ -79,12 +79,12 @@ function sameSavedTerminal(
 
 function observedRuntime(
   machine: string | undefined,
-  tmuxName: string,
+  target: SessionTarget,
   agent?: string
-): ReturnType<typeof captureTmuxRuntime> {
+): ReturnType<typeof captureSessionRuntime> {
   return machine && machine !== LOCAL_MACHINE
     ? {}
-    : captureTmuxRuntime(tmuxName, undefined, agent);
+    : captureSessionRuntime(target, undefined, agent);
 }
 
 function launchEnv(req: TerminalLaunch): Record<string, string> | undefined {
@@ -95,10 +95,10 @@ function launchEnv(req: TerminalLaunch): Record<string, string> | undefined {
 
 function terminalRuntime(
   req: TerminalLaunch,
-  tmuxName: string,
+  target: SessionTarget,
   agent?: string
 ) {
-  const observed = observedRuntime(terminalMachine(req), tmuxName, agent);
+  const observed = observedRuntime(terminalMachine(req), target, agent);
   const env = observed.env ?? req.restore?.env ?? launchEnv(req);
   const conversationId = observed.conversationId ?? req.restore?.conversationId;
   return {
@@ -117,20 +117,18 @@ function terminalTags(req: TerminalLaunch, agent: string | undefined) {
 
 function terminalRecord(
   req: TerminalLaunch,
-  launched: Awaited<ReturnType<typeof launchTerminalSession>>,
-  name: string
+  launched: Awaited<ReturnType<typeof launchTerminalSession>>
 ): TerminalRecord {
   const agent = launched.agent ?? req.restore?.agent;
-  const tmuxName =
-    launched.pty.target?.name ?? req.restore?.target.name ?? name;
+  const target = launched.pty.target;
   return {
     kind: req.kind,
     cwd: req.cwd,
     restore: {
-      target: { kind: 'tmux', name: tmuxName },
+      target,
       tags: terminalTags(req, agent),
       ...(agent ? { agent } : {}),
-      ...terminalRuntime(req, tmuxName, agent),
+      ...terminalRuntime(req, target, agent),
     },
   };
 }
@@ -155,10 +153,9 @@ export function createTerminalService(ports: TerminalPorts) {
   function refreshRuntime(name: string, record: TerminalRecord): void {
     const restore = record.restore;
     if (!restore) return;
-    const tmuxName = getSession(name)?.pty.target?.name ?? restore.target.name;
     const runtime = observedRuntime(
       sessionIdentity(name)?.machine,
-      tmuxName,
+      getSession(name)?.pty.target ?? restore.target,
       restore.agent
     );
     if (!runtime.env && !runtime.conversationId) return;
@@ -197,7 +194,7 @@ export function createTerminalService(ports: TerminalPorts) {
       restore: req.restore,
     });
     const name = launched.name;
-    const record = terminalRecord(req, launched, name);
+    const record = terminalRecord(req, launched);
     if (req.sessionName && name !== req.sessionName && replacing)
       known.delete(req.sessionName);
     known.set(name, record);
