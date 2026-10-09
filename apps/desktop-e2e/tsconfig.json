@@ -4,6 +4,12 @@
   "include": [],
   "references": [
     {
+      "path": "../../libs/terminal-pty"
+    },
+    {
+      "path": "../../libs/core"
+    },
+    {
       "path": "../../libs/vcs/core"
     },
     {

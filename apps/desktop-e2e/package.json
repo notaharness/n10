@@ -96,6 +96,18 @@
           }
         }
       },
+      "e2e:windows": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "outputs": [
+          "{projectRoot}/test-output/windows/output",
+          "{projectRoot}/test-output/windows/report"
+        ],
+        "options": {
+          "command": "npx playwright test --config windows.config.ts",
+          "cwd": "apps/desktop-e2e"
+        }
+      },
       "perf": {
         "executor": "nx:run-commands",
         "cache": false,
