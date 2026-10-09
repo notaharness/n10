@@ -1,5 +1,11 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -65,17 +71,11 @@ export interface ProbeRun {
   log: () => string;
 }
 
-export type Scenario = 'main-crash' | 'main-exit' | 'host-crash';
-
-export async function launchProbe(
-  probeMain: string,
-  scenario: Scenario
-): Promise<ProbeRun> {
+export async function launchProbe(probeMain: string): Promise<ProbeRun> {
   const stateDir = mkdtempSync(join(tmpdir(), 'n10-probe-'));
   const electron = spawn(require('electron') as string, [probeMain], {
     env: windowsPowerShellEnv({
       N10_PROBE_DIR: stateDir,
-      N10_PROBE_SCENARIO: scenario,
       ELECTRON_ENABLE_LOGGING: '1',
     }),
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -145,11 +145,22 @@ export async function survivorsAfter(
   return pids.filter(alive);
 }
 
-/** End whatever a failed run left behind, and say what that was. */
+/** Ask main to quit on its own, telling the host nothing. */
+export function requestMainExit(run: ProbeRun): void {
+  writeFileSync(join(run.stateDir, 'exit'), '');
+}
+
+/** The host and every descendant it recorded. */
+export const hostTree = ({ host, descendants }: ProbeRun): number[] => [
+  host,
+  ...Object.values(descendants),
+];
+
+/** End the run: main however it stands, and whatever of the host's tree
+ *  a failed run left behind, which it reports. */
 export function reap(run: ProbeRun): number[] {
-  const pids = [run.main, run.host, ...Object.values(run.descendants)];
-  const survivors = pids.filter(alive);
-  for (const pid of survivors)
+  const survivors = hostTree(run).filter(alive);
+  for (const pid of [run.main, ...survivors].filter(alive))
     spawnSync('taskkill', ['/F', '/T', '/PID', String(pid)], {
       stdio: 'ignore',
     });

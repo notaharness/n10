@@ -2,12 +2,13 @@ import { expect, test } from '@playwright/test';
 import {
   alive,
   bundleProbe,
+  hostTree,
   launchProbe,
   reap,
+  requestMainExit,
   survivorsAfter,
   waitFor,
   type ProbeRun,
-  type Scenario,
 } from './setup/probe.js';
 
 /**
@@ -32,8 +33,21 @@ test.afterEach(async () => {
   expect(reap(finished), 'processes the test had to end itself').toEqual([]);
 });
 
-async function start(scenario: Scenario): Promise<ProbeRun> {
-  run = await launchProbe(probeMain, scenario);
+/** Survivors of the host's tree once it should be gone, with how long
+ *  that took recorded as evidence in the report and the log. */
+async function survivorsOf(probe: ProbeRun): Promise<number[]> {
+  const started = Date.now();
+  const survivors = await survivorsAfter(hostTree(probe));
+  const ms = `${Date.now() - started} ms`;
+  test
+    .info()
+    .annotations.push({ type: 'host tree gone after', description: ms });
+  console.log(`[${test.info().title}] host tree gone after ${ms}`);
+  return survivors;
+}
+
+async function start(): Promise<ProbeRun> {
+  run = await launchProbe(probeMain);
   const { host, descendants, job, main } = run;
   // Every descendant is alive and in the host's job; main is not.
   for (const [kind, pid] of Object.entries(descendants)) {
@@ -45,20 +59,16 @@ async function start(scenario: Scenario): Promise<ProbeRun> {
   return run;
 }
 
-const hostTree = ({ host, descendants }: ProbeRun) => [
-  host,
-  ...Object.values(descendants),
-];
-
 test('a crashed main takes the host and every descendant with it', async () => {
-  const probe = await start('main-crash');
+  const probe = await start();
   process.kill(probe.main); // TerminateProcess: no shutdown code runs
-  expect(await survivorsAfter(hostTree(probe))).toEqual([]);
+  expect(await survivorsOf(probe)).toEqual([]);
 });
 
 test('main exiting without telling the host ends it and every descendant', async () => {
-  const probe = await start('main-exit');
-  expect(await survivorsAfter(hostTree(probe))).toEqual([]);
+  const probe = await start();
+  requestMainExit(probe);
+  expect(await survivorsOf(probe)).toEqual([]);
   const code = await waitFor('Electron to exit', () =>
     probe.electron.exitCode === null ? undefined : probe.electron.exitCode
   );
@@ -66,8 +76,8 @@ test('main exiting without telling the host ends it and every descendant', async
 });
 
 test('a crashed host takes every descendant and leaves main running', async () => {
-  const probe = await start('host-crash');
+  const probe = await start();
   process.kill(probe.host);
-  expect(await survivorsAfter(hostTree(probe))).toEqual([]);
+  expect(await survivorsOf(probe)).toEqual([]);
   expect(alive(probe.main)).toBe(true);
 });
