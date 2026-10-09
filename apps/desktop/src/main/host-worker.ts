@@ -10,7 +10,12 @@
  */
 // First: nothing the host starts may inherit the module it preloaded.
 import './host-env-restore.js';
-import { applySessionBackend, killAll, probeTmuxAvailability } from '@n10/core';
+import {
+  applySessionBackend,
+  joinKillOnCloseJob,
+  killAll,
+  probeTmuxAvailability,
+} from '@n10/core';
 import { installHostPushes } from '../host/host-pushes.js';
 import {
   registerHostHandlers,
@@ -155,6 +160,9 @@ port.on('message', ({ data }: { data: MainToHost }) => {
 // ── Startup ──────────────────────────────────────────────────────
 
 async function start(): Promise<void> {
+  // Before anything starts a process: on Windows every descendant then
+  // ends with this host, however it exits.
+  joinKillOnCloseJob();
   const userData = process.env.N10_USER_DATA;
   if (userData) installSessionBin(userData);
   installHostPushes({
