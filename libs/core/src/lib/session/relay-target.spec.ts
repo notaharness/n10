@@ -12,9 +12,13 @@ vi.mock('../session-key.js', () => ({
   sessionIdentity: (key: string) => sessionIdentity(key),
 }));
 
-const tmuxListSessions = vi.fn();
-vi.mock('@n10/terminal-tmux', () => ({
-  tmuxListSessions: () => tmuxListSessions(),
+/** The names of every session the local catalog lists, tagged or not. */
+const tmuxListSessions = vi.fn<() => string[]>();
+vi.mock('../session-catalog.js', () => ({
+  localCatalog: () => ({
+    list: () =>
+      tmuxListSessions().map((name) => ({ target: { kind: 'tmux', name } })),
+  }),
 }));
 
 import { parseRelayPayload, resolveLocalRelayTarget } from './relay-target.js';
