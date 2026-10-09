@@ -29,20 +29,23 @@ let flock: Flock | undefined;
 function loadFlock(endpoint: string): Flock {
   if (flock) return flock;
   let koffi: typeof Koffi;
+  let call: Flock;
   try {
     koffi = createRequire(import.meta.url)('koffi') as typeof Koffi;
-  } catch {
+    const libc = koffi.load(
+      process.platform === 'darwin' ? 'libSystem.B.dylib' : 'libc.so.6'
+    );
+    call = libc.func('int flock(int fd, int operation)') as Flock;
+  } catch (err) {
+    // No koffi, or a libc it cannot load (musl has no libc.so.6).
     throw new MuxError(
       'UNSUPPORTED',
-      `A previous n10 mux owner left ${endpoint} behind and the optional ` +
-        `koffi package that recovers it is not installed. Delete ${endpoint} ` +
-        'and start again.'
+      `A previous n10 mux owner left ${endpoint} behind, and without ` +
+        'file locking n10 cannot remove it safely ' +
+        `(${err instanceof Error ? err.message : String(err)}). ` +
+        `Delete ${endpoint} and start again.`
     );
   }
-  const libc = koffi.load(
-    process.platform === 'darwin' ? 'libSystem.B.dylib' : 'libc.so.6'
-  );
-  const call = libc.func('int flock(int fd, int operation)') as Flock;
   flock = (fd, operation) => {
     const result = call(fd, operation);
     if (result !== 0 && koffi.errno() !== koffi.os.errno.EWOULDBLOCK)
