@@ -163,6 +163,27 @@ describe.skipIf(process.platform === 'win32')('a managed catalog', () => {
     expect(catalog.list([])).toHaveLength(1);
   });
 
+  it('replaces an exited agent it was approved for, as a fresh launch', async () => {
+    catalog = new ManagedCatalog('host-a');
+    const handle = await catalog.open(spec('exit 0'), {
+      mode: 'create',
+      label: 'agent',
+      tags: {},
+      retainOnExit: true,
+    });
+    let exited = false;
+    handle.onExit(() => (exited = true));
+    await until(() => exited);
+    const target = handle.target!;
+    const replaced = await catalog.open(spec('exec sleep 30'), {
+      mode: 'replace',
+      target,
+      expected: catalog.snapshot(target)!.incarnation,
+      retainOnExit: true,
+    });
+    expect(replaced.processState?.running).toBe(true);
+  });
+
   it('removes a shell when it exits, and a killed session at once', async () => {
     catalog = new ManagedCatalog('host-a');
     const shell = await catalog.open(spec('exit 0'), {

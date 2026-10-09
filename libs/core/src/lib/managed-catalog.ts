@@ -140,10 +140,6 @@ export class ManagedCatalog implements SessionCatalog {
     plan: ExistingPlan
   ): void {
     const expected = plan.expected;
-    if (plan.mode === 'replace' && !record.pty.running)
-      throw new Error(
-        'Session changed before replacement; reopen the launch dialog.'
-      );
     if (!expected) return;
     const same =
       expected.kind === 'mux' &&
