@@ -1,14 +1,20 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { test as base, expect } from './fixtures/n10.js';
-import { npmUpdateFixture } from './setup/fake-npm-install.js';
+import { test as base, expect, type N10Session } from './fixtures/n10.js';
+import { npmUpdateFixture } from '@n10/core/testing/npm-update';
 import {
   addExternalWorktree,
   listTaggedSessions,
   startExternalTmuxSession,
   uniqueTmuxBranch,
 } from './setup/tmux.js';
+
+function live(n10: N10Session, text: RegExp) {
+  return n10.term.root
+    .locator('.term-row:not(.term-scrollback-row)')
+    .filter({ hasText: text });
+}
 
 const test = base.extend<{ npm: Awaited<ReturnType<typeof npmUpdateFixture>> }>(
   {
@@ -48,12 +54,12 @@ test('Npm restart: updates in the foreground, reopens the TUI and keeps the same
       (session) => session.branch === branch
     );
   const pid = agent()!.panePid;
-  await expect(n10.term.getByText(/Update available/)).toBeVisible();
+  await expect(live(n10, /Update available/)).toBeVisible();
   await n10.term.type('s');
-  await expect(n10.term.getByText(/Updates — version/)).toBeVisible();
+  await expect(live(n10, /Updates — version/)).toBeVisible();
   await n10.term.type('u');
-  await expect(n10.term.getByText(/Settings › Updates/)).toBeVisible();
-  await expect(n10.term.getByText(/Update and restart/)).toBeVisible();
+  await expect(live(n10, /Settings › Updates/)).toBeVisible();
+  await expect(live(n10, /Update and restart/)).toBeVisible();
   await n10.term.root.screenshot({
     path: info.outputPath('restart-terminal-before.png'),
   });
@@ -64,17 +70,15 @@ test('Npm restart: updates in the foreground, reopens the TUI and keeps the same
         JSON.parse(readFileSync(join(npm.root, 'package.json'), 'utf8')).version
     )
     .toBe(npm.version);
-  await expect(n10.term.getByText(/Settings › Updates/)).toBeHidden();
-  await expect(n10.term.getByText(/s settings/)).toBeVisible();
+  await expect(live(n10, /Settings › Updates/)).toBeHidden();
+  await expect(live(n10, /s settings/)).toBeVisible();
   await n10.term.type('s');
-  await expect(n10.term.getByText(/Updates — version/)).toBeVisible();
+  await expect(live(n10, /Updates — version/)).toBeVisible();
   await n10.term.type('u');
-  await expect(n10.term.getByText(/Settings › Updates/)).toBeVisible();
-  await expect(
-    n10.term.getByText(/Current version: 1.0.0-beta.2/)
-  ).toBeVisible();
-  await expect(n10.term.getByText(/Updated to n10 1.0.0-beta.2/)).toBeVisible();
-  await expect(n10.term.getByText(/Update and restart/)).toBeHidden();
+  await expect(live(n10, /Settings › Updates/)).toBeVisible();
+  await expect(live(n10, /Current version: 1.0.0-beta.2/)).toBeVisible();
+  await expect(live(n10, /Updated to n10 1.0.0-beta.2/)).toBeVisible();
+  await expect(live(n10, /Update and restart/)).toBeHidden();
   expect(npm.requests).toContain('/n10.tgz');
   expect(agent()).toMatchObject({ panePid: pid, paneDead: false });
   await n10.term.root.screenshot({
@@ -86,12 +90,12 @@ test('Npm restart: failed npm install reopens with a recovery message and can re
   n10,
   npm,
 }) => {
-  await expect(n10.term.getByText(/Update available/)).toBeVisible();
+  await expect(live(n10, /Update available/)).toBeVisible();
   await n10.term.type('s');
-  await expect(n10.term.getByText(/Updates — version/)).toBeVisible();
+  await expect(live(n10, /Updates — version/)).toBeVisible();
   await n10.term.type('u');
-  await expect(n10.term.getByText(/Settings › Updates/)).toBeVisible();
-  await expect(n10.term.getByText(/Update and restart/)).toBeVisible();
+  await expect(live(n10, /Settings › Updates/)).toBeVisible();
+  await expect(live(n10, /Update and restart/)).toBeVisible();
   npm.scenario.fail = true;
   await n10.term.type('u');
   await expect
@@ -105,13 +109,13 @@ test('Npm restart: failed npm install reopens with a recovery message and can re
       }
     })
     .toBe('failed');
-  await expect(n10.term.getByText(/s settings/)).toBeVisible();
+  await expect(live(n10, /s settings/)).toBeVisible();
   await n10.term.type('s');
-  await expect(n10.term.getByText(/Updates — version/)).toBeVisible();
+  await expect(live(n10, /Updates — version/)).toBeVisible();
   await n10.term.type('u');
-  await expect(n10.term.getByText(/Settings › Updates/)).toBeVisible();
-  await expect(n10.term.getByText(/npm exited 1/)).toBeVisible();
-  await expect(n10.term.getByText(/Update and restart/)).toBeVisible();
+  await expect(live(n10, /Settings › Updates/)).toBeVisible();
+  await expect(live(n10, /npm exited 1/)).toBeVisible();
+  await expect(live(n10, /Update and restart/)).toBeVisible();
   npm.scenario.fail = false;
   await n10.term.type('u');
   await expect
@@ -122,5 +126,48 @@ test('Npm restart: failed npm install reopens with a recovery message and can re
         ).status
     )
     .toBe('succeeded');
-  await expect(n10.term.getByText(/s settings/)).toBeVisible();
+  await expect(live(n10, /s settings/)).toBeVisible();
+});
+
+test('Npm restart: Ctrl-C during download rolls back, releases the lock and reopens n10', async ({
+  n10,
+  npm,
+}, info) => {
+  await expect(live(n10, /Update available/)).toBeVisible();
+  await n10.term.type('s');
+  await expect(live(n10, /Updates — version/)).toBeVisible();
+  await n10.term.type('u');
+  await expect(live(n10, /Update and restart/)).toBeVisible();
+  npm.scenario.holdTarball = true;
+  await n10.term.type('u');
+  await expect.poll(() => npm.requests.includes('/n10.tgz')).toBe(true);
+  await n10.term.root.screenshot({
+    path: info.outputPath('restart-interrupt-pending.png'),
+  });
+  await n10.term.write('\x03');
+  await expect(live(n10, /\^C/)).toBeVisible();
+  npm.releaseDownload();
+  await expect
+    .poll(() => {
+      const path = join(n10.homeDir, '.n10/npm-update-result.json');
+      return existsSync(path)
+        ? JSON.parse(readFileSync(path, 'utf8')).status
+        : null;
+    })
+    .toBe('failed');
+  await expect
+    .poll(() => existsSync(join(n10.homeDir, '.n10/npm-update.lock')))
+    .toBe(false);
+  expect(
+    JSON.parse(readFileSync(join(npm.root, 'package.json'), 'utf8')).version
+  ).toBe('1.0.0-beta.1');
+  await expect(live(n10, /s settings/)).toBeVisible();
+  await n10.term.type('s');
+  await expect(live(n10, /Updates — version/)).toBeVisible();
+  await n10.term.type('u');
+  await expect(live(n10, /npm exited/)).toBeVisible();
+  await expect(live(n10, /npm logs:/)).toBeVisible();
+  await n10.term.root.screenshot({
+    path: info.outputPath('restart-interrupted.png'),
+  });
 });

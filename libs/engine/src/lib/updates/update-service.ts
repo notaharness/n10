@@ -68,7 +68,10 @@ export function createUpdateService(options: Options): UpdateService {
         : null;
     return {
       availableVersion: version,
-      restartSupported: !!options.prepare && installation.kind === 'npm-global',
+      restartSupported:
+        !!options.prepare &&
+        installation.kind === 'npm-global' &&
+        !installation.manualUpdateReason,
       command:
         version && installation.kind === 'npm-global'
           ? `npm i -g @notaharness/n10@${version}`

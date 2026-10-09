@@ -1,3 +1,4 @@
+import { assertNpmUpdateWritable } from './npm-update-access.js';
 import { execFile } from 'node:child_process';
 import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -50,8 +51,20 @@ export async function detectUpdateInstallation(
   installation.kind = 'npm-local';
   try {
     const prefix = await globalRoot();
-    if (realpathSync(join(prefix, '@notaharness/n10')) === realpathSync(root))
+    if (realpathSync(join(prefix, '@notaharness/n10')) === realpathSync(root)) {
       installation.kind = 'npm-global';
+      // POSIX npm's global modules live at <prefix>/lib/node_modules.
+      try {
+        if (process.platform !== 'win32')
+          await assertNpmUpdateWritable(
+            realpathSync(root),
+            resolve(prefix, '../..')
+          );
+      } catch (error) {
+        installation.manualUpdateReason =
+          error instanceof Error ? error.message : String(error);
+      }
+    }
   } catch {
     /* An unverified npm prefix gets instructions, never a global update action. */
   }

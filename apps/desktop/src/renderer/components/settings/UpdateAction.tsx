@@ -24,7 +24,6 @@ export function UpdateAction({ update }: { update: UpdateSnapshot }) {
           : 'Update n10 the same way you installed it.'}
       </p>
     );
-  if (!update.availableVersion) return null;
   const copy = () =>
     navigator.clipboard
       .writeText(command)
@@ -59,6 +58,11 @@ export function UpdateAction({ update }: { update: UpdateSnapshot }) {
           {copied ? 'Copied' : 'Copy command'}
         </Button>
       </div>
+      {update.installation.manualUpdateReason && (
+        <p className="text-sm text-warning">
+          {update.installation.manualUpdateReason}
+        </p>
+      )}
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">
           Your tmux agents keep running. Save any unfinished review text before

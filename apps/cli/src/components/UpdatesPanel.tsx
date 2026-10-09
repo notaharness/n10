@@ -73,6 +73,11 @@ export function UpdatesPanel({ onClose }: { onClose: () => void }) {
                 ? 'Press u to close n10, install with npm, and reopen. Or copy the command to update manually.'
                 : 'Quit n10, run the command in your terminal, then open n10 --tui again.'}
             </Text>
+            {update.installation.manualUpdateReason && (
+              <Text color="yellow">
+                {update.installation.manualUpdateReason}
+              </Text>
+            )}
             <Text dimColor>Your tmux agents keep running.</Text>
           </>
         ) : (

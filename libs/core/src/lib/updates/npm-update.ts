@@ -1,13 +1,9 @@
+import { assertNpmUpdateWritable } from './npm-update-access.js';
+import { acquireNpmUpdateLock } from './npm-update-lock.js';
+import { protectNpmTransaction } from './npm-update-signals.js';
 import { execFile, spawn } from 'node:child_process';
-import {
-  access,
-  mkdir,
-  readFile,
-  realpath,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
-import { constants, readFileSync, realpathSync } from 'node:fs';
+import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
+import { readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -22,6 +18,7 @@ export interface NpmUpdatePlan {
 }
 export interface NpmUpdateResult {
   root: string;
+  fromVersion: string;
   version: string;
   status: 'succeeded' | 'failed';
   message: string;
@@ -47,10 +44,8 @@ export async function prepareNpmUpdate(
       'The requested version is no longer newer than this installation. Check again.'
     );
   const canonical = await realpath(root);
-  await access(canonical, constants.W_OK);
-  await access(join(canonical, '..'), constants.W_OK);
   const prefix = await npmRead(['prefix', '--global']);
-  await access(join(prefix, 'bin'), constants.W_OK);
+  await assertNpmUpdateWritable(canonical, prefix);
   return {
     root: canonical,
     prefix,
@@ -59,22 +54,11 @@ export async function prepareNpmUpdate(
   };
 }
 
-async function acquireLock(dir: string) {
-  const lock = join(dir, 'npm-update.lock');
-  try {
-    await mkdir(lock);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-    throw new Error(
-      `Another npm update may be running. If it has stopped, remove ${lock} and try again.`
-    );
-  }
-  return async () => {
-    await rm(lock, { recursive: true, force: true });
-  };
-}
-
-function install(plan: NpmUpdatePlan, logs: string): Promise<void> {
+function install(
+  plan: NpmUpdatePlan,
+  logs: string,
+  signals: ReturnType<typeof protectNpmTransaction>
+): Promise<void> {
   return new Promise((resolve, reject) => {
     // No shell, elevation, timeout or automatic retry around a package mutation.
     const child = spawn(
@@ -95,6 +79,7 @@ function install(plan: NpmUpdatePlan, logs: string): Promise<void> {
         stdio: 'inherit',
       }
     );
+    signals.watch(child);
     child.once('error', reject);
     child.once('close', (code, signal) =>
       code === 0
@@ -116,11 +101,12 @@ export async function runNpmUpdate(
 ): Promise<NpmUpdateResult> {
   const dir = join(homedir(), '.n10');
   const logPath = join(dir, 'npm-update-logs');
-  await mkdir(logPath, { recursive: true });
+  const signals = protectNpmTransaction();
   let release: () => Promise<void> = async () => undefined;
   let result: NpmUpdateResult;
   try {
-    release = await acquireLock(dir);
+    await mkdir(logPath, { recursive: true });
+    release = await acquireNpmUpdateLock(dir);
     const current = await prepareNpmUpdate(plan.root, plan.version);
     if (
       current.prefix !== plan.prefix ||
@@ -129,7 +115,7 @@ export async function runNpmUpdate(
       throw new Error(
         'The npm installation changed. Reopen n10 and check again.'
       );
-    await install(current, logPath);
+    await install(current, logPath, signals);
     const manifest = JSON.parse(
       await readFile(join(plan.root, 'package.json'), 'utf8')
     ) as { version: string };
@@ -139,6 +125,7 @@ export async function runNpmUpdate(
       );
     result = {
       root: plan.root,
+      fromVersion: plan.fromVersion,
       version: plan.version,
       status: 'succeeded',
       message: `Updated to n10 ${plan.version}.`,
@@ -147,18 +134,29 @@ export async function runNpmUpdate(
   } catch (error) {
     result = {
       root: plan.root,
+      fromVersion: plan.fromVersion,
       version: plan.version,
       status: 'failed',
       message: error instanceof Error ? error.message : String(error),
       logPath,
     };
-  } finally {
-    await release();
   }
-  await writeFile(join(dir, 'npm-update-result.json'), JSON.stringify(result), {
-    mode: 0o600,
-  });
-  return result;
+  try {
+    await writeFile(
+      join(dir, 'npm-update-result.json'),
+      JSON.stringify(result),
+      {
+        mode: 0o600,
+      }
+    );
+    return result;
+  } finally {
+    try {
+      await release();
+    } finally {
+      signals.dispose();
+    }
+  }
 }
 
 export function readNpmUpdateResult(root: string): NpmUpdateResult | null {
@@ -166,7 +164,13 @@ export function readNpmUpdateResult(root: string): NpmUpdateResult | null {
     const result = JSON.parse(
       readFileSync(join(homedir(), '.n10/npm-update-result.json'), 'utf8')
     ) as NpmUpdateResult;
-    return result.root === realpathSync(root) &&
+    const installed = JSON.parse(
+      readFileSync(join(root, 'package.json'), 'utf8')
+    ) as { version: string };
+    const relevantVersion =
+      result.status === 'succeeded' ? result.version : result.fromVersion;
+    return installed.version === relevantVersion &&
+      result.root === realpathSync(root) &&
       ['succeeded', 'failed'].includes(result.status) &&
       typeof result.message === 'string' &&
       typeof result.logPath === 'string'
@@ -175,25 +179,4 @@ export function readNpmUpdateResult(root: string): NpmUpdateResult | null {
   } catch {
     return null;
   }
-}
-
-/** Keeps the calling terminal owned until the replacement app exits. */
-export function relaunchNpmApp(
-  root: string,
-  mode: 'desktop' | 'tui'
-): Promise<number> {
-  const env = { ...process.env };
-  delete env.N10_UPDATE_HANDOFF;
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      process.execPath,
-      [
-        join(root, 'main.js'),
-        ...(mode === 'tui' ? ['--tui', process.cwd()] : []),
-      ],
-      { stdio: 'inherit', env }
-    );
-    child.once('error', reject);
-    child.once('close', (code) => resolve(code ?? 1));
-  });
 }

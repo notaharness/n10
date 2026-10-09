@@ -198,7 +198,6 @@ export {
   prepareNpmUpdate,
   runNpmUpdate,
   readNpmUpdateResult,
-  relaunchNpmApp,
 } from './lib/updates/npm-update.js';
 export type {
   NpmUpdatePlan,
