@@ -6,7 +6,6 @@ import { BINARY_NOTE, tooLargeNote, untrackedDiff } from './untracked-diff.js';
 
 export { untrackedFilePatch, BINARY_NOTE } from './untracked-diff.js';
 
-
 /** The target's remote-tracking ref, else the local branch. */
 async function resolveRef(cwd: string, branch: string): Promise<string> {
   for (const candidate of [`origin/${branch}`, branch]) {
