@@ -31,9 +31,11 @@ export function restoreNodeOptions(env: NodeJS.ProcessEnv): void {
  *  `execArgv`. */
 export function hostEnv(
   env: NodeJS.ProcessEnv,
-  userData: string
+  userData: string,
+  startDir?: string
 ): NodeJS.ProcessEnv {
   const out: NodeJS.ProcessEnv = { ...env, N10_USER_DATA: userData };
+  if (startDir) out.N10_START_DIR = startDir;
   const preload = env[HOST_REQUIRE];
   if (preload) {
     out[HOST_NODE_OPTIONS] = env.NODE_OPTIONS ?? '';
