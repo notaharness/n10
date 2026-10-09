@@ -13,6 +13,9 @@
       "path": "../../libs/review-comments"
     },
     {
+      "path": "../../libs/core"
+    },
+    {
       "path": "./tsconfig.e2e.json"
     }
   ]
