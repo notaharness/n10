@@ -5,11 +5,27 @@ $qaRoot = Join-Path $env:RUNNER_TEMP 'n10-installer-qa'
 New-Item -ItemType Directory -Force $qaRoot | Out-Null
 $env:N10_QA_RENDERER_ONLY = '1'
 $env:N10_QA_RESULT_FILE = Join-Path $qaRoot 'renderer-result.txt'
-$shot = Join-Path $qaRoot 'renderer.png'
-$env:N10_QA_STEPS = ConvertTo-Json -Compress -InputObject @(@{
-  js = 'document.querySelector("#root")?.childElementCount > 0 && !!window.n10 ? "RENDERER_OK" : "RENDERER_MISSING"'
-  shot = $shot
-})
+$shots = @(
+  (Join-Path $qaRoot 'renderer-dark.png'),
+  (Join-Path $qaRoot 'renderer-light.png')
+)
+$rendererCheck = 'document.querySelector("#root")?.childElementCount > 0 && !!window.n10 ? "RENDERER_OK" : "RENDERER_MISSING"'
+$env:N10_QA_STEPS = ConvertTo-Json -Compress -Depth 4 -InputObject @(
+  @{
+    js = "(() => { document.documentElement.classList.add('dark'); document.documentElement.style.colorScheme = 'dark'; return $rendererCheck; })()"
+    width = 1600
+    height = 900
+    waitMs = 800
+    shot = $shots[0]
+  },
+  @{
+    js = "(() => { document.documentElement.classList.remove('dark'); document.documentElement.style.colorScheme = 'light'; return $rendererCheck; })()"
+    width = 1600
+    height = 900
+    waitMs = 800
+    shot = $shots[1]
+  }
+)
 
 $install = Start-Process -FilePath $installer -ArgumentList '/S' -PassThru -Wait
 if ($install.ExitCode -ne 0) { throw "Installer exited $($install.ExitCode)" }
@@ -34,8 +50,19 @@ try {
   if ((Get-Content $env:N10_QA_RESULT_FILE -Raw).Trim() -ne 'RENDERER_OK') {
     throw 'Packaged renderer did not mount with its preload bridge'
   }
-  if (!(Test-Path $shot) -or (Get-Item $shot).Length -lt 1000) {
-    throw 'Packaged renderer screenshot missing'
+  Add-Type -AssemblyName System.Drawing
+  foreach ($shot in $shots) {
+    if (!(Test-Path $shot) -or (Get-Item $shot).Length -lt 1000) {
+      throw "Packaged renderer screenshot missing: $shot"
+    }
+    $image = [System.Drawing.Image]::FromFile($shot)
+    try {
+      if ($image.Width -ne 1600 -or $image.Height -ne 900) {
+        throw "Packaged renderer screenshot is not 1600x900: $shot"
+      }
+    } finally {
+      $image.Dispose()
+    }
   }
   $logs = (Get-Content $stdout, $stderr -Raw) -join "`n"
   if (!$logs.Contains('Terminal sessions are not supported on Windows yet.')) {

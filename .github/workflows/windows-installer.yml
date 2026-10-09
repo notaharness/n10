@@ -12,6 +12,7 @@ on:
       - 'apps/desktop/scripts/package-windows.mjs'
       - 'apps/desktop/scripts/test-windows-installer.ps1'
       - 'apps/desktop/src/main/main.ts'
+      - 'apps/desktop/src/main/host-worker.ts'
       - 'apps/desktop/src/main/qa-steps.ts'
       - 'apps/desktop/build/**'
       - 'package-lock.json'
@@ -50,4 +51,10 @@ jobs:
         with:
           name: release-windows-x64
           path: release/
+          if-no-files-found: error
+      - if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-qa
+          path: ${{ runner.temp }}/n10-installer-qa/renderer-*.png
           if-no-files-found: error
