@@ -1,1 +1,2 @@
-export { runNpmUpdate, relaunchNpmApp } from '@n10/core';
+export { runNpmUpdate } from '@n10/core';
+export { relaunchNpmApp } from './relaunch-npm-app.js';

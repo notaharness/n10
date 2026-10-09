@@ -1,3 +1,4 @@
+import { relaunchNpmApp } from './commands/relaunch-npm-app.js';
 import { UpdatesContext } from './hooks/useUpdates.js';
 import type { UpdateService, NpmUpdatePlan } from '@n10/engine/contract';
 import { createInstalledUpdates, type RepositoryHandle } from '@n10/engine';
@@ -37,7 +38,6 @@ import {
 import {
   killAll,
   runNpmUpdate,
-  relaunchNpmApp,
   applySessionBackend,
   probeTmuxAvailability,
   resetRepoRoot,
@@ -58,6 +58,10 @@ const providers: VcsProvider[] = [azureDevOpsProvider, githubProvider];
 const pullRequests = createPullRequestList({ providers });
 
 const EXIT_GRACE_MS = 3_000;
+async function drainAndDetach(stop: () => Promise<void>) {
+  await waitForExit(stop, settlePendingRuns, EXIT_GRACE_MS);
+  killAll();
+}
 
 // ── App ────────────────────────────────────────────────────────────
 
@@ -80,8 +84,7 @@ function App({
           'Closing n10 — waiting up to 3 seconds for active operations…',
           'info'
         );
-        await waitForExit(() => sync.stop(), settlePendingRuns, EXIT_GRACE_MS);
-        killAll();
+        await drainAndDetach(() => sync.stop());
         exit();
         if (command) console.log(`To update, run: ${command}`);
         process.exit(0);
@@ -156,14 +159,12 @@ export async function runTui(args: string[], packageRoot = ''): Promise<void> {
     killAll();
     restoreWindowTitle();
   });
-  process.on('SIGINT', () => {
+  const stopOnSignal = () => {
     killAll();
     process.exit(0);
-  });
-  process.on('SIGTERM', () => {
-    killAll();
-    process.exit(0);
-  });
+  };
+  process.on('SIGINT', stopOnSignal);
+  process.on('SIGTERM', stopOnSignal);
 
   // Resolve the requirement before rendering so missing tmux is actionable.
   await probeTmuxAvailability();
@@ -194,7 +195,7 @@ export async function runTui(args: string[], packageRoot = ''): Promise<void> {
   });
 
   async function restart(plan: NpmUpdatePlan) {
-    await Promise.all([sync.stop(), settlePendingRuns()]);
+    await drainAndDetach(() => sync.stop());
     updates.stop();
     instance.unmount();
     await instance.waitUntilExit();
@@ -204,7 +205,8 @@ export async function runTui(args: string[], packageRoot = ''): Promise<void> {
     repo.sessions.park();
     repo.reviews.park();
     pullRequests.dispose();
-    killAll();
+    process.off('SIGINT', stopOnSignal);
+    process.off('SIGTERM', stopOnSignal);
     try {
       console.log(
         `Updating n10 to ${plan.version}… Your tmux agents keep running.`

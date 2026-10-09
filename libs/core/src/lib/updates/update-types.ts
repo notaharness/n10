@@ -13,6 +13,7 @@ export interface UpdateCache {
   etag?: string;
 }
 export interface UpdateInstallation {
+  manualUpdateReason?: string;
   version: string;
   kind: 'unknown' | 'npm-global' | 'npm-local' | 'packaged' | 'development';
 }

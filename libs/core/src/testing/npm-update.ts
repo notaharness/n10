@@ -1,14 +1,16 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer, type ServerResponse } from 'node:http';
 import { join } from 'node:path';
 
 /** A real npm package and registry, confined to a disposable prefix. */
-export async function npmUpdateFixture() {
-  const home = mkdtempSync(join(tmpdir(), 'n10-npm-update-test-'));
+export async function npmUpdateFixture(
+  home: string,
+  entry: string,
+  fixtureOverrides = true
+) {
   const prefix = join(home, 'prefix');
   const root = join(prefix, 'lib/node_modules/@notaharness/n10');
   const stage = join(home, 'stage');
@@ -27,14 +29,13 @@ export async function npmUpdateFixture() {
     JSON.stringify({ ...manifest, version: '1.0.0-beta.1' })
   );
   writeFileSync(join(packageDir, 'package.json'), JSON.stringify(manifest));
-  writeFileSync(
-    join(packageDir, 'main.js'),
-    '#!/usr/bin/env node\nconsole.log("replacement n10");\nprocess.exit(23);\n'
-  );
+  writeFileSync(join(root, 'main.js'), entry);
+  writeFileSync(join(packageDir, 'main.js'), entry);
   execFileSync('tar', ['-czf', join(home, 'n10.tgz'), '-C', stage, 'package']);
   const tarball = readFileSync(join(home, 'n10.tgz'));
   const requests: string[] = [];
-  const scenario = { fail: false };
+  const scenario = { fail: false, holdTarball: false };
+  const downloads = new Set<ServerResponse>();
   let url = '';
   const server = createServer((req, res) => {
     requests.push(req.url ?? '');
@@ -43,8 +44,16 @@ export async function npmUpdateFixture() {
       res.end('{}');
       return;
     }
+    if (req.url === '/dist-tags') {
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ beta: version, latest: version }));
+      return;
+    }
     if (req.url === '/n10.tgz') {
-      res.end(tarball);
+      if (scenario.holdTarball) {
+        downloads.add(res);
+        res.on('close', () => downloads.delete(res));
+      } else res.end(tarball);
       return;
     }
     res.setHeader('content-type', 'application/json');
@@ -76,6 +85,12 @@ export async function npmUpdateFixture() {
     npm_config_registry: url,
     npm_config_cache: join(home, 'cache'),
     npm_config_userconfig: join(home, '.npmrc'),
+    ...(fixtureOverrides
+      ? {
+          N10_UPDATE_TEST_REGISTRY: `${url}/dist-tags`,
+          N10_UPDATE_TEST_INSTALL: root,
+        }
+      : {}),
     npm_config_globalconfig: join(home, 'global.npmrc'),
   };
   return {
@@ -86,6 +101,11 @@ export async function npmUpdateFixture() {
     requests,
     scenario,
     env,
+    releaseDownload: () => {
+      scenario.holdTarball = false;
+      for (const res of downloads) res.end(tarball);
+      downloads.clear();
+    },
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));

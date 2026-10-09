@@ -1,25 +1,32 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { chmodSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test as base, expect } from './fixtures/desktop.js';
-import { npmUpdateFixture } from './setup/fake-npm-install.js';
+import { npmUpdateFixture } from '@n10/core/testing/npm-update';
 import { npmUpdateParent } from './setup/npm-update-parent.js';
 import { clickAppMenuItem } from './setup/menu.js';
 import { socketEnv } from './setup/tmux.js';
 
 const test = base.extend<{
+  readOnlyPrefix: boolean;
   npm: Awaited<ReturnType<typeof npmUpdateFixture>>;
   parent: Awaited<ReturnType<typeof npmUpdateParent>>;
 }>({
-  npm: async ({ fixtureHome }, provide) => {
+  readOnlyPrefix: [false, { option: true }],
+  npm: async ({ fixtureHome, readOnlyPrefix }, provide) => {
     // A tiny fixture release records that the installed entry point ran.
     const marker = join(fixtureHome, 'restarted.json');
     const entry = `#!/usr/bin/env node\nimport { writeFileSync } from 'node:fs';\nwriteFileSync(${JSON.stringify(
       marker
     )}, JSON.stringify(process.argv));\n`;
     const npm = await npmUpdateFixture(fixtureHome, entry);
-    await provide(npm);
-    await npm.close();
+    if (readOnlyPrefix) chmodSync(npm.root, 0o555);
+    try {
+      await provide(npm);
+    } finally {
+      chmodSync(npm.root, 0o755);
+      await npm.close();
+    }
   },
   parent: async ({ npm }, provide) => {
     const parent = await npmUpdateParent(npm.root, npm.env);
@@ -99,4 +106,44 @@ test('Npm restart: desktop quits, npm installs the pinned release, and the repla
     path: info.outputPath('restart-complete-1600x900.png'),
   });
   expect(pid()).toBe(before);
+});
+
+test.describe('read-only npm prefix', () => {
+  test.use({ readOnlyPrefix: true });
+  test.skip(process.getuid?.() === 0, 'Root bypasses POSIX write permissions.');
+  test('keeps the manual command and explains administrator rights without offering a restart', async ({
+    desktop,
+  }, info) => {
+    await desktop.main(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0]!.setContentSize(1600, 900)
+    );
+    await desktop.page
+      .getByRole('button', { name: 'Update available', exact: true })
+      .click();
+    await expect(
+      desktop.page.getByText('npm needs administrator rights', { exact: false })
+    ).toBeVisible();
+    await expect(
+      desktop.page.getByRole('button', {
+        name: 'Update and restart',
+        exact: true,
+      })
+    ).toHaveCount(0);
+    await expect(
+      desktop.page.getByRole('button', { name: 'Copy command', exact: true })
+    ).toBeVisible();
+    await expect(
+      desktop.page.getByText('npm i -g @notaharness/n10@1.0.0-beta.2', {
+        exact: true,
+      })
+    ).toBeVisible();
+    for (const theme of ['Light', 'Dark']) {
+      await clickAppMenuItem(desktop.app, theme);
+      await desktop.page.screenshot({
+        path: info.outputPath(
+          `restart-manual-${theme.toLowerCase()}-1600x900.png`
+        ),
+      });
+    }
+  });
 });
