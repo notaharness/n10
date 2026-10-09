@@ -21,7 +21,7 @@ docker run --rm -i --platform "$platform" \
   -e N10_QA_STEPS="$qa_steps" \
   -v "$deb:/tmp/n10.deb:ro" \
   -v "$app_image:/tmp/n10.AppImage:ro" \
-  public.ecr.aws/ubuntu/ubuntu:24.04 bash -se <<'CONTAINER'
+  ubuntu.azurecr.io/ubuntu:24.04 bash -se <<'CONTAINER'
 set -euo pipefail
 apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/n10.deb xvfb fuse3 > /tmp/install.log
