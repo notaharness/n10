@@ -11,6 +11,11 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./mux": {
+      "types": "./src/mux.ts",
+      "import": "./src/mux.ts",
+      "default": "./src/mux.ts"
+    },
     "./plan": {
       "types": "./src/plan.ts",
       "import": "./src/plan.ts",
