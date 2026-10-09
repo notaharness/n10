@@ -17,6 +17,8 @@ import { MAIN_MARKS, mark } from './boot-marks.js';
 import { pickFolderWithDialog } from './folder-picker.js';
 import { buildMenuTemplate } from '../host/menu-template.js';
 import { installUnsavedGuard } from './unsaved-guard.js';
+import { installDockIcon, windowIcon } from './app-icon.js';
+import { showAbout } from './about.js';
 import {
   installProcessDiagnostics,
   installRendererRecovery,
@@ -58,23 +60,6 @@ function installAppMenu(): void {
     sendMenuCommand
   );
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-}
-
-function showAbout(): Promise<void> {
-  return dialog
-    .showMessageBox({
-      type: 'info',
-      title: 'About n10 Desktop',
-      message: 'n10 Desktop',
-      detail: [
-        `Version ${APP_VERSION}`,
-        `Electron ${process.versions.electron} · Chromium ${process.versions.chrome} · Node ${process.versions.node}`,
-        '',
-        'Worktrees, agents and reviews for one repository.',
-      ].join('\n'),
-      buttons: ['OK'],
-    })
-    .then(() => undefined);
 }
 
 function popupContextMenu(items: ContextMenuItem[]): Promise<string | null> {
@@ -136,6 +121,7 @@ function createMainWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     title: 'n10',
+    icon: windowIcon(DIST),
     show: false,
     autoHideMenuBar: false,
     ...chrome,
@@ -255,7 +241,7 @@ function startHost(): HostProcess {
         const win = BrowserWindow.getFocusedWindow() ?? undefined;
         menu?.popup({ window: win });
       },
-      aboutBox: showAbout,
+      aboutBox: () => showAbout(APP_VERSION),
       prefsChanged: async (next) => {
         prefs = next;
         nativeTheme.themeSource = next.theme; // recolors overlay + native menus
@@ -312,6 +298,7 @@ if (!app.requestSingleInstanceLock()) {
     .whenReady()
     .then(async () => {
       mark(MAIN_MARKS.ready);
+      installDockIcon(DIST);
       nativeTheme.themeSource = prefs.theme;
       installAppMenu();
       // Only the instance that holds the lock starts a host, so only it
