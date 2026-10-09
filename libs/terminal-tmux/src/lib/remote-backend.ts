@@ -7,7 +7,7 @@
  * different sources on purpose — see decisions.md D4 and AGENTS.md: a
  * dropped connection must never render as the agent having exited.
  */
-import type { SessionBackend, SessionSpec } from '@n10/terminal';
+import type { SessionBackend, SessionSpec, SessionTarget } from '@n10/terminal';
 import { tmuxAttachArgs } from './tmux-cli.js';
 import { tmuxCapturePaneWith, tmuxKillSessionWith } from './tmux-cli-remote.js';
 import { prepareRemoteTmuxSession } from './tmux-launch-remote.js';
@@ -42,7 +42,8 @@ const MAX_RECONNECT_ATTEMPTS = 3;
 const STABLE_CONNECTION_MS = 2000;
 
 export class RemoteTmuxBackend implements SessionBackend {
-  readonly name: string;
+  readonly target: SessionTarget;
+  private readonly name: string;
   /** No local OS process backs a remote session. */
   readonly pid = 0;
   private handle: RemotePtyHandle;
@@ -83,6 +84,7 @@ export class RemoteTmuxBackend implements SessionBackend {
     handle: RemotePtyHandle
   ) {
     this.name = name;
+    this.target = { kind: 'tmux', name };
     this.width = spec.cols;
     this.height = spec.rows;
     this.handle = handle;

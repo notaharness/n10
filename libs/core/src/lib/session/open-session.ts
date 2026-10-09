@@ -170,7 +170,7 @@ function registration(
   const { session } = params;
   const machineId = session.machine ?? LOCAL_MACHINE;
   if (session.type !== 'worktree')
-    return { key: terminalSessionKey(backend.name!, machineId) };
+    return { key: terminalSessionKey(backend.target!.name, machineId) };
   const written =
     plan.mode === 'create' ? plan.tags[ORCHESTRA_TAG.branch] : undefined;
   return {

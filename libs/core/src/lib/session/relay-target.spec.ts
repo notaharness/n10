@@ -20,7 +20,13 @@ vi.mock('@n10/terminal-tmux', () => ({
 import { parseRelayPayload, resolveLocalRelayTarget } from './relay-target.js';
 
 function entry(name: string, agent: string | undefined) {
-  return { pty: { name }, agent, exited: false, emu: {}, spawnedAt: 0 };
+  return {
+    pty: { target: { kind: 'tmux', name } },
+    agent,
+    exited: false,
+    emu: {},
+    spawnedAt: 0,
+  };
 }
 
 describe('parseRelayPayload', () => {

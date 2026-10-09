@@ -176,7 +176,7 @@ it('refreshes the owning agent runtime and retains it after the pane exits', asy
     return {
       ...entry,
       agent: 'claude',
-      pty: { ...entry.pty, name: 'real-tmux' },
+      pty: { ...entry.pty, target: { kind: 'tmux', name: 'real-tmux' } },
     };
   });
   await service.launch({ kind: 'agent', cwd: '/repo' });

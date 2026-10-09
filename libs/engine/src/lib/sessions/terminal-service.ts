@@ -121,7 +121,8 @@ function terminalRecord(
   name: string
 ): TerminalRecord {
   const agent = launched.agent ?? req.restore?.agent;
-  const tmuxName = launched.pty.name ?? req.restore?.target.name ?? name;
+  const tmuxName =
+    launched.pty.target?.name ?? req.restore?.target.name ?? name;
   return {
     kind: req.kind,
     cwd: req.cwd,
@@ -154,7 +155,7 @@ export function createTerminalService(ports: TerminalPorts) {
   function refreshRuntime(name: string, record: TerminalRecord): void {
     const restore = record.restore;
     if (!restore) return;
-    const tmuxName = getSession(name)?.pty.name ?? restore.target.name;
+    const tmuxName = getSession(name)?.pty.target?.name ?? restore.target.name;
     const runtime = observedRuntime(
       sessionIdentity(name)?.machine,
       tmuxName,

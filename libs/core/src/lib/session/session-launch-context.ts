@@ -82,7 +82,7 @@ export function sessionIncarnationMatches(
 ): boolean {
   const machine = sessionIdentity(name)?.machine ?? LOCAL_MACHINE;
   if (machine !== LOCAL_MACHINE) return false;
-  const nativeName = getSession(name)?.pty.name;
+  const nativeName = getSession(name)?.pty.target?.name;
   const live = nativeName && tmuxSessionSnapshot(nativeName)?.incarnation;
   return !!live && sameTmuxIncarnation(live, expected);
 }

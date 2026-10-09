@@ -213,7 +213,7 @@ describe('explicit tmux launch plans', () => {
     mock.taken.add('test');
     mock.duplicate.add('test-2');
     const backend = await launch();
-    expect(backend.name).toBe('test-3');
+    expect(backend.target).toEqual({ kind: 'tmux', name: 'test-3' });
     expect(mock.calls.some((call) => call.startsWith('option test '))).toBe(
       false
     );
@@ -225,7 +225,7 @@ describe('explicit tmux launch plans', () => {
       tags: {},
       excludedNames: ['a-b'],
     });
-    expect(backend.name).toBe('a-b-2');
+    expect(backend.target).toEqual({ kind: 'tmux', name: 'a-b-2' });
   });
   it('does not clean up someone else’s session when allocation fails', async () => {
     mock.createError = 'permission denied';
