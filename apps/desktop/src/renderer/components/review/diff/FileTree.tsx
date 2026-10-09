@@ -16,6 +16,7 @@ import {
   type TreeNode,
 } from '../../../lib/diff/file-tree-model.js';
 import type { Coverage, Unavailable } from '../../../lib/diff/coverage.js';
+import { useVisibleDiffFiles } from '../../../lib/diff/visible-files-context.js';
 import { cn } from '../../../lib/utils.js';
 import { ScrollArea } from '../../ui/scroll-area.js';
 import { ChangeKind, type ChangeStatus } from './ChangeKind.js';
@@ -223,22 +224,49 @@ function TreeRow({
     );
   }
 
-  const { entry } = node;
+  return (
+    <FileRow
+      entry={node.entry}
+      name={node.name}
+      depth={depth}
+      selected={selected}
+      onSelect={onSelect}
+    />
+  );
+}
+
+function FileRow({
+  entry,
+  name,
+  depth,
+  selected,
+  onSelect,
+}: {
+  entry: FileEntry;
+  name: string;
+  depth: number;
+  selected: string | null;
+  onSelect: (path: string) => void;
+}) {
+  const visibleFiles = useVisibleDiffFiles();
   const isSel = selected === entry.path;
+  const isVisible = visibleFiles.has(entry.path);
   return (
     <button
       type="button"
       onClick={() => onSelect(entry.path)}
       aria-current={isSel || undefined}
+      data-visible-in-diff={isVisible || undefined}
       style={{ paddingLeft: 8 + depth * 12 + 16 }}
       title={entry.path}
       className={cn(
         'flex h-[22px] w-full items-center gap-1.5 pr-2 text-base hover:bg-accent',
-        isSel ? 'bg-sidebar-active text-foreground' : 'text-foreground/90'
+        isSel ? 'bg-sidebar-active text-foreground' : 'text-foreground/90',
+        isVisible && 'bg-accent shadow-[inset_3px_0_0_var(--primary)]'
       )}
     >
       <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
-      <span className="min-w-0 flex-1 truncate text-left">{node.name}</span>
+      <span className="min-w-0 flex-1 truncate text-left">{name}</span>
       {(entry.drafts ?? 0) > 0 && (
         <span
           className="rounded border border-dashed border-border px-1 text-[10px] text-muted-foreground"

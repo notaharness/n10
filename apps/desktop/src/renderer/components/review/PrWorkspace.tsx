@@ -6,6 +6,7 @@ import {
 } from 'react-resizable-panels';
 import type { PlanItem } from '@n10/core/plan';
 import type { PullRequestInfo } from '@n10/vcs-core';
+import { VisibleDiffFiles } from '../../lib/diff/visible-files-provider.js';
 import { useDiffOptions } from '../../lib/diff/diff-options.js';
 import {
   useDraftComments,
@@ -136,15 +137,9 @@ export function PrWorkspace({
     [inlineThreads]
   );
 
-  const fileOrder = useMemo(
-    () => new Map(files.map(([f], i) => [f, i])),
-    [files]
-  );
-  const filesByName = useMemo(() => new Map(files), [files]);
-
   const hasDrafts = drafts.length > 0;
 
-  const { entries, listing } = useFileEntries(
+  const { entries, listing, fileOrder, filesByName } = useFileEntries(
     files,
     prDiff,
     threadsByFile,
@@ -216,131 +211,135 @@ export function PrWorkspace({
   diffShown.settle(effMode);
 
   return (
-    <div ref={rootRef} className="flex h-full min-h-0 min-w-0 flex-col">
-      <WorkspaceHeader
-        pr={pr}
-        mode={effMode}
-        branch={branch}
-        baseBranch={baseBranch}
-        fileCount={files.length}
-        onShowUnresolved={rail.showUnresolved}
-        onBack={backToReview}
-      />
-      <div className="flex min-h-0 min-w-0 flex-1">
-        {rail.hidden && <CollapsedRail onShow={() => rail.setHidden(false)} />}
-
-        <Group
-          orientation="horizontal"
-          className="min-h-0 min-w-0 flex-1"
-          onLayoutChanged={railWidth.onLayoutChanged}
-        >
-          {!rail.hidden && (
-            <>
-              <Panel
-                id={railWidth.id}
-                panelRef={railWidth.panelRef}
-                elementRef={railWidth.elementRef}
-                defaultSize={railWidth.defaultSize}
-                groupResizeBehavior="preserve-pixel-size"
-                minSize="200px"
-                maxSize="45%"
-                className="min-w-0"
-              >
-                <ReviewRail
-                  sessions={sessions.cards}
-                  shownSession={effMode === 'agent' ? pane.shownName : null}
-                  agentBusy={busy}
-                  terminalBusy={sessions.terminalBusy}
-                  onOpenSession={pane.open}
-                  onLaunchAgent={onLaunch}
-                  onLaunchTerminal={sessions.launchTerminal}
-                  onStopSession={sessions.stop}
-                  onHide={() => rail.setHidden(true)}
-                  guide={guide}
-                  guideActive={effMode === 'guide'}
-                  onGuide={() => setMode('guide')}
-                  drafts={drafts}
-                  reviewActive={effMode === 'review'}
-                  onReview={openDrafts}
-                  postingAll={postAll.pending}
-                  onPostAll={postAll.post}
-                  planCount={plan.count}
-                  planNoted={plan.noted}
-                  planActive={effMode === 'plan'}
-                  onPlan={openPlanPane}
-                  entries={entries}
-                  listing={listing}
-                  diffLoading={diff.pending}
-                  selectedFile={effMode === 'diff' ? nav.selectedFile : null}
-                  onSelectFile={nav.jumpToFile}
-                />
-              </Panel>
-              <PanelSeparator
-                disableDoubleClick
-                onDoubleClick={railWidth.onReset}
-                className="relative w-px bg-border transition-colors after:absolute after:inset-y-0 after:-left-1 after:w-2 hover:bg-primary data-[resize-handle-state=drag]:bg-primary"
-              />
-            </>
+    <VisibleDiffFiles active={effMode === 'diff'}>
+      <div ref={rootRef} className="flex h-full min-h-0 min-w-0 flex-col">
+        <WorkspaceHeader
+          pr={pr}
+          mode={effMode}
+          branch={branch}
+          baseBranch={baseBranch}
+          fileCount={files.length}
+          onShowUnresolved={rail.showUnresolved}
+          onBack={backToReview}
+        />
+        <div className="flex min-h-0 min-w-0 flex-1">
+          {rail.hidden && (
+            <CollapsedRail onShow={() => rail.setHidden(false)} />
           )}
 
-          <Panel id="review-content" minSize="30%" className="min-w-0">
-            <ContentPane
-              effMode={effMode}
-              pr={pr}
-              prId={prId}
-              branch={branch}
-              baseBranch={baseBranch}
-              sessionName={pane.shownName ?? undefined}
-              sessionEpoch={pane.epoch}
-              connectionBanner={pane.banner.connectionBanner}
-              inputDisabled={pane.banner.inputDisabled}
-              exited={
-                pane.banner.ended
-                  ? { onResume: pane.shownIsAgent ? onLaunch : undefined }
-                  : null
-              }
-              files={files}
-              diffHead={diff.head}
-              filesByName={filesByName}
-              fileOrder={fileOrder}
-              threadsByFile={threadsByFile}
-              draftsByFile={draftsByFile}
-              general={general}
-              hideResolved={options.hideResolved}
-              drafts={drafts}
-              hasDrafts={hasDrafts}
-              guide={guide}
-              commentsLoading={comments.isLoading}
-              threadsNotice={readNotice(
-                'comments',
-                threadsRead,
-                threads.retrying,
-                threads.retry,
-                'mx-2 mt-2 shrink-0'
-              )}
-              diffRead={diff.read}
-              diffRetrying={diff.retrying}
-              onRetryDiff={diff.retry}
-              prDiff={diff.prDiff}
-              focusThreadId={nav.focusId}
-              scrollRef={nav.scrollRef}
-              jumpRef={nav.jumpRef}
-              place={nav.place}
-              navCount={nav.items.length}
-              navIndex={nav.navIndex}
-              onPrev={() => nav.step(-1)}
-              onNext={() => nav.step(1)}
-              onExitReview={showDiff}
-              onReviewDrafts={openDrafts}
-              onOpenPlace={nav.jumpToPlace}
-              onOpenInDiff={nav.jumpToFile}
-              onOverviewAction={onOverviewAction}
-              onOpenThread={nav.jumpToId}
-              plan={plan.wiring}
-            />
-          </Panel>
-        </Group>
+          <Group
+            orientation="horizontal"
+            className="min-h-0 min-w-0 flex-1"
+            onLayoutChanged={railWidth.onLayoutChanged}
+          >
+            {!rail.hidden && (
+              <>
+                <Panel
+                  id={railWidth.id}
+                  panelRef={railWidth.panelRef}
+                  elementRef={railWidth.elementRef}
+                  defaultSize={railWidth.defaultSize}
+                  groupResizeBehavior="preserve-pixel-size"
+                  minSize="200px"
+                  maxSize="45%"
+                  className="min-w-0"
+                >
+                  <ReviewRail
+                    sessions={sessions.cards}
+                    shownSession={effMode === 'agent' ? pane.shownName : null}
+                    agentBusy={busy}
+                    terminalBusy={sessions.terminalBusy}
+                    onOpenSession={pane.open}
+                    onLaunchAgent={onLaunch}
+                    onLaunchTerminal={sessions.launchTerminal}
+                    onStopSession={sessions.stop}
+                    onHide={() => rail.setHidden(true)}
+                    guide={guide}
+                    guideActive={effMode === 'guide'}
+                    onGuide={() => setMode('guide')}
+                    drafts={drafts}
+                    reviewActive={effMode === 'review'}
+                    onReview={openDrafts}
+                    postingAll={postAll.pending}
+                    onPostAll={postAll.post}
+                    planCount={plan.count}
+                    planNoted={plan.noted}
+                    planActive={effMode === 'plan'}
+                    onPlan={openPlanPane}
+                    entries={entries}
+                    listing={listing}
+                    diffLoading={diff.pending}
+                    selectedFile={effMode === 'diff' ? nav.selectedFile : null}
+                    onSelectFile={nav.jumpToFile}
+                  />
+                </Panel>
+                <PanelSeparator
+                  disableDoubleClick
+                  onDoubleClick={railWidth.onReset}
+                  className="relative w-px bg-border transition-colors after:absolute after:inset-y-0 after:-left-1 after:w-2 hover:bg-primary data-[resize-handle-state=drag]:bg-primary"
+                />
+              </>
+            )}
+
+            <Panel id="review-content" minSize="30%" className="min-w-0">
+              <ContentPane
+                effMode={effMode}
+                pr={pr}
+                prId={prId}
+                branch={branch}
+                baseBranch={baseBranch}
+                sessionName={pane.shownName ?? undefined}
+                sessionEpoch={pane.epoch}
+                connectionBanner={pane.banner.connectionBanner}
+                inputDisabled={pane.banner.inputDisabled}
+                exited={
+                  pane.banner.ended
+                    ? { onResume: pane.shownIsAgent ? onLaunch : undefined }
+                    : null
+                }
+                files={files}
+                diffHead={diff.head}
+                filesByName={filesByName}
+                fileOrder={fileOrder}
+                threadsByFile={threadsByFile}
+                draftsByFile={draftsByFile}
+                general={general}
+                hideResolved={options.hideResolved}
+                drafts={drafts}
+                hasDrafts={hasDrafts}
+                guide={guide}
+                commentsLoading={comments.isLoading}
+                threadsNotice={readNotice(
+                  'comments',
+                  threadsRead,
+                  threads.retrying,
+                  threads.retry,
+                  'mx-2 mt-2 shrink-0'
+                )}
+                diffRead={diff.read}
+                diffRetrying={diff.retrying}
+                onRetryDiff={diff.retry}
+                prDiff={diff.prDiff}
+                focusThreadId={nav.focusId}
+                scrollRef={nav.scrollRef}
+                jumpRef={nav.jumpRef}
+                place={nav.place}
+                navCount={nav.items.length}
+                navIndex={nav.navIndex}
+                onPrev={() => nav.step(-1)}
+                onNext={() => nav.step(1)}
+                onExitReview={showDiff}
+                onReviewDrafts={openDrafts}
+                onOpenPlace={nav.jumpToPlace}
+                onOpenInDiff={nav.jumpToFile}
+                onOverviewAction={onOverviewAction}
+                onOpenThread={nav.jumpToId}
+                plan={plan.wiring}
+              />
+            </Panel>
+          </Group>
+        </div>
       </div>
-    </div>
+    </VisibleDiffFiles>
   );
 }

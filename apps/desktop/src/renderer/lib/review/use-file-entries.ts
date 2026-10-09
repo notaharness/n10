@@ -21,7 +21,17 @@ export function useFileEntries(
   prDiff: PrDiffView | undefined,
   threadsByFile: Map<string, RemoteCommentThread[]>,
   draftsByFile: Map<string, ReviewComment[]>
-): { entries: FileEntry[]; listing?: FileListing } {
+): {
+  entries: FileEntry[];
+  listing?: FileListing;
+  fileOrder: Map<string, number>;
+  filesByName: Map<string, DiffLine[]>;
+} {
+  const fileOrder = useMemo(
+    () => new Map(files.map(([file], index) => [file, index])),
+    [files]
+  );
+  const filesByName = useMemo(() => new Map(files), [files]);
   const manifestFiles = prDiff?.manifestFiles;
   const bodies = prDiff?.bodies;
   const incomplete = prDiff?.incomplete ?? false;
@@ -44,5 +54,5 @@ export function useFileEntries(
         : undefined,
     [manifestFiles, bodies, incomplete]
   );
-  return listing ? { entries, listing } : { entries };
+  return { entries, listing, fileOrder, filesByName };
 }
