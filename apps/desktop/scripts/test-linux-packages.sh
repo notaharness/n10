@@ -23,7 +23,7 @@ docker run --rm -i --platform "$platform" \
   ubuntu:24.04 bash -se <<'CONTAINER'
 set -euo pipefail
 apt-get update -qq
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/n10.deb xvfb > /tmp/install.log
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/n10.deb xvfb zlib1g > /tmp/install.log
 tmux -V
 git --version
 git init -q /tmp/qa-repo
