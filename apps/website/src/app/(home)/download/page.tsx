@@ -73,7 +73,7 @@ export default function DownloadPage() {
               <Heading title="npm" note="Linux and macOS" />
               <p className="text-fd-muted-foreground mt-2 text-sm text-pretty">
                 One package holds n10 Desktop and the terminal UI. It needs
-                Node.js 20 or newer.
+                Node.js 22.12 or newer.
               </p>
               <CommandLines
                 lines={['npm install -g @notaharness/n10']}
