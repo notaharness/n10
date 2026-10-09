@@ -67,7 +67,7 @@ test.describe('Terminal tabs', () => {
     // be up first — a keystroke sent while the shell is still starting
     // is read in cooked mode and lost.
     await expect(
-      page.locator('[data-terminal-pane]').getByText(/\S/).first()
+      page.locator('[data-terminal-pane] .xterm-rows').getByText(/\S/).first()
     ).toBeVisible({ timeout: 15_000 });
     await focusTerminal(page);
     await page.keyboard.type('echo n10-shell-$((40+2))\n', { delay: 20 });
@@ -101,7 +101,7 @@ test.describe('Terminal tabs', () => {
     await expect(tab).toHaveCount(1);
 
     await expect(
-      page.locator('[data-terminal-pane]').getByText(/\S/).first()
+      page.locator('[data-terminal-pane] .xterm-rows').getByText(/\S/).first()
     ).toBeVisible({ timeout: 15_000 });
     await focusTerminal(page);
     await page.keyboard.type('exit\n', { delay: 20 });
@@ -329,7 +329,7 @@ test.describe('Terminal shell', () => {
     await openNewTerminalDialog(app, page);
     await confirmNewTerminal(page, 'Shell');
     await expect(
-      page.locator('[data-terminal-pane]').getByText(/\S/).first()
+      page.locator('[data-terminal-pane] .xterm-rows').getByText(/\S/).first()
     ).toBeVisible({ timeout: 15_000 });
     await focusTerminal(page);
     await page.keyboard.type('echo shell-$(ps -o comm= -p $$)\n', {

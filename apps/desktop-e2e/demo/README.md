@@ -22,6 +22,7 @@ Nothing else: no network, no GitHub token, no real agent.
 | `review-in-place` | reading a pull request, switching diff views, replying to and resolving a thread                            |
 | `plan`            | queueing comments, annotating one, sending the plan to an agent                                             |
 | `babysit`         | babysitting a red pull request: the row's badge, then the update reaching an agent — cropped to the sidebar |
+| `tab-switching`   | Ctrl+PgDn/PgUp along the tab strip, then a held Ctrl+Tab through recent tabs, captioned                     |
 | `tui`             | the terminal UI: sidebar, changed files, diff with threads inline                                           |
 
 ## How it works

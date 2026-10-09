@@ -10,7 +10,7 @@ import {
   captureTmuxRuntime,
   snapshot as activitySnapshot,
 } from '@n10/core';
-import { activeRepository, requireRepo } from './repo.js';
+import { activeRepository, repository, requireRepo } from './repo.js';
 import { machines } from './machines.js';
 import { machineFor } from './remote-machines.js';
 import { broadcastLaunchStep } from './session-relay.js';
@@ -110,7 +110,9 @@ export async function launchReviewAgent(req: ReviewLaunchRequest): Promise<{
 }> {
   requireRepo();
   const branch = req.pr.sourceBranch;
-  const request = buildReviewLaunchRequest(req.pr, req.instruction);
+  const request = buildReviewLaunchRequest(req.pr, req.instruction, {
+    guide: req.guide,
+  });
   return launchAgent({
     branch,
     intent: 'seed',
@@ -197,8 +199,8 @@ function withResume(
   return { ...summary, restore };
 }
 
-export function listSessions(): SessionSummary[] {
-  const repo = activeRepository();
+export function listSessions(cwd: string): SessionSummary[] {
+  const repo = repository(cwd);
   const tagged = new Map(
     listOurSessions().map((session) => [registryNameOf(session), session])
   );
@@ -263,8 +265,12 @@ export function reconnectSession(name: string): void {
   getSession(name)?.pty.reconnect?.();
 }
 
+/** Any session this host relays, open repository or parked: its name
+ *  is qualified by its repository, so it is never another one's, and
+ *  its live output already reaches whoever watches it. A parked
+ *  repository's pane, held ready, starts from this. */
 export function getSessionBuffer(name: string): SessionBuffer {
-  const entry = ownSession(name);
+  const entry = known.get(name);
   if (entry) return relayBuffer(entry);
   // A terminal tab belongs to a directory, not to the open repository,
   // so its scrollback is answered whatever repository that is.

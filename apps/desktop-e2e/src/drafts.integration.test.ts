@@ -110,12 +110,8 @@ test.describe('@integration Agent draft comments', () => {
   }) => {
     const { page } = desktop;
     const listed = await page.evaluate(
-      (id) =>
-        (
-          window.n10 as never as {
-            listDraftComments(prId: number): Promise<{ id: string }[]>;
-          }
-        ).listDraftComments(id),
+      async (id) =>
+        window.n10.listDraftComments((await window.n10.getRepo())!.cwd, id),
       PR_ID
     );
     expect(listed.map((c) => c.id).sort()).toEqual([
@@ -128,15 +124,9 @@ test.describe('@integration Agent draft comments', () => {
     const { page, homeDir } = desktop;
     await page.evaluate(
       (id) =>
-        (
-          window.n10 as never as {
-            updateDraftComment(
-              prId: number,
-              commentId: string,
-              patch: Record<string, unknown>
-            ): Promise<void>;
-          }
-        ).updateDraftComment(id, 'draft-minor', { body: 'Edited by hand.' }),
+        window.n10.updateDraftComment(id, 'draft-minor', {
+          body: 'Edited by hand.',
+        }),
       PR_ID
     );
 
@@ -159,22 +149,13 @@ test.describe('@integration Agent draft comments', () => {
   test('discarding one leaves the rest alone', async ({ desktop }) => {
     const { page } = desktop;
     await page.evaluate(
-      (id) =>
-        (
-          window.n10 as never as {
-            deleteDraftComment(prId: number, commentId: string): Promise<void>;
-          }
-        ).deleteDraftComment(id, 'draft-minor'),
+      (id) => window.n10.deleteDraftComment(id, 'draft-minor'),
       PR_ID
     );
 
     const listed = await page.evaluate(
-      (id) =>
-        (
-          window.n10 as never as {
-            listDraftComments(prId: number): Promise<{ id: string }[]>;
-          }
-        ).listDraftComments(id),
+      async (id) =>
+        window.n10.listDraftComments((await window.n10.getRepo())!.cwd, id),
       PR_ID
     );
     expect(listed.map((c) => c.id)).toEqual(['draft-major']);

@@ -17,9 +17,11 @@ import {
   sidebarRow,
   tabs,
   visibleText,
+  openSessions,
 } from './setup/app.js';
 import { armContextMenuChoice, clickAppMenuItem } from './setup/menu.js';
 import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
+import { scrollTerminalToTop } from './setup/terminal-grid.js';
 
 /**
  * What the app does when something goes wrong.
@@ -65,7 +67,7 @@ async function expectAgentExited(page: Page, branch: string): Promise<void> {
   await expect
     .poll(
       async () => {
-        const sessions = await page.evaluate(() => window.n10.listSessions());
+        const sessions = await openSessions(page);
         return (
           sessions.find((s) => sessionBranch(s.name) === branch)?.running ??
           true
@@ -93,6 +95,9 @@ test.describe('An agent that exits immediately', () => {
     // The exit swaps the pane for tmux's retained frame, so what the
     // agent printed has to survive that swap. A capture that came back
     // empty would clear the terminal and leave the user with nothing.
+    // The frame is the PTY's height, taller than the pane under the exit
+    // bar, so its first line is up in the scrollback.
+    await scrollTerminalToTop(page);
     await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible();
   });
 
@@ -205,13 +210,17 @@ test.describe('An agent command that does not exist', () => {
     // that and the terminal is never put in front, the complaint is
     // written into a pane nobody is shown, and the launch fails in
     // silence with the diff still up.
-    await expect(
-      visibleText(page, /not found|no such file|ENOENT/i)
-    ).toBeVisible({ timeout: 30_000 });
+    // Under the exit bar, the complaint is up in the scrollback.
+    await expect(async () => {
+      await scrollTerminalToTop(page);
+      await expect(
+        visibleText(page, /not found|no such file|ENOENT/i)
+      ).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 30_000 });
     await expect
       .poll(
         async () => {
-          const sessions = await page.evaluate(() => window.n10.listSessions());
+          const sessions = await openSessions(page);
           return (
             sessions.find((s) => sessionBranch(s.name) === 'broken-agent')
               ?.running ?? false

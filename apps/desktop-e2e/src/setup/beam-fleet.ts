@@ -96,7 +96,7 @@ async function attachStreams(testInfo: TestInfo, page: Page): Promise<void> {
   const streams = await page
     .evaluate(async () => {
       const [sessions, terminals] = await Promise.all([
-        window.n10.listSessions(),
+        window.n10.listSessions((await window.n10.getRepo())!.cwd),
         window.n10.listTerminals(),
       ]);
       const names = [

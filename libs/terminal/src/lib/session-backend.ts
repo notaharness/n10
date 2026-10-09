@@ -44,6 +44,11 @@ export interface SessionBackend {
   /** The local connection ended while the hosted process remained alive. */
   onDisconnect?(cb: () => void): void;
   offDisconnect?(cb: () => void): void;
+  /** A local client's output begins: the next chunk `onData` delivers
+   *  is the first that client wrote. Fires for every client, the first
+   *  and each reconnection, as that output arrives. */
+  onAttach?(cb: () => void): void;
+  offAttach?(cb: () => void): void;
   /** Manual retry after automatic reconnection has given up
    *  (`connectionState === 'failed'`) — the affordance behind a pane's
    *  "Reconnect" action. A no-op when there is nothing to retry (a

@@ -140,9 +140,9 @@ export const PROGRAMS = {
     });
   },
 
-  reviewer(pr: PullRequestInfo, repo: RepoState): ClaudeCode {
+  reviewer(pr: PullRequestInfo, repo: RepoState, guide: boolean): ClaudeCode {
     return new ClaudeCode({
-      ...reviewScript(pr, repo),
+      ...reviewScript(pr, repo, guide),
       reply: () => DEMO_REPLY,
     });
   },

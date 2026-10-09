@@ -24,7 +24,7 @@ test.describe('Session PATH', () => {
     // The prompt has to be up first: a keystroke sent while the shell
     // is still starting is read in cooked mode and lost.
     await expect(
-      page.locator('[data-terminal-pane]').getByText(/\S/).first()
+      page.locator('[data-terminal-pane] .xterm-rows').getByText(/\S/).first()
     ).toBeVisible({ timeout: 15_000 });
     await focusTerminal(page);
     await page.keyboard.type(

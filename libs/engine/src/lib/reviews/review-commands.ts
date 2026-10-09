@@ -1,7 +1,4 @@
-import type {
-  PullRequestComments,
-  RemoteCommentThread,
-} from '@n10/vcs-core';
+import type { PullRequestComments, RemoteCommentThread } from '@n10/vcs-core';
 import type { PullRequestList } from '../pull-requests/api.js';
 import {
   createReviewContext,
@@ -45,7 +42,7 @@ export function createReviewCommands(
 ) {
   const context = createReviewContext(options);
   function configured() {
-    const snapshot = context.current();
+    const snapshot = context.selected();
     if (!snapshot.vcsConfigured || !snapshot.provider)
       throw new Error('No review provider is configured');
     return { snapshot, provider: snapshot.provider, ...snapshot.config };
@@ -62,10 +59,6 @@ export function createReviewCommands(
     return { resource, base: resource.getSnapshot(), value };
   }
   return {
-    viewer() {
-      const identifier = context.current().viewer;
-      return identifier ? { identifier } : null;
-    },
     async reply(req: ReplyToReviewThread) {
       if (typeof req.body !== 'string' || !req.body.trim())
         throw new TypeError('A reply needs a body');
@@ -73,7 +66,7 @@ export function createReviewCommands(
       if (!provider.replyToThread)
         throw new Error("Replies aren't available for this repository");
       const target = await thread(req.prId, req.threadId);
-      context.assertUnchanged(snapshot);
+      context.assertWritable(snapshot);
       const reply = await provider.replyToThread(
         vendorAuth,
         vendorProject,
@@ -103,7 +96,7 @@ export function createReviewCommands(
         );
       const target = await thread(req.prId, req.threadId);
       if (!target.value.canResolve) return false;
-      context.assertUnchanged(snapshot);
+      context.assertWritable(snapshot);
       await provider.setThreadResolved(
         vendorAuth,
         vendorProject,

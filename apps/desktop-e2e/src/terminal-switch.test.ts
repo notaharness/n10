@@ -11,7 +11,6 @@ import {
   SHOWN_TERMINAL,
   currentPid,
   expectAgentFillsPane,
-  gridReckonings,
   paneGrid,
   reportedGrids,
 } from './setup/terminal-grid.js';
@@ -60,7 +59,7 @@ test.describe('Streaming agents in several tabs', () => {
     await launch(page, 'gamma');
 
     // Gamma on screen, beta (left last) held ready, alpha neither.
-    await expect(page.locator('.wterm')).toHaveCount(2);
+    await expect(page.locator('[data-terminal-grid]')).toHaveCount(2);
     await expect(page.locator(SHOWN_TERMINAL)).toHaveCount(1);
     // All agents print at the same rate, so the time gamma takes to
     // print ten lines is time alpha printed in too — unsent here.
@@ -102,15 +101,11 @@ test.describe('Streaming agents in several tabs', () => {
       .toBeGreaterThanOrEqual(15);
     await tab(page, /alpha/).click();
 
+    // The terminal draws only the rows in its viewport, so reading
+    // them also says it is scrolled to the latest, not somewhere above.
     await expect
       .poll(() => latestWork(page), { timeout: 10_000 })
       .toBeGreaterThanOrEqual(left + 10);
-    // …and the terminal is scrolled to them, not somewhere above.
-    const atBottom = await page.evaluate((shown) => {
-      const el = document.querySelector<HTMLElement>(shown)!;
-      return el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
-    }, SHOWN_TERMINAL);
-    expect(atBottom).toBe(true);
   });
 });
 
@@ -128,9 +123,6 @@ test.describe('Typing into an agent after a switch', () => {
     await expect(visibleText(page, BANNER)).toBeVisible();
     // No click into the terminal first: arriving is enough.
     await expect(page.locator(`${SHOWN_TERMINAL} textarea`)).toBeFocused();
-    // The palette's Ctrl+K that created beta also reached alpha's
-    // terminal, which had the keyboard then; end that line first.
-    await page.keyboard.press('Enter');
     await page.keyboard.type('back');
     await page.keyboard.press('Enter');
     await expect(visibleText(page, /echo:back/)).toBeVisible({
@@ -200,44 +192,5 @@ test.describe('Fitting the terminal to its pane', () => {
     await tab(page, /alpha/).click();
     await expect.poll(() => reports()).toBeGreaterThanOrEqual(before);
     expect(await reports()).toBe(before);
-  });
-
-  /**
-   * The pane widths where a column boundary falls within a pixel's
-   * rounding: `clientWidth` says one grid there and wterm's fractional
-   * `contentRect` another. An app reckoning by the first answers every
-   * resize a column away from wterm's observer — two resizes of the
-   * agent each time, and the last one wrong.
-   */
-  test('a pane on a column boundary gets the grid wterm draws', async ({
-    desktop,
-  }) => {
-    const { app, page } = desktop;
-    await launch(page, 'alpha');
-    await expectAgentFillsPane(page);
-
-    const setWidth = (width: number) =>
-      app.evaluate(({ BrowserWindow }, w) => {
-        const win = BrowserWindow.getAllWindows()[0];
-        win.setSize(w, win.getSize()[1]);
-      }, width);
-    const [start] = await app.evaluate(({ BrowserWindow }) =>
-      BrowserWindow.getAllWindows()[0].getSize()
-    );
-    let width = start;
-    const viewport = () => page.evaluate(() => window.innerWidth);
-    // A column is about eight pixels and the rounding half of one, so a
-    // width like that turns up within a few dozen one-pixel steps.
-    await expect(async () => {
-      const previous = await viewport();
-      width -= 1;
-      await setWidth(width);
-      // The window resizes before the page does.
-      await expect.poll(viewport).not.toBe(previous);
-      const { contentRect, clientBox } = await gridReckonings(page);
-      expect(contentRect.cols).not.toBe(clientBox.cols);
-    }).toPass({ timeout: 60_000, intervals: [0] });
-
-    await expectAgentFillsPane(page);
   });
 });

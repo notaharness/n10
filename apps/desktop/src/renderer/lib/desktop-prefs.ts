@@ -6,6 +6,9 @@ let prefs: DesktopPrefs = {
   theme: 'system',
   nativeFrame: false,
   tabOverflow: 'wrap',
+  tabCycleMru: false,
+  guidedReview: true,
+  imageCompare: 'side-by-side',
 };
 const listeners = new Set<() => void>();
 

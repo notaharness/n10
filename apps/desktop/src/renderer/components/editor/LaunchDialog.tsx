@@ -9,8 +9,9 @@ import type {
   SessionLaunchView,
 } from '../../../host/contract.js';
 import { useAgentOptions } from '../../lib/data/queries.js';
+import { useGuidedReviewChoice } from './use-guided-review-choice.js';
 import { agentIdForLaunch } from '../../lib/agent-pick.js';
-import { useMachineChoice } from '../terminal/NewTerminalMachineChoice.js';
+import { useMachineChoice } from '../../lib/machines/use-machine-choice.js';
 import { LaunchDialogBody } from './LaunchDialogBody.js';
 import { firstField, useLaunchFocus } from './launch-keyboard.js';
 import { focusAfter } from '../../lib/focus.js';
@@ -39,6 +40,8 @@ export type LaunchChoice =
   | {
       kind: 'review';
       instruction?: string;
+      /** Ask for a guided review too. */
+      guide: boolean;
       agentId?: AgentId;
       expected?: SessionIncarnation;
       machine?: string;
@@ -77,6 +80,7 @@ export function LaunchDialog({
   });
   const [selected, setSelected] = useState<Mode | null>(null);
   const [instruction, setInstruction] = useState('');
+  const [guide, setGuide] = useGuidedReviewChoice();
   const options = useAgentOptions(cwd);
   const agents = options.data ?? [];
   const [agentIndex, setAgentIndex] = useState(0);
@@ -104,7 +108,7 @@ export function LaunchDialog({
       launchChoice(
         mode,
         info,
-        instruction,
+        { instruction, guide },
         agentIdForLaunch(agents, agentIndex),
         machine
       )
@@ -174,6 +178,8 @@ export function LaunchDialog({
             remoteError={remoteError}
             instruction={instruction}
             onInstructionChange={setInstruction}
+            guide={guide}
+            onGuideChange={setGuide}
             onSubmit={go}
             replacing={replacing}
           />
@@ -243,7 +249,7 @@ function launchDisabled(
 function launchChoice(
   mode: Mode,
   info: SessionLaunchView,
-  instruction: string,
+  review: { instruction: string; guide: boolean },
   agentId: AgentId | undefined,
   machine: string | undefined
 ): LaunchChoice {
@@ -251,7 +257,8 @@ function launchChoice(
     return {
       kind: 'review',
       agentId,
-      instruction: instruction.trim() || undefined,
+      instruction: review.instruction.trim() || undefined,
+      guide: review.guide,
       expected: info.incarnation,
       machine,
     };

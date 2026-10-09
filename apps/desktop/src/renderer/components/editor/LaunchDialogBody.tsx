@@ -3,7 +3,7 @@ import type {
   LaunchStep,
   SessionLaunchView,
 } from '../../../host/contract.js';
-import type { useMachineChoice } from '../terminal/NewTerminalMachineChoice.js';
+import type { useMachineChoice } from '../../lib/machines/use-machine-choice.js';
 import { ContinueContext } from './LaunchSessionContext.js';
 import { LaunchAgentPicker } from './LaunchAgentPicker.js';
 import { LaunchMachineSection } from './LaunchMachineSection.js';
@@ -30,6 +30,8 @@ export function LaunchDialogBody({
   remoteError,
   instruction,
   onInstructionChange,
+  guide,
+  onGuideChange,
   onSubmit,
   replacing,
 }: {
@@ -46,6 +48,8 @@ export function LaunchDialogBody({
   remoteError?: string | null;
   instruction: string;
   onInstructionChange: (value: string) => void;
+  guide: boolean;
+  onGuideChange: (guide: boolean) => void;
   onSubmit: () => void;
   replacing: boolean;
 }) {
@@ -84,6 +88,8 @@ export function LaunchDialogBody({
         <ReviewInstructions
           value={instruction}
           onChange={onInstructionChange}
+          guide={guide}
+          onGuideChange={onGuideChange}
           onSubmit={onSubmit}
         />
       )}

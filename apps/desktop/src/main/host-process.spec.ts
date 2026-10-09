@@ -69,6 +69,7 @@ function start(
       appMenuPopup: async () => undefined,
       aboutBox: async () => undefined,
       prefsChanged: async () => undefined,
+      holdMenuShortcuts: async () => undefined,
       ...shell,
     },
     pushes: { broadcast: () => undefined, sendTo: () => undefined },

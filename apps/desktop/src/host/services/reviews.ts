@@ -1,12 +1,13 @@
 import { readResourceValue } from '@n10/engine';
-import { activeReviewService } from './repo.js';
+import { activeReviewService, repository } from './repo.js';
 import type { ReplyRequest, ResolveRequest } from '../contract.js';
 
-export function getReviewViewer() {
-  return activeReviewService().commands.viewer();
-}
-export async function fetchCommentThreads(prId: number, force = false) {
-  return readResourceValue(activeReviewService().comments(prId), force);
+export async function fetchCommentThreads(
+  repo: string,
+  prId: number,
+  force = false
+) {
+  return readResourceValue(repository(repo).reviews.comments(prId), force);
 }
 export async function replyToThread(req: ReplyRequest): Promise<void> {
   await activeReviewService().commands.reply({
@@ -22,19 +23,30 @@ export async function setThreadResolved(req: ResolveRequest): Promise<void> {
     resolved: req.resolved,
   });
 }
-export async function fetchPrDescription(prId: number) {
-  return readResourceValue(activeReviewService().description(prId));
+export async function fetchPrDescription(repo: string, prId: number) {
+  return readResourceValue(repository(repo).reviews.description(prId));
+}
+/** A diff request names its repository; the engine parses the rest,
+ *  and reports a malformed one. */
+function diffReads(req: unknown) {
+  const repo = (req as { repo?: unknown } | null)?.repo;
+  if (typeof repo !== 'string') throw new TypeError('repo must be a string');
+  return repository(repo).reviews.diff;
 }
 /** A pull request's comparison and file manifest at exact commits. */
 export function getPrDiffManifest(req: unknown) {
-  return readResourceValue(activeReviewService().diff.manifest(req));
+  return readResourceValue(diffReads(req).manifest(req));
 }
 /** The patch between a resolved comparison's commits. */
 export function getPrDiffPatch(req: unknown) {
-  return readResourceValue(activeReviewService().diff.patch(req));
+  return readResourceValue(diffReads(req).patch(req));
+}
+/** One side of a changed image, by blob id. */
+export function getPrDiffImage(req: unknown) {
+  return readResourceValue(activeReviewService().diff.image(req));
 }
 /** Two revisions resolved to exact commits, and every file changed
  *  between them. */
 export function getPrRangeManifest(req: unknown) {
-  return readResourceValue(activeReviewService().diff.rangeManifest(req));
+  return readResourceValue(diffReads(req).rangeManifest(req));
 }

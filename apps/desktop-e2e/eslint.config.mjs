@@ -23,10 +23,15 @@ export default [
     // the app to go idle, which is the cost being measured, and every
     // run would report zero. Confined to the one helper that owns it
     // (`perf/setup/pace.ts`) so the rule still covers the rest of the
-    // directory, and scoped here rather than inline because the
-    // pre-commit hook runs eslint without the Playwright plugin, where
-    // an inline directive naming one of its rules is a hard error.
+    // directory.
     files: ['perf/setup/pace.ts'],
+    rules: { 'playwright/no-wait-for-timeout': 'off' },
+  },
+  {
+    // The host's TTLs run on its own clock, which `page.clock` cannot
+    // move: a test crossing one waits in real time, through the one
+    // helper that owns the wait.
+    files: ['src/setup/host-time.ts'],
     rules: { 'playwright/no-wait-for-timeout': 'off' },
   },
   {
@@ -38,10 +43,7 @@ export default [
     // arguments, so a bare `test.skip()` in a body passes too. What
     // stays reported is the modifier form — `test.skip('name', fn)` and
     // `test.describe.skip(...)` — a test declared and marked skipped,
-    // which is the one that silently stops running for good. Set here
-    // rather than inline, because the pre-commit hook runs eslint
-    // without this plugin registered and an inline rule-specific
-    // directive fails there.
+    // which is the one that silently stops running for good.
     files: ['**/*.test.ts'],
     rules: {
       'playwright/no-skipped-test': ['warn', { allowConditional: true }],

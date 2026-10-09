@@ -23,9 +23,24 @@ import type {
   WorktreeRemovalCheck,
   WorktreeRemovalOutcome,
 } from '@n10/core';
-import type { CommentSeverity, ReviewComment } from '@n10/review-comments';
-export type { CommentSeverity, ReviewComment };
+import type {
+  CommentSeverity,
+  GuideFile,
+  GuideSlide,
+  GuideVisual,
+  GuidedReview,
+  ReviewComment,
+} from '@n10/review-comments';
+export type {
+  CommentSeverity,
+  GuideFile,
+  GuideSlide,
+  GuideVisual,
+  GuidedReview,
+  ReviewComment,
+};
 import type { WorktreeInfo } from '@n10/worktree-manager';
+import type { DesktopBindings, KeyDescriptor } from '@n10/core';
 import type {
   BranchPrMap,
   PullRequestComments,
@@ -73,12 +88,15 @@ import type {
 export type * from './contract-sessions.js';
 import type {
   ForeignSessionSummary,
+  OrchestratorGroupSummary,
   SessionSummary,
   WorktreeResume,
 } from './contract-sessions.js';
 // Pull request diffs at exact commits.
 export type * from './contract-diff.js';
 import type {
+  PrDiffImageRequest,
+  PrDiffImageResult,
   PrDiffManifestRequest,
   PrDiffManifestResult,
   PrDiffPatchRequest,
@@ -313,9 +331,23 @@ export interface DesktopPrefs {
   /** What the tab strip does with more tabs than fit: wrap onto more
    *  rows, or scroll the one row sideways. */
   tabOverflow: TabOverflow;
+  /** Ctrl+Tab / Ctrl+Shift+Tab (or their rebinding) walk the tabs in
+   *  most-recently-used order instead of strip order. */
+  tabCycleMru: boolean;
+  /** Whether a review started from the launch dialog asks for a guided
+   *  review: the dialog's checkbox, remembered from the last choice. */
+  guidedReview: boolean;
+  /** How a changed image's two sides are compared in a diff: the last
+   *  choice made from an image's row, not a setting. */
+  imageCompare: ImageCompareMode;
 }
 
 export type TabOverflow = 'wrap' | 'scroll';
+export type ImageCompareMode = 'side-by-side' | 'toggle' | 'slider';
+
+/** The desktop shortcuts the user rebound, by action id; an action
+ *  missing here has its default (`DESKTOP_DEFAULT_BINDINGS`). */
+export type DesktopKeybindings = Partial<DesktopBindings>;
 
 /** One entry of a native context menu. */
 export type ContextMenuItem =
@@ -351,6 +383,8 @@ export interface N10HostApi {
   openRepo(cwd: string): Promise<RepoInfo>;
   getRepo(): Promise<RepoInfo | null>;
   refreshRepo(): Promise<RepoInfo | null>;
+  /** What `getRepo` says, for any repository, open or not. */
+  getRepoInfo(repo: string): Promise<RepoInfo>;
 
   // ── Recent repos ─────────────────────────────────────────────
   listRecentRepos(): Promise<RecentRepoEntry[]>;
@@ -377,10 +411,10 @@ export interface N10HostApi {
   ): Promise<void>;
 
   // ── Sidebar (unified worktrees + PRs + reviews, TUI order) ────
-  /** The sidebar of the open repository, stamped with which one that
-   *  is — see `SidebarModel`. */
-  getSidebarModel(): Promise<SidebarModel>;
-  getSyncState(): Promise<SyncState>;
+  /** The sidebar of `repo`, open or not, stamped with the repository
+   *  it describes — see `SidebarModel`. */
+  getSidebarModel(repo: string): Promise<SidebarModel>;
+  getSyncState(repo: string): Promise<SyncState>;
   /** Drop the remote PR cache and re-fetch now. */
   refreshRemote(): Promise<void>;
 
@@ -388,7 +422,7 @@ export interface N10HostApi {
   listWorktrees(): Promise<WorktreeInfo[]>;
   listBranches(): Promise<string[]>;
   /** All local + remote branch names (checkout candidates). */
-  listAllBranches(): Promise<string[]>;
+  listAllBranches(repo: string): Promise<string[]>;
   createWorktree(branch: string): Promise<string>;
   /** Remove with the verdict the user confirmed; core's outcome says
    *  what was kept, if anything. */
@@ -407,42 +441,53 @@ export interface N10HostApi {
 
   // ── Reviews ──────────────────────────────────────────────────
   fetchCommentThreads(
+    repo: string,
     prId: number,
     force?: boolean
   ): Promise<PullRequestComments>;
   replyToThread(req: ReplyRequest): Promise<void>;
   setThreadResolved(req: ResolveRequest): Promise<void>;
   /** Full PR description (list payloads truncate or omit it). */
-  fetchPrDescription(prId: number): Promise<string>;
+  fetchPrDescription(repo: string, prId: number): Promise<string>;
   /** One pull request by identity: the list row, the provider's detail
    *  and the exact commits its review compares. Rejects a ref from
    *  another repository or a caller that last saw another account. */
-  getPullRequestSnapshot(req: SnapshotRequest): Promise<PullRequestSnapshot>;
+  getPullRequestSnapshot(
+    repo: string,
+    req: SnapshotRequest
+  ): Promise<PullRequestSnapshot>;
   /** What the pull request's history offers to compare against: the
    *  provider's record of its heads and the viewer's latest review, and
    *  the viewer's last visit before the one `visitId` names — the same
    *  for every read that names it. */
-  getPullRequestHistory(req: HistoryRequest): Promise<PullRequestHistory>;
+  getPullRequestHistory(
+    repo: string,
+    req: HistoryRequest
+  ): Promise<PullRequestHistory>;
   /** Record the commits the reader was shown in a visit, kept outside
    *  the repository per account and pull request. Call once
    *  `getPullRequestHistory` for the same `visitId` has resolved, in
    *  this run of the app; it rejects otherwise. The record is kept
    *  under the pull request that read confirmed: the id on `req.ref`
    *  is not used. */
-  recordPullRequestVisit(req: VisitRequest): Promise<void>;
+  recordPullRequestVisit(repo: string, req: VisitRequest): Promise<void>;
   /** What stands between one pull request and completion: its checks,
    *  the target's rules and the provider's merge state, with n10's
    *  reading of them. Identity-checked like the snapshot. */
-  getPullRequestChecks(req: SnapshotRequest): Promise<PullRequestChecksAnswer>;
+  getPullRequestChecks(
+    repo: string,
+    req: SnapshotRequest
+  ): Promise<PullRequestChecksAnswer>;
   /** One pull request's whole conversation by identity: threads with
    *  every reply, conversation comments, reviews and events, with how
    *  much of each was read. Refused like the snapshot. */
   getPullRequestConversation(
+    repo: string,
     req: SnapshotRequest
   ): Promise<PullRequestConversationRead>;
   /** The reviewer's own unpublished drafts on one pull request, kept on
    *  this machine for the configured account. Refused like the snapshot. */
-  listReviewDrafts(req: DraftsRequest): Promise<ReviewDrafts>;
+  listReviewDrafts(repo: string, req: DraftsRequest): Promise<ReviewDrafts>;
   /** Store the draft for a target; an empty body removes it. Resolves
    *  to the stored draft, or null when it was removed. */
   saveReviewDraft(req: SaveDraftRequest): Promise<ReviewDraft | null>;
@@ -454,15 +499,15 @@ export interface N10HostApi {
    *  reviewer read. Resolves to the drafts as they now stand; a failure
    *  leaves each draft saying where it got to. Refused like the snapshot. */
   submitReview(req: SubmitReviewRequest): Promise<SubmittedReview>;
-  /** The reviewer-list identifier of the authenticated user (GitHub
-   *  login / ADO email), for optimistic reviewer patches. */
-  getReviewViewer(): Promise<{ identifier: string } | null>;
   /** Download a comment image with the provider's credentials (Azure
    *  DevOps PAT / GitHub token) and return it as a data URL. */
-  fetchCommentImage(url: string): Promise<CommentImagePayload | null>;
+  fetchCommentImage(
+    repo: string,
+    url: string
+  ): Promise<CommentImagePayload | null>;
 
   // ── Draft review comments (from the review agent) ─────────────
-  listDraftComments(prId: number): Promise<ReviewComment[]>;
+  listDraftComments(repo: string, prId: number): Promise<ReviewComment[]>;
   updateDraftComment(
     prId: number,
     id: string,
@@ -471,6 +516,8 @@ export interface N10HostApi {
   deleteDraftComment(prId: number, id: string): Promise<void>;
   /** Resolves to the number of comments posted. */
   postDraftComments(req: PostDraftsRequest): Promise<number>;
+  /** The review agent's guided review of the pull request, if it wrote one. */
+  getGuidedReview(repo: string, prId: number): Promise<GuidedReview | null>;
 
   // ── Sessions ─────────────────────────────────────────────────
   launchAgent(req: SessionLaunchRequest): Promise<{ name: string }>;
@@ -478,17 +525,20 @@ export interface N10HostApi {
    *  session seeded with the shared review prompt + guidance. */
   launchReviewAgent(req: ReviewLaunchRequest): Promise<{ name: string }>;
   /** The agents the session menu offers, configured default first. */
-  listAgentOptions(): Promise<AgentOptionView[]>;
+  listAgentOptions(repo: string): Promise<AgentOptionView[]>;
   getSessionLaunchContext(branch: string): Promise<SessionLaunchView>;
   /** Send a composed plan to the PR's agent, creating the worktree and
    *  starting one when there is none. Rejects with the reason on
    *  failure, leaving the plan intact for a retry. */
   checkoutPlan(req: PlanCheckoutRequest): Promise<PlanCheckoutResult>;
-  listSessions(): Promise<SessionSummary[]>;
+  listSessions(repo: string): Promise<SessionSummary[]>;
   /** Agents alive in other repositories, for the tab strip to give
    *  each a tab in its own group. The open repository's own are left
    *  out — the sidebar describes those. */
   listForeignSessions(): Promise<ForeignSessionSummary[]>;
+  /** This machine's Orchestra orchestrators and their players, for the
+   *  tab strip to group player tabs under their orchestrator's tab. */
+  listOrchestratorGroups(): Promise<OrchestratorGroupSummary[]>;
   /** Debounced per-session agent activity (same registry as the TUI's
    *  sidebar spinner): `active` = producing output now, `flashing` =
    *  went idle after a real work streak and the user hasn't looked. */
@@ -529,7 +579,7 @@ export interface N10HostApi {
   /** The agents and terminals working in `branch`'s checkouts of the
    *  open repository, on every machine, and the machine a new terminal
    *  opens on by default. */
-  listBranchSessions(branch: string): Promise<BranchSessions>;
+  listBranchSessions(repo: string, branch: string): Promise<BranchSessions>;
   /** Open a shell in the branch's checkout on the requested machine. */
   launchBranchTerminal(req: BranchTerminalRequest): Promise<TerminalSummary>;
   /** PTY output of the sessions this window watches (`watchSession`).
@@ -546,7 +596,11 @@ export interface N10HostApi {
    *  and untracked work — what an agent has done so far, as opposed to
    *  what it has committed. Empty string when the branch has no
    *  worktree. */
-  fetchWorktreeDiffText(branch: string, targetBranch: string): Promise<string>;
+  fetchWorktreeDiffText(
+    repo: string,
+    branch: string,
+    targetBranch: string
+  ): Promise<string>;
   /** Resolve a pull request to exact commits and list every file that
    *  changed between them. Failures that describe the pull request
    *  (a head this clone cannot produce, unrelated history) are data. */
@@ -555,6 +609,9 @@ export interface N10HostApi {
   ): Promise<PrDiffManifestResult>;
   /** The patch between a resolved comparison's commits. */
   fetchPrDiffPatch(req: PrDiffPatchRequest): Promise<PrDiffPatchResult>;
+  /** One side of a changed image, by the blob id the manifest lists,
+   *  as a data URL. Too large or not an image is data. */
+  fetchPrDiffImage(req: PrDiffImageRequest): Promise<PrDiffImageResult>;
   /** Two revisions resolved to exact commits — fetched by id when the
    *  clone lacks one — and every file changed from one to the other. A
    *  revision nowhere to be had is data. */
@@ -626,6 +683,17 @@ export interface N10HostApi {
   onBabysitChanged(cb: (event: BabysitChangedEvent) => void): () => void;
   getDesktopPrefs(): Promise<DesktopPrefs>;
   setDesktopPrefs(patch: Partial<DesktopPrefs>): Promise<DesktopPrefs>;
+  /** The rebound desktop shortcuts, kept in the global config. */
+  getKeybindings(): Promise<DesktopKeybindings>;
+  /** Rebind one desktop shortcut, or with null restore its default.
+   *  Answers with every rebound shortcut after the write. */
+  setKeybinding(
+    actionId: string,
+    descriptors: KeyDescriptor[] | null
+  ): Promise<DesktopKeybindings>;
+  /** While held, this window's application menu accelerators stand
+   *  aside (Ctrl+W, Ctrl+N, …), so recording a shortcut hears them. */
+  holdMenuShortcuts(held: boolean): Promise<void>;
   /** Native about box. */
   showAbout(): Promise<void>;
 }
@@ -641,6 +709,7 @@ export const IPC = {
   selectFolder: 'n10/shell/select-folder',
   forgetRecent: 'n10/repo/forget',
   getRepo: 'n10/repo/get',
+  getRepoInfo: 'n10/repo/info',
   refreshRepo: 'n10/repo/refresh',
   getSettingsView: 'n10/settings/view',
   updateSettingsField: 'n10/config/update-field',
@@ -657,6 +726,7 @@ export const IPC = {
   launchAgent: 'n10/session/launch',
   listSessions: 'n10/session/list',
   listForeignSessions: 'n10/session/list-foreign',
+  listOrchestratorGroups: 'n10/session/list-orchestrators',
   getSessionActivity: 'n10/session/activity',
   watchSession: 'n10/session/watch',
   unwatchSession: 'n10/session/unwatch',
@@ -686,12 +756,12 @@ export const IPC = {
   discardReviewDraft: 'n10/review-drafts/discard',
   searchMentionCandidates: 'n10/pull-requests/mentions',
   submitReview: 'n10/review-drafts/submit',
-  getReviewViewer: 'n10/reviews/viewer',
   fetchCommentImage: 'n10/reviews/comment-image',
   listDraftComments: 'n10/drafts/list',
   updateDraftComment: 'n10/drafts/update',
   deleteDraftComment: 'n10/drafts/delete',
   postDraftComments: 'n10/drafts/post',
+  getGuidedReview: 'n10/drafts/guide',
   launchReviewAgent: 'n10/session/launch-review',
   listAgentOptions: 'n10/session/agent-options',
   getSessionLaunchContext: 'n10/session/launch-context',
@@ -699,12 +769,16 @@ export const IPC = {
   fetchWorktreeDiffText: 'n10/diff/worktree-text',
   fetchPrDiffManifest: 'n10/diff/pr-manifest',
   fetchPrDiffPatch: 'n10/diff/pr-patch',
+  fetchPrDiffImage: 'n10/diff/pr-image',
   fetchPrRangeManifest: 'n10/diff/pr-range-manifest',
   openExternal: 'n10/shell/open-external',
   showContextMenu: 'n10/shell/context-menu',
   showAppMenu: 'n10/shell/app-menu',
   getDesktopPrefs: 'n10/shell/prefs/get',
   setDesktopPrefs: 'n10/shell/prefs/set',
+  getKeybindings: 'n10/keybindings/get',
+  setKeybinding: 'n10/keybindings/set',
+  holdMenuShortcuts: 'n10/keybindings/hold-menu',
   showAbout: 'n10/shell/about',
   startBabysit: 'n10/babysit/start',
   stopBabysit: 'n10/babysit/stop',

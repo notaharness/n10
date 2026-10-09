@@ -13,6 +13,7 @@ import { keys, resetProviderScopedCache } from './query-keys.js';
 import { errorMessage } from '../utils.js';
 import { repositoryKey } from '@n10/vcs-core/pr-details';
 import type {
+  GuidedReview,
   MachineView,
   RepoInfo,
   SidebarItem,
@@ -26,6 +27,19 @@ import type {
  * them are in `mutations.ts`; the key catalog they share is in
  * `query-keys.ts`.
  */
+
+/**
+ * A query's last answer, kept on screen while the next one loads — for
+ * the same repository only. The workspace stays mounted across a switch,
+ * and another repository's rows must never stand in for this one's.
+ * Repository-scoped keys name their repository second.
+ */
+export function keepRepoAnswer(cwd: string) {
+  return <T>(
+    prev: T | undefined,
+    query: { queryKey: readonly unknown[] } | undefined
+  ): T | undefined => (query?.queryKey[1] === cwd ? prev : undefined);
+}
 
 /**
  * The boot read behind the repo gate: which repository the host is on,
@@ -76,8 +90,9 @@ export async function refreshRepoInfo(qc: QueryClient): Promise<void> {
   // The host moved to another repository meanwhile: that is the
   // gate's switch to adopt, not this.
   if (!prev || !next || prev.cwd !== next.cwd) return;
-  if (!sameRepoIdentity(prev, next)) resetProviderScopedCache(qc);
+  if (!sameRepoIdentity(prev, next)) resetProviderScopedCache(qc, next.cwd);
   qc.setQueryData(keys.repo, next);
+  qc.setQueryData(keys.repoInfo(next.cwd), next);
 }
 
 export function useRepoGate() {
@@ -86,6 +101,20 @@ export function useRepoGate() {
     queryFn: loadRepoGate,
     // Written by hand when the user opens or leaves a repository; there
     // is nothing to re-poll, and a refetch would re-run the prefs load.
+    staleTime: Infinity,
+  });
+}
+
+/**
+ * Any repository's info, for a pane of a repository that is not open.
+ * Written whenever a repository is opened; read from the host for one
+ * that has not been this run.
+ */
+export function useRepoInfo(cwd: string, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.repoInfo(cwd),
+    queryFn: () => window.n10.getRepoInfo(cwd),
+    enabled,
     staleTime: Infinity,
   });
 }
@@ -107,53 +136,56 @@ export function useRecentRepos() {
 }
 
 /**
- * The sidebar rows for `cwd`, from a host that answers for whichever
- * repository it has open.
+ * The sidebar rows for `cwd`, open or not, as the host answers for the
+ * repository asked.
  *
- * An answer about another repository is not this workspace's, however
- * it arrived: the host moves on before the renderer does during a
- * switch, and the workspace being left keeps polling until it unmounts.
- * Reconciling such an answer into this repo's tabs opens a tab stamped
- * with this repo for a branch that exists only in the other one — a
- * tab that then reads as the other repo's and opens it when clicked.
- * So the rows stay what they were, and a first poll with nothing to
- * keep shows nothing rather than someone else's rows.
+ * An answer stamped with another repository is not this one's, however
+ * it arrived. Reconciling it into this repo's tabs would open a tab
+ * stamped with this repo for a branch that exists only in the other one
+ * — a tab that then reads as the other repo's and opens it when
+ * clicked. So the rows stay what they were, and a first answer with
+ * nothing to keep shows nothing rather than someone else's rows.
  */
 export async function loadSidebarModel(
   cwd: string,
   previous: SidebarItem[] | undefined
 ): Promise<SidebarItem[]> {
-  const answer = await window.n10.getSidebarModel();
+  const answer = await window.n10.getSidebarModel(cwd);
   if (answer.cwd !== cwd) return previous ?? [];
   return answer.items;
 }
 
 /** Sidebar model. Local state (worktrees, alive PTYs) is cheap so we
  *  poll it every few seconds; remote PR data is cached host-side and
- *  only re-fetched on its own interval or an explicit refresh. */
-export function useSidebarModel(cwd: string) {
+ *  only re-fetched on its own interval or an explicit refresh. A pane of
+ *  a repository that is not open reads it once (`poll: false`). */
+export function useSidebarModel(
+  cwd: string,
+  { enabled = true, poll = true }: { enabled?: boolean; poll?: boolean } = {}
+) {
   const qc = useQueryClient();
   return useQuery({
     queryKey: keys.sidebar(cwd),
     queryFn: () => loadSidebarModel(cwd, qc.getQueryData(keys.sidebar(cwd))),
-    refetchInterval: 4_000,
-    placeholderData: (prev) => prev,
+    enabled,
+    refetchInterval: poll ? 4_000 : false,
+    placeholderData: keepRepoAnswer(cwd),
   });
 }
 
 export function useSyncState(cwd: string) {
   return useQuery({
     queryKey: keys.sync(cwd),
-    queryFn: () => window.n10.getSyncState(),
+    queryFn: () => window.n10.getSyncState(cwd),
     refetchInterval: 4_000,
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
   });
 }
 
 export function useAllBranches(cwd: string, enabled = true) {
   return useQuery({
     queryKey: keys.branches(cwd),
-    queryFn: () => window.n10.listAllBranches(),
+    queryFn: () => window.n10.listAllBranches(cwd),
     enabled,
     staleTime: 30_000,
   });
@@ -225,12 +257,14 @@ export function useWorktreeDiff(
   return useQuery({
     queryKey: keys.worktreeDiff(cwd, branch, target),
     queryFn: () =>
-      measured('fetch', () => window.n10.fetchWorktreeDiffText(branch, target)),
+      measured('fetch', () =>
+        window.n10.fetchWorktreeDiffText(cwd, branch, target)
+      ),
     enabled: opts.enabled,
     refetchInterval: opts.live ? 2_000 : false,
     // Keep the previous patch on screen while the next one is in
     // flight, so a poll does not blank the viewer every two seconds.
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
     staleTime: 0,
   });
 }
@@ -269,6 +303,7 @@ export function useThreads(cwd: string, prId: number) {
     queryKey: keys.threads(cwd, prId),
     queryFn: ({ client, queryKey }) =>
       window.n10.fetchCommentThreads(
+        cwd,
         prId,
         client.getQueryState(queryKey)?.isInvalidated ?? false
       ),
@@ -282,7 +317,7 @@ export function useThreads(cwd: string, prId: number) {
 export function useAgentOptions(cwd: string) {
   return useQuery({
     queryKey: keys.agentOptions(cwd),
-    queryFn: () => window.n10.listAgentOptions(),
+    queryFn: () => window.n10.listAgentOptions(cwd),
   });
 }
 
@@ -295,9 +330,9 @@ export function useAgentOptions(cwd: string) {
 export function useSessions(cwd: string) {
   return useQuery({
     queryKey: keys.sessions(cwd),
-    queryFn: () => window.n10.listSessions(),
+    queryFn: () => window.n10.listSessions(cwd),
     refetchInterval: 2_000,
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
   });
 }
 
@@ -331,6 +366,21 @@ export function useForeignSessions() {
   });
 }
 
+/**
+ * Orchestra orchestrators and their players, for the tab strip to
+ * group under. Orchestra tags a player as it spawns or adopts one,
+ * which no discovery event announces, so this polls on the same
+ * cadence as the foreign listing.
+ */
+export function useOrchestratorGroups() {
+  return useQuery({
+    queryKey: keys.orchestratorGroups,
+    queryFn: () => window.n10.listOrchestratorGroups(),
+    refetchInterval: 4_000,
+    placeholderData: (prev) => prev,
+  });
+}
+
 /** The safety net under `onMachinesChanged`, not the way the list is
  *  kept current: a real change is pushed straight into the cache, so
  *  this only has to catch a push that never arrived. `StatusBar` is
@@ -342,7 +392,7 @@ const MACHINES_POLL_MS = 5 * 60_000;
 
 /**
  * Every machine: this one first, then fleet members. Not repo-
- * scoped — survives a repo switch (CROSS_REPO_KEYS). Pushed on every
+ * scoped. Pushed on every
  * change (`onMachinesChanged` in fleet-context.tsx writes straight
  * into this cache), so the poll here is only the fallback for the
  * first load and for a missed push.
@@ -377,28 +427,44 @@ export function useSessionActivity(cwd: string) {
     queryKey: keys.activity(cwd),
     queryFn: () => window.n10.getSessionActivity(),
     refetchInterval: 1_000,
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
   });
 }
 
 export function usePrDescription(cwd: string, prId: number) {
   return useQuery({
     queryKey: keys.prDescription(cwd, prId),
-    queryFn: () => window.n10.fetchPrDescription(prId),
+    queryFn: () => window.n10.fetchPrDescription(cwd, prId),
     staleTime: 5 * 60_000,
     enabled: prId > 0,
   });
 }
 
 /** Comment image bytes (as a data URL), fetched host-side with auth. */
-export function useCommentImage(url: string) {
+export function useCommentImage(cwd: string, url: string) {
   return useQuery({
-    queryKey: keys.commentImage(url),
-    queryFn: () => window.n10.fetchCommentImage(url),
+    queryKey: keys.commentImage(cwd, url),
+    queryFn: () => window.n10.fetchCommentImage(cwd, url),
     enabled: url.length > 0,
     staleTime: Infinity,
     gcTime: 10 * 60_000,
   });
+}
+
+/** The review agent's guided review; polled so it appears when the
+ *  agent stores it. */
+export function useGuidedReview(
+  cwd: string,
+  prId: number
+): GuidedReview | null {
+  const read = useQuery({
+    queryKey: keys.guide(cwd, prId),
+    queryFn: () => window.n10.getGuidedReview(cwd, prId),
+    refetchInterval: 2_000,
+    placeholderData: keepRepoAnswer(cwd),
+    enabled: prId > 0,
+  });
+  return read.data ?? null;
 }
 
 /** Draft review comments written by the review agent; polled so they
@@ -406,9 +472,9 @@ export function useCommentImage(url: string) {
 export function useDraftComments(cwd: string, prId: number) {
   return useQuery({
     queryKey: keys.drafts(cwd, prId),
-    queryFn: () => window.n10.listDraftComments(prId),
+    queryFn: () => window.n10.listDraftComments(cwd, prId),
     refetchInterval: 2_000,
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
     enabled: prId > 0,
   });
 }

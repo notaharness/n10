@@ -1,5 +1,6 @@
 import type { MenuCommandEvent } from '../../../host/contract-events.js';
 import type {
+  DesktopKeybindings,
   DesktopPrefs,
   N10HostApi,
   RepoInfo,
@@ -85,6 +86,7 @@ type ShellHost = Pick<
   | 'openRepo'
   | 'getRepo'
   | 'refreshRepo'
+  | 'getRepoInfo'
   | 'listRecentRepos'
   | 'selectRepoDirectory'
   | 'selectFolder'
@@ -96,6 +98,9 @@ type ShellHost = Pick<
   | 'onMenuCommand'
   | 'getDesktopPrefs'
   | 'setDesktopPrefs'
+  | 'getKeybindings'
+  | 'setKeybinding'
+  | 'holdMenuShortcuts'
   | 'showAbout'
 >;
 
@@ -105,7 +110,11 @@ export function createShellHost(state: DemoState): ShellHost {
     theme: requestedTheme() ?? 'system',
     nativeFrame: false,
     tabOverflow: 'wrap',
+    tabCycleMru: false,
+    guidedReview: true,
+    imageCompare: 'side-by-side',
   };
+  let keybindings: DesktopKeybindings = {};
   const menuCommands = new Channel<MenuCommandEvent>();
   return {
     getVersion: () =>
@@ -121,6 +130,7 @@ export function createShellHost(state: DemoState): ShellHost {
     },
     getRepo: () => later(info(state.repo())),
     refreshRepo: () => later(info(state.repo())),
+    getRepoInfo: (cwd) => later(info(state.repoAt(cwd))),
     listRecentRepos: () =>
       later(
         state.recent.map((cwd, i) => ({
@@ -149,6 +159,16 @@ export function createShellHost(state: DemoState): ShellHost {
       prefs = { ...prefs, ...patch };
       return later(prefs);
     },
+    getKeybindings: () => later(keybindings),
+    setKeybinding: (actionId, descriptors) => {
+      const rest = Object.fromEntries(
+        Object.entries(keybindings).filter(([id]) => id !== actionId)
+      );
+      keybindings = descriptors ? { ...rest, [actionId]: descriptors } : rest;
+      return later(keybindings);
+    },
+    // The demo's menu is web-rendered and has no accelerators.
+    holdMenuShortcuts: () => later(undefined),
     showAbout: () => later(undefined),
   };
 }

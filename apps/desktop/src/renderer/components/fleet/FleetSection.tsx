@@ -2,6 +2,7 @@ import { ChevronRightIcon, NetworkIcon, PlusIcon } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useBeamStatus, useMachines } from '../../lib/data/queries.js';
 import { useFleet } from '../../lib/fleet/fleet-context.js';
+import { useFleetActions } from '../../lib/fleet/use-fleet-actions.js';
 import {
   fleetSectionSummary,
   type SummaryTone,
@@ -15,7 +16,7 @@ import {
 import { FocusScope } from '../../lib/fleet/use-focus-on-mount.js';
 import { Button } from '../ui/button.js';
 import { Tip } from '../ui/tooltip.js';
-import { FleetActionsMenu, useFleetActions } from './FleetActions.js';
+import { FleetActionsMenu } from './FleetActions.js';
 import { FleetPanel } from './FleetPanel.js';
 
 const TONE_CLASS: Record<SummaryTone, string> = {

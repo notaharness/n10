@@ -49,6 +49,10 @@ export interface DesktopOptions extends HomeSeed {
    * clone the shared sandbox repo once per file.
    */
   repoPathOverride?: string;
+  /** Give the window WebGL, in software (SwiftShader), so terminals
+   *  draw with xterm's WebGL renderer. Without it there is no GPU and
+   *  they use xterm's DOM renderer, whose rows are text to assert on. */
+  webgl?: boolean;
   /** Create the test repo inside the app's HOME (`fixtureHome`), where
    *  a path is home-relative, instead of a temp directory beside it. */
   repoInHome?: boolean;
@@ -127,10 +131,13 @@ export const test = base.extend<
   startWithoutRepo: [false, { option: true }],
   repoPathOverride: [undefined, { option: true }],
   repoInHome: [false, { option: true }],
+  webgl: [false, { option: true }],
   githubToken: [undefined, { option: true }],
   drafts: [undefined, { option: true }],
+  guides: [undefined, { option: true }],
   fakeGitHub: [undefined, { option: true }],
   fakeAzureDevOps: [undefined, { option: true }],
+  tmuxConf: [undefined, { option: true }],
   liveSessions: [undefined, { option: true }],
   env: [undefined, { option: true }],
   liveTerminals: [undefined, { option: true }],
@@ -144,10 +151,13 @@ export const test = base.extend<
       startWithoutRepo,
       repoPathOverride,
       repoInHome,
+      webgl,
       githubToken,
       drafts,
+      guides,
       fakeGitHub,
       fakeAzureDevOps,
+      tmuxConf,
       liveSessions,
       env,
       liveTerminals,
@@ -173,8 +183,10 @@ export const test = base.extend<
       projectConfig,
       desktopPrefs,
       drafts,
+      guides,
       fakeGitHub,
       fakeAzureDevOps,
+      tmuxConf,
     });
 
     seedTmux(repoPath, homeDir, liveSessions, liveTerminals);
@@ -188,7 +200,7 @@ export const test = base.extend<
       extra: env,
     });
     let app = await electron.launch({
-      args: launchArgs(),
+      args: launchArgs(webgl),
       cwd: WORKSPACE_ROOT,
       env: launchEnv,
       timeout: 60_000,
@@ -227,7 +239,7 @@ export const test = base.extend<
         delete nextEnv.TMUX;
         delete nextEnv.TMUX_PANE;
         app = await electron.launch({
-          args: launchArgs(),
+          args: launchArgs(webgl),
           cwd: WORKSPACE_ROOT,
           env: nextEnv,
           timeout: 60_000,
@@ -319,7 +331,7 @@ async function readyWindow(
 }
 
 /** Electron's arguments. */
-function launchArgs(): string[] {
+function launchArgs(webgl?: boolean): string[] {
   return [
     APP_DIR,
     // CI runners have no user namespaces for the sandbox, and
@@ -327,6 +339,8 @@ function launchArgs(): string[] {
     '--no-sandbox',
     '--disable-gpu',
     '--ozone-platform=x11',
+    // WebGL with no GPU, which Chromium allows only when asked.
+    ...(webgl ? ['--enable-unsafe-swiftshader'] : []),
   ];
 }
 

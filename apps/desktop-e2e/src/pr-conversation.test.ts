@@ -29,16 +29,14 @@ async function readConversation(page: Page, number: number) {
   return page.evaluate(async (n) => {
     const repo = await window.n10.getRepo();
     if (!repo?.repository) throw new Error('no provider for the open repo');
-    return window.n10.getPullRequestConversation({
+    return window.n10.getPullRequestConversation(repo.cwd, {
       ref: { ...repo.repository, number: n },
     });
   }, number);
 }
 
 /** The conversation a read produced; throws on any other outcome. */
-function conversationOf(
-  read: Awaited<ReturnType<typeof readConversation>>
-): FakeConversation {
+function conversationOf(read: Awaited<ReturnType<typeof readConversation>>) {
   const outcome = read.conversation;
   if (outcome.state === 'read') return outcome.value;
   throw new Error(`conversation not read: ${JSON.stringify(outcome)}`);

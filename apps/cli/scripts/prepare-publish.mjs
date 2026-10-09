@@ -61,7 +61,9 @@ copyFileSync(
 );
 
 // The desktop app keeps its build layout: main/ finds preload/ and
-// renderer/ beside it.
+// renderer/ beside it. Only the runtime ships: no source maps, and no
+// declarations, which the esbuild executor writes into its outputPath
+// whenever the build tsconfig emits them.
 rmSync(resolve(distDir, 'desktop'), { recursive: true, force: true });
 for (const part of ['main', 'preload', 'renderer']) {
   const from = resolve(desktopDir, 'dist', part);
@@ -70,7 +72,7 @@ for (const part of ['main', 'preload', 'renderer']) {
   }
   cpSync(from, resolve(distDir, 'desktop', part), {
     recursive: true,
-    filter: (path) => !path.endsWith('.map'),
+    filter: (path) => !path.endsWith('.map') && !path.endsWith('.d.ts'),
   });
 }
 

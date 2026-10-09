@@ -13,8 +13,11 @@
  * (`pull-request-scope.ts`). Replacing any of those at the same path
  * moves the repository to a new scope with nothing in it, so a list
  * fetched as somebody else is never shown, and a fetch still out under
- * the old scope can land only in the old one. Past `MAX_CACHED_SCOPES`
- * the least recently used idle scope goes.
+ * the old scope can land only in the old one. A scope a repository
+ * shows is kept for the life of the list, however long since it was
+ * read: a repository left a while ago is still worth showing at once.
+ * Past `MAX_CACHED_SCOPES`, the least recently used scope that no
+ * repository shows any more goes.
  *
  * **One request per scope at a time.** Reads join the request already
  * out. A forced read — the user pressed refresh, or the app knows the
@@ -67,11 +70,9 @@ import {
   type Slot,
 } from './pull-request-slot.js';
 
-/**
- * How many scopes' lists to keep: enough to cover moving between the
- * checkouts one person has open at once — the desktop's tab strip
- * spans repositories, and following a tab opens its repository.
- */
+/** How many scopes' lists to keep before dropping ones no repository
+ *  shows: those a config change left behind, kept a while in case it
+ *  is changed back. */
 const MAX_CACHED_SCOPES = 8;
 
 export interface PullRequestListOptions {
@@ -93,8 +94,9 @@ export interface PullRequestList {
   /** The user asked: a forced read that also has the provider forget
    *  its per-row answers when the request starts. */
   refresh(cwd: string): Promise<BranchPrMap>;
-  /** Start a read if one is due and return without waiting for it. */
-  refreshInBackground(cwd: string): void;
+  /** Start a read if one is due and return without waiting for it.
+   *  `maxAge` lets a list that old serve without one, past its TTL. */
+  refreshInBackground(cwd: string, opts?: { maxAge?: number }): void;
   /** Keep `cwd` fresh on its interval until the returned function is
    *  called. */
   watch(cwd: string): () => void;
@@ -160,34 +162,21 @@ export function createPullRequestList(
     current.get(slot.scope.cwd) === slot.scope.key;
 
   /** Never the scope being read, one with a request out, or one a
-   *  watched repository shows: evicting that makes the watch read it
-   *  back at once, which evicts the next, and so on. */
+   *  repository shows. */
   const evictable = (slot: Slot, keep: Slot): boolean =>
-    slot !== keep &&
-    !busy(slot) &&
-    !(shown(slot) && schedule.watching(slot.scope.cwd));
+    slot !== keep && !busy(slot) && !shown(slot);
 
-  /** Scopes no repository shows go first, then the least recently used. */
-  const evictsBefore = (a: Slot, b: Slot): boolean =>
-    shown(a) === shown(b) ? a.usedAt < b.usedAt : !shown(a);
-
-  /** Drop scopes past the bound. Past it with nothing evictable — more
-   *  watched repositories than the bound — the cache holds them all. */
+  /** Drop the least recently used scopes no repository shows, past the
+   *  bound. Every scope a repository shows stays. */
   const evict = (keep: Slot): void => {
     while (slots.size > MAX_CACHED_SCOPES) {
       let victim: Slot | null = null;
       for (const slot of slots.values()) {
         if (!evictable(slot, keep)) continue;
-        if (!victim || evictsBefore(slot, victim)) victim = slot;
+        if (!victim || slot.usedAt < victim.usedAt) victim = slot;
       }
       if (!victim) return;
-      const wasShown = shown(victim);
       slots.delete(victim.scope.key);
-      if (wasShown) {
-        // What its repository showed: it shows nothing now.
-        current.delete(victim.scope.cwd);
-        emit(victim.scope.cwd);
-      }
     }
   };
 
@@ -363,8 +352,13 @@ export function createPullRequestList(
     },
     read: (cwd, opts) => read(cwd, { force: opts?.force }),
     refresh: (cwd) => read(cwd, { force: true, forget: true }),
-    refreshInBackground: (cwd) => {
-      void read(cwd);
+    refreshInBackground: (cwd, opts) => {
+      const slot = slotFor(cwd);
+      const last = lastAttempt(slot);
+      const maxAge = Math.max(opts?.maxAge ?? 0, ttlOf(slot));
+      if (last > 0 && now() - last < maxAge) return;
+      // `readIn` never rejects: a failure is kept in the snapshot.
+      void readIn(slot, {});
     },
     watch: (cwd) => schedule.watch(cwd),
     lookupPullRequest,

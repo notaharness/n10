@@ -18,7 +18,7 @@ import {
  * released as it ends, as the terminal service releases a terminal's.
  */
 export function createSessionConnections() {
-  const offExit = onSessionExit((name) => {
+  onSessionExit((name) => {
     if (sessionIdentity(name)?.kind !== 'worktree') return;
     if (getSession(name)?.pty.processState?.gone) releaseExitedSession(name);
   });
@@ -41,5 +41,5 @@ export function createSessionConnections() {
       ];
     });
   }
-  return { read, dispose: offExit };
+  return { read };
 }

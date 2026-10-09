@@ -6,6 +6,9 @@ export default [
   {
     files: ['**/*.{ts,tsx}'],
     plugins: { '@next/next': next },
+    // The plugin looks for the app relative to the working directory,
+    // which is the repo root when pre-commit lints a staged file.
+    settings: { next: { rootDir: import.meta.dirname } },
     rules: {
       ...next.configs.recommended.rules,
       ...next.configs['core-web-vitals'].rules,

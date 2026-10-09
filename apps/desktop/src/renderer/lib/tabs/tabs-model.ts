@@ -106,7 +106,9 @@ export type TabsAction =
   | { type: 'pin'; id: string }
   | { type: 'activate'; id: string }
   | { type: 'close'; id: string; repo?: string }
-  | { type: 'close-others'; id: string }
+  /** Close every tab but `id` and those in `keep`: an orchestrator's
+   *  tab keeps the player tabs it shows. */
+  | { type: 'close-others'; id: string; keep?: readonly string[] }
   | { type: 'close-all' }
   | { type: 'move'; id: string; targetId: string; side: 'before' | 'after' }
   /** The one reconciliation dispatched from Workspace's effect: the
@@ -176,9 +178,14 @@ function activateTab(state: TabsState, id: string): TabsState {
 }
 
 /** Keep only `id`; whatever survives becomes active. */
-function closeOtherTabs(state: TabsState, id: string): TabsState {
-  const tabs = state.tabs.filter((t) => t.id === id);
-  return { ...state, tabs, activeId: tabs[0]?.id ?? null };
+function closeOtherTabs(
+  state: TabsState,
+  id: string,
+  keep: readonly string[] = []
+): TabsState {
+  const tabs = state.tabs.filter((t) => t.id === id || keep.includes(t.id));
+  const kept = tabs.some((t) => t.id === id) ? id : null;
+  return { ...state, tabs, activeId: kept ?? tabs[0]?.id ?? null };
 }
 
 export function reduce(state: TabsState, action: TabsAction): TabsState {
@@ -276,7 +283,7 @@ function applyClose(state: TabsState, action: CloseAction): TabsState {
     case 'worktrees-removed':
       return closeRemovedWorktrees(state, action.repo, action.worktrees);
     case 'close-others':
-      return closeOtherTabs(state, action.id);
+      return closeOtherTabs(state, action.id, action.keep);
     case 'close-all':
       // `autoOpened` survives on purpose: closing every tab is a manual
       // act, and re-opening the running agents on the next sidebar poll

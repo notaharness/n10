@@ -64,6 +64,8 @@ interface LineCounts {
 
 /** What the diff pane says about the comparison, beside its files. */
 export interface PrDiffView extends PrDiffBodies {
+  /** The repository its reads name. */
+  cwd: string;
   comparison: PrComparison | null;
   /** The target branch the diff on screen is compared with, which a
    *  retarget does not change until the reader loads it. */
@@ -255,6 +257,7 @@ export function usePrDiff(
     view: {
       ...bodies,
       ...maps,
+      cwd,
       comparison,
       target: pin.target,
       moved,

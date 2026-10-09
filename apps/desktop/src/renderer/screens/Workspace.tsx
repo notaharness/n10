@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   Group,
   Panel,
@@ -12,15 +12,7 @@ import type {
   SidebarItem,
 } from '../../host/contract.js';
 import { AttentionRail } from '../components/AttentionRail.js';
-import {
-  applyPendingRemovals,
-  itemBranch,
-  itemKey,
-  itemRunning,
-  itemSessionName,
-  itemWorktree,
-  itemTitle,
-} from '../lib/sidebar/sidebar-model.js';
+import { applyPendingRemovals } from '../lib/sidebar/sidebar-model.js';
 import { CommandPalette } from '../components/CommandPalette.js';
 import { EditorArea } from '../components/editor/EditorArea.js';
 import { prefetchPanes } from '../components/editor/lazy-panes.js';
@@ -45,6 +37,7 @@ import {
   type ForeignSessionEntry,
   type ItemEntry,
 } from '../lib/tabs/tabs.js';
+import { itemEntries } from '../lib/tabs/tab-item.js';
 import { useCloseTabs } from '../lib/tabs/use-close-tabs.js';
 import { REMOTE_HOME_CWD } from '../lib/terminals/terminal-launch-request.js';
 import { useTerminalTabs } from '../lib/terminals/use-terminal-tabs.js';
@@ -60,6 +53,11 @@ const SIDEBAR_KEY = 'n10.sidebar.hidden';
  * The main window once a repo is open: title bar, resizable sidebar +
  * tabbed editor area, status bar. Owns global shortcuts, native menu
  * command routing and the command palette.
+ *
+ * It stays mounted across a repository switch, so the editor keeps the
+ * pane it holds ready for the tab being switched to. What keeps state
+ * about the open repository — the sidebar, the status bar and the
+ * palette — is keyed by it and starts fresh.
  */
 export function Workspace({
   repo,
@@ -149,20 +147,10 @@ function WorkspaceInner({
     return () => setRevealHost(null);
   }, [setRevealHost]);
 
-  // The sidebar as the tab model sees it.
-  const entries: ItemEntry[] = useMemo(() => {
-    const byName = new Map(sessions.data?.map((s) => [s.name, s.restore]));
-    return items.map((i) => ({
-      itemKey: itemKey(i),
-      branch: itemBranch(i),
-      title: itemTitle(i),
-      running: itemRunning(i),
-      sessionName: itemSessionName(i),
-      restore: byName.get(itemSessionName(i) ?? ''),
-      worktree: itemWorktree(i),
-      sessionBranch: i.kind === 'session' ? i.session.sessionBranch : undefined,
-    }));
-  }, [items, sessions.data]);
+  const entries: ItemEntry[] = useMemo(
+    () => itemEntries(items, sessions.data),
+    [items, sessions.data]
+  );
 
   // The one place every store the strip depends on is reconciled: the
   // sidebar items, the host's terminal listing *and* its listing of
@@ -250,20 +238,23 @@ function WorkspaceInner({
 
   // In-page shortcuts for the web-rendered UI. Anything that is also a
   // native menu accelerator reaches us through onMenuCommand instead;
-  // handled here: palette (⌘K). Tab cycling was removed for now — it
-  // collided with Shift+Tab inside agent terminals (Claude Code's mode
-  // switch).
+  // handled here: palette (⌘K). Tab switching is `useTabSwitching`'s,
+  // on rebindable Ctrl chords: a bare Shift+Tab belongs to the agent
+  // terminals (Claude Code's mode switch). The palette's chord is taken
+  // in the capture phase, ahead of a focused terminal, which keeps every
+  // key it handles to itself.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
       if (e.key.toLowerCase() === 'k') {
         e.preventDefault();
+        e.stopPropagation();
         setPaletteOpen((o) => !o);
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, []);
 
   return (
@@ -302,6 +293,7 @@ function WorkspaceInner({
                 className="min-w-0"
               >
                 <Sidebar
+                  key={repo.cwd}
                   items={items}
                   loading={model.isLoading}
                   updatedAt={model.dataUpdatedAt}
@@ -326,19 +318,23 @@ function WorkspaceInner({
         </Group>
       </div>
 
-      <StatusBar items={items} onOpenSettings={() => tabs.openSettings()} />
+      {/* One key for both: keys only tell siblings apart, and two
+          siblings sharing one leave the old ones behind on a switch. */}
+      <Fragment key={repo.cwd}>
+        <StatusBar items={items} onOpenSettings={() => tabs.openSettings()} />
 
-      <CommandPalette
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
-        items={items}
-        onToggleSidebar={toggleSidebar}
-        onSwitchRepo={onSwitchRepo}
-        onNewTerminal={terminalTabs.openDialog}
-        onOpenTerminalOnMachine={(machine) =>
-          terminalTabs.launchTerminal('shell', REMOTE_HOME_CWD, machine)
-        }
-      />
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          items={items}
+          onToggleSidebar={toggleSidebar}
+          onSwitchRepo={onSwitchRepo}
+          onNewTerminal={terminalTabs.openDialog}
+          onOpenTerminalOnMachine={(machine) =>
+            terminalTabs.launchTerminal('shell', REMOTE_HOME_CWD, machine)
+          }
+        />
+      </Fragment>
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       {terminalTabs.dialogOpen && (
         <NewTerminalDialog

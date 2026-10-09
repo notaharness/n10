@@ -21,6 +21,7 @@ import { DiffFileHeader } from './DiffFileHeader.js';
 import { FoldRow, HunkRow, SplitCell, UnifiedRow } from './diff-rows.js';
 import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
 import { FileBodyNotice } from './FileBodyNotice.js';
+import { ImageCompare } from './ImageCompare.js';
 import type { GutterProps } from './LineGutter.js';
 import type { TextMatch } from '../../../lib/diff/text-matches.js';
 
@@ -137,6 +138,9 @@ function FileNoticeRow({
   const file = ctx.manifest.get(row.file);
   const body = prDiff?.bodies.get(row.file);
   if (!file || !body || !prDiff) return null;
+  if (body.state === 'no-text' && body.images) {
+    return <ImageCompare cwd={prDiff.cwd} file={file} />;
+  }
   return (
     <FileBodyNotice
       file={file}

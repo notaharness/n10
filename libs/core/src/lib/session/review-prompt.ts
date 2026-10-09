@@ -18,7 +18,9 @@ export function buildReviewLaunchRequest(
     PullRequestInfo,
     'id' | 'title' | 'sourceBranch' | 'targetBranch' | 'createdByDisplayName'
   >,
-  additionalInstruction?: string
+  additionalInstruction?: string,
+  /** Ask for a guided review too: only a shell that shows one asks. */
+  options: { guide?: boolean } = {}
 ): LaunchRequest {
   // Reusable how-to guidance (installed as a system prompt for agents
   // that support it, e.g. Claude; folded into the prompt otherwise).
@@ -55,12 +57,18 @@ export function buildReviewLaunchRequest(
     `sentence it is, not as a downgrade\n` +
     `- Do not sign the comment or say it came from an AI — that is added ` +
     `when it is posted`;
+  const guideGuidance =
+    `\n\nAfter your comments, write a guided review: a short slideshow ` +
+    `that walks the reader through this pull request before they read the ` +
+    `diff. Run \`n10 util guide-help --pr=${pr.id}\` for what to put in it ` +
+    `and how to store it with \`n10 util add-guide\`.`;
 
   let prompt =
     `Review PR #${pr.id} ("${pr.title || pr.sourceBranch}") ` +
     `merging ${pr.sourceBranch} → ${pr.targetBranch} ` +
     `by ${pr.createdByDisplayName || 'unknown'}.\n\n` +
-    `Review all changed files thoroughly. Add comments for any issues found.`;
+    `Review all changed files thoroughly. Add comments for any issues found.` +
+    (options.guide ? ` Then write a guided review of the pull request.` : '');
 
   const extra = additionalInstruction?.trim();
   if (extra) {
@@ -69,5 +77,11 @@ export function buildReviewLaunchRequest(
       extra;
   }
 
-  return { intent: 'continue-or-seed', prompt, systemGuidance };
+  return {
+    intent: 'continue-or-seed',
+    prompt,
+    systemGuidance: options.guide
+      ? systemGuidance + guideGuidance
+      : systemGuidance,
+  };
 }

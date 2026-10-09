@@ -772,6 +772,23 @@ describe('tabs across repositories', () => {
     s = reduce(s, { type: 'close', id: id('branch:main', OTHER) });
     expect(s.tabs).toEqual([]);
   });
+
+  it('close-others spares the tabs it is told to keep', () => {
+    // An orchestrator's tab keeps the player tabs it shows.
+    let s = open(empty, 'branch:orch');
+    s = open(s, 'branch:player');
+    s = open(s, 'branch:stranger');
+    s = reduce(s, {
+      type: 'close-others',
+      id: id('branch:orch'),
+      keep: [id('branch:player')],
+    });
+    expect(s.tabs.map((t) => t.id)).toEqual([
+      id('branch:orch'),
+      id('branch:player'),
+    ]);
+    expect(s.activeId).toBe(id('branch:orch'));
+  });
 });
 
 describe('activeTabRepo', () => {

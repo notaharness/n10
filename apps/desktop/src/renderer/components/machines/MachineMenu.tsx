@@ -2,12 +2,9 @@ import { MoreHorizontalIcon } from 'lucide-react';
 import { useRef } from 'react';
 import { toast } from 'sonner';
 import type { MachineGrant, MachineView } from '@n10/engine/contract';
-import { copyText } from '../../lib/copy-text.js';
 import { useSetMachineGrant } from '../../lib/data/mutations-machines.js';
-import {
-  fingerprintGroups,
-  isFleetMember,
-} from '../../lib/machines/machine-model.js';
+import { copyFingerprint } from '../../lib/machines/copy-fingerprint.js';
+import { isFleetMember } from '../../lib/machines/machine-model.js';
 import { errorMessage } from '../../lib/utils.js';
 import { Button } from '../ui/button.js';
 import {
@@ -27,12 +24,6 @@ const GRANTS: { grant: MachineGrant; label: string }[] = [
   { grant: 'msg', label: 'Messages only' },
   { grant: 'none', label: 'No access' },
 ];
-
-/** Copies the 64-bit fingerprint as displayed, not the full peerId
- *  (beam-fleet-ux.md §1). */
-export function copyFingerprint(peerId: string): void {
-  copyText(fingerprintGroups(peerId), 'Fingerprint copied');
-}
 
 /** A machine row's actions: alias, grant and revoke for a member (beam
  *  docs/08), copying the fingerprint for any row. */

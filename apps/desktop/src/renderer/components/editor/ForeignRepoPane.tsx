@@ -4,13 +4,9 @@ import { repoDisplayName } from '../../lib/tabs/tab-presentation.js';
 import { Button } from '../ui/button.js';
 
 /**
- * What an active tab from another repository shows until that
- * repository is open.
- *
- * Activating such a tab opens its repo by itself, so this is normally a
- * frame or two on the way there. It stays put when the open failed —
- * the checkout was moved or deleted while its tab sat in the strip —
- * which is why it offers the retry rather than spinning forever.
+ * What another repository's tab shows when the host cannot read that
+ * repository: the checkout was moved or deleted while its tab sat in
+ * the strip. It offers the retry rather than spinning forever.
  */
 export function ForeignRepoPane({ cwd }: { cwd: string }) {
   const { openRepo } = useRepo();

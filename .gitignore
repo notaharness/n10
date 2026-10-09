@@ -85,3 +85,7 @@ docs/media/raw
 
 # Personal agent instructions
 CLAUDE.local.md
+
+.nx/polygraph
+.nx/self-healing
+.nx/migrate-runs

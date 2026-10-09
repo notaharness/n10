@@ -4,6 +4,8 @@ export type { ReviewService } from './review-service.js';
 export { readResourceValue } from './read-resource.js';
 export type { ReadResource, ReadSnapshot } from './read-resource.js';
 export type {
+  PrDiffImageRequest,
+  PrDiffImageResult,
   PrDiffManifestRequest,
   PrDiffPatchRequest,
   PrRangeManifestRequest,
@@ -11,10 +13,11 @@ export type {
   PrDiffManifestResult,
   PrDiffPatchResult,
   PrDiffError,
-  RepoChangedError,
+  OtherRepoError,
 } from './diff-reads.js';
 export type {
   ReplyToReviewThread,
   ResolveReviewThread,
 } from './review-commands.js';
 export type { PostAgentCommentsRequest } from './agent-publication.js';
+export type { AgentGuideRead } from './agent-guide.js';

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchRefs,
   fetchWorktreeDiffText,
+  readBlobImage,
   readPrDiffManifest,
   readPrDiffPatch,
   readRevisionRangeManifest,
@@ -22,6 +23,7 @@ vi.mock('@n10/core', () => ({
   WHOLE_FILE_CONTEXT: 2_147_483_647,
   fetchRefs: vi.fn(),
   fetchWorktreeDiffText: vi.fn(),
+  readBlobImage: vi.fn(),
   readPrDiffManifest: vi.fn(),
   readPrDiffPatch: vi.fn(),
   readRevisionRangeManifest: vi.fn(),
@@ -48,13 +50,13 @@ const request = {
 };
 const patchRequest = { repo: '/repo/a', mergeBaseOid: BASE, headOid: HEAD };
 const find = vi.fn();
-let current = true;
-const reads = (repo = '/repo/a') =>
-  createDiffReads(repo, () => current, { find }, {});
+const reads = (
+  repo = '/repo/a',
+  freshness?: Parameters<typeof createDiffReads>[1]
+) => createDiffReads(repo, freshness, { find }, {});
 
 beforeEach(() => {
   vi.resetAllMocks();
-  current = true;
   vi.mocked(fetchRefs).mockResolvedValue(true);
   vi.mocked(resolvePrComparison).mockImplementation(async (req) => ({
     ok: true,
@@ -95,7 +97,7 @@ describe('manifest', () => {
   it('lists under the ceiling the environment sets', async () => {
     const diff = createDiffReads(
       '/repo/a',
-      () => true,
+      undefined,
       { find },
       {
         N10_DIFF_MANIFEST_MAX_BYTES: '400',
@@ -174,19 +176,8 @@ describe('manifest', () => {
     const diff = reads();
     expect(
       await readResourceValue(diff.manifest({ ...request, repo: '/repo/b' }))
-    ).toMatchObject({ ok: false, error: { code: 'repo-changed' } });
+    ).toMatchObject({ ok: false, error: { code: 'other-repo' } });
     expect(resolvePrComparison).not.toHaveBeenCalled();
-  });
-
-  it('drops an answer when the repository closes during the read', async () => {
-    vi.mocked(readPrDiffManifest).mockImplementationOnce(async (_cwd, c) => {
-      current = false;
-      return { comparison: c, files: [], complete: true };
-    });
-    expect(await readResourceValue(reads().manifest(request))).toMatchObject({
-      ok: false,
-      error: { code: 'repo-changed' },
-    });
   });
 
   it.each([
@@ -216,6 +207,17 @@ describe('patch', () => {
     );
   });
 
+  it('lets go of its patches when its repository is parked, and keeps the manifest', async () => {
+    const diff = reads();
+    await readResourceValue(diff.manifest(request));
+    await readResourceValue(diff.patch(patchRequest));
+    diff.park();
+    await readResourceValue(diff.patch(patchRequest));
+    await readResourceValue(diff.manifest(request));
+    expect(readPrDiffPatch).toHaveBeenCalledTimes(2);
+    expect(resolvePrComparison).toHaveBeenCalledOnce();
+  });
+
   it('keeps the last two patches read, and joins one still being read', async () => {
     const diff = reads();
     const of = (path: string) => ({ ...patchRequest, paths: [path] });
@@ -235,17 +237,6 @@ describe('patch', () => {
     // Past the two kept: read again.
     await readResourceValue(diff.patch(of('a')));
     expect(calls('a')).toBe(2);
-  });
-
-  it('drops an answer when the repository closes mid-read', async () => {
-    vi.mocked(readPrDiffPatch).mockImplementationOnce(async () => {
-      current = false;
-      return { text: '', truncated: false, limitBytes: 1 };
-    });
-    expect(await readResourceValue(reads().patch(patchRequest))).toMatchObject({
-      ok: false,
-      error: { code: 'repo-changed' },
-    });
   });
 
   it.each([
@@ -282,6 +273,74 @@ describe('patch', () => {
   });
 });
 
+describe('image', () => {
+  const OID = 'd'.repeat(40);
+  const image = {
+    dataUrl: 'data:image/png;base64,AA==',
+    contentType: 'image/png',
+    bytes: 1,
+  };
+
+  it('reads a blob in its repository once, by id', async () => {
+    vi.mocked(readBlobImage).mockResolvedValue({ ok: true, image });
+    const diff = reads();
+    const req = { repo: '/repo/a', oid: OID };
+    expect(await readResourceValue(diff.image(req))).toEqual({
+      ok: true,
+      image,
+    });
+    await readResourceValue(diff.image(req));
+    expect(readBlobImage).toHaveBeenCalledTimes(1);
+    expect(readBlobImage).toHaveBeenCalledWith('/repo/a', OID);
+  });
+
+  it('keeps only the last few images, which the renderer caches', async () => {
+    vi.mocked(readBlobImage).mockResolvedValue({ ok: true, image });
+    const diff = reads();
+    const oids = ['1', '2', '3'].map((c) => c.repeat(40));
+    for (const oid of oids) {
+      await readResourceValue(diff.image({ repo: '/repo/a', oid }));
+    }
+    await readResourceValue(diff.image({ repo: '/repo/a', oid: oids[2] }));
+    expect(readBlobImage).toHaveBeenCalledTimes(3);
+    await readResourceValue(diff.image({ repo: '/repo/a', oid: oids[0] }));
+    expect(readBlobImage).toHaveBeenCalledTimes(4);
+  });
+
+  it('reads a refusal again rather than keeping it', async () => {
+    vi.mocked(readBlobImage).mockResolvedValue({
+      ok: false,
+      error: { code: 'too-large', message: 'larger than 10 MB' },
+    });
+    const diff = reads();
+    const req = { repo: '/repo/a', oid: OID };
+    await readResourceValue(diff.image(req));
+    await readResourceValue(diff.image(req));
+    expect(readBlobImage).toHaveBeenCalledTimes(2);
+  });
+
+  it('answers only for its own repository', async () => {
+    const diff = reads();
+    const result = await readResourceValue(
+      diff.image({ repo: '/repo/b', oid: OID })
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'other-repo' },
+    });
+    expect(readBlobImage).not.toHaveBeenCalled();
+  });
+
+  it('rejects an id that is not an object id', () => {
+    expect(() =>
+      reads().image({ repo: '/repo/a', oid: 'HEAD:secret' })
+    ).toThrow('oid must be an object id');
+    expect(() => reads().image({ repo: '/repo/a' })).toThrow(
+      'oid must be an object id'
+    );
+  });
+});
+
 describe('rangeManifest', () => {
   const range = { repo: '/repo/a', from: BASE, to: HEAD, target: TARGET };
   beforeEach(() => {
@@ -313,18 +372,8 @@ describe('rangeManifest', () => {
       await readResourceValue(
         reads().rangeManifest({ ...range, repo: '/repo/b' })
       )
-    ).toMatchObject({ ok: false, error: { code: 'repo-changed' } });
+    ).toMatchObject({ ok: false, error: { code: 'other-repo' } });
     expect(readRevisionRangeManifest).not.toHaveBeenCalled();
-  });
-
-  it('drops an answer when the repository closes during the read', async () => {
-    vi.mocked(readRevisionRangeManifest).mockImplementationOnce(async () => {
-      current = false;
-      return { ok: false, error: { code: 'to-unavailable', message: 'x' } };
-    });
-    expect(await readResourceValue(reads().rangeManifest(range))).toMatchObject(
-      { ok: false, error: { code: 'repo-changed' } }
-    );
   });
 
   it('reads a range that failed again, rather than keeping the failure', async () => {
@@ -367,4 +416,19 @@ it('reads a live diff from the resolved checkout', async () => {
     '/checkouts/actual',
     'main'
   );
+});
+
+describe('worktree', () => {
+  it('keeps its one-second TTL while its repository is parked', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    find.mockResolvedValue(null);
+    const diff = reads('/repo/a', { parked: () => true, parkedTtl: 3_600_000 });
+    await readResourceValue(diff.worktree('feature', 'main'));
+    await readResourceValue(diff.worktree('feature', 'main'));
+    expect(find).toHaveBeenCalledOnce();
+    vi.setSystemTime(Date.now() + 1_001);
+    await readResourceValue(diff.worktree('feature', 'main'));
+    expect(find).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
 });

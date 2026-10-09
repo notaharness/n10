@@ -69,7 +69,7 @@ async function openTerminals(page: Page): Promise<void> {
     await page.waitForFunction(
       (b) =>
         Array.from(
-          document.querySelectorAll('[data-editor-panes] .wterm .term-row')
+          document.querySelectorAll('[data-editor-panes] .xterm-rows > div')
         ).some((row) => row.textContent?.includes(`@${b}`)),
       branch,
       { timeout: 60_000 }
@@ -131,14 +131,17 @@ for (const size of [
             async () => undefined,
             async (page) => {
               const result = await page.evaluate(async (branch) => {
+                const repo = (await window.n10.getRepo())!.cwd;
                 const start = performance.now();
                 const patch = await window.n10.fetchWorktreeDiffText(
+                  repo,
                   branch,
                   'main'
                 );
                 const firstReadMs = performance.now() - start;
                 const cachedStart = performance.now();
                 const cached = await window.n10.fetchWorktreeDiffText(
+                  repo,
                   branch,
                   'main'
                 );

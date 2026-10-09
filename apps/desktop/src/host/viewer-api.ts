@@ -9,7 +9,8 @@ export type ViewerScoped =
   | 'watchSession'
   | 'unwatchSession'
   | 'showSession'
-  | 'hideSession';
+  | 'hideSession'
+  | 'holdMenuShortcuts';
 
 export type ViewerApi = {
   [K in ViewerScoped]: (
@@ -17,6 +18,19 @@ export type ViewerApi = {
     ...args: Parameters<N10HostApi[K]>
   ) => ReturnType<N10HostApi[K]>;
 };
+
+/** Main-process glue (`webContents.setIgnoreMenuShortcuts`), injected
+ *  by the host worker; a no-op in tests. */
+let menuShortcutHold: (
+  viewer: Viewer,
+  held: boolean
+) => Promise<void> = async () => undefined;
+
+export function setMenuShortcutHold(
+  fn: (viewer: Viewer, held: boolean) => Promise<void>
+): void {
+  menuShortcutHold = fn;
+}
 
 export function createViewerApi(): ViewerApi {
   return {
@@ -28,6 +42,7 @@ export function createViewerApi(): ViewerApi {
       Promise.resolve(sessions.showSession(viewer, name)),
     hideSession: (viewer, name) =>
       Promise.resolve(sessions.hideSession(viewer, name)),
+    holdMenuShortcuts: (viewer, held) => menuShortcutHold(viewer, held),
   };
 }
 
@@ -40,6 +55,7 @@ export function viewerHandlers(
     [IPC.unwatchSession]: api.unwatchSession,
     [IPC.showSession]: api.showSession,
     [IPC.hideSession]: api.hideSession,
+    [IPC.holdMenuShortcuts]: api.holdMenuShortcuts,
   };
 }
 

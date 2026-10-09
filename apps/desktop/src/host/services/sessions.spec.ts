@@ -80,8 +80,7 @@ vi.mock('./repo.js', async () => {
     '@n10/engine'
   );
   const handles = state.handles;
-  function activeRepository() {
-    const repo = state.cwd;
+  function repository(repo: string) {
     let sessions = handles.get(repo);
     if (!sessions) {
       // The engine resolves a remote machine's own clone (its spec).
@@ -130,7 +129,8 @@ vi.mock('./repo.js', async () => {
   return {
     requireRepo: () => state.cwd,
     activeRepoIs: (cwd: string) => cwd === state.cwd,
-    activeRepository,
+    activeRepository: () => repository(state.cwd),
+    repository,
   };
 });
 
@@ -231,10 +231,14 @@ vi.mock('@n10/core', async (importOriginal) => {
       return state.alive.has(name);
     },
     buildAgentOptions: actual.buildAgentOptions,
-    buildReviewLaunchRequest: (pr: { id: number }, instruction?: string) => ({
+    buildReviewLaunchRequest: (
+      pr: { id: number },
+      instruction?: string,
+      options: { guide?: boolean } = {}
+    ) => ({
       intent: 'review',
       prompt: `review #${pr.id}${instruction ? `: ${instruction}` : ''}`,
-      systemGuidance: 'guidance',
+      systemGuidance: options.guide ? 'guidance, guide' : 'guidance',
     }),
     launchSession: async (spec: {
       name: string;
@@ -736,7 +740,7 @@ describe('listSessions: a local session never carries a connectionState (finding
     // concern than the remote D4 banner) can legitimately report this
     // — it must still never reach the renderer for a local session.
     state.connectionStateByName.set(name, 'reconnecting');
-    const summary = listSessions().find((s) => s.name === name);
+    const summary = listSessions(state.cwd).find((s) => s.name === name);
     expect(summary?.connectionState).toBeUndefined();
   });
 
@@ -749,7 +753,7 @@ describe('listSessions: a local session never carries a connectionState (finding
       machine: 'bbbbbbbbbbbbbbbb',
     });
     state.connectionStateByName.set(name, 'reconnecting');
-    const summary = listSessions().find((s) => s.name === name);
+    const summary = listSessions(state.cwd).find((s) => s.name === name);
     expect(summary?.connectionState).toBe('reconnecting');
   });
 });
@@ -772,7 +776,7 @@ describe('another repository owns the name', () => {
     expect(second.name).toBe(keyFor('shared', '/repo-b'));
     expect(state.spawns).toHaveLength(2);
     expect(state.alive.has(keyFor('shared', '/repo-a'))).toBe(true);
-    expect(listSessions().map((s) => s.name)).toEqual([second.name]);
+    expect(listSessions(state.cwd).map((s) => s.name)).toEqual([second.name]);
   });
 
   it('refuses to kill it', async () => {
@@ -785,9 +789,9 @@ describe('another repository owns the name', () => {
 
   it('hides it from the session list', async () => {
     await launchInAThenSwitch();
-    expect(listSessions()).toEqual([]);
+    expect(listSessions(state.cwd)).toEqual([]);
     state.cwd = '/repo-a';
-    expect(listSessions().map((s) => s.name)).toEqual([
+    expect(listSessions(state.cwd).map((s) => s.name)).toEqual([
       keyFor('shared', '/repo-a'),
     ]);
   });
@@ -797,14 +801,15 @@ describe('another repository owns the name', () => {
     expect(getSessionActivity()).toEqual({});
   });
 
-  it('does not hand over its scrollback', async () => {
+  it('hands over its scrollback by its own name, and only that', async () => {
     await launchInAThenSwitch();
-    // The buffer holds whatever the other repo's agent printed.
-    expect(getSessionBuffer(keyFor('shared', '/repo-a')).data).toBe('');
-    state.cwd = '/repo-a';
+    // A pane of the parked repository, held ready, starts from it: the
+    // name says which repository's agent it is.
     expect(getSessionBuffer(keyFor('shared', '/repo-a')).data).toBe(
       'repo-a secrets'
     );
+    // The same branch here is another session, with none of it.
+    expect(getSessionBuffer(keyFor('shared', '/repo-b')).data).toBe('');
   });
 
   it('reports it as not alive here, so this repo does not show it running', () => {
@@ -854,18 +859,20 @@ describe('session buffer', () => {
     });
   });
 
-  it('drops the oldest output once the buffer is full', async () => {
+  it("drops the oldest output after the client's first once the ring is full", async () => {
     await launchAgent({ branch: 'big', intent: 'continue-or-blank' });
     const chunk = 'x'.repeat(256 * 1024);
+    emit(keyFor('big', '/repo-a'), 'setup');
     emit(keyFor('big', '/repo-a'), chunk);
     emit(keyFor('big', '/repo-a'), chunk);
     emit(keyFor('big', '/repo-a'), chunk);
 
-    // Bounded at 512 KiB: the scrollback stays useful without letting a
-    // chatty agent grow the main process without limit.
-    const { data } = getSessionBuffer(keyFor('big', '/repo-a'));
-    expect(data.length).toBeLessThanOrEqual(512 * 1024);
-    expect(data.length).toBeGreaterThan(0);
+    // The ring is bounded at 512 KiB: the scrollback stays useful without
+    // letting a chatty agent grow the host without limit. The client's
+    // first output, its terminal setup, stays ahead of it.
+    const { data, truncated } = getSessionBuffer(keyFor('big', '/repo-a'));
+    expect(data).toBe('setup' + chunk + chunk);
+    expect(truncated).toBe(true);
   });
 });
 
@@ -890,6 +897,7 @@ describe('launchReviewAgent', () => {
     await launchReviewAgent({
       pr: { id: 42, sourceBranch: 'feature/review' },
       instruction: 'focus on error handling',
+      guide: false,
     } as Parameters<typeof launchReviewAgent>[0]);
 
     expect(state.spawns).toHaveLength(1);
@@ -905,9 +913,9 @@ describe('launchReviewAgent', () => {
     const pr = { id: 1, sourceBranch: 'dup' } as Parameters<
       typeof launchReviewAgent
     >[0]['pr'];
-    const first = launchReviewAgent({ pr, instruction: 'first' });
+    const first = launchReviewAgent({ pr, instruction: 'first', guide: false });
     await expect(
-      launchReviewAgent({ pr, instruction: 'second' })
+      launchReviewAgent({ pr, instruction: 'second', guide: false })
     ).rejects.toThrow('Another launch is in progress');
     await first;
     expect(state.spawns[0].request).toMatchObject({
@@ -919,7 +927,7 @@ describe('launchReviewAgent', () => {
     const pr = { id: 1, sourceBranch: 'selected' } as Parameters<
       typeof launchReviewAgent
     >[0]['pr'];
-    await launchReviewAgent({ pr, agentId: 'codex' });
+    await launchReviewAgent({ pr, agentId: 'codex', guide: false });
     expect(state.spawns[0]).toMatchObject({
       fresh: true,
       agent: { id: 'codex' },
@@ -934,10 +942,24 @@ describe('launchReviewAgent', () => {
   it('goes through the same de-duplication as a plain launch', async () => {
     const pr = { id: 1, sourceBranch: 'dup' };
     await Promise.all([
-      launchReviewAgent({ pr } as Parameters<typeof launchReviewAgent>[0]),
-      launchReviewAgent({ pr } as Parameters<typeof launchReviewAgent>[0]),
+      launchReviewAgent({ pr, guide: false } as Parameters<
+        typeof launchReviewAgent
+      >[0]),
+      launchReviewAgent({ pr, guide: false } as Parameters<
+        typeof launchReviewAgent
+      >[0]),
     ]);
     expect(state.spawns).toHaveLength(1);
+  });
+
+  it('asks for a guided review exactly when the request does', async () => {
+    const pr = { id: 7, sourceBranch: 'guided' } as Parameters<
+      typeof launchReviewAgent
+    >[0]['pr'];
+    await launchReviewAgent({ pr, guide: true });
+    expect(state.spawns[0].request).toMatchObject({
+      systemGuidance: 'guidance, guide',
+    });
   });
 });
 
@@ -959,7 +981,7 @@ describe('checkoutPlan', () => {
     expect(getSessionBuffer(keyFor('feature/x', '/repo-a')).data).toBe(
       'agent says hello'
     );
-    expect(listSessions().map((s) => s.name)).toEqual([
+    expect(listSessions(state.cwd).map((s) => s.name)).toEqual([
       keyFor('feature/x', '/repo-a'),
     ]);
   });
@@ -972,7 +994,9 @@ describe('checkoutPlan', () => {
     await expect(checkoutPlan(request)).resolves.toBe('injected');
     emit(name, 'persisted agent output');
     expect(getSessionBuffer(name).data).toBe('persisted agent output');
-    expect(listSessions().map((session) => session.name)).toContain(name);
+    expect(listSessions(state.cwd).map((session) => session.name)).toContain(
+      name
+    );
   });
 
   it('injecting neither spawns nor disturbs the scrollback', async () => {
@@ -1114,11 +1138,11 @@ describe('checkoutPlan', () => {
 describe('listAgentOptions', () => {
   it('lists the repo config default first, then the rest of the registry', () => {
     state.configByCwd['/repo-a'] = { agentId: 'claude' };
-    expect(sessions.listAgentOptions()[0]).toEqual({
+    expect(sessions.listAgentOptions(state.cwd)[0]).toEqual({
       id: 'claude',
       name: 'Claude (default)',
     });
-    expect(sessions.listAgentOptions()).toContainEqual({
+    expect(sessions.listAgentOptions(state.cwd)).toContainEqual({
       id: 'codex',
       name: 'Codex',
     });
@@ -1129,7 +1153,7 @@ describe('listAgentOptions', () => {
       agentId: 'test',
       aiCommand: 'node fake.mjs',
     };
-    expect(sessions.listAgentOptions()[0]).toEqual({
+    expect(sessions.listAgentOptions(state.cwd)[0]).toEqual({
       id: 'test',
       name: 'Custom (default)',
     });

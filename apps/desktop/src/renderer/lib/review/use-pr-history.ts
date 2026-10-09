@@ -57,11 +57,12 @@ export function visitIdFor(key: string): string {
 }
 
 async function loadHistory(
+  cwd: string,
   ref: PullRequestRef,
   viewer: string | null,
   visitId: string
 ): Promise<PullRequestHistory> {
-  const answer = await window.n10.getPullRequestHistory({
+  const answer = await window.n10.getPullRequestHistory(cwd, {
     ref,
     viewer,
     visitId,
@@ -84,6 +85,8 @@ const NO_REF: PullRequestRef = {
 };
 
 export interface PrHistory {
+  /** The repository it was read in, where the visit is recorded. */
+  cwd: string;
   read: HistoryRead;
   viewer: string | null;
   visitId: string;
@@ -103,7 +106,7 @@ export function usePrHistory(
   const visitId = visitIdFor(key);
   const query = useQuery({
     queryKey: keys.prHistory(cwd, ref ?? NO_REF, viewer, visitId),
-    queryFn: () => loadHistory(ref!, viewer, visitId),
+    queryFn: () => loadHistory(cwd, ref!, viewer, visitId),
     enabled: enabled && ref !== null,
     staleTime: 60_000,
   });
@@ -117,7 +120,7 @@ export function usePrHistory(
   const { refetch } = query;
   // Its outcome lands in the query's own state.
   const retry = useCallback(() => void refetch(), [refetch]);
-  return { read, viewer, visitId, retry };
+  return { cwd, read, viewer, visitId, retry };
 }
 
 /**
@@ -134,14 +137,14 @@ export function useRecordVisit(
   const reviewed =
     review?.state === 'read' ? review.value?.head ?? null : undefined;
   const ref = value?.ref ?? null;
-  const { viewer, visitId } = history;
+  const { cwd, viewer, visitId } = history;
   const head = comparison?.headOid;
   const target = comparison?.targetOid;
   const mergeBase = comparison?.mergeBaseOid;
   useEffect(() => {
     if (!ref || !head || !target || !mergeBase) return;
     window.n10
-      .recordPullRequestVisit({
+      .recordPullRequestVisit(cwd, {
         ref,
         viewer,
         visitId,
@@ -153,5 +156,5 @@ export function useRecordVisit(
           id: `record-visit:${visitId}`,
         })
       );
-  }, [ref, viewer, visitId, head, target, mergeBase, reviewed]);
+  }, [cwd, ref, viewer, visitId, head, target, mergeBase, reviewed]);
 }

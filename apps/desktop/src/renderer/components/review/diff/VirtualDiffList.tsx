@@ -241,6 +241,7 @@ export function VirtualDiffList({
   useDiffJumps(
     jumpRef,
     flat,
+    points.rowOf,
     rows,
     virtualizer,
     scrollRef,

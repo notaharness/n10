@@ -96,6 +96,7 @@ export type * from './lib/pull-requests/pull-request-lookup.js';
 export * from './lib/pull-requests/pr-comparison.js';
 export * from './lib/pull-requests/pr-diff-manifest.js';
 export * from './lib/pull-requests/blob-sizes.js';
+export * from './lib/pull-requests/blob-image.js';
 export * from './lib/pull-requests/pr-history.js';
 export * from './lib/pull-requests/pr-revision-range.js';
 export * from './lib/pull-requests/pr-store-file.js';
@@ -109,6 +110,7 @@ export * from './lib/babysit/babysit-model.js';
 export * from './lib/babysit/babysit-prompt.js';
 export * from './lib/discovery/worktree-origin.js';
 export * from './lib/discovery/live-worktree-sessions.js';
+export * from './lib/discovery/orchestrator-groups.js';
 
 // ── Pure utilities ───────────────────────────────────────────────
 export * from './lib/utils/sidebar-items.js';

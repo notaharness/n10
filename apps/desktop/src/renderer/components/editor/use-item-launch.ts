@@ -96,6 +96,7 @@ export function useItemLaunch(
 
   const startReview = (
     instruction: string | undefined,
+    guide: boolean,
     expected: SessionIncarnation | undefined,
     agentId: AgentId | undefined,
     machine?: string
@@ -114,6 +115,7 @@ export function useItemLaunch(
       reviewLaunchRequest(
         pr,
         instruction,
+        guide,
         estimateGrid(),
         expected,
         agentId,
@@ -148,6 +150,7 @@ export function useItemLaunch(
     else
       startReview(
         choice.instruction,
+        choice.guide,
         choice.expected,
         choice.agentId,
         choice.machine

@@ -45,7 +45,7 @@ export async function timedSwitch(
         const latestIn = (term: Element | null): number => {
           let latest = 0;
           for (const r of Array.from(
-            term?.querySelectorAll('.term-row') ?? []
+            term?.querySelectorAll('.xterm-rows > div') ?? []
           )) {
             const m = tickRe.exec(r.textContent ?? '');
             if (m) latest = Math.max(latest, Number(m[1]));
@@ -55,7 +55,7 @@ export async function timedSwitch(
         // The terminal on screen after the switch is another element:
         // one mounted for it, or the one held ready.
         const drawn = (term: Element | null): boolean =>
-          term !== before && !!term?.querySelector('.term-row');
+          term !== before && !!term?.querySelector('.xterm-rows > div');
         const noPress = setTimeout(
           () => reject(new Error(`the press on ${b} never arrived`)),
           15_000

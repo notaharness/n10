@@ -148,7 +148,7 @@ function pushUnread(
   mine: InlineTarget[]
 ): void {
   const notice = rows.length;
-  rows.push(noticeRow(file, slice.stats));
+  rows.push(noticeRow(file, slice.stats, body));
   const { visibleThreads, activeDrafts } = slice;
   if (body.state !== 'loading') {
     pushOrphans(rows, indexById, file, visibleThreads, activeDrafts, mine);

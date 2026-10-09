@@ -7,10 +7,10 @@ import { join } from 'node:path';
  * Somewhere to put an image pasted into an agent terminal.
  *
  * A PTY carries text, so an image on the clipboard cannot be handed to
- * the agent the way a string can — wterm's own paste handler reads
- * `clipboardData.getData('text')` and drops anything else on the floor,
- * which is why pasting a screenshot into the terminal appears to do
- * nothing at all. Writing the bytes out and typing the path instead is
+ * the agent the way a string can — a terminal's own paste handling reads
+ * the clipboard's text and drops anything else on the floor, which is
+ * why pasting a screenshot into a terminal appears to do nothing at
+ * all. Writing the bytes out and typing the path instead is
  * how a terminal agent takes an image: Claude Code reads a path in the
  * prompt and loads the file itself.
  *

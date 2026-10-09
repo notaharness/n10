@@ -8,6 +8,7 @@ import {
   tab,
   tabs,
   visibleText,
+  openSessions,
 } from './setup/app.js';
 import { execFileSync } from 'node:child_process';
 import { renameSync } from 'node:fs';
@@ -158,7 +159,7 @@ test.describe('Tabs across repositories', () => {
     // close cannot have killed it — the agent is still there when
     // alpha comes back.
     await switchRepo(page, repoPath);
-    const sessions = await page.evaluate(() => window.n10.listSessions());
+    const sessions = await openSessions(page);
     expect(
       sessions.find((s) => sessionBranch(s.name) === BRANCH)?.running
     ).toBe(true);
@@ -198,7 +199,7 @@ test.describe('Tabs across repositories', () => {
     await expect(foreign).toHaveCount(0);
 
     // Beta's agent survived its neighbour's tab closing.
-    const sessions = await page.evaluate(() => window.n10.listSessions());
+    const sessions = await openSessions(page);
     expect(
       sessions.find((s) => sessionBranch(s.name) === SHARED)?.running
     ).toBe(true);

@@ -13,8 +13,23 @@ the extending config: `apps/**/*.ts` becomes `apps/cli-e2e/apps/**/*.ts` there
 and matches nothing. Shared blocks use `**/*.{ts,tsx}` or `**/src/**/*.{ts,tsx}`.
 Keep project-specific blocks, such as Ink and renderer imports, anchored.
 
-Verify a new block with `npx eslint --print-config <file>` from the directory
-owning that file's config. Running ESLint from the root can miss e2e rules.
+Plain `npx eslint` resolves one config from the working directory, so from the
+root it applies the root config to e2e files and misses their rules. Pass
+`--flag v10_config_lookup_from_file` to lint each file under its nearest
+`eslint.config.mjs`; verify a new block with
+`npx eslint --flag v10_config_lookup_from_file --print-config <file>`.
+
+## Pre-commit
+
+`.husky/pre-commit` runs lint-staged, which runs
+`eslint --flag v10_config_lookup_from_file --fix --max-warnings 0` on staged
+`*.{ts,tsx}` files from the root, so every file is linted under its owning
+config. The flag is ESLint 10's default lookup, opted into early; drop it
+everywhere when upgrading. Configs that read the working directory, such as
+the Next plugin's app discovery, must anchor to their own directory instead.
+
+The website's type-aware rules need the generated `.source` types:
+run `npx nx run website:typegen` in a fresh worktree before committing there.
 
 ## Budgets and exceptions
 
@@ -26,7 +41,7 @@ owning that file's config. Running ESLint from the root can miss e2e rules.
 
 Refactor before adding an exception. Inline suppressions need a `--` rationale
 explaining why the rule does not apply. Put plugin-rule exceptions in the owning
-ESLint config: lint-staged may run without that plugin registered.
+ESLint config, beside the plugin that defines the rule.
 
 ## Async and type safety
 
@@ -72,7 +87,7 @@ its app or library config. Otherwise a passing typecheck can exclude the tests.
 ## Claude edit hook
 
 `.claude/settings.json` runs `tools/lint-hook.mjs` after Write/Edit. It lints
-JS/TS files from the nearest owning ESLint config and reports issues to Claude.
+JS/TS files inside the repo with the same flag and reports issues to Claude.
 The edit has already happened; the hook does not roll it back. Non-code files,
 missing files, missing dependencies and ESLint execution failures are skipped,
 so silence from the hook does not establish a clean workspace.

@@ -1,12 +1,15 @@
 import {
   fetchRefs,
   fetchWorktreeDiffText,
+  readBlobImage,
   readPrDiffManifest,
   readPrDiffPatch,
   resolvePrComparison,
   readRevisionRangeManifest,
 } from '@n10/core';
 import type {
+  BlobImage,
+  BlobImageError,
   PrComparison,
   PrComparisonError,
   PrDiffManifest,
@@ -15,38 +18,45 @@ import type {
   RevisionRangeError,
 } from '@n10/core';
 import type { WorktreeService } from '../worktrees/api.js';
+import type { ReadFreshness } from '../kernel/read-freshness.js';
 import { createResourceCache } from './resource-cache.js';
 import { readResourceValue } from './read-resource.js';
 import {
+  parseImageRequest,
   parseManifestRequest,
   parsePatchRequest,
   parseRangeRequest,
+  type PrDiffImageRequest,
   type PrDiffManifestRequest,
   type PrDiffPatchRequest,
   type PrRangeManifestRequest,
 } from './diff-requests.js';
 
 export type {
+  PrDiffImageRequest,
   PrDiffManifestRequest,
   PrDiffPatchRequest,
   PrRangeManifestRequest,
 };
 
-/** The repository changed between the request and the answer. */
-export interface RepoChangedError {
-  code: 'repo-changed';
+/** The request named another repository than the one it was asked of. */
+export interface OtherRepoError {
+  code: 'other-repo';
   message: string;
 }
-export type PrDiffError = PrComparisonError | RepoChangedError;
+export type PrDiffError = PrComparisonError | OtherRepoError;
 export type PrDiffManifestResult =
   | { ok: true; manifest: PrDiffManifest }
   | { ok: false; error: PrDiffError };
 export type PrRangeManifestResult =
   | { ok: true; range: RevisionRange; manifest: PrDiffManifest }
-  | { ok: false; error: RevisionRangeError | RepoChangedError };
+  | { ok: false; error: RevisionRangeError | OtherRepoError };
 export type PrDiffPatchResult =
   | { ok: true; patch: PrDiffPatch }
-  | { ok: false; error: RepoChangedError };
+  | { ok: false; error: OtherRepoError };
+export type PrDiffImageResult =
+  | { ok: true; image: BlobImage }
+  | { ok: false; error: BlobImageError | OtherRepoError };
 
 const TARGET_FETCH_TTL_MS = 5 * 60 * 1000;
 
@@ -61,6 +71,8 @@ function manifestCeiling(env: Record<string, string | undefined>) {
 }
 const RESOLUTION_TTL_MS = 30_000;
 const PATCHES_KEPT = 2;
+/** Finished image reads kept: each is up to ~13 MB as a data URL. */
+const IMAGES_KEPT = 2;
 
 /**
  * A pull request's diff at exact commits: a request resolves once to
@@ -69,42 +81,48 @@ const PATCHES_KEPT = 2;
  */
 export function createDiffReads(
   repo: string,
-  isCurrent: () => boolean,
+  freshness: ReadFreshness | undefined,
   worktrees: Pick<WorktreeService, 'find'>,
   env: Record<string, string | undefined> = process.env
 ) {
   const ceiling = manifestCeiling(env);
   const manifests = createResourceCache<PrDiffManifestResult>(
     RESOLUTION_TTL_MS,
-    32,
-    (result) => result.ok
+    { capacity: 32, cacheable: (result) => result.ok, freshness }
   );
   // What the commits determine. The comparison is the one just resolved:
   // a target that moves past the same merge base lists the same files.
   const listings = createResourceCache<Omit<PrDiffManifest, 'comparison'>>(
     Infinity,
-    8
+    { capacity: 8 }
   );
   // Patches are the reader's batches, up to the patch ceiling each, and
   // the renderer holds the set on screen: this joins reads in flight and
   // keeps the last two finished, never evicting one still loading.
-  const patches = createResourceCache<PrDiffPatchResult>(
-    Infinity,
-    PATCHES_KEPT,
-    (result) => result.ok
-  );
-  const ranges = createResourceCache<PrRangeManifestResult>(
-    Infinity,
-    8,
-    (result) => result.ok
-  );
-  const live = createResourceCache<string>(1_000, 2);
-  const changed = (asked: string): RepoChangedError | null =>
-    asked === repo && isCurrent()
+  const patches = createResourceCache<PrDiffPatchResult>(Infinity, {
+    capacity: PATCHES_KEPT,
+    cacheable: (result) => result.ok,
+  });
+  const ranges = createResourceCache<PrRangeManifestResult>(Infinity, {
+    capacity: 8,
+    cacheable: (result) => result.ok,
+  });
+  // A blob id names its bytes forever, but the renderer caches what it
+  // shows: this joins reads in flight and keeps the last two finished,
+  // for a quick re-read, never every image the reader scrolled past.
+  const images = createResourceCache<PrDiffImageResult>(Infinity, {
+    capacity: IMAGES_KEPT,
+    cacheable: (result) => result.ok,
+  });
+  // A checkout changes under a running agent whether or not its
+  // repository is selected: its diff keeps its own second.
+  const live = createResourceCache<string>(1_000, { capacity: 2 });
+  const otherRepo = (asked: string): OtherRepoError | null =>
+    asked === repo
       ? null
       : {
-          code: 'repo-changed',
-          message: `${asked} is no longer the open repository`,
+          code: 'other-repo',
+          message: `${asked} is not this repository`,
         };
   async function resolve(req: Omit<PrDiffManifestRequest, 'repo'>) {
     // A target the provider did not pin is this clone's idea of it;
@@ -130,7 +148,7 @@ export function createDiffReads(
       }
     );
   }
-  const caches = [manifests, listings, patches, ranges, live];
+  const caches = [manifests, listings, patches, ranges, images, live];
   return {
     /** Resolve a pull request to commits and list every changed file.
      *  Failures that describe the pull request are data. Branches are
@@ -140,16 +158,13 @@ export function createDiffReads(
       return manifests.get(
         JSON.stringify([asked, req]),
         async (): Promise<PrDiffManifestResult> => {
-          const before = changed(asked);
-          if (before) return { ok: false, error: before };
+          const foreign = otherRepo(asked);
+          if (foreign) return { ok: false, error: foreign };
           const resolved = await resolve(req);
           if (!resolved.ok) return resolved;
           const { comparison } = resolved;
           const listed = await readResourceValue(listing(comparison));
-          const after = changed(asked);
-          return after
-            ? { ok: false, error: after }
-            : { ok: true, manifest: { ...listed, comparison } };
+          return { ok: true, manifest: { ...listed, comparison } };
         }
       );
     },
@@ -159,15 +174,26 @@ export function createDiffReads(
       return patches.get(
         JSON.stringify([asked, req]),
         async (): Promise<PrDiffPatchResult> => {
-          const before = changed(asked);
-          if (before) return { ok: false, error: before };
+          const foreign = otherRepo(asked);
+          if (foreign) return { ok: false, error: foreign };
           const { paths, context, ...bounds } = req;
           const patch = await readPrDiffPatch(repo, bounds, {
             ...(paths ? { paths } : {}),
             ...(context === undefined ? {} : { context }),
           });
-          const after = changed(asked);
-          return after ? { ok: false, error: after } : { ok: true, patch };
+          return { ok: true, patch };
+        }
+      );
+    },
+    /** One side of a changed image, by blob id. */
+    image(value: unknown) {
+      const { repo: asked, oid } = parseImageRequest(value);
+      return images.get(
+        JSON.stringify([asked, oid]),
+        async (): Promise<PrDiffImageResult> => {
+          const foreign = otherRepo(asked);
+          if (foreign) return { ok: false, error: foreign };
+          return readBlobImage(repo, oid);
         }
       );
     },
@@ -179,14 +205,9 @@ export function createDiffReads(
       return ranges.get(
         JSON.stringify([asked, req]),
         async (): Promise<PrRangeManifestResult> => {
-          const before = changed(asked);
-          if (before) return { ok: false, error: before };
-          const result = await readRevisionRangeManifest(
-            { cwd: repo, ...req },
-            ceiling
-          );
-          const after = changed(asked);
-          return after ? { ok: false, error: after } : result;
+          const foreign = otherRepo(asked);
+          if (foreign) return { ok: false, error: foreign };
+          return readRevisionRangeManifest({ cwd: repo, ...req }, ceiling);
         }
       );
     },
@@ -198,15 +219,18 @@ export function createDiffReads(
           : '';
       });
     },
+    /** The repository was parked: let go of the patches. They can be
+     *  as large as the patch ceiling, the renderer holds the ones it
+     *  shows, and reading one again is a local Git read. */
+    park() {
+      patches.release();
+    },
     /** Branches may have moved: resolve them again. Commit reads stay. */
     invalidate() {
       manifests.invalidate();
     },
     reset() {
       for (const cache of caches) cache.reset();
-    },
-    dispose() {
-      for (const cache of caches) cache.dispose();
     },
   };
 }

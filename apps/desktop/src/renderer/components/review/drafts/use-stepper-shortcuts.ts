@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { inField } from '../../../lib/field-keys.js';
 
 export interface StepperShortcuts {
   onNext: () => void;
@@ -9,9 +10,6 @@ export interface StepperShortcuts {
   onExit: () => void;
 }
 
-/** Fields take every key of their own. */
-const FIELDS =
-  'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
 /** Controls Enter presses: on one, Enter is that control's, not Post. */
 const CONTROLS =
   'button, a[href], summary, [role="button"], [role="link"], [role="menuitem"], [role="tab"]';
@@ -58,7 +56,7 @@ export function useStepperShortcuts(
       // post or exit here as well.
       if (e.defaultPrevented) return;
       const t = e.target as HTMLElement | null;
-      if (t?.closest(FIELDS)) return;
+      if (inField(t)) return;
       if (e.key === 'Enter' && t?.closest(CONTROLS)) return;
       const run = actions[e.key];
       if (!run) return;

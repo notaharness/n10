@@ -8,6 +8,7 @@ import {
   sidebar,
   sidebarRow,
   tabs,
+  openSessions,
 } from './setup/app.js';
 import { armContextMenuChoice } from './setup/menu.js';
 
@@ -153,7 +154,7 @@ test.describe('A worktree whose branch was switched inside it', () => {
         'original'
       )
     ).rejects.toThrow('Failed to create a worktree');
-    expect(await page.evaluate(() => window.n10.listSessions())).toEqual([]);
+    expect(await openSessions(page)).toEqual([]);
     await page.evaluate(
       (branch) =>
         window.n10.launchAgent({ branch, intent: 'continue-or-blank' }),

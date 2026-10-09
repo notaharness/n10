@@ -96,7 +96,6 @@ it('invalidates on account changes including Azure email and rejects answers fro
   release({ threads: [], generalComments: [] });
   await read;
   expect(fetchCommentThreads).toHaveBeenCalledTimes(2);
-  reviews.dispose();
 });
 
 it('rejects a thread answer if the account changes during the read without a notification', async () => {
@@ -147,7 +146,6 @@ it('expires review reads when list facts move, preserving rows and ignoring othe
     error: 'Offline',
   });
   expect(fetchCommentThreads).toHaveBeenCalledTimes(2);
-  reviews.dispose();
 });
 
 it('rejects a disk identity change without publishing config effects from a query', async () => {

@@ -27,16 +27,27 @@ export interface GitOutput {
   truncated: boolean;
 }
 
-export function runGit(
+interface GitRunOptions {
+  cwd?: string;
+  maxBytes: number;
+  timeoutMs?: number;
+  input?: string;
+}
+
+export async function runGit(
   args: readonly string[],
-  opts: {
-    cwd?: string;
-    maxBytes: number;
-    timeoutMs?: number;
-    input?: string;
-  }
+  opts: GitRunOptions
 ): Promise<GitOutput> {
-  return new Promise<GitOutput>((resolve, reject) => {
+  const { bytes, truncated } = await runGitBytes(args, opts);
+  return { text: bytes.toString('utf8'), truncated };
+}
+
+/** `runGit` for output that is not text: a blob's bytes, as git wrote them. */
+export function runGitBytes(
+  args: readonly string[],
+  opts: GitRunOptions
+): Promise<{ bytes: Buffer; truncated: boolean }> {
+  return new Promise((resolve, reject) => {
     const child = spawn('git', [...args], {
       cwd: opts.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -102,9 +113,9 @@ export function runGit(
     child.on('error', (err) => finish(() => reject(err)));
     child.on('close', (code) => {
       finish(() => {
-        const text = Buffer.concat(chunks).toString('utf8');
+        const bytes = Buffer.concat(chunks);
         // A non-zero exit after we killed it is our own doing.
-        if (truncated || code === 0) resolve({ text, truncated });
+        if (truncated || code === 0) resolve({ bytes, truncated });
         else {
           const why = Buffer.concat(errChunks).toString('utf8').trim();
           reject(

@@ -115,7 +115,6 @@ function fixture(lastScans?: Map<string, DiscoveryScan>) {
     remove: vi.fn(),
     fetchBranches: vi.fn(),
     rebase: vi.fn(),
-    dispose: vi.fn(),
   };
   const service = createSessionService({
     config,
@@ -151,7 +150,7 @@ it('observes the handle’s live worktree scope and stops without detaching conn
   f.selected.config = { ...f.selected.config, worktreePath: '/changed' };
   expect(state.scan!.scope().resolver.base()).toBe('/changed');
   await f.service.launch(request);
-  f.service.dispose();
+  f.service.park();
   expect(state.stopScan).toHaveBeenCalledOnce();
   expect(state.entries.has(key)).toBe(true);
   expect(state.stop).not.toHaveBeenCalled();
@@ -175,7 +174,7 @@ it('adopts the exact observed checkout with the captured repository config', asy
   expect(state.launch.mock.calls[0][0]).not.toHaveProperty('branch');
   expect(started).toHaveBeenCalledWith(key, '/repo');
   expect(f.worktrees.create).not.toHaveBeenCalled();
-  f.service.dispose();
+  f.service.park();
 });
 
 it('does not attach after discovery stops during an ownership check', async () => {
@@ -191,7 +190,7 @@ it('does not attach after discovery stops during an ownership check', async () =
   gate.resolve(undefined);
   await attach;
   expect(state.launch).not.toHaveBeenCalled();
-  f.service.dispose();
+  f.service.park();
 });
 
 it('refuses a launch when selection changes during worktree resolution', async () => {
@@ -204,7 +203,7 @@ it('refuses a launch when selection changes during worktree resolution', async (
   await expect(launch).rejects.toThrow('repository changed');
   expect(state.launch).not.toHaveBeenCalled();
   expect(f.worktrees.resolve).not.toHaveBeenCalled();
-  f.service.dispose();
+  f.service.park();
 });
 
 it('checks remote ownership before resuming a saved local worktree', async () => {
@@ -227,7 +226,7 @@ it('checks remote ownership before resuming a saved local worktree', async () =>
   ).rejects.toThrow('A peer already owns this branch');
   expect(beforeLaunch).toHaveBeenCalledExactlyOnceWith('feature', key);
   expect(state.launch).not.toHaveBeenCalled();
-  f.service.dispose();
+  f.service.park();
 });
 
 it('does not recreate a missing saved worktree while resuming', async () => {
@@ -241,7 +240,7 @@ it('does not recreate a missing saved worktree while resuming', async () => {
   ).rejects.toThrow('saved session worktree is no longer available');
   expect(f.worktrees.resolve).not.toHaveBeenCalled();
   expect(state.launch).not.toHaveBeenCalled();
-  f.service.dispose();
+  f.service.park();
 });
 
 it('keeps a saved remote checkout on its own machine', async () => {
@@ -260,7 +259,7 @@ it('keeps a saved remote checkout on its own machine', async () => {
   expect(state.launch).toHaveBeenCalledWith(
     expect.objectContaining({ name: remote, cwd: '/peer/wt' })
   );
-  f.service.dispose();
+  f.service.park();
 });
 
 it('captures launch config before its first await', async () => {
@@ -276,7 +275,7 @@ it('captures launch config before its first await', async () => {
       agent: expect.objectContaining({ id: 'claude' }),
     })
   );
-  f.service.dispose();
+  f.service.park();
 });
 
 it('joins identical launches and refuses conflicting requests for the same resolved checkout', async () => {
@@ -292,7 +291,7 @@ it('joins identical launches and refuses conflicting requests for the same resol
   gate.resolve({ exited: false, pty: {} });
   expect(await first).toBe(key);
   expect(state.launch).toHaveBeenCalledOnce();
-  f.service.dispose();
+  f.service.park();
 });
 
 it('publishes exit facts without reattaching the agent', async () => {
@@ -309,7 +308,7 @@ it('publishes exit facts without reattaching the agent', async () => {
   expect(changed).toHaveBeenCalledOnce();
   expect(f.service.getSnapshot().sessions[0].running).toBe(false);
   expect(state.launch).not.toHaveBeenCalled();
-  f.service.dispose();
+  f.service.park();
 });
 
 it('reports only this repository’s connections and hides local reconnect transport state', () => {
@@ -347,7 +346,7 @@ it('reports only this repository’s connections and hides local reconnect trans
     f.service.stop(worktreeSessionKey('/other/wt', '/other'))
   ).toThrow('another repository');
   expect(state.stop).not.toHaveBeenCalled();
-  f.service.dispose();
+  f.service.park();
 });
 
 // Stopping ends the tmux session: nothing is left to read or resume.
@@ -359,7 +358,7 @@ it('lists no agent once it is stopped', async () => {
   );
   f.service.stop(key);
   expect(f.service.connections()).toEqual([]);
-  f.service.dispose();
+  f.service.park();
 });
 // An agent that exited keeps its dead pane, to be read and resumed,
 // whichever handle the repository has by then.
@@ -380,14 +379,14 @@ it('retains an exited agent across repository handle replacement', async () => {
   await first.launch(request);
   state.entries.get(key)!.exited = true;
   state.exit(key);
-  first.dispose();
+  first.park();
   const reopened = createSessionService(options);
   expect(reopened.connections()).toEqual([
     expect.objectContaining({ name: key, running: false }),
   ]);
   expect(connections.read('/other')).toEqual([]);
-  reopened.dispose();
-  f.service.dispose();
+  reopened.park();
+  f.service.park();
 });
 // Killed from outside, or its tmux server gone: no pane is retained.
 it('releases an agent whose tmux session is gone as it ends', async () => {
@@ -399,7 +398,7 @@ it('releases an agent whose tmux session is gone as it ends', async () => {
   state.exit(key);
   expect(state.released).toEqual([key]);
   expect(f.service.connections()).toEqual([]);
-  f.service.dispose();
+  f.service.park();
 });
 it('names the branch of a terminal in a linked checkout, never the main checkout’s', () => {
   const { service, worktrees } = fixture();
@@ -464,7 +463,7 @@ it('starts a reopened repository’s discovery from its previous scan', () => {
   const first = fixture(lastScans);
   first.service.watch({ size });
   state.lastScan.mockReturnValue(before);
-  first.service.dispose();
+  first.service.park();
 
   fixture(lastScans).service.watch({ size });
   expect(state.scan!.baseline).toBe(before);
@@ -496,7 +495,7 @@ it('lists an agent still running in a removed worktree', async () => {
     f.service.watch({ size });
     await f.service.read();
     expect(f.service.getSnapshot().sessions).toContainEqual(row);
-    f.service.dispose();
+    f.service.park();
   } finally {
     state.stranded = [];
   }
@@ -524,7 +523,7 @@ it('keeps the row of an agent discovery holds stranded', async () => {
     });
     await f.service.refresh();
     expect(f.service.getSnapshot().sessions).toContainEqual(row);
-    f.service.dispose();
+    f.service.park();
   } finally {
     state.stranded = [];
     state.lastScan.mockReturnValue(null);
@@ -539,7 +538,7 @@ it('scans as soon as an agent is stopped', () => {
   f.service.stop(key);
   expect(state.stop).toHaveBeenCalledWith(key);
   expect(state.scanNow).toHaveBeenCalled();
-  f.service.dispose();
+  f.service.park();
 });
 
 it('leaves discovery to its schedule when it has seen every listed worktree', async () => {

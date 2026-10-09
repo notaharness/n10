@@ -14,3 +14,4 @@
 /apps/website/.open-next
 /apps/website/.wrangler
 /apps/website/src/generated
+.nx/self-healing

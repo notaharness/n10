@@ -1,7 +1,7 @@
 import { sessionBranch } from './setup/session-keys.js';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { openPalette, sidebarRow, tab } from './setup/app.js';
+import { openPalette, sidebarRow, tab, openSessions } from './setup/app.js';
 import {
   addExternalWorktree,
   cleanupExternalSessions,
@@ -52,7 +52,7 @@ async function attached(page: Page, branch: string): Promise<void> {
   await expect
     .poll(
       async () => {
-        const sessions = await page.evaluate(() => window.n10.listSessions());
+        const sessions = await openSessions(page);
         return (
           sessions.find((s) => sessionBranch(s.name) === branch)?.running ??
           false

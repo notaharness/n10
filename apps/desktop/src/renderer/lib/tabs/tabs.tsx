@@ -63,11 +63,10 @@ interface TabsApi extends TabsState {
   activate: (id: string) => void;
   /** `repo` is the one in view: focus never leaves it on a close. */
   close: (id: string, repo?: string) => void;
-  closeOthers: (id: string) => void;
+  /** `keep`: tabs spared besides `id` (an orchestrator's players). */
+  closeOthers: (id: string, keep?: readonly string[]) => void;
   closeAll: () => void;
   closeActive: () => void;
-  /** Activate the next (+1) / previous (-1) tab, wrapping around. */
-  cycle: (delta: 1 | -1) => void;
   /** Drag-reorder: place `id` before/after `targetId`. */
   moveTab: (id: string, targetId: string, side: 'before' | 'after') => void;
   /**
@@ -181,23 +180,14 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     []
   );
   const closeOthers = useCallback(
-    (id: string) => dispatch({ type: 'close-others', id }),
+    (id: string, keep?: readonly string[]) =>
+      dispatch({ type: 'close-others', id, keep }),
     []
   );
   const closeAll = useCallback(() => dispatch({ type: 'close-all' }), []);
   const closeActive = useCallback(() => {
     if (state.activeId) dispatch({ type: 'close', id: state.activeId });
   }, [state.activeId]);
-  const cycle = useCallback(
-    (delta: 1 | -1) => {
-      const { tabs, activeId } = state;
-      if (tabs.length < 2) return;
-      const idx = tabs.findIndex((t) => t.id === activeId);
-      const next = tabs[(idx + delta + tabs.length) % tabs.length];
-      dispatch({ type: 'activate', id: next.id });
-    },
-    [state]
-  );
   const moveTab = useCallback(
     (id: string, targetId: string, side: 'before' | 'after') =>
       dispatch({ type: 'move', id, targetId, side }),
@@ -246,7 +236,6 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       closeOthers,
       closeAll,
       closeActive,
-      cycle,
       moveTab,
       syncItems,
       repoOpened,
@@ -265,7 +254,6 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       closeOthers,
       closeAll,
       closeActive,
-      cycle,
       moveTab,
       syncItems,
       repoOpened,

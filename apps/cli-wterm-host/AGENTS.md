@@ -18,4 +18,4 @@ both in one esbuild script to avoid competing output-directory cleanup.
 - One active PTY. Playwright runs with `workers: 1`; two worktrees running
   `cli-e2e` at once share port 5174 and clobber each other; set `PORT=<n>`.
   `GET /output` returns the raw ring buffer base64-encoded for byte assertions.
-- `@wterm/dom` here is pinned to the exact version `apps/desktop` uses.
+- `@wterm/dom` here is pinned to an exact version.
