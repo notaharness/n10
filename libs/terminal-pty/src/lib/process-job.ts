@@ -37,9 +37,23 @@ export function joinKillOnCloseJob(): ProcessJob | null {
   return joined;
 }
 
+/** koffi is an optional dependency of the published package. */
+function loadKoffi(): typeof Koffi {
+  try {
+    return createRequire(import.meta.url)('koffi') as typeof Koffi;
+  } catch (err) {
+    throw new Error(
+      'n10 needs the koffi package on Windows to tie sessions to its ' +
+        `lifetime; reinstall n10 (${
+          err instanceof Error ? err.message : String(err)
+        })`
+    );
+  }
+}
+
 function createJob(): ProcessJob {
   // Loaded only here: the binding is a Windows dependency of this one call.
-  const koffi = createRequire(import.meta.url)('koffi') as typeof Koffi;
+  const koffi = loadKoffi();
   const kernel32 = koffi.load('kernel32.dll');
   koffi.opaque('JOB');
   const basic = koffi.struct('JOBOBJECT_BASIC_LIMIT_INFORMATION', {
@@ -84,10 +98,11 @@ function createJob(): ProcessJob {
   const AssignProcessToJobObject = kernel32.func(
     'int __stdcall AssignProcessToJobObject(JOB *job, void *process)'
   );
-  const GetLastError = kernel32.func('uint32_t __stdcall GetLastError()');
-
+  // No error code: Win32's last error is not preserved across the
+  // return to JavaScript, so a separate GetLastError call could report
+  // something V8 or Node did in between.
   const fail = (call: string): never => {
-    throw new Error(`${call} failed (Windows error ${GetLastError()})`);
+    throw new Error(`${call} failed`);
   };
 
   // No security attributes: the handle is not inheritable.
