@@ -6,6 +6,7 @@ import type {
   ResolveRequest,
 } from './contract.js';
 import { IPC } from './contract.js';
+import * as updates from './services/updates.js';
 import * as repo from './services/repo.js';
 import * as prefs from './services/desktop-prefs.js';
 import * as settings from './services/settings.js';
@@ -50,6 +51,10 @@ export { createViewerApi, type ViewerApi };
 
 export function createHostApi(): HostApi {
   return {
+    getUpdates: updates.getUpdates,
+    checkUpdates: updates.checkUpdates,
+    setUpdatePreferences: updates.setUpdatePreferences,
+    quitForUpdate: () => quitForUpdate(),
     getVersion: () =>
       Promise.resolve({
         app: process.env.N10_DESKTOP_VERSION ?? 'dev',
@@ -188,6 +193,7 @@ export function createHostApi(): HostApi {
     onDirectoryPublished: () => () => undefined,
     dismissInboundMail: (id) => inboundMail.dismissInboundMail(id),
     onMachinesChanged: () => () => undefined,
+    onUpdatesChanged: () => () => undefined,
   };
 }
 
@@ -210,6 +216,7 @@ let contextMenu: (
   items: ContextMenuItem[]
 ) => Promise<string | null> = async () => null;
 let appMenuPopup: () => Promise<void> = async () => undefined;
+let quitForUpdate: () => Promise<void> = async () => undefined;
 let aboutBox: () => Promise<void> = async () => undefined;
 let prefsChanged: (next: prefs.DesktopPrefsLike) => void = () => undefined;
 
@@ -233,11 +240,13 @@ export function setExternalOpener(fn: (url: string) => Promise<void>): void {
 }
 
 export function setShellGlue(glue: {
+  quitForUpdate?: () => Promise<void>;
   contextMenu: (items: ContextMenuItem[]) => Promise<string | null>;
   appMenuPopup: () => Promise<void>;
   aboutBox: () => Promise<void>;
   prefsChanged: (next: prefs.DesktopPrefsLike) => void;
 }): void {
+  quitForUpdate = glue.quitForUpdate ?? quitForUpdate;
   contextMenu = glue.contextMenu;
   appMenuPopup = glue.appMenuPopup;
   aboutBox = glue.aboutBox;

@@ -1,3 +1,4 @@
+import { installQuitHandler, quitForUpdate } from './quit.js';
 import { join } from 'node:path';
 import { app, BrowserWindow, dialog, Menu, nativeTheme, shell } from 'electron';
 import {
@@ -244,6 +245,7 @@ function startHost(): HostProcess {
   const host = startHostProcess({
     pushes: windowPushes,
     shell: {
+      quitForUpdate,
       pickFolder: pickFolderWithDialog,
       openExternal: async (url) => {
         if (!/^https?:/i.test(url)) throw new Error(`Refusing to open ${url}`);
@@ -350,18 +352,4 @@ app.on('window-all-closed', () => {
   }
 });
 
-// The host releases its terminal clients (the tmux-hosted processes
-// survive app exit) and stops the beam daemon the app started (D15).
-// `app.exit`, because an `app.quit` from here can land inside this quit
-// and be ignored.
-let quitting = false;
-app.on('will-quit', (event) => {
-  event.preventDefault();
-  if (quitting) return;
-  quitting = true;
-  // A relaunch while this one waits on the host must win, not quit into it.
-  app.releaseSingleInstanceLock();
-  (host?.stop() ?? Promise.resolve())
-    .catch((err: unknown) => console.error('[desktop] host stop', err))
-    .finally(() => app.exit());
-});
+installQuitHandler(() => host);

@@ -11,6 +11,7 @@ import type { DaemonExit } from './beam/owned-daemon.js';
 
 /** What the host asks of the main process. */
 export interface ShellCalls {
+  quitForUpdate(): Promise<void>;
   pickFolder(title: string): Promise<string | null>;
   openExternal(url: string): Promise<void>;
   contextMenu(items: ContextMenuItem[]): Promise<string | null>;

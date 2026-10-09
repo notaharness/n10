@@ -1,4 +1,5 @@
 import type { N10HostApi } from '../../../host/contract.js';
+import { createUpdatesHost } from './updates-host.js';
 import { PROGRAMS } from '../programs/index.js';
 import { createBranchSessionHost } from './branch-session-host.js';
 import { createFleetHost } from './fleet-host.js';
@@ -26,6 +27,7 @@ export function createDemoHost(): N10HostApi {
   const sessions = createSessionHost(state, hub);
   return {
     ...createShellHost(state),
+    ...createUpdatesHost(),
     ...createWorktreeHost(state, hub),
     ...createReviewHost(state),
     ...createPrDiffHost(state),

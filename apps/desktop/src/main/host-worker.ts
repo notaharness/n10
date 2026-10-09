@@ -10,6 +10,7 @@
  */
 // First: nothing the host starts may inherit the module it preloaded.
 import './host-env-restore.js';
+import { startUpdates, stopUpdates } from '../host/services/updates.js';
 import { applySessionBackend, killAll, probeTmuxAvailability } from '@n10/core';
 import { installHostPushes } from '../host/host-pushes.js';
 import {
@@ -118,6 +119,7 @@ function settle(message: Extract<MainToHost, { t: 'reply' }>): void {
 // Terminal clients go; the tmux sessions behind them stay. Then the
 // daemon this host started stops (D15).
 async function shutdown(): Promise<void> {
+  stopUpdates();
   const removals = stopRemoteSyncLoop();
   stopDiscovery();
   stopAllBabysitters();
@@ -165,6 +167,7 @@ async function start(): Promise<void> {
   setFolderPicker((title) => callMain('pickFolder', title));
   setExternalOpener((url) => callMain('openExternal', url));
   setShellGlue({
+    quitForUpdate: () => callMain('quitForUpdate'),
     contextMenu: (items) => callMain('contextMenu', items),
     appMenuPopup: () => callMain('appMenuPopup'),
     aboutBox: () => callMain('aboutBox'),
@@ -179,6 +182,7 @@ async function start(): Promise<void> {
   await probeTmuxAvailability();
   applySessionBackend();
   const opened = openStartupRepo();
+  startUpdates();
   post({ t: 'ready', repo: opened ? opened.cwd : null });
 }
 

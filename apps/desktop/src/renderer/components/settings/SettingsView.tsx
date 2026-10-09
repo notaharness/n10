@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { useRepo } from '../../lib/repo-context.js';
 import { useSettingsView } from '../../lib/data/queries.js';
+import { visibleSettingsGroups } from '../../lib/settings-groups.js';
 import {
-  visibleSettingsGroups,
-  type GroupKey,
-} from '../../lib/settings-groups.js';
+  selectSettingsSection,
+  useSettingsNavigation,
+} from '../../lib/settings-navigation.js';
 import { cn } from '../../lib/utils.js';
 import { Skeleton } from '../ui/skeleton.js';
+import { UpdatesRows } from './UpdatesRows.js';
 import { AppearanceRows } from './AppearanceRows.js';
 import { FieldRow } from './FieldRow.js';
 import { KeyboardRows } from './KeyboardRows.js';
@@ -20,16 +22,17 @@ import { MachineRows } from './MachineRows.js';
 export function SettingsView() {
   const { repo } = useRepo();
   const view = useSettingsView(repo.cwd);
-  const [activeGroup, setActiveGroup] = useState<GroupKey>('appearance');
-
+  const navigation = useSettingsNavigation();
   const visibleGroups = visibleSettingsGroups(view.data);
-
-  const jump = (key: GroupKey) => {
-    setActiveGroup(key);
-    document
-      .getElementById(`settings-${key}`)
-      ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-  };
+  useEffect(() => {
+    if (navigation.revision === 0) return;
+    if (navigation.section === 'updates')
+      document.getElementById('settings-scroll')?.scrollTo({ top: 0 });
+    else
+      document
+        .getElementById(`settings-${navigation.section}`)
+        ?.scrollIntoView({ block: 'start' });
+  }, [navigation, view.isLoading]);
 
   return (
     <div className="flex h-full min-h-0">
@@ -38,10 +41,10 @@ export function SettingsView() {
           <button
             type="button"
             key={g.key}
-            onClick={() => jump(g.key)}
+            onClick={() => selectSettingsSection(g.key)}
             className={cn(
               'flex h-7 w-full items-center px-4 text-base transition-colors hover:bg-accent',
-              activeGroup === g.key
+              navigation.section === g.key
                 ? 'border-l-2 border-primary bg-sidebar-active font-medium text-foreground'
                 : 'border-l-2 border-transparent text-muted-foreground'
             )}
@@ -51,7 +54,7 @@ export function SettingsView() {
         ))}
       </nav>
 
-      <div className="min-w-0 flex-1 overflow-y-auto">
+      <div id="settings-scroll" className="min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-8 py-6">
           <h1 className="text-xl font-semibold">Settings</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -81,7 +84,9 @@ export function SettingsView() {
               <h2 className="text-lg font-semibold">{g.label}</h2>
               <p className="mb-3 text-sm text-muted-foreground">{g.blurb}</p>
               <div className="divide-y divide-border rounded-lg border border-border bg-card">
-                {g.key === 'appearance' ? (
+                {g.key === 'updates' ? (
+                  <UpdatesRows />
+                ) : g.key === 'appearance' ? (
                   <AppearanceRows />
                 ) : g.key === 'keyboard' ? (
                   <KeyboardRows />

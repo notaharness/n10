@@ -4,6 +4,7 @@ import { useInput, Box } from 'ink';
 import { Sidebar } from '../../components/Sidebar.js';
 import { useSidebarMouse } from './useSidebarMouse.js';
 import { Pane } from '../../components/Pane.js';
+import { UpdateStatus } from '../../components/UpdateStatus.js';
 import { SessionTabBar } from '../../components/SessionTabBar.js';
 import {
   useNavState,
@@ -289,7 +290,12 @@ function MainTabBody({
         />
       )}
       <Box flexDirection="column" flexGrow={1}>
-        <SessionTabBar />
+        <Box height={1}>
+          <Box flexGrow={1} overflow="hidden">
+            <SessionTabBar />
+          </Box>
+          <UpdateStatus />
+        </Box>
         <Pane focused={mainFocused} title={paneTitle} flexGrow={1}>
           <MainContent
             pane={pane}

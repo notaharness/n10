@@ -8,6 +8,8 @@ import {
   MENU_EVENTS,
   SESSION_EVENTS,
   SYNC_EVENTS,
+  UPDATE_EVENTS,
+  type UpdateSnapshot,
   type FleetStatus,
   type CeremonyProgress,
   type DirectoryPublished,
@@ -29,6 +31,16 @@ import {
  */
 const api: N10HostApi = {
   getVersion: () => ipcRenderer.invoke(IPC.getVersion),
+  onUpdatesChanged: (cb) => {
+    const listener = (_e: unknown, snapshot: UpdateSnapshot) => cb(snapshot);
+    ipcRenderer.on(UPDATE_EVENTS.changed, listener);
+    return () => ipcRenderer.removeListener(UPDATE_EVENTS.changed, listener);
+  },
+  getUpdates: () => ipcRenderer.invoke(IPC.getUpdates),
+  checkUpdates: () => ipcRenderer.invoke(IPC.checkUpdates),
+  setUpdatePreferences: (patch) =>
+    ipcRenderer.invoke(IPC.setUpdatePreferences, patch),
+  quitForUpdate: () => ipcRenderer.invoke(IPC.quitForUpdate),
 
   openRepo: (cwd) => ipcRenderer.invoke(IPC.openRepo, cwd),
   getRepo: () => ipcRenderer.invoke(IPC.getRepo),

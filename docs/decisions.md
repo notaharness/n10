@@ -1362,3 +1362,50 @@ worker pool. Keep ordered mutations and PTY ownership in their current process.
 Require an attributed CPU profile and identical-fixture before/after evidence
 before adding another worker; asynchronous I/O or smaller payloads may address
 the measured cost without a new lifetime and queue.
+
+## App updates and release channels
+
+The engine's `updates` domain owns checks, persistence, retry policy and the
+snapshot used by desktop and TUI. Core owns registry HTTP, semantic-version
+comparison and install identity. Preferences are global
+(`~/.n10/update-preferences.json`), separate from cached metadata. Both shells
+observe the same preferences; repositories and remote machines have no update
+settings. Development and packaged builds do not request npm metadata. A
+loopback-only fixture override is accepted only by development builds and uses
+a separate cache.
+
+Published npm installs read the public package's `beta` and `latest` dist-tags,
+accepting the newest stable or beta semantic version. Both tags follow beta
+while `LATEST_FOLLOWS_BETA` is enabled. Preview is the default; choosing Stable
+persists that intent and explains that no non-beta release exists yet. Both
+choices currently use the same feed. A real channel split must filter
+prereleases for Stable and retain opt-in beta delivery for Preview.
+
+Checks start two seconds after launch when the cache is stale, then run daily
+with up to an hour of jitter. Concurrent requests in one shell coalesce. Both
+shells reread the shared cache before checking and on their preference tick, so
+completed checks and server retry deadlines are shared. Simultaneous cold starts
+can still each make a request. npm install identity resolves in the background;
+it cannot delay either shell becoming ready. Conditional ETags,
+a five-second deadline and bounded response bodies limit the work. Offline or
+invalid responses retain the last successful result and back off from fifteen
+minutes to a day. Manual checks bypass ordinary failure backoff; server rate
+limits and Retry-After deadlines survive restarts and also apply to manual
+checks. Automatic checks can be disabled. There is no telemetry, authentication,
+repository path, machine inventory or user identifier in the request: the
+registry receives an ordinary public metadata request and the network address.
+
+A quiet desktop status-bar notice opens Settings > Updates; the TUI shows a
+compact notice beside its tabs and an Updates panel under Settings (`s`, `u`).
+The npm action is offered only when the installed package's real path matches
+`npm root --global`. Local npm installs receive local-install guidance. n10
+copies/displays `npm i -g @notaharness/n10@<detected-version>` and offers
+**Quit to update**.
+Quit uses the normal engine/host drain and terminal detach path. tmux processes
+survive and can be reattached after reopening; unsaved renderer-only state is
+not promised to survive.
+
+The approved next step is an npm **Update and restart** action in the same
+area, with npm running after the UI has closed and terminal clients detached.
+Packaged updates are outside this implementation. GitHub's prerelease flag is
+not a channel selector: a beta release may be marked as a non-prerelease.
