@@ -18,8 +18,9 @@ asarUnpack:
   - node_modules/node-pty/**
   - node_modules/@notaharness/beam-*/**
 mac:
-  # build/icon.icns is picked up when #347 lands; until then builder uses
-  # its default app icon. The ZIP is required by the macOS auto-updater.
+  # The app icon comes from the desktop icon assets. The ZIP is required by
+  # the macOS auto-updater.
+  icon: build/icon.icns
   target:
     - dmg
     - zip
