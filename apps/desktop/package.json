@@ -38,6 +38,7 @@
           "thirdParty": true,
           "external": [
             "electron",
+            "koffi",
             "node-pty",
             "@notaharness/beam"
           ],
@@ -189,6 +190,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "html-tag-names": "^2.1.0",
+    "koffi": "3.3.2",
     "lucide-react": "^1.31.0",
     "mermaid": "11.17.2",
     "node-pty": "^1.1.0",

@@ -50,6 +50,7 @@
           "bundle": true,
           "thirdParty": true,
           "external": [
+            "koffi",
             "node-pty"
           ],
           "main": "apps/cli/src/main.ts",
@@ -142,6 +143,7 @@
     "@mishieck/ink-titled-box": "0.4.2",
     "cli-highlight": "^2.1.11",
     "ink": "^6.8.0",
+    "koffi": "3.3.2",
     "node-pty": "^1.1.0",
     "react": "^19.2.4"
   },

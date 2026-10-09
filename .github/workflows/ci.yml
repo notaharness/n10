@@ -69,6 +69,72 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # Windows viability: the session host's job and ConPTY under real
+  # Electron, and the mux pipe's authentication, including against a
+  # second local account (docs/design/windows-support.md).
+  windows:
+    runs-on: windows-2022
+    env:
+      NX_DAEMON: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npx --no install-electron
+
+      - run: npx nx run-many -t typecheck -p @n10/terminal-pty @n10/core desktop-e2e
+
+      - run: npx nx test @n10/core -- src/lib/mux
+
+      # A standard account for the separate-user test. The runner is
+      # already elevated. A failure here fails the job: the test never
+      # silently skips in CI.
+      - name: Create a second local account
+        shell: pwsh
+        run: |
+          $name = "n10e2e$(Get-Random -Minimum 10000 -Maximum 99999)"
+          $bytes = [byte[]]::new(24)
+          [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+          $password = "$([Convert]::ToBase64String($bytes))aA1!"
+          Write-Output "::add-mask::$password"
+          $secure = ConvertTo-SecureString $password -AsPlainText -Force
+          New-LocalUser -Name $name -Password $secure -AccountNeverExpires -PasswordNeverExpires | Out-Null
+          Add-LocalGroupMember -Group Users -Member $name
+          "N10_E2E_OTHER_USER=$name" >> $env:GITHUB_ENV
+          "N10_E2E_OTHER_PASSWORD=$password" >> $env:GITHUB_ENV
+
+      - run: npx nx e2e:windows desktop-e2e
+
+      - name: Remove the second local account
+        if: always()
+        shell: pwsh
+        run: |
+          $name = $env:N10_E2E_OTHER_USER
+          if (-not $name) { exit 0 }
+          Get-Process -IncludeUserName |
+            Where-Object { $_.UserName -like "*\$name" } |
+            Stop-Process -Force -ErrorAction SilentlyContinue
+          $sid = (Get-LocalUser -Name $name).SID.Value
+          Get-CimInstance Win32_UserProfile |
+            Where-Object { $_.SID -eq $sid } |
+            Remove-CimInstance
+          Remove-LocalUser -Name $name
+
+      - name: Upload Playwright test output on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-output
+          path: apps/desktop-e2e/test-output/windows
+          if-no-files-found: ignore
+          retention-days: 7
+
   # The flake builds from package-lock.json's resolved URLs and integrity
   # hashes alone, so this also fails when a locked package lacks either.
   # nixpkgs' packages come from cache.nixos.org.

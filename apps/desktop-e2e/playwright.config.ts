@@ -25,6 +25,8 @@ const outputBase =
 
 export default defineConfig({
   testDir: './src',
+  // Their own target: `e2e:windows` (windows.config.ts).
+  testIgnore: 'windows/**',
   outputDir: `${outputBase}/output`,
   timeout: 90_000,
   expect: { timeout: 10_000 },

@@ -11,6 +11,11 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./mux": {
+      "types": "./src/mux.ts",
+      "import": "./src/mux.ts",
+      "default": "./src/mux.ts"
+    },
     "./plan": {
       "types": "./src/plan.ts",
       "import": "./src/plan.ts",
@@ -43,6 +48,7 @@
     "@n10/terminal-pty": "*",
     "@n10/terminal-tmux": "*",
     "@n10/vcs-core": "*",
-    "@n10/worktree-manager": "*"
+    "@n10/worktree-manager": "*",
+    "koffi": "3.3.2"
   }
 }

@@ -103,6 +103,8 @@ libs/core/                       — Shell-agnostic operations. No React, Ink, E
   src/lib/babysit/               — Pure observation model and briefing composition
   src/ui.ts                      — Browser-safe presentation and input models
   src/plan.ts                    — Browser-safe entry (`@n10/core/plan`) for the renderer
+  src/mux.ts                     — `@n10/core/mux` (Node): the user's mux endpoint and authenticated connections
+  src/lib/mux/                   — Runtime dir and credentials, mutual HMAC handshake, owner election, POSIX startup lock
   src/lib/utils/                 — Git reads and presentation helpers (worktree-diff, sidebar-items, virtual-viewport…)
   src/lib/settings/              — Settings field model, coercion and explicitly scoped config writes
   src/lib/agents/                — Agent registry
@@ -128,8 +130,9 @@ libs/worktree-manager/           — Git worktree and branch operations
 libs/terminal/                   — Terminal emulator (renderer) + SessionBackend interface
   src/lib/terminal-emulator.ts   — @xterm/headless wrapper with ANSI rendering
   src/lib/session-backend.ts     — SessionSpec and terminal connection/process lifecycle contract
-libs/terminal-pty/               — Low-level node-pty transport used to embed the tmux client
+libs/terminal-pty/               — Low-level node-pty transport, and the PTY owner's process containment
   src/lib/pty-session.ts         — node-pty wrapper (PtySession)
+  src/lib/process-job.ts         — Windows: the owner joins its own kill-on-close Job Object
 libs/terminal-tmux/              — Required tmux backend (system tmux 3.2+)
   src/lib/tmux-cli.ts            — execFileSync wrappers for tmux subcommands (sessions, options, listing with user options)
   src/lib/tmux-backend.ts        — createTmuxBackend(spec, plan): tmux client connection and hosted-process observation

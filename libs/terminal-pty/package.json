@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@n10/terminal": "*",
+    "koffi": "3.3.2",
     "node-pty": "^1.1.0",
     "tslib": "^2.3.0"
   }
