@@ -127,7 +127,10 @@ Linux/macOS, giving the existing Linux desktop/TUI e2e suites a real owner to te
 | Desktop host / CLI   | Compose the owner or client; adapt IPC, lazy command dispatch and user-visible errors.                                                |
 | Orchestra            | Existing Bash worktree/harness/report workflow with a narrow tmux-or-mux seam.                                                        |
 
-The only new n10 native binding is the Windows Job Object operation below core.
+n10's new native calls go through koffi, a prebuilt FFI that the published
+package lists as optional: the Windows Job Object operation below core, and
+`flock(2)` for the POSIX startup lock, loaded only when a crashed owner's socket
+must be removed.
 Node's public networking API handles IPC. Core/engine keep their current import
 boundaries; renderer contracts remain browser-safe.
 
@@ -291,7 +294,8 @@ the private user-profile ACL, or a private directory/mode-0600 file on POSIX.
 Only the winner publishes readiness and credentials atomically. Address-in-use
 means authenticate/attach or report an error; failed authentication does not
 permit deleting another owner's endpoint. Unix stale-socket cleanup requires
-exclusive ownership of the startup lock; it cannot unlink a live listener.
+exclusive ownership of the startup lock (`flock(2)`, which Node does not
+expose); it cannot unlink a live listener.
 Another local user can derive and pre-bind the stable pipe name, causing startup
 denial of service; this is an accepted single-user Windows baseline limitation,
 not impersonation or a reason to add a custom pipe DACL.
