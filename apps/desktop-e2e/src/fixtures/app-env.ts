@@ -1,4 +1,18 @@
 import { delimiter, join } from 'node:path';
+import { pathWithoutTmux } from '../setup/no-tmux.js';
+
+/** The app's PATH: the fake `gh` first, and tmux hidden when asked. */
+function appPath(
+  opts: {
+    ghEnv: Record<string, string>;
+    homeDir: string;
+    withoutTmux?: boolean;
+  },
+  inherited: string | undefined
+): string {
+  const path = [opts.ghEnv.PATH, inherited].filter(Boolean).join(delimiter);
+  return opts.withoutTmux ? pathWithoutTmux(path, opts.homeDir) : path;
+}
 
 /**
  * The environment the app under test is launched with: the developer's
@@ -18,6 +32,8 @@ export function appEnv(opts: {
   ghEnv: Record<string, string>;
   /** Extra knobs a test asked for. Applied before the isolation below. */
   extra: Record<string, string> | undefined;
+  /** Hide tmux from the app, which then owns its sessions itself. */
+  withoutTmux?: boolean;
 }): Record<string, string> {
   // New terminals run the login shell from `$SHELL`, so the suite pins
   // one rather than inherit the developer's: zsh greets a HOME without
@@ -76,7 +92,7 @@ export function appEnv(opts: {
     // The fake `gh` has to win the PATH lookup; the Azure DevOps
     // preload finds its scenario here.
     ...opts.ghEnv,
-    PATH: [opts.ghEnv.PATH, env.PATH].filter(Boolean).join(delimiter),
+    PATH: appPath(opts, env.PATH),
     // Last, and not negotiable. A tmux server is identified by its
     // socket directory, and the default one is the developer's own —
     // holding their real work and every persisted agent session. A
