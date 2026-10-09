@@ -10,6 +10,9 @@
 //   - node-pty, native, so external to both bundles. N-API based, so
 //     one build loads in Node and Electron alike. Linux installs compile
 //     it (see the README).
+//   - koffi, native, so external to both bundles: the Windows session
+//     owner's Job Object calls go through it, and nothing else loads
+//     it. Its binary is an optional package per platform.
 //   - electron, whose binary `n10` launches the desktop app with.
 //   - @notaharness/beam, whose platform package holds the `beam` binary
 //     the desktop runs as its daemon.
@@ -97,6 +100,7 @@ const out = {
   repository: cli.repository,
   dependencies: {
     electron: requireVersion('electron', desktop.devDependencies?.electron),
+    koffi: requireVersion('koffi', cli.dependencies?.koffi),
     'node-pty': requireVersion('node-pty', cli.dependencies?.['node-pty']),
     '@notaharness/beam': requireVersion(
       '@notaharness/beam',

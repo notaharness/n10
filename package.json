@@ -53,6 +53,7 @@
   },
   "dependencies": {
     "@xterm/headless": "^6.0.0",
+    "koffi": "3.3.2",
     "node-pty": "^1.1.0"
   }
 }
