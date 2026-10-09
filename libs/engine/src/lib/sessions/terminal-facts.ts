@@ -27,7 +27,7 @@ export function terminalFacts(name: string, record: TerminalRecord) {
   return {
     name,
     ...record,
-    ...(session?.pty.target ? { target: session.pty.target } : {}),
+    ...(session ? { target: session.pty.target } : {}),
     agent: session?.agent,
     running: isSessionAlive(name),
     spawnedAt: getSpawnedAt(name) ?? 0,

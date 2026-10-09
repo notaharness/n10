@@ -51,7 +51,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       };
       process.kill(first.pid, 'SIGTERM');
       await expect
-        .poll(() => resolveSessionByName(entry.pty.target!.name)?.exited)
+        .poll(() => resolveSessionByName(entry.pty.target.name)?.exited)
         .toBe(true);
       await expect.poll(() => entry.exited).toBe(true);
       rmSync(join(fixture.home, 'agent-start.json'));
@@ -68,7 +68,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       expect(next.pid).not.toBe(first.pid);
       expect(resumed.name).toBe(entry.name);
       expect(resumed.agent).toBe('codex');
-      expect(resolveSessionByName(entry.pty.target!.name)?.exited).toBe(false);
+      expect(resolveSessionByName(entry.pty.target.name)?.exited).toBe(false);
     });
 
     it.each(['disappears', 'appears'] as const)(

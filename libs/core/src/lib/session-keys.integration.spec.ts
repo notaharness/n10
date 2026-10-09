@@ -166,7 +166,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       });
       expect(adopted.pty.target).toEqual({
         kind: 'tmux',
-        name: external.target!.name,
+        name: external.target.name,
       });
       expect(isSessionAlive(tab.name)).toBe(true);
       external.dispose();

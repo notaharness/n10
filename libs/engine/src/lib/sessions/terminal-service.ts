@@ -117,12 +117,10 @@ function terminalTags(req: TerminalLaunch, agent: string | undefined) {
 
 function terminalRecord(
   req: TerminalLaunch,
-  launched: Awaited<ReturnType<typeof launchTerminalSession>>,
-  name: string
+  launched: Awaited<ReturnType<typeof launchTerminalSession>>
 ): TerminalRecord {
   const agent = launched.agent ?? req.restore?.agent;
-  const target = launched.pty.target ?? req.restore?.target;
-  if (!target) throw new Error(`Terminal ${name} has no session target`);
+  const target = launched.pty.target;
   return {
     kind: req.kind,
     cwd: req.cwd,
@@ -196,7 +194,7 @@ export function createTerminalService(ports: TerminalPorts) {
       restore: req.restore,
     });
     const name = launched.name;
-    const record = terminalRecord(req, launched, name);
+    const record = terminalRecord(req, launched);
     if (req.sessionName && name !== req.sessionName && replacing)
       known.delete(req.sessionName);
     known.set(name, record);
