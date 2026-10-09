@@ -1,4 +1,6 @@
 import type {
+  NpmUpdatePlan,
+  NpmUpdateResult,
   UpdateCache,
   UpdateInstallation,
   UpdatePreferences,
@@ -7,6 +9,8 @@ export type { UpdateInstallation, UpdatePreferences } from '@n10/core';
 
 export interface UpdateSnapshot {
   installation: UpdateInstallation;
+  restartSupported: boolean;
+  lastUpdate: NpmUpdateResult | null;
   preferences: UpdatePreferences;
   checking: boolean;
   availableVersion: string | null;
@@ -20,6 +24,7 @@ export interface UpdateService {
   getSnapshot(): UpdateSnapshot;
   subscribe(listener: () => void): () => void;
   check(): Promise<void>;
+  prepareNpmUpdate(): Promise<NpmUpdatePlan>;
   setPreferences(patch: Partial<UpdatePreferences>): void;
   reloadPreferences(): void;
   start(): void;

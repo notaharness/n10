@@ -64,6 +64,7 @@ function start(
   const host = startHostProcess({
     shell: {
       quitForUpdate: async () => undefined,
+      quitForNpmUpdate: async () => undefined,
       pickFolder: async () => null,
       openExternal: async () => undefined,
       contextMenu: async () => null,

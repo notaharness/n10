@@ -193,3 +193,14 @@ export type * from './lib/updates/update-types.js';
 export * from './lib/updates/update-registry.js';
 export * from './lib/updates/update-store.js';
 export * from './lib/updates/update-installation.js';
+
+export {
+  prepareNpmUpdate,
+  runNpmUpdate,
+  readNpmUpdateResult,
+  relaunchNpmApp,
+} from './lib/updates/npm-update.js';
+export type {
+  NpmUpdatePlan,
+  NpmUpdateResult,
+} from './lib/updates/npm-update.js';

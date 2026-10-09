@@ -33,3 +33,5 @@ export type {
   UpdatePreferences,
   UpdateInstallation,
 } from './lib/updates/api.js';
+
+export type { NpmUpdatePlan, NpmUpdateResult } from '@n10/core';

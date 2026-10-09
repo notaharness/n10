@@ -1,3 +1,4 @@
+import { desktopUpdateHandoff } from './desktop-update.js';
 import {
   spawn,
   type ChildProcess,
@@ -172,6 +173,11 @@ export function launchDesktop(root: string, version: string): Promise<number> {
       '[n10] SUID sandbox unavailable — launching with --no-sandbox'
     );
   }
-  const child = spawn(electron, [...args, root], electronSpawnOptions(version));
-  return superviseChild(child);
+  const handoff = desktopUpdateHandoff(root);
+  const options = electronSpawnOptions(version, {
+    ...process.env,
+    N10_UPDATE_HANDOFF: handoff.request,
+  });
+  const child = spawn(electron, [...args, root], options);
+  return superviseChild(child).then((code) => handoff.finish(code));
 }

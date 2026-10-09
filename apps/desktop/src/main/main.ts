@@ -1,4 +1,4 @@
-import { installQuitHandler, quitForUpdate } from './quit.js';
+import { installQuitHandler, quitForUpdate, quitForNpmUpdate } from './quit.js';
 import { join } from 'node:path';
 import { isatty } from 'node:tty';
 import { app, BrowserWindow, dialog, Menu, nativeTheme, shell } from 'electron';
@@ -197,6 +197,7 @@ function startHost(): HostProcess {
     pushes: windowPushes,
     shell: {
       quitForUpdate,
+      quitForNpmUpdate,
       pickFolder: pickFolderWithDialog,
       openExternal: async (url) => {
         if (!/^https?:/i.test(url)) throw new Error(`Refusing to open ${url}`);

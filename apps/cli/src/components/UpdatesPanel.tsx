@@ -4,21 +4,41 @@ import { useEffect, useState } from 'react';
 import { useUpdates } from '../hooks/useUpdates.js';
 
 export function UpdatesPanel({ onClose }: { onClose: () => void }) {
-  const { service, snapshot: update, quit } = useUpdates();
+  const { service, snapshot: update, quit, restart } = useUpdates();
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const beginUpdate = () => {
+    setBusy(true);
+    service
+      .prepareNpmUpdate()
+      .then(restart)
+      .catch((e: unknown) => {
+        setError(String(e));
+        setBusy(false);
+      });
+  };
+  const canRestart = update.restartSupported && !!update.command;
+  const shortcuts: Record<string, () => void> = {
+    c: () => {
+      service.check().catch((e: unknown) => setError(String(e)));
+    },
+    p: () =>
+      service.setPreferences({
+        channel:
+          update.preferences.channel === 'preview' ? 'stable' : 'preview',
+      }),
+    a: () =>
+      service.setPreferences({ automatic: !update.preferences.automatic }),
+    q: () => {
+      if (update.command) quit(update.command);
+    },
+  };
   useInput((input, key) => {
+    if (busy) return;
+    if (input === 'u' && canRestart) return beginUpdate();
     if (key.escape) return onClose();
     try {
-      if (input === 'c')
-        service.check().catch((e: unknown) => setError(String(e)));
-      if (input === 'p')
-        service.setPreferences({
-          channel:
-            update.preferences.channel === 'preview' ? 'stable' : 'preview',
-        });
-      if (input === 'a')
-        service.setPreferences({ automatic: !update.preferences.automatic });
-      if (input === 'q' && update.command) quit(update.command);
+      shortcuts[input]?.();
     } catch (e) {
       setError(String(e));
     }
@@ -29,6 +49,8 @@ export function UpdatesPanel({ onClose }: { onClose: () => void }) {
         Settings › Updates
       </Text>
       <UpdateDetails update={update} error={error} />
+      {busy && <Text color="cyan">Preparing update…</Text>}
+      <UpdateResult update={update} />
       <Box marginTop={1} flexDirection="column">
         <Text bold>
           Release channel:{' '}
@@ -47,8 +69,9 @@ export function UpdatesPanel({ onClose }: { onClose: () => void }) {
             <Text bold>Update with npm</Text>
             <Text color="cyan">{update.command}</Text>
             <Text>
-              Quit n10, run the command in your terminal, then open n10 --tui
-              again.
+              {update.restartSupported
+                ? 'Press u to close n10, install with npm, and reopen. Or copy the command to update manually.'
+                : 'Quit n10, run the command in your terminal, then open n10 --tui again.'}
             </Text>
             <Text dimColor>Your tmux agents keep running.</Text>
           </>
@@ -64,19 +87,7 @@ export function UpdatesPanel({ onClose }: { onClose: () => void }) {
           No telemetry. Checks send no repository information or credentials.
         </Text>
       </Box>
-      <Box marginTop={1}>
-        <Text>
-          <Text color="cyan">c</Text> Check now · <Text color="cyan">p</Text>{' '}
-          channel · <Text color="cyan">a</Text> automatic
-          {update.command && (
-            <>
-              {' '}
-              · <Text color="cyan">q</Text> Quit to update
-            </>
-          )}{' '}
-          · Esc back
-        </Text>
-      </Box>
+      <UpdateShortcuts update={update} />
     </Box>
   );
 }
@@ -141,5 +152,46 @@ function UpdateFallback({ update }: { update: UpdateSnapshot }) {
         ? 'Development build: update your checkout.'
         : 'Update n10 the same way you installed it.'}
     </Text>
+  );
+}
+
+function UpdateResult({ update }: { update: UpdateSnapshot }) {
+  return (
+    <>
+      {update.lastUpdate && (
+        <Text
+          color={update.lastUpdate.status === 'failed' ? 'yellow' : 'green'}
+        >
+          {update.lastUpdate.message}
+        </Text>
+      )}
+      {update.lastUpdate?.status === 'failed' && (
+        <Text>npm logs: {update.lastUpdate.logPath}</Text>
+      )}
+    </>
+  );
+}
+
+function UpdateShortcuts({ update }: { update: UpdateSnapshot }) {
+  return (
+    <Box marginTop={1}>
+      <Text>
+        <Text color="cyan">c</Text> Check now · <Text color="cyan">p</Text>{' '}
+        channel · <Text color="cyan">a</Text> automatic
+        {update.command && update.restartSupported && (
+          <>
+            {' '}
+            · <Text color="cyan">u</Text> Update and restart
+          </>
+        )}
+        {update.command && (
+          <>
+            {' '}
+            · <Text color="cyan">q</Text> Quit to update
+          </>
+        )}{' '}
+        · Esc back
+      </Text>
+    </Box>
   );
 }

@@ -1,3 +1,4 @@
+import type { NpmUpdatePlan } from '@n10/engine/contract';
 import { realpathSync } from 'node:fs';
 import type {
   ContextMenuItem,
@@ -55,6 +56,8 @@ export function createHostApi(): HostApi {
     checkUpdates: updates.checkUpdates,
     setUpdatePreferences: updates.setUpdatePreferences,
     quitForUpdate: () => quitForUpdate(),
+    updateAndRestart: async () =>
+      quitForNpmUpdate(await updates.prepareNpmUpdate()),
     getVersion: () =>
       Promise.resolve({
         app: process.env.N10_DESKTOP_VERSION ?? 'dev',
@@ -216,6 +219,8 @@ let contextMenu: (
   items: ContextMenuItem[]
 ) => Promise<string | null> = async () => null;
 let appMenuPopup: () => Promise<void> = async () => undefined;
+let quitForNpmUpdate: (plan: NpmUpdatePlan) => Promise<void> = async () =>
+  undefined;
 let quitForUpdate: () => Promise<void> = async () => undefined;
 let aboutBox: () => Promise<void> = async () => undefined;
 let prefsChanged: (next: prefs.DesktopPrefsLike) => void = () => undefined;
@@ -241,12 +246,14 @@ export function setExternalOpener(fn: (url: string) => Promise<void>): void {
 
 export function setShellGlue(glue: {
   quitForUpdate?: () => Promise<void>;
+  quitForNpmUpdate?: (plan: NpmUpdatePlan) => Promise<void>;
   contextMenu: (items: ContextMenuItem[]) => Promise<string | null>;
   appMenuPopup: () => Promise<void>;
   aboutBox: () => Promise<void>;
   prefsChanged: (next: prefs.DesktopPrefsLike) => void;
 }): void {
   quitForUpdate = glue.quitForUpdate ?? quitForUpdate;
+  quitForNpmUpdate = glue.quitForNpmUpdate ?? quitForNpmUpdate;
   contextMenu = glue.contextMenu;
   appMenuPopup = glue.appMenuPopup;
   aboutBox = glue.aboutBox;
