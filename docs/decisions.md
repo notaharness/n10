@@ -1230,10 +1230,9 @@ serves the current release. The website reads that file at build time for its
 download links, so a rename on `master` breaks them until the next release
 ships the renamed assets; change the names only right before a release. Each
 release also attaches the file, describing exactly the assets beside it.
-During the beta there is one channel: a `-beta` GitHub release is not marked a
-prerelease, so `releases/latest`, npm's `latest` and a future updater agree.
-A separate beta channel comes with 1.0, alongside the updater's channel
-support.
+While `LATEST_FOLLOWS_BETA` is true, a beta GitHub release is marked latest,
+so `releases/latest` and npm's `latest` serve the same version. With that
+setting false, beta releases are prereleases and stable releases are latest.
 
 The app tells builds apart by manifest name, not `app.isPackaged`, which is
 false under the npm package too: `n10-dev` is the dev build, and anything else

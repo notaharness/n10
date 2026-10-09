@@ -79,6 +79,10 @@ Every release run, a rehearsal included, builds the Linux packages
 is published unless every package built.
 
 The `github-release` job creates the GitHub release with generated notes,
-marked as a prerelease for a prerelease version, and attaches every artifact
-named `release-*` from the run. Jobs that build release assets upload under
-that prefix and join its `needs`.
+attaches every file named in `apps/desktop/release-assets.json` and the
+manifest itself, and fails before release creation if an asset is missing.
+During the beta-only period (`LATEST_FOLLOWS_BETA=true`), beta releases are
+marked latest so `releases/latest/download/<name>` resolves. After that
+setting becomes false, beta releases are GitHub prereleases and stable
+releases are latest. The Linux jobs upload under `release-*` and join the
+publish gate; a dispatched rehearsal builds them but publishes nothing.

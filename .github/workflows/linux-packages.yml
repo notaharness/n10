@@ -40,14 +40,14 @@ jobs:
 
       - run: npm ci
 
-      - run: npx nx package-linux desktop
+      - run: NX_DAEMON=false npx nx package-linux desktop
 
       - run: |
           mkdir release
           names=$(jq -er --arg arch "$ARCH" '.linux[$arch][]' apps/desktop/release-assets.json)
-          for name in $names; do
+          while IFS= read -r name; do
             cp "apps/desktop/dist/installers/$name" release/
-          done
+          done <<< "$names"
         env:
           ARCH: ${{ matrix.arch }}
 
