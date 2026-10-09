@@ -75,6 +75,22 @@ test('main exiting without telling the host ends it and every descendant', async
   expect(code).toBe(0);
 });
 
+// The control: the same crash without the job leaves descendants
+// running, so the tests above pass because of it.
+test('without the job, descendants outlive a crashed main', async () => {
+  const probe = await launchProbe(probeMain, { job: false });
+  run = probe;
+  process.kill(probe.main);
+  const survivors = await survivorsAfter(hostTree(probe), 5_000);
+  const kinds = Object.entries(probe.descendants)
+    .filter(([, pid]) => survivors.includes(pid))
+    .map(([kind]) => kind);
+  console.log(`[control] outlived a crashed main: ${kinds.join(', ')}`);
+  run = undefined;
+  reap(probe);
+  expect(kinds).not.toEqual([]);
+});
+
 test('a crashed host takes every descendant and leaves main running', async () => {
   const probe = await start();
   process.kill(probe.host);

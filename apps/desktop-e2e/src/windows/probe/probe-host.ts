@@ -50,10 +50,17 @@ function detached(command: string, args: string[]): number {
   return child.pid;
 }
 
-async function run(): Promise<void> {
-  // First, before this process starts anything.
+/** The job, joined first, before this process starts anything; or, for
+ *  the control run (`N10_PROBE_JOB=off`), none. */
+function containment(): { processIds(): number[] } {
+  if (process.env['N10_PROBE_JOB'] === 'off') return { processIds: () => [] };
   const job = joinKillOnCloseJob();
   if (!job) throw new Error('No job off Windows');
+  return job;
+}
+
+async function run(): Promise<void> {
+  const job = containment();
   const pty = new PtySession(
     'powershell.exe',
     ['-NoLogo', '-NoProfile', '-NoExit'],

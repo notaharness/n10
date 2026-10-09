@@ -41,6 +41,7 @@ test('another account cannot read the secret or authenticate', async () => {
     .info()
     .attach('findings.json', { body: JSON.stringify(findings, null, 2) });
   const summary = summarize(findings);
+  console.log(`[other account] ${JSON.stringify(summary)}`);
   expect(summary.user).toBe(account!.user.toLowerCase());
   expect(summary.credentials).toBe('denied');
   expect(['denied', 'nonce only, closed after a wrong proof']).toContain(

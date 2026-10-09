@@ -71,11 +71,17 @@ export interface ProbeRun {
   log: () => string;
 }
 
-export async function launchProbe(probeMain: string): Promise<ProbeRun> {
+/** Start the probe; `job: false` is the control run, whose host joins
+ *  no job. */
+export async function launchProbe(
+  probeMain: string,
+  { job: contained = true }: { job?: boolean } = {}
+): Promise<ProbeRun> {
   const stateDir = mkdtempSync(join(tmpdir(), 'n10-probe-'));
   const electron = spawn(require('electron') as string, [probeMain], {
     env: windowsPowerShellEnv({
       N10_PROBE_DIR: stateDir,
+      N10_PROBE_JOB: contained ? 'on' : 'off',
       ELECTRON_ENABLE_LOGGING: '1',
     }),
     stdio: ['ignore', 'pipe', 'pipe'],
