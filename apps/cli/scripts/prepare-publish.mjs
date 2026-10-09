@@ -75,6 +75,9 @@ for (const part of ['main', 'preload', 'renderer']) {
     filter: (path) => !path.endsWith('.map') && !path.endsWith('.d.ts'),
   });
 }
+cpSync(resolve(desktopDir, 'build'), resolve(distDir, 'desktop', 'build'), {
+  recursive: true,
+});
 
 const out = {
   name: cli.name,

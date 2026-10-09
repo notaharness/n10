@@ -25,7 +25,7 @@ import {
 } from './ui/dropdown-menu.js';
 import { Kbd } from './ui/kbd.js';
 import { Tip } from './ui/tooltip.js';
-import { N10Mark } from './N10Mark.js';
+import n10Mark from '../assets/n10-mark.svg?url';
 
 /**
  * Top bar. With the custom frame (default) it doubles as the window's
@@ -83,7 +83,13 @@ export function TitleBar({
           </Tip>
         )}
         <div className="app-no-drag flex items-center pl-1">
-          <N10Mark className="size-5" />
+          <img
+            data-testid="titlebar-logo"
+            src={n10Mark}
+            alt=""
+            aria-hidden="true"
+            className="size-8"
+          />
         </div>
         {repo ? (
           <RepoMenu
