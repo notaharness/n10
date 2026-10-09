@@ -98,13 +98,12 @@ export default function DownloadPage() {
                   Git with it.
                 </Package>
                 <Package format="appImage" title="AppImage">
-                  Any distribution with libfuse2 (
-                  <code>sudo apt install libfuse2t64</code> on Ubuntu 24.04).
-                  Where AppArmor blocks Electron&apos;s sandbox, as on Ubuntu
-                  24.04 and later, it starts with <code>--no-sandbox</code> by
-                  itself. Sessions that outlive it can&apos;t run{' '}
-                  <code>n10 util</code> or <code>beam</code> until it runs
-                  again; the .deb has no such gap.
+                  Portable, with no installation or host FUSE library. Where
+                  AppArmor blocks Electron&apos;s sandbox, as on Ubuntu 24.04
+                  and later, its launcher adds <code>--no-sandbox</code>.
+                  Sessions that outlive it can&apos;t run <code>n10 util</code>{' '}
+                  or <code>beam</code> until it runs again; the .deb has no such
+                  gap.
                 </Package>
               </div>
             </PlatformCard>
