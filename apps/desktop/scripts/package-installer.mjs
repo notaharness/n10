@@ -98,9 +98,12 @@ export function buildInstaller(platform) {
   );
 
   execFileSync(
-    process.platform === 'win32' ? 'npx.cmd' : 'npx',
+    process.execPath,
     [
-      'electron-builder',
+      resolve(
+        dirname(require.resolve('electron-builder/package.json')),
+        'cli.js'
+      ),
       platform === 'win32' ? '--win' : '--linux',
       `--${process.arch}`,
       '--publish',
