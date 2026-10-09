@@ -1405,7 +1405,34 @@ Quit uses the normal engine/host drain and terminal detach path. tmux processes
 survive and can be reattached after reopening; unsaved renderer-only state is
 not promised to survive.
 
-The approved next step is an npm **Update and restart** action in the same
-area, with npm running after the UI has closed and terminal clients detached.
-Packaged updates are outside this implementation. GitHub's prerelease flag is
-not a channel selector: a beta release may be marked as a non-prerelease.
+Writable global npm installations on Linux and macOS also offer **Update and
+restart**. Core's read-only preflight verifies the active npm root, current and
+target versions, prefix and write access. After closing the UI, the owner
+revalidates that plan and invokes npm with the exact version and explicit
+`--prefix`, inherited stdio, and the user's normal npm configuration. There is
+no shell, elevation, mutation timeout, automatic retry or rollback. A small
+`~/.n10/npm-update.lock` directory serializes n10's installers across shells;
+a crash can leave it behind, and the error tells the user how to clear it after
+checking that no update is still running.
+
+The TUI stops scheduling and drains pending operations, unmounts Ink, pauses its
+stdin, and detaches terminal clients before running npm in the foreground. The
+existing process then starts the installed entry point with inherited stdio and
+exits with its status. Pausing stdin matters: removing stream listeners alone
+does not stop a flowing stream from consuming the replacement's input. Ordinary
+TUI launches have no parent launcher or detached updater.
+
+Desktop uses its existing Node launcher. The accepted `will-quit` path writes a
+private request, drains the host, and exits with the update handoff code. Choosing
+Stay in the unsaved-draft dialog clears the request, so a later ordinary quit
+cannot unexpectedly install anything. The launcher waits for Electron to exit,
+loads its update runtime before files can be replaced, runs npm, and starts the
+installed entry point. No copied standalone updater is required on POSIX.
+
+Both paths retain npm logs under `~/.n10/npm-update-logs` and record the last
+result for the reopened Settings screen. An install failure attempts to reopen
+the existing entry point and keeps the manual command available; a damaged
+installation may require running that command from the terminal. Windows,
+local installs and packaged apps keep the manual path. Native packaged updates
+remain a separate increment. GitHub's prerelease flag is not a channel selector:
+a beta release may be marked as a non-prerelease.

@@ -1,9 +1,10 @@
 import { createContext, useContext, useSyncExternalStore } from 'react';
-import type { UpdateService } from '@n10/engine/contract';
+import type { UpdateService, NpmUpdatePlan } from '@n10/engine/contract';
 
 export const UpdatesContext = createContext<{
   service: UpdateService;
   quit: (command?: string) => void;
+  restart: (plan: NpmUpdatePlan) => Promise<void>;
 } | null>(null);
 export function useUpdates() {
   const context = useContext(UpdatesContext);

@@ -1,6 +1,6 @@
 import { UpdatesContext } from './hooks/useUpdates.js';
-import type { UpdateService } from '@n10/engine/contract';
-import { createInstalledUpdates } from '@n10/engine';
+import type { UpdateService, NpmUpdatePlan } from '@n10/engine/contract';
+import { createInstalledUpdates, type RepositoryHandle } from '@n10/engine';
 import { useTerminalDimensions } from './hooks/useTerminalDimensions.js';
 import { useState, useCallback, useMemo } from 'react';
 import { render, Box, useApp } from 'ink';
@@ -36,6 +36,8 @@ import {
 } from '@n10/app-core';
 import {
   killAll,
+  runNpmUpdate,
+  relaunchNpmApp,
   applySessionBackend,
   probeTmuxAvailability,
   resetRepoRoot,
@@ -59,7 +61,13 @@ const EXIT_GRACE_MS = 3_000;
 
 // ── App ────────────────────────────────────────────────────────────
 
-function App({ updates }: { updates: UpdateService }) {
+function App({
+  updates,
+  restart,
+}: {
+  updates: UpdateService;
+  restart: (plan: NpmUpdatePlan) => Promise<void>;
+}) {
   const { exit } = useApp();
   const { sync } = useEngine();
   const { flash } = useToastActions();
@@ -82,8 +90,8 @@ function App({ updates }: { updates: UpdateService }) {
     [exit, sync, flash]
   );
   const updatesContext = useMemo(
-    () => ({ service: updates, quit: handleExit }),
-    [updates, handleExit]
+    () => ({ service: updates, quit: handleExit, restart }),
+    [updates, handleExit, restart]
   );
   const { config, provider, vcsConfigured } = useConfig();
   const nav = useNavState();
@@ -131,7 +139,7 @@ function App({ updates }: { updates: UpdateService }) {
 
 /** `n10 --tui [dir]`: `args` follow `--tui`. */
 export async function runTui(args: string[], packageRoot = ''): Promise<void> {
-  const updates = createInstalledUpdates(packageRoot);
+  const updates = createInstalledUpdates(packageRoot, false, 'tui');
   updates.start();
   const targetDir = args.find((a) => !a.startsWith('--'));
   if (targetDir) {
@@ -166,7 +174,7 @@ export async function runTui(args: string[], packageRoot = ''): Promise<void> {
     process.exit(1);
   }
 
-  let repo;
+  let repo: RepositoryHandle;
   try {
     repo = createRepositoryService({ providers, pullRequests }).open(
       process.cwd()
@@ -185,7 +193,37 @@ export async function runTui(args: string[], packageRoot = ''): Promise<void> {
     worktrees,
   });
 
-  render(
+  async function restart(plan: NpmUpdatePlan) {
+    await Promise.all([sync.stop(), settlePendingRuns()]);
+    updates.stop();
+    instance.unmount();
+    await instance.waitUntilExit();
+    // Removing Ink/data listeners alone does not pause a flowing stream.
+    // The foreground npm process and replacement TUI must own stdin.
+    process.stdin.pause();
+    repo.sessions.park();
+    repo.reviews.park();
+    pullRequests.dispose();
+    killAll();
+    try {
+      console.log(
+        `Updating n10 to ${plan.version}… Your tmux agents keep running.`
+      );
+      const result = await runNpmUpdate(plan);
+      console.log(result.message);
+      if (result.status === 'failed')
+        console.error(`npm logs: ${result.logPath}`);
+      process.exit(await relaunchNpmApp(plan.root, 'tui'));
+    } catch (error) {
+      console.error('n10: update failed:', error);
+      console.error(
+        `Run npm i -g @notaharness/n10@${plan.version}, then n10 --tui.`
+      );
+      process.exit(1);
+    }
+  }
+
+  const instance = render(
     <ConfigProvider service={repo.config}>
       <EngineProvider
         pullRequests={pullRequests}
@@ -204,7 +242,7 @@ export async function runTui(args: string[], packageRoot = ''): Promise<void> {
                     <ToastProvider>
                       <SessionProvider>
                         <SidebarProvider>
-                          <App updates={updates} />
+                          <App updates={updates} restart={restart} />
                         </SidebarProvider>
                       </SessionProvider>
                     </ToastProvider>

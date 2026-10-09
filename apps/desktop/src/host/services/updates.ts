@@ -36,3 +36,7 @@ export function startUpdates() {
 export function stopUpdates() {
   updates?.stop();
 }
+
+export async function prepareNpmUpdate() {
+  return service().prepareNpmUpdate();
+}

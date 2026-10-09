@@ -1,3 +1,4 @@
+import type { NpmUpdatePlan } from '@n10/engine/contract';
 /**
  * The channel between the main process and the host utility process
  * (`host-worker.ts`). Contract calls travel as `invoke` by channel
@@ -12,6 +13,7 @@ import type { DaemonExit } from './beam/owned-daemon.js';
 /** What the host asks of the main process. */
 export interface ShellCalls {
   quitForUpdate(): Promise<void>;
+  quitForNpmUpdate(plan: NpmUpdatePlan): Promise<void>;
   pickFolder(title: string): Promise<string | null>;
   openExternal(url: string): Promise<void>;
   contextMenu(items: ContextMenuItem[]): Promise<string | null>;
