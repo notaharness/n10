@@ -177,9 +177,9 @@ async function start(): Promise<void> {
     callMain('holdMenuShortcuts', viewer, held)
   );
   installMachineResolver();
-  beam.start();
   await probeTmuxAvailability();
   applySessionBackend();
+  beam.start();
   const opened = openStartupRepo({ N10_START_DIR: startDir });
   post({ t: 'ready', repo: opened ? opened.cwd : null });
 }
