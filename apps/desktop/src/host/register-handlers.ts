@@ -193,6 +193,7 @@ export function createHostApi(): HostApi {
     onDirectoryPublished: () => () => undefined,
     dismissInboundMail: (id) => inboundMail.dismissInboundMail(id),
     onMachinesChanged: () => () => undefined,
+    onUpdatesChanged: () => () => undefined,
   };
 }
 

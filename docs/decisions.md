@@ -1382,7 +1382,11 @@ choices currently use the same feed. A real channel split must filter
 prereleases for Stable and retain opt-in beta delivery for Preview.
 
 Checks start two seconds after launch when the cache is stale, then run daily
-with up to an hour of jitter. Concurrent requests coalesce. Conditional ETags,
+with up to an hour of jitter. Concurrent requests in one shell coalesce. Both
+shells reread the shared cache before checking and on their preference tick, so
+completed checks and server retry deadlines are shared. Simultaneous cold starts
+can still each make a request. npm install identity resolves in the background;
+it cannot delay either shell becoming ready. Conditional ETags,
 a five-second deadline and bounded response bodies limit the work. Offline or
 invalid responses retain the last successful result and back off from fifteen
 minutes to a day. Manual checks bypass ordinary failure backoff; server rate
@@ -1394,28 +1398,14 @@ registry receives an ordinary public metadata request and the network address.
 A quiet desktop status-bar notice opens Settings > Updates; the TUI shows a
 compact notice beside its tabs and an Updates panel under Settings (`s`, `u`).
 The npm action is offered only when the installed package's real path matches
-`npm root --global`. Local npm installs receive local-install guidance. Phase 1
-copies/displays `npm i -g @notaharness/n10@beta` and offers **Quit to update**.
+`npm root --global`. Local npm installs receive local-install guidance. n10
+copies/displays `npm i -g @notaharness/n10@<detected-version>` and offers
+**Quit to update**.
 Quit uses the normal engine/host drain and terminal detach path. tmux processes
 survive and can be reattached after reopening; unsaved renderer-only state is
 not promised to survive.
 
-The next increment is a separate, stacked npm **Update and restart** change.
-Its primary action occupies the existing update action area. An after-exit
-transaction must verify the same npm prefix, wait for the running app to exit,
-run npm without replacing a live Electron installation, retain useful output
-and recovery instructions on failure, and relaunch the same entry point on
-success. The manual command remains available. This precedes packaged updates.
-
-Packaged apps will use electron-builder's documented `electron-updater` with
-GitHub releases, stacked on the installer work. AppImage, NSIS and signed macOS
-DMG+ZIP need the corresponding updater metadata and blockmaps published by CI.
-GitHub's latest/prerelease flag alone is not a channel selector: the Linux
-release proposal marks the newest beta as a non-prerelease. Version filtering
-must enforce the chosen channel. A .deb download link is the initial handoff;
-an apt repository or explicit installer privilege policy is a separate choice.
-
-Offline e2e fixtures serve mutable registry responses on loopback. They cover
-newer/equal/older versions, channel and automatic-check persistence, malformed
-responses, recovery, rate limits, clipboard handoff, and quit/reopen with the
-same tmux agent PID. Desktop review captures use 1600×900 in both themes.
+The approved next step is an npm **Update and restart** action in the same
+area, with npm running after the UI has closed and terminal clients detached.
+Packaged updates are outside this implementation. GitHub's prerelease flag is
+not a channel selector: a beta release may be marked as a non-prerelease.

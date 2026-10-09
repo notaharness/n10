@@ -51,6 +51,20 @@ describe('installation and persisted update state', () => {
       detectUpdateInstallation(root, true, prefix)
     ).resolves.toMatchObject({ kind: 'packaged' });
   });
+  it('does not invoke npm for a published manifest outside an npm install layout', async () => {
+    const { home } = fixture();
+    const root = join(home, 'nix/store/n10');
+    mkdirSync(root, { recursive: true });
+    writeFileSync(
+      join(root, 'package.json'),
+      JSON.stringify({ name: '@notaharness/n10', version: '1.0.0-beta.1' })
+    );
+    const prefix = vi.fn();
+    await expect(
+      detectUpdateInstallation(root, false, prefix)
+    ).resolves.toMatchObject({ kind: 'packaged' });
+    expect(prefix).not.toHaveBeenCalled();
+  });
   it('ignores fixture overrides in installed copies and refuses a non-loopback fixture', () => {
     const env = { N10_UPDATE_TEST_REGISTRY: 'http://example.com/dist-tags' };
     expect(

@@ -54,6 +54,23 @@ describe('release metadata', () => {
     await expect(readRegistryVersion()).rejects.toThrow();
     await expect(readRegistryVersion()).rejects.toThrow('no valid');
   });
+  it('treats forbidden as an ordinary HTTP failure and ignores unrelated rate-limit headers', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response('', { status: 403 }))
+        .mockResolvedValueOnce(
+          new Response('', {
+            status: 429,
+            headers: { 'x-ratelimit-reset': 'bad', 'retry-after': 'invalid' },
+          })
+        )
+    );
+    await expect(readRegistryVersion()).rejects.toThrow('HTTP 403');
+    const error = await readRegistryVersion().catch((value: unknown) => value);
+    expect(Number.isFinite((error as UpdateCheckError).retryAt)).toBe(true);
+  });
   it('honors a server retry deadline', async () => {
     vi.stubGlobal(
       'fetch',

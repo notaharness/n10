@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UpdatePreferences } from '../../../host/contract.js';
 
@@ -6,7 +7,7 @@ export function useUpdates() {
   return useQuery({
     queryKey: KEY,
     queryFn: () => window.n10.getUpdates(),
-    refetchInterval: 2000,
+    staleTime: Infinity,
   });
 }
 export function useUpdateActions() {
@@ -22,4 +23,15 @@ export function useUpdateActions() {
     onSuccess: refresh,
   });
   return { check, preferences };
+}
+
+export function useUpdateEvents() {
+  const client = useQueryClient();
+  useEffect(
+    () =>
+      window.n10.onUpdatesChanged((snapshot) =>
+        client.setQueryData(KEY, snapshot)
+      ),
+    [client]
+  );
 }

@@ -5,7 +5,9 @@ const state = vi.hoisted(() => ({
   restart: vi.fn(),
   opened: vi.fn(),
   discover: vi.fn(),
+  updates: vi.fn(),
 }));
+vi.mock('./services/updates.js', () => ({ setUpdatesNotifier: state.updates }));
 vi.mock('./services/repo.js', () => ({ setRepoOpenedListener: state.opened }));
 vi.mock('./services/remote-sync.js', () => ({
   startRemoteSyncLoop: state.restart,
@@ -33,4 +35,16 @@ it('installs repository opening to start the engine sync and discovery adapters'
   opened('/repo');
   expect(state.restart).toHaveBeenCalledExactlyOnceWith('/repo');
   expect(state.discover).toHaveBeenCalledExactlyOnceWith('/repo');
+});
+
+it('pushes changed update snapshots to every window', () => {
+  const broadcast = vi.fn();
+  installHostPushes({ broadcast, sendTo: vi.fn() });
+  const notify = state.updates.mock.lastCall![0] as (snapshot: unknown) => void;
+  const snapshot = { availableVersion: '1.0.0-beta.10' };
+  notify(snapshot);
+  expect(broadcast).toHaveBeenCalledExactlyOnceWith(
+    'n10/updates/changed',
+    snapshot
+  );
 });

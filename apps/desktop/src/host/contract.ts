@@ -374,6 +374,7 @@ export interface SessionActivitySnapshot {
 export interface N10HostApi {
   getVersion(): Promise<N10VersionInfo>;
   getUpdates(): Promise<UpdateSnapshot>;
+  onUpdatesChanged(cb: (snapshot: UpdateSnapshot) => void): () => void;
   checkUpdates(): Promise<void>;
   setUpdatePreferences(patch: Partial<UpdatePreferences>): Promise<void>;
   quitForUpdate(): Promise<void>;
@@ -802,3 +803,5 @@ export class NoActiveRepoError extends Error {
     this.name = 'NoActiveRepoError';
   }
 }
+
+export const UPDATE_EVENTS = { changed: 'n10/updates/changed' } as const;

@@ -65,18 +65,22 @@ function App({ updates }: { updates: UpdateService }) {
   const { flash } = useToastActions();
   // Give manual operations and automatic removals one shared grace period.
   // Ink unmounts the UI; the entry point must also detach PTY clients and exit.
-  const handleExit = useCallback(() => {
-    void (async () => {
-      flash(
-        'Closing n10 — waiting up to 3 seconds for active operations…',
-        'info'
-      );
-      await waitForExit(() => sync.stop(), settlePendingRuns, EXIT_GRACE_MS);
-      killAll();
-      exit();
-      process.exit(0);
-    })();
-  }, [exit, sync, flash]);
+  const handleExit = useCallback(
+    (command?: string) => {
+      void (async () => {
+        flash(
+          'Closing n10 — waiting up to 3 seconds for active operations…',
+          'info'
+        );
+        await waitForExit(() => sync.stop(), settlePendingRuns, EXIT_GRACE_MS);
+        killAll();
+        exit();
+        if (command) console.log(`To update, run: ${command}`);
+        process.exit(0);
+      })();
+    },
+    [exit, sync, flash]
+  );
   const updatesContext = useMemo(
     () => ({ service: updates, quit: handleExit }),
     [updates, handleExit]
@@ -127,9 +131,8 @@ function App({ updates }: { updates: UpdateService }) {
 
 /** `n10 --tui [dir]`: `args` follow `--tui`. */
 export async function runTui(args: string[], packageRoot = ''): Promise<void> {
-  const updates = await createInstalledUpdates(packageRoot);
+  const updates = createInstalledUpdates(packageRoot);
   updates.start();
-  process.on('exit', () => updates.stop());
   const targetDir = args.find((a) => !a.startsWith('--'));
   if (targetDir) {
     process.chdir(targetDir);

@@ -1,8 +1,9 @@
 import { ArrowUpCircleIcon } from 'lucide-react';
 import { selectSettingsSection } from '../lib/settings-navigation.js';
-import { useUpdates } from '../lib/data/updates.js';
+import { useUpdates, useUpdateEvents } from '../lib/data/updates.js';
 
 export function UpdateNotice({ onOpen }: { onOpen: () => void }) {
+  useUpdateEvents();
   const version = useUpdates().data?.availableVersion;
   if (!version) return null;
   return (

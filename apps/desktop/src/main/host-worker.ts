@@ -119,7 +119,7 @@ function settle(message: Extract<MainToHost, { t: 'reply' }>): void {
 // Terminal clients go; the tmux sessions behind them stay. Then the
 // daemon this host started stops (D15).
 async function shutdown(): Promise<void> {
-  await stopUpdates();
+  stopUpdates();
   const removals = stopRemoteSyncLoop();
   stopDiscovery();
   stopAllBabysitters();
@@ -182,7 +182,7 @@ async function start(): Promise<void> {
   await probeTmuxAvailability();
   applySessionBackend();
   const opened = openStartupRepo();
-  await startUpdates();
+  startUpdates();
   post({ t: 'ready', repo: opened ? opened.cwd : null });
 }
 

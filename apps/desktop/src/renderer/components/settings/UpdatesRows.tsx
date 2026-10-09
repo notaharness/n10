@@ -1,7 +1,8 @@
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { UpdateSnapshot } from '../../../host/contract.js';
 import { useUpdateActions, useUpdates } from '../../lib/data/updates.js';
-import { errorMessage, relativeTime } from '../../lib/utils.js';
+import { errorMessage } from '../../lib/utils.js';
 import { Button } from '../ui/button.js';
 import {
   Select,
@@ -38,7 +39,11 @@ export function UpdatesRows() {
       <UpdateAction update={update} />
       <RowShell
         label="Release channel"
-        description="n10 doesn’t have a non-beta release yet. Both choices receive Preview builds for now; your preference is saved for when Stable is available."
+        description={
+          update.preferences.channel === 'stable'
+            ? 'n10 doesn’t have a non-beta release yet.'
+            : undefined
+        }
         control={
           <Select
             value={update.preferences.channel}
@@ -83,6 +88,8 @@ export function UpdatesRows() {
 function updateStatus(update: UpdateSnapshot) {
   if (update.availableVersion)
     return `n10 ${update.availableVersion} is available`;
+  if (update.installation.kind === 'unknown')
+    return 'Identifying installation…';
   if (update.installation.kind === 'development') return 'Development build';
   if (update.installation.kind === 'packaged') return 'Installer updates';
   return update.checkedAt && !update.error
@@ -105,7 +112,7 @@ function UpdateCheck({
   const supported =
     update.installation.kind === 'npm-global' ||
     update.installation.kind === 'npm-local';
-  const waiting = (update.retryAt ?? 0) > checkedAt;
+  const waiting = useRetryWait(update.retryAt, checkedAt);
   return (
     <div className="space-y-3 px-4 py-4">
       <div className="flex items-center justify-between gap-4">
@@ -141,7 +148,7 @@ function UpdateCheckDetails({
     <>
       <p className="text-sm text-muted-foreground">
         {update.checkedAt
-          ? `Last checked ${relativeTime(update.checkedAt)}`
+          ? `Last checked ${new Date(update.checkedAt).toLocaleString()}`
           : 'Not checked yet'}
         {waiting
           ? ` · Retry after ${new Date(update.retryAt!).toLocaleTimeString()}`
@@ -167,4 +174,17 @@ function UpdateCheckDetails({
       )}
     </>
   );
+}
+
+function useRetryWait(retryAt: number | null, checkedAt: number) {
+  const [expired, setExpired] = useState<number | null>(null);
+  useEffect(() => {
+    if (!retryAt) return;
+    const timer = setTimeout(
+      () => setExpired(retryAt),
+      Math.max(0, retryAt - Date.now())
+    );
+    return () => clearTimeout(timer);
+  }, [retryAt]);
+  return !!retryAt && retryAt > checkedAt && expired !== retryAt;
 }

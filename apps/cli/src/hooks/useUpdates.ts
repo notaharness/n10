@@ -3,7 +3,7 @@ import type { UpdateService } from '@n10/engine/contract';
 
 export const UpdatesContext = createContext<{
   service: UpdateService;
-  quit: () => void;
+  quit: (command?: string) => void;
 } | null>(null);
 export function useUpdates() {
   const context = useContext(UpdatesContext);

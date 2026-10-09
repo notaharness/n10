@@ -14,7 +14,7 @@ export interface UpdateCache {
 }
 export interface UpdateInstallation {
   version: string;
-  kind: 'npm-global' | 'npm-local' | 'packaged' | 'development';
+  kind: 'unknown' | 'npm-global' | 'npm-local' | 'packaged' | 'development';
 }
 export interface RegistryVersion {
   version: string;

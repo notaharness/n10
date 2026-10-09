@@ -4,18 +4,22 @@ import type { UpdateSnapshot } from '../../../host/contract.js';
 import { Button } from '../ui/button.js';
 import { errorMessage } from '../../lib/utils.js';
 
-/** The action slot will also host the after-exit npm update transaction. */
 export function UpdateAction({ update }: { update: UpdateSnapshot }) {
   const [copied, setCopied] = useState(false);
   const command = update.command;
+  if (
+    update.installation.kind === 'unknown' ||
+    (update.installation.kind === 'npm-global' && !command)
+  )
+    return null;
   if (!command)
     return (
       <p className="px-4 py-3 text-sm text-muted-foreground">
         {update.installation.kind === 'development'
           ? 'Development build. Update your checkout to get the latest changes.'
           : update.installation.kind === 'packaged'
-          ? 'Download the latest installer from n10.is/download. Automatic installer updates are coming later.'
-          : 'This npm installation is not in your current global prefix. Update it with the package manager and location you used to install it; for npx, launch npx @notaharness/n10@beta.'}
+          ? 'Download the latest version from n10.is/download.'
+          : 'Update n10 the same way you installed it.'}
       </p>
     );
   if (!update.availableVersion) return null;

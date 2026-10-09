@@ -59,6 +59,74 @@ describe('app update scheduling', () => {
       service.stop();
     }
   );
+  it('resolves npm identity in the background without checking an unknown installation', async () => {
+    const { store, read } = setup();
+    let resolve!: (value: { kind: 'npm-global'; version: string }) => void;
+    const service = createUpdateService({
+      installation: { kind: 'unknown', version: '1.0.0-beta.1' },
+      store,
+      read,
+      resolveInstallation: () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    });
+    expect(service.start()).toBeUndefined();
+    expect(service.getSnapshot().installation.kind).toBe('unknown');
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(read).not.toHaveBeenCalled();
+    resolve({ kind: 'npm-global', version: '1.0.0-beta.1' });
+    await Promise.resolve();
+    await service.check();
+    expect(service.getSnapshot().command).toBe(
+      'npm i -g @notaharness/n10@1.0.0-beta.10'
+    );
+    service.stop();
+  });
+  it('offers the detected stable promotion and clears the handoff for equal or older releases', async () => {
+    const { service, read } = setup();
+    read.mockResolvedValueOnce({ version: '1.0.0' });
+    await service.check();
+    expect(service.getSnapshot().command).toBe(
+      'npm i -g @notaharness/n10@1.0.0'
+    );
+    for (const version of ['1.0.0-beta.1', '1.0.0-beta.0']) {
+      read.mockResolvedValueOnce({ version });
+      await service.check();
+      expect(service.getSnapshot()).toMatchObject({
+        command: null,
+        availableVersion: null,
+      });
+    }
+  });
+  it('observes a check and rate-limit deadline written by another running shell', async () => {
+    const { service, read, store } = setup();
+    service.start();
+    store.writeCache({
+      version: '1.0.0-beta.11',
+      checkedAt: Date.now(),
+      nextCheckAt: Date.now() + 86_400_000,
+    });
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(read).not.toHaveBeenCalled();
+    expect(service.getSnapshot().availableVersion).toBe('1.0.0-beta.11');
+    store.writeCache({ retryAt: Date.now() + 3_600_000 });
+    await service.check();
+    expect(read).not.toHaveBeenCalled();
+    service.stop();
+  });
+  it('retains in-memory backoff when the cache cannot be saved', async () => {
+    const { service, read, store } = setup();
+    store.writeCache = () => {
+      throw new Error('read-only');
+    };
+    read.mockRejectedValue(new Error('offline'));
+    await service.check();
+    service.start();
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(read).toHaveBeenCalledTimes(1);
+    service.stop();
+  });
   it('checks after startup, skips fresh cache, and checks again daily', async () => {
     const { service, read } = setup();
     service.start();
