@@ -865,3 +865,336 @@
 .dark .n10-only-light {
   display: none;
 }
+
+/* "Works with" (src/components/landing/works-with.tsx): a Git graph
+ * under the install command. A faint trunk runs the width of the row,
+ * and each agent's branch forks off it at a commit and curves down into
+ * the agent's tile. Every --n10-works-cycle, each commit in turn pulses,
+ * runs down its branch, and lands: the two panes behind the agent's mark
+ * split apart and mix back, as the hero's mark does. Each agent starts
+ * its run at its own slot, a fifth of the cycle apart. The marks never
+ * move; only the graph and the glass behind them do. */
+.n10-works {
+  --n10-works-cycle: 11s;
+  --n10-works-play: running;
+  --n10-works-tile: 44px;
+  --n10-works-sage: var(--color-fd-primary);
+  --n10-works-sand: #b3902f;
+}
+
+.dark .n10-works {
+  --n10-works-sage: var(--n10-sage);
+  --n10-works-sand: var(--n10-sand);
+}
+
+@media (min-width: 40rem) {
+  .n10-works {
+    --n10-works-tile: 52px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .n10-works {
+    --n10-works-play: paused;
+  }
+}
+
+.n10-works-graph {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-top: 0.75rem;
+}
+
+/* The trunk, fading in and out at the ends: history either side. */
+.n10-works-graph::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 1.25px;
+  height: 1.5px;
+  background: var(--color-fd-border);
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 12%,
+    black 88%,
+    transparent
+  );
+}
+
+.n10-works-agent {
+  --n10-works-tone: var(--n10-works-sage);
+  --n10-works-pane-opacity: 0.34;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 40px;
+}
+
+.dark .n10-works-agent {
+  --n10-works-pane-opacity: 0.22;
+}
+
+.n10-works-agent[data-tone='sand'] {
+  --n10-works-tone: var(--n10-works-sand);
+}
+
+.n10-works-branch {
+  position: absolute;
+  top: 0;
+  left: calc(50% - 32px);
+  width: 40px;
+  height: 40px;
+  overflow: visible;
+}
+
+.n10-works-track,
+.n10-works-commit {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.n10-works-track {
+  stroke: var(--color-fd-border);
+  transition: stroke 320ms var(--n10-logo-hover-ease);
+}
+
+.n10-works-agent:hover .n10-works-track {
+  stroke: var(--n10-works-tone);
+}
+
+/* One dash, shorter than the gap behind it, so at most one shows. It
+ * waits, and leaves, far enough past either end of the path that its
+ * round cap doesn't show there either. */
+.n10-works-commit {
+  stroke: var(--n10-works-tone);
+  stroke-width: 3;
+  stroke-dasharray: 12 200;
+  stroke-dashoffset: 20;
+  animation: n10-works-commit var(--n10-works-cycle) linear infinite;
+}
+
+.n10-works-node {
+  fill: var(--n10-works-tone);
+  stroke: var(--color-fd-background);
+  stroke-width: 2;
+  paint-order: stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: n10-works-node var(--n10-works-cycle) linear infinite;
+}
+
+.n10-works-commit,
+.n10-works-node,
+.n10-works-pane--sand {
+  animation-delay: calc(
+    var(--n10-works-slot) * var(--n10-works-cycle) / 5 - 2s
+  );
+  animation-play-state: var(--n10-works-play);
+}
+
+@keyframes n10-works-node {
+  0%,
+  18% {
+    transform: scale(1);
+  }
+  20% {
+    transform: scale(1.7);
+    animation-timing-function: var(--n10-logo-hover-ease);
+  }
+  26%,
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes n10-works-commit {
+  0%,
+  19% {
+    stroke-dashoffset: 20;
+    animation-timing-function: var(--n10-logo-intro-ease);
+  }
+  31%,
+  100% {
+    stroke-dashoffset: -110;
+  }
+}
+
+/* The tile: two panes of the mark's glass behind the agent's mark,
+ * sand overlapping sage by a third, like the n's shared stem. They
+ * multiply inside an isolated group, so the overlap is olive on any
+ * ground. The mark sits on top in the text colour, with the tile's
+ * margin as its clear space. */
+.n10-works-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--n10-works-tile);
+  height: var(--n10-works-tile);
+}
+
+.n10-works-panes {
+  position: absolute;
+  inset: 0;
+  isolation: isolate;
+  opacity: var(--n10-works-pane-opacity);
+  transition: opacity 320ms var(--n10-logo-hover-ease);
+}
+
+.n10-works-agent:hover .n10-works-panes {
+  --n10-works-pane-opacity: 0.6;
+}
+
+.dark .n10-works-agent:hover .n10-works-panes {
+  --n10-works-pane-opacity: 0.4;
+}
+
+.n10-works-pane {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--n10-works-tile) * 2 / 3);
+  mix-blend-mode: multiply;
+}
+
+.n10-works-pane--sage {
+  left: 0;
+  background: var(--n10-sage);
+}
+
+.n10-works-pane--sand {
+  left: calc(var(--n10-works-tile) / 3);
+  background: var(--n10-sand);
+  /* Longhands, so the slot's delay above still applies. */
+  animation-name: n10-works-land;
+  animation-duration: var(--n10-works-cycle);
+  animation-iteration-count: infinite;
+}
+
+/* Lands as the commit reaches the tile: the sand pane slides off the
+ * sage one with the mark's hover ease, holds, and mixes back in with
+ * its intro ease. */
+@keyframes n10-works-land {
+  0%,
+  30% {
+    transform: none;
+    animation-timing-function: var(--n10-logo-hover-ease);
+  }
+  34%,
+  40% {
+    transform: translateX(calc(var(--n10-works-tile) / 3));
+    animation-timing-function: var(--n10-logo-intro-ease);
+  }
+  50%,
+  100% {
+    transform: none;
+  }
+}
+
+/* Hover sends a commit down that branch straight away and holds the
+ * panes apart once it lands, as hovering the hero's mark splits it.
+ * Swapping the animation restarts it; leaving restarts the cycle. */
+.n10-works-agent:hover .n10-works-commit {
+  animation: n10-works-commit-now 600ms var(--n10-logo-intro-ease) both;
+}
+
+.n10-works-agent:hover .n10-works-node {
+  animation: n10-works-node-now 360ms var(--n10-logo-hover-ease);
+}
+
+.n10-works-agent:hover .n10-works-pane--sand {
+  animation: n10-works-split-now 900ms both;
+}
+
+@keyframes n10-works-commit-now {
+  from {
+    stroke-dashoffset: 20;
+  }
+  to {
+    stroke-dashoffset: -110;
+  }
+}
+
+@keyframes n10-works-node-now {
+  40% {
+    transform: scale(1.7);
+  }
+}
+
+@keyframes n10-works-split-now {
+  0%,
+  55% {
+    transform: none;
+    animation-timing-function: var(--n10-logo-hover-ease);
+  }
+  80%,
+  100% {
+    transform: translateX(calc(var(--n10-works-tile) / 3));
+  }
+}
+
+.n10-works-logo {
+  position: relative;
+  width: 44%;
+  height: 44%;
+  color: var(--color-fd-foreground);
+}
+
+.n10-works-name {
+  margin-top: 0.5rem;
+  font-size: 11px;
+  line-height: 1.25;
+  font-weight: 500;
+  text-wrap: balance;
+  color: var(--color-fd-muted-foreground);
+  transition: color 320ms var(--n10-logo-hover-ease);
+}
+
+.n10-works-agent:hover .n10-works-name {
+  color: var(--color-fd-foreground);
+}
+
+@media (min-width: 40rem) {
+  .n10-works-name {
+    font-size: 0.75rem;
+  }
+}
+
+/* "Soon": a dashed frame that marches while the thing inside is being
+ * built, and holds still under reduced motion. */
+.n10-soon {
+  --n10-soon-dash: color-mix(
+    in srgb,
+    var(--color-fd-muted-foreground) 55%,
+    transparent
+  );
+  background:
+    linear-gradient(90deg, var(--n10-soon-dash) 50%, transparent 0) repeat-x
+      0 0 / 8px 1px,
+    linear-gradient(90deg, var(--n10-soon-dash) 50%, transparent 0) repeat-x
+      0 100% / 8px 1px,
+    linear-gradient(0deg, var(--n10-soon-dash) 50%, transparent 0) repeat-y
+      0 0 / 1px 8px,
+    linear-gradient(0deg, var(--n10-soon-dash) 50%, transparent 0) repeat-y
+      100% 0 / 1px 8px;
+  animation: n10-soon-march 2.4s linear infinite;
+}
+
+@keyframes n10-soon-march {
+  to {
+    background-position:
+      8px 0,
+      -8px 100%,
+      0 -8px,
+      100% 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .n10-soon {
+    animation: none;
+  }
+}

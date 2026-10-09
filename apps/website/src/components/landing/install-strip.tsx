@@ -1,17 +1,9 @@
 import { CopyButton } from '@/components/copy-button';
+import { Platforms } from '@/components/landing/platforms';
+import { WorksWith } from '@/components/landing/works-with';
 import { cn } from '@/lib/cn';
 
 const INSTALL = 'npm install -g @notaharness/n10';
-
-const worksWith = [
-  'Claude',
-  'Codex',
-  'Gemini',
-  'Copilot',
-  'OpenCode',
-  'GitHub',
-  'Azure DevOps',
-];
 
 export function InstallStrip({ className }: { className?: string }) {
   return (
@@ -28,26 +20,18 @@ export function InstallStrip({ className }: { className?: string }) {
         </div>
         <CopyButton text={INSTALL} label="Copy the install command" />
       </div>
-      <ul className="mt-6 flex flex-wrap items-center justify-center gap-2">
-        <li className="text-fd-muted-foreground mr-1 text-sm">Works with</li>
-        {worksWith.map((name) => (
-          <li
-            key={name}
-            className="border-fd-border bg-fd-card rounded-full border px-3 py-1 text-xs font-medium"
-          >
-            {name}
-          </li>
-        ))}
-      </ul>
-      <p className="text-fd-muted-foreground mt-3 text-center text-xs">
-        Linux and macOS ·{' '}
+      <WorksWith className="mt-8" />
+      <Platforms className="mt-6">
+        <span aria-hidden className="max-sm:hidden">
+          ·
+        </span>
         <a
           href="https://github.com/notaharness/n10/blob/master/LICENSE"
           className="hover:text-fd-foreground underline decoration-fd-border underline-offset-4 transition-colors"
         >
           MIT licensed
         </a>
-      </p>
+      </Platforms>
     </div>
   );
 }
