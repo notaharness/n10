@@ -1,5 +1,8 @@
+import { UpdatesContext } from './hooks/useUpdates.js';
+import type { UpdateService } from '@n10/engine/contract';
+import { createInstalledUpdates } from '@n10/engine';
 import { useTerminalDimensions } from './hooks/useTerminalDimensions.js';
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { render, Box, useApp } from 'ink';
 import type { VcsProvider } from '@n10/vcs-core';
 import { azureDevOpsProvider } from '@n10/vcs-azure-devops';
@@ -56,13 +59,13 @@ const EXIT_GRACE_MS = 3_000;
 
 // ── App ────────────────────────────────────────────────────────────
 
-function App() {
+function App({ updates }: { updates: UpdateService }) {
   const { exit } = useApp();
   const { sync } = useEngine();
   const { flash } = useToastActions();
   // Give manual operations and automatic removals one shared grace period.
   // Ink unmounts the UI; the entry point must also detach PTY clients and exit.
-  const handleExit = () => {
+  const handleExit = useCallback(() => {
     void (async () => {
       flash(
         'Closing n10 — waiting up to 3 seconds for active operations…',
@@ -73,7 +76,11 @@ function App() {
       exit();
       process.exit(0);
     })();
-  };
+  }, [exit, sync, flash]);
+  const updatesContext = useMemo(
+    () => ({ service: updates, quit: handleExit }),
+    [updates, handleExit]
+  );
   const { config, provider, vcsConfigured } = useConfig();
   const nav = useNavState();
   const deleteConfirm = useDeleteConfirmState();
@@ -94,30 +101,35 @@ function App() {
   }
 
   return (
-    <Box flexDirection="column" height={termRows}>
-      <Box flexGrow={1}>
-        <MainTab
-          terminalFocused={terminalFocused}
-          showOnboarding={showOnboarding}
-          exit={handleExit}
-        />
+    <UpdatesContext.Provider value={updatesContext}>
+      <Box flexDirection="column" height={termRows}>
+        <Box flexGrow={1}>
+          <MainTab
+            terminalFocused={terminalFocused}
+            showOnboarding={showOnboarding}
+            exit={handleExit}
+          />
+        </Box>
+        {deleteConfirm.confirmDelete && (
+          <DeleteConfirmModal
+            branch={deleteConfirm.confirmDelete.branch}
+            reason={deleteConfirm.confirmDelete.reason}
+            mode={deleteConfirm.confirmDelete.mode}
+            confirmInput={deleteConfirm.confirmInput}
+          />
+        )}
       </Box>
-      {deleteConfirm.confirmDelete && (
-        <DeleteConfirmModal
-          branch={deleteConfirm.confirmDelete.branch}
-          reason={deleteConfirm.confirmDelete.reason}
-          mode={deleteConfirm.confirmDelete.mode}
-          confirmInput={deleteConfirm.confirmInput}
-        />
-      )}
-    </Box>
+    </UpdatesContext.Provider>
   );
 }
 
 // ── Entry point ────────────────────────────────────────────────────
 
 /** `n10 --tui [dir]`: `args` follow `--tui`. */
-export async function runTui(args: string[]): Promise<void> {
+export async function runTui(args: string[], packageRoot = ''): Promise<void> {
+  const updates = await createInstalledUpdates(packageRoot);
+  updates.start();
+  process.on('exit', () => updates.stop());
   const targetDir = args.find((a) => !a.startsWith('--'));
   if (targetDir) {
     process.chdir(targetDir);
@@ -189,7 +201,7 @@ export async function runTui(args: string[]): Promise<void> {
                     <ToastProvider>
                       <SessionProvider>
                         <SidebarProvider>
-                          <App />
+                          <App updates={updates} />
                         </SidebarProvider>
                       </SessionProvider>
                     </ToastProvider>

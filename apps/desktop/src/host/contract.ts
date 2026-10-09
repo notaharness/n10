@@ -66,6 +66,8 @@ export * from './contract-events.js';
 // Machines: this one and the other members of its beam fleet.
 export type * from '@n10/engine/contract';
 import type {
+  UpdateSnapshot,
+  UpdatePreferences,
   FleetStatus,
   CeremonyOutcome,
   CeremonyProgress,
@@ -371,6 +373,10 @@ export interface SessionActivitySnapshot {
 /** The API surface exposed on `window.n10`. */
 export interface N10HostApi {
   getVersion(): Promise<N10VersionInfo>;
+  getUpdates(): Promise<UpdateSnapshot>;
+  checkUpdates(): Promise<void>;
+  setUpdatePreferences(patch: Partial<UpdatePreferences>): Promise<void>;
+  quitForUpdate(): Promise<void>;
 
   // ── Repo ─────────────────────────────────────────────────────
   /** Validate + open a directory as the active repo. */
@@ -695,6 +701,10 @@ export interface N10HostApi {
 /** IPC channel names — single source of truth for main and preload. */
 export const IPC = {
   getVersion: 'n10/version',
+  getUpdates: 'n10/updates/get',
+  checkUpdates: 'n10/updates/check',
+  setUpdatePreferences: 'n10/updates/preferences',
+  quitForUpdate: 'n10/updates/quit',
   openRepo: 'n10/repo/open',
   listRecentRepos: 'n10/repo/recents',
   selectRepoDirectory: 'n10/repo/select-directory',

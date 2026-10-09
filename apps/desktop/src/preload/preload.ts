@@ -29,6 +29,11 @@ import {
  */
 const api: N10HostApi = {
   getVersion: () => ipcRenderer.invoke(IPC.getVersion),
+  getUpdates: () => ipcRenderer.invoke(IPC.getUpdates),
+  checkUpdates: () => ipcRenderer.invoke(IPC.checkUpdates),
+  setUpdatePreferences: (patch) =>
+    ipcRenderer.invoke(IPC.setUpdatePreferences, patch),
+  quitForUpdate: () => ipcRenderer.invoke(IPC.quitForUpdate),
 
   openRepo: (cwd) => ipcRenderer.invoke(IPC.openRepo, cwd),
   getRepo: () => ipcRenderer.invoke(IPC.getRepo),

@@ -27,3 +27,9 @@ export type {
   BranchSession,
   BranchSessions,
 } from './index.js';
+export type {
+  UpdateService,
+  UpdateSnapshot,
+  UpdatePreferences,
+  UpdateInstallation,
+} from './lib/updates/api.js';
