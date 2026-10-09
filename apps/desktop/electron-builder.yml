@@ -23,16 +23,13 @@ mac:
   target:
     - dmg
     - zip
+  artifactName: n10-desktop-${arch}.${ext}
   # Beta tags are GitHub's latest release during the beta-only period.
   detectUpdateChannel: false
   publish:
     provider: github
     owner: notaharness
     repo: n10
-dmg:
-  artifactName: n10-desktop-${arch}.dmg
-zip:
-  artifactName: n10-desktop-${arch}.zip
 linux:
   target:
     - deb
