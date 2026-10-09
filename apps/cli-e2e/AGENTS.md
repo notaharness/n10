@@ -7,7 +7,9 @@ isolated HOME with an optional `.n10/config.json` (`test.use({ n10Config })`),
 `{ term, repoPath, homeDir }`. `term` exposes `getByText`, `press`, `type`,
 `write` and `resize`. Full infrastructure notes: `docs/testing.md`.
 
-- Every test uses tmux on a private socket inside its scratch HOME. The
+- `test.use({ withoutTmux: true })` gives n10 a PATH without tmux
+  (`src/setup/no-tmux.ts`), so it owns its sessions; `processesRunning` finds
+  the agents it started. Every other test uses tmux on a private socket inside its scratch HOME. The
   fixture waits for the host PTY to exit, then reaps individual sessions
   before deleting HOME, including after startup failures. A failed host
   shutdown preserves HOME rather than deleting files a process may still use. Both `TMUX` and `TMUX_PANE` are unset.
