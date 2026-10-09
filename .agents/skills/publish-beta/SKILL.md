@@ -45,8 +45,8 @@ beta tags become GitHub prereleases.
    The workflow fails before building when the tag does not match
    `apps/cli/package.json`.
 
-4. Watch the run (`gh run watch`), then verify the dist-tag, release, four
-   Linux assets named in `apps/desktop/release-assets.json`, and `SHA256SUMS`:
+4. Watch the run (`gh run watch`), then verify the dist-tag, release, assets
+   named in `apps/desktop/release-assets.json`, and `SHA256SUMS`:
 
    ```sh
    npm view @notaharness/n10 dist-tags --json

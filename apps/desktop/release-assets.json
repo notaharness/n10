@@ -8,5 +8,22 @@
       "deb": "n10-desktop_arm64.deb",
       "appImage": "n10-desktop-arm64.AppImage"
     }
+  },
+  "macos": {
+    "arm64": {
+      "dmg": "n10-desktop-arm64.dmg",
+      "dmgBlockmap": "n10-desktop-arm64.dmg.blockmap",
+      "zip": "n10-desktop-arm64.zip",
+      "zipBlockmap": "n10-desktop-arm64.zip.blockmap"
+    },
+    "x64": {
+      "dmg": "n10-desktop-x64.dmg",
+      "dmgBlockmap": "n10-desktop-x64.dmg.blockmap",
+      "zip": "n10-desktop-x64.zip",
+      "zipBlockmap": "n10-desktop-x64.zip.blockmap"
+    },
+    "update": {
+      "channel": "latest-mac.yml"
+    }
   }
 }

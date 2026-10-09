@@ -41,6 +41,26 @@ bash apps/desktop/scripts/test-linux-packages.sh \
 On arm64, use `*arm64.deb` and `*arm64.AppImage` instead. Pass exactly one file
 of each format; clear stale installer output if a glob matches more than one.
 
+To check a macOS installer on a Mac of the same architecture, build it with Nx
+and run the DMG smoke script. It mounts the DMG, copies the app into an
+isolated Applications directory, checks its ad-hoc or Developer ID signature,
+then opens a Git repository, loads the renderer, starts a shell PTY through
+the packaged host, captures the installed app, and quits. Git and tmux 3.2+
+must be available; the GitHub runners install tmux with Homebrew. The tmux
+socket lives under the test's temporary HOME.
+
+```sh
+NX_DAEMON=false npx nx package-macos desktop
+arch=$(uname -m)
+if [ "$arch" = x86_64 ]; then arch=x64; fi
+bash apps/desktop/scripts/test-macos-package.sh \
+  "apps/desktop/dist/installers/n10-desktop-$arch.dmg" \
+  /tmp/n10-installed.png
+```
+
+CI runs this on `macos-14` (arm64) and `macos-15-intel` (x64), uploading the
+screenshots as artifacts.
+
 `src/fixtures/desktop.ts` creates a repo and isolated HOME, seeds optional Git
 states, supplies a scriptable fake agent and fails on renderer exceptions.
 Every test uses a private tmux socket inside its fixture HOME and kills only
@@ -240,6 +260,7 @@ GH_TOKEN=<integration-pat> gh api \
 - **Integration Tests** (`.github/workflows/integration.yml`) — runs `npx nx e2e:integration cli-e2e` with `GH_TOKEN` from the `INTEGRATION_TEST_PAT` secret. Triggers on PRs, pushes to master, and manual dispatch. Uses `concurrency` with `cancel-in-progress: false` because the test repo is shared state.
 - **Package** (`.github/workflows/package.yml`) — packs `@notaharness/n10` and runs `apps/cli/scripts/test-installed.sh` on the tarball in a clean container. Triggers on PRs touching packaging; the Release workflow calls it before publishing.
 - **Linux packages** (`.github/workflows/linux-packages.yml`) — builds the desktop's .deb and AppImage on x64 and arm64 runners, installs the deb in clean Ubuntu and launches both formats under Xvfb. The AppImage runs in extraction mode and normally with FUSE 3. Triggers on PRs touching the installer configuration; the Release workflow calls it.
+- **macOS packages** (`.github/workflows/macos-packages.yml`) — builds DMG and ZIP assets on Apple Silicon and Intel runners, installs each DMG, and checks the renderer and a shell PTY. Triggers on PRs touching the macOS installer; the Release workflow calls it.
 - **Release** (`.github/workflows/release.yml`) — publishes on a `v*` tag; see the `publish-beta` skill.
 
 ## Orchestra interoperability

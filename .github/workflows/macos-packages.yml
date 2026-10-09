@@ -1,0 +1,115 @@
+name: macOS packages
+
+# Build each architecture on native hardware, install from its DMG, and
+# upload only the named release assets. Called by release.yml as a gate.
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/electron-builder.yml'
+      - 'apps/desktop/package.json'
+      - 'apps/desktop/release-assets.json'
+      - 'apps/desktop/scripts/package-macos.mjs'
+      - 'apps/desktop/scripts/merge-macos-updates.mjs'
+      - 'apps/desktop/scripts/test-macos-package.sh'
+      - 'apps/desktop/scripts/installer-qa.js'
+      - 'apps/desktop/build/**'
+      - 'package-lock.json'
+      - '.github/workflows/macos-packages.yml'
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    strategy:
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+          - arch: x64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - run: brew install tmux
+
+      - run: npm ci
+
+      # Pull requests have no signing secrets. Tag runs use Developer ID
+      # signing and notarization when the complete credential set exists.
+      - run: NX_DAEMON=false npx nx package-macos desktop
+        env:
+          CSC_LINK: ${{ github.event_name == 'push' && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ github.event_name == 'push' && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ github.event_name == 'push' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ github.event_name == 'push' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ github.event_name == 'push' && secrets.APPLE_TEAM_ID || '' }}
+
+      - run: |
+          dmg=$(jq -er --arg arch "$ARCH" '.macos[$arch].dmg' apps/desktop/release-assets.json)
+          bash apps/desktop/scripts/test-macos-package.sh \
+            "apps/desktop/dist/installers/$dmg" \
+            "qa/installed-$ARCH.png"
+        env:
+          ARCH: ${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qa-macos-${{ matrix.arch }}
+          path: qa/
+          if-no-files-found: error
+
+      - run: |
+          mkdir release
+          names=$(jq -er --arg arch "$ARCH" '.macos[$arch][]' apps/desktop/release-assets.json)
+          while IFS= read -r name; do
+            cp "apps/desktop/dist/installers/$name" release/
+          done <<< "$names"
+        env:
+          ARCH: ${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-${{ matrix.arch }}
+          path: release/
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metadata-macos-${{ matrix.arch }}
+          path: apps/desktop/dist/installers/latest-mac.yml
+          if-no-files-found: error
+
+  updates:
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: metadata-macos-*
+          path: metadata
+      - run: |
+          mkdir release
+          node apps/desktop/scripts/merge-macos-updates.mjs \
+            metadata/metadata-macos-arm64/latest-mac.yml \
+            metadata/metadata-macos-x64/latest-mac.yml \
+            release/latest-mac.yml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-update
+          path: release/
+          if-no-files-found: error

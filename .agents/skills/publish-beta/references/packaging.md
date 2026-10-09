@@ -74,16 +74,29 @@ checks neither.
 `publish` can be re-run: when the version is already on npm, it skips the
 OIDC check and the publish and only sets the dist-tags.
 
-Every release run, a rehearsal included, builds the Linux packages
-(`.github/workflows/linux-packages.yml`); `publish` waits for them, so nothing
-is published unless every package built.
+Every release run, a rehearsal included, builds the Linux and macOS packages
+(`.github/workflows/linux-packages.yml`, `.github/workflows/macos-packages.yml`);
+`publish` waits for them, so nothing is published unless every package built.
+The macOS job installs each architecture's DMG and requires renderer startup
+and a shell PTY through the session host. It produces a ZIP alongside each
+DMG for future signed auto-updates. With no Apple credentials, the app is
+ad-hoc signed and users must override Gatekeeper as described in the README;
+auto-update requires Developer ID signing. A complete `CSC_LINK`,
+`CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and
+`APPLE_TEAM_ID` secret set enables Developer ID signing and notarization for
+tag releases. A partial set fails the macOS package job. electron-builder
+produces DMG and ZIP blockmaps and one `latest-mac.yml` on each native runner;
+the macOS workflow merges those two channel files into one release asset
+listing both architectures. The versionless ZIPs, DMGs, blockmaps, and channel
+file all receive SHA-256 entries in `SHA256SUMS`.
 
 The `github-release` job creates the GitHub release with generated notes,
 attaches every file named in `apps/desktop/release-assets.json`, the manifest,
-and `SHA256SUMS`. A rehearsal checks every package file and its digest too;
+and `SHA256SUMS`. A rehearsal checks every installer, blockmap, channel file,
+and digest too;
 missing files fail before release creation.
 During the beta-only period (`LATEST_FOLLOWS_BETA=true`), beta releases are
 marked latest so `releases/latest/download/<name>` resolves. After that
 setting becomes false, beta releases are GitHub prereleases and stable
-releases are latest. The Linux jobs upload under `release-*` and join the
+releases are latest. The installer jobs upload under `release-*` and join the
 publish gate; a dispatched rehearsal builds them but publishes nothing.

@@ -17,6 +17,22 @@ npmRebuild: true
 asarUnpack:
   - node_modules/node-pty/**
   - node_modules/@notaharness/beam-*/**
+mac:
+  # build/icon.icns is picked up when #347 lands; until then builder uses
+  # its default app icon. The ZIP is required by the macOS auto-updater.
+  target:
+    - dmg
+    - zip
+  # Beta tags are GitHub's latest release during the beta-only period.
+  detectUpdateChannel: false
+  publish:
+    provider: github
+    owner: notaharness
+    repo: n10
+dmg:
+  artifactName: n10-desktop-${arch}.dmg
+zip:
+  artifactName: n10-desktop-${arch}.zip
 linux:
   target:
     - deb
