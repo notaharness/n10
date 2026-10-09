@@ -40,8 +40,12 @@ build target pins production). Full notes: `docs/testing.md`.
   tolerance. `node run-visual.mjs --update-snapshots`, then review the diff.
 - Each target keeps its own results directory — `test-output/playwright` for
   `e2e`, `test-output/visual` for `e2e:visual`, `test-output/beam` for
-  `e2e:beam` (`N10_E2E_OUTPUT_BASE`).
+  `e2e:beam` (`N10_E2E_OUTPUT_BASE`), `test-output/windows` for
+  `e2e:windows`.
   Playwright empties the directory it is given at the start of every run.
+- `e2e:windows` (`windows.config.ts`, `src/windows/`) runs on Windows only,
+  drives its own probes, not the built app, and needs a second local account
+  in `N10_E2E_OTHER_USER`/`N10_E2E_OTHER_PASSWORD` (`docs/testing.md`).
 - `@beam` needs a beamtest build: `nx e2e:beam`, or `BEAM_TEST_BINARY`
   (absolute path) for a local one.
 - `@integration` reads the fixture PRs through the real provider and needs

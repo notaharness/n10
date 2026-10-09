@@ -88,6 +88,30 @@ Pass GH_TOKEN explicitly because the isolated HOME hides stored gh credentials:
 GH_TOKEN=$(gh auth token) npx nx e2e:integration desktop-e2e
 ```
 
+### Windows
+
+`e2e:windows` (`windows.config.ts`, `src/windows/`) runs on Windows only and
+skips elsewhere; it drives probe processes rather than the built app, so it does
+not depend on `desktop:build`:
+
+```sh
+npx nx e2e:windows desktop-e2e
+```
+
+- `host-lifetime.test.ts` bundles a probe Electron app (`src/windows/probe/`)
+  whose utility-process host joins its job, runs PowerShell in a ConPTY and
+  starts attached, detached and GUI descendants. It crashes main, lets main
+  exit and crashes the host, and requires nothing of the host's tree to remain.
+  A control run without the job must leave descendants running.
+- `mux-other-user.test.ts` needs a second local standard account in
+  `N10_E2E_OTHER_USER` and `N10_E2E_OTHER_PASSWORD`. CI creates a random one
+  before the suite and removes it and its profile afterwards; under `CI` a
+  missing account fails the test, elsewhere it skips. The owner's credentials
+  live under the real `%LOCALAPPDATA%`, whose profile ACL is what is tested.
+
+A child Windows PowerShell is started without the `PSModulePath` it would
+inherit from pwsh 7, which otherwise stops it loading its own modules.
+
 ## TUI and browser bridge
 
 `apps/cli-e2e/src/fixtures/n10.ts` creates a repo and HOME, sends `/spawn` to

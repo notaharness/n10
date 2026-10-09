@@ -54,6 +54,7 @@ npx nx serve cli                      # rebuild dependencies and run the TUI
 npx nx e2e cli-e2e                    # offline TUI tests
 npx nx e2e desktop-e2e                # offline Electron tests
 npx nx e2e:visual desktop-e2e          # screenshots in a pinned container
+npx nx e2e:windows desktop-e2e         # Windows host lifetime and mux access (Windows)
 GH_TOKEN=$(gh auth token) npx nx e2e:integration desktop-e2e
 npx nx dev website                    # apps/website at http://localhost:3100
 ```

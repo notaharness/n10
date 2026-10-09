@@ -1390,14 +1390,15 @@ inheritable and no breakaway is allowed, so the kernel ends ConPTY hosts,
 shells and detached or GUI descendants when the owner exits for any reason.
 POSIX needs no equivalent: PTY teardown hangs up the session.
 
-The three kernel32 calls go through [koffi](https://koffi.dev/), pinned,
-external to both bundles, and loaded only on win32. Its binary arrives as one
-optional package for the installing platform, so other installs never load
-it and carry only their own small platform package. The alternative, an own
-N-API addon, needs a compiler at install or a prebuild pipeline for the npm
-package; koffi needs neither and keeps the binding to declarations of
-documented APIs. The package runs Electron on `dist/` without an asar, so no
-unpack rule applies.
+The three kernel32 calls go through [koffi](https://koffi.dev/), a prebuilt
+N-API FFI, pinned and external to both bundles. It is `require`d only on win32
+and on the POSIX socket recovery path below, and its binary arrives as one optional package for the installing platform. The
+published package lists koffi under `optionalDependencies`: its install script
+falls back to a CMake build when no prebuilt binary loads, and that must not fail
+`npm i -g` on a machine that would rarely or never load it. A Windows host without it
+fails at start, naming the reinstall. The alternative, an own N-API addon, needs
+a compiler at install or a prebuild pipeline for the npm package. The package
+runs Electron on `dist/` without an asar, so no unpack rule applies.
 
 The mux endpoint (`@n10/core/mux`) uses Node's public `net` API: a named pipe
 derived from `%LOCALAPPDATA%\n10\run` on Windows, a socket in the mode-0700
@@ -1409,3 +1410,19 @@ another account can open a pipe, but cannot read the secret under the owner's
 profile or prove possession of it (`e2e:windows desktop-e2e` checks this with a
 second local account). That account can still pre-bind the derivable name and
 block startup; this is accepted for the single-user baseline.
+
+A client that reaches an owner between its bind and its publication finds no
+`mux.json`, or the previous owner's. It reads the credentials and tries the
+handshake again for two seconds; an endpoint nobody answers fails at once.
+
+A POSIX owner that crashes leaves its socket file, which refuses connections.
+The next starter removes it only while holding `flock(2)` on
+`<run>/startup.lock`, after probing it again under the lock: a new owner can
+bind only once the file is gone, and only the lock holder removes it, so a live
+socket is never unlinked. The kernel releases the lock with its holder. Node has
+no file-lock API, so the call goes through koffi, loaded only on this recovery
+path; without koffi the recovery reports the socket to delete. Two alternatives
+were rejected. A Linux abstract-namespace endpoint leaves nothing to clean up,
+but macOS has no such namespace, so POSIX would split into two code paths with
+the lock still needed on one. A `node:sqlite` exclusive transaction would use a
+database for its lock side effect, and Electron's Node may not ship it.
