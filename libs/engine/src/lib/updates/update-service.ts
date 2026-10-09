@@ -1,5 +1,10 @@
 import { newerRelease, UpdateCheckError } from '@n10/core';
-import type { RegistryVersion, UpdateCache } from '@n10/core';
+import type {
+  RegistryVersion,
+  UpdateCache,
+  NpmUpdatePlan,
+  NpmUpdateResult,
+} from '@n10/core';
 import type {
   UpdateInstallation,
   UpdateService,
@@ -12,6 +17,8 @@ const cacheKey = (cache: UpdateCache) =>
   JSON.stringify(cache, Object.keys(cache).sort());
 interface Options {
   installation: UpdateInstallation;
+  prepare?: (version: string) => Promise<NpmUpdatePlan>;
+  lastUpdate?: NpmUpdateResult | null;
   store: UpdateStore;
   resolveInstallation?: () => Promise<UpdateInstallation>;
   read: (
@@ -34,6 +41,8 @@ export function createUpdateService(options: Options): UpdateService {
   let observedCache = cacheKey(cache);
   let snapshot: UpdateSnapshot = {
     installation,
+    restartSupported: false,
+    lastUpdate: options.lastUpdate ?? null,
     preferences: store.readPreferences(),
     checking: false,
     availableVersion: null,
@@ -59,6 +68,10 @@ export function createUpdateService(options: Options): UpdateService {
         : null;
     return {
       availableVersion: version,
+      restartSupported:
+        !!options.prepare &&
+        installation.kind === 'npm-global' &&
+        !installation.manualUpdateReason,
       command:
         version && installation.kind === 'npm-global'
           ? `npm i -g @notaharness/n10@${version}`
@@ -176,6 +189,17 @@ export function createUpdateService(options: Options): UpdateService {
       };
     },
     check,
+    prepareNpmUpdate() {
+      if (
+        !snapshot.restartSupported ||
+        !options.prepare ||
+        !snapshot.availableVersion
+      )
+        return Promise.reject(
+          new Error('Check for an update first, or use the manual command.')
+        );
+      return options.prepare(snapshot.availableVersion);
+    },
     reloadPreferences,
     setPreferences(patch) {
       if (

@@ -1405,7 +1405,53 @@ Quit uses the normal engine/host drain and terminal detach path. tmux processes
 survive and can be reattached after reopening; unsaved renderer-only state is
 not promised to survive.
 
-The approved next step is an npm **Update and restart** action in the same
-area, with npm running after the UI has closed and terminal clients detached.
-Packaged updates are outside this implementation. GitHub's prerelease flag is
-not a channel selector: a beta release may be marked as a non-prerelease.
+Writable global npm installations on Linux and macOS also offer **Update and
+restart**. Core's read-only preflight verifies the active npm root, current and
+target versions, prefix and write access. After closing the UI, the owner
+revalidates that plan and invokes npm with the exact version and explicit
+`--prefix`, inherited stdio, and the user's normal npm configuration. There is
+no shell, elevation, mutation timeout, automatic retry or n10-managed rollback.
+Read-only global prefixes offer the manual command with administrator-rights
+guidance. An owner-PID claim in `~/.n10/npm-update.lock` serializes n10's
+installers across shells. Dead owners (`kill(pid, 0)` returning `ESRCH`) are
+reclaimed; live owners are preserved. Each contender publishes its own claim
+before inspecting peers and removes only dead claims or its own, so concurrent
+reclaimers cannot delete a new owner's lock.
+
+The TUI shares ordinary quit's three-second grace period for stopping scheduling
+and draining pending operations, then unmounts Ink, pauses its
+stdin, and detaches terminal clients before running npm in the foreground. The
+existing process then starts the installed entry point with inherited stdio and
+exits with its status. Pausing stdin matters: removing stream listeners alone
+does not stop a flowing stream from consuming the replacement's input. Ordinary
+TUI launches have no parent launcher or detached updater. During npm and the
+replacement session the parent absorbs tty SIGINT/SIGHUP (the foreground child
+already receives them), forwards SIGTERM, and waits for child completion.
+Ctrl-C leaves npm time to finish its native interruption cleanup, including
+pending I/O and rollback, before recording a failure and reopening n10. Keeping
+the parent alive also prevents a PTY session leader's exit from hanging up npm
+mid-install. Replacement exits use the shared launcher's exit-status mapping,
+including 128 plus the terminating signal. On a stalled download, npm ignores
+the first Ctrl-C until its fetch finishes or gives up; n10 imposes no mutation
+timeout. A second Ctrl-C can terminate npm before rollback and leave the
+installation incomplete, just as a manual npm install can. Both shells check
+that `main.js` exists before relaunching; if it is missing, they exit with status
+1 and print the pinned manual retry command last.
+
+Desktop uses its existing Node launcher. The accepted `will-quit` path writes a
+private request, drains the host, and exits with the update handoff code. Choosing
+Stay in the unsaved-draft dialog clears the request, so a later ordinary quit
+cannot unexpectedly install anything. The launcher waits for Electron to exit,
+loads its update runtime before files can be replaced, runs npm, and starts the
+installed entry point. No copied standalone updater is required on POSIX.
+
+Both paths retain npm logs under `~/.n10/npm-update-logs` and record the last
+result for the reopened Settings screen. A success applies only to its installed
+target version; a failure applies only to its recorded starting version. Manual
+updates make those messages obsolete without either shell deleting shared state.
+An install failure attempts to reopen
+the existing entry point and keeps the manual command available; a damaged
+installation may require running that command from the terminal. Windows,
+local installs and packaged apps keep the manual path. Native packaged updates
+remain a separate increment. GitHub's prerelease flag is not a channel selector:
+a beta release may be marked as a non-prerelease.

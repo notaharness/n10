@@ -1,8 +1,7 @@
-import {
-  spawn,
-  type ChildProcess,
-  type SpawnOptions,
-} from 'node:child_process';
+import { superviseChild } from './child-supervision.js';
+export { superviseChild, exitStatus } from './child-supervision.js';
+import { desktopUpdateHandoff } from './desktop-update.js';
+import { spawn, type SpawnOptions } from 'node:child_process';
 import {
   accessSync,
   constants as fsConstants,
@@ -11,7 +10,6 @@ import {
   type Stats,
 } from 'node:fs';
 import { createRequire } from 'node:module';
-import { constants } from 'node:os';
 import { dirname, join } from 'node:path';
 
 /**
@@ -41,16 +39,6 @@ export function sandboxArgs(
     // has nothing to sandbox with.
     return env.ELECTRON_OVERRIDE_DIST_PATH ? [] : ['--no-sandbox'];
   }
-}
-
-/** A shell's exit status for how Electron ended: its code, or 128 plus
- *  the signal that killed it (SIGTRAP when the sandbox aborts). */
-export function exitStatus(
-  code: number | null,
-  signal: NodeJS.Signals | null
-): number {
-  if (code !== null) return code;
-  return signal ? 128 + constants.signals[signal] : 1;
 }
 
 /**
@@ -86,8 +74,6 @@ function isWritable(dir: string): boolean {
   }
 }
 
-const STOP_SIGNALS: NodeJS.Signals[] = ['SIGTERM', 'SIGINT', 'SIGHUP'];
-
 /**
  * How Electron is spawned. It gets its own process group: a terminal's
  * Ctrl+C or hangup then reaches only the launcher, which forwards it once.
@@ -106,42 +92,6 @@ export function electronSpawnOptions(
     // Launching from inside a repo opens that repo.
     env: { ...env, N10_START_DIR: cwd, N10_DESKTOP_VERSION: version },
   };
-}
-
-/**
- * Waits for the Electron `child` and resolves with its exit status. Stop
- * signals sent to the launcher are forwarded to it while it runs, so
- * stopping n10 closes the window; the launcher then exits with Electron's
- * status, as it does when Electron ends first. Its own process group would
- * let Electron outlive a launcher that exits any other way, so the launcher
- * stops it on its way out.
- */
-export function superviseChild(
-  child: Pick<ChildProcess, 'on' | 'kill'>,
-  host: Pick<NodeJS.Process, 'on' | 'off'> = process
-): Promise<number> {
-  const forwards = STOP_SIGNALS.map((signal) => {
-    const forward = () => child.kill(signal);
-    host.on(signal, forward);
-    return () => host.off(signal, forward);
-  });
-  const stopOnExit = () => child.kill('SIGTERM');
-  host.on('exit', stopOnExit);
-  const release = () => {
-    forwards.forEach((remove) => remove());
-    host.off('exit', stopOnExit);
-  };
-  return new Promise((resolve) => {
-    child.on('error', (error) => {
-      release();
-      console.error(`n10: could not start Electron: ${error.message}`);
-      resolve(1);
-    });
-    child.on('close', (code, signal) => {
-      release();
-      resolve(exitStatus(code, signal));
-    });
-  });
 }
 
 /**
@@ -172,6 +122,11 @@ export function launchDesktop(root: string, version: string): Promise<number> {
       '[n10] SUID sandbox unavailable — launching with --no-sandbox'
     );
   }
-  const child = spawn(electron, [...args, root], electronSpawnOptions(version));
-  return superviseChild(child);
+  const handoff = desktopUpdateHandoff(root);
+  const options = electronSpawnOptions(version, {
+    ...process.env,
+    N10_UPDATE_HANDOFF: handoff.request,
+  });
+  const child = spawn(electron, [...args, root], options);
+  return superviseChild(child).then((code) => handoff.finish(code));
 }

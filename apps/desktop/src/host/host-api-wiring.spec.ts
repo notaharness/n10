@@ -34,7 +34,12 @@ function recorder(moduleName: string, names: string[]) {
 }
 
 vi.mock('./services/updates.js', () =>
-  recorder('updates', ['getUpdates', 'checkUpdates', 'setUpdatePreferences'])
+  recorder('updates', [
+    'getUpdates',
+    'checkUpdates',
+    'setUpdatePreferences',
+    'prepareNpmUpdate',
+  ])
 );
 vi.mock('./services/repo.js', () =>
   recorder('repo', [
@@ -393,6 +398,7 @@ describe('host API wiring', () => {
     const quit = vi.fn(async () => undefined);
     setShellGlue({
       quitForUpdate: quit,
+      quitForNpmUpdate: async () => undefined,
       contextMenu: async () => null,
       appMenuPopup: async () => undefined,
       aboutBox: async () => undefined,
@@ -400,6 +406,21 @@ describe('host API wiring', () => {
     });
     await api.quitForUpdate();
     expect(quit).toHaveBeenCalledOnce();
+  });
+  it('prepares the npm update before asking the shell to quit', async () => {
+    const { setShellGlue } = await import('./register-handlers.js');
+    const quit = vi.fn(async () => undefined);
+    setShellGlue({
+      quitForNpmUpdate: quit,
+      quitForUpdate: async () => undefined,
+      contextMenu: async () => null,
+      appMenuPopup: async () => undefined,
+      aboutBox: async () => undefined,
+      prefsChanged: () => undefined,
+    });
+    await api.updateAndRestart();
+    expect(calls).toEqual([{ fn: 'updates.prepareNpmUpdate', args: [] }]);
+    expect(quit).toHaveBeenCalledWith('updates.prepareNpmUpdate');
   });
   it.each(WIRING)('%s reaches %s', async (method, args, expected) => {
     // The table is heterogeneous by construction — each row has its own
@@ -422,6 +443,7 @@ describe('host API wiring', () => {
       'showAppMenu',
       'showAbout',
       'quitForUpdate',
+      'updateAndRestart',
       'onUpdatesChanged',
       'setDesktopPrefs', // also notifies main.ts; covered separately
       'onSessionData',

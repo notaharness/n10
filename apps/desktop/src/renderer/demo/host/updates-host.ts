@@ -6,11 +6,14 @@ export function createUpdatesHost(): Pick<
   | 'checkUpdates'
   | 'setUpdatePreferences'
   | 'quitForUpdate'
+  | 'updateAndRestart'
 > {
   let preferences: UpdatePreferences = { channel: 'preview', automatic: false };
   return {
     onUpdatesChanged: () => () => undefined,
     getUpdates: async () => ({
+      restartSupported: false,
+      lastUpdate: null,
       installation: { version: 'demo', kind: 'development' },
       preferences,
       checking: false,
@@ -26,5 +29,6 @@ export function createUpdatesHost(): Pick<
       preferences = { ...preferences, ...patch };
     },
     quitForUpdate: async () => undefined,
+    updateAndRestart: async () => undefined,
   };
 }

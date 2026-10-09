@@ -72,5 +72,8 @@
         }
       }
     }
+  },
+  "devDependencies": {
+    "@n10/core": "^0.0.1"
   }
 }

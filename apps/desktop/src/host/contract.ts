@@ -378,6 +378,7 @@ export interface N10HostApi {
   checkUpdates(): Promise<void>;
   setUpdatePreferences(patch: Partial<UpdatePreferences>): Promise<void>;
   quitForUpdate(): Promise<void>;
+  updateAndRestart(): Promise<void>;
 
   // ── Repo ─────────────────────────────────────────────────────
   /** Validate + open a directory as the active repo. */
@@ -706,6 +707,7 @@ export const IPC = {
   checkUpdates: 'n10/updates/check',
   setUpdatePreferences: 'n10/updates/preferences',
   quitForUpdate: 'n10/updates/quit',
+  updateAndRestart: 'n10/updates/restart',
   openRepo: 'n10/repo/open',
   listRecentRepos: 'n10/repo/recents',
   selectRepoDirectory: 'n10/repo/select-directory',

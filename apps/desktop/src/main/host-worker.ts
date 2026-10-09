@@ -168,6 +168,7 @@ async function start(): Promise<void> {
   setExternalOpener((url) => callMain('openExternal', url));
   setShellGlue({
     quitForUpdate: () => callMain('quitForUpdate'),
+    quitForNpmUpdate: (plan) => callMain('quitForNpmUpdate', plan),
     contextMenu: (items) => callMain('contextMenu', items),
     appMenuPopup: () => callMain('appMenuPopup'),
     aboutBox: () => callMain('aboutBox'),
