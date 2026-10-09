@@ -37,6 +37,13 @@ try {
   if (!(Test-Path $shot) -or (Get-Item $shot).Length -lt 1000) {
     throw 'Packaged renderer screenshot missing'
   }
+  $logs = (Get-Content $stdout, $stderr -Raw) -join "`n"
+  if (!$logs.Contains('Terminal sessions are not supported on Windows yet.')) {
+    throw 'Packaged app did not report the Windows session limitation'
+  }
+  if ($logs.Contains('Install it, then start n10 again')) {
+    throw 'Packaged app still suggests installing tmux on Windows'
+  }
   Write-Host "Per-user install, shortcuts, renderer and screenshot passed: $installDir"
 } finally {
   Get-Content $stdout, $stderr -ErrorAction SilentlyContinue

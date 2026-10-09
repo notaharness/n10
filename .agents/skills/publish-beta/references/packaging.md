@@ -78,6 +78,9 @@ Every release run, a rehearsal included, builds the Linux packages and Windows
 x64 NSIS installer (`.github/workflows/linux-packages.yml` and
 `.github/workflows/windows-installer.yml`); `publish` waits for them, so nothing
 is published unless every package built and its smoke test passed.
+The Windows installer is unsigned. Its release notes warn that Microsoft
+Defender SmartScreen may show an unknown-publisher prompt, and that terminal
+sessions are unavailable on Windows until the Windows support stack lands.
 
 The `github-release` job creates the GitHub release with generated notes,
 attaches every file named in `apps/desktop/release-assets.json`, the manifest,

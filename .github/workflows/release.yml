@@ -198,7 +198,9 @@ jobs:
             channel=(--latest)
           fi
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-            --verify-tag --generate-notes "${channel[@]}" "${assets[@]}"
+            --verify-tag --generate-notes \
+            --notes 'Windows x64 installer: unsigned. Microsoft Defender SmartScreen may show an unknown-publisher warning. Terminal sessions are not supported on Windows in this release.' \
+            "${channel[@]}" "${assets[@]}"
         env:
           GH_TOKEN: ${{ github.token }}
           PRERELEASE: ${{ needs.version.outputs.prerelease }}

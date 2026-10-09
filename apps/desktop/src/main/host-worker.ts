@@ -155,6 +155,9 @@ port.on('message', ({ data }: { data: MainToHost }) => {
 // ── Startup ──────────────────────────────────────────────────────
 
 async function start(): Promise<void> {
+  if (process.platform === 'win32') {
+    throw new Error('Terminal sessions are not supported on Windows yet.');
+  }
   const startDir = process.env.N10_START_DIR;
   delete process.env.N10_START_DIR;
   const userData = process.env.N10_USER_DATA;

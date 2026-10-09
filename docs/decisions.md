@@ -1224,8 +1224,11 @@ points into its temporary runtime directory, so `n10 util` and `beam` in
 sessions that outlive it fail until it runs again; the deb has fixed paths.
 The Windows NSIS installer installs per user by default, with Start menu and
 desktop shortcuts. It uses `build/icon.ico` when present and electron-builder's
-default until the desktop icon lands. Its renderer runs in the installer smoke
-test; Windows sessions need the separate Windows support stack.
+default until the desktop icon lands. It is unsigned, so Microsoft Defender
+SmartScreen may show an unknown-publisher warning. A normal start reports that
+terminal sessions are not supported on Windows yet and exits cleanly. The
+renderer runs in the installer smoke test; sessions need the separate Windows
+support stack.
 Where AppArmor blocks user namespaces (Ubuntu 24.04 and later), the deb
 installs a profile, and the AppImage's launcher adds `--no-sandbox`.
 

@@ -46,7 +46,9 @@ The Windows x64 NSIS installer is built and tested by
 for the current user, verifies the Start menu and desktop shortcuts, starts the
 packaged app with `N10_QA_RENDERER_ONLY=1`, waits for the renderer and preload
 bridge to mount, captures a screenshot, then silently uninstalls and checks
-that the executable and shortcuts are gone. This checks the installer and UI;
+that the executable and shortcuts are gone. It also checks that the packaged
+host reports the Windows session limitation without a tmux installation hint.
+This checks the installer and UI;
 Windows sessions require the separate Windows support stack.
 
 ```powershell
