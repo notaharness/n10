@@ -1,6 +1,6 @@
 # Windows support
 
-Status: proposed; design review required before implementation.
+Status: [design approved](https://github.com/notaharness/n10/pull/346#pullrequestreview-5474285062); implementation follows the PR sequence below.
 
 ## Goals and boundaries
 
@@ -166,8 +166,9 @@ remains a hint backed by polling, and remote observations remain batched.
 The one-shot CLI calls the running owner; it never implicitly starts a daemon.
 Without an owner it returns `HOST_NOT_RUNNING`: **Open n10 or run `n10 mux serve`
 in another terminal.** `serve` stays in the foreground until Ctrl+C/console close.
-One-shot clients print JSON to stdout and diagnostics to stderr. Requests use
-UTF-8 JSON on stdin (`--request -`), so prompts and paths are not shell source.
+One-shot clients default to line-oriented output for Bash, with `--json` for
+structured consumers. Diagnostics go to stderr. Requests still use UTF-8 JSON on
+stdin (`--request -`), so prompts and paths are not shell source.
 
 | Command                            | Contract                                                                                                                                                                                           |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -180,7 +181,7 @@ UTF-8 JSON on stdin (`--request -`), so prompts and paths are not shell source.
 | `n10 mux restart ID --request -`   | Launch body plus expected generation; only an exited record. Explicit resume never falls back to fresh launch.                                                                                     |
 | `n10 mux metadata ID --request -`  | `{expectedHostId,set,unset,claimTarget?}`; atomic validated metadata/claim update.                                                                                                                 |
 | `n10 mux send ID --request -`      | `{requestId,expectedHostId,generation,mode,text?,key?,submit?}`; modes `paste`, `literal`, `key`; result describes transport acceptance or a partial/unknown outcome.                              |
-| `n10 mux capture ID [--history N]` | `{text,seq,generation,truncated,alternateScreen}`.                                                                                                                                                 |
+| `n10 mux capture ID [--history N]` | Raw text by default; `--json` includes `{text,seq,generation,truncated,alternateScreen}`.                                                                                                          |
 | `n10 mux stop ID --request -`      | Expected host/generation; stop exact session and remove retained record, leaving Git worktree/branch intact.                                                                                       |
 
 There is no owner `shutdown` command. Owners close through their UI or foreground
@@ -190,6 +191,70 @@ size, activity, title and all twelve tags in the inventory. Known direct agent
 launches are classified by the launch adapter; an arbitrary shell's foreground
 agent is unknown until verified, not inferred from its title.
 
+### One-shot output formats
+
+All default output is UTF-8 with LF record endings, no header, color or progress
+text. `list` emits zero or more summary rows ordered by creation time then session
+ID. `inspect`, `self`, `create`, `restart` and `metadata` emit exactly one summary
+row on success, using the same fixed TSV columns:
+
+| Columns (1-based) | Fields, in order                                                                                                                                                |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1–3               | `sessionId`, `hostId`, `generation`                                                                                                                             |
+| 4–6               | `label`, `createdAt` (Unix seconds), `cwd`                                                                                                                      |
+| 7–9               | `processState` (`running` or `exited`), `pid`, `exitCode`                                                                                                       |
+| 10–12             | `cols`, `rows`, `lastOutputAt` (Unix seconds; creation time until first output)                                                                                 |
+| 13–14             | `launchKind` (`shell`, `agent` or `unknown`), `launchAgent` (verified agent name or empty)                                                                      |
+| 15–20             | `@orchestra-spawner`, `@orchestra-repo`, `@orchestra-session-type`, `@orchestra-branch`, `@orchestra-worktree-path`, `@orchestra-agent`                         |
+| 21–26             | `@orchestra-orchestrator`, `@orchestra-orchestrator-config`, `@orchestra-last-report`, `@orchestra-claude-session`, `@orchestra-target`, `@orchestra-launching` |
+| 27–30             | `captureSeq`, `captureTruncated`, `captureAlternateScreen`, `captureBase64`                                                                                     |
+| 31                | `title` (the entire remainder of the line, including any tabs)                                                                                                  |
+
+Integers are unquoted base-10; booleans are `0` or `1`. Missing PID/exit code/tags
+are empty fields, not `null` or `-`. Consecutive tabs retain empty fields; Bash
+splits the first 30 delimiters explicitly rather than whitespace-IFS `read`.
+Label, cwd and tag values reject TAB, CR, LF and NUL at mux validation. In the TSV
+title only, CR/LF/NUL become spaces; tabs stay intact in the final field. JSON
+retains the original title. There is no backslash/unicode escaping layer to parse.
+
+Capture columns are empty except with `list --capture N`, where N is the number
+of history lines in addition to the active screen (0 means screen only).
+`captureBase64` is padded, unwrapped RFC 4648 base64 of the UTF-8 capture text;
+sequence and boolean columns describe that sample. The Bash adapter decodes it
+with the existing base64 utility, then applies the existing `screen_text`
+whitespace normalization and digest comparison. Two batched calls preserve
+`sessions.sh --sample` behavior without a process per player or nested JSON
+parsing. The wire protocol retains ordinary capture text, not this CLI encoding.
+
+Other commands have these exact default success outputs:
+
+- `status`: one TSV row of `protocolVersion`, `hostId`, `ownerType`
+  (`desktop`, `tui` or `headless`), `os` (`win32`, `linux` or `darwin`),
+  `sessionCount`, `capabilities` (sorted comma-separated names: `oneshot-v1`,
+  plus `frontend-v1` when the stream extension is available).
+- `capture`: raw capture text, with captured rows separated by LF and a final LF;
+  an empty capture writes zero bytes. No metadata or framing appears on stdout.
+  This is the same text carried by JSON capture and batched base64 capture.
+- `send`: one TSV row of `acceptedBytes` and `submitted` (`0` or `1`, meaning
+  submission input was written, not that the agent processed it).
+- `stop`: no stdout. `serve` keeps stdout empty and reports readiness on stderr.
+
+In default mode, failure leaves stdout empty and stderr starts with
+`CODE<TAB>message<LF>`; TAB/CR/LF/NUL in that message become spaces;
+additional explanatory lines may follow. The first code is one of the stable
+codes below, and the nonzero exit status is authoritative, including for partial
+or uncertain sends. Bound/read a one-shot result before emitting it so a failed
+batch cannot be mistaken for a successful partial list.
+
+Every one-shot verb accepts `--json`. It emits exactly one JSON line with the
+wire result envelope (`{ok:true,result}` or `{ok:false,error}`, without request
+ID), preserving nested objects, numbers, original strings and capture metadata.
+`list` has an array result; `stop` has `{}` as its success result. A JSON error
+also retains the stable stderr line and exit code. Orchestra uses the default
+output and its existing request encoder; it does not scan JSON responses.
+
+### Wire protocol
+
 Wire v1 is bounded NDJSON with LF framing. After authentication, requests carry
 `{v:1,id,op,params}`; replies are `{id,ok:true,result}` or
 `{id,ok:false,error:{code,message}}`. Verbs map to `host.status` and
@@ -197,15 +262,15 @@ Wire v1 is bounded NDJSON with LF framing. After authentication, requests carry
 Limit a frame to 1 MiB, message text to 256 KiB, tags to 64 keys of 4 KiB each,
 and outstanding requests to 32. Dimensions are 2–500. Batch captures split into
 bounded `{id,ok:true,part:record}` frames followed by a completion result; the
-CLI assembles the JSON result. Cap the whole batch at 16 MiB and return an
-actionable limit error when more data is requested. A failed batch is an error,
+CLI assembles the result before formatting TSV or JSON. Cap the whole batch
+at 16 MiB and return `OUTPUT_LIMIT` when more data is requested. A failed batch is an error,
 not a successful empty list.
 
-Use exit 0 for success, 2 validation, 3 unavailable host/session, 4 auth/version,
+Use exit 0 for success, 2 validation/output limit, 3 unavailable host/session, 4 auth/version,
 5 stale/conflicting state, 1 other failures. Preserve machine-readable errors:
 `HOST_NOT_RUNNING`, `AUTH_FAILED`, `VERSION_UNSUPPORTED`, `NOT_FOUND`,
 `IDENTITY_MISMATCH`, `STALE_GENERATION`, `RUNNING`, `INVALID_REQUEST`,
-`SPAWN_FAILED`, `UNSUPPORTED`, `OUTCOME_UNKNOWN`.
+`SPAWN_FAILED`, `UNSUPPORTED`, `OUTPUT_LIMIT`, `OUTCOME_UNKNOWN`.
 
 A send serializes paste/literal and submission against other writers. Paste
 honors bracketed-paste mode; key encoding honors cursor mode. Initial keys are
@@ -227,6 +292,9 @@ Only the winner publishes readiness and credentials atomically. Address-in-use
 means authenticate/attach or report an error; failed authentication does not
 permit deleting another owner's endpoint. Unix stale-socket cleanup requires
 exclusive ownership of the startup lock; it cannot unlink a live listener.
+Another local user can derive and pre-bind the stable pipe name, causing startup
+denial of service; this is an accepted single-user Windows baseline limitation,
+not impersonation or a reason to add a custom pipe DACL.
 
 Mutual HMAC-SHA256 authenticates both directions. The server initially sends only
 a fresh nonce; the client sends its nonce and proof bound to both nonces, protocol
@@ -279,9 +347,10 @@ resolve Git for Windows' `bin\bash.exe` from the installed Git location (with an
 explicit override for custom installs), then invoke the same absolute script
 path with PowerShell's call operator. Exclude `System32\bash.exe`/WSL. Git for
 Windows supplies the required shell utilities; no Node, Python or jq dependency
-is added to Orchestra. Reuse the existing Bash JSON encoder/scanners, extending
-only the typed fields needed by mux. Test control characters, Unicode, arrays
-and escaped paths against the exact wire schema.
+is added to Orchestra. Reuse `json_str` for request encoding and consume the
+fixed TSV/raw output above; the mux arm does not extend Bash JSON scanners.
+Test empty fields, title tabs, Unicode, raw/base64 captures and stable errors.
+Existing Unix beam/inbox parsing stays outside this mux change.
 
 Mux creation supplies complete metadata and argv, eliminating the placeholder
 pane/prompt-buffer sequence on that arm. Prepare known-agent argv before create
@@ -548,12 +617,12 @@ typecheck and applicable unit suites, without broad core/engine exclusions.
 | Lifetime / #331                          | Linux and Windows                                  | Cancel/confirmed owner quit, client-only quit, headless owner plus desktop and TUI, hidden players, waiting-tab restore, no implicit launch and one explicit resume; owner loss propagates to clients. |
 | Windows native viability                 | Windows                                            | ConPTY under real Electron host, pre-spawn self-job assignment, main/host crash, immediate/detached/GUI descendants and parentPort closure.                                                            |
 | Mux contract                             | All three                                          | No-owner error, serve, all one-shot verbs, batch samples, exact IDs, concurrent restart/claim, stale generation, capture bounds, malformed/oversized input and uncertain-write behavior.               |
-| IPC security                             | Windows and POSIX                                  | Bad proof/replay, unauthenticated preamble, spoof server, private secret, competing startup and stale endpoint; separate-user test below.                                                              |
+| IPC security                             | Windows and POSIX                                  | Bad proof/replay, nonce-only preamble, spoof server, private secret, competing startup, squatted-name error and stale endpoint; separate-user test below.                                              |
 | Shell/path/fixtures                      | Windows                                            | pwsh/powershell/cmd/Git Bash, native and npm agent entries, no global n10, spaces/drive forms/junctions, MSYS conversion, #94 quoting/reuse, locks/watch loss and CRLF/LF.                             |
 | Orchestra tmux regression                | Linux/macOS without n10                            | Existing Bash spawn/resume/dir/adopt/send/screen/list/sample/kill/report, account/default/dry-run behavior and POSIX invocation paths.                                                                 |
 | Orchestra mux                            | Windows via PowerShell and Git Bash; Linux no-tmux | Same applicable workflow against real mux, skill path quoting, parent identity stripping, dead-pane resume, stale supervisor, long messages and no duplicate partial report.                           |
 | Beam exec/control/mailbox                | Windows two-daemon fixture; existing Unix suites   | Native exec status/stdio/argv/cleanup, pipe/lock, parent lifeline, stored/restarted/acked/deferred mail and grants; Windows PTY request explicitly unsupported; control proxy preserves ack timing.    |
-| Distribution / integrated fleet          | Windows and Linux                                  | Packed beam/beamtest binaries, installed n10 artifact, plugin→beam exec→mux commands, desktop stream reconnect vs owner loss, target paths/accounts and all/msg relay boundary.                        |
+| Distribution / integrated fleet          | Windows and Linux                                  | Packed beam/beamtest binaries, pinned-SHA n10 build, plugin→beam exec→mux commands, desktop stream reconnect vs owner loss, target paths/accounts and all/msg relay boundary.                          |
 
 Extend existing n10 desktop-e2e, cli-e2e and e2e:beam targets. Linux runs the real
 Electron host in no-tmux as well as tmux configurations, not only standalone
@@ -573,22 +642,20 @@ account to guarantee protocol coverage. Never log the account password; stop the
 probe and remove the account/profile in finally/always cleanup. Setup failure
 fails CI rather than skipping the test.
 
-**Plugins CI consumes a built n10 artifact, not an unspecified future release.**
-The n10 OS jobs upload packed CLI/test-runtime artifacts named by full commit SHA,
-OS, architecture and runtime ABI, with checksums and a manifest. Include the
-runtime needed for mux, native dependencies and normal command entries; no global
-Node installation is added as an Orchestra requirement. This is a test fixture,
-not n10 production packaging. Plugins CI pins an n10
-SHA and successful workflow run ID in its fixture manifest, downloads that run's
-matching artifact through GitHub Actions, verifies it, and installs into a scratch
-prefix on PATH. A read-only GitHub App token scoped to n10 Actions supplies
-cross-repo downloads in the trusted CI workflow; only that download step receives
-it. Fork changes require maintainer approval before this integration job runs.
-The artifact source is pinned and no write token enters plugin tests.
-Expired/missing artifacts fail with a rebuild instruction, not a latest-version
-fallback. Update the pin with the n10 mux PR; run the exact plugin head against
-that artifact for cross-repo acceptance. n10 additionally runs the pinned plugin
-suite against its candidate build before publishing the fixture artifact.
+**Plugins CI builds n10 from a pinned public commit.** Its fixture manifest pins
+one full SHA from `notaharness/n10`. Each OS job checks out that SHA into a
+separate scratch directory, verifies HEAD, uses n10's pinned build runtime, then
+runs `npm ci` and `NX_DAEMON=false npx nx build cli`. Put the resulting CLI on a
+scratch PATH with normal shell/native command entries and its checkout-owned
+native dependencies. Node is a CI/build dependency, not a new Orchestra runtime
+prerequisite; the no-n10 POSIX tmux job still proves standalone operation.
+
+Run the exact plugins candidate against that build. Cache only reproducible build
+inputs keyed by SHA, lockfile, OS, architecture and runtime ABI. Public checkout
+needs no cross-repository credentials, Actions-artifact download, expiry handling
+or extra fork approval gate. Missing commits or failed builds fail the job, with
+no latest-version fallback. Update the SHA alongside mux contract changes.
+n10 also runs a pinned plugin suite against its own candidate build.
 
 Beam's Windows in-process paired daemons with fake worker/dev DERP cover its
 exec/control/mailbox scope in required CI. Integrated Windows↔Linux qualification
@@ -636,7 +703,7 @@ the tmux/no-tmux and OS matrix.
 - **P1 — Bash mux seam.** Keep all script names and the existing tmux arm; add
   helpers translating the inventoried operations to one-shot mux, Git Bash
   invocation instructions and Windows path/launch/report behavior. No runtime
-  rewrite PR. Gate with no-n10 POSIX tmux tests and n10 step 5's pinned artifact.
+  rewrite PR. Gate with no-n10 POSIX tmux tests and the pinned-SHA n10 step 5 build.
 - **P2 — Native control/fleet.** After beam B3 and n10 step 8, add Windows relay
   through `beam control --stdio`, remote native argv and mux target routing.
   Preserve Unix relay behavior and validate accepted/stored/failed outcomes.
