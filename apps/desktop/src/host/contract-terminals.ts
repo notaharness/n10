@@ -6,6 +6,8 @@
  * file is a catalogue already.
  */
 
+import type { SessionTarget } from '@n10/core';
+
 export type TerminalKind = 'shell' | 'agent';
 
 export interface TerminalLaunchRequest {
@@ -28,7 +30,7 @@ export interface TerminalLaunchRequest {
   launchId?: string;
   /** Saved identity for a tab whose tmux server disappeared at reboot. */
   restore?: {
-    tmuxName: string;
+    target: SessionTarget;
     tags: Record<string, string>;
     agent?: string;
     env?: Record<string, string>;
@@ -71,7 +73,7 @@ export interface TerminalSummary {
   connectionState?: 'connected' | 'reconnecting' | 'failed';
   /** Captured launch data kept with an open tab for explicit resume. */
   restore?: {
-    tmuxName: string;
+    target: SessionTarget;
     tags: Record<string, string>;
     agent?: string;
     env?: Record<string, string>;

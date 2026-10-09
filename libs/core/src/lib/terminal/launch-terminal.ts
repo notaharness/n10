@@ -6,6 +6,7 @@ import { requireMachine } from '../machine-registry.js';
 import { LOCAL_MACHINE, sessionIdentity } from '../session-key.js';
 import { resolveShell } from './shell.js';
 import type { TerminalKind } from './terminal-name.js';
+import type { SessionTarget } from '@n10/terminal';
 
 export interface TerminalLaunchParams {
   /** Existing qualified terminal key. Omit to create a new terminal. */
@@ -23,7 +24,7 @@ export interface TerminalLaunchParams {
    *  (D2's key), already carries whatever machine it was created on. */
   machine?: string;
   restore?: {
-    tmuxName: string;
+    target: SessionTarget;
     tags: Record<string, string>;
     agent?: string;
     env?: Record<string, string>;

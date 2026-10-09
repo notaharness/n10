@@ -4,6 +4,7 @@ import {
   isSessionAlive,
   LOCAL_MACHINE,
   sessionIdentity,
+  type SessionTarget,
   type TerminalKind,
 } from '@n10/core';
 
@@ -11,7 +12,7 @@ export interface TerminalRecord {
   kind: TerminalKind;
   cwd: string;
   restore?: {
-    tmuxName: string;
+    target: SessionTarget;
     tags: Record<string, string>;
     agent?: string;
     env?: Record<string, string>;

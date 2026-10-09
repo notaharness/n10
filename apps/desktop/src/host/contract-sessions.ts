@@ -8,6 +8,10 @@
  * file is a catalogue already.
  */
 
+import type { SessionTarget } from '@n10/core';
+
+export type { SessionTarget };
+
 export interface SessionSummary {
   name: string;
   running: boolean;
@@ -27,7 +31,7 @@ export interface SessionSummary {
 
 export interface WorktreeResume {
   sessionName: string;
-  tmuxName: string;
+  target: SessionTarget;
   tags: Record<string, string>;
   agent?: string;
   aiCommand?: string;

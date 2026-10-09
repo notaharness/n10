@@ -1,4 +1,7 @@
 /** Identity tags that must agree before a saved tab can adopt a tmux target. */
+
+import type { SessionTarget } from '../../../host/contract.js';
+
 const IDENTITY_TAGS = [
   '@orchestra-spawner',
   '@orchestra-repo',
@@ -9,7 +12,7 @@ const IDENTITY_TAGS = [
 ];
 
 export interface SavedTarget {
-  tmuxName: string;
+  target: SessionTarget;
   tags: Record<string, string>;
   env?: Record<string, string>;
   conversationId?: string;
@@ -17,7 +20,8 @@ export interface SavedTarget {
 
 export function sameSavedTarget(a: SavedTarget, b: SavedTarget): boolean {
   return (
-    a.tmuxName === b.tmuxName &&
+    a.target.kind === b.target.kind &&
+    a.target.name === b.target.name &&
     IDENTITY_TAGS.every((tag) => a.tags[tag] === b.tags[tag])
   );
 }

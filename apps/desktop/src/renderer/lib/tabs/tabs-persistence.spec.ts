@@ -36,7 +36,7 @@ it('rejects corrupted resume metadata before displaying a saved tab', () => {
     listed: true,
     resumeRequired: true,
     restore: {
-      tmuxName: 'old',
+      target: { kind: 'tmux', name: 'old' },
       tags: {
         '@orchestra-spawner': 'n10',
         '@orchestra-repo': '/repo',

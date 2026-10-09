@@ -217,7 +217,7 @@ it('checks remote ownership before resuming a saved local worktree', async () =>
         ...request,
         restore: {
           sessionName: key,
-          tmuxName: 'saved-agent',
+          target: { kind: 'tmux', name: 'saved-agent' },
           tags: {},
         },
       },
@@ -235,7 +235,11 @@ it('does not recreate a missing saved worktree while resuming', async () => {
   await expect(
     f.service.launch({
       ...request,
-      restore: { sessionName: key, tmuxName: 'saved-agent', tags: {} },
+      restore: {
+        sessionName: key,
+        target: { kind: 'tmux', name: 'saved-agent' },
+        tags: {},
+      },
     })
   ).rejects.toThrow('saved session worktree is no longer available');
   expect(f.worktrees.resolve).not.toHaveBeenCalled();
@@ -250,7 +254,11 @@ it('keeps a saved remote checkout on its own machine', async () => {
   await f.service.launch(
     {
       ...request,
-      restore: { sessionName: remote, tmuxName: 'peer-agent', tags: {} },
+      restore: {
+        sessionName: remote,
+        target: { kind: 'tmux', name: 'peer-agent' },
+        tags: {},
+      },
     },
     { beforeLaunch }
   );

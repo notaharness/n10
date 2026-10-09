@@ -88,9 +88,10 @@ function createPlan(
     mode: 'create',
     label:
       request.type === 'worktree'
-        ? restore?.tmuxName ??
+        ? restore?.target.name ??
           worktreeSessionLabel(request.repo, worktree!.branch)
-        : restore?.tmuxName ?? terminalSessionLabel(request.repo, request.kind),
+        : restore?.target.name ??
+          terminalSessionLabel(request.repo, request.kind),
     tags: restore?.tags ?? {
       ...sessionTags(request.repo, identity),
       ...agentTags,

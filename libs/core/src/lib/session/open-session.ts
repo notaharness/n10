@@ -4,7 +4,7 @@ import {
   type TmuxSessionIncarnation,
   type TmuxLaunchPlan,
 } from '@n10/terminal-tmux';
-import type { SessionBackend, SessionSpec } from '@n10/terminal';
+import type { SessionBackend, SessionSpec, SessionTarget } from '@n10/terminal';
 import { spawnSession, type NamedPtyEntry } from '../pty-registry.js';
 import {
   LOCAL_MACHINE,
@@ -35,7 +35,7 @@ export interface OpenSessionParams {
   rows: number;
   /** A dormant tab's exact tmux identity and launch environment. */
   restore?: {
-    tmuxName: string;
+    target: SessionTarget;
     tags: Record<string, string>;
     env?: Record<string, string>;
   };
@@ -218,7 +218,7 @@ function matchingSavedSession(
 ): TaggedSession | null {
   if (!found || !params.restore) return found;
   if (params.session.type === 'worktree') {
-    if (found.name !== params.restore.tmuxName)
+    if (found.name !== params.restore.target.name)
       throw new Error(
         'Session changed while n10 was closed; reopen the launch dialog.'
       );

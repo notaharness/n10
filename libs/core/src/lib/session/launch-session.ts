@@ -11,6 +11,7 @@ import {
   type LaunchSpec,
   type SeedOptions,
 } from '../agents/registry.js';
+import type { SessionTarget } from '@n10/terminal';
 
 // ── Session launcher ─────────────────────────────────────────────
 //
@@ -115,7 +116,7 @@ export interface LaunchSessionParams {
   fresh?: boolean;
   expected?: SessionIncarnation;
   restore?: {
-    tmuxName: string;
+    target: SessionTarget;
     tags: Record<string, string>;
     agent?: string;
     env?: Record<string, string>;

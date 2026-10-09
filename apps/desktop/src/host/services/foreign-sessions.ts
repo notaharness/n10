@@ -50,7 +50,7 @@ export function listForeignSessions(): ForeignSessionSummary[] {
         ? {
             restore: {
               sessionName: live.sessionName,
-              tmuxName: live.tmuxName,
+              target: { kind: 'tmux', name: live.tmuxName },
               tags: live.tags,
               ...(live.agent ? { agent: live.agent } : {}),
               ...captureTmuxRuntime(live.tmuxName, undefined, live.agent),

@@ -13,7 +13,11 @@ import {
   stopSession,
   worktreeSessionKey,
 } from '@n10/core';
-import type { LaunchRequest, SessionIncarnation } from '@n10/core';
+import type {
+  LaunchRequest,
+  SessionIncarnation,
+  SessionTarget,
+} from '@n10/core';
 import type { AppConfig } from '@n10/vcs-core';
 import type { Machine } from '@n10/worktree-manager';
 import type { WorktreeService } from '../worktrees/api.js';
@@ -31,7 +35,7 @@ export interface SessionLaunch {
   remote?: { id: string; machine: Machine };
   restore?: {
     sessionName: string;
-    tmuxName: string;
+    target: SessionTarget;
     tags: Record<string, string>;
     agent?: string;
     aiCommand?: string;

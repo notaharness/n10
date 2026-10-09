@@ -36,10 +36,21 @@ function validRuntime(value: RecordValue): boolean {
   );
 }
 
+/** The session the tab reattaches to while it runs: a tmux session
+ *  named by its label. */
+function sessionTarget(value: unknown): boolean {
+  return (
+    record(value) &&
+    value.kind === 'tmux' &&
+    typeof value.name === 'string' &&
+    value.name !== ''
+  );
+}
+
 function restore(value: unknown, item: boolean): boolean {
   if (value === undefined) return true;
   if (!record(value)) return false;
-  if (typeof value.tmuxName !== 'string' || !value.tmuxName) return false;
+  if (!sessionTarget(value.target)) return false;
   if (!validTags(value.tags, item) || !validRuntime(value)) return false;
   return item
     ? typeof value.sessionName === 'string' && optionalString(value.aiCommand)

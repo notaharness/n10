@@ -15,6 +15,7 @@ import {
   requireMachine,
   sessionIdentity,
   type DiscoveredTerminal,
+  type SessionTarget,
   type TerminalKind,
   captureTmuxRuntime,
 } from '@n10/core';
@@ -33,7 +34,7 @@ export interface TerminalLaunch {
    *  on this machine. */
   machinePath?: boolean;
   restore?: {
-    tmuxName: string;
+    target: SessionTarget;
     tags: Record<string, string>;
     agent?: string;
     env?: Record<string, string>;
@@ -71,7 +72,7 @@ function sameSavedTerminal(
   if (!req.restore || !previous) return true;
   return (
     previous.cwd === req.cwd &&
-    previous.restore?.tmuxName === req.restore.tmuxName &&
+    previous.restore?.target.name === req.restore.target.name &&
     JSON.stringify(previous.restore?.tags) === JSON.stringify(req.restore.tags)
   );
 }
@@ -120,12 +121,12 @@ function terminalRecord(
   name: string
 ): TerminalRecord {
   const agent = launched.agent ?? req.restore?.agent;
-  const tmuxName = launched.pty.name ?? req.restore?.tmuxName ?? name;
+  const tmuxName = launched.pty.name ?? req.restore?.target.name ?? name;
   return {
     kind: req.kind,
     cwd: req.cwd,
     restore: {
-      tmuxName,
+      target: { kind: 'tmux', name: tmuxName },
       tags: terminalTags(req, agent),
       ...(agent ? { agent } : {}),
       ...terminalRuntime(req, tmuxName, agent),
@@ -153,7 +154,7 @@ export function createTerminalService(ports: TerminalPorts) {
   function refreshRuntime(name: string, record: TerminalRecord): void {
     const restore = record.restore;
     if (!restore) return;
-    const tmuxName = getSession(name)?.pty.name ?? restore.tmuxName;
+    const tmuxName = getSession(name)?.pty.name ?? restore.target.name;
     const runtime = observedRuntime(
       sessionIdentity(name)?.machine,
       tmuxName,
@@ -262,8 +263,13 @@ export function createTerminalService(ports: TerminalPorts) {
           ...(terminal.tags
             ? {
                 restore: {
-                  tmuxName:
-                    identity?.kind === 'terminal' ? identity.id : terminal.name,
+                  target: {
+                    kind: 'tmux',
+                    name:
+                      identity?.kind === 'terminal'
+                        ? identity.id
+                        : terminal.name,
+                  },
                   tags: terminal.tags,
                   ...(terminal.agent ? { agent: terminal.agent } : {}),
                 },

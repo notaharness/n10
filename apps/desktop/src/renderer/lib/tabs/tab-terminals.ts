@@ -228,7 +228,5 @@ function restamp(tab: TerminalTab, entry: TerminalEntry): TerminalTab {
 /** A saved label alone does not identify a session after a tmux reboot. */
 function sameSavedTerminal(tab: TerminalTab, entry: TerminalEntry): boolean {
   if (!tab.restore || !entry.restore) return false;
-  if (tab.cwd !== entry.cwd || tab.restore.tmuxName !== entry.restore.tmuxName)
-    return false;
-  return sameSavedTarget(tab.restore, entry.restore);
+  return tab.cwd === entry.cwd && sameSavedTarget(tab.restore, entry.restore);
 }

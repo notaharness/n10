@@ -6,7 +6,7 @@
  * that is the open one — and none of them involve a transition.
  */
 import type { TerminalKind } from '../../../host/contract.js';
-import type { WorktreeResume } from '../../../host/contract.js';
+import type { SessionTarget, WorktreeResume } from '../../../host/contract.js';
 
 export type Tab =
   | {
@@ -68,7 +68,7 @@ export type Tab =
       /** A saved tab whose tmux session has not been found this run. */
       resumeRequired?: boolean;
       restore?: {
-        tmuxName: string;
+        target: SessionTarget;
         tags: Record<string, string>;
         agent?: string;
         env?: Record<string, string>;

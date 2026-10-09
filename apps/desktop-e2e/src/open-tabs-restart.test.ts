@@ -47,7 +47,7 @@ interface SavedTabs {
       kind: string;
       repo?: string;
       restore?: {
-        tmuxName: string;
+        target: { kind: string; name: string };
         env?: Record<string, string>;
       };
     }[];
@@ -143,9 +143,9 @@ test('after a computer restart tabs wait for an explicit Resume session', async 
     .toBe(2);
   const before = savedTabs(desktop.homeDir)!;
   expect(before.version).toBe(1);
-  expect(before.state.tabs.map((tab) => tab.restore?.tmuxName)).toEqual([
-    agent.name,
-    shell.name,
+  expect(before.state.tabs.map((tab) => tab.restore?.target)).toEqual([
+    { kind: 'tmux', name: agent.name },
+    { kind: 'tmux', name: shell.name },
   ]);
   expect(before.state.activeId).toBe(before.state.tabs[1].id);
 
@@ -222,13 +222,16 @@ test('the selected foreign worktree tab resumes its original agent on demand', a
     .poll(
       () =>
         savedTabs(desktop.homeDir)?.state.tabs.find((tab) => tab.repo === other)
-          ?.restore?.tmuxName
+          ?.restore?.target.name
     )
     .toBe(original.name);
   const before = savedTabs(desktop.homeDir)!;
   const foreign = before.state.tabs.find((tab) => tab.repo === other);
   expect(before.state.activeId).toBe(foreign?.id);
-  expect(foreign?.restore?.tmuxName).toBe(original.name);
+  expect(foreign?.restore?.target).toEqual({
+    kind: 'tmux',
+    name: original.name,
+  });
 
   await desktop.relaunch({
     whileClosed: () => killFixtureSessions(desktop.homeDir),

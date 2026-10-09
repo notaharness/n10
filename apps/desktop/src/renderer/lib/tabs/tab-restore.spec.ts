@@ -1,8 +1,12 @@
 import { expect, it } from 'vitest';
-import { retainRuntime, sameSavedTarget } from './tab-restore.js';
+import {
+  retainRuntime,
+  sameSavedTarget,
+  type SavedTarget,
+} from './tab-restore.js';
 
-const saved = {
-  tmuxName: 'old',
+const saved: SavedTarget = {
+  target: { kind: 'tmux', name: 'old' },
   tags: {
     '@orchestra-spawner': 'n10',
     '@orchestra-repo': '/repo',
@@ -15,7 +19,7 @@ const saved = {
 
 it('retains captured runtime facts when a dead pane cannot be sampled', () => {
   expect(
-    retainRuntime({ tmuxName: saved.tmuxName, tags: saved.tags }, saved)
+    retainRuntime({ target: saved.target, tags: saved.tags }, saved)
   ).toMatchObject({ env: saved.env, conversationId: saved.conversationId });
 });
 
@@ -26,6 +30,6 @@ it('does not transfer a Claude tab to a Codex session with the same name and dir
   };
   expect(sameSavedTarget(saved, codex)).toBe(false);
   expect(
-    retainRuntime({ tmuxName: codex.tmuxName, tags: codex.tags }, saved).env
+    retainRuntime({ target: codex.target, tags: codex.tags }, saved).env
   ).toBeUndefined();
 });

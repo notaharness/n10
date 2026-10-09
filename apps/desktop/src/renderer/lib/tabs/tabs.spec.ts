@@ -77,7 +77,7 @@ describe('sync-items', () => {
         sessionName: 'worktree-key',
         restore: {
           sessionName: 'worktree-key',
-          tmuxName: 'old',
+          target: { kind: 'tmux', name: 'old' },
           tags: { '@orchestra-repo': REPO },
         },
       },
@@ -103,7 +103,7 @@ describe('sync-items', () => {
         sessionName: 'worktree-key',
         restore: {
           sessionName: 'worktree-key',
-          tmuxName: 'old',
+          target: { kind: 'tmux', name: 'old' },
           tags: { '@orchestra-repo': REPO },
         },
       },
@@ -139,7 +139,7 @@ describe('sync-items', () => {
       displayPath: '/repo',
       repo: null,
       restore: {
-        tmuxName: 'old',
+        target: { kind: 'tmux' as const, name: 'old' },
         tags: {
           '@orchestra-spawner': 'n10',
           '@orchestra-repo': '/repo',
@@ -154,7 +154,7 @@ describe('sync-items', () => {
         ...previous,
         cwd: '/other',
         restore: {
-          tmuxName: 'old',
+          target: { kind: 'tmux', name: 'old' },
           tags: {
             '@orchestra-spawner': 'n10',
             '@orchestra-repo': '/other',
@@ -229,7 +229,7 @@ describe('sync-items', () => {
       sessionName: 'feat-x',
       restore: {
         sessionName: 'feat-x',
-        tmuxName: 'feat-x',
+        target: { kind: 'tmux', name: 'feat-x' },
         tags: {
           '@orchestra-repo': REPO,
           '@orchestra-branch': 'feat-x',

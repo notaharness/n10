@@ -165,7 +165,7 @@ function worktreeRestore(
 ): WorktreeResume {
   return {
     sessionName: summary.name,
-    tmuxName,
+    target: { kind: 'tmux', name: tmuxName },
     tags,
     ...(agent ? { agent } : {}),
     ...(agent === 'test' && aiCommand ? { aiCommand } : {}),

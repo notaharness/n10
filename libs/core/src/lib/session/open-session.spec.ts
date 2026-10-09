@@ -130,7 +130,7 @@ describe('session launch boundary', () => {
       },
       cwd: '/repo',
       restore: {
-        tmuxName: 'old',
+        target: { kind: 'tmux', name: 'old' },
         tags: {
           '@orchestra-spawner': 'n10',
           '@orchestra-repo': '/repo',
@@ -167,7 +167,7 @@ describe('session launch boundary', () => {
         target: 'old',
       },
       cwd: '/repo',
-      restore: { tmuxName: 'old', tags },
+      restore: { target: { kind: 'tmux', name: 'old' }, tags },
     });
     expect(state.create.mock.calls[0][1]).toMatchObject({
       mode: 'create',
@@ -180,7 +180,7 @@ describe('session launch boundary', () => {
       openSession({
         ...base,
         restore: {
-          tmuxName: 'original-target',
+          target: { kind: 'tmux', name: 'original-target' },
           tags: { '@orchestra-agent': 'claude' },
         },
       })
