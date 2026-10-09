@@ -1,5 +1,12 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { captureSessionRuntime } from './session-runtime.js';
+
+const catalog = vi.hoisted(() => ({ pid: undefined as number | undefined }));
+vi.mock('../session-catalog.js', () => ({
+  localCatalog: () => ({
+    snapshot: () => (catalog.pid ? { pid: catalog.pid } : null),
+  }),
+}));
 
 const pane = { kind: 'tmux', name: 'pane' } as const;
 
@@ -93,3 +100,13 @@ it('does not apply a child Claude ID to a Codex pane', () => {
     )
   ).toEqual({ env: { CLAUDE_CONFIG_DIR: '/codex' } });
 });
+
+it.runIf(process.platform === 'linux')(
+  'reads the process tree of the process the local catalog reports',
+  () => {
+    catalog.pid = undefined;
+    expect(captureSessionRuntime(pane)).toEqual({});
+    catalog.pid = process.pid;
+    expect(captureSessionRuntime(pane).env).toHaveProperty('CLAUDE_CONFIG_DIR');
+  }
+);
