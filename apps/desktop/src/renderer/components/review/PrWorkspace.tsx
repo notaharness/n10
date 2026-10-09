@@ -6,7 +6,7 @@ import {
 } from 'react-resizable-panels';
 import type { PlanItem } from '@n10/core/plan';
 import type { PullRequestInfo } from '@n10/vcs-core';
-import { VisibleDiffFiles } from '../../lib/diff/visible-files-context.js';
+import { VisibleDiffFiles } from '../../lib/diff/visible-files-provider.js';
 import { useDiffOptions } from '../../lib/diff/diff-options.js';
 import {
   useDraftComments,
@@ -137,15 +137,9 @@ export function PrWorkspace({
     [inlineThreads]
   );
 
-  const fileOrder = useMemo(
-    () => new Map(files.map(([f], i) => [f, i])),
-    [files]
-  );
-  const filesByName = useMemo(() => new Map(files), [files]);
-
   const hasDrafts = drafts.length > 0;
 
-  const { entries, listing } = useFileEntries(
+  const { entries, listing, fileOrder, filesByName } = useFileEntries(
     files,
     prDiff,
     threadsByFile,

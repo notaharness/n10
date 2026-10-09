@@ -145,10 +145,9 @@ export function VirtualDiffList({
     ]
   );
   const rows = flat.rows;
-  const anchored = prDiff?.anchored;
   const points = useMemo(
-    () => linePoints(rows, linesByFile, anchored),
-    [rows, linesByFile, anchored]
+    () => linePoints(rows, linesByFile, prDiff?.anchored),
+    [rows, linesByFile, prDiff?.anchored]
   );
 
   // Scrolls the list makes itself reach the jumps as they happen.
