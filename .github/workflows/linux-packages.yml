@@ -11,6 +11,7 @@ on:
       - 'apps/desktop/package.json'
       - 'apps/desktop/release-assets.json'
       - 'apps/desktop/scripts/package-linux.mjs'
+      - 'apps/desktop/scripts/package-installer.mjs'
       - 'apps/desktop/scripts/test-linux-packages.sh'
       - 'apps/desktop/scripts/installer-qa.js'
       - 'apps/desktop/build/**'

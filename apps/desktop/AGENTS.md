@@ -290,8 +290,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `publish-beta` skill. The private `productName` `n10-dev` keeps a dev
   build's userData, and its single-instance lock, apart from the installed
   app's `n10`, and it is how `main/launch-env.ts` recognizes the dev build.
-- The Linux installers package the same build: `package-linux` target,
-  `electron-builder.yml`, `scripts/package-linux.mjs`. Keep anything another
+- The Linux and Windows installers package the same build: `package-linux`
+  and `package-windows` targets, `electron-builder.yml`, and
+  `scripts/package-installer.mjs`. Keep anything another
   process runs (node-pty, beam) in `asarUnpack`, and resolve its path with
   `unpackedPath`. electron-builder uses `build/icons` when it exists and its
   default icon otherwise.

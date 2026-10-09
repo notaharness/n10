@@ -40,6 +40,9 @@ export async function runQaSteps(win: BrowserWindow): Promise<void> {
           true
         );
         console.log(`[desktop] qa step ${i} js →`, r);
+        if (process.env.N10_QA_RESULT_FILE) {
+          await writeFile(process.env.N10_QA_RESULT_FILE, String(r));
+        }
       }
       await sleep(step.waitMs ?? 600);
       if (step.shot) {

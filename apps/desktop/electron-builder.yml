@@ -1,7 +1,5 @@
 # The installers: the desktop build packaged with its own Electron.
-# scripts/package-linux.mjs stages the app directory and runs this for
-# the host's architecture only, so each package carries that
-# architecture's node-pty and beam binary.
+# Each package carries its host architecture's node-pty binary.
 appId: is.n10.desktop
 # Not `n10`, which is the npm package's command (`n10 --tui`, `n10 util`).
 executableName: n10-desktop
@@ -17,6 +15,19 @@ npmRebuild: true
 asarUnpack:
   - node_modules/node-pty/**
   - node_modules/@notaharness/beam-*/**
+win:
+  target:
+    - nsis
+  # electron-builder reads build/icon.ico when present, and uses its default
+  # icon until the desktop icon branch supplies it.
+nsis:
+  artifactName: n10-desktop-x64.exe
+  oneClick: false
+  perMachine: false
+  selectPerMachineByDefault: false
+  createStartMenuShortcut: true
+  createDesktopShortcut: true
+  shortcutName: n10 Desktop
 linux:
   target:
     - deb
