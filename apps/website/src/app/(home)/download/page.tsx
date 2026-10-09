@@ -98,14 +98,30 @@ export default function DownloadPage() {
                   Git with it.
                 </Package>
                 <Package format="appImage" title="AppImage">
-                  Portable, with no installation or host FUSE library. Where
-                  AppArmor blocks Electron&apos;s sandbox, as on Ubuntu 24.04
-                  and later, its launcher adds <code>--no-sandbox</code>.
-                  Sessions that outlive it can&apos;t run <code>n10 util</code>{' '}
-                  or <code>beam</code> until it runs again; the .deb has no such
-                  gap.
+                  Direct launch needs FUSE 3 (
+                  <code>sudo apt install fuse3</code> on Ubuntu). Without FUSE,
+                  prefix the run command with{' '}
+                  <code>APPIMAGE_EXTRACT_AND_RUN=1</code>. Where AppArmor blocks
+                  Electron&apos;s sandbox, its launcher adds{' '}
+                  <code>--no-sandbox</code>. Sessions that outlive it can&apos;t
+                  run <code>n10 util</code> or <code>beam</code> until it runs
+                  again; the .deb has no such gap.
                 </Package>
               </div>
+              <p className="text-fd-muted-foreground mt-6 text-sm text-pretty">
+                Save{' '}
+                <a
+                  href={`${RELEASES_URL}/latest/download/SHA256SUMS`}
+                  className={link}
+                >
+                  SHA256SUMS
+                </a>{' '}
+                beside the package to verify the download:
+              </p>
+              <CommandLines
+                lines={['sha256sum -c SHA256SUMS --ignore-missing']}
+                className="mt-3"
+              />
             </PlatformCard>
 
             <PlatformCard os="mac">
