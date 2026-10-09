@@ -20,6 +20,7 @@ import {
   copyFileSync,
   cpSync,
   existsSync,
+  mkdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -75,9 +76,13 @@ for (const part of ['main', 'preload', 'renderer']) {
     filter: (path) => !path.endsWith('.map') && !path.endsWith('.d.ts'),
   });
 }
-cpSync(resolve(desktopDir, 'build'), resolve(distDir, 'desktop', 'build'), {
-  recursive: true,
-});
+// The npm app reads only these two at runtime. The SVG, ICNS and Linux
+// hicolor ladder stay in apps/desktop/build for native package recipes.
+const iconsOut = resolve(distDir, 'desktop', 'build');
+mkdirSync(iconsOut, { recursive: true });
+for (const icon of ['icon.png', 'icon.ico']) {
+  copyFileSync(resolve(desktopDir, 'build', icon), resolve(iconsOut, icon));
+}
 
 const out = {
   name: cli.name,

@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 250">
-<!-- The n10 mark. Same geometry as src/components/logo.tsx, flattened: the overlap is drawn as the multiply product of the two panes (#9caf88 x #e3c16f = #8b843b) so nothing depends on blend modes. Sized for a square avatar; safe under a circular crop. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="25 57.5 200 135" preserveAspectRatio="none">
+<!-- The n10 mark. Same geometry as src/components/logo.tsx, flattened: the overlap is drawn as the multiply product of the two panes (#9caf88 x #e3c16f = #8b843b) so nothing depends on blend modes. Optically enlarged for small app icons. -->
   <clipPath id="n">
     <path transform="translate(37.5 75.0)" d="M0,100 V25 H22.5 L23.5,37 C27,30 36,25 50,25 C64,25 75,36 75,53 V100 H50 V60 C50,50 46,45 38,45 C29,45 25,51 25,60 V100 Z" />
   </clipPath>

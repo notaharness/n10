@@ -16,6 +16,11 @@ SOURCE = ROOT / "apps/website/public/brand/n10-mark.svg"
 BUILD = ROOT / "apps/desktop/build"
 RENDERER = ROOT / "apps/desktop/src/renderer/assets/n10-mark.svg"
 SIZES = (16, 20, 24, 32, 40, 48, 64, 128, 256, 512, 1024)
+WEBSITE_VIEWBOX = 'viewBox="0 0 250 250"'
+# The wide wordmark has large vertical margins in the site's square avatar.
+# Native icons need an optical variant: about 1px of side padding and 2px
+# above/below at 16px, with a taller letterform for legibility.
+ICON_VIEWBOX = 'viewBox="25 57.5 200 135" preserveAspectRatio="none"'
 
 
 def chunk(kind: bytes, payload: bytes) -> bytes:
@@ -29,14 +34,23 @@ def main() -> None:
     BUILD.mkdir(parents=True, exist_ok=True)
     icons = BUILD / "icons"
     icons.mkdir(exist_ok=True)
-    shutil.copyfile(SOURCE, BUILD / "icon.svg")
+    source = SOURCE.read_text(encoding="utf-8")
+    if source.count(WEBSITE_VIEWBOX) != 1:
+        raise SystemExit("Website mark viewBox changed; inspect the icon crop")
+    icon_source = source.replace(WEBSITE_VIEWBOX, ICON_VIEWBOX, 1).replace(
+        "Sized for a square avatar; safe under a circular crop.",
+        "Optically enlarged for small app icons.",
+        1,
+    )
+    icon_svg = BUILD / "icon.svg"
+    icon_svg.write_bytes(icon_source.encode("utf-8"))
     shutil.copyfile(SOURCE, RENDERER)
 
     pngs = {}
     for size in SIZES:
         path = icons / f"{size}x{size}.png"
         subprocess.run(
-            ["inkscape", str(SOURCE), "--export-type=png", f"--export-width={size}",
+            ["inkscape", str(icon_svg), "--export-type=png", f"--export-width={size}",
              f"--export-height={size}", f"--export-filename={path}"],
             check=True,
             stdout=subprocess.DEVNULL,
