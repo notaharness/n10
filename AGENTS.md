@@ -55,6 +55,7 @@ npx nx e2e cli-e2e                    # offline TUI tests
 npx nx e2e desktop-e2e                # offline Electron tests
 npx nx e2e:visual desktop-e2e          # screenshots in a pinned container
 npx nx e2e:windows desktop-e2e         # Windows host lifetime and mux access (Windows)
+npx nx e2e:no-tmux desktop-e2e         # the suite with tmux hidden, minus @tmux tests
 GH_TOKEN=$(gh auth token) npx nx e2e:integration desktop-e2e
 npx nx dev website                    # apps/website at http://localhost:3100
 ```

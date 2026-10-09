@@ -40,10 +40,12 @@ resolved configuration with `npx nx show project <name> --json`.
 
 ## Tmux sessions and transport
 
-n10 requires tmux 3.2 or newer. Startup probes it and reports an installation
-hint when unavailable; a stored `terminalBackend` field has no effect. Every
-worktree agent and terminal tab runs in tmux. `node-pty` remains the low-level
-connection used to embed a tmux client in the CLI or desktop terminal.
+Startup probes tmux. When tmux 3.2 or newer is installed, every worktree agent
+and terminal tab runs in it, and `node-pty` is the low-level connection that
+embeds a tmux client in the CLI or desktop terminal. When no tmux is installed,
+n10 owns its sessions itself ("Managed owner without tmux" below). A tmux that
+is installed but too old or failing is a startup error with an installation
+hint, never a reason to switch. A stored `terminalBackend` field has no effect.
 
 Core owns identity and agent policy. `session/open-session.ts` receives an
 explicit worktree or terminal request, resolves tagged sessions, and chooses a
@@ -1379,6 +1381,43 @@ worker pool. Keep ordered mutations and PTY ownership in their current process.
 Require an attributed CPU profile and identical-fixture before/after evidence
 before adding another worker; asynchronous I/O or smaller payloads may address
 the measured cost without a new lifetime and queue.
+
+## Managed owner without tmux
+
+Where no tmux is installed, the desktop session host or the TUI becomes the
+profile's managed owner (`applySessionBackend` in `session-backend.ts`). It binds
+the mux endpoint before it creates anything, then holds its sessions in a
+`ManagedCatalog` (`managed-catalog.ts`) under the owner's host ID: one record,
+PTY and handle set per session (`ManagedPty` in `libs/terminal-pty`). Releasing
+a handle leaves the session running; stopping it ends it. Agents keep their exit
+for restart; shells end with their shell. Every local operation reaches the
+records through the same catalog seam as tmux (`localCatalog()`), so discovery,
+launch plans, replacement approvals and removal are shared.
+
+Sessions end with the owner, however it ends: a quit closes the catalog, and a
+crashed host's PTYs hang up. Tabs then wait for an explicit Resume; nothing
+relaunches by itself. The next owner removes a crashed owner's socket under the
+startup lock above.
+
+A managed target is `{ kind: 'mux', hostId, sessionId, name }`. Host and
+session ID identify it. The name is the record's label: unique within the owner
+while the record exists, reused after it is removed, so it addresses a session
+but never identifies one. A saved tab therefore never adopts another session
+that took its label, and a new owner's records never match an old owner's
+saved targets. A Resume the user pressed adopts the session it started, whatever
+its new target (`resume-item`, `resume-terminal`).
+
+Until another n10 can attach to a running owner as a client, a second desktop
+or TUI that finds the endpoint taken refuses to start ("Another n10 owns this
+profile's sessions"), rather than running a second catalog. tmux machines are
+unaffected: nothing binds there.
+
+The no-tmux end-to-end runs hide tmux from the app by giving it a PATH without
+it (`apps/desktop-e2e/src/setup/no-tmux.ts`, `withoutTmux`): the same
+binaries, one link each, except tmux. The owner's own lifecycle is
+`managed-owner.test.ts`. CI's `no-tmux` job runs the offline suite again with
+`N10_E2E_NO_TMUX=1`, leaving out the tests tagged `@tmux`, which drive tmux
+themselves or need sessions to outlive the app.
 
 ## Windows process containment and mux authentication
 

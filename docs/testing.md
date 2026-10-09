@@ -88,6 +88,21 @@ Pass GH_TOKEN explicitly because the isolated HOME hides stored gh credentials:
 GH_TOKEN=$(gh auth token) npx nx e2e:integration desktop-e2e
 ```
 
+### Without tmux
+
+With no tmux installed the session host owns the sessions itself. A test runs
+that way with `test.use({ withoutTmux: true })`: the fixture gives the app a
+PATH with every program but tmux (`src/setup/no-tmux.ts`).
+`managed-owner.test.ts` covers the owner's own lifecycle: sessions end when it
+quits or crashes, and its tabs wait for an explicit Resume. `e2e:no-tmux` runs
+the offline suite with tmux hidden (`N10_E2E_NO_TMUX=1`), so the session tests
+exercise a real owner. Tests that drive tmux themselves or need a session to
+outlive the app are tagged `@tmux` and left out. CI runs it in its own job:
+
+```sh
+npx nx e2e:no-tmux desktop-e2e
+```
+
 ### Windows
 
 `e2e:windows` (`windows.config.ts`, `src/windows/`) runs on Windows only and

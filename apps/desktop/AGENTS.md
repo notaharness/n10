@@ -29,8 +29,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - `services/repo.ts` opens an engine repository handle; session and worktree
   commands capture that handle before awaiting. `repository(cwd)` hands out
   any repository's handle, selected or parked, for reads. Discovery observes its live scope. The host
-  awaits the tmux probe and validates the requirement before opening a
-  repo; missing tmux is a startup error with an installation hint.
+  awaits the tmux probe and selects the session backend before opening a
+  repo: tmux when installed, else the host owns its sessions; an installed
+  tmux that fails is a startup error with an installation hint.
 - `main/beam/` is a client of the beam daemon's control socket (beam's
   docs/06) and installs the three machine ports: `MachinesPort`,
   `RemoteMachinePort` and `InboundMailPort`. Nothing above them knows beam.
