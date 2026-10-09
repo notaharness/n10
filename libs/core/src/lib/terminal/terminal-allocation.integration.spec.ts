@@ -51,7 +51,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       };
       process.kill(first.pid, 'SIGTERM');
       await expect
-        .poll(() => resolveSessionByName(entry.pty.name!)?.paneDead)
+        .poll(() => resolveSessionByName(entry.pty.target!.name)?.paneDead)
         .toBe(true);
       await expect.poll(() => entry.exited).toBe(true);
       rmSync(join(fixture.home, 'agent-start.json'));
@@ -68,7 +68,9 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       expect(next.pid).not.toBe(first.pid);
       expect(resumed.name).toBe(entry.name);
       expect(resumed.agent).toBe('codex');
-      expect(resolveSessionByName(entry.pty.name!)?.paneDead).toBe(false);
+      expect(resolveSessionByName(entry.pty.target!.name)?.paneDead).toBe(
+        false
+      );
     });
 
     it.each(['disappears', 'appears'] as const)(
@@ -96,7 +98,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
           config: {} as AppConfig,
         });
         expect(entry.name).toBe(terminalSessionKey(expected));
-        expect(entry.pty.name).toBe(expected);
+        expect(entry.pty.target).toEqual({ kind: 'tmux', name: expected });
         expect(getSession(terminalSessionKey(expected))).toBe(entry);
         expect(liveSessionNames()).toEqual([terminalSessionKey(expected)]);
         expect(resolveSessionByName(expected)).not.toBeNull();

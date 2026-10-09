@@ -12,7 +12,11 @@ const spec: SessionSpec = {
   rows: 24,
 };
 
-interface ExecResult { stdout: string; stderr: string; code: number }
+interface ExecResult {
+  stdout: string;
+  stderr: string;
+  code: number;
+}
 
 interface FakeOptions {
   hasSession?: (name: string) => boolean;

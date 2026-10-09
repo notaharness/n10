@@ -103,18 +103,18 @@ describe('retained tmux process lifecycle', () => {
     // tmux before 3.7 can drop what a pane wrote just before its
     // process exited.
     await vi.waitFor(() =>
-      expect(tmuxCli.tmuxCapturePane(backend.name!)).toContain(
+      expect(tmuxCli.tmuxCapturePane(backend.target!.name)).toContain(
         'seed:<prompt;\nend;>'
       )
     );
-    expect(tmuxShowOption(backend.name!, '@literal')).toBe('metadata;');
-    const output = tmuxCli.tmuxCapturePane(backend.name!);
+    expect(tmuxShowOption(backend.target!.name, '@literal')).toBe('metadata;');
+    const output = tmuxCli.tmuxCapturePane(backend.target!.name);
     for (const argument of literal) expect(output).toContain(`<${argument}>`);
   });
   it('replaces only the approved process and applies metadata after the guarded launch', async () => {
     const first = await retained('sleep 30');
-    tmuxCli.tmuxSetOption(first.name!, '@supervisor', 'old');
-    const snapshot = tmuxSessionSnapshot(first.name!, [
+    tmuxCli.tmuxSetOption(first.target!.name, '@supervisor', 'old');
+    const snapshot = tmuxSessionSnapshot(first.target!.name, [
       '@test-agent',
       '@supervisor',
     ])!;
@@ -127,31 +127,33 @@ describe('retained tmux process lifecycle', () => {
     request.args = ['-c', 'printf "%s\\n" "$1"; sleep 30', 'agent', literal];
     const replaced = await createTmuxBackend(request, {
       mode: 'replace',
-      target: first.name!,
+      target: first.target!.name,
       expected: snapshot.incarnation,
       tags: { '@test-agent': 'second', '@supervisor': null },
       retainOnExit: true,
     });
     backends.push(replaced);
-    const winner = tmuxSessionSnapshot(first.name!, [
+    const winner = tmuxSessionSnapshot(first.target!.name, [
       '@test-agent',
       '@supervisor',
     ])!;
     expect(winner.incarnation.panePid).not.toBe(snapshot.incarnation.panePid);
     expect(winner.options).toEqual({ '@test-agent': 'second' });
     await vi.waitFor(() =>
-      expect(tmuxCli.tmuxCapturePane(first.name!)).toContain(literal)
+      expect(tmuxCli.tmuxCapturePane(first.target!.name)).toContain(literal)
     );
     await expect(
       createTmuxBackend(spec('sleep 30'), {
         mode: 'replace',
-        target: first.name!,
+        target: first.target!.name,
         expected: snapshot.incarnation,
         tags: { '@test-agent': 'stale' },
         retainOnExit: true,
       })
     ).rejects.toThrow('Session changed');
-    expect(tmuxSessionSnapshot(first.name!, ['@test-agent'])).toMatchObject({
+    expect(
+      tmuxSessionSnapshot(first.target!.name, ['@test-agent'])
+    ).toMatchObject({
       incarnation: winner.incarnation,
       options: { '@test-agent': 'second' },
       paneDead: false,
@@ -159,11 +161,11 @@ describe('retained tmux process lifecycle', () => {
   });
   it('rejects replacement approval from another server or a deleted session incarnation', async () => {
     const first = await retained('sleep 30');
-    const original = tmuxSessionSnapshot(first.name!)!.incarnation;
+    const original = tmuxSessionSnapshot(first.target!.name)!.incarnation;
     await expect(
       createTmuxBackend(spec('sleep 30'), {
         mode: 'replace',
-        target: first.name!,
+        target: first.target!.name,
         expected: { ...original, serverPid: original.serverPid + 1 },
       })
     ).rejects.toThrow('Session changed');
@@ -171,70 +173,72 @@ describe('retained tmux process lifecycle', () => {
     const request = spec('sleep 30');
     const next = await createTmuxBackend(request, {
       mode: 'create',
-      label: first.name!,
+      label: first.target!.name,
       tags: {},
       retainOnExit: true,
     });
     backends.push(next);
-    const winner = tmuxSessionSnapshot(next.name!)!.incarnation;
+    const winner = tmuxSessionSnapshot(next.target!.name)!.incarnation;
     await expect(
       createTmuxBackend(spec('sleep 30'), {
         mode: 'replace',
-        target: next.name!,
+        target: next.target!.name,
         expected: original,
       })
     ).rejects.toThrow('Session changed');
-    expect(tmuxSessionSnapshot(next.name!)!.incarnation).toEqual(winner);
+    expect(tmuxSessionSnapshot(next.target!.name)!.incarnation).toEqual(winner);
   });
   it('guards identity tags literally and refuses a target retagged after selection', async () => {
     const first = await retained('sleep 30');
     const identity = 'repo,branch} #{pane_pid}';
-    tmuxCli.tmuxSetOption(first.name!, '@identity', identity);
-    const expected = tmuxSessionSnapshot(first.name!)!.incarnation;
+    tmuxCli.tmuxSetOption(first.target!.name, '@identity', identity);
+    const expected = tmuxSessionSnapshot(first.target!.name)!.incarnation;
     const attached = await createTmuxBackend(spec('sleep 30'), {
       mode: 'attach',
-      target: first.name!,
+      target: first.target!.name,
       expected,
       expectedTags: { '@identity': identity },
     });
     backends.push(attached);
-    tmuxCli.tmuxSetOption(first.name!, '@identity', 'another owner');
+    tmuxCli.tmuxSetOption(first.target!.name, '@identity', 'another owner');
     await expect(
       createTmuxBackend(spec('sleep 30'), {
         mode: 'replace',
-        target: first.name!,
+        target: first.target!.name,
         expected,
         expectedTags: { '@identity': identity },
         tags: { '@test-agent': 'changed' },
       })
     ).rejects.toThrow('Session changed');
-    expect(tmuxSessionSnapshot(first.name!)!.incarnation).toEqual(expected);
-    expect(tmuxShowOption(first.name!, '@test-agent')).toBe('first');
+    expect(tmuxSessionSnapshot(first.target!.name)!.incarnation).toEqual(
+      expected
+    );
+    expect(tmuxShowOption(first.target!.name, '@test-agent')).toBe('first');
   });
   it('rejects a stale Continue attachment and restart after a process changes', async () => {
     const first = await retained('sleep 30');
-    const expected = tmuxSessionSnapshot(first.name!)!.incarnation;
+    const expected = tmuxSessionSnapshot(first.target!.name)!.incarnation;
     const replaced = await createTmuxBackend(spec('exit 9'), {
       mode: 'replace',
-      target: first.name!,
+      target: first.target!.name,
       expected,
       retainOnExit: true,
     });
     backends.push(replaced);
     await vi.waitFor(() =>
-      expect(tmuxPaneState(first.name!)?.paneDead).toBe(true)
+      expect(tmuxPaneState(first.target!.name)?.paneDead).toBe(true)
     );
     for (const mode of ['attach', 'restart'] as const) {
       await expect(
         createTmuxBackend(spec('sleep 30'), {
           mode,
-          target: first.name!,
+          target: first.target!.name,
           expected,
           ...(mode === 'restart' ? { retainOnExit: true } : {}),
         })
       ).rejects.toThrow('Session changed');
     }
-    expect(tmuxPaneState(first.name!)?.exitCode).toBe(9);
+    expect(tmuxPaneState(first.target!.name)?.exitCode).toBe(9);
   });
   it('retains immediate exit status and creation tags before a client attaches', async () => {
     const backend = await retained('exit 17');
@@ -243,17 +247,17 @@ describe('retained tmux process lifecycle', () => {
     await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(17, undefined), {
       timeout: 4000,
     });
-    expect(tmuxShowOption(backend.name!, '@test-agent')).toBe('first');
+    expect(tmuxShowOption(backend.target!.name, '@test-agent')).toBe('first');
     expect(
       tmuxListSessionsDetailed(['@test-agent']).find(
-        (s) => s.name === backend.name
+        (s) => s.name === backend.target?.name
       )
     ).toMatchObject({
       paneDead: true,
       exitCode: 17,
       options: { '@test-agent': 'first' },
     });
-    expect(tmuxHasSession(backend.name!)).toBe(true);
+    expect(tmuxHasSession(backend.target!.name)).toBe(true);
   });
   it('delivers fast launch failure output before reporting its logical exit', async () => {
     const backend = await retained('/nonexistent/tmux-test-agent');
@@ -269,24 +273,24 @@ describe('retained tmux process lifecycle', () => {
   it('reattaches an exited pane without executing a new command or overwriting tags', async () => {
     const first = await retained('echo retained-output; exit 4');
     await vi.waitFor(() =>
-      expect(tmuxPaneState(first.name!)?.paneDead).toBe(true)
+      expect(tmuxPaneState(first.target!.name)?.paneDead).toBe(true)
     );
     first.dispose();
     const attached = await createTmuxBackend(
       spec('echo should-not-run; sleep 30'),
       {
         mode: 'attach',
-        target: first.name!,
+        target: first.target!.name,
       }
     );
     backends.push(attached);
     const exit = vi.fn();
     attached.onExit(exit);
     await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(4, undefined));
-    expect(tmuxShowOption(first.name!, '@test-agent')).toBe('first');
+    expect(tmuxShowOption(first.target!.name, '@test-agent')).toBe('first');
     const output = execFileSync(
       'tmux',
-      ['capture-pane', '-p', '-S', '-', '-t', `=${first.name}:`],
+      ['capture-pane', '-p', '-S', '-', '-t', `=${first.target?.name}:`],
       { encoding: 'utf8' }
     );
     expect(output).toContain('retained-output');
@@ -295,28 +299,28 @@ describe('retained tmux process lifecycle', () => {
   it('restarts only a dead pane and refuses to interrupt the resulting live process', async () => {
     const first = await retained('exit 6');
     await vi.waitFor(() =>
-      expect(tmuxPaneState(first.name!)?.paneDead).toBe(true)
+      expect(tmuxPaneState(first.target!.name)?.paneDead).toBe(true)
     );
     first.dispose();
     const restarted = await createTmuxBackend(
       spec('echo restarted; sleep 30'),
       {
         mode: 'restart',
-        target: first.name!,
+        target: first.target!.name,
         tags: { '@test-agent': 'second' },
         retainOnExit: true,
       }
     );
     backends.push(restarted);
-    expect(tmuxPaneState(first.name!)?.paneDead).toBe(false);
-    expect(tmuxShowOption(first.name!, '@test-agent')).toBe('second');
+    expect(tmuxPaneState(first.target!.name)?.paneDead).toBe(false);
+    expect(tmuxShowOption(first.target!.name, '@test-agent')).toBe('second');
     await expect(
       createTmuxBackend(spec('exit 0'), {
         mode: 'restart',
-        target: first.name!,
+        target: first.target!.name,
       })
     ).rejects.toThrow('running');
-    expect(tmuxPaneState(first.name!)?.paneDead).toBe(false);
+    expect(tmuxPaneState(first.target!.name)?.paneDead).toBe(false);
   });
   it('does not overwrite the winning restart metadata after a stale dead-pane read', async () => {
     const winner = await retained('sleep 30');
@@ -328,13 +332,13 @@ describe('retained tmux process lifecycle', () => {
       await expect(
         createTmuxBackend(spec('sleep 30'), {
           mode: 'restart',
-          target: winner.name!,
+          target: winner.target!.name,
           tags: { '@test-agent': 'loser' },
           retainOnExit: false,
         })
       ).rejects.toThrow('still active');
-      expect(tmuxShowOption(winner.name!, '@test-agent')).toBe('first');
-      expect(tmuxShowOption(winner.name!, 'remain-on-exit')).toBe('on');
+      expect(tmuxShowOption(winner.target!.name, '@test-agent')).toBe('first');
+      expect(tmuxShowOption(winner.target!.name, 'remain-on-exit')).toBe('on');
     } finally {
       staleRead.mockRestore();
     }
@@ -355,7 +359,7 @@ describe('retained tmux process lifecycle', () => {
     backends.push(backend);
     // The process stays up once it has printed, as above.
     await vi.waitFor(() =>
-      expect(tmuxCli.tmuxCapturePane(backend.name!)).toContain(
+      expect(tmuxCli.tmuxCapturePane(backend.target!.name)).toContain(
         'env:/tmp/alternate-home:literal seed'
       )
     );
@@ -364,8 +368,8 @@ describe('retained tmux process lifecycle', () => {
     const backend = await retained('sleep 30');
     const exit = vi.fn();
     backend.onExit(exit);
-    tmuxKillSession(backend.name!);
-    expect(tmuxPaneState(backend.name!)).toBeNull();
+    tmuxKillSession(backend.target!.name);
+    expect(tmuxPaneState(backend.target!.name)).toBeNull();
     await vi.waitFor(() => expect(exit).toHaveBeenCalledOnce());
     expect(backend.processState?.running).toBe(false);
   });
@@ -379,20 +383,20 @@ describe('retained tmux process lifecycle', () => {
     await vi.waitFor(() => {
       const clients = execFileSync(
         'tmux',
-        ['list-clients', '-t', `=${backend.name}:`],
+        ['list-clients', '-t', `=${backend.target?.name}:`],
         { encoding: 'utf8' }
       );
       expect(clients.trim()).not.toBe('');
     });
-    execFileSync('tmux', ['detach-client', '-s', `=${backend.name}:`]);
+    execFileSync('tmux', ['detach-client', '-s', `=${backend.target?.name}:`]);
     await vi.waitFor(() => expect(disconnect).toHaveBeenCalledOnce());
     expect(exit).not.toHaveBeenCalled();
-    expect(tmuxPaneState(backend.name!)?.paneDead).toBe(false);
+    expect(tmuxPaneState(backend.target!.name)?.paneDead).toBe(false);
     await vi.waitFor(
       () => {
         const clients = execFileSync(
           'tmux',
-          ['list-clients', '-t', `=${backend.name}:`],
+          ['list-clients', '-t', `=${backend.target?.name}:`],
           { encoding: 'utf8' }
         );
         expect(clients.trim()).not.toBe('');

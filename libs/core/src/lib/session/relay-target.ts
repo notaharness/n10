@@ -66,7 +66,7 @@ function findRegistryMatch(
 ): { key: string; entry: NonNullable<ReturnType<typeof getSession>> } | null {
   for (const key of sessionNames()) {
     const entry = getSession(key);
-    if (entry && entry.pty.name === name) return { key, entry };
+    if (entry && entry.pty.target?.name === name) return { key, entry };
   }
   return null;
 }

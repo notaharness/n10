@@ -29,7 +29,7 @@ const state = vi.hoisted(() => ({
   entries: new Map<string, object>(),
   /** Native tmux incarnation name behind each session's PTY. */
   ptyNames: new Map<string, string>(),
-  /** What a fresh `tmuxSessionSnapshot(pty.name)` answers, keyed by
+  /** What a fresh `tmuxSessionSnapshot(pty.target.name)` answers, keyed by
    *  native name — absent means the read fails, as it would for a
    *  vanished target. */
   tmuxSnapshots: new Map<string, { incarnation: unknown }>(),
@@ -270,7 +270,7 @@ vi.mock('@n10/core', async (importOriginal) => {
         state.entries.set(name, {
           exited: false,
           pty: {
-            name: state.ptyNames.get(name) ?? name,
+            target: { kind: 'tmux', name: state.ptyNames.get(name) ?? name },
             onData: (cb: (data: string) => void) => state.onData.set(name, cb),
             onExit: () => undefined,
             write: () => undefined,
@@ -755,6 +755,19 @@ describe('listSessions: a local session never carries a connectionState (finding
     state.connectionStateByName.set(name, 'reconnecting');
     const summary = listSessions(state.cwd).find((s) => s.name === name);
     expect(summary?.connectionState).toBe('reconnecting');
+  });
+});
+
+describe('listSessions: a held worktree session’s resume recipe', () => {
+  it('names the native session it is attached to, not its registry key', async () => {
+    const name = keyFor('native-label', '/repo-a');
+    state.ptyNames.set(name, 'repo-a-native-label-2');
+    await launchAgent({ branch: 'native-label', intent: 'continue-or-blank' });
+    const summary = listSessions(state.cwd).find((s) => s.name === name);
+    expect(summary?.restore?.target).toEqual({
+      kind: 'tmux',
+      name: 'repo-a-native-label-2',
+    });
   });
 });
 

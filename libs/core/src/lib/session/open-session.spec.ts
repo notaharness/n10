@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TaggedSession } from '../session-identity.js';
 const state = vi.hoisted(() => ({
   existing: null as TaggedSession | null,
-  create: vi.fn<(spec: unknown, plan: unknown) => { name: string }>(() => ({
-    name: 'allocated',
+  create: vi.fn<
+    (spec: unknown, plan: unknown) => { target: { kind: 'tmux'; name: string } }
+  >(() => ({
+    target: { kind: 'tmux', name: 'allocated' },
   })),
   createRemote: vi.fn<
     (
@@ -11,10 +13,8 @@ const state = vi.hoisted(() => ({
       plan: unknown,
       machine: unknown,
       poller: unknown
-    ) => {
-      name: string;
-    }
-  >(() => ({ name: 'remote-allocated' })),
+    ) => { target: { kind: 'tmux'; name: string } }
+  >(() => ({ target: { kind: 'tmux', name: 'remote-allocated' } })),
   register: vi.fn(),
   head: vi.fn(),
   held: vi.fn(() => false),

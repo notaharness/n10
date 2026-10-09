@@ -64,7 +64,6 @@ describe('a pull request patch carries whole files', () => {
     execSync(`printf '%s' '${modified}' > test.txt`, { cwd: repoDir });
     execSync('git add test.txt', { cwd: repoDir });
     execSync('git commit -m "modify lines 15-17"', { cwd: repoDir });
-
   });
 
   afterAll(() => {

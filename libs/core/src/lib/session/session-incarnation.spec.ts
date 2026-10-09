@@ -7,7 +7,9 @@ const state = vi.hoisted(() => ({
   native: 'player',
 }));
 vi.mock('../pty-registry.js', () => ({
-  getSession: () => ({ pty: { name: state.native } }),
+  getSession: () => ({
+    pty: { target: { kind: 'tmux', name: state.native } },
+  }),
 }));
 vi.mock('@n10/terminal-tmux', async (original) => ({
   ...(await original<typeof Primitive>()),

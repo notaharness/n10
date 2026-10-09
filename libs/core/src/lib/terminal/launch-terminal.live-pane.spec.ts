@@ -7,8 +7,10 @@ import type { TaggedSession } from '../session-identity.js';
 // launchTerminalSession through to openSession is caught here.
 const state = vi.hoisted(() => ({
   existing: null as TaggedSession | null,
-  create: vi.fn<(spec: unknown, plan: unknown) => { name: string }>(() => ({
-    name: 'allocated',
+  create: vi.fn<
+    (spec: unknown, plan: unknown) => { target: { kind: 'tmux'; name: string } }
+  >(() => ({
+    target: { kind: 'tmux', name: 'allocated' },
   })),
   register: vi.fn(),
 }));

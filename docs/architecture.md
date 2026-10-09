@@ -130,6 +130,7 @@ libs/worktree-manager/           — Git worktree and branch operations
 libs/terminal/                   — Terminal emulator (renderer) + SessionBackend interface
   src/lib/terminal-emulator.ts   — @xterm/headless wrapper with ANSI rendering
   src/lib/session-backend.ts     — SessionSpec and terminal connection/process lifecycle contract
+  src/lib/session-target.ts      — SessionTarget: the persistent session a connection addresses, by transport
 libs/terminal-pty/               — Low-level node-pty transport, and the PTY owner's process containment
   src/lib/pty-session.ts         — node-pty wrapper (PtySession)
   src/lib/process-job.ts         — Windows: the owner joins its own kill-on-close Job Object

@@ -128,7 +128,7 @@ describe.skipIf(SKIP)('attaching, detaching and re-attaching', () => {
   holdScratchTmuxServer();
   it('keeps the pane, its process and its scrollback across a detach', async () => {
     const backend = await retained("printf 'scrollback-marker\\n'; sleep 30");
-    const name = backend.name!;
+    const name = backend.target!.name;
     let seen = '';
     backend.onData((data) => {
       seen += data;
@@ -166,7 +166,7 @@ describe.skipIf(SKIP)('attaching, detaching and re-attaching', () => {
 
   it('re-attaches after its client was killed, and the session still takes input', async () => {
     const backend = await retained('cat');
-    const name = backend.name!;
+    const name = backend.target!.name;
     const exit = vi.fn();
     const disconnect = vi.fn();
     backend.onExit(exit);
@@ -203,7 +203,7 @@ describe.skipIf(SKIP)('attaching, detaching and re-attaching', () => {
 
   it('gives the client that re-attaches the size set while none was attached', async () => {
     const backend = await retained('sleep 30', 80, 24);
-    const name = backend.name!;
+    const name = backend.target!.name;
     await vi.waitFor(() => expect(clientPids(name)).toHaveLength(1), {
       timeout: SETTLE_MS,
     });
@@ -231,7 +231,7 @@ describe.skipIf(SKIP)('attaching, detaching and re-attaching', () => {
 
   it('joins a session someone else is watching instead of throwing them off', async () => {
     const backend = await retained('sleep 30', 80, 24);
-    const name = backend.name!;
+    const name = backend.target!.name;
     const exit = vi.fn();
     backend.onExit(exit);
     await vi.waitFor(() => expect(clientPids(name)).toHaveLength(1), {
@@ -276,7 +276,7 @@ describe.skipIf(SKIP)('attaching, detaching and re-attaching', () => {
 
   it('refuses to attach to a session that vanished after it was listed', async () => {
     const backend = await retained('sleep 30');
-    const name = backend.name!;
+    const name = backend.target!.name;
     expect(tmuxHasSession(name)).toBe(true);
     backend.dispose();
     tmuxKillSession(name);

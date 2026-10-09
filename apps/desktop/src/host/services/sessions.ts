@@ -180,7 +180,7 @@ function withResume(
 ): SessionSummary {
   const identity = sessionIdentity(summary.name);
   const held = getSession(summary.name);
-  const tmuxName = held?.pty.name;
+  const tmuxName = held?.pty.target?.name;
   if (identity?.kind !== 'worktree' || !tmuxName) return summary;
   const listed =
     identity.machine === LOCAL_MACHINE ? tagged.get(summary.name) : undefined;

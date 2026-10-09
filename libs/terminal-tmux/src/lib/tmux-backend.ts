@@ -1,4 +1,4 @@
-import type { SessionBackend, SessionSpec } from '@n10/terminal';
+import type { SessionBackend, SessionSpec, SessionTarget } from '@n10/terminal';
 import { PtySession } from '@n10/terminal-pty';
 import {
   tmuxAttachArgs,
@@ -49,10 +49,12 @@ class TmuxBackend implements SessionBackend {
   private state: NonNullable<SessionBackend['processState']> = {
     running: true,
   };
-  readonly name: string;
+  readonly target: SessionTarget;
+  private readonly name: string;
 
   constructor(spec: SessionSpec, name: string, created: boolean) {
     this.name = name;
+    this.target = { kind: 'tmux', name };
     this.spec = spec;
     this.width = spec.cols;
     this.height = spec.rows;

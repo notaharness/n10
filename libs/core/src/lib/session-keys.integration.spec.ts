@@ -164,7 +164,10 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
           throw new Error('Attachment must not build a launch command');
         },
       });
-      expect(adopted.pty.name).toBe(external.name);
+      expect(adopted.pty.target).toEqual({
+        kind: 'tmux',
+        name: external.target!.name,
+      });
       expect(isSessionAlive(tab.name)).toBe(true);
       external.dispose();
     });

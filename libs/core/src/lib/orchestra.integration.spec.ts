@@ -164,7 +164,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       expect(getSession(worktreeSessionKey(player.path, fixture.repo))).toBe(
         entry
       );
-      expect(entry.pty.name).toBe(player.name);
+      expect(entry.pty.target).toEqual({ kind: 'tmux', name: player.name });
       expect(
         fixture.tmux(
           'display-message',
@@ -302,7 +302,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       const next = JSON.parse(fixture.read('agent-start.json'));
       expect(next.pid).not.toBe(first.pid);
       expect(next.args).toEqual(['resume', '--last']);
-      expect(resumed.pty.name).toBe(player.name);
+      expect(resumed.pty.target).toEqual({ kind: 'tmux', name: player.name });
       expect(resumed.agent).toBe('codex');
       expect(
         resolveWorktreeSession(fixture.repo, player.worktreePath)

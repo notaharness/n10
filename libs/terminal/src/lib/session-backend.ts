@@ -3,6 +3,8 @@
  * metadata and lifecycle intent belong to the caller and transport launch plan.
  */
 
+import type { SessionTarget } from './session-target.js';
+
 export interface SessionSpec {
   /** Command to run. The empty string means the backend's own default
    *  interactive shell: tmux runs its `default-shell`. Callers wanting
@@ -28,8 +30,9 @@ export interface SessionSpec {
 }
 
 export interface SessionBackend {
-  /** Actual persistent session name, after allocation or resolution. */
-  readonly name?: string;
+  /** The persistent session this connection addresses, after
+   *  allocation or resolution. */
+  readonly target?: SessionTarget;
   /** Local client health, independent of the hosted process lifetime. */
   readonly connectionState?: 'connected' | 'reconnecting' | 'failed';
   /** Logical process status, independent of the local transport client. */
