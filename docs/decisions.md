@@ -1379,3 +1379,33 @@ worker pool. Keep ordered mutations and PTY ownership in their current process.
 Require an attributed CPU profile and identical-fixture before/after evidence
 before adding another worker; asynchronous I/O or smaller payloads may address
 the measured cost without a new lifetime and queue.
+
+## Windows process containment and mux authentication
+
+The process that owns PTYs on Windows joins its own Job Object with
+`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` before it starts anything
+(`libs/terminal-pty/src/lib/process-job.ts`; the desktop host calls it first
+in `start()`). Descendants inherit membership, the handle is not
+inheritable and no breakaway is allowed, so the kernel ends ConPTY hosts,
+shells and detached or GUI descendants when the owner exits for any reason.
+POSIX needs no equivalent: PTY teardown hangs up the session.
+
+The three kernel32 calls go through [koffi](https://koffi.dev/), pinned,
+external to both bundles, and loaded only on win32. Its binary arrives as one
+optional package for the installing platform, so other installs never load
+it and carry only their own small platform package. The alternative, an own
+N-API addon, needs a compiler at install or a prebuild pipeline for the npm
+package; koffi needs neither and keeps the binding to declarations of
+documented APIs. The package runs Electron on `dist/` without an asar, so no
+unpack rule applies.
+
+The mux endpoint (`@n10/core/mux`) uses Node's public `net` API: a named pipe
+derived from `%LOCALAPPDATA%\n10\run` on Windows, a socket in the mode-0700
+`~/.n10/run` on POSIX. Binding it arbitrates ownership; only the winner
+publishes `mux.json` (host ID and 256-bit secret, mode 0600, one rename).
+Mutual HMAC-SHA256 proofs authenticate both directions, and the owner sends
+only a nonce before the client's proof verifies. There is no custom pipe DACL:
+another account can open a pipe, but cannot read the secret under the owner's
+profile or prove possession of it (`e2e:windows desktop-e2e` checks this with a
+second local account). That account can still pre-bind the derivable name and
+block startup; this is accepted for the single-user baseline.
