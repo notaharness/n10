@@ -209,13 +209,8 @@ export function createUpdateService(options: Options): UpdateService {
               error: cache.error ?? null,
             });
           })
-          .catch(() => {
-            if (running)
-              publish({
-                error:
-                  'Could not identify this installation. Update n10 the same way you installed it.',
-              });
-          });
+          // The resolver settles failures into an installation classification.
+          .catch(() => undefined);
       }
       timer = setTimeout(tick, 2000);
       timer.unref();

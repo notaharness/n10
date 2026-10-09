@@ -53,15 +53,7 @@ export function UpdatesPanel({ onClose }: { onClose: () => void }) {
             <Text dimColor>Your tmux agents keep running.</Text>
           </>
         ) : (
-          <Text dimColor>
-            {update.installation.kind === 'unknown'
-              ? 'Identifying installation…'
-              : update.installation.kind === 'development'
-              ? 'Development build: update your checkout.'
-              : update.installation.kind === 'npm-global'
-              ? ''
-              : 'Update n10 the same way you installed it.'}
-          </Text>
+          <UpdateFallback update={update} />
         )}
         {update.releaseNotesUrl && (
           <Text dimColor>Release notes: {update.releaseNotesUrl}</Text>
@@ -132,5 +124,22 @@ function UpdateDetails({
         </Text>
       )}
     </>
+  );
+}
+
+function UpdateFallback({ update }: { update: UpdateSnapshot }) {
+  if (
+    ['npm-global', 'npm-local'].includes(update.installation.kind) &&
+    !update.availableVersion
+  )
+    return null;
+  return (
+    <Text dimColor>
+      {update.installation.kind === 'unknown'
+        ? 'Identifying installation…'
+        : update.installation.kind === 'development'
+        ? 'Development build: update your checkout.'
+        : 'Update n10 the same way you installed it.'}
+    </Text>
   );
 }
