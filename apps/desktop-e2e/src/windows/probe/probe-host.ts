@@ -25,18 +25,7 @@ const parent = (
   process as unknown as { parentPort: { postMessage(message: unknown): void } }
 ).parentPort;
 
-const job = joinKillOnCloseJob();
-if (!job) throw new Error('No job off Windows');
-
 let output = '';
-const pty = new PtySession(
-  'powershell.exe',
-  ['-NoLogo', '-NoProfile', '-NoExit'],
-  { cols: 80, rows: 24, cwd: stateDir }
-);
-pty.onData((data) => {
-  output += data;
-});
 
 async function until<T>(what: string, check: () => T | undefined): Promise<T> {
   const deadline = Date.now() + 30_000;
@@ -62,6 +51,18 @@ function detached(command: string, args: string[]): number {
 }
 
 async function run(): Promise<void> {
+  // First, before this process starts anything.
+  const job = joinKillOnCloseJob();
+  if (!job) throw new Error('No job off Windows');
+  const pty = new PtySession(
+    'powershell.exe',
+    ['-NoLogo', '-NoProfile', '-NoExit'],
+    { cols: 80, rows: 24, cwd: stateDir }
+  );
+  pty.onData((data) => {
+    output += data;
+  });
+
   // Computed by the shell, so an echo of the input cannot pass.
   pty.write('Write-Output ("n10-" + (20 + 22))\r');
   await until('shell output', () => seen('n10-42'));
@@ -96,7 +97,7 @@ async function run(): Promise<void> {
   };
   writeFileSync(
     join(stateDir!, 'descendants.json'),
-    JSON.stringify({ descendants, job: job!.processIds() })
+    JSON.stringify({ descendants, job: job.processIds() })
   );
   parent.postMessage({ t: 'ready' });
 }

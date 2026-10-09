@@ -17,6 +17,18 @@ const BUNDLE = resolve(
   'probe'
 );
 
+/** A child Windows PowerShell inherits pwsh 7's PSModulePath and then
+ *  cannot load its own modules; without it, it uses its defaults. */
+export function windowsPowerShellEnv(
+  extra: Record<string, string> = {}
+): NodeJS.ProcessEnv {
+  return Object.fromEntries(
+    Object.entries({ ...process.env, ...extra }).filter(
+      ([key]) => key.toLowerCase() !== 'psmodulepath'
+    )
+  );
+}
+
 /** Bundle the probe's main and host where Node finds the workspace's
  *  node_modules: electron, node-pty and koffi stay external, exactly as
  *  the desktop build leaves them. */
@@ -27,16 +39,20 @@ export async function bundleProbe(): Promise<string> {
       'probe-host': join(SOURCES, 'probe-host.ts'),
     },
     outdir: BUNDLE,
-    outExtension: { '.js': '.cjs' },
+    outExtension: { '.js': '.mjs' },
     bundle: true,
     platform: 'node',
-    format: 'cjs',
+    format: 'esm',
+    // As the desktop build does: bundled CommonJS dependencies require.
+    banner: {
+      js: "import { createRequire as __probeRequire } from 'node:module'; const require = __probeRequire(import.meta.url);",
+    },
     target: 'node22',
     conditions: ['@n10/source'],
     external: ['electron', 'node-pty', 'koffi'],
     logLevel: 'warning',
   });
-  return join(BUNDLE, 'probe-main.cjs');
+  return join(BUNDLE, 'probe-main.mjs');
 }
 
 export interface ProbeRun {
@@ -57,12 +73,11 @@ export async function launchProbe(
 ): Promise<ProbeRun> {
   const stateDir = mkdtempSync(join(tmpdir(), 'n10-probe-'));
   const electron = spawn(require('electron') as string, [probeMain], {
-    env: {
-      ...process.env,
+    env: windowsPowerShellEnv({
       N10_PROBE_DIR: stateDir,
       N10_PROBE_SCENARIO: scenario,
       ELECTRON_ENABLE_LOGGING: '1',
-    },
+    }),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let log = '';

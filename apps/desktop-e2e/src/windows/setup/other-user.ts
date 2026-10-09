@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { build } from 'esbuild';
+import { windowsPowerShellEnv } from './probe.js';
 
 /**
  * A second local account, created by CI before the Windows suite
@@ -94,7 +95,7 @@ function run(
   env: Record<string, string> = {}
 ): void {
   const result = spawnSync(command, args, {
-    env: { ...process.env, ...env },
+    env: windowsPowerShellEnv(env),
     timeout: 60_000,
     encoding: 'utf8',
   });

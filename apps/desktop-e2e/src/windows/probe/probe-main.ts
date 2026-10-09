@@ -14,11 +14,15 @@ const scenario = process.env['N10_PROBE_SCENARIO'];
 if (!stateDir) throw new Error('N10_PROBE_DIR is not set');
 
 void app.whenReady().then(() => {
-  const host = utilityProcess.fork(join(__dirname, 'probe-host.cjs'), [], {
-    serviceName: 'n10 host',
-    stdio: 'inherit',
-    env: { ...process.env },
-  });
+  const host = utilityProcess.fork(
+    join(import.meta.dirname, 'probe-host.mjs'),
+    [],
+    {
+      serviceName: 'n10 host',
+      stdio: 'inherit',
+      env: { ...process.env },
+    }
+  );
   host.once('spawn', () =>
     writeFileSync(
       join(stateDir, 'processes.json'),
