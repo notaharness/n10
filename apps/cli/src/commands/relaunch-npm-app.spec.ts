@@ -1,44 +1,73 @@
 import { EventEmitter } from 'node:events';
-import { expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { relaunchNpmApp } from './relaunch-npm-app.js';
-import { superviseChild } from './child-supervision.js';
 const spawn = vi.hoisted(() => vi.fn());
 vi.mock('node:child_process', () => ({ spawn }));
+let root: string;
+beforeEach(() => {
+  spawn.mockReset();
+  root = mkdtempSync(join(tmpdir(), 'n10-relaunch-test-'));
+  writeFileSync(join(root, 'main.js'), '');
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  rmSync(root, { recursive: true, force: true });
+});
 
-it('starts the installed entry in the foreground and maps its signal exit', async () => {
-  const child = Object.assign(new EventEmitter(), { kill: vi.fn() });
-  spawn.mockReturnValue(child);
-  vi.stubEnv('N10_UPDATE_HANDOFF', '/stale/request');
-  try {
-    const exit = relaunchNpmApp('/installed', 'tui');
-    expect(spawn).toHaveBeenCalledWith(
-      process.execPath,
-      ['/installed/main.js', '--tui', process.cwd()],
-      {
-        stdio: 'inherit',
-        env: expect.not.objectContaining({
-          N10_UPDATE_HANDOFF: expect.anything(),
-        }),
-      }
+it.each(['tui', 'desktop'] as const)(
+  'supervises the actual %s relaunch in the foreground',
+  async (mode) => {
+    const child = Object.assign(new EventEmitter(), { kill: vi.fn() });
+    spawn.mockReturnValue(child);
+    vi.stubEnv('N10_UPDATE_HANDOFF', '/stale/request');
+    const signals = ['SIGINT', 'SIGHUP', 'SIGTERM'] as const;
+    const before = new Map(
+      signals.map((signal) => [signal, process.listeners(signal)])
     );
-    child.emit('close', null, 'SIGTERM');
-    await expect(exit).resolves.toBe(143);
-  } finally {
-    vi.unstubAllEnvs();
+    const exit = relaunchNpmApp(root, mode);
+    try {
+      expect(spawn).toHaveBeenCalledWith(
+        process.execPath,
+        [
+          join(root, 'main.js'),
+          ...(mode === 'tui' ? ['--tui', process.cwd()] : []),
+        ],
+        {
+          stdio: 'inherit',
+          env: expect.not.objectContaining({
+            N10_UPDATE_HANDOFF: expect.anything(),
+          }),
+        }
+      );
+      for (const signal of signals) {
+        // Exercise only the handlers this relaunch installed, not Vitest's own.
+        const handlers = process
+          .listeners(signal)
+          .filter((listener) => !before.get(signal)!.includes(listener));
+        expect(handlers).toHaveLength(1);
+        handlers[0].call(process, signal);
+        expect(child.kill).toHaveBeenCalledTimes(Number(signal === 'SIGTERM'));
+      }
+      expect(child.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM');
+    } finally {
+      child.emit('close', null, 'SIGTERM');
+      await expect(exit).resolves.toBe(143);
+      for (const signal of signals)
+        expect(process.listeners(signal)).toEqual(before.get(signal));
+    }
   }
-});
+);
 
-it('absorbs foreground tty signals, forwards TERM and waits for the child', async () => {
-  const child = Object.assign(new EventEmitter(), { kill: vi.fn() });
-  const host = new EventEmitter();
-  const status = superviseChild(child as never, host as never, true);
-  host.emit('SIGINT');
-  host.emit('SIGHUP');
-  expect(child.kill).not.toHaveBeenCalled();
-  host.emit('SIGTERM');
-  expect(child.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM');
-  child.emit('close', null, 'SIGHUP');
-  await expect(status).resolves.toBe(129);
-  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'exit'])
-    expect(host.listenerCount(signal)).toBe(0);
-});
+it.each(['tui', 'desktop'] as const)(
+  'does not spawn Node when the %s entry is missing',
+  async (mode) => {
+    unlinkSync(join(root, 'main.js'));
+    await expect(relaunchNpmApp(root, mode)).rejects.toThrow(
+      'installation is incomplete'
+    );
+    expect(spawn).not.toHaveBeenCalled();
+  }
+);

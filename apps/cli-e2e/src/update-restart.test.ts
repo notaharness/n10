@@ -171,3 +171,46 @@ test('Npm restart: Ctrl-C during download rolls back, releases the lock and reop
     path: info.outputPath('restart-interrupted.png'),
   });
 });
+
+test('Npm restart: double Ctrl-C leaves the pinned recovery command last when npm removes the entry', async ({
+  n10,
+  npm,
+}, info) => {
+  await expect(live(n10, /Update available/)).toBeVisible();
+  await n10.term.type('s');
+  await expect(live(n10, /Updates — version/)).toBeVisible();
+  await n10.term.type('u');
+  await expect(live(n10, /Update and restart/)).toBeVisible();
+  npm.scenario.holdTarball = true;
+  await n10.term.type('u');
+  await expect.poll(() => npm.requests.includes('/n10.tgz')).toBe(true);
+  await n10.term.root.screenshot({
+    path: info.outputPath('restart-double-interrupt-pending.png'),
+  });
+  await n10.term.write('\x03');
+  await expect(live(n10, /\^C/)).toBeVisible();
+  await n10.term.write('\x03');
+  const command = 'Run npm i -g @notaharness/n10@1.0.0-beta.2, then n10 --tui.';
+  await expect
+    .poll(async () => {
+      const rows = await n10.term.root
+        .locator('.term-row:not(.term-scrollback-row)')
+        .allTextContents();
+      return rows
+        .map((row) => row.trim())
+        .filter(Boolean)
+        .at(-1);
+    })
+    .toBe(command);
+  expect(existsSync(join(npm.root, 'main.js'))).toBe(false);
+  expect(existsSync(join(n10.homeDir, '.n10/npm-update.lock'))).toBe(false);
+  expect(
+    JSON.parse(
+      readFileSync(join(n10.homeDir, '.n10/npm-update-result.json'), 'utf8')
+    ).status
+  ).toBe('failed');
+  await expect(n10.term.getByText(/MODULE_NOT_FOUND/)).toHaveCount(0);
+  await n10.term.root.screenshot({
+    path: info.outputPath('restart-double-interrupted.png'),
+  });
+});

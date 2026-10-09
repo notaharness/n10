@@ -37,7 +37,10 @@ export function desktopUpdateHandoff(root: string) {
           console.error(`npm logs: ${result.logPath}`);
         return await relaunchNpmApp(root, 'desktop');
       } catch (error) {
-        console.error('n10: update failed:', error);
+        console.error(
+          'n10: update failed:',
+          error instanceof Error ? error.message : String(error)
+        );
         console.error(`Run ${command}, then open n10 again.`);
         return 1;
       } finally {
