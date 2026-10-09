@@ -74,3 +74,23 @@ describe('existing desktop launcher npm handoff', () => {
     expect(runtime.relaunchNpmApp).not.toHaveBeenCalled();
   });
 });
+
+it('ends a failed relaunch with the pinned retry command', async () => {
+  const handoff = desktopUpdateHandoff(root);
+  writeFileSync(
+    handoff.request,
+    JSON.stringify({ root, version: '1.0.0-beta.2' })
+  );
+  runtime.relaunchNpmApp.mockRejectedValueOnce(
+    new Error('The n10 installation is incomplete.')
+  );
+  const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  try {
+    await expect(handoff.finish(42)).resolves.toBe(1);
+    expect(error).toHaveBeenLastCalledWith(
+      'Run npm i -g @notaharness/n10@1.0.0-beta.2, then open n10 again.'
+    );
+  } finally {
+    error.mockRestore();
+  }
+});

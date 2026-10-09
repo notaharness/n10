@@ -68,7 +68,9 @@ describe.skipIf(process.platform === 'win32')('npm update transaction', () => {
     writeFileSync(owner, String(process.pid));
     expect(await runNpmUpdate(plan)).toMatchObject({
       status: 'failed',
-      message: expect.stringContaining('Another npm update'),
+      message: expect.stringContaining(
+        `If no update is running, remove ${lock} and try again.`
+      ),
     });
     expect(readFileSync(owner, 'utf8')).toBe(String(process.pid));
     expect(fixture.requests).toEqual([]);

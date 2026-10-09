@@ -217,7 +217,10 @@ export async function runTui(args: string[], packageRoot = ''): Promise<void> {
         console.error(`npm logs: ${result.logPath}`);
       process.exit(await relaunchNpmApp(plan.root, 'tui'));
     } catch (error) {
-      console.error('n10: update failed:', error);
+      console.error(
+        'n10: update failed:',
+        error instanceof Error ? error.message : String(error)
+      );
       console.error(
         `Run npm i -g @notaharness/n10@${plan.version}, then n10 --tui.`
       );

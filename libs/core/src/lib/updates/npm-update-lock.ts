@@ -27,7 +27,9 @@ export async function acquireNpmUpdateLock(dir: string) {
   const owner = String(process.pid);
   const claim = join(lock, owner);
   const busy = () =>
-    new Error('Another npm update is running. Try again when it finishes.');
+    new Error(
+      `Another npm update may be running. Wait for it to finish. If no update is running, remove ${lock} and try again.`
+    );
   for (;;) {
     await mkdir(lock, { recursive: true });
     try {

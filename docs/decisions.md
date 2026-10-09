@@ -1431,7 +1431,12 @@ Ctrl-C leaves npm time to finish its native interruption cleanup, including
 pending I/O and rollback, before recording a failure and reopening n10. Keeping
 the parent alive also prevents a PTY session leader's exit from hanging up npm
 mid-install. Replacement exits use the shared launcher's exit-status mapping,
-including 128 plus the terminating signal.
+including 128 plus the terminating signal. On a stalled download, npm ignores
+the first Ctrl-C until its fetch finishes or gives up; n10 imposes no mutation
+timeout. A second Ctrl-C can terminate npm before rollback and leave the
+installation incomplete, just as a manual npm install can. Both shells check
+that `main.js` exists before relaunching; if it is missing, they exit with status
+1 and print the pinned manual retry command last.
 
 Desktop uses its existing Node launcher. The accepted `will-quit` path writes a
 private request, drains the host, and exits with the update handoff code. Choosing
