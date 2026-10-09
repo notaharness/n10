@@ -30,6 +30,10 @@ linux:
 # release-assets.json in step: the release uploads the files it names.
 appImage:
   artifactName: n10-desktop-${arch}.AppImage
+# The default FUSE2 runtime needs an unversioned libz.so on arm64. The static
+# runtime runs without that development-library symlink or a host FUSE library.
+toolsets:
+  appimage: '1.0.3'
 deb:
   artifactName: n10-desktop_${arch}.deb
   # electron-builder's defaults, which setting depends replaces, then

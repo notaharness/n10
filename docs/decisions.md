@@ -1217,11 +1217,12 @@ copies node-pty and the one installed beam platform package from the
 workspace. electron-builder rebuilds node-pty against Electron. Its addon and
 the beam binary stay unpacked from the asar because other processes run
 them. The executable is `n10-desktop`, so a deb never shadows the npm
-package's `n10`. An AppImage's session bin points into its FUSE mount, so
-`n10 util` and `beam` in sessions that outlive it fail until it runs again;
-the deb has fixed paths. Where AppArmor blocks user namespaces (Ubuntu 24.04
-and later) the deb installs a profile, and the AppImage's launcher adds
-`--no-sandbox`.
+package's `n10`. The AppImage uses electron-builder's static runtime, which
+starts without a host FUSE library. Its session bin points into its temporary
+runtime directory, so `n10 util` and `beam` in sessions that outlive it fail
+until it runs again; the deb has fixed paths. Where AppArmor blocks user
+namespaces (Ubuntu 24.04 and later) the deb installs a profile, and the
+AppImage's launcher adds `--no-sandbox`.
 
 Release assets have versionless names, listed in
 `apps/desktop/release-assets.json`, so
