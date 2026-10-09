@@ -170,6 +170,7 @@ function start(
 
 const shellTerm: DiscoveredTerminal = {
   name: terminalSessionKey('n10-shell-1a2b3c'),
+  target: { kind: 'tmux', name: 'n10-shell-1a2b3c' },
   kind: 'shell',
   path: '/home/dev/notes',
 };
@@ -306,6 +307,7 @@ describe('startSessionDiscovery', () => {
     const exited = wtKey('feature-a');
     const terminal: DiscoveredTerminal = {
       name: terminalSessionKey('repo-shell'),
+      target: { kind: 'tmux', name: 'repo-shell' },
       kind: 'shell',
       path: '/repo',
     };
@@ -443,6 +445,7 @@ describe('startSessionDiscovery', () => {
     listTerminalsMock.mockReturnValue([
       {
         name: terminalSessionKey('repo-feature-a'),
+        target: { kind: 'tmux', name: 'repo-feature-a' },
         kind: 'agent',
         path,
         running: false,
@@ -640,6 +643,7 @@ describe('startSessionDiscovery', () => {
       const SILENT = 'f'.repeat(32);
       const remoteTerm: DiscoveredTerminal = {
         name: terminalSessionKey('n10-shell-9f8e7d', PEER),
+        target: { kind: 'tmux', name: 'n10-shell-9f8e7d' },
         kind: 'shell',
         path: '/home/far/notes',
       };

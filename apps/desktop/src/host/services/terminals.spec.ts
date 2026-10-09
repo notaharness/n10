@@ -237,6 +237,7 @@ describe('adoptTerminal', () => {
   it('reattaches under the name and in the directory tmux reported', async () => {
     await terminals.adoptTerminal({
       name: 'n10-shell',
+      target: { kind: 'tmux', name: 'n10-shell' },
       kind: 'shell',
       path: '/home/dev/notes',
     });
@@ -259,6 +260,7 @@ describe('adoptTerminal', () => {
   it('coalesces concurrent attachment before installing one output relay', async () => {
     const terminal = {
       name: 'n10-shell',
+      target: { kind: 'tmux' as const, name: 'n10-shell' },
       kind: 'shell' as const,
       path: '/x',
     };
@@ -281,6 +283,7 @@ describe('adoptTerminal', () => {
   it('puts a restored terminal’s repository back on the repo list', async () => {
     await terminals.adoptTerminal({
       name: 'n10-agent',
+      target: { kind: 'tmux', name: 'n10-agent' },
       kind: 'agent',
       path: '/home/dev/other',
     });
@@ -458,6 +461,7 @@ it('uses the allocated backend name for the tab and its lifecycle', async () => 
   // Restoring names a target explicitly rather than allocating another.
   await terminals.adoptTerminal({
     name: tab.name,
+    target: { kind: 'tmux', name: tab.name },
     kind: 'shell',
     path: '/home/dev/n10',
   });

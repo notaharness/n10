@@ -13,6 +13,7 @@ import {
   LOCAL_MACHINE,
   releaseExitedSession,
   requireMachine,
+  sameSessionTarget,
   sessionIdentity,
   type DiscoveredTerminal,
   type SessionTarget,
@@ -72,7 +73,8 @@ function sameSavedTerminal(
   if (!req.restore || !previous) return true;
   return (
     previous.cwd === req.cwd &&
-    previous.restore?.target.name === req.restore.target.name &&
+    !!previous.restore &&
+    sameSessionTarget(previous.restore.target, req.restore.target) &&
     JSON.stringify(previous.restore?.tags) === JSON.stringify(req.restore.tags)
   );
 }
@@ -252,7 +254,6 @@ export function createTerminalService(ports: TerminalPorts) {
       return terminalFacts(name, record);
     },
     async adopt(terminal: DiscoveredTerminal) {
-      const identity = sessionIdentity(terminal.name);
       const name = await start(
         {
           sessionName: terminal.name,
@@ -261,13 +262,7 @@ export function createTerminalService(ports: TerminalPorts) {
           ...(terminal.tags
             ? {
                 restore: {
-                  target: {
-                    kind: 'tmux',
-                    name:
-                      identity?.kind === 'terminal'
-                        ? identity.id
-                        : terminal.name,
-                  },
+                  target: terminal.target,
                   tags: terminal.tags,
                   ...(terminal.agent ? { agent: terminal.agent } : {}),
                 },

@@ -1,5 +1,6 @@
-/** Identity tags that must agree before a saved tab can adopt a tmux target. */
+/** Identity tags that must agree before a saved tab can adopt a session target. */
 
+import { sameSessionTarget } from '@n10/core/ui';
 import type { SessionTarget } from '../../../host/contract.js';
 
 const IDENTITY_TAGS = [
@@ -20,8 +21,7 @@ export interface SavedTarget {
 
 export function sameSavedTarget(a: SavedTarget, b: SavedTarget): boolean {
   return (
-    a.target.kind === b.target.kind &&
-    a.target.name === b.target.name &&
+    sameSessionTarget(a.target, b.target) &&
     IDENTITY_TAGS.every((tag) => a.tags[tag] === b.tags[tag])
   );
 }

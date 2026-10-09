@@ -5,11 +5,13 @@ import {
   tmuxListSessionsRead,
   tmuxSessionSnapshot,
   type TmuxLaunchPlan,
+  type TmuxSessionIncarnation,
   type TmuxSessionInfo,
 } from '@n10/terminal-tmux';
 import type {
   CatalogSession,
   SessionCatalog,
+  SessionIncarnation,
   SessionLaunchPlan,
 } from './session-catalog.js';
 
@@ -25,16 +27,28 @@ export function tmuxCatalogSession(info: TmuxSessionInfo): CatalogSession {
   };
 }
 
+/** A session another backend holds is never reached through tmux. */
 function tmuxName(target: SessionTarget): string {
+  if (target.kind !== 'tmux')
+    throw new Error(`${target.name} is not a tmux session`);
   return target.name;
 }
 
-/** A launch plan in tmux's terms, for a local or a remote server. An
- *  incarnation already carries tmux's fields. */
+function tmuxExpected(
+  expected: SessionIncarnation | undefined
+): TmuxSessionIncarnation | undefined {
+  if (expected && expected.kind !== 'tmux')
+    throw new Error(`${expected.name} is not a tmux session`);
+  return expected;
+}
+
+/** A launch plan in tmux's terms, for a local or a remote server. */
 export function tmuxLaunchPlan(plan: SessionLaunchPlan): TmuxLaunchPlan {
-  return plan.mode === 'create'
-    ? plan
-    : { ...plan, target: tmuxName(plan.target) };
+  if (plan.mode === 'create') return plan;
+  const target = tmuxName(plan.target);
+  if (plan.mode === 'replace')
+    return { ...plan, target, expected: tmuxExpected(plan.expected)! };
+  return { ...plan, target, expected: tmuxExpected(plan.expected) };
 }
 
 /** The local tmux server, through `@n10/terminal-tmux`. */

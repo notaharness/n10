@@ -36,14 +36,16 @@ function validRuntime(value: RecordValue): boolean {
   );
 }
 
-/** The session the tab reattaches to while it runs: a tmux session
- *  named by its label. */
+const nonEmpty = (value: unknown): boolean =>
+  typeof value === 'string' && value !== '';
+
+/** The session the tab reattaches to while it runs: a tmux session by
+ *  its name, or a managed owner's record by host and session ID. */
 function sessionTarget(value: unknown): boolean {
+  if (!record(value) || !nonEmpty(value.name)) return false;
+  if (value.kind === 'tmux') return true;
   return (
-    record(value) &&
-    value.kind === 'tmux' &&
-    typeof value.name === 'string' &&
-    value.name !== ''
+    value.kind === 'mux' && nonEmpty(value.hostId) && nonEmpty(value.sessionId)
   );
 }
 

@@ -7,6 +7,8 @@
  * away — are testable without git, tmux, timers or a filesystem.
  */
 
+import type { SessionTarget } from '@n10/terminal';
+
 /** One n10-owned worktree, as a scan saw it. */
 export interface DiscoveredWorktree {
   /** Qualified core key — `keyForWorktree(wt)`. */
@@ -21,8 +23,10 @@ export interface DiscoveredWorktree {
  *  what tmux holds: the kind is the session-type tag, the directory is
  *  the session's own `session_path`. */
 export interface DiscoveredTerminal {
-  /** Qualified terminal key containing the actual tmux attachment target. */
+  /** Qualified terminal key, from the session's name. */
   name: string;
+  /** The session as its catalog lists it. */
+  target: SessionTarget;
   kind: 'shell' | 'agent';
   running?: boolean;
   agent?: string;

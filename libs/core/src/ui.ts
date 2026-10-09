@@ -8,3 +8,7 @@ export * from './lib/utils/diff-scroll.js';
 export * from './lib/session/session-menu.js';
 export * from './lib/session/session-menu-request.js';
 export * from './lib/pull-requests/blob-image-limit.js';
+export {
+  sameSessionTarget,
+  type SessionTarget,
+} from '@n10/terminal/session-target';

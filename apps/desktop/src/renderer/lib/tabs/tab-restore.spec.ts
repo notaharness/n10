@@ -33,3 +33,26 @@ it('does not transfer a Claude tab to a Codex session with the same name and dir
     retainRuntime({ target: codex.target, tags: codex.tags }, saved).env
   ).toBeUndefined();
 });
+
+it('never adopts another managed session that took the saved label', () => {
+  const tags = {
+    '@orchestra-spawner': 'n10',
+    '@orchestra-repo': '/repo',
+    '@orchestra-session-type': 'agent',
+    '@orchestra-agent': 'claude',
+  };
+  const target = {
+    kind: 'mux',
+    hostId: 'h',
+    sessionId: 's',
+    name: 'old',
+  } as const;
+  const saved = { target, tags };
+  expect(sameSavedTarget(saved, { target: { ...target }, tags })).toBe(true);
+  expect(
+    sameSavedTarget(saved, { target: { ...target, sessionId: 'other' }, tags })
+  ).toBe(false);
+  expect(
+    sameSavedTarget(saved, { target: { ...target, hostId: 'restarted' }, tags })
+  ).toBe(false);
+});
