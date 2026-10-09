@@ -20,9 +20,9 @@ function terminal(
   tags: Partial<TaggedSession> = {}
 ): TaggedSession {
   return {
-    name,
+    target: { kind: 'tmux', name },
     created: ++created,
-    paneDead: false,
+    exited: false,
     path: `/home/u/${name}`,
     spawner: 'n10',
     repo: '/home/u/repo',
@@ -64,7 +64,7 @@ const wt = (branch: string) => {
 describe('orchestratorGroups', () => {
   it('finds a conversation by the target its session was marked with', () => {
     const sessions = [
-      terminal('repo-shell', { target: CLAUDE }),
+      terminal('repo-shell', { orchestraTarget: CLAUDE }),
       player('a', CLAUDE),
       player('b', CLAUDE),
       terminal('other-shell'),
@@ -83,7 +83,7 @@ describe('orchestratorGroups', () => {
 
   it('groups a dir player, which is a terminal tab, like a worktree one', () => {
     const sessions = [
-      terminal('repo-agent', { type: 'agent', target: CODEX }),
+      terminal('repo-agent', { type: 'agent', orchestraTarget: CODEX }),
       terminal('notes-dir', {
         spawner: 'orchestra',
         type: 'agent',
@@ -96,9 +96,9 @@ describe('orchestratorGroups', () => {
   });
 
   it('keeps a marked orchestrator whose players are all gone', () => {
-    expect(orchestratorGroups([terminal('t', { target: CLAUDE })])).toEqual([
-      { orchestrator: tab('t'), players: [] },
-    ]);
+    expect(
+      orchestratorGroups([terminal('t', { orchestraTarget: CLAUDE })])
+    ).toEqual([{ orchestrator: tab('t'), players: [] }]);
     // A tmux target is no mark: unnamed by any player, it is no one.
     expect(orchestratorGroups([terminal('gemini-tab')])).toEqual([]);
   });
@@ -127,7 +127,11 @@ describe('orchestratorGroups', () => {
       orchestrator: CLAUDE,
     });
     expect(
-      orchestratorGroups([terminal('mc-shell', { target: CLAUDE }), other, dir])
+      orchestratorGroups([
+        terminal('mc-shell', { orchestraTarget: CLAUDE }),
+        other,
+        dir,
+      ])
     ).toEqual([
       {
         orchestrator: tab('mc-shell'),
@@ -149,7 +153,7 @@ describe('orchestratorGroups', () => {
 
   it('leaves a beam target, an orchestrator on another machine, alone', () => {
     const sessions = [
-      terminal('near-shell', { target: CLAUDE }),
+      terminal('near-shell', { orchestraTarget: CLAUDE }),
       player('a', `beam:${PEER}/${CLAUDE}`),
     ];
     expect(orchestratorGroups(sessions)).toEqual([
@@ -158,7 +162,10 @@ describe('orchestratorGroups', () => {
   });
 
   it('never makes a session its own player', () => {
-    const self = terminal('loop', { target: CLAUDE, orchestrator: CLAUDE });
+    const self = terminal('loop', {
+      orchestraTarget: CLAUDE,
+      orchestrator: CLAUDE,
+    });
     expect(orchestratorGroups([self])).toEqual([
       { orchestrator: tab('loop'), players: [] },
     ]);
@@ -166,8 +173,8 @@ describe('orchestratorGroups', () => {
 
   it('keeps several orchestrators apart', () => {
     const sessions = [
-      terminal('one', { target: CLAUDE }),
-      terminal('two', { target: CODEX }),
+      terminal('one', { orchestraTarget: CLAUDE }),
+      terminal('two', { orchestraTarget: CODEX }),
       player('a', CODEX),
       player('b', CLAUDE),
     ];

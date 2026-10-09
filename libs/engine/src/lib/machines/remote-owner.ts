@@ -1,8 +1,4 @@
-import {
-  hasLiveTmuxSession,
-  isSessionAlive,
-  listOurSessionsWith,
-} from '@n10/core';
+import { hasLiveSession, isSessionAlive, listOurSessionsWith } from '@n10/core';
 import type { RemoteMachine } from '@n10/terminal-tmux';
 import type { MachineView } from './machine-types.js';
 
@@ -18,7 +14,7 @@ export async function refuseIfRemoteOwns(
   branch: string,
   name: string | null
 ): Promise<void> {
-  if (name && (isSessionAlive(name) || hasLiveTmuxSession(name))) return;
+  if (name && (isSessionAlive(name) || hasLiveSession(name))) return;
   let machines: MachineView[];
   try {
     machines = await fleet.listMachines();
@@ -51,7 +47,7 @@ async function ownsBranch(
         session.type === 'worktree' &&
         session.repo === repo &&
         session.branch === branch &&
-        !session.paneDead
+        !session.exited
     );
   } catch {
     return false;

@@ -1,8 +1,3 @@
-import {
-  tmuxSessionSnapshot,
-  sameTmuxIncarnation,
-  type TmuxSessionIncarnation,
-} from '@n10/terminal-tmux';
 import type { AppConfig } from '@n10/vcs-core';
 import {
   LISTED_TAGS,
@@ -13,8 +8,12 @@ import { resolveWorktreeSession } from '../session-resolver.js';
 import { getSession } from '../pty-registry.js';
 import { LOCAL_MACHINE, sessionIdentity } from '../session-key.js';
 import { isKnownAgentId, resolveAgent } from '../agents/registry.js';
+import {
+  localCatalog,
+  sameIncarnation,
+  type SessionIncarnation,
+} from '../session-catalog.js';
 
-export type SessionIncarnation = TmuxSessionIncarnation;
 export interface SessionLaunchContext {
   exists: boolean;
   running: boolean;
@@ -36,7 +35,7 @@ export function getSessionLaunchContext(
   if (identity?.kind !== 'worktree') return empty;
   const candidate = resolveWorktreeSession(identity.repo, identity.path);
   if (!candidate) return empty;
-  const snapshot = tmuxSessionSnapshot(candidate.name, LISTED_TAGS);
+  const snapshot = localCatalog().snapshot(candidate.target, LISTED_TAGS);
   const session = snapshot && taggedSession(snapshot);
   if (!session || !isWorktreeSessionFor(session, identity.repo, identity.path))
     return empty;
@@ -50,7 +49,7 @@ export function getSessionLaunchContext(
   const lastReport = parseReport(session.lastReport);
   return {
     exists: true,
-    running: !session.paneDead,
+    running: !session.exited,
     canResume: !!agent?.resume,
     recordedAgent: session.agent,
     recordedAgentName: displayName(session.agent, agent?.name),
@@ -82,7 +81,7 @@ export function sessionIncarnationMatches(
 ): boolean {
   const machine = sessionIdentity(name)?.machine ?? LOCAL_MACHINE;
   if (machine !== LOCAL_MACHINE) return false;
-  const nativeName = getSession(name)?.pty.target?.name;
-  const live = nativeName && tmuxSessionSnapshot(nativeName)?.incarnation;
-  return !!live && sameTmuxIncarnation(live, expected);
+  const target = getSession(name)?.pty.target;
+  const live = target && localCatalog().snapshot(target)?.incarnation;
+  return !!live && sameIncarnation(live, expected);
 }

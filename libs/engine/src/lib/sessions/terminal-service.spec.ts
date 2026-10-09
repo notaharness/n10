@@ -16,6 +16,7 @@ const state = vi.hoisted(() => ({
     string,
     {
       pty: {
+        target?: { kind: 'tmux'; name: string };
         onExit: (cb: () => void) => void;
         connectionState?: 'connected' | 'reconnecting' | 'failed';
       };
@@ -51,13 +52,14 @@ vi.mock('@n10/core', async (original) => ({
     id,
     executor: { run: state.remoteRun },
   }),
-  captureTmuxRuntime: state.capture,
+  captureSessionRuntime: state.capture,
 }));
 const local = terminalSessionKey('terminal');
 const remote = terminalSessionKey('terminal', 'peer');
 function register(name: string) {
   const entry = {
     pty: {
+      target: { kind: 'tmux' as const, name: 'terminal' },
       onExit: (cb: () => void) => {
         state.exits.push(cb);
       },
@@ -180,7 +182,11 @@ it('refreshes the owning agent runtime and retains it after the pane exits', asy
     };
   });
   await service.launch({ kind: 'agent', cwd: '/repo' });
-  expect(state.capture).toHaveBeenCalledWith('real-tmux', undefined, 'claude');
+  expect(state.capture).toHaveBeenCalledWith(
+    { kind: 'tmux', name: 'real-tmux' },
+    undefined,
+    'claude'
+  );
   expect(service.list()[0].restore).toMatchObject({
     env: { CLAUDE_CONFIG_DIR: '/session/claude' },
     conversationId,

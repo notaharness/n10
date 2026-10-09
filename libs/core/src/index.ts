@@ -43,6 +43,7 @@ export * from './lib/plan/plan-types.js';
 export * from './lib/session-backend.js';
 export * from './lib/session-identity.js';
 export * from './lib/session-resolver.js';
+export type { SessionIncarnation } from './lib/session-catalog.js';
 export * from './lib/session/session-request.js';
 export * from './lib/session/open-session.js';
 export type * from './lib/terminal/terminal-name.js';

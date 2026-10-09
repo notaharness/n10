@@ -7,8 +7,9 @@ import {
   sessionTags,
   ORCHESTRA_TAG,
   LOCAL_MACHINE,
-  captureTmuxRuntime,
+  captureSessionRuntime,
   snapshot as activitySnapshot,
+  type SessionTarget,
 } from '@n10/core';
 import { activeRepository, repository, requireRepo } from './repo.js';
 import { machines } from './machines.js';
@@ -157,7 +158,7 @@ function worktreeTags(
 
 function worktreeRestore(
   summary: SessionSummary,
-  tmuxName: string,
+  target: SessionTarget,
   tags: Record<string, string>,
   agent: string | undefined,
   aiCommand: string | undefined,
@@ -165,11 +166,11 @@ function worktreeRestore(
 ): WorktreeResume {
   return {
     sessionName: summary.name,
-    target: { kind: 'tmux', name: tmuxName },
+    target,
     tags,
     ...(agent ? { agent } : {}),
     ...(agent === 'test' && aiCommand ? { aiCommand } : {}),
-    ...(local ? captureTmuxRuntime(tmuxName, undefined, agent) : {}),
+    ...(local ? captureSessionRuntime(target, undefined, agent) : {}),
   };
 }
 
@@ -180,8 +181,8 @@ function withResume(
 ): SessionSummary {
   const identity = sessionIdentity(summary.name);
   const held = getSession(summary.name);
-  const tmuxName = held?.pty.target?.name;
-  if (identity?.kind !== 'worktree' || !tmuxName) return summary;
+  const target = held?.pty.target;
+  if (identity?.kind !== 'worktree' || !target) return summary;
   const listed =
     identity.machine === LOCAL_MACHINE ? tagged.get(summary.name) : undefined;
   const agent = listed?.agent ?? held.agent;
@@ -190,7 +191,7 @@ function withResume(
     worktreeTags(identity.repo, identity.path, held.createdFor ?? '', agent);
   const restore = worktreeRestore(
     summary,
-    tmuxName,
+    target,
     tags,
     agent,
     aiCommand,

@@ -7,7 +7,7 @@ import { createPlanCommands } from './plan-commands.js';
 
 const {
   hasSession,
-  hasLiveTmuxSession,
+  hasLiveSession,
   hasSessionConnection,
   stopSession,
   launchSession,
@@ -15,7 +15,7 @@ const {
   createWorktree,
 } = vi.hoisted(() => ({
   hasSession: vi.fn(),
-  hasLiveTmuxSession: vi.fn(),
+  hasLiveSession: vi.fn(),
   hasSessionConnection: vi.fn(),
   stopSession: vi.fn(),
   launchSession: vi.fn(),
@@ -25,7 +25,7 @@ const {
 vi.mock('@n10/core', async (original) => ({
   ...(await original<typeof Core>()),
   isSessionAlive: hasSession,
-  hasLiveTmuxSession,
+  hasLiveSession,
   hasSessionConnection,
   stopSession,
   launchSession,
@@ -62,7 +62,7 @@ describe('checkoutPlan', () => {
       isCurrent: () => true,
       changed: async () => undefined,
     }).checkoutPlan;
-    hasLiveTmuxSession.mockReturnValue(false);
+    hasLiveSession.mockReturnValue(false);
     hasSessionConnection.mockImplementation((name: string) => hasSession(name));
     createWorktree.mockResolvedValue('/wt/feature-x');
   });
@@ -84,7 +84,7 @@ describe('checkoutPlan', () => {
 
   it('attaches a persisted live agent before injecting without starting another process', async () => {
     hasSession.mockReturnValue(false);
-    hasLiveTmuxSession.mockReturnValue(true);
+    hasLiveSession.mockReturnValue(true);
     deliverToRunningSession.mockReturnValue(true);
     await expect(checkoutPlan(deps('inject'))).resolves.toMatchObject({
       outcome: 'injected',
@@ -99,7 +99,7 @@ describe('checkoutPlan', () => {
   it('refreshes an exited local entry when Orchestra has already restarted its process', async () => {
     hasSession.mockReturnValue(false);
     hasSessionConnection.mockReturnValue(true);
-    hasLiveTmuxSession.mockReturnValue(true);
+    hasLiveSession.mockReturnValue(true);
     deliverToRunningSession.mockReturnValue(true);
     await expect(checkoutPlan(deps('inject'))).resolves.toMatchObject({
       outcome: 'injected',
@@ -111,7 +111,7 @@ describe('checkoutPlan', () => {
 
   it('stops a persisted live agent before starting a requested fresh plan session', async () => {
     hasSession.mockReturnValue(false);
-    hasLiveTmuxSession.mockReturnValue(true);
+    hasLiveSession.mockReturnValue(true);
     await expect(checkoutPlan(deps('new-session'))).resolves.toMatchObject({
       outcome: 'spawned',
     });

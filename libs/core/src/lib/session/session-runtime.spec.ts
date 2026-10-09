@@ -1,16 +1,7 @@
 import { expect, it } from 'vitest';
-import { captureTmuxRuntime, tmuxPanePid } from './session-runtime.js';
-import type { tmuxSessionSnapshot } from '@n10/terminal-tmux';
+import { captureSessionRuntime } from './session-runtime.js';
 
-it('does not sample a retained dead pane whose PID may have been reused', () => {
-  const snapshot = (paneDead: boolean) => () =>
-    ({
-      paneDead,
-      incarnation: { panePid: 100 },
-    } as NonNullable<ReturnType<typeof tmuxSessionSnapshot>>);
-  expect(tmuxPanePid('old', snapshot(true))).toBeNull();
-  expect(tmuxPanePid('old', snapshot(false))).toBe(100);
-});
+const pane = { kind: 'tmux', name: 'pane' } as const;
 
 it('captures the agent child environment and its exact Claude conversation', () => {
   const files: Record<string, string> = {
@@ -24,10 +15,10 @@ it('captures the agent child environment and its exact Claude conversation', () 
       procStart: '987',
     }),
   };
-  const captured = captureTmuxRuntime(
-    'old',
+  const captured = captureSessionRuntime(
+    pane,
     {
-      panePid: () => 100,
+      processId: () => 100,
       read: (path) => files[path] ?? null,
       defaultClaudeDir: '/default',
     },
@@ -61,10 +52,10 @@ it('keeps the owning Claude conversation when its child runs another Claude', ()
     }),
   };
   expect(
-    captureTmuxRuntime(
-      'pane',
+    captureSessionRuntime(
+      pane,
       {
-        panePid: () => 100,
+        processId: () => 100,
         read: (path) => files[path] ?? null,
         defaultClaudeDir: '/default',
       },
@@ -91,10 +82,10 @@ it('does not apply a child Claude ID to a Codex pane', () => {
     }),
   };
   expect(
-    captureTmuxRuntime(
-      'pane',
+    captureSessionRuntime(
+      pane,
       {
-        panePid: () => 100,
+        processId: () => 100,
         read: (path) => files[path] ?? null,
         defaultClaudeDir: '/default',
       },

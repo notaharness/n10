@@ -5,17 +5,14 @@ import {
   terminalSessionKey,
   sessionIdentity,
 } from './session-key.js';
-import {
-  isTmuxAvailable,
-  tmuxKillSession,
-  type TmuxStatus,
-} from '@n10/terminal-tmux';
+import { isTmuxAvailable, type TmuxStatus } from '@n10/terminal-tmux';
 import type {
   DiscoveredTerminal,
   DiscoveredWorktree,
 } from './discovery/discovery-model.js';
 import { requireMachine } from './machine-registry.js';
 import { getSession, liveSessionNames } from './pty-registry.js';
+import { localCatalog } from './session-catalog.js';
 import {
   isTerminalSession,
   registryNameOf,
@@ -63,18 +60,17 @@ export function applySessionBackend(): void {
   }
 }
 
-/** What one `tmux list-sessions` fork says about the sessions n10
- *  cares about. */
-export interface TmuxObservation {
+/** What one catalog listing says about the sessions n10 cares about. */
+export interface SessionObservation {
   /** The registry names of the asked-about worktrees that have a live
-   *  tmux session tagged with this repository and their checkout. */
+   *  session tagged with this repository and their checkout. */
   persisted: Set<string>;
   /** Every terminal-tab session on the server, whatever directory or
    *  repository it belongs to, plus this repository's orphaned worktree
-   *  sessions — see {@link observeTmuxSessions}. */
+   *  sessions — see {@link observeSessions}. */
   terminals: DiscoveredTerminal[];
   /** The registry names of every worktree session of this repository
-   *  the server still has, its pane live or dead, whether or not git
+   *  the catalog still has, its process running or exited, whether or not git
    *  still lists the checkout. */
   held: Set<string>;
 }
@@ -95,8 +91,9 @@ export interface TmuxObservation {
  * Terminal sessions are found by session type and reported wherever
  * they run, because a terminal belongs to its directory, not to the
  * repository this scan happens to be for — one opened in another
- * checkout still has to come back as a tab. Its directory is tmux's
- * own `session_path`; nothing is written to disk to remember it.
+ * checkout still has to come back as a tab. Its directory is the
+ * catalog's own (tmux's `session_path`); nothing is written to disk to
+ * remember it.
  *
  * A worktree session tagged with this repository whose checkout no
  * worktree answers to — its directory was removed, or its tag names a
@@ -108,13 +105,13 @@ export interface TmuxObservation {
  * holds it, though, since attaching a second client to a session this
  * process is driving is exactly what the orphan path must not do.
  * Never throws. An absent tmux server yields nothing, same as no
- * sessions; a listing tmux could not give (a failed fork, the timeout
- * kill) yields `null`, which says nothing about any session.
+ * sessions; a listing the catalog could not give (a failed fork, the
+ * timeout kill) yields `null`, which says nothing about any session.
  */
-export function observeTmuxSessions(
+export function observeSessions(
   root: string,
   worktrees: readonly DiscoveredWorktree[]
-): TmuxObservation | null {
+): SessionObservation | null {
   const listed = readOurSessions();
   if (!listed) return null;
   const ctx: ClassifyContext = {
@@ -148,12 +145,12 @@ interface ClassifyContext {
   owned: Set<string>;
 }
 
-/** What one of our live tmux sessions means to this repository: a
+/** What one of our live sessions means to this repository: a
  *  worktree session that survived (`persisted`), a terminal tab to
  *  report (`terminal`), or nothing (`null`) — another repository's
  *  session, or one already owned that would otherwise read as an
  *  orphan. A terminal tab needs somewhere to run and display, so a
- *  session tmux reports no path for is dropped rather than reported
+ *  session the catalog reports no path for is dropped rather than reported
  *  onto no path at all; a persisted worktree session needs no path. */
 function classifySession(
   session: TaggedSession,
@@ -176,7 +173,7 @@ function classifySession(
     canonicalWorktreePath(session.worktreePath)
   );
   if (registryName !== undefined)
-    return session.paneDead ? null : { kind: 'persisted', name: registryName };
+    return session.exited ? null : { kind: 'persisted', name: registryName };
   if (ctx.owned.has(registryNameOf(session)) || !path) return null;
   return { kind: 'terminal', terminal: discoveredTerminal(session, 'agent') };
 }
@@ -188,10 +185,10 @@ function discoveredTerminal(
   kind: DiscoveredTerminal['kind']
 ): DiscoveredTerminal {
   return {
-    name: terminalSessionKey(session.name, session.machine),
+    name: terminalSessionKey(session.target.name, session.machine),
     kind,
     path: session.path,
-    running: !session.paneDead,
+    running: !session.exited,
     agent: session.agent,
     tags: session.tags,
   };
@@ -222,7 +219,7 @@ export async function observeRemoteTerminals(
   );
 }
 
-/** The tmux session a registry name stands for in the open
+/** The session a registry name stands for in the open
  *  repository, verified by its tags, or `null` — outside a working
  *  tree there is nothing to tag a session with, so nothing to find. */
 function resolveOwn(sessionName: string): TaggedSession | null {
@@ -233,13 +230,13 @@ function resolveOwn(sessionName: string): TaggedSession | null {
 }
 
 /** Whether the tagged worktree session has a live hosted process. */
-export function hasLiveTmuxSession(sessionName: string): boolean {
+export function hasLiveSession(sessionName: string): boolean {
   if (cachedTmuxStatus && !cachedTmuxStatus.available) return false;
   const session = resolveOwn(sessionName);
-  return session !== null && !session.paneDead;
+  return session !== null && !session.exited;
 }
 
-/** Resolve a qualified terminal key to its exact tagged tmux target, across
+/** Resolve a qualified terminal key to its exact tagged target, across
  *  repositories. Adopted orphan worktrees also use terminal keys. Another
  *  machine's tmux cannot be asked synchronously: its backend's last
  *  listing there answers, which says `gone` once tmux no longer has it. */
@@ -256,12 +253,7 @@ export function hasPersistedTerminalSession(name: string): boolean {
 
 /** Stop the tagged worktree session even when no local connection exists.
  * Names alone never authorize cleanup: the resolver verifies identity first. */
-export function killPersistedTmuxSession(sessionName: string): void {
+export function killPersistedSession(sessionName: string): void {
   const session = resolveOwn(sessionName);
-  if (!session) return;
-  try {
-    tmuxKillSession(session.name);
-  } catch {
-    // no server / no session — nothing to kill
-  }
+  if (session) localCatalog().kill(session.target);
 }

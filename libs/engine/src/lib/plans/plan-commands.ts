@@ -3,7 +3,7 @@ import { paneDimension } from '../kernel/terminal-size.js';
 import {
   deliverToRunningSession,
   getSession,
-  hasLiveTmuxSession,
+  hasLiveSession,
   hasSessionConnection,
   isSessionAlive,
   launchSession,
@@ -86,7 +86,7 @@ export function createPlanCommands(options: {
     await at.ports.beforeLaunch?.(at.request.pr.sourceBranch, current);
     assertCurrent();
     const running =
-      current && (isSessionAlive(current) || hasLiveTmuxSession(current));
+      current && (isSessionAlive(current) || hasLiveSession(current));
     if (running && at.request.mode === 'inject') {
       if (!isSessionAlive(current) || !hasSessionConnection(current))
         await launch(at, await checkout(at), true);

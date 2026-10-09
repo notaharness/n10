@@ -9,7 +9,7 @@ import { afterAll, beforeAll } from 'vitest';
  * server, before a single spec is imported.
  *
  * `libs/core` is where the real tmux calls live — the resolver lists
- * sessions, `killPersistedTmuxSession` kills one — and
+ * sessions, `killPersistedSession` kills one — and
  * `session-resolver.spec.ts` deliberately creates and kills real
  * sessions to prove the tag rules against a server. Without this it
  * would do that on `/tmp/tmux-$UID/default`, next to the developer's

@@ -7,7 +7,7 @@ const state = vi.hoisted(() => ({
   report: 'PROGRESS 2026-01-01T00:00:00Z inbox',
 }));
 vi.mock('../session-resolver.js', () => ({
-  resolveWorktreeSession: () => ({ name: 'player' }),
+  resolveWorktreeSession: () => ({ target: { kind: 'tmux', name: 'player' } }),
 }));
 vi.mock('@n10/terminal-tmux', () => ({
   tmuxSessionSnapshot: () =>

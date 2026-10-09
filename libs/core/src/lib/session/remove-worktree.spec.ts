@@ -21,8 +21,7 @@ vi.mock('../pty-registry.js', () => ({
   killSession: (key: string) => state.calls.push(['kill', key]),
 }));
 vi.mock('../session-backend.js', () => ({
-  killPersistedTmuxSession: (key: string) =>
-    state.calls.push(['persisted', key]),
+  killPersistedSession: (key: string) => state.calls.push(['persisted', key]),
 }));
 vi.mock('@n10/worktree-manager', () => ({
   branchTip: async () => {

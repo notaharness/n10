@@ -15,8 +15,13 @@ The reasoning behind each rule is in `docs/decisions.md`.
 - **Launch boundary** (`session/open-session.ts`): receive explicit worktree or
   terminal identity, validate the worktree HEAD against the branch a caller
   names (discovery's attaches name none), resolve tags, then choose
-  create/attach/restart. Build agent argv only for create or restart. The tmux
-  package receives opaque launch plans; it must not infer n10 identities.
+  create/attach/restart. Build agent argv only for create or restart. The
+  catalog receives opaque launch plans; it must not infer n10 identities.
+- **Session catalog** (`session-catalog.ts`): every local listing, snapshot,
+  kill and launch in core goes through `localCatalog()`; `tmux-catalog.ts`
+  is its tmux implementation and maps plans to tmux's terms, for remote
+  servers too. Targets (`SessionTarget`) and incarnations are discriminated by
+  `kind`. Remote machines and the `tmux:` relay grammar stay tmux.
 - **Registry identity** (`session-key.ts`): worktree keys encode repo and the
   canonical checkout path (`canonicalWorktreePath`), never the branch: a
   `git switch`, rename or detached HEAD keeps the key, and a second worktree
@@ -63,7 +68,7 @@ The reasoning behind each rule is in `docs/decisions.md`.
   guarded removal. Engine commands capture the scope from their config snapshot
   and reuse it for lookup and checkout. Never select a process-wide path resolver.
 - **Observation** (`discovery/`, `session-backend.ts`): pure scan differences,
-  tagged observations and live-worktree lookups. `observeTmuxSessions` receives
+  tagged observations and live-worktree lookups. `observeSessions` receives
   the repository explicitly. The engine owns polling, adoption and removal rescans.
   Retained agent panes are not running processes.
 - **Terminal sessions** (`terminal/launch-terminal.ts`): explicit shell/agent

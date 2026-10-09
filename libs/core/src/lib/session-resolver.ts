@@ -1,10 +1,9 @@
 import {
-  tmuxListSessionsDetailed,
   tmuxListSessionsDetailedWith,
-  tmuxListSessionsRead,
   type MachineExecutor,
-  type TmuxSessionInfo,
 } from '@n10/terminal-tmux';
+import { localCatalog, type CatalogSession } from './session-catalog.js';
+import { tmuxCatalogSession } from './tmux-catalog.js';
 import {
   isWorktreeSessionFor,
   LISTED_TAGS,
@@ -14,16 +13,16 @@ import {
 } from './session-identity.js';
 
 /**
- * The one way a tmux session is found: one `tmux -u list-sessions -F`
- * fork, matched client-side on its tags (never `list-sessions -f`,
- * filtering stays in core; never a composed name).
+ * The one way a session is found: one catalog listing (for tmux, one
+ * `tmux -u list-sessions -F` fork), matched in core on its tags (never
+ * `list-sessions -f`, filtering stays in core; never a composed name).
  * Every attach, exists, kill, adopt and listing in core goes through
  * here, so the rule that an untagged session is foreign is enforced in
  * one place. Never throws: no server, or no tmux, is an empty listing.
  */
 
 function sessionsFromListing(
-  listed: TmuxSessionInfo[],
+  listed: readonly CatalogSession[],
   machine?: string
 ): TaggedSession[] {
   const ours: TaggedSession[] = [];
@@ -34,25 +33,18 @@ function sessionsFromListing(
   return ours;
 }
 
-/** {@link listOurSessions}, or `null` when tmux could not be asked —
- *  for a caller that must not read a failed listing as no sessions. */
+/** {@link listOurSessions}, or `null` when the catalog could not be
+ *  read — for a caller that must not read a failed listing as no
+ *  sessions. */
 export function readOurSessions(): TaggedSession[] | null {
-  try {
-    const listed = tmuxListSessionsRead(LISTED_TAGS);
-    return listed && sessionsFromListing(listed);
-  } catch {
-    return null;
-  }
+  const listed = localCatalog().list(LISTED_TAGS);
+  return listed && sessionsFromListing(listed);
 }
 
-/** Every session on the server that carries our tags, in tmux's
+/** Every local session that carries our tags, in the catalog's
  *  listing order. */
 export function listOurSessions(): TaggedSession[] {
-  try {
-    return sessionsFromListing(tmuxListSessionsDetailed(LISTED_TAGS));
-  } catch {
-    return [];
-  }
+  return readOurSessions() ?? [];
 }
 
 /** Bounds one `listOurSessionsWith` round trip: a remote exec
@@ -93,17 +85,15 @@ export async function listOurSessionsWith(
   executor: MachineExecutor,
   machine: string
 ): Promise<TaggedSession[]> {
-  return sessionsFromListing(
-    await withTimeout(
-      tmuxListSessionsDetailedWith(executor, LISTED_TAGS),
-      LIST_SESSIONS_TIMEOUT_MS,
-      `list-sessions on ${machine} timed out after ${LIST_SESSIONS_TIMEOUT_MS}ms`
-    ),
-    machine
+  const listed = await withTimeout(
+    tmuxListSessionsDetailedWith(executor, LISTED_TAGS),
+    LIST_SESSIONS_TIMEOUT_MS,
+    `list-sessions on ${machine} timed out after ${LIST_SESSIONS_TIMEOUT_MS}ms`
   );
+  return sessionsFromListing(listed.map(tmuxCatalogSession), machine);
 }
 
-/** The oldest of several sessions, by tmux's creation time. More than
+/** The oldest of several sessions, by creation time. More than
  *  one session for an identity should not happen; when it does, the
  *  one that was there first is the one everything acts on, and the
  *  others are left where they are — listed, never silently killed. */
@@ -128,8 +118,8 @@ export function resolveWorktreeSession(
 
 /**
  * One of our sessions with exactly this name, or `null` — any type, any
- * repository, because a tmux name is unique on the server. This is how
- * a caller that holds a tmux name reaches its session: a terminal tab,
+ * repository, because a session name is unique in its catalog. This is
+ * how a caller that holds a session name reaches its session: a terminal tab,
  * which belongs to its directory rather than to the open repository
  * and outlives a repository switch; or an orphaned worktree session
  * that a terminal tab has adopted, which keeps its `worktree` tag. The
@@ -141,7 +131,7 @@ export function resolveSessionByName(
   name: string,
   sessions: TaggedSession[] = listOurSessions()
 ): TaggedSession | null {
-  return sessions.find((s) => s.name === name) ?? null;
+  return sessions.find((s) => s.target.name === name) ?? null;
 }
 
 /**
@@ -153,10 +143,10 @@ export function resolveSessionByName(
  * Nothing is matched by name here, only tags: `registryNameOf` rebuilds
  * each candidate session's key from its `repo`/worktree-path tags (via
  * {@link worktreeSessionKey}, a JSON tuple — see `session-key.ts`) and
- * compares that to `registryName`. A registry key is never a tmux
+ * compares that to `registryName`. A registry key is never a session
  * name by construction, so matching on the name directly could answer
  * with an unrelated session that happens to share a label. Callers
- * holding a tmux name — a terminal tab, whose key *is* its name — use
+ * holding a session name — a terminal tab, whose key *is* its name — use
  * {@link resolveSessionByName} instead.
  */
 export function resolveRegistrySession(

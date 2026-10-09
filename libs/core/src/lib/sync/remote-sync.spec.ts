@@ -80,7 +80,7 @@ vi.mock('../pty-registry.js', () => ({
 
 // A surviving tmux agent prevents deletion even without a registry client.
 vi.mock('../session-backend.js', () => ({
-  hasLiveTmuxSession: (name: string) => env.persisted.has(name),
+  hasLiveSession: (name: string) => env.persisted.has(name),
 }));
 
 const { computeConflictCounts, sweepMergedBranches } = await import(

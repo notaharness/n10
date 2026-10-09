@@ -12,7 +12,7 @@ vi.mock('@n10/logger', () => ({
 
 // The sweep skips a checkout with a live agent; none runs here.
 vi.mock('../pty-registry.js', () => ({ isSessionAlive: () => false }));
-vi.mock('../session-backend.js', () => ({ hasLiveTmuxSession: () => false }));
+vi.mock('../session-backend.js', () => ({ hasLiveSession: () => false }));
 
 import { sweepMergedBranches, syncRemote } from './remote-sync.js';
 

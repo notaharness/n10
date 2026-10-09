@@ -6,10 +6,11 @@ import {
 } from './session-key.js';
 import { createHash } from 'node:crypto';
 import { basename } from 'node:path';
-import type { TmuxSessionInfo } from '@n10/terminal-tmux';
+import type { SessionTarget } from '@n10/terminal';
+import type { CatalogSession } from './session-catalog.js';
 
 /**
- * What a tmux session *is*, and what it is merely *called*.
+ * What a persistent session *is*, and what it is merely *called*.
  *
  * Names are labels, tags are identity. A session's name is chosen once
  * at creation, for a human reading `tmux ls`, and never parsed: every
@@ -19,8 +20,9 @@ import type { TmuxSessionInfo } from '@n10/terminal-tmux';
  * session whose name n10 would have chosen but that lacks the tags is
  * foreign: never attached to, killed, adopted or listed.
  *
- * Tags: `set-option -t '=<name>:' @orchestra-x value` to write,
- * `#{@orchestra-x}` in a format string to read. They die with the
+ * Tags live with the session in its catalog — in tmux, session user
+ * options (`set-option -t '=<name>:' @orchestra-x value` to write,
+ * `#{@orchestra-x}` in a format string to read). They die with the
  * session and need no file. A value is a plain string without tabs;
  * an absent tag is unset, never a sentinel.
  */
@@ -63,7 +65,7 @@ export const ORCHESTRA_TAG = {
   target: '@orchestra-target',
 } as const;
 
-/** Every tag a listing asks tmux for, in the one fork. */
+/** Every tag a listing asks the catalog for, in one read. */
 export const LISTED_TAGS: readonly string[] = Object.values(ORCHESTRA_TAG);
 
 /** What n10 writes as `@orchestra-spawner` on the sessions it creates. */
@@ -89,14 +91,14 @@ const SESSION_TYPES: ReadonlyMap<string, SessionType> = new Map([
 
 /** One of our sessions, as the tags describe it. */
 export interface TaggedSession {
-  /** The tmux name — a label, never parsed. */
-  name: string;
-  /** `#{session_created}`, epoch seconds: orders two sessions that
-   *  claim one identity. */
+  /** What addresses the session; its name is a label, never parsed. */
+  target: SessionTarget;
+  /** Epoch seconds: orders two sessions that claim one identity. */
   created: number;
-  paneDead: boolean;
+  /** The process ended; the session retains its screen. */
+  exited: boolean;
   exitCode?: number;
-  /** `#{session_path}` — the directory the session runs in. */
+  /** The directory the session runs in. */
   path: string;
   spawner: string;
   repo: string;
@@ -113,7 +115,7 @@ export interface TaggedSession {
   orchestrator?: string;
   lastReport?: string;
   /** Set on an orchestrator's own session — see `ORCHESTRA_TAG.target`. */
-  target?: string;
+  orchestraTarget?: string;
   /** The machine this session lives on — a beam `peerId`, or `'local'`.
    *  Set by whoever listed the session: the local resolver always says
    *  `'local'`; a remote poller (D3) stamps its peerId. Tags themselves
@@ -128,16 +130,19 @@ export interface TaggedSession {
  *  {@link taggedSession} to keep its own complexity within budget. */
 function orchestraTagFields(
   tags: Record<string, string>
-): Pick<TaggedSession, 'agent' | 'orchestrator' | 'lastReport' | 'target'> {
+): Pick<
+  TaggedSession,
+  'agent' | 'orchestrator' | 'lastReport' | 'orchestraTarget'
+> {
   const agent = tags[ORCHESTRA_TAG.agent];
   const orchestrator = tags[ORCHESTRA_TAG.orchestrator];
   const lastReport = tags[ORCHESTRA_TAG.lastReport];
-  const target = tags[ORCHESTRA_TAG.target];
+  const orchestraTarget = tags[ORCHESTRA_TAG.target];
   return {
     ...(agent ? { agent } : {}),
     ...(orchestrator ? { orchestrator } : {}),
     ...(lastReport ? { lastReport } : {}),
-    ...(target ? { target } : {}),
+    ...(orchestraTarget ? { orchestraTarget } : {}),
   };
 }
 
@@ -160,10 +165,10 @@ function checkoutTag(
  * Nothing about the name is consulted.
  */
 export function taggedSession(
-  info: TmuxSessionInfo,
+  listed: CatalogSession,
   machine: string = LOCAL_MACHINE
 ): TaggedSession | null {
-  const tags = info.options ?? {};
+  const tags = listed.tags;
   const spawner = tags[ORCHESTRA_TAG.spawner];
   const type = SESSION_TYPES.get(tags[ORCHESTRA_TAG.sessionType] ?? '');
   const repo = tags[ORCHESTRA_TAG.repo];
@@ -171,11 +176,11 @@ export function taggedSession(
   const worktreePath = checkoutTag(type, tags);
   if (worktreePath === null) return null;
   return {
-    name: info.name,
-    created: info.created,
-    paneDead: info.paneDead,
-    exitCode: info.exitCode,
-    path: info.path,
+    target: listed.target,
+    created: listed.created,
+    exited: listed.exited,
+    exitCode: listed.exitCode,
+    path: listed.path,
     spawner,
     repo: repo ?? '',
     type,
@@ -216,13 +221,14 @@ export function isTerminalSession(
 /**
  * The PTY-registry key a session answers to in its own repository:
  * a worktree session is keyed by `worktreeSessionKey(path)`, the
- * checkout it belongs to and the key both shells spawn it under; a terminal tab by its tmux name,
- * which discovery learns from the listing.
+ * checkout it belongs to and the key both shells spawn it under; a
+ * terminal tab by its session name, which discovery learns from the
+ * listing.
  */
 export function registryNameOf(session: TaggedSession): string {
   return session.type === 'worktree'
     ? worktreeSessionKey(session.worktreePath, session.repo, session.machine)
-    : terminalSessionKey(session.name, session.machine);
+    : terminalSessionKey(session.target.name, session.machine);
 }
 
 /** The tags n10 writes on a session it creates. */

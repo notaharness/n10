@@ -52,20 +52,20 @@ vi.mock('./pty-registry.js', () => ({
 import {
   applySessionBackend,
   getRepoRoot,
-  hasLiveTmuxSession,
+  hasLiveSession,
   hasPersistedTerminalSession,
-  killPersistedTmuxSession,
+  killPersistedSession,
   observeRemoteTerminals,
-  observeTmuxSessions,
+  observeSessions,
   probeTmuxAvailability,
   resetRepoRoot,
 } from './session-backend.js';
 
 /** The observation, for a listing tmux gave. */
 function observed(
-  ...args: Parameters<typeof observeTmuxSessions>
-): NonNullable<ReturnType<typeof observeTmuxSessions>> {
-  const seen = observeTmuxSessions(...args);
+  ...args: Parameters<typeof observeSessions>
+): NonNullable<ReturnType<typeof observeSessions>> {
+  const seen = observeSessions(...args);
   if (!seen) throw new Error('tmux could not list its sessions');
   return seen;
 }
@@ -193,8 +193,8 @@ describe('tmux session existence', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('some-label-2', 'worktree', '/repo', 'feature/x', '/wt/x'),
     ]);
-    expect(hasLiveTmuxSession(worktreeSessionKey('/wt/x'))).toBe(true);
-    expect(hasLiveTmuxSession(worktreeSessionKey('/wt/y'))).toBe(false);
+    expect(hasLiveSession(worktreeSessionKey('/wt/x'))).toBe(true);
+    expect(hasLiveSession(worktreeSessionKey('/wt/y'))).toBe(false);
   });
 
   // An orphaned worktree session adopted as an agent terminal is keyed
@@ -227,17 +227,15 @@ describe('tmux session existence', () => {
 
   it('does not see an untagged session that carries the expected name', () => {
     tmuxListSessionsMock.mockReturnValue([foreign('repo-feature-x')]);
-    expect(hasLiveTmuxSession(worktreeSessionKey('/x'))).toBe(false);
-    expect(hasLiveTmuxSession(worktreeSessionKey('repo-feature-x'))).toBe(
-      false
-    );
+    expect(hasLiveSession(worktreeSessionKey('/x'))).toBe(false);
+    expect(hasLiveSession(worktreeSessionKey('repo-feature-x'))).toBe(false);
   });
 
   it('does not see another repository’s session for the same checkout', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('other-feature-x', 'worktree', '/other', 'feature-x', '/wt/x'),
     ]);
-    expect(hasLiveTmuxSession(worktreeSessionKey('/wt/x'))).toBe(false);
+    expect(hasLiveSession(worktreeSessionKey('/wt/x'))).toBe(false);
   });
 
   it('reports no live session when tmux is unavailable', async () => {
@@ -246,7 +244,7 @@ describe('tmux session existence', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('x', 'worktree', '/repo', 'feature-x', '/wt/x'),
     ]);
-    expect(hasLiveTmuxSession(worktreeSessionKey('/wt/x'))).toBe(false);
+    expect(hasLiveSession(worktreeSessionKey('/wt/x'))).toBe(false);
     expect(tmuxListSessionsMock).not.toHaveBeenCalled();
   });
 
@@ -260,12 +258,10 @@ describe('tmux session existence', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('feature-x', 'worktree', '/w/feature', 'x', '/w/feature/wt/x'),
     ]);
-    expect(hasLiveTmuxSession(worktreeSessionKey('feature-x'))).toBe(false);
-    killPersistedTmuxSession(worktreeSessionKey('feature-x'));
+    expect(hasLiveSession(worktreeSessionKey('feature-x'))).toBe(false);
+    killPersistedSession(worktreeSessionKey('feature-x'));
     expect(tmuxKillSessionMock).not.toHaveBeenCalled();
-    expect(hasLiveTmuxSession(worktreeSessionKey('/w/feature/wt/x'))).toBe(
-      true
-    );
+    expect(hasLiveSession(worktreeSessionKey('/w/feature/wt/x'))).toBe(true);
   });
 
   // Kill the target verified by tags, not a label composed from the branch.
@@ -273,7 +269,7 @@ describe('tmux session existence', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('repo-feature-x-3', 'worktree', '/repo', 'feature/x', '/wt/x'),
     ]);
-    killPersistedTmuxSession(worktreeSessionKey('/wt/x'));
+    killPersistedSession(worktreeSessionKey('/wt/x'));
     expect(tmuxKillSessionMock).toHaveBeenCalledWith('repo-feature-x-3');
   });
 
@@ -282,8 +278,8 @@ describe('tmux session existence', () => {
       foreign('repo-feature-x'),
       foreign('feature-x'),
     ]);
-    killPersistedTmuxSession(worktreeSessionKey('/x'));
-    killPersistedTmuxSession(worktreeSessionKey('repo-feature-x'));
+    killPersistedSession(worktreeSessionKey('/x'));
+    killPersistedSession(worktreeSessionKey('repo-feature-x'));
     expect(tmuxKillSessionMock).not.toHaveBeenCalled();
   });
 
@@ -291,7 +287,7 @@ describe('tmux session existence', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('feature-x', 'worktree', '/other', 'feature-x', '/wt/x'),
     ]);
-    killPersistedTmuxSession(worktreeSessionKey('/wt/x'));
+    killPersistedSession(worktreeSessionKey('/wt/x'));
     expect(tmuxKillSessionMock).not.toHaveBeenCalled();
   });
 
@@ -300,9 +296,9 @@ describe('tmux session existence', () => {
       throw new Error('no server running');
     });
     expect(() =>
-      killPersistedTmuxSession(worktreeSessionKey('/wt/x'))
+      killPersistedSession(worktreeSessionKey('/wt/x'))
     ).not.toThrow();
-    expect(hasLiveTmuxSession(worktreeSessionKey('/wt/x'))).toBe(false);
+    expect(hasLiveSession(worktreeSessionKey('/wt/x'))).toBe(false);
   });
 
   it('is empty outside a git working tree', () => {
@@ -313,8 +309,8 @@ describe('tmux session existence', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('x', 'worktree', '/repo', 'feature-x', '/wt/x'),
     ]);
-    expect(hasLiveTmuxSession(worktreeSessionKey('/wt/x'))).toBe(false);
-    killPersistedTmuxSession(worktreeSessionKey('/wt/x'));
+    expect(hasLiveSession(worktreeSessionKey('/wt/x'))).toBe(false);
+    killPersistedSession(worktreeSessionKey('/wt/x'));
     expect(tmuxKillSessionMock).not.toHaveBeenCalled();
   });
 });
@@ -332,9 +328,7 @@ describe('terminal tabs reach tmux by their own name', () => {
     ).toBe(false);
     // A registry *key* never reaches a terminal tab, even one keyed by
     // the tab's own directory: keys are worktree checkouts.
-    expect(hasLiveTmuxSession(worktreeSessionKey('/home/dev/notes'))).toBe(
-      false
-    );
+    expect(hasLiveSession(worktreeSessionKey('/home/dev/notes'))).toBe(false);
   });
 
   // An agent tab runs in a directory a worktree key could name: the
@@ -347,8 +341,8 @@ describe('terminal tabs reach tmux by their own name', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('app-agent', 'agent', '/w/app', null, '/w/app'),
     ]);
-    expect(hasLiveTmuxSession(worktreeSessionKey('/w/app'))).toBe(false);
-    killPersistedTmuxSession(worktreeSessionKey('/w/app'));
+    expect(hasLiveSession(worktreeSessionKey('/w/app'))).toBe(false);
+    killPersistedSession(worktreeSessionKey('/w/app'));
     expect(tmuxKillSessionMock).not.toHaveBeenCalled();
     // The tab itself is still reachable by name.
     expect(hasPersistedTerminalSession(terminalSessionKey('app-agent'))).toBe(
@@ -364,8 +358,8 @@ describe('terminal tabs reach tmux by their own name', () => {
       ours('repo-shell', 'shell', '/repo', null, '/repo'),
       foreign('repo-shell-2'),
     ]);
-    killPersistedTmuxSession(worktreeSessionKey('/repo'));
-    killPersistedTmuxSession(worktreeSessionKey('/x'));
+    killPersistedSession(worktreeSessionKey('/repo'));
+    killPersistedSession(worktreeSessionKey('/x'));
     expect(tmuxKillSessionMock).not.toHaveBeenCalled();
     expect(hasPersistedTerminalSession(terminalSessionKey('repo-shell'))).toBe(
       true
@@ -380,7 +374,7 @@ describe('terminal tabs reach tmux by their own name', () => {
  * One listing, read through the tags: which worktrees have a session,
  * which terminal tabs exist, and which worktree sessions are orphans.
  */
-describe('observeTmuxSessions', () => {
+describe('observeSessions', () => {
   it('reports a worktree as persisted when a session is tagged with its repo and checkout', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('whatever', 'worktree', '/repo', 'feat/a', dirOf('feat-a')),
@@ -549,7 +543,7 @@ describe('observeTmuxSessions', () => {
   // A listing tmux could not give says nothing about any session.
   it('observes nothing when tmux could not be asked', () => {
     tmuxListSessionsMock.mockReturnValue(null);
-    expect(observeTmuxSessions('/repo', [wt('feat-a', 'feat-a')])).toBe(null);
+    expect(observeSessions('/repo', [wt('feat-a', 'feat-a')])).toBe(null);
   });
 
   it('retains exited terminal metadata for restoration', () => {

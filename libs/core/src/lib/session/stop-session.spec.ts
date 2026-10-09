@@ -15,7 +15,7 @@ vi.mock('../pty-registry.js', () => ({
 vi.mock('../session-backend.js', () => ({
   // Both targets advertise the same worktree identity. Resolution selects the
   // oldest survivor, just like the production tagged-session resolver.
-  killPersistedTmuxSession: () => state.targets.shift(),
+  killPersistedSession: () => state.targets.shift(),
 }));
 import { stopSession } from './stop-session.js';
 

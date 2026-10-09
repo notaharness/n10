@@ -1,6 +1,6 @@
 import type { AppConfig } from '@n10/vcs-core';
 import { getSession, type NamedPtyEntry } from '../pty-registry.js';
-import type { SessionIncarnation } from './session-launch-context.js';
+import type { SessionIncarnation } from '../session-catalog.js';
 import { openSession } from './open-session.js';
 import { worktreeRequest } from './session-request.js';
 import { noteInput } from '../activity.js';

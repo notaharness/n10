@@ -54,7 +54,7 @@ vi.mock('@n10/core', async (original) => ({
   hasSessionConnection: (name: string) => isSessionAliveMock(name),
   isSessionAlive: (name: string) => isSessionAliveMock(name),
   // A null `held` stands for a listing tmux could not give.
-  observeTmuxSessions: () => {
+  observeSessions: () => {
     const held = listHeldMock();
     return (
       held && {

@@ -73,7 +73,7 @@ function terminalSummary(state: DemoState, s: DemoSession): TerminalSummary {
   };
   return {
     name: s.name,
-    tmuxName: (JSON.parse(s.name) as string[])[1],
+    target: { kind: 'tmux', name: (JSON.parse(s.name) as string[])[1] },
     kind,
     cwd,
     displayPath: cwd.replace(HOME, '~'),

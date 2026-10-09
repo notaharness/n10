@@ -126,7 +126,7 @@ describe.skipIf(SKIP)(
       startSession(name('a'), tags(REPO, 'feat/remote', WT));
       const sessions = await listOurSessionsWith(executor, MACHINE);
       expect(resolveWorktreeSession(REPO, WT, sessions)).toMatchObject({
-        name: name('a'),
+        target: { kind: 'tmux', name: name('a') },
         repo: REPO,
         branch: 'feat/remote',
         worktreePath: WT,
@@ -141,7 +141,7 @@ describe.skipIf(SKIP)(
     it('does not find an untagged session sharing the name n10 would allocate', async () => {
       startSession(`remote-${RUN}-untagged`, {});
       const sessions = await listOurSessionsWith(executor, MACHINE);
-      expect(sessions.map((s) => s.name)).not.toContain(
+      expect(sessions.map((s) => s.target.name)).not.toContain(
         `remote-${RUN}-untagged`
       );
     });

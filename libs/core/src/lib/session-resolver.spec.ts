@@ -105,7 +105,7 @@ describe.skipIf(SKIP)('session resolver', () => {
   it('finds a worktree session by its tags, whatever it is called', () => {
     startSession(name('anything'), tags('worktree', REPO, 'feat/a'));
     expect(resolveWorktreeSession(REPO, wt('feat/a'))).toMatchObject({
-      name: name('anything'),
+      target: { kind: 'tmux', name: name('anything') },
       repo: REPO,
       branch: 'feat/a',
       worktreePath: wt('feat/a'),
@@ -123,7 +123,7 @@ describe.skipIf(SKIP)('session resolver', () => {
     expect(resolveRegistrySession(REPO, `alpha-${RUN}-feat-a`)).toBeNull();
     expect(resolveSessionByName(`alpha-${RUN}-feat-a`)).toBeNull();
     expect(resolveSessionByName(name('half'))).toBeNull();
-    expect(listOurSessions().map((s) => s.name)).not.toContain(
+    expect(listOurSessions().map((s) => s.target.name)).not.toContain(
       `alpha-${RUN}-feat-a`
     );
   });
@@ -141,11 +141,13 @@ describe.skipIf(SKIP)('session resolver', () => {
     // `session_created` has one-second resolution.
     await new Promise((r) => setTimeout(r, 1100));
     startSession(name('second'), tags('worktree', REPO, 'dup'));
-    expect(resolveWorktreeSession(REPO, wt('dup'))?.name).toBe(name('first'));
+    expect(resolveWorktreeSession(REPO, wt('dup'))?.target.name).toBe(
+      name('first')
+    );
     expect(
       listOurSessions()
         .filter((s) => s.branch === 'dup')
-        .map((s) => s.name)
+        .map((s) => s.target.name)
         .sort()
     ).toEqual([name('first'), name('second')].sort());
   });
@@ -183,7 +185,7 @@ describe.skipIf(SKIP)('session resolver', () => {
     });
     startSession(name('quiet'), tags('worktree', REPO, 'quiet'));
     const ours = listOurSessions().filter((s) => s.repo === REPO);
-    expect(ours.map((s) => [s.name, s.branch, s.path]).sort()).toEqual(
+    expect(ours.map((s) => [s.target.name, s.branch, s.path]).sort()).toEqual(
       [
         [name('noisy'), 'noisy', process.cwd()],
         [name('quiet'), 'quiet', process.cwd()],
@@ -198,7 +200,8 @@ describe.skipIf(SKIP)('session resolver', () => {
     startSession(name('slashy'), tags('worktree', REPO, 'feat/b'));
     startSession(name('other-repo'), tags('worktree', '/repos/beta', 'feat/c'));
     expect(
-      resolveRegistrySession(REPO, worktreeSessionKey(wt('feat/b'), REPO))?.name
+      resolveRegistrySession(REPO, worktreeSessionKey(wt('feat/b'), REPO))
+        ?.target.name
     ).toBe(name('slashy'));
     expect(resolveRegistrySession(REPO, wt('feat/b'))).toBeNull();
     expect(
@@ -217,7 +220,8 @@ describe.skipIf(SKIP)('session resolver', () => {
     expect(resolveRegistrySession(REPO, name('term'))).toBeNull();
     expect(resolveRegistrySession(REPO, name('feature-x'))).toBeNull();
     expect(
-      resolveRegistrySession(REPO, worktreeSessionKey(wt('x'), REPO))?.name
+      resolveRegistrySession(REPO, worktreeSessionKey(wt('x'), REPO))?.target
+        .name
     ).toBe(name('feature-x'));
   });
 });
