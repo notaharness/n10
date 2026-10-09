@@ -101,6 +101,13 @@ if (present.length !== 0 && present.length !== signingNames.length) {
   );
 }
 const signed = present.length === signingNames.length;
+// electron-builder treats CSC_LINK='' as a path to the current directory.
+// GitHub Actions passes absent secrets as empty strings, so omit them.
+const builderEnv = Object.fromEntries(
+  Object.entries(process.env).filter(
+    ([name]) => signed || !signingNames.includes(name)
+  )
+);
 console.log(
   `[package-macos] ${
     signed
@@ -127,5 +134,5 @@ execFileSync(
           '-c.mac.notarize=false',
         ]),
   ],
-  { cwd: desktopDir, stdio: 'inherit' }
+  { cwd: desktopDir, stdio: 'inherit', env: builderEnv }
 );
