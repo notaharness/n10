@@ -17,6 +17,7 @@ fi
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # macOS tmux sockets have a short path limit; keep the fixture HOME short.
 work=$(mktemp -d /tmp/n10-macos-qa.XXXXXX)
+work=$(cd "$work" && pwd -P)
 mounted=false
 cleanup() {
   if "$mounted"; then hdiutil detach "$work/mount" -quiet; fi
