@@ -1,13 +1,22 @@
 import * as pty from 'node-pty';
 import type { ManagedTarget, SessionBackend, SessionSpec } from '@n10/terminal';
 
-/** Output a newly attached handle replays before live data: enough for
- *  a full-screen program's last frame and some scrollback. */
+/** Output a newly attached handle replays before live data, in UTF-8
+ *  bytes: enough for a full-screen program's last frame and some
+ *  scrollback. */
 export const REPLAY_BYTES = 512 * 1024;
 
 type ExitListener = (code: number, signal?: number) => void;
 
-const HANGUP = 1;
+/** The last `limit` UTF-8 bytes of `text`, starting on a whole
+ *  character. */
+function tailBytes(text: string, limit: number): string {
+  const bytes = Buffer.from(text, 'utf8');
+  let start = bytes.length - limit;
+  // Continuation bytes are 10xxxxxx: skip to the next character start.
+  while (start < bytes.length && (bytes[start]! & 0xc0) === 0x80) start += 1;
+  return bytes.subarray(start).toString('utf8');
+}
 
 /** What the holder of a session hears about it. */
 export interface ManagedPtyEvents {
@@ -39,9 +48,12 @@ export class ManagedPty {
   private launches = 0;
   private ended: ManagedExit | null = null;
   private removed = false;
-  private replay: string[] = [];
-  private replayLength = 0;
+  private replay: { text: string; bytes: number }[] = [];
+  private replayBytes = 0;
   private readonly handles = new Set<ManagedPtyHandle>();
+  /** The process `stop` ended, and the handles that hear its exit. */
+  private stopping: { child: pty.IPty; handles: ManagedPtyHandle[] } | null =
+    null;
 
   constructor(
     readonly target: ManagedTarget,
@@ -97,10 +109,20 @@ export class ManagedPty {
     child.onData((data) => {
       if (this.process === child) this.output(data);
     });
-    child.onExit(({ exitCode, signal }) => {
+    child.onExit(({ exitCode, signal: reported }) => {
+      // node-pty reports 0 for an exit no signal caused.
+      const signal = reported || undefined;
+      const exit = { exitCode, ...(signal ? { signal } : {}) };
+      if (this.stopping?.child === child) {
+        const { handles } = this.stopping;
+        this.stopping = null;
+        this.ended = exit;
+        for (const handle of handles) handle.exited(exitCode, signal);
+        return;
+      }
       if (this.process !== child) return;
       this.process = null;
-      this.ended = { exitCode, ...(signal ? { signal } : {}) };
+      this.ended = exit;
       for (const handle of [...this.handles]) handle.exited(exitCode, signal);
       this.events.ended?.(this.ended);
     });
@@ -113,16 +135,17 @@ export class ManagedPty {
     this.launch(spec);
   }
 
-  /** End the session: its process, if running, and every handle. */
+  /** End the session: its process, if running, and every handle. The
+   *  handles attached now hear the process's own exit when it comes; a
+   *  process that already ended reported its exit. */
   stop(): void {
     if (this.removed) return;
     this.removed = true;
+    const child = this.process;
+    if (child) this.stopping = { child, handles: [...this.handles] };
     // node-pty hangs up the terminal, which ends its session's
-    // processes. A process that already ended reported its exit.
-    if (this.end()) {
-      this.ended = { exitCode: 0, signal: HANGUP };
-      for (const handle of [...this.handles]) handle.exited(0, HANGUP);
-    }
+    // processes.
+    this.end();
     this.handles.clear();
     this.events.stopped?.();
   }
@@ -143,7 +166,8 @@ export class ManagedPty {
   /** A new connection, which first receives the retained output. */
   attach(): ManagedPtyHandle {
     if (this.removed) throw new Error('The session was stopped');
-    const handle = new ManagedPtyHandle(this, this.replay.join(''));
+    const replay = this.replay.map((chunk) => chunk.text).join('');
+    const handle = new ManagedPtyHandle(this, replay);
     this.handles.add(handle);
     return handle;
   }
@@ -162,11 +186,28 @@ export class ManagedPty {
   }
 
   private output(data: string): void {
-    this.replay.push(data);
-    this.replayLength += data.length;
-    while (this.replayLength > REPLAY_BYTES && this.replay.length > 1)
-      this.replayLength -= this.replay.shift()!.length;
+    this.retain(data);
     for (const handle of [...this.handles]) handle.data(data);
+  }
+
+  /** Keep `data` for the next handle, within {@link REPLAY_BYTES}:
+   *  whole chunks leave first, and a chunk alone over the bound keeps
+   *  its last bytes. */
+  private retain(data: string): void {
+    this.replay.push({ text: data, bytes: Buffer.byteLength(data) });
+    this.replayBytes += this.replay.at(-1)!.bytes;
+    while (this.replayBytes > REPLAY_BYTES && this.replay.length > 1)
+      this.replayBytes -= this.replay.shift()!.bytes;
+    if (this.replayBytes > REPLAY_BYTES) {
+      const text = tailBytes(this.replay[0]!.text, REPLAY_BYTES);
+      this.replay = [{ text, bytes: Buffer.byteLength(text) }];
+      this.replayBytes = this.replay[0]!.bytes;
+    }
+  }
+
+  /** @internal The retained output's size in UTF-8 bytes. */
+  get retainedBytes(): number {
+    return this.replayBytes;
   }
 }
 
