@@ -31,17 +31,22 @@ const FAKE_AGENT = fileURLToPath(
   new URL('./fixtures/fake-agent.mjs', import.meta.url)
 );
 
-/** A second `n10 --tui` on the same HOME, until it exits. */
-function startAnother(homeDir: string, path: string) {
+/** Another `n10 ARGS` on the same HOME, until it exits. */
+function n10Cli(homeDir: string, path: string, args: string[]) {
   const env: NodeJS.ProcessEnv = { ...process.env, HOME: homeDir, PATH: path };
   delete env.TMUX;
   delete env.TMUX_PANE;
   delete env.CI;
-  return spawnSync(process.execPath, [BINARY, '--tui', homeDir], {
+  return spawnSync(process.execPath, [BINARY, ...args], {
     env,
     encoding: 'utf8',
     timeout: 15_000,
   });
+}
+
+/** A second `n10 --tui` on the same HOME, until it exits. */
+function startAnother(homeDir: string, path: string) {
+  return n10Cli(homeDir, path, ['--tui', homeDir]);
 }
 
 async function n10Running(host: string): Promise<boolean> {
@@ -73,10 +78,19 @@ test.describe('Without tmux', () => {
     const agents = processesRunning(FAKE_AGENT, n10.homeDir);
     expect(agents).toHaveLength(1);
 
-    const second = startAnother(
-      n10.homeDir,
-      join(n10.homeDir, '.path-without-tmux')
+    const path = join(n10.homeDir, '.path-without-tmux');
+    const status = n10Cli(n10.homeDir, path, ['mux', 'status']);
+    expect(status.stdout.split('\t').slice(2, 5)).toEqual([
+      'tui',
+      process.platform,
+      '1',
+    ]);
+    const [listed] = n10Cli(n10.homeDir, path, ['mux', 'list']).stdout.split(
+      '\n'
     );
+    expect(listed!.split('\t')[6]).toBe('running');
+
+    const second = startAnother(n10.homeDir, path);
     expect(second.status).toBe(1);
     expect(second.stderr).toContain(
       'Another n10 is already running without tmux'
