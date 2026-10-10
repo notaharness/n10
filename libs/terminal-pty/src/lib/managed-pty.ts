@@ -15,6 +15,10 @@ export interface ManagedPtyEvents {
   ended?(exit: ManagedExit): void;
   /** The session was stopped, from any handle or by its holder. */
   stopped?(): void;
+  /** The running process wrote output. */
+  output?(data: string): void;
+  /** The terminal took a new size. */
+  resized?(cols: number, rows: number): void;
 }
 
 /** The facts a managed session keeps once its process has ended. */
@@ -158,7 +162,9 @@ export class ManagedPty {
   }
 
   resize(cols: number, rows: number): void {
-    this.process?.resize(cols, rows);
+    if (!this.process) return;
+    this.process.resize(cols, rows);
+    this.events.resized?.(cols, rows);
   }
 
   private output(data: string): void {
@@ -166,6 +172,7 @@ export class ManagedPty {
     this.replayLength += data.length;
     while (this.replayLength > REPLAY_BYTES && this.replay.length > 1)
       this.replayLength -= this.replay.shift()!.length;
+    this.events.output?.(data);
     for (const handle of [...this.handles]) handle.data(data);
   }
 }
