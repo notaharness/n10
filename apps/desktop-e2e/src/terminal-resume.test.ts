@@ -1,47 +1,43 @@
-import { execFileSync } from 'node:child_process';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
+import { currentPid } from './setup/terminal-grid.js';
 import {
   confirmNewTerminal,
   openNewTerminalDialog,
-  terminalSessions,
   terminalTabs,
 } from './setup/terminals.js';
-import { socketEnv } from './setup/tmux.js';
 
-test.use({ n10Config: { aiCommand: fakeAgent({ exitAfterMs: 5000 }) } });
+test.use({
+  n10Config: { aiCommand: fakeAgent({ exitAfterMs: 5000, printSize: true }) },
+});
 
-test('an exited agent terminal resumes in its existing tab and tmux session @tmux', async ({
+const BANNER = 'n10-fake-agent-ready';
+
+test('an exited agent terminal resumes in its existing tab and session', async ({
   desktop,
 }) => {
-  const { app, page, homeDir } = desktop;
+  const { app, page } = desktop;
   await openNewTerminalDialog(app, page);
   await confirmNewTerminal(page, 'Agent');
-  await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible();
+  await expect(page.getByText(BANNER).first()).toBeVisible();
   await expect(terminalTabs(page)).toHaveCount(1);
-  const [name] = terminalSessions(homeDir);
-  const panePid = () =>
-    execFileSync(
-      'tmux',
-      ['display-message', '-p', '-t', `=${name}:`, '#{pane_pid}'],
-      {
-        env: socketEnv(homeDir),
-        encoding: 'utf8',
-      }
-    ).trim();
-  const initialPid = panePid();
+  const exited = await currentPid(page);
   const [before] = await page.evaluate(() => window.n10.listTerminals());
   const resume = page.getByRole('button', {
     name: 'Resume agent',
     exact: true,
   });
   await expect(resume).toBeVisible({ timeout: 15_000 });
-  expect(terminalSessions(homeDir)).toEqual([name]);
 
   await resume.click();
   await expect(resume).toBeHidden();
-  await expect.poll(panePid).not.toBe(initialPid);
+  await expect.poll(() => currentPid(page)).not.toBe(exited);
   await expect(terminalTabs(page)).toHaveCount(1);
-  const [after] = await page.evaluate(() => window.n10.listTerminals());
-  expect(after).toMatchObject({ name: before.name, running: true });
-  expect(terminalSessions(homeDir)).toEqual([name]);
+  const after = await page.evaluate(() => window.n10.listTerminals());
+  expect(after).toHaveLength(1);
+  // The same session, in its next process.
+  expect(after[0]).toMatchObject({
+    name: before!.name,
+    target: before!.target,
+    running: true,
+  });
 });
