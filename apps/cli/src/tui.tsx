@@ -35,6 +35,7 @@ import {
   killAll,
   applySessionBackend,
   closeSessionBackend,
+  joinKillOnCloseJob,
   probeTmuxAvailability,
   resetRepoRoot,
 } from '@n10/core';
@@ -149,6 +150,9 @@ export async function runTui(args: string[]): Promise<void> {
     process.exit(0);
   });
 
+  // On Windows, everything this process starts ends with it, as the
+  // desktop's session host's does. Before anything is spawned.
+  joinKillOnCloseJob();
   // Resolve the requirement before rendering so missing tmux is actionable.
   await probeTmuxAvailability();
   try {
