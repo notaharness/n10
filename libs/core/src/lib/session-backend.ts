@@ -16,7 +16,7 @@ import { localCatalog, selectLocalCatalog } from './session-catalog.js';
 import { tmuxCatalog } from './tmux-catalog.js';
 import { ManagedCatalog } from './managed-catalog.js';
 import { listenMux, type MuxOwner } from './mux/mux-ipc.js';
-import { muxRuntime } from './mux/mux-endpoint.js';
+import { ownerRuntime } from './mux/mux-endpoint.js';
 import type { OwnerType } from './mux/mux-protocol.js';
 import { serveMuxConnection } from './mux/mux-server.js';
 import { MuxSessions } from './mux/mux-sessions.js';
@@ -94,7 +94,7 @@ export async function ownSessions(
 ): Promise<
   { kind: 'owner'; hostId: string } | { kind: 'existing'; hostId: string }
 > {
-  const runtime = muxRuntime();
+  const runtime = ownerRuntime();
   let sessions: MuxSessions | null = null;
   const claim = await listenMux(runtime, (connection) => {
     if (sessions) serveMuxConnection(connection, sessions);

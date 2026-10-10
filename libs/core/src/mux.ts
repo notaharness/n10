@@ -11,6 +11,7 @@ export {
 export { muxRequest, type MuxResponse } from './lib/mux/mux-client.js';
 export {
   muxRuntime,
+  ownerRuntime,
   readCredentials,
   type MuxRuntime,
 } from './lib/mux/mux-endpoint.js';

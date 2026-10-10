@@ -20,6 +20,7 @@ import { authenticateToMux } from './mux-auth.js';
 import {
   ensureRuntimeDir,
   muxRuntime,
+  ownerRuntime,
   readCredentials,
   type MuxRuntime,
 } from './mux-endpoint.js';
@@ -343,18 +344,31 @@ describe('mux IPC', () => {
   );
 
   it('finds the owner a session was launched by, wherever HOME points', () => {
-    const runtime = muxRuntime({
-      HOME: '/elsewhere',
-      N10_MUX_RUNTIME: '/run/owner',
+    const env = { HOME: '/elsewhere', N10_MUX_RUNTIME: '/run/owner' };
+    expect(muxRuntime(env, 'linux')).toEqual({
+      dir: '/run/owner',
+      endpoint: '/run/owner/mux.sock',
     });
-    expect(runtime.dir).toBe('/run/owner');
     expect(muxRuntime({ HOME: '/home/u' }, 'linux').dir).toBe(
       '/home/u/.n10/run'
     );
-    const windows = (env: NodeJS.ProcessEnv) =>
-      muxRuntime(env, 'win32').endpoint;
-    expect(windows({ N10_MUX_RUNTIME: 'C:\\run' })).not.toBe(
-      windows({ LOCALAPPDATA: 'C:\\Users\\u\\AppData\\Local' })
+    const pipe = (env: NodeJS.ProcessEnv) => muxRuntime(env, 'win32').endpoint;
+    expect(pipe({ N10_MUX_RUNTIME: 'C:\\run' })).not.toBe(
+      pipe({ LOCALAPPDATA: 'C:\\Users\\u\\AppData\\Local' })
     );
+  });
+
+  it('binds an owner in the profile, whatever a session says', () => {
+    const env = { HOME: '/home/u', N10_MUX_RUNTIME: '/tmp/anyone' };
+    expect(ownerRuntime(env, 'linux').dir).toBe('/home/u/.n10/run');
+    expect(
+      ownerRuntime(
+        {
+          LOCALAPPDATA: 'C:\\Users\\u\\AppData\\Local',
+          N10_MUX_RUNTIME: 'D:\\x',
+        },
+        'win32'
+      ).dir
+    ).toBe('C:\\Users\\u\\AppData\\Local\\n10\\run');
   });
 });

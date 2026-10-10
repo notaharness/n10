@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, posix, win32 } from 'node:path';
 import { MUX_VERSION, type MuxCredentials } from './mux-auth.js';
 import { MuxError } from './mux-error.js';
 
@@ -29,29 +29,47 @@ export interface MuxRuntime {
 
 const CREDENTIALS_FILE = 'mux.json';
 
-/** A managed session's own owner, which it was told on launch; it
- *  wins over the profile, so a session whose HOME was redirected still
- *  finds the owner running it. */
+/** A managed session's own owner, which it was told on launch. */
 const SESSION_RUNTIME = 'N10_MUX_RUNTIME';
 
+/**
+ * Where a client finds its owner: the one that launched it, when it
+ * runs in a managed session (so a redirected HOME still finds it), else
+ * the user's profile.
+ */
 export function muxRuntime(
   env: NodeJS.ProcessEnv = process.env,
   platform: NodeJS.Platform = process.platform
 ): MuxRuntime {
   const session = env[SESSION_RUNTIME];
-  if (platform === 'win32') {
-    const dir = session || windowsRunDir(env);
-    const hash = createHash('sha256').update(dir).digest('hex').slice(0, 16);
-    return { dir, endpoint: `\\\\.\\pipe\\n10-mux-v1-${hash}` };
-  }
-  const dir = session || join(env['HOME'] ?? homedir(), '.n10', 'run');
-  return { dir, endpoint: join(dir, 'mux.sock') };
+  return session ? runtimeIn(session, platform) : ownerRuntime(env, platform);
 }
 
-function windowsRunDir(env: NodeJS.ProcessEnv): string {
-  const local = env['LOCALAPPDATA'];
-  if (!local) throw new MuxError('UNSUPPORTED', 'LOCALAPPDATA is not set');
-  return resolve(local, 'n10', 'run');
+/**
+ * Where an owner binds and publishes its secret: always the user's
+ * profile. Only clients follow `N10_MUX_RUNTIME`, which could point an
+ * owner at a directory other accounts can read.
+ */
+export function ownerRuntime(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform
+): MuxRuntime {
+  if (platform === 'win32') {
+    const local = env['LOCALAPPDATA'];
+    if (!local) throw new MuxError('UNSUPPORTED', 'LOCALAPPDATA is not set');
+    return runtimeIn(win32.resolve(local, 'n10', 'run'), platform);
+  }
+  return runtimeIn(
+    posix.join(env['HOME'] ?? homedir(), '.n10', 'run'),
+    platform
+  );
+}
+
+function runtimeIn(dir: string, platform: NodeJS.Platform): MuxRuntime {
+  if (platform !== 'win32')
+    return { dir, endpoint: posix.join(dir, 'mux.sock') };
+  const hash = createHash('sha256').update(dir).digest('hex').slice(0, 16);
+  return { dir, endpoint: `\\\\.\\pipe\\n10-mux-v1-${hash}` };
 }
 
 /** Create the runtime directory, refusing one others could read. */
