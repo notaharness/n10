@@ -50,7 +50,7 @@ afterEach(() => {
 async function select(probe: TmuxStatus): Promise<void> {
   status.current = probe;
   await probeTmuxAvailability();
-  await applySessionBackend();
+  await applySessionBackend('tui');
 }
 
 const socket = () => muxRuntime().endpoint;

@@ -17,6 +17,9 @@ import { tmuxCatalog } from './tmux-catalog.js';
 import { ManagedCatalog } from './managed-catalog.js';
 import { listenMux, type MuxOwner } from './mux/mux-ipc.js';
 import { muxRuntime } from './mux/mux-endpoint.js';
+import type { OwnerType } from './mux/mux-protocol.js';
+import { serveMuxConnection } from './mux/mux-server.js';
+import { MuxSessions } from './mux/mux-sessions.js';
 import {
   isTerminalSession,
   registryNameOf,
@@ -62,7 +65,7 @@ let owned: { catalog: ManagedCatalog; owner: MuxOwner } | null = null;
  * reason to switch. Until another n10 can attach to a running owner,
  * one that finds the owner already taken refuses to start.
  */
-export async function applySessionBackend(): Promise<void> {
+export async function applySessionBackend(ownerType: OwnerType): Promise<void> {
   const status = cachedTmuxStatus;
   if (status?.available) {
     selectLocalCatalog(tmuxCatalog);
@@ -74,16 +77,35 @@ export async function applySessionBackend(): Promise<void> {
         status?.reason ?? 'Availability has not been checked.'
       } ${status?.installHint ?? 'Install tmux and restart n10.'}`
     );
-  const claim = await listenMux(muxRuntime(), ({ socket }) => socket.end());
+  const claim = await ownSessions(ownerType);
   if (claim.kind === 'existing')
     throw new Error(
       "Another n10 owns this profile's sessions. Close it, or install tmux to run both."
     );
-  owned = {
-    catalog: new ManagedCatalog(claim.owner.hostId),
-    owner: claim.owner,
-  };
-  selectLocalCatalog(owned.catalog);
+}
+
+/**
+ * Become the profile's managed owner: claim its mux endpoint, hold its
+ * sessions in a `ManagedCatalog`, and answer one-shot mux clients from
+ * it. `existing` names the owner already running, which is left alone.
+ */
+export async function ownSessions(
+  ownerType: OwnerType
+): Promise<
+  { kind: 'owner'; hostId: string } | { kind: 'existing'; hostId: string }
+> {
+  const runtime = muxRuntime();
+  let sessions: MuxSessions | null = null;
+  const claim = await listenMux(runtime, (connection) => {
+    if (sessions) serveMuxConnection(connection, sessions);
+    else connection.socket.end();
+  });
+  if (claim.kind === 'existing') return claim;
+  const catalog = new ManagedCatalog(claim.owner.hostId, runtime.dir);
+  sessions = new MuxSessions(catalog, ownerType);
+  owned = { catalog, owner: claim.owner };
+  selectLocalCatalog(catalog);
+  return { kind: 'owner', hostId: claim.owner.hostId };
 }
 
 /** Stop the sessions this process owns and give up ownership. tmux

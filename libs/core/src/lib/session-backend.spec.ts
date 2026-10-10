@@ -143,13 +143,13 @@ beforeEach(async () => {
 
 describe('tmux requirement', () => {
   it('accepts a successful startup probe', async () => {
-    await expect(applySessionBackend()).resolves.toBeUndefined();
+    await expect(applySessionBackend('tui')).resolves.toBeUndefined();
   });
 
   it('rejects an installed tmux that fails, with an installation hint', async () => {
     isTmuxAvailableMock.mockResolvedValueOnce(TMUX_TOO_OLD);
     await probeTmuxAvailability();
-    await expect(applySessionBackend()).rejects.toThrow(
+    await expect(applySessionBackend('tui')).rejects.toThrow(
       /requires tmux.*brew install tmux/
     );
   });
