@@ -41,6 +41,22 @@ bash apps/desktop/scripts/test-linux-packages.sh \
 On arm64, use `*arm64.deb` and `*arm64.AppImage` instead. Pass exactly one file
 of each format; clear stale installer output if a glob matches more than one.
 
+The Windows x64 NSIS installer is built and tested by
+`.github/workflows/windows-installer.yml` on `windows-2022`. It silently installs
+for the current user, verifies the Start menu and desktop shortcuts, starts the
+packaged app with `N10_QA_RENDERER_ONLY=1`, waits for the renderer and preload
+bridge to mount, captures 1600×900 light and dark screenshots, then silently uninstalls and checks
+that the executable and shortcuts are gone. It also checks that the packaged
+host reports the Windows session limitation without a tmux installation hint.
+This checks the installer and UI;
+Windows sessions require the separate Windows support stack.
+
+```powershell
+$env:NX_DAEMON = 'false'
+npx nx package-windows desktop
+& apps/desktop/scripts/test-windows-installer.ps1 apps/desktop/dist/installers/n10-desktop-x64.exe
+```
+
 `src/fixtures/desktop.ts` creates a repo and isolated HOME, seeds optional Git
 states, supplies a scriptable fake agent and fails on renderer exceptions.
 Every test uses a private tmux socket inside its fixture HOME and kills only

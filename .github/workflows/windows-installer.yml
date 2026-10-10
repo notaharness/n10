@@ -1,0 +1,60 @@
+name: Windows installer
+
+# Builds and smoke-tests the x64 NSIS installer. Release calls this workflow
+# and downloads release-windows-x64 alongside the Linux package artifacts.
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/electron-builder.yml'
+      - 'apps/desktop/package.json'
+      - 'apps/desktop/release-assets.json'
+      - 'apps/desktop/scripts/package-installer.mjs'
+      - 'apps/desktop/scripts/package-windows.mjs'
+      - 'apps/desktop/scripts/test-windows-installer.ps1'
+      - 'apps/desktop/src/main/main.ts'
+      - 'apps/desktop/src/main/host-worker.ts'
+      - 'apps/desktop/src/main/qa-steps.ts'
+      - 'apps/desktop/build/**'
+      - 'package-lock.json'
+      - '.github/workflows/windows-installer.yml'
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+      - run: npm ci
+      - run: npx nx package-windows desktop
+        env:
+          NX_DAEMON: 'false'
+      - name: Install, launch renderer, and uninstall
+        shell: pwsh
+        run: |
+          $name = (Get-Content apps/desktop/release-assets.json | ConvertFrom-Json).windows.x64.nsis
+          & apps/desktop/scripts/test-windows-installer.ps1 "apps/desktop/dist/installers/$name"
+      - name: Stage release asset
+        shell: pwsh
+        run: |
+          $name = (Get-Content apps/desktop/release-assets.json | ConvertFrom-Json).windows.x64.nsis
+          New-Item -ItemType Directory release | Out-Null
+          Copy-Item "apps/desktop/dist/installers/$name" release/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-x64
+          path: release/
+          if-no-files-found: error
+      - if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-qa
+          path: ${{ runner.temp }}/n10-installer-qa/renderer-*.png
+          if-no-files-found: error

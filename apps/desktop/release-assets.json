@@ -8,5 +8,10 @@
       "deb": "n10-desktop_arm64.deb",
       "appImage": "n10-desktop-arm64.AppImage"
     }
+  },
+  "windows": {
+    "x64": {
+      "nsis": "n10-desktop-x64.exe"
+    }
   }
 }

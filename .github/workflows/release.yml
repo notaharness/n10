@@ -1,8 +1,9 @@
 name: Release
 
 # A vX.Y.Z tag releases X.Y.Z: it packs and tests the npm package and builds
-# the Linux installers on x64 and arm64, publishes the tarball to npm through
-# trusted publishing, and creates the GitHub release with those installers.
+# the Linux installers on x64 and arm64 and the Windows x64 installer,
+# publishes the tarball to npm through trusted publishing, and creates the
+# GitHub release with those installers.
 # A prerelease (vX.Y.Z-beta.N) goes under npm's `beta` dist-tag, and `latest`
 # too while LATEST_FOLLOWS_BETA is true; any other version goes under `latest`.
 # During that beta-only period its GitHub release is latest as well, so the
@@ -71,11 +72,17 @@ jobs:
       contents: read
     uses: ./.github/workflows/linux-packages.yml
 
+  windows-installer:
+    needs: version
+    permissions:
+      contents: read
+    uses: ./.github/workflows/windows-installer.yml
+
   # Its own job, so a GitHub release that fails after publishing can be
   # re-run alone.
   publish:
     if: github.event_name == 'push'
-    needs: [version, package, linux-packages]
+    needs: [version, package, linux-packages, windows-installer]
     runs-on: ubuntu-latest
     # Its deployment rule admits only v* tags; npm's trusted publisher names it.
     environment: npm
@@ -130,7 +137,7 @@ jobs:
   # so it cannot check the trusted publisher.
   rehearse:
     if: github.event_name == 'workflow_dispatch'
-    needs: [version, package, linux-packages]
+    needs: [version, package, linux-packages, windows-installer]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -191,7 +198,9 @@ jobs:
             channel=(--latest)
           fi
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-            --verify-tag --generate-notes "${channel[@]}" "${assets[@]}"
+            --verify-tag --generate-notes \
+            --notes 'Windows x64 installer: unsigned. Microsoft Defender SmartScreen may show an unknown-publisher warning. Terminal sessions are not supported on Windows in this release.' \
+            "${channel[@]}" "${assets[@]}"
         env:
           GH_TOKEN: ${{ github.token }}
           PRERELEASE: ${{ needs.version.outputs.prerelease }}

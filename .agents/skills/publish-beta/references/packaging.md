@@ -74,9 +74,13 @@ checks neither.
 `publish` can be re-run: when the version is already on npm, it skips the
 OIDC check and the publish and only sets the dist-tags.
 
-Every release run, a rehearsal included, builds the Linux packages
-(`.github/workflows/linux-packages.yml`); `publish` waits for them, so nothing
-is published unless every package built.
+Every release run, a rehearsal included, builds the Linux packages and Windows
+x64 NSIS installer (`.github/workflows/linux-packages.yml` and
+`.github/workflows/windows-installer.yml`); `publish` waits for them, so nothing
+is published unless every package built and its smoke test passed.
+The Windows installer is unsigned. Its release notes warn that Microsoft
+Defender SmartScreen may show an unknown-publisher prompt, and that terminal
+sessions are unavailable on Windows until the Windows support stack lands.
 
 The `github-release` job creates the GitHub release with generated notes,
 attaches every file named in `apps/desktop/release-assets.json`, the manifest,
@@ -85,5 +89,5 @@ missing files fail before release creation.
 During the beta-only period (`LATEST_FOLLOWS_BETA=true`), beta releases are
 marked latest so `releases/latest/download/<name>` resolves. After that
 setting becomes false, beta releases are GitHub prereleases and stable
-releases are latest. The Linux jobs upload under `release-*` and join the
+releases are latest. The installer jobs upload under `release-*` and join the
 publish gate; a dispatched rehearsal builds them but publishes nothing.

@@ -270,7 +270,21 @@ if (!app.requestSingleInstanceLock()) {
       // Only the instance that holds the lock starts a host, so only it
       // rewrites what its sessions run (the host's session bin).
       host = startHost();
-      const opened = await host.started;
+      let opened: string | null;
+      try {
+        opened = await host.started;
+      } catch (err) {
+        // The installer smoke test can verify the Windows renderer before
+        // the separate Windows session host is available.
+        if (
+          process.platform !== 'win32' ||
+          process.env.N10_QA_RENDERER_ONLY !== '1'
+        ) {
+          throw err;
+        }
+        console.warn('[desktop] renderer-only QA: host unavailable', err);
+        opened = null;
+      }
       mark(MAIN_MARKS.repo);
       console.log(`[desktop] startup repo: ${opened ?? 'none'}`);
 

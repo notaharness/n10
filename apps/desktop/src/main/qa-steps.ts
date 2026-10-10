@@ -8,6 +8,8 @@ interface QaStep {
   js?: string;
   waitMs?: number;
   shot?: string;
+  width?: number;
+  height?: number;
 }
 
 export async function runQaSteps(win: BrowserWindow): Promise<void> {
@@ -34,12 +36,18 @@ export async function runQaSteps(win: BrowserWindow): Promise<void> {
   for (const step of steps) {
     i += 1;
     try {
+      if (step.width && step.height) {
+        win.setContentSize(step.width, step.height);
+      }
       if (step.js) {
         const r: unknown = await win.webContents.executeJavaScript(
           step.js,
           true
         );
         console.log(`[desktop] qa step ${i} js →`, r);
+        if (process.env.N10_QA_RESULT_FILE) {
+          await writeFile(process.env.N10_QA_RESULT_FILE, String(r));
+        }
       }
       await sleep(step.waitMs ?? 600);
       if (step.shot) {
