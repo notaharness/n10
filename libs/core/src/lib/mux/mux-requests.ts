@@ -32,6 +32,8 @@ export interface MetadataRequest {
   set: Record<string, string>;
   unset: string[];
   claimTarget?: string;
+  /** The session the caller runs as, which a claim must be for. */
+  caller?: { hostId: string; sessionId: string; generation: number };
 }
 
 export type SendRequest = {
@@ -173,13 +175,24 @@ export function restartRequest(params: Params): RestartRequest {
   };
 }
 
+function caller(value: unknown, name: string) {
+  const given = record(value, name);
+  return {
+    hostId: field(given['hostId'], `${name}.hostId`),
+    sessionId: field(given['sessionId'], `${name}.sessionId`),
+    generation: integer(given['generation'], `${name}.generation`),
+  };
+}
+
 export function metadataRequest(params: Params): MetadataRequest {
   const claimTarget = optional(params, 'claimTarget', field);
+  const claimant = optional(params, 'caller', caller);
   return {
     expectedHostId: field(params['expectedHostId'], 'expectedHostId'),
     set: tags(params['set'] ?? {}, 'set'),
     unset: strings(params['unset'] ?? [], 'unset'),
     ...(claimTarget === undefined ? {} : { claimTarget }),
+    ...(claimant === undefined ? {} : { caller: claimant }),
   };
 }
 

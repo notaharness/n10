@@ -157,6 +157,15 @@ describe('one-shot mux verbs', () => {
     expect(
       await rejected('session.create', { label: 'b', cwd: home, tags })
     ).toBe('IDENTITY_MISMATCH');
+    // Another spelling of the same checkout is the same checkout.
+    const respelled = { '@orchestra-worktree-path': `${checkout}/` };
+    expect(
+      await rejected('session.create', {
+        label: 'c',
+        cwd: home,
+        tags: respelled,
+      })
+    ).toBe('IDENTITY_MISMATCH');
   });
 
   it('sends paste, literal text and keys as the program asked for them', async () => {
@@ -226,19 +235,43 @@ describe('one-shot mux verbs', () => {
     );
   });
 
-  it('moves a target claim between sessions in one step', async () => {
+  it('moves a target claim between sessions in one step, each claiming for itself', async () => {
     const first = await create({ label: 'a' });
     const second = await create({ label: 'b' });
-    const claim = (sessionId: string) =>
+    const claim = (sessionId: string, as = sessionId) =>
       call('session.metadata', {
         sessionId,
         expectedHostId: hostId,
         claimTarget: 'claude:abc',
+        caller: { hostId, sessionId: as, generation: 1 },
       });
     await claim(first.sessionId);
     expect(await claim(second.sessionId)).toMatchObject({
       tags: { '@orchestra-target': 'claude:abc' },
     });
+    const { tags } = (await call('session.inspect', {
+      sessionId: first.sessionId,
+    })) as MuxSummary;
+    expect(tags['@orchestra-target']).toBeUndefined();
+  });
+
+  it('refuses a claim made for another session, or by nobody', async () => {
+    const first = await create({ label: 'a' });
+    const second = await create({ label: 'b' });
+    const claim = { expectedHostId: hostId, claimTarget: 'claude:abc' };
+    expect(
+      await rejected('session.metadata', {
+        ...claim,
+        sessionId: first.sessionId,
+      })
+    ).toBe('IDENTITY_MISMATCH');
+    expect(
+      await rejected('session.metadata', {
+        ...claim,
+        sessionId: first.sessionId,
+        caller: { hostId, sessionId: second.sessionId, generation: 1 },
+      })
+    ).toBe('IDENTITY_MISMATCH');
     const { tags } = (await call('session.inspect', {
       sessionId: first.sessionId,
     })) as MuxSummary;

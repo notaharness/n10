@@ -4,6 +4,7 @@ import type { ManagedCatalog, ManagedRecord } from '../managed-catalog.js';
 import { resolveExecutable } from '../managed-launch.js';
 import { ORCHESTRA_TAG } from '../session-identity.js';
 import { boundedCapture, summary } from './mux-summary.js';
+import { canonicalCheckout, checkCheckout, moveClaim } from './mux-identity.js';
 import { MuxError } from './mux-error.js';
 import { encodeKey, encodePaste } from './mux-input.js';
 import {
@@ -118,10 +119,11 @@ export class MuxSessions {
     if (request.expectedHostId !== undefined)
       this.expectHost(request.expectedHostId);
     const spec = this.spec(request);
-    this.checkIdentity(request.tags);
+    const tags = canonicalCheckout(request.tags);
+    checkCheckout(this.catalog, tags);
     let record: ManagedRecord;
     try {
-      record = this.catalog.create(spec, request);
+      record = this.catalog.create(spec, { ...request, tags });
     } catch (err) {
       throw new MuxError('SPAWN_FAILED', (err as Error).message);
     }
@@ -134,10 +136,11 @@ export class MuxSessions {
     this.expectProcess(record, request);
     if (record.pty.running)
       throw new MuxError('RUNNING', `${record.label} is still running`);
-    this.checkIdentity({ ...record.tags, ...request.tags }, record);
+    const tags = canonicalCheckout(request.tags);
+    checkCheckout(this.catalog, { ...record.tags, ...tags }, record);
     const spec = this.spec(request);
     try {
-      this.catalog.relaunch(record, spec, request);
+      this.catalog.relaunch(record, spec, { ...request, tags });
     } catch (err) {
       throw new MuxError('SPAWN_FAILED', (err as Error).message);
     }
@@ -148,23 +151,17 @@ export class MuxSessions {
     const record = this.find(sessionId(params));
     const request = metadataRequest(params);
     this.expectHost(request.expectedHostId);
-    const changes: Record<string, string | null> = { ...request.set };
+    const changes: Record<string, string | null> = {
+      ...canonicalCheckout(request.set),
+    };
     for (const key of request.unset) changes[key] = null;
     if (request.claimTarget !== undefined)
-      changes[CLAIM_TAG] = request.claimTarget;
-    const next = { ...record.tags, ...changes };
-    this.checkIdentity(
-      Object.fromEntries(
-        Object.entries(next).filter(
-          (entry): entry is [string, string] => entry[1] !== null
-        )
-      ),
-      record
+      changes[ORCHESTRA_TAG.target] = request.claimTarget;
+    const next = Object.entries({ ...record.tags, ...changes }).filter(
+      (entry): entry is [string, string] => entry[1] !== null
     );
-    if (request.claimTarget !== undefined)
-      for (const other of this.catalog.all())
-        if (other !== record && other.tags[CLAIM_TAG] === request.claimTarget)
-          this.catalog.retag(other, { [CLAIM_TAG]: null });
+    checkCheckout(this.catalog, Object.fromEntries(next), record);
+    moveClaim(this.catalog, record, request);
     this.catalog.retag(record, changes);
     return summary(record);
   }
@@ -231,26 +228,6 @@ export class MuxSessions {
       );
   }
 
-  /** A checkout belongs to one session: no other may claim it. */
-  private checkIdentity(
-    tags: Record<string, string>,
-    self?: ManagedRecord
-  ): void {
-    const checkout = tags[ORCHESTRA_TAG.worktreePath];
-    if (checkout === undefined) return;
-    const holder = this.catalog
-      .all()
-      .find(
-        (other) =>
-          other !== self && other.tags[ORCHESTRA_TAG.worktreePath] === checkout
-      );
-    if (holder)
-      throw new MuxError(
-        'IDENTITY_MISMATCH',
-        `${checkout} belongs to session ${holder.sessionId}`
-      );
-  }
-
   /** What a launch request runs: its directory resolved, its argv's
    *  executable found on its own PATH. */
   private spec(request: LaunchRequest): SessionSpec {
@@ -266,8 +243,6 @@ export class MuxSessions {
     return { ...base, cmd, args };
   }
 }
-
-const CLAIM_TAG = ORCHESTRA_TAG.target;
 
 function canonicalDirectory(path: string): string {
   try {
