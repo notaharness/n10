@@ -163,6 +163,28 @@ describe.skipIf(process.platform === 'win32')('a managed catalog', () => {
     expect(catalog.list([])).toHaveLength(1);
   });
 
+  it('refuses an approval whose identity tags changed since', async () => {
+    catalog = new ManagedCatalog('host-a');
+    const handle = await catalog.open(spec('exec sleep 30'), {
+      mode: 'create',
+      label: 'agent',
+      tags: { '@orchestra-agent': 'claude' },
+      retainOnExit: true,
+    });
+    const target = handle.target!;
+    const approved = catalog.snapshot(target)!.incarnation;
+    const pid = handle.pid;
+    await expect(
+      catalog.open(spec('exec sleep 30'), {
+        mode: 'replace',
+        target,
+        expected: approved,
+        expectedTags: { '@orchestra-agent': 'codex' },
+      })
+    ).rejects.toThrow('Session changed');
+    expect(catalog.snapshot(target)!.pid).toBe(pid);
+  });
+
   it('replaces an exited agent it was approved for, as a fresh launch', async () => {
     catalog = new ManagedCatalog('host-a');
     const handle = await catalog.open(spec('exit 0'), {
