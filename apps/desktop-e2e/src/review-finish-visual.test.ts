@@ -79,6 +79,13 @@ test.describe('Visual (filing a review) @visual', () => {
     await expect(
       toolbar.getByRole('button', { name: 'Finish review' })
     ).toBeVisible();
+    // Finish review shows as soon as the pane has a diff to file on; the
+    // comparison waits for the file list's read. A screenshot that settles
+    // in between is stable, so the comparison has to be on screen first.
+    await expect(toolbar.getByTestId('revision-selector')).toHaveText(
+      'All changes'
+    );
+    await expect(toolbar.getByTestId('diff-comparison')).toBeVisible();
     await expect(toolbar).toHaveScreenshot('diff-toolbar.png', shot);
     await resizeWindow(app, 900, 700);
     await expect(toolbar).toHaveScreenshot('diff-toolbar-narrow.png', shot);
