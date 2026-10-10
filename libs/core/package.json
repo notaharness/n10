@@ -26,6 +26,11 @@
       "types": "./src/ui.ts",
       "import": "./src/ui.ts",
       "default": "./src/ui.ts"
+    },
+    "./testing/npm-update": {
+      "types": "./src/testing/npm-update.ts",
+      "import": "./src/testing/npm-update.ts",
+      "default": "./src/testing/npm-update.ts"
     }
   },
   "nx": {

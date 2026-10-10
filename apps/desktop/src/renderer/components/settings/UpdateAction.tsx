@@ -6,6 +6,7 @@ import { errorMessage } from '../../lib/utils.js';
 
 export function UpdateAction({ update }: { update: UpdateSnapshot }) {
   const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
   const command = update.command;
   if (
     update.installation.kind === 'unknown' ||
@@ -23,12 +24,18 @@ export function UpdateAction({ update }: { update: UpdateSnapshot }) {
           : 'Update n10 the same way you installed it.'}
       </p>
     );
-  if (!update.availableVersion) return null;
   const copy = () =>
     navigator.clipboard
       .writeText(command)
       .then(() => setCopied(true))
       .catch((error: unknown) => toast.error(errorMessage(error)));
+  const restart = () => {
+    setBusy(true);
+    window.n10
+      .updateAndRestart()
+      .catch((error: unknown) => toast.error(errorMessage(error)))
+      .finally(() => setBusy(false));
+  };
   const quit = () =>
     window.n10
       .quitForUpdate()
@@ -38,8 +45,9 @@ export function UpdateAction({ update }: { update: UpdateSnapshot }) {
       <div>
         <p className="font-medium">Update with npm</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Copy the command, quit n10, then run it in your terminal. Open n10
-          again when it finishes.
+          {update.restartSupported
+            ? 'n10 will close while npm installs the update, then reopen. You can also copy the command to update manually.'
+            : 'Copy the command, quit n10, then run it in your terminal. Open n10 again when it finishes.'}
         </p>
       </div>
       <div className="flex items-center gap-3 rounded-md border border-border bg-background p-3">
@@ -50,12 +58,26 @@ export function UpdateAction({ update }: { update: UpdateSnapshot }) {
           {copied ? 'Copied' : 'Copy command'}
         </Button>
       </div>
+      {update.installation.manualUpdateReason && (
+        <p className="text-sm text-warning">
+          {update.installation.manualUpdateReason}
+        </p>
+      )}
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">
           Your tmux agents keep running. Save any unfinished review text before
           quitting.
         </p>
-        <Button onClick={() => void quit()}>Quit to update</Button>
+        <div className="flex shrink-0 gap-2">
+          <Button disabled={busy} variant="outline" onClick={() => void quit()}>
+            Quit to update
+          </Button>
+          {update.restartSupported && (
+            <Button disabled={busy} onClick={restart}>
+              {busy ? 'Preparing…' : 'Update and restart'}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

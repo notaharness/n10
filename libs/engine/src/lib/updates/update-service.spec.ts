@@ -211,3 +211,25 @@ describe('app update scheduling', () => {
     service.stop();
   });
 });
+
+it('retains the manual command while denying restart for a read-only global install', async () => {
+  const { store, read } = setup();
+  const prepare = vi.fn();
+  const service = createUpdateService({
+    installation: {
+      kind: 'npm-global',
+      version: '1.0.0-beta.1',
+      manualUpdateReason: 'npm needs administrator rights.',
+    },
+    store,
+    read,
+    prepare,
+  });
+  await service.check();
+  expect(service.getSnapshot()).toMatchObject({
+    restartSupported: false,
+    command: 'npm i -g @notaharness/n10@1.0.0-beta.10',
+  });
+  await expect(service.prepareNpmUpdate()).rejects.toThrow('manual command');
+  expect(prepare).not.toHaveBeenCalled();
+});

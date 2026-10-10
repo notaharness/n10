@@ -41,6 +41,7 @@ const api: N10HostApi = {
   setUpdatePreferences: (patch) =>
     ipcRenderer.invoke(IPC.setUpdatePreferences, patch),
   quitForUpdate: () => ipcRenderer.invoke(IPC.quitForUpdate),
+  updateAndRestart: () => ipcRenderer.invoke(IPC.updateAndRestart),
 
   openRepo: (cwd) => ipcRenderer.invoke(IPC.openRepo, cwd),
   getRepo: () => ipcRenderer.invoke(IPC.getRepo),

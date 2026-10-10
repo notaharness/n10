@@ -36,6 +36,16 @@ export function UpdatesRows() {
         checkedAt={query.dataUpdatedAt}
         onCheck={() => actions.check.mutate()}
       />
+      {update.lastUpdate && (
+        <div className="space-y-2 px-4 py-3 text-sm" role="status">
+          <p>{update.lastUpdate.message}</p>
+          {update.lastUpdate.status === 'failed' && (
+            <p className="select-text text-muted-foreground">
+              npm logs: {update.lastUpdate.logPath}
+            </p>
+          )}
+        </div>
+      )}
       <UpdateAction update={update} />
       <RowShell
         label="Release channel"

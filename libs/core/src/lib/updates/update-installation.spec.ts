@@ -12,8 +12,9 @@ const homes: string[] = [];
 function fixture() {
   const home = mkdtempSync(join(tmpdir(), 'n10-update-unit-'));
   homes.push(home);
-  const root = join(home, 'node_modules/@notaharness/n10');
+  const root = join(home, 'lib/node_modules/@notaharness/n10');
   mkdirSync(root, { recursive: true });
+  mkdirSync(join(home, 'bin'), { recursive: true });
   const manifest = (extra = {}) =>
     writeFileSync(
       join(root, 'package.json'),
@@ -33,7 +34,7 @@ afterEach(() => {
 describe('installation and persisted update state', () => {
   it('only identifies a global npm install when its real path matches the active prefix', async () => {
     const { home, root, manifest } = fixture();
-    const prefix = vi.fn().mockResolvedValue(join(home, 'node_modules'));
+    const prefix = vi.fn().mockResolvedValue(join(home, 'lib/node_modules'));
     await expect(
       detectUpdateInstallation(root, false, prefix)
     ).resolves.toEqual({ kind: 'npm-global', version: '1.0.0-beta.1' });
