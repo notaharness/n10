@@ -77,7 +77,7 @@ export async function applySessionBackend(): Promise<void> {
   const claim = await listenMux(muxRuntime(), ({ socket }) => socket.end());
   if (claim.kind === 'existing')
     throw new Error(
-      "Another n10 owns this profile's sessions. Close it, or install tmux to run both."
+      'Another n10 is already running without tmux. Close it, or install tmux to run both.'
     );
   owned = {
     catalog: new ManagedCatalog(claim.owner.hostId),

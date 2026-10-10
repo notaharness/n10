@@ -78,7 +78,9 @@ test.describe('Without tmux', () => {
       join(n10.homeDir, '.path-without-tmux')
     );
     expect(second.status).toBe(1);
-    expect(second.stderr).toContain("Another n10 owns this profile's sessions");
+    expect(second.stderr).toContain(
+      'Another n10 is already running without tmux'
+    );
 
     await n10.term.write('\x00');
     await waitForSidebarFocused(n10.term);

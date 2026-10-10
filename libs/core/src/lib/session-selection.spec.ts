@@ -74,7 +74,7 @@ it('refuses to start beside another owner of the profile', async () => {
   if (other.kind !== 'owner') throw new Error('expected to own the endpoint');
   try {
     await expect(select(MISSING)).rejects.toThrow(
-      "Another n10 owns this profile's sessions"
+      'Another n10 is already running without tmux'
     );
     expect(localCatalog()).toBe(tmuxCatalog);
   } finally {
