@@ -12,6 +12,7 @@
 import './host-env-restore.js';
 import {
   applySessionBackend,
+  closeSessionBackend,
   joinKillOnCloseJob,
   killAll,
   probeTmuxAvailability,
@@ -120,8 +121,8 @@ function settle(message: Extract<MainToHost, { t: 'reply' }>): void {
   else call.reject(new Error(message.error));
 }
 
-// Terminal clients go; the tmux sessions behind them stay. Then the
-// daemon this host started stops (D15).
+// Terminal clients go; tmux sessions behind them stay, and sessions this
+// host owns end. Then the daemon this host started stops (D15).
 async function shutdown(): Promise<void> {
   const removals = stopRemoteSyncLoop();
   stopDiscovery();
@@ -131,6 +132,7 @@ async function shutdown(): Promise<void> {
   } catch {
     // nothing was running
   }
+  closeSessionBackend();
   await beam.shutdown().catch(logFailure('beam shutdown'));
   await removals;
   post({ t: 'stopped' });
@@ -185,7 +187,7 @@ async function start(): Promise<void> {
   installMachineResolver();
   beam.start();
   await probeTmuxAvailability();
-  applySessionBackend();
+  await applySessionBackend();
   const opened = openStartupRepo();
   post({ t: 'ready', repo: opened ? opened.cwd : null });
 }

@@ -111,6 +111,35 @@ describe('sync-items', () => {
     expect(found.tabs[0]).toMatchObject({ resumeRequired: false });
   });
 
+  it('adopts the new managed session a resumed worktree tab started', () => {
+    const tags = { '@orchestra-agent': 'codex' };
+    const entry = (sessionId: string): ItemEntry => ({
+      itemKey: 'branch:feature',
+      branch: 'feature',
+      worktree: '/repo/feature',
+      running: true,
+      sessionName: 'worktree-key',
+      restore: {
+        sessionName: 'worktree-key',
+        target: { kind: 'mux', hostId: 'h', sessionId, name: 'repo-feature' },
+        tags,
+      },
+    });
+    const opened = sync(open(empty, 'branch:feature'), [entry('saved')]);
+    const saved = reduce(opened, { type: 'hydrate', saved: opened });
+    // Another session that took the label is not this tab's.
+    const unrelated = sync(saved, [entry('newer')]);
+    expect(unrelated.tabs[0]).toMatchObject({ resumeRequired: true });
+    const resumed = reduce(unrelated, {
+      type: 'resume-item',
+      id: saved.tabs[0].id,
+    });
+    const adopted = sync(resumed, [entry('resumed')]);
+    expect(adopted.tabs[0]).toMatchObject({
+      resumeRequired: false,
+      restore: { target: { sessionId: 'resumed' } },
+    });
+  });
   it('replaces a dormant tab when its original tmux name was taken', () => {
     const terminal = {
       name: 'terminal:old',

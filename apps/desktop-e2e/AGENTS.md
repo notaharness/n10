@@ -43,6 +43,11 @@ build target pins production). Full notes: `docs/testing.md`.
   `e2e:beam` (`N10_E2E_OUTPUT_BASE`), `test-output/windows` for
   `e2e:windows`.
   Playwright empties the directory it is given at the start of every run.
+- `withoutTmux` (default `N10_E2E_NO_TMUX=1`) gives the app a PATH without
+  tmux (`src/setup/no-tmux.ts`): the host owns its sessions. `e2e:no-tmux`
+  runs the offline suite that way, into `test-output/no-tmux`. Tag a test
+  `@tmux` when it drives tmux itself or needs a session to outlive the app.
+  `managed-owner.test.ts` is the owner itself.
 - `e2e:windows` (`windows.config.ts`, `src/windows/`) runs on Windows only,
   drives its own probes, not the built app, and needs a second local account
   in `N10_E2E_OTHER_USER`/`N10_E2E_OTHER_PASSWORD` (`docs/testing.md`).

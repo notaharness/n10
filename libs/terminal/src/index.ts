@@ -6,4 +6,10 @@ export {
   type SessionSpec,
   type SessionBackend,
 } from './lib/session-backend.js';
-export type { SessionTarget } from './lib/session-target.js';
+export {
+  sameSessionTarget,
+  type ManagedTarget,
+  type SessionTarget,
+  type TmuxTarget,
+} from './lib/session-target.js';
+export { sessionNameCandidates } from './lib/session-labels.js';

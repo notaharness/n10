@@ -53,7 +53,7 @@ function tmuxConfigDir(name: string, homeDir: string): string {
   ).trim();
 }
 
-test('a discovered tab keeps its session config directory after reboot', async ({
+test('a discovered tab keeps its session config directory after reboot @tmux', async ({
   desktop,
 }) => {
   const originalConfig = join(desktop.homeDir, 'claude-from-session');

@@ -26,7 +26,7 @@ test.use({
   },
 });
 
-test('Codex worktree launch, activity and recorded-agent continuation in Desktop', async ({
+test('Codex worktree launch, activity and recorded-agent continuation in Desktop @tmux', async ({
   desktop,
 }) => {
   const { app, page, homeDir, repoPath } = desktop;

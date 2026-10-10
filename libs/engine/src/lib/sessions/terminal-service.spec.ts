@@ -55,6 +55,7 @@ vi.mock('@n10/core', async (original) => ({
   captureSessionRuntime: state.capture,
 }));
 const local = terminalSessionKey('terminal');
+const terminalTarget = { kind: 'tmux', name: 'terminal' } as const;
 const remote = terminalSessionKey('terminal', 'peer');
 function register(name: string) {
   const entry = {
@@ -107,6 +108,7 @@ it('uses the retained terminal’s directory, kind and machine when a restart su
   const { service } = fixture();
   await service.adopt({
     name: remote,
+    target: terminalTarget,
     kind: 'agent',
     path: '/remote/checkout',
   });
@@ -139,7 +141,12 @@ it('uses the retained terminal’s directory, kind and machine when a restart su
 
 it('coalesces concurrent discovery attachment before installing output delivery', async () => {
   const { service, ports } = fixture();
-  const discovered = { name: local, kind: 'shell' as const, path: '/repo' };
+  const discovered = {
+    name: local,
+    target: terminalTarget,
+    kind: 'shell' as const,
+    path: '/repo',
+  };
   await Promise.all([service.adopt(discovered), service.adopt(discovered)]);
   expect(state.launch).toHaveBeenCalledOnce();
   expect(ports.started).toHaveBeenCalledOnce();
@@ -148,7 +155,12 @@ it('coalesces concurrent discovery attachment before installing output delivery'
 
 it('keeps an ended agent while tmux retains it and forgets it only after the native target disappears', async () => {
   const { service, ports } = fixture();
-  await service.adopt({ name: local, kind: 'agent', path: '/repo' });
+  await service.adopt({
+    name: local,
+    target: terminalTarget,
+    kind: 'agent',
+    path: '/repo',
+  });
   state.persisted.add(local);
   state.exits[0]();
   service.forget(local);
@@ -203,7 +215,12 @@ it('refreshes the owning agent runtime and retains it after the pane exits', asy
 // is there; discovery's listing on that machine is the word that it went.
 it('forgets another machine’s retained agent when discovery finds its session gone', async () => {
   const { service, ports } = fixture();
-  await service.adopt({ name: remote, kind: 'agent', path: '/far/repo' });
+  await service.adopt({
+    name: remote,
+    target: terminalTarget,
+    kind: 'agent',
+    path: '/far/repo',
+  });
   state.persisted.add(remote);
   state.exits[0]();
   expect(service.has(remote)).toBe(true);
@@ -215,7 +232,12 @@ it('forgets another machine’s retained agent when discovery finds its session 
 
 it('ignores an old client’s exit after replacing the same terminal', async () => {
   const { service, ports } = fixture();
-  await service.adopt({ name: local, kind: 'shell', path: '/repo' });
+  await service.adopt({
+    name: local,
+    target: terminalTarget,
+    kind: 'shell',
+    path: '/repo',
+  });
   const priorExit = state.exits[0];
   await service.launch({ sessionName: local, kind: 'shell', cwd: '/repo' });
   priorExit();
@@ -274,7 +296,12 @@ it('refuses an unknown retained identity instead of launching it', async () => {
 });
 it('validates the retained local directory and never substitutes a request directory', async () => {
   const { service } = fixture();
-  await service.adopt({ name: local, kind: 'agent', path: '/recorded' });
+  await service.adopt({
+    name: local,
+    target: terminalTarget,
+    kind: 'agent',
+    path: '/recorded',
+  });
   state.stat.mockClear();
   await service.launch({
     sessionName: local,
@@ -294,7 +321,12 @@ it('validates the retained local directory and never substitutes a request direc
 });
 it('refuses a concurrent restart with different intent', async () => {
   const { service } = fixture();
-  await service.adopt({ name: local, kind: 'agent', path: '/project' });
+  await service.adopt({
+    name: local,
+    target: terminalTarget,
+    kind: 'agent',
+    path: '/project',
+  });
   const first = service.launch({
     sessionName: local,
     kind: 'agent',
@@ -320,7 +352,12 @@ it('never kills or detaches a terminal this service does not own', () => {
 });
 it('forgets a stopped terminal and ignores its late client exit', async () => {
   const { service, ports } = fixture();
-  await service.adopt({ name: local, kind: 'shell', path: '/project' });
+  await service.adopt({
+    name: local,
+    target: terminalTarget,
+    kind: 'shell',
+    path: '/project',
+  });
   const exit = state.exits[0];
   service.stop(local);
   exit();
@@ -332,8 +369,18 @@ it('forgets a stopped terminal and ignores its late client exit', async () => {
 });
 it('exposes connection health only for remote terminals', async () => {
   const { service } = fixture();
-  await service.adopt({ name: local, kind: 'shell', path: '/project' });
-  await service.adopt({ name: remote, kind: 'agent', path: '/remote' });
+  await service.adopt({
+    name: local,
+    target: terminalTarget,
+    kind: 'shell',
+    path: '/project',
+  });
+  await service.adopt({
+    name: remote,
+    target: terminalTarget,
+    kind: 'agent',
+    path: '/remote',
+  });
   state.entries.get(local)!.pty.connectionState = 'reconnecting';
   state.entries.get(remote)!.pty.connectionState = 'failed';
   const [localFacts, remoteFacts] = service.list();

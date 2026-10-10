@@ -49,7 +49,11 @@ export * from './lib/session/open-session.js';
 export type * from './lib/terminal/terminal-name.js';
 export * from './lib/terminal/launch-terminal.js';
 export * from './lib/pty-registry.js';
-export type { SessionTarget } from '@n10/terminal';
+export {
+  sameSessionTarget,
+  type ManagedTarget,
+  type SessionTarget,
+} from '@n10/terminal';
 export { joinKillOnCloseJob, type ProcessJob } from '@n10/terminal-pty';
 export * from './lib/worktree-rows.js';
 export {

@@ -12,7 +12,11 @@ import type {
 } from './discovery/discovery-model.js';
 import { requireMachine } from './machine-registry.js';
 import { getSession, liveSessionNames } from './pty-registry.js';
-import { localCatalog } from './session-catalog.js';
+import { localCatalog, selectLocalCatalog } from './session-catalog.js';
+import { tmuxCatalog } from './tmux-catalog.js';
+import { ManagedCatalog } from './managed-catalog.js';
+import { listenMux, type MuxOwner } from './mux/mux-ipc.js';
+import { muxRuntime } from './mux/mux-endpoint.js';
 import {
   isTerminalSession,
   registryNameOf,
@@ -49,15 +53,47 @@ export function getTmuxAvailability(): TmuxStatus | null {
   return cachedTmuxStatus;
 }
 
-/** Startup requires tmux; an old backend preference never selects a fallback. */
-export function applySessionBackend(): void {
-  if (!cachedTmuxStatus?.available) {
+let owned: { catalog: ManagedCatalog; owner: MuxOwner } | null = null;
+
+/**
+ * Choose where this machine's sessions live: tmux when it is installed,
+ * else this process becomes the profile's managed owner, whose sessions
+ * end with it. A tmux that is installed but fails is an error, never a
+ * reason to switch. Until another n10 can attach to a running owner,
+ * one that finds the owner already taken refuses to start.
+ */
+export async function applySessionBackend(): Promise<void> {
+  const status = cachedTmuxStatus;
+  if (status?.available) {
+    selectLocalCatalog(tmuxCatalog);
+    return;
+  }
+  if (!status?.missing)
     throw new Error(
       `n10 requires tmux 3.2 or newer. ${
-        cachedTmuxStatus?.reason ?? 'Availability has not been checked.'
-      } ${cachedTmuxStatus?.installHint ?? 'Install tmux and restart n10.'}`
+        status?.reason ?? 'Availability has not been checked.'
+      } ${status?.installHint ?? 'Install tmux and restart n10.'}`
     );
-  }
+  const claim = await listenMux(muxRuntime(), ({ socket }) => socket.end());
+  if (claim.kind === 'existing')
+    throw new Error(
+      'Another n10 is already running without tmux. Close it, or install tmux to run both.'
+    );
+  owned = {
+    catalog: new ManagedCatalog(claim.owner.hostId),
+    owner: claim.owner,
+  };
+  selectLocalCatalog(owned.catalog);
+}
+
+/** Stop the sessions this process owns and give up ownership. tmux
+ *  sessions are not this process's: they keep running. */
+export function closeSessionBackend(): void {
+  if (!owned) return;
+  const { catalog, owner } = owned;
+  owned = null;
+  catalog.close();
+  void owner.close();
 }
 
 /** What one catalog listing says about the sessions n10 cares about. */
@@ -186,6 +222,7 @@ function discoveredTerminal(
 ): DiscoveredTerminal {
   return {
     name: terminalSessionKey(session.target.name, session.machine),
+    target: session.target,
     kind,
     path: session.path,
     running: !session.exited,
@@ -231,7 +268,6 @@ function resolveOwn(sessionName: string): TaggedSession | null {
 
 /** Whether the tagged worktree session has a live hosted process. */
 export function hasLiveSession(sessionName: string): boolean {
-  if (cachedTmuxStatus && !cachedTmuxStatus.available) return false;
   const session = resolveOwn(sessionName);
   return session !== null && !session.exited;
 }
@@ -247,7 +283,6 @@ export function hasPersistedTerminalSession(name: string): boolean {
     const state = getSession(name)?.pty.processState;
     return !!state && !state.gone;
   }
-  if (cachedTmuxStatus && !cachedTmuxStatus.available) return false;
   return resolveSessionByName(identity.id) !== null;
 }
 

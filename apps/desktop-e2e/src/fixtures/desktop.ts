@@ -16,6 +16,7 @@ import {
   type TestRepoOptions,
 } from '../setup/git-repo.js';
 import { killFixtureSessions } from '../setup/tmux.js';
+import { RUN_WITHOUT_TMUX } from '../setup/no-tmux.js';
 import { appEnv } from './app-env.js';
 import { fakeAdoLoaded, fakeAdoMisses } from '../setup/fake-ado.js';
 import { closeDesktopApp } from '../setup/app-close.js';
@@ -36,6 +37,9 @@ const WORKSPACE_ROOT = resolve(APP_DIR, '..', '..');
 export { fakeAgent };
 
 export interface DesktopOptions extends HomeSeed {
+  /** Run with no tmux on the app's PATH, so it owns its sessions
+   *  itself. Defaults to the no-tmux run (`N10_E2E_NO_TMUX=1`). */
+  withoutTmux: boolean;
   /** Seed options for the per-test git repo. */
   repo?: TestRepoOptions;
   /**
@@ -138,6 +142,7 @@ export const test = base.extend<
   fakeGitHub: [undefined, { option: true }],
   fakeAzureDevOps: [undefined, { option: true }],
   tmuxConf: [undefined, { option: true }],
+  withoutTmux: [RUN_WITHOUT_TMUX, { option: true }],
   liveSessions: [undefined, { option: true }],
   env: [undefined, { option: true }],
   liveTerminals: [undefined, { option: true }],
@@ -158,6 +163,7 @@ export const test = base.extend<
       fakeGitHub,
       fakeAzureDevOps,
       tmuxConf,
+      withoutTmux,
       liveSessions,
       env,
       liveTerminals,
@@ -198,6 +204,7 @@ export const test = base.extend<
       githubToken,
       ghEnv,
       extra: env,
+      withoutTmux,
     });
     let app = await electron.launch({
       args: launchArgs(webgl),

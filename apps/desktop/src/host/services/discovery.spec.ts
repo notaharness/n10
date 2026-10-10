@@ -88,6 +88,7 @@ describe('desktop session observation adapter', () => {
     startDiscoveryForRepo('/repo-a');
     const terminal = {
       name: 'terminal',
+      target: { kind: 'tmux' as const, name: 'terminal' },
       kind: 'shell' as const,
       path: '/notes',
     };

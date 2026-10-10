@@ -82,7 +82,7 @@ function requireSession(
   return session;
 }
 
-test('relaunch reopens the same live terminal without a duplicate tab or session', async ({
+test('relaunch reopens the same live terminal without a duplicate tab or session @tmux', async ({
   desktop,
 }) => {
   await openNewTerminalDialog(desktop.app, desktop.page);
@@ -118,7 +118,7 @@ test('relaunch reopens the same live terminal without a duplicate tab or session
   expect(listTaggedSessions(desktop.homeDir)).toEqual([]);
 });
 
-test('after a computer restart tabs wait for an explicit Resume session', async ({
+test('after a computer restart tabs wait for an explicit Resume session @tmux', async ({
   desktop,
 }) => {
   await openNewTerminalDialog(desktop.app, desktop.page);
@@ -193,7 +193,7 @@ test('after a computer restart tabs wait for an explicit Resume session', async 
   expect(listTaggedSessions(desktop.homeDir)).toEqual(originalSessions);
 });
 
-test('the selected foreign worktree tab resumes its original agent on demand', async ({
+test('the selected foreign worktree tab resumes its original agent on demand @tmux', async ({
   desktop,
   other,
 }) => {

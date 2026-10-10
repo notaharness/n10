@@ -292,6 +292,7 @@ function WorktreeItemView({
   if (shouldResumeWorktree(tab)) {
     return (
       <ResumeWorktreePane
+        tabId={tab.id}
         {...resumePresentation(tab, branch)}
         repo={repo.cwd}
         restore={tab.restore}

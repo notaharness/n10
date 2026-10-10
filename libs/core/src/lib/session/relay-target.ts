@@ -74,7 +74,9 @@ function findRegistryMatch(
 ): { key: string; entry: NonNullable<ReturnType<typeof getSession>> } | null {
   for (const key of sessionNames()) {
     const entry = getSession(key);
-    if (entry && entry.pty.target.name === name) return { key, entry };
+    const target = entry?.pty.target;
+    if (entry && target?.kind === 'tmux' && target.name === name)
+      return { key, entry };
   }
   return null;
 }

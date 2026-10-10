@@ -174,6 +174,34 @@ describe('session launch boundary', () => {
       label: 'old',
     });
   });
+  it('does not attach another managed session that took the saved label', async () => {
+    const tags = {
+      '@orchestra-spawner': 'n10',
+      '@orchestra-repo': '/repo',
+      '@orchestra-session-type': 'agent',
+      '@orchestra-agent': 'claude',
+    };
+    const saved = { kind: 'mux', hostId: 'h', name: 'old' } as const;
+    state.existing = {
+      ...found,
+      target: { ...saved, sessionId: 'newer' },
+      type: 'agent',
+      path: '/repo',
+      tags,
+    };
+    await openSession({
+      ...base,
+      session: {
+        type: 'terminal',
+        kind: 'agent',
+        repo: '/repo',
+        target: 'old',
+      },
+      cwd: '/repo',
+      restore: { target: { ...saved, sessionId: 'saved' }, tags },
+    });
+    expect(state.create.mock.calls[0][1]).toMatchObject({ mode: 'create' });
+  });
   it('refuses a different worktree session that appeared while a saved tab was closed', async () => {
     state.existing = found;
     await expect(

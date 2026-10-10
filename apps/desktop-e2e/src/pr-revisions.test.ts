@@ -534,7 +534,7 @@ test.describe('a pull request opened behind another tab', () => {
     cleanupExternalSessions(desktop.repoPath, branches, desktop.homeDir);
   });
 
-  test('records no visit until its diff is in front of the reader', async ({
+  test('records no visit until its diff is in front of the reader @tmux', async ({
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;

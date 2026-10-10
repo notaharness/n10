@@ -36,6 +36,7 @@ import { hydrateTabs } from './tab-hydrate.js';
 import { moveTab } from './tab-move.js';
 import { openForeign, type ForeignSessionEntry } from './tab-foreign.js';
 import { pinLive, rekey } from './tab-sync.js';
+import { resumedItem } from './tab-restore.js';
 import {
   openTerminal,
   resumeTerminal,
@@ -138,6 +139,9 @@ export type TabsAction =
   /** Open (or activate) the tab for a terminal the host just started. */
   | { type: 'open-terminal'; terminal: TerminalEntry }
   | { type: 'resume-terminal'; previous: string; terminal: TerminalEntry }
+  /** The user resumed a waiting worktree tab: it takes the session the
+   *  resume started, whatever target that session now has. */
+  | { type: 'resume-item'; id: string }
   /** The host says the process behind a terminal ended, by name — the
    *  shell exited, the agent quit, tmux ended the session. Its tab
    *  closes on that word alone, whether or not a listing ever named it:
@@ -361,6 +365,8 @@ function applyStrip(state: TabsState, action: StripAction): TabsState {
       return focusRepo(state, action.repo);
     case 'forget-auto-opened':
       return forgetAutoOpened(state, action.keys);
+    case 'resume-item':
+      return resumedItem(state, action.id);
   }
 }
 

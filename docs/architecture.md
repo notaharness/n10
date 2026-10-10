@@ -111,6 +111,7 @@ libs/core/                       — Shell-agnostic operations. No React, Ink, E
   src/lib/activity.ts            — Agent activity registry; pty-registry.ts — PTY session lifecycle
   src/lib/session-backend.ts     — Required tmux availability, tagged-session observations and cleanup
   src/lib/session-catalog.ts     — The local session catalog seam: listing, snapshots, kills, launch plans, incarnations
+  src/lib/managed-catalog.ts     — The sessions this process owns when no tmux is installed
   src/lib/tmux-catalog.ts        — The tmux catalog, and launch plans in tmux's terms for local and remote servers
   src/lib/session-identity.ts    — `@orchestra-*` tag names, session labels and matching rules shared with Orchestra
   src/lib/session-resolver.ts    — The one catalog listing every session lookup goes through
@@ -133,7 +134,7 @@ libs/terminal/                   — Terminal emulator (renderer) + SessionBacke
   src/lib/terminal-emulator.ts   — @xterm/headless wrapper with ANSI rendering
   src/lib/session-backend.ts     — SessionSpec and terminal connection/process lifecycle contract
   src/lib/session-target.ts      — SessionTarget: the persistent session a connection addresses, by transport
-libs/terminal-pty/               — Low-level node-pty transport, and the PTY owner's process containment
+libs/terminal-pty/               — node-pty transport: managed sessions with releasable handles, and the PTY owner's process containment
   src/lib/pty-session.ts         — node-pty wrapper (PtySession)
   src/lib/process-job.ts         — Windows: the owner joins its own kill-on-close Job Object
 libs/terminal-tmux/              — Required tmux backend (system tmux 3.2+)

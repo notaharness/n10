@@ -42,7 +42,7 @@ test.describe('Tabs for work created outside the app', () => {
     await expect(tab(page, /beta/)).not.toHaveAttribute('data-unseen');
   });
 
-  test('a worktree and session created from a shell open in the background', async ({
+  test('a worktree and session created from a shell open in the background @tmux', async ({
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;

@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
+import type { ElectronApplication, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
 import { fakeCli } from './setup/fake-cli.js';
 import {
@@ -25,11 +26,15 @@ test.use({
   },
 });
 
-test('Gemini worktree launch, activity and explicit fresh restart in Desktop', async ({
-  desktop,
-}) => {
-  const { app, page, homeDir, repoPath } = desktop;
-  const cwd = join(repoPath, '.claude/worktrees/gemini-life');
+/** The open repository's agent sessions as the app lists them. */
+function sessions(page: Page) {
+  return page.evaluate(async () =>
+    window.n10.listSessions((await window.n10.getRepo())!.cwd)
+  );
+}
+
+/** Launch Gemini in a new worktree and watch it work, then let it exit. */
+async function launchThenExit(page: Page, cwd: string): Promise<void> {
   await createWorktree(page, 'gemini-life');
   await page.getByRole('button', { name: 'Launch Agent', exact: true }).click();
   await expect(
@@ -45,24 +50,18 @@ test('Gemini worktree launch, activity and explicit fresh restart in Desktop', a
   await expect.poll(() => gemini.worked(cwd)).toBe(true);
   gemini.control(cwd, 'idle');
   await expect(agentSpinner(page)).toHaveCount(0, { timeout: 10_000 });
-  const name = findN10SessionFor('gemini-life', homeDir)!;
-  tagTmuxSession(
-    name,
-    {
-      '@orchestra-orchestrator': 'tmux:fixture-orchestrator',
-      '@orchestra-last-report': 'PROGRESS 2026-09-09T14:32:00Z inbox',
-    },
-    homeDir
-  );
+}
+
+/** Gemini has no worktree-safe continue: the menu offers only a fresh
+ *  start, which runs in the same session. */
+async function exitAndStartFresh(
+  app: ElectronApplication,
+  page: Page,
+  cwd: string
+): Promise<void> {
   gemini.control(cwd, 'exit');
   await expect
-    .poll(() =>
-      page.evaluate(async () =>
-        (
-          await window.n10.listSessions((await window.n10.getRepo())!.cwd)
-        ).map((session) => session.running)
-      )
-    )
+    .poll(async () => (await sessions(page)).map((session) => session.running))
     .toEqual([false]);
   await openAgentMenuFromCard(app, page);
   const menu = sessionMenu(page);
@@ -76,6 +75,41 @@ test('Gemini worktree launch, activity and explicit fresh restart in Desktop', a
   await expect
     .poll(() => gemini.calls(cwd))
     .toMatchObject([{ args: [] }, { args: [], cwd }]);
+}
+
+test('Gemini worktree launch, activity and explicit fresh restart in Desktop', async ({
+  desktop,
+}) => {
+  const { app, page, repoPath } = desktop;
+  const cwd = join(repoPath, '.claude/worktrees/gemini-life');
+  await launchThenExit(page, cwd);
+  const [launched] = await sessions(page);
+  await exitAndStartFresh(app, page, cwd);
+  await expect
+    .poll(async () => (await sessions(page)).map((session) => session.running))
+    .toEqual([true]);
+  const [restarted] = await sessions(page);
+  // The same session, its recorded agent the one that runs now.
+  expect(restarted!.restore?.target).toEqual(launched!.restore?.target);
+  expect(restarted!.restore?.tags['@orchestra-agent']).toBe('gemini');
+});
+
+test('a fresh Gemini restart clears the supervisor its last run reported to @tmux', async ({
+  desktop,
+}) => {
+  const { app, page, homeDir, repoPath } = desktop;
+  const cwd = join(repoPath, '.claude/worktrees/gemini-life');
+  await launchThenExit(page, cwd);
+  const name = findN10SessionFor('gemini-life', homeDir)!;
+  tagTmuxSession(
+    name,
+    {
+      '@orchestra-orchestrator': 'tmux:fixture-orchestrator',
+      '@orchestra-last-report': 'PROGRESS 2026-09-09T14:32:00Z inbox',
+    },
+    homeDir
+  );
+  await exitAndStartFresh(app, page, cwd);
   expect(findN10SessionFor('gemini-life', homeDir)).toBe(name);
   expect(
     execFileSync(

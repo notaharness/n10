@@ -62,7 +62,7 @@ test.afterEach(({ desktop, other }) => {
 });
 
 test.describe('Agents restored across repositories', () => {
-  test('every repository’s live agent gets its tab back in its own group', async ({
+  test('every repository’s live agent gets its tab back in its own group @tmux', async ({
     desktop,
     other,
   }) => {

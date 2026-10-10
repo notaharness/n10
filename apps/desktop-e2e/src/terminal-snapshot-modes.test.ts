@@ -70,7 +70,7 @@ test.describe('A terminal mounted from a truncated snapshot', () => {
     killN10Sessions(desktop.homeDir);
   });
 
-  test('has the modes the tmux client set as it attached', async ({
+  test('has the modes the tmux client set as it attached @tmux', async ({
     desktop,
   }) => {
     const { page } = desktop;

@@ -69,6 +69,47 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # Without tmux the session host owns its sessions. The offline suite,
+  # minus `@tmux` tests, runs again with tmux hidden from the app's PATH
+  # (docs/testing.md).
+  no-tmux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npx --no install-electron
+
+      # cli-e2e drives the TUI in Chromium through its wterm host.
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - uses: nrwl/nx-set-shas@v4
+
+      - run: npx nx affected -t e2e:no-tmux
+
+      - name: Upload Playwright test output on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: no-tmux-test-output
+          path: |
+            apps/desktop-e2e/test-output/no-tmux
+            apps/cli-e2e/test-output/no-tmux
+          if-no-files-found: ignore
+          retention-days: 7
+
   # Windows viability: the session host's job and ConPTY under real
   # Electron, and the mux pipe's authentication, including against a
   # second local account (docs/design/windows-support.md).

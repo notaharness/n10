@@ -70,6 +70,43 @@
           "command": "playwright test",
           "cwd": "apps/cli-e2e"
         }
+      },
+      "e2e:no-tmux": {
+        "executor": "nx:run-commands",
+        "cache": true,
+        "dependsOn": [
+          {
+            "projects": [
+              "cli"
+            ],
+            "target": "build"
+          },
+          {
+            "projects": [
+              "cli-wterm-host"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "externalDependencies": [
+              "@playwright/test"
+            ]
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/test-output/no-tmux/output"
+        ],
+        "options": {
+          "command": "playwright test --grep-invert '@integration|@tmux'",
+          "cwd": "apps/cli-e2e",
+          "env": {
+            "N10_E2E_NO_TMUX": "1"
+          }
+        }
       }
     }
   }

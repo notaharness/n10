@@ -14,7 +14,8 @@ function term(
   id: string,
   kind: 'shell' | 'agent' = 'shell'
 ): DiscoveredTerminal {
-  return { name: `n10-${kind}-${id}`, kind, path: `/dir/${id}` };
+  const name = `n10-${kind}-${id}`;
+  return { name, target: { kind: 'tmux', name }, kind, path: `/dir/${id}` };
 }
 
 function scan(

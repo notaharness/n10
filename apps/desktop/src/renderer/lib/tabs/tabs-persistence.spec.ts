@@ -99,6 +99,11 @@ it('rejects a saved session target it cannot address', () => {
   const withTarget = (restore: Record<string, unknown>) =>
     snapshot({ ...terminal, restore: { ...terminal.restore, ...restore } });
   expect(decodeTabs(withTarget({}))).not.toBeNull();
+  const managed = { kind: 'mux', hostId: 'h', sessionId: 's', name: 'old' };
+  expect(decodeTabs(withTarget({ target: managed }))).not.toBeNull();
+  expect(
+    decodeTabs(withTarget({ target: { ...managed, sessionId: '' } }))
+  ).toBeNull();
   expect(
     decodeTabs(withTarget({ target: { kind: 'screen', name: 'old' } }))
   ).toBeNull();

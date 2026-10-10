@@ -7,7 +7,6 @@ vi.mock('node:child_process', () => ({
 
 import {
   isDuplicateSession,
-  sessionNameCandidates,
   tmuxAttachArgs,
   tmuxFreeSessionName,
   tmuxHasSession,
@@ -170,15 +169,6 @@ describe('tmuxAttachArgs', () => {
 });
 
 describe('free-name probing', () => {
-  it('tries the name, then -2, -3, …', () => {
-    const it3 = sessionNameCandidates('repo-feat');
-    expect([it3.next().value, it3.next().value, it3.next().value]).toEqual([
-      'repo-feat',
-      'repo-feat-2',
-      'repo-feat-3',
-    ]);
-  });
-
   it('answers the first candidate the server does not hold, one has-session per candidate', () => {
     // `repo-shell` and `repo-shell-2` exist; `-3` does not.
     mockedExec

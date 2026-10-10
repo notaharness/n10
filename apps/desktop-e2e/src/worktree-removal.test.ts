@@ -311,7 +311,9 @@ test.describe('Worktree removed outside n10 (running agent)', () => {
 
     // `mkdir -p`, or a tool writing to a path under it: git still does
     // not list the worktree, and the agent runs on.
-    test('keeps the agent running and its tab marked', async ({ desktop }) => {
+    test('keeps the agent running and its tab marked @tmux', async ({
+      desktop,
+    }) => {
       const { page, repoPath, homeDir } = desktop;
       await removeUnderAgent(page, repoPath, removals[1]![1]);
 

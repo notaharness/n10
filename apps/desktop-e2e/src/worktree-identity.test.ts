@@ -43,7 +43,7 @@ async function launchInWorktree(page: Page, branch: string): Promise<void> {
 test.describe('A worktree session belongs to its checkout', () => {
   const BRANCH = 'feature';
 
-  test('tags the session with its checkout', async ({ desktop }) => {
+  test('tags the session with its checkout @tmux', async ({ desktop }) => {
     const { page, repoPath, homeDir } = desktop;
     await launchInWorktree(page, BRANCH);
     const worktree = realpathSync(
@@ -126,7 +126,7 @@ test.describe('After a restart, a switched worktree’s session', () => {
     cleanupExternalSessions(desktop.repoPath, [SEEDED, MOVED], desktop.homeDir);
   });
 
-  test('comes back behind the worktree’s tab', async ({ desktop }) => {
+  test('comes back behind the worktree’s tab @tmux', async ({ desktop }) => {
     const { page } = desktop;
     await expect(tab(page, new RegExp(MOVED))).toBeVisible({ timeout: 30_000 });
     await expect(tabs(page)).toHaveCount(1);

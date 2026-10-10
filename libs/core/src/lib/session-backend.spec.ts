@@ -70,9 +70,10 @@ function observed(
   return seen;
 }
 
-const TMUX_MISSING: TmuxStatus = {
+const TMUX_TOO_OLD: TmuxStatus = {
   available: false,
-  reason: 'tmux binary not found on PATH',
+  version: '2.9',
+  reason: 'tmux 2.9 is too old; need ≥ 3.2',
   installHint: 'brew install tmux',
 };
 
@@ -141,14 +142,14 @@ beforeEach(async () => {
 });
 
 describe('tmux requirement', () => {
-  it('accepts a successful startup probe', () => {
-    expect(() => applySessionBackend()).not.toThrow();
+  it('accepts a successful startup probe', async () => {
+    await expect(applySessionBackend()).resolves.toBeUndefined();
   });
 
-  it('rejects unavailable tmux with an installation hint', async () => {
-    isTmuxAvailableMock.mockResolvedValueOnce(TMUX_MISSING);
+  it('rejects an installed tmux that fails, with an installation hint', async () => {
+    isTmuxAvailableMock.mockResolvedValueOnce(TMUX_TOO_OLD);
     await probeTmuxAvailability();
-    expect(() => applySessionBackend()).toThrow(
+    await expect(applySessionBackend()).rejects.toThrow(
       /requires tmux.*brew install tmux/
     );
   });
@@ -236,16 +237,6 @@ describe('tmux session existence', () => {
       ours('other-feature-x', 'worktree', '/other', 'feature-x', '/wt/x'),
     ]);
     expect(hasLiveSession(worktreeSessionKey('/wt/x'))).toBe(false);
-  });
-
-  it('reports no live session when tmux is unavailable', async () => {
-    isTmuxAvailableMock.mockResolvedValueOnce(TMUX_MISSING);
-    await probeTmuxAvailability();
-    tmuxListSessionsMock.mockReturnValue([
-      ours('x', 'worktree', '/repo', 'feature-x', '/wt/x'),
-    ]);
-    expect(hasLiveSession(worktreeSessionKey('/wt/x'))).toBe(false);
-    expect(tmuxListSessionsMock).not.toHaveBeenCalled();
   });
 
   // A registry key names a checkout, never a tmux name: repository

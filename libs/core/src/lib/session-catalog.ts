@@ -1,4 +1,9 @@
-import type { SessionBackend, SessionSpec, SessionTarget } from '@n10/terminal';
+import type {
+  ManagedTarget,
+  SessionBackend,
+  SessionSpec,
+  SessionTarget,
+} from '@n10/terminal';
 import {
   sameTmuxIncarnation,
   type TmuxSessionIncarnation,
@@ -10,7 +15,15 @@ import { tmuxCatalog } from './tmux-catalog.js';
  * approval names the incarnation it saw, so a session that was
  * restarted, or a label reused after a kill, never matches it.
  */
-export type SessionIncarnation = { kind: 'tmux' } & TmuxSessionIncarnation;
+export type SessionIncarnation =
+  | ({ kind: 'tmux' } & TmuxSessionIncarnation)
+  | ManagedIncarnation;
+
+/** One process launch of a managed record: each launch increments
+ *  `generation`. */
+export interface ManagedIncarnation extends ManagedTarget {
+  generation: number;
+}
 
 /** A persistent session as its catalog lists it, before core reads
  *  its tags. */
@@ -87,20 +100,26 @@ export interface SessionCatalog {
   open(spec: SessionSpec, plan: SessionLaunchPlan): Promise<SessionBackend>;
 }
 
+let local: SessionCatalog = tmuxCatalog;
+
 /** The catalog sessions on this machine live in. */
 export function localCatalog(): SessionCatalog {
-  return tmuxCatalog;
+  return local;
 }
 
-export function sameSessionTarget(a: SessionTarget, b: SessionTarget): boolean {
-  return a.kind === b.kind && a.name === b.name;
+/** Select the local catalog: startup's backend selection does. */
+export function selectLocalCatalog(catalog: SessionCatalog): void {
+  local = catalog;
 }
 
 /** The target an incarnation ran under. */
 export function incarnationTarget(
   incarnation: SessionIncarnation
 ): SessionTarget {
-  return { kind: incarnation.kind, name: incarnation.name };
+  if (incarnation.kind === 'tmux')
+    return { kind: 'tmux', name: incarnation.name };
+  const { kind, hostId, sessionId, name } = incarnation;
+  return { kind, hostId, sessionId, name };
 }
 
 /** Whether two incarnations name the exact same process. */
@@ -108,5 +127,11 @@ export function sameIncarnation(
   a: SessionIncarnation,
   b: SessionIncarnation
 ): boolean {
-  return a.kind === b.kind && sameTmuxIncarnation(a, b);
+  if (a.kind === 'tmux') return b.kind === 'tmux' && sameTmuxIncarnation(a, b);
+  if (b.kind === 'tmux') return false;
+  return (
+    a.hostId === b.hostId &&
+    a.sessionId === b.sessionId &&
+    a.generation === b.generation
+  );
 }

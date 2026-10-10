@@ -19,9 +19,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
   menus, `openExternal`, prefs, forking the beam daemon) the host asks
   for as `ShellCalls` (`main/host-protocol.ts`). Nothing the host imports
   may import `electron`. A host that dies is forked again, backing off
-  and giving up after repeated failures (`main/host-restarts.ts`): its
-  tmux sessions survive, discovery re-attaches them, windows reload to
-  watch again. Calls wait out a restart; after giving up they fail and
+  and giving up after repeated failures (`main/host-restarts.ts`): tmux
+  sessions survive and discovery re-attaches them, while a host that owned
+  its sessions (no tmux) took them with it and their tabs wait for Resume;
+  windows reload to watch again. Calls wait out a restart; after giving up they fail and
   the user is told. Tests load a module into the host first with `N10_HOST_REQUIRE`.
 - The host creates tmux servers itself: a utility process does not hand
   Chromium's descriptors to the persistent server, as spawning straight
@@ -29,8 +30,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - `services/repo.ts` opens an engine repository handle; session and worktree
   commands capture that handle before awaiting. `repository(cwd)` hands out
   any repository's handle, selected or parked, for reads. Discovery observes its live scope. The host
-  awaits the tmux probe and validates the requirement before opening a
-  repo; missing tmux is a startup error with an installation hint.
+  awaits the tmux probe and selects the session backend before opening a
+  repo: tmux when installed, else the host owns its sessions; an installed
+  tmux that fails is a startup error with an installation hint.
 - `main/beam/` is a client of the beam daemon's control socket (beam's
   docs/06) and installs the three machine ports: `MachinesPort`,
   `RemoteMachinePort` and `InboundMailPort`. Nothing above them knows beam.
@@ -79,7 +81,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   (`<directory>-shell`, suffixed on collision) and the key, the directory is
   `#{session_path}`. The tab group is derived at read time
   (`services/terminal-home.ts`). Closing a terminal tab confirms and kills;
-  quitting only detaches. Agent panes remain available after exit for viewing
+  quitting detaches tmux sessions and, without tmux, stops the sessions the
+  host owns. Agent panes remain available after exit for viewing
   and restart; shell terminals close when their process exits. The desktop
   saves its open tabs, order, focus and launch identity in
   `~/.n10/open-tabs.json`. When tmux is gone, tabs stay open and wait for

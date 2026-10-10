@@ -117,7 +117,7 @@ test.describe('A worktree removed outside n10', () => {
   }
 
   for (const [how, remove] of forcedRemovals) {
-    test(`${how} keeps a running agent's tab, marked, until it is stopped`, async ({
+    test(`${how} keeps a running agent's tab, marked, until it is stopped @tmux`, async ({
       n10,
     }) => {
       const agent = await worktreeWithAgent(n10, 'sleep 120');
@@ -137,7 +137,7 @@ test.describe('A worktree removed outside n10', () => {
     });
   }
 
-  test("an agent exiting takes its removed worktree's tab with it", async ({
+  test("an agent exiting takes its removed worktree's tab with it @tmux", async ({
     n10,
   }) => {
     const agent = await worktreeWithAgent(n10, 'sleep 12');

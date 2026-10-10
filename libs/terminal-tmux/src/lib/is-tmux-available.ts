@@ -2,6 +2,8 @@ import { tmuxVersion } from './tmux-cli.js';
 
 export interface TmuxStatus {
   available: boolean;
+  /** No tmux is installed: none could be started from PATH. */
+  missing?: boolean;
   /** Reported by `tmux -V` — e.g. "3.4" or "next-3.5". Undefined if
    *  the binary couldn't be invoked. */
   version?: string;
@@ -44,10 +46,14 @@ async function probe(): Promise<TmuxStatus> {
   let raw: string;
   try {
     raw = tmuxVersion();
-  } catch {
+  } catch (error) {
+    const missing = (error as NodeJS.ErrnoException).code === 'ENOENT';
     return {
       available: false,
-      reason: 'tmux binary not found on PATH',
+      ...(missing ? { missing } : {}),
+      reason: missing
+        ? 'tmux binary not found on PATH'
+        : `\`tmux -V\` failed: ${(error as Error).message}`,
       installHint: installHintForPlatform(),
     };
   }

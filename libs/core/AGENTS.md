@@ -9,9 +9,12 @@ state, scheduling and caching over these belong in `libs/engine`. `src/ui.ts`,
 import `@n10/vcs-core` as types, or its `./types` subpath for values.
 The reasoning behind each rule is in `docs/decisions.md`.
 
-- **Tmux requirement** (`session-backend.ts`): await `probeTmuxAvailability()`
-  before startup validation. Require tmux 3.2+. Legacy backend preferences are
-  ignored; no direct-agent PTY fallback exists.
+- **Backend selection** (`session-backend.ts`): await `probeTmuxAvailability()`,
+  then `applySessionBackend()`. tmux 3.2+ when installed; with no tmux, this
+  process becomes the profile's managed owner (`managed-catalog.ts`), or
+  refuses when another owns it. An installed tmux that fails is an error,
+  never a fallback. Legacy backend preferences are ignored. Shells call
+  `closeSessionBackend()` after `killAll()` on exit: owned sessions end.
 - **Launch boundary** (`session/open-session.ts`): receive explicit worktree or
   terminal identity, validate the worktree HEAD against the branch a caller
   names (discovery's attaches name none), resolve tags, then choose

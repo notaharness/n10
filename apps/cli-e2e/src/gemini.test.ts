@@ -1,8 +1,8 @@
 import { join } from 'node:path';
 import { test, expect } from './fixtures/n10.js';
 import { fakeCli } from './setup/fake-cli.js';
+import { sidebarLocator } from './setup/sidebar.js';
 import { createSession, waitForSidebarFocused } from './setup/sessions.js';
-import { listTaggedSessions } from './setup/tmux.js';
 
 const gemini = fakeCli('gemini');
 
@@ -24,11 +24,7 @@ test('Gemini rejects automatic resume and starts fresh only when selected in the
   await createSession(n10.term, 'gemini-life', { start: true });
   await expect(n10.term.getByText('fake-gemini-ready').first()).toBeVisible();
   expect(gemini.calls(cwd)).toMatchObject([{ args: [], cwd }]);
-  const [before] = listTaggedSessions(n10.homeDir);
   gemini.control(cwd, 'exit');
-  await expect
-    .poll(() => listTaggedSessions(n10.homeDir)[0]?.paneDead)
-    .toBe(true);
   // Native exit precedes the TUI's lifecycle update; Tab during that gap
   // focuses the terminal instead of opening its continuation menu.
   await expect(
@@ -48,10 +44,10 @@ test('Gemini rejects automatic resume and starts fresh only when selected in the
   await expect
     .poll(() => gemini.calls(cwd))
     .toMatchObject([{ args: [] }, { args: [], cwd }]);
-  const [after] = listTaggedSessions(n10.homeDir);
-  expect(after.name).toBe(before.name);
-  expect(after.panePid).not.toBe(before.panePid);
-  expect(after.paneDead).toBe(false);
+  // The same row, running its second process.
+  const row = sidebarLocator(n10.term.page, 'gemini-life');
+  await expect(row.running().first()).toBeVisible();
+  await expect(row.any()).toHaveCount(1);
 });
 
 test('Gemini output becomes busy and then idle in the TUI sidebar', async ({
@@ -74,5 +70,8 @@ test('Gemini output becomes busy and then idle in the TUI sidebar', async ({
     timeout: 10_000,
   });
   await expect(row).not.toContainText(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/);
-  expect(listTaggedSessions(n10.homeDir)[0]?.paneDead).toBe(false);
+  // Still running: idle is not an exit.
+  await expect(
+    n10.term.page.locator('.term-row', { hasText: /◎.*gemini-busy/ })
+  ).toHaveCount(0);
 });

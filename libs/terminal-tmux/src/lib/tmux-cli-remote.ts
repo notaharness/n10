@@ -1,3 +1,4 @@
+import { sessionNameCandidates } from '@n10/terminal';
 /**
  * Async, `MachineExecutor`-driven twins of the synchronous primitives in
  * `tmux-cli.ts`/`tmux-state.ts`. A remote machine cannot be talked to
@@ -15,7 +16,6 @@ import {
   isDuplicateSession,
   killSessionArgv,
   newSessionDetachedArgv,
-  sessionNameCandidates,
   showOptionArgv,
   type MachineExecutor,
   type TmuxNewSessionOptions,

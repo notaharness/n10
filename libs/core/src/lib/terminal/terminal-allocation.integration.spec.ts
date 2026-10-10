@@ -109,6 +109,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
             terminals: [
               {
                 name: terminalSessionKey(expected),
+                target: { kind: 'tmux', name: expected },
                 kind: 'shell',
                 path: fixture.repo,
               },

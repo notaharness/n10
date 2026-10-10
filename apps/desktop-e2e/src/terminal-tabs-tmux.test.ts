@@ -33,7 +33,7 @@ test.describe('Terminal tabs under tmux', () => {
     killN10Sessions(desktop.homeDir);
   });
 
-  test('a shell is a tagged <repo>-shell session started in its directory, killed on close', async ({
+  test('a shell is a tagged <repo>-shell session started in its directory, killed on close @tmux', async ({
     desktop,
   }) => {
     const { app, page, repoPath, homeDir } = desktop;
@@ -69,7 +69,7 @@ test.describe('Terminal tabs under tmux', () => {
   // process exits, or someone runs `tmux kill-session` in another
   // window. The client the app holds exits with it, and the tab goes
   // the way a PTY shell's does on `exit`: by itself, with no dialog.
-  test('a shell tab closes itself when its tmux session is killed from outside', async ({
+  test('a shell tab closes itself when its tmux session is killed from outside @tmux', async ({
     desktop,
   }) => {
     const { app, page, homeDir } = desktop;
@@ -97,7 +97,7 @@ test.describe('Terminal tabs under tmux', () => {
   // is, focused, with a fresh client behind it that still takes what is
   // typed. Without this the tab closed and discovery reopened it,
   // unfocused, up to a scan later.
-  test('a detach from inside tmux keeps the tab, focused, and the shell keeps working', async ({
+  test('a detach from inside tmux keeps the tab, focused, and the shell keeps working @tmux', async ({
     desktop,
   }) => {
     const { app, page, homeDir } = desktop;
@@ -213,7 +213,7 @@ test.describe('Terminal tabs surviving a restart', () => {
     killN10Sessions(desktop.homeDir);
   });
 
-  test('every surviving terminal reopens as a tab in its group, without switching repository', async ({
+  test('every surviving terminal reopens as a tab in its group, without switching repository @tmux', async ({
     desktop,
     folder,
     other,
@@ -279,7 +279,7 @@ test.describe("Orchestra's directory players", () => {
     killFixtureSessions(desktop.homeDir);
   });
 
-  test('is adopted as an agent terminal tab', async ({ desktop }) => {
+  test('is adopted as an agent terminal tab @tmux', async ({ desktop }) => {
     const { page } = desktop;
     await expect(terminalTabs(page)).toHaveCount(1, { timeout: 30_000 });
     await expect

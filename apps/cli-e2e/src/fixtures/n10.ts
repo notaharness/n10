@@ -1,3 +1,4 @@
+import { pathWithoutTmux } from '../setup/no-tmux.js';
 import {
   test as base,
   expect,
@@ -68,6 +69,20 @@ export interface N10Options {
    * integration tests).
    */
   n10RepoPath?: string;
+  /** Run n10 with no tmux on its PATH, so it owns its sessions itself. */
+  withoutTmux: boolean;
+}
+
+/** The PATH n10 runs with: the test's own, less tmux when asked. */
+function pathFor(
+  withoutTmux: boolean,
+  env: Record<string, string> | undefined,
+  homeDir: string
+): { PATH?: string } {
+  if (!withoutTmux) return {};
+  return {
+    PATH: pathWithoutTmux(env?.PATH ?? process.env.PATH ?? '', homeDir),
+  };
 }
 
 export interface N10Term {
@@ -111,9 +126,21 @@ export const test = base.extend<
   cols: [100, { option: true }],
   rows: [30, { option: true }],
   n10RepoPath: [undefined, { option: true }],
+  // `e2e:no-tmux` runs every test this way.
+  withoutTmux: [process.env.N10_E2E_NO_TMUX === '1', { option: true }],
 
   n10: async (
-    { page, baseURL, n10Config, n10Env, cols, rows, n10RepoPath, fixtureHome },
+    {
+      page,
+      baseURL,
+      n10Config,
+      n10Env,
+      cols,
+      rows,
+      n10RepoPath,
+      withoutTmux,
+      fixtureHome,
+    },
     // Playwright's fixture callback. Named `provide` rather than the
     // conventional `use` so it does not read as a React hook call to
     // the react-hooks rules, which run over this workspace.
@@ -148,7 +175,11 @@ export const test = base.extend<
           //
           // Last, so a test's own env additions cannot override it. The
           // host pins the same value again for the same reason.
-          env: { ...n10Env, TMUX_TMPDIR: homeDir },
+          env: {
+            ...n10Env,
+            ...pathFor(withoutTmux, n10Env, homeDir),
+            TMUX_TMPDIR: homeDir,
+          },
         }),
       });
       if (!spawnRes.ok) {

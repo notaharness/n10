@@ -11,6 +11,11 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./session-target": {
+      "types": "./src/lib/session-target.ts",
+      "import": "./src/lib/session-target.ts",
+      "default": "./src/lib/session-target.ts"
+    },
     "./package.json": "./package.json"
   },
   "dependencies": {

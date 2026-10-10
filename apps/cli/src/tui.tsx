@@ -34,6 +34,8 @@ import {
 import {
   killAll,
   applySessionBackend,
+  closeSessionBackend,
+  joinKillOnCloseJob,
   probeTmuxAvailability,
   resetRepoRoot,
 } from '@n10/core';
@@ -54,6 +56,12 @@ const pullRequests = createPullRequestList({ providers });
 
 const EXIT_GRACE_MS = 3_000;
 
+/** Detach every terminal client; sessions this process owns end. */
+function releaseSessions(): void {
+  killAll();
+  closeSessionBackend();
+}
+
 // ── App ────────────────────────────────────────────────────────────
 
 function App() {
@@ -69,7 +77,7 @@ function App() {
         'info'
       );
       await waitForExit(() => sync.stop(), settlePendingRuns, EXIT_GRACE_MS);
-      killAll();
+      releaseSessions();
       exit();
       process.exit(0);
     })();
@@ -130,22 +138,25 @@ export async function runTui(args: string[]): Promise<void> {
   }
 
   process.on('exit', () => {
-    killAll();
+    releaseSessions();
     restoreWindowTitle();
   });
   process.on('SIGINT', () => {
-    killAll();
+    releaseSessions();
     process.exit(0);
   });
   process.on('SIGTERM', () => {
-    killAll();
+    releaseSessions();
     process.exit(0);
   });
 
+  // On Windows, everything this process starts ends with it, as the
+  // desktop's session host's does. Before anything is spawned.
+  joinKillOnCloseJob();
   // Resolve the requirement before rendering so missing tmux is actionable.
   await probeTmuxAvailability();
   try {
-    applySessionBackend();
+    await applySessionBackend();
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

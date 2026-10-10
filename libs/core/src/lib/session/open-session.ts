@@ -1,5 +1,10 @@
 import { createRemoteTmuxBackend } from '@n10/terminal-tmux';
-import type { SessionBackend, SessionSpec, SessionTarget } from '@n10/terminal';
+import {
+  sameSessionTarget,
+  type SessionBackend,
+  type SessionSpec,
+  type SessionTarget,
+} from '@n10/terminal';
 import { spawnSession, type NamedPtyEntry } from '../pty-registry.js';
 import {
   LOCAL_MACHINE,
@@ -11,7 +16,6 @@ import { ORCHESTRA_TAG, type TaggedSession } from '../session-identity.js';
 import {
   incarnationTarget,
   localCatalog,
-  sameSessionTarget,
   type SessionIncarnation,
   type SessionLaunchPlan,
 } from '../session-catalog.js';
@@ -239,13 +243,15 @@ function matchingSavedSession(
   return sameRestoredSession(found, params) ? found : null;
 }
 
-/** A saved label may now be owned by someone else's tagged session. */
+/** A saved label may now be owned by someone else's tagged session, or
+ *  by another managed session that took the label after it was freed. */
 function sameRestoredSession(
   found: TaggedSession,
   params: OpenSessionParams
 ): boolean {
   const restore = params.restore;
   if (!restore || !found.tags) return false;
+  if (!sameSessionTarget(found.target, restore.target)) return false;
   const identityTags = [
     ORCHESTRA_TAG.spawner,
     ORCHESTRA_TAG.repo,

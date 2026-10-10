@@ -50,7 +50,7 @@ test.describe('Discovering work created outside the app', () => {
     });
   });
 
-  test('an agent already running in tmux is picked up as a live session', async ({
+  test('an agent already running in tmux is picked up as a live session @tmux', async ({
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;
@@ -87,7 +87,7 @@ test.describe('Discovering work created outside the app', () => {
   // backend attached to it: its output predates the app knowing the
   // session existed, and is redrawn on attach. A fresh spawn would have
   // run `aiCommand` instead.
-  test('opening the session shows the agent that was already running', async ({
+  test('opening the session shows the agent that was already running @tmux', async ({
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;

@@ -34,9 +34,16 @@ recipe, rather than coupling the tab schema to `tmuxName`/`TmuxSessionIncarnatio
 
 ```ts
 type SavedSessionTarget =
-  | { kind: 'tmux'; name: string; incarnation?: TmuxSessionIncarnation }
-  | { kind: 'mux'; hostId: string; sessionId: string; generation: number };
+  | { kind: 'tmux'; name: string }
+  | { kind: 'mux'; hostId: string; sessionId: string; name: string };
 ```
+
+Host and session ID identify a mux target. Its `name` is the record's label,
+which addresses the session but never identifies it: a label is reused once
+its record is gone. The generation is not part of the target. It lives in the
+incarnation an approval pins (as tmux's does), so a saved tab follows its
+record across a restart within one owner while a replacement still names the
+exact process it approved.
 
 The tab also retains repo/cwd/machine, tags, agent/account selectors and optional
 verified conversation ID. Add the discriminator before #331 ships; this avoids
@@ -541,7 +548,9 @@ and GUI descendants. On POSIX use native PTY teardown/process-group behavior;
 owner-close tests cover the same user-visible session lifetime. POSIX detached
 daemons are not covered by a Windows-style kernel job guarantee.
 
-A resumed mux record gets a new live target in #331's discriminated schema.
+A restart within the owner keeps the record and its target. A session resumed
+after its owner is gone is a new record under a new owner, so it gets a new
+target in #331's discriminated schema.
 Tabs may reattach to a still-running headless owner; stopped owners require
 explicit Resume. Stale supervisor mux handles require re-adoption. Known exact
 conversation IDs and launch-time account selectors survive; directory/latest
@@ -695,7 +704,9 @@ the tmux/no-tmux and OS matrix.
    This is required for the initial Orchestra/desktop workflow, not deferred fleet
    work. Keep remote connect out of the one-shot CLI PR.
 7. **Windows launch/restore integration.** Native shell/agent/path adapters,
-   quit/save/wait/Resume, session-bin and tag/relay grouping. Gate on Windows and
+   quit/save/wait/Resume, session-bin and tag/relay grouping. Until this step's
+   quit confirmation lands, quitting an owner stops its sessions without asking
+   (step 4's interim, in decisions.md). Gate on Windows and
    Linux owner e2e plus real-harness qualification before claiming support.
    Split shell/path primitives from the UI integration if review size requires it.
 8. **Fleet reuse.** After beam B3, add target-native discovery and

@@ -55,6 +55,8 @@ npx nx e2e cli-e2e                    # offline TUI tests
 npx nx e2e desktop-e2e                # offline Electron tests
 npx nx e2e:visual desktop-e2e          # screenshots in a pinned container
 npx nx e2e:windows desktop-e2e         # Windows host lifetime and mux access (Windows)
+npx nx e2e:no-tmux desktop-e2e         # the suite with tmux hidden, minus @tmux tests
+npx nx e2e:no-tmux cli-e2e             # the same for the TUI
 GH_TOKEN=$(gh auth token) npx nx e2e:integration desktop-e2e
 npx nx dev website                    # apps/website at http://localhost:3100
 ```
@@ -112,7 +114,9 @@ Next.js requires otherwise).
 
 Tests and scripts must use a scratch socket directory inside a fixture-created
 HOME and unset `TMUX`, which overrides `TMUX_TMPDIR`. Never run
-`tmux kill-server`. Closing n10 detaches sessions; it must not kill them.
+`tmux kill-server`. Closing n10 detaches its tmux sessions; it must not kill
+them. Without tmux, n10 owns its sessions and closing it ends them
+(`docs/decisions.md`, "Managed owner without tmux").
 See `libs/terminal-tmux/AGENTS.md`.
 
 ## Git and releases

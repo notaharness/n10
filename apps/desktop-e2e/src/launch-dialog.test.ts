@@ -106,7 +106,7 @@ test('long titles fit a narrow short window and the Review footer remains reacha
   await expect(menu).toBeHidden();
 });
 
-test('Orchestra context shows real report metadata only for Continue and preserves it on Open', async ({
+test('Orchestra context shows real report metadata only for Continue and preserves it on Open @tmux', async ({
   desktop,
 }) => {
   const { app, page, homeDir } = desktop;
@@ -145,7 +145,7 @@ test('Orchestra context shows real report metadata only for Continue and preserv
   );
 });
 
-test('a stopped unknown agent has no Continue action; a recorded resumable agent does', async ({
+test('a stopped unknown agent has no Continue action; a recorded resumable agent does @tmux', async ({
   desktop,
 }) => {
   const { app, page, homeDir } = desktop;
@@ -170,7 +170,7 @@ test('a stopped unknown agent has no Continue action; a recorded resumable agent
   await expect(menu.getByText('Stopped · ready to continue')).toBeVisible();
 });
 
-test('Review sends its selected agent and instructions to the same guarded worktree session', async ({
+test('Review sends its selected agent and instructions to the same guarded worktree session @tmux', async ({
   desktop,
 }) => {
   const { app, page, homeDir, repoPath } = desktop;

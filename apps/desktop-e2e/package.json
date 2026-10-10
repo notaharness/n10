@@ -43,6 +43,40 @@
           "cwd": "apps/desktop-e2e"
         }
       },
+      "e2e:no-tmux": {
+        "executor": "nx:run-commands",
+        "cache": true,
+        "dependsOn": [
+          {
+            "projects": [
+              "desktop"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "externalDependencies": [
+              "@playwright/test",
+              "electron"
+            ]
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/test-output/no-tmux/output",
+          "{projectRoot}/test-output/no-tmux/report"
+        ],
+        "options": {
+          "command": "node run-e2e.mjs --grep-invert '@visual|@integration|@beam|@tmux'",
+          "cwd": "apps/desktop-e2e",
+          "env": {
+            "N10_E2E_NO_TMUX": "1",
+            "N10_E2E_OUTPUT_BASE": "./test-output/no-tmux"
+          }
+        }
+      },
       "e2e:visual": {
         "executor": "nx:run-commands",
         "cache": true,

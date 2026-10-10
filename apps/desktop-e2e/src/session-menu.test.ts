@@ -46,7 +46,7 @@ test.describe('Session menu', () => {
     await expect(menu).toBeHidden();
   });
 
-  test('Enter opens the menu and a live session can be reopened without replacement', async ({
+  test('Enter opens the menu and a live session can be reopened without replacement @tmux', async ({
     desktop,
   }) => {
     const { page, homeDir } = desktop;
