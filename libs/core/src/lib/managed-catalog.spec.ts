@@ -63,10 +63,13 @@ describe.skipIf(process.platform === 'win32')('a managed catalog', () => {
       ...plan,
       excludedNames: ['repo-shell-2'],
     });
-    expect(catalog.list([]).map((s) => s.target.name)).toEqual([
-      'repo-shell',
-      'repo-shell-3',
-    ]);
+    // Two records created within a second list in session-ID order.
+    expect(
+      catalog
+        .list([])
+        .map((s) => s.target.name)
+        .sort()
+    ).toEqual(['repo-shell', 'repo-shell-3']);
   });
 
   it('keeps a session running after its handle is released, and replays it to the next', async () => {
