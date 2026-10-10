@@ -1,7 +1,10 @@
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Windows starts each Node agent and its ConPTY host several times slower.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 import { closeSessionBackend, ownSessions } from '../session-backend.js';
 import { selectLocalCatalog } from '../session-catalog.js';
 import { tmuxCatalog } from '../tmux-catalog.js';
@@ -35,7 +38,14 @@ afterEach(() => {
   process.env['HOME'] = savedHome;
   if (savedLocal === undefined) delete process.env['LOCALAPPDATA'];
   else process.env['LOCALAPPDATA'] = savedLocal;
-  rmSync(home, { recursive: true, force: true });
+  // Windows keeps a stopped process's cwd until it has exited, which
+  // node-pty's kill there can take a few seconds to bring about.
+  rmSync(home, {
+    recursive: true,
+    force: true,
+    maxRetries: 80,
+    retryDelay: 100,
+  });
 });
 
 const call = async (op: Parameters<typeof muxRequest>[1], params = {}) =>
@@ -50,11 +60,12 @@ const rejected = (op: Parameters<typeof muxRequest>[1], params = {}) =>
   );
 
 async function until<T>(read: () => Promise<T>, done: (value: T) => boolean) {
-  const deadline = Date.now() + 5_000;
+  const deadline = Date.now() + 15_000;
   for (;;) {
     const value = await read();
     if (done(value)) return value;
-    if (Date.now() > deadline) throw new Error('timed out');
+    if (Date.now() > deadline)
+      throw new Error(`timed out; last read ${JSON.stringify(value)}`);
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
 }

@@ -124,7 +124,13 @@ export class MuxProfile {
 
   async dispose(): Promise<void> {
     await this.stop();
-    rmSync(this.home, { recursive: true, force: true });
+    // Windows keeps an ended process's cwd until it has fully exited.
+    rmSync(this.home, {
+      recursive: true,
+      force: true,
+      maxRetries: 80,
+      retryDelay: 100,
+    });
   }
 }
 
