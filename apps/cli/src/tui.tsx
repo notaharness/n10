@@ -156,7 +156,7 @@ export async function runTui(args: string[]): Promise<void> {
   // Resolve the requirement before rendering so missing tmux is actionable.
   await probeTmuxAvailability();
   try {
-    await applySessionBackend();
+    await applySessionBackend('tui');
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

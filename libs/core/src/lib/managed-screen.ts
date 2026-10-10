@@ -21,8 +21,10 @@ export class ManagedScreen {
   private written: Promise<void> = Promise.resolve();
   private chunks = 0;
   private lastOutput: number;
+  private size: { cols: number; rows: number };
 
   constructor(cols: number, rows: number) {
+    this.size = { cols, rows };
     this.emulator = new TerminalEmulator(cols, rows, SCREEN_HISTORY_LINES);
     this.lastOutput = Math.floor(Date.now() / 1000);
   }
@@ -34,7 +36,16 @@ export class ManagedScreen {
   }
 
   resize(cols: number, rows: number): void {
+    this.size = { cols, rows };
     this.emulator.resize(cols, rows);
+  }
+
+  get cols(): number {
+    return this.size.cols;
+  }
+
+  get rows(): number {
+    return this.size.rows;
   }
 
   /** The screen and up to `history` lines above it, once every write

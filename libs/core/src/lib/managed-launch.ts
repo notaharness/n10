@@ -1,4 +1,5 @@
-import { basename } from 'node:path';
+import { accessSync, constants, statSync } from 'node:fs';
+import { basename, delimiter, join, resolve } from 'node:path';
 import type { SessionSpec } from '@n10/terminal';
 import { AGENTS } from './agents/registry.js';
 
@@ -65,4 +66,49 @@ export function launchKind(spec: SessionSpec): LaunchKind {
   const executable = basename(spec.cmd).replace(/\.(exe|cmd|bat)$/i, '');
   const agent = AGENT_EXECUTABLES.get(executable);
   return agent ? { kind: 'agent', agent } : { kind: 'unknown' };
+}
+
+function isExecutable(path: string): boolean {
+  try {
+    if (!statSync(path).isFile()) return false;
+    if (process.platform !== 'win32') accessSync(path, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function envValue(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  const key = Object.keys(env).find(
+    (candidate) => candidate.toUpperCase() === name
+  );
+  return key === undefined ? undefined : env[key];
+}
+
+/**
+ * The executable a command names, as the launch environment's PATH
+ * finds it (with PATHEXT on Windows); a command with a directory part
+ * is taken relative to `cwd`. `null` when there is none to run.
+ */
+export function resolveExecutable(
+  command: string,
+  env: NodeJS.ProcessEnv,
+  cwd: string
+): string | null {
+  const windows = process.platform === 'win32';
+  if (command.includes('/') || (windows && command.includes('\\'))) {
+    const path = resolve(cwd, command);
+    return isExecutable(path) ? path : null;
+  }
+  const extensions = windows
+    ? ['', ...(envValue(env, 'PATHEXT') ?? '.COM;.EXE;.BAT;.CMD').split(';')]
+    : [''];
+  for (const dir of (envValue(env, 'PATH') ?? '').split(delimiter)) {
+    if (!dir) continue;
+    for (const extension of extensions) {
+      const path = join(dir, command + extension);
+      if (isExecutable(path)) return path;
+    }
+  }
+  return null;
 }
