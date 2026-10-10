@@ -101,7 +101,11 @@ outlive the app are tagged `@tmux` and left out. CI runs it in its own job:
 
 ```sh
 npx nx e2e:no-tmux desktop-e2e
+npx nx e2e:no-tmux cli-e2e
 ```
+
+`cli-e2e` does the same for the TUI: its fixture's `withoutTmux` follows
+`N10_E2E_NO_TMUX`, and its `@tmux` tests are left out the same way.
 
 ### Windows
 

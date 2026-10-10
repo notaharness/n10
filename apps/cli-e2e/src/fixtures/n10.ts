@@ -73,6 +73,18 @@ export interface N10Options {
   withoutTmux: boolean;
 }
 
+/** The PATH n10 runs with: the test's own, less tmux when asked. */
+function pathFor(
+  withoutTmux: boolean,
+  env: Record<string, string> | undefined,
+  homeDir: string
+): { PATH?: string } {
+  if (!withoutTmux) return {};
+  return {
+    PATH: pathWithoutTmux(env?.PATH ?? process.env.PATH ?? '', homeDir),
+  };
+}
+
 export interface N10Term {
   page: Page;
   root: Locator;
@@ -114,7 +126,8 @@ export const test = base.extend<
   cols: [100, { option: true }],
   rows: [30, { option: true }],
   n10RepoPath: [undefined, { option: true }],
-  withoutTmux: [false, { option: true }],
+  // `e2e:no-tmux` runs every test this way.
+  withoutTmux: [process.env.N10_E2E_NO_TMUX === '1', { option: true }],
 
   n10: async (
     {
@@ -164,9 +177,7 @@ export const test = base.extend<
           // host pins the same value again for the same reason.
           env: {
             ...n10Env,
-            ...(withoutTmux
-              ? { PATH: pathWithoutTmux(process.env.PATH ?? '', homeDir) }
-              : {}),
+            ...pathFor(withoutTmux, n10Env, homeDir),
             TMUX_TMPDIR: homeDir,
           },
         }),

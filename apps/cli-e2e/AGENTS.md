@@ -9,7 +9,9 @@ isolated HOME with an optional `.n10/config.json` (`test.use({ n10Config })`),
 
 - `test.use({ withoutTmux: true })` gives n10 a PATH without tmux
   (`src/setup/no-tmux.ts`), so it owns its sessions; `processesRunning` finds
-  the agents it started. Every other test uses tmux on a private socket inside its scratch HOME. The
+  the agents it started. `e2e:no-tmux` sets it for every test
+  (`N10_E2E_NO_TMUX=1`) and leaves out those tagged `@tmux`: tag a test that
+  drives tmux itself or needs a session to outlive n10. Every other test uses tmux on a private socket inside its scratch HOME. The
   fixture waits for the host PTY to exit, then reaps individual sessions
   before deleting HOME, including after startup failures. A failed host
   shutdown preserves HOME rather than deleting files a process may still use. Both `TMUX` and `TMUX_PANE` are unset.

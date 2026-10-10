@@ -45,7 +45,7 @@ function agentPid(branch: string, homeDir: string): number | undefined {
 }
 
 test.describe('Quit with running agents (#56)', () => {
-  test("'q' quits n10 and leaves every agent running in tmux", async ({
+  test("'q' quits n10 and leaves every agent running in tmux @tmux", async ({
     n10,
     baseURL,
   }) => {

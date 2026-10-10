@@ -25,7 +25,7 @@ test.use({
 });
 
 test.describe('Sidebar indicator after agent exit (#55)', () => {
-  test('flips from running (◉) to stopped (◎) when the agent terminates', async ({
+  test('flips from running (◉) to stopped (◎) when the agent terminates @tmux', async ({
     n10,
   }) => {
     const branch = 'short-lived';

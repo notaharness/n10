@@ -63,7 +63,7 @@ test.describe('Discovering sessions created outside n10', () => {
     await expect(row.any().first()).toBeVisible({ timeout: 20_000 });
   });
 
-  test('a tmux session started from outside shows as running', async ({
+  test('a tmux session started from outside shows as running @tmux', async ({
     n10,
   }) => {
     const branch = uniqueTmuxBranch();
@@ -89,7 +89,7 @@ test.describe('Discovering sessions created outside n10', () => {
   // the external session printed before n10 knew it existed is redrawn
   // on attach — a fresh spawn would run `aiCommand` instead and print
   // the fake agent's banner.
-  test('attaching reaches the running agent rather than starting a new one', async ({
+  test('attaching reaches the running agent rather than starting a new one @tmux', async ({
     n10,
   }) => {
     const branch = uniqueTmuxBranch();
@@ -115,7 +115,7 @@ test.describe('Discovering sessions created outside n10', () => {
     await expect(n10.term.getByText('n10-fake-agent-ready')).toHaveCount(0);
   });
 
-  test('a session killed from outside stops showing as running', async ({
+  test('a session killed from outside stops showing as running @tmux', async ({
     n10,
   }) => {
     const branch = uniqueTmuxBranch();

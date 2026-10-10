@@ -40,7 +40,7 @@ test.use({
   },
 });
 
-test.describe('Tmux backend (e2e)', () => {
+test.describe('Tmux backend (e2e) @tmux', () => {
   // Branches whose tmux sessions need reaping. Populated per test, since
   // n10's own exit path leaves them running by design.
   let branches: string[] = [];

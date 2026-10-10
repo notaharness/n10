@@ -1,8 +1,8 @@
 import { join } from 'node:path';
 import { test, expect } from './fixtures/n10.js';
 import { fakeCli } from './setup/fake-cli.js';
+import { sidebarLocator } from './setup/sidebar.js';
 import { createSession, waitForSidebarFocused } from './setup/sessions.js';
-import { listTaggedSessions } from './setup/tmux.js';
 
 const copilot = fakeCli('copilot');
 
@@ -24,11 +24,7 @@ test('Copilot rejects automatic resume and starts fresh only when selected in th
   await createSession(n10.term, 'copilot-life', { start: true });
   await expect(n10.term.getByText('fake-copilot-ready').first()).toBeVisible();
   expect(copilot.calls(cwd)).toMatchObject([{ args: [], cwd }]);
-  const [before] = listTaggedSessions(n10.homeDir);
   copilot.control(cwd, 'exit');
-  await expect
-    .poll(() => listTaggedSessions(n10.homeDir)[0]?.paneDead)
-    .toBe(true);
   // Native exit precedes the TUI's lifecycle update; Tab during that gap
   // focuses the terminal instead of opening its continuation menu.
   await expect(
@@ -48,10 +44,10 @@ test('Copilot rejects automatic resume and starts fresh only when selected in th
   await expect
     .poll(() => copilot.calls(cwd))
     .toMatchObject([{ args: [] }, { args: [], cwd }]);
-  const [after] = listTaggedSessions(n10.homeDir);
-  expect(after.name).toBe(before.name);
-  expect(after.panePid).not.toBe(before.panePid);
-  expect(after.paneDead).toBe(false);
+  // The same row, running its second process.
+  const row = sidebarLocator(n10.term.page, 'copilot-life');
+  await expect(row.running().first()).toBeVisible();
+  await expect(row.any()).toHaveCount(1);
 });
 
 test('Copilot output becomes busy and then idle in the TUI sidebar', async ({
@@ -74,5 +70,8 @@ test('Copilot output becomes busy and then idle in the TUI sidebar', async ({
     timeout: 10_000,
   });
   await expect(row).not.toContainText(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/);
-  expect(listTaggedSessions(n10.homeDir)[0]?.paneDead).toBe(false);
+  // Still running: idle is not an exit.
+  await expect(
+    n10.term.page.locator('.term-row', { hasText: /◎.*copilot-busy/ })
+  ).toHaveCount(0);
 });

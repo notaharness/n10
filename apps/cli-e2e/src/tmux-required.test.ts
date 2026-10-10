@@ -14,7 +14,7 @@ for (const legacyBackend of [undefined, 'pty']) {
       },
     });
 
-    test('launches an agent in tmux', async ({ n10 }) => {
+    test('launches an agent in tmux @tmux', async ({ n10 }) => {
       const branch = uniqueTmuxBranch();
       await createSession(n10.term, branch, { start: true });
       await expect(

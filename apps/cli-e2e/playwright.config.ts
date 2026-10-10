@@ -10,7 +10,11 @@ const baseURL = process.env.BASE_URL ?? `http://localhost:${port}`;
 
 export default defineConfig({
   testDir: './src',
-  outputDir: './test-output/playwright/output',
+  // Each target keeps its own results: Playwright empties this per run.
+  outputDir:
+    process.env.N10_E2E_NO_TMUX === '1'
+      ? './test-output/no-tmux/output'
+      : './test-output/playwright/output',
   timeout: 120_000,
   workers: 1,
   retries: 0,
