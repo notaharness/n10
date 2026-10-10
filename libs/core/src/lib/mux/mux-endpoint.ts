@@ -29,19 +29,29 @@ export interface MuxRuntime {
 
 const CREDENTIALS_FILE = 'mux.json';
 
+/** A managed session's own owner, which it was told on launch; it
+ *  wins over the profile, so a session whose HOME was redirected still
+ *  finds the owner running it. */
+const SESSION_RUNTIME = 'N10_MUX_RUNTIME';
+
 export function muxRuntime(
   env: NodeJS.ProcessEnv = process.env,
   platform: NodeJS.Platform = process.platform
 ): MuxRuntime {
+  const session = env[SESSION_RUNTIME];
   if (platform === 'win32') {
-    const local = env['LOCALAPPDATA'];
-    if (!local) throw new MuxError('UNSUPPORTED', 'LOCALAPPDATA is not set');
-    const dir = resolve(local, 'n10', 'run');
+    const dir = session || windowsRunDir(env);
     const hash = createHash('sha256').update(dir).digest('hex').slice(0, 16);
     return { dir, endpoint: `\\\\.\\pipe\\n10-mux-v1-${hash}` };
   }
-  const dir = join(env['HOME'] ?? homedir(), '.n10', 'run');
+  const dir = session || join(env['HOME'] ?? homedir(), '.n10', 'run');
   return { dir, endpoint: join(dir, 'mux.sock') };
+}
+
+function windowsRunDir(env: NodeJS.ProcessEnv): string {
+  const local = env['LOCALAPPDATA'];
+  if (!local) throw new MuxError('UNSUPPORTED', 'LOCALAPPDATA is not set');
+  return resolve(local, 'n10', 'run');
 }
 
 /** Create the runtime directory, refusing one others could read. */

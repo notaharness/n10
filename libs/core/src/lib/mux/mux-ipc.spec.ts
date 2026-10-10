@@ -341,4 +341,20 @@ describe('mux IPC', () => {
       expect(statSync(join(at.dir, 'mux.json')).mode & 0o777).toBe(0o600);
     }
   );
+
+  it('finds the owner a session was launched by, wherever HOME points', () => {
+    const runtime = muxRuntime({
+      HOME: '/elsewhere',
+      N10_MUX_RUNTIME: '/run/owner',
+    });
+    expect(runtime.dir).toBe('/run/owner');
+    expect(muxRuntime({ HOME: '/home/u' }, 'linux').dir).toBe(
+      '/home/u/.n10/run'
+    );
+    const windows = (env: NodeJS.ProcessEnv) =>
+      muxRuntime(env, 'win32').endpoint;
+    expect(windows({ N10_MUX_RUNTIME: 'C:\\run' })).not.toBe(
+      windows({ LOCALAPPDATA: 'C:\\Users\\u\\AppData\\Local' })
+    );
+  });
 });

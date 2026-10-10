@@ -13,6 +13,13 @@ describe('parseArgs', () => {
     });
   });
 
+  it('hands mux its verb and flags', () => {
+    expect(parseArgs(['mux', 'list', '--json'])).toEqual({
+      kind: 'mux',
+      args: ['list', '--json'],
+    });
+  });
+
   it('hands util its subcommand and flags', () => {
     expect(parseArgs(['util', 'add-comment', '--pr=7'])).toEqual({
       kind: 'util',
