@@ -10,11 +10,14 @@ import `@n10/vcs-core` as types, or its `./types` subpath for values.
 The reasoning behind each rule is in `docs/decisions.md`.
 
 - **Backend selection** (`session-backend.ts`): await `probeTmuxAvailability()`,
-  then `applySessionBackend()`. tmux 3.2+ when installed; with no tmux, this
+  then `applySessionBackend(ownerType)`. tmux 3.2+ when installed; with no tmux, this
   process becomes the profile's managed owner (`managed-catalog.ts`), or
   refuses when another owns it. An installed tmux that fails is an error,
   never a fallback. Legacy backend preferences are ignored. Shells call
   `closeSessionBackend()` after `killAll()` on exit: owned sessions end.
+  An owner answers one-shot mux clients (`mux/mux-sessions.ts`): every
+  mutation names the owner and generation it expects, and validation lives
+  in `mux/mux-requests.ts`, before any operation reads a field.
 - **Launch boundary** (`session/open-session.ts`): receive explicit worktree or
   terminal identity, validate the worktree HEAD against the branch a caller
   names (discovery's attaches name none), resolve tags, then choose

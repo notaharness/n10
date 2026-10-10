@@ -24,7 +24,7 @@ records the survey, migration order and target diagram. The
 ```
 apps/cli/                        — The published `n10` package: the command, the Ink TUI (ESM, React 19) — thin render layer over @n10/app-core
   src/main.ts                    — `n10` entry: routes to the desktop, `--tui` or `util`, loading only that path
-  src/commands/                  — Argument parsing and the Electron launch behind plain `n10`
+  src/commands/                  — Argument parsing, the Electron launch behind plain `n10`, and `n10 mux` (`mux/`)
   src/tui.tsx                    — TUI entry (`runTui`), root component
   src/input-handlers.ts          — Settings/controls input handlers (keybind-driven state transitions)
   src/components/                — Shared components (SidebarLayout, TerminalView, TabBar, StatusBar, etc.)
@@ -71,7 +71,7 @@ apps/cli-wterm-host/             — HTTP + WS host that bridges n10 PTY to brow
   src/public/index.html
   src/public/client.ts           — Browser: @wterm/dom + auto-reconnect WS
   build.mjs                      — Single esbuild script (Node server + browser client)
-apps/cli-e2e/                    — E2E tests (@playwright/test)
+apps/cli-e2e/                    — E2E tests (@playwright/test); `src/mux/` is the one-shot mux contract (`mux.config.ts`)
   src/fixtures/n10.ts          — Per-test: temp repo, POST /spawn, page, term helpers
   src/setup/                     — git-repo.ts, sidebar.ts, constants.ts, github.ts
   src/*.test.ts                  — Test files (one per feature area)
@@ -103,8 +103,8 @@ libs/core/                       — Shell-agnostic operations. No React, Ink, E
   src/lib/babysit/               — Pure observation model and briefing composition
   src/ui.ts                      — Browser-safe presentation and input models
   src/plan.ts                    — Browser-safe entry (`@n10/core/plan`) for the renderer
-  src/mux.ts                     — `@n10/core/mux` (Node): the user's mux endpoint and authenticated connections
-  src/lib/mux/                   — Runtime dir and credentials, mutual HMAC handshake, owner election, POSIX startup lock
+  src/mux.ts                     — `@n10/core/mux` (Node): the user's mux endpoint, authenticated connections and one-shot protocol
+  src/lib/mux/                   — Runtime dir and credentials, mutual HMAC handshake, owner election, POSIX startup lock; wire protocol, request bounds, the owner's verbs (`mux-sessions.ts`) and the one-shot client
   src/lib/utils/                 — Git reads and presentation helpers (worktree-diff, sidebar-items, virtual-viewport…)
   src/lib/settings/              — Settings field model, coercion and explicitly scoped config writes
   src/lib/agents/                — Agent registry
@@ -112,6 +112,8 @@ libs/core/                       — Shell-agnostic operations. No React, Ink, E
   src/lib/session-backend.ts     — Required tmux availability, tagged-session observations and cleanup
   src/lib/session-catalog.ts     — The local session catalog seam: listing, snapshots, kills, launch plans, incarnations
   src/lib/managed-catalog.ts     — The sessions this process owns when no tmux is installed
+  src/lib/managed-screen.ts      — Each owned session's emulated screen, for captures and input modes
+  src/lib/managed-launch.ts      — A managed launch's identity environment, executable lookup and launch kind
   src/lib/tmux-catalog.ts        — The tmux catalog, and launch plans in tmux's terms for local and remote servers
   src/lib/session-identity.ts    — `@orchestra-*` tag names, session labels and matching rules shared with Orchestra
   src/lib/session-resolver.ts    — The one catalog listing every session lookup goes through

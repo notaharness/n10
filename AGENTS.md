@@ -57,6 +57,7 @@ npx nx e2e:visual desktop-e2e          # screenshots in a pinned container
 npx nx e2e:windows desktop-e2e         # Windows host lifetime and mux access (Windows)
 npx nx e2e:no-tmux desktop-e2e         # the suite with tmux hidden, minus @tmux tests
 npx nx e2e:no-tmux cli-e2e             # the same for the TUI
+npx nx e2e:mux cli-e2e                 # one-shot mux contract between processes
 GH_TOKEN=$(gh auth token) npx nx e2e:integration desktop-e2e
 npx nx dev website                    # apps/website at http://localhost:3100
 ```
