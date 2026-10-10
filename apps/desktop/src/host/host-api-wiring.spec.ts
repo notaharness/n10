@@ -33,6 +33,9 @@ function recorder(moduleName: string, names: string[]) {
   );
 }
 
+vi.mock('./services/updates.js', () =>
+  recorder('updates', ['getUpdates', 'checkUpdates', 'setUpdatePreferences'])
+);
 vi.mock('./services/repo.js', () =>
   recorder('repo', [
     'openRepo',
@@ -351,6 +354,13 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     'branchSessions.launchBranchTerminal',
   ],
 
+  ['getUpdates', [], 'updates.getUpdates'],
+  ['checkUpdates', [], 'updates.checkUpdates'],
+  [
+    'setUpdatePreferences',
+    [{ channel: 'stable' }],
+    'updates.setUpdatePreferences',
+  ],
   ['getDesktopPrefs', [], 'prefs.loadDesktopPrefs'],
   ['getKeybindings', [], 'keybindings.getDesktopKeybindings'],
   [
@@ -378,6 +388,19 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
 ];
 
 describe('host API wiring', () => {
+  it('Quit to update reaches the shell quit path', async () => {
+    const { setShellGlue } = await import('./register-handlers.js');
+    const quit = vi.fn(async () => undefined);
+    setShellGlue({
+      quitForUpdate: quit,
+      contextMenu: async () => null,
+      appMenuPopup: async () => undefined,
+      aboutBox: async () => undefined,
+      prefsChanged: () => undefined,
+    });
+    await api.quitForUpdate();
+    expect(quit).toHaveBeenCalledOnce();
+  });
   it.each(WIRING)('%s reaches %s', async (method, args, expected) => {
     // The table is heterogeneous by construction — each row has its own
     // signature — so the call is made through the widest function type
@@ -398,6 +421,8 @@ describe('host API wiring', () => {
       'showContextMenu',
       'showAppMenu',
       'showAbout',
+      'quitForUpdate',
+      'onUpdatesChanged',
       'setDesktopPrefs', // also notifies main.ts; covered separately
       'onSessionData',
       'onSessionExit',

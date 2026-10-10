@@ -43,6 +43,10 @@
     "@n10/terminal-pty": "*",
     "@n10/terminal-tmux": "*",
     "@n10/vcs-core": "*",
-    "@n10/worktree-manager": "*"
+    "@n10/worktree-manager": "*",
+    "semver": "^7.8.5"
+  },
+  "devDependencies": {
+    "@types/semver": "^7.8.0"
   }
 }

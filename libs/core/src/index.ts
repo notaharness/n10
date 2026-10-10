@@ -188,3 +188,8 @@ export {
   agentCommentRepository,
   runReviewUtility,
 } from './lib/pull-requests/agent-comment-scope.js';
+
+export type * from './lib/updates/update-types.js';
+export * from './lib/updates/update-registry.js';
+export * from './lib/updates/update-store.js';
+export * from './lib/updates/update-installation.js';

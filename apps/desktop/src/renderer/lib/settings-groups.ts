@@ -9,7 +9,12 @@ import type { SettingsFieldView, SettingsGroup } from '../../host/contract.js';
  * is drawn here as well: its shortcuts and the recently-used switch are
  * n10-wide (the global config and desktop prefs), not the repository's.
  */
-export type GroupKey = 'appearance' | 'keyboard' | 'machines' | SettingsGroup;
+export type GroupKey =
+  | 'updates'
+  | 'appearance'
+  | 'keyboard'
+  | 'machines'
+  | SettingsGroup;
 
 export interface SettingsGroupMeta {
   key: GroupKey;
@@ -19,6 +24,11 @@ export interface SettingsGroupMeta {
 
 /** Section order on the page, and in the jump nav beside it. */
 export const GROUPS: SettingsGroupMeta[] = [
+  {
+    key: 'updates',
+    label: 'Updates',
+    blurb: 'Keep n10 up to date, without interrupting your agents.',
+  },
   { key: 'appearance', label: 'Appearance', blurb: 'How n10 Desktop looks.' },
   {
     key: 'keyboard',
@@ -58,7 +68,12 @@ export const GROUPS: SettingsGroupMeta[] = [
 ];
 
 /** Sections this shell draws itself, shown whatever the host sends. */
-const LOCAL_GROUPS = new Set<GroupKey>(['appearance', 'keyboard', 'machines']);
+const LOCAL_GROUPS = new Set<GroupKey>([
+  'updates',
+  'appearance',
+  'keyboard',
+  'machines',
+]);
 
 export interface SettingsSection extends SettingsGroupMeta {
   fields: SettingsFieldView[];
