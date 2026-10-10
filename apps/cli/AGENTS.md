@@ -2,8 +2,9 @@
 
 This project is the published `@notaharness/n10` package. `src/main.ts` is the
 `n10` executable: plain `n10` runs Electron on the desktop build shipped beside
-it (`commands/launch-desktop.ts`), `--tui` loads `src/tui.tsx`, and `util`
-loads `commands/util.ts`, which delegates to core’s scoped review utility. Those two are
+it (`commands/launch-desktop.ts`), `--tui` loads `src/tui.tsx`, `mux` loads
+`commands/mux/mux-command.ts` (one-shot clients and `serve`), and `util`
+loads `commands/util.ts`, which delegates to core’s scoped review utility. Those are
 dynamic imports of local modules (Nx forbids lazy-loading a library imported
 statically elsewhere), which esbuild splits into chunks. Keep Ink, React and
 Electron out of `main.ts`'s static imports so `util`, `--help` and `--version`

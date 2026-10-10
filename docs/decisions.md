@@ -1473,3 +1473,74 @@ were rejected. A Linux abstract-namespace endpoint leaves nothing to clean up,
 but macOS has no such namespace, so POSIX would split into two code paths with
 the lock still needed on one. A `node:sqlite` exclusive transaction would use a
 database for its lock side effect, and Electron's Node may not ship it.
+
+## One-shot mux
+
+A managed owner, whichever shell runs it, answers one-shot requests on its
+authenticated endpoint (`mux-server.ts` over `MuxSessions` in
+`libs/core/src/lib/mux/`). `n10 mux <verb>` (`apps/cli/src/commands/mux/`) is
+one connection, one request: it reads the whole answer, including every part
+of a batch, before it prints anything, so a failure never looks like a short
+listing. Default output is the design's fixed TSV, `--json` the result
+envelope; failures print `CODE<TAB>message` on stderr and exit 2 (invalid or
+too large), 3 (no owner or session), 4 (authentication or version), 5 (stale
+or conflicting state) or 1. A mutation whose reply the connection lost is
+`OUTCOME_UNKNOWN`; the client never retries it.
+
+TSV has no escaping layer, so a row never carries a field with a tab or line
+break, whichever shell created the record (mux requests refuse them; a
+desktop or TUI checkout path may not). `list` leaves such a record out and
+names it on stderr; a single-record verb fails `UNSUPPORTED` and points at
+`--json`. Only the title, the last column, is made to fit.
+
+Mutations name the owner (`expectedHostId`) and the process generation they
+saw. Restart takes only an exited record, so of two concurrent restarts one
+wins and the other is stale. A checkout (`@orchestra-worktree-path`) belongs
+to one record, compared in its canonical spelling (native realpath when it
+exists); create and metadata refuse a second claim. A session claims an
+`@orchestra-target` only for itself: the client sends the session and
+generation it runs as (its own `N10_MUX_*`, which `n10 mux metadata` adds),
+they must be the record's current ones, and the claim then leaves any other
+record in the same step. That identity is context, not a credential; the
+secret is the boundary, and the check keeps a client from moving someone
+else's claim by mistake. A send is
+one PTY write, input and submission together, bracketed when the program
+asked for bracketed paste and with cursor keys in the mode it set.
+
+Each record keeps an emulated screen (`managed-screen.ts`: `@xterm/headless`,
+10,000 lines of history) whether or not anyone watches: captures, the title
+and the input modes come from it, after every pending write is parsed. A
+capture is the emulated screen, not the raw bytes, so a tab arrives as the
+cursor movement it made. Captures over 512 KiB keep their most recent whole
+lines and say so.
+
+Every process a managed owner launches gets `N10_MUX_HOST_ID`,
+`N10_MUX_SESSION_ID`, `N10_MUX_GENERATION` and the owner's runtime directory
+in `N10_MUX_RUNTIME`, replacing any it inherited along with `TMUX` and
+`TMUX_PANE`. They locate the session; they authorize nothing. `n10 mux self`
+reports the record only while the caller is still that owner's current
+process. Clients follow `N10_MUX_RUNTIME` to their owner even where HOME is
+redirected; owners never do (`ownerRuntime`), so an owner started from inside
+a session, or with the variable set by hand, still binds and publishes its
+secret only in the user's own profile.
+`launchKind` is `agent` only when the executable is one the agent registry
+launches directly; anything else, including an agent started from a shell, is
+`unknown`.
+
+`n10 mux serve` is the same owner in the foreground, under the same backend
+selection: where tmux is installed it refuses, since sessions live in tmux
+there; a second serve reports the running owner's host and exits 5 without
+touching it. An endpoint it cannot bind (a socket path past the platform's
+limit) is reported as `UNSUPPORTED`, exit 1. It announces readiness only once
+its signal handlers are in place, and ends on SIGINT, SIGTERM or SIGHUP (a
+closed Windows console). On Windows it joins its own kill-on-close job first,
+so a terminated serve still takes its sessions.
+
+`apps/cli-e2e/src/mux/` holds the separate-process contract (`e2e:mux`, its own
+Playwright config, no browser), run by CI's `no-tmux` and `windows` jobs. Its
+Bash fixture (`orchestra-mux.sh`) is the Orchestra mux arm the design
+specifies: requests on stdin through Orchestra's own `json_str` (copied
+verbatim, its source commit noted), rows split on their first 30 tabs,
+samples decoded from base64, native paths through `cygpath` on Windows. It
+stands in for the pinned plugins suite until the plugins' mux seam exists to
+pin.

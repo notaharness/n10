@@ -89,4 +89,43 @@ describe('TerminalEmulator', () => {
     emu.dispose();
     expect(() => emu.dispose()).not.toThrow();
   });
+
+  describe('capture', () => {
+    it('is the screen as plain text, with as much history as asked', async () => {
+      const emu = new TerminalEmulator(20, 3, 100);
+      await emu.write('one\r\ntwo\r\n\x1b[31mthree\x1b[0m\r\nfour  ');
+      expect(emu.capture(0)).toBe('two\nthree\nfour\n');
+      expect(emu.capture(1)).toBe('one\ntwo\nthree\nfour\n');
+      expect(emu.capture(50)).toBe('one\ntwo\nthree\nfour\n');
+      emu.dispose();
+    });
+
+    it('is empty for a blank screen', () => {
+      const emu = new TerminalEmulator(20, 3);
+      expect(emu.capture(10)).toBe('');
+      emu.dispose();
+    });
+
+    it('keeps no more history than the scrollback', async () => {
+      const emu = new TerminalEmulator(20, 2, 1);
+      await emu.write('a\r\nb\r\nc\r\nd');
+      expect(emu.capture(10)).toBe('b\nc\nd\n');
+      emu.dispose();
+    });
+  });
+
+  it('reports the title and the modes a program sets', async () => {
+    const emu = new TerminalEmulator(20, 3);
+    expect([emu.title, emu.alternateScreen, emu.bracketedPaste]).toEqual([
+      '',
+      false,
+      false,
+    ]);
+    await emu.write('\x1b]2;agent\x07\x1b[?1049h\x1b[?2004h\x1b[?1h');
+    expect(emu.title).toBe('agent');
+    expect(emu.alternateScreen).toBe(true);
+    expect(emu.bracketedPaste).toBe(true);
+    expect(emu.applicationCursorKeys).toBe(true);
+    emu.dispose();
+  });
 });

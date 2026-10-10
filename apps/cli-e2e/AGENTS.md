@@ -15,6 +15,10 @@ isolated HOME with an optional `.n10/config.json` (`test.use({ n10Config })`),
   fixture waits for the host PTY to exit, then reaps individual sessions
   before deleting HOME, including after startup failures. A failed host
   shutdown preserves HOME rather than deleting files a process may still use. Both `TMUX` and `TMUX_PANE` are unset.
+- `src/mux/` is the one-shot mux contract: separate `n10 mux` processes
+  against `n10 mux serve`, run by `e2e:mux` with `mux.config.ts` (no browser,
+  no wterm host; the main config ignores it). An owner the test itself runs
+  needs `muxAsync`: `spawnSync` blocks the event loop it answers on.
 - Tag live-GitHub suites `@integration`; offline runs exclude them. They need
   `GH_TOKEN`. Fixture-reading tests leave permanent PRs unchanged, but
   `merge-auto-delete.test.ts` creates branches and PRs and merges them in the

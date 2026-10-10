@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ElectronApplication, Page } from '@playwright/test';
+import { muxRequest, muxRuntime, type MuxSummary } from '@n10/core/mux';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import {
   createWorktree,
@@ -119,4 +120,19 @@ test('a host that dies takes its sessions, and the next one owns the profile', a
     .toBe(true);
   await expect.poll(() => alive(pid), { timeout: 10_000 }).toBe(false);
   await resumeWaitingTab(page, pid);
+});
+
+test('answers mux clients about the sessions it owns', async ({ desktop }) => {
+  await startAgent(desktop.page, 'answered');
+  const runtime = muxRuntime({ HOME: desktop.homeDir });
+  const status = await muxRequest(runtime, 'host.status', {});
+  expect(status.result).toMatchObject({
+    ownerType: 'desktop',
+    sessionCount: 1,
+  });
+  const { parts } = await muxRequest(runtime, 'session.list', { capture: 0 });
+  const [listed] = parts as MuxSummary[];
+  expect(listed).toMatchObject({ processState: 'running' });
+  expect(listed!.tags['@orchestra-worktree-path']).toContain('answered');
+  expect(listed!.capture?.text).toContain(BANNER);
 });

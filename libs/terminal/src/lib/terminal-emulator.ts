@@ -13,12 +13,19 @@ export class TerminalEmulator {
   private terminal: InstanceType<typeof Terminal>;
   private renderDisposables = new Map<() => void, IDisposable>();
   private disposed = false;
+  private currentTitle = '';
 
-  constructor(cols = 80, rows = 24) {
+  /** `scrollback` is how many lines leave the top of the screen before
+   *  the oldest is dropped; xterm's own default when omitted. */
+  constructor(cols = 80, rows = 24, scrollback?: number) {
     this.terminal = new Terminal({
       cols,
       rows,
       allowProposedApi: true,
+      ...(scrollback === undefined ? {} : { scrollback }),
+    });
+    this.terminal.onTitleChange((title) => {
+      this.currentTitle = title;
     });
   }
 
@@ -130,6 +137,40 @@ export class TerminalEmulator {
         }`
       );
     }
+  }
+
+  /**
+   * The screen as plain text, preceded by up to `history` lines of
+   * scrollback: one LF-terminated line per row, trailing blank rows and
+   * each row's trailing spaces dropped. Empty when nothing is shown.
+   */
+  capture(history: number): string {
+    const buffer = this.terminal.buffer.active;
+    const lines: string[] = [];
+    const end = buffer.baseY + this.terminal.rows;
+    for (let i = Math.max(0, buffer.baseY - history); i < end; i++)
+      lines.push(
+        (buffer.getLine(i)?.translateToString(true) ?? '').replace(/ +$/, '')
+      );
+    while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+    return lines.map((line) => `${line}\n`).join('');
+  }
+
+  /** The window title the program last set. */
+  get title(): string {
+    return this.currentTitle;
+  }
+
+  get alternateScreen(): boolean {
+    return this.terminal.buffer.active.type === 'alternate';
+  }
+
+  get bracketedPaste(): boolean {
+    return this.terminal.modes.bracketedPasteMode;
+  }
+
+  get applicationCursorKeys(): boolean {
+    return this.terminal.modes.applicationCursorKeysMode;
   }
 
   get maxScrollback(): number {

@@ -6,6 +6,12 @@ import {
   type SessionTarget,
 } from '@n10/terminal';
 import { ManagedPty } from '@n10/terminal-pty';
+import {
+  launchKind,
+  withSessionIdentity,
+  type LaunchKind,
+} from './managed-launch.js';
+import { ManagedScreen } from './managed-screen.js';
 import type {
   CatalogSession,
   ManagedIncarnation,
@@ -14,15 +20,32 @@ import type {
 } from './session-catalog.js';
 
 /** One session the owner holds. */
-interface ManagedRecord {
+export interface ManagedRecord {
+  readonly sessionId: string;
   label: string;
   /** Epoch seconds. */
-  created: number;
+  readonly created: number;
   cwd: string;
   tags: Record<string, string>;
   retainOnExit: boolean;
-  pty: ManagedPty;
+  launch: LaunchKind;
+  /** The mux request that created it, kept for reconciliation. */
+  readonly requestId?: string;
+  readonly pty: ManagedPty;
+  readonly screen: ManagedScreen;
 }
+
+/** How a new record is filed. */
+export interface NewRecord {
+  label: string;
+  tags: Record<string, string>;
+  retainOnExit?: boolean;
+  excludedNames?: readonly string[];
+  requestId?: string;
+}
+
+/** Tag changes: a `null` value removes the tag. */
+export type TagChanges = Record<string, string | null>;
 
 type ExistingPlan = Exclude<SessionLaunchPlan, { mode: 'create' }>;
 
@@ -30,7 +53,7 @@ const MAX_LABEL_CANDIDATES = 10_000;
 
 function withTags(
   tags: Record<string, string>,
-  changes: Record<string, string | null> = {}
+  changes: TagChanges = {}
 ): Record<string, string> {
   const merged = { ...tags, ...changes };
   return Object.fromEntries(
@@ -42,27 +65,29 @@ function withTags(
 
 /**
  * The sessions this process owns, when no tmux is installed: one record,
- * PTY and set of handles per session, under a random `hostId` that
- * names this owner's lifetime. Sessions end with the owner.
+ * PTY, emulated screen and set of handles per session, under a random
+ * `hostId` that names this owner's lifetime. Sessions end with the owner.
  */
 export class ManagedCatalog implements SessionCatalog {
   readonly hostId: string;
   private readonly records = new Map<string, ManagedRecord>();
 
-  constructor(hostId = randomBytes(16).toString('hex')) {
+  /** `runtimeDir` is where this owner serves mux clients, which its
+   *  sessions are told so they can reach it. */
+  constructor(
+    hostId = randomBytes(16).toString('hex'),
+    private readonly runtimeDir?: string
+  ) {
     this.hostId = hostId;
   }
 
   list(tags: readonly string[]): CatalogSession[] {
-    return [...this.records.values()].map((record) =>
-      this.listed(record, tags)
-    );
+    return this.all().map((record) => this.listed(record, tags));
   }
 
   snapshot(target: SessionTarget, tags: readonly string[] = []) {
-    const found = this.find(target);
-    if (!found) return null;
-    const [, record] = found;
+    const record = this.find(target);
+    if (!record) return null;
     const incarnation: ManagedIncarnation = {
       ...record.pty.target,
       generation: record.pty.generation,
@@ -76,29 +101,32 @@ export class ManagedCatalog implements SessionCatalog {
   }
 
   kill(target: SessionTarget): void {
-    this.find(target)?.[1].pty.stop();
+    this.find(target)?.pty.stop();
   }
 
   async open(spec: SessionSpec, plan: SessionLaunchPlan) {
-    if (plan.mode === 'create') return this.create(spec, plan).attach();
-    const found = this.find(plan.target);
-    if (!found) throw new Error(`No such session: ${plan.target.name}`);
-    const [sessionId, record] = found;
-    this.checkExpected(sessionId, record, plan);
+    if (plan.mode === 'create') return this.create(spec, plan).pty.attach();
+    const record = this.find(plan.target);
+    if (!record) throw new Error(`No such session: ${plan.target.name}`);
+    this.checkExpected(record, plan);
     if (plan.mode !== 'attach') this.relaunch(record, spec, plan);
     return record.pty.attach();
   }
 
-  /** Stop every session: the owner is closing. */
-  close(): void {
-    for (const record of [...this.records.values()]) record.pty.stop();
+  /** Every record, oldest first. */
+  all(): ManagedRecord[] {
+    return [...this.records.values()].sort(
+      (a, b) => a.created - b.created || a.sessionId.localeCompare(b.sessionId)
+    );
   }
 
-  private create(
-    spec: SessionSpec,
-    plan: Extract<SessionLaunchPlan, { mode: 'create' }>
-  ): ManagedPty {
-    const label = this.freeLabel(plan.label, plan.excludedNames ?? []);
+  record(sessionId: string): ManagedRecord | undefined {
+    return this.records.get(sessionId);
+  }
+
+  /** File and start a new session. */
+  create(spec: SessionSpec, filed: NewRecord): ManagedRecord {
+    const label = this.freeLabel(filed.label, filed.excludedNames ?? []);
     const sessionId = randomBytes(8).toString('hex');
     const target: ManagedTarget = {
       kind: 'mux',
@@ -106,49 +134,84 @@ export class ManagedCatalog implements SessionCatalog {
       sessionId,
       name: label,
     };
+    const screen = new ManagedScreen(spec.cols, spec.rows);
     // A process ends asynchronously, after its record is in place.
-    const pty = new ManagedPty(target, spec, {
+    const pty = new ManagedPty(target, this.identified(spec, sessionId, 1), {
       ended: () => this.ended(sessionId, pty),
       stopped: () => this.forget(sessionId, pty),
+      output: (data) => screen.output(data),
+      resized: (cols, rows) => screen.resize(cols, rows),
     });
-    this.records.set(sessionId, {
+    const record: ManagedRecord = {
+      sessionId,
       label,
       created: Math.floor(Date.now() / 1000),
       cwd: spec.cwd,
-      tags: { ...plan.tags },
-      retainOnExit: !!plan.retainOnExit,
+      tags: { ...filed.tags },
+      retainOnExit: !!filed.retainOnExit,
+      launch: launchKind(spec),
+      ...(filed.requestId ? { requestId: filed.requestId } : {}),
       pty,
-    });
-    return pty;
+      screen,
+    };
+    this.records.set(sessionId, record);
+    return record;
   }
 
-  private relaunch(
+  /** Launch the next generation of a record: a new process for one
+   *  that ended, or in place of the one running. */
+  relaunch(
     record: ManagedRecord,
     spec: SessionSpec,
-    plan: Exclude<ExistingPlan, { mode: 'attach' }>
+    changes: { tags?: TagChanges; retainOnExit?: boolean } = {}
   ): void {
-    if (plan.mode === 'restart' && record.pty.running)
-      throw new Error(`Cannot restart a running session: ${record.label}`);
-    record.tags = withTags(record.tags, plan.tags);
-    record.retainOnExit = !!plan.retainOnExit;
+    record.tags = withTags(record.tags, changes.tags);
+    record.retainOnExit = !!changes.retainOnExit;
     record.cwd = spec.cwd;
-    if (record.pty.running) record.pty.replace(spec);
-    else record.pty.launch(spec);
+    record.launch = launchKind(spec);
+    record.screen.resize(spec.cols, spec.rows);
+    const next = this.identified(
+      spec,
+      record.sessionId,
+      record.pty.generation + 1
+    );
+    if (record.pty.running) record.pty.replace(next);
+    else record.pty.launch(next);
+  }
+
+  retag(record: ManagedRecord, changes: TagChanges): void {
+    record.tags = withTags(record.tags, changes);
+  }
+
+  /** Stop every session: the owner is closing. */
+  close(): void {
+    for (const record of [...this.records.values()]) record.pty.stop();
+  }
+
+  private identified(
+    spec: SessionSpec,
+    sessionId: string,
+    generation: number
+  ): SessionSpec {
+    return withSessionIdentity(spec, {
+      hostId: this.hostId,
+      sessionId,
+      generation,
+      ...(this.runtimeDir ? { runtimeDir: this.runtimeDir } : {}),
+    });
   }
 
   /** An approval names the exact process it saw and the identity tags it
    *  read; anything else changed since is refused. */
-  private checkExpected(
-    sessionId: string,
-    record: ManagedRecord,
-    plan: ExistingPlan
-  ): void {
+  private checkExpected(record: ManagedRecord, plan: ExistingPlan): void {
+    if (plan.mode === 'restart' && record.pty.running)
+      throw new Error(`Cannot restart a running session: ${record.label}`);
     const expected = plan.expected;
     if (!expected) return;
     const same =
       expected.kind === 'mux' &&
       expected.hostId === this.hostId &&
-      expected.sessionId === sessionId &&
+      expected.sessionId === record.sessionId &&
       expected.generation === record.pty.generation &&
       Object.entries(plan.expectedTags ?? {}).every(
         ([key, value]) => record.tags[key] === value
@@ -166,8 +229,10 @@ export class ManagedCatalog implements SessionCatalog {
   }
 
   private forget(sessionId: string, pty: ManagedPty): void {
-    if (this.records.get(sessionId)?.pty === pty)
-      this.records.delete(sessionId);
+    const record = this.records.get(sessionId);
+    if (record?.pty !== pty) return;
+    this.records.delete(sessionId);
+    record.screen.dispose();
   }
 
   private freeLabel(preferred: string, excluded: readonly string[]): string {
@@ -183,10 +248,9 @@ export class ManagedCatalog implements SessionCatalog {
     throw new Error(`No free session label for ${preferred}`);
   }
 
-  private find(target: SessionTarget): [string, ManagedRecord] | null {
+  private find(target: SessionTarget): ManagedRecord | null {
     if (target.kind !== 'mux' || target.hostId !== this.hostId) return null;
-    const record = this.records.get(target.sessionId);
-    return record ? [target.sessionId, record] : null;
+    return this.records.get(target.sessionId) ?? null;
   }
 
   private listed(

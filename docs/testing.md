@@ -107,6 +107,19 @@ npx nx e2e:no-tmux cli-e2e
 `cli-e2e` does the same for the TUI: its fixture's `withoutTmux` follows
 `N10_E2E_NO_TMUX`, and its `@tmux` tests are left out the same way.
 
+### Mux contract
+
+`e2e:mux cli-e2e` (`mux.config.ts`, `apps/cli-e2e/src/mux/`) runs the one-shot
+mux verbs as separate processes against a foreground `n10 mux serve` in a scratch
+profile: no browser and no wterm host, so it runs on Windows as well. Its
+Bash fixture `orchestra-mux.sh` drives a player the way Orchestra's mux arm
+will; on Windows it runs under Git for Windows' Bash, never WSL's. A POSIX
+scratch HOME must stay short: a socket path over 107 bytes cannot be bound.
+
+```sh
+npx nx e2e:mux cli-e2e
+```
+
 ### Windows
 
 `e2e:windows` (`windows.config.ts`, `src/windows/`) runs on Windows only and

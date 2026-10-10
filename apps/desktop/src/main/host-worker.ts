@@ -187,7 +187,7 @@ async function start(): Promise<void> {
   installMachineResolver();
   beam.start();
   await probeTmuxAvailability();
-  await applySessionBackend();
+  await applySessionBackend('desktop');
   const opened = openStartupRepo();
   post({ t: 'ready', repo: opened ? opened.cwd : null });
 }

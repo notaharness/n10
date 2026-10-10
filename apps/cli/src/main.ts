@@ -34,6 +34,10 @@ async function run(command: Command): Promise<number | undefined> {
       await runUtil(command.args);
       return 0;
     }
+    case 'mux': {
+      const { runMux } = await import('./commands/mux/mux-command.js');
+      return runMux(command.args);
+    }
     case 'tui': {
       const { runTui } = await import('./tui.js');
       await runTui(command.args);

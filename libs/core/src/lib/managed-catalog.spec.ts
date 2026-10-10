@@ -63,10 +63,13 @@ describe.skipIf(process.platform === 'win32')('a managed catalog', () => {
       ...plan,
       excludedNames: ['repo-shell-2'],
     });
-    expect(catalog.list([]).map((s) => s.target.name)).toEqual([
-      'repo-shell',
-      'repo-shell-3',
-    ]);
+    // Two records created within a second list in session-ID order.
+    expect(
+      catalog
+        .list([])
+        .map((s) => s.target.name)
+        .sort()
+    ).toEqual(['repo-shell', 'repo-shell-3']);
   });
 
   it('keeps a session running after its handle is released, and replays it to the next', async () => {
@@ -240,5 +243,45 @@ describe.skipIf(process.platform === 'win32')('a managed catalog', () => {
     expect(catalog.snapshot(elsewhere)).toBeNull();
     catalog.kill(elsewhere);
     expect(catalog.list([])).toHaveLength(1);
+  });
+
+  it('tells each process its own session and generation, never an inherited one', async () => {
+    catalog = new ManagedCatalog('host-a', '/run/n10');
+    const identity =
+      'echo "id=$N10_MUX_HOST_ID/$N10_MUX_SESSION_ID/$N10_MUX_GENERATION/$N10_MUX_RUNTIME/${TMUX:-none}"';
+    const inherited = {
+      ...spec(identity),
+      env: {
+        PATH: process.env['PATH'] ?? '',
+        TMUX: '/tmp/tmux-1/default,1,0',
+        N10_MUX_SESSION_ID: 'parent',
+      },
+    };
+    const record = catalog.create(inherited, {
+      label: 'agent',
+      tags: {},
+      retainOnExit: true,
+    });
+    await until(() => !record.pty.running);
+    const first = `id=host-a/${record.sessionId}/1//run/n10/none`;
+    expect((await record.screen.capture(0)).text).toContain(first);
+    catalog.relaunch(record, inherited, { retainOnExit: true });
+    await until(() => !record.pty.running);
+    expect((await record.screen.capture(0)).text).toContain(
+      `id=host-a/${record.sessionId}/2//run/n10/none`
+    );
+  });
+
+  it('keeps a screen to capture while nobody watches', async () => {
+    catalog = new ManagedCatalog('host-a');
+    const record = catalog.create(
+      { ...spec('printf "\\033]2;busy\\007ready"; exec sleep 30'), cols: 40 },
+      { label: 'agent', tags: {} }
+    );
+    await until(() => record.screen.title === 'busy');
+    const captured = await record.screen.capture(0);
+    expect(captured.text).toBe('ready\n');
+    expect(captured.seq).toBeGreaterThan(0);
+    expect(record.launch).toEqual({ kind: 'unknown' });
   });
 });
