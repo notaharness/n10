@@ -36,6 +36,25 @@ function captureColumns(capture: MuxCapture | undefined): string[] {
   ];
 }
 
+/** Fields a row cannot carry: TSV has no escaping, so a tab or line
+ *  break would shift every column after it. */
+const ROW_BREAKING = /[\t\r\n\0]/;
+
+/** The first field of `summary` a row cannot carry, if any. The title
+ *  is last and has its line breaks turned into spaces, so it always
+ *  fits. */
+export function unrepresentable(summary: MuxSummary): string | null {
+  const fields: [string, string][] = [
+    ['label', summary.label],
+    ['cwd', summary.cwd],
+    ...SUMMARY_TAGS.map((tag): [string, string] => [
+      tag,
+      summary.tags[tag] ?? '',
+    ]),
+  ];
+  return fields.find(([, value]) => ROW_BREAKING.test(value))?.[0] ?? null;
+}
+
 export function summaryRow(summary: MuxSummary): string {
   const columns = [
     summary.sessionId,

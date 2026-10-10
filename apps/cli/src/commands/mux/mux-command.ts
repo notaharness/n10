@@ -17,7 +17,12 @@ import {
   type MuxInvocation,
   type MuxVerb,
 } from './mux-args.js';
-import { errorLine, statusRow, summaryRow } from './mux-format.js';
+import {
+  errorLine,
+  statusRow,
+  summaryRow,
+  unrepresentable,
+} from './mux-format.js';
 
 type ClientVerb = Exclude<MuxVerb, 'serve'>;
 
@@ -34,15 +39,47 @@ const OPS: Record<ClientVerb, MuxOp> = {
   stop: 'session.stop',
 };
 
+/** One record's row; a record whose fields a row cannot carry is an
+ *  error rather than a row that shifts its columns. */
+function row(result: unknown): string {
+  const summary = result as MuxSummary;
+  const field = unrepresentable(summary);
+  if (field)
+    throw new MuxError(
+      'UNSUPPORTED',
+      `Session ${summary.sessionId}'s ${field} contains a tab or line break; use --json`
+    );
+  return summaryRow(summary);
+}
+
+/** Every record a row can carry. One that cannot is left out and named
+ *  on stderr, so it never shifts the columns of the rest. */
+function rows(parts: unknown[]): string {
+  return (parts as MuxSummary[])
+    .filter((summary) => {
+      const field = unrepresentable(summary);
+      if (field)
+        process.stderr.write(
+          errorLine(
+            'UNSUPPORTED',
+            `Left out session ${summary.sessionId}: its ${field} contains a tab or line break; use --json`
+          )
+        );
+      return !field;
+    })
+    .map(summaryRow)
+    .join('');
+}
+
 /** Default output per verb; `--json` prints the result envelope. */
 const FORMAT: Record<ClientVerb, (response: MuxResponse) => string> = {
   status: ({ result }) => statusRow(result as MuxStatus),
-  list: ({ parts }) => (parts as MuxSummary[]).map(summaryRow).join(''),
-  inspect: ({ result }) => summaryRow(result as MuxSummary),
-  self: ({ result }) => summaryRow(result as MuxSummary),
-  create: ({ result }) => summaryRow(result as MuxSummary),
-  restart: ({ result }) => summaryRow(result as MuxSummary),
-  metadata: ({ result }) => summaryRow(result as MuxSummary),
+  list: ({ parts }) => rows(parts),
+  inspect: ({ result }) => row(result),
+  self: ({ result }) => row(result),
+  create: ({ result }) => row(result),
+  restart: ({ result }) => row(result),
+  metadata: ({ result }) => row(result),
   send: ({ result }) => {
     const sent = result as { acceptedBytes: number; submitted: boolean };
     return `${sent.acceptedBytes}\t${sent.submitted ? 1 : 0}\n`;
@@ -102,14 +139,25 @@ async function paramsFor(
       return { ...id, history: invocation.lines ?? 0 };
     case 'self':
       return selfContext();
+    case 'metadata':
+      return { ...(await readRequest()), ...id, ...callerContext() };
     case 'create':
     case 'restart':
-    case 'metadata':
     case 'send':
     case 'stop':
       return { ...(await readRequest()), ...id };
     default:
       return id;
+  }
+}
+
+/** Who is asking, for a claim: the session this process runs in, when
+ *  it runs in one. */
+function callerContext(): Record<string, unknown> {
+  try {
+    return { caller: selfContext() };
+  } catch {
+    return {};
   }
 }
 

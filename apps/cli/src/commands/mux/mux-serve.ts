@@ -39,13 +39,23 @@ export async function serveMux(): Promise<number> {
   // On Windows its sessions end with it however it ends, as the
   // desktop's session host's do.
   joinKillOnCloseJob();
-  const claim = await ownSessions('headless');
+  let claim: Awaited<ReturnType<typeof ownSessions>>;
+  try {
+    claim = await ownSessions('headless');
+  } catch (err) {
+    // A socket path past the platform's limit, a runtime directory
+    // another account owns: said, not thrown.
+    return refuse(
+      'UNSUPPORTED',
+      `Cannot serve: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
   if (claim.kind === 'existing')
     return refuse(
       'RUNNING',
       `An n10 mux owner is already running as host ${claim.hostId}`
     );
-  process.stderr.write(`n10 mux serving as host ${claim.hostId}\n`);
+  const { hostId } = claim;
   return new Promise<number>((resolve) => {
     const end = () => {
       for (const signal of ENDING_SIGNALS) process.off(signal, end);
@@ -53,5 +63,7 @@ export async function serveMux(): Promise<number> {
       resolve(0);
     };
     for (const signal of ENDING_SIGNALS) process.on(signal, end);
+    // Last: whoever reads this may signal at once.
+    process.stderr.write(`n10 mux serving as host ${hostId}\n`);
   });
 }

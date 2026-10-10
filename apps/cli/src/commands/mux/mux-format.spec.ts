@@ -5,6 +5,7 @@ import {
   statusRow,
   SUMMARY_TAGS,
   summaryRow,
+  unrepresentable,
 } from './mux-format.js';
 
 const SUMMARY: MuxSummary = {
@@ -100,4 +101,16 @@ it('formats the status row and an error line', () => {
   expect(errorLine('NOT_FOUND', 'No\tsession\nhere')).toBe(
     'NOT_FOUND\tNo session here\n'
   );
+});
+
+it('names a field a row cannot carry, wherever the record came from', () => {
+  expect(unrepresentable(SUMMARY)).toBeNull();
+  expect(unrepresentable({ ...SUMMARY, cwd: '/work/a\tb' })).toBe('cwd');
+  expect(unrepresentable({ ...SUMMARY, label: 'x\ny' })).toBe('label');
+  expect(
+    unrepresentable({
+      ...SUMMARY,
+      tags: { '@orchestra-branch': 'feat\rx' },
+    })
+  ).toBe('@orchestra-branch');
 });
