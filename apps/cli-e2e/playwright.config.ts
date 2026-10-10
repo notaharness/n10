@@ -10,6 +10,8 @@ const baseURL = process.env.BASE_URL ?? `http://localhost:${port}`;
 
 export default defineConfig({
   testDir: './src',
+  // The mux contract runs on its own (mux.config.ts).
+  testIgnore: ['mux/**'],
   outputDir: './test-output/playwright/output',
   timeout: 120_000,
   workers: 1,
