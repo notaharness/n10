@@ -6,6 +6,7 @@
  * that is the open one — and none of them involve a transition.
  */
 import type { TerminalKind } from '../../../host/contract.js';
+import type { SessionTarget, WorktreeResume } from '../../../host/contract.js';
 
 export type Tab =
   | {
@@ -37,6 +38,9 @@ export type Tab =
        *  not the open one, so the sidebar cannot describe it — rather
        *  than falling back to a key. */
       title?: string;
+      sessionName?: string;
+      restore?: WorktreeResume;
+      resumeRequired?: boolean;
     }
   | { id: 'settings'; kind: 'settings'; preview: false }
   | {
@@ -61,6 +65,15 @@ export type Tab =
        *  it — only a listing that has named it, and then stops, has
        *  seen it end. */
       listed: boolean;
+      /** A saved tab whose tmux session has not been found this run. */
+      resumeRequired?: boolean;
+      restore?: {
+        target: SessionTarget;
+        tags: Record<string, string>;
+        agent?: string;
+        env?: Record<string, string>;
+        conversationId?: string;
+      };
     };
 
 /** A tab that shows a sidebar item, and so belongs to a repository. */

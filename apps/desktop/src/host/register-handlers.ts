@@ -8,6 +8,7 @@ import type {
 import { IPC } from './contract.js';
 import * as repo from './services/repo.js';
 import * as prefs from './services/desktop-prefs.js';
+import * as openTabs from './services/open-tabs.js';
 import * as settings from './services/settings.js';
 import * as keybindings from './services/keybindings.js';
 import * as sidebar from './services/sidebar.js';
@@ -50,6 +51,9 @@ export { createViewerApi, type ViewerApi };
 
 export function createHostApi(): HostApi {
   return {
+    loadOpenTabs: () => Promise.resolve(openTabs.loadOpenTabs()),
+    saveOpenTabs: (snapshot) =>
+      Promise.resolve(openTabs.saveOpenTabs(snapshot)),
     getVersion: () =>
       Promise.resolve({
         app: process.env.N10_DESKTOP_VERSION ?? 'dev',

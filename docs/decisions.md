@@ -244,14 +244,31 @@ connection health only for remote terminals.
 
 Desktop adapts lifecycle callbacks into output relays, preserving relay sequence
 numbers across restarts. Tab grouping, home-directory display and recent-repo
-bookkeeping stay shell-specific. Restoring tabs does not move focus. Discovery
-also removes retained tabs whose sessions were deleted outside n10.
+bookkeeping stay shell-specific. Discovery opens new session tabs behind the
+active tab. Sessions deleted while n10 is running still close their terminal
+tabs.
+
+The desktop atomically saves its tab strip to `~/.n10/open-tabs.json`: tab order,
+selected tab, repository focus and each session's launch identity. Startup loads
+the saved strip before reconciling live listings. A saved tab whose session is
+missing stays open, with **Resume session** in its pane. Selecting or prewarming
+it cannot create a session; only pressing the button launches. Closing a tab
+removes it from the saved strip. Resume retains its working directory, machine,
+raw tmux target, identity tags, recorded agent and Claude config directory. A
+reused tmux name with different identity tags cannot replace a saved session.
 
 Agent panes use `remain-on-exit` and retain final output. Resume uses the
 recorded agent, regardless of the current project default: Claude and Codex
-have explicit resume adapters. Their native continuation selects a conversation
-in the working directory; the agent tag is not a conversation ID. Missing or
-unsupported resume metadata produces an actionable error. Start-new choices
+have explicit resume adapters. Where the running Claude session registry supplies
+a verified conversation ID, the saved tab resumes that ID. Runtime capture reads
+only `CLAUDE_CONFIG_DIR` from the pane process tree on Linux; it does not persist
+the process's full environment. Other platforms and remote sessions retain
+previously captured launch metadata. Without a captured conversation ID, the
+agent's existing continuation remains scoped to its working directory and config
+folder: Claude continues there and Codex selects its latest conversation there.
+With multiple conversations in one directory, that fallback cannot guarantee
+the original transcript. The agent tag identifies an agent, not a conversation.
+Missing or unsupported resume metadata produces an actionable error. Start-new choices
 explicitly select an agent and a fresh conversation, including the configured
 default. Shell panes close normally when their process exits.
 

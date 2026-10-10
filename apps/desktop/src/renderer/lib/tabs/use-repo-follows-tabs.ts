@@ -22,11 +22,14 @@ import { activeTabRepo, useTabs } from './tabs.js';
  */
 export function useRepoFollowsTabs(
   repoCwd: string | null,
-  openRepo: (cwd: string) => Promise<boolean>
+  openRepo: (cwd: string) => Promise<boolean>,
+  ready = true
 ): void {
   const tabs = useTabs();
   const target = activeTabRepo(tabs);
   const lastActiveId = useRef(tabs.activeId);
+  const initialTarget = useRef(target);
+  const initialRepoHandled = useRef(false);
   const repoOpened = tabs.repoOpened;
   const shown = useRef<string | null>(null);
 
@@ -36,10 +39,24 @@ export function useRepoFollowsTabs(
   // repositories leaves it to the open that succeeded (`adoptRepo`): a
   // failed one returns here, and must not take the tab that asked.
   useEffect(() => {
+    if (!ready) return;
     const was = shown.current;
     shown.current = repoCwd;
-    if (was === null && repoCwd !== null) repoOpened(repoCwd);
-  }, [repoCwd, repoOpened]);
+    if (was !== null || repoCwd === null) return;
+    if (!initialRepoHandled.current) {
+      initialRepoHandled.current = true;
+      // A restored strip may come up in front of another repository's
+      // tab: open that repository instead, keeping this one if it fails.
+      const savedRepo = initialTarget.current;
+      if (savedRepo && savedRepo !== repoCwd) {
+        void openRepo(savedRepo).then((opened) => {
+          if (!opened) repoOpened(repoCwd);
+        });
+        return;
+      }
+    }
+    repoOpened(repoCwd);
+  }, [ready, repoCwd, repoOpened, openRepo]);
 
   useEffect(() => {
     const activeId = tabs.activeId;

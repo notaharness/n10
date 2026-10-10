@@ -184,6 +184,11 @@ vi.mock('@n10/core', async (importOriginal) => {
     worktreeSessionKey: actual.worktreeSessionKey,
     sessionLabel: actual.sessionLabel,
     sessionIdentity: actual.sessionIdentity,
+    sessionTags: actual.sessionTags,
+    registryNameOf: actual.registryNameOf,
+    ORCHESTRA_TAG: actual.ORCHESTRA_TAG,
+    listOurSessions: () => [],
+    captureTmuxRuntime: () => ({}),
     LOCAL_MACHINE: actual.LOCAL_MACHINE,
     resolveAgent: actual.resolveAgent,
     sessionIncarnationMatches: (

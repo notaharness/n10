@@ -48,6 +48,7 @@ export * from './lib/session/open-session.js';
 export type * from './lib/terminal/terminal-name.js';
 export * from './lib/terminal/launch-terminal.js';
 export * from './lib/pty-registry.js';
+export type { SessionTarget } from '@n10/terminal';
 export * from './lib/worktree-rows.js';
 export {
   attach,
@@ -79,6 +80,7 @@ export * from './lib/session/session-menu-request.js';
 export * from './lib/session/review-prompt.js';
 export * from './lib/session/relay-target.js';
 export * from './lib/session/claude-inbox.js';
+export * from './lib/session/session-runtime.js';
 export * from './lib/sync/remote-sync.js';
 export * from './lib/sync/conflicts.js';
 export * from './lib/sync/fetch-queue.js';

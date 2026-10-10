@@ -6,6 +6,8 @@
  * file is a catalogue already.
  */
 
+import type { SessionTarget } from '@n10/core';
+
 export type TerminalKind = 'shell' | 'agent';
 
 export interface TerminalLaunchRequest {
@@ -26,6 +28,14 @@ export interface TerminalLaunchRequest {
   /** Set only alongside `machine`: correlates this launch's
    *  `onLaunchStep` events. Ignored for a local launch. */
   launchId?: string;
+  /** Saved identity for a tab whose tmux server disappeared at reboot. */
+  restore?: {
+    target: SessionTarget;
+    tags: Record<string, string>;
+    agent?: string;
+    env?: Record<string, string>;
+    conversationId?: string;
+  };
 }
 
 /**
@@ -61,6 +71,14 @@ export interface TerminalSummary {
   /** Local client health, independent of `running` (decisions.md D4).
    *  Absent for a local terminal. */
   connectionState?: 'connected' | 'reconnecting' | 'failed';
+  /** Captured launch data kept with an open tab for explicit resume. */
+  restore?: {
+    target: SessionTarget;
+    tags: Record<string, string>;
+    agent?: string;
+    env?: Record<string, string>;
+    conversationId?: string;
+  };
 }
 
 /** A shell in a branch's checkout on one machine — the review sidebar's

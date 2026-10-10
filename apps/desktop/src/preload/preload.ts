@@ -29,6 +29,8 @@ import {
  */
 const api: N10HostApi = {
   getVersion: () => ipcRenderer.invoke(IPC.getVersion),
+  loadOpenTabs: () => ipcRenderer.invoke(IPC.loadOpenTabs),
+  saveOpenTabs: (snapshot) => ipcRenderer.invoke(IPC.saveOpenTabs, snapshot),
 
   openRepo: (cwd) => ipcRenderer.invoke(IPC.openRepo, cwd),
   getRepo: () => ipcRenderer.invoke(IPC.getRepo),

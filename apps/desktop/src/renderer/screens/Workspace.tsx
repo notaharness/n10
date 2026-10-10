@@ -12,15 +12,7 @@ import type {
   SidebarItem,
 } from '../../host/contract.js';
 import { AttentionRail } from '../components/AttentionRail.js';
-import {
-  applyPendingRemovals,
-  itemBranch,
-  itemKey,
-  itemRunning,
-  itemSessionName,
-  itemWorktree,
-  itemTitle,
-} from '../lib/sidebar/sidebar-model.js';
+import { applyPendingRemovals } from '../lib/sidebar/sidebar-model.js';
 import { CommandPalette } from '../components/CommandPalette.js';
 import { EditorArea } from '../components/editor/EditorArea.js';
 import { prefetchPanes } from '../components/editor/lazy-panes.js';
@@ -28,7 +20,11 @@ import { ShortcutsDialog } from '../components/ShortcutsDialog.js';
 import { Sidebar } from '../components/sidebar/Sidebar.js';
 import { StatusBar } from '../components/StatusBar.js';
 import { TitleBar } from '../components/TitleBar.js';
-import { useForeignSessions, useSidebarModel } from '../lib/data/queries.js';
+import {
+  useForeignSessions,
+  useSessions,
+  useSidebarModel,
+} from '../lib/data/queries.js';
 import { useFleet } from '../lib/fleet/fleet-context.js';
 import {
   useRefreshRemote,
@@ -41,6 +37,7 @@ import {
   type ForeignSessionEntry,
   type ItemEntry,
 } from '../lib/tabs/tabs.js';
+import { itemEntries } from '../lib/tabs/tab-item.js';
 import { useCloseTabs } from '../lib/tabs/use-close-tabs.js';
 import { REMOTE_HOME_CWD } from '../lib/terminals/terminal-launch-request.js';
 import { useTerminalTabs } from '../lib/terminals/use-terminal-tabs.js';
@@ -100,6 +97,7 @@ function WorkspaceInner({
   const { repo } = useRepo();
   const tabs = useRepoTabs();
   const model = useSidebarModel(repo.cwd);
+  const sessions = useSessions(repo.cwd);
   const refresh = useRefreshRemote(repo.cwd);
   // Worktrees being removed drop out of the model right away — every
   // consumer below (sidebar, tabs, attention rail) derives from this one
@@ -122,6 +120,7 @@ function WorkspaceInner({
         branch: s.branch,
         worktree: s.worktree,
         sessionName: s.sessionName,
+        restore: s.restore,
       })),
     [foreignSessions.data]
   );
@@ -148,20 +147,9 @@ function WorkspaceInner({
     return () => setRevealHost(null);
   }, [setRevealHost]);
 
-  // The sidebar as the tab model sees it.
   const entries: ItemEntry[] = useMemo(
-    () =>
-      items.map((i) => ({
-        itemKey: itemKey(i),
-        branch: itemBranch(i),
-        title: itemTitle(i),
-        running: itemRunning(i),
-        sessionName: itemSessionName(i),
-        worktree: itemWorktree(i),
-        sessionBranch:
-          i.kind === 'session' ? i.session.sessionBranch : undefined,
-      })),
-    [items]
+    () => itemEntries(items, sessions.data),
+    [items, sessions.data]
   );
 
   // The one place every store the strip depends on is reconciled: the

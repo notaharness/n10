@@ -81,6 +81,8 @@ const SETTINGS: SettingsFieldView[] = [
 type ShellHost = Pick<
   N10HostApi,
   | 'getVersion'
+  | 'loadOpenTabs'
+  | 'saveOpenTabs'
   | 'openRepo'
   | 'getRepo'
   | 'refreshRepo'
@@ -103,6 +105,7 @@ type ShellHost = Pick<
 >;
 
 export function createShellHost(state: DemoState): ShellHost {
+  let openTabs: unknown = null;
   let prefs: DesktopPrefs = {
     theme: requestedTheme() ?? 'system',
     nativeFrame: false,
@@ -116,6 +119,11 @@ export function createShellHost(state: DemoState): ShellHost {
   return {
     getVersion: () =>
       later({ app: '1.0.0', electron: '44.0.0', node: '24.4.0', chrome: '' }),
+    loadOpenTabs: () => later(openTabs),
+    saveOpenTabs: (snapshot) => {
+      openTabs = snapshot;
+      return later(undefined);
+    },
     openRepo: async (cwd) => {
       await later(null, 250);
       return info(state.open(cwd));

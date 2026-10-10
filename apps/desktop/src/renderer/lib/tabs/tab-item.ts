@@ -1,6 +1,32 @@
-import type { SidebarItem } from '../../../host/contract.js';
-import { itemBranch, itemKey, itemWorktree } from '../sidebar/sidebar-model.js';
-import type { Tab } from './tabs-model.js';
+import type { SessionSummary, SidebarItem } from '../../../host/contract.js';
+import {
+  itemBranch,
+  itemKey,
+  itemRunning,
+  itemSessionName,
+  itemTitle,
+  itemWorktree,
+} from '../sidebar/sidebar-model.js';
+import type { ItemEntry, Tab } from './tabs-model.js';
+
+/** The sidebar as the tab model sees it, each row with the resume
+ *  recipe of its session when the host lists one. */
+export function itemEntries(
+  items: readonly SidebarItem[],
+  sessions: readonly SessionSummary[] | undefined
+): ItemEntry[] {
+  const byName = new Map(sessions?.map((s) => [s.name, s.restore]));
+  return items.map((i) => ({
+    itemKey: itemKey(i),
+    branch: itemBranch(i),
+    title: itemTitle(i),
+    running: itemRunning(i),
+    sessionName: itemSessionName(i),
+    restore: byName.get(itemSessionName(i) ?? ''),
+    worktree: itemWorktree(i),
+    sessionBranch: i.kind === 'session' ? i.session.sessionBranch : undefined,
+  }));
+}
 
 /** A repository's sidebar rows, looked up the three ways a tab names
  *  its row. */

@@ -1,6 +1,13 @@
 import {
   buildReviewLaunchRequest,
   getSession,
+  listOurSessions,
+  registryNameOf,
+  sessionIdentity,
+  sessionTags,
+  ORCHESTRA_TAG,
+  LOCAL_MACHINE,
+  captureTmuxRuntime,
   snapshot as activitySnapshot,
 } from '@n10/core';
 import { activeRepository, repository, requireRepo } from './repo.js';
@@ -25,6 +32,7 @@ import type {
   SessionLaunchRequest,
   SessionSummary,
 } from '../contract.js';
+import type { WorktreeResume } from '../contract.js';
 
 export type { SessionLaunchRequest, SessionSummary };
 export { isForeignSession, isOwnSessionAlive } from './session-registry.js';
@@ -71,6 +79,7 @@ export async function launchAgent(
       remote: req.machine
         ? { id: req.machine, machine: machineFor(req.machine) }
         : undefined,
+      restore: req.restore,
     },
     {
       beforeLaunch: (branch, current) =>
@@ -134,8 +143,71 @@ export async function checkoutPlan(
   return result.outcome;
 }
 
-export function listSessions(repo: string): SessionSummary[] {
-  return repository(repo).sessions.connections();
+function worktreeTags(
+  repo: string,
+  path: string,
+  branch: string,
+  agent: string | undefined
+): Record<string, string> {
+  return {
+    ...sessionTags(repo, { type: 'worktree', branch, worktreePath: path }),
+    ...(agent ? { [ORCHESTRA_TAG.agent]: agent } : {}),
+  };
+}
+
+function worktreeRestore(
+  summary: SessionSummary,
+  tmuxName: string,
+  tags: Record<string, string>,
+  agent: string | undefined,
+  aiCommand: string | undefined,
+  local: boolean
+): WorktreeResume {
+  return {
+    sessionName: summary.name,
+    target: { kind: 'tmux', name: tmuxName },
+    tags,
+    ...(agent ? { agent } : {}),
+    ...(agent === 'test' && aiCommand ? { aiCommand } : {}),
+    ...(local ? captureTmuxRuntime(tmuxName, undefined, agent) : {}),
+  };
+}
+
+function withResume(
+  summary: SessionSummary,
+  tagged: ReadonlyMap<string, ReturnType<typeof listOurSessions>[number]>,
+  aiCommand: string | undefined
+): SessionSummary {
+  const identity = sessionIdentity(summary.name);
+  const held = getSession(summary.name);
+  const tmuxName = held?.pty.name;
+  if (identity?.kind !== 'worktree' || !tmuxName) return summary;
+  const listed =
+    identity.machine === LOCAL_MACHINE ? tagged.get(summary.name) : undefined;
+  const agent = listed?.agent ?? held.agent;
+  const tags =
+    listed?.tags ??
+    worktreeTags(identity.repo, identity.path, held.createdFor ?? '', agent);
+  const restore = worktreeRestore(
+    summary,
+    tmuxName,
+    tags,
+    agent,
+    aiCommand,
+    identity.machine === LOCAL_MACHINE
+  );
+  return { ...summary, restore };
+}
+
+export function listSessions(cwd: string): SessionSummary[] {
+  const repo = repository(cwd);
+  const tagged = new Map(
+    listOurSessions().map((session) => [registryNameOf(session), session])
+  );
+  const aiCommand = repo.config.getSnapshot().config.aiCommand;
+  return repo.sessions
+    .connections()
+    .map((summary) => withResume(summary, tagged, aiCommand));
 }
 
 /** Debounced agent-activity snapshots for every session this host has

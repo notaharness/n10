@@ -122,7 +122,10 @@ export function useCloseTabs(items: SidebarItem[]): {
       const activeBranches = sessions
         .filter((s) => activity.data?.[s.name]?.active)
         .map((s) => s.branch);
-      const terminals = closing.filter((t) => t.kind === 'terminal');
+      const terminals = closing.filter(
+        (t): t is Extract<Tab, { kind: 'terminal' }> =>
+          t.kind === 'terminal' && !t.resumeRequired
+      );
       const finish = () => {
         killNames(names);
         killTerminals(terminals.map((t) => t.name));

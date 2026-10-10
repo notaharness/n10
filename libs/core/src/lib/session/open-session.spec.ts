@@ -107,6 +107,87 @@ beforeEach(() => {
   state.listOurSessionsWith.mockResolvedValue([]);
 });
 describe('session launch boundary', () => {
+  it('does not attach an unrelated tagged session using a saved terminal name', async () => {
+    state.existing = {
+      ...found,
+      name: 'old',
+      type: 'agent',
+      repo: '/other',
+      path: '/other',
+      tags: {
+        '@orchestra-spawner': 'n10',
+        '@orchestra-repo': '/other',
+        '@orchestra-session-type': 'agent',
+      },
+    };
+    await openSession({
+      ...base,
+      session: {
+        type: 'terminal',
+        kind: 'agent',
+        repo: '/repo',
+        target: 'old',
+      },
+      cwd: '/repo',
+      restore: {
+        target: { kind: 'tmux', name: 'old' },
+        tags: {
+          '@orchestra-spawner': 'n10',
+          '@orchestra-repo': '/repo',
+          '@orchestra-session-type': 'agent',
+        },
+      },
+    });
+    expect(state.create.mock.calls[0][1]).toMatchObject({
+      mode: 'create',
+      label: 'old',
+    });
+  });
+  it('does not attach a different agent that reused the saved terminal target', async () => {
+    const tags = {
+      '@orchestra-spawner': 'n10',
+      '@orchestra-repo': '/repo',
+      '@orchestra-session-type': 'agent',
+      '@orchestra-agent': 'claude',
+    };
+    state.existing = {
+      ...found,
+      name: 'old',
+      type: 'agent',
+      path: '/repo',
+      agent: 'codex',
+      tags: { ...tags, '@orchestra-agent': 'codex' },
+    };
+    await openSession({
+      ...base,
+      session: {
+        type: 'terminal',
+        kind: 'agent',
+        repo: '/repo',
+        target: 'old',
+      },
+      cwd: '/repo',
+      restore: { target: { kind: 'tmux', name: 'old' }, tags },
+    });
+    expect(state.create.mock.calls[0][1]).toMatchObject({
+      mode: 'create',
+      label: 'old',
+    });
+  });
+  it('refuses a different worktree session that appeared while a saved tab was closed', async () => {
+    state.existing = found;
+    await expect(
+      openSession({
+        ...base,
+        restore: {
+          target: { kind: 'tmux', name: 'original-target' },
+          tags: { '@orchestra-agent': 'claude' },
+        },
+      })
+    ).rejects.toThrow('Session changed');
+    expect(state.create).not.toHaveBeenCalled();
+    expect(build).not.toHaveBeenCalled();
+  });
   it('coalesces concurrent requests for the same worktree', async () => {
     await Promise.all([openSession(base), openSession(base)]);
     expect(state.create).toHaveBeenCalledOnce();

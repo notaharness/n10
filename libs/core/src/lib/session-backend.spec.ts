@@ -448,7 +448,7 @@ describe('observeTmuxSessions', () => {
       ours('repo-agent-2', 'agent', '/repo', null, '/repo'),
       ours('odd-name', 'shell', '/repo', null, '/repo'),
     ]);
-    expect(observed('/repo', []).terminals).toEqual([
+    expect(observed('/repo', []).terminals).toMatchObject([
       {
         name: terminalSessionKey('notes-shell'),
         kind: 'shell',
@@ -483,7 +483,7 @@ describe('observeTmuxSessions', () => {
     ]);
     const seen = observed('/repo', [wt('new-branch', 'new-branch', 'dir')]);
     expect(seen.persisted).toEqual(new Set([worktreeSessionKey(dirOf('dir'))]));
-    expect(seen.terminals).toEqual([
+    expect(seen.terminals).toMatchObject([
       {
         name: terminalSessionKey('repo-stray'),
         kind: 'agent',
@@ -557,7 +557,7 @@ describe('observeTmuxSessions', () => {
     session.paneDead = true;
     session.options!['@orchestra-agent'] = 'codex';
     tmuxListSessionsMock.mockReturnValue([session]);
-    expect(observed('/repo', []).terminals).toEqual([
+    expect(observed('/repo', []).terminals).toMatchObject([
       {
         name: terminalSessionKey('repo-agent'),
         kind: 'agent',
@@ -632,7 +632,7 @@ describe('another machine’s terminals', () => {
       ours('wt', 'worktree', '/home/far/app', 'main', '/home/far/app/wt'),
       foreign('untagged', '/home/far'),
     ]);
-    await expect(observeRemoteTerminals(PEER)).resolves.toEqual([
+    await expect(observeRemoteTerminals(PEER)).resolves.toMatchObject([
       {
         name: terminalSessionKey('notes', PEER),
         kind: 'shell',

@@ -206,6 +206,70 @@ it('refuses a launch when selection changes during worktree resolution', async (
   f.service.park();
 });
 
+it('checks remote ownership before resuming a saved local worktree', async () => {
+  const f = fixture();
+  const beforeLaunch = vi.fn(async () => {
+    throw new Error('A peer already owns this branch');
+  });
+  await expect(
+    f.service.launch(
+      {
+        ...request,
+        restore: {
+          sessionName: key,
+          target: { kind: 'tmux', name: 'saved-agent' },
+          tags: {},
+        },
+      },
+      { beforeLaunch }
+    )
+  ).rejects.toThrow('A peer already owns this branch');
+  expect(beforeLaunch).toHaveBeenCalledExactlyOnceWith('feature', key);
+  expect(state.launch).not.toHaveBeenCalled();
+  f.service.park();
+});
+
+it('does not recreate a missing saved worktree while resuming', async () => {
+  const f = fixture();
+  vi.mocked(f.worktrees.find).mockResolvedValue(null);
+  await expect(
+    f.service.launch({
+      ...request,
+      restore: {
+        sessionName: key,
+        target: { kind: 'tmux', name: 'saved-agent' },
+        tags: {},
+      },
+    })
+  ).rejects.toThrow('saved session worktree is no longer available');
+  expect(f.worktrees.resolve).not.toHaveBeenCalled();
+  expect(state.launch).not.toHaveBeenCalled();
+  f.service.park();
+});
+
+it('keeps a saved remote checkout on its own machine', async () => {
+  const f = fixture();
+  const remote = worktreeSessionKey('/peer/wt', '/repo', 'peer');
+  const beforeLaunch = vi.fn();
+  await f.service.launch(
+    {
+      ...request,
+      restore: {
+        sessionName: remote,
+        target: { kind: 'tmux', name: 'peer-agent' },
+        tags: {},
+      },
+    },
+    { beforeLaunch }
+  );
+  expect(f.worktrees.find).not.toHaveBeenCalled();
+  expect(beforeLaunch).not.toHaveBeenCalled();
+  expect(state.launch).toHaveBeenCalledWith(
+    expect.objectContaining({ name: remote, cwd: '/peer/wt' })
+  );
+  f.service.park();
+});
+
 it('captures launch config before its first await', async () => {
   const f = fixture();
   const gate = deferred<typeof wt>();

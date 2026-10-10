@@ -8,6 +8,10 @@
  * file is a catalogue already.
  */
 
+import type { SessionTarget } from '@n10/core';
+
+export type { SessionTarget };
+
 export interface SessionSummary {
   name: string;
   running: boolean;
@@ -21,6 +25,18 @@ export interface SessionSummary {
    *  (decisions.md D4). Absent for a local session, which has no
    *  separate transport to lose. */
   connectionState?: 'connected' | 'reconnecting' | 'failed';
+  /** Exact launch context retained in the open tab across a reboot. */
+  restore?: WorktreeResume;
+}
+
+export interface WorktreeResume {
+  sessionName: string;
+  target: SessionTarget;
+  tags: Record<string, string>;
+  agent?: string;
+  aiCommand?: string;
+  env?: Record<string, string>;
+  conversationId?: string;
 }
 
 /**
@@ -38,6 +54,7 @@ export interface ForeignSessionSummary {
   worktree: string;
   /** Its qualified core registry key (repository plus checkout). */
   sessionName: string;
+  restore?: WorktreeResume;
 }
 
 /**

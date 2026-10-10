@@ -131,7 +131,7 @@ function Gate() {
   );
 
   // A tab from another repository is shown by opening that repository.
-  useRepoFollowsTabs(repo?.cwd ?? null, openRepoAsync);
+  useRepoFollowsTabs(repo?.cwd ?? null, openRepoAsync, !isPending);
   // Above the workspace, which the repository picker unmounts: a walk
   // onto another repository's tab is what switches repository. Off on
   // the picker and while connecting, where no strip is shown.

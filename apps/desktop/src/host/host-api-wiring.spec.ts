@@ -46,6 +46,9 @@ vi.mock('./services/repo.js', () =>
 vi.mock('./services/settings.js', () =>
   recorder('settings', ['getSettingsView', 'updateSettingsFromView'])
 );
+vi.mock('./services/open-tabs.js', () =>
+  recorder('openTabs', ['loadOpenTabs', 'saveOpenTabs'])
+);
 vi.mock('./services/keybindings.js', () =>
   recorder('keybindings', ['getDesktopKeybindings', 'setDesktopKeybinding'])
 );
@@ -352,6 +355,8 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ],
 
   ['getDesktopPrefs', [], 'prefs.loadDesktopPrefs'],
+  ['loadOpenTabs', [], 'openTabs.loadOpenTabs'],
+  ['saveOpenTabs', [{ version: 1 }], 'openTabs.saveOpenTabs'],
   ['getKeybindings', [], 'keybindings.getDesktopKeybindings'],
   [
     'setKeybinding',

@@ -74,13 +74,17 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `spawned` and `ended`; everything else rides on the sidebar poll.
 - `libs/engine/src/lib/sessions/terminal-service.ts` owns process-wide terminal lifecycle;
   `services/terminals.ts` supplies output relays, recents and tab grouping.
-  Terminal tabs have no state file; tmux is the record: the kind is the
+  Live sessions are discovered from tmux: the kind is the
   `@orchestra-session-type` tag (`shell` | `agent`), the name is a label
   (`<directory>-shell`, suffixed on collision) and the key, the directory is
   `#{session_path}`. The tab group is derived at read time
   (`services/terminal-home.ts`). Closing a terminal tab confirms and kills;
   quitting only detaches. Agent panes remain available after exit for viewing
-  and restart; shell terminals close when their process exits.
+  and restart; shell terminals close when their process exits. The desktop
+  saves its open tabs, order, focus and launch identity in
+  `~/.n10/open-tabs.json`. When tmux is gone, tabs stay open and wait for
+  **Resume session**; focus and pane prewarming never launch a session.
+  Resume keeps the saved tmux target, tags, agent and Claude config directory.
 - Pasted images are written under the OS temp dir
   (`services/clipboard-image.ts`), suffix from the host's own MIME table, and
   the path is typed into the PTY.

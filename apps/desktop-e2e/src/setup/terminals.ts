@@ -73,6 +73,10 @@ export function tmuxSessionPath(name: string, tmuxTmpdir: string): string {
 export interface TerminalSeed {
   cwd: string;
   command: string;
+  /** Variables captured from a session that was started outside n10. */
+  env?: Record<string, string>;
+  /** Agent identity recorded in the external session's n10 tags. */
+  agent?: string;
   /** Shell unless said. `dir` is the tag Orchestra's `--dir` players
    *  carry, written the way Orchestra writes it: spawner `orchestra`. */
   kind?: 'shell' | 'agent' | 'dir';
@@ -98,6 +102,10 @@ export function startSurvivingTerminal(
       `HOME=${opts.homeDir}`,
       '-e',
       `PATH=${process.env.PATH ?? ''}`,
+      ...Object.entries(opts.env ?? {}).flatMap(([key, value]) => [
+        '-e',
+        `${key}=${value}`,
+      ]),
       '--',
       '/bin/sh',
       '-c',
@@ -111,6 +119,7 @@ export function startSurvivingTerminal(
       '@orchestra-spawner': opts.kind === 'dir' ? 'orchestra' : 'n10',
       '@orchestra-repo': opts.cwd,
       '@orchestra-session-type': opts.kind ?? 'shell',
+      ...(opts.agent ? { '@orchestra-agent': opts.agent } : {}),
     },
     opts.homeDir
   );

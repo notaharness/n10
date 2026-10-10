@@ -1,5 +1,5 @@
 import { realpathSync } from 'node:fs';
-import { listLiveWorktreeSessions } from '@n10/core';
+import { captureTmuxRuntime, listLiveWorktreeSessions } from '@n10/core';
 import type { ForeignSessionSummary } from '../contract.js';
 import { ensureRecent } from './recent-repos.js';
 import { requireRepo } from './repo.js';
@@ -46,6 +46,17 @@ export function listForeignSessions(): ForeignSessionSummary[] {
       branch: live.branch,
       worktree: live.path,
       sessionName: live.sessionName,
+      ...(live.tags
+        ? {
+            restore: {
+              sessionName: live.sessionName,
+              target: { kind: 'tmux', name: live.tmuxName },
+              tags: live.tags,
+              ...(live.agent ? { agent: live.agent } : {}),
+              ...captureTmuxRuntime(live.tmuxName, undefined, live.agent),
+            },
+          }
+        : {}),
     });
   }
   noteRepositories(out);

@@ -96,7 +96,7 @@ const OURS = {
 
 describe('taggedSession', () => {
   it('reads one of ours from its tags, never from its name', () => {
-    expect(taggedSession(listed('anything-at-all', OURS))).toEqual({
+    expect(taggedSession(listed('anything-at-all', OURS))).toMatchObject({
       name: 'anything-at-all',
       created: 10,
       paneDead: false,

@@ -1,6 +1,7 @@
 import type { TerminalKind } from '../../../host/contract.js';
 import { closeTab } from './tab-close.js';
 import { terminalTabId, type Tab, type TerminalTab } from './tab-identity.js';
+import { retainRuntime, sameSavedTarget } from './tab-restore.js';
 import type { TabsState } from './tabs-model.js';
 
 /**
@@ -21,6 +22,7 @@ export interface TerminalEntry {
   repo: string | null;
   /** The branch whose checkout it is in: that branch's tab lists it. */
   branch?: string;
+  restore?: TerminalTab['restore'];
 }
 
 function terminalTab(entry: TerminalEntry, listed: boolean): TerminalTab {
@@ -34,6 +36,7 @@ function terminalTab(entry: TerminalEntry, listed: boolean): TerminalTab {
     repo: entry.repo,
     preview: false,
     listed,
+    ...(entry.restore ? { restore: entry.restore } : {}),
   };
 }
 
@@ -68,6 +71,30 @@ export function openTerminal(
     autoOpened: state.autoOpened.includes(seen)
       ? state.autoOpened
       : [...state.autoOpened, seen],
+  };
+}
+
+/** The tmux allocator may suffix a saved target taken by another session. */
+export function resumeTerminal(
+  state: TabsState,
+  previous: string,
+  entry: TerminalEntry
+): TabsState {
+  const oldId = terminalTabId(previous);
+  if (!state.tabs.some((tab) => tab.id === oldId)) return state;
+  const replacement = terminalTab(entry, false);
+  const tabs = state.tabs.map((tab) => (tab.id === oldId ? replacement : tab));
+  const seen = new Set<string>();
+  return {
+    ...state,
+    tabs: tabs.filter((tab) => !seen.has(tab.id) && !!seen.add(tab.id)),
+    activeId: state.activeId === oldId ? replacement.id : state.activeId,
+    autoOpened: [
+      ...new Set([
+        ...state.autoOpened.filter((id) => id !== oldId),
+        replacement.id,
+      ]),
+    ],
   };
 }
 
@@ -151,7 +178,13 @@ function dropEnded(
   const listed = new Set(entries.map((e) => terminalTabId(e.name)));
   let next = state;
   for (const tab of state.tabs) {
-    if (tab.kind !== 'terminal' || !tab.listed || listed.has(tab.id)) continue;
+    if (
+      tab.kind !== 'terminal' ||
+      tab.resumeRequired ||
+      !tab.listed ||
+      listed.has(tab.id)
+    )
+      continue;
     next = closeTab(next, tab.id, repo);
   }
   const open = new Set(next.tabs.map((t) => t.id));
@@ -167,11 +200,15 @@ function dropEnded(
  *  repository (a `.git` appearing) and how home is written. Being
  *  named by a listing at all is the other thing a tab learns here. */
 function restamp(tab: TerminalTab, entry: TerminalEntry): TerminalTab {
+  if (tab.resumeRequired && tab.restore && !sameSavedTerminal(tab, entry))
+    return tab;
   if (
     tab.listed &&
     tab.repo === entry.repo &&
     tab.displayPath === entry.displayPath &&
-    tab.cwd === entry.cwd
+    tab.cwd === entry.cwd &&
+    !tab.resumeRequired &&
+    JSON.stringify(tab.restore) === JSON.stringify(entry.restore)
   ) {
     return tab;
   }
@@ -181,5 +218,15 @@ function restamp(tab: TerminalTab, entry: TerminalEntry): TerminalTab {
     displayPath: entry.displayPath,
     repo: entry.repo,
     listed: true,
+    resumeRequired: false,
+    ...(entry.restore
+      ? { restore: retainRuntime(entry.restore, tab.restore) }
+      : {}),
   };
+}
+
+/** A saved label alone does not identify a session after a tmux reboot. */
+function sameSavedTerminal(tab: TerminalTab, entry: TerminalEntry): boolean {
+  if (!tab.restore || !entry.restore) return false;
+  return tab.cwd === entry.cwd && sameSavedTarget(tab.restore, entry.restore);
 }

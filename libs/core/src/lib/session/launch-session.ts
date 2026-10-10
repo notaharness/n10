@@ -11,6 +11,7 @@ import {
   type LaunchSpec,
   type SeedOptions,
 } from '../agents/registry.js';
+import type { SessionTarget } from '@n10/terminal';
 
 // ── Session launcher ─────────────────────────────────────────────
 //
@@ -28,6 +29,8 @@ export type LaunchIntent =
 
 export interface LaunchRequest {
   intent: LaunchIntent;
+  /** Exact CLI conversation ID captured from the original agent, when known. */
+  conversationId?: string;
   /** Required for `seed` / `continue-or-seed`. */
   prompt?: string;
   /**
@@ -112,6 +115,13 @@ export interface LaunchSessionParams {
   mode?: 'open' | 'attach';
   fresh?: boolean;
   expected?: SessionIncarnation;
+  restore?: {
+    target: SessionTarget;
+    tags: Record<string, string>;
+    agent?: string;
+    env?: Record<string, string>;
+    conversationId?: string;
+  };
 }
 
 /**
@@ -128,11 +138,16 @@ export function launchSession(
     fresh: params.fresh,
     intent: params.request.intent.startsWith('continue') ? 'continue' : 'fresh',
     expected: params.expected,
+    restore: params.restore,
     cwd: params.cwd,
     cols: params.cols,
     rows: params.rows,
     build: (previous, restarting) =>
-      buildAgentLaunch(params, previous, restarting),
+      buildAgentLaunch(
+        params,
+        previous ?? params.restore?.agent,
+        restarting || !!params.restore
+      ),
   });
 }
 
@@ -220,5 +235,5 @@ function buildResumeSpec(
     request.prompt ?? '',
     request.systemGuidance
   );
-  return agent.resume(prompt || undefined, opts);
+  return agent.resume(prompt || undefined, opts, request.conversationId);
 }

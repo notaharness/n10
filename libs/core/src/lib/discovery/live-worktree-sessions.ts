@@ -42,6 +42,7 @@ export interface LiveWorktreeSession {
   /** Orchestra's tags, when the session carries them. The harness
    *  running in the pane. */
   agent?: string;
+  tags?: Record<string, string>;
   /** The player's reporting target (`ORCHESTRA_TAG.orchestrator`). */
   orchestrator?: string;
   /** `<KIND> <ISO-8601 UTC>` of the last report the player delivered. */
@@ -114,6 +115,7 @@ function describeSession(
     detached: head.detached,
     sessionName: worktreeSessionKey(path, session.repo, session.machine),
     machine: session.machine,
+    ...(session.tags ? { tags: session.tags } : {}),
     ...orchestraFields(session),
   };
 }

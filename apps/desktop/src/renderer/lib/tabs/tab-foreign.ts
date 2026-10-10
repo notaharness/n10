@@ -1,5 +1,6 @@
 import { autoOpenKey, itemTabId, type Tab } from './tab-identity.js';
 import type { TabsState } from './tabs-model.js';
+import type { WorktreeResume } from '../../../host/contract.js';
 
 /**
  * The pass of `sync-items` for agents running in *other* repositories.
@@ -24,6 +25,7 @@ export interface ForeignSessionEntry {
    *  history is kept under there. */
   sessionName: string;
   title?: string;
+  restore?: WorktreeResume;
 }
 
 /**
@@ -85,5 +87,8 @@ function foreignTab(entry: ForeignSessionEntry): Tab {
     branch: entry.branch,
     ...(entry.worktree ? { worktree: entry.worktree } : {}),
     title: entry.title ?? entry.branch,
+    ...(entry.restore
+      ? { sessionName: entry.sessionName, restore: entry.restore }
+      : {}),
   };
 }
