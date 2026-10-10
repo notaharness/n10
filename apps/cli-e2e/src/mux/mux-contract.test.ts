@@ -20,6 +20,9 @@ test.afterEach(async () => {
   await profile.dispose();
 });
 
+/** What the Bash adapter pastes: a tab, non-ASCII and an ESC. */
+const MESSAGE = 'hello\ttab ünïcode \x1b[x';
+
 const lines = (text: string) => text.split('\n').filter(Boolean);
 
 test('without an owner, every verb says so and prints nothing', () => {
@@ -77,6 +80,21 @@ test('serve leaves an installed tmux to hold the sessions', () => {
   expect(profile.mux(['status']).status).toBe(3);
 });
 
+test('serve says it cannot bind an endpoint, rather than crash', () => {
+  test.skip(process.platform === 'win32', 'a POSIX socket path limit');
+  // Past the 104/108-byte limit on a socket path.
+  const deep = join(profile.home, 'd'.repeat(120));
+  mkdirSync(deep);
+  const serve = spawnSync(process.execPath, [N10_MAIN, 'mux', 'serve'], {
+    env: { ...profile.env, HOME: deep },
+    encoding: 'utf8',
+    timeout: 15_000,
+  });
+  expect(serve.status).toBe(1);
+  expect(serve.stderr).toMatch(/^UNSUPPORTED\tCannot serve: /);
+  expect(serve.stderr).not.toMatch(/\n\s+at /);
+});
+
 test('the Bash adapter drives a player through every verb', async () => {
   await profile.serve();
   const worktree = join(profile.home, 'work tree ü');
@@ -107,15 +125,16 @@ test('the Bash adapter drives a player through every verb', async () => {
     created: 'running,orchestra,worktree',
     duplicate: '5,IDENTITY_MISMATCH',
     title: 'mux-agent',
-    sent: `${Buffer.byteLength('hello\ttab ünïcode\r')},1`,
+    sent: `${Buffer.byteLength(`${MESSAGE}\r`)},1`,
+    selfclaim: 'claim=0',
+    outsideclaim: '5,IDENTITY_MISMATCH',
     claimed: 'claude:abc',
     exited: 'exited,7',
     listed: '0',
   });
   expect(steps['self']).toMatch(/^self=0:[0-9a-f]{16}$/);
-  // The agent echoed the tab; the captured screen shows where it moved
-  // the cursor.
-  expect(steps['echoed']).toMatch(/^got:hello +tab ünïcode$/);
+  // The agent echoes each line as JSON, so the tab and the ESC show.
+  expect(steps['echoed']).toBe(`got:${JSON.stringify(MESSAGE)}`);
 });
 
 test('one of two restarts of an exited session wins', async () => {

@@ -112,7 +112,9 @@ export class MuxProfile {
    *  process is terminated. */
   async stop(): Promise<number | null> {
     const owner = this.owner;
-    if (!owner || owner.exitCode !== null) return owner?.exitCode ?? null;
+    // Already gone, whether it exited or a signal ended it.
+    if (!owner || owner.exitCode !== null || owner.signalCode !== null)
+      return owner?.exitCode ?? null;
     const exited = new Promise<number | null>((resolve) =>
       owner.once('exit', (code) => resolve(code))
     );
