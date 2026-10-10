@@ -132,7 +132,7 @@ jobs:
 
       - run: npx nx run-many -t typecheck -p @n10/terminal-pty @n10/core desktop-e2e
 
-      - run: npx nx test @n10/core -- src/lib/mux
+      - run: npx nx test @n10/core -- src/lib/mux src/lib/managed
 
       # A standard account for the separate-user test. The runner is
       # already elevated. A failure here fails the job: the test never

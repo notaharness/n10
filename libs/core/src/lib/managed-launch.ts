@@ -85,6 +85,20 @@ function envValue(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return key === undefined ? undefined : env[key];
 }
 
+/** As Windows looks a command up: a name that already ends in one of
+ *  PATHEXT's extensions as it is, any other with each of them. A bare
+ *  name is never run itself, so npm's extensionless shell script loses
+ *  to its `.cmd` beside it. */
+function windowsExtensions(command: string, env: NodeJS.ProcessEnv): string[] {
+  const pathext = (envValue(env, 'PATHEXT') ?? '.COM;.EXE;.BAT;.CMD')
+    .split(';')
+    .filter(Boolean);
+  const named = pathext.some((extension) =>
+    command.toUpperCase().endsWith(extension.toUpperCase())
+  );
+  return named ? [''] : pathext;
+}
+
 /**
  * The executable a command names, as the launch environment's PATH
  * finds it (with PATHEXT on Windows); a command with a directory part
@@ -100,9 +114,7 @@ export function resolveExecutable(
     const path = resolve(cwd, command);
     return isExecutable(path) ? path : null;
   }
-  const extensions = windows
-    ? ['', ...(envValue(env, 'PATHEXT') ?? '.COM;.EXE;.BAT;.CMD').split(';')]
-    : [''];
+  const extensions = windows ? windowsExtensions(command, env) : [''];
   for (const dir of (envValue(env, 'PATH') ?? '').split(delimiter)) {
     if (!dir) continue;
     for (const extension of extensions) {
