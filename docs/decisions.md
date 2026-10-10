@@ -1389,7 +1389,9 @@ profile's managed owner (`applySessionBackend` in `session-backend.ts`). It bind
 the mux endpoint before it creates anything, then holds its sessions in a
 `ManagedCatalog` (`managed-catalog.ts`) under the owner's host ID: one record,
 PTY and handle set per session (`ManagedPty` in `libs/terminal-pty`). Releasing
-a handle leaves the session running; stopping it ends it. Agents keep their exit
+a handle leaves the session running; stopping it ends it, and the handles
+attached then hear the process's own exit, never a made-up one. A new handle
+first replays the output it missed, up to 512 KiB of UTF-8. Agents keep their exit
 for restart; shells end with their shell. Every local operation reaches the
 records through the same catalog seam as tmux (`localCatalog()`), so discovery,
 launch plans, replacement approvals and removal are shared.
@@ -1408,9 +1410,15 @@ saved targets. A Resume the user pressed adopts the session it started, whatever
 its new target (`resume-item`, `resume-terminal`).
 
 Until another n10 can attach to a running owner as a client, a second desktop
-or TUI that finds the endpoint taken refuses to start ("Another n10 owns this
-profile's sessions"), rather than running a second catalog. tmux machines are
+or TUI that finds the endpoint taken refuses to start ("Another n10 is already
+running without tmux"), rather than running a second catalog. tmux machines are
 unaffected: nothing binds there.
+
+Quitting does not yet ask before stopping running sessions. Cmd+Q, closing the
+last window or Ctrl+C in the TUI stops every session the owner holds. The
+design's confirmation ("Quit n10 and stop N running sessions?", Cancel by
+default) is step 7's quit/save/wait/Resume work; this is the interim until it
+lands. Before the managed owner, n10 refused to start without tmux at all.
 
 The no-tmux end-to-end runs hide tmux from the app by giving it a PATH without
 it (`apps/desktop-e2e/src/setup/no-tmux.ts`, `withoutTmux`): the same

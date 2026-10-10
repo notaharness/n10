@@ -113,7 +113,9 @@ Next.js requires otherwise).
 
 Tests and scripts must use a scratch socket directory inside a fixture-created
 HOME and unset `TMUX`, which overrides `TMUX_TMPDIR`. Never run
-`tmux kill-server`. Closing n10 detaches sessions; it must not kill them.
+`tmux kill-server`. Closing n10 detaches its tmux sessions; it must not kill
+them. Without tmux, n10 owns its sessions and closing it ends them
+(`docs/decisions.md`, "Managed owner without tmux").
 See `libs/terminal-tmux/AGENTS.md`.
 
 ## Git and releases
