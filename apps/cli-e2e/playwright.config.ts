@@ -10,6 +10,8 @@ const baseURL = process.env.BASE_URL ?? `http://localhost:${port}`;
 
 export default defineConfig({
   testDir: './src',
+  // The mux contract runs on its own (mux.config.ts).
+  testIgnore: ['mux/**'],
   // Each target keeps its own results: Playwright empties this per run.
   outputDir:
     process.env.N10_E2E_NO_TMUX === '1'

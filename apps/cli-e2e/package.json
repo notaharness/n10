@@ -107,6 +107,34 @@
             "N10_E2E_NO_TMUX": "1"
           }
         }
+      },
+      "e2e:mux": {
+        "executor": "nx:run-commands",
+        "cache": true,
+        "dependsOn": [
+          {
+            "projects": [
+              "cli"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "externalDependencies": [
+              "@playwright/test"
+            ]
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/test-output/mux"
+        ],
+        "options": {
+          "command": "playwright test -c mux.config.ts",
+          "cwd": "apps/cli-e2e"
+        }
       }
     }
   }

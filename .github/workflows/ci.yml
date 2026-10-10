@@ -97,7 +97,7 @@ jobs:
 
       - uses: nrwl/nx-set-shas@v4
 
-      - run: npx nx affected -t e2e:no-tmux
+      - run: npx nx affected -t e2e:no-tmux e2e:mux
 
       - name: Upload Playwright test output on failure
         if: failure()
@@ -107,6 +107,7 @@ jobs:
           path: |
             apps/desktop-e2e/test-output/no-tmux
             apps/cli-e2e/test-output/no-tmux
+            apps/cli-e2e/test-output/mux
           if-no-files-found: ignore
           retention-days: 7
 
@@ -152,6 +153,8 @@ jobs:
 
       - run: npx nx e2e:windows desktop-e2e
 
+      - run: npx nx e2e:mux cli-e2e
+
       - name: Remove the second local account
         if: always()
         shell: pwsh
@@ -172,7 +175,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-test-output
-          path: apps/desktop-e2e/test-output/windows
+          path: |
+            apps/desktop-e2e/test-output/windows
+            apps/cli-e2e/test-output/mux
           if-no-files-found: ignore
           retention-days: 7
 

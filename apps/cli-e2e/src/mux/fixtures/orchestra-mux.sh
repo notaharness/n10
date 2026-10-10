@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# The mux arm of Orchestra's Bash backend seam, as the design specifies
+# it (docs/design/windows-support.md, "Orchestra's Bash backend seam"):
+# requests encoded with json_str on stdin, the fixed TSV split on its
+# first 30 tabs, captures sampled as base64. Each step prints one
+# `key=value` line for the test to check.
+#
+# Usage: orchestra-mux.sh CWD AGENT_SCRIPT, with N10 naming the command.
+set -euo pipefail
+
+cwd=$1 agent=$2
+n10() { "$N10_NODE" "$N10_MAIN" "$@"; }
+
+json_str() {
+  local s=$1
+  s=${s//\\/\\\\} s=${s//\"/\\\"} s=${s//$'\t'/\\t} s=${s//$'\n'/\\n}
+  s=${s//$'\r'/\\r}
+  printf '"%s"' "$s"
+}
+
+native_path() {
+  if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"
+  else printf '%s' "$1"; fi
+}
+
+# split_row ROW: ROW_FIELDS[0..29] and ROW_FIELDS[30], the title.
+split_row() {
+  local row=$1 i
+  ROW_FIELDS=()
+  for ((i = 0; i < 30; i++)); do
+    ROW_FIELDS+=("${row%%$'\t'*}")
+    row=${row#*$'\t'}
+  done
+  ROW_FIELDS+=("$row")
+}
+
+IFS=$'\t' read -r _ host_id owner_type _ count caps < <(n10 mux status)
+echo "status=$owner_type,$count,$caps"
+
+wt=$(native_path "$cwd") node=$(native_path "$N10_NODE")
+main=$(native_path "$N10_MAIN") script=$(native_path "$agent")
+request="{\"requestId\":\"spawn-1\",\"expectedHostId\":$(json_str "$host_id"),"
+request+="\"label\":\"player\",\"cwd\":$(json_str "$wt"),"
+request+="\"argv\":[$(json_str "$node"),$(json_str "$script"),$(json_str "$main")],"
+request+="\"envSet\":{\"ORCHESTRA_BACKEND\":\"mux\"},\"cols\":120,\"rows\":30,"
+request+="\"retainOnExit\":true,\"tags\":{\"@orchestra-spawner\":\"orchestra\","
+request+="\"@orchestra-session-type\":\"worktree\",\"@orchestra-worktree-path\":$(json_str "$wt")}}"
+split_row "$(printf '%s' "$request" | n10 mux create --request -)"
+id=${ROW_FIELDS[0]} generation=${ROW_FIELDS[2]}
+echo "created=${ROW_FIELDS[6]},${ROW_FIELDS[14]},${ROW_FIELDS[16]}"
+
+if printf '%s' "$request" | n10 mux create --request - >/dev/null 2>err.txt; then
+  echo "duplicate=created"
+else
+  echo "duplicate=$?,$(cut -f1 err.txt)"
+fi
+
+sample() {
+  local row
+  while IFS= read -r row; do
+    split_row "$row"
+    [ "${ROW_FIELDS[0]}" = "$id" ] || continue
+    printf '%s' "${ROW_FIELDS[29]}" | base64 -d
+  done < <(n10 mux list --capture 0)
+}
+for _ in $(seq 100); do sample | grep -q ready && break; sleep 0.1; done
+echo "self=$(sample | grep -o 'self=[^[:space:]]*')"
+split_row "$(n10 mux inspect "$id")"
+echo "title=${ROW_FIELDS[30]}"
+
+message='hello	tab ünïcode'
+send="{\"requestId\":\"send-1\",\"expectedHostId\":$(json_str "$host_id"),"
+send+="\"generation\":$generation,\"mode\":\"paste\",\"text\":$(json_str "$message"),\"submit\":true}"
+echo "sent=$(printf '%s' "$send" | n10 mux send "$id" --request - | tr '\t' ',')"
+for _ in $(seq 100); do n10 mux capture "$id" | grep -q '^got:' && break; sleep 0.1; done
+echo "echoed=$(n10 mux capture "$id" | grep '^got:')"
+
+claim="{\"expectedHostId\":$(json_str "$host_id"),\"claimTarget\":\"claude:abc\"}"
+split_row "$(printf '%s' "$claim" | n10 mux metadata "$id" --request -)"
+echo "claimed=${ROW_FIELDS[24]}"
+
+exit_line="{\"expectedHostId\":$(json_str "$host_id"),\"generation\":$generation,"
+exit_line+="\"mode\":\"literal\",\"text\":\"exit\",\"submit\":true}"
+printf '%s' "$exit_line" | n10 mux send "$id" --request - >/dev/null
+for _ in $(seq 100); do
+  split_row "$(n10 mux inspect "$id")"
+  [ "${ROW_FIELDS[6]}" = exited ] && break
+  sleep 0.1
+done
+echo "exited=${ROW_FIELDS[6]},${ROW_FIELDS[8]}"
+
+stop="{\"expectedHostId\":$(json_str "$host_id"),\"generation\":$generation}"
+printf '%s' "$stop" | n10 mux stop "$id" --request -
+echo "listed=$(n10 mux list | wc -l | tr -d ' ')"
