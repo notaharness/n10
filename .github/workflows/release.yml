@@ -1,12 +1,14 @@
 name: Release
 
-# A vX.Y.Z tag releases X.Y.Z: it packs and tests the package (package.yml),
-# publishes that tarball to npm through trusted publishing, and creates the
-# GitHub release. A prerelease (vX.Y.Z-beta.N) is a GitHub prerelease and
-# goes under npm's `beta` dist-tag, and `latest` too while LATEST_FOLLOWS_BETA
-# is true; any other version goes under `latest`.
+# A vX.Y.Z tag releases X.Y.Z: it packs and tests the npm package and builds
+# the Linux installers on x64 and arm64, publishes the tarball to npm through
+# trusted publishing, and creates the GitHub release with those installers.
+# A prerelease (vX.Y.Z-beta.N) goes under npm's `beta` dist-tag, and `latest`
+# too while LATEST_FOLLOWS_BETA is true; any other version goes under `latest`.
+# During that beta-only period its GitHub release is latest as well, so the
+# versionless download URLs resolve. Once false, beta releases are prereleases.
 # Run by hand, it rehearses the release of the selected ref's version:
-# everything but the GitHub release, and npm publish with --dry-run.
+# the same builds, with npm publish --dry-run and no GitHub release.
 on:
   push:
     tags: ['v*']
@@ -55,7 +57,7 @@ jobs:
             echo "dist-tag=$dist_tag"
             echo "move-latest=$move_latest"
           } >> "$GITHUB_OUTPUT"
-          echo "$name@$version: dist-tag $dist_tag, moves latest $move_latest, GitHub prerelease $prerelease"
+          echo "$name@$version: dist-tag $dist_tag, moves latest $move_latest"
 
   package:
     needs: version
@@ -63,11 +65,17 @@ jobs:
       contents: read
     uses: ./.github/workflows/package.yml
 
+  linux-packages:
+    needs: version
+    permissions:
+      contents: read
+    uses: ./.github/workflows/linux-packages.yml
+
   # Its own job, so a GitHub release that fails after publishing can be
   # re-run alone.
   publish:
     if: github.event_name == 'push'
-    needs: [version, package]
+    needs: [version, package, linux-packages]
     runs-on: ubuntu-latest
     # Its deployment rule admits only v* tags; npm's trusted publisher names it.
     environment: npm
@@ -122,11 +130,19 @@ jobs:
   # so it cannot check the trusted publisher.
   rehearse:
     if: github.event_name == 'workflow_dispatch'
-    needs: [version, package]
+    needs: [version, package, linux-packages]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       DIST_TAG: ${{ needs.version.outputs.dist-tag }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            apps/desktop/release-assets.json
+            apps/desktop/scripts/prepare-release-assets.sh
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -134,10 +150,16 @@ jobs:
         with:
           name: package
           path: package
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: assets
+          merge-multiple: true
+      - run: bash apps/desktop/scripts/prepare-release-assets.sh apps/desktop/release-assets.json assets
       - run: npm publish --dry-run --tag "$DIST_TAG" ./package/*.tgz
 
-  # Release assets are the artifacts named release-*. The Linux package jobs
-  # (#122) join `needs` and upload their .deb and AppImage under that prefix.
+  # Attach every file release-assets.json names from release-* artifacts,
+  # plus the manifest and per-file checksums for user verification.
   github-release:
     if: github.event_name == 'push'
     needs: [version, publish]
@@ -145,15 +167,32 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            apps/desktop/release-assets.json
+            apps/desktop/scripts/prepare-release-assets.sh
+          sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v4
         with:
           pattern: release-*
           path: assets
           merge-multiple: true
       - run: |
-          mapfile -t assets < <(find assets -type f 2>/dev/null)
+          manifest=apps/desktop/release-assets.json
+          bash apps/desktop/scripts/prepare-release-assets.sh "$manifest" assets
+          assets=("$manifest" assets/SHA256SUMS)
+          for name in $(jq -er '.[][][]' "$manifest"); do
+            assets+=("assets/$name")
+          done
+          if [ "$PRERELEASE" = true ] && [ "$MOVE_LATEST" != true ]; then
+            channel=(--prerelease)
+          else
+            channel=(--latest)
+          fi
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-            --verify-tag --generate-notes --prerelease="$PRERELEASE" "${assets[@]}"
+            --verify-tag --generate-notes "${channel[@]}" "${assets[@]}"
         env:
           GH_TOKEN: ${{ github.token }}
           PRERELEASE: ${{ needs.version.outputs.prerelease }}
+          MOVE_LATEST: ${{ needs.version.outputs.move-latest }}

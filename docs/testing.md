@@ -24,11 +24,12 @@ The `desktop-e2e` targets build Electron before testing. Directly invoking
 To check the Linux installers, build them on an x64 or arm64 Linux host, then
 run the Docker smoke script with that architecture's .deb and AppImage. The
 script apt-installs the .deb in clean Ubuntu 24.04, launches the deb and the
-AppImage in extraction mode under Xvfb, and requires the startup repository,
-renderer, and a shell PTY through the packaged session host. Extraction mode
-exercises the AppImage payload without needing a FUSE device in Docker. The
-script gives tmux a scratch socket under a container HOME and never touches
-the host's tmux server. It also checks the missing-tmux startup message.
+AppImage in extraction and normal modes under Xvfb, and requires the startup
+repository, renderer, and a shell PTY through the packaged session host.
+Normal AppImage launch uses a mapped `/dev/fuse` and Ubuntu's `fuse3`; extraction
+mode also exercises the fallback for machines without FUSE. The script gives
+tmux a scratch socket under a container HOME and never touches the host's tmux
+server. It also checks the missing-tmux startup message.
 
 ```sh
 NX_DAEMON=false npx nx package-linux desktop
@@ -238,6 +239,7 @@ GH_TOKEN=<integration-pat> gh api \
 - **CI** (`.github/workflows/ci.yml`) — runs `nx affected -t lint test build typecheck e2e`. Runs `npx playwright install --with-deps chromium` before `nx affected` (needed for `cli-e2e`). Uploads `apps/cli-e2e/test-output/` as an artifact on failure. Integration tests skipped (no `GH_TOKEN`).
 - **Integration Tests** (`.github/workflows/integration.yml`) — runs `npx nx e2e:integration cli-e2e` with `GH_TOKEN` from the `INTEGRATION_TEST_PAT` secret. Triggers on PRs, pushes to master, and manual dispatch. Uses `concurrency` with `cancel-in-progress: false` because the test repo is shared state.
 - **Package** (`.github/workflows/package.yml`) — packs `@notaharness/n10` and runs `apps/cli/scripts/test-installed.sh` on the tarball in a clean container. Triggers on PRs touching packaging; the Release workflow calls it before publishing.
+- **Linux packages** (`.github/workflows/linux-packages.yml`) — builds the desktop's .deb and AppImage on x64 and arm64 runners, installs the deb in clean Ubuntu and launches both formats under Xvfb. The AppImage runs in extraction mode and normally with FUSE 3. Triggers on PRs touching the installer configuration; the Release workflow calls it.
 - **Release** (`.github/workflows/release.yml`) — publishes on a `v*` tag; see the `publish-beta` skill.
 
 ## Orchestra interoperability

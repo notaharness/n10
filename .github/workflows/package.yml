@@ -44,7 +44,7 @@ jobs:
     needs: pack
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    container: node:24-bookworm
+    container: public.ecr.aws/docker/library/node:24-bookworm
     steps:
       # The test script only: nothing from the workspace is installed.
       - uses: actions/checkout@v4

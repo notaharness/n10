@@ -1,0 +1,69 @@
+name: Linux packages
+
+# Builds the desktop's .deb and AppImage on each architecture's own runner
+# and uploads the files apps/desktop/release-assets.json names as
+# release-linux-<arch>; a name the build did not produce fails the job.
+# release.yml calls this and attaches those artifacts to the release.
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/electron-builder.yml'
+      - 'apps/desktop/package.json'
+      - 'apps/desktop/release-assets.json'
+      - 'apps/desktop/scripts/package-linux.mjs'
+      - 'apps/desktop/scripts/test-linux-packages.sh'
+      - 'apps/desktop/scripts/installer-qa.js'
+      - 'apps/desktop/build/**'
+      - 'package-lock.json'
+      - '.github/workflows/linux-packages.yml'
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: NX_DAEMON=false npx nx package-linux desktop
+
+      - run: |
+          deb=$(jq -er --arg arch "$ARCH" '.linux[$arch].deb' apps/desktop/release-assets.json)
+          app_image=$(jq -er --arg arch "$ARCH" '.linux[$arch].appImage' apps/desktop/release-assets.json)
+          bash apps/desktop/scripts/test-linux-packages.sh \
+            "apps/desktop/dist/installers/$deb" \
+            "apps/desktop/dist/installers/$app_image"
+        env:
+          ARCH: ${{ matrix.arch }}
+
+      - run: |
+          mkdir release
+          names=$(jq -er --arg arch "$ARCH" '.linux[$arch][]' apps/desktop/release-assets.json)
+          while IFS= read -r name; do
+            cp "apps/desktop/dist/installers/$name" release/
+          done <<< "$names"
+        env:
+          ARCH: ${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-${{ matrix.arch }}
+          path: release/
+          if-no-files-found: error

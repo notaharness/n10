@@ -25,9 +25,17 @@ linux:
   synopsis: Coding agents in git worktrees, and reviews of their pull requests
   maintainer: notaharness <notaharness@users.noreply.github.com>
   vendor: notaharness
-  artifactName: ${productName}-${version}-${arch}.${ext}
   syncDesktopName: true
+# Versionless release asset names (docs/decisions.md). Keep
+# release-assets.json in step: the release uploads the files it names.
+appImage:
+  artifactName: n10-desktop-${arch}.AppImage
+# The default FUSE2 runtime needs an unversioned libz.so on arm64. The static
+# runtime avoids that symlink and libfuse2; normal launch still needs FUSE 3.
+toolsets:
+  appimage: '1.0.3'
 deb:
+  artifactName: n10-desktop_${arch}.deb
   # electron-builder's defaults, which setting depends replaces, then
   # the ALSA library Electron links, which minimal systems lack (named
   # first, so apt does not pick an ALSA emulation), and what n10 runs.

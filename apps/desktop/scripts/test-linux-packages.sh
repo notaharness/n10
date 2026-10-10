@@ -17,13 +17,16 @@ case $(uname -m) in
 esac
 
 docker run --rm -i --platform "$platform" \
+  --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined \
   -e N10_QA_STEPS="$qa_steps" \
   -v "$deb:/tmp/n10.deb:ro" \
   -v "$app_image:/tmp/n10.AppImage:ro" \
-  ubuntu:24.04 bash -se <<'CONTAINER'
+  ubuntu.azurecr.io/ubuntu:24.04 bash -se <<'CONTAINER'
 set -euo pipefail
 apt-get update -qq
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/n10.deb xvfb > /tmp/install.log
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/n10.deb xvfb fuse3 > /tmp/install.log
+test -c /dev/fuse
+command -v fusermount3
 tmux -V
 git --version
 git init -q /tmp/qa-repo
@@ -51,7 +54,9 @@ launch() {
 }
 
 launch deb /usr/bin/n10-desktop --no-sandbox --disable-gpu
-APPIMAGE_EXTRACT_AND_RUN=1 launch appimage /tmp/n10.AppImage --disable-gpu
+APPIMAGE_EXTRACT_AND_RUN=1 launch appimage-extract /tmp/n10.AppImage --no-sandbox --disable-gpu
+unset APPIMAGE_EXTRACT_AND_RUN
+launch appimage /tmp/n10.AppImage --no-sandbox --disable-gpu
 
 mv /usr/bin/tmux /usr/bin/tmux.qa-disabled
 unset N10_QA_STEPS

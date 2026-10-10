@@ -12,14 +12,17 @@ Release only when the user asks. n10 is one package, `@notaharness/n10`
 through npm trusted publishing and creates the GitHub release. Nothing is
 published from a local machine; no npm login or token is involved.
 
-| Tag             | npm dist-tag                                     | GitHub release |
-| --------------- | ------------------------------------------------ | -------------- |
-| `v1.0.0-beta.2` | `beta`, and `latest` while `LATEST_FOLLOWS_BETA` | prerelease     |
-| `v1.0.0`        | `latest`                                         | release        |
+| Tag             | npm dist-tag                                     | GitHub release                                               |
+| --------------- | ------------------------------------------------ | ------------------------------------------------------------ |
+| `v1.0.0-beta.2` | `beta`, and `latest` while `LATEST_FOLLOWS_BETA` | latest release while `LATEST_FOLLOWS_BETA`; prerelease after |
+| `v1.0.0`        | `latest`                                         | release                                                      |
 
 Any version with a `-` is a prerelease. `LATEST_FOLLOWS_BETA`, at the top of
 `release.yml`, is `true` while n10 is beta-only, so a plain install gets the
 newest beta. Set it to `false` at 1.0, so `latest` stays on stable releases.
+During the beta-only period, the GitHub release is latest too, so
+`releases/latest/download` serves its installers. When the setting is false,
+beta tags become GitHub prereleases.
 
 1. Choose the version. Compare `apps/cli/package.json` with
    `npm view @notaharness/n10 versions --json`; for a beta, take the next
@@ -42,7 +45,8 @@ newest beta. Set it to `false` at 1.0, so `latest` stays on stable releases.
    The workflow fails before building when the tag does not match
    `apps/cli/package.json`.
 
-4. Watch the run (`gh run watch`), then verify the dist-tag and the release:
+4. Watch the run (`gh run watch`), then verify the dist-tag, release, four
+   Linux assets named in `apps/desktop/release-assets.json`, and `SHA256SUMS`:
 
    ```sh
    npm view @notaharness/n10 dist-tags --json
@@ -50,8 +54,9 @@ newest beta. Set it to `false` at 1.0, so `latest` stays on stable releases.
    ```
 
 To rehearse a release, `gh workflow run release.yml` on `master` runs the
-build, the install test and `npm publish --dry-run`, without the GitHub
-release. It cannot check the trusted publisher, which admits only tags.
+build, installer tests, asset checksum check, and `npm publish --dry-run`,
+without the GitHub release. It cannot check the trusted publisher, which
+admits only tags.
 
 If a job fails, re-run the failed jobs (`gh run rerun <run-id> --failed`).
 When `publish` fails at a trusted-publisher check, nothing was published: fix

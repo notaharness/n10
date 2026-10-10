@@ -1217,11 +1217,24 @@ copies node-pty and the one installed beam platform package from the
 workspace. electron-builder rebuilds node-pty against Electron. Its addon and
 the beam binary stay unpacked from the asar because other processes run
 them. The executable is `n10-desktop`, so a deb never shadows the npm
-package's `n10`. An AppImage's session bin points into its FUSE mount, so
-`n10 util` and `beam` in sessions that outlive it fail until it runs again;
-the deb has fixed paths. Where AppArmor blocks user namespaces (Ubuntu 24.04
-and later) the deb installs a profile, and the AppImage's launcher adds
-`--no-sandbox`.
+package's `n10`. The AppImage's static runtime avoids the legacy libfuse2 and
+unversioned libz.so dependencies, but normal launch requires `/dev/fuse` and
+`fusermount3`. `APPIMAGE_EXTRACT_AND_RUN=1` runs it without FUSE. Its session bin
+points into its temporary runtime directory, so `n10 util` and `beam` in
+sessions that outlive it fail until it runs again; the deb has fixed paths.
+Where AppArmor blocks user namespaces (Ubuntu 24.04 and later), the deb
+installs a profile, and the AppImage's launcher adds `--no-sandbox`.
+
+Release assets have versionless names, listed in
+`apps/desktop/release-assets.json`, so
+`https://github.com/notaharness/n10/releases/latest/download/<name>` always
+serves the current release. The website reads that file at build time for its
+download links, so a rename on `master` breaks them until the next release
+ships the renamed assets; change the names only right before a release. Each
+release also attaches the file and `SHA256SUMS` for those four package files.
+While `LATEST_FOLLOWS_BETA` is true, a beta GitHub release is marked latest,
+so `releases/latest` and npm's `latest` serve the same version. With that
+setting false, beta releases are prereleases and stable releases are latest.
 
 The app tells builds apart by manifest name, not `app.isPackaged`, which is
 false under the npm package too: `n10-dev` is the dev build, and anything else
