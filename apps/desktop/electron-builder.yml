@@ -18,8 +18,8 @@ asarUnpack:
 win:
   target:
     - nsis
-  # electron-builder reads build/icon.ico when present, and uses its default
-  # icon until the desktop icon branch supplies it.
+  # electron-builder uses build/icon.ico for the app and NSIS installer.
+  # An isolated checkout without the asset gets its default icon.
 nsis:
   artifactName: n10-desktop-x64.exe
   oneClick: false
