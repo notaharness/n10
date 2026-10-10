@@ -1,3 +1,4 @@
+import { sessionNameCandidates } from '@n10/terminal';
 import {
   runGuardedTmuxCommands,
   type TmuxSessionIncarnation,
@@ -6,7 +7,6 @@ import type { SessionSpec } from '@n10/terminal';
 import { sanitizeTmuxSessionName } from './sanitize-tmux-session-name.js';
 import {
   isDuplicateSession,
-  sessionNameCandidates,
   setOptionArgv,
   tmuxHasSession,
   tmuxKillSession,

@@ -1,4 +1,5 @@
 import { execFile, execFileSync } from 'node:child_process';
+import { sessionNameCandidates } from '@n10/terminal';
 import { tmuxListSessionsDetailed } from './tmux-state.js';
 
 /**
@@ -205,21 +206,12 @@ export function tmuxAttachArgs(name: string): string[] {
   return ['attach-session', '-t', exactSession(name)];
 }
 
-/** The names a caller tries, in order, for a preferred one: the name
- *  itself, then `name-2`, `name-3`, … A suffix is chosen at creation
- *  only; nothing reconstructs it later, because the name is a label
- *  and whatever identifies the session lives elsewhere. */
-export function* sessionNameCandidates(preferred: string): Generator<string> {
-  yield preferred;
-  for (let n = 2; ; n += 1) yield `${preferred}-${n}`;
-}
-
 /** How many candidates a free-name probe tries before giving up: far
  *  more sessions than one server ever holds, but finite, so a probe
  *  whose `isTaken` never says no cannot spin forever. */
 const MAX_NAME_CANDIDATES = 10_000;
 
-/** The first of {@link sessionNameCandidates} that is not taken —
+/** The first of `sessionNameCandidates` that is not taken —
  *  by default, not held by the server (`has-session`, one fork per
  *  candidate; the preferred name is usually free, so usually one).
  *  `isTaken` lets a caller fold in names it holds itself. */

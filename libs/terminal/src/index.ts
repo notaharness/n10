@@ -12,3 +12,4 @@ export {
   type SessionTarget,
   type TmuxTarget,
 } from './lib/session-target.js';
+export { sessionNameCandidates } from './lib/session-labels.js';

@@ -3,7 +3,6 @@ export { createTmuxBackend, type TmuxLaunchPlan } from './lib/tmux-backend.js';
 export { sanitizeTmuxSessionName } from './lib/sanitize-tmux-session-name.js';
 export {
   isDuplicateSession,
-  sessionNameCandidates,
   tmuxAttachArgs,
   tmuxFreeSessionName,
   tmuxHasSession,

@@ -1,7 +1,11 @@
 import { randomBytes } from 'node:crypto';
-import type { ManagedTarget, SessionSpec, SessionTarget } from '@n10/terminal';
+import {
+  sessionNameCandidates,
+  type ManagedTarget,
+  type SessionSpec,
+  type SessionTarget,
+} from '@n10/terminal';
 import { ManagedPty } from '@n10/terminal-pty';
-import { sessionNameCandidates } from '@n10/terminal-tmux';
 import type {
   CatalogSession,
   ManagedIncarnation,
