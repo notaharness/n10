@@ -1,6 +1,7 @@
 import {
   closeSessionBackend,
   getTmuxAvailability,
+  joinKillOnCloseJob,
   ownSessions,
   probeTmuxAvailability,
 } from '@n10/core';
@@ -35,6 +36,9 @@ export async function serveMux(): Promise<number> {
       'UNSUPPORTED',
       `n10 requires tmux 3.2 or newer. ${tmux?.reason ?? ''}`.trim()
     );
+  // On Windows its sessions end with it however it ends, as the
+  // desktop's session host's do.
+  joinKillOnCloseJob();
   const claim = await ownSessions('headless');
   if (claim.kind === 'existing')
     return refuse(
