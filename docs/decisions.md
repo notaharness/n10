@@ -1487,11 +1487,23 @@ too large), 3 (no owner or session), 4 (authentication or version), 5 (stale
 or conflicting state) or 1. A mutation whose reply the connection lost is
 `OUTCOME_UNKNOWN`; the client never retries it.
 
+TSV has no escaping layer, so a row never carries a field with a tab or line
+break, whichever shell created the record (mux requests refuse them; a
+desktop or TUI checkout path may not). `list` leaves such a record out and
+names it on stderr; a single-record verb fails `UNSUPPORTED` and points at
+`--json`. Only the title, the last column, is made to fit.
+
 Mutations name the owner (`expectedHostId`) and the process generation they
 saw. Restart takes only an exited record, so of two concurrent restarts one
 wins and the other is stale. A checkout (`@orchestra-worktree-path`) belongs
-to one record; create and metadata refuse a second claim. `claimTarget`
-moves `@orchestra-target` from any other record in the same step. A send is
+to one record, compared in its canonical spelling (native realpath when it
+exists); create and metadata refuse a second claim. A session claims an
+`@orchestra-target` only for itself: the client sends the session and
+generation it runs as (its own `N10_MUX_*`, which `n10 mux metadata` adds),
+they must be the record's current ones, and the claim then leaves any other
+record in the same step. That identity is context, not a credential; the
+secret is the boundary, and the check keeps a client from moving someone
+else's claim by mistake. A send is
 one PTY write, input and submission together, bracketed when the program
 asked for bracketed paste and with cursor keys in the mode it set.
 
@@ -1507,7 +1519,10 @@ Every process a managed owner launches gets `N10_MUX_HOST_ID`,
 in `N10_MUX_RUNTIME`, replacing any it inherited along with `TMUX` and
 `TMUX_PANE`. They locate the session; they authorize nothing. `n10 mux self`
 reports the record only while the caller is still that owner's current
-process, and `N10_MUX_RUNTIME` finds the owner even where HOME is redirected.
+process. Clients follow `N10_MUX_RUNTIME` to their owner even where HOME is
+redirected; owners never do (`ownerRuntime`), so an owner started from inside
+a session, or with the variable set by hand, still binds and publishes its
+secret only in the user's own profile.
 `launchKind` is `agent` only when the executable is one the agent registry
 launches directly; anything else, including an agent started from a shell, is
 `unknown`.
@@ -1515,14 +1530,17 @@ launches directly; anything else, including an agent started from a shell, is
 `n10 mux serve` is the same owner in the foreground, under the same backend
 selection: where tmux is installed it refuses, since sessions live in tmux
 there; a second serve reports the running owner's host and exits 5 without
-touching it. It ends on SIGINT, SIGTERM or SIGHUP (a closed Windows console),
-and on Windows joins its own kill-on-close job first, so a terminated serve
-still takes its sessions.
+touching it. An endpoint it cannot bind (a socket path past the platform's
+limit) is reported as `UNSUPPORTED`, exit 1. It announces readiness only once
+its signal handlers are in place, and ends on SIGINT, SIGTERM or SIGHUP (a
+closed Windows console). On Windows it joins its own kill-on-close job first,
+so a terminated serve still takes its sessions.
 
 `apps/cli-e2e/src/mux/` holds the separate-process contract (`e2e:mux`, its own
 Playwright config, no browser), run by CI's `no-tmux` and `windows` jobs. Its
 Bash fixture (`orchestra-mux.sh`) is the Orchestra mux arm the design
-specifies: `json_str` requests on stdin, rows split on their first 30 tabs,
+specifies: requests on stdin through Orchestra's own `json_str` (copied
+verbatim, its source commit noted), rows split on their first 30 tabs,
 samples decoded from base64, native paths through `cygpath` on Windows. It
 stands in for the pinned plugins suite until the plugins' mux seam exists to
 pin.
