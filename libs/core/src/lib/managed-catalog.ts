@@ -43,6 +43,11 @@ export interface NewRecord {
 /** Tag changes: a `null` value removes the tag. */
 export type TagChanges = Record<string, string | null>;
 
+/** What changed in the catalog: a record filed or changed, or gone. */
+export type CatalogChange =
+  | { type: 'upsert'; record: ManagedRecord }
+  | { type: 'removed'; sessionId: string };
+
 type ExistingPlan = Exclude<SessionLaunchPlan, { mode: 'create' }>;
 
 const MAX_LABEL_CANDIDATES = 10_000;
@@ -67,6 +72,7 @@ function withTags(
 export class ManagedCatalog implements SessionCatalog {
   readonly hostId: string;
   private readonly records = new Map<string, ManagedRecord>();
+  private readonly watchers = new Set<(change: CatalogChange) => void>();
 
   /** `runtimeDir` is where this owner serves mux clients, which its
    *  sessions are told so they can reach it. */
@@ -120,6 +126,16 @@ export class ManagedCatalog implements SessionCatalog {
     return this.records.get(sessionId);
   }
 
+  /** Hear of every change after this call; returns the unsubscribe. */
+  watch(listener: (change: CatalogChange) => void): () => void {
+    this.watchers.add(listener);
+    return () => this.watchers.delete(listener);
+  }
+
+  private changed(change: CatalogChange): void {
+    for (const listener of [...this.watchers]) listener(change);
+  }
+
   /** File and start a new session. */
   create(spec: SessionSpec, filed: NewRecord): ManagedRecord {
     const label = this.freeLabel(filed.label, filed.excludedNames ?? []);
@@ -151,6 +167,7 @@ export class ManagedCatalog implements SessionCatalog {
       screen,
     };
     this.records.set(sessionId, record);
+    this.changed({ type: 'upsert', record });
     return record;
   }
 
@@ -173,10 +190,12 @@ export class ManagedCatalog implements SessionCatalog {
     );
     if (record.pty.running) record.pty.replace(next);
     else record.pty.launch(next);
+    this.changed({ type: 'upsert', record });
   }
 
   retag(record: ManagedRecord, changes: TagChanges): void {
     record.tags = withTags(record.tags, changes);
+    this.changed({ type: 'upsert', record });
   }
 
   /** Stop every session: the owner is closing. */
@@ -221,7 +240,9 @@ export class ManagedCatalog implements SessionCatalog {
   /** A process ended: a session that does not retain its exit goes. */
   private ended(sessionId: string, pty: ManagedPty): void {
     const record = this.records.get(sessionId);
-    if (record?.pty === pty && !record.retainOnExit) pty.stop();
+    if (record?.pty !== pty) return;
+    if (record.retainOnExit) this.changed({ type: 'upsert', record });
+    else pty.stop();
   }
 
   private forget(sessionId: string, pty: ManagedPty): void {
@@ -229,6 +250,7 @@ export class ManagedCatalog implements SessionCatalog {
     if (record?.pty !== pty) return;
     this.records.delete(sessionId);
     record.screen.dispose();
+    this.changed({ type: 'removed', sessionId });
   }
 
   private freeLabel(preferred: string, excluded: readonly string[]): string {

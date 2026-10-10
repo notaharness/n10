@@ -8,6 +8,9 @@ export interface LaunchRequest {
   cwd: string;
   /** Empty: the user's login shell. */
   argv: string[];
+  /** The complete environment to start from, in place of the owner's:
+   *  a frontend launching for itself sends its own. */
+  env?: Record<string, string>;
   envSet: Record<string, string>;
   envUnset: string[];
   cols: number;
@@ -20,11 +23,17 @@ export interface CreateRequest extends LaunchRequest {
   requestId?: string;
   expectedHostId?: string;
   label: string;
+  /** Labels the new session must not take. */
+  excludedNames?: string[];
 }
 
 export interface RestartRequest extends LaunchRequest {
   expectedHostId: string;
   generation: number;
+  /** Tags to remove as it relaunches. */
+  untag: string[];
+  /** Identity tags the caller read, which must still hold. */
+  expectedTags?: Record<string, string>;
 }
 
 export interface MetadataRequest {
@@ -140,9 +149,11 @@ function boolean(value: unknown, name: string): boolean {
 }
 
 function launch(params: Params): LaunchRequest {
+  const env = optional(params, 'env', environment);
   return {
     cwd: field(params['cwd'], 'cwd'),
     argv: strings(params['argv'] ?? [], 'argv'),
+    ...(env === undefined ? {} : { env }),
     envSet: environment(params['envSet'] ?? {}, 'envSet'),
     envUnset: strings(params['envUnset'] ?? [], 'envUnset'),
     cols: dimension(params['cols'] ?? 80, 'cols'),
@@ -157,19 +168,39 @@ export function createRequest(params: Params): CreateRequest {
   if (!label) throw invalid('label must not be empty');
   const requestId = optional(params, 'requestId', field);
   const expectedHostId = optional(params, 'expectedHostId', field);
+  const excludedNames = optional(params, 'excludedNames', strings);
   return {
     ...launch(params),
     label,
     ...(requestId === undefined ? {} : { requestId }),
     ...(expectedHostId === undefined ? {} : { expectedHostId }),
+    ...(excludedNames === undefined ? {} : { excludedNames }),
   };
 }
 
 export function restartRequest(params: Params): RestartRequest {
+  const expectedTags = optional(params, 'expectedTags', tags);
   return {
     ...launch(params),
     expectedHostId: field(params['expectedHostId'], 'expectedHostId'),
     generation: integer(params['generation'], 'generation'),
+    untag: strings(params['untag'] ?? [], 'untag'),
+    ...(expectedTags === undefined ? {} : { expectedTags }),
+  };
+}
+
+/** Frontend typing: raw input for whatever runs now. */
+export function inputRequest(params: Params): { data: string } {
+  const data = text(params['data'], 'data');
+  if (Buffer.byteLength(data) > LIMITS.messageBytes)
+    throw invalid(`data exceeds ${LIMITS.messageBytes} bytes`);
+  return { data };
+}
+
+export function resizeRequest(params: Params): { cols: number; rows: number } {
+  return {
+    cols: dimension(params['cols'], 'cols'),
+    rows: dimension(params['rows'], 'rows'),
   };
 }
 
