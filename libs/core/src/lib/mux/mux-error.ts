@@ -39,5 +39,5 @@ export class MuxError extends Error {
 }
 
 export function isMuxErrorCode(code: unknown): code is MuxErrorCode {
-  return typeof code === 'string' && code in MUX_EXIT_STATUS;
+  return typeof code === 'string' && Object.hasOwn(MUX_EXIT_STATUS, code);
 }
