@@ -1231,10 +1231,23 @@ Release assets have versionless names, listed in
 serves the current release. The website reads that file at build time for its
 download links, so a rename on `master` breaks them until the next release
 ships the renamed assets; change the names only right before a release. Each
-release also attaches the file and `SHA256SUMS` for those four package files.
+release also attaches the file and `SHA256SUMS` for every installer and update
+file named in the manifest.
 While `LATEST_FOLLOWS_BETA` is true, a beta GitHub release is marked latest,
 so `releases/latest` and npm's `latest` serve the same version. With that
 setting false, beta releases are prereleases and stable releases are latest.
+
+The macOS DMG and ZIP each carry the same desktop build, plus Electron,
+node-pty rebuilt for that Electron and Mac architecture, and Beam's matching
+binary. The DMG is the manual install format; the ZIP is the updater payload.
+electron-builder's blockmaps and a `latest-mac.yml` combining both native
+builds ship beside them.
+Without all five Apple signing/notarization secrets, electron-builder uses
+an ad-hoc signature (needed to launch on arm64) and disables hardened runtime
+and notarization. These downloads trigger Gatekeeper's unidentified developer
+or unverified software warning; the README explains the override. Auto-update
+requires Developer ID signing. The builder uses `build/icon.icns` when #347's
+icon assets are present, and its default icon while they are absent.
 
 The app tells builds apart by manifest name, not `app.isPackaged`, which is
 false under the npm package too: `n10-dev` is the dev build, and anything else

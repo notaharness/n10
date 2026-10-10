@@ -17,6 +17,20 @@ npmRebuild: true
 asarUnpack:
   - node_modules/node-pty/**
   - node_modules/@notaharness/beam-*/**
+mac:
+  # The app icon comes from the desktop icon assets. The ZIP is required by
+  # the macOS auto-updater.
+  icon: build/icon.icns
+  target:
+    - dmg
+    - zip
+  artifactName: n10-desktop-${arch}.${ext}
+  # Beta tags are GitHub's latest release during the beta-only period.
+  detectUpdateChannel: false
+  publish:
+    provider: github
+    owner: notaharness
+    repo: n10
 linux:
   target:
     - deb

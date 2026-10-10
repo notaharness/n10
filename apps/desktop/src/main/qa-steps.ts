@@ -8,6 +8,7 @@ interface QaStep {
   js?: string;
   waitMs?: number;
   shot?: string;
+  contentSize?: [number, number];
 }
 
 export async function runQaSteps(win: BrowserWindow): Promise<void> {
@@ -34,6 +35,7 @@ export async function runQaSteps(win: BrowserWindow): Promise<void> {
   for (const step of steps) {
     i += 1;
     try {
+      if (step.contentSize) win.setContentSize(...step.contentSize);
       if (step.js) {
         const r: unknown = await win.webContents.executeJavaScript(
           step.js,

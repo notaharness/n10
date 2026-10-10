@@ -1,8 +1,8 @@
 name: Release
 
 # A vX.Y.Z tag releases X.Y.Z: it packs and tests the npm package and builds
-# the Linux installers on x64 and arm64, publishes the tarball to npm through
-# trusted publishing, and creates the GitHub release with those installers.
+# the Linux and macOS installers on x64 and arm64, publishes the tarball to
+# npm through trusted publishing, and creates the GitHub release with them.
 # A prerelease (vX.Y.Z-beta.N) goes under npm's `beta` dist-tag, and `latest`
 # too while LATEST_FOLLOWS_BETA is true; any other version goes under `latest`.
 # During that beta-only period its GitHub release is latest as well, so the
@@ -71,11 +71,18 @@ jobs:
       contents: read
     uses: ./.github/workflows/linux-packages.yml
 
+  macos-packages:
+    needs: version
+    permissions:
+      contents: read
+    uses: ./.github/workflows/macos-packages.yml
+    secrets: inherit
+
   # Its own job, so a GitHub release that fails after publishing can be
   # re-run alone.
   publish:
     if: github.event_name == 'push'
-    needs: [version, package, linux-packages]
+    needs: [version, package, linux-packages, macos-packages]
     runs-on: ubuntu-latest
     # Its deployment rule admits only v* tags; npm's trusted publisher names it.
     environment: npm
@@ -130,7 +137,7 @@ jobs:
   # so it cannot check the trusted publisher.
   rehearse:
     if: github.event_name == 'workflow_dispatch'
-    needs: [version, package, linux-packages]
+    needs: [version, package, linux-packages, macos-packages]
     runs-on: ubuntu-latest
     permissions:
       contents: read
