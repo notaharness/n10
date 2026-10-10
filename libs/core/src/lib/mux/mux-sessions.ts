@@ -47,9 +47,11 @@ export class MuxSessions {
     'session.stop': (params) => this.stop(params),
   };
 
+  /** `batchBytes` bounds one listing; tests lower it. */
   constructor(
     private readonly catalog: ManagedCatalog,
-    private readonly ownerType: OwnerType
+    private readonly ownerType: OwnerType,
+    private readonly batchBytes: number = LIMITS.batchBytes
   ) {}
 
   call(
@@ -85,8 +87,11 @@ export class MuxSessions {
           : boundedCapture(record, await record.screen.capture(history));
       const item = summary(record, captured);
       bytes += Buffer.byteLength(JSON.stringify(item));
-      if (bytes > LIMITS.batchBytes)
-        throw new MuxError('OUTPUT_LIMIT', 'The listing exceeds 16 MiB');
+      if (bytes > this.batchBytes)
+        throw new MuxError(
+          'OUTPUT_LIMIT',
+          `The listing exceeds ${this.batchBytes} bytes`
+        );
       listed.push(item);
     }
     for (const item of listed) part(item);

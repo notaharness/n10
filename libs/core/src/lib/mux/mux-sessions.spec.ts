@@ -9,6 +9,8 @@ import { muxRequest } from './mux-client.js';
 import { muxRuntime } from './mux-endpoint.js';
 import { connectMux } from './mux-ipc.js';
 import { FrameReader, type MuxSummary } from './mux-protocol.js';
+import { MuxSessions } from './mux-sessions.js';
+import { ManagedCatalog } from '../managed-catalog.js';
 
 /**
  * The one-shot verbs against a real owner, over its real endpoint in a
@@ -18,9 +20,12 @@ import { FrameReader, type MuxSummary } from './mux-protocol.js';
 let home: string;
 let hostId: string;
 const savedHome = process.env['HOME'];
+const savedLocal = process.env['LOCALAPPDATA'];
 beforeEach(async () => {
   home = mkdtempSync(join(tmpdir(), 'n10-mux-'));
   process.env['HOME'] = home;
+  // Windows' endpoint is derived from here: one pipe per test.
+  process.env['LOCALAPPDATA'] = home;
   const owner = await ownSessions('headless');
   hostId = owner.hostId;
 });
@@ -28,6 +33,8 @@ afterEach(() => {
   closeSessionBackend();
   selectLocalCatalog(tmuxCatalog);
   process.env['HOME'] = savedHome;
+  if (savedLocal === undefined) delete process.env['LOCALAPPDATA'];
+  else process.env['LOCALAPPDATA'] = savedLocal;
   rmSync(home, { recursive: true, force: true });
 });
 
@@ -52,11 +59,14 @@ async function until<T>(read: () => Promise<T>, done: (value: T) => boolean) {
   }
 }
 
+/** A Node program, so every case runs on Windows as well. */
+const node = (script: string) => [process.execPath, '-e', script];
+
 const create = (params: Record<string, unknown>) =>
   call('session.create', {
     label: 'player',
     cwd: home,
-    argv: ['/bin/sh', '-c', 'echo ready; exec sleep 30'],
+    argv: node("console.log('ready'); setInterval(() => {}, 1000)"),
     ...params,
   }) as Promise<MuxSummary>;
 
@@ -73,7 +83,7 @@ const ECHO_INPUT = [
    process.stdin.on('data', (d) => process.stdout.write('<' + d.toString('hex') + '>\\n'));`,
 ];
 
-describe.skipIf(process.platform === 'win32')('one-shot mux verbs', () => {
+describe('one-shot mux verbs', () => {
   it('reports the owner', async () => {
     expect(await call('host.status')).toEqual({
       protocolVersion: 1,
@@ -194,13 +204,13 @@ describe.skipIf(process.platform === 'win32')('one-shot mux verbs', () => {
       expectedHostId: hostId,
       generation: 1,
       cwd: home,
-      argv: ['/bin/sh', '-c', 'exit 4'],
+      argv: node('process.exit(4)'),
       retainOnExit: true,
     };
     expect(await rejected('session.restart', restart)).toBe('RUNNING');
     const exited = await create({
       label: 'done',
-      argv: ['/bin/sh', '-c', 'exit 3'],
+      argv: node('process.exit(3)'),
       retainOnExit: true,
     });
     const { sessionId } = exited;
@@ -260,6 +270,78 @@ describe.skipIf(process.platform === 'win32')('one-shot mux verbs', () => {
         generation: 1,
       })
     ).toBe('IDENTITY_MISMATCH');
+  });
+});
+
+describe('bounds', () => {
+  it('refuses a tag value over 4 KiB', async () => {
+    const tags = (bytes: number) => ({
+      '@orchestra-branch': 'x'.repeat(bytes),
+    });
+    expect(
+      await rejected('session.create', {
+        label: 'p',
+        cwd: home,
+        tags: tags(4097),
+      })
+    ).toBe('INVALID_REQUEST');
+    expect(await create({ tags: tags(4096) })).toMatchObject({
+      processState: 'running',
+    });
+  });
+
+  it('captures the newest whole lines within 512 KiB, and says it cut', async () => {
+    const line = (n: number) =>
+      `L${String(n).padStart(4, '0')} ${'x'.repeat(490)}`;
+    const { sessionId } = await create({
+      cols: 500,
+      rows: 50,
+      argv: node(
+        `for (let n = 1; n <= 1500; n++) console.log('L' + String(n).padStart(4, '0') + ' ' + 'x'.repeat(490)); console.log('done'); setInterval(() => {}, 1000)`
+      ),
+    });
+    await until(
+      () => screen(sessionId),
+      (s) => s.text.includes('done')
+    );
+    const captured = (await call('session.capture', {
+      sessionId,
+      history: 10_000,
+    })) as { text: string; truncated: boolean };
+    expect(captured.truncated).toBe(true);
+    expect(Buffer.byteLength(captured.text)).toBeLessThanOrEqual(512 * 1024);
+    const lines = captured.text.trimEnd().split('\n');
+    expect(lines.at(-1)).toBe('done');
+    expect(
+      lines
+        .slice(0, -1)
+        .every((text, i, all) => text === line(1500 - all.length + 1 + i))
+    ).toBe(true);
+  });
+
+  it('fails a listing over its bound whole, not short', async () => {
+    const catalog = new ManagedCatalog('bounded');
+    try {
+      for (const label of ['a', 'b', 'c'])
+        catalog.create(
+          {
+            cmd: process.execPath,
+            args: ['-e', 'setInterval(() => {}, 1000)'],
+            cwd: home,
+            cols: 80,
+            rows: 24,
+          },
+          { label, tags: { '@orchestra-branch': 'x'.repeat(1000) } }
+        );
+      const parts: unknown[] = [];
+      const sessions = new MuxSessions(catalog, 'headless', 2_500);
+      await expect(
+        sessions.call('session.list', {}, (part) => parts.push(part))
+      ).rejects.toMatchObject({ code: 'OUTPUT_LIMIT' });
+      expect(parts).toEqual([]);
+    } finally {
+      catalog.close();
+    }
   });
 });
 
