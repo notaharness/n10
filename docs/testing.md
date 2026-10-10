@@ -21,6 +21,25 @@ appearing exactly once.
 The `desktop-e2e` targets build Electron before testing. Directly invoking
 `run-e2e.mjs` or `run-visual.mjs` does not; run `npx nx build desktop` first.
 
+To check the Linux installers, build them on an x64 or arm64 Linux host, then
+run the Docker smoke script with that architecture's .deb and AppImage. The
+script apt-installs the .deb in clean Ubuntu 24.04, launches the deb and the
+AppImage in extraction mode under Xvfb, and requires the startup repository,
+renderer, and a shell PTY through the packaged session host. Extraction mode
+exercises the AppImage payload without needing a FUSE device in Docker. The
+script gives tmux a scratch socket under a container HOME and never touches
+the host's tmux server. It also checks the missing-tmux startup message.
+
+```sh
+NX_DAEMON=false npx nx package-linux desktop
+bash apps/desktop/scripts/test-linux-packages.sh \
+  apps/desktop/dist/installers/*amd64.deb \
+  apps/desktop/dist/installers/*x86_64.AppImage
+```
+
+On arm64, use `*arm64.deb` and `*arm64.AppImage` instead. Pass exactly one file
+of each format; clear stale installer output if a glob matches more than one.
+
 `src/fixtures/desktop.ts` creates a repo and isolated HOME, seeds optional Git
 states, supplies a scriptable fake agent and fails on renderer exceptions.
 Every test uses a private tmux socket inside its fixture HOME and kills only

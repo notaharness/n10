@@ -155,6 +155,8 @@ port.on('message', ({ data }: { data: MainToHost }) => {
 // ── Startup ──────────────────────────────────────────────────────
 
 async function start(): Promise<void> {
+  const startDir = process.env.N10_START_DIR;
+  delete process.env.N10_START_DIR;
   const userData = process.env.N10_USER_DATA;
   if (userData) installSessionBin(userData);
   installHostPushes({
@@ -175,10 +177,10 @@ async function start(): Promise<void> {
     callMain('holdMenuShortcuts', viewer, held)
   );
   installMachineResolver();
-  beam.start();
   await probeTmuxAvailability();
   applySessionBackend();
-  const opened = openStartupRepo();
+  beam.start();
+  const opened = openStartupRepo({ N10_START_DIR: startDir });
   post({ t: 'ready', repo: opened ? opened.cwd : null });
 }
 

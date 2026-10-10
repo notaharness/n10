@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { hostEnv, restoreNodeOptions } from './host-env.js';
 
 describe('the host environment', () => {
+  it('passes the startup repo only to the host', () => {
+    expect(hostEnv({}, '/data', '/repo').N10_START_DIR).toBe('/repo');
+  });
   it('loads N10_HOST_REQUIRE into the host, and gives its children none of it', () => {
     const env = hostEnv(
       {

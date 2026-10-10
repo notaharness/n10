@@ -43,6 +43,7 @@ export const HOST_UNAVAILABLE = {
 type Shell = Omit<ShellCalls, 'spawnDaemon' | 'stopDaemon' | 'killDaemon'>;
 
 export interface HostProcessOptions {
+  startDir?: string;
   shell: Shell;
   pushes: HostPushes;
   /** A host was forked again and is ready. */
@@ -203,7 +204,7 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
       {
         serviceName: 'n10 host',
         stdio: 'inherit',
-        env: hostEnv(process.env, app.getPath('userData')),
+        env: hostEnv(process.env, app.getPath('userData'), options.startDir),
       }
     );
     child = host;

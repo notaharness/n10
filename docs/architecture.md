@@ -41,6 +41,8 @@ apps/desktop/                    — Electron GUI shell, shipped inside `@notaha
   src/main/beam/                 — Client of the beam daemon's control socket: machines, remote exec/pty, ceremonies, mail relay, and the daemon the app starts
   src/preload/preload.ts         — Typed contextBridge → window.n10
   src/host/menu-template.ts      — Pure native app menu template, used by main and the web demo
+  build/                         — Optional desktop icon resources, discovered by electron-builder
+  electron-builder.yml           — The Linux installers, built by scripts/package-linux.mjs (`package-linux` target)
   src/host/contract.ts           — Single source of truth for the bridge API + IPC channel names (incl. MenuCommand, ContextMenuItem, DesktopPrefs)
   src/host/services/             — Host adapters (engine snapshots/commands, IPC events, scrollback, desktop preferences)
   src/renderer/                  — Vite + React 19 + Tailwind v4 web app (no Node access)
