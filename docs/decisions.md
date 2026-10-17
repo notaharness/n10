@@ -965,13 +965,17 @@ utility runs where no provider is configured, so the diff is the checkout's
 own: from where HEAD left `--base` (`origin/<base>`, else the local branch) to
 HEAD, three lines of context, renames detected (core `agent-comment-diff.ts`).
 The review prompt writes `--base` from the pull request's target. The finding
-records that HEAD as `head`; it is not checked against the provider's head.
+records that HEAD as `head`, and a post refuses a line or file finding whose
+`head` is not the head it files on: its lines belong to that commit.
 Findings on the pull request are filed as the review's summary, joined under
 one attribution: core's submission files a summary with the review, while a
-conversation comment is posted on its own. A summary already published that
-does not say this post's findings belonged to an earlier post, so the post
-starts a new one. The diff's comment navigation skips them; the walkthrough
-shows them.
+conversation comment is posted on its own. The summary is one draft, so which
+findings it holds is read from the findings (`agent-post-plan.ts`): one still
+carrying a publication went out in the summary last sent. While that summary's
+outcome is unknown, only those are sent, and it goes again as it was; a new
+finding waits for the next post. Once it is published, they are marked posted
+and a new summary carries the rest. The diff's comment navigation skips them;
+the desktop walkthrough and the TUI's PR comments pane show and post them.
 
 Agent publication uses core’s draft submission machinery in the separate
 `~/.n10/agent-review-publications` store, keyed by provider repository, PR and

@@ -384,10 +384,92 @@ it('recovers findings on the pull request from a summary already posted with the
     lineEnd: null,
   });
   await f.service.post({ prId: 7, headSha: head });
+  // As a post leaves it when it stops after the summary is filed and
+  // before the finding is marked.
   changeAgentComments('/repo/.git', 7, (comments) =>
-    comments.map((item) => ({ ...item, status: 'draft' as const }))
+    comments.map((item) => ({
+      ...item,
+      status: 'posting' as const,
+      publication: {
+        provider: 'github',
+        host: 'github.com',
+        repository: 'owner/app',
+        viewer: 'alice',
+      },
+    }))
   );
   expect(await f.service.post({ prId: 7, headSha: head })).toBe(1);
   expect(f.publish).toHaveBeenCalledOnce();
   expect(f.service.read(7)[0].status).toBe('posted');
+  expect(f.service.read(7)[0].publication).toBeUndefined();
+});
+
+const onPullRequest = (id: string, body: string): ReviewComment => ({
+  ...comment,
+  id,
+  body,
+  file: null,
+  lineStart: null,
+  lineEnd: null,
+});
+
+it('resends an unanswered summary as it was, and holds a new finding for the next post', async () => {
+  const f = setup();
+  f.service.remove(7, 'one');
+  appendAgentComment('/repo/.git', 7, onPullRequest('pr-1', 'First.'));
+  f.publish.mockImplementationOnce(async (_submission, ledger) => {
+    ledger.write({ ...freshLedger(head), inFlight: 'review' });
+    throw new Error('Lost response');
+  });
+  await expect(f.service.post({ prId: 7, headSha: head })).rejects.toThrow(
+    'Lost response'
+  );
+  appendAgentComment('/repo/.git', 7, onPullRequest('pr-2', 'Second.'));
+
+  // Only the new finding chosen: nothing can go until the first is known.
+  await expect(
+    f.service.post({ prId: 7, ids: ['pr-2'], headSha: head })
+  ).rejects.toThrow('may already be posted');
+
+  expect(await f.service.post({ prId: 7, headSha: head })).toBe(1);
+  const resent = f.publish.mock.calls[1][0];
+  expect(resent.body).toContain('First.');
+  expect(resent.body).not.toContain('Second.');
+  expect(f.service.read(7).map((item) => item.status)).toEqual([
+    'posted',
+    'draft',
+  ]);
+
+  expect(await f.service.post({ prId: 7, headSha: head })).toBe(1);
+  const next = f.publish.mock.calls[2][0];
+  expect(next.body).toContain('Second.');
+  expect(next.body).not.toContain('First.');
+  expect(f.service.read(7)[1].status).toBe('posted');
+});
+
+it('sends a new finding that says what an earlier summary said', async () => {
+  const f = setup();
+  f.service.remove(7, 'one');
+  appendAgentComment('/repo/.git', 7, onPullRequest('pr-1', 'Same words.'));
+  await f.service.post({ prId: 7, headSha: head });
+  appendAgentComment('/repo/.git', 7, onPullRequest('pr-2', 'Same words.'));
+  expect(await f.service.post({ prId: 7, headSha: head })).toBe(1);
+  expect(f.publish).toHaveBeenCalledTimes(2);
+  expect(f.publish.mock.calls[1][0].body).toContain('Same words.');
+});
+
+it('refuses findings on code written on another commit than the head', async () => {
+  const f = setup();
+  changeAgentComments('/repo/.git', 7, (comments) =>
+    comments.map((item) => ({ ...item, head: 'b'.repeat(40) }))
+  );
+  await expect(f.service.post({ prId: 7, headSha: head })).rejects.toThrow(
+    "A comment was written on another commit than the pull request's head (aaaaaaa). Discard it or run the review again."
+  );
+  expect(f.publish).not.toHaveBeenCalled();
+  expect(f.service.read(7)[0].status).toBe('draft');
+  changeAgentComments('/repo/.git', 7, (comments) =>
+    comments.map((item) => ({ ...item, head }))
+  );
+  expect(await f.service.post({ prId: 7, headSha: head })).toBe(1);
 });

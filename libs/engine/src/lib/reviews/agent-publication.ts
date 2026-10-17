@@ -8,58 +8,23 @@ import {
   saveReviewDraft,
   submitReview,
 } from '@n10/core';
-import {
-  isOid,
-  sameRepository,
-  REVIEW_EVENTS,
-  type ReviewEvent,
-} from '@n10/vcs-core';
-import {
-  readComments,
-  resolveComment,
-  type ReviewComment,
-} from '@n10/review-comments';
+import { isOid, sameRepository } from '@n10/vcs-core';
+import { readComments, type ReviewComment } from '@n10/review-comments';
 import { agentDraftId, agentDrafts, type AgentDraft } from './agent-drafts.js';
+import {
+  assertWrittenAt,
+  planPost,
+  postable,
+  validatePostRequest,
+  type PostAgentCommentsRequest,
+} from './agent-post-plan.js';
 import {
   createReviewContext,
   requirePullRequestNumber,
   type ReviewContextOptions,
 } from './review-context.js';
 
-export interface PostAgentCommentsRequest {
-  prId: number;
-  ids?: string[];
-  headSha?: string;
-  event?: ReviewEvent;
-}
-
-function validatePostRequest(req: PostAgentCommentsRequest): void {
-  if (req.event !== undefined && !REVIEW_EVENTS.includes(req.event))
-    throw new TypeError('Invalid review event');
-  if (
-    req.ids !== undefined &&
-    (!Array.isArray(req.ids) || !req.ids.every((id) => typeof id === 'string'))
-  )
-    throw new TypeError('Invalid draft ids');
-}
-
-function postable(
-  comments: ReviewComment[],
-  req: PostAgentCommentsRequest
-): ReviewComment[] {
-  const chosen = comments.filter(
-    (comment) =>
-      comment.status !== 'posted' && (!req.ids || req.ids.includes(comment.id))
-  );
-  if (
-    chosen.some(
-      (comment) =>
-        !resolveComment(comment.body, comment.severity).header.subject
-    )
-  )
-    throw new Error('Cannot post a comment with an empty body');
-  return chosen;
-}
+export type { PostAgentCommentsRequest } from './agent-post-plan.js';
 
 function patchComment(
   repo: string,
@@ -156,13 +121,9 @@ export function createAgentPublication(
       (stored) => stored.id === draft.id
     );
     const state = existing?.publication.state;
-    // A published summary holds these findings only if it says them;
-    // otherwise it was an earlier post's, and this one starts anew.
-    if (
-      state === 'published' &&
-      (draft.target.kind !== 'summary' || existing?.body === draft.body)
-    )
-      return null;
+    // A published summary was an earlier post's: `planPost` settled the
+    // findings it held, and this one starts a new summary.
+    if (state === 'published' && draft.target.kind !== 'summary') return null;
     if (state !== 'publishing' && state !== 'unknown') {
       saveReviewDraft(
         { ref, viewer, target: draft.target, body: draft.body },
@@ -202,22 +163,17 @@ export function createAgentPublication(
     req: PostAgentCommentsRequest,
     captured: ReturnType<typeof publicationContext>
   ) {
-    let marked: ReviewComment[] = [];
+    const summary = listReviewDrafts(
+      { ref: captured.ref, viewer: captured.viewer },
+      sources
+    ).drafts.find((draft) => draft.id === 'summary')?.publication.state;
+    const publication = { ...captured.ref, viewer: captured.viewer };
+    let plan: ReturnType<typeof planPost> | undefined;
     changeAgentComments(repo, req.prId, (stored) => {
-      const ids = new Set(postable(stored, req).map((comment) => comment.id));
-      const next = stored.map((comment) =>
-        ids.has(comment.id)
-          ? {
-              ...comment,
-              status: 'posting' as const,
-              publication: { ...captured.ref, viewer: captured.viewer },
-            }
-          : comment
-      );
-      marked = next.filter((comment) => ids.has(comment.id));
-      return next;
+      plan = planPost(stored, req, publication, summary);
+      return plan.next;
     });
-    return marked;
+    return plan!;
   }
   async function post(req: PostAgentCommentsRequest) {
     identity(req.prId);
@@ -235,8 +191,21 @@ export function createAgentPublication(
     const preview = postable(readComments(repo, req.prId), req);
     if (!preview.length) return 0;
     const captured = publicationContext(req);
+    assertWrittenAt(preview, captured.head);
     for (const comment of preview) assertPublicationScope(req.prId, comment);
-    const comments = markPosting(repo, req, captured);
+    const {
+      sending: comments,
+      settled,
+      waiting,
+    } = markPosting(repo, req, captured);
+    if (!comments.length) {
+      changed(req.prId);
+      if (waiting && !settled)
+        throw new Error(
+          'A comment on the pull request may already be posted. Post it again first'
+        );
+      return settled;
+    }
     const reconcile = () =>
       comments.reduce(
         (posted, comment) =>
@@ -277,7 +246,7 @@ export function createAgentPublication(
         throw new Error(
           'The provider did not confirm all comments were posted'
         );
-      return posted;
+      return posted + settled;
     } catch (error) {
       const posted = reconcile();
       const reason = error instanceof Error ? error.message : String(error);
