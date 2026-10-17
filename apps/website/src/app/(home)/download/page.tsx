@@ -96,13 +96,25 @@ export default function DownloadPage() {
                   For Debian and Ubuntu. Includes Git and tmux dependencies.
                 </Package>
                 <Package format="appImage" title="AppImage">
-                  Requires FUSE 3. Without FUSE, run with{' '}
+                  Requires FUSE 3 (<code>sudo apt install fuse3</code> on
+                  Ubuntu). Without FUSE, prefix the run command with{' '}
                   <code>APPIMAGE_EXTRACT_AND_RUN=1</code>. Keep the app open to
                   use <code>n10 util</code> and <code>beam</code> in its
                   sessions. On Ubuntu 24.04+, it runs without Electron’s
                   sandbox.
                 </Package>
               </div>
+              <p className="text-fd-muted-foreground mt-6 text-sm text-pretty">
+                Save{' '}
+                <a href={releaseAssetUrl('SHA256SUMS')} className={link}>
+                  SHA256SUMS
+                </a>{' '}
+                beside the package to verify the download:
+              </p>
+              <CommandLines
+                lines={['sha256sum -c SHA256SUMS --ignore-missing']}
+                className="mt-3"
+              />
             </PlatformCard>
 
             <PlatformCard os="mac">
