@@ -34,10 +34,19 @@ function archFromUserAgent(userAgent: string): Arch | undefined {
  * CPU, so its client hints decide where they exist.
  */
 export async function detectPlatform(): Promise<Platform> {
+  // iPadOS can request a desktop user agent indistinguishable from macOS.
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent)) return {};
+  if (/mac/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+    return {};
   const uaData = (navigator as { userAgentData?: UserAgentData }).userAgentData;
   const os = osFrom(uaData?.platform || navigator.userAgent);
-  if (os !== 'linux') return { os };
-  if (!uaData) return { os, arch: archFromUserAgent(navigator.userAgent) };
+  if (!os) return {};
+  if (!uaData) {
+    // Safari reports Intel even on Apple Silicon. Do not guess a Mac's CPU.
+    return os === 'linux'
+      ? { os, arch: archFromUserAgent(navigator.userAgent) }
+      : { os };
+  }
   const { architecture, bitness } = await uaData
     .getHighEntropyValues(['architecture', 'bitness'])
     .catch(() => ({ architecture: undefined, bitness: undefined }));

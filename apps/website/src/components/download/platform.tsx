@@ -6,7 +6,7 @@ import { CommandLines } from '@/components/command-lines';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { detectPlatform, type Platform } from '@/lib/platform';
-import { linuxAsset, type Arch } from '@/lib/release-assets';
+import { linuxAsset, macAsset, type Arch } from '@/lib/release-assets';
 
 type Format = 'deb' | 'appImage';
 
@@ -53,16 +53,20 @@ export function PlatformCard({
   );
 }
 
-export function LinuxDownload({
+export function PackageDownload({
   arch,
   format,
 }: {
   arch: Arch;
-  format: Format;
+  format: Format | 'dmg';
 }) {
   const platform = use(PlatformContext);
-  const { name, url } = linuxAsset(arch, format);
-  const mine = platform.os === 'linux' && platform.arch === arch;
+  const { name, url } =
+    format === 'dmg' ? macAsset(arch) : linuxAsset(arch, format);
+  const os = format === 'dmg' ? 'mac' : 'linux';
+  const label =
+    format === 'dmg' ? (arch === 'arm64' ? 'Apple Silicon' : 'Intel') : arch;
+  const mine = platform.os === os && platform.arch === arch;
   return (
     <a
       href={url}
@@ -72,7 +76,7 @@ export function LinuxDownload({
       )}
     >
       <Download className="size-4 shrink-0" aria-hidden />
-      <span>{arch}</span>
+      <span>{label}</span>
       <span className="truncate font-mono text-xs opacity-70">{name}</span>
       {mine && <span className="sr-only">(this computer)</span>}
     </a>

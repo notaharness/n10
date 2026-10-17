@@ -4,17 +4,17 @@ import type { ReactNode } from 'react';
 import { CommandLines } from '@/components/command-lines';
 import {
   InstallCommands,
-  LinuxDownload,
+  PackageDownload,
   PlatformCard,
   PlatformProvider,
 } from '@/components/download/platform';
 import { Footer } from '@/components/landing/footer';
-import { archs, RELEASES_URL } from '@/lib/release-assets';
+import { archs, RELEASES_URL, releaseAssetUrl } from '@/lib/release-assets';
 
 export const metadata: Metadata = {
   title: 'Download',
   description:
-    'Install n10 Desktop and the terminal UI from npm on Linux and macOS, or n10 Desktop as a .deb or AppImage for Linux on x64 and arm64.',
+    'Install n10 from npm, or download n10 Desktop for Linux and macOS.',
 };
 
 const link =
@@ -46,7 +46,7 @@ function Package({
       </p>
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         {archs.map((arch) => (
-          <LinuxDownload key={arch} arch={arch} format={format} />
+          <PackageDownload key={arch} arch={arch} format={format} />
         ))}
       </div>
       <InstallCommands format={format} />
@@ -60,11 +60,11 @@ export default function DownloadPage() {
       <div className="mx-auto w-full max-w-3xl px-4 pt-16 pb-24 sm:pt-20">
         <h1 className="text-4xl font-semibold tracking-tight">Download</h1>
         <p className="text-fd-muted-foreground mt-4 text-lg text-pretty">
-          n10 runs on Linux and macOS, and needs Git and tmux 3.2 or newer.{' '}
+          For Linux and macOS. Requires Git and tmux 3.2 or newer.{' '}
           <Link href="/docs/installation#prerequisites" className={link}>
-            Prerequisites
-          </Link>{' '}
-          lists the rest.
+            All prerequisites
+          </Link>
+          .
         </p>
 
         <PlatformProvider>
@@ -72,8 +72,8 @@ export default function DownloadPage() {
             <section className="border-fd-border bg-fd-card rounded-2xl border px-5 py-6 sm:px-8 sm:py-8">
               <Heading title="npm" note="Linux and macOS" />
               <p className="text-fd-muted-foreground mt-2 text-sm text-pretty">
-                One package holds n10 Desktop and the terminal UI. It needs
-                Node.js 20 or newer.
+                n10 Desktop and the terminal UI. Requires Node.js 22.12 or
+                newer.
               </p>
               <CommandLines
                 lines={['npm install -g @notaharness/n10']}
@@ -88,47 +88,57 @@ export default function DownloadPage() {
             <PlatformCard os="linux">
               <Heading title="Linux packages" note="x64 and arm64" />
               <p className="text-fd-muted-foreground mt-2 text-sm text-pretty">
-                n10 Desktop without Node.js, installed as{' '}
-                <code>n10-desktop</code>. The terminal UI and the{' '}
-                <code>n10</code> command in your own shell still come from npm.
+                n10 Desktop without Node.js. For the terminal UI and the{' '}
+                <code>n10</code> shell command, use npm.
               </p>
               <div className="mt-6 flex flex-col gap-6">
                 <Package format="deb" title=".deb">
-                  Debian, Ubuntu and their derivatives. apt installs tmux and
-                  Git with it.
+                  For Debian and Ubuntu. Includes Git and tmux dependencies.
                 </Package>
                 <Package format="appImage" title="AppImage">
-                  Any distribution with libfuse2 (
-                  <code>sudo apt install libfuse2t64</code> on Ubuntu 24.04).
-                  Where AppArmor blocks Electron&apos;s sandbox, as on Ubuntu
-                  24.04 and later, it starts with <code>--no-sandbox</code> by
-                  itself. Sessions that outlive it can&apos;t run{' '}
-                  <code>n10 util</code> or <code>beam</code> until it runs
-                  again; the .deb has no such gap.
+                  Requires FUSE 3. Without FUSE, run with{' '}
+                  <code>APPIMAGE_EXTRACT_AND_RUN=1</code>. Keep the app open to
+                  use <code>n10 util</code> and <code>beam</code> in its
+                  sessions. On Ubuntu 24.04+, it runs without Electron’s
+                  sandbox.
                 </Package>
               </div>
             </PlatformCard>
 
             <PlatformCard os="mac">
-              <Heading title="macOS" />
+              <Heading title="macOS" note=".dmg" />
               <p className="text-fd-muted-foreground mt-2 text-sm text-pretty">
-                npm only for now. A signed .dmg is planned in{' '}
-                <a
-                  href="https://github.com/notaharness/n10/issues/122"
-                  className={link}
-                >
-                  #122
-                </a>
-                .
+                Open the .dmg and drag <code>n10-desktop.app</code> to
+                Applications.
+              </p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {(['arm64', 'x64'] as const).map((arch) => (
+                  <PackageDownload key={arch} arch={arch} format="dmg" />
+                ))}
+              </div>
+              <p className="text-fd-muted-foreground mt-4 text-sm text-pretty">
+                Install Git and tmux first:
+              </p>
+              <CommandLines
+                lines={['brew install git tmux']}
+                className="mt-4"
+              />
+              <p className="text-fd-muted-foreground mt-4 text-sm text-pretty">
+                The app is not notarized. If macOS blocks a release you trust,
+                open it once, then choose System Settings → Privacy &amp;
+                Security → Open Anyway.
               </p>
             </PlatformCard>
           </div>
         </PlatformProvider>
 
         <p className="text-fd-muted-foreground mt-8 text-sm">
-          Older versions and release notes:{' '}
+          <a href={releaseAssetUrl('SHA256SUMS')} className={link}>
+            Checksums
+          </a>{' '}
+          ·{' '}
           <a href={RELEASES_URL} className={link}>
-            every release on GitHub
+            Release notes and older versions
           </a>
           .
         </p>

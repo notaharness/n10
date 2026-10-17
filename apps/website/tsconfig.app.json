@@ -6,6 +6,8 @@
   // `next dev`/`next build`/`next typegen`. Overriding eight options
   // would be less honest than not extending; the strictness flags the
   // base cares about are restated one-for-one below instead.
+  // Only release-assets.json crosses this boundary; no desktop TS build is needed.
+  "nx": { "sync": { "ignoredDependencies": ["desktop"] } },
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],

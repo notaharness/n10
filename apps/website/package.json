@@ -219,6 +219,15 @@
         "outputs": [
           "{projectRoot}/public/desktop-demo"
         ]
+      },
+      "test": {
+        "executor": "nx:run-commands",
+        "cache": true,
+        "options": {
+          "command": "node --experimental-strip-types --test scripts/platform.test.mjs",
+          "cwd": "apps/website"
+        },
+        "dependsOn": []
       }
     }
   },
