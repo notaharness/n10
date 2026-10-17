@@ -1,6 +1,6 @@
 import type { ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { protectNpmTransaction } from './npm-update-signals.js';
 
 function tty(isTTY = true) {
@@ -12,13 +12,19 @@ function tty(isTTY = true) {
   });
 }
 
+type Tty = ReturnType<typeof tty>;
+
 function npm() {
   return Object.assign(new EventEmitter(), { kill: vi.fn() });
 }
 
-function setup(isTTY = true) {
+function setup(
+  isTTY = true,
+  configure: (input: Tty) => void = () => undefined
+) {
   const host = new EventEmitter();
   const input = tty(isTTY);
+  configure(input);
   const onCancel = vi.fn();
   const signals = protectNpmTransaction(
     onCancel,
@@ -31,6 +37,10 @@ function setup(isTTY = true) {
 
 const watch = (s: ReturnType<typeof setup>) =>
   s.signals.watch(s.child as unknown as ChildProcess);
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('npm transaction signals', () => {
   it('turns the first Ctrl-C into one SIGINT for npm and ignores the rest', () => {
@@ -101,5 +111,50 @@ describe('npm transaction signals', () => {
     expect(s.onCancel).not.toHaveBeenCalled();
     s.signals.dispose();
     expect(s.input.setRawMode).not.toHaveBeenCalled();
+  });
+
+  it('still cancels npm when the cancel callback throws', () => {
+    const error = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    const s = setup();
+    s.onCancel.mockImplementation(() => {
+      throw new Error('stdout closed');
+    });
+    watch(s);
+    expect(() => s.input.emit('data', '\x03')).not.toThrow();
+    expect(s.child.kill).toHaveBeenCalledWith('SIGINT');
+    expect(error).toHaveBeenCalledWith('n10:', 'stdout closed');
+  });
+
+  it('stays cooked, absorbs SIGINT and cleans up when raw mode is refused', () => {
+    const s = setup(true, (input) =>
+      input.setRawMode.mockImplementation(() => {
+        throw new Error('setRawMode EINVAL');
+      })
+    );
+    watch(s);
+    expect(s.input.listenerCount('data')).toBe(0);
+    s.host.emit('SIGINT');
+    expect(s.child.kill).not.toHaveBeenCalled();
+    s.signals.dispose();
+    expect(s.input.setRawMode).toHaveBeenCalledTimes(1);
+    for (const signal of ['SIGINT', 'SIGHUP', 'SIGTERM'])
+      expect(s.host.listenerCount(signal)).toBe(0);
+  });
+
+  it('absorbs stdin read errors while raw and stops listening on dispose', () => {
+    const s = setup();
+    expect(() => s.input.emit('error', new Error('read EIO'))).not.toThrow();
+    s.signals.dispose();
+    expect(s.input.listenerCount('error')).toBe(0);
+  });
+
+  it('ignores Ctrl-C when npm could not start', () => {
+    const s = setup();
+    watch(s);
+    s.child.emit('error', new Error('spawn npm ENOENT'));
+    s.input.emit('data', '\x03');
+    expect(s.onCancel).not.toHaveBeenCalled();
   });
 });

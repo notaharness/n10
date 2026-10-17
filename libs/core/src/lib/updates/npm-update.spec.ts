@@ -33,6 +33,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   vi.unstubAllEnvs();
+  vi.restoreAllMocks();
   await fixture.close();
   rmSync(fixture.home, { recursive: true, force: true });
 });

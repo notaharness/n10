@@ -4,6 +4,18 @@ type Host = Pick<NodeJS.Process, 'on' | 'off'>;
 type Input = Pick<NodeJS.ReadStream, 'isTTY' | 'on' | 'off' | 'pause'> &
   Partial<Pick<NodeJS.ReadStream, 'setRawMode' | 'resume'>>;
 
+/** Raw mode when stdin is a tty that accepts it; otherwise stay cooked. */
+function holdRawMode(input: Input): boolean {
+  if (input.isTTY !== true || typeof input.setRawMode !== 'function')
+    return false;
+  try {
+    input.setRawMode(true);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** npm shares the foreground group. Keep its parent (possibly the session
  * leader) alive through npm rollback, result persistence and lock release.
  * On a tty, n10 reads Ctrl-C itself: the first asks npm to cancel and later
@@ -17,14 +29,22 @@ export function protectNpmTransaction(
   let child: Pick<ChildProcess, 'kill'> | undefined;
   let cancelled = false;
   let settled = false;
-  const raw = input.isTTY === true && typeof input.setRawMode === 'function';
+  const raw = holdRawMode(input);
   const absorb = () => undefined;
   const terminate = () => child?.kill('SIGTERM');
   const cancel = () => {
     if (cancelled || settled) return;
     cancelled = true;
     child?.kill('SIGINT');
-    onCancel();
+    try {
+      onCancel();
+    } catch (error) {
+      // Throwing here would end n10 mid-rollback and orphan npm.
+      console.error(
+        'n10:',
+        error instanceof Error ? error.message : String(error)
+      );
+    }
   };
   const read = (chunk: Buffer | string) => {
     if (String(chunk).includes('\x03')) cancel();
@@ -35,14 +55,17 @@ export function protectNpmTransaction(
   host.on('SIGHUP', absorb);
   host.on('SIGTERM', terminate);
   if (raw) {
-    input.setRawMode?.(true);
+    // A hung-up tty reports EIO on read; npm still gets the hangup itself.
+    input.on('error', absorb);
     input.on('data', read);
     input.resume?.();
   }
   return {
     watch(value: ChildProcess) {
       child = value;
-      value.once('close', () => (settled = true));
+      const settle = () => (settled = true);
+      value.once('close', settle);
+      value.once('error', settle);
       if (cancelled) value.kill('SIGINT');
     },
     dispose() {
@@ -51,6 +74,7 @@ export function protectNpmTransaction(
       host.off('SIGTERM', terminate);
       if (!raw) return;
       input.off('data', read);
+      input.off('error', absorb);
       input.pause();
       try {
         input.setRawMode?.(false);
