@@ -13,7 +13,10 @@ import {
   type DragEndEvent,
   type Over,
 } from '@dnd-kit/core';
-import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
+import {
+  restrictToHorizontalAxis,
+  restrictToParentElement,
+} from '@dnd-kit/modifiers';
 import {
   horizontalListSortingStrategy,
   rectSortingStrategy,
@@ -122,7 +125,16 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
     <DndContext
       sensors={sensors}
       collisionDetection={collisionsEndingAt(ids.at(-1))}
-      modifiers={wrap ? [] : [restrictToHorizontalAxis]}
+      // The dragged tab stays inside the strip. Carried past its end, it
+      // would widen the nearest scrolling box (the strip, scrolled; the
+      // editor column, wrapped), which auto-scroll then scrolls after
+      // the pointer, carrying the tab further: the box grows for as long
+      // as the pointer stays there.
+      modifiers={
+        wrap
+          ? [restrictToParentElement]
+          : [restrictToHorizontalAxis, restrictToParentElement]
+      }
       accessibility={{ announcements, screenReaderInstructions }}
       onDragEnd={onDragEnd}
     >

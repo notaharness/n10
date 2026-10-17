@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test as base, expect, type N10Session } from './fixtures/n10.js';
 import { npmUpdateFixture } from '@n10/core/testing/npm-update';
+import { wtermHost } from './setup/constants.js';
 import {
   addExternalWorktree,
   listTaggedSessions,
@@ -14,6 +15,16 @@ function live(n10: N10Session, text: RegExp) {
   return n10.term.root
     .locator('.term-row:not(.term-scrollback-row)')
     .filter({ hasText: text });
+}
+
+/** The tty's `^C` echoes since npm started. npm's spinner clears its line on
+ * the next frame, so the echo only survives in the PTY byte stream. */
+async function interruptEchoes(baseURL: string | undefined) {
+  const res = await fetch(`${wtermHost(baseURL)}/output`);
+  const { base64 } = (await res.json()) as { base64: string };
+  const raw = Buffer.from(base64, 'base64').toString('latin1');
+  const start = raw.lastIndexOf('Updating n10 to');
+  return start < 0 ? 0 : raw.slice(start).split('^C').length - 1;
 }
 
 const test = base.extend<{ npm: Awaited<ReturnType<typeof npmUpdateFixture>> }>(
@@ -132,6 +143,7 @@ test('Npm restart: failed npm install reopens with a recovery message and can re
 test('Npm restart: Ctrl-C during download rolls back, releases the lock and reopens n10', async ({
   n10,
   npm,
+  baseURL,
 }, info) => {
   await expect(live(n10, /Update available/)).toBeVisible();
   await n10.term.type('s');
@@ -145,7 +157,7 @@ test('Npm restart: Ctrl-C during download rolls back, releases the lock and reop
     path: info.outputPath('restart-interrupt-pending.png'),
   });
   await n10.term.write('\x03');
-  await expect(live(n10, /\^C/)).toBeVisible();
+  await expect.poll(() => interruptEchoes(baseURL)).toBe(1);
   npm.releaseDownload();
   await expect
     .poll(() => {
@@ -175,6 +187,7 @@ test('Npm restart: Ctrl-C during download rolls back, releases the lock and reop
 test('Npm restart: double Ctrl-C leaves the pinned recovery command last when npm removes the entry', async ({
   n10,
   npm,
+  baseURL,
 }, info) => {
   await expect(live(n10, /Update available/)).toBeVisible();
   await n10.term.type('s');
@@ -188,7 +201,7 @@ test('Npm restart: double Ctrl-C leaves the pinned recovery command last when np
     path: info.outputPath('restart-double-interrupt-pending.png'),
   });
   await n10.term.write('\x03');
-  await expect(live(n10, /\^C/)).toBeVisible();
+  await expect.poll(() => interruptEchoes(baseURL)).toBe(1);
   await n10.term.write('\x03');
   const command = 'Run npm i -g @notaharness/n10@1.0.0-beta.2, then n10 --tui.';
   await expect
