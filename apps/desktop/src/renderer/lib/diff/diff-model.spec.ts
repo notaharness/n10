@@ -6,6 +6,7 @@ import {
   buildUnifiedRows,
   defaultCollapseReason,
   expandIndices,
+  draftPlace,
   orderDraftsForReview,
   severityCounts,
   snippetAround,
@@ -173,6 +174,33 @@ describe('orderDraftsForReview', () => {
       'crit-b',
       'nit',
     ]);
+  });
+
+  it('puts the pull request first and a whole file before its lines', () => {
+    const order = new Map([['a.ts', 0]]);
+    const drafts = [
+      draft({ id: 'line', lineStart: 1 }),
+      { ...draft({ id: 'file' }), lineStart: null, lineEnd: null },
+      { ...draft({ id: 'pr' }), file: null, lineStart: null, lineEnd: null },
+    ];
+    expect(orderDraftsForReview(drafts, order).map((d) => d.id)).toEqual([
+      'pr',
+      'file',
+      'line',
+    ]);
+  });
+});
+
+describe('draftPlace', () => {
+  it('names the lines, the file or the pull request', () => {
+    expect(draftPlace(draft({ lineStart: 3, lineEnd: 5 }))).toBe('a.ts:3-5');
+    expect(draftPlace(draft({ lineStart: 3 }))).toBe('a.ts:3');
+    expect(draftPlace({ ...draft({}), lineStart: null, lineEnd: null })).toBe(
+      'a.ts'
+    );
+    expect(
+      draftPlace({ ...draft({}), file: null, lineStart: null, lineEnd: null })
+    ).toBe('Pull request');
   });
 });
 

@@ -1,5 +1,5 @@
 import { openTerminal } from './terminals/xterm.js';
-import { resolveTheme } from './theme.js';
+import { getResolvedTheme } from './theme.js';
 
 /**
  * Estimate a terminal's column/row grid from its pane in pixels. Char
@@ -62,7 +62,7 @@ export function paneTerminalGrid(paneEl: HTMLElement): Grid | null {
   const host = document.createElement('div');
   host.style.height = '100%';
   probe.appendChild(host);
-  const xterm = openTerminal(host, resolveTheme());
+  const xterm = openTerminal(host, getResolvedTheme());
   try {
     return xterm.fit.proposeDimensions() ?? estimateTerminalGrid(box);
   } finally {

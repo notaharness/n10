@@ -8,8 +8,7 @@ import {
 import { mkdtempSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import {
   cleanupTestRepo,
   createTestRepo,
@@ -17,9 +16,21 @@ import {
 } from '../setup/git-repo.js';
 import { killFixtureSessions } from '../setup/tmux.js';
 import { appEnv } from './app-env.js';
-import { fakeAdoLoaded, fakeAdoMisses } from '../setup/fake-ado.js';
+import { fakeAdoMisses } from '../setup/fake-ado.js';
+import {
+  networkGuardBase,
+  takeNetworkRefusals,
+} from '../setup/network-guard.js';
+import {
+  WORKSPACE_ROOT,
+  forgetPreloads,
+  launchArgs,
+  missingPreloads,
+  requirePreloads,
+} from './launch.js';
 import { closeDesktopApp } from '../setup/app-close.js';
 import { launchAgain } from '../setup/launch-again.js';
+import { readyWindow } from './ready-window.js';
 import type { TerminalSeed } from '../setup/terminals.js';
 import {
   fakeAgent,
@@ -28,11 +39,6 @@ import {
   type HomeSeed,
   type LiveSessionSeed,
 } from './seed-home.js';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-/** apps/desktop — Electron resolves `main` from its package.json. */
-const APP_DIR = resolve(HERE, '..', '..', '..', 'desktop');
-const WORKSPACE_ROOT = resolve(APP_DIR, '..', '..');
 
 export { fakeAgent };
 
@@ -111,8 +117,13 @@ export interface DesktopApp {
   launchAgain: (startDir: string) => Promise<void>;
   /** Quit the app and start it again on the same HOME, tmux socket and
    *  environment, as a user closing and reopening n10 would. `app`,
-   *  `page` and `main` then answer for the new process. */
-  relaunch(): Promise<void>;
+   *  `page` and `main` then answer for the new process. `startPath`
+   *  opens another repository path, such as a relocated or symlinked
+   *  copy of the test repo. Fails if the old process did not exit. */
+  relaunch(startPath?: string): Promise<void>;
+  /** Quit the app and fail unless the process exited, for a test that
+   *  changes the repository while n10 is not running. */
+  stop(): Promise<void>;
 }
 
 export const test = base.extend<
@@ -194,34 +205,67 @@ export const test = base.extend<
     });
 
     seedTmux(repoPath, homeDir, liveSessions, liveTerminals);
+    // A real token is the @integration suite reaching GitHub on purpose.
+    const networkGuard = githubToken ? undefined : networkGuardBase(homeDir);
 
-    const launchEnv = appEnv({
-      homeDir,
-      repoPath,
-      startWithoutRepo,
-      githubToken,
-      ghEnv,
-      extra: env,
-    });
-    let app = await electron.launch({
-      args: launchArgs(webgl),
-      cwd: WORKSPACE_ROOT,
-      env: launchEnv,
-      timeout: 60_000,
-    });
+    const envFor = (startPath: string) =>
+      appEnv({
+        homeDir,
+        repoPath: startPath,
+        startWithoutRepo,
+        githubToken,
+        ghEnv,
+        networkGuard,
+        extra: env,
+      });
+    const wanted = {
+      ado: fakeAzureDevOps !== undefined,
+      guard: networkGuard !== undefined,
+    };
+    const launch = async (startPath: string): Promise<ElectronApplication> => {
+      // A relaunch proves its own preloads, not the first launch's.
+      forgetPreloads(homeDir);
+      return electron.launch({
+        args: launchArgs(wanted.guard, webgl),
+        cwd: WORKSPACE_ROOT,
+        env: envFor(startPath),
+        timeout: 60_000,
+      });
+    };
+    let app = await launch(repoPath);
 
     const page = await app.firstWindow();
-    if (fakeAzureDevOps) {
-      await requireFakeAdo(
-        app,
-        homeDir,
-        () => ownsRepo && cleanupTestRepo(repoPath)
-      );
-    }
+    await requirePreloads(
+      app,
+      missingPreloads(homeDir, wanted),
+      () => ownsRepo && cleanupTestRepo(repoPath)
+    );
 
     const pageErrors: string[] = [];
     const consoleErrors: string[] = [];
     await readyWindow(app, page, startWithoutRepo, pageErrors, consoleErrors);
+
+    // Bounded, and never the reason a test fails: see setup/app-close.ts.
+    // A test that stopped the app itself leaves nothing for teardown.
+    let stopped = false;
+    async function close() {
+      if (stopped) return { exited: true, note: null };
+      const result = await closeDesktopApp(app);
+      stopped = true;
+      if (result.note) {
+        console.warn(`[desktop-e2e] ${result.note}`);
+        await testInfo.attach('desktop-close', {
+          body: result.note,
+          contentType: 'text/plain',
+        });
+      }
+      return result;
+    }
+    async function stop(): Promise<void> {
+      const result = await close();
+      if (!result.exited)
+        throw new Error(result.note ?? 'Electron did not exit');
+    }
 
     const desktop: DesktopApp = {
       app,
@@ -232,19 +276,18 @@ export const test = base.extend<
       main: app.evaluate.bind(app),
       launchAgain: (startDir) =>
         launchAgain({
-          args: launchArgs(webgl),
+          args: launchArgs(wanted.guard, webgl),
           cwd: WORKSPACE_ROOT,
-          env: { ...launchEnv, N10_START_DIR: startDir },
+          env: { ...envFor(repoPath), N10_START_DIR: startDir },
         }),
-      async relaunch() {
-        await closeDesktopApp(app);
-        app = await electron.launch({
-          args: launchArgs(webgl),
-          cwd: WORKSPACE_ROOT,
-          env: launchEnv,
-          timeout: 60_000,
-        });
+      stop,
+      async relaunch(startPath = repoPath) {
+        await stop();
+        app = await launch(startPath);
+        stopped = false;
         const next = await app.firstWindow();
+        // The test's teardown cleans up after it.
+        await requirePreloads(app, missingPreloads(homeDir, wanted));
         await readyWindow(
           app,
           next,
@@ -260,6 +303,7 @@ export const test = base.extend<
       },
     };
     let used = false;
+    let refusals: string[] = [];
     try {
       await provide(desktop);
       used = true;
@@ -270,100 +314,41 @@ export const test = base.extend<
           contentType: 'text/plain',
         });
       }
-      // Bounded, and never the reason a test fails: see setup/app-close.ts.
-      const closeNote = await closeDesktopApp(app);
-      if (closeNote) {
-        console.warn(`[desktop-e2e] ${closeNote}`);
-        await testInfo.attach('desktop-close', {
-          body: closeNote,
+      await close();
+      if (ownsRepo) cleanupTestRepo(repoPath);
+      // Attached whether or not the test got far enough to fail on
+      // them: a refused request is often why it failed.
+      if (networkGuard) refusals = takeNetworkRefusals(homeDir);
+      if (refusals.length) {
+        await testInfo.attach('network-refusals', {
+          body: refusals.join('\n'),
           contentType: 'text/plain',
         });
       }
-      if (ownsRepo) cleanupTestRepo(repoPath);
     }
 
     // Only when the test itself got that far, so a real assertion
     // failure keeps priority.
     if (used) {
-      afterEffects(pageErrors, fakeAzureDevOps ? fakeAdoMisses(homeDir) : []);
+      afterEffects(
+        pageErrors,
+        fakeAzureDevOps ? fakeAdoMisses(homeDir) : [],
+        refusals
+      );
     }
   },
 });
 
-/**
- * Make a launched window ready for a test. Chromium throttles
- * requestAnimationFrame in a window it considers hidden or occluded, and
- * under xvfb (or behind another window on a developer's desktop) that is
- * the normal state. Playwright's actionability check waits for two
- * consecutive stable animation frames before it will click, so a
- * throttled window makes every click hang until the timeout even though
- * the page is perfectly idle. Show, focus and un-throttle before any
- * test touches it, and collect what the renderer reports as errors.
- */
-async function readyWindow(
-  app: ElectronApplication,
-  page: Page,
-  startWithoutRepo: boolean | undefined,
-  pageErrors: string[],
-  consoleErrors: string[]
-): Promise<void> {
-  await app.evaluate(({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows()[0];
-    if (!win) return;
-    win.webContents.setBackgroundThrottling(false);
-    win.show();
-    win.focus();
-  });
-  page.on('pageerror', (err) =>
-    pageErrors.push(err.stack || err.message || String(err))
-  );
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') consoleErrors.push(msg.text());
-  });
-  await page.waitForLoadState('domcontentloaded');
-  if (startWithoutRepo) return;
-  // The workspace has rendered (not the repo picker, not a blank
-  // window) once the sidebar's actions exist.
-  await page
-    .getByRole('button', { name: 'New worktree', exact: true })
-    .first()
-    .waitFor({ state: 'visible', timeout: 30_000 });
-}
-
-/** Electron's arguments. */
-function launchArgs(webgl?: boolean): string[] {
-  return [
-    APP_DIR,
-    // CI runners have no user namespaces for the sandbox, and
-    // software rendering is both available and deterministic.
-    '--no-sandbox',
-    '--disable-gpu',
-    '--ozone-platform=x11',
-    // WebGL with no GPU, which Chromium allows only when asked.
-    ...(webgl ? ['--enable-unsafe-swiftshader'] : []),
-  ];
-}
-
-/** Stop unless the Azure DevOps fake is in the session host. The
- *  preload writes the token, so without it the app has no credentials
- *  and has asked Azure nothing; it is stopped all the same. */
-async function requireFakeAdo(
-  app: ElectronApplication,
-  homeDir: string,
-  cleanup: () => void
-): Promise<void> {
-  if (fakeAdoLoaded(homeDir)) return;
-  await closeDesktopApp(app);
-  cleanup();
-  throw new Error('The Azure DevOps fake did not load');
-}
-
 /** What a test that passed must not have left behind. An uncaught
  *  renderer exception blanks a pane behind the ErrorBoundary, which a
  *  passing assertion elsewhere would happily ignore; a request the
- *  Azure DevOps fake does not model was answered 404, a failure the
- *  test did not ask for. */
-function afterEffects(pageErrors: string[], misses: string[]): void {
+ *  Azure DevOps fake does not model was answered 404, and one off this
+ *  machine was refused — failures the test did not ask for. */
+function afterEffects(
+  pageErrors: string[],
+  misses: string[],
+  refusals: string[]
+): void {
   if (pageErrors.length > 0) {
     throw new Error(
       `Renderer threw during the test:\n${pageErrors.join('\n---\n')}`
@@ -372,6 +357,13 @@ function afterEffects(pageErrors: string[], misses: string[]): void {
   if (misses.length > 0) {
     throw new Error(
       `The app made requests the Azure DevOps fake does not model:\n${misses.join(
+        '\n'
+      )}`
+    );
+  }
+  if (refusals.length > 0) {
+    throw new Error(
+      `The app reached off this machine, past the fakes:\n${refusals.join(
         '\n'
       )}`
     );

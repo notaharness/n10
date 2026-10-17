@@ -8,6 +8,7 @@ import {
 import { sidebarRow } from './setup/app.js';
 import {
   fakeGhScenarioPath,
+  twoDaysAgoAt,
   type FakeGitHub,
   type FakeThread,
 } from './setup/fake-gh.js';
@@ -32,7 +33,7 @@ const LOCKED: FakeThread = {
     {
       author: 'dan',
       body: 'question (non-blocking): Locked: see the design doc.',
-      createdAt: '2026-09-20T12:30:00Z',
+      createdAt: twoDaysAgoAt(12, 30),
     },
   ],
 };

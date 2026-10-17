@@ -53,16 +53,14 @@ function buildHighlightSet(
   if (!selectedCommentId) return highlighted;
 
   const comment = comments.find((c) => c.id === selectedCommentId);
-  if (!comment) return highlighted;
+  if (!comment || comment.lineStart == null || comment.lineEnd == null)
+    return highlighted;
+  const { lineStart, lineEnd } = comment;
 
   for (let i = 0; i < diffLines.length; i++) {
     const dl = diffLines[i];
     const lineNum = comment.side === 'LEFT' ? dl.oldLine : dl.newLine;
-    if (
-      lineNum != null &&
-      lineNum >= comment.lineStart &&
-      lineNum <= comment.lineEnd
-    ) {
+    if (lineNum != null && lineNum >= lineStart && lineNum <= lineEnd) {
       highlighted.add(i);
     }
   }
@@ -138,7 +136,10 @@ function appendOutOfDiffLocals(
 
   builder.beginSection('comments on lines not in diff');
   for (const comment of comments) {
-    builder.label(lineLabel(comment.lineStart, comment.lineEnd));
+    // A comment on the whole file or the pull request has no line.
+    if (comment.lineStart != null && comment.lineEnd != null) {
+      builder.label(lineLabel(comment.lineStart, comment.lineEnd));
+    }
     builder.localThread(comment);
   }
 }
@@ -279,7 +280,8 @@ export function getCommentPositions(
   const commentLineStartDiffIdx = new Map<string, number>();
   for (const comment of comments) {
     const lineMap = comment.side === 'LEFT' ? oldLineToIndex : newLineToIndex;
-    const idx = lineMap.get(comment.lineStart);
+    const idx =
+      comment.lineStart == null ? undefined : lineMap.get(comment.lineStart);
     if (idx !== undefined) {
       commentLineStartDiffIdx.set(comment.id, idx);
     }

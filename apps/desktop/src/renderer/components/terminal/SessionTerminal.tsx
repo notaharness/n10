@@ -9,7 +9,7 @@ import {
   type DesktopTerminal,
 } from '../../lib/terminals/xterm.js';
 import { usePaneShown } from '../../lib/tabs/pane-shown.js';
-import { resolveTheme, useTheme } from '../../lib/theme.js';
+import { getResolvedTheme, useTheme } from '../../lib/theme.js';
 import { errorMessage } from '../../lib/utils.js';
 
 /** The grid that fills the pane, by `FitAddon`'s reckoning; null
@@ -99,7 +99,7 @@ export function SessionTerminal({
         onError: reportError,
       });
       feedRef.current = watch.feed;
-      const opened = openTerminal(host, resolveTheme());
+      const opened = openTerminal(host, getResolvedTheme());
       setXterm(opened);
       return () => {
         setXterm(null);

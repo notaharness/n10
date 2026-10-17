@@ -9,7 +9,7 @@ import {
   tab,
 } from './setup/app.js';
 import { armContextMenuChoice, clickAppMenuItem } from './setup/menu.js';
-import type { FakeGitHub } from './setup/fake-gh.js';
+import { hoursAgo, type FakeGitHub } from './setup/fake-gh.js';
 import { fleetView } from './setup/machines.js';
 
 /**
@@ -296,11 +296,6 @@ test.describe('Visual (plan, light theme) @visual', () => {
   });
 });
 
-/** Hours before the run, so the activity's "3d ago" reads the same on
- *  every run; a fixed date's age moves a day at a time. */
-const hoursAgo = (h: number) =>
-  new Date(Date.now() - h * 3_600_000).toISOString();
-
 /**
  * The pull request Overview, for a pull request someone else opened —
  * which is where it opens. One column at the window's own size, two
@@ -382,9 +377,12 @@ async function openOverview(page: Page) {
   ).toBeVisible({ timeout: 30_000 });
   // The footer is in every overview shot; provider reads can finish after
   // the overview and file list, leaving a transient syncing indicator.
-  await expect(page.getByText('synced just now', { exact: true })).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(
+    page.getByRole('button', {
+      name: 'GitHub PR sync: Last synced just now',
+      exact: true,
+    })
+  ).toBeVisible({ timeout: 30_000 });
 }
 
 test.describe('Visual (overview) @visual', () => {

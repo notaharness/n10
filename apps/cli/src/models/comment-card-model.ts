@@ -166,6 +166,8 @@ export interface LocalHeaderState {
   editing: boolean;
   planHint: boolean;
   inPlan: boolean;
+  /** Posting is all the card's place offers. */
+  postOnly?: boolean;
 }
 
 export function localHeaderSpans(
@@ -192,9 +194,11 @@ export function localHeaderSpans(
   if (state.selected && !state.editing && !state.pendingDelete) {
     spans.push({
       key: 'hints',
-      text: `  [e]dit [x]delete [p]ost${
-        state.planHint ? planHintText(state.inPlan) : ''
-      }`,
+      text: state.postOnly
+        ? '  [p]ost'
+        : `  [e]dit [x]delete [p]ost${
+            state.planHint ? planHintText(state.inPlan) : ''
+          }`,
       dim: true,
     });
   }

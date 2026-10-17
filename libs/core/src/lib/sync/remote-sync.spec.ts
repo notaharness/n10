@@ -14,6 +14,9 @@ import type { VcsProvider } from '@n10/vcs-core';
  *   • a branch whose agent is still running is left alone, because the
  *     user deliberately left it running;
  *   • a branch git will not part with safely is left alone;
+ *   • a branch with commits its merged pull request did not carry is
+ *     left alone, because a merge vouches for commits, not a name: a
+ *     reused branch name holds work that exists nowhere else;
  *   • a provider that failed to answer means no deletions at all, not
  *     "nothing is merged, carry on";
  *   • and a cancelled pass stops between steps rather than finishing
@@ -22,8 +25,19 @@ import type { VcsProvider } from '@n10/vcs-core';
 
 const checkout = vi.hoisted(() => (branch: string) => `/wt/${branch}`);
 
+/** The head commit each merged pull request had: `head:<branch>`. */
+const mergedHead = vi.hoisted(() => (branch: string) => `head:${branch}`);
+
 const env = vi.hoisted(() => ({
   merged: new Set<string>(),
+  /** A branch's local tip, when it is not its merged head. */
+  tips: {} as Record<string, string | null>,
+  /** `commit>descendant` pairs git would call ancestry. */
+  ancestry: new Set<string>(),
+  /** Commits the clone has; every merged head unless listed in `absent`. */
+  absent: new Set<string>(),
+  /** Commits a fetch asked for, by commit. */
+  fetched: [] as string[],
   fetchThrows: false,
   alive: new Set<string>(),
   persisted: new Set<string>(),
@@ -43,7 +57,11 @@ const env = vi.hoisted(() => ({
 
 vi.mock('@n10/worktree-manager', async (original) => ({
   ...(await original<typeof WorktreeManager>()),
-  branchTip: (branch: string) => Promise.resolve(`tip:${branch}`),
+  branchTip: (branch: string) =>
+    Promise.resolve(branch in env.tips ? env.tips[branch] : mergedHead(branch)),
+  isAncestorOf: (commit: string, other: string) =>
+    Promise.resolve(env.ancestry.has(`${commit}>${other}`)),
+  refExists: (ref: string) => Promise.resolve(!env.absent.has(ref)),
   repositoryOf: () => Promise.resolve('/repo/.git'),
   branchToSessionName: (b: string) => b.replace(/\//g, '-'),
   canRemoveBranch: (branch: string) => {
@@ -60,7 +78,10 @@ vi.mock('@n10/worktree-manager', async (original) => ({
   },
   fastForwardMainBranch: () => Promise.resolve(),
   fetchRemote: () => Promise.resolve(true),
-  fetchBranches: () => Promise.resolve(true),
+  fetchBranches: (refs: string[]) => {
+    env.fetched.push(...refs);
+    return Promise.resolve(true);
+  },
   // Every swept branch is checked out in a worktree of its own, whose
   // checkout keys the agent session.
   listWorktrees: () =>
@@ -91,7 +112,9 @@ const provider = {
   id: 'github',
   fetchMergedBranches: () => {
     if (env.fetchThrows) return Promise.reject(new Error('provider down'));
-    return Promise.resolve(env.merged);
+    return Promise.resolve(
+      new Map([...env.merged].map((b) => [b, [mergedHead(b)]]))
+    );
   },
 } as unknown as VcsProvider;
 
@@ -119,6 +142,10 @@ function sweep(over: Partial<Parameters<typeof sweepMergedBranches>[0]> = {}) {
 
 beforeEach(() => {
   env.merged = new Set(['feature/a']);
+  env.tips = {};
+  env.ancestry = new Set();
+  env.absent = new Set();
+  env.fetched = [];
   env.fetchThrows = false;
   env.alive = new Set();
   env.persisted = new Set();
@@ -141,9 +168,58 @@ describe('sweepMergedBranches', () => {
         branch: 'feature/a',
         // The commit it was judged at, so removal leaves a branch that
         // moves on before the removal runs.
-        tip: 'tip:feature/a',
+        tip: mergedHead('feature/a'),
       },
     ]);
+  });
+
+  it('leaves a reused branch that has commits its merged pull request did not', async () => {
+    // Work committed after the merge exists nowhere else.
+    env.tips = { 'feature/a': 'later' };
+    env.ancestry = new Set([`${mergedHead('feature/a')}>later`]);
+    const result = await sweep();
+    expect(env.deleted).toEqual([]);
+    // Nor does it get as far as asking git whether removal is safe.
+    expect(env.checks).toBe(0);
+    // Its pull request did merge: the badge stays.
+    expect([...result.merged]).toEqual(['feature/a']);
+  });
+
+  it('deletes a branch that is behind its merged head', async () => {
+    // Someone pushed to the pull request after this checkout pulled.
+    env.tips = { 'feature/a': 'behind' };
+    env.ancestry = new Set([`behind>${mergedHead('feature/a')}`]);
+    await sweep();
+    expect(env.deleted.map((d) => d.tip)).toEqual(['behind']);
+  });
+
+  it('fetches a merged head the clone lacks before judging', async () => {
+    env.tips = { 'feature/a': 'behind' };
+    env.ancestry = new Set([`behind>${mergedHead('feature/a')}`]);
+    env.absent = new Set([mergedHead('feature/a')]);
+    await sweep();
+    expect(env.fetched).toEqual([mergedHead('feature/a')]);
+    // Still absent after the fetch: not knowing keeps the branch.
+    expect(env.deleted).toEqual([]);
+  });
+
+  it('leaves a branch whose merged pull request named no head', async () => {
+    const result = await sweep({
+      provider: {
+        fetchMergedBranches: () =>
+          Promise.resolve(new Map([['feature/a', []]])),
+      } as unknown as VcsProvider,
+    });
+    expect(env.deleted).toEqual([]);
+    expect(env.checks).toBe(0);
+    // Its pull request did merge: the badge stays.
+    expect([...result.merged]).toEqual(['feature/a']);
+  });
+
+  it('leaves a branch git cannot find a tip for', async () => {
+    env.tips = { 'feature/a': null };
+    await sweep();
+    expect(env.deleted).toEqual([]);
   });
 
   it('leaves a branch alone when its agent is still running', async () => {

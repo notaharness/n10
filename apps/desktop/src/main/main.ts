@@ -19,6 +19,7 @@ import {
   type ContextMenuItem,
   type DesktopPrefs,
   type MenuCommand,
+  type ResolvedTheme,
 } from '../host/contract.js';
 import { loadDesktopPrefs } from '../host/services/desktop-prefs.js';
 import { onPageGone, windowPushes } from './host-events.js';
@@ -120,10 +121,15 @@ function popupContextMenu(items: ContextMenuItem[]): Promise<string | null> {
   });
 }
 
-// Native chrome (overlay window controls, context menus, dialogs)
-// follows the resolved theme. Both OS scheme changes and in-app
-// Light/Dark picks land here: setting `themeSource` fires 'updated'.
+// Both OS scheme changes and in-app Light/Dark picks land here:
+// setting `themeSource` fires 'updated'. The host relays the result to
+// the windows, whose UI and terminals paint from it; native chrome
+// (overlay window controls, context menus, dialogs) follows it here.
+const resolvedTheme = (): ResolvedTheme =>
+  nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
+
 nativeTheme.on('updated', () => {
+  host?.themeChanged();
   if (prefs.nativeFrame) return;
   const next = windowChrome(nativeTheme.shouldUseDarkColors);
   if (next.titleBarOverlay && typeof next.titleBarOverlay === 'object') {
@@ -205,6 +211,7 @@ function startHost(): HostProcess {
   const host = startHostProcess({
     startDir: START_DIR,
     pushes: windowPushes,
+    theme: resolvedTheme,
     shell: {
       quitForUpdate,
       quitForNpmUpdate,

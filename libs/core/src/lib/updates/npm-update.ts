@@ -95,13 +95,19 @@ function install(
   });
 }
 
+export interface NpmUpdateOptions {
+  /** Called once, when Ctrl-C has asked npm to cancel. */
+  onCancel?: () => void;
+}
+
 /** Caller has already unmounted/drained the TUI, or waited for Electron exit. */
 export async function runNpmUpdate(
-  plan: NpmUpdatePlan
+  plan: NpmUpdatePlan,
+  options: NpmUpdateOptions = {}
 ): Promise<NpmUpdateResult> {
   const dir = join(homedir(), '.n10');
   const logPath = join(dir, 'npm-update-logs');
-  const signals = protectNpmTransaction();
+  const signals = protectNpmTransaction(options.onCancel);
   let release: () => Promise<void> = async () => undefined;
   let result: NpmUpdateResult;
   try {

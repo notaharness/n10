@@ -20,7 +20,10 @@ describe('buildReviewLaunchRequest', () => {
     expect(req.prompt).toContain('Review PR #42 ("Add "quoted" feature")');
     expect(req.prompt).toContain('feat/x → main');
     expect(req.prompt).toContain('by Ada');
-    expect(req.systemGuidance).toContain('n10 util add-comment --pr=42');
+    expect(req.systemGuidance).toContain(
+      'n10 util add-comment --pr=42 --base=main --file=<path>'
+    );
+    expect(req.systemGuidance).toContain('leave out --file and --base');
     expect(req.prompt).not.toContain('ADDITIONAL USER INSTRUCTION');
   });
 

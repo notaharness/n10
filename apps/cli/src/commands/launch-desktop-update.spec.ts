@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
     .fn()
     .mockResolvedValue({ status: 'succeeded', message: 'Updated' }),
   relaunchNpmApp: vi.fn().mockResolvedValue(23),
+  showNpmUpdateCancelling: vi.fn(),
 }));
 vi.mock('node:child_process', () => ({ spawn: mocks.spawn }));
 vi.mock('node:module', () => ({
@@ -54,7 +55,9 @@ it('passes the private request to Electron and finishes the update only after ex
   expect(mocks.runNpmUpdate).not.toHaveBeenCalled();
   child.emit('close', 42, null);
   await expect(finished).resolves.toBe(23);
-  expect(mocks.runNpmUpdate).toHaveBeenCalledWith(plan);
+  expect(mocks.runNpmUpdate).toHaveBeenCalledWith(plan, {
+    onCancel: expect.any(Function),
+  });
   expect(mocks.relaunchNpmApp).toHaveBeenCalledWith(root, 'desktop');
   expect(existsSync(dirname(request))).toBe(false);
 });

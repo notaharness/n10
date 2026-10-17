@@ -50,6 +50,7 @@ const EVENT_METHODS = [
   'onSessionExit',
   'onLaunchStep',
   'onMenuCommand',
+  'onThemeChanged',
   'onSyncNotice',
   'onRemoteUpdated',
   'onDiscoveryChanged',

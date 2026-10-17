@@ -308,16 +308,19 @@ export interface SyncState {
   /** ms-epoch of the last git sync pass (fetch + ff main), null if never. */
   lastGitSyncAt: number | null;
   remoteError: string | null;
+  /** Source of the displayed error; PR-provider errors take precedence. */
+  remoteErrorSource: 'provider' | 'maintenance' | null;
   remoteSyncing: boolean;
-  /** Remote cache TTL in ms (from config, clamped). */
+  /** PR refresh interval in ms (from config). */
   remoteIntervalMs: number;
+  /** Repository maintenance cadence in ms (from config, clamped). */
+  maintenanceIntervalMs: number;
   /**
    * Provider fetches this process has started, successful or not.
    *
    * Monotonic and diagnostic: it is how "did that actually go and
-   * ask?" gets a yes or no. A test — or a curious user reading the
-   * sync popover — cannot tell a refetch from a cache hit by watching
-   * `lastRemoteSyncAt`, which only moves when a fetch succeeds.
+   * ask?" gets a yes or no. A test cannot tell a refetch from a cache
+   * hit by watching `lastRemoteSyncAt`, which only moves on success.
    */
   remoteFetches: number;
 }
@@ -325,6 +328,10 @@ export interface SyncState {
 // ── Desktop shell (native menus, prefs) ──────────────────────────
 
 export type ThemePreference = 'system' | 'light' | 'dark';
+
+/** The theme in effect: Electron's `nativeTheme`, which folds the
+ *  preference (its `themeSource`) into the OS colour scheme. */
+export type ResolvedTheme = 'light' | 'dark';
 
 export interface DesktopPrefs {
   theme: ThemePreference;
@@ -693,6 +700,9 @@ export interface N10HostApi {
   onBabysitChanged(cb: (event: BabysitChangedEvent) => void): () => void;
   getDesktopPrefs(): Promise<DesktopPrefs>;
   setDesktopPrefs(patch: Partial<DesktopPrefs>): Promise<DesktopPrefs>;
+  /** The theme in effect; its changes arrive on `onThemeChanged`. */
+  getTheme(): Promise<ResolvedTheme>;
+  onThemeChanged(cb: (theme: ResolvedTheme) => void): () => void;
   /** The rebound desktop shortcuts, kept in the global config. */
   getKeybindings(): Promise<DesktopKeybindings>;
   /** Rebind one desktop shortcut, or with null restore its default.
@@ -790,6 +800,7 @@ export const IPC = {
   showAppMenu: 'n10/shell/app-menu',
   getDesktopPrefs: 'n10/shell/prefs/get',
   setDesktopPrefs: 'n10/shell/prefs/set',
+  getTheme: 'n10/shell/theme',
   getKeybindings: 'n10/keybindings/get',
   setKeybinding: 'n10/keybindings/set',
   holdMenuShortcuts: 'n10/keybindings/hold-menu',
@@ -805,7 +816,7 @@ export const IPC = {
   cancelCeremony: 'n10/machines/ceremony/cancel',
   resetFleet: 'n10/machines/fleet-reset',
   dismissInboundMail: 'n10/machines/dismiss-inbound-mail',
-} as const;
+} as const satisfies { [K in keyof N10HostApi]?: string };
 
 /** Error thrown by host handlers when no repo has been opened yet. */
 export class NoActiveRepoError extends Error {

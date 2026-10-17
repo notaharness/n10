@@ -246,6 +246,8 @@ interface LocalCommentCardProps {
   inPlan?: boolean;
   /** See CommentThreadCard.planHint. */
   planHint?: boolean;
+  /** The place offers posting only (`LocalHeaderState.postOnly`). */
+  postOnly?: boolean;
 }
 
 /**
@@ -295,6 +297,7 @@ export const LocalCommentCard = memo(function LocalCommentCard({
   indent,
   inPlan = false,
   planHint = false,
+  postOnly = false,
 }: LocalCommentCardProps) {
   return (
     <CardShell indent={indent}>
@@ -317,6 +320,7 @@ export const LocalCommentCard = memo(function LocalCommentCard({
             editing,
             planHint,
             inPlan,
+            postOnly,
           })}
         />
         {editing ? (

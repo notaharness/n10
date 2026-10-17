@@ -61,7 +61,7 @@ export function uniqueTmuxBranch(): string {
  *  are the user's running agents. So the socket is proven rather than
  *  assumed, and anything unproven throws.
  */
-function socketEnv(tmuxTmpdir: string): NodeJS.ProcessEnv {
+export function socketEnv(tmuxTmpdir: string): NodeJS.ProcessEnv {
   if (!tmuxTmpdir) {
     throw new Error('tmux helpers need the test homeDir (TMUX_TMPDIR)');
   }

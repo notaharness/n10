@@ -290,7 +290,14 @@ verdict did not name, such as a file written into a checkout judged clean. Any
 of them keeps everything. A branch that moves during the removal itself, or
 that git will not delete, keeps the branch. `removeWorktreeSession`
 returns what it did, and each shell says what was kept and why. The
-merged-branch sweep uses the same guard. The engine worktree command
+merged-branch sweep uses the same guard, at the branch's own tip, and only while
+a merged pull request carried that tip: a merge vouches for the commits it
+carried, not for the branch name. Providers answer with each merged pull
+request's head commit, and the sweep removes a branch only while its tip is one
+of them or an ancestor of one, fetching by commit a head the clone lacks. Work
+committed after the merge, as on a reused branch name, exists nowhere else, so
+such a branch is left alone. It keeps its merged badge, since its pull request
+did merge. The engine worktree command
 scans its repository’s discovery before and after core removal, so the shells learn of n10's
 removals through `onChanged`, as they learn of `git worktree remove`: discovery
 can only report the removal of a worktree it has seen.
@@ -995,6 +1002,26 @@ unscoped path is read. The standalone utility resolves this identity through cor
 Only observed resources attach a nonrecursive watcher; the last observer
 leaving closes it.
 
+A finding goes on lines, a whole file, or the pull request: a null `file` or
+null lines, as `RemoteCommentThread` says it. `n10 util add-comment` checks a
+line or file anchor against the pull request's diff before storing it, so an
+anchor the provider would refuse (GitHub answers 422) never becomes a draft. The
+utility runs where no provider is configured, so the diff is the checkout's
+own: from where HEAD left `--base` (`origin/<base>`, else the local branch) to
+HEAD, three lines of context, renames detected (core `agent-comment-diff.ts`).
+The review prompt writes `--base` from the pull request's target. The finding
+records that HEAD as `head`, and a post refuses a line or file finding whose
+`head` is not the head it files on: its lines belong to that commit.
+Findings on the pull request are filed as the review's summary, joined under
+one attribution: core's submission files a summary with the review, while a
+conversation comment is posted on its own. The summary is one draft, so which
+findings it holds is read from the findings (`agent-post-plan.ts`): one still
+carrying a publication went out in the summary last sent. While that summary's
+outcome is unknown, only those are sent, and it goes again as it was; a new
+finding waits for the next post. Once it is published, they are marked posted
+and a new summary carries the rest. The diff's comment navigation skips them;
+the desktop walkthrough and the TUI's PR comments pane show and post them.
+
 Agent publication uses core’s draft submission machinery in the separate
 `~/.n10/agent-review-publications` store, keyed by provider repository, PR and
 account. Human writing stays in `review-drafts`. Every network write goes through
@@ -1535,18 +1562,26 @@ existing process then starts the installed entry point with inherited stdio and
 exits with its status. Pausing stdin matters: removing stream listeners alone
 does not stop a flowing stream from consuming the replacement's input. Ordinary
 TUI launches have no parent launcher or detached updater. During npm and the
-replacement session the parent absorbs tty SIGINT/SIGHUP (the foreground child
-already receives them), forwards SIGTERM, and waits for child completion.
-Ctrl-C leaves npm time to finish its native interruption cleanup, including
-pending I/O and rollback, before recording a failure and reopening n10. Keeping
-the parent alive also prevents a PTY session leader's exit from hanging up npm
-mid-install. Replacement exits use the shared launcher's exit-status mapping,
-including 128 plus the terminating signal. On a stalled download, npm ignores
-the first Ctrl-C until its fetch finishes or gives up; n10 imposes no mutation
-timeout. A second Ctrl-C can terminate npm before rollback and leave the
-installation incomplete, just as a manual npm install can. Both shells check
-that `main.js` exists before relaunching; if it is missing, they exit with status
-1 and print the pinned manual retry command last.
+replacement session the parent absorbs tty SIGHUP (the foreground child
+already receives it), forwards SIGTERM, and waits for child completion.
+While npm runs, core holds a tty stdin in raw mode, so the terminal raises no
+SIGINT and n10 reads Ctrl-C itself. The first Ctrl-C sends npm one SIGINT and
+both shells print **Cancelling update…** with the detail to keep n10 open; later
+presses are ignored, because npm handles only the first SIGINT and a second one
+terminates it mid-rollback. Without a tty on stdin the parent absorbs SIGINT
+like SIGHUP. Cooked mode returns when npm exits, fails or the
+update errors; a hung-up tty has no mode to restore. Ctrl-C leaves npm time to
+finish its native interruption cleanup, including pending I/O and rollback,
+before recording a failure and reopening n10. On a stalled download, npm defers
+that cleanup until its fetch finishes or gives up; n10 imposes no mutation
+timeout. npm exposes no signal for the moment rollback starts, so the cancelling
+detail stays until npm exits. Keeping the parent alive also prevents a PTY
+session leader's exit from hanging up npm mid-install. Replacement exits use the
+shared launcher's exit-status mapping, including 128 plus the terminating
+signal. npm killed by anything else before rollback leaves the installation
+incomplete, just as a manual npm install can. Both shells check that `main.js`
+exists before relaunching; if it is missing, they exit with status 1 and print
+the pinned manual retry command last.
 
 Desktop uses its existing Node launcher. The accepted `will-quit` path writes a
 private request, drains the host, and exits with the update handoff code. Choosing
@@ -1565,3 +1600,47 @@ installation may require running that command from the terminal. Windows,
 local installs and packaged apps keep the manual path. Native packaged updates
 remain a separate increment. GitHub's prerelease flag is not a channel selector:
 a beta release may be marked as a non-prerelease.
+
+## Theme
+
+The desktop paints one theme: Electron's `nativeTheme`, which folds the
+preference (`themeSource`) into the OS colour scheme, including the
+xdg-desktop-portal `color-scheme` Electron reads on Linux. The main process
+posts it to the host at fork and on every `'updated'`; windows read it from
+the host and repaint on its push. The renderer's `prefers-color-scheme` only
+seeds the first paint: a class set from its change event beside a terminal
+that re-read `matches` on each render could disagree.
+
+Programs in a terminal learn the theme the way they would from any terminal,
+and only the terminal on screen answers: the renderer's xterm, whose replies
+reach the PTY through `onData`. xterm answers OSC 10/11 itself from
+`options.theme`, the palette it paints with. It lacks the colour-scheme
+reports, so `lib/terminals/scheme-reports.ts` adds them with parser hooks:
+`CSI ? 996 n`, DECRQM for mode 2031 (xterm would say "not recognized"), and
+`CSI ? 997 ; 1|2 n` on a switch while the program has 2031 set. The host's
+headless emulators answer nothing, so a session no window has mounted is not
+told of a switch while it happens.
+
+A terminal knows mode 2031 is set only from the output it has parsed. tmux
+3.6 sets it, and asks `CSI ? 996 n`, in the same start-up output as the
+alternate screen and bracketed paste: the client's first output, which the
+relay keeps ahead of its ring, so a terminal mounted from a truncated snapshot
+has it too. A remount replays that head without answering it (see the
+session relay's queries), so once the replay is parsed a terminal with 2031
+set sends the current scheme (`SchemeReports.replayed`): tmux learns of a
+switch made while nothing was mounted. tmux forwards only an actual change to
+the pane, and takes a repeated report as a prompt to ask for colours again,
+which is harmless. A session mounted in two windows answers each query and sends each
+switch from both; tmux reads the duplicates the same way.
+
+tmux is that program: it asks its client for colours when the client
+attaches (again on a resize, at most every 30 seconds) and answers its panes'
+OSC 10/11 from what it last read. Only tmux 3.6 and later set mode 2031 on the
+client, ask again when the client reports a scheme change, and pass the change
+on to panes that enabled it; that is what lets a running program, such as
+Claude Code with its auto theme, follow a switch. tmux derives a pane's scheme
+from the client's background and re-derives it on each colour reply, so on a
+switch the pane is told the old scheme (after the foreground reply) before the
+new one. Older tmux answers from the colours it read at attach or at the last
+such resize, so after a switch only terminals attached since then report the
+new theme; nothing native makes it ask again.

@@ -337,6 +337,23 @@ describe('buildCommentRows ordering', () => {
     expect(rows.map((r) => r.id)).toEqual(['zeta', 'alpha']);
   });
 
+  /** The diff renders no draft on the pull request itself, so prev/next
+   *  must not land on one; one on a whole file is the file's first. */
+  it('leaves out drafts on the pull request and puts a file draft first', () => {
+    const rows = buildCommentRows(
+      files('src/a.ts'),
+      [],
+      [],
+      [
+        draft({ id: 'line', lineStart: 4 }),
+        draft({ id: 'file', lineStart: null, lineEnd: null }),
+        draft({ id: 'pr', file: null, lineStart: null, lineEnd: null }),
+      ]
+    );
+    expect(rows.map((r) => r.id)).toEqual(['file', 'line']);
+    expect(groupDraftsByFile([draft({ id: 'pr', file: null })]).size).toBe(0);
+  });
+
   it('orders rows within a file by line', () => {
     const rows = buildCommentRows(
       files('src/a.ts'),

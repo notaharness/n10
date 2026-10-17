@@ -19,8 +19,9 @@ import type {
   ReviewSubmission,
   PullRequestChecks,
   PullRequestDetail,
+  MergedBranchHeads,
 } from '@n10/vcs-core';
-import { sanitizeBody, VcsError } from '@n10/vcs-core';
+import { mergedHeadCommit, sanitizeBody, VcsError } from '@n10/vcs-core';
 import { searchGitHubMentions } from './mentions.js';
 import { GITHUB_EVENTS, publishGitHubReview } from './pr-review-publisher.js';
 import { classifyGhError, parseGhJson } from './gh-errors.js';
@@ -287,6 +288,7 @@ const SEARCH_MERGED_PRS_QUERY = `
       nodes {
         ... on PullRequest {
           headRefName
+          headRefOid
         }
       }
     }
@@ -295,6 +297,8 @@ const SEARCH_MERGED_PRS_QUERY = `
 
 interface MergedPrNode {
   headRefName: string;
+  /** The head commit the pull request merged. */
+  headRefOid?: string;
 }
 
 interface SearchMergedPrsResponse {
@@ -461,9 +465,10 @@ function transformGeneralComment(
   };
 }
 
-/** Every merged head branch the search matches, across all its pages. */
-async function fetchMergedHeads(searchQuery: string): Promise<Set<string>> {
-  const heads = new Set<string>();
+/** Every merged pull request the search matches, across all its pages:
+ *  its head branch and the commit it merged. */
+async function fetchMergedHeads(searchQuery: string): Promise<MergedPrNode[]> {
+  const heads: MergedPrNode[] = [];
   let cursor: string | undefined;
   do {
     const variables: Record<string, string> = { searchQuery };
@@ -475,9 +480,7 @@ async function fetchMergedHeads(searchQuery: string): Promise<Set<string>> {
     )) as SearchMergedPrsResponse;
 
     const { nodes, pageInfo } = result.data.search;
-    for (const node of nodes) {
-      if (node.headRefName) heads.add(node.headRefName);
-    }
+    heads.push(...nodes);
     cursor = nextCursor(pageInfo);
   } while (cursor);
   return heads;
@@ -770,21 +773,23 @@ export const githubProvider: VcsProvider = {
     _auth: Record<string, string>,
     project: Record<string, string>,
     branches: string[]
-  ): Promise<Set<string>> {
+  ): Promise<MergedBranchHeads> {
     const { owner, repo, username } = project;
-    if (!username || !owner || !repo || branches.length === 0) return new Set();
+    if (!username || !owner || !repo || branches.length === 0) return new Map();
 
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
       .toISOString()
       .slice(0, 10);
     const searchQuery = `repo:${owner}/${repo} is:pr is:merged author:${username} merged:>${since}`;
 
-    const mergedHeads = await fetchMergedHeads(searchQuery);
-
     const branchSet = new Set(branches);
-    const matched = new Set<string>();
-    for (const head of mergedHeads) {
-      if (branchSet.has(head)) matched.add(head);
+    const matched: MergedBranchHeads = new Map();
+    for (const pr of await fetchMergedHeads(searchQuery)) {
+      if (!branchSet.has(pr.headRefName)) continue;
+      // Merged either way; only a full commit id vouches for commits.
+      const heads = matched.get(pr.headRefName) ?? [];
+      const head = mergedHeadCommit(pr.headRefOid);
+      matched.set(pr.headRefName, head ? [...heads, head] : heads);
     }
     return matched;
   },

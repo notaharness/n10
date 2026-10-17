@@ -84,6 +84,8 @@ export interface N10Session {
   term: N10Term;
   repoPath: string;
   homeDir: string;
+  restart(repoPath?: string): Promise<void>;
+  stop(): Promise<void>;
 }
 
 async function stopHost(host: string): Promise<void> {
@@ -130,13 +132,12 @@ export const test = base.extend<
       JSON.stringify(n10Config ?? {}, null, 2)
     );
 
-    const consoleMessages: string[] = [];
-    try {
+    async function spawn(startPath: string): Promise<void> {
       const spawnRes = await fetch(`${host}/spawn`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          repoPath,
+          repoPath: startPath,
           homeDir,
           cols,
           rows,
@@ -157,6 +158,15 @@ export const test = base.extend<
         );
       }
 
+      await page.goto('/');
+      await page
+        .getByText('n10')
+        .first()
+        .waitFor({ state: 'visible', timeout: 30_000 });
+    }
+
+    const consoleMessages: string[] = [];
+    try {
       page.on('console', (msg) => {
         consoleMessages.push(`[browser:${msg.type()}] ${msg.text()}`);
       });
@@ -164,18 +174,8 @@ export const test = base.extend<
         consoleMessages.push(`[browser:pageerror] ${err.message}`);
       });
 
-      await page.goto('/');
+      await spawn(repoPath);
       const root = page.locator('#wterm-root');
-
-      // Wait for n10's first render. Cold-start + any WS reconnect cycles
-      // can take several seconds on CI runners.
-      // Using locator.waitFor() (not `expect`) keeps this out of the
-      // `playwright/no-standalone-expect` eslint rule's scope — this is
-      // readiness plumbing, not a test assertion.
-      await page
-        .getByText('n10')
-        .first()
-        .waitFor({ state: 'visible', timeout: 30_000 });
 
       const term: N10Term = {
         page,
@@ -208,7 +208,16 @@ export const test = base.extend<
         },
       };
 
-      await provide({ term, repoPath, homeDir });
+      await provide({
+        term,
+        repoPath,
+        homeDir,
+        stop: () => stopHost(host),
+        async restart(startPath = repoPath) {
+          await stopHost(host);
+          await spawn(startPath);
+        },
+      });
     } catch (err) {
       if (consoleMessages.length) {
         console.error(

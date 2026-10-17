@@ -18,7 +18,8 @@ const ME = 'me-guid';
  * Azure DevOps's side, as its pull request REST API documents it:
  * threads and their comments, iterations with their source commits and
  * changes, and each reviewer's vote. `lose` performs a write and drops
- * its answer; `refuse` answers 400 and writes nothing.
+ * its answer; `blank` performs it and answers 2xx without its id;
+ * `refuse` answers 400 and writes nothing.
  */
 class FakeAzure implements AdoReviewApi {
   head = HEAD;
@@ -42,6 +43,7 @@ class FakeAzure implements AdoReviewApi {
   writes: { method: string; path: string; body: Record<string, unknown> }[] =
     [];
   lose = new Set<string>();
+  blank = new Set<string>();
   /** Lost before it reaches Azure: nothing written. */
   drop = new Set<string>();
   refuse = new Set<string>();
@@ -112,6 +114,7 @@ class FakeAzure implements AdoReviewApi {
     if (this.lose.delete(op)) {
       return Promise.reject(new VcsError('network', 'connection reset'));
     }
+    if (this.blank.delete(op)) return this.ok<T>({});
     return this.ok<T>(answer);
   };
 
@@ -300,6 +303,43 @@ describe('publishing an Azure DevOps review', () => {
     expect(ado.writes.filter((w) => w.path.endsWith('/comments'))).toHaveLength(
       1
     );
+  });
+
+  it('records no id for a thread Azure answered without one, and posts it on the next attempt', async () => {
+    const ado = new FakeAzure();
+    const store = memory();
+    ado.blank.add('thread');
+    const err = await failed(publish(ado, store));
+    expect(err).toMatchObject({
+      failure: 'unknown',
+      item: 'range',
+      posted: {},
+    });
+    expect(store.read()?.added).toEqual({});
+    expect(ado.votes.has(ME)).toBe(false);
+    // Azure wrote nothing after all.
+    ado.threads = ado.threads.filter((t) => t.id !== 101);
+    const published = await publish(ado, store);
+    expect(posts(ado)).toBe(5);
+    expect(published.items['range']).toBe('102');
+  });
+
+  it('finds a reply Azure answered without its id instead of posting it again', async () => {
+    const ado = new FakeAzure();
+    const store = memory();
+    ado.blank.add('reply');
+    expect(await failed(publish(ado, store))).toMatchObject({
+      failure: 'unknown',
+      message:
+        'Azure DevOps returned no comment ID. n10 will check whether the comment was posted before retrying.',
+      item: 'reply',
+      posted: { range: '101', file: '102' },
+    });
+    const published = await publish(ado, store);
+    expect(ado.writes.filter((w) => w.path.endsWith('/comments'))).toHaveLength(
+      1
+    );
+    expect(published.items['reply']).toBe('103');
   });
 
   it('sends a vote whose answer was lost again, and nothing else', async () => {

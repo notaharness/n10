@@ -116,6 +116,9 @@ The reasoning behind each rule is in `docs/decisions.md`.
   last visit is fixed per visit, which the caller names. Recorded heads are
   kept under `refs/n10/retained/`. The engine owns the history
   resource and the baselines' lifetime.
+- **Merged sweep** (`sync/remote-sync.ts`, `sync/merged-tip.ts`): removes a
+  branch only at a merged pull request's head commit or an ancestor of one,
+  never by name alone; a head it cannot get keeps the branch.
 - `asyncOps.run` never rejects; errors go through `setOperationErrorHandler`.
 - `keybindings/registry.ts` is the action catalog and carries a 900-line
   ceiling on purpose. Presets: Normie, Vim.

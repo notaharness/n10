@@ -24,9 +24,15 @@ build target pins production). Full notes: `docs/testing.md`.
   rollup). Point `headRefName` at a real branch for a real diff. The replacement is isolated to the test PATH.
 - `src/setup/fake-ado.ts` (`fakeAzureDevOps` option) answers Azure DevOps's
   REST API from a preload in the session host (`fixtures/fake-ado.cjs`,
-  loaded by `N10_HOST_REQUIRE`).
+  loaded by `N10_HOST_REQUIRE` through `fixtures/host-preload.cjs`).
   The token comes from the preload alone, so an app without it asks Azure
-  nothing; seed no Azure DevOps token of your own beside it.
+  nothing; seed no Azure DevOps token of your own beside it. `acceptedPat`
+  models a revoked token (401).
+- No test leaves the machine: `fixtures/network-guard.cjs` refuses every
+  non-loopback connection that gets past the fakes in the main process and
+  the host (sockets, `webRequest`, every `shell.openExternal`), and a
+  refusal fails the test (`setup/network-guard.ts`). Serve a new fake on
+  loopback. Only `githubToken` (@integration) runs unguarded.
 - Playwright's Electron launcher drops `NODE_OPTIONS`, so a main-process
   preload goes on the Electron command line (`-r`). Host services are not
   in the main process: `app.evaluate` cannot reach them.
@@ -50,9 +56,9 @@ build target pins production). Full notes: `docs/testing.md`.
   tells one agent's report from the next when tmux repaints the screen.
 - Terminals run xterm's DOM renderer here (`--disable-gpu`, so no WebGL), so
   their rows are text to assert on. The element xterm opens in carries
-  `data-terminal-grid` and `data-terminal-renderer` (`setup/terminal-grid.ts`),
-  and the screen and cursor-key mode (`data-terminal-buffer`,
-  `data-terminal-cursor-keys`).
+  `data-terminal-grid`, `data-terminal-renderer` and `data-terminal-theme`
+  (`setup/terminal-grid.ts`), and the screen and cursor-key mode
+  (`data-terminal-buffer`, `data-terminal-cursor-keys`).
   The `webgl` option gives the window SwiftShader WebGL
   (`terminal-webgl.test.ts`). xterm's textarea is zero-sized and off screen:
   `focusTerminal` focuses it by class.
