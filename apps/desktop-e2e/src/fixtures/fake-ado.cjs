@@ -137,7 +137,11 @@ function projectApi(s, url, path) {
   if (sub !== 'pullrequests') return null;
   if (id == null) {
     const status = url.searchParams.get('searchCriteria.status') ?? 'active';
-    return list(s.prs.filter((p) => p.status === status));
+    // Azure answers 101 rows unless asked for a page.
+    const skip = Number(url.searchParams.get('$skip') ?? 0);
+    const top = Number(url.searchParams.get('$top') ?? 101);
+    const rows = s.prs.filter((p) => p.status === status);
+    return list(rows.slice(skip, skip + top));
   }
   return pullRequest(s, Number(id), rest);
 }
