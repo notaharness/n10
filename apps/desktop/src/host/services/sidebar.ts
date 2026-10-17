@@ -7,7 +7,11 @@ import {
   sortSessionsByPrId,
   type SidebarItem,
 } from '@n10/core';
-import { pullRequestPollIntervalMs, type RepositoryHandle } from '@n10/engine';
+import {
+  pullRequestPollIntervalMs,
+  remoteSyncIntervalMs,
+  type RepositoryHandle,
+} from '@n10/engine';
 import { activeReviewService, repository, requireRepo } from './repo.js';
 import { babysatStatuses } from './babysit.js';
 import { getSyncDecorations, refreshRemoteSync } from './remote-sync.js';
@@ -107,8 +111,14 @@ export function getSyncState(cwd: string): SyncState {
     lastRemoteSyncAt: remote.fetchedAt,
     lastGitSyncAt: decorations.lastGitSyncAt,
     remoteError: remote.error ?? decorations.error,
+    remoteErrorSource: remote.error
+      ? 'provider'
+      : decorations.error
+      ? 'maintenance'
+      : null,
     remoteSyncing: remote.refreshing || decorations.loading,
     remoteIntervalMs: pullRequestPollIntervalMs(config.prPollInterval),
+    maintenanceIntervalMs: remoteSyncIntervalMs(config.mergePollInterval),
     remoteFetches: pullRequests.fetchCount(),
   };
 }

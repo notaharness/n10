@@ -1,8 +1,6 @@
 import {
-  ArrowRightIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  FileIcon,
   Loader2Icon,
   PencilIcon,
   SendIcon,
@@ -33,6 +31,7 @@ import { CommentBody } from '../comments/CommentBody.js';
 import { ComposerNoticeLine } from '../comments/ComposerNotice.js';
 import { useComposerRefresh } from '../comments/use-composer-refresh.js';
 import { DraftEditor } from './DraftEditor.js';
+import { DraftLocation } from './DraftLocation.js';
 import { SnippetView } from '../diff/SnippetView.js';
 import { useStepperShortcuts } from './use-stepper-shortcuts.js';
 
@@ -176,24 +175,17 @@ export function StepCard({
 
       <div className="relative min-h-0 flex-1 overflow-auto">
         <div className="mx-auto max-w-3xl space-y-3 p-4">
-          {/* Location */}
-          <button
-            type="button"
-            ref={locationRef}
-            onClick={onOpenInDiff}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-            title="Open this file in the diff"
-          >
-            <FileIcon className="size-3.5" />
-            <span className="font-mono">
-              {draft.file}:{draft.lineStart}
-              {draft.lineEnd !== draft.lineStart ? `-${draft.lineEnd}` : ''}
-            </span>
-            <ArrowRightIcon className="size-3" />
-          </button>
+          <DraftLocation
+            draft={draft}
+            onOpenInDiff={onOpenInDiff}
+            locationRef={locationRef}
+          />
 
-          {/* Snippet */}
-          {unread || <SnippetView filename={draft.file} rows={snippet} />}
+          {/* Snippet: a draft on the whole file or the pull request has none. */}
+          {unread ||
+            (draft.file !== null && draft.lineStart !== null && (
+              <SnippetView filename={draft.file} rows={snippet} />
+            ))}
 
           {/* Draft */}
           <div className="rounded-lg border border-dashed border-border bg-card">

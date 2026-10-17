@@ -290,7 +290,14 @@ verdict did not name, such as a file written into a checkout judged clean. Any
 of them keeps everything. A branch that moves during the removal itself, or
 that git will not delete, keeps the branch. `removeWorktreeSession`
 returns what it did, and each shell says what was kept and why. The
-merged-branch sweep uses the same guard. The engine worktree command
+merged-branch sweep uses the same guard, at the branch's own tip, and only while
+a merged pull request carried that tip: a merge vouches for the commits it
+carried, not for the branch name. Providers answer with each merged pull
+request's head commit, and the sweep removes a branch only while its tip is one
+of them or an ancestor of one, fetching by commit a head the clone lacks. Work
+committed after the merge, as on a reused branch name, exists nowhere else, so
+such a branch is left alone. It keeps its merged badge, since its pull request
+did merge. The engine worktree command
 scans its repository’s discovery before and after core removal, so the shells learn of n10's
 removals through `onChanged`, as they learn of `git worktree remove`: discovery
 can only report the removal of a worktree it has seen.
@@ -978,6 +985,26 @@ do not. Files live under `~/.n10/reviews/<repository hash>/pr-<number>`; no lega
 unscoped path is read. The standalone utility resolves this identity through core.
 Only observed resources attach a nonrecursive watcher; the last observer
 leaving closes it.
+
+A finding goes on lines, a whole file, or the pull request: a null `file` or
+null lines, as `RemoteCommentThread` says it. `n10 util add-comment` checks a
+line or file anchor against the pull request's diff before storing it, so an
+anchor the provider would refuse (GitHub answers 422) never becomes a draft. The
+utility runs where no provider is configured, so the diff is the checkout's
+own: from where HEAD left `--base` (`origin/<base>`, else the local branch) to
+HEAD, three lines of context, renames detected (core `agent-comment-diff.ts`).
+The review prompt writes `--base` from the pull request's target. The finding
+records that HEAD as `head`, and a post refuses a line or file finding whose
+`head` is not the head it files on: its lines belong to that commit.
+Findings on the pull request are filed as the review's summary, joined under
+one attribution: core's submission files a summary with the review, while a
+conversation comment is posted on its own. The summary is one draft, so which
+findings it holds is read from the findings (`agent-post-plan.ts`): one still
+carrying a publication went out in the summary last sent. While that summary's
+outcome is unknown, only those are sent, and it goes again as it was; a new
+finding waits for the next post. Once it is published, they are marked posted
+and a new summary carries the rest. The diff's comment navigation skips them;
+the desktop walkthrough and the TUI's PR comments pane show and post them.
 
 Agent publication uses core’s draft submission machinery in the separate
 `~/.n10/agent-review-publications` store, keyed by provider repository, PR and

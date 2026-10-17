@@ -7,60 +7,24 @@ import {
   listReviewDrafts,
   saveReviewDraft,
   submitReview,
-  type DraftTarget,
 } from '@n10/core';
+import { isOid, sameRepository } from '@n10/vcs-core';
+import { readComments, type ReviewComment } from '@n10/review-comments';
+import { agentDraftId, agentDrafts, type AgentDraft } from './agent-drafts.js';
 import {
-  isOid,
-  sameRepository,
-  REVIEW_EVENTS,
-  type ReviewEvent,
-} from '@n10/vcs-core';
-import {
-  readComments,
-  renderCommentBody,
-  resolveComment,
-  type ReviewComment,
-} from '@n10/review-comments';
+  assertWrittenAt,
+  planPost,
+  postable,
+  validatePostRequest,
+  type PostAgentCommentsRequest,
+} from './agent-post-plan.js';
 import {
   createReviewContext,
   requirePullRequestNumber,
   type ReviewContextOptions,
 } from './review-context.js';
 
-export interface PostAgentCommentsRequest {
-  prId: number;
-  ids?: string[];
-  headSha?: string;
-  event?: ReviewEvent;
-}
-
-function validatePostRequest(req: PostAgentCommentsRequest): void {
-  if (req.event !== undefined && !REVIEW_EVENTS.includes(req.event))
-    throw new TypeError('Invalid review event');
-  if (
-    req.ids !== undefined &&
-    (!Array.isArray(req.ids) || !req.ids.every((id) => typeof id === 'string'))
-  )
-    throw new TypeError('Invalid draft ids');
-}
-
-function postable(
-  comments: ReviewComment[],
-  req: PostAgentCommentsRequest
-): ReviewComment[] {
-  const chosen = comments.filter(
-    (comment) =>
-      comment.status !== 'posted' && (!req.ids || req.ids.includes(comment.id))
-  );
-  if (
-    chosen.some(
-      (comment) =>
-        !resolveComment(comment.body, comment.severity).header.subject
-    )
-  )
-    throw new Error('Cannot post a comment with an empty body');
-  return chosen;
-}
+export type { PostAgentCommentsRequest } from './agent-post-plan.js';
 
 function patchComment(
   repo: string,
@@ -102,10 +66,10 @@ export function createAgentPublication(
       viewer: start.viewer,
     };
   }
-  function draftState(prId: number, id: string) {
+  function draftState(prId: number, comment: ReviewComment) {
     const { ref, viewer } = identity(prId);
     return listReviewDrafts({ ref, viewer }, sources).drafts.find(
-      (draft) => draft.id === `inline:agent-${id}`
+      (draft) => draft.id === agentDraftId(comment)
     );
   }
   function requireEditable(prId: number, comment: ReviewComment) {
@@ -117,7 +81,7 @@ export function createAgentPublication(
       return;
     }
     assertPublicationScope(prId, comment);
-    const state = draftState(prId, comment.id)?.publication.state;
+    const state = draftState(prId, comment)?.publication.state;
     if (comment.status === 'posted' || state === 'published')
       throw new Error('Comment is already posted');
     if (state === 'unknown' || state === 'publishing')
@@ -149,40 +113,24 @@ export function createAgentPublication(
     return { ...captured, publish, head: req.headSha };
   }
   function prepareDraft(
-    req: PostAgentCommentsRequest,
-    comment: ReviewComment,
+    draft: AgentDraft,
     captured: ReturnType<typeof publicationContext>
   ): string | null {
-    const { ref, viewer, head } = captured;
-    const target: DraftTarget = {
-      kind: 'inline',
-      key: `agent-${comment.id}`,
-      anchor: {
-        path: comment.file,
-        previousPath: null,
-        head,
-        lines: [],
-        range: {
-          start: comment.lineStart,
-          end: comment.lineEnd,
-          startSide: comment.side,
-          side: comment.side,
-        },
-      },
-    };
-    const existing = draftState(req.prId, comment.id);
-    if (existing?.publication.state === 'published') return null;
-    if (
-      !existing ||
-      existing.publication.state === 'unpublished' ||
-      existing.publication.state === 'failed'
-    ) {
+    const { ref, viewer } = captured;
+    const existing = listReviewDrafts({ ref, viewer }, sources).drafts.find(
+      (stored) => stored.id === draft.id
+    );
+    const state = existing?.publication.state;
+    // A published summary was an earlier post's: `planPost` settled the
+    // findings it held, and this one starts a new summary.
+    if (state === 'published' && draft.target.kind !== 'summary') return null;
+    if (state !== 'publishing' && state !== 'unknown') {
       saveReviewDraft(
-        { ref, viewer, target, body: renderCommentBody(comment) },
+        { ref, viewer, target: draft.target, body: draft.body },
         sources
       );
     }
-    return `inline:agent-${comment.id}`;
+    return draft.id;
   }
   function recover(
     prId: number,
@@ -198,8 +146,8 @@ export function createAgentPublication(
         repository: () => captured.ref,
         viewer: () => captured.viewer,
       }
-    ).drafts.find((draft) => draft.id === `inline:agent-${comment.id}`)
-      ?.publication.state;
+    ).drafts.find((draft) => draft.id === agentDraftId(comment))?.publication
+      .state;
     patchComment(repo, prId, comment.id, {
       status: state === 'published' ? 'posted' : 'draft',
       ...(state === 'unknown' || state === 'publishing'
@@ -215,22 +163,17 @@ export function createAgentPublication(
     req: PostAgentCommentsRequest,
     captured: ReturnType<typeof publicationContext>
   ) {
-    let marked: ReviewComment[] = [];
+    const summary = listReviewDrafts(
+      { ref: captured.ref, viewer: captured.viewer },
+      sources
+    ).drafts.find((draft) => draft.id === 'summary')?.publication.state;
+    const publication = { ...captured.ref, viewer: captured.viewer };
+    let plan: ReturnType<typeof planPost> | undefined;
     changeAgentComments(repo, req.prId, (stored) => {
-      const ids = new Set(postable(stored, req).map((comment) => comment.id));
-      const next = stored.map((comment) =>
-        ids.has(comment.id)
-          ? {
-              ...comment,
-              status: 'posting' as const,
-              publication: { ...captured.ref, viewer: captured.viewer },
-            }
-          : comment
-      );
-      marked = next.filter((comment) => ids.has(comment.id));
-      return next;
+      plan = planPost(stored, req, publication, summary);
+      return plan.next;
     });
-    return marked;
+    return plan!;
   }
   async function post(req: PostAgentCommentsRequest) {
     identity(req.prId);
@@ -248,8 +191,21 @@ export function createAgentPublication(
     const preview = postable(readComments(repo, req.prId), req);
     if (!preview.length) return 0;
     const captured = publicationContext(req);
+    assertWrittenAt(preview, captured.head);
     for (const comment of preview) assertPublicationScope(req.prId, comment);
-    const comments = markPosting(repo, req, captured);
+    const {
+      sending: comments,
+      settled,
+      waiting,
+    } = markPosting(repo, req, captured);
+    if (!comments.length) {
+      changed(req.prId);
+      if (waiting && !settled)
+        throw new Error(
+          'An earlier pull request comment may already be posted. Retry that comment first so n10 can check.'
+        );
+      return settled;
+    }
     const reconcile = () =>
       comments.reduce(
         (posted, comment) =>
@@ -258,8 +214,8 @@ export function createAgentPublication(
       );
     try {
       changed(req.prId);
-      const draftIds = comments.flatMap((comment) => {
-        const id = prepareDraft(req, comment, captured);
+      const draftIds = agentDrafts(comments, captured.head).flatMap((draft) => {
+        const id = prepareDraft(draft, captured);
         return id ? [id] : [];
       });
       if (draftIds.length) {
@@ -290,7 +246,7 @@ export function createAgentPublication(
         throw new Error(
           'The provider did not confirm all comments were posted'
         );
-      return posted;
+      return posted + settled;
     } catch (error) {
       const posted = reconcile();
       const reason = error instanceof Error ? error.message : String(error);

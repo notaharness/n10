@@ -45,6 +45,8 @@ export function draftAt(
     (draft) =>
       draft.file === file.path &&
       draft.side === 'RIGHT' &&
+      draft.lineStart !== null &&
+      draft.lineEnd !== null &&
       draft.lineStart <= lineEnd &&
       draft.lineEnd >= lineStart
   );

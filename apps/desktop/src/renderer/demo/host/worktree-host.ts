@@ -20,8 +20,10 @@ function syncState(): SyncState {
     lastRemoteSyncAt: now - 20_000,
     lastGitSyncAt: now - 45_000,
     remoteError: null,
+    remoteErrorSource: null,
     remoteSyncing: false,
     remoteIntervalMs: 60_000,
+    maintenanceIntervalMs: 3_600_000,
     remoteFetches: 12,
   };
 }

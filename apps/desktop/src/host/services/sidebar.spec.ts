@@ -46,6 +46,8 @@ const env = vi.hoisted(() => ({
     reject: (e: Error) => void;
   }[],
   fetchCount: 0,
+  maintenanceCount: 0,
+  maintenanceError: null as string | null,
   forgetCount: 0,
   /** The provider's side, in order: `start`, `end`, `forget`. */
   events: [] as string[],
@@ -96,12 +98,15 @@ vi.mock('./babysit.js', () => ({
 }));
 
 vi.mock('./remote-sync.js', () => ({
-  refreshRemoteSync: () => Promise.resolve(),
+  refreshRemoteSync: () => {
+    env.maintenanceCount += 1;
+    return Promise.resolve();
+  },
   getSyncDecorations: (cwd: string) => ({
     merged: new Set<string>(),
     conflicts: new Map<string, number>(),
     lastGitSyncAt: cwd === '/parked' ? 7 : 42,
-    error: null,
+    error: env.maintenanceError,
     loading: false,
   }),
 }));
@@ -157,6 +162,8 @@ beforeEach(async () => {
   env.releaseWorktrees = null;
   env.pending = [];
   env.fetchCount = 0;
+  env.maintenanceCount = 0;
+  env.maintenanceError = null;
   env.forgetCount = 0;
   env.events = [];
   env.now = 1_000_000;
@@ -190,6 +197,7 @@ describe('sync state', () => {
     await flush();
     settle(0);
     await first;
+    expect(env.maintenanceCount).toBe(1);
     expect(sidebar.getSyncState(env.cwd)).toMatchObject({
       providerId: 'github',
       providerConfigured: true,
@@ -198,6 +206,7 @@ describe('sync state', () => {
       remoteError: null,
       remoteSyncing: false,
       remoteIntervalMs: 60_000,
+      maintenanceIntervalMs: 3_600_000,
       remoteFetches: 1,
     });
 
@@ -216,6 +225,27 @@ describe('sync state', () => {
     expect(sidebar.getSyncState(env.cwd).remoteIntervalMs).toBe(5_000);
   });
 
+  it.each([
+    [600_000, 600_000],
+    [1_000, 300_000],
+  ])(
+    'reports maintenance interval %i with the scheduler clamp (%i)',
+    (configured, effective) => {
+      env.config = { mergePollInterval: configured };
+      expect(sidebar.getSyncState(env.cwd).maintenanceIntervalMs).toBe(
+        effective
+      );
+    }
+  );
+
+  it('identifies maintenance failures separately from provider failures', () => {
+    env.maintenanceError = 'git fetch failed';
+    expect(sidebar.getSyncState(env.cwd)).toMatchObject({
+      remoteError: 'git fetch failed',
+      remoteErrorSource: 'maintenance',
+    });
+  });
+
   it('does not call the provider at all when it is not configured', async () => {
     env.configured = false;
     await listSidebarItems();
@@ -228,7 +258,11 @@ describe('sync state', () => {
     await flush();
     env.pending[0].reject(new Error('provider exploded'));
     await bad;
-    expect(sidebar.getSyncState(env.cwd).remoteError).toBe('provider exploded');
+    env.maintenanceError = 'git fetch failed';
+    expect(sidebar.getSyncState(env.cwd)).toMatchObject({
+      remoteError: 'provider exploded',
+      remoteErrorSource: 'provider',
+    });
   });
 });
 

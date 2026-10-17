@@ -135,6 +135,11 @@ export function computeInsertionMap(
   const outOfDiff: ReviewComment[] = [];
 
   for (const comment of comments) {
+    // A comment on the whole file or the pull request has no row.
+    if (comment.lineStart == null || comment.lineEnd == null) {
+      outOfDiff.push(comment);
+      continue;
+    }
     const lineMap = comment.side === 'LEFT' ? oldLineToIndex : newLineToIndex;
     const insertAfter = placeAfter(
       lineMap,

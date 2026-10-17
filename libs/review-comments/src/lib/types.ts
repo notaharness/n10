@@ -2,14 +2,19 @@ export type CommentSeverity = 'critical' | 'major' | 'minor' | 'nit';
 
 export interface ReviewComment {
   id: string;
-  file: string;
-  lineStart: number;
-  lineEnd: number;
+  /** Where the comment goes, as `RemoteCommentThread` says it: null
+   *  `file` for the pull request itself, null lines for a whole file. */
+  file: string | null;
+  lineStart: number | null;
+  lineEnd: number | null;
   severity: CommentSeverity;
   body: string;
   side: 'LEFT' | 'RIGHT';
   status: 'draft' | 'posting' | 'posted';
   createdAt: string;
+  /** The commit checked out where the comment was written, and whose
+   *  diff its lines were checked against. */
+  head?: string;
   /** Account/repository bound to an unanswered publication; retry before editing. */
   publication?: {
     provider: string;

@@ -50,6 +50,8 @@ holds the keybind-driven state transitions; screens under `src/screens/main`
   own shim (decisions.md D16). Engine agent-draft commands publish through
   the VCS publishers and core’s durable ledger, retaining completed comments
   after a partial failure. Findings are scoped to the common Git directory.
+  A finding sits on lines, a file or the pull request; a line or file anchor
+  outside the PR diff at HEAD is refused before it is stored.
 - Packaging: `prepare-publish` assembles `dist/` from this build and the
   desktop build; see the `publish-beta` skill.
 - Comment images (`![alt](url)`) render inline through kitty graphics only

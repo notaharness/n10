@@ -842,7 +842,7 @@ describe('azureDevOpsProvider.fetchMergedBranches', () => {
       testProject,
       ['done-240', 'still-open']
     );
-    expect(merged).toEqual(new Set(['done-240']));
+    expect(merged).toEqual(new Map([['done-240', []]]));
   });
 
   it('asks only for pull requests closed in the last thirty days', async () => {
@@ -881,7 +881,7 @@ describe('azureDevOpsProvider.fetchMergedBranches', () => {
       testProject,
       ['done-900', 'done-1200']
     );
-    expect(merged).toEqual(new Set(['done-900']));
+    expect(merged).toEqual(new Map([['done-900', []]]));
     expect(mockFetch).toHaveBeenCalledTimes(10);
   });
 });

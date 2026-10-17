@@ -85,14 +85,7 @@ export function ReviewStepper({
     return <FinishScreen onExit={onExit} />;
   }
 
-  const snippet = snippetAround(
-    filesByName.get(current.file) ?? [],
-    current.side,
-    current.lineStart,
-    current.lineEnd
-  );
-
-  const unread = prDiff && unreadBody(prDiff, current.file, snippet.length > 0);
+  const { snippet, unread } = draftCode(current, filesByName, prDiff);
 
   return (
     <StepCard
@@ -107,7 +100,6 @@ export function ReviewStepper({
         unread && (
           <UnreadCode
             {...unread}
-            prDiff={prDiff}
             // The notice goes when the read starts: the keyboard moves
             // to the draft's place in the file, just above it.
             focusAfter={location}
@@ -121,7 +113,9 @@ export function ReviewStepper({
       onPrev={() => setIndex((i) => Math.max(0, i - 1))}
       onNext={() => setIndex((i) => Math.min(ordered.length - 1, i + 1))}
       onExit={onExit}
-      onOpenInDiff={() => onOpenInDiff(current.file)}
+      onOpenInDiff={() => {
+        if (current.file !== null) onOpenInDiff(current.file);
+      }}
       onPost={() =>
         post.mutate(
           { prId, ids: [current.id], headSha },
@@ -147,6 +141,27 @@ export function ReviewStepper({
       }
     />
   );
+}
+
+/** The code a draft is on, and whether its file is still to be read.
+ *  A draft on a whole file or the pull request has no lines to show. */
+function draftCode(
+  draft: ReviewComment,
+  filesByName: Map<string, DiffLine[]>,
+  prDiff: PrDiffView | undefined
+) {
+  const { file, lineStart, lineEnd } = draft;
+  if (file === null || lineStart === null || lineEnd === null)
+    return { snippet: [], unread: null };
+  const snippet = snippetAround(
+    filesByName.get(file) ?? [],
+    draft.side,
+    lineStart,
+    lineEnd
+  );
+  if (!prDiff) return { snippet, unread: null };
+  const body = unreadBody(prDiff, file, snippet.length > 0);
+  return { snippet, unread: body && { ...body, prDiff } };
 }
 
 /**

@@ -5,7 +5,11 @@ import {
   reviewConversation,
 } from './fixtures/conversation-review.js';
 import { sidebarRow } from './setup/app.js';
-import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
+import {
+  twoDaysAgoAt,
+  updateFakeGh,
+  type FakeGitHub,
+} from './setup/fake-gh.js';
 
 /**
  * The Overview's activity (C1, C2): the whole conversation in order,
@@ -251,12 +255,12 @@ test.describe('Pull request activity', () => {
       s.prs[0]!.generalComments!.push({
         author: 'carol',
         body: 'Late to the party, but this looks good.',
-        createdAt: '2026-09-20T14:00:00Z',
+        createdAt: twoDaysAgoAt(14),
       });
       s.prs[0]!.threads!.find((t) => t.id === 'T-open')!.comments.push({
         author: 'carol',
         body: 'Confirmed on my machine too.',
-        createdAt: '2026-09-20T14:01:00Z',
+        createdAt: twoDaysAgoAt(14, 1),
       });
     });
     // Resolving a thread in the diff re-reads the conversation.

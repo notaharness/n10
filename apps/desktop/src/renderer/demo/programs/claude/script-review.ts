@@ -36,7 +36,7 @@ function addComment(repo: RepoState, pr: PullRequestInfo, i: number): Beat {
       {
         kind: 'tool',
         name: 'Bash',
-        arg: `n10 util add-comment --pr=${pr.id} --file=${draft.file} --lineStart=${draft.lineStart} --lineEnd=${draft.lineEnd} --severity=${draft.severity} --body="${subject}…"`,
+        arg: `n10 util add-comment --pr=${pr.id} --base=${pr.targetBranch} --file=${draft.file} --lineStart=${draft.lineStart} --lineEnd=${draft.lineEnd} --severity=${draft.severity} --body="${subject}…"`,
         out: [id],
       },
     ],

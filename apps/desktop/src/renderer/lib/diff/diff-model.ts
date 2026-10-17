@@ -266,6 +266,24 @@ export const SEVERITY_RANK: Record<CommentSeverity, number> = {
   nit: 3,
 };
 
+/** Where a draft goes, as text: `a.ts:12-14`, `a.ts` for the whole
+ *  file, and `Pull request` for the pull request itself. */
+export function draftPlace(draft: ReviewComment): string {
+  const { file, lineStart, lineEnd } = draft;
+  if (file === null) return 'Pull request';
+  if (lineStart === null) return file;
+  return `${file}:${lineStart}${lineEnd !== lineStart ? `-${lineEnd}` : ''}`;
+}
+
+/** Drafts on the pull request itself come before every file's. */
+function fileRank(
+  draft: ReviewComment,
+  fileOrder: ReadonlyMap<string, number>
+): number {
+  if (draft.file === null) return -1;
+  return fileOrder.get(draft.file) ?? Number.MAX_SAFE_INTEGER;
+}
+
 /**
  * Order drafts for the "Review ready" walkthrough: by severity
  * (critical → nit), then by the file's position in the diff, then by
@@ -279,10 +297,10 @@ export function orderDraftsForReview(
   return [...drafts].sort((a, b) => {
     const s = SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity];
     if (s !== 0) return s;
-    const fa = fileOrder.get(a.file) ?? Number.MAX_SAFE_INTEGER;
-    const fb = fileOrder.get(b.file) ?? Number.MAX_SAFE_INTEGER;
+    const fa = fileRank(a, fileOrder);
+    const fb = fileRank(b, fileOrder);
     if (fa !== fb) return fa - fb;
-    return a.lineStart - b.lineStart;
+    return (a.lineStart ?? 0) - (b.lineStart ?? 0);
   });
 }
 
