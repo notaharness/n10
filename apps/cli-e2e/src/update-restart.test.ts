@@ -35,6 +35,15 @@ async function startHeldUpdate(n10: N10Session, npm: Npm) {
   await expect.poll(() => npm.requests.includes('/n10.tgz')).toBe(true);
 }
 
+/** npm retires the old package directory before it extracts the new one, so
+ * mid-install there is briefly no manifest to read. */
+function installedVersion(npm: Npm) {
+  const path = join(npm.root, 'package.json');
+  return existsSync(path)
+    ? (JSON.parse(readFileSync(path, 'utf8')) as { version: string }).version
+    : null;
+}
+
 function updateStatus(n10: N10Session) {
   const path = join(n10.homeDir, '.n10/npm-update-result.json');
   return existsSync(path)
@@ -95,12 +104,7 @@ test('Npm restart: updates in the foreground, reopens the TUI and keeps the same
     path: info.outputPath('restart-terminal-before.png'),
   });
   await n10.term.type('u');
-  await expect
-    .poll(
-      () =>
-        JSON.parse(readFileSync(join(npm.root, 'package.json'), 'utf8')).version
-    )
-    .toBe(npm.version);
+  await expect.poll(() => installedVersion(npm)).toBe(npm.version);
   await expect(live(n10, /Settings › Updates/)).toBeHidden();
   await expect(live(n10, /s settings/)).toBeVisible();
   await n10.term.type('s');
@@ -178,9 +182,7 @@ test('Npm restart: Ctrl-C during download rolls back, releases the lock and reop
   await expect
     .poll(() => existsSync(join(n10.homeDir, '.n10/npm-update.lock')))
     .toBe(false);
-  expect(
-    JSON.parse(readFileSync(join(npm.root, 'package.json'), 'utf8')).version
-  ).toBe('1.0.0-beta.1');
+  expect(installedVersion(npm)).toBe('1.0.0-beta.1');
   await expect(live(n10, /s settings/)).toBeVisible();
   await n10.term.type('s');
   await expect(live(n10, /Updates — version/)).toBeVisible();
@@ -211,9 +213,7 @@ test('Npm restart: a second Ctrl-C while cancelling is ignored and npm still rol
   npm.releaseDownload();
   await expect.poll(() => updateStatus(n10)).toBe('failed');
   expect(existsSync(join(npm.root, 'main.js'))).toBe(true);
-  expect(
-    JSON.parse(readFileSync(join(npm.root, 'package.json'), 'utf8')).version
-  ).toBe('1.0.0-beta.1');
+  expect(installedVersion(npm)).toBe('1.0.0-beta.1');
   await expect(live(n10, /s settings/)).toBeVisible();
 });
 
