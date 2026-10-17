@@ -172,13 +172,13 @@ class Run {
     const context =
       place.kind === 'conversation' ? null : await this.iterationContext();
     const posted = await this.step(key, this.sending(body, place), () =>
-      this.api.send<{ id: number }>(
+      this.api.send<{ id?: unknown }>(
         'POST',
         `pullrequests/${this.submission.prId}/threads?${V}`,
         newThread(body, place, context)
       )
     );
-    this.record(key, String(posted.id), body);
+    this.record(key, this.postedId(key, posted), body);
   }
 
   async reply(key: string, body: string, threadId: string): Promise<void> {
@@ -191,13 +191,13 @@ class Run {
     );
     const place: SentPlace = { kind: 'reply', threadId };
     const posted = await this.step(key, this.sending(body, place), () =>
-      this.api.send<{ id: number }>('POST', `${path}/comments?${V}`, {
+      this.api.send<{ id?: unknown }>('POST', `${path}/comments?${V}`, {
         parentCommentId: root?.id ?? 0,
         content: body,
         commentType: 1,
       })
     );
-    this.record(key, String(posted.id), body);
+    this.record(key, this.postedId(key, posted), body);
   }
 
   /** The reviewer's vote, once everything chosen is posted. */
@@ -281,6 +281,19 @@ class Run {
   private posted(): Record<string, string> {
     return Object.fromEntries(
       Object.entries(this.ledger.added).map(([key, { id }]) => [key, id])
+    );
+  }
+
+  /** The id Azure answered a post with. An answer without one says
+   *  nothing of whether the post landed, so it is taken as lost: the
+   *  step stays in flight and the next attempt looks for it first. */
+  private postedId(key: string, answer: { id?: unknown } | null): string {
+    const id = answer?.id;
+    if (typeof id === 'number' && Number.isInteger(id)) return String(id);
+    throw new ReviewPublishError(
+      'unknown',
+      "Azure DevOps answered without the new comment's id; n10 will check what was posted before trying again",
+      { item: key, posted: this.posted() }
     );
   }
 

@@ -38,8 +38,9 @@ const ROOTS: Record<string, string> = {
  * GitHub's side of a review, as its GraphQL schema describes it: one
  * pending review per reviewer, visible only to them, filled by thread
  * and reply mutations and filed by a submit. `lose` performs a write
- * and then drops its answer; `drop` loses the request before it
- * reaches GitHub; `refuse` answers no and writes nothing.
+ * and then drops its answer; `blank` performs it and answers with a
+ * null payload; `drop` loses the request before it reaches GitHub;
+ * `refuse` answers no and writes nothing.
  * What GitHub itself refuses (a second pending review, a submit of one
  * already filed, a comment that is not there) is refused here too.
  */
@@ -54,6 +55,7 @@ class FakeGitHub {
   submitted: Record<string, unknown>[] = [];
   threadWrites: Record<string, unknown>[] = [];
   lose = new Set<string>();
+  blank = new Set<string>();
   drop = new Set<string>();
   refuse = new Map<string, string>();
   private next = 0;
@@ -79,6 +81,10 @@ class FakeGitHub {
     }
     if (this.lose.delete(op)) {
       return Promise.reject(new VcsError('network', 'connection reset'));
+    }
+    if (this.blank.delete(op)) {
+      const [field] = Object.keys(data as Record<string, unknown>);
+      return Promise.resolve({ data: { [field!]: null } });
     }
     return Promise.resolve({ data });
   };
@@ -383,6 +389,40 @@ describe('publishing a GitHub review', () => {
     expect(await failure(publish(gh, store))).toBe('unknown');
     await publish(gh, store);
     expect(gh.sent.filter((op) => op === 'StartReview')).toHaveLength(1);
+    expect(gh.submitted).toHaveLength(1);
+  });
+
+  it('records no id for a comment GitHub answered without one, and finds it on the next attempt', async () => {
+    const gh = new FakeGitHub();
+    const store = memory();
+    gh.blank.add('AddReviewThread');
+    const err = await publish(gh, store).catch((e: unknown) => e);
+    expect(err).toMatchObject({ failure: 'unknown', item: 'range' });
+    expect(store.get()).toMatchObject({ added: {}, inFlight: 'range' });
+    await publish(gh, store);
+    expect(count(gh, 'AddReviewThread')).toBe(2);
+    expect(gh.submitted[0]).toMatchObject({ comments: 3 });
+  });
+
+  it('adds a reply again when GitHub answered without its id and kept nothing', async () => {
+    const gh = new FakeGitHub();
+    const store = memory();
+    gh.blank.add('AddReviewReply');
+    expect(await failure(publish(gh, store))).toBe('unknown');
+    gh.pending!.comments.pop();
+    await publish(gh, store);
+    expect(count(gh, 'AddReviewReply')).toBe(2);
+    expect(gh.submitted[0]).toMatchObject({ comments: 3 });
+  });
+
+  it('takes up its own pending review when the start was answered without its id', async () => {
+    const gh = new FakeGitHub();
+    const store = memory();
+    gh.blank.add('StartReview');
+    expect(await failure(publish(gh, store))).toBe('unknown');
+    expect(store.get()).toMatchObject({ reviewId: null, inFlight: 'review' });
+    await publish(gh, store);
+    expect(count(gh, 'StartReview')).toBe(1);
     expect(gh.submitted).toHaveLength(1);
   });
 
