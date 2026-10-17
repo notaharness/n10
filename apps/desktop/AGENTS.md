@@ -225,8 +225,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - Terminals are xterm.js with its WebGL renderer, opened only through
   `lib/terminals/xterm.ts` (options, palette, addons); a lost WebGL context
   falls back to xterm's DOM renderer and refits. The element xterm opens in
-  carries `data-terminal-renderer`, `data-terminal-grid`, `data-terminal-buffer`
-  and `data-terminal-cursor-keys` for tests and QA.
+  carries `data-terminal-renderer`, `data-terminal-theme`, `data-terminal-grid`,
+  `data-terminal-buffer` and `data-terminal-cursor-keys` for tests and QA.
   `SessionTerminal` sends `resizeSession` on every fit and refits on the
   session's `spawnedAt` epoch; `FitAddon` is the only grid reckoning. It
   bounces the grid for a full repaint only when the snapshot is `truncated`.
@@ -278,8 +278,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   are accepted until they are next changed.
 - The theme painted is the host's (`services/theme.ts`), which main
   posts from `nativeTheme`; `lib/theme.ts` gives the UI class and every
-  terminal that one value. Do not paint from `prefers-color-scheme`. The
-  host's terminal emulators answer colour and scheme queries from it
+  terminal that one value. Do not paint from `prefers-color-scheme`. Only
+  the renderer's xterm answers a program's colour and scheme queries:
+  OSC 10/11 natively, the rest in `lib/terminals/scheme-reports.ts`
   (decisions.md, Theme).
 - Components use design tokens from `styles.css` and the primitives in
   `components/ui` only. Check visual work with `scripts/qa-shots.mjs`.

@@ -8,25 +8,22 @@ import {
   openNewTerminalDialog,
   terminalTabs,
 } from './setup/terminals.js';
+import { SHOWN_TERMINAL } from './setup/terminal-grid.js';
 
 /** Asks the terminal for its background (OSC 11), as Claude Code does
- *  at start, and prints the answer. */
+ *  at start, and prints the answers it gets within a second. */
 const ASK_BACKGROUND = `
 process.stdin.setRawMode(true);
 process.stdout.write('\\x1b]11;?\\x1b\\\\');
 let got = '';
 process.stdin.on('data', (data) => {
   got += data;
-  const answer = /\\x1b\\]11;([^\\x07\\x1b]*)/.exec(got);
-  if (answer) {
-    console.log('background ' + answer[1]);
-    process.exit(0);
-  }
 });
 setTimeout(() => {
-  console.log('background unanswered');
-  process.exit(1);
-}, 5000);
+  const answers = [...got.matchAll(/\\x1b\\]11;([^\\x07\\x1b]*)/g)];
+  console.log('background ' + answers.map((a) => a[1]).join(' ') + ' end');
+  process.exit(0);
+}, 1000);
 `;
 
 /**
@@ -59,23 +56,20 @@ async function openShell(app: ElectronApplication, page: Page) {
   await confirmNewTerminal(page, 'Shell');
   await expect(terminalTabs(page)).toHaveCount(before + 1);
   await expect(
-    page
-      .locator('[data-terminal-pane]')
-      .filter({ visible: true })
-      .getByText(/\S/)
-      .first()
+    page.locator(`${SHOWN_TERMINAL} .xterm-rows`).getByText(/\S/).first()
   ).toBeVisible({ timeout: 15_000 });
 }
 
-async function painted(page: Page): Promise<{ ui: Theme; terminal: Theme }> {
-  return page.evaluate(() => ({
-    ui: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
-    terminal: document
-      .querySelector('[data-terminal-pane] .wterm')
-      ?.classList.contains('theme-light')
-      ? 'light'
-      : 'dark',
-  }));
+async function painted(
+  page: Page
+): Promise<{ ui: Theme; terminal: string | null }> {
+  const ui = await page.evaluate(() =>
+    document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+  );
+  const terminal = await page
+    .locator(SHOWN_TERMINAL)
+    .getAttribute('data-terminal-theme');
+  return { ui, terminal };
 }
 
 test.describe('Theme', () => {
@@ -95,23 +89,26 @@ test.describe('Theme', () => {
     }
   });
 
-  // tmux asks its client terminal for its colours when the client
-  // starts, and answers its panes from them.
-  test("a program in a terminal is told the theme's background", async ({
+  // tmux asks its client terminal, xterm, for its colours when the
+  // client starts, and answers its panes from them. One answer: xterm's
+  // reply goes to tmux, never past it to the program as well.
+  test("a program in a terminal is told the theme's background, once", async ({
     desktop,
   }) => {
     const { app, page, repoPath } = desktop;
     writeFileSync(join(repoPath, 'ask-background.cjs'), ASK_BACKGROUND);
 
     for (const [theme, background] of [
-      ['dark', 'rgb:1e1e/1e1e/1e1e'],
-      ['light', 'rgb:fafa/fafa/fafa'],
+      ['dark', 'rgb:1f1f/1f1f/1f1f'],
+      ['light', 'rgb:ffff/ffff/ffff'],
     ] as const) {
       await switchSystemTheme(app, theme);
       await openShell(app, page);
       await focusTerminal(page);
       await page.keyboard.type('node ask-background.cjs\n', { delay: 20 });
-      await expect(visibleText(page, `background ${background}`)).toBeVisible({
+      await expect(
+        visibleText(page, `background ${background} end`)
+      ).toBeVisible({
         timeout: 15_000,
       });
     }

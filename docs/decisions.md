@@ -1512,17 +1512,24 @@ the host and repaint on its push. The renderer's `prefers-color-scheme` only
 seeds the first paint: a class set from its change event beside a terminal
 that re-read `matches` on each render could disagree.
 
-Programs in a terminal learn the theme the way they would from any terminal.
-The host's headless emulator for each attach client answers OSC 10/11 with
-the colours wterm paints, answers `CSI ? 996 n` and, while the program has
-mode 2031 set, reports `CSI ? 997 ; 1|2 n` on change. These replies go to the
-client's input, apart from xterm's own answers, which the renderer gives.
+Programs in a terminal learn the theme the way they would from any terminal,
+and only the terminal on screen answers: the renderer's xterm, whose replies
+reach the PTY through `onData`. xterm answers OSC 10/11 itself from
+`options.theme`, the palette it paints with. It lacks the colour-scheme
+reports, so `lib/terminals/scheme-reports.ts` adds them with parser hooks:
+`CSI ? 996 n`, DECRQM for mode 2031 (xterm would say "not recognized"), and
+`CSI ? 997 ; 1|2 n` on a switch while the program has 2031 set. The host's
+headless emulators answer nothing, so a session no window has mounted is not
+told of a switch while it happens.
+
 tmux is that program: it asks its client for colours when the client
 attaches (again on a resize, at most every 30 seconds) and answers its panes'
 OSC 10/11 from what it last read. Only tmux 3.6 and later set mode 2031 on the
 client, ask again when the client reports a scheme change, and pass the change
 on to panes that enabled it; that is what lets a running program, such as
-Claude Code with its auto theme, follow a switch. Older tmux answers from the
-colours it read at attach or at the last such resize, so after a switch only
-terminals attached since then report the new theme; nothing native makes it
-ask again.
+Claude Code with its auto theme, follow a switch. tmux derives a pane's scheme
+from the client's background and re-derives it on each colour reply, so on a
+switch the pane is told the old scheme (after the foreground reply) before the
+new one. Older tmux answers from the colours it read at attach or at the last
+such resize, so after a switch only terminals attached since then report the
+new theme; nothing native makes it ask again.
