@@ -12,7 +12,11 @@ import {
 const BRANCH = 'transition';
 const MARKER = 'transition-agent-ready';
 test.use({
-  n10Config: { aiCommand: `echo ${MARKER}; sleep 300`, keybindPreset: 'vim' },
+  n10Config: {
+    agentId: 'test',
+    aiCommand: `echo ${MARKER}; sleep 300`,
+    keybindPreset: 'vim',
+  },
 });
 
 for (const transition of [
