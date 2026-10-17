@@ -318,7 +318,6 @@ export interface VcsProvider {
     project: Record<string, string>,
     prId: number
   ): Promise<PullRequestChecks>;
-
 }
 
 // ── Remote comment threads (fetched from VCS providers) ───────────

@@ -19,6 +19,7 @@ import { killFixtureSessions } from '../setup/tmux.js';
 import { appEnv } from './app-env.js';
 import { fakeAdoLoaded, fakeAdoMisses } from '../setup/fake-ado.js';
 import { closeDesktopApp } from '../setup/app-close.js';
+import { launchAgain } from '../setup/launch-again.js';
 import type { TerminalSeed } from '../setup/terminals.js';
 import {
   fakeAgent,
@@ -102,6 +103,12 @@ export interface DesktopApp {
   pageErrors: string[];
   /** Evaluate in the main process (e.g. to inspect host services). */
   main: ElectronApplication['evaluate'];
+  /**
+   * Launch the app again while this one runs, as a user would from a
+   * shell in `startDir` (the npm launcher's `N10_START_DIR`). Resolves
+   * once that process has handed over and quit.
+   */
+  launchAgain: (startDir: string) => Promise<void>;
   /** Quit the app and start it again on the same HOME, tmux socket and
    *  environment, as a user closing and reopening n10 would. `app`,
    *  `page` and `main` then answer for the new process. `startPath`
@@ -193,18 +200,20 @@ export const test = base.extend<
 
     seedTmux(repoPath, homeDir, liveSessions, liveTerminals);
 
+    const envFor = (startPath: string) =>
+      appEnv({
+        homeDir,
+        repoPath: startPath,
+        startWithoutRepo,
+        githubToken,
+        ghEnv,
+        extra: env,
+      });
     const launch = (startPath: string) =>
       electron.launch({
         args: launchArgs(webgl),
         cwd: WORKSPACE_ROOT,
-        env: appEnv({
-          homeDir,
-          repoPath: startPath,
-          startWithoutRepo,
-          githubToken,
-          ghEnv,
-          extra: env,
-        }),
+        env: envFor(startPath),
         timeout: 60_000,
       });
     let app = await launch(repoPath);
@@ -251,6 +260,12 @@ export const test = base.extend<
       homeDir,
       pageErrors,
       main: app.evaluate.bind(app),
+      launchAgain: (startDir) =>
+        launchAgain({
+          args: launchArgs(webgl),
+          cwd: WORKSPACE_ROOT,
+          env: { ...envFor(repoPath), N10_START_DIR: startDir },
+        }),
       stop,
       async relaunch(startPath = repoPath) {
         await stop();

@@ -67,9 +67,7 @@ describe('fileAnalysisQuery', () => {
     const lines = [line('a'), line('b')];
 
     const first = await qc.query(fileAnalysisQuery('a.ts', lines, 'dark'));
-    const second = await qc.query(
-      fileAnalysisQuery('a.ts', lines, 'dark')
-    );
+    const second = await qc.query(fileAnalysisQuery('a.ts', lines, 'dark'));
 
     expect(analyze).toHaveBeenCalledTimes(1);
     expect(second).toBe(first);
@@ -236,9 +234,7 @@ describe('the review walkthrough snippet path', () => {
     // Five renders of one step: a keystroke in the draft editor, a
     // toast, a `drafts` refetch — none of them touch the snippet.
     for (let i = 0; i < 5; i++) {
-      await qc.query(
-        fileAnalysisQuery('a.ts', renderSnippetLines(), 'dark')
-      );
+      await qc.query(fileAnalysisQuery('a.ts', renderSnippetLines(), 'dark'));
     }
 
     expect(analyze).toHaveBeenCalledTimes(1);
