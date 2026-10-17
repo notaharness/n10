@@ -8,9 +8,11 @@ import {
   quotaExhausted,
   readJsonResponse,
   RequestCache,
+  retryAfterHeaderMs,
   retryAfterMs,
   throttledError,
   ThrottleGate,
+  VcsError,
   type RequestCounters,
 } from '@n10/vcs-core';
 import { log } from '@n10/logger';
@@ -125,12 +127,12 @@ async function send(
   }
 
   gate.noteSuccess();
-  if (quotaExhausted(res.headers)) {
-    // Azure warns before it refuses. Standing down now costs one poll
-    // interval; ignoring it costs the backoff on the refusal that
-    // follows.
+  // Azure warns before it refuses: a `Retry-After` on a response it
+  // served, or a spent quota. Standing down now costs one poll
+  // interval; ignoring it costs the backoff on the refusal that follows.
+  if (retryAfterHeaderMs(res.headers) !== null || quotaExhausted(res.headers)) {
     const wait = gate.noteQuotaExhausted(retryAfterMs(res.headers));
-    log('warn', 'ado.throttle', `quota spent — pausing for ${wait}ms`);
+    log('warn', 'ado.throttle', `asked to slow down — pausing for ${wait}ms`);
   }
   return res;
 }
@@ -189,6 +191,64 @@ export function adoGetPage<T>(
     const res = await send(context, url, { headers });
     const continuation = res.headers.get('x-ms-continuationtoken');
     return { data: await toJson<T>(res, what), continuation };
+  });
+}
+
+/** Rows per page of a `$top`/`$skip` listing. Azure answers 101 when
+ *  not asked, so it serves at least this many and a shorter page is
+ *  the last one. */
+const PAGE_SIZE = 100;
+
+/** Pages read before a listing is abandoned as never ending — a server
+ *  that ignores `$skip` answers every page in full. */
+const MAX_PAGES = 50;
+
+/**
+ * Every row of a `$top`/`$skip` listing, as one answer.
+ *
+ * Azure's list endpoints stop at a page whether or not there are more
+ * rows, and a missing row reads to a caller as a pull request that has
+ * gone. The pages are cached together, so a listing is kept — and
+ * handed out — only once every page has arrived: a failed page fails
+ * the read rather than passing off the rows before it as the whole list.
+ *
+ * Only for endpoints that fill every page but the last, as
+ * `/pullrequests` does. One that pages by `x-ms-continuationtoken`
+ * (`/build/builds`) can answer a short page with more to come; read
+ * those through `adoGetPage`.
+ *
+ * `truncateAfterPages` is for a caller a partial list cannot mislead:
+ * past that many pages it gets the rows read so far instead of a throw.
+ */
+export function adoGetAll<T>(
+  context: string,
+  key: string,
+  ttlMs: number,
+  url: string,
+  headers: Record<string, string>,
+  what?: string,
+  { truncateAfterPages }: { truncateAfterPages?: number } = {}
+): Promise<T[]> {
+  return cache.get(key, ttlMs, async () => {
+    const rows: T[] = [];
+    const pages = truncateAfterPages ?? MAX_PAGES;
+    for (let page = 0; page < pages; page++) {
+      const res = await send(
+        context,
+        `${url}&$top=${PAGE_SIZE}&$skip=${page * PAGE_SIZE}`,
+        { headers }
+      );
+      const value = (await toJson<{ value?: T[] }>(res, what)).value ?? [];
+      rows.push(...value);
+      if (value.length < PAGE_SIZE) return rows;
+    }
+    if (truncateAfterPages !== undefined) return rows;
+    throw new VcsError(
+      'unexpected-response',
+      `${PROVIDER_NAME} listed more than ${MAX_PAGES * PAGE_SIZE} rows for ${
+        what ?? 'one request'
+      }`
+    );
   });
 }
 

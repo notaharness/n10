@@ -976,13 +976,39 @@ shows them.
 Agent publication uses core’s draft submission machinery in the separate
 `~/.n10/agent-review-publications` store, keyed by provider repository, PR and
 account. Human writing stays in `review-drafts`. Every network write goes through
-`VcsProvider.publishReview`; review-comments contains storage and formatting only.
+`VcsProvider.publishReview`; review-comments contains paths, reads and formatting
+only, and core owns every write.
 Selected findings are submitted as one native review with one verdict. A partial
 retry resumes the same durable submission and skips confirmed findings; the
 error reports how many findings were posted.
 Completed findings stay posted after a later failure. An uncertain outcome retains
 its ledger and account binding, blocks edits, and is reconciled on retry. Restarted
 processes can retry findings left posting without inventing a second write path.
+
+The findings file has writers in several processes: `n10 util add-comment`, edits in
+the TUI and the desktop, and publication. Each reads, changes and writes it under
+`comments.json.lock` (core `changeAgentComments`, `file-lock.ts`), so none drops
+another's change. The lock is synchronous: a section is a few milliseconds of file
+work, so a waiter blocks no longer than the synchronous write it replaces, and
+nothing in one process can interleave with it; an asynchronous lock would reorder
+one process's writes and open its own check-then-write gaps. A post holds a
+separate claim, `posting.lock`, across its network calls, so one process at a time
+posts a pull request's findings. A comment marked `posting` reads as a draft unless
+some process holds that claim, and edits check it under the store lock.
+
+A lock file holds its owner's host, pid and a nonce. Release removes only a lock
+still holding its own token. A holder on this machine is judged by its pid alone,
+never by age, so a stopped TUI or a slow network never loses its claim; a holder
+that cannot be checked counts as gone after a minute. Breaking a lock happens under
+a second `.break` lock and only if the file still holds the token judged gone, so
+two waiters cannot both break it and both get in. A lock written before the
+machine last booted is gone whatever its pid now names, since after a power loss
+that pid can belong to a live, even root, process. Known limit: within one boot, a
+lock left by a crashed process whose pid has since been reused stays until that
+process exits.
+
+A write reads the file strictly: no file is no findings, but a file it cannot open
+or parse fails the write and leaves the file as it is, where a reader shows nothing.
 
 ## Guided review
 

@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { handleUtilCommand } from '@n10/review-comments';
 import { readCommentDiff } from './agent-comment-diff.js';
+import { appendAgentComment } from './agent-comment-store.js';
 
 /** A repository and every linked checkout share one agent-finding store. */
 export function agentCommentRepository(cwd: string): string {
@@ -33,7 +34,10 @@ export async function runReviewUtility(
   args: string[],
   cwd: string
 ): Promise<void> {
-  await handleUtilCommand(args, agentCommentRepository(cwd), {
+  const repository = agentCommentRepository(cwd);
+  await handleUtilCommand(args, repository, {
+    appendComment: (prId, comment) =>
+      appendAgentComment(repository, prId, comment),
     head: () => checkedOutCommit(cwd),
     diff: (base, file) => readCommentDiff(cwd, base, file),
   });

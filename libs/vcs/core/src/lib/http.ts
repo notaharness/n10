@@ -38,15 +38,6 @@ export interface JsonResponseOptions {
 
 const DEFAULT_RETRY_AFTER_MS = 30_000;
 
-/**
- * How long the server asked us to wait, in ms, or null.
- *
- * `Retry-After` is either a delta in seconds or an HTTP date; Azure
- * sends the former on its own throttling responses and the latter
- * essentially never, but both are legal. `X-RateLimit-Reset` is a unix
- * timestamp in seconds and is what Azure sends when a quota — rather
- * than one request — is what ran out.
- */
 /** A header's value, or null when it is absent or blank.
  *
  *  `headers.get` answers `''` for a header that is present with no
@@ -63,17 +54,41 @@ function headerValue(
   return trimmed === '' ? null : trimmed;
 }
 
-export function retryAfterMs(
+/**
+ * The wait a `Retry-After` header names, in ms, or null without a
+ * valid one. It is either a delta in seconds or an HTTP date; Azure
+ * sends the former, but both are legal.
+ *
+ * On any response, success included, this is the server telling the
+ * client to stop until then.
+ */
+export function retryAfterHeaderMs(
   headers: Pick<Headers, 'get'>,
   now: number = Date.now()
 ): number | null {
   const raw = headerValue(headers, 'retry-after');
-  if (raw) {
-    const asSeconds = Number(raw);
-    if (Number.isFinite(asSeconds)) return Math.max(0, asSeconds * 1000);
-    const asDate = Date.parse(raw);
-    if (!Number.isNaN(asDate)) return Math.max(0, asDate - now);
-  }
+  if (!raw) return null;
+  const asSeconds = Number(raw);
+  if (Number.isFinite(asSeconds)) return Math.max(0, asSeconds * 1000);
+  const asDate = Date.parse(raw);
+  return Number.isNaN(asDate) ? null : Math.max(0, asDate - now);
+}
+
+/**
+ * How long the server asked us to wait, in ms, or null.
+ *
+ * `Retry-After` first, then `X-RateLimit-Reset`: a unix timestamp in
+ * seconds, which is what Azure sends when a quota — rather than one
+ * request — is what ran out. The reset alone says when the usage
+ * window drains, not that the client must wait for it, so it only
+ * times a pause that a refusal or a spent quota already called for.
+ */
+export function retryAfterMs(
+  headers: Pick<Headers, 'get'>,
+  now: number = Date.now()
+): number | null {
+  const asked = retryAfterHeaderMs(headers, now);
+  if (asked !== null) return asked;
   const resetRaw = headerValue(headers, 'x-ratelimit-reset');
   const reset = resetRaw === null ? NaN : Number(resetRaw);
   if (Number.isFinite(reset) && reset > 0) {

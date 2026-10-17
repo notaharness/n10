@@ -6,7 +6,6 @@ import {
   readAnchor,
   type CommentAnchor,
 } from './comment-anchor.js';
-import { appendComment } from './comment-store.js';
 import { validateGuide } from './guide.js';
 import { guideInstructions } from './guide-instructions.js';
 import { writeGuide } from './guide-store.js';
@@ -93,11 +92,7 @@ function placeComment(
   return { anchor, head: diff.head };
 }
 
-function handleAddComment(
-  args: string[],
-  repository: string,
-  context: UtilContext
-): void {
+function handleAddComment(args: string[], context: UtilContext): void {
   const parsed = parseArgs(args);
   const { prId, severity } = readRequired(parsed);
   const { anchor, head } = placeComment(parsed, context);
@@ -122,7 +117,7 @@ function handleAddComment(
     ...(parsed.thread ? { threadId: parsed.thread } : {}),
   };
 
-  appendComment(repository, prId, comment);
+  context.appendComment(prId, comment);
   console.log(comment.id);
 }
 
@@ -137,8 +132,11 @@ export type CommentDiff =
     }
   | { ok: false; error: string };
 
-/** What the agent's checkout tells the command, read only when needed. */
+/** What the caller supplies the command: the store it writes to, and
+ *  what the agent's checkout tells it, read only when needed. */
 export interface UtilContext {
+  /** Stores a new draft; the caller owns the store and its locking. */
+  appendComment: (prId: number, comment: ReviewComment) => void;
   /** The commit checked out where the command runs. */
   head?: () => string | undefined;
   /** `file`'s diff from where HEAD branched off `base` to HEAD. */
@@ -181,12 +179,12 @@ function handleAddGuide(
 export async function handleUtilCommand(
   args: string[],
   repository: string,
-  context: UtilContext = {}
+  context: UtilContext
 ): Promise<void> {
   const subcommand = args[0];
 
   if (subcommand === 'add-comment') {
-    handleAddComment(args.slice(1), repository, context);
+    handleAddComment(args.slice(1), context);
     return;
   }
   if (subcommand === 'add-guide') {

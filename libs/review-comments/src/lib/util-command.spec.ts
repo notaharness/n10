@@ -51,17 +51,14 @@ describe('parseArgs', () => {
 });
 
 /**
- * What `add-comment` actually writes.
- *
- * The command is the agent's whole interface to the review — a
- * subprocess with no state — so the file it leaves behind is the
- * contract, and asserting on the parsed flags alone would not have
- * caught a field that never reached disk.
+ * What `add-comment` hands the store. The command is the agent's whole
+ * interface to the review — a subprocess with no state — so the draft
+ * it stores is the contract; core's `agent-comment-store.spec.ts`
+ * covers the file it lands in.
  */
 describe('add-comment', () => {
-  let home: string;
-  let originalHome: string | undefined;
   let util: typeof Util;
+  let appended: { prId: number; comment: ReviewComment }[];
   let exit: ReturnType<typeof vi.spyOn>;
   let errors: string[];
 
@@ -92,6 +89,9 @@ describe('add-comment', () => {
   }));
   const run = (args: string[]) =>
     util.handleUtilCommand(['add-comment', ...args], '/repo', {
+      appendComment: (prId, comment) => {
+        appended.push({ prId, comment });
+      },
       diff,
       head: () => HEAD,
     });
@@ -99,18 +99,13 @@ describe('add-comment', () => {
   const refused = async (args: string[]) => {
     await expect(run(args)).rejects.toThrow('exit');
     expect(exit).toHaveBeenCalledWith(1);
-    expect(existsSync(storePath())).toBe(false);
+    expect(appended).toEqual([]);
     return errors;
   };
 
   beforeEach(async () => {
-    originalHome = process.env.HOME;
-    home = mkdtempSync(join(tmpdir(), 'n10-util-'));
-    process.env.HOME = home;
-    // ~/.n10 is resolved once at import time, so the module chain has
-    // to be re-imported after HOME moves.
-    vi.resetModules();
     util = await import('./util-command.js');
+    appended = [];
     errors = [];
     diff.mockClear();
     vi.spyOn(console, 'error').mockImplementation((line: string) => {
@@ -124,35 +119,14 @@ describe('add-comment', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    if (originalHome === undefined) delete process.env.HOME;
-    else process.env.HOME = originalHome;
-    rmSync(home, { recursive: true, force: true });
   });
 
-  /**
-   * Read the drafts file the way the reader does — off disk, at the
-   * path the agent's subprocess wrote it to. Going through the store's
-   * own API instead would prove the two agree with each other and
-   * nothing about the file that is actually the contract.
-   */
-  const storePath = () =>
-    join(
-      home,
-      '.n10',
-      'reviews',
-      createHash('sha256').update('/repo').digest('hex').slice(0, 32),
-      `pr-${PR}`,
-      'comments.json'
-    );
   const stored = (): ReviewComment[] => {
-    return (
-      JSON.parse(readFileSync(storePath(), 'utf8')) as {
-        comments: ReviewComment[];
-      }
-    ).comments;
+    expect(appended.every((entry) => entry.prId === PR)).toBe(true);
+    return appended.map((entry) => entry.comment);
   };
 
-  it('writes the draft the flags describe', async () => {
+  it('stores the draft the flags describe', async () => {
     await run(BASE);
     expect(stored()).toHaveLength(1);
     expect(stored()[0]).toMatchObject({
@@ -356,7 +330,7 @@ describe('add-guide', () => {
     await util.handleUtilCommand(
       ['add-guide', `--pr=${PR}`, `--file=${file}`],
       '/repo',
-      { head: () => 'abc123' }
+      { appendComment: () => undefined, head: () => 'abc123' }
     );
     expect(JSON.parse(readFileSync(guideAt(), 'utf8'))).toMatchObject({
       prId: PR,
@@ -371,7 +345,8 @@ describe('add-guide', () => {
     await expect(
       util.handleUtilCommand(
         ['add-guide', `--pr=${PR}`, `--file=${file}`],
-        '/repo'
+        '/repo',
+        { appendComment: () => undefined }
       )
     ).rejects.toThrow('exit');
     expect(exit).toHaveBeenCalledWith(1);

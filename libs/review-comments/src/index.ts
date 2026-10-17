@@ -7,9 +7,6 @@ export {
   commentDirPath,
   commentFilePath,
   readComments,
-  appendComment,
-  updateComment,
-  removeComment,
 } from './lib/comment-store.js';
 export { renderCommentBody, renderSummaryBody } from './lib/comment-body.js';
 export {
