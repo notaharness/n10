@@ -46,6 +46,7 @@ const env = vi.hoisted(() => ({
     reject: (e: Error) => void;
   }[],
   fetchCount: 0,
+  maintenanceCount: 0,
   forgetCount: 0,
   /** The provider's side, in order: `start`, `end`, `forget`. */
   events: [] as string[],
@@ -96,7 +97,10 @@ vi.mock('./babysit.js', () => ({
 }));
 
 vi.mock('./remote-sync.js', () => ({
-  refreshRemoteSync: () => Promise.resolve(),
+  refreshRemoteSync: () => {
+    env.maintenanceCount += 1;
+    return Promise.resolve();
+  },
   getSyncDecorations: (cwd: string) => ({
     merged: new Set<string>(),
     conflicts: new Map<string, number>(),
@@ -157,6 +161,7 @@ beforeEach(async () => {
   env.releaseWorktrees = null;
   env.pending = [];
   env.fetchCount = 0;
+  env.maintenanceCount = 0;
   env.forgetCount = 0;
   env.events = [];
   env.now = 1_000_000;
@@ -190,6 +195,7 @@ describe('sync state', () => {
     await flush();
     settle(0);
     await first;
+    expect(env.maintenanceCount).toBe(1);
     expect(sidebar.getSyncState(env.cwd)).toMatchObject({
       providerId: 'github',
       providerConfigured: true,
@@ -198,6 +204,7 @@ describe('sync state', () => {
       remoteError: null,
       remoteSyncing: false,
       remoteIntervalMs: 60_000,
+      maintenanceIntervalMs: 3_600_000,
       remoteFetches: 1,
     });
 
@@ -215,6 +222,19 @@ describe('sync state', () => {
     env.config = { prPollInterval: 5_000 };
     expect(sidebar.getSyncState(env.cwd).remoteIntervalMs).toBe(5_000);
   });
+
+  it.each([
+    [600_000, 600_000],
+    [1_000, 300_000],
+  ])(
+    'reports maintenance interval %i with the scheduler clamp (%i)',
+    (configured, effective) => {
+      env.config = { mergePollInterval: configured };
+      expect(sidebar.getSyncState(env.cwd).maintenanceIntervalMs).toBe(
+        effective
+      );
+    }
+  );
 
   it('does not call the provider at all when it is not configured', async () => {
     env.configured = false;

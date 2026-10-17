@@ -22,6 +22,7 @@ function syncState(): SyncState {
     remoteError: null,
     remoteSyncing: false,
     remoteIntervalMs: 60_000,
+    maintenanceIntervalMs: 3_600_000,
     remoteFetches: 12,
   };
 }
