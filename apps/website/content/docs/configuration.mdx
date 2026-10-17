@@ -11,6 +11,7 @@ Open settings with `⌘,` (`Ctrl+,` on Linux) in n10 Desktop, or
 | **AI Tool** | The agent n10 launches: Claude (the default), Codex, Gemini, Copilot or OpenCode. |
 | **Editor** | The editor **Open in editor** uses, globally or per project. |
 | **Worktree Path** | Where new worktrees go, such as `../worktrees/{session}`. `{session}` is a filesystem-safe form of the branch name and `{branch}` the name itself. The default is `.claude/worktrees/{session}` inside the repository. Takes effect after a restart. |
+| **Shell** | The shell a new terminal runs: Auto, fish, zsh, bash or sh. Auto is the login shell (`$SHELL`) of the machine the terminal opens on, so a terminal on another machine uses that machine's, and falls back to sh when `$SHELL` is unset or not runnable. A named shell that isn't installed there is treated as Auto. |
 | **Sync Interval** | How often n10 fetches, fast-forwards your default branch, checks worktrees for conflicts and looks for merged pull requests. Default 1 hour, minimum 5 minutes. The pull request list refreshes every minute regardless. |
 | **Auto Delete on Merge** | Off by default. On each sync, removes worktrees whose pull requests have merged (on GitHub, pull requests you opened). It skips worktrees with a running agent, uncommitted changes or a rebase in progress, and main or master. |
 | **Auto Rebase** | Has no effect yet. |

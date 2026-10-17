@@ -1,3 +1,4 @@
+import { agentDraftDirectory } from './setup/agent-drafts.js';
 import type { Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -15,7 +16,7 @@ import {
  * The draft review flow: what the review agent writes, and what you do
  * with it before any of it reaches GitHub.
  *
- * The agent leaves comments in ~/.n10/reviews/pr-<id>/comments.json
+ * The agent leaves comments in the repository-scoped agent findings store
  * through `n10 util add-comment`; the desktop picks them up, shows
  * them against the code they were written about, and walks you through
  * them in severity order. Everything up to the moment of posting is
@@ -92,12 +93,15 @@ test.describe('@integration Agent draft comments', () => {
     await openPr(page);
 
     // The rail advertises a finished review rather than making you go
-    // looking for it in the diff.
+    // looking for it in the diff, and opens its walkthrough.
+    const review = page.getByRole('button', { name: /Review ready/ }).first();
+    await expect(review).toBeVisible({ timeout: 60_000 });
+    await review.click();
     await expect(
-      page.getByRole('button', { name: /Review ready|Review/ }).first()
-    ).toBeVisible({ timeout: 60_000 });
-    await expect(
-      page.getByText('The undo stack is never bounded.')
+      page
+        .getByText('The undo stack is never bounded.')
+        .filter({ visible: true })
+        .first()
     ).toBeVisible({ timeout: 60_000 });
   });
 
@@ -106,12 +110,8 @@ test.describe('@integration Agent draft comments', () => {
   }) => {
     const { page } = desktop;
     const listed = await page.evaluate(
-      (id) =>
-        (
-          window.n10 as never as {
-            listDraftComments(prId: number): Promise<{ id: string }[]>;
-          }
-        ).listDraftComments(id),
+      async (id) =>
+        window.n10.listDraftComments((await window.n10.getRepo())!.cwd, id),
       PR_ID
     );
     expect(listed.map((c) => c.id).sort()).toEqual([
@@ -124,15 +124,9 @@ test.describe('@integration Agent draft comments', () => {
     const { page, homeDir } = desktop;
     await page.evaluate(
       (id) =>
-        (
-          window.n10 as never as {
-            updateDraftComment(
-              prId: number,
-              commentId: string,
-              patch: Record<string, unknown>
-            ): Promise<void>;
-          }
-        ).updateDraftComment(id, 'draft-minor', { body: 'Edited by hand.' }),
+        window.n10.updateDraftComment(id, 'draft-minor', {
+          body: 'Edited by hand.',
+        }),
       PR_ID
     );
 
@@ -140,7 +134,10 @@ test.describe('@integration Agent draft comments', () => {
     // `add-comment` run does not overwrite them.
     const stored = JSON.parse(
       readFileSync(
-        join(homeDir, '.n10', 'reviews', `pr-${PR_ID}`, 'comments.json'),
+        join(
+          agentDraftDirectory(homeDir, desktop.repoPath, PR_ID),
+          'comments.json'
+        ),
         'utf8'
       )
     ) as { comments: { id: string; body: string }[] };
@@ -152,22 +149,13 @@ test.describe('@integration Agent draft comments', () => {
   test('discarding one leaves the rest alone', async ({ desktop }) => {
     const { page } = desktop;
     await page.evaluate(
-      (id) =>
-        (
-          window.n10 as never as {
-            deleteDraftComment(prId: number, commentId: string): Promise<void>;
-          }
-        ).deleteDraftComment(id, 'draft-minor'),
+      (id) => window.n10.deleteDraftComment(id, 'draft-minor'),
       PR_ID
     );
 
     const listed = await page.evaluate(
-      (id) =>
-        (
-          window.n10 as never as {
-            listDraftComments(prId: number): Promise<{ id: string }[]>;
-          }
-        ).listDraftComments(id),
+      async (id) =>
+        window.n10.listDraftComments((await window.n10.getRepo())!.cwd, id),
       PR_ID
     );
     expect(listed.map((c) => c.id)).toEqual(['draft-major']);

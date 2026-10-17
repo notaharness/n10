@@ -111,10 +111,6 @@ export function ThreadSummary({
             — {firstNonEmptyLine(commentBodyParts(preview).body)}
           </span>
         )}
-        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-          {thread.comments.length} comment
-          {thread.comments.length === 1 ? '' : 's'}
-        </span>
       </button>
       <span className="flex shrink-0 items-center gap-1">
         <ThreadIdButton id={thread.id} />

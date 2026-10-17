@@ -1,17 +1,20 @@
-import { worktreeSessionKey } from '@n10/core';
+import { worktreeSessionKey, worktreeSessionRow } from '@n10/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as SidebarModule from './sidebar.js';
 import type * as PullRequestsModule from './pull-requests.js';
+import type * as ProgramModule from './program.js';
 import type * as Core from '@n10/core';
+import type { RepositoryHandle } from '@n10/engine';
+import { repository } from './repo.js';
 
 /**
  * The renderer polls the sidebar model continuously; the pull request
- * list behind it comes from `@n10/core`'s per-repository cache,
- * whose semantics (TTL, joining, retiring, eviction, credentials) are
- * its own spec's. What is asserted here is the sidebar's use of it:
- * that the model never waits for the provider, that a landed fetch is
- * announced, what the sync state reports for the open repository, and
- * what a refresh tells the provider.
+ * list behind it is `@n10/engine`'s, whose semantics (TTL, joining,
+ * queueing, scopes, credentials) are its own spec's. What is asserted
+ * here is the host's use of it: that the model never waits for the
+ * provider, that a landed fetch is announced, what the sync state
+ * reports for the open repository, and what a refresh tells the
+ * provider, and when.
  */
 
 interface Worktree {
@@ -44,45 +47,62 @@ const env = vi.hoisted(() => ({
   }[],
   fetchCount: 0,
   forgetCount: 0,
+  /** The provider's side, in order: `start`, `end`, `forget`. */
+  events: [] as string[],
   now: 1_000_000,
   /** Last babysat map handed to buildSidebarItems. */
   lastBabysat: null as ReadonlyMap<number, unknown> | null,
   /** cwd → babysit statuses the babysit service answers with. */
   babysat: new Map<string, Map<number, unknown>>(),
+  /** The pull request list's background read, as a handle prewarms. */
+  refreshInBackground: null as ((cwd: string) => void) | null,
 }));
 
-vi.mock('./repo.js', () => ({
-  requireRepo: () => env.cwd,
-  activeRepoIs: (cwd: string) => cwd === env.cwd,
-  PROVIDERS: [
-    {
-      id: 'github',
-      isConfigured: () => env.configured,
-      forgetPullRequestCache: () => {
-        env.forgetCount += 1;
-      },
-      fetchPullRequests: () => {
-        env.fetchCount += 1;
-        return new Promise((resolve, reject) => {
-          env.pending.push({
-            resolve: resolve as (v: Record<string, unknown>) => void,
-            reject,
-          });
-        });
+vi.mock('./repo.js', () => {
+  /** A repository handle as the sidebar uses one: its rows, and the
+   *  prewarm that has the list read in the background. */
+  const handle = (cwd: string) => ({
+    cwd,
+    prewarm: () => env.refreshInBackground?.(cwd),
+    sessions: {
+      read: async () => {
+        const worktrees = env.holdWorktrees
+          ? await new Promise<typeof env.worktrees>((resolve) => {
+              env.holdWorktrees = false;
+              env.releaseWorktrees = (list) => resolve(list ?? env.worktrees);
+            })
+          : env.worktrees;
+        return worktrees.map((wt) =>
+          worktreeSessionRow(
+            { ...wt, branch: wt.branch ?? '' } as Parameters<
+              typeof worktreeSessionRow
+            >[0],
+            () => false,
+            cwd
+          )
+        );
       },
     },
-  ],
-}));
+  });
+  return {
+    requireRepo: () => env.cwd,
+    repository: handle,
+    activeReviewService: () => ({ invalidateProvider: vi.fn() }),
+  };
+});
 
 vi.mock('./babysit.js', () => ({
   babysatStatuses: (cwd: string) => env.babysat.get(cwd) ?? new Map(),
 }));
 
 vi.mock('./remote-sync.js', () => ({
-  getSyncDecorations: () => ({
+  refreshRemoteSync: () => Promise.resolve(),
+  getSyncDecorations: (cwd: string) => ({
     merged: new Set<string>(),
     conflicts: new Map<string, number>(),
-    lastGitSyncAt: 42,
+    lastGitSyncAt: cwd === '/parked' ? 7 : 42,
+    error: null,
+    loading: false,
   }),
 }));
 
@@ -90,24 +110,13 @@ vi.mock('@n10/vcs-core', () => ({
   readConfig: () => ({ vendor: 'github', ...env.config }),
 }));
 
-vi.mock('@n10/worktree-manager', () => ({
-  listWorktrees: () =>
-    env.holdWorktrees
-      ? new Promise<typeof env.worktrees>((resolve) => {
-          env.holdWorktrees = false;
-          env.releaseWorktrees = (list) => resolve(list ?? env.worktrees);
-        })
-      : Promise.resolve(env.worktrees),
-  worktreeSessionName: (wt: { branch?: string }) =>
-    (wt.branch ?? 'detached').replace(/\//g, '-'),
-}));
-
 vi.mock('@n10/core', async (importOriginal) => ({
-  // The cache is the real one: this spec is about what the sidebar
-  // does with it, and a fake would only prove the fake.
+  // The pull request list is the engine's real one: this spec is about
+  // what the sidebar does with it, and a fake would only prove the fake.
   ...(await importOriginal<typeof Core>()),
   isSessionAlive: () => false,
   findOrphanPrs: () => [],
+  findYourPrIds: () => new Set(),
   categorizeReviews: () => ({
     needsReview: [],
     waitingForAuthor: [],
@@ -119,6 +128,7 @@ vi.mock('@n10/core', async (importOriginal) => ({
     _orphans: unknown,
     _reviews: unknown,
     _sessionPrMap: unknown,
+    _yours: unknown,
     _merged: unknown,
     _conflicts: unknown,
     babysat: ReadonlyMap<number, unknown>
@@ -130,10 +140,12 @@ vi.mock('@n10/core', async (importOriginal) => ({
 
 let sidebar: typeof SidebarModule;
 let pullRequests: typeof PullRequestsModule;
+let program: typeof ProgramModule;
 
-/** Settle the promise chain without advancing the clock. */
-async function flush(times = 4) {
-  for (let i = 0; i < times; i++) await Promise.resolve();
+/** Settle every pending promise without advancing the clock: the
+ *  microtask queue drains before an immediate runs. */
+async function flush() {
+  await new Promise((resolve) => setImmediate(resolve));
 }
 
 beforeEach(async () => {
@@ -146,6 +158,7 @@ beforeEach(async () => {
   env.pending = [];
   env.fetchCount = 0;
   env.forgetCount = 0;
+  env.events = [];
   env.now = 1_000_000;
   env.lastBabysat = null;
   env.babysat = new Map();
@@ -154,7 +167,17 @@ beforeEach(async () => {
   vi.resetModules();
   sidebar = await import('./sidebar.js');
   pullRequests = await import('./pull-requests.js');
+  program = await import('./program.js');
+  env.refreshInBackground = (cwd) =>
+    program.pullRequests.refreshInBackground(cwd);
 });
+
+/** The open repository's rows. */
+function listSidebarItems() {
+  return sidebar.listSidebarItems(
+    repository(env.cwd) as unknown as RepositoryHandle
+  );
+}
 
 /** Resolve the nth outstanding provider fetch. */
 function settle(index = 0, value: Record<string, unknown> = {}) {
@@ -167,7 +190,7 @@ describe('sync state', () => {
     await flush();
     settle(0);
     await first;
-    expect(sidebar.getSyncState()).toMatchObject({
+    expect(sidebar.getSyncState(env.cwd)).toMatchObject({
       providerId: 'github',
       providerConfigured: true,
       lastRemoteSyncAt: 1_000_000,
@@ -181,19 +204,23 @@ describe('sync state', () => {
     env.cwd = '/repo-b';
     // The cached timestamp belongs to the other checkout; reporting it
     // here would claim this repo had just synced.
-    expect(sidebar.getSyncState().lastRemoteSyncAt).toBeNull();
+    expect(sidebar.getSyncState(env.cwd).lastRemoteSyncAt).toBeNull();
+  });
+
+  it('reports the repository it names, not the open one', () => {
+    expect(sidebar.getSyncState('/parked').lastGitSyncAt).toBe(7);
   });
 
   it('reports the interval the config sets', () => {
     env.config = { prPollInterval: 5_000 };
-    expect(sidebar.getSyncState().remoteIntervalMs).toBe(5_000);
+    expect(sidebar.getSyncState(env.cwd).remoteIntervalMs).toBe(5_000);
   });
 
   it('does not call the provider at all when it is not configured', async () => {
     env.configured = false;
-    await sidebar.listSidebarItems();
+    await listSidebarItems();
     expect(env.fetchCount).toBe(0);
-    expect(sidebar.getSyncState().providerConfigured).toBe(false);
+    expect(sidebar.getSyncState(env.cwd).providerConfigured).toBe(false);
   });
 
   it('reports the failure the cache recorded', async () => {
@@ -201,7 +228,7 @@ describe('sync state', () => {
     await flush();
     env.pending[0].reject(new Error('provider exploded'));
     await bad;
-    expect(sidebar.getSyncState().remoteError).toBe('provider exploded');
+    expect(sidebar.getSyncState(env.cwd).remoteError).toBe('provider exploded');
   });
 });
 
@@ -217,6 +244,22 @@ describe('refreshing', () => {
     settle(0);
     await forced;
     expect(env.forgetCount).toBe(1);
+  });
+
+  it('has the provider forget when the refresh’s own request starts, after a read already out', async () => {
+    // The sidebar's background read is out when the user presses
+    // refresh. Forgetting at the press lets that read write its per-row
+    // answers straight back into the provider's memo, and the refresh
+    // then answers from them.
+    await listSidebarItems();
+    const refreshed = sidebar.refreshRemote();
+    expect(env.events).toEqual(['start']);
+
+    settle(0);
+    await flush();
+    expect(env.events).toEqual(['start', 'end', 'forget', 'start']);
+    settle(1);
+    await refreshed;
   });
 
   it('does not, for a re-read the app asked for itself', async () => {
@@ -235,11 +278,11 @@ describe('refreshing', () => {
 
 /**
  * Replacing a rejected access token has to look like it worked: the
- * cache is dropped and refetched (its spec), and the renderer is told
- * at once.
+ * list starts a new, empty scope (its spec), and the renderer is told
+ * at once rather than when the next fetch lands.
  */
 describe('after the credentials change', () => {
-  it('tells the renderer straight away and fetches again', async () => {
+  it('tells the renderer straight away', async () => {
     const first = sidebar.refreshRemote();
     await flush();
     settle(0, { a: 1 });
@@ -247,39 +290,38 @@ describe('after the credentials change', () => {
 
     let announced = 0;
     pullRequests.setRemoteUpdatedNotifier(() => announced++);
-    sidebar.onCredentialsChanged();
-    // The cleared error is itself a change worth painting, before
-    // the fetch it started has landed.
+    program.pullRequests.credentialsChanged();
+    // The cleared list and error are themselves a change worth
+    // painting, before any fetch has landed.
     expect(announced).toBe(1);
-    await flush();
-    expect(env.fetchCount).toBe(2);
-    settle(1, {});
+    expect(sidebar.getSyncState(env.cwd).lastRemoteSyncAt).toBeNull();
     pullRequests.setRemoteUpdatedNotifier(null);
   });
 });
 
 /**
- * A babysitter reads its pull request through the sidebar's cache, so
+ * A babysitter reads its pull request through the sidebar's list, so
  * a watched row costs the provider nothing beyond the list the sidebar
  * fetches anyway.
  */
 describe('lookupPullRequest', () => {
   it('answers from the same list the sidebar shows', async () => {
-    const model = sidebar.listSidebarItems();
+    const model = listSidebarItems();
     await flush();
     settle(0, { feature: { id: 7 } });
     await model;
-    const found = await pullRequests.lookupPullRequest('/repo-a', 7);
+    const found = await program.pullRequests.lookupPullRequest('/repo-a', 7);
     expect(found).toMatchObject({ kind: 'found', pr: { id: 7 } });
     expect(env.fetchCount).toBe(1);
   });
 
   it('cannot say when no provider is configured', async () => {
     env.configured = false;
-    expect(await pullRequests.lookupPullRequest('/repo-a', 7)).toMatchObject({
+    expect(
+      await program.pullRequests.lookupPullRequest('/repo-a', 7)
+    ).toMatchObject({
       kind: 'unknown',
     });
-    expect(pullRequests.repoProvider('/repo-a')).toBeNull();
   });
 });
 
@@ -288,7 +330,7 @@ describe('sidebar model', () => {
     // The row carries its branch whether or not the branch has a PR —
     // so a PR-less `feat/foo` still displays as `feat/foo`.
     env.worktrees = [checkout('feat/foo')];
-    const model = sidebar.listSidebarItems();
+    const model = listSidebarItems();
     await flush();
     settle(0);
     const rows = (await model) as unknown as Core.AgentSession[];
@@ -301,7 +343,7 @@ describe('sidebar model', () => {
 
   it('carries a mid-rebase worktree state through to its session', async () => {
     env.worktrees = [checkout('rebasing-one', '/repo-a', 'rebasing')];
-    const model = sidebar.listSidebarItems();
+    const model = listSidebarItems();
     await flush();
     settle(0);
     const items = (await model) as { state?: string }[];
@@ -311,7 +353,7 @@ describe('sidebar model', () => {
   it('decorates the rows with the babysitters of the open repository', async () => {
     env.babysat.set('/repo-a', new Map([[7, { prId: 7 }]]));
     env.babysat.set('/repo-b', new Map([[8, { prId: 8 }]]));
-    const model = sidebar.listSidebarItems();
+    const model = listSidebarItems();
     await flush();
     settle(0);
     await model;
@@ -320,7 +362,7 @@ describe('sidebar model', () => {
 
   it('omits the state key entirely for a normal worktree', async () => {
     env.worktrees = [checkout('normal')];
-    const model = sidebar.listSidebarItems();
+    const model = listSidebarItems();
     await flush();
     settle(0);
     const items = (await model) as Record<string, unknown>[];
@@ -342,7 +384,7 @@ describe('the model never waits for the provider', () => {
 
     // No `settle` anywhere: if this ever awaits the fetch again, the
     // await below never resolves and the test times out.
-    const model = (await sidebar.listSidebarItems()) as unknown[];
+    const model = (await listSidebarItems()) as unknown[];
 
     expect(model).toHaveLength(1);
     expect(env.fetchCount).toBe(1);
@@ -351,11 +393,11 @@ describe('the model never waits for the provider', () => {
 
   it('serves the pull requests on the next call, once they have landed', async () => {
     env.worktrees = [checkout('feature')];
-    await sidebar.listSidebarItems();
+    await listSidebarItems();
     settle(0, { feature: { id: 7 } });
     await flush();
 
-    await sidebar.listSidebarItems();
+    await listSidebarItems();
     // Still one request: the second call read the cache the first
     // call's fetch filled, rather than starting another.
     expect(env.fetchCount).toBe(1);
@@ -365,7 +407,7 @@ describe('the model never waits for the provider', () => {
     let announced = 0;
     pullRequests.setRemoteUpdatedNotifier(() => announced++);
 
-    await sidebar.listSidebarItems();
+    await listSidebarItems();
     // Nothing to say yet — the model that just went out is local-only.
     expect(announced).toBe(0);
 
@@ -377,13 +419,13 @@ describe('the model never waits for the provider', () => {
   });
 
   it('stays quiet when the cache was already fresh', async () => {
-    await sidebar.listSidebarItems();
+    await listSidebarItems();
     settle(0);
     await flush();
 
     let announced = 0;
     pullRequests.setRemoteUpdatedNotifier(() => announced++);
-    await sidebar.listSidebarItems();
+    await listSidebarItems();
     await flush();
 
     expect(env.fetchCount).toBe(1);
@@ -394,30 +436,49 @@ describe('the model never waits for the provider', () => {
 describe('getSidebarSnapshot', () => {
   it('stamps the rows with the repository they describe', async () => {
     env.worktrees = [checkout('feature')];
-    const snapshot = await sidebar.getSidebarSnapshot();
+    const snapshot = await sidebar.getSidebarSnapshot('/repo-a');
     expect(snapshot.cwd).toBe('/repo-a');
     expect(snapshot.items).toHaveLength(1);
   });
 
-  it('answers for the repository the host is on once a switch lands mid-call', async () => {
-    // The worktree list is where the call awaits; the host moves to
-    // another repository while it is out. Stamping the rows that come
-    // back with either repo would be wrong — they were listed under
-    // one and had their sessions judged under the other — so the
-    // snapshot is the new repository's, computed whole.
-    const listedUnderA = [checkout('from-a')];
-    env.holdWorktrees = true;
-    const pending = sidebar.getSidebarSnapshot();
-    await flush();
+  it('answers for the repository asked, whichever is open', async () => {
+    env.worktrees = [checkout('feature')];
     env.cwd = '/repo-b';
-    env.worktrees = [checkout('from-b', '/repo-b')];
-    env.releaseWorktrees?.(listedUnderA);
-    const snapshot = await pending;
-    expect(snapshot.cwd).toBe('/repo-b');
+    const snapshot = await sidebar.getSidebarSnapshot('/repo-a');
+    expect(snapshot.cwd).toBe('/repo-a');
     expect(snapshot.items).toEqual([
       expect.objectContaining({
-        name: worktreeSessionKey('/repo-b/.claude/worktrees/from-b', '/repo-b'),
+        name: worktreeSessionKey(
+          '/repo-a/.claude/worktrees/feature',
+          '/repo-a'
+        ),
       }),
     ]);
   });
 });
+
+vi.mock('./providers.js', () => ({
+  PROVIDERS: [
+    {
+      id: 'github',
+      isConfigured: () => env.configured,
+      forgetPullRequestCache: () => {
+        env.forgetCount += 1;
+        env.events.push('forget');
+      },
+      fetchPullRequests: () => {
+        env.fetchCount += 1;
+        env.events.push('start');
+        return new Promise((resolve, reject) => {
+          env.pending.push({
+            resolve: (v: Record<string, unknown>) => {
+              env.events.push('end');
+              resolve(v);
+            },
+            reject,
+          });
+        });
+      },
+    },
+  ],
+}));

@@ -1,4 +1,4 @@
-import { parseUnifiedDiff, type DiffLine } from '@n10/diff';
+import { parseDiffFiles, type DiffLine, type ParsedDiffFile } from '@n10/diff';
 import type {
   SlimToken,
   WorkerRequest,
@@ -85,19 +85,60 @@ async function request(
   }
 }
 
-export async function parseDiffInWorker(
-  text: string
-): Promise<[string, DiffLine[]][]> {
+/**
+ * Parse a patch off the main thread, into files with their metadata.
+ * An aborted `signal` drops a parse still waiting for a worker.
+ */
+export async function parseDiffFilesInWorker(
+  text: string,
+  signal?: AbortSignal
+): Promise<ParsedDiffFile[]> {
   try {
-    const r = await request({ type: 'parse', text });
-    if (r.type === 'parse') return r.entries;
-  } catch {
-    // fall through to the main-thread parser
+    const r = await request({ type: 'parse', text }, signal);
+    if (r.type === 'parse') return r.files;
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    // otherwise fall through to the main-thread parser
   }
   // Fallback: environments where the module worker can't start (e.g.
   // file:// quirks) must still show the diff — highlights can degrade,
   // the parse cannot. The parser itself is tiny.
-  return [...parseUnifiedDiff(text).entries()];
+  return parseDiffFiles(text);
+}
+
+/** `parseDiffFilesInWorker` as path → lines, keyed like the parser's
+ *  own map: the last file under a path wins. */
+export async function parseDiffInWorker(
+  text: string
+): Promise<[string, DiffLine[]][]> {
+  const files = await parseDiffFilesInWorker(text);
+  return requireFiles(text, [
+    ...new Map(files.map((f) => [f.path, f.lines])).entries(),
+  ]);
+}
+
+/**
+ * A patch with content that yields no files was not understood, which
+ * is not the same as there being no changes. Git starts every file of a
+ * non-empty diff with a header, so nothing parsed out of something is
+ * the parser failing — a header form it does not read, say — and the
+ * viewer has to say that rather than "No changes".
+ */
+export function requireFiles(
+  text: string,
+  entries: [string, DiffLine[]][]
+): [string, DiffLine[]][] {
+  if (entries.length === 0 && text.trim() !== '') {
+    throw new Error(
+      `No files could be shown from this ${patchSize(text)} diff`
+    );
+  }
+  return entries;
+}
+
+function patchSize(text: string): string {
+  const kib = text.length / 1024;
+  return kib < 1 ? `${text.length} characters` : `${Math.round(kib)} KiB`;
 }
 
 export interface FileAnalysis {

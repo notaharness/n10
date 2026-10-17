@@ -1,0 +1,54 @@
+{
+  "count": 3,
+  "value": [
+    {
+      "id": "8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+      "descriptor": "Microsoft.IdentityModel.Claims.ClaimsIdentity;72f988bf-86f1-41af-91ab-2d7cd011db47\\jamalh@fabrikam.com",
+      "subjectDescriptor": "aad.OGM4YzdkMzItNmIxYi03N2Y0LWIyZTktMzBiNDc3YjVhYjNk",
+      "providerDisplayName": "Jamal Hartnett",
+      "isActive": true,
+      "members": [],
+      "memberOf": [],
+      "memberIds": [],
+      "properties": {
+        "Description": { "$type": "System.String", "$value": "" },
+        "Domain": {
+          "$type": "System.String",
+          "$value": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        },
+        "Account": {
+          "$type": "System.String",
+          "$value": "jamalh@fabrikam.com"
+        },
+        "Mail": { "$type": "System.String", "$value": "jamalh@fabrikam.com" }
+      },
+      "resourceVersion": 2,
+      "metaTypeId": 0
+    },
+    {
+      "id": "d6245f20-2af8-44f4-9451-8107cb2767db",
+      "descriptor": "Microsoft.IdentityModel.Claims.ClaimsIdentity;72f988bf-86f1-41af-91ab-2d7cd011db47\\normanp@fabrikam.com",
+      "providerDisplayName": "Norman Paulk",
+      "isActive": true,
+      "properties": {
+        "Account": {
+          "$type": "System.String",
+          "$value": "normanp@fabrikam.com"
+        }
+      },
+      "resourceVersion": 2,
+      "metaTypeId": 0
+    },
+    {
+      "id": "3b5f0c34-4aec-4bf4-8708-1d36f0dbc468",
+      "descriptor": "Microsoft.IdentityModel.Claims.ClaimsIdentity;72f988bf-86f1-41af-91ab-2d7cd011db47\\chuckr@fabrikam.com",
+      "providerDisplayName": "Chuck Reinhart",
+      "isActive": false,
+      "properties": {
+        "Mail": { "$type": "System.String", "$value": "chuckr@fabrikam.com" }
+      },
+      "resourceVersion": 2,
+      "metaTypeId": 0
+    }
+  ]
+}

@@ -27,7 +27,7 @@ import {
 export type { ItemTab, Tab, TerminalTab } from './tab-identity.js';
 export type { TerminalEntry } from './tab-terminals.js';
 export type { ForeignSessionEntry } from './tab-foreign.js';
-import { closeTab } from './tab-close.js';
+import { closeRemovedWorktrees, closeTab } from './tab-close.js';
 import { openForeign, type ForeignSessionEntry } from './tab-foreign.js';
 import { pinLive, rekey } from './tab-sync.js';
 import {
@@ -97,7 +97,9 @@ export type TabsAction =
   | { type: 'pin'; id: string }
   | { type: 'activate'; id: string }
   | { type: 'close'; id: string; repo?: string }
-  | { type: 'close-others'; id: string }
+  /** Close every tab but `id` and those in `keep`: an orchestrator's
+   *  tab keeps the player tabs it shows. */
+  | { type: 'close-others'; id: string; keep?: readonly string[] }
   | { type: 'close-all' }
   | { type: 'move'; id: string; targetId: string; side: 'before' | 'after' }
   /** The one reconciliation dispatched from Workspace's effect: the
@@ -134,6 +136,10 @@ export type TabsAction =
    *  session that is already gone. Focus follows the close rules for
    *  `repo`, the one in view. A name with no terminal tab is nothing. */
   | { type: 'terminal-ended'; name: string; repo?: string }
+  /** Discovery says these checkouts of `repo` are gone — removed by
+   *  n10, with `git worktree remove`, or deleted from disk. Their tabs
+   *  close: nothing is left to show in them. */
+  | { type: 'worktrees-removed'; repo: string; worktrees: string[] }
   /** A repository was opened. Dispatched for every open, tab-driven or
    *  not; it only does something when the tab in front of the user
    *  belongs to somewhere else. */
@@ -162,9 +168,14 @@ function activateTab(state: TabsState, id: string): TabsState {
 }
 
 /** Keep only `id`; whatever survives becomes active. */
-function closeOtherTabs(state: TabsState, id: string): TabsState {
-  const tabs = state.tabs.filter((t) => t.id === id);
-  return { ...state, tabs, activeId: tabs[0]?.id ?? null };
+function closeOtherTabs(
+  state: TabsState,
+  id: string,
+  keep: readonly string[] = []
+): TabsState {
+  const tabs = state.tabs.filter((t) => t.id === id || keep.includes(t.id));
+  const kept = tabs.some((t) => t.id === id) ? id : null;
+  return { ...state, tabs, activeId: kept ?? tabs[0]?.id ?? null };
 }
 
 export function reduce(state: TabsState, action: TabsAction): TabsState {
@@ -229,12 +240,25 @@ function focusRepo(state: TabsState, repo: string): TabsState {
 /** The actions that take tabs off the strip. */
 type CloseAction = Extract<
   TabsAction,
-  { type: 'close' | 'close-others' | 'close-all' | 'terminal-ended' }
+  {
+    type:
+      | 'close'
+      | 'close-others'
+      | 'close-all'
+      | 'terminal-ended'
+      | 'worktrees-removed';
+  }
 >;
 
 const CLOSE_ACTIONS: ReadonlySet<TabsAction['type']> = new Set<
   CloseAction['type']
->(['close', 'close-others', 'close-all', 'terminal-ended']);
+>([
+  'close',
+  'close-others',
+  'close-all',
+  'terminal-ended',
+  'worktrees-removed',
+]);
 
 function isCloseAction(action: TabsAction): action is CloseAction {
   return CLOSE_ACTIONS.has(action.type);
@@ -246,8 +270,10 @@ function applyClose(state: TabsState, action: CloseAction): TabsState {
       return closeTab(state, action.id, action.repo);
     case 'terminal-ended':
       return closeTab(state, terminalTabId(action.name), action.repo);
+    case 'worktrees-removed':
+      return closeRemovedWorktrees(state, action.repo, action.worktrees);
     case 'close-others':
-      return closeOtherTabs(state, action.id);
+      return closeOtherTabs(state, action.id, action.keep);
     case 'close-all':
       // `autoOpened` survives on purpose: closing every tab is a manual
       // act, and re-opening the running agents on the next sidebar poll

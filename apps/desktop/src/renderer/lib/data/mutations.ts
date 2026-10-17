@@ -6,8 +6,8 @@ import {
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { keys } from './query-keys.js';
-import { verdictDecision } from '../review/review-verdict.js';
 import { errorMessage } from '../utils.js';
+import { keptNotice } from './removal-notice.js';
 import type {
   PlanCheckoutRequest,
   PostDraftsRequest,
@@ -16,9 +16,8 @@ import type {
   ResolveRequest,
   ReviewComment,
   ReviewLaunchRequest,
-  ReviewVerdict,
   SessionLaunchRequest,
-  SidebarItem,
+  WorktreeRemovalCheck,
 } from '../../../host/contract.js';
 
 /**
@@ -35,86 +34,22 @@ function useInvalidator(cwd: string) {
     sync: () => qc.invalidateQueries({ queryKey: keys.sync(cwd) }),
     branches: () => qc.invalidateQueries({ queryKey: keys.branches(cwd) }),
     sessions: () => qc.invalidateQueries({ queryKey: keys.sessions(cwd) }),
-    settings: () =>
-      Promise.all([
-        qc.invalidateQueries({ queryKey: keys.settings(cwd) }),
-        // The picker's default row follows the configured agent.
-        qc.invalidateQueries({ queryKey: keys.agentOptions(cwd) }),
-      ]),
+    branchSessions: () =>
+      qc.invalidateQueries({ queryKey: keys.branchSessionsAll }),
+    // A write to a thread changes the conversation the Overview reads
+    // too; its entries are keyed by ref, so every one in this
+    // repository goes, which is the pull request on screen.
     threads: (prId: number) =>
-      qc.invalidateQueries({ queryKey: keys.threads(cwd, prId) }),
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.threads(cwd, prId) }),
+        qc.invalidateQueries({ queryKey: keys.prConversations(cwd) }),
+      ]),
     drafts: (prId: number) =>
       qc.invalidateQueries({ queryKey: keys.drafts(cwd, prId) }),
   };
 }
 
 // ── Mutations ────────────────────────────────────────────────────
-
-export function useSubmitVerdict(cwd: string, providerId?: string) {
-  const qc = useQueryClient();
-  const inv = useInvalidator(cwd);
-  return useMutation({
-    mutationFn: ({ prId, verdict }: { prId: number; verdict: ReviewVerdict }) =>
-      window.n10.submitReviewVerdict(prId, verdict),
-    // Optimistic: the vote succeeds virtually always, so reflect it in
-    // the cached sidebar model immediately (reviewer dots, PR bar and
-    // row badges all derive from it) and roll back only on error.
-    onMutate: async ({ prId, verdict }) => {
-      const viewer = await qc
-        .fetchQuery({
-          queryKey: keys.reviewViewer(cwd),
-          queryFn: () => window.n10.getReviewViewer(),
-          staleTime: Infinity,
-        })
-        .catch(() => null);
-      if (!viewer) return { prev: undefined };
-      const key = keys.sidebar(cwd);
-      await qc.cancelQueries({ queryKey: key });
-      const prev = qc.getQueryData<SidebarItem[]>(key);
-      if (prev) {
-        const decision = verdictDecision(verdict, providerId);
-        const me = viewer.identifier.toLowerCase();
-        qc.setQueryData<SidebarItem[]>(
-          key,
-          prev.map((item) => {
-            if (item.pr?.id !== prId) return item;
-            const reviewers = item.pr.reviewers ?? [];
-            const mine = reviewers.some(
-              (r) => r.identifier.toLowerCase() === me
-            );
-            const next = mine
-              ? reviewers.map((r) =>
-                  r.identifier.toLowerCase() === me ? { ...r, decision } : r
-                )
-              : [
-                  ...reviewers,
-                  {
-                    identifier: viewer.identifier,
-                    displayName: 'You',
-                    decision,
-                  },
-                ];
-            return { ...item, pr: { ...item.pr, reviewers: next } };
-          })
-        );
-      }
-      return { prev };
-    },
-    onError: (_e, _v, ctx) => {
-      if (ctx?.prev) qc.setQueryData(keys.sidebar(cwd), ctx.prev);
-    },
-    // The host already re-read the pull request list as part of
-    // submitting the verdict — plain invalidation would refetch the
-    // sidebar from a TTL cache (prPollInterval, a minute by default)
-    // and hand back pre-verdict reviewers, reverting the optimistic
-    // patch a frame later. Asking for a *refresh* here as well would
-    // spend a second forced cycle, and tell the provider to forget
-    // rows a vote changed nothing about.
-    onSettled: () => {
-      void inv.sidebar();
-    },
-  });
-}
 
 export function useCreateWorktree(cwd: string) {
   const inv = useInvalidator(cwd);
@@ -135,13 +70,24 @@ export function useRemoveWorktree(cwd: string) {
   const inv = useInvalidator(cwd);
   return useMutation({
     mutationKey: REMOVE_WORKTREE_KEY,
-    mutationFn: ({ branch, force }: { branch: string; force: boolean }) =>
-      window.n10.removeWorktree(branch, force),
+    mutationFn: ({
+      branch,
+      approved,
+    }: {
+      branch: string;
+      approved: WorktreeRemovalCheck;
+    }) => window.n10.removeWorktree(branch, approved),
     // Reported here rather than through `mutate`'s own callbacks: the
     // confirm dialog closes as soon as it fires, and per-call callbacks
     // are dropped when their component unmounts. Mutation-level ones run
     // either way, so the outcome is never swallowed.
-    onSuccess: (_r, { branch }) => toast.success(`Removed worktree ${branch}`),
+    // A removed worktree's tab closes on discovery's report of it
+    // (`TabsProvider`), however it was removed.
+    onSuccess: (outcome, { branch }) => {
+      const notice = keptNotice(branch, outcome);
+      if (notice) toast.warning(notice);
+      else toast.success(`Removed worktree ${branch}`);
+    },
     onError: (err) => toast.error(errorMessage(err)),
     onSettled: () => {
       void inv.sidebar();
@@ -179,6 +125,7 @@ export function useLaunchAgent(cwd: string) {
     onSuccess: () => {
       void inv.sidebar();
       void inv.sessions();
+      void inv.branchSessions();
     },
   });
 }
@@ -191,6 +138,7 @@ export function useLaunchReview(cwd: string) {
       void inv.sidebar();
       void inv.branches();
       void inv.sessions();
+      void inv.branchSessions();
     },
   });
 }
@@ -256,6 +204,7 @@ export function useKillSession(cwd: string) {
     onSuccess: () => {
       void inv.sidebar();
       void inv.sessions();
+      void inv.branchSessions();
     },
   });
 }
@@ -336,19 +285,5 @@ export function useSetResolved(cwd: string) {
       if (ctx?.prev) qc.setQueryData(keys.threads(cwd, req.prId), ctx.prev);
     },
     onSettled: (_r, _e, req) => void inv.threads(req.prId),
-  });
-}
-
-export function useUpdateSetting(cwd: string) {
-  const inv = useInvalidator(cwd);
-  return useMutation({
-    mutationFn: ({
-      ref,
-      value,
-    }: {
-      ref: { label: string; key: string };
-      value: string;
-    }) => window.n10.updateSettingsField(ref, value),
-    onSettled: () => void inv.settings(),
   });
 }

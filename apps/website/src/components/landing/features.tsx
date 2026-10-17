@@ -1,6 +1,10 @@
-import Link from 'next/link';
-import { BeamFeature, OrchestraFeature } from './companion-sections';
+import {
+  BeamFeature,
+  ConversationsFeature,
+  OrchestraFeature,
+} from './companion-sections';
 import { FeatureSection, type Feature } from './feature-section';
+import { GuidedReviewScene } from './guided-review-scene';
 
 const features: Feature[] = [
   {
@@ -10,6 +14,14 @@ const features: Feature[] = [
     title: 'An agent drafts the review, you post it',
     description:
       'An agent drafts review comments on pull requests that involve you, yours or a colleague’s. Triage them by severity, then edit, skip or post each one under your name. Only comments you choose to post are published.',
+  },
+  {
+    label: 'Guided review',
+    href: '/docs/guides/agent-reviews#guided-review',
+    title: 'Understand the pull request before the diff',
+    description:
+      'Your reviewer walks you through what changes and why, one short slide at a time. Follow diagrams and before-and-after views, jump to the code, then step into the ranked findings. Works with any agent in n10 Desktop, with no plugin to install.',
+    scene: <GuidedReviewScene />,
   },
   {
     media: 'review-in-place',
@@ -100,24 +112,15 @@ export function Features() {
       <div className="flex flex-col gap-24 sm:gap-32">
         <BeamFeature />
         <OrchestraFeature />
+        <ConversationsFeature />
         {features.map((feature, i) => (
           <FeatureSection
             key={feature.href}
             {...feature}
-            reverse={i % 2 === 1}
+            reverse={i % 2 === 0}
           />
         ))}
       </div>
-      <p className="text-fd-muted-foreground mt-16 text-center text-sm">
-        Also:{' '}
-        <Link
-          href="/docs/guides/themes"
-          className="hover:text-fd-foreground underline decoration-fd-border underline-offset-4 transition-colors"
-        >
-          light and dark themes
-        </Link>
-        , the most important feature of any software.
-      </p>
     </section>
   );
 }

@@ -9,7 +9,7 @@ import { log } from '@n10/logger';
 import { exec, gitOptions } from './exec.js';
 import { isRemoteMachine, runGitOn, type Machine } from './machine.js';
 import { branchToSessionName } from './refs.js';
-import { ownsWorktreePath } from './worktree-resolver.js';
+import type { WorktreeScope, WorktreeResolver } from './worktree-resolver.js';
 
 export interface WorktreeInfo {
   path: string;
@@ -36,8 +36,13 @@ export function worktreeSessionName(wt: WorktreeInfo): string {
   return wt.branch ? branchToSessionName(wt.branch) : basename(wt.path);
 }
 
+/** One block of the porcelain listing. `prunable` is git's mark on a
+ *  registration whose directory no longer exists. */
+type ListedWorktree = WorktreeInfo & { prunable?: true };
+
 /**
- * Parse `git worktree list --porcelain -z` output into WorktreeInfo[].
+ * Every block of `git worktree list --porcelain -z` output, including
+ * the registrations of worktrees deleted from disk.
  *
  * `-z` terminates each attribute with NUL rather than a newline, which
  * is what makes a worktree path containing one parseable at all — the
@@ -45,8 +50,8 @@ export function worktreeSessionName(wt: WorktreeInfo): string {
  * and lose the worktree. Blocks are separated by the empty attribute
  * that terminates each one, so an extra NUL.
  */
-export function parseWorktrees(output: string): WorktreeInfo[] {
-  const results: WorktreeInfo[] = [];
+function parseListing(output: string): ListedWorktree[] {
+  const results: ListedWorktree[] = [];
   const blocks = output.split('\0\0').filter((b) => b.length > 0);
 
   for (const block of blocks) {
@@ -54,6 +59,7 @@ export function parseWorktrees(output: string): WorktreeInfo[] {
     let path = '';
     let branch = '';
     let bare = false;
+    let prunable = false;
 
     for (const line of lines) {
       if (line.startsWith('worktree ')) {
@@ -62,15 +68,67 @@ export function parseWorktrees(output: string): WorktreeInfo[] {
         branch = line.slice('branch refs/heads/'.length);
       } else if (line === 'bare') {
         bare = true;
+      } else if (line === 'prunable' || line.startsWith('prunable ')) {
+        prunable = true;
       }
     }
 
     if (path) {
-      results.push({ path, branch, bare });
+      results.push({ path, branch, bare, ...(prunable && { prunable }) });
     }
   }
 
   return results;
+}
+
+/**
+ * Parse `git worktree list --porcelain -z` output into the worktrees
+ * that exist. One whose directory was deleted (`rm -rf`) is gone as far
+ * as n10 is concerned, exactly like one removed with `git worktree
+ * remove`: git keeps its registration until pruned, but there is no
+ * checkout left to show, diff or run an agent in.
+ */
+export function parseWorktrees(output: string): WorktreeInfo[] {
+  return parseListing(output).filter((w) => !w.prunable);
+}
+
+/** n10's worktrees in one repository, from one `git worktree list`. */
+export interface WorktreeRegistrations {
+  /** What {@link listWorktrees} answers. */
+  present: WorktreeInfo[];
+  /** Deleted from disk but still registered with git. A registration
+   *  keeps its branch checked out as far as git is concerned, so it
+   *  stands in the way of checking that branch out again until
+   *  something clears it. */
+  deleted: WorktreeInfo[];
+}
+
+/** {@link listWorktrees}, plus the registrations of owned worktrees
+ *  whose directory is gone. Local only; rejects when git fails. */
+export async function listWorktreeRegistrations(
+  scope: WorktreeScope
+): Promise<WorktreeRegistrations> {
+  const { cwd, resolver } = scope;
+  try {
+    const { stdout } = await exec(
+      'git worktree list --porcelain -z',
+      gitOptions(cwd)
+    );
+    const listed = parseListing(stdout);
+    return {
+      present: recoverDetachedHeads(
+        listed.filter((w) => !w.prunable),
+        resolver,
+        recoverRebaseBranch
+      ),
+      deleted: listed
+        .filter((w) => w.prunable && !w.bare && resolver.owns(w.path))
+        .map(({ path, branch, bare }) => ({ path, branch, bare })),
+    };
+  } catch (e) {
+    log('error', 'listWorktrees', 'git worktree list failed', e);
+    throw e;
+  }
 }
 
 /**
@@ -118,7 +176,7 @@ export function recoverRebaseBranch(worktreePath: string): string | null {
 
 /**
  * List git worktrees under .claude/worktrees/ for the current repo.
- * Skips the main worktree and bare entries.
+ * Skips the main worktree, bare entries and worktrees deleted from disk.
  *
  * Detached-HEAD worktrees: if a rebase is in progress, the branch is
  * recovered from `rebase-{merge,apply}/head-name` and `state` is set
@@ -128,14 +186,8 @@ export function recoverRebaseBranch(worktreePath: string): string | null {
  * them via `worktreeSessionName` (directory basename) so they render
  * in the sidebar and can host a session by their directory name.
  *
- * `cwd` names the repository to list, and to judge ownership against.
- * Omitting it runs against the process's directory, which is the open
- * repository — what every caller polling for the sidebar wants. A
- * caller acting on a repository it was handed passes it, so the answer
- * cannot be about somewhere the desktop `chdir`-ed to meanwhile.
- *
- * `machine` is local by default. A remote machine runs the same `git
- * worktree list --porcelain -z` through its executor instead of a
+ * The scope names the repository and its path ownership policy. Its optional
+ * remote machine runs `git worktree list --porcelain -z` instead of a
  * local fork — but cannot recover a detached-HEAD worktree's rebase
  * branch (`recoverRebaseBranch` reads the remote's `.git` directory
  * directly, which only makes sense against this machine's filesystem),
@@ -143,30 +195,18 @@ export function recoverRebaseBranch(worktreePath: string): string | null {
  * with its recovered branch. Everything else is unchanged.
  */
 export async function listWorktrees(
-  cwd?: string,
-  machine?: Machine
+  scope: WorktreeScope
 ): Promise<WorktreeInfo[]> {
-  if (isRemoteMachine(machine)) return listWorktreesRemote(cwd, machine);
-  try {
-    const { stdout } = await exec(
-      'git worktree list --porcelain -z',
-      gitOptions(cwd)
-    );
-    return recoverDetachedHeads(
-      parseWorktrees(stdout),
-      cwd,
-      recoverRebaseBranch
-    );
-  } catch (e) {
-    log('error', 'listWorktrees', 'git worktree list failed', e);
-    return [];
-  }
+  if (isRemoteMachine(scope.machine))
+    return listWorktreesRemote(scope, scope.machine);
+  return (await listWorktreeRegistrations(scope)).present;
 }
 
 async function listWorktreesRemote(
-  cwd: string | undefined,
+  scope: WorktreeScope,
   machine: Machine
 ): Promise<WorktreeInfo[]> {
+  const { cwd, resolver } = scope;
   try {
     const { stdout } = await runGitOn(
       machine,
@@ -175,7 +215,7 @@ async function listWorktreesRemote(
     );
     // No local filesystem to recover a detached HEAD's rebase branch
     // from — see this function's doc comment.
-    return recoverDetachedHeads(parseWorktrees(stdout), cwd, () => null);
+    return recoverDetachedHeads(parseWorktrees(stdout), resolver, () => null);
   } catch (e) {
     log(
       'error',
@@ -183,16 +223,16 @@ async function listWorktreesRemote(
       `remote git worktree list failed on ${machine.id}`,
       e
     );
-    return [];
+    throw e;
   }
 }
 
 function recoverDetachedHeads(
   parsed: WorktreeInfo[],
-  cwd: string | undefined,
+  resolver: WorktreeResolver,
   recover: (worktreePath: string) => string | null
 ): WorktreeInfo[] {
-  const owned = parsed.filter((w) => !w.bare && ownsWorktreePath(w.path, cwd));
+  const owned = parsed.filter((w) => !w.bare && resolver.owns(w.path));
   const recovered: WorktreeInfo[] = [];
   for (const w of owned) {
     if (w.branch !== '') {

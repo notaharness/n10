@@ -29,6 +29,7 @@ vi.mock('@n10/terminal-tmux', () => ({
   isTmuxAvailable: vi.fn(),
   tmuxKillSession: vi.fn(),
   tmuxListSessionsDetailed: () => listMock(),
+  tmuxListSessionsRead: () => listMock(),
 }));
 vi.mock('@n10/worktree-manager', () => ({ listWorktrees: vi.fn() }));
 vi.mock('./pty-registry.js', () => ({
@@ -45,6 +46,15 @@ import {
   worktreeSessionKey,
 } from './session-key.js';
 import { worktreeSessionRow } from './worktree-rows.js';
+
+/** The observation, for a listing tmux gave. */
+function observed(
+  ...args: Parameters<typeof observeTmuxSessions>
+): NonNullable<ReturnType<typeof observeTmuxSessions>> {
+  const seen = observeTmuxSessions(...args);
+  if (!seen) throw new Error('tmux could not list its sessions');
+  return seen;
+}
 
 const REPO = '/repo';
 const WT = '/repo/.claude/worktrees/feature';
@@ -90,7 +100,7 @@ describe('discovery matches a session to its checkout', () => {
     listMock.mockReturnValue([
       session({ branch: 'feature', path: WT, tag: WT }),
     ]);
-    const seen = observeTmuxSessions([worktree(WT, 'other')]);
+    const seen = observed(REPO, [worktree(WT, 'other')]);
     expect([...seen.persisted]).toEqual([keyForWorktree({ path: WT }, REPO)]);
     expect(seen.terminals).toEqual([]);
   });
@@ -99,7 +109,7 @@ describe('discovery matches a session to its checkout', () => {
     listMock.mockReturnValue([
       session({ branch: 'feature', path: WT, tag: WT }),
     ]);
-    const seen = observeTmuxSessions([
+    const seen = observed(REPO, [
       worktree(WT, 'other'),
       worktree(WT2, 'feature'),
     ]);
@@ -108,7 +118,7 @@ describe('discovery matches a session to its checkout', () => {
 
   it('treats a worktree session without the tag as foreign', () => {
     listMock.mockReturnValue([session({ branch: 'feature', path: WT })]);
-    const seen = observeTmuxSessions([worktree(WT, 'feature')]);
+    const seen = observed(REPO, [worktree(WT, 'feature')]);
     expect(seen.persisted.size).toBe(0);
     expect(seen.terminals).toEqual([]);
   });
@@ -117,7 +127,7 @@ describe('discovery matches a session to its checkout', () => {
     listMock.mockReturnValue([
       session({ branch: 'feature', path: '/somewhere/else', tag: WT }),
     ]);
-    const seen = observeTmuxSessions([worktree(WT, 'feature')]);
+    const seen = observed(REPO, [worktree(WT, 'feature')]);
     expect([...seen.persisted]).toEqual([keyForWorktree({ path: WT }, REPO)]);
   });
 
@@ -129,7 +139,7 @@ describe('discovery matches a session to its checkout', () => {
         tag: '/repo/.claude/worktrees/gone',
       }),
     ]);
-    const seen = observeTmuxSessions([worktree(WT2, 'feature')]);
+    const seen = observed(REPO, [worktree(WT2, 'feature')]);
     expect(seen.persisted.size).toBe(0);
     // Surfaced where it runs instead, as an orphan agent.
     expect(seen.terminals).toEqual([
@@ -209,6 +219,7 @@ describe('a scan notices a worktree that switched branch', () => {
     const { diffScans } = await import('./discovery/discovery-model.js');
     const scan = (branch: string) => ({
       worktrees: [worktree(WT, branch)],
+      stranded: [],
       persisted: new Set<string>(),
       terminals: [],
     });

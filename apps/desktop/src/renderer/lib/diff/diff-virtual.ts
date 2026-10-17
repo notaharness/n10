@@ -3,164 +3,88 @@ import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
+import type { InlineTarget } from '../review/my-drafts.js';
 import {
   anchorKey,
   buildSplitRows,
   buildUnifiedRows,
   defaultCollapseReason,
-  lineAnchors,
-  type CollapseReason,
   type SplitRow,
 } from './diff-model.js';
+import {
+  anchorComments,
+  presentAnchors,
+  pushOrphans,
+  splitMine,
+} from './diff-anchors.js';
+import {
+  noticeRow,
+  type FileDisplayState,
+  type FileStats,
+  type FlatDiff,
+  type FlatDiffOptions,
+  type FlatRow,
+} from './diff-rows-model.js';
+import type { FileBody } from './diff-bodies.js';
 
-// ── Flat rows for the virtualized all-files diff ─────────────────
-//
-// The diff renders as ONE list across every file — headers, code
-// rows, fold markers and comment cards — so the viewer can virtualize
-// it (materialize only the rows in the viewport, terminal-style).
-// Everything here is pure data: the component maps a FlatRow to the
-// existing row primitives.
+export {
+  estimateRowHeight,
+  type FileDisplayState,
+  type FileStats,
+  type FlatDiff,
+  type FlatDiffOptions,
+  type FlatRow,
+} from './diff-rows-model.js';
 
-export type FlatRow =
-  | { key: string; kind: 'conversation' }
-  | { key: string; kind: 'file-header'; file: string }
-  | { key: string; kind: 'hunk'; file: string; index: number }
-  | { key: string; kind: 'unified'; file: string; index: number }
-  | { key: string; kind: 'split-context'; file: string; index: number }
-  | {
-      key: string;
-      kind: 'split-pair';
-      file: string;
-      row: Extract<SplitRow, { kind: 'pair' }>;
-    }
-  | { key: string; kind: 'fold'; file: string; from: number; to: number }
-  | {
-      key: string;
-      kind: 'comments';
-      file: string;
-      threads: RemoteCommentThread[];
-      drafts: ReviewComment[];
-      /** Indent under the gutter (unified view). */
-      indent: boolean;
-    }
-  | {
-      key: string;
-      kind: 'orphans';
-      file: string;
-      threads: RemoteCommentThread[];
-      drafts: ReviewComment[];
-    };
+const BOTH_SIDES = { LEFT: true, RIGHT: true } as const;
 
-/** Rough pixel heights per row kind; the virtualizer refines them by
- *  measuring rendered rows. Code rows are the exact leading-5 height. */
-export function estimateRowHeight(row: FlatRow): number {
-  switch (row.kind) {
-    case 'unified':
-    case 'split-context':
-    case 'split-pair':
-      return 20;
-    case 'hunk':
-      return 20;
-    case 'fold':
-      return 24;
-    case 'file-header':
-      return 37;
-    case 'comments':
-      return 160;
-    case 'orphans':
-      return 220;
-    case 'conversation':
-      return 260;
-  }
-}
-
-export interface FileDisplayState {
-  /** Overrides the collapse-reason default when set. */
-  open?: boolean;
-  viewed?: boolean;
-  expanded?: ReadonlySet<number>;
-}
-
-export interface FileStats {
-  adds: number;
-  dels: number;
-  openThreads: number;
-  draftCount: number;
-  collapseReason: CollapseReason;
-  open: boolean;
-  viewed: boolean;
-}
-
-export interface FlatDiff {
-  rows: FlatRow[];
-  /** Comment/draft id → row index (the comments/orphans/conversation
-   *  row containing it). */
-  indexById: Map<string, number>;
-  /** File → its header row index. */
-  fileIndex: Map<string, number>;
-  /** Per-file header data. */
-  stats: Map<string, FileStats>;
-}
-
-/** Group agent drafts / remote threads by the anchor they sit under. */
-function anchorComments<T extends { side: 'LEFT' | 'RIGHT' }>(
-  present: ReadonlySet<string>,
-  items: readonly T[],
-  lineFor: (t: T) => number | null
-): { byAnchor: Map<string, T[]>; orphans: T[]; pinned: Set<string> } {
-  const byAnchor = new Map<string, T[]>();
-  const orphans: T[] = [];
-  const pinned = new Set<string>();
-  for (const t of items) {
-    const line = lineFor(t);
-    if (line == null) {
-      orphans.push(t);
-      continue;
-    }
-    const a = anchorKey(t.side === 'LEFT' ? 'L' : 'R', line);
-    if (present.has(a)) {
-      (byAnchor.get(a) ?? byAnchor.set(a, []).get(a)!).push(t);
-      pinned.add(a);
-    } else {
-      orphans.push(t);
-    }
-  }
-  return { byAnchor, orphans, pinned };
-}
-
-/** Every anchor key this file's lines can carry a comment on. */
-function presentAnchors(lines: readonly DiffLine[]): Set<string> {
-  const present = new Set<string>();
-  for (const l of lines) for (const a of lineAnchors(l)) present.add(a);
-  return present;
+/** A file's comments by the line each sits under, on the sides `on`
+ *  numbers as comments do: threads, the agent's drafts, and the
+ *  reviewer's own. */
+function anchorFile(
+  lines: readonly DiffLine[],
+  threads: readonly RemoteCommentThread[],
+  drafts: readonly ReviewComment[],
+  mine: ReturnType<typeof splitMine>['onLines'],
+  on: NonNullable<FlatDiffOptions['anchored']> = BOTH_SIDES
+) {
+  const present = presentAnchors(lines);
+  const t = anchorComments(present, threads, (x) =>
+    x.lineStart == null || !on[x.side] ? null : x.lineEnd ?? x.lineStart
+  );
+  const d = anchorComments(present, drafts, (x) =>
+    on[x.side] ? x.lineEnd : null
+  );
+  const m = anchorComments(present, mine, (x) =>
+    on[x.side] ? x.anchor.range!.end : null
+  );
+  return {
+    t,
+    d,
+    m,
+    pinnedAll: new Set([...t.pinned, ...d.pinned, ...m.pinned]),
+  };
 }
 
 /**
- * The tail row under a file, holding comments whose anchor line the
- * diff doesn't contain. Emits nothing when there are none.
+ * A file's changed lines: Git's counts from the manifest, else the lines
+ * in hand — but only once they are the file's lines. A pull request's
+ * file not read yet has none, and zero would say nothing changed.
  */
-function pushOrphans(
-  rows: FlatRow[],
-  indexById: Map<string, number>,
+function lineCounts(
   file: string,
-  threads: RemoteCommentThread[],
-  drafts: ReviewComment[]
-): void {
-  if (threads.length === 0 && drafts.length === 0) return;
-  const index = rows.length;
-  rows.push({ key: `o:${file}`, kind: 'orphans', file, threads, drafts });
-  for (const x of threads) indexById.set(x.id, index);
-  for (const x of drafts) indexById.set(x.id, index);
-}
-
-export interface FlatDiffOptions {
-  view: 'unified' | 'split';
-  hideResolved: boolean;
-  hasConversation: boolean;
-  generalThreads: readonly RemoteCommentThread[];
-  threadsByFile: ReadonlyMap<string, RemoteCommentThread[]>;
-  draftsByFile: ReadonlyMap<string, ReviewComment[]>;
-  fileState: ReadonlyMap<string, FileDisplayState>;
+  lines: readonly DiffLine[],
+  opts: FlatDiffOptions
+): { adds: number | null; dels: number | null } {
+  const counted = opts.counts?.get(file);
+  if (counted) return { adds: counted.additions, dels: counted.deletions };
+  if (opts.bodies && opts.bodies.get(file)?.state !== 'loaded') {
+    return { adds: null, dels: null };
+  }
+  return {
+    adds: lines.filter((l) => l.type === 'add').length,
+    dels: lines.filter((l) => l.type === 'remove').length,
+  };
 }
 
 /**
@@ -182,9 +106,8 @@ function fileSlice(
   activeDrafts: ReviewComment[];
 } {
   const state = opts.fileState.get(file) ?? {};
-  const adds = lines.filter((l) => l.type === 'add').length;
-  const dels = lines.filter((l) => l.type === 'remove').length;
-  const collapseReason = defaultCollapseReason(file, adds + dels);
+  const { adds, dels } = lineCounts(file, lines, opts);
+  const collapseReason = defaultCollapseReason(file, (adds ?? 0) + (dels ?? 0));
   const allThreads = opts.threadsByFile.get(file) ?? [];
   const visibleThreads = opts.hideResolved
     ? allThreads.filter((t) => !t.isResolved)
@@ -199,6 +122,7 @@ function fileSlice(
       dels,
       openThreads: allThreads.filter((t) => !t.isResolved).length,
       draftCount: activeDrafts.length,
+      mineCount: opts.mineCount?.get(file) ?? 0,
       collapseReason,
       open: state.open ?? collapseReason === null,
       viewed: state.viewed ?? false,
@@ -206,6 +130,70 @@ function fileSlice(
     visibleThreads,
     activeDrafts,
   };
+}
+
+/**
+ * A file with no lines on screen: a notice in their place. Lines on the
+ * way (`loading`) take its comments with them — a jump to one lands on
+ * the file now and follows the comment in when they arrive, rather than
+ * the comment showing here and then moving. A file with no lines to
+ * anchor to, or none unless asked, keeps its comments under the notice.
+ */
+function pushUnread(
+  rows: FlatRow[],
+  indexById: Map<string, number>,
+  file: string,
+  body: FileBody,
+  slice: ReturnType<typeof fileSlice>,
+  mine: InlineTarget[]
+): void {
+  const notice = rows.length;
+  rows.push(noticeRow(file, slice.stats, body));
+  const { visibleThreads, activeDrafts } = slice;
+  if (body.state !== 'loading') {
+    pushOrphans(rows, indexById, file, visibleThreads, activeDrafts, mine);
+    return;
+  }
+  for (const x of [...visibleThreads, ...activeDrafts]) {
+    indexById.set(x.id, notice);
+  }
+  for (const x of mine) indexById.set(x.key, notice);
+}
+
+/** The reviewer's comments on a whole file, under its header, so they
+ *  show even while the file is collapsed (generated, large, or marked
+ *  Viewed). */
+function pushFileDrafts(
+  rows: FlatRow[],
+  indexById: Map<string, number>,
+  file: string,
+  mine: InlineTarget[]
+): void {
+  if (mine.length === 0) return;
+  for (const x of mine) indexById.set(x.key, rows.length);
+  rows.push({ key: `fd:${file}`, kind: 'file-drafts', file, mine });
+}
+
+/**
+ * What a pull request's file body adds before its lines: a notice in
+ * place of lines not in hand, or one introducing lines read by their
+ * changes alone. True when there are no lines to lay out.
+ */
+function pushBodyRows(
+  rows: FlatRow[],
+  indexById: Map<string, number>,
+  file: string,
+  opts: FlatDiffOptions,
+  slice: ReturnType<typeof fileSlice>,
+  mine: InlineTarget[]
+): boolean {
+  const body = opts.bodies?.get(file);
+  if (body && body.state !== 'loaded') {
+    pushUnread(rows, indexById, file, body, slice, mine);
+    return true;
+  }
+  if (body?.scope === 'changes') rows.push(noticeRow(file, slice.stats));
+  return false;
 }
 
 export function buildFlatDiff(
@@ -229,14 +217,20 @@ export function buildFlatDiff(
     fileIndex.set(file, rows.length);
     rows.push({ key: `h:${file}`, kind: 'file-header', file });
     stats.set(file, slice.stats);
+    const own = splitMine(opts.mineByFile?.get(file) ?? []);
+    pushFileDrafts(rows, indexById, file, own.onFile);
     if (!slice.stats.open) continue;
+    if (pushBodyRows(rows, indexById, file, opts, slice, own.onLines)) {
+      continue;
+    }
 
-    const present = presentAnchors(lines);
-    const t = anchorComments(present, visibleThreads, (x) =>
-      x.lineStart == null ? null : x.lineEnd ?? x.lineStart
+    const { t, d, m, pinnedAll } = anchorFile(
+      lines,
+      visibleThreads,
+      activeDrafts,
+      own.onLines,
+      opts.anchored
     );
-    const d = anchorComments(present, activeDrafts, (x) => x.lineEnd);
-    const pinnedAll = new Set([...t.pinned, ...d.pinned]);
 
     const unified = buildUnifiedRows(lines, {
       pinnedAnchors: pinnedAll,
@@ -252,9 +246,11 @@ export function buildFlatDiff(
     ) => {
       const threads: RemoteCommentThread[] = [];
       const drafts: ReviewComment[] = [];
+      const mine: InlineTarget[] = [];
       const take = (anchor: string) => {
         threads.push(...(t.byAnchor.get(anchor) ?? []));
         drafts.push(...(d.byAnchor.get(anchor) ?? []));
+        mine.push(...(m.byAnchor.get(anchor) ?? []));
       };
       if (!onlyLeft && line.newLine != null) take(anchorKey('R', line.newLine));
       // A context line carries both an old and a new number, and a
@@ -266,7 +262,7 @@ export function buildFlatDiff(
       if ((onlyLeft || line.type !== 'add') && line.oldLine != null) {
         take(anchorKey('L', line.oldLine));
       }
-      if (threads.length === 0 && drafts.length === 0) return;
+      if (threads.length + drafts.length + mine.length === 0) return;
       const index = rows.length;
       rows.push({
         key: `c:${file}:${keySuffix}`,
@@ -274,10 +270,12 @@ export function buildFlatDiff(
         file,
         threads,
         drafts,
+        mine,
         indent,
       });
       for (const x of threads) indexById.set(x.id, index);
       for (const x of drafts) indexById.set(x.id, index);
+      for (const x of mine) indexById.set(x.key, index);
     };
 
     /**
@@ -352,7 +350,7 @@ export function buildFlatDiff(
     if (opts.view === 'split') appendSplitRows();
     else appendUnifiedRows();
 
-    pushOrphans(rows, indexById, file, t.orphans, d.orphans);
+    pushOrphans(rows, indexById, file, t.orphans, d.orphans, m.orphans);
   }
 
   return { rows, indexById, fileIndex, stats };

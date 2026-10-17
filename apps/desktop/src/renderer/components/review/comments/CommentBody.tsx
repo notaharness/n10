@@ -24,25 +24,59 @@ import { CommentMarkdown } from './CommentMarkdown.js';
  * badge a reviewer sees here is the one the TUI shows for the same
  * comment.
  */
-export function CommentBody({ markdown }: { markdown: string }) {
+export function CommentBody({
+  markdown,
+  labels = true,
+}: {
+  markdown: string;
+  /** Show the header's labels above the body; false where the card's
+   *  header row shows them (`ConventionalLabels`). */
+  labels?: boolean;
+}) {
   const parts = useMemo(() => commentBodyParts(markdown), [markdown]);
   return (
     <>
-      {parts.header && (
+      {labels && parts.header && (
         <div className="mb-1 flex flex-wrap items-center gap-1">
-          <Badge variant={conventionalBadge(parts.header)}>
-            {parts.header.label}
-          </Badge>
-          {parts.header.decorations.map((decoration) => (
-            <Badge key={decoration} variant="outline">
-              {decoration}
-            </Badge>
-          ))}
+          <HeaderBadges header={parts.header} />
         </div>
       )}
       <CommentMarkdown markdown={parts.body} />
       {parts.footer && <AgentAttribution />}
     </>
+  );
+}
+
+type Header = NonNullable<ReturnType<typeof commentBodyParts>['header']>;
+
+function HeaderBadges({ header }: { header: Header }) {
+  return (
+    <>
+      <Badge variant={conventionalBadge(header)}>{header.label}</Badge>
+      {header.decorations.map((decoration) => (
+        <Badge key={decoration} variant="outline">
+          {decoration}
+        </Badge>
+      ))}
+    </>
+  );
+}
+
+/**
+ * The header's labels for a card's header row, after the author and the
+ * time: one group that wraps onto its own line, whole, where the row is
+ * narrow. Nothing where the comment has no header.
+ */
+export function ConventionalLabels({ markdown }: { markdown: string }) {
+  const { header } = useMemo(() => commentBodyParts(markdown), [markdown]);
+  if (!header) return null;
+  return (
+    <span
+      data-comment-labels
+      className="inline-flex flex-wrap items-center gap-1"
+    >
+      <HeaderBadges header={header} />
+    </span>
   );
 }
 

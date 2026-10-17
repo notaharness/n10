@@ -28,6 +28,10 @@ export function baseOptions(): BaseLayoutProps {
         url: '/orchestra',
       },
       {
+        text: 'Conversations',
+        url: '/conversations',
+      },
+      {
         text: 'Roadmap',
         url: '/docs/roadmap',
       },

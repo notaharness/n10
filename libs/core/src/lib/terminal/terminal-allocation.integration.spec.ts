@@ -104,6 +104,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
           null,
           {
             worktrees: [],
+            stranded: [],
             persisted: new Set(),
             terminals: [
               {

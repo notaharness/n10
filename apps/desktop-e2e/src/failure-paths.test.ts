@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { sessionBranch } from './setup/session-keys.js';
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
@@ -9,11 +10,18 @@ import {
   focusTerminal,
   launchAgentFromRail,
   openPalette,
+  sessionCard,
+  showChanges,
+  showFile,
+  showOverview,
   sidebarRow,
   tabs,
   visibleText,
+  openSessions,
 } from './setup/app.js';
-import { armContextMenuChoice } from './setup/menu.js';
+import { armContextMenuChoice, clickAppMenuItem } from './setup/menu.js';
+import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
+import { scrollTerminalToTop } from './setup/terminal-grid.js';
 
 /**
  * What the app does when something goes wrong.
@@ -31,11 +39,11 @@ import { armContextMenuChoice } from './setup/menu.js';
 /**
  * Wait until the host says this branch's agent has finished.
  *
- * Not the rail's "Relaunch agent" button, and deliberately so. That
- * button reads `hasSession && !running`, and `running` reaches the
- * renderer through a query polled every two seconds — so it is equally
- * true in the window between the launch creating the session and the
- * first poll that catches it alive. A wait on the button alone lands
+ * Not the rail's "Exited" card, and deliberately so. That card reads
+ * `!running`, and `running` reaches the renderer through a query
+ * polled every two seconds — so it is equally true in the window
+ * between the launch creating the session and the first poll that
+ * catches it alive. A wait on the card alone lands
  * in that window on a loaded machine and hands the test back an agent
  * that is still starting: the assertions that follow then describe a
  * live session and fail for the wrong reason.
@@ -43,7 +51,7 @@ import { armContextMenuChoice } from './setup/menu.js';
  * `listSessions()` is answered by the host from its own registry with
  * no cache in front of it, and a name only appears there once the
  * session has been created — so a session that is present and not
- * running has genuinely exited. The button is then waited on second,
+ * running has genuinely exited. The card is then waited on second,
  * because that is the exit as the user meets it.
  *
  * It is deliberately not tmux's retained "Pane is dead" notice either.
@@ -59,7 +67,7 @@ async function expectAgentExited(page: Page, branch: string): Promise<void> {
   await expect
     .poll(
       async () => {
-        const sessions = await page.evaluate(() => window.n10.listSessions());
+        const sessions = await openSessions(page);
         return (
           sessions.find((s) => sessionBranch(s.name) === branch)?.running ??
           true
@@ -68,9 +76,9 @@ async function expectAgentExited(page: Page, branch: string): Promise<void> {
       { timeout: 30_000 }
     )
     .toBe(false);
-  await expect(
-    page.getByRole('button', { name: 'Relaunch agent', exact: true })
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(sessionCard(page, 'Agent')).toContainText('Exited', {
+    timeout: 30_000,
+  });
 }
 
 test.describe('An agent that exits immediately', () => {
@@ -87,10 +95,15 @@ test.describe('An agent that exits immediately', () => {
     // The exit swaps the pane for tmux's retained frame, so what the
     // agent printed has to survive that swap. A capture that came back
     // empty would clear the terminal and leave the user with nothing.
+    // The frame is the PTY's height, taller than the pane under the exit
+    // bar, so its first line is up in the scrollback.
+    await scrollTerminalToTop(page);
     await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible();
   });
 
-  test('typing into an exited agent reports the failed delivery without a renderer exception', async ({
+  // Its pane is a read-only view of the final output: keystrokes go
+  // nowhere, and say nothing about it.
+  test('typing into an exited agent is ignored without an error', async ({
     desktop,
   }) => {
     const { page } = desktop;
@@ -100,8 +113,13 @@ test.describe('An agent that exits immediately', () => {
 
     await focusTerminal(page);
     await page.keyboard.type('hello');
+    await expect(
+      page.getByRole('button', { name: 'Resume agent' })
+    ).toBeVisible();
     expect(desktop.pageErrors).toEqual([]);
-    await expect(page.getByText(/Session .* is not running/)).toBeVisible();
+    await expect(page.getByText(/is not running|Error invoking/)).toHaveCount(
+      0
+    );
     await expect(tabs(page)).toHaveCount(1);
   });
 
@@ -192,13 +210,17 @@ test.describe('An agent command that does not exist', () => {
     // that and the terminal is never put in front, the complaint is
     // written into a pane nobody is shown, and the launch fails in
     // silence with the diff still up.
-    await expect(
-      visibleText(page, /not found|no such file|ENOENT/i)
-    ).toBeVisible({ timeout: 30_000 });
+    // Under the exit bar, the complaint is up in the scrollback.
+    await expect(async () => {
+      await scrollTerminalToTop(page);
+      await expect(
+        visibleText(page, /not found|no such file|ENOENT/i)
+      ).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 30_000 });
     await expect
       .poll(
         async () => {
-          const sessions = await page.evaluate(() => window.n10.listSessions());
+          const sessions = await openSessions(page);
           return (
             sessions.find((s) => sessionBranch(s.name) === 'broken-agent')
               ?.running ?? false
@@ -207,5 +229,207 @@ test.describe('An agent command that does not exist', () => {
         { timeout: 20_000 }
       )
       .toBe(false);
+  });
+});
+
+/**
+ * A pull request's reads fail one at a time, and each section says so
+ * for itself. The lie these guard against is a failure rendered as a
+ * successful empty answer: "no description", "no changes" and an
+ * diff without its threads all look like facts about the pull request, and
+ * a reviewer acts on them.
+ */
+test.describe('Pull request reads that fail', () => {
+  const FAILING_PR = {
+    number: 51,
+    title: 'Flaky reads',
+    headRefName: 'flaky-reads',
+    body: 'The real description.',
+    failing: { body: true, threads: true },
+    threads: [
+      {
+        id: 'T1',
+        path: 'a.txt',
+        line: 1,
+        comments: [{ author: 'alice', body: 'A remote question.' }],
+      },
+    ],
+  };
+  const GITHUB: FakeGitHub = {
+    username: 'n10-tester',
+    prs: [
+      FAILING_PR,
+      {
+        ...FAILING_PR,
+        number: 52,
+        title: 'Steady reads',
+        headRefName: 'steady-reads',
+        failing: {},
+      },
+      {
+        number: 53,
+        title: 'Silent author',
+        headRefName: 'silent-author',
+        body: '',
+      },
+      { number: 54, title: 'Vanished branch', headRefName: 'vanished' },
+      { number: 55, title: 'Accented path', headRefName: 'accented' },
+    ],
+  };
+
+  test.use({
+    fakeGitHub: GITHUB,
+    repo: {
+      worktrees: [
+        { branch: 'flaky-reads', files: { 'a.txt': 'one\n' } },
+        { branch: 'steady-reads', files: { 'a.txt': 'one\n' } },
+        { branch: 'silent-author', files: { 'b.txt': 'two\n' } },
+        // Git quotes a non-ASCII path in the diff header.
+        { branch: 'accented', files: { 'café.txt': 'x\n' } },
+      ],
+    },
+  });
+
+  /** The viewer's own pull request, on its changes. */
+  async function openPr(page: Page, title: string) {
+    await sidebarRow(page, new RegExp(title)).first().click();
+    await showChanges(page);
+  }
+
+  async function openOverview(page: Page, title: string) {
+    await sidebarRow(page, new RegExp(title)).first().click();
+    await showOverview(page);
+  }
+
+  const setFailing = (
+    homeDir: string,
+    number: number,
+    failing: { body?: boolean; threads?: boolean }
+  ) =>
+    updateFakeGh(homeDir, (scenario) => {
+      const pr = scenario.prs.find((p) => p.number === number);
+      if (pr) pr.failing = failing;
+    });
+
+  test('a description that fails to load offers Retry, not "no description"', async ({
+    desktop,
+  }) => {
+    const { page, homeDir } = desktop;
+    await openOverview(page, 'Flaky reads');
+
+    const failure = page
+      .getByRole('alert')
+      .filter({ hasText: "Couldn't load the description" });
+    await expect(failure).toBeVisible({ timeout: 30_000 });
+    await expect(failure).toContainText('GitHub returned an error');
+    await expect(
+      page.getByText('This pull request has no description.')
+    ).toHaveCount(0);
+
+    setFailing(homeDir, 51, {});
+    await failure.getByRole('button', { name: /^Retry/ }).click();
+    await expect(page.getByText('The real description.')).toBeVisible();
+    await expect(failure).toHaveCount(0);
+  });
+
+  test('a description that is actually empty says so', async ({ desktop }) => {
+    const { page } = desktop;
+    await openOverview(page, 'Silent author');
+    await expect(
+      page.getByText('This pull request has no description.')
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
+
+  test('comments that fail to load are not counted as none', async ({
+    desktop,
+  }) => {
+    const { page, homeDir } = desktop;
+    // With its comments unread, the Overview's next step waits on them.
+    await sidebarRow(page, /Flaky reads/)
+      .first()
+      .click();
+    await showFile(page);
+
+    const failure = page
+      .getByRole('alert')
+      .filter({ hasText: "Couldn't load comments" });
+    await expect(failure).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('[data-thread="T1"]')).toHaveCount(0);
+    // The rest of the pull request is still readable.
+    await expect(
+      page.locator('[data-diff-scroll]').getByText('one', { exact: true })
+    ).toBeVisible();
+
+    setFailing(homeDir, 51, {});
+    await failure.getByRole('button', { name: /^Retry/ }).click();
+    await expect(page.locator('[data-thread="T1"]')).toBeVisible();
+    await expect(failure).toHaveCount(0);
+  });
+
+  test('comments whose refresh fails stay on screen, marked as old', async ({
+    desktop,
+  }) => {
+    const { page, homeDir } = desktop;
+    await openPr(page, 'Steady reads');
+    const row = page.locator('[data-thread="T1"]');
+    await expect(row).toBeVisible({ timeout: 30_000 });
+
+    // Opening a reply box re-reads the threads; this time GitHub fails.
+    setFailing(homeDir, 52, { threads: true });
+    await page.getByRole('button', { name: 'Reply…', exact: true }).click();
+
+    const stale = page
+      .getByRole('status')
+      .filter({ hasText: 'Showing the comments from' });
+    await expect(stale).toBeVisible({ timeout: 30_000 });
+    await expect(stale).toContainText('GitHub returned an error');
+    await expect(row).toBeVisible();
+
+    setFailing(homeDir, 52, {});
+    await stale.getByRole('button', { name: /^Retry/ }).click();
+    await expect(stale).toHaveCount(0);
+    await expect(row).toBeVisible();
+  });
+
+  test('a diff that cannot be fetched says why, not "No changes"', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openPr(page, 'Vanished branch');
+    const failure = page
+      .getByRole('alert')
+      .filter({ hasText: "Couldn't load the diff" });
+    await expect(failure).toBeVisible({ timeout: 30_000 });
+    await expect(failure).toContainText('vanished');
+    await expect(page.getByText(/No changes between/)).toHaveCount(0);
+
+    // A retry that fails again keeps the notice, and the focus on its
+    // button, rather than flashing a skeleton in their place.
+    const retry = failure.getByRole('button', { name: /^Retry/ });
+    await retry.focus();
+    await page.keyboard.press('Enter');
+    await expect(failure).toBeVisible();
+    await expect(retry).toBeFocused();
+    await expect(retry).not.toHaveAttribute('aria-disabled', 'true');
+
+    // Once the branch exists, the provider reports its head. The failed
+    // read put nothing on screen to hold, so the tab reads that head:
+    // an empty diff, now a fact.
+    execFileSync('git', ['branch', 'vanished'], { cwd: desktop.repoPath });
+    await clickAppMenuItem(desktop.app, 'Refresh Pull Requests');
+    await expect(failure).toHaveCount(0, { timeout: 30_000 });
+    await expect(page.getByText(/No changes between/)).toBeVisible();
+  });
+
+  test('a path git quotes reads as its name, not a failure', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await openPr(page, 'Accented path');
+    await expect(
+      page.locator('[data-diff-scroll]').getByText('café.txt').first()
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('alert')).toHaveCount(0);
   });
 });

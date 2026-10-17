@@ -18,11 +18,15 @@ import { basename, dirname, join } from 'node:path';
  * branch/diff features have nothing to show.
  */
 
+/** Git's environment while a repo with `commitDate` is seeded. */
+let seedEnv: NodeJS.ProcessEnv | undefined;
+
 function git(cwd: string, args: string[]): string {
   return execFileSync('git', args, {
     cwd,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    env: seedEnv,
   });
 }
 
@@ -49,6 +53,12 @@ export interface TestRepoWorktree {
   conflictedRebase?: boolean;
   /** Delete the worktree directory, leaving git's registration behind. */
   deleteDirectory?: boolean;
+  /**
+   * Remove the worktree once seeded, keeping only its branch: a pull
+   * request with no local checkout, whose tab has no session to keep
+   * its pane mounted.
+   */
+  removeWorktree?: boolean;
 }
 
 export interface TestRepoOptions {
@@ -60,8 +70,14 @@ export interface TestRepoOptions {
    * otherwise every run differs by the tempdir's random suffix.
    */
   name?: string;
+  /** Create the repo (named `name`, else `repo`) in this directory
+   *  rather than a random temp parent. The caller owns the directory. */
+  parent?: string;
   /** Extra branches to create off the initial commit. */
   branches?: string[];
+  /** Files committed on main before anything branches, path →
+   *  contents, so a worktree's edits to them diff with removed lines. */
+  baseFiles?: Record<string, string>;
   /**
    * Worktrees to create before the app launches, in the same location
    * the app uses.
@@ -73,19 +89,50 @@ export interface TestRepoOptions {
    * lifetime.
    */
   worktrees?: TestRepoWorktree[];
+  /**
+   * Make every seeded commit at this date, so the commit ids are the
+   * same on every run: a screenshot that shows a pull request's head
+   * needs it fixed, as it needs the name.
+   */
+  commitDate?: string;
+}
+
+/** The new repo's directory: `name` in `parent`, else in (or as) a
+ *  random temp parent. */
+function repoDir(opts: TestRepoOptions): string {
+  const parent = opts.parent ?? mkdtempSync(join(tmpdir(), 'n10-desktop-e2e-'));
+  const name = opts.name ?? (opts.parent ? 'repo' : undefined);
+  if (!name) return parent;
+  const dir = join(parent, name);
+  mkdirSync(dir);
+  return dir;
 }
 
 export function createTestRepo(opts: TestRepoOptions = {}): string {
-  const parent = mkdtempSync(join(tmpdir(), 'n10-desktop-e2e-'));
-  const dir = opts.name ? join(parent, opts.name) : parent;
-  if (opts.name) mkdirSync(dir);
+  const date = opts.commitDate;
+  seedEnv = date
+    ? { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date }
+    : undefined;
+  try {
+    return seedRepo(opts);
+  } finally {
+    seedEnv = undefined;
+  }
+}
+
+function seedRepo(opts: TestRepoOptions): string {
+  const dir = repoDir(opts);
   git(dir, ['init', '-q', '-b', 'main']);
   git(dir, ['config', 'user.email', 'test@n10.dev']);
   git(dir, ['config', 'user.name', 'n10 Test']);
   // Commit hooks and signing would prompt or fail in CI.
   git(dir, ['config', 'commit.gpgsign', 'false']);
   writeFileSync(join(dir, 'README.md'), '# test repo\n', 'utf8');
-  git(dir, ['add', 'README.md']);
+  for (const [name, contents] of Object.entries(opts.baseFiles ?? {})) {
+    mkdirSync(dirname(join(dir, name)), { recursive: true });
+    writeFileSync(join(dir, name), contents, 'utf8');
+  }
+  git(dir, ['add', '.']);
   git(dir, ['commit', '-q', '-m', 'initial']);
 
   for (const branch of opts.branches ?? []) {
@@ -132,6 +179,7 @@ function addWorktree(dir: string, base: string, wt: TestRepoWorktree): void {
   if (wt.switchTo) git(path, ['checkout', '-q', '-b', wt.switchTo]);
   if (wt.detach) git(path, ['checkout', '-q', '--detach']);
   if (wt.deleteDirectory) rmSync(path, { recursive: true, force: true });
+  if (wt.removeWorktree) git(dir, ['worktree', 'remove', path]);
 }
 
 /**

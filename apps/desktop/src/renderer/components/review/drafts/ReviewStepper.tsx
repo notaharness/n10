@@ -1,8 +1,11 @@
 import { CheckIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { toast } from 'sonner';
 import type { DiffLine } from '@n10/diff';
-import type { ReviewComment } from '../../../../host/contract.js';
+import type {
+  PrDiffManifestFile,
+  ReviewComment,
+} from '../../../../host/contract.js';
 import {
   orderDraftsForReview,
   severityCounts,
@@ -13,9 +16,14 @@ import {
   usePostDrafts,
   useUpdateDraft,
 } from '../../../lib/data/mutations.js';
+import type { FileBody } from '../../../lib/diff/diff-bodies.js';
 import { useRepo } from '../../../lib/repo-context.js';
+import { useTabView } from '../../../lib/tabs/tab-views.js';
+import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
 import { errorMessage } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
+import { FileBodyNotice } from '../diff/FileBodyNotice.js';
+import { ImageCompare } from '../diff/ImageCompare.js';
 import { StepCard } from './ReviewStepCard.js';
 
 /**
@@ -30,23 +38,20 @@ export function ReviewStepper({
   drafts,
   filesByName,
   fileOrder,
-  active,
   onExit,
   onOpenInDiff,
+  prDiff,
 }: {
   prId: number;
   headSha?: string;
   drafts: ReviewComment[];
   filesByName: Map<string, DiffLine[]>;
   fileOrder: Map<string, number>;
-  /** Whether this stepper's tab is the visible one. Its shortcuts are
-   *  bound on `window`, and the pane stays mounted while the tab is in
-   *  the background (a live agent keeps its terminal alive), so without
-   *  this a keypress meant for another tab would post or discard a
-   *  draft here. */
-  active: boolean;
   onExit: () => void;
   onOpenInDiff: (file: string) => void;
+  /** A pull request's file bodies, which are read as they are needed:
+   *  the walkthrough asks for the files it is about to show. */
+  prDiff?: PrDiffView;
 }) {
   const { repo } = useRepo();
   const update = useUpdateDraft(repo.cwd);
@@ -57,16 +62,37 @@ export function ReviewStepper({
     () => orderDraftsForReview(drafts, fileOrder),
     [drafts, fileOrder]
   );
-  const [index, setIndex] = useState(0);
+  // The draft's place in the file, where the keyboard goes once the
+  // notice standing in for its code starts a read.
+  const location = useRef<HTMLButtonElement>(null);
+  // The step the reader was on when they left the tab.
+  const { saved, save } = useTabView();
+  const [index, setIndex] = useState(saved.step ?? 0);
   const clamped = Math.min(index, Math.max(0, ordered.length - 1));
   if (clamped !== index) setIndex(clamped);
+  useEffect(() => save({ step: clamped }), [clamped, save]);
 
   const current = ordered[clamped];
   const done = ordered.length === 0;
+  const file = current?.file;
+  const nextFile = ordered[clamped + 1]?.file;
+  const requestFiles = prDiff?.requestFiles;
+  useEffect(() => {
+    if (file) requestFiles?.(nextFile ? [file, nextFile] : [file]);
+  }, [requestFiles, file, nextFile]);
 
   if (done) {
     return <FinishScreen onExit={onExit} />;
   }
+
+  const snippet = snippetAround(
+    filesByName.get(current.file) ?? [],
+    current.side,
+    current.lineStart,
+    current.lineEnd
+  );
+
+  const unread = prDiff && unreadBody(prDiff, current.file, snippet.length > 0);
 
   return (
     <StepCard
@@ -76,13 +102,19 @@ export function ReviewStepper({
       pos={clamped + 1}
       total={ordered.length}
       counts={severityCounts(ordered)}
-      snippet={snippetAround(
-        filesByName.get(current.file) ?? [],
-        current.side,
-        current.lineStart,
-        current.lineEnd
-      )}
-      active={active}
+      snippet={snippet}
+      unread={
+        unread && (
+          <UnreadCode
+            {...unread}
+            prDiff={prDiff}
+            // The notice goes when the read starts: the keyboard moves
+            // to the draft's place in the file, just above it.
+            focusAfter={location}
+          />
+        )
+      }
+      locationRef={location}
       busy={post.isPending || update.isPending || remove.isPending}
       atStart={clamped === 0}
       atEnd={clamped >= ordered.length - 1}
@@ -114,6 +146,52 @@ export function ReviewStepper({
         )
       }
     />
+  );
+}
+
+/**
+ * Whether the draft's code needs something to stand in for it: the
+ * file's lines are not in hand — still loading, waiting to be asked
+ * for, failed — so a draft is never called outdated only because its
+ * file has not been read. Null when the snippet can speak for itself.
+ */
+function unreadBody(prDiff: PrDiffView, path: string, found: boolean) {
+  const file = prDiff.manifestByPath.get(path);
+  const body = prDiff.bodies.get(path);
+  if (!file || !body) return null;
+  // Read by its changes alone, the lines may be outside what was read.
+  const partial = body.state === 'loaded' && body.scope === 'changes';
+  if (body.state === 'loaded' && !(partial && !found)) return null;
+  return { file, body };
+}
+
+function UnreadCode({
+  prDiff,
+  file,
+  body,
+  focusAfter,
+}: {
+  prDiff: PrDiffView;
+  file: PrDiffManifestFile;
+  body: FileBody;
+  focusAfter: RefObject<HTMLElement | null>;
+}) {
+  const { path } = file;
+  return (
+    <div className="overflow-hidden rounded-md border border-border bg-muted/30">
+      {body.state === 'no-text' && body.images ? (
+        <ImageCompare cwd={prDiff.cwd} file={file} />
+      ) : (
+        <FileBodyNotice
+          file={file}
+          body={body}
+          estimate={56}
+          onReadAlone={(scope) => prDiff.readAlone(path, scope)}
+          onRetry={() => prDiff.retryFile(path)}
+          focusAfter={focusAfter}
+        />
+      )}
+    </div>
   );
 }
 

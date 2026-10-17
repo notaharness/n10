@@ -66,7 +66,7 @@ test.describe('@integration Session Sort Selection', () => {
 
   test.use({
     n10RepoPath: cloneDir,
-    n10Config: { aiCommand: 'cat', keybindPreset: 'vim' },
+    n10Config: { agentId: 'test', aiCommand: 'cat', keybindPreset: 'vim' },
     rows: 60,
     cols: 120,
   });

@@ -22,6 +22,14 @@ build target pins production). Full notes: `docs/testing.md`.
 - `src/setup/fake-gh.ts` puts a fake `gh` on PATH answering from a JSON
   scenario (`fakeGitHub` option: PRs, review threads, comments, check
   rollup). Point `headRefName` at a real branch for a real diff. The replacement is isolated to the test PATH.
+- `src/setup/fake-ado.ts` (`fakeAzureDevOps` option) answers Azure DevOps's
+  REST API from a preload in the session host (`fixtures/fake-ado.cjs`,
+  loaded by `N10_HOST_REQUIRE`).
+  The token comes from the preload alone, so an app without it asks Azure
+  nothing; seed no Azure DevOps token of your own beside it.
+- Playwright's Electron launcher drops `NODE_OPTIONS`, so a main-process
+  preload goes on the Electron command line (`-r`). Host services are not
+  in the main process: `app.evaluate` cannot reach them.
 - Provider config from a test: project fields go under `vendorProject`, or
   auto-detect overwrites them and the provider silently returns nothing.
 - Native menus: `src/setup/menu.ts` arms a one-shot `Menu.popup` interception
@@ -40,6 +48,14 @@ build target pins production). Full notes: `docs/testing.md`.
   `GH_TOKEN` handed in explicitly; the isolated HOME hides `gh` credentials.
 - The fake agent's `--print-size` reports the PTY grid with its pid, which
   tells one agent's report from the next when tmux repaints the screen.
+- Terminals run xterm's DOM renderer here (`--disable-gpu`, so no WebGL), so
+  their rows are text to assert on. The element xterm opens in carries
+  `data-terminal-grid` and `data-terminal-renderer` (`setup/terminal-grid.ts`),
+  and the screen and cursor-key mode (`data-terminal-buffer`,
+  `data-terminal-cursor-keys`).
+  The `webgl` option gives the window SwiftShader WebGL
+  (`terminal-webgl.test.ts`). xterm's textarea is zero-sized and off screen:
+  `focusTerminal` focuses it by class.
 - zsh greets a fresh HOME with its first-user wizard and eats the first
   keystroke; the fixture seeds an empty `.zshrc`. Playwright reads
   `[value, {…}]` as a fixture tuple, so `liveTerminals` is a record keyed by

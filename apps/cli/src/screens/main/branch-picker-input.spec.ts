@@ -1,7 +1,6 @@
 import { worktreeSessionKey } from '@n10/core';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type * as CoreModule from '@n10/core';
-import type * as WorktreeManagerModule from '@n10/worktree-manager';
 import {
   ACTIONS,
   NORMIE_PRESET,
@@ -22,16 +21,9 @@ let liveSessions = new Set<string>();
 vi.mock('@n10/core', async (importOriginal) => ({
   ...(await importOriginal<typeof CoreModule>()),
   isSessionAlive: (name: string) => liveSessions.has(name),
-  fetchRefs: vi.fn(() => Promise.resolve(true)),
 }));
 
-vi.mock('@n10/worktree-manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof WorktreeManagerModule>()),
-  createWorktree: vi.fn(),
-  listAllBranches: vi.fn(),
-}));
-
-import { createWorktree } from '@n10/worktree-manager';
+const createWorktree = vi.fn();
 import { handleBranchPickerInput } from './branch-picker-input.js';
 
 function makeKey(overrides: Partial<KeyPress> = {}): KeyPress {
@@ -78,6 +70,7 @@ function makeCtx(opts: { sessionNameForTerminal?: string | null } = {}) {
     setBranches: vi.fn(),
   };
   const sessions = {
+    worktrees: { create: createWorktree },
     flashStatus: vi.fn(),
     refreshSessions: vi.fn().mockResolvedValue([]),
   };
@@ -161,11 +154,11 @@ describe('branch picker — select', () => {
   });
 
   it('leaves the selection alone when the worktree cannot be created', async () => {
-    vi.mocked(createWorktree).mockResolvedValue(null as unknown as string);
+    createWorktree.mockRejectedValueOnce(new Error('Git refused the checkout'));
     const t = makeCtx();
 
     handleBranchPickerInput('', makeKey({ return: true }), t.ctx);
-    await t.settle();
+    await expect(t.settle()).rejects.toThrow('Git refused the checkout');
 
     expect(t.sidebar.selectByKey).not.toHaveBeenCalled();
     expect(peekSessionMenuRequest()).toBeNull();

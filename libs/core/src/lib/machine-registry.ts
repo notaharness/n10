@@ -1,9 +1,8 @@
 /**
  * Where `libs/core` learns about remote machines, without depending on
- * beam or Electron. Mirrors `@n10/terminal-tmux`'s own
- * `setTmuxSessionPreparer` seam: a callback the desktop installs at
- * startup (`apps/desktop/src/main/main.ts`), never called by the TUI or
- * the CLI, which have no remote-machine capability.
+ * beam or Electron: a callback the desktop's session host installs at
+ * startup (`apps/desktop/src/main/host-worker.ts`), never called by the
+ * TUI or the CLI, which have no remote-machine capability.
  *
  * `open-session.ts` is the one place this is consulted, branching on
  * the machine in a `SessionRequest` — see decisions.md D4/D5.
@@ -15,6 +14,9 @@ export type MachineResolver = (machineId: string) => RemoteMachine | undefined;
 
 let resolver: MachineResolver | null = null;
 const pollers = new Map<string, RemoteSessionPoller>();
+/** What the fleet last said of each machine (`setMachineReachable`),
+ *  for a poller made after it said so. */
+const reachability = new Map<string, boolean>();
 
 /** Installed once, or cleared (`null`) on shutdown/test teardown. A
  *  fresh resolver may back different executors than the last one, so
@@ -53,7 +55,19 @@ export function pollerFor(machine: RemoteMachine): RemoteSessionPoller {
   let poller = pollers.get(machine.id);
   if (!poller) {
     poller = new RemoteSessionPoller(machine.executor);
+    if (reachability.get(machine.id) === false) poller.setReachable(false);
     pollers.set(machine.id, poller);
   }
   return poller;
+}
+
+/** What the fleet says of a machine, ahead of any listing: the sessions
+ *  on it wait to reconnect as it goes offline, and try again as it
+ *  returns. Remembered for a session opened on it later. */
+export function setMachineReachable(
+  machineId: string,
+  reachable: boolean
+): void {
+  reachability.set(machineId, reachable);
+  pollers.get(machineId)?.setReachable(reachable);
 }

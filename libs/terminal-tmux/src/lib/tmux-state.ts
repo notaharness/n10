@@ -66,19 +66,23 @@ export type TmuxPaneRead =
   | { status: 'gone' }
   | { status: 'failed' };
 
-/** tmux's own wording for "this server has no sessions left" — the same
- *  condition {@link tmuxListSessionsDetailed} treats as an empty list, not
- *  a failure. Killing a session's last sibling on a server tears the
- *  server down with it, so the target being gone can surface either as
- *  this non-zero exit or as the exit-0/empty-output case below,
+/** tmux's own wording for "there is no server": its socket answers no
+ *  one, or was never created on a machine that has not run tmux yet. The
+ *  same condition {@link tmuxListSessionsDetailed} treats as an empty
+ *  list, not a failure. Killing a session's last sibling on a server
+ *  tears the server down with it, so the target being gone can surface
+ *  either as this non-zero exit or as the exit-0/empty-output case below,
  *  depending on whether other sessions kept the server alive. */
-const NO_SERVER = /no server running/;
+const NO_SERVER =
+  /no server running|error connecting to .* \(No such file or directory\)/;
+
+export function isNoServer(result: TmuxRunResult): boolean {
+  return result.exitCode !== 0 && NO_SERVER.test(result.stderr);
+}
 
 function classifyPaneStateResult(result: TmuxRunResult): TmuxPaneRead {
   if (result.exitCode !== 0)
-    return NO_SERVER.test(result.stderr)
-      ? { status: 'gone' }
-      : { status: 'failed' };
+    return isNoServer(result) ? { status: 'gone' } : { status: 'failed' };
   const fields = result.stdout.trimEnd().split('\t');
   // display-message may succeed with empty output for a vanished target.
   // Require an actual pane identity and explicit native liveness state.
@@ -163,9 +167,19 @@ export function listSessionsArgv(options: readonly string[] = []): string[] {
 export function tmuxListSessionsDetailed(
   options: readonly string[] = []
 ): TmuxSessionInfo[] {
-  const { stdout, exitCode } = runTmux(listSessionsArgv(options));
-  if (exitCode !== 0) return [];
-  return stdout
+  return tmuxListSessionsRead(options) ?? [];
+}
+
+/** {@link tmuxListSessionsDetailed} for a caller that must tell an
+ *  empty server from one n10 could not ask: `null` when tmux could not
+ *  be run or answered with anything but "no server" (a failed fork, the
+ *  timeout kill), as {@link TmuxPaneRead}'s `'failed'`. */
+export function tmuxListSessionsRead(
+  options: readonly string[] = []
+): TmuxSessionInfo[] | null {
+  const result = runTmux(listSessionsArgv(options));
+  if (result.exitCode !== 0) return isNoServer(result) ? [] : null;
+  return result.stdout
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)

@@ -51,8 +51,11 @@ jobs:
         run: gh auth status
 
       # desktop-e2e drives the real Electron app, which needs a display.
-      - name: Install xvfb and tmux
-        run: sudo apt-get update && sudo apt-get install -y xvfb tmux
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      # The tmux both e2e suites run against (docs/testing.md).
+      - uses: ./.github/actions/setup-tmux
 
       - name: Build CLI
         run: npx nx build cli

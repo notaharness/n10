@@ -1,5 +1,6 @@
+import { toast } from 'sonner';
 import { useCallback, useMemo, useState } from 'react';
-import type { CeremonyRequest } from '../../../host/contract-machines.js';
+import type { CeremonyRequest } from '@n10/engine/contract';
 import { useCeremony, type CeremonyHooks } from './use-ceremony.js';
 
 type EnrolmentMode = 'create' | 'join';
@@ -10,7 +11,20 @@ type EnrolmentMode = 'create' | 'join';
  * outlive a failure, so **Back** and **Try again** start from them.
  */
 export function useEnrolment(hooks: CeremonyHooks) {
-  const ceremony = useCeremony(hooks);
+  const { onSettled } = hooks;
+  const completion = useMemo<CeremonyHooks>(
+    () => ({
+      onSettled: (outcome, dismiss) => {
+        onSettled(outcome, dismiss);
+        if (outcome.ok && outcome.op === 'init') {
+          dismiss();
+          toast.success('Fleet created');
+        }
+      },
+    }),
+    [onSettled]
+  );
+  const ceremony = useCeremony(completion);
   const { start, reset } = ceremony;
   /** Null while the two choices show. */
   const [mode, setMode] = useState<EnrolmentMode | null>(null);

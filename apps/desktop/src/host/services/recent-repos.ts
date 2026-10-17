@@ -17,6 +17,11 @@ import { homedir } from 'node:os';
 export interface RecentRepo {
   cwd: string;
   lastOpenedAt: number;
+  /** The repository's colour on screen: an index into the renderer's
+   *  palette (`lib/tabs/repo-colors.ts`), taken as it is added — the
+   *  lowest no other listed repository holds — and kept while it stays
+   *  listed. */
+  color?: number;
 }
 
 const MAX_RECENTS = 10;
@@ -42,17 +47,40 @@ export function saveRecents(
   writeFileSync(file, JSON.stringify(recents, null, 2) + '\n');
 }
 
-/** Record an open: move-to-front on dedupe, capped at MAX_RECENTS. */
+/**
+ * The list with a colour on every entry. An entry without one — new, or
+ * written before colours — takes the lowest no other entry holds, in
+ * list order, so the colours already on screen stay put.
+ */
+export function withColors(
+  recents: RecentRepo[]
+): (RecentRepo & { color: number })[] {
+  const taken = new Set(recents.map((r) => r.color));
+  return recents.map((r) => {
+    if (r.color !== undefined) return { ...r, color: r.color };
+    let color = 0;
+    while (taken.has(color)) color++;
+    taken.add(color);
+    return { ...r, color };
+  });
+}
+
+/** Record an open: move-to-front on dedupe, capped at MAX_RECENTS. A
+ *  repository already listed keeps its colour; one dropped off the end
+ *  frees its own. */
 export function recordOpen(
   recents: RecentRepo[],
   cwd: string,
   now = Date.now()
 ): RecentRepo[] {
-  const next = [
-    { cwd, lastOpenedAt: now },
-    ...recents.filter((r) => r.cwd !== cwd),
-  ].slice(0, MAX_RECENTS);
-  return next;
+  const color = recents.find((r) => r.cwd === cwd)?.color;
+  const rest = recents
+    .filter((r) => r.cwd !== cwd)
+    .slice(0, MAX_RECENTS - 1);
+  return withColors([
+    { cwd, lastOpenedAt: now, ...(color === undefined ? {} : { color }) },
+    ...rest,
+  ]);
 }
 
 export function forgetRecent(cwd: string, file = recentsFilePath()): void {
@@ -81,7 +109,7 @@ export function ensureRecent(
   const recents = loadRecents(file);
   if (recents.some((r) => r.cwd === cwd)) return;
   saveRecents(
-    [...recents, { cwd, lastOpenedAt: now }].slice(0, MAX_RECENTS),
+    withColors([...recents, { cwd, lastOpenedAt: now }].slice(0, MAX_RECENTS)),
     file
   );
 }

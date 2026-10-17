@@ -93,11 +93,7 @@ function settle(page: Page) {
 function statuses(page: Page) {
   return page.evaluate(async () =>
     (
-      await (
-        window.n10 as never as {
-          listDraftComments(prId: number): Promise<{ status: string }[]>;
-        }
-      ).listDraftComments(42)
+      await window.n10.listDraftComments((await window.n10.getRepo())!.cwd, 42)
     ).map((c) => c.status)
   );
 }

@@ -2,8 +2,8 @@ import { memo, useEffect, type ReactNode } from 'react';
 import { Text, Box } from 'ink';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import type { AgentSession } from '@n10/core';
-import { useActivityStatus, useFlashPhase } from '@n10/app-core';
-import { noteSeen, remove as removeInactiveAlert, tabDigit } from '@n10/core';
+import { useActivityStatus, useFlashPhase } from '../hooks/useActivity.js';
+import { remove as removeInactiveAlert, tabDigit } from '@n10/core';
 import { Divider } from './Divider.js';
 import { PrBadge } from './PrBadge.js';
 import { RainbowSpinner } from './RainbowSpinner.js';
@@ -44,6 +44,7 @@ function SessionTitleLine({
   flashing,
   merged,
   rebasing,
+  removed,
 }: {
   tabNumber: number | undefined;
   icon: string;
@@ -53,6 +54,8 @@ function SessionTitleLine({
   flashing: boolean;
   merged: boolean;
   rebasing: boolean;
+  /** The worktree is gone and its agent still runs. */
+  removed: boolean;
 }) {
   return (
     <Text wrap="truncate">
@@ -74,6 +77,7 @@ function SessionTitleLine({
         </Text>
       ) : null}
       {rebasing ? <Text color="yellow"> rebasing</Text> : null}
+      {removed ? <Text color="red"> worktree removed</Text> : null}
     </Text>
   );
 }
@@ -114,23 +118,13 @@ export const SessionItemRow = memo(function SessionItemRow({
   const activity = useActivityStatus(session.name);
   const title = pr?.title || session.label || session.name;
 
-  // The selected row is what the user is looking at, so ack any output
-  // (poll while selected, plus a final ack on deselect) — that way the
-  // row does not flash the moment it is deselected. Runs at 1Hz; flash
-  // requires ACTIVITY_IDLE_MS (2s) of silence after data, so a single
-  // missed tick at the tail can't make the flash appear for content
-  // the user actually saw.
+  // Visiting acks any pending inactive-alert: the user is here, they
+  // don't need a queued jump back to a session they're already on.
+  // Whether its output was seen is up to the terminal pane
+  // (`showTerminal`), not the selection: the pane may show the branch
+  // picker or a diff instead, and auto-hide unmounts this row.
   useEffect(() => {
-    if (!selected) return;
-    noteSeen(session.name);
-    // Visiting acks any pending inactive-alert: the user is here, they
-    // don't need a queued jump back to a session they're already on.
-    removeInactiveAlert(session.name);
-    const id = setInterval(() => noteSeen(session.name), 1000);
-    return () => {
-      clearInterval(id);
-      noteSeen(session.name);
-    };
+    if (selected) removeInactiveAlert(session.name);
   }, [selected, session.name]);
 
   // Short-circuit animations for the selected row: the user can see it
@@ -151,6 +145,7 @@ export const SessionItemRow = memo(function SessionItemRow({
             flashing={showFlash}
             merged={isMerged}
             rebasing={session.state === 'rebasing'}
+            removed={session.worktreeRemoved === true}
           />
         </Box>
         <Box flexShrink={0} marginLeft={1} width={1}>

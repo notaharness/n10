@@ -17,6 +17,7 @@ function toEntry(t: TerminalSummary): TerminalEntry {
     cwd: t.cwd,
     displayPath: t.displayPath,
     repo: t.repo,
+    ...(t.branch ? { branch: t.branch } : {}),
   };
 }
 

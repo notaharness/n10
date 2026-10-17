@@ -10,7 +10,7 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode, type Ref } from 'react';
 import type { DiffLine } from '@n10/diff';
 import type {
   CommentSeverity,
@@ -19,6 +19,7 @@ import type {
 import { useThreads } from '../../../lib/data/queries.js';
 import { totalCommentCount } from '../../../lib/diff/thread-model.js';
 import { useRepo } from '../../../lib/repo-context.js';
+import { usePaneShown } from '../../../lib/tabs/pane-shown.js';
 import { cn } from '../../../lib/utils.js';
 import {
   SEVERITIES,
@@ -45,7 +46,7 @@ export function StepCard({
   total,
   counts,
   snippet,
-  active,
+  unread,
   busy,
   atStart,
   atEnd,
@@ -53,6 +54,7 @@ export function StepCard({
   onNext,
   onExit,
   onOpenInDiff,
+  locationRef,
   onPost,
   onDiscard,
   onSave,
@@ -65,7 +67,8 @@ export function StepCard({
   total: number;
   counts: Record<CommentSeverity, number>;
   snippet: { line: DiffLine; anchored: boolean }[];
-  active: boolean;
+  /** Shown instead of the snippet when the file's lines are not read. */
+  unread?: ReactNode;
   busy: boolean;
   atStart: boolean;
   atEnd: boolean;
@@ -73,6 +76,8 @@ export function StepCard({
   onNext: () => void;
   onExit: () => void;
   onOpenInDiff: () => void;
+  /** The button naming the draft's place in the file. */
+  locationRef?: Ref<HTMLButtonElement>;
   onPost: () => void;
   onDiscard: () => void;
   onSave: (body: string, severity: CommentSeverity) => void;
@@ -91,6 +96,7 @@ export function StepCard({
     threads.data ? totalCommentCount(threads.data) : null
   );
 
+  const shown = usePaneShown();
   const startEditing = () => {
     setBody(draft.body);
     setSeverity(draft.severity);
@@ -98,7 +104,8 @@ export function StepCard({
     refresh.begin();
   };
 
-  useStepperShortcuts(!editing && active, {
+  // A spare pane's card waits off screen; its keys are not the user's.
+  useStepperShortcuts(!editing && shown, {
     onNext,
     onPrev,
     onEdit: startEditing,
@@ -167,11 +174,12 @@ export function StepCard({
         />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="relative min-h-0 flex-1 overflow-auto">
         <div className="mx-auto max-w-3xl space-y-3 p-4">
           {/* Location */}
           <button
             type="button"
+            ref={locationRef}
             onClick={onOpenInDiff}
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
             title="Open this file in the diff"
@@ -185,7 +193,7 @@ export function StepCard({
           </button>
 
           {/* Snippet */}
-          <SnippetView filename={draft.file} rows={snippet} />
+          {unread || <SnippetView filename={draft.file} rows={snippet} />}
 
           {/* Draft */}
           <div className="rounded-lg border border-dashed border-border bg-card">

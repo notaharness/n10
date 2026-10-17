@@ -73,7 +73,7 @@ describe('PlanCheckoutPane', () => {
       />
     );
     const out = stripAnsi(lastFrame() ?? '');
-    expect(out).toContain('Inject into it');
+    expect(out).toContain('Send to it');
     expect(out).toContain('Restart with plan');
   });
 

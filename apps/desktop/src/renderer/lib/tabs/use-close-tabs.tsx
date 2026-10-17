@@ -29,7 +29,7 @@ import { errorMessage } from '../utils.js';
  */
 export function useCloseTabs(items: SidebarItem[]): {
   close: (id: string) => void;
-  closeOthers: (id: string) => void;
+  closeOthers: (id: string, keep?: readonly string[]) => void;
   closeAll: () => void;
   closeActive: () => void;
   confirmDialog: ReactNode;
@@ -150,10 +150,10 @@ export function useCloseTabs(items: SidebarItem[]): {
     [tabs, requestClose, repo.cwd]
   );
   const closeOthers = useCallback(
-    (id: string) => {
+    (id: string, keep: readonly string[] = []) => {
       requestClose(
-        tabs.tabs.filter((t) => t.id !== id),
-        () => tabs.closeOthers(id)
+        tabs.tabs.filter((t) => t.id !== id && !keep.includes(t.id)),
+        () => tabs.closeOthers(id, keep)
       );
     },
     [tabs, requestClose]

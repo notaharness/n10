@@ -6,6 +6,7 @@ const links = [
   { text: 'Download', href: '/download' },
   { text: 'Beam', href: '/beam' },
   { text: 'Orchestra', href: '/orchestra' },
+  { text: 'Conversations', href: '/conversations' },
   { text: 'GitHub', href: 'https://github.com/notaharness/n10' },
   { text: 'llms.txt', href: '/llms.txt' },
 ];

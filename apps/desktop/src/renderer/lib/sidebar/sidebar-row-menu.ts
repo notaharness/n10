@@ -64,6 +64,9 @@ export interface SidebarRowMenuState {
   hasPr: boolean;
   /** The pull request is being babysat. */
   babysitting?: boolean;
+  /** The worktree is gone and its agent still runs: there is nothing
+   *  left to launch, check out, open or remove, only the agent to stop. */
+  worktreeRemoved?: boolean;
 }
 
 /**
@@ -99,6 +102,10 @@ export function sidebarRowMenuItems(
     { id: 'open', label: 'Open' },
     { type: 'separator' },
   ];
+  if (state.worktreeRemoved) {
+    if (running) items.push({ id: 'kill', label: 'Stop agent' });
+    return items;
+  }
   if (hasWorktree)
     items.push({ id: 'launch', label: running ? 'Session…' : 'Launch agent…' });
   if (hasWorktree && running) items.push({ id: 'kill', label: 'Stop agent' });

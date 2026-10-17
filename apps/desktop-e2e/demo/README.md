@@ -22,6 +22,7 @@ Nothing else: no network, no GitHub token, no real agent.
 | `review-in-place` | reading a pull request, switching diff views, replying to and resolving a thread                            |
 | `plan`            | queueing comments, annotating one, sending the plan to an agent                                             |
 | `babysit`         | babysitting a red pull request: the row's badge, then the update reaching an agent — cropped to the sidebar |
+| `tab-switching`   | Ctrl+PgDn/PgUp along the tab strip, then a held Ctrl+Tab through recent tabs, captioned                     |
 | `tui`             | the terminal UI: sidebar, changed files, diff with threads inline                                           |
 
 ## How it works
@@ -40,8 +41,8 @@ what ships. Three things make it a demo rather than a test:
   ugly — a banner and echo lines, built to be asserted against — and a
   capture needs the opposite. This one paces its output like an agent at
   work and reads back the plan it was seeded with, while staying
-  deterministic and offline. n10 launches it through the ordinary
-  `aiCommand` path.
+  deterministic and offline. n10 launches it through the explicitly selected
+  `agentId: 'test'` runner, which reads `aiCommand`.
 - **`capture.mjs`** runs a dedicated Xvfb display at 2x device scale,
   records it with `ffmpeg -f x11grab`, and drives the app with a visible
   cursor that glides between targets instead of teleporting.

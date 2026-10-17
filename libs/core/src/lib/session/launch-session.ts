@@ -169,7 +169,7 @@ export function buildAgentLaunch(
     !knownRecordedAgent(previous, params.config.aiCommand)
   ) {
     throw new Error(
-      'This session has no known agent metadata. Choose an agent explicitly to restart it.'
+      "n10 doesn't know which agent ran this session. Choose one to restart it."
     );
   }
   const agent =
