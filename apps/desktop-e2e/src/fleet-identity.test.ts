@@ -19,7 +19,7 @@ import {
 async function finishJoin(page: Page, beam: FakeBeam) {
   const view = fleetView(page);
   await view.getByRole('button', { name: 'Join a fleet' }).click();
-  await view.getByRole('button', { name: 'Join fleet' }).click();
+  await view.getByRole('button', { name: 'Continue' }).click();
   await expect(view.getByTestId('ceremony-url')).toBeVisible();
   beam.finishCeremony();
 }
@@ -28,7 +28,7 @@ async function finishJoin(page: Page, beam: FakeBeam) {
 async function finishCreatePending(page: Page, beam: FakeBeam) {
   const view = fleetView(page);
   await view.getByRole('button', { name: 'Create a fleet' }).click();
-  await view.getByRole('button', { name: 'Create fleet' }).click();
+  await view.getByRole('button', { name: 'Continue' }).click();
   await expect(view.getByTestId('ceremony-url')).toBeVisible();
   beam.nextPasskeyStep();
   beam.finishCeremony('pending');
@@ -112,7 +112,7 @@ test.describe('An enrolled machine', () => {
     await page.getByRole('button', { name: 'Add a machine' }).click();
     const panel = fleetView(page);
     await expect(
-      panel.getByText(/On the other machine, open Fleet → Join a fleet/)
+      panel.getByText(/Open n10 Desktop → Fleet → Join a fleet/)
     ).toBeVisible();
     await expect(panel.getByText('beam join --label my-server')).toBeVisible();
     await expect(panel.getByText('3f9a 0c4e 7d12 e805')).toBeVisible();
@@ -197,8 +197,10 @@ test.describe('Joining a fleet', () => {
     ).toBeVisible();
     await expect(view.getByRole('button', { name: 'Close' })).toHaveCount(0);
 
+    await page.getByRole('button', { name: 'Keep working' }).click();
     await collapseFleet(page);
     await openFleet(desktop);
+    await page.getByRole('button', { name: 'Resume setup' }).click();
     await view.getByRole('button', { name: 'Matches' }).click();
     await expect(
       view.getByRole('heading', { name: 'Check fleet fingerprint' })

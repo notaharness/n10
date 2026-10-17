@@ -11,7 +11,7 @@ import { MachineRow } from '../machines/MachineRow.js';
 import { Button } from '../ui/button.js';
 import { Skeleton } from '../ui/skeleton.js';
 import { AddMachinePanel } from './AddMachinePanel.js';
-import { EnrolmentFlow } from './EnrolmentFlow.js';
+import { FleetResume } from './FleetResume.js';
 import { FirstRun } from './FirstRun.js';
 import { ResetFleetPanel } from './ResetFleetPanel.js';
 
@@ -115,7 +115,13 @@ function StatusNotices({ beam }: { beam: FleetStatus }) {
   if (beam.state === 'restarting')
     return <Notice warning>Reconnecting… Status may be out of date.</Notice>;
   if (!publication.pending || !beam.enrolled) return null;
-  return <Notice>{publicationText(false)}</Notice>;
+  return (
+    <Notice>
+      <span>{publicationText(false)}</span>
+      <br />
+      Directory publication is pending; beam will retry while it runs.
+    </Notice>
+  );
 }
 
 /** This machine's fleet: its rows, or in their place the
@@ -159,13 +165,13 @@ function FleetBody({
 }) {
   const { enrolment, reset } = useFleet();
   const reconnecting = beam.state === 'restarting';
-  const enrolling = enrolment.ceremony.view !== null;
+  const enrolling = enrolment.mode !== null || enrolment.ceremony.view !== null;
   if (reset.open) return <ResetFleetPanel />;
   return (
     <div className="space-y-3">
       <StatusNotices beam={beam} />
       {loadFailure}
-      {enrolling && <EnrolmentFlow />}
+      <FleetResume />
       {!enrolling && !beam.enrolled && <FirstRun disabled={reconnecting} />}
       {beam.enrolled && <EnrolledBody beam={beam} machines={machines} />}
     </div>

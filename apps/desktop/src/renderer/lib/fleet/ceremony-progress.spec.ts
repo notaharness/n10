@@ -126,7 +126,8 @@ describe('ceremonyHeading', () => {
   it('tells a joining machine not to create another passkey', () => {
     expect(ceremonyHeading(walk('join', [sign]))).toEqual({
       heading: 'Add this machine',
-      explanation: 'Use your fleet’s existing passkey.',
+      explanation:
+        'Use your fleet’s passkey there. Come back here to see the result.',
     });
     expect(
       ceremonyHeading(

@@ -12,12 +12,15 @@ type EnrolmentMode = 'create' | 'join';
  */
 export function useEnrolment(hooks: CeremonyHooks) {
   const { onSettled } = hooks;
+  const [visible, setVisible] = useState(false);
   const completion = useMemo<CeremonyHooks>(
     () => ({
       onSettled: (outcome, dismiss) => {
         onSettled(outcome, dismiss);
         if (outcome.ok && outcome.op === 'init') {
           dismiss();
+          setMode(null);
+          setVisible(false);
           toast.success('Fleet created');
         }
       },
@@ -45,8 +48,13 @@ export function useEnrolment(hooks: CeremonyHooks) {
   const leave = useCallback(() => {
     reset();
     setMode(null);
+    setVisible(false);
     setMismatch(false);
   }, [reset]);
+  const choose = useCallback((next: EnrolmentMode | null) => {
+    setMode(next);
+    setVisible(next !== null);
+  }, []);
   const reportMismatch = useCallback(() => setMismatch(true), []);
 
   return useMemo(
@@ -55,7 +63,9 @@ export function useEnrolment(hooks: CeremonyHooks) {
       mode,
       label,
       fleetName,
-      choose: setMode,
+      choose,
+      visible,
+      setVisible,
       setLabel,
       setFleetName,
       submit,
@@ -63,7 +73,18 @@ export function useEnrolment(hooks: CeremonyHooks) {
       mismatch,
       reportMismatch,
     }),
-    [ceremony, mode, label, fleetName, submit, leave, mismatch, reportMismatch]
+    [
+      ceremony,
+      mode,
+      label,
+      fleetName,
+      submit,
+      leave,
+      mismatch,
+      reportMismatch,
+      choose,
+      visible,
+    ]
   );
 }
 

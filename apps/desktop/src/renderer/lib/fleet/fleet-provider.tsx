@@ -122,6 +122,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const { settle, clear } = publication;
   const hooks = useMemo(() => ({ onSettled: settle }), [settle]);
   const enrolment = useEnrolment(hooks);
+  const [revokeVisible, setRevokeVisible] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<MachineView | null>(null);
   const revokeHooks = useMemo(
     () => ({
@@ -129,8 +130,15 @@ export function FleetProvider({ children }: { children: ReactNode }) {
         settle(outcome);
         if (outcome.ok) {
           setRevokeTarget(null);
-          toast.success('Access revoked', {
-            description: 'Unreachable machines update when they reconnect.',
+          toast.success('Access revoked here', {
+            description:
+              outcome.op === 'revoke'
+                ? `Acknowledged by ${
+                    outcome.acknowledgedBy
+                  } peers. Offline peers learn when they reconnect.${
+                    outcome.published === true ? ' Published.' : ''
+                  }`
+                : undefined,
           });
         }
       },
@@ -153,6 +161,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     (machine: MachineView) => {
       resetRevocation();
       setRevokeTarget(machine);
+      setRevokeVisible(true);
     },
     [resetRevocation]
   );
@@ -165,6 +174,8 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       enrolment,
       revocation: {
         target: revokeTarget,
+        visible: revokeVisible,
+        setVisible: setRevokeVisible,
         ceremony: revokeCeremony,
         open: openRevocation,
         close: closeRevocation,
@@ -178,6 +189,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       setAdding,
       enrolment,
       revokeTarget,
+      revokeVisible,
       revokeCeremony,
       closeRevocation,
       openRevocation,

@@ -102,7 +102,7 @@ export function MachineMenu({
             disabled={disabled}
             onSelect={onRevoke}
           >
-            Revoke {machine.label}…
+            Revoke access…
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>

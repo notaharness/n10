@@ -11,7 +11,7 @@ function Mismatch({ onReset }: { onReset: () => void }) {
       <h3
         ref={focus}
         tabIndex={-1}
-        className="font-medium text-destructive outline-none"
+        className="text-lg font-semibold text-destructive outline-none"
       >
         Different fleet
       </h3>
@@ -19,7 +19,12 @@ function Mismatch({ onReset }: { onReset: () => void }) {
         Stop using remote connections. Reset here, then join with your fleet’s
         passkey.
       </p>
-      <Button size="sm" variant="destructive" onClick={onReset}>
+      <Button
+        size="sm"
+        variant="outline"
+        className="border-destructive/50 text-destructive"
+        onClick={onReset}
+      >
         Reset fleet…
       </Button>
     </div>
@@ -34,16 +39,27 @@ function Mismatch({ onReset }: { onReset: () => void }) {
  */
 export function FingerprintCheck({ fleetId }: { fleetId: string }) {
   const { enrolment, reset } = useFleet();
-  if (enrolment.mismatch) return <Mismatch onReset={reset.show} />;
+  if (enrolment.mismatch)
+    return (
+      <Mismatch
+        onReset={() => {
+          enrolment.setVisible(false);
+          reset.show();
+        }}
+      />
+    );
   return (
-    <div className="space-y-2 border-t border-border pt-3">
-      <h4 className="font-medium">Check fleet fingerprint</h4>
+    <div className="space-y-3">
+      <h4 tabIndex={-1} className="text-lg font-semibold outline-none">
+        Check fleet fingerprint
+      </h4>
+      <p className="text-sm text-muted-foreground">Fleet fingerprint</p>
       <p className="font-mono text-lg select-all">
         {fingerprintGroups(fleetId)}
       </p>
       <p className="text-base text-muted-foreground">
-        Compare with a machine already in your fleet: its Fleet … menu shows the
-        fingerprint.
+        This machine joined. Before using remote connections, compare with a
+        machine already in your fleet: Fleet … → Copy fleet fingerprint.
       </p>
       <div className="flex gap-2">
         <Button size="sm" onClick={enrolment.leave}>

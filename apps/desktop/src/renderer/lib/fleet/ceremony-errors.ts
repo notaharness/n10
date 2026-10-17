@@ -23,15 +23,16 @@ const INTERNAL: FailureCopy = {
 
 const CATALOGUE: Record<string, FailureCopy> = {
   'prf-unsupported': {
-    explanation: 'This passkey isn’t supported. Try another browser or device.',
+    explanation: 'This passkey did not provide WebAuthn PRF.',
     actions: ['compatibility', 'retry', 'back'],
   },
   'ceremony-cancelled': {
-    explanation: 'Passkey request cancelled.',
+    explanation:
+      'Passkey request cancelled. No further approval is pending for this request.',
     actions: ['retry', 'back'],
   },
   'ceremony-timeout': {
-    explanation: 'Request expired. Try again.',
+    explanation: 'This passkey request expired after five minutes.',
     actions: ['retry'],
   },
   'ceremony-state': {
@@ -43,11 +44,13 @@ const CATALOGUE: Record<string, FailureCopy> = {
     actions: ['retry'],
   },
   'directory-unavailable': {
-    explanation: 'Couldn’t reach your fleet. Check your connection and retry.',
+    explanation:
+      'Cannot read the fleet directory. Check the connection to beam.n10.is and try joining again.',
     actions: ['retry'],
   },
   'wrong-passkey': {
-    explanation: 'Wrong passkey. Choose your fleet’s original passkey.',
+    explanation:
+      'This passkey does not unlock the expected fleet. Choose the original fleet passkey.',
     actions: ['retry'],
   },
   busy: {

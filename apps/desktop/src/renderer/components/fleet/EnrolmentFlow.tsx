@@ -16,7 +16,7 @@ export function EnrolmentFlow() {
     return (
       <CeremonyProgress
         view={view}
-        cancelLabel="Cancel"
+        cancelLabel="Cancel request"
         onCancel={ceremony.cancel}
       />
     );

@@ -160,7 +160,7 @@ test.describe('after creating a fleet', () => {
     await openFleet(desktop);
     const view = fleetView(page);
     await view.getByRole('button', { name: 'Create a fleet' }).click();
-    await view.getByRole('button', { name: 'Create fleet' }).click();
+    await view.getByRole('button', { name: 'Continue' }).click();
     await expect(view.getByTestId('ceremony-url')).toBeVisible();
     beam!.nextPasskeyStep();
     beam!.finishCeremony();

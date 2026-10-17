@@ -103,14 +103,15 @@ const PUBLISHING: Record<CeremonyOp, CeremonyHeading> = {
     explanation: null,
   },
   join: { heading: 'Finishing setup…', explanation: null },
-  revoke: { heading: 'Revoking access…', explanation: null },
+  revoke: { heading: 'Finishing setup…', explanation: null },
 };
 
 const PASSKEY: Record<CeremonyOp, CeremonyHeading[]> = {
   init: [
     {
       heading: '1 of 2 · Save a passkey',
-      explanation: 'Open or scan to save your fleet’s passkey.',
+      explanation:
+        'Save the passkey there. Come back here for the second link.',
     },
     {
       heading: '2 of 2 · Add this machine',
@@ -120,10 +121,17 @@ const PASSKEY: Record<CeremonyOp, CeremonyHeading[]> = {
   join: [
     {
       heading: 'Add this machine',
-      explanation: 'Use your fleet’s existing passkey.',
+      explanation:
+        'Use your fleet’s passkey there. Come back here to see the result.',
     },
   ],
-  revoke: [{ heading: 'Confirm with your passkey', explanation: null }],
+  revoke: [
+    {
+      heading: 'Confirm with your passkey',
+      explanation:
+        'Use your fleet’s passkey there. Come back here to see the result.',
+    },
+  ],
 };
 
 /** What a running ceremony says at the top, from its latest signal. */

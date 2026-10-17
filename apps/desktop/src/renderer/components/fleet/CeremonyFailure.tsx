@@ -90,7 +90,9 @@ export function CeremonyFailure({
             variant={i === 0 ? 'default' : 'outline'}
             onClick={handlers[a]}
           >
-            {LABEL[a]}
+            {a === 'retry' && code === 'ceremony-timeout'
+              ? 'Start a fresh request'
+              : LABEL[a]}
           </Button>
         ))}
       </div>

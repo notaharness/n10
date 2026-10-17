@@ -16,21 +16,19 @@ export function PasskeyPrompt({ url }: { url: string }) {
       <QrCode value={url} />
       <div className="min-w-0 flex-1 basis-48 space-y-2 text-base">
         {summary && (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
+          <dl className="grid gap-1 border-y border-border py-3 select-text [&_dd]:mb-2">
             <dt className="text-muted-foreground">Action</dt>
             <dd className="break-words">{summary.action}</dd>
             <dt className="text-muted-foreground">Machine</dt>
             <dd className="break-words">{summary.machine}</dd>
-            <dt className="text-muted-foreground">Fingerprint</dt>
+            <dt className="text-muted-foreground">Machine fingerprint</dt>
             <dd className="font-mono select-all">{summary.fingerprint}</dd>
           </dl>
         )}
-        <p>Check the action, machine and fingerprint on the page.</p>
-        <p
-          className="truncate font-mono text-sm text-muted-foreground select-all"
-          title={url}
-          data-testid="ceremony-url"
-        >
+        <p>
+          Check the action, machine name and machine fingerprint on the page.
+        </p>
+        <p className="sr-only" title={url} data-testid="ceremony-url">
           {url}
         </p>
         <div className="flex flex-wrap gap-2">
@@ -48,7 +46,7 @@ export function PasskeyPrompt({ url }: { url: string }) {
           </Button>
         </div>
         <p className="text-muted-foreground">
-          Keep this link private. It expires in 5 minutes.
+          Keep this link private. Requests expire after five minutes.
         </p>
       </div>
     </div>

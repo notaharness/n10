@@ -126,14 +126,15 @@ function NameField({
 function CreateSteps() {
   return (
     <p className="text-base text-muted-foreground">
-      Save a passkey, then use it to add this machine.
+      Save one passkey for your fleet, then use it to add this machine. Expect
+      two passkey prompts.
     </p>
   );
 }
 
 /** Create or join: the names, what the passkey steps will be, and the
  *  compatibility help, before anything starts (beam-fleet-ux.md §2). */
-function EnrolmentForm({ disabled }: { disabled: boolean }) {
+export function EnrolmentForm({ disabled }: { disabled: boolean }) {
   const e = useFleet().enrolment;
   const creating = e.mode === 'create';
   const invalid =
@@ -147,12 +148,10 @@ function EnrolmentForm({ disabled }: { disabled: boolean }) {
         e.submit();
       }}
     >
-      <h2 className="text-base font-semibold">
-        {creating ? 'Create a fleet' : 'Join a fleet'}
-      </h2>
       {!creating && (
         <p className="text-base text-muted-foreground">
-          Use your fleet’s passkey.
+          Use the passkey for your existing fleet. This takes one passkey
+          prompt.
         </p>
       )}
       <div className="grid gap-3">
@@ -178,7 +177,7 @@ function EnrolmentForm({ disabled }: { disabled: boolean }) {
       <PasskeyCompatibility />
       <div className="flex gap-2">
         <Button type="submit" disabled={invalid || disabled}>
-          {creating ? 'Create fleet' : 'Join fleet'}
+          Continue
         </Button>
         <Button type="button" variant="ghost" onClick={() => e.choose(null)}>
           Back
@@ -190,10 +189,5 @@ function EnrolmentForm({ disabled }: { disabled: boolean }) {
 
 /** An unenrolled machine's way in: two choices, then that choice's form. */
 export function FirstRun({ disabled }: { disabled: boolean }) {
-  const { mode } = useFleet().enrolment;
-  return mode ? (
-    <EnrolmentForm disabled={disabled} />
-  ) : (
-    <Choices disabled={disabled} />
-  );
+  return <Choices disabled={disabled} />;
 }

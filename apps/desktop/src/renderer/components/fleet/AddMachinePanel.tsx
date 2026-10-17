@@ -35,14 +35,16 @@ export function AddMachinePanel({
         </Tip>
       </div>
       <section className="space-y-1">
-        <h4 className="font-medium">Desktop</h4>
+        <h4 className="font-medium">Next · your other machine</h4>
         <p className="text-muted-foreground">
-          On the other machine, open Fleet → Join a fleet. Use your fleet’s
+          Open n10 Desktop → Fleet → Join a fleet. Use your existing fleet
           passkey.
         </p>
       </section>
       <section className="space-y-1.5">
-        <h4 className="font-medium">Terminal</h4>
+        <p className="text-muted-foreground">
+          Or run this on the other machine:
+        </p>
         <div className="flex items-center gap-1">
           <code className="min-w-0 flex-1 break-words rounded bg-muted px-2 py-1 font-mono text-sm select-all">
             {JOIN_COMMAND}
@@ -59,12 +61,12 @@ export function AddMachinePanel({
           </Tip>
         </div>
         <p className="text-muted-foreground">
-          Run there, then open the link or scan the QR.
+          Open its link or scan its QR code.
         </p>
       </section>
-      <div className="space-y-1 rounded-md border border-border bg-muted/40 px-2 py-2">
+      <div className="space-y-1 border-y border-border py-2">
         <p className="text-sm text-muted-foreground">
-          Check that its fleet fingerprint matches:
+          Compare its fleet fingerprint with this:
         </p>
         <div className="flex items-center gap-1">
           <p

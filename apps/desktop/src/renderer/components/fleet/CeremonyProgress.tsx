@@ -37,7 +37,7 @@ export function InitSteps({
 }) {
   const statuses = initStepStatuses(view, failed);
   return (
-    <ol className="space-y-1 text-base">
+    <ol className="flex flex-wrap gap-x-5 gap-y-2 border-b border-border pb-3 pr-5 text-base">
       {INIT_STEPS.map((step, i) => {
         const status = statuses[i];
         const Icon = STEP_ICON[status];
@@ -88,9 +88,16 @@ export function CeremonyProgress({
     <div className="space-y-4">
       {view.op === 'init' && <InitSteps view={view} />}
       <div role="status" aria-live="polite" className="space-y-1">
-        <h3 ref={focus} tabIndex={-1} className="font-medium outline-none">
+        <h3
+          ref={focus}
+          tabIndex={-1}
+          className="text-lg font-semibold outline-none"
+        >
           {heading}
         </h3>
+        {view.passkeyUrl && (
+          <p className="text-base font-medium">Next · browser or phone</p>
+        )}
         {explanation && (
           <p className="text-base text-muted-foreground">{explanation}</p>
         )}

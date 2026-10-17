@@ -33,6 +33,8 @@ export interface FleetContextValue {
   /** The revocation dialog's machine and ceremony, kept the same way. */
   revocation: {
     target: MachineView | null;
+    visible: boolean;
+    setVisible: (visible: boolean) => void;
     ceremony: Ceremony;
     open: (machine: MachineView) => void;
     close: () => void;

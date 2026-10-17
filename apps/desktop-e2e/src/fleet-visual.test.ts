@@ -28,20 +28,92 @@ for (const theme of ['dark', 'light'] as const) {
           shot
         );
         await fleet.getByRole('button', { name: 'Create a fleet' }).click();
-        await expect(page.getByRole('complementary')).toHaveScreenshot(
+        await expect(page.getByRole('dialog')).toHaveScreenshot(
           `fleet-create-${theme}.png`,
           shot
         );
-        await fleet.getByRole('button', { name: 'Create fleet' }).click();
+        await fleet.getByRole('button', { name: 'Continue' }).click();
         await expect(fleet.getByTestId('ceremony-url')).toBeVisible();
-        await expect(page.getByRole('complementary')).toHaveScreenshot(
+        await expect(page.getByRole('dialog')).toHaveScreenshot(
           `fleet-passkey-${theme}.png`,
+          shot
+        );
+        await page.getByRole('button', { name: 'Keep working' }).click();
+        await expect(page.getByRole('complementary')).toHaveScreenshot(
+          `fleet-resume-${theme}.png`,
+          shot
+        );
+        beam!.nextPasskeyStep();
+        await page.getByRole('button', { name: 'Resume setup' }).click();
+        await expect(
+          page.getByRole('heading', { name: '2 of 2 · Add this machine' })
+        ).toBeVisible();
+        await expect(page.getByRole('dialog')).toHaveScreenshot(
+          `fleet-authorize-${theme}.png`,
           shot
         );
         beam!.failCeremony('prf-unsupported', 'no prf.results.first');
         await expect(fleet.getByRole('alert')).toBeVisible();
-        await expect(page.getByRole('complementary')).toHaveScreenshot(
+        await expect(page.getByRole('dialog')).toHaveScreenshot(
           `fleet-error-${theme}.png`,
+          shot
+        );
+        await page.getByRole('button', { name: 'Try again' }).click();
+        await expect(page.getByTestId('ceremony-url')).toBeVisible();
+        beam!.nextPasskeyStep();
+        beam!.finishCeremony();
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        await expect(page.getByRole('complementary')).toHaveScreenshot(
+          `fleet-created-${theme}.png`,
+          shot
+        );
+      });
+    });
+
+    test.describe('join', () => {
+      test.use({ beamScenario: { enrolled: false } });
+      test('join, comparison and mismatch', async ({ desktop, beam }) => {
+        const { page } = desktop;
+        await fleetView(page)
+          .getByRole('button', { name: 'Join a fleet' })
+          .click();
+        const dialog = page.getByRole('dialog');
+        await expect(dialog).toHaveScreenshot(`fleet-join-${theme}.png`, shot);
+        await dialog.getByRole('button', { name: 'Continue' }).click();
+        await expect(dialog.getByTestId('ceremony-url')).toBeVisible();
+        await expect(dialog).toHaveScreenshot(
+          `fleet-join-passkey-${theme}.png`,
+          shot
+        );
+        beam!.stage('reading directory');
+        await expect(
+          dialog.getByRole('heading', { name: 'Finding machines…' })
+        ).toBeVisible();
+        await expect(dialog).toHaveScreenshot(
+          `fleet-finding-${theme}.png`,
+          shot
+        );
+        beam!.stage('publishing');
+        await expect(
+          dialog.getByRole('heading', { name: 'Finishing setup…' })
+        ).toBeVisible();
+        await expect(dialog).toHaveScreenshot(
+          `fleet-finishing-${theme}.png`,
+          shot
+        );
+        beam!.finishCeremony('pending');
+        await expect(
+          dialog.getByRole('button', { name: 'Matches', exact: true })
+        ).toBeVisible();
+        await expect(dialog).toHaveScreenshot(`fleet-check-${theme}.png`, shot);
+        await dialog.getByRole('button', { name: 'Doesn’t match' }).click();
+        await expect(dialog).toHaveScreenshot(
+          `fleet-mismatch-${theme}.png`,
+          shot
+        );
+        await dialog.getByRole('button', { name: 'Keep working' }).click();
+        await expect(page.getByRole('complementary')).toHaveScreenshot(
+          `fleet-pending-${theme}.png`,
           shot
         );
       });
@@ -54,7 +126,7 @@ for (const theme of ['dark', 'light'] as const) {
           peers: [{ peerId: WORKBOX, label: 'workbox', state: 'offline' }],
         },
       });
-      test('overview and add machine', async ({ desktop }) => {
+      test('overview and add machine', async ({ desktop, beam }) => {
         const { page } = desktop;
         await expect(page.getByTestId('machine-row')).toHaveCount(2);
         await expect(page.getByRole('complementary')).toHaveScreenshot(
@@ -96,15 +168,51 @@ for (const theme of ['dark', 'light'] as const) {
           `fleet-reset-${theme}.png`,
           shot
         );
+        await fleetView(page).getByLabel('Type reset to confirm').fill('reset');
+        await expect(page.getByRole('complementary')).toHaveScreenshot(
+          `fleet-reset-confirmed-${theme}.png`,
+          shot
+        );
+        beam!.refuse('fleet.reset', 'storage-failure', 'disk full');
+        await fleetView(page)
+          .getByRole('button', { name: 'Reset fleet', exact: true })
+          .click();
+        await expect(fleetView(page).getByRole('alert')).toBeVisible();
+        await expect(page.getByRole('complementary')).toHaveScreenshot(
+          `fleet-reset-error-${theme}.png`,
+          shot
+        );
         await fleetView(page).getByRole('button', { name: 'Cancel' }).click();
         await page
           .getByTestId('machine-row')
           .filter({ hasText: 'workbox' })
           .getByRole('button', { name: 'Machine actions' })
           .click();
-        await page.getByRole('menuitem', { name: 'Revoke workbox…' }).click();
+        await page.getByRole('menuitem', { name: 'Revoke access…' }).click();
         await expect(page.getByRole('dialog')).toHaveScreenshot(
           `fleet-revoke-${theme}.png`,
+          shot
+        );
+        await page
+          .getByRole('button', { name: 'Revoke access', exact: true })
+          .click();
+        await expect(page.getByTestId('ceremony-url')).toBeVisible();
+        await expect(page.getByRole('dialog')).toHaveScreenshot(
+          `fleet-revoke-passkey-${theme}.png`,
+          shot
+        );
+        beam!.stage('notifying peers');
+        await expect(
+          page.getByRole('heading', { name: 'Updating machines…' })
+        ).toBeVisible();
+        await expect(page.getByRole('dialog')).toHaveScreenshot(
+          `fleet-updating-${theme}.png`,
+          shot
+        );
+        beam!.finishCeremony();
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        await expect(page.getByRole('complementary')).toHaveScreenshot(
+          `fleet-revoked-${theme}.png`,
           shot
         );
       });
