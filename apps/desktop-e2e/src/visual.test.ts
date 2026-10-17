@@ -382,9 +382,12 @@ async function openOverview(page: Page) {
   ).toBeVisible({ timeout: 30_000 });
   // The footer is in every overview shot; provider reads can finish after
   // the overview and file list, leaving a transient syncing indicator.
-  await expect(page.getByText('synced just now', { exact: true })).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(
+    page.getByRole('button', {
+      name: 'GitHub PR sync: Last synced just now',
+      exact: true,
+    })
+  ).toBeVisible({ timeout: 30_000 });
 }
 
 test.describe('Visual (overview) @visual', () => {
