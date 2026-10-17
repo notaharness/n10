@@ -66,7 +66,8 @@ const CATALOGUE: Record<string, FailureCopy> = {
     actions: ['close'],
   },
   'revoked-peer': {
-    explanation: 'Access revoked. Resetting won’t let this machine rejoin.',
+    explanation:
+      'Access revoked. Reset this machine, then get approval to rejoin.',
     actions: ['close'],
   },
   'unknown-peer': {

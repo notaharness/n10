@@ -94,7 +94,11 @@ daemons: `beam testkit` serves beam's dev DERP and fake directory worker on
 loopback, a daemon in the fixture HOME is the one the app finds, a second
 daemon with its own HOME (`workboxHome`, inside the fixture HOME) is another
 machine, and beam's test authenticator answers every ceremony
-(`src/setup/beam-testkit.ts`, `src/setup/beam-fleet.ts`). `repoInHome` puts
+(`src/setup/beam-testkit.ts`, `src/setup/beam-fleet.ts`). beam gives a
+remote process only a login's part of its daemon's environment, without
+`TMUX_TMPDIR`, so each daemon's `PATH` starts with a `tmux` wrapper that pins
+the socket directory to that daemon's HOME (`src/setup/remote-tmux.ts`);
+without it a remote session lands on the developer's server. `repoInHome` puts
 the test repo in the fixture HOME, so a remote launch looks for its clone at
 the same place under the other machine's HOME. These need a `beamtest`
 build, so a plain run leaves them out. `run-beam-e2e.mjs` downloads the

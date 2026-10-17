@@ -31,8 +31,9 @@ export function ResetFleetPanel() {
         }}
       >
         <p className="text-muted-foreground">
-          This keeps this machine’s identity. It will not recover a lost passkey
-          or undo a revocation.
+          This machine gets a new identity. After it rejoins this fleet, revoke
+          its old one from another machine. A reset won’t recover a lost
+          passkey.
         </p>
         <div className="grid gap-1.5">
           <Label htmlFor="fleet-reset-confirm">Type reset to confirm</Label>

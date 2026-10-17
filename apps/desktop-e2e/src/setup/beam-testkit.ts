@@ -3,6 +3,7 @@ import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { connect } from 'node:net';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
+import { pinnedTmuxPath } from './remote-tmux.js';
 
 /**
  * Real beam processes for the `@beam` tests (docs/testing.md). The
@@ -216,6 +217,7 @@ export async function startMachine(
   const env = beamEnv(home, {
     BEAM_CONFIG_DIR: configDir,
     BEAM_TEST_AUTHENTICATOR: kit.authenticator,
+    PATH: pinnedTmuxPath(home),
   });
   const held = new Held(
     spawn(
