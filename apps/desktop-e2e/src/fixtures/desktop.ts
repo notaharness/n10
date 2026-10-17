@@ -8,8 +8,7 @@ import {
 import { mkdtempSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import {
   cleanupTestRepo,
   createTestRepo,
@@ -19,15 +18,16 @@ import { killFixtureSessions } from '../setup/tmux.js';
 import { appEnv } from './app-env.js';
 import { fakeAdoMisses } from '../setup/fake-ado.js';
 import {
-  NETWORK_GUARD_PRELOAD,
   networkGuardBase,
   takeNetworkRefusals,
 } from '../setup/network-guard.js';
 import {
+  WORKSPACE_ROOT,
   forgetPreloads,
+  launchArgs,
   missingPreloads,
   requirePreloads,
-} from './preloads.js';
+} from './launch.js';
 import { closeDesktopApp } from '../setup/app-close.js';
 import { launchAgain } from '../setup/launch-again.js';
 import type { TerminalSeed } from '../setup/terminals.js';
@@ -38,11 +38,6 @@ import {
   type HomeSeed,
   type LiveSessionSeed,
 } from './seed-home.js';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-/** apps/desktop — Electron resolves `main` from its package.json. */
-const APP_DIR = resolve(HERE, '..', '..', '..', 'desktop');
-const WORKSPACE_ROOT = resolve(APP_DIR, '..', '..');
 
 export { fakeAgent };
 
@@ -252,7 +247,7 @@ export const test = base.extend<
       main: app.evaluate.bind(app),
       launchAgain: (startDir) =>
         launchAgain({
-          args: launchArgs(webgl),
+          args: launchArgs(wanted.guard, webgl),
           cwd: WORKSPACE_ROOT,
           env: { ...launchEnv, N10_START_DIR: startDir },
         }),
@@ -359,22 +354,6 @@ async function readyWindow(
     .getByRole('button', { name: 'New worktree', exact: true })
     .first()
     .waitFor({ state: 'visible', timeout: 30_000 });
-}
-
-/** Electron's arguments. The network guard goes first, before any of
- *  the app's code. */
-function launchArgs(guarded: boolean, webgl?: boolean): string[] {
-  return [
-    ...(guarded ? ['-r', NETWORK_GUARD_PRELOAD] : []),
-    APP_DIR,
-    // CI runners have no user namespaces for the sandbox, and
-    // software rendering is both available and deterministic.
-    '--no-sandbox',
-    '--disable-gpu',
-    '--ozone-platform=x11',
-    // WebGL with no GPU, which Chromium allows only when asked.
-    ...(webgl ? ['--enable-unsafe-swiftshader'] : []),
-  ];
 }
 
 /** What a test that passed must not have left behind. An uncaught
