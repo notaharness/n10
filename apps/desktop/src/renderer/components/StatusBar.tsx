@@ -18,8 +18,10 @@ import { useMachines, useSyncState, useVersion } from '../lib/data/queries.js';
 import { useFleet } from '../lib/fleet/fleet-context.js';
 import { useRefreshRemote } from '../lib/data/mutations.js';
 import { machinesSummary } from '../lib/machines/machine-model.js';
+import { providerName } from '../lib/provider-name.js';
 import { itemRunning } from '../lib/sidebar/sidebar-model.js';
 import { basename, cn, relativeTime } from '../lib/utils.js';
+import { UpdateNotice } from './UpdateNotice.js';
 import { Tip } from './ui/tooltip.js';
 
 /**
@@ -68,6 +70,7 @@ export function StatusBar({
 
       <div className="flex-1" />
 
+      <UpdateNotice onOpen={onOpenSettings} />
       <MachinesSegment
         machines={machines.data}
         onOpenFleet={fleet.section.reveal}
@@ -108,7 +111,7 @@ function ProviderSegment({
   if (!s.providerId) {
     return (
       <Segment
-        label="No VCS provider configured — open Settings"
+        label="No provider set up — open Settings"
         onClick={onOpenSettings}
       >
         <CloudOffIcon className="size-3" />
@@ -184,12 +187,6 @@ function MachinesSegment({
       {summary.text}
     </Segment>
   );
-}
-
-function providerName(id: string): string {
-  if (id === 'github') return 'GitHub';
-  if (id === 'azure-devops') return 'Azure DevOps';
-  return id;
 }
 
 function Segment({

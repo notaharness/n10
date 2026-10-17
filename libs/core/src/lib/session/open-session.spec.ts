@@ -149,7 +149,7 @@ describe('session launch boundary', () => {
   it('requires captured approval for a fresh live replacement', async () => {
     state.existing = found;
     await expect(openSession({ ...base, fresh: true })).rejects.toThrow(
-      'confirmation'
+      'reopen the launch dialog to replace it'
     );
     expect(state.create).not.toHaveBeenCalled();
   });
@@ -181,6 +181,7 @@ describe('session launch boundary', () => {
         '@orchestra-orchestrator': null,
         '@orchestra-orchestrator-config': null,
         '@orchestra-last-report': null,
+        '@orchestra-target': null,
       },
     });
     expect(state.create.mock.calls[0][0]).toMatchObject({

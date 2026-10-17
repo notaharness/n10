@@ -1,13 +1,42 @@
+import type { AppConfig, VcsProvider } from '@n10/vcs-core';
 import type { AgentSession } from '../types.js';
 
 import {
   isBlockingDecision,
+  viewerEntry,
   type BranchPrMap,
   type PullRequestInfo,
+  type PullRequestReviewer,
   type CategorizedReviews,
-  type AppConfig,
-  type VcsProvider,
-} from '@n10/vcs-core';
+} from '@n10/vcs-core/types';
+
+/** The provider says the viewer wrote it: by the signed-in identity
+ *  where its list carries that, else by matching its author field. */
+function viewerAuthored(
+  pr: PullRequestInfo,
+  config: AppConfig,
+  provider: VcsProvider
+): boolean {
+  return (
+    pr.viewerIsAuthor ?? provider.matchesUser(pr.createdByIdentifier, config)
+  );
+}
+
+/**
+ * The ids of the pull requests the viewer authored, by the provider's
+ * author field — never by whether a worktree has the branch checked out.
+ */
+export function findYourPrIds(
+  prMap: BranchPrMap,
+  config: AppConfig,
+  provider: VcsProvider
+): Set<number> {
+  return new Set(
+    Object.values(prMap).flatMap((pr) =>
+      pr && viewerAuthored(pr, config, provider) ? [pr.id] : []
+    )
+  );
+}
 
 /**
  * Find PRs created by the current user whose branch no worktree has
@@ -23,10 +52,32 @@ export function findOrphanPrs(
     .filter(
       (pr): pr is PullRequestInfo =>
         pr != null &&
-        provider.matchesUser(pr.createdByIdentifier, config) &&
+        viewerAuthored(pr, config, provider) &&
         !checkedOut.has(pr.sourceBranch)
     )
     .sort((a, b) => b.id - a.id);
+}
+
+type ReviewBucket = keyof CategorizedReviews;
+
+/** Where the viewer's own entry files a pull request, or nowhere. */
+function reviewBucket(
+  reviewer: PullRequestReviewer,
+  isDraft: boolean
+): ReviewBucket | null {
+  if (reviewer.decision === 'declined') return null;
+  // Asked again after a verdict: the author wants another look. A draft
+  // asks for none yet, so its verdict files it as before.
+  const askedAgain = reviewer.requested && reviewer.decision !== 'no-response';
+  if (askedAgain && !isDraft) return 'needsReview';
+  if (reviewer.decision === 'approved') return 'approvedByYou';
+  if (isBlockingDecision(reviewer.decision)) return 'waitingForAuthor';
+  // A draft is not asking for review yet, so it does not belong in
+  // "Needs Your Review" — being listed there is a standing job that
+  // cannot be cleared. The other two buckets still take drafts: both
+  // record a decision already made, and one of them ("Waiting for
+  // Author") is exactly where a PR put back into draft belongs.
+  return isDraft ? null : 'needsReview';
 }
 
 /**
@@ -37,33 +88,22 @@ export function categorizeReviews(
   config: AppConfig,
   provider: VcsProvider
 ): CategorizedReviews {
-  const needsReview: PullRequestInfo[] = [];
-  const waitingForAuthor: PullRequestInfo[] = [];
-  const approvedByYou: PullRequestInfo[] = [];
-
+  const buckets: CategorizedReviews = {
+    needsReview: [],
+    waitingForAuthor: [],
+    approvedByYou: [],
+  };
   for (const pr of Object.values(prMap)) {
     if (!pr || !pr.reviewers) continue;
     // Skip PRs created by the current user — they belong in sessions, not reviews
-    if (provider.matchesUser(pr.createdByIdentifier, config)) continue;
-    const reviewer = pr.reviewers.find((r) =>
+    if (viewerAuthored(pr, config, provider)) continue;
+    const reviewer = viewerEntry(pr.reviewers, (r) =>
       provider.matchesUser(r.identifier, config)
     );
-    if (!reviewer) continue;
-    if (reviewer.decision === 'declined') continue;
-    if (reviewer.decision === 'approved') {
-      approvedByYou.push(pr);
-    } else if (isBlockingDecision(reviewer.decision)) {
-      waitingForAuthor.push(pr);
-    } else if (!pr.isDraft) {
-      // A draft is not asking for review yet, so it does not belong in
-      // "Needs Your Review" — being listed there is a standing job that
-      // cannot be cleared. The other two buckets still take drafts:
-      // both record a decision already made, and one of them ("Waiting
-      // for Author") is exactly where a PR put back into draft belongs.
-      needsReview.push(pr);
-    }
+    const bucket = reviewer && reviewBucket(reviewer, pr.isDraft ?? false);
+    if (bucket) buckets[bucket].push(pr);
   }
-  return { needsReview, waitingForAuthor, approvedByYou };
+  return buckets;
 }
 
 /**

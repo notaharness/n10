@@ -1,4 +1,6 @@
-import { useCallback } from 'react';
+import { useEngine } from '@n10/app-core';
+import { useCallback, useEffect } from 'react';
+import { log } from '@n10/logger';
 import { useInput } from 'ink';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import { DiffViewer } from '../reviews/DiffViewer.js';
@@ -26,19 +28,9 @@ interface DiffFileViewerContainerProps {
   diffBundle: DiffBundle;
 }
 
-// Owns the single-file half of the old DiffPane: parses the diff for
-// the currently opened file, interleaves review comments, computes the
-// annotated line stream + comment positions, wires scroll-wheel input,
-// and routes diff-viewer keypresses. Mounted by MainContent when
-// paneMode === 'diff-file'. Diff data flows in via `diffBundle` from
-// MainContent so the viewer shares state with the list container.
-//
-// Since M2: threads ride in `annotatedLines` as `{type:'thread-*'}`
-// entries carrying the object, not pre-rendered ANSI. The Ink
-// <DiffViewer> branches on type and renders real components for
-// threads — so live edit/reply buffers flow through props and only
-// re-render the one card whose props changed, no spliceCommentBlock
-// overlay needed.
+// Adapts the shared single-file view model to Ink: card geometry, scrolling,
+// input and Node-side placement diagnostics. MainContent mounts this for
+// diff-file mode and supplies the same DiffBundle as the file list.
 export function DiffFileViewerContainer({
   pane,
   terminal,
@@ -46,6 +38,7 @@ export function DiffFileViewerContainer({
   terminalFocused,
   diffBundle,
 }: DiffFileViewerContainerProps) {
+  const { reviews } = useEngine();
   const sessionCtx = useSessionActions();
   const configCtx = useConfig();
   const keybinds = useKeybindResolve();
@@ -53,8 +46,8 @@ export function DiffFileViewerContainer({
   const plan = usePlan();
 
   // Shell-agnostic derivations + scroll effects live in the app-core
-  // controller; this wrapper only adds TUI card geometry, the Ink
-  // scroll wheel, and Ink input routing.
+  // controller; this wrapper adds TUI card geometry, placement diagnostics,
+  // the Ink scroll wheel, and input routing.
   //
   // Card width math, mirrored in DiffViewer. The row map needs the
   // card content width to estimate body wrap accurately.
@@ -83,7 +76,19 @@ export function DiffFileViewerContainer({
     fileRemoteThreads,
     diffTotalRows,
     sectionAnchorRows,
+    placementDiagnostics,
   } = vm;
+
+  useEffect(() => {
+    for (const diagnostic of placementDiagnostics ?? []) {
+      log(
+        diagnostic.reason === 'inline' ? 'info' : 'warn',
+        'placement.remoteThread',
+        `thread ${diagnostic.threadId}: ${diagnostic.reason}`,
+        diagnostic
+      );
+    }
+  }, [placementDiagnostics]);
 
   // ── Scroll wheel (main-pane region — the sidebar scrolls itself) ─
   const { setDiffScrollOffset } = pane;
@@ -117,6 +122,7 @@ export function DiffFileViewerContainer({
               prId: selectedPr.id,
               positions: commentPositions,
               selectedReviewPr: selectedPr,
+              service: reviews.agentComments,
             }
           : undefined,
         remoteCtx: {

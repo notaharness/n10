@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -178,7 +179,15 @@ test.describe('@integration Auto-select first comment', () => {
     // (interleaveComments drops them), so `info` is undefined,
     // `rowEntry` is undefined, and the auto-select effect bails
     // forever — no thread gets selected.
-    const reviewsDir = join(homeDir, '.n10', 'reviews', 'pr-38');
+    const repository = execSync(
+      'git rev-parse --path-format=absolute --git-common-dir',
+      { cwd: n10.repoPath, encoding: 'utf8' }
+    ).trim();
+    const repoKey = createHash('sha256')
+      .update(repository)
+      .digest('hex')
+      .slice(0, 32);
+    const reviewsDir = join(homeDir, '.n10', 'reviews', repoKey, 'pr-38');
     mkdirSync(reviewsDir, { recursive: true });
     const seededLine = Math.max(1, firstInlineThread!.line - 5);
     const file = {

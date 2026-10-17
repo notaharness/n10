@@ -17,7 +17,7 @@ export interface TerminalPaneState {
   /** True only while `connectionState === 'reconnecting'` — keystrokes
    *  that would go nowhere are worse than a visibly blocked prompt. */
   inputDisabled: boolean;
-  /** The "Resume agent" / "Start new" bar, gated on `processState`
+  /** The "Resume agent" / "Start default agent" bar, gated on `processState`
    *  (`running`) alone — never on `connectionState`. */
   showExitedBar: boolean;
 }

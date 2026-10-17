@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import { partitionFiles } from '@n10/diff';
-import { planItemKey } from '@n10/core';
+import { planItemKey } from '@n10/core/plan';
 import { useConfig } from '../context/ConfigContext.js';
 import { usePlan } from '../context/PlanContext.js';
 import type { PaneModeValue } from '../hooks/usePaneReducer.js';

@@ -9,7 +9,7 @@ import type { BuildStatusState, RemoteCommentThread } from '@n10/vcs-core';
 // remembers what the agent has already been told, works out what is new
 // against that, and decides when a pending update is quiet enough to
 // send. No timers, no git, no provider: the watcher in
-// `pr-babysitter.ts` feeds it observations and asks it what to do.
+// The engine feeds observations into this pure state model.
 //
 // "What the agent was told" is the baseline, not "what was last seen".
 // A comment that arrives between two polls and is answered before the

@@ -53,3 +53,15 @@ export async function runGitOn(
   }
   return { stdout: result.stdout, stderr: result.stderr };
 }
+
+/** Throws for any function this phase left local-only: half-threading
+ *  the machine seam (accepting one that is quietly ignored) is the
+ *  data-loss bug this package's AGENTS.md warns about, so a caller
+ *  that hands one of these a remote machine gets a loud failure
+ *  instead of an operation silently run against the local repository. */
+export function refuseRemote(fn: string, machine: Machine | undefined): void {
+  if (isRemoteMachine(machine))
+    throw new Error(
+      `${fn}() does not support a remote machine yet (${machine.id})`
+    );
+}

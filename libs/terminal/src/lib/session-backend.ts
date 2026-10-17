@@ -37,10 +37,18 @@ export interface SessionBackend {
     running: boolean;
     exitCode?: number;
     signal?: number;
+    /** Ended with the persistent session itself (killed, or its server
+     *  gone), so no retained pane is left to show or restart in. */
+    gone?: boolean;
   };
   /** The local connection ended while the hosted process remained alive. */
   onDisconnect?(cb: () => void): void;
   offDisconnect?(cb: () => void): void;
+  /** A local client's output begins: the next chunk `onData` delivers
+   *  is the first that client wrote. Fires for every client, the first
+   *  and each reconnection, as that output arrives. */
+  onAttach?(cb: () => void): void;
+  offAttach?(cb: () => void): void;
   /** Manual retry after automatic reconnection has given up
    *  (`connectionState === 'failed'`) — the affordance behind a pane's
    *  "Reconnect" action. A no-op when there is nothing to retry (a

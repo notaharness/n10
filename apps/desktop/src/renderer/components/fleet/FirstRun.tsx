@@ -1,21 +1,50 @@
+import { LinkIcon } from 'lucide-react';
+import tailscaleBlack from '../../assets/tailscale-logo-black.svg?url';
+import tailscaleWhite from '../../assets/tailscale-logo-white.svg?url';
 import { useFleet } from '../../lib/fleet/fleet-context.js';
 import { nameError } from '../../lib/fleet/names.js';
+import { openLink } from '../../lib/open-link.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
 import { Label } from '../ui/label.js';
+import { FleetIllustration } from './FleetIllustration.js';
 import { PasskeyCompatibility } from './PasskeyCompatibility.js';
+
+const BEAM_URL = 'https://beam.n10.is';
+
+/** Tailscale's own wordmark, its black or white file by theme. */
+function PoweredByTailscale() {
+  return (
+    <div className="flex flex-col items-center gap-1.5 text-xs text-muted-foreground">
+      <span>Powered by</span>
+      <img src={tailscaleBlack} alt="Tailscale" className="h-3.5 dark:hidden" />
+      <img
+        src={tailscaleWhite}
+        alt="Tailscale"
+        className="hidden h-3.5 dark:block"
+      />
+    </div>
+  );
+}
 
 function Choices({ disabled }: { disabled: boolean }) {
   const { choose } = useFleet().enrolment;
   return (
-    <div className="space-y-3">
-      <h2 className="text-base font-semibold">Connect your first machine</h2>
+    <div className="flex flex-col items-center gap-3 text-center">
+      <h2 className="text-base font-semibold">
+        Your machines, connected anywhere
+      </h2>
+      <div className="flex flex-col items-center gap-1">
+        <FleetIllustration />
+        <PoweredByTailscale />
+      </div>
       <p className="text-base text-muted-foreground">
-        Create a fleet once. On your other machines, join it with the same
-        passkey. Members can run commands as your user unless you restrict their
-        access.
+        Connect your machines, secured with your passkey, accessible from
+        anywhere.
+        <br />
+        No VPN or SSH required.
       </p>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         <Button disabled={disabled} onClick={() => choose('create')}>
           Create a fleet
         </Button>
@@ -24,9 +53,21 @@ function Choices({ disabled }: { disabled: boolean }) {
           disabled={disabled}
           onClick={() => choose('join')}
         >
-          Join an existing fleet
+          Join a fleet
         </Button>
       </div>
+      <Button variant="link" size="sm" asChild>
+        <a
+          href={BEAM_URL}
+          onClick={(e) => {
+            e.preventDefault();
+            openLink(BEAM_URL);
+          }}
+        >
+          <LinkIcon className="size-3.5" />
+          More information
+        </a>
+      </Button>
     </div>
   );
 }
@@ -84,19 +125,9 @@ function NameField({
 
 function CreateSteps() {
   return (
-    <div className="space-y-2 text-base">
-      <ol className="list-decimal space-y-1 pl-5">
-        <li>Create your fleet passkey — save a new passkey for beam.n10.is.</li>
-        <li>
-          Authorize this machine — use that same passkey to sign its membership
-          and unlock the encrypted directory.
-        </li>
-      </ol>
-      <p className="text-muted-foreground">
-        Two passkey prompts, once per fleet. Each prompt has its own link and QR
-        code.
-      </p>
-    </div>
+    <p className="text-base text-muted-foreground">
+      Save a passkey, then use it to add this machine.
+    </p>
   );
 }
 
@@ -117,18 +148,17 @@ function EnrolmentForm({ disabled }: { disabled: boolean }) {
       }}
     >
       <h2 className="text-base font-semibold">
-        {creating ? 'Create a fleet' : 'Join an existing fleet'}
+        {creating ? 'Create a fleet' : 'Join a fleet'}
       </h2>
       {!creating && (
         <p className="text-base text-muted-foreground">
-          Use the passkey you created for this fleet. One passkey prompt
-          authorizes this machine.
+          Use your fleet’s passkey.
         </p>
       )}
       <div className="grid gap-3">
         <NameField
           id="beam-label"
-          label="This machine’s name"
+          label="Machine name"
           placeholder="Host name"
           value={e.label}
           onChange={e.setLabel}
@@ -140,7 +170,7 @@ function EnrolmentForm({ disabled }: { disabled: boolean }) {
             placeholder="beam"
             value={e.fleetName}
             onChange={e.setFleetName}
-            helper="The fleet name appears in your passkey manager."
+            helper="Shown in your passkey manager."
           />
         )}
       </div>

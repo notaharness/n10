@@ -8,6 +8,7 @@ import { settleFor } from './setup/waits.js';
 
 test.use({
   n10Config: {
+    agentId: 'test',
     aiCommand: 'echo n10-session-active && sleep 300',
     keybindPreset: 'vim',
   },
@@ -96,7 +97,7 @@ test.describe('Delete active session', () => {
         });
       }).toPass({ timeout: 20_000 });
       await expect(
-        n10.term.getByText(/session is active/i).first()
+        n10.term.getByText(/an agent is running here/i).first()
       ).toBeVisible();
 
       // Esc cancels — session must remain in the sidebar.

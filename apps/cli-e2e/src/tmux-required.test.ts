@@ -13,6 +13,7 @@ for (const legacyBackend of [undefined, 'pty']) {
   })`, () => {
     test.use({
       n10Config: {
+        agentId: 'test',
         aiCommand: fakeAgentCommand({ silent: true }),
         terminalBackend: legacyBackend,
       },

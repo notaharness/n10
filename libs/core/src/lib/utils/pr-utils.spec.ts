@@ -3,11 +3,14 @@ import { describe, it, expect } from 'vitest';
 import type {
   BranchPrMap,
   PullRequestInfo,
+  PullRequestReviewer,
+  ReviewDecision,
   AppConfig,
   VcsProvider,
 } from '@n10/vcs-core';
 import {
   findOrphanPrs,
+  findYourPrIds,
   categorizeReviews,
   buildSessionPrMap,
 } from './pr-utils.js';
@@ -78,6 +81,50 @@ describe('findOrphanPrs', () => {
   });
 });
 
+describe('findYourPrIds', () => {
+  it('names the pull requests the provider says the viewer authored', () => {
+    // Reviewing a pull request, or checking out its branch, does not
+    // make it yours: only its author field does.
+    const prMap: BranchPrMap = {
+      'feature/branch-1': makePr({ id: 1 }),
+      'feature/branch-2': makePr({
+        id: 2,
+        createdByIdentifier: 'other@test.com',
+        reviewers: [
+          {
+            displayName: 'Me',
+            identifier: 'me@test.com',
+            decision: 'approved',
+          },
+        ],
+      }),
+      'feature/branch-3': null,
+    };
+    expect(findYourPrIds(prMap, mockConfig, mockProvider)).toEqual(
+      new Set([1])
+    );
+  });
+
+  it('takes the provider’s word on the signed-in account over the configured email', () => {
+    // Azure names the account by its authenticated identity; git's email
+    // need not be its uniqueName.
+    const prMap: BranchPrMap = {
+      'feature/branch-1': makePr({
+        id: 1,
+        createdByIdentifier: 'CORP\\me',
+        viewerIsAuthor: true,
+      }),
+      'feature/branch-2': makePr({ id: 2, viewerIsAuthor: false }),
+    };
+    expect(findYourPrIds(prMap, mockConfig, mockProvider)).toEqual(
+      new Set([1])
+    );
+    expect(
+      findOrphanPrs(prMap, new Set(), mockConfig, mockProvider).map((p) => p.id)
+    ).toEqual([1]);
+  });
+});
+
 describe('categorizeReviews', () => {
   it('categorizes PRs by reviewer decision', () => {
     const prMap: BranchPrMap = {
@@ -122,6 +169,37 @@ describe('categorizeReviews', () => {
     expect(result.waitingForAuthor.map((p) => p.id)).toEqual([3]);
   });
 
+  it('files a review asked for again under Needs your review, unless it is a draft', () => {
+    const me = (decision: 'approved' | 'changes-requested') => ({
+      displayName: 'Me',
+      identifier: 'me@test.com',
+      decision,
+      requested: true,
+    });
+    const prMap: BranchPrMap = {
+      'branch-a': makePr({
+        id: 1,
+        createdByIdentifier: 'other@test.com',
+        reviewers: [me('approved')],
+      }),
+      'branch-b': makePr({
+        id: 2,
+        createdByIdentifier: 'other@test.com',
+        reviewers: [me('changes-requested')],
+      }),
+      'branch-c': makePr({
+        id: 3,
+        createdByIdentifier: 'other@test.com',
+        isDraft: true,
+        reviewers: [me('approved')],
+      }),
+    };
+    const result = categorizeReviews(prMap, mockConfig, mockProvider);
+    expect(result.needsReview.map((p) => p.id)).toEqual([1, 2]);
+    expect(result.approvedByYou.map((p) => p.id)).toEqual([3]);
+    expect(result.waitingForAuthor).toEqual([]);
+  });
+
   it('skips declined reviewers', () => {
     const prMap: BranchPrMap = {
       'branch-a': makePr({
@@ -160,6 +238,26 @@ describe('categorizeReviews', () => {
     expect(result.needsReview).toEqual([]);
     expect(result.approvedByYou).toEqual([]);
     expect(result.waitingForAuthor).toEqual([]);
+  });
+
+  it('files a request by the reviewer row the provider marks as the viewer', () => {
+    // An Azure uniqueName need not be git's email.
+    const prMap: BranchPrMap = {
+      'feature/branch-1': makePr({
+        id: 1,
+        createdByIdentifier: 'other@test.com',
+        reviewers: [
+          {
+            displayName: 'Me',
+            identifier: 'CORP\\me',
+            decision: 'no-response',
+            isViewer: true,
+          },
+        ],
+      }),
+    };
+    const reviews = categorizeReviews(prMap, mockConfig, mockProvider);
+    expect(reviews.needsReview.map((p) => p.id)).toEqual([1]);
   });
 
   it('skips PRs where user is not a reviewer', () => {
@@ -261,6 +359,83 @@ describe('categorizeReviews', () => {
     const result = categorizeReviews(prMap, mockConfig, mockProvider);
     expect(result.waitingForAuthor.map((p) => p.id)).toEqual([1]);
     expect(result.approvedByYou.map((p) => p.id)).toEqual([2]);
+  });
+
+  describe('through a group the user belongs to', () => {
+    const team = (decision: ReviewDecision) => ({
+      displayName: '[proj]\\Core Team',
+      identifier: 'vstfs:///Classification/TeamProject/proj\\Core Team',
+      decision,
+      includesViewer: true,
+    });
+    const me = (decision: ReviewDecision) => ({
+      displayName: 'Me',
+      identifier: 'me@test.com',
+      decision,
+    });
+    const reviewedBy = (...reviewers: PullRequestReviewer[]): BranchPrMap => ({
+      'branch-a': makePr({
+        id: 1,
+        createdByIdentifier: 'other@test.com',
+        reviewers,
+      }),
+    });
+
+    it('asks for a review while the group has not answered', () => {
+      const result = categorizeReviews(
+        reviewedBy(team('no-response')),
+        mockConfig,
+        mockProvider
+      );
+      expect(result.needsReview.map((p) => p.id)).toEqual([1]);
+    });
+
+    /** The reported bug: a teammate's approval of the group read as the
+     *  user's own, on a pull request they never looked at. */
+    it('never files the group’s vote as the user’s', () => {
+      for (const decision of [
+        'approved',
+        'waiting-for-author',
+        'rejected',
+      ] as const) {
+        const result = categorizeReviews(
+          reviewedBy(team(decision)),
+          mockConfig,
+          mockProvider
+        );
+        expect(result).toEqual({
+          needsReview: [],
+          waitingForAuthor: [],
+          approvedByYou: [],
+        });
+      }
+    });
+
+    it('goes by the user’s own vote when they have one', () => {
+      expect(
+        categorizeReviews(
+          reviewedBy(team('approved'), me('no-response')),
+          mockConfig,
+          mockProvider
+        ).needsReview.map((p) => p.id)
+      ).toEqual([1]);
+      expect(
+        categorizeReviews(
+          reviewedBy(team('no-response'), me('approved')),
+          mockConfig,
+          mockProvider
+        ).approvedByYou.map((p) => p.id)
+      ).toEqual([1]);
+    });
+
+    it('ignores a pending group the user is not in', () => {
+      const result = categorizeReviews(
+        reviewedBy({ ...team('no-response'), includesViewer: false }),
+        mockConfig,
+        mockProvider
+      );
+      expect(result.needsReview).toEqual([]);
+    });
   });
 });
 

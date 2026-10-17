@@ -1,8 +1,8 @@
 import type {
-  BeamStatus,
+  FleetStatus,
   DirectoryPublished,
   MachineView,
-} from '../../host/contract-machines.js';
+} from '@n10/engine/contract';
 import { setInboundMailPort } from '../../host/services/inbound-mail.js';
 import {
   getLastKnownMachines,
@@ -64,7 +64,7 @@ export class BeamClient {
   private stopped = false;
   private backoff = MIN_BACKOFF_MS;
   private timer: ReturnType<typeof setTimeout> | null = null;
-  private status: BeamStatus = {
+  private status: FleetStatus = {
     state: 'connecting',
     detail: null,
     enrolled: false,
@@ -115,7 +115,7 @@ export class BeamClient {
     this.options.log?.(`[beam] ${what}: ${String(err)}`);
   }
 
-  private publish(status: BeamStatus): void {
+  private publish(status: FleetStatus): void {
     this.status = status;
     receiveBeamStatus(status);
   }

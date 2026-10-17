@@ -1,11 +1,5 @@
-import { sessionForBranch } from '@n10/core';
 import type { KeyPress, PlanItem } from '@n10/core';
-import {
-  hasSession,
-  checkoutPlan,
-  composePlanPrompt,
-  planItemKey,
-} from '@n10/core';
+import { hasSession, composePlanPrompt, planItemKey } from '@n10/core';
 
 import { handlePlanAnnotateInput } from '../../utils/plan-annotate-mode.js';
 import type { PlanCheckoutHandlerCtx } from './input-types.js';
@@ -169,27 +163,19 @@ function runCheckout(
   const prompt = composePlanPrompt(items);
 
   void ctx.asyncOps.run('start-session', async () => {
-    const result = await checkoutPlan({
+    const result = await ctx.sessions.commands.checkoutPlan({
       pr: selectedPr,
       prompt,
-      paneCols: ctx.terminal.paneCols,
-      paneRows: ctx.terminal.paneRows,
+      cols: ctx.terminal.paneCols,
+      rows: ctx.terminal.paneRows,
       mode,
-      config: ctx.config.config,
-      flashStatus: ctx.sessions.flashStatus,
     });
-    if (result === 'failed') {
-      // Leave the plan intact so the user can retry.
-      pane.setPlanCheckoutTarget(null);
-      return;
-    }
-
     plan.clear(prId);
-    const rows = await ctx.sessions.refreshSessions();
-    const name = sessionForBranch(rows, selectedPr.sourceBranch)?.name;
-    if (name) ctx.sidebar.selectByKey(`session:${name}`);
+    ctx.sidebar.selectByKey(`session:${result.name}`);
     ctx.sessions.flashStatus(
-      result === 'injected' ? 'Plan sent to agent' : 'Agent started with plan'
+      result.outcome === 'injected'
+        ? 'Plan sent to agent'
+        : 'Agent started with plan'
     );
     pane.setPlanCheckoutTarget(null);
     pane.setPaneMode('terminal');

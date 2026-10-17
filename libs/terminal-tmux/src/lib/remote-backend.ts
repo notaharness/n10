@@ -8,88 +8,29 @@
  * dropped connection must never render as the agent having exited.
  */
 import type { SessionBackend, SessionSpec } from '@n10/terminal';
-import { tmuxAttachArgs, type MachineExecutor } from './tmux-cli.js';
+import { tmuxAttachArgs } from './tmux-cli.js';
 import { tmuxCapturePaneWith, tmuxKillSessionWith } from './tmux-cli-remote.js';
 import { prepareRemoteTmuxSession } from './tmux-launch-remote.js';
 import type { TmuxLaunchPlan } from './tmux-launch.js';
 import type { RemoteSessionPoller } from './remote-poller.js';
-
-/** One remote pty stream's client contract — deliberately narrow, the
- *  same seam shape as `TmuxSessionPreparer`: the desktop supplies a
- *  concrete implementation over its beam transport; this package
- *  never imports beam or Electron. */
-export interface RemotePtyHandle {
-  onData(cb: (data: string) => void): void;
-  offData(cb: (data: string) => void): void;
-  write(data: string): void;
-  resize(cols: number, rows: number): void;
-  /**
-   * The stream closed. Any reason: the remote `tmux attach-session`
-   * client exited because the user detached with `C-b d`, the hosted
-   * process ended, or the connection underneath went away. Nothing on
-   * this side can tell those apart — the handle carries no reason —
-   * so the backend treats every close the
-   * same way, by re-attaching, and does not read a closed stream as
-   * evidence against the connection it was riding on. What is evidence
-   * is in `RemotePtyOpenParams.reconnect`.
-   */
-  onClose(cb: () => void): void;
-  /** Detach locally; the remote tmux session is left running. */
-  dispose(): void;
-}
-
-export interface RemotePtyOpenParams {
-  /** Absent or empty means the login shell. This backend
-   *  always passes one (attaching a tmux client), but the type stays
-   *  optional so a `RemotePtyOpener` is usable for a plain remote
-   *  shell too. */
-  argv?: string[];
-  cwd?: string;
-  env?: Record<string, string>;
-  cols: number;
-  rows: number;
-  /**
-   * The *connection* this attach will ride on is suspect, and an opener
-   * that pools one per machine should verify it before reusing it —
-   * three retries down a transport that can never answer are three
-   * retries spent for nothing, and the manual Reconnect behind them
-   * fails exactly the same way.
-   *
-   * Set only where there is evidence about the connection rather than
-   * about one stream on it: the machine stopped answering control-plane
-   * commands, or an attach over this connection has already failed. A
-   * stream closing is not evidence — the remote tmux client exits when
-   * the user detaches, and the hosted process exits when it is done,
-   * and both of those happen over a connection that is working and
-   * shared with every other pane on that machine plus its mailbox.
-   * Verifying costs a round trip the caller must wait out, and acting
-   * on a verification that fails costs every one of those streams.
-   */
-  reconnect?: boolean;
-}
-
-export interface RemotePtyOpener {
-  open(params: RemotePtyOpenParams): Promise<RemotePtyHandle>;
-}
-
-/** Everything a remote backend needs for one machine: the beam peerId
- *  it addresses, an executor for tmux/git control commands, and an
- *  opener for the interactive pty stream. */
-export interface RemoteMachine {
-  id: string;
-  executor: MachineExecutor;
-  ptyOpener: RemotePtyOpener;
-}
+import { ClientDraw } from './client-draw.js';
+import type { RemoteMachine, RemotePtyHandle } from './remote-pty.js';
 
 type ExitCallback = (code: number, signal?: number) => void;
 
-function sanitizedEnv(spec: SessionSpec): Record<string, string> {
+/** The terminal the attached tmux client draws for: the emulator on
+ *  this side, as the local PTY names it (terminal-pty's pty-session).
+ *  The far daemon's own environment may have no `TERM` at all (one a
+ *  service manager started), and tmux will not attach without one. */
+const ATTACH_TERM = 'xterm-256color';
+
+function attachEnv(spec: SessionSpec): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(spec.env ?? {})) {
     if (value != null && key !== 'TMUX' && key !== 'TMUX_PANE')
       env[key] = value;
   }
-  return env;
+  return { ...env, TERM: ATTACH_TERM };
 }
 
 const MAX_RECONNECT_ATTEMPTS = 3;
@@ -116,7 +57,13 @@ export class RemoteTmuxBackend implements SessionBackend {
   private width: number;
   private height: number;
   private finalFrame: string | null = null;
+  private readonly draw = new ClientDraw();
   private reconnectAttempts = 0;
+  /** The fleet says the machine is offline. */
+  private machineOffline = false;
+  /** The poller's last word on the machine is that it could not list
+   *  it; cleared by its next listing. */
+  private machineUnreachable = false;
   /** Whether anything has said the *connection* is in doubt, as opposed
    *  to this one stream having ended. Reset only once a re-attach has
    *  held for the stability window, so a link that keeps failing keeps
@@ -144,11 +91,16 @@ export class RemoteTmuxBackend implements SessionBackend {
       onState: (info) => this.handlePollState(info),
       // The poller speaks to the machine, not to this stream: it going
       // quiet is evidence about the connection itself.
-      onUnreachable: () => this.enterReconnecting('unreachable'),
+      onUnreachable: () => {
+        this.machineUnreachable = true;
+        this.enterReconnecting('unreachable');
+      },
+      onReachability: (reachable) => this.setMachineOffline(!reachable),
     });
   }
 
   private bindHandle(handle: RemotePtyHandle): void {
+    this.draw.track(handle);
     for (const cb of this.data) handle.onData(cb);
     handle.onClose(() => {
       if (this.disposed || this.handle !== handle) return;
@@ -174,8 +126,35 @@ export class RemoteTmuxBackend implements SessionBackend {
     this.scheduleReconnect();
   }
 
+  /** Whether anything says the machine is not there to attach to. A
+   *  transport may hand back a stream to a peer that is gone, which
+   *  would read as reconnected, so nothing is attached meanwhile. */
+  private get machineAway(): boolean {
+    return this.machineOffline || this.machineUnreachable;
+  }
+
+  private setMachineOffline(offline: boolean): void {
+    if (this.disposed || offline === this.machineOffline) return;
+    this.machineOffline = offline;
+    if (offline) {
+      clearTimeout(this.reconnectTimer);
+      this.enterReconnecting('unreachable');
+      return;
+    }
+    this.attachIfBack();
+  }
+
+  /** Back, by every account: try at once, with a full set of attempts. */
+  private attachIfBack(): void {
+    if (this.machineAway || !this.state.running) return;
+    if (this.connection === 'connected') return;
+    this.connection = 'reconnecting';
+    this.reconnectAttempts = 0;
+    void this.attemptReconnect();
+  }
+
   private scheduleReconnect(): void {
-    if (this.disposed || !this.state.running) return;
+    if (this.disposed || !this.state.running || this.machineAway) return;
     if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       this.connection = 'failed';
       return;
@@ -200,12 +179,12 @@ export class RemoteTmuxBackend implements SessionBackend {
   }
 
   private async attemptReconnect(): Promise<void> {
-    if (this.disposed || !this.state.running) return;
+    if (this.disposed || !this.state.running || this.machineAway) return;
     try {
       const handle = await this.machine.ptyOpener.open({
         argv: ['tmux', ...tmuxAttachArgs(this.name)],
         cwd: this.spec.cwd,
-        env: sanitizedEnv(this.spec),
+        env: attachEnv(this.spec),
         cols: this.width,
         rows: this.height,
         reconnect: this.transportSuspect,
@@ -214,7 +193,7 @@ export class RemoteTmuxBackend implements SessionBackend {
       // already awaiting `open()`. Adopting this handle on a backend
       // that was torn down (or whose process exited) meanwhile leaks
       // the remote pty stream — nothing would ever dispose it.
-      if (this.disposed || !this.state.running) {
+      if (this.disposed || !this.state.running || this.machineAway) {
         handle.dispose();
         return;
       }
@@ -250,11 +229,17 @@ export class RemoteTmuxBackend implements SessionBackend {
     exitSignal?: number;
   }): void {
     if (this.disposed || !this.state.running) return;
+    // A listing came back: the machine answers again.
+    if (this.machineUnreachable) {
+      this.machineUnreachable = false;
+      this.attachIfBack();
+    }
     if (info.found && !info.paneDead) return;
     this.state = {
       running: false,
       exitCode: info.found ? info.exitCode : undefined,
       signal: info.found ? info.exitSignal : undefined,
+      ...(info.found ? {} : { gone: true }),
     };
     this.unsubscribePoll();
     clearTimeout(this.reconnectTimer);
@@ -265,9 +250,16 @@ export class RemoteTmuxBackend implements SessionBackend {
     // failure, and an uncaught rejection in Electron main is a
     // process-level crash over what is otherwise a routine "the machine
     // went away right as the session ended" (finding 4).
-    if (info.found) void this.replayFinalFrame().catch(() => undefined);
+    if (info.found) void this.replayOnceDrawn().catch(() => undefined);
     for (const cb of [...this.exits])
       cb(this.state.exitCode ?? 0, this.state.signal);
+  }
+
+  /** The dead pane's final frame, once the stream's tmux client has
+   *  drawn (`ClientDraw`). */
+  private async replayOnceDrawn(): Promise<void> {
+    await this.draw.settled();
+    if (!this.disposed) await this.replayFinalFrame();
   }
 
   private async replayFinalFrame(): Promise<void> {
@@ -325,6 +317,12 @@ export class RemoteTmuxBackend implements SessionBackend {
   offDisconnect(cb: () => void): void {
     this.disconnects.delete(cb);
   }
+  onAttach(cb: () => void): void {
+    this.draw.onStart(cb);
+  }
+  offAttach(cb: () => void): void {
+    this.draw.offStart(cb);
+  }
 
   /** Detach the local stream client. The remote tmux session is left
    *  running — a remote session survives closing n10 exactly as a
@@ -341,6 +339,7 @@ export class RemoteTmuxBackend implements SessionBackend {
     this.data.clear();
     this.exits.clear();
     this.disconnects.clear();
+    this.draw.clear();
     this.handle.dispose();
   }
 
@@ -377,7 +376,7 @@ export async function createRemoteTmuxBackend(
   const handle = await machine.ptyOpener.open({
     argv: ['tmux', ...tmuxAttachArgs(name)],
     cwd: spec.cwd,
-    env: sanitizedEnv(spec),
+    env: attachEnv(spec),
     cols: spec.cols,
     rows: spec.rows,
   });

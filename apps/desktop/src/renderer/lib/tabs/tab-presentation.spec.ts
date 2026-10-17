@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import type { SidebarItem } from '../../../host/contract.js';
 import {
+  cutSide,
   repoDisplayName,
   tabPresentation,
   tabRepo,
-  truncateLeading,
 } from './tab-presentation.js';
 import { itemTabId, terminalTabId } from './tab-identity.js';
 import type { ItemTab, Tab } from './tabs-model.js';
@@ -67,31 +67,12 @@ describe('tabRepo', () => {
   });
 });
 
-/**
- * A directory is read from its tail — the last segments are what tells
- * `~/Code/n10` from `~/Code/other` — so a long one loses its head,
- * never its end.
- */
-describe('truncateLeading', () => {
-  it('keeps a short path whole', () => {
-    expect(truncateLeading('~/Code/n10', 24)).toBe('~/Code/n10');
-  });
-
-  it('drops leading segments and marks the cut', () => {
-    expect(truncateLeading('~/Documents/Code/Personal/n10', 24)).toBe(
-      '…/Code/Personal/n10'
-    );
-  });
-
-  it('never cuts inside a segment while a whole one fits', () => {
-    const out = truncateLeading('/a/very-long-directory-name/tail', 16);
-    expect(out).toBe('…/tail');
-  });
-
-  it('cuts the last segment itself when nothing else fits', () => {
-    expect(truncateLeading('/x/abcdefghijklmnopqrstuvwxyz', 10)).toBe(
-      '…rstuvwxyz'
-    );
+describe('cutSide', () => {
+  it('cuts branch names and directories from the start, titles from the end', () => {
+    expect(cutSide('branch')).toBe('start');
+    expect(cutSide('terminal')).toBe('start');
+    expect(cutSide('pr')).toBe('end');
+    expect(cutSide('settings')).toBe('end');
   });
 });
 
@@ -142,13 +123,13 @@ describe('tabPresentation', () => {
     expect(tabPresentation(tab(), undefined).label).toBe('42');
   });
 
-  it('shows a terminal as its directory, cut from the front', () => {
+  it('shows a terminal as its whole directory; the strip cuts it to fit', () => {
     expect(
       tabPresentation(
         terminal('t', null, '~/Documents/Code/Personal/n10'),
         undefined
       )
-    ).toEqual({ label: '…/Code/Personal/n10', face: 'terminal' });
+    ).toEqual({ label: '~/Documents/Code/Personal/n10', face: 'terminal' });
   });
 
   it('names the settings tab', () => {

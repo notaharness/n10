@@ -2,7 +2,7 @@ import type {
   MachineGrant,
   MachineState,
   MachineView,
-} from '../../host/contract-machines.js';
+} from '@n10/engine/contract';
 
 /** The fields of beam docs/06's `PeerView` this client reads. */
 export interface PeerView {

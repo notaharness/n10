@@ -1,41 +1,18 @@
-/**
- * Where a worktree for a branch lives on disk.
- *
- * The resolver is process-wide state because it is a property of the
- * open repository, not of any one call: n10 detects the project's
- * worktree template once at open and every later `createWorktree` /
- * `listWorktrees` has to agree about which directories are n10's.
- */
+/** Immutable path policy captured by one repository operation. */
 import { resolve } from 'node:path';
 import { branchToSessionName } from './refs.js';
+import type { Machine } from './machine.js';
 
 export interface WorktreeResolver {
-  /** Relative path for a new worktree for this branch */
   dir(branch: string): string;
-  /**
-   * True if this absolute worktree path belongs to this resolver.
-   *
-   * `cwd` names the repository to judge membership of. Omitting it
-   * means the process's directory, which is the open repository and
-   * what every long-standing caller wants. A caller acting on a
-   * repository it was handed — one that must survive the desktop
-   * `chdir`-ing elsewhere between its awaits — passes it explicitly.
-   */
-  owns(absolutePath: string, cwd?: string): boolean;
-  /**
-   * The absolute directory every owned worktree sits under — the root
-   * `owns()` is testing membership of.
-   *
-   * Exposed because a caller that wants to be told when a worktree
-   * appears needs somewhere to point a watcher, and the alternative is
-   * recursing a checkout. It may not exist on disk yet: nothing
-   * creates it until the first worktree is made.
-   *
-   * `cwd` is resolved against as in {@link owns}. An absolute template
-   * ignores it, which is correct: that base is the same directory
-   * whichever repository is asking.
-   */
-  base(cwd?: string): string;
+  owns(absolutePath: string): boolean;
+  base(): string;
+}
+
+export interface WorktreeScope {
+  readonly cwd: string;
+  readonly resolver: WorktreeResolver;
+  readonly machine?: Machine;
 }
 
 /**
@@ -63,63 +40,34 @@ const isUnder = (p: string, baseDir: string): boolean => {
   return target === base || target.startsWith(base + '/');
 };
 
-const defaultResolver: WorktreeResolver = {
-  dir: (branch) => '.claude/worktrees/' + branchToSessionName(branch),
-  owns: (p, cwd) => isUnder(p, defaultResolver.base(cwd)),
-  // Resolved per call, not captured: the default resolver is the one
-  // in force before anything has told n10 which repo it is in, and
-  // the desktop chdir()s into a repo after that point.
-  base: (cwd = process.cwd()) => resolve(cwd, '.claude/worktrees'),
-};
-
-let activeResolver: WorktreeResolver = defaultResolver;
-
-export function setWorktreeResolver(r: WorktreeResolver): void {
-  activeResolver = r;
-}
-
-export function resetWorktreeResolver(): void {
-  activeResolver = defaultResolver;
-}
-
 export function createTemplateResolver(
   template: string,
-  cwd = process.cwd()
+  cwd: string
 ): WorktreeResolver {
   const baseTemplate =
     template.replace(/\/?\{(?:branch|session)\}.*$/, '') || '.';
-  // The template is kept, not just the directory it resolved to at
-  // creation: a relative one names a different directory in each
-  // repository (`../{session}` is a sibling of whichever checkout is
-  // asking), so a caller naming its own repository has to re-resolve.
-  // An absolute template resolves to itself whatever `cwd` is.
-  const baseFor = (at?: string) => resolve(at ?? cwd, baseTemplate);
-
+  const base = resolve(cwd, baseTemplate);
   return {
     dir: (branch) =>
       template
         .replace('{branch}', branch)
         .replace('{session}', branchToSessionName(branch)),
-    owns: (p, at) => isUnder(p, baseFor(at)),
-    base: (at) => baseFor(at),
+    owns: (path) => isUnder(path, base),
+    base: () => base,
   };
 }
 
-/** Convert a branch name to its worktree relative directory */
-export function worktreeDir(branch: string): string {
-  return activeResolver.dir(branch);
-}
-
-/**
- * True if this absolute worktree path is one n10 manages, judged
- * against `cwd`'s repository (the process's directory when omitted).
- */
-export function ownsWorktreePath(absolutePath: string, cwd?: string): boolean {
-  return activeResolver.owns(absolutePath, cwd);
-}
-
-/** The absolute directory n10's worktrees live under, per the
- *  resolver in force. May not exist yet. */
-export function worktreesBasePath(cwd?: string): string {
-  return activeResolver.base(cwd);
+/** Capture path policy before awaiting Git; no process-wide selected resolver. */
+export function worktreeScope(
+  cwd: string,
+  options: { template?: string; machine?: Machine } = {}
+): WorktreeScope {
+  return {
+    cwd,
+    resolver: createTemplateResolver(
+      options.template ?? '.claude/worktrees/{session}',
+      cwd
+    ),
+    ...(options.machine ? { machine: options.machine } : {}),
+  };
 }

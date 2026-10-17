@@ -1,44 +1,50 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   useCallback,
-  useImperativeHandle,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type Ref,
   type RefObject,
 } from 'react';
 import type { DiffLine } from '@n10/diff';
 import type {
+  PrDiffManifestFile,
   RemoteCommentThread,
   ReviewComment,
 } from '../../../../host/contract.js';
 import { expandIndices } from '../../../lib/diff/diff-model.js';
 import { useDiffOptions } from '../../../lib/diff/diff-options.js';
+import { filesOnScreen } from '../../../lib/diff/diff-rows-model.js';
+import { linePoints, pointKey } from '../../../lib/diff/diff-points.js';
 import {
   buildFlatDiff,
   estimateRowHeight,
   type FileDisplayState,
-  type FlatRow,
 } from '../../../lib/diff/diff-virtual.js';
+import { useFileAnalyses } from '../../../lib/diff/highlight.js';
+import { MyDraftsContext } from '../../../lib/review/my-drafts-context.js';
 import {
-  cellHighlight,
-  lineHighlight,
-  useFileAnalyses,
-} from '../../../lib/diff/highlight.js';
+  readsSettled,
+  scrollTelling,
+  useDiffJumps,
+  type DiffJumpHandle,
+} from '../../../lib/diff/use-diff-jumps.js';
+import type { PrDiffView } from '../../../lib/review/use-pr-diff.js';
 import { useTheme } from '../../../lib/theme.js';
-import { CommentBlock, OrphanBlock } from '../comments/CommentBlock.js';
-import { ConversationPanel } from '../comments/ConversationPanel.js';
-import { DiffFileHeader } from './DiffFileHeader.js';
-import { FoldRow, HunkRow, SplitCell, UnifiedRow } from './diff-rows.js';
+import type { RowContext } from './DiffRowView.js';
+import { DiffVisibleRows } from './DiffVisibleRows.js';
+import { pointId } from './LineGutter.js';
+import { useDiffAnchor } from './use-diff-anchor.js';
+import { useDiffComments } from './use-diff-comments.js';
+import type { TextMatch } from '../../../lib/diff/text-matches.js';
+import { useDiffSearchTarget } from './use-diff-search-target.js';
+import { focusDiffRow } from './diff-focus.js';
 
-/** Imperative scrolling into the virtualized list — jump targets may
- *  not be materialized yet, so DOM queries can't do this. */
-export interface DiffJumpHandle {
-  /** Scroll the row containing this thread/draft id into view. */
-  jumpToId(id: string): boolean;
-  /** Scroll a file's header row into view. */
-  jumpToFile(file: string): boolean;
-}
+const NO_MANIFEST: ReadonlyMap<string, PrDiffManifestFile> = new Map();
+
+export type { DiffJumpHandle };
 
 /**
  * The all-files diff as ONE virtualized list: only the rows in (and
@@ -48,6 +54,8 @@ export interface DiffJumpHandle {
  */
 export function VirtualDiffList({
   files,
+  searchFiles,
+  diffHead,
   threadsByFile,
   draftsByFile,
   generalThreads,
@@ -57,8 +65,17 @@ export function VirtualDiffList({
   focusThreadId,
   scrollRef,
   jumpRef,
+  prDiff,
+  searchTerm,
+  selectionTerm,
+  searchTarget,
+  searchRequest,
 }: {
   files: [string, DiffLine[]][];
+  /** The complete comparison, including files outside single-file mode. */
+  searchFiles: [string, DiffLine[]][];
+  /** The commit the diff was read at; what new comments anchor to. */
+  diffHead: string | null;
   threadsByFile: Map<string, RemoteCommentThread[]>;
   draftsByFile: Map<string, ReviewComment[]>;
   generalThreads: RemoteCommentThread[];
@@ -68,6 +85,13 @@ export function VirtualDiffList({
   focusThreadId: string | null;
   scrollRef: RefObject<HTMLDivElement | null>;
   jumpRef?: Ref<DiffJumpHandle>;
+  /** A pull request's manifest and file bodies; absent for a worktree,
+   *  whose files all arrive with their lines. */
+  prDiff?: PrDiffView;
+  searchTerm: string;
+  selectionTerm: string;
+  searchTarget: TextMatch | null;
+  searchRequest: number;
 }) {
   const options = useDiffOptions();
   const { resolved } = useTheme();
@@ -76,6 +100,14 @@ export function VirtualDiffList({
   );
 
   const linesByFile = useMemo(() => new Map(files), [files]);
+  const manifest = prDiff?.manifestByPath ?? NO_MANIFEST;
+  const comments = useDiffComments({
+    prId,
+    head: diffHead,
+    linesByFile,
+    split: options.view === 'split',
+  });
+  const { mineByFile, mineCount } = comments;
 
   const flat = useMemo(
     () =>
@@ -86,9 +118,19 @@ export function VirtualDiffList({
         generalThreads,
         threadsByFile,
         draftsByFile,
+        mineByFile,
+        mineCount,
         fileState,
+        ...(prDiff
+          ? {
+              bodies: prDiff.bodies,
+              counts: prDiff.counts,
+              anchored: prDiff.anchored,
+            }
+          : {}),
       }),
     [
+      prDiff,
       files,
       options.view,
       options.hideResolved,
@@ -96,11 +138,20 @@ export function VirtualDiffList({
       commentsLoading,
       threadsByFile,
       draftsByFile,
+      mineByFile,
+      mineCount,
       fileState,
     ]
   );
   const rows = flat.rows;
+  const anchored = prDiff?.anchored;
+  const points = useMemo(
+    () => linePoints(rows, linesByFile, anchored),
+    [rows, linesByFile, anchored]
+  );
 
+  // Scrolls the list makes itself reach the jumps as they happen.
+  const scrolledRef = useRef<(() => void) | null>(null);
   // React Compiler declines to memoize a component that calls this,
   // because the virtualizer hands back methods rather than values. That
   // is a property of @tanstack/react-virtual and not something this
@@ -113,21 +164,53 @@ export function VirtualDiffList({
     estimateSize: (i) => estimateRowHeight(rows[i]),
     getItemKey: (i) => rows[i].key,
     overscan: 16,
+    scrollToFn: scrollTelling(scrolledRef),
   });
   const virtualItems = virtualizer.getVirtualItems();
+  useDiffAnchor({
+    ready: files.length > 0,
+    points,
+    virtualizer,
+    scrollRef,
+  });
 
   // Highlight only files that currently have rows on screen.
-  const wantedFiles = useMemo(() => {
-    const wanted = new Set<string>();
-    for (const vi of virtualItems) {
-      const row = rows[vi.index];
-      if ('file' in row) wanted.add(row.file);
-    }
-    return wanted;
-    // virtualItems identity churns per scroll frame; the derived set is
-    // tiny and memo keeps downstream effects keyed on real changes.
-  }, [virtualItems, rows]);
+  const { shown: wantedFiles, toRead } = useMemo(
+    () =>
+      filesOnScreen(
+        rows,
+        virtualItems.map((vi) => vi.index)
+      ),
+    // virtualItems identity churns per scroll frame; the derived sets
+    // are tiny and memo keeps downstream effects keyed on real changes.
+    [virtualItems, rows]
+  );
   const analyses = useFileAnalyses(linesByFile, resolved, wantedFiles);
+
+  // An open file on screen is a file to read: its batch is asked for
+  // once the list settles with its placeholder in view. Not while it
+  // scrolls: a drag through the list would ask for every batch it
+  // passes.
+  const showFiles = prDiff?.showFiles;
+  const scrolling = virtualizer.isScrolling;
+  useEffect(() => {
+    if (!scrolling)
+      showFiles?.(searchTerm ? searchFiles.map(([path]) => path) : toRead);
+  }, [showFiles, toRead, scrolling, searchTerm, searchFiles]);
+
+  const scrollToSearch = useCallback(
+    (index: number) => virtualizer.scrollToIndex(index, { align: 'center' }),
+    [virtualizer]
+  );
+  useDiffSearchTarget(
+    searchTarget,
+    searchRequest,
+    rows,
+    linesByFile,
+    setFileState,
+    scrollToSearch,
+    scrollRef
+  );
 
   const patchFile = useCallback(
     (file: string, patch: Partial<FileDisplayState>) =>
@@ -155,158 +238,110 @@ export function VirtualDiffList({
     []
   );
 
-  useImperativeHandle(
+  useDiffJumps(
     jumpRef,
-    () => ({
-      jumpToId: (id) => {
-        const index = flat.indexById.get(id);
-        if (index == null) return false;
-        virtualizer.scrollToIndex(index, { align: 'center' });
-        return true;
-      },
-      jumpToFile: (file) => {
-        const index = flat.fileIndex.get(file);
-        if (index == null) return false;
-        virtualizer.scrollToIndex(index, { align: 'start' });
-        return true;
-      },
-    }),
-    [flat, virtualizer]
+    flat,
+    points.rowOf,
+    rows,
+    virtualizer,
+    scrollRef,
+    scrolledRef,
+    readsSettled(prDiff, toRead)
   );
 
-  const renderRow = (row: FlatRow) => {
-    switch (row.kind) {
-      case 'conversation':
-        return (
-          <ConversationPanel
-            threads={generalThreads}
-            loading={commentsLoading}
-            prId={prId}
-            focusThreadId={focusThreadId}
-          />
-        );
-      case 'file-header': {
-        const s = flat.stats.get(row.file);
-        if (!s) return null;
-        return (
-          <div data-file={row.file} className="border-t border-border">
-            <DiffFileHeader
-              filename={row.file}
-              open={s.open}
-              onToggleOpen={() => patchFile(row.file, { open: !s.open })}
-              viewed={s.viewed}
-              onToggleViewed={() =>
-                patchFile(row.file, { viewed: !s.viewed, open: s.viewed })
-              }
-              collapseReason={s.collapseReason}
-              draftCount={s.draftCount}
-              openThreads={s.openThreads}
-              adds={s.adds}
-              dels={s.dels}
-            />
-          </div>
-        );
-      }
-      case 'hunk':
-        return <HunkRow line={linesByFile.get(row.file)![row.index]} />;
-      case 'fold':
-        return (
-          <FoldRow
-            fold={{ from: row.from, to: row.to }}
-            onExpand={(fold, dir) => expand(row.file, fold, dir)}
-          />
-        );
-      case 'unified': {
-        const line = linesByFile.get(row.file)![row.index];
-        const hl = lineHighlight(analyses.get(row.file), row.index);
-        return (
-          <UnifiedRow
-            line={line}
-            tokens={hl.tokens}
-            ranges={hl.ranges}
-            wrap={options.wrap}
-          />
-        );
-      }
-      case 'split-context': {
-        const line = linesByFile.get(row.file)![row.index];
-        const { tokens } = lineHighlight(analyses.get(row.file), row.index);
-        const cell = { index: row.index, line };
-        return (
-          <div className="grid grid-cols-2">
-            <SplitCell cell={cell} tokens={tokens} side="L" wrap />
-            <SplitCell cell={cell} tokens={tokens} side="R" wrap />
-          </div>
-        );
-      }
-      case 'split-pair': {
-        const analysis = analyses.get(row.file);
-        const { left, right } = row.row;
-        const hlLeft = cellHighlight(analysis, left);
-        const hlRight = cellHighlight(analysis, right);
-        return (
-          <div className="grid grid-cols-2">
-            <SplitCell
-              cell={left}
-              tokens={hlLeft.tokens}
-              ranges={hlLeft.ranges}
-              side="L"
-              wrap
-            />
-            <SplitCell
-              cell={right}
-              tokens={hlRight.tokens}
-              ranges={hlRight.ranges}
-              side="R"
-              wrap
-            />
-          </div>
-        );
-      }
-      case 'comments':
-        return (
-          <CommentBlock
-            threads={row.threads}
-            drafts={row.drafts}
-            prId={prId}
-            headSha={headSha}
-            focusId={focusThreadId}
-            indent={row.indent}
-          />
-        );
-      case 'orphans':
-        return (
-          <OrphanBlock
-            threads={row.threads}
-            drafts={row.drafts}
-            prId={prId}
-            headSha={headSha}
-            focusId={focusThreadId}
-          />
-        );
-    }
+  // Moving through lines, or back from a closed composer, may land on
+  // a row the list has not mounted: scroll it into view, then focus it
+  // once it renders, which can take the virtualizer a few frames.
+  const { nav } = comments;
+  useEffect(() => {
+    const focusIn = (
+      selector: string,
+      index: number | undefined,
+      onlyIfLost = false
+    ) =>
+      focusDiffRow(
+        scrollRef,
+        (i) => virtualizer.scrollToIndex(i, { align: 'auto' }),
+        selector,
+        index,
+        onlyIfLost
+      );
+    const file = (f: string) => `[data-file="${CSS.escape(f)}"]`;
+    nav.current = {
+      pointsOf: (f) => points.byFile.get(f) ?? [],
+      rowOf: (p) => points.rowOf.get(pointKey(p)),
+      focus: (p, onlyIfLost) =>
+        focusIn(
+          `${file(p.file)}[data-point="${pointId(p)}"]`,
+          points.rowOf.get(pointKey(p)),
+          onlyIfLost
+        ),
+      focusFileComment: (f) =>
+        focusIn(
+          `[data-file-comment="${CSS.escape(f)}"]`,
+          flat.fileIndex.get(f),
+          true
+        ),
+      focusDraft: (key) =>
+        focusIn(
+          `[data-my-draft="${CSS.escape(key)}"]`,
+          flat.indexById.get(key),
+          true
+        ),
+    };
+  });
+
+  // Each mounted file header's toggle, where a file notice that
+  // replaces itself hands the keyboard.
+  const headers = useRef(new Map<string, HTMLButtonElement>());
+
+  // In Split the new side is where most comments go, so a file's tab
+  // stop is its first new-side line; Left and Right cross columns.
+  const split = options.view === 'split';
+  const firstPoint = (f: string) => {
+    const all = points.byFile.get(f);
+    return (split && all?.find((p) => p.side === 'RIGHT')) || all?.[0] || null;
+  };
+
+  const ctx: RowContext = {
+    linesByFile,
+    analyses,
+    stats: flat.stats,
+    wrap: options.wrap,
+    searchTerm,
+    searchTarget,
+    selectionTerm,
+    prId,
+    headSha,
+    focusThreadId,
+    generalThreads,
+    commentsLoading,
+    patchFile,
+    expand,
+    gutterFor: comments.scope.ref ? comments.gutterFor : null,
+    firstPoint,
+    commentOnFile: comments.scope.ref
+      ? (file) => comments.commentOn(file, null)
+      : null,
+    manifest,
+    prDiff,
+    headers: headers.current,
+    commentable: (p) => points.rowOf.has(pointKey(p)),
   };
 
   return (
-    <div
-      className="relative font-mono text-sm leading-5"
-      style={{ height: virtualizer.getTotalSize() }}
-    >
-      {virtualItems.map((vi) => (
-        <div
-          key={vi.key}
-          data-index={vi.index}
-          // Which primitive this row is, for tests and the benchmarks:
-          // "is the code coloured yet" has to be asked of code rows,
-          // and a class name shared with the sidebar cannot answer it.
-          data-row-kind={rows[vi.index].kind}
-          ref={virtualizer.measureElement}
-          className="absolute top-0 left-0 w-full"
-          style={{ transform: `translateY(${vi.start}px)` }}
-        >
-          {renderRow(rows[vi.index])}
-        </div>
-      ))}
-    </div>
+    <MyDraftsContext.Provider value={comments.scope}>
+      <DiffVisibleRows
+        rows={rows}
+        items={virtualItems}
+        linesByFile={linesByFile}
+        ctx={ctx}
+        height={virtualizer.getTotalSize()}
+        measureElement={virtualizer.measureElement}
+      />
+      <div role="status" aria-live="polite" className="sr-only">
+        {comments.announcement}
+      </div>
+    </MyDraftsContext.Provider>
   );
 }

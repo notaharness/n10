@@ -1,5 +1,6 @@
 import type { AppConfig, VcsProvider } from '@n10/vcs-core';
 import { AGENTS } from '../agents/registry.js';
+import { SHELL_CHOICES } from '../terminal/shell-choices.js';
 
 export interface SettingsField {
   label: string;
@@ -41,6 +42,11 @@ export const EDITOR_PRESETS: { name: string; value: string | null }[] = [
   { name: 'VS Code Insiders', value: 'code-insiders' },
   { name: 'Sublime Text', value: 'subl' },
   { name: 'Custom', value: null },
+];
+
+export const SHELL_PRESETS: { name: string; value: string | null }[] = [
+  { name: 'Auto (login shell)', value: 'auto' },
+  ...SHELL_CHOICES.map((shell) => ({ name: shell, value: shell })),
 ];
 
 export const SYNC_INTERVAL_PRESETS: { name: string; value: string | null }[] = [
@@ -95,6 +101,14 @@ export function buildSettingsFields(
       key: 'worktreePath',
       description:
         'Template for worktree placement ({session} = sanitized branch). Restart required.',
+      configBag: 'global',
+    },
+    {
+      label: 'Shell',
+      key: 'shell',
+      description:
+        'Shell a new terminal runs. Auto is the login shell ($SHELL) of the machine the terminal opens on, or sh.',
+      presets: SHELL_PRESETS,
       configBag: 'global',
     },
     {

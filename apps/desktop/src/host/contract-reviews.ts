@@ -33,6 +33,10 @@ export interface ReviewLaunchRequest {
   pr: PullRequestInfo;
   /** Extra user instruction appended to the review task prompt. */
   instruction?: string;
+  /** Ask the reviewer for a guided review too (`buildReviewLaunchRequest`'s
+   *  `guide`); false, its prompt says nothing of one. Required: the
+   *  launch dialog decides, never a default in the host. */
+  guide: boolean;
   cols?: number;
   rows?: number;
   /** A beam peerId to launch on, or omitted for local (decisions.md
@@ -44,31 +48,10 @@ export interface ReviewLaunchRequest {
   launchId?: string;
 }
 
-/**
- * Deliver a plan — the comments the user queued for this pull request,
- * already composed into one prompt — to the agent in its worktree.
- *
- * The prompt is composed in the renderer rather than here because the
- * plan pane shows the user the exact text before sending it, and
- * composing it twice is how the preview and the delivery drift apart.
- */
-export interface PlanCheckoutRequest {
-  pr: PullRequestInfo;
-  /** Output of `composePlanPrompt` — sent verbatim. */
-  prompt: string;
-  /**
-   * Only meaningful when an agent is already running on the branch:
-   * `inject` types the plan into the conversation it is already having,
-   * `new-session` restarts it seeded with the plan.
-   */
-  mode: 'inject' | 'new-session';
-  /** Initial PTY size for a spawn — the renderer knows the pane. */
-  cols?: number;
-  rows?: number;
-}
-
-/** What checkout did, so the renderer can say which one happened. */
-export type PlanCheckoutResult = 'injected' | 'spawned';
+export type {
+  PlanCheckoutRequest,
+  PlanCheckoutResult,
+} from '@n10/engine/contract';
 
 export interface PostDraftsRequest {
   prId: number;

@@ -17,7 +17,7 @@ import {
 } from '../setup/git-repo.js';
 import { killFixtureSessions } from '../setup/tmux.js';
 import { appEnv } from './app-env.js';
-import { prepareWindow } from './prepare-window.js';
+import { fakeAdoLoaded, fakeAdoMisses } from '../setup/fake-ado.js';
 import { closeDesktopApp } from '../setup/app-close.js';
 import type { TerminalSeed } from '../setup/terminals.js';
 import {
@@ -49,6 +49,13 @@ export interface DesktopOptions extends HomeSeed {
    * clone the shared sandbox repo once per file.
    */
   repoPathOverride?: string;
+  /** Give the window WebGL, in software (SwiftShader), so terminals
+   *  draw with xterm's WebGL renderer. Without it there is no GPU and
+   *  they use xterm's DOM renderer, whose rows are text to assert on. */
+  webgl?: boolean;
+  /** Create the test repo inside the app's HOME (`fixtureHome`), where
+   *  a path is home-relative, instead of a temp directory beside it. */
+  repoInHome?: boolean;
   /**
    * Hand the app a GitHub token. Its HOME is isolated, so the `gh` CLI
    * it authenticates through cannot see the developer's stored
@@ -95,9 +102,14 @@ export interface DesktopApp {
   pageErrors: string[];
   /** Evaluate in the main process (e.g. to inspect host services). */
   main: ElectronApplication['evaluate'];
-  /** Relaunch the real host with the same HOME and optional new repo path. */
-  restart(repoPath?: string): Promise<void>;
-  /** Stop and verify process exit before a test changes repository paths. */
+  /** Quit the app and start it again on the same HOME, tmux socket and
+   *  environment, as a user closing and reopening n10 would. `app`,
+   *  `page` and `main` then answer for the new process. `startPath`
+   *  opens another repository path, such as a relocated or symlinked
+   *  copy of the test repo. Fails if the old process did not exit. */
+  relaunch(startPath?: string): Promise<void>;
+  /** Quit the app and fail unless the process exited, for a test that
+   *  changes the repository while n10 is not running. */
   stop(): Promise<void>;
 }
 
@@ -120,9 +132,14 @@ export const test = base.extend<
   repo: [undefined, { option: true }],
   startWithoutRepo: [false, { option: true }],
   repoPathOverride: [undefined, { option: true }],
+  repoInHome: [false, { option: true }],
+  webgl: [false, { option: true }],
   githubToken: [undefined, { option: true }],
   drafts: [undefined, { option: true }],
+  guides: [undefined, { option: true }],
   fakeGitHub: [undefined, { option: true }],
+  fakeAzureDevOps: [undefined, { option: true }],
+  tmuxConf: [undefined, { option: true }],
   liveSessions: [undefined, { option: true }],
   env: [undefined, { option: true }],
   liveTerminals: [undefined, { option: true }],
@@ -135,9 +152,14 @@ export const test = base.extend<
       repo,
       startWithoutRepo,
       repoPathOverride,
+      repoInHome,
+      webgl,
       githubToken,
       drafts,
+      guides,
       fakeGitHub,
+      fakeAzureDevOps,
+      tmuxConf,
       liveSessions,
       env,
       liveTerminals,
@@ -149,29 +171,31 @@ export const test = base.extend<
     provide,
     testInfo
   ) => {
-    const ownsRepo = !repoPathOverride;
-    const repoPath = repoPathOverride ?? createTestRepo(repo ?? {});
+    // A repo in the fixture HOME goes with it.
+    const ownsRepo = !repoPathOverride && !repoInHome;
+    const repoPath =
+      repoPathOverride ??
+      createTestRepo({
+        ...repo,
+        ...(repoInHome ? { parent: fixtureHome } : {}),
+      });
     const homeDir = fixtureHome;
     const ghEnv = seedHome(homeDir, repoPath, {
       n10Config,
       projectConfig,
       desktopPrefs,
       drafts,
+      guides,
       fakeGitHub,
+      fakeAzureDevOps,
+      tmuxConf,
     });
 
     seedTmux(repoPath, homeDir, liveSessions, liveTerminals);
 
     const launch = (startPath: string) =>
       electron.launch({
-        args: [
-          APP_DIR,
-          // CI runners have no user namespaces for the sandbox, and
-          // software rendering is both available and deterministic.
-          '--no-sandbox',
-          '--disable-gpu',
-          '--ozone-platform=x11',
-        ],
+        args: launchArgs(webgl),
         cwd: WORKSPACE_ROOT,
         env: appEnv({
           homeDir,
@@ -183,18 +207,24 @@ export const test = base.extend<
         }),
         timeout: 60_000,
       });
+    let app = await launch(repoPath);
+
+    const page = await app.firstWindow();
+    if (fakeAzureDevOps) {
+      await requireFakeAdo(
+        app,
+        homeDir,
+        () => ownsRepo && cleanupTestRepo(repoPath)
+      );
+    }
 
     const pageErrors: string[] = [];
     const consoleErrors: string[] = [];
-    let app = await launch(repoPath);
-    let page = await prepareWindow(
-      app,
-      startWithoutRepo,
-      pageErrors,
-      consoleErrors
-    );
-    let stopped = false;
+    await readyWindow(app, page, startWithoutRepo, pageErrors, consoleErrors);
 
+    // Bounded, and never the reason a test fails: see setup/app-close.ts.
+    // A test that stopped the app itself leaves nothing for teardown.
+    let stopped = false;
     async function close() {
       if (stopped) return { exited: true, note: null };
       const result = await closeDesktopApp(app);
@@ -208,43 +238,42 @@ export const test = base.extend<
       }
       return result;
     }
-
     async function stop(): Promise<void> {
       const result = await close();
       if (!result.exited)
         throw new Error(result.note ?? 'Electron did not exit');
-      if (pageErrors.length)
-        throw new Error(`Renderer threw:\n${pageErrors.join('\n')}`);
     }
 
+    const desktop: DesktopApp = {
+      app,
+      page,
+      repoPath,
+      homeDir,
+      pageErrors,
+      main: app.evaluate.bind(app),
+      stop,
+      async relaunch(startPath = repoPath) {
+        await stop();
+        app = await launch(startPath);
+        stopped = false;
+        const next = await app.firstWindow();
+        await readyWindow(
+          app,
+          next,
+          startWithoutRepo,
+          pageErrors,
+          consoleErrors
+        );
+        Object.assign(desktop, {
+          app,
+          page: next,
+          main: app.evaluate.bind(app),
+        });
+      },
+    };
     let used = false;
     try {
-      await provide({
-        get app() {
-          return app;
-        },
-        get page() {
-          return page;
-        },
-        repoPath,
-        homeDir,
-        pageErrors,
-        get main() {
-          return app.evaluate.bind(app);
-        },
-        stop,
-        async restart(startPath = repoPath) {
-          await stop();
-          app = await launch(startPath);
-          stopped = false;
-          page = await prepareWindow(
-            app,
-            startWithoutRepo,
-            pageErrors,
-            consoleErrors
-          );
-        },
-      });
+      await provide(desktop);
       used = true;
     } finally {
       if (consoleErrors.length) {
@@ -253,22 +282,104 @@ export const test = base.extend<
           contentType: 'text/plain',
         });
       }
-      // Bounded, and never the reason a test fails: see setup/app-close.ts.
       await close();
       if (ownsRepo) cleanupTestRepo(repoPath);
     }
 
-    // An uncaught renderer exception blanks a pane behind the
-    // ErrorBoundary, which a passing assertion elsewhere would happily
-    // ignore. Surface it as a failure of the test that provoked it —
-    // but only when the test itself got that far, so a real assertion
+    // Only when the test itself got that far, so a real assertion
     // failure keeps priority.
-    if (used && pageErrors.length > 0) {
-      throw new Error(
-        `Renderer threw during the test:\n${pageErrors.join('\n---\n')}`
-      );
+    if (used) {
+      afterEffects(pageErrors, fakeAzureDevOps ? fakeAdoMisses(homeDir) : []);
     }
   },
 });
+
+/**
+ * Make a launched window ready for a test. Chromium throttles
+ * requestAnimationFrame in a window it considers hidden or occluded, and
+ * under xvfb (or behind another window on a developer's desktop) that is
+ * the normal state. Playwright's actionability check waits for two
+ * consecutive stable animation frames before it will click, so a
+ * throttled window makes every click hang until the timeout even though
+ * the page is perfectly idle. Show, focus and un-throttle before any
+ * test touches it, and collect what the renderer reports as errors.
+ */
+async function readyWindow(
+  app: ElectronApplication,
+  page: Page,
+  startWithoutRepo: boolean | undefined,
+  pageErrors: string[],
+  consoleErrors: string[]
+): Promise<void> {
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win) return;
+    win.webContents.setBackgroundThrottling(false);
+    win.show();
+    win.focus();
+  });
+  page.on('pageerror', (err) =>
+    pageErrors.push(err.stack || err.message || String(err))
+  );
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  await page.waitForLoadState('domcontentloaded');
+  if (startWithoutRepo) return;
+  // The workspace has rendered (not the repo picker, not a blank
+  // window) once the sidebar's actions exist.
+  await page
+    .getByRole('button', { name: 'New worktree', exact: true })
+    .first()
+    .waitFor({ state: 'visible', timeout: 30_000 });
+}
+
+/** Electron's arguments. */
+function launchArgs(webgl?: boolean): string[] {
+  return [
+    APP_DIR,
+    // CI runners have no user namespaces for the sandbox, and
+    // software rendering is both available and deterministic.
+    '--no-sandbox',
+    '--disable-gpu',
+    '--ozone-platform=x11',
+    // WebGL with no GPU, which Chromium allows only when asked.
+    ...(webgl ? ['--enable-unsafe-swiftshader'] : []),
+  ];
+}
+
+/** Stop unless the Azure DevOps fake is in the session host. The
+ *  preload writes the token, so without it the app has no credentials
+ *  and has asked Azure nothing; it is stopped all the same. */
+async function requireFakeAdo(
+  app: ElectronApplication,
+  homeDir: string,
+  cleanup: () => void
+): Promise<void> {
+  if (fakeAdoLoaded(homeDir)) return;
+  await closeDesktopApp(app);
+  cleanup();
+  throw new Error('The Azure DevOps fake did not load');
+}
+
+/** What a test that passed must not have left behind. An uncaught
+ *  renderer exception blanks a pane behind the ErrorBoundary, which a
+ *  passing assertion elsewhere would happily ignore; a request the
+ *  Azure DevOps fake does not model was answered 404, a failure the
+ *  test did not ask for. */
+function afterEffects(pageErrors: string[], misses: string[]): void {
+  if (pageErrors.length > 0) {
+    throw new Error(
+      `Renderer threw during the test:\n${pageErrors.join('\n---\n')}`
+    );
+  }
+  if (misses.length > 0) {
+    throw new Error(
+      `The app made requests the Azure DevOps fake does not model:\n${misses.join(
+        '\n'
+      )}`
+    );
+  }
+}
 
 export { expect };

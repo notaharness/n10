@@ -15,9 +15,10 @@ export const BEAM_TEST_BINARY = process.env.BEAM_TEST_BINARY;
 /** beam's own grace for a daemon that was asked to stop. */
 const STOP_GRACE_MS = 12_000;
 const START_TIMEOUT_MS = 20_000;
+const TAIL_LINES = 200;
 
 /** A child started with `--exit-with-parent`, and its stderr tail for a
- *  failure message. `stop` closes its stdin and sends SIGTERM, either of
+ *  failure message or a failed test's attachment. `stop` closes its stdin and sends SIGTERM, either of
  *  which stops it, then kills it after beam's grace. */
 class Held {
   private tail: string[] = [];
@@ -33,7 +34,7 @@ class Held {
     });
     child.stderr?.setEncoding('utf8');
     child.stderr?.on('data', (chunk: string) => {
-      this.tail = [...this.tail, ...chunk.split('\n')].slice(-20);
+      this.tail = [...this.tail, ...chunk.split('\n')].slice(-TAIL_LINES);
     });
   }
 
@@ -56,8 +57,25 @@ class Held {
     }): ${this.tail.join('\n')}`;
   }
 
+  /** Whether it still runs, and what it last wrote to stderr. */
+  log(): string {
+    return this.exited
+      ? this.describe()
+      : `${this.name} running:\n${this.tail.join('\n')}`;
+  }
+
+  /** Stops it answering anything, without a word to its peers. */
+  freeze(): void {
+    if (!this.exited) this.child.kill('SIGSTOP');
+  }
+
+  thaw(): void {
+    if (!this.exited) this.child.kill('SIGCONT');
+  }
+
   async stop(): Promise<void> {
     if (this.exited) return;
+    this.thaw();
     this.child.stdin?.end();
     this.child.kill('SIGTERM');
     const timer = setTimeout(() => this.child.kill('SIGKILL'), STOP_GRACE_MS);
@@ -66,7 +84,10 @@ class Held {
   }
 }
 
+/** Nothing of the developer's terminal either: a daemon a service
+ *  manager starts, like CI's, has no `TERM`. */
 const SCRUBBED = new Set([
+  'TERM',
   'TMUX',
   'TMUX_PANE',
   'BEAM_CONFIG_DIR',
@@ -88,6 +109,9 @@ function beamEnv(
     HOME: home,
     XDG_CONFIG_HOME: join(home, '.config'),
     TS_DEBUG_ALWAYS_USE_DERP: 'true',
+    // A terminal on this machine runs its `$SHELL`; pin one, not the
+    // developer's (zsh's first-run wizard eats typed input in a bare HOME).
+    SHELL: '/bin/bash',
     ...extra,
     TMUX_TMPDIR: home,
   };
@@ -164,6 +188,12 @@ export interface BeamMachine {
   cli(args: string[]): Promise<CliResult>;
   /** This machine's peerId, from `beam status --json`. */
   peerId(): Promise<string>;
+  /** The daemon's state and stderr tail, for a failed test. */
+  log(): string;
+  /** The daemon stops answering, as a machine that hangs or loses its
+   *  network does, and tells no peer; `thaw` brings it back. */
+  freeze(): void;
+  thaw(): void;
   stop(): Promise<void>;
 }
 
@@ -236,6 +266,9 @@ export async function startMachine(
       if (code !== 0) throw new Error(`beam status: ${stderr}`);
       return (JSON.parse(stdout) as { peerId: string }).peerId;
     },
+    log: () => held.log(),
+    freeze: () => held.freeze(),
+    thaw: () => held.thaw(),
     stop: () => held.stop(),
   };
 }

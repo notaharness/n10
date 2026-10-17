@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { UpdatesPanel } from './UpdatesPanel.js';
+import { useMemo, useState } from 'react';
 import { Text, Box, useInput } from 'ink';
 import {
   useConfig,
@@ -40,6 +41,7 @@ export function SettingsPanel({
   editingField: string | null;
   editBuffer: string;
 }) {
+  const [updatesOpen, setUpdatesOpen] = useState(false);
   const configCtx = useConfig();
   const { config, provider } = configCtx;
   const fields = useMemo(() => buildSettingsFields(provider), [provider]);
@@ -61,6 +63,10 @@ export function SettingsPanel({
 
   useInput(
     (input, key) => {
+      if (input === 'u' && !editingField) {
+        setUpdatesOpen(true);
+        return;
+      }
       handleSettingsInput(input, key, {
         settings,
         config: configCtx,
@@ -68,8 +74,13 @@ export function SettingsPanel({
         keybinds,
       });
     },
-    { isActive: settings.settingsOpen && !settings.controlsOpen }
+    {
+      isActive: settings.settingsOpen && !settings.controlsOpen && !updatesOpen,
+    }
   );
+
+  if (updatesOpen)
+    return <UpdatesPanel onClose={() => setUpdatesOpen(false)} />;
 
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={1}>
@@ -78,6 +89,10 @@ export function SettingsPanel({
         {provider ? <Text dimColor> ({provider.displayName})</Text> : null}
       </Text>
       <Text dimColor>{'─'.repeat(40)}</Text>
+      <Text>
+        <Text color="cyan">u</Text> Updates — version, release channel and
+        update command
+      </Text>
       {fields.map((field, i) => {
         const selected = i === fieldIndex;
         const isEditing = editingField === field.key;

@@ -51,8 +51,7 @@ export function SnippetView({
   if (rows.length === 0) {
     return (
       <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-        This comment's lines aren't in the current diff (outdated or outside the
-        changed hunks).
+        This comment's lines aren't in the current diff.
       </div>
     );
   }

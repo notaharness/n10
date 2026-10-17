@@ -54,7 +54,7 @@ for (const pathKind of paths) {
     let observed = false;
     try {
       pathKind.prepare(repoPath, nextPath);
-      await desktop.restart(nextPath);
+      await desktop.relaunch(nextPath);
       await expect(sidebarRow(desktop.page, /path-agent/)).toBeVisible();
       await sidebarRow(desktop.page, /path-agent/).click();
       expect(listTaggedSessions(homeDir)).toEqual(before);

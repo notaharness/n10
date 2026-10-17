@@ -33,6 +33,48 @@ PORT=5187 npx nx e2e cli-e2e -- worktree-transitions worktree-session-transition
 The `desktop-e2e` targets build Electron before testing. Directly invoking
 `run-e2e.mjs` or `run-visual.mjs` does not; run `npx nx build desktop` first.
 
+To check the Linux installers, build them on an x64 or arm64 Linux host, then
+run the Docker smoke script with that architecture's .deb and AppImage. The
+script apt-installs the .deb in clean Ubuntu 24.04, launches the deb and the
+AppImage in extraction and normal modes under Xvfb, and requires the startup
+repository, renderer, and a shell PTY through the packaged session host.
+Normal AppImage launch uses a mapped `/dev/fuse` and Ubuntu's `fuse3`; extraction
+mode also exercises the fallback for machines without FUSE. The script gives
+tmux a scratch socket under a container HOME and never touches the host's tmux
+server. It also checks the missing-tmux startup message.
+
+```sh
+NX_DAEMON=false npx nx package-linux desktop
+bash apps/desktop/scripts/test-linux-packages.sh \
+  apps/desktop/dist/installers/*amd64.deb \
+  apps/desktop/dist/installers/*x86_64.AppImage
+```
+
+On arm64, use `*arm64.deb` and `*arm64.AppImage` instead. Pass exactly one file
+of each format; clear stale installer output if a glob matches more than one.
+
+To check a macOS installer on a Mac of the same architecture, build it with Nx
+and run the DMG smoke script. It mounts the DMG, copies the app into an
+isolated Applications directory, checks its ad-hoc or Developer ID signature,
+then opens a Git repository, loads the renderer, starts a shell PTY through
+the packaged host, captures the installed app, and quits. Git and tmux 3.2+
+must be available; the GitHub runners install tmux with Homebrew. The tmux
+socket lives under the test's temporary HOME. The script captures 1600×900
+light and dark PNGs beside the requested screenshot path, with `-light` and
+`-dark` suffixes.
+
+```sh
+NX_DAEMON=false npx nx package-macos desktop
+arch=$(uname -m)
+if [ "$arch" = x86_64 ]; then arch=x64; fi
+bash apps/desktop/scripts/test-macos-package.sh \
+  "apps/desktop/dist/installers/n10-desktop-$arch.dmg" \
+  /tmp/n10-installed.png
+```
+
+CI runs this on `macos-14` (arm64) and `macos-15-intel` (x64), uploading the
+screenshots as artifacts.
+
 `src/fixtures/desktop.ts` creates a repo and isolated HOME, seeds optional Git
 states, supplies a scriptable fake agent and fails on renderer exceptions.
 Every test uses a private tmux socket inside its fixture HOME and kills only
@@ -47,11 +89,14 @@ runs a passkey step. A test without it gets the real `beam daemon` from
 `@notaharness/beam`, started by the app in the fixture HOME, unenrolled, and
 stopped when the app quits.
 
-`@beam` tests (`src/beam-fleet.test.ts`) run the app against real beam
+`@beam` tests (`src/beam-*.test.ts`) run the app against real beam
 daemons: `beam testkit` serves beam's dev DERP and fake directory worker on
 loopback, a daemon in the fixture HOME is the one the app finds, a second
-daemon with its own HOME is another machine, and beam's test authenticator
-answers every ceremony (`src/setup/beam-testkit.ts`). These need a `beamtest`
+daemon with its own HOME (`workboxHome`, inside the fixture HOME) is another
+machine, and beam's test authenticator answers every ceremony
+(`src/setup/beam-testkit.ts`, `src/setup/beam-fleet.ts`). `repoInHome` puts
+the test repo in the fixture HOME, so a remote launch looks for its clone at
+the same place under the other machine's HOME. These need a `beamtest`
 build, so a plain run leaves them out. `run-beam-e2e.mjs` downloads the
 `beamtest-<os>-<arch>` asset of the beam release matching the installed
 `@notaharness/beam`, checks it against the checksums pinned in the script
@@ -67,7 +112,15 @@ BEAM_TEST_BINARY=$HOME/beam/beamtest npx nx e2e:beam desktop-e2e
 `src/setup/fake-gh.ts` supplies offline PRs, threads, comments and checks through
 a fake executable on PATH. Set a PR's `headRefName` to a real fixture branch for
 a real diff. Seeded worktree branches must be slash-free because the fixture and
-app construct paths differently. Provider project fields belong in `vendorProject`
+app construct paths differently.
+
+`src/setup/fake-ado.ts` (the `fakeAzureDevOps` option) does the same for Azure
+DevOps. The fixture loads `fixtures/fake-ado.cjs` into the session host, which
+makes the provider's requests, through `N10_HOST_REQUIRE`, and it answers every request to an Azure host from the scenario,
+written out as the REST API's own JSON, so nothing reaches Azure. The preload
+writes the token itself, so an app it is not in has none and asks Azure nothing;
+the fixture then stops. It marks that it loaded with `fake-ado.json.loaded`. A request it does not model answers 404 and fails the test
+at teardown. Seed no Azure DevOps token of your own alongside it. Provider project fields belong in `vendorProject`
 or auto-detection replaces them.
 
 Tests run under Xvfb on Linux, even with DISPLAY set. The fixture drops
@@ -110,6 +163,18 @@ Both suites' tmux helpers must assert that their socket directory belongs to a
 fixture HOME and unset TMUX before any operation. All terminal tests require
 tmux 3.2 or newer. Never kill the default server or use `kill-server`.
 See `libs/terminal-tmux/AGENTS.md`.
+
+CI runs every tmux suite against tmux 3.7 or later. Earlier versions can
+lose what a fast-exiting pane last wrote, and its exit status. The pane
+reads as dead, but the output never reaches the pane and
+`pane_dead_status` never appears. On tmux 3.4, a pane running `exit 17`
+loses its status in 6 of 60 runs on an idle machine and 19 of 60 under
+load; 3.7 kept it every time. The tests assert both, so locally they can
+fail on an older tmux. The version is pinned in `tools/tmux/build-tmux.sh`,
+which `.github/actions/setup-tmux` builds and caches for the runner jobs and
+`apps/desktop-e2e/Dockerfile.visual` builds into the visual image.
+`tools/tmux/require-tmux.sh` fails the job on anything older. The product
+itself still requires only 3.2.
 
 Failures retain traces, screenshots and video in `test-output/`.
 `error-context.md` is useful for text inspection. Open a trace with
@@ -207,6 +272,10 @@ GH_TOKEN=<integration-pat> gh api \
 
 - **CI** (`.github/workflows/ci.yml`) — runs `nx affected -t lint test build typecheck e2e`. Runs `npx playwright install --with-deps chromium` before `nx affected` (needed for `cli-e2e`). Uploads `apps/cli-e2e/test-output/` as an artifact on failure. Integration tests skipped (no `GH_TOKEN`).
 - **Integration Tests** (`.github/workflows/integration.yml`) — runs `npx nx e2e:integration cli-e2e` with `GH_TOKEN` from the `INTEGRATION_TEST_PAT` secret. Triggers on PRs, pushes to master, and manual dispatch. Uses `concurrency` with `cancel-in-progress: false` because the test repo is shared state.
+- **Package** (`.github/workflows/package.yml`) — packs `@notaharness/n10` and runs `apps/cli/scripts/test-installed.sh` on the tarball in a clean container. Triggers on PRs touching packaging; the Release workflow calls it before publishing.
+- **Linux packages** (`.github/workflows/linux-packages.yml`) — builds the desktop's .deb and AppImage on x64 and arm64 runners, installs the deb in clean Ubuntu and launches both formats under Xvfb. The AppImage runs in extraction mode and normally with FUSE 3. Triggers on PRs touching the installer configuration; the Release workflow calls it.
+- **macOS packages** (`.github/workflows/macos-packages.yml`) — builds DMG and ZIP assets on Apple Silicon and Intel runners, installs each DMG, and checks the renderer and a shell PTY. Triggers on PRs touching the macOS installer; the Release workflow calls it.
+- **Release** (`.github/workflows/release.yml`) — publishes on a `v*` tag; see the `publish-beta` skill.
 
 ## Orchestra interoperability
 
@@ -219,6 +288,125 @@ and failed report delivery. It does not exercise a model or CLI plugin manager.
 
 The archive, provenance, checksum and update instructions live in
 `libs/core/tests/fixtures/README.md`. Tests require no network or agent login;
-tmux is installed in CI, and the live suites skip locally when it is absent.
+tmux 3.7 is installed in CI (see above), and the live suites skip locally when it is absent.
 `terminal-allocation.integration.spec.ts` exercises names becoming occupied or
 free between a tab's preliminary name probe and the backend's allocation.
+
+## Codex CLI
+
+Codex support is verified offline against the interactive command contract from
+`codex-cli 0.154.0` (`codex --help`, `codex resume --help`, `codex exec --help`
+and `codex queue --help`). The agent registry launches `codex`, seeds with
+`codex -- PROMPT`, and continues with `codex resume --last [-- PROMPT]` in the
+worktree directory. It does not use `exec`, `--all`, global continuation or
+approval/sandbox bypass flags. The separator keeps option-like prompts and
+subcommand names such as `review` literal. Codex receives review guidance in
+its user prompt because it has no Claude-style `--append-system-prompt` flag.
+
+The CLI's [resume parser](https://github.com/openai/codex/blob/main/codex-rs/cli/src/main.rs)
+accepts a single positional prompt with `--last`; selection is cwd-filtered.
+Continuation uses the retained session's recorded agent. With several Codex
+conversations in one checkout, `--last` selects the most recent eligible one;
+n10 does not store a Codex thread ID.
+
+`apps/cli-e2e/src/codex.test.ts` and
+`apps/desktop-e2e/src/codex.test.ts` install a fake `codex` on the fixture PATH,
+record argv/cwd, resume only in a cwd with a prior launch, and produce changing
+ANSI output before becoming quiet. They exercise both shells' launch/resume
+flows and busy/idle indicators, plus Desktop standalone agent terminals.
+`launch-dialog.test.ts` verifies the selected Codex review agent receives its
+instructions and review guidance intact. Both shells use the shared
+`libs/core/tests/fixtures/fake-vendor-cli.mjs` through their `setup/fake-cli.ts`
+helpers. Every fake runs in an isolated HOME and tmux socket; no real Codex session or account is used.
+
+Activity is inferred from terminal output, not Codex model/tool events. Quiet
+network or tool work can appear idle. These tests verify n10's integration,
+not model responses, authentication, or exact Codex screen rendering.
+
+Reporting uses Orchestra's `codex queue --thread ID --message TEXT` adapter;
+`orchestra.integration.spec.ts` runs the pinned Orchestra 1.6.0 report scripts
+with a fake queue and checks success, failure and retained reporting metadata.
+n10 reads `@orchestra-last-report` only in Orchestra's `KIND TIMESTAMP OUTCOME`
+form; unit tests cover each outcome, including `delivered` for a direct `codex:`
+target and `queue` for a tmux-hosted Codex TUI. Claude's inbox is a separate
+transport. Desktop's inbound relay deliberately refuses `codex:` targets
+(covered by `relay-target.spec.ts`); it does not silently route them to a
+guessed session. Local n10-managed agent panes can receive messages through
+their `tmux:` target.
+
+Run the offline checks (choose an unused `PORT` when other worktrees are running
+the TUI browser bridge):
+
+```sh
+npx nx test core
+PORT=5198 npx nx e2e cli-e2e -- codex.test.ts
+npx nx e2e desktop-e2e -- codex.test.ts launch-dialog.test.ts
+```
+
+## Gemini CLI
+
+Verified offline against the official [CLI reference](https://geminicli.com/docs/cli/cli-reference/)
+and v0.61.0 [argument parser](https://github.com/google-gemini/gemini-cli/blob/v0.61.0/packages/cli/src/config/config.ts)
+and [session entry point](https://github.com/google-gemini/gemini-cli/blob/v0.61.0/packages/cli/src/gemini.tsx).
+No real Gemini binary, authentication or model session is exercised by the tests.
+
+`agentId: "gemini"` selects the agent. Blank launches use `gemini`; seeds use
+one `--prompt-interactive=PROMPT` argument so yargs does not treat option-like
+text as flags. Review guidance is folded into the prompt. Headless `-p` is not
+used.
+
+Automatic resume is refused: native `--resume latest` can create a fresh
+conversation when project history is missing, and n10 does not record Gemini
+conversation IDs. Both shells offer an explicit fresh start in the retained pane;
+a surviving process can still be attached without launching another one.
+
+Both e2e shells use `libs/core/tests/fixtures/fake-vendor-cli.mjs` through their
+`setup/fake-cli.ts` helpers. The fake accepts blank/attached-prompt launches and
+rejects resume. Tests cover launch, refusal, fresh starts, report-tag clearing,
+selected-agent review prompts and busy/idle transitions in isolated fixture HOME
+and tmux sockets. Activity measures changing terminal output, not internal model
+turns. Local managed panes use `tmux:` message targets; no Gemini-specific inbox
+or queue adapter is used.
+
+Choose an unused `PORT` when another worktree runs the TUI browser bridge:
+
+```sh
+npx nx test core
+PORT=5198 npx nx e2e cli-e2e -- gemini.test.ts
+npx nx e2e desktop-e2e -- gemini.test.ts gemini-review.test.ts
+```
+
+## Copilot CLI
+
+The command surface was checked against Copilot CLI 1.0.87 (`--version`,
+`--help`, `sessions --help`, `help commands`) and the official
+[command reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference).
+No authenticated conversation, model request or real session restoration is
+exercised by the tests. Help-only probes do not establish live prompt parsing.
+
+`agentId: "copilot"` selects the standalone CLI. Blank launches use `copilot`;
+seeded/review launches use the documented `--interactive=PROMPT` form with
+guidance folded into the prompt. The short `-i PROMPT` form is valid too. Tests
+verify n10's argv and prompt delivery contract, not a defect in Copilot's
+short-option parser.
+
+Automatic continuation stays disabled: documented `--continue` prefers the
+current directory but can fall back to global history. n10 does not record a
+conversation ID. Both shells cover refusal and explicit fresh starts; surviving
+processes can be attached without launching another one.
+
+Both e2e shells install `libs/core/tests/fixtures/fake-vendor-cli.mjs` through
+`setup/fake-cli.ts`. The fake accepts blank/attached-prompt launches and rejects
+`--continue`; it does not model upstream history. Coverage includes TUI/Desktop
+launch, refusal, fresh starts, report-tag clearing, selected-agent review prompts
+and busy/idle transitions. Activity measures changing terminal output, not
+internal model turns. Local managed panes use `tmux:` message targets; Copilot
+has no separate n10 inbox/queue adapter.
+
+Choose an unused `PORT` when another worktree runs the TUI browser bridge:
+
+```sh
+npx nx test core
+PORT=5198 npx nx e2e cli-e2e -- copilot.test.ts
+npx nx e2e desktop-e2e -- copilot.test.ts copilot-review.test.ts
+```

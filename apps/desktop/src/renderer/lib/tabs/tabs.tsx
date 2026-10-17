@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useReducer,
   type ReactNode,
@@ -11,10 +12,12 @@ import {
   reduce,
   type ForeignSessionEntry,
   type ItemEntry,
+  type Tab,
   type TabsState,
   type TerminalEntry,
 } from './tabs-model.js';
 import { useRepo } from '../repo-context.js';
+import { tabOpening } from './tab-identity.js';
 
 export type {
   ForeignSessionEntry,
@@ -56,11 +59,10 @@ interface TabsApi extends TabsState {
   activate: (id: string) => void;
   /** `repo` is the one in view: focus never leaves it on a close. */
   close: (id: string, repo?: string) => void;
-  closeOthers: (id: string) => void;
+  /** `keep`: tabs spared besides `id` (an orchestrator's players). */
+  closeOthers: (id: string, keep?: readonly string[]) => void;
   closeAll: () => void;
   closeActive: () => void;
-  /** Activate the next (+1) / previous (-1) tab, wrapping around. */
-  cycle: (delta: 1 | -1) => void;
   /** Drag-reorder: place `id` before/after `targetId`. */
   moveTab: (id: string, targetId: string, side: 'before' | 'after') => void;
   /**
@@ -100,6 +102,23 @@ const TabsContext = createContext<TabsApi | null>(null);
 export function TabsProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reduce, EMPTY_TABS);
 
+  // A removed worktree takes its tabs with it, whoever removed it: n10,
+  // `git worktree remove` or `rm -rf`. Heard here, above the repo gate,
+  // because the strip spans repositories and the workspace remounts per
+  // repository — a scan landing mid-switch would find no listener there.
+  useEffect(
+    () =>
+      window.n10.onDiscoveryChanged(({ repo, removedWorktrees }) => {
+        if (removedWorktrees.length === 0) return;
+        dispatch({
+          type: 'worktrees-removed',
+          repo,
+          worktrees: removedWorktrees,
+        });
+      }),
+    []
+  );
+
   const openItem = useCallback(
     (repo: string, itemKey: string, opts?: { preview?: boolean }) =>
       dispatch({
@@ -124,23 +143,14 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     []
   );
   const closeOthers = useCallback(
-    (id: string) => dispatch({ type: 'close-others', id }),
+    (id: string, keep?: readonly string[]) =>
+      dispatch({ type: 'close-others', id, keep }),
     []
   );
   const closeAll = useCallback(() => dispatch({ type: 'close-all' }), []);
   const closeActive = useCallback(() => {
     if (state.activeId) dispatch({ type: 'close', id: state.activeId });
   }, [state.activeId]);
-  const cycle = useCallback(
-    (delta: 1 | -1) => {
-      const { tabs, activeId } = state;
-      if (tabs.length < 2) return;
-      const idx = tabs.findIndex((t) => t.id === activeId);
-      const next = tabs[(idx + delta + tabs.length) % tabs.length];
-      dispatch({ type: 'activate', id: next.id });
-    },
-    [state]
-  );
   const moveTab = useCallback(
     (id: string, targetId: string, side: 'before' | 'after') =>
       dispatch({ type: 'move', id, targetId, side }),
@@ -184,7 +194,6 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       closeOthers,
       closeAll,
       closeActive,
-      cycle,
       moveTab,
       syncItems,
       repoOpened,
@@ -202,7 +211,6 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       closeOthers,
       closeAll,
       closeActive,
-      cycle,
       moveTab,
       syncItems,
       repoOpened,
@@ -232,6 +240,7 @@ export function useRepoTabs(): RepoTabsApi {
       ...tabs,
       openItem: (itemKey: string, opts?: { preview?: boolean }) =>
         tabs.openItem(cwd, itemKey, opts),
+      tabOpening: (itemKey: string) => tabOpening(tabs.tabs, cwd, itemKey),
       syncItems: (
         entries: ItemEntry[],
         terminals: TerminalEntry[] | undefined,
@@ -247,6 +256,8 @@ export function useRepoTabs(): RepoTabsApi {
 export interface RepoTabsApi
   extends Omit<TabsApi, 'openItem' | 'syncItems' | 'terminalEnded'> {
   openItem: (itemKey: string, opts?: { preview?: boolean }) => void;
+  /** The tab a single click on `itemKey` would show. */
+  tabOpening: (itemKey: string) => Tab;
   syncItems: (
     entries: ItemEntry[],
     terminals: TerminalEntry[] | undefined,

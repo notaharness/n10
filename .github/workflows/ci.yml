@@ -34,9 +34,12 @@ jobs:
 
       # xvfb: desktop-e2e drives the real Electron app, which has no
       # headless mode of its own and needs an X server on the runner.
-      # tmux is required by both application e2e suites.
-      - name: Install xvfb and tmux
-        run: sudo apt-get update && sudo apt-get install -y xvfb tmux
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      # tmux is required by the tmux, core and both application e2e
+      # suites, which run against 3.7 (docs/testing.md).
+      - uses: ./.github/actions/setup-tmux
 
       - uses: nrwl/nx-set-shas@v4
 
@@ -65,3 +68,17 @@ jobs:
             apps/desktop-e2e/test-output
           if-no-files-found: ignore
           retention-days: 7
+
+  # The flake builds from package-lock.json's resolved URLs and integrity
+  # hashes alone, so this also fails when a locked package lacks either.
+  # nixpkgs' packages come from cache.nixos.org.
+  nix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v31
+
+      - run: nix build -L
+
+      - run: ./result/bin/n10 --version

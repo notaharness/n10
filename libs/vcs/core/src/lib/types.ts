@@ -1,3 +1,15 @@
+import type { MentionCandidate } from './mentions.js';
+import type {
+  LedgerStore,
+  PublishedReview,
+  ReviewEvent,
+  ReviewSubmission,
+} from './review-publication.js';
+import type { PullRequestChecks } from './pr-checks.js';
+import type { PullRequestConversation } from './pr-conversation.js';
+import type { PullRequestDetail, RepositoryRef } from './pr-details.js';
+import type { PullRequestRevisions } from './pr-revisions.js';
+
 export type ReviewDecision =
   | 'approved'
   | 'changes-requested'
@@ -15,22 +27,83 @@ export function isBlockingDecision(d: ReviewDecision): boolean {
     d === 'changes-requested' || d === 'waiting-for-author' || d === 'rejected'
   );
 }
-export type BuildStatusState = 'succeeded' | 'failed' | 'pending' | 'none';
 
-/** The current user's review verdict on a PR, in ADO's vocabulary
- *  (votes 10 / 5 / −5 / −10). GitHub has a smaller one: both approve
- *  variants submit an approving review, and both wait-for-author and
- *  reject submit a changes-requested review. */
-export type ReviewVerdict =
-  | 'approve'
-  | 'approve-with-suggestions'
-  | 'wait-for-author'
-  | 'reject';
+/** The blocking decisions, most severe first: Azure's −10, its −5,
+ *  then GitHub's changes requested. */
+export const HOLDING_DECISIONS = [
+  'rejected',
+  'waiting-for-author',
+  'changes-requested',
+] as const satisfies readonly ReviewDecision[];
+
+/** The most severe verdict holding a pull request back, with everyone
+ *  who gave it; null where none does. Every frontend words the same
+ *  verdict. */
+export function holdingVerdict<R extends { decision: ReviewDecision }>(
+  reviewers: readonly R[]
+): { decision: (typeof HOLDING_DECISIONS)[number]; by: R[] } | null {
+  for (const decision of HOLDING_DECISIONS) {
+    const by = reviewers.filter((r) => r.decision === decision);
+    if (by.length > 0) return { decision, by };
+  }
+  return null;
+}
+export type BuildStatusState = 'succeeded' | 'failed' | 'pending' | 'none';
 
 export interface PullRequestReviewer {
   displayName: string;
   identifier: string;
   decision: ReviewDecision;
+  /** The provider holds an open request for their review — asked again
+   *  after a verdict, where `decision` still holds that verdict. Absent
+   *  where the list does not say. */
+  requested?: boolean;
+  /** This reviewer is the signed-in account, as the provider identifies
+   *  both. Absent where the list does not say; the caller's own match
+   *  answers then (`viewerEntry`). */
+  isViewer?: boolean;
+  /** A group reviewer the signed-in user belongs to. Asking the group
+   *  asks the user, but its `decision` is whoever voted for the group,
+   *  never the user's own. */
+  includesViewer?: boolean;
+  /** The `identifier`s of the groups this reviewer's vote was cast for.
+   *  Such a group's row carries this same vote. */
+  votedFor?: string[];
+}
+
+/** The reviewers a tally counts: one row per vote. A group answered by
+ *  a member who is listed too carries that member's vote, so only the
+ *  member is counted; any other group counts as its own reviewer. */
+export function reviewersToCount<
+  R extends Pick<PullRequestReviewer, 'identifier' | 'votedFor'>
+>(reviewers: readonly R[]): R[] {
+  const answered = new Set(reviewers.flatMap((r) => r.votedFor ?? []));
+  return reviewers.filter((r) => !answered.has(r.identifier));
+}
+
+/** The provider holds a request for this reviewer's verdict. Where the
+ *  list says (GitHub's review requests, including one asked again after
+ *  a verdict), that is the answer; a comment is not a request. Where it
+ *  does not (Azure DevOps keeps no request apart from its list), a
+ *  listed reviewer who has neither voted nor declined is asked. */
+export function asksForReview(reviewer: PullRequestReviewer): boolean {
+  if (reviewer.decision === 'declined') return false;
+  return reviewer.requested ?? reviewer.decision === 'no-response';
+}
+
+/** The entry that speaks for the viewer: their own, or else a group
+ *  they belong to that is still asked. A group that has voted was
+ *  answered by another member, so its vote is never the viewer's. Their
+ *  own is the one the provider marks `isViewer`; `isViewer` here
+ *  decides only the rows it leaves unmarked. */
+export function viewerEntry(
+  reviewers: readonly PullRequestReviewer[],
+  isViewer: (reviewer: PullRequestReviewer) => boolean
+): PullRequestReviewer | undefined {
+  return (
+    reviewers.find((r) => r.isViewer ?? isViewer(r)) ??
+    reviewers.find((r) => r.includesViewer && asksForReview(r))
+  );
 }
 
 export interface PullRequestInfo {
@@ -41,6 +114,10 @@ export interface PullRequestInfo {
   url: string;
   createdByIdentifier: string;
   createdByDisplayName: string;
+  /** The signed-in account wrote it, as the provider identifies both.
+   *  Absent where the list does not say; `matchesUser` on
+   *  `createdByIdentifier` answers then. */
+  viewerIsAuthor?: boolean;
   isDraft?: boolean;
   reviewers?: PullRequestReviewer[];
   activeCommentCount?: number;
@@ -125,6 +202,14 @@ export interface VcsProvider {
   /** Web URL for a specific PR */
   getPullRequestUrl(project: Record<string, string>, prId: number): string;
 
+  /**
+   * The repository this project config addresses, as a pull request
+   * ref's repository half — or null while the config is incomplete.
+   * What a cached answer, a draft or a write is checked against before
+   * it is trusted to belong to the repository that is open.
+   */
+  repositoryRef?(project: Record<string, string>): RepositoryRef | null;
+
   /** Return branch names (from the provided list) whose PRs have been merged */
   fetchMergedBranches?(
     auth: Record<string, string>,
@@ -138,6 +223,30 @@ export interface VcsProvider {
     project: Record<string, string>,
     prId: number
   ): Promise<PullRequestComments>;
+
+  /**
+   * Everything said and done on a pull request — threads with every
+   * reply, conversation comments, submitted reviews and events — read
+   * to the end of every page. Read on demand for the selected pull
+   * request, never per sidebar row.
+   */
+  fetchPullRequestConversation?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestConversation>;
+
+  /**
+   * People a comment on this repository can mention for `query`, as the
+   * provider's own search answers it; how much of a name it matches is
+   * the provider's. Each carries the token the provider stores for the
+   * mention, which is what a composer inserts.
+   */
+  searchMentionCandidates?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    query: string
+  ): Promise<MentionCandidate[]>;
 
   /** Reply to an existing comment thread. The thread is passed (not just
    *  the id) so providers can dispatch on `replyKind` — GitHub review
@@ -170,13 +279,46 @@ export interface VcsProvider {
     prId: number
   ): Promise<string>;
 
-  /** Cast the current user's review verdict on a PR. */
-  submitReviewVerdict?(
+  /** The selected pull request in full: lifecycle, source and target
+   *  commits, fork identity. Read on demand for one pull request, never
+   *  per sidebar row. */
+  fetchPullRequestDetail?(
     auth: Record<string, string>,
     project: Record<string, string>,
-    prId: number,
-    verdict: ReviewVerdict
-  ): Promise<void>;
+    prId: number
+  ): Promise<PullRequestDetail>;
+
+  /** The pull request's heads over time and the viewer's latest
+   *  submitted review, read on demand for one pull request. */
+  fetchPullRequestRevisions?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestRevisions>;
+
+  /** The verdicts `publishReview` files, in the provider's order;
+   *  present with it. */
+  reviewEvents?: readonly ReviewEvent[];
+  /**
+   * File the reviewer's drafts as one native review (see
+   * review-publication.ts). Progress goes to `ledger` step by step, so
+   * an attempt that stops part-way is resumed, never repeated.
+   */
+  publishReview?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    submission: ReviewSubmission,
+    ledger: LedgerStore
+  ): Promise<PublishedReview>;
+  /** What stands between one pull request and completion, read on
+   *  demand: its head's checks, the target's rules, and the provider's
+   *  reading of mergeability and reviews. */
+  fetchPullRequestChecks?(
+    auth: Record<string, string>,
+    project: Record<string, string>,
+    prId: number
+  ): Promise<PullRequestChecks>;
+
 }
 
 // ── Remote comment threads (fetched from VCS providers) ───────────
@@ -246,15 +388,10 @@ export type AgentId = 'claude' | 'copilot' | 'codex' | 'gemini' | 'opencode';
 export interface AppConfig {
   email?: string;
   prPollInterval?: number;
-  /**
-   * Legacy raw agent command (run via `sh -c`). Still honored: when
-   * `agentId` is unset it is mapped back to a known agent, and any
-   * unrecognized command routes to the hidden test runner (used by the
-   * e2e harness). New configs should prefer `agentId`.
-   */
+  /** Raw command for an explicitly configured internal test agent. */
   aiCommand?: string;
-  /** Selected AI agent. Takes precedence over `aiCommand` when set. */
-  agentId?: AgentId;
+  /** Selected AI agent; test fixtures may explicitly select the hidden runner. */
+  agentId?: AgentId | 'test';
   vendor?: string;
   vendorAuth: Record<string, string>;
   vendorProject: Record<string, string>;
@@ -273,6 +410,9 @@ export interface AppConfig {
   mergePollInterval?: number; // ms, default 3600000, min 300000
   editor?: string;
   worktreePath?: string;
+  /** Shell a new terminal runs: `auto` (the machine's login shell), or
+   *  `fish`, `zsh`, `bash`, `sh`. Unset means `auto`. */
+  shell?: string;
   keybindPreset?: string;
   keybindOverrides?: Record<string, KeyDescriptorConfig[]>;
   /** Recently opened repositories, newest first. Shared naming so any

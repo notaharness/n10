@@ -1,7 +1,7 @@
 import type { DiffLine } from '@n10/diff';
 import type { ReviewComment } from './types.js';
 import type { RemoteCommentThread } from '@n10/vcs-core';
-import type { InsertionMap } from './comment-placement.js';
+import type { InsertionMap, RemoteInsertionMap } from './comment-placement.js';
 import {
   computeInsertionMap,
   computeRemoteInsertionMap,
@@ -182,6 +182,7 @@ export function interleaveComments(
   lines: AnnotatedLine[];
   insertionMap: InsertionMap;
   sectionAnchors: number[];
+  placementDiagnostics: RemoteInsertionMap['diagnostics'];
 } {
   // Drop posted local comments from the render pipeline: once a local
   // comment has been pushed to the remote, its `status` flips to
@@ -196,12 +197,13 @@ export function interleaveComments(
 
   // Skipped entirely when there are no threads: the map builds a line index
   // over the whole diff, which is wasted work on the common case.
-  const remoteMap =
+  const remoteMap: RemoteInsertionMap =
     remoteThreads && remoteThreads.length > 0
       ? computeRemoteInsertionMap(diffLines, remoteThreads)
       : {
           insertions: new Map<number, RemoteCommentThread[]>(),
-          outOfDiff: [] as RemoteCommentThread[],
+          outOfDiff: [],
+          diagnostics: [],
         };
 
   const highlightSet = buildHighlightSet(diffLines, drafts, selectedCommentId);
@@ -228,6 +230,7 @@ export function interleaveComments(
     lines: builder.lines,
     insertionMap,
     sectionAnchors: builder.sectionAnchors,
+    placementDiagnostics: remoteMap.diagnostics,
   };
 }
 

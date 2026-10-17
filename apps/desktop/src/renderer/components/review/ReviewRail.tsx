@@ -1,20 +1,16 @@
-import {
-  BookOpenIcon,
-  PanelLeftCloseIcon,
-  PanelLeftOpenIcon,
-} from 'lucide-react';
-import type { ReviewComment } from '../../../host/contract.js';
-import { cn } from '../../lib/utils.js';
+import { PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react';
+import type { GuidedReview, ReviewComment } from '../../../host/contract.js';
 import { Button } from '../ui/button.js';
 import { ScrollArea } from '../ui/scroll-area.js';
 import { Tip } from '../ui/tooltip.js';
-import { CommentsList, type CommentListItem } from './comments/CommentsList.js';
-import { FileTree, type FileEntry } from './diff/FileTree.js';
+import { FileTree, type FileEntry, type FileListing } from './diff/FileTree.js';
+import type { SessionCard } from '../../lib/review/session-cards.js';
 import {
-  AgentSection,
+  GuideSection,
   PlanSection,
   ReviewReadySection,
 } from './ReviewRailSections.js';
+import { SessionsSection } from './SessionCards.js';
 
 /** What is left of the rail while it is hidden: the button back. */
 export function CollapsedRail({ onShow }: { onShow: () => void }) {
@@ -34,18 +30,25 @@ export function CollapsedRail({ onShow }: { onShow: () => void }) {
   );
 }
 
+/**
+ * The review rail: the sessions, the guide, the review and plan when they have
+ * something, and the files. The Overview is the top of the review
+ * and where every Back leads, and it carries the conversation, so the
+ * rail lists neither.
+ */
 export function ReviewRail({
-  hasPr,
-  overviewActive,
-  onOverview,
-  running,
-  busy,
-  hasSession,
-  agentActive,
-  onSelectAgent,
-  onLaunch,
-  onStop,
+  sessions,
+  shownSession,
+  agentBusy,
+  terminalBusy,
+  onOpenSession,
+  onLaunchAgent,
+  onLaunchTerminal,
+  onStopSession,
   onHide,
+  guide,
+  guideActive,
+  onGuide,
   drafts,
   reviewActive,
   onReview,
@@ -56,27 +59,24 @@ export function ReviewRail({
   planActive,
   onPlan,
   entries,
+  listing,
   diffLoading,
   selectedFile,
   onSelectFile,
-  commentItems,
-  activeCommentId,
-  commentsOpen,
-  onCommentsOpenChange,
-  onJumpComment,
-  onCommentContextMenu,
 }: {
-  hasPr: boolean;
-  overviewActive: boolean;
-  onOverview: () => void;
-  running: boolean;
-  busy: boolean;
-  hasSession: boolean;
-  agentActive: boolean;
-  onSelectAgent: () => void;
-  onLaunch: () => void;
-  onStop: () => void;
+  sessions: SessionCard[];
+  /** The session whose terminal the pane shows now, if any. */
+  shownSession: string | null;
+  agentBusy: boolean;
+  terminalBusy: boolean;
+  onOpenSession: (name: string) => void;
+  onLaunchAgent: () => void;
+  onLaunchTerminal: () => void;
+  onStopSession: (card: SessionCard) => void;
   onHide: () => void;
+  guide: GuidedReview | null;
+  guideActive: boolean;
+  onGuide: () => void;
   drafts: ReviewComment[];
   reviewActive: boolean;
   onReview: () => void;
@@ -88,15 +88,11 @@ export function ReviewRail({
   planActive: boolean;
   onPlan: () => void;
   entries: FileEntry[];
+  /** A pull request's listing: completeness and what is not shown. */
+  listing?: FileListing;
   diffLoading: boolean;
   selectedFile: string | null;
   onSelectFile: (path: string) => void;
-  commentItems: CommentListItem[];
-  activeCommentId: string | null;
-  commentsOpen: boolean;
-  onCommentsOpenChange: (open: boolean) => void;
-  onJumpComment: (item: CommentListItem) => void;
-  onCommentContextMenu: (item: CommentListItem) => void;
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col bg-sidebar/60">
@@ -116,38 +112,20 @@ export function ReviewRail({
         </Tip>
       </div>
 
-      {/* Overview — the PR's title, description and verdict actions. */}
-      {hasPr && (
-        <div className="shrink-0 px-2 pb-1">
-          <button
-            type="button"
-            onClick={onOverview}
-            className={cn(
-              'flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-base transition-colors',
-              overviewActive
-                ? 'bg-sidebar-active text-foreground'
-                : 'hover:bg-sidebar-accent'
-            )}
-          >
-            <BookOpenIcon className="size-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate text-left">Overview</span>
-          </button>
-        </div>
-      )}
-
-      {/* Agent — a running row you can select to view the terminal, or
-          a launch button (opening the session/review menu) otherwise. */}
       <div className="shrink-0 border-b border-border px-2 pb-2">
-        <AgentSection
-          running={running}
-          busy={busy}
-          hasSession={hasSession}
-          agentActive={agentActive}
-          onSelectAgent={onSelectAgent}
-          onLaunch={onLaunch}
-          onStop={onStop}
+        <SessionsSection
+          cards={sessions}
+          activeName={shownSession}
+          agentBusy={agentBusy}
+          terminalBusy={terminalBusy}
+          onLaunchAgent={onLaunchAgent}
+          onLaunchTerminal={onLaunchTerminal}
+          onOpen={onOpenSession}
+          onStop={onStopSession}
         />
       </div>
+
+      <GuideSection guide={guide} active={guideActive} onOpen={onGuide} />
 
       <ReviewReadySection
         drafts={drafts}
@@ -164,21 +142,13 @@ export function ReviewRail({
         onPlan={onPlan}
       />
 
-      {/* Files + Comments */}
       <ScrollArea className="min-h-0 flex-1">
         <FileTree
           entries={entries}
+          listing={listing}
           loading={diffLoading}
           selected={selectedFile}
           onSelect={onSelectFile}
-        />
-        <CommentsList
-          items={commentItems}
-          activeId={activeCommentId}
-          open={commentsOpen}
-          onOpenChange={onCommentsOpenChange}
-          onJump={onJumpComment}
-          onContextMenu={onCommentContextMenu}
         />
       </ScrollArea>
     </div>

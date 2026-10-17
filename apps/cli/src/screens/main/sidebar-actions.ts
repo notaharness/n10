@@ -1,25 +1,17 @@
-import { keyForWorktree } from '@n10/core';
 import { spawn } from 'node:child_process';
 import type { SidebarItem } from '@n10/core';
 import {
   getSpawnedAt,
   hasSession,
   isSessionAlive,
-  stopSession,
   getItemKey,
   getPrFromItem,
   orderRunningTabs,
   openSessionMenuState,
 } from '@n10/core';
-import {
-  canRemoveBranch,
-  createWorktree,
-  listAllBranches,
-  listWorktrees,
-  rebaseOntoMaster,
-} from '@n10/worktree-manager';
 import type { SidebarInputCtx } from './input-types.js';
-import { resolveEditorTarget } from './editor-target.js';
+import { worktreeTarget } from './worktree-target.js';
+import { keptNotice } from './confirm-delete-input.js';
 
 /** One sidebar action. Everything it needs comes from the context. */
 export type SidebarAction = (ctx: SidebarInputCtx) => void;
@@ -148,7 +140,7 @@ const startSession: SidebarAction = (ctx) => {
 
 const checkoutBranch: SidebarAction = (ctx) => {
   void ctx.asyncOps.run('fetch-branches', async () => {
-    const allBranches = await listAllBranches();
+    const allBranches = (await ctx.sessions.worktrees.read()).allBranches;
     ctx.branchPicker.setBranches(allBranches);
     ctx.branchPicker.setCreating(true);
     ctx.branchPicker.setBranchFilter('');
@@ -158,48 +150,46 @@ const checkoutBranch: SidebarAction = (ctx) => {
 
 /**
  * Decide what happens to a branch whose worktree still exists: delete
- * it outright, or route through one of the two confirmations.
+ * it outright, or route through one of the two confirmations. Core
+ * decides what is at stake; this only picks the prompt.
  */
 async function confirmOrDelete(
   ctx: SidebarInputCtx,
-  sessionName: string,
   branch: string
 ): Promise<void> {
-  const check = await canRemoveBranch(branch);
-  if (!check.safe) {
-    if (
-      check.reason === 'not pushed to upstream' ||
-      check.reason === 'uncommitted changes'
-    ) {
+  const check = await ctx.sessions.worktrees.checkRemoval(branch);
+  switch (check.verdict) {
+    case 'refused':
+      ctx.sessions.flashStatus(`Cannot delete: ${check.reason}`);
+      return;
+    case 'force':
+      // High friction: typing the branch name, for work on disk.
       ctx.deleteConfirm.setConfirmDelete({
         branch,
-        sessionName,
         reason: check.reason,
         mode: 'type-branch',
+        approved: check,
       });
       ctx.deleteConfirm.setConfirmInput('');
-    } else {
-      ctx.sessions.flashStatus(`Cannot delete: ${check.reason}`);
+      return;
+    case 'agent-running':
+      // Git has nothing to lose, but the live agent carries in-memory
+      // state (plans, prompts, tool history): a Y/N so an active
+      // session is never blown away by accident.
+      ctx.deleteConfirm.setConfirmDelete({
+        branch,
+        reason: 'An agent is running here — deleting stops it',
+        mode: 'yes-no',
+        approved: check,
+      });
+      ctx.deleteConfirm.setConfirmInput('');
+      return;
+    case 'clear': {
+      const outcome = await ctx.sessions.worktrees.remove(branch, check);
+      const notice = keptNotice(branch, outcome);
+      if (notice) ctx.sessions.flashStatus(notice);
     }
-    return;
   }
-  // Branch is git-clean, but if the agent's PTY is still alive it
-  // carries in-memory state (plans, prompts, tool history) that would
-  // be lost. Surface a lightweight Y/N prompt so the user can't blow
-  // away an active session by accident. A session whose agent already
-  // exited has no live process/state to lose, so it deletes without
-  // the prompt.
-  if (isSessionAlive(sessionName)) {
-    ctx.deleteConfirm.setConfirmDelete({
-      branch,
-      sessionName,
-      reason: 'session is active — agent process will be killed',
-      mode: 'yes-no',
-    });
-    ctx.deleteConfirm.setConfirmInput('');
-    return;
-  }
-  await ctx.sessions.performDelete(sessionName, branch);
 }
 
 const deleteBranch: SidebarAction = (ctx) => {
@@ -207,14 +197,13 @@ const deleteBranch: SidebarAction = (ctx) => {
   if (!sessionName) return;
 
   void ctx.asyncOps.run('check-delete', async () => {
-    const worktrees = await listWorktrees();
-    const wt = worktrees.find((w) => keyForWorktree(w) === sessionName);
+    const wt = await ctx.sessions.worktrees.find({ session: sessionName });
     const branch = wt?.branch;
     if (branch) {
-      await confirmOrDelete(ctx, sessionName, branch);
+      await confirmOrDelete(ctx, branch);
       return;
     }
-    stopSession(sessionName);
+    ctx.sessions.commands.stop(sessionName);
     ctx.pane.setReconnectKey((k) => k + 1);
     await ctx.sessions.refreshSessions();
   });
@@ -225,7 +214,7 @@ const killAgent: SidebarAction = (ctx) => {
   if (!sessionName) return;
 
   void ctx.asyncOps.run('delete', async () => {
-    stopSession(sessionName);
+    ctx.sessions.commands.stop(sessionName);
     await ctx.sessions.refreshSessions();
   });
   ctx.pane.setReconnectKey((k) => k + 1);
@@ -252,12 +241,6 @@ const rebase: SidebarAction = (ctx) => {
 
   const sessionName = selectedItem.session.name;
   void ctx.asyncOps.run('rebase', async () => {
-    const worktrees = await listWorktrees();
-    const wt = worktrees.find((w) => keyForWorktree(w) === sessionName);
-    if (!wt) {
-      ctx.sessions.flashStatus('No worktree found for selected session');
-      return;
-    }
     // No "Updating from origin…" flash — the 'rebase' spinner
     // (label: "Rebasing") already communicates that we're working.
     const rebaseMessages = {
@@ -265,7 +248,11 @@ const rebase: SidebarAction = (ctx) => {
       conflict: 'Conflicts detected — rebase aborted',
       error: 'Failed to fetch from origin',
     } as const;
-    ctx.sessions.flashStatus(rebaseMessages[await rebaseOntoMaster(wt.path)]);
+    ctx.sessions.flashStatus(
+      rebaseMessages[
+        await ctx.sessions.worktrees.rebase({ session: sessionName })
+      ]
+    );
   });
 };
 
@@ -280,10 +267,7 @@ const openEditor: SidebarAction = (ctx) => {
   if (!item) return;
 
   void ctx.asyncOps.run('open-editor', async () => {
-    const wtPath = await resolveEditorTarget(item, {
-      listWorktrees,
-      createWorktree,
-    });
+    const wtPath = await ctx.sessions.worktrees.resolve(worktreeTarget(item));
     if (!wtPath) {
       ctx.sessions.flashStatus('No worktree found for selected session');
       return;

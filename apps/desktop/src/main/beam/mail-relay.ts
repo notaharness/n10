@@ -14,7 +14,7 @@ import {
   resolveLocalRelayTarget,
   type LocalDeliveryTarget,
 } from '@n10/core';
-import type { InboundMailItem } from '../../host/contract-machines.js';
+import type { InboundMailItem } from '@n10/engine/contract';
 import type { InboundMailPort } from '../../host/services/inbound-mail.js';
 import { ControlConnection } from './control.js';
 import {

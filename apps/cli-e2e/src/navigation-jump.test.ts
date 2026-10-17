@@ -98,6 +98,7 @@ test.describe('@integration Navigation Jump', () => {
   test.use({
     n10RepoPath: cloneDir,
     n10Config: {
+      agentId: 'test',
       aiCommand: 'cat',
       keybindPreset: 'vim',
       prPollInterval: 5000,

@@ -27,9 +27,12 @@ type SessionHost = Pick<
   | 'checkoutPlan'
   | 'listSessions'
   | 'listForeignSessions'
+  | 'listOrchestratorGroups'
   | 'getSessionActivity'
-  | 'markSessionSeen'
-  | 'getSessionBuffer'
+  | 'watchSession'
+  | 'unwatchSession'
+  | 'showSession'
+  | 'hideSession'
   | 'writeSession'
   | 'resizeSession'
   | 'killSession'
@@ -145,7 +148,11 @@ export function createSessionHost(
     launchAgent: (req) =>
       start(req, req.branch, PROGRAMS.agent(req, state.repo())),
     launchReviewAgent: (req) =>
-      start(req, req.pr.sourceBranch, PROGRAMS.reviewer(req.pr, state.repo())),
+      start(
+        req,
+        req.pr.sourceBranch,
+        PROGRAMS.reviewer(req.pr, state.repo(), req.guide)
+      ),
     listAgentOptions: () => later(AGENTS),
     getSessionLaunchContext: (branch) => {
       const session = inRepo(state.current, branch);
@@ -170,10 +177,10 @@ export function createSessionHost(
       await start(req, req.pr.sourceBranch, program);
       return 'spawned' as const;
     },
-    listSessions: () =>
+    listSessions: (cwd) =>
       later(
         agents()
-          .filter((s) => s.meta.repo === state.current)
+          .filter((s) => s.meta.repo === cwd)
           .map((s) => ({
             name: s.name,
             running: s.running,
@@ -192,16 +199,36 @@ export function createSessionHost(
             sessionName: s.name,
           }))
       ),
+    listOrchestratorGroups: () => later([]),
     getSessionActivity: () =>
       later(Object.fromEntries(hub.all().map((s) => [s.name, s.activity()]))),
-    markSessionSeen: (name) => {
+    // The demo pushes every session's output to the page and lets the
+    // terminal filter it, so watching only answers the replay; showing
+    // counts as seeing.
+    watchSession: (name) => {
       const session = hub.get(name);
-      if (session) session.flashing = false;
+      return later(
+        {
+          data: session?.output ?? '',
+          seq: session?.seq ?? 0,
+          truncated: false,
+        },
+        20
+      );
+    },
+    unwatchSession: () => later(undefined),
+    showSession: (name) => {
+      const session = hub.get(name);
+      if (session) {
+        session.onScreen += 1;
+        session.flashing = false;
+      }
       return later(undefined);
     },
-    getSessionBuffer: (name) => {
+    hideSession: (name) => {
       const session = hub.get(name);
-      return later({ data: session?.output ?? '', seq: session?.seq ?? 0 }, 20);
+      if (session) session.onScreen = Math.max(0, session.onScreen - 1);
+      return later(undefined);
     },
     writeSession: (name, data) => {
       hub.get(name)?.input(data);

@@ -93,6 +93,9 @@ export interface TaggedTmuxSession {
   branch: string;
   paneDead: boolean;
   panePid: number;
+  /** The command the pane was (re)spawned with: the launch placeholder
+   *  until the requested command replaces it. */
+  paneStartCommand: string;
 }
 
 const LISTING = [
@@ -103,6 +106,7 @@ const LISTING = [
   '#{@orchestra-branch}',
   '#{pane_dead}',
   '#{pane_pid}',
+  '#{pane_start_command}',
 ].join('\t');
 
 /** Every session on the test's tmux server, tags included. Empty when
@@ -132,6 +136,7 @@ export function listTaggedSessions(tmuxTmpdir: string): TaggedTmuxSession[] {
           branch = '',
           dead,
           pid,
+          startCommand = '',
         ] = line.split('\t');
         return {
           name,
@@ -141,6 +146,7 @@ export function listTaggedSessions(tmuxTmpdir: string): TaggedTmuxSession[] {
           branch,
           paneDead: dead === '1',
           panePid: Number(pid),
+          paneStartCommand: startCommand,
         };
       });
   } catch {

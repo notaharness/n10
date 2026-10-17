@@ -53,7 +53,7 @@ export function babysitBadge(
       )}`
     );
   }
-  if (status.lastError) lines.push(`Last poll failed: ${status.lastError}`);
+  if (status.lastError) lines.push(`Last check failed: ${status.lastError}`);
   return {
     label: status.phase === 'pending' ? 'update pending' : 'babysitting',
     title: lines.join('\n'),

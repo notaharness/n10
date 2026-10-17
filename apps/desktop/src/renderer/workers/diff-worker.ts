@@ -5,7 +5,7 @@
  * typing stutter. All of it runs here instead; the renderer talks to
  * this worker through lib/diff-worker-client.ts.
  */
-import { parseUnifiedDiff, type DiffLine } from '@n10/diff';
+import { parseDiffFiles, type DiffLine, type ParsedDiffFile } from '@n10/diff';
 import { createHighlighterCore, type HighlighterCore } from 'shiki/core';
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
 import { bundledLanguages } from 'shiki/langs';
@@ -41,7 +41,7 @@ export type WorkerRequest =
     };
 
 export type WorkerResponse =
-  | { id: number; type: 'parse'; entries: [string, DiffLine[]][] }
+  | { id: number; type: 'parse'; files: ParsedDiffFile[] }
   | {
       id: number;
       type: 'analyze';
@@ -113,11 +113,10 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   const msg = e.data;
   try {
     if (msg.type === 'parse') {
-      const entries = [...parseUnifiedDiff(msg.text).entries()];
       postMessage({
         id: msg.id,
         type: 'parse',
-        entries,
+        files: parseDiffFiles(msg.text),
       } satisfies WorkerResponse);
     } else if (msg.type === 'analyze') {
       const lang = languageForFile(msg.filename);

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { MachineGrant } from '../../../host/contract-machines.js';
+import type { MachineGrant } from '@n10/engine/contract';
 import { keys } from './query-keys.js';
 
 /**

@@ -18,36 +18,7 @@ import {
   getBindingRows,
   handleTextInput,
   resolveValue,
-  settingsEffects,
 } from '@n10/core';
-import { autoDetectProjectConfig } from '@n10/vcs-core';
-
-function writeFieldChange(
-  field: SettingsField,
-  value: string | undefined,
-  ctx: SettingsHandlerCtx
-): void {
-  ctx.config.updateField(field, value);
-  for (const effect of settingsEffects(field)) {
-    switch (effect) {
-      case 'reset-provider-cache':
-        // Every provider, not just the selected one. Everything cached
-        // was fetched as somebody else, and on a `vendor` change the
-        // stale entries belong to the provider being left — which
-        // `ctx.config.provider` no longer is by the time this runs.
-        for (const p of ctx.config.providers) p.resetCaches?.();
-        break;
-      case 'refresh-remote':
-        // Without this a corrected token sits behind the poll
-        // interval, showing the failure it just fixed.
-        void ctx.sessions.refreshPr();
-        break;
-      case 'restart-sync-loop':
-        void ctx.sessions.triggerSync();
-        break;
-    }
-  }
-}
 
 // ── Shared context slice types ────────────────────────────────────
 
@@ -123,7 +94,7 @@ function cyclePreset({ ctx, field }: SettingsActionCtx, step: 1 | -1): void {
     ctx.keybinds.setPreset(preset.value);
     return;
   }
-  writeFieldChange(field, preset.value ?? undefined, ctx);
+  ctx.config.updateField(field, preset.value ?? undefined);
 }
 
 /** Enter on a field. What that means depends on the field: open a
@@ -139,7 +110,7 @@ function editToggle({ ctx, field }: SettingsActionCtx): void {
   if (field.presets && field.presets.every((p) => p.value !== null)) {
     const presets = field.presets;
     const idx = (currentPresetIndex(ctx, field, presets) + 1) % presets.length;
-    writeFieldChange(field, presets[idx]!.value ?? undefined, ctx);
+    ctx.config.updateField(field, presets[idx]!.value ?? undefined);
     return;
   }
   ctx.settings.setEditingField(field.key);
@@ -147,15 +118,13 @@ function editToggle({ ctx, field }: SettingsActionCtx): void {
 }
 
 function autoDetect({ ctx }: SettingsActionCtx): void {
-  const { updated, detected } = autoDetectProjectConfig(
-    process.cwd(),
-    ctx.config.providers
-  );
+  const { updated, detected } = ctx.config.detect();
   if (!updated) {
-    ctx.sessions.flashStatus('Nothing new to detect (all fields already set)');
+    ctx.sessions.flashStatus(
+      'Nothing new to detect; every setting is filled in'
+    );
     return;
   }
-  ctx.config.reloadFromDisk();
   ctx.sessions.flashStatus(
     `Auto-detected: ${Object.keys(detected).join(', ')}`
   );
@@ -186,10 +155,7 @@ function handleFieldEditMode(
     return;
   }
   if (key.return) {
-    // Through writeFieldChange, not updateField: a pasted access token
-    // arrives on this path, and it is the one that most needs the
-    // cache dropped and a fetch started.
-    writeFieldChange(field, ctx.settings.editBuffer || undefined, ctx);
+    ctx.config.updateField(field, ctx.settings.editBuffer || undefined);
     ctx.settings.setEditingField(null);
     ctx.settings.setEditBuffer('');
     return;
@@ -208,14 +174,20 @@ export function handleSettingsInput(
   const fields = buildSettingsFields(ctx.config.provider);
   const field = fields[ctx.settings.settingsFieldIndex]!;
 
-  if (ctx.settings.editingField) {
-    handleFieldEditMode(input, key, ctx, field);
-    return;
-  }
+  try {
+    if (ctx.settings.editingField) {
+      handleFieldEditMode(input, key, ctx, field);
+      return;
+    }
 
-  const action = ctx.keybinds.resolve(input, key, 'settings');
-  if (!action) return;
-  SETTINGS_ACTIONS[action]?.({ ctx, fields, field });
+    const action = ctx.keybinds.resolve(input, key, 'settings');
+    if (!action) return;
+    SETTINGS_ACTIONS[action]?.({ ctx, fields, field });
+  } catch (error) {
+    ctx.sessions.flashStatus(
+      error instanceof Error ? error.message : String(error)
+    );
+  }
 }
 
 // ── Controls sub-screen input handler ─────────────────────────────

@@ -28,7 +28,7 @@ test.describe('Fleet in the sidebar', () => {
       await openFleet(desktop);
       await expect(
         fleetView(page).getByRole('heading', {
-          name: 'Connect your first machine',
+          name: 'Your machines, connected anywhere',
         })
       ).toBeVisible();
       await expect(
@@ -74,10 +74,10 @@ test.describe('Fleet in the sidebar', () => {
     await openFleet(desktop);
     const fleet = fleetView(page);
     await fleet.getByRole('button', { name: 'Create a fleet' }).click();
-    await fleet.getByLabel('This machine’s name').fill('laptop');
+    await fleet.getByLabel('Machine name').fill('laptop');
     await collapseFleet(page);
     await openFleet(desktop);
-    await expect(fleet.getByLabel('This machine’s name')).toHaveValue('laptop');
+    await expect(fleet.getByLabel('Machine name')).toHaveValue('laptop');
     await fleet.getByRole('button', { name: 'Create fleet' }).click();
     await expect(fleet.getByTestId('ceremony-url')).toBeVisible();
 
@@ -103,7 +103,7 @@ test.describe('Fleet in the sidebar', () => {
     await fleet.getByRole('button', { name: 'Create a fleet' }).click();
     await fleet.getByRole('button', { name: 'Create fleet' }).click();
     const step = fleet.getByRole('heading', {
-      name: 'Step 1 of 2 · Create your fleet passkey',
+      name: '1 of 2 · Save a passkey',
     });
     // A real step transition takes focus: the clicked button is gone.
     await expect(step).toBeFocused();
@@ -194,7 +194,7 @@ test.describe('Fleet in the sidebar', () => {
       await row.getByRole('button', { name: 'Machine actions' }).click();
       await page.getByRole('menuitem', { name: 'Revoke workbox…' }).click();
       const dialog = page.getByRole('dialog');
-      await dialog.getByRole('button', { name: 'Continue to passkey' }).click();
+      await dialog.getByRole('button', { name: 'Revoke access' }).click();
       await expect(dialog.getByTestId('ceremony-url')).toHaveText(
         beam!.currentUrl
       );

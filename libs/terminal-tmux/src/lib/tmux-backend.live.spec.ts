@@ -12,7 +12,7 @@
  * can't see — wrong tmux flag, broken arg ordering, tmux version
  * weirdness, etc.
  */
-import { describe, it, expect, afterEach, beforeAll } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { createTmuxBackend } from './tmux-backend.js';
 import {
@@ -24,7 +24,7 @@ import {
   tmuxShowOption,
 } from './tmux-cli.js';
 import type { SessionSpec } from '@n10/terminal';
-import { assertScratchTmuxSocket } from '../../vitest.setup.js';
+import { holdScratchTmuxServer } from '../../vitest.setup.js';
 
 function tmuxAvailable(): boolean {
   try {
@@ -64,14 +64,6 @@ function startForeignSession(name: string): void {
 }
 
 const SKIP = !tmuxAvailable();
-
-// This file creates and kills real tmux sessions. `vitest.setup.ts`
-// points them at a throwaway server; if that ever stops taking effect
-// the sessions land on the developer's own, next to their running
-// agents. Stop rather than find out.
-beforeAll(() => {
-  assertScratchTmuxSocket();
-});
 
 /** Sessions created during a test, cleaned up in afterEach even on
  *  failure. Names are unique per test so parallel CI workers can't
@@ -124,7 +116,12 @@ afterEach(() => {
   }
 });
 
+// This file creates and kills real tmux sessions. `vitest.setup.ts`
+// points them at a throwaway server; if that ever stops taking effect
+// the sessions land on the developer's own, next to their running
+// agents. Stop rather than find out.
 describe.skipIf(SKIP)('TmuxBackend live integration', () => {
+  holdScratchTmuxServer();
   it('creates a real tmux session and pipes shell output through', async () => {
     const name = uniqueName('output');
     createdSessions.push(name);

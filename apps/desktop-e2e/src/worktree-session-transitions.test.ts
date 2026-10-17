@@ -140,7 +140,7 @@ test('n10 restart with sessions alive rediscovers the checkout', async ({
   });
   const before = listTaggedSessions(homeDir);
 
-  await desktop.restart();
+  await desktop.relaunch();
   await expect(sidebarRow(desktop.page, /restart-agent/)).toBeVisible();
   await expect(tab(desktop.page, /restart-agent/)).toBeVisible({
     timeout: 30_000,
@@ -166,7 +166,7 @@ test('n10 restart with sessions gone rediscovers the checkout', async ({
     timeout: 30_000,
   });
   killFixtureSessions(homeDir);
-  await desktop.restart();
+  await desktop.relaunch();
   await expect(sidebarRow(desktop.page, /restart-agent/)).toBeVisible();
   await sidebarRow(desktop.page, /restart-agent/).click();
   await expect(
