@@ -3,9 +3,12 @@ import { createWorktree, tab } from './setup/app.js';
 import {
   carryOver,
   expectNothingLifted,
+  frames,
   LIFT,
   liftRightOver,
   motion,
+  rightEdge,
+  sidewaysScroll,
   tabNames,
 } from './setup/tab-row.js';
 
@@ -139,3 +142,41 @@ test.describe('Reordering tabs', () => {
     await expectNothingLifted(page);
   });
 });
+
+for (const tabOverflow of ['wrap', 'scroll'] as const) {
+  test.describe(`Dragging a tab past the strip's end (${tabOverflow})`, () => {
+    test.use({ desktopPrefs: { tabOverflow } });
+
+    test('the tab stops at the end, nothing scrolls, and it drops last', async ({
+      desktop,
+    }) => {
+      const { page } = desktop;
+      for (const branch of ['alpha', 'beta', 'gamma'])
+        await createWorktree(page, branch);
+      await expect
+        .poll(() => tabNames(page))
+        .toEqual(['alpha', 'beta', 'gamma']);
+      const before = await sidewaysScroll(page);
+      const strip = page.getByRole('tablist', { name: 'Open tabs' });
+      const alpha = tab(page, /alpha/);
+      const from = (await alpha.boundingBox())!;
+      const stripEnd = await rightEdge(strip);
+
+      const y = from.y + from.height / 2;
+      await page.mouse.move(from.x + from.width / 2, y);
+      await page.mouse.down();
+      const right = await page.evaluate(() => window.innerWidth - 1);
+      await page.mouse.move(right, y, { steps: 20 });
+      // Held at the window's edge long enough for auto-scroll to run.
+      await frames(page, 30);
+
+      expect(await rightEdge(alpha)).toBeLessThanOrEqual(stripEnd);
+      expect(await sidewaysScroll(page)).toEqual(before);
+
+      await page.mouse.up();
+      await expect
+        .poll(() => tabNames(page))
+        .toEqual(['beta', 'gamma', 'alpha']);
+    });
+  });
+}
