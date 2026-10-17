@@ -67,21 +67,24 @@ function hasGitEntry(dir: string): boolean {
   }
 }
 
-function bringForward(): void {
+function bringForward(openWindow: () => void): void {
   const win = BrowserWindow.getAllWindows()[0];
-  if (!win) return;
+  if (!win) return openWindow();
   if (win.isMinimized()) win.restore();
   win.focus();
 }
 
 /**
- * Answer every later launch: bring the window forward and, when the
- * launch named a repository, `open` it in the page that has claimed
- * launches (`launch-repo.ts`), by its webContents id, or keep it for
- * the next page that claims. Install before the first window is created.
+ * Answer every later launch: bring the window forward, or call
+ * `openWindow` when there is none (macOS keeps running with every
+ * window closed), and, when the launch named a repository, `open` it in
+ * the page that has claimed launches (`launch-repo.ts`), by its
+ * webContents id, or keep it for the next page that claims. Install
+ * before the first window is created.
  */
 export function installSecondLaunch(
-  open: (viewer: number, cwd: string) => void
+  open: (viewer: number, cwd: string) => void,
+  openWindow: () => void
 ): void {
   app.on('browser-window-created', (_event, win) => {
     // The claim is the page's, so it ends when another document commits,
@@ -98,7 +101,7 @@ export function installSecondLaunch(
     win.on('closed', release);
   });
   app.on('second-instance', (_event, _argv, _cwd, data) => {
-    bringForward();
+    bringForward(openWindow);
     const repo = requestedRepo(data);
     if (!repo) return;
     const viewer = offerLaunchRepo(repo);

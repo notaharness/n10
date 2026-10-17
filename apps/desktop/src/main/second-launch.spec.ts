@@ -85,6 +85,7 @@ describe('requestedRepo', () => {
 
 describe('installSecondLaunch', () => {
   const open = vi.fn();
+  const openWindow = vi.fn();
   let win: FakeWindow;
 
   const launch = (data: unknown) =>
@@ -93,11 +94,12 @@ describe('installSecondLaunch', () => {
   beforeEach(() => {
     app.removeAllListeners();
     open.mockReset();
+    openWindow.mockReset();
     // No page has claimed, and nothing waits.
     claimLaunchRepo(PAGE);
     releaseLaunchRepo(PAGE);
     windows.length = 0;
-    installSecondLaunch(open);
+    installSecondLaunch(open, openWindow);
     win = new FakeWindow();
     windows.push(win);
     app.emit('browser-window-created', {}, win);
@@ -109,6 +111,17 @@ describe('installSecondLaunch', () => {
     expect(win.restore).toHaveBeenCalled();
     expect(win.focus).toHaveBeenCalled();
     expect(open).not.toHaveBeenCalled();
+    expect(openWindow).not.toHaveBeenCalled();
+  });
+
+  it('opens a window when every window has closed, whose page takes the launch', () => {
+    claimLaunchRepo(PAGE);
+    win.emit('closed');
+    windows.length = 0;
+    launch({ startDir: repo });
+    expect(openWindow).toHaveBeenCalledOnce();
+    expect(open).not.toHaveBeenCalled();
+    expect(claimLaunchRepo(PAGE + 1)).toBe(repo);
   });
 
   it('keeps a launch until a page claims, handing it the last one', () => {

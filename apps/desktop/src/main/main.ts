@@ -258,16 +258,22 @@ installProcessDiagnostics();
 
 // ── App lifecycle ────────────────────────────────────────────────
 
+// macOS keeps running with every window closed; a later launch then
+// opens one, as the dock icon does. Not before startup has made its own.
+let reopenWindow: () => void = () => undefined;
+
 // One instance at a time: a second launch focuses the existing
 // window, and opens the repository it was started for, instead of
 // opening a competing (possibly stale-cached) one.
 if (!app.requestSingleInstanceLock(secondLaunchData(START_DIR))) {
   app.quit();
 } else {
-  installSecondLaunch((viewer, cwd) =>
-    webContents
-      .fromId(viewer)
-      ?.send(MENU_EVENTS.command, { command: 'open-repo', arg: cwd })
+  installSecondLaunch(
+    (viewer, cwd) =>
+      webContents
+        .fromId(viewer)
+        ?.send(MENU_EVENTS.command, { command: 'open-repo', arg: cwd }),
+    () => reopenWindow()
   );
 
   // A throw in here leaves the app running with no window and no
@@ -289,6 +295,7 @@ if (!app.requestSingleInstanceLock(secondLaunchData(START_DIR))) {
 
       void createMainWindow();
       mark(MAIN_MARKS.window);
+      reopenWindow = () => void createMainWindow();
 
       app.on('activate', () => {
         // macOS: re-create the window when the dock icon is clicked and
