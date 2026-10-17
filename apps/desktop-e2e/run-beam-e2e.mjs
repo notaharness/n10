@@ -17,16 +17,16 @@ const RELEASES = 'https://github.com/notaharness/beam/releases/download';
 /** The beamtest assets of the beam release the desktop depends on, from
  *  its SHA256SUMS. Bumping `@notaharness/beam` means replacing these. */
 const PINNED = {
-  version: '0.1.0-beta.3',
+  version: '0.1.0-beta.4',
   sha256: {
     'beamtest-darwin-amd64':
-      '6a8de7060c996ba80d46ccdd6d5c62c9bd23aa0e1c379565921af6fbca3ec38b',
+      '328ef726bcb288b5e830dba4a36cefeea903de5f3467d83b2e694b5d35ec691a',
     'beamtest-darwin-arm64':
-      'e62f342794e275b87216fd4072fa61116995fd910ee094c1aa9c78652d3e07fb',
+      '22b288b85b466b2958d22745ce05a59e6cb37c8c28edcdc9c9afe4d2d245dccd',
     'beamtest-linux-amd64':
-      '03175fded3e18c34421a2ace67227aeb3ed4923310b7518e7f4da72a91e4b1ee',
+      '8da411e8be2d2ae0cbfa6054e032267c3c440121666ea522875c215813befdcd',
     'beamtest-linux-arm64':
-      'ae1cfad03110bdfadb8531ee1d5a58e10f50f7c4b8a1e77a62444d9add596547',
+      '75ec4d9952fbbe1577b5b3b927259119dbe3181b7d4ed3cb803dc8c4b6703d80',
   },
 };
 
