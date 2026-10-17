@@ -48,13 +48,13 @@ function forkPoint(
     return {
       ok: false,
       error:
-        `There is no branch ${base} in this clone. Run \`git fetch origin ${base}\` ` +
-        'and try again, or pass the branch the pull request merges into as --base.',
+        `Branch ${base} was not found in this clone. Run \`git fetch origin ${base}\` ` +
+        'and retry, or set --base to the pull request’s target branch.',
     };
   try {
     return { ok: true, oid: git(cwd, ['merge-base', tip, head]).trim() };
   } catch {
-    return { ok: false, error: `HEAD shares no history with ${base}.` };
+    return { ok: false, error: `HEAD and ${base} have no common ancestor.` };
   }
 }
 
@@ -89,7 +89,7 @@ export function readCommentDiff(
   file: string
 ): CommentDiff {
   if (!isBranchName(base))
-    return { ok: false, error: `"${base}" is not a branch name.` };
+    return { ok: false, error: `"${base}" is not a valid branch name.` };
   const head = commit(cwd, 'HEAD');
   if (!head)
     return {

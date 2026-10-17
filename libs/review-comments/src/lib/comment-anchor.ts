@@ -101,7 +101,7 @@ export function commentableRanges(
 }
 
 const span = ([start, end]: [number, number]) =>
-  start === end ? `${start}` : `${start}-${end}`;
+  start === end ? `${start}` : `${start}–${end}`;
 
 /**
  * Why the pull request's diff cannot take a comment at `anchor`, or
@@ -115,22 +115,25 @@ export function anchorOutsideDiff(
 ): string | null {
   if (lines === null)
     return (
-      `${anchor.file} is not changed in ${at}. Comment on a changed file, ` +
-      'or leave out --file to comment on the pull request.'
+      `${anchor.file} is unchanged in ${at}. Choose a changed file, ` +
+      'or omit --file to comment on the pull request itself.'
     );
   const { lineStart, lineEnd, side } = anchor;
   if (lineStart === null || lineEnd === null) return null;
   const ranges = commentableRanges(lines, side);
   if (ranges.some(([start, end]) => start <= lineStart && lineEnd <= end))
     return null;
+  if (!ranges.length)
+    return (
+      `${anchor.file} has no diff lines on ${side} in ${at}. ` +
+      'Omit --lineStart and --lineEnd to comment on the whole file.'
+    );
   const asked = span([lineStart, lineEnd]);
-  const open = ranges.length
-    ? `Lines in the diff on that side: ${ranges.map(span).join(', ')}.`
-    : 'The diff has no lines on that side.';
   return (
-    `${anchor.file} line${lineStart === lineEnd ? '' : 's'} ${asked} ` +
-    `(${side}) ${lineStart === lineEnd ? 'is' : 'are'} outside ${at}. ` +
-    `${open} Keep --lineStart and --lineEnd within one of these, or ` +
-    'leave them out to comment on the whole file.'
+    `${anchor.file}: line${lineStart === lineEnd ? '' : 's'} ${asked} ` +
+    `on ${side} must fit within one diff range in ${at}. ` +
+    `Valid ranges on this side: ${ranges.map(span).join(', ')}. ` +
+    'Set --lineStart and --lineEnd within one range, or omit both to ' +
+    'comment on the whole file.'
   );
 }

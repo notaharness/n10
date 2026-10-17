@@ -224,10 +224,10 @@ describe('add-comment', () => {
       arg.startsWith('--line') ? arg.replace('12', '40') : arg
     );
     expect(await refused(args)).toEqual([
-      'src/undo.c line 40 (RIGHT) is outside the diff of main...HEAD at ' +
-        'c0ffee0. Lines in the diff on that side: 10-14. Keep --lineStart ' +
-        'and --lineEnd within one of these, or leave them out to comment ' +
-        'on the whole file.',
+      'src/undo.c: line 40 on RIGHT must fit within one diff range in ' +
+        'main...HEAD at c0ffee0. Valid ranges on this side: 10–14. Set ' +
+        '--lineStart and --lineEnd within one range, or omit both to ' +
+        'comment on the whole file.',
     ]);
   });
 
@@ -236,7 +236,7 @@ describe('add-comment', () => {
       arg.startsWith('--lineEnd') ? '--lineEnd=15' : arg
     );
     expect((await refused(args))[0]).toMatch(
-      /^src\/undo\.c lines 12-15 \(RIGHT\) are outside/
+      /^src\/undo\.c: lines 12–15 on RIGHT must fit within one diff range/
     );
   });
 
@@ -245,16 +245,15 @@ describe('add-comment', () => {
       arg.startsWith('--file') ? '--file=src/other.c' : arg
     );
     expect(await refused(args)).toEqual([
-      'src/other.c is not changed in the diff of main...HEAD at c0ffee0. ' +
-        'Comment on a changed file, or leave out --file to comment on the ' +
-        'pull request.',
+      'src/other.c is unchanged in main...HEAD at c0ffee0. Choose a ' +
+        'changed file, or omit --file to comment on the pull request itself.',
     ]);
   });
 
   it('refuses a file anchor without --base and says what to pass', async () => {
     expect(await refused(BASE.filter((arg) => arg !== '--base=main'))).toEqual([
-      '--file needs --base=<branch the pull request merges into>, e.g. --base=main.',
-      'Leave out --file to comment on the pull request itself.',
+      '--file requires --base=<target branch>, for example --base=main.',
+      'Omit --file to comment on the pull request itself.',
     ]);
     expect(diff).not.toHaveBeenCalled();
   });

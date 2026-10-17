@@ -115,15 +115,15 @@ describe('readCommentDiff', () => {
     expect(readCommentDiff(checkout, 'release', 'a.ts')).toEqual({
       ok: false,
       error:
-        'There is no branch release in this clone. Run `git fetch origin release` ' +
-        'and try again, or pass the branch the pull request merges into as --base.',
+        'Branch release was not found in this clone. Run `git fetch origin release` ' +
+        'and retry, or set --base to the pull request’s target branch.',
     });
   });
 
   it('refuses a base that is not a branch name', () => {
     expect(readCommentDiff(checkout, 'HEAD~1', 'a.ts')).toEqual({
       ok: false,
-      error: '"HEAD~1" is not a branch name.',
+      error: '"HEAD~1" is not a valid branch name.',
     });
   });
 });

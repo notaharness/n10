@@ -115,7 +115,7 @@ describe('anchorOutsideDiff', () => {
 
   it('refuses a range across two hunks', () => {
     expect(anchorOutsideDiff(anchor(4, 20), lines, at)).toMatch(
-      /^a\.ts lines 4-20 \(RIGHT\) are outside the diff\. Lines in the diff on that side: 1-4, 20-23\./
+      /^a\.ts: lines 4–20 on RIGHT must fit within one diff range in the diff\. Valid ranges on this side: 1–4, 20–23\./
     );
   });
 
@@ -134,12 +134,14 @@ new file mode 100644
         added ?? [],
         at
       )
-    ).toContain('The diff has no lines on that side.');
+    ).toBe(
+      'n.ts has no diff lines on LEFT in the diff. Omit --lineStart and --lineEnd to comment on the whole file.'
+    );
   });
 
   it('refuses a file the diff does not change, even without lines', () => {
     expect(anchorOutsideDiff(anchor(null), null, at)).toBe(
-      'a.ts is not changed in the diff. Comment on a changed file, or leave out --file to comment on the pull request.'
+      'a.ts is unchanged in the diff. Choose a changed file, or omit --file to comment on the pull request itself.'
     );
   });
 });

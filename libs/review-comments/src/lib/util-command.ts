@@ -76,13 +76,13 @@ function placeComment(
   if (anchor.file === null) return { anchor, head: context.head?.() };
   if (!parsed.base)
     fail(
-      '--file needs --base=<branch the pull request merges into>, e.g. --base=main.',
-      'Leave out --file to comment on the pull request itself.'
+      '--file requires --base=<target branch>, for example --base=main.',
+      'Omit --file to comment on the pull request itself.'
     );
   if (!context.diff) fail('This n10 cannot read the pull request diff.');
   const diff = context.diff(parsed.base, anchor.file);
   if (!diff.ok) fail(diff.error);
-  const at = `the diff of ${parsed.base}...HEAD at ${diff.head.slice(0, 7)}`;
+  const at = `${parsed.base}...HEAD at ${diff.head.slice(0, 7)}`;
   const outside = anchorOutsideDiff(
     { ...anchor, file: anchor.file },
     diff.lines,
