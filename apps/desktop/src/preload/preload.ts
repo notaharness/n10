@@ -47,6 +47,7 @@ const api: N10HostApi = {
 
   openRepo: (cwd) => ipcRenderer.invoke(IPC.openRepo, cwd),
   getRepo: () => ipcRenderer.invoke(IPC.getRepo),
+  takeLaunchRepo: () => ipcRenderer.invoke(IPC.takeLaunchRepo),
   refreshRepo: () => ipcRenderer.invoke(IPC.refreshRepo),
   getRepoInfo: (repo) => ipcRenderer.invoke(IPC.getRepoInfo, repo),
   listRecentRepos: () => ipcRenderer.invoke(IPC.listRecentRepos),

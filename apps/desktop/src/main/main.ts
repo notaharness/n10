@@ -1,7 +1,15 @@
 import { installQuitHandler, quitForUpdate, quitForNpmUpdate } from './quit.js';
 import { join } from 'node:path';
 import { isatty } from 'node:tty';
-import { app, BrowserWindow, dialog, Menu, nativeTheme, shell } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  Menu,
+  nativeTheme,
+  shell,
+  webContents,
+} from 'electron';
 import {
   holdMenuShortcuts,
   releaseMenuShortcutsOnLoad,
@@ -19,6 +27,8 @@ import { startHostProcess, type HostProcess } from './host-process.js';
 import { MAIN_MARKS, mark } from './boot-marks.js';
 import { pickFolderWithDialog } from './folder-picker.js';
 import { buildMenuTemplate } from '../host/menu-template.js';
+import { installSecondLaunch, secondLaunchData } from './second-launch.js';
+import { claimLaunchRepo } from './launch-repo.js';
 import { installUnsavedGuard } from './unsaved-guard.js';
 import { installDockIcon, windowIcon } from './app-icon.js';
 import { showAbout } from './about.js';
@@ -223,6 +233,7 @@ function startHost(): HostProcess {
         installAppMenu(); // theme radio state lives in the menu
       },
       holdMenuShortcuts,
+      takeLaunchRepo: async (viewer) => claimLaunchRepo(viewer),
     },
     // The new host has no watches; reloaded pages watch again.
     onRespawn: () => {
@@ -254,18 +265,23 @@ installProcessDiagnostics();
 
 // ── App lifecycle ────────────────────────────────────────────────
 
+// macOS keeps running with every window closed; a later launch then
+// opens one, as the dock icon does. Not before startup has made its own.
+let reopenWindow: () => void = () => undefined;
+
 // One instance at a time: a second launch focuses the existing
-// window instead of opening a competing (possibly stale-cached) one.
-if (!app.requestSingleInstanceLock()) {
+// window, and opens the repository it was started for, instead of
+// opening a competing (possibly stale-cached) one.
+if (!app.requestSingleInstanceLock(secondLaunchData(START_DIR))) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
-    const win = BrowserWindow.getAllWindows()[0];
-    if (win) {
-      if (win.isMinimized()) win.restore();
-      win.focus();
-    }
-  });
+  installSecondLaunch(
+    (viewer, cwd) =>
+      webContents
+        .fromId(viewer)
+        ?.send(MENU_EVENTS.command, { command: 'open-repo', arg: cwd }),
+    () => reopenWindow()
+  );
 
   // A throw in here leaves the app running with no window and no
   // sign of why, so startup failures are logged rather than dropped.
@@ -286,6 +302,7 @@ if (!app.requestSingleInstanceLock()) {
 
       void createMainWindow();
       mark(MAIN_MARKS.window);
+      reopenWindow = () => void createMainWindow();
 
       app.on('activate', () => {
         // macOS: re-create the window when the dock icon is clicked and

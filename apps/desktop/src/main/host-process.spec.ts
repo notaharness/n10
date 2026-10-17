@@ -74,6 +74,7 @@ function start(
       aboutBox: async () => undefined,
       prefsChanged: async () => undefined,
       holdMenuShortcuts: async () => undefined,
+      takeLaunchRepo: async () => null,
       ...shell,
     },
     pushes: { broadcast: () => undefined, sendTo: () => undefined },

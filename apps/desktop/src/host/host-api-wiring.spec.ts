@@ -490,6 +490,14 @@ describe('host API wiring', () => {
     expect(hold).toHaveBeenCalledWith(7, true);
   });
 
+  it('takeLaunchRepo asks the main process for the asking window', async () => {
+    const { setLaunchRepoClaim } = await import('./viewer-api.js');
+    const claim = vi.fn(async () => '/repo');
+    setLaunchRepoClaim(claim);
+    await expect(createViewerApi().takeLaunchRepo(7)).resolves.toBe('/repo');
+    expect(claim).toHaveBeenCalledWith(7);
+  });
+
   it('reports the running versions rather than a service call', () => {
     // getVersion is the one method that answers from the process
     // itself; it must not start delegating by accident.

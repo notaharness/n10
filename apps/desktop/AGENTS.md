@@ -54,6 +54,12 @@ Every rule below has its reasoning in `docs/decisions.md`.
   repo, so the pane stays mounted across the switch. Repository writes wait
   on `writable()` (`lib/data/repo-switch.ts`): mutations do through the
   `MutationCache`; a direct bridge write must call it.
+- A later launch sends its start directory as the single-instance lock's
+  `additionalData` (`main/second-launch.ts`), never through `argv`. The
+  running app sends it to the claiming page as `open-repo` with a path, which
+  the gate in `App.tsx` handles for both screens. Launches wait in
+  `main/launch-repo.ts` until a page claims them (`takeLaunchRepo`, which the
+  host hands to main).
 - The reads a pane or the sidebar makes name the repository they read
   (`getSidebarModel(repo)`, sync state, branch lists, the review reads,
   sessions, branch sessions, agent options, worktree diffs; diff requests
