@@ -985,8 +985,14 @@ still holding its own token. A holder on this machine is judged by its pid alone
 never by age, so a stopped TUI or a slow network never loses its claim; a holder
 that cannot be checked counts as gone after a minute. Breaking a lock happens under
 a second `.break` lock and only if the file still holds the token judged gone, so
-two waiters cannot both break it and both get in. Known limit: a lock left by a
-crashed process whose pid has since been reused stays until that process exits.
+two waiters cannot both break it and both get in. A lock written before the
+machine last booted is gone whatever its pid now names, since after a power loss
+that pid can belong to a live, even root, process. Known limit: within one boot, a
+lock left by a crashed process whose pid has since been reused stays until that
+process exits.
+
+A write reads the file strictly: no file is no findings, but a file it cannot open
+or parse fails the write and leaves the file as it is, where a reader shows nothing.
 
 ## Guided review
 

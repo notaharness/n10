@@ -4,9 +4,10 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
-import { hostname, tmpdir } from 'node:os';
+import { hostname, tmpdir, uptime } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { claimFile, isClaimed, withFileLock } from './file-lock.js';
@@ -71,6 +72,25 @@ describe('withFileLock', () => {
     // Taken over while it ran: releasing must not free the new holder.
     withFileLock(lock, () => writeFileSync(lock, token(process.pid)));
     expect(readFileSync(lock, 'utf8')).toBe(token(process.pid));
+  });
+
+  it('takes over a lock written before this boot, whatever its pid now names', () => {
+    // After a power loss the pid can name a live process, even a root
+    // one that answers EPERM.
+    writeFileSync(lock, token(process.pid));
+    const beforeBoot = Date.now() / 1000 - uptime() - 60;
+    utimesSync(lock, beforeBoot, beforeBoot);
+    expect(isClaimed(lock)).toBe(false);
+    expect(withFileLock(lock, () => 'ran', 50)).toBe('ran');
+  });
+
+  it('clears a break lock its breaker died holding, then takes the lock', () => {
+    writeFileSync(lock, token(deadPid()));
+    writeFileSync(`${lock}.break`, token(deadPid()));
+    expect(withFileLock(lock, () => existsSync(`${lock}.break`), 200)).toBe(
+      false
+    );
+    expect(existsSync(lock)).toBe(false);
   });
 
   it('judges a holder on another machine by age alone', () => {

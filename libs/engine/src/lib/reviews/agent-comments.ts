@@ -15,6 +15,9 @@ import {
   type ReviewContextOptions,
 } from './review-context.js';
 
+/** The findings, and the claim a post in any process holds. */
+const WATCHED = new Set(['comments.json', 'posting.lock']);
+
 /** One repo owns agent findings, filesystem observation and publication policy. */
 export function createAgentComments(
   options: ReviewContextOptions,
@@ -55,7 +58,10 @@ export function createAgentComments(
         if (!watchers.has(prId)) {
           const dir = commentDirPath(repo(), prId);
           mkdirSync(dir, { recursive: true });
-          const watcher = watch(dir, () => current.invalidate());
+          // Lock and temporary files come and go on every write.
+          const watcher = watch(dir, (_event, name) => {
+            if (!name || WATCHED.has(name)) current.invalidate();
+          });
           watcher.on('error', (error) => {
             logError('agent comments watch', error);
             watcher.close();

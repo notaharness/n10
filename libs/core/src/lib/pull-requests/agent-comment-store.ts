@@ -1,14 +1,40 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { logError } from '@n10/logger';
 import {
   commentDirPath,
   commentFilePath,
-  readComments,
   type ReviewComment,
   type ReviewCommentsFile,
 } from '@n10/review-comments';
-import { claimFile, isClaimed, withFileLock } from '../file-lock.js';
+import {
+  claimFile,
+  isClaimed,
+  LockTimeoutError,
+  withFileLock,
+} from '../file-lock.js';
+
+/**
+ * The findings as stored, for a write: none only when there is no file.
+ * Anything else unreadable throws, so a write never replaces findings
+ * it could not read.
+ */
+function readForWrite(path: string): ReviewComment[] {
+  let text: string;
+  try {
+    text = readFileSync(path, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw err;
+  }
+  const { comments } = JSON.parse(text) as Partial<ReviewCommentsFile>;
+  if (comments === undefined) return [];
+  if (!Array.isArray(comments)) {
+    throw new TypeError(`${path} holds no list of comments`);
+  }
+  return comments;
+}
 
 /**
  * Every write to a pull request's agent findings: `n10 util add-comment`,
@@ -24,14 +50,23 @@ export function changeAgentComments(
   const dir = commentDirPath(repository, prId);
   mkdirSync(dir, { recursive: true });
   const path = commentFilePath(repository, prId);
-  return withFileLock(`${path}.lock`, () => {
-    const comments = change(readComments(repository, prId));
-    const tmp = `${path}.${randomUUID()}.tmp`;
-    const data: ReviewCommentsFile = { prId, comments };
-    writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
-    renameSync(tmp, path);
-    return comments;
-  });
+  try {
+    return withFileLock(`${path}.lock`, () => {
+      const comments = change(readForWrite(path));
+      const tmp = `${path}.${randomUUID()}.tmp`;
+      const data: ReviewCommentsFile = { prId, comments };
+      writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
+      renameSync(tmp, path);
+      return comments;
+    });
+  } catch (err) {
+    if (!(err instanceof LockTimeoutError)) throw err;
+    logError('agent comments', err);
+    throw new Error(
+      'Another n10 process is using these review drafts. Try again.',
+      { cause: err }
+    );
+  }
 }
 
 export function appendAgentComment(

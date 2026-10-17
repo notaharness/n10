@@ -8,7 +8,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { hostname } from 'node:os';
+import { hostname, uptime } from 'node:os';
 
 /**
  * Lock files several processes take in turn: the TUI, the desktop host
@@ -80,8 +80,10 @@ function isRunning(pid: number): boolean {
 }
 
 /** A holder on this machine is judged by its pid alone, so a live one —
- *  stopped, or posting over a slow network — is never taken over. */
+ *  stopped, or posting over a slow network — is never taken over. A
+ *  lock written before this boot is gone whatever its pid now names. */
 function isGone({ token, ageMs }: Holder): boolean {
+  if (ageMs > uptime() * 1000) return true;
   let owner: { host?: unknown; pid?: unknown };
   try {
     owner = JSON.parse(token) as typeof owner;
@@ -127,6 +129,13 @@ function breakLock(path: string, gone: string): void {
 
 const pause = new Int32Array(new SharedArrayBuffer(4));
 
+export class LockTimeoutError extends Error {
+  constructor(readonly path: string) {
+    super(`Timed out waiting for ${path}`);
+    this.name = 'LockTimeoutError';
+  }
+}
+
 /**
  * Run `fn` holding `path`. Synchronous throughout: `fn` does a few
  * milliseconds of file work, so a waiter blocks no longer than the
@@ -142,7 +151,7 @@ export function withFileLock<T>(
   const deadline = Date.now() + timeoutMs;
   while (!tryTake(path, token)) {
     if (Date.now() > deadline) {
-      throw new Error(`Timed out waiting for ${path}`);
+      throw new LockTimeoutError(path);
     }
     Atomics.wait(pause, 0, 0, 5);
   }

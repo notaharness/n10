@@ -109,6 +109,38 @@ describe('changeAgentComments', () => {
   });
 });
 
+describe('a file a write cannot read', () => {
+  it('is left as it is, not replaced by the new comment alone', () => {
+    appendAgentComment(REPO, PR, comment('one'));
+    const path = commentFilePath(REPO, PR);
+    writeFileSync(path, '{"prId":42,"comm');
+    expect(() => appendAgentComment(REPO, PR, comment('two'))).toThrow();
+    expect(readFileSync(path, 'utf8')).toBe('{"prId":42,"comm');
+  });
+
+  it('is refused when it cannot be opened', () => {
+    mkdirSync(commentFilePath(REPO, PR), { recursive: true });
+    expect(() => appendAgentComment(REPO, PR, comment('one'))).toThrow(
+      'EISDIR'
+    );
+  });
+});
+
+describe('a lock another process keeps', () => {
+  it("reports it in the reader's terms after waiting", () => {
+    mkdirSync(commentDirPath(REPO, PR), { recursive: true });
+    const lock = `${commentFilePath(REPO, PR)}.lock`;
+    writeFileSync(
+      lock,
+      JSON.stringify({ host: hostname(), pid: process.pid, id: 'x' })
+    );
+    expect(() => appendAgentComment(REPO, PR, comment('one'))).toThrow(
+      'Another n10 process is using these review drafts. Try again.'
+    );
+    expect(existsSync(commentFilePath(REPO, PR))).toBe(false);
+  });
+});
+
 describe('claimAgentPost', () => {
   it('refuses a second post while the first holds the claim', () => {
     const release = claimAgentPost(REPO, PR);
