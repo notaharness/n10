@@ -11,10 +11,10 @@ import type { LaunchStep, TerminalKind } from '../../../host/contract.js';
 import { useRecentRepos } from '../../lib/data/queries.js';
 import { useRepo } from '../../lib/repo-context.js';
 import { basename, errorMessage } from '../../lib/utils.js';
+import { useMachineChoice } from '../../lib/machines/use-machine-choice.js';
 import {
   MachineChoiceSelect,
   RemoteLaunchProgress,
-  useMachineChoice,
 } from './NewTerminalMachineChoice.js';
 import { Button } from '../ui/button.js';
 import {
@@ -211,17 +211,15 @@ export function NewTerminalDialog({
 
         <MachineChoiceSelect id="new-terminal-machine" choice={machineChoice} />
 
-        {/* Finding 5: the folder choices above, "Other folder…" above
-         *  all, are browsed on THIS machine — there is no remote folder
-         *  picker (a known limitation) — so a directory picked here is
-         *  sent to the chosen machine as a plain path, which resolves
-         *  or fails against its own filesystem, not this one's. */}
+        {/* The folder choices above, "Other folder…" above all, are
+         *  browsed on THIS machine — there is no remote folder picker.
+         *  The engine opens a folder under this home at the same place
+         *  under the chosen machine's home, and fails naming it when
+         *  that machine has no such directory. */}
         {machineChoice.selectedMachine() && (
           <p className="text-sm text-muted-foreground">
-            Folders above are on this machine, not{' '}
-            {machineChoice.selectedLabel()}
-            's — it will open the same path there, or fail if that path doesn't
-            exist on it.
+            Folders above are on this machine. A folder in your home opens at
+            the same place in {machineChoice.selectedLabel()}'s home.
           </p>
         )}
 

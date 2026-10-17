@@ -1,16 +1,26 @@
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
-import { sessionMenu, sidebarRow, startSessionFromMenu } from './setup/app.js';
+import {
+  sessionMenu,
+  sidebarRow,
+  startSessionFromMenu,
+  openSessions,
+} from './setup/app.js';
 import { armContextMenuChoice } from './setup/menu.js';
 import type { ElectronApplication } from '@playwright/test';
 import { findN10SessionFor, socketEnv, tagTmuxSession } from './setup/tmux.js';
+import { fakeCli } from './setup/fake-cli.js';
+
+const codex = fakeCli('codex');
 
 const BRANCH = 'launch-dialog';
 const TITLE = `Launch ${'a-very-long-unbroken-title-'.repeat(18)}`;
 const REPORT_TIME = '2026-09-09T14:32:00Z';
 test.use({
+  env: async ({ fixtureHome }, provide) => {
+    await provide(codex.install(fixtureHome));
+  },
   fakeGitHub: {
     username: 'tester',
     prs: [{ number: 42, title: TITLE, headRefName: BRANCH }],
@@ -32,12 +42,12 @@ async function openMenu(
 ) {
   await sidebarRow(page, /#42/).first().click();
   await expect(
-    page.getByRole('button', { name: `${BRANCH} → main`, exact: true })
+    page.getByRole('button', { name: 'Open on GitHub', exact: true })
   ).toBeVisible();
-  const sessions = await page.evaluate(() => window.n10.listSessions());
-  if (!sessions.some((s) => s.running)) {
+  const sessions = await openSessions(page);
+  if (sessions.length === 0) {
     await page
-      .getByRole('button', { name: /^(Launch|Relaunch) agent$/, exact: true })
+      .getByRole('button', { name: 'Launch Agent', exact: true })
       .click();
   } else {
     await armContextMenuChoice(app, 'Session…');
@@ -109,7 +119,7 @@ test('Orchestra context shows real report metadata only for Continue and preserv
     {
       '@orchestra-spawner': 'orchestra',
       '@orchestra-orchestrator': 'planning',
-      '@orchestra-last-report': `DONE ${REPORT_TIME}`,
+      '@orchestra-last-report': `DONE ${REPORT_TIME} inbox`,
     },
     homeDir
   );
@@ -131,7 +141,7 @@ test('Orchestra context shows real report metadata only for Continue and preserv
     'planning'
   );
   expect(await pane(homeDir, name, '#{@orchestra-last-report}')).toBe(
-    `DONE ${REPORT_TIME}`
+    `DONE ${REPORT_TIME} inbox`
   );
 });
 
@@ -163,21 +173,7 @@ test('a stopped unknown agent has no Continue action; a recorded resumable agent
 test('Review sends its selected agent and instructions to the same guarded worktree session', async ({
   desktop,
 }) => {
-  const { app, page, homeDir } = desktop;
-  const bin = join(homeDir, 'agent-bin');
-  const capture = join(homeDir, 'codex-argv.json');
-  mkdirSync(bin);
-  const fake = join(bin, 'codex');
-  writeFileSync(
-    fake,
-    `#!/usr/bin/env node\nrequire('node:fs').writeFileSync(${JSON.stringify(
-      capture
-    )},JSON.stringify(process.argv.slice(2)));\nconsole.log('selected-codex-ready');\nsetInterval(()=>{},60000);\n`
-  );
-  chmodSync(fake, 0o755);
-  await app.evaluate((_electron, path) => {
-    process.env.PATH = `${path}:${process.env.PATH}`;
-  }, bin);
+  const { app, page, homeDir, repoPath } = desktop;
   await openMenu(page, app);
   await startSessionFromMenu(page);
   await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible();
@@ -187,7 +183,7 @@ test('Review sends its selected agent and instructions to the same guarded workt
     {
       '@orchestra-spawner': 'orchestra',
       '@orchestra-orchestrator': 'planning',
-      '@orchestra-last-report': `DONE ${REPORT_TIME}`,
+      '@orchestra-last-report': `DONE ${REPORT_TIME} inbox`,
     },
     homeDir
   );
@@ -207,16 +203,22 @@ test('Review sends its selected agent and instructions to the same guarded workt
   await page.getByRole('option', { name: 'Codex', exact: true }).click();
   await menu
     .getByLabel('Additional instructions')
-    .fill('Check module boundaries.');
+    .fill(
+      'Check module boundaries. Preserve "quotes", $HOME and `code`.\nSecond line.'
+    );
   await expect(menu.getByRole('note')).toContainText(
     'stops the running Custom session'
   );
   await menu
     .getByRole('button', { name: 'Stop and start review', exact: true })
     .click();
-  await expect(page.getByText('selected-codex-ready').first()).toBeVisible();
-  const args: string[] = JSON.parse(readFileSync(capture, 'utf8'));
-  expect(args.join('\n')).toContain('Check module boundaries.');
+  await expect(page.getByText('fake-codex-ready').first()).toBeVisible();
+  const [{ args }] = codex.calls(join(repoPath, '.claude/worktrees', BRANCH));
+  expect(args).toHaveLength(2);
+  expect(args[0]).toBe('--');
+  expect(args.join('\n')).toContain(
+    'Check module boundaries. Preserve "quotes", $HOME and `code`.\nSecond line.'
+  );
   expect(args.join('\n')).toContain('n10 util add-comment');
   expect(args.join('\n')).toContain('42');
   expect(args).not.toContain('resume');
@@ -225,5 +227,35 @@ test('Review sends its selected agent and instructions to the same guarded workt
   expect(await pane(homeDir, name, '#{@orchestra-spawner}')).toBe('orchestra');
   expect(await pane(homeDir, name, '#{@orchestra-orchestrator}')).toBe('');
   expect(await pane(homeDir, name, '#{@orchestra-last-report}')).toBe('');
-  expect(await page.evaluate(() => window.n10.listSessions())).toHaveLength(1);
+  expect(await openSessions(page)).toHaveLength(1);
+});
+
+test('Enter or Space on a mode chooses it and moves on to the agent, rather than switching it off', async ({
+  desktop,
+}) => {
+  const { app, page } = desktop;
+  const menu = await openMenu(page, app);
+  const picker = menu.getByRole('combobox', { name: 'Agent' });
+  await expect(picker).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(
+    menu.getByRole('radio', { name: 'New session', exact: true })
+  ).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  const review = menu.getByRole('radio', { name: 'Review', exact: true });
+  // The arrows only move focus; Enter chooses.
+  await expect(review).toBeFocused();
+  await expect(review).not.toBeChecked();
+  await page.keyboard.press('Enter');
+  await expect(review).toBeChecked();
+  await expect(picker).toBeFocused();
+  await expect(menu.getByLabel('Additional instructions')).toBeVisible();
+  // Enter or Space on the mode already chosen keeps it.
+  for (const key of ['Enter', 'Space']) {
+    await page.keyboard.press('Shift+Tab');
+    await expect(review).toBeFocused();
+    await page.keyboard.press(key);
+    await expect(review).toBeChecked();
+    await expect(picker).toBeFocused();
+  }
 });

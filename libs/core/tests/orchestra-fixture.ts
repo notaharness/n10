@@ -15,7 +15,7 @@ import { killAll } from '../src/lib/pty-registry.js';
 
 const fixtures = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const archiveHash =
-  '8f2203443b94cecfc86e31b0aecb5f3d1329fa3612530fd16c30d24ba72d44d5';
+  'afe847911e21a8c73866d4743fd1cd645973bc5a6011ab14729d946efb65ea83';
 
 /** One plugin install, repository and tmux server per test. */
 export function orchestraFixture() {
@@ -121,7 +121,9 @@ export function orchestraFixture() {
         // Only this fixture's server; the last individually killed
         // session shuts it down. Never kill-server, even on a scratch
         // socket. `list-sessions` throws (execFileSync) when the server
-        // is already gone — nothing left to kill, not a fixture failure.
+        // is already gone, or answers "server exited unexpectedly" while
+        // it is still going down after its last session — either way
+        // nothing is left to kill, not a fixture failure.
         // That is the only failure this scopes to: assertIsolated()
         // (inside every `tmux(...)` call, including this one) must keep
         // throwing through, or a lost isolation guarantee — $TMUX
@@ -133,7 +135,10 @@ export function orchestraFixture() {
             .split('\n')
             .filter(Boolean);
         } catch (error) {
-          if (!/no server running/.test(String(error))) throw error;
+          if (
+            !/no server running|server exited unexpectedly/.test(String(error))
+          )
+            throw error;
         }
         for (const name of names) tmux('kill-session', '-t', `=${name}:`);
       } finally {

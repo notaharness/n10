@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import type { BabysitStatus, SidebarItem } from '../../../host/contract.js';
 import { useRepo } from '../../lib/repo-context.js';
+import { useHoverPrewarm } from '../../lib/tabs/prewarm.js';
+import type { Tab } from '../../lib/tabs/tabs.js';
 import {
   useCreateWorktree,
   useKillSession,
@@ -16,10 +18,10 @@ import { babysitBadge } from '../../lib/sidebar/babysit-badge.js';
 import {
   itemBranch,
   itemHasWorktree,
-  itemKey,
   itemRunning,
   itemSessionName,
   itemTitle,
+  itemWorktreeRemoved,
 } from '../../lib/sidebar/sidebar-model.js';
 import {
   isPrRowCommand,
@@ -41,12 +43,15 @@ import { usePullRequestRow } from './use-pull-request-row.js';
 function RowBadges({
   merged,
   rebasing,
+  removed,
   conflictCount,
   babysit,
   machineLabel,
 }: {
   merged: boolean;
   rebasing: boolean;
+  /** The worktree is gone and its agent still runs. */
+  removed: boolean;
   conflictCount: number;
   babysit: BabysitStatus | undefined;
   /** The row's session machine, resolved by the caller — only when
@@ -90,6 +95,11 @@ function RowBadges({
           rebasing
         </span>
       )}
+      {removed && (
+        <span className="shrink-0 rounded bg-warning/15 px-1 text-[10px] font-medium text-warning">
+          worktree removed
+        </span>
+      )}
       {conflictCount > 0 && (
         <span
           className="shrink-0 rounded bg-warning/15 px-1 text-[10px] font-medium text-warning"
@@ -118,14 +128,23 @@ function useRowMachineLabel(
   );
 }
 
+/** A plain primary press: the one that opens a row as it goes down. */
+function opensOnPress(e: React.MouseEvent): boolean {
+  return e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey;
+}
+
 export function SidebarRow({
   item,
   active,
   onOpen,
+  opening,
 }: {
   item: SidebarItem;
   active: boolean;
   onOpen: (preview: boolean) => void;
+  /** The tab a click on the row shows, for resting on it to render
+   *  ahead of the click. */
+  opening: () => Tab;
 }) {
   const { repo } = useRepo();
   const kill = useKillSession(repo.cwd);
@@ -133,6 +152,7 @@ export function SidebarRow({
   const openEditor = useOpenInEditor();
   const [confirmRemove, setConfirmRemove] = useState(false);
 
+  const hover = useHoverPrewarm(() => (active ? null : opening()));
   const running = itemRunning(item);
   const hasWorktree = itemHasWorktree(item);
   const branch = itemBranch(item);
@@ -177,6 +197,7 @@ export function SidebarRow({
         running,
         hasPr: Boolean(pr),
         babysitting: Boolean(item.babysit),
+        worktreeRemoved: itemWorktreeRemoved(item),
       })
     );
     if (!isSidebarRowCommand(chosen)) return;
@@ -218,7 +239,17 @@ export function SidebarRow({
       <div
         role="button"
         tabIndex={0}
-        onClick={() => onOpen(true)}
+        {...hover.handlers}
+        // Opens as the button goes down, as a tab does; a modified
+        // click opens on release, as it always has.
+        onMouseDown={(e) => {
+          if (!opensOnPress(e)) return;
+          hover.pressed();
+          onOpen(true);
+        }}
+        onClick={(e) => {
+          if (!opensOnPress(e)) onOpen(true);
+        }}
         onDoubleClick={onActivate}
         onContextMenu={(e) => void openContextMenu(e)}
         onKeyDown={(e) => {
@@ -243,6 +274,7 @@ export function SidebarRow({
             <RowBadges
               merged={merged}
               rebasing={rebasing}
+              removed={itemWorktreeRemoved(item)}
               conflictCount={conflictCount}
               babysit={item.babysit}
               machineLabel={machineLabel}
@@ -267,7 +299,6 @@ export function SidebarRow({
       {confirmRemove && (
         <RemoveWorktreeDialog
           branch={branch}
-          itemKey={itemKey(item)}
           running={running}
           onClose={() => setConfirmRemove(false)}
         />

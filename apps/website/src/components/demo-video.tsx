@@ -43,9 +43,9 @@ function useSiteTheme(): 'light' | 'dark' | null {
  * filmed in real time and may be a few frames apart. Nothing is
  * fetched for a theme not shown.
  *
- * Under prefers-reduced-motion it doesn't autoplay: the poster shows,
- * with controls to play it. `autoplay` is never server-rendered, since
- * the browser would act on it before hydration could take it back;
+ * Under prefers-reduced-motion it stays still. `autoplay` is never
+ * server-rendered, since the browser would act on it before hydration
+ * could take it back;
  * playback starts from an effect instead.
  */
 export function DemoVideo({
@@ -92,7 +92,6 @@ export function DemoVideo({
           key={theme}
           ref={ref}
           className="absolute inset-0 size-full object-cover"
-          controls={reduced}
           muted
           loop
           playsInline

@@ -1,43 +1,42 @@
+import { installQuitHandler, quitForUpdate, quitForNpmUpdate } from './quit.js';
 import { join } from 'node:path';
+import { isatty } from 'node:tty';
 import {
   app,
   BrowserWindow,
   dialog,
-  ipcMain,
   Menu,
   nativeTheme,
   shell,
+  webContents,
 } from 'electron';
 import {
-  registerHostHandlers,
-  setExternalOpener,
-  setFolderPicker,
-  setShellGlue,
-} from '../host/register-handlers.js';
-import { applySessionBackend, killAll, probeTmuxAvailability } from '@n10/core';
+  holdMenuShortcuts,
+  releaseMenuShortcutsOnLoad,
+} from './menu-shortcuts.js';
 import {
   MENU_EVENTS,
   type ContextMenuItem,
   type DesktopPrefs,
   type MenuCommand,
 } from '../host/contract.js';
-import { openStartupRepo } from '../host/services/repo.js';
-import { stopRemoteSyncLoop } from '../host/services/remote-sync.js';
-import { stopDiscovery } from '../host/services/discovery.js';
-import { stopAllBabysitters } from '../host/services/babysit.js';
 import { loadDesktopPrefs } from '../host/services/desktop-prefs.js';
-import { installMachineResolver } from '../host/services/remote-machines.js';
-import {
-  appBeamClient,
-  installSessionBin,
-  quitAfterBeam,
-} from './beam/app-beam.js';
-import { installHostEventBridge } from './host-events.js';
-import { installDesktopTmuxPreparer } from './tmux-session-preparer.js';
+import { onPageGone, windowPushes } from './host-events.js';
+import { startHostProcess, type HostProcess } from './host-process.js';
 import { MAIN_MARKS, mark } from './boot-marks.js';
 import { pickFolderWithDialog } from './folder-picker.js';
 import { buildMenuTemplate } from '../host/menu-template.js';
 import { installSecondLaunch, secondLaunchData } from './second-launch.js';
+import { claimLaunchRepo } from './launch-repo.js';
+import { installUnsavedGuard } from './unsaved-guard.js';
+import { installDockIcon, windowIcon } from './app-icon.js';
+import { showAbout } from './about.js';
+import {
+  appIdentity,
+  importLoginShellPath,
+  launchStartDir,
+} from './launch-env.js';
+import { runQaSteps } from './qa-steps.js';
 import {
   installProcessDiagnostics,
   installRendererRecovery,
@@ -46,6 +45,7 @@ import {
   isAllowedNavigation,
   loadTarget,
   rendererWebPreferences,
+  showWhenReadyOrLoaded,
   windowChrome,
 } from './window.js';
 
@@ -53,13 +53,23 @@ mark(MAIN_MARKS.module);
 
 const DIST = join(import.meta.dirname, '..');
 const DEV_SERVER_URL = process.env.N10_VITE_URL;
-const APP_VERSION = process.env.N10_DESKTOP_VERSION ?? 'dev';
-const IS_DEV = Boolean(DEV_SERVER_URL) || APP_VERSION === 'dev';
-// The directory this launch was asked to open. Read here, once, for the
-// single-instance lock: a second launch hands it to the running app.
-const START_DIR = process.env.N10_START_DIR || undefined;
+const { version: APP_VERSION, isDev: IS_DEV } = appIdentity(
+  app.getName(),
+  app.getVersion(),
+  process.env
+);
+const FROM_TERMINAL = isatty(0);
+const START_DIR = launchStartDir({
+  env: process.env,
+  argv: process.argv,
+  cwd: process.cwd(),
+  packaged: app.isPackaged,
+  fromTerminal: FROM_TERMINAL,
+});
+delete process.env.N10_START_DIR;
 
 let prefs: DesktopPrefs = loadDesktopPrefs();
+let host: HostProcess | null = null;
 
 // ── Native application menu ──────────────────────────────────────
 
@@ -82,23 +92,6 @@ function installAppMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-function showAbout(): Promise<void> {
-  return dialog
-    .showMessageBox({
-      type: 'info',
-      title: 'About n10 Desktop',
-      message: 'n10 Desktop',
-      detail: [
-        `Version ${APP_VERSION}`,
-        `Electron ${process.versions.electron} · Chromium ${process.versions.chrome} · Node ${process.versions.node}`,
-        '',
-        'Worktrees, agents and reviews for one repository.',
-      ].join('\n'),
-      buttons: ['OK'],
-    })
-    .then(() => undefined);
-}
-
 function popupContextMenu(items: ContextMenuItem[]): Promise<string | null> {
   return new Promise((resolve) => {
     let chosen: string | null = null;
@@ -109,6 +102,9 @@ function popupContextMenu(items: ContextMenuItem[]): Promise<string | null> {
           : {
               label: item.label,
               enabled: item.enabled ?? true,
+              ...(item.checked === undefined
+                ? {}
+                : { type: 'radio' as const, checked: item.checked }),
               click: () => {
                 chosen = item.id;
               },
@@ -155,6 +151,7 @@ function createMainWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     title: 'n10',
+    icon: windowIcon(DIST),
     show: false,
     autoHideMenuBar: false,
     ...chrome,
@@ -173,7 +170,7 @@ function createMainWindow(): BrowserWindow {
     void win.loadFile(target.path);
   }
 
-  win.once('ready-to-show', () => win.show());
+  showWhenReadyOrLoaded(win);
   win.webContents.on('did-finish-load', () => {
     console.log('[desktop] renderer loaded');
     void runQaSteps(win);
@@ -195,99 +192,69 @@ function createMainWindow(): BrowserWindow {
   });
 
   installRendererRecovery(win);
+  releaseMenuShortcutsOnLoad(win.webContents);
+  installUnsavedGuard(win);
   return win;
 }
 
-// ── Headless QA hook ─────────────────────────────────────────────
-// N10_QA_STEPS='[{"js":"...","waitMs":500,"shot":"/tmp/a.png"}]'
-// runs each step's JS in the page, waits, captures a PNG, then quits.
-// Dev/CI only — lets us screenshot the real app under xvfb.
+// ── The session host ─────────────────────────────────────────────
+// Every host service runs in its own utility process (host-worker.ts);
+// this process forwards the contract to it and does what only it can.
 
-interface QaStep {
-  js?: string;
-  waitMs?: number;
-  shot?: string;
-}
-
-async function runQaSteps(win: BrowserWindow): Promise<void> {
-  const raw = process.env.N10_QA_STEPS;
-  if (!raw) return;
-  let steps: QaStep[] = [];
-  try {
-    steps = JSON.parse(raw) as QaStep[];
-  } catch (err) {
-    console.error('[desktop] bad N10_QA_STEPS:', err);
-    app.quit();
-    return;
-  }
-  const { writeFile } = await import('node:fs/promises');
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  // Hidden/occluded windows may never paint, which makes capturePage
-  // hang — force the window visible and un-throttled for the run.
-  win.show();
-  win.focus();
-  win.webContents.setBackgroundThrottling(false);
-  console.log(`[desktop] qa: ${steps.length} steps`);
-  await sleep(1500);
-  let i = 0;
-  for (const step of steps) {
-    i += 1;
-    try {
-      if (step.js) {
-        const r: unknown = await win.webContents.executeJavaScript(
-          step.js,
-          true
+function startHost(): HostProcess {
+  const host = startHostProcess({
+    startDir: START_DIR,
+    pushes: windowPushes,
+    shell: {
+      quitForUpdate,
+      quitForNpmUpdate,
+      pickFolder: pickFolderWithDialog,
+      openExternal: async (url) => {
+        if (!/^https?:/i.test(url)) throw new Error(`Refusing to open ${url}`);
+        await shell.openExternal(url);
+      },
+      contextMenu: popupContextMenu,
+      appMenuPopup: async () => {
+        const menu = Menu.getApplicationMenu();
+        const win = BrowserWindow.getFocusedWindow() ?? undefined;
+        menu?.popup({ window: win });
+      },
+      aboutBox: () => showAbout(APP_VERSION),
+      prefsChanged: async (next) => {
+        prefs = next;
+        nativeTheme.themeSource = next.theme; // recolors overlay + native menus
+        installAppMenu(); // theme radio state lives in the menu
+      },
+      holdMenuShortcuts,
+      takeLaunchRepo: async (viewer) => claimLaunchRepo(viewer),
+    },
+    // The new host has no watches; reloaded pages watch again.
+    onRespawn: () => {
+      for (const win of BrowserWindow.getAllWindows()) win.webContents.reload();
+    },
+    // The message says it all; the title only names the app.
+    onFailed: (message) => {
+      dialog
+        .showMessageBox({
+          type: 'error',
+          title: 'n10',
+          message,
+          buttons: ['Quit', 'Keep Window Open'],
+          defaultId: 0,
+        })
+        .then(({ response }) => {
+          if (response === 0) app.quit();
+        })
+        .catch((err: unknown) =>
+          console.error('[desktop] host failure dialog', err)
         );
-        console.log(`[desktop] qa step ${i} js →`, r);
-      }
-      await sleep(step.waitMs ?? 600);
-      if (step.shot) {
-        const img = await win.webContents.capturePage();
-        await writeFile(step.shot, img.toPNG());
-        console.log(`[desktop] qa step ${i} shot → ${step.shot}`);
-      }
-    } catch (err) {
-      console.error(`[desktop] qa step ${i} failed:`, err);
-    }
-  }
-  app.quit();
+    },
+  });
+  onPageGone((viewer) => host.dropViewer(viewer));
+  return host;
 }
 
-// ── Host contract (main-process side) ────────────────────────────
-
-registerHostHandlers(ipcMain);
-
-setFolderPicker(pickFolderWithDialog);
-
-setExternalOpener(async (url) => {
-  if (!/^https?:/i.test(url)) throw new Error(`Refusing to open ${url}`);
-  await shell.openExternal(url);
-});
-
-setShellGlue({
-  contextMenu: popupContextMenu,
-  appMenuPopup: async () => {
-    const menu = Menu.getApplicationMenu();
-    const win = BrowserWindow.getFocusedWindow() ?? undefined;
-    menu?.popup({ window: win });
-  },
-  aboutBox: showAbout,
-  prefsChanged: (next) => {
-    prefs = next;
-    nativeTheme.themeSource = next.theme; // recolors overlay + native menus
-    installAppMenu(); // theme radio state lives in the menu
-  },
-});
-
-installHostEventBridge();
 installProcessDiagnostics();
-
-// Machines come from the beam daemon's control socket; remote launches
-// resolve their machine through the ports the client installs. The app
-// starts a daemon when none is running (D15), once ready: a utility
-// process cannot be forked before then.
-const beam = appBeamClient();
-installMachineResolver();
 
 // ── App lifecycle ────────────────────────────────────────────────
 
@@ -297,9 +264,11 @@ installMachineResolver();
 if (!app.requestSingleInstanceLock(secondLaunchData(START_DIR))) {
   app.quit();
 } else {
-  // Only the instance that holds the lock rewrites what its sessions run.
-  installSessionBin(app.getPath('userData'));
-  installSecondLaunch((cwd) => sendMenuCommand('open-repo', cwd));
+  installSecondLaunch((viewer, cwd) =>
+    webContents
+      .fromId(viewer)
+      ?.send(MENU_EVENTS.command, { command: 'open-repo', arg: cwd })
+  );
 
   // A throw in here leaves the app running with no window and no
   // sign of why, so startup failures are logged rather than dropped.
@@ -307,15 +276,16 @@ if (!app.requestSingleInstanceLock(secondLaunchData(START_DIR))) {
     .whenReady()
     .then(async () => {
       mark(MAIN_MARKS.ready);
-      beam.start();
+      installDockIcon(DIST);
+      if (app.isPackaged && !FROM_TERMINAL) await importLoginShellPath();
       nativeTheme.themeSource = prefs.theme;
       installAppMenu();
-      installDesktopTmuxPreparer();
-      await probeTmuxAvailability();
-      applySessionBackend();
-      const opened = openStartupRepo();
+      // Only the instance that holds the lock starts a host, so only it
+      // rewrites what its sessions run (the host's session bin).
+      host = startHost();
+      const opened = await host.started;
       mark(MAIN_MARKS.repo);
-      console.log(`[desktop] startup repo: ${opened ? opened.cwd : 'none'}`);
+      console.log(`[desktop] startup repo: ${opened ?? 'none'}`);
 
       void createMainWindow();
       mark(MAIN_MARKS.window);
@@ -346,15 +316,4 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Release local terminal clients; the tmux-hosted processes survive app exit.
-// Then wait for the beam daemon the app started to stop.
-quitAfterBeam(beam, () => {
-  stopRemoteSyncLoop();
-  stopDiscovery();
-  stopAllBabysitters();
-  try {
-    killAll();
-  } catch {
-    // nothing was running
-  }
-});
+installQuitHandler(() => host);

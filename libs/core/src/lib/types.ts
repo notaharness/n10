@@ -19,6 +19,10 @@ export type SidebarItem =
       kind: 'session';
       session: AgentSession;
       pr?: PullRequestInfo;
+      /** The viewer authored `pr`. Only then does the row file under the
+       *  pull request sections: a checkout of someone else's pull
+       *  request that no review section lists is a worktree row. */
+      authored?: boolean;
       branch?: string;
       isMerged: boolean;
       conflictCount?: number;
@@ -76,6 +80,10 @@ export interface AgentSession {
   /** The branch the agent session in this worktree was created for,
    *  set only when the worktree has since switched to another one. */
   sessionBranch?: string;
+  /** The checkout is gone — removed, by n10 or not, while its agent
+   *  ran — and the agent still runs. The row lasts as long as the agent
+   *  does, so it can be seen and stopped (`strandedSessionRows`). */
+  worktreeRemoved?: true;
 }
 
 export type { DiffFile, FileCategory } from '@n10/diff';

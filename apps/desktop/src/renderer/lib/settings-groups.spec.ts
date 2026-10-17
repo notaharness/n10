@@ -16,7 +16,9 @@ describe('visibleSettingsGroups', () => {
     // not empty the page, and machines is repo-independent so it has
     // nothing to wait on in the first place.
     expect(visibleSettingsGroups(undefined).map((g) => g.key)).toEqual([
+      'updates',
       'appearance',
+      'keyboard',
       'machines',
     ]);
     expect(visibleSettingsGroups([])[0]?.fields).toEqual([]);
@@ -25,7 +27,9 @@ describe('visibleSettingsGroups', () => {
   it('drops sections the host sent no fields for', () => {
     const groups = visibleSettingsGroups([field('agentCommand', 'agent')]);
     expect(groups.map((g) => g.key)).toEqual([
+      'updates',
       'appearance',
+      'keyboard',
       'agent',
       'machines',
     ]);
@@ -41,7 +45,9 @@ describe('visibleSettingsGroups', () => {
     // order that tracked the host's arbitrary field order would move
     // the nav around whenever the catalog was reordered.
     expect(groups.map((g) => g.key)).toEqual([
+      'updates',
       'appearance',
+      'keyboard',
       'general',
       'terminal',
       'provider',
@@ -67,7 +73,9 @@ describe('visibleSettingsGroups', () => {
     const rogue = field('mystery', 'quantum' as SettingsFieldView['group']);
     const groups = visibleSettingsGroups([rogue, field('editor', 'general')]);
     expect(groups.map((g) => g.key)).toEqual([
+      'updates',
       'appearance',
+      'keyboard',
       'general',
       'machines',
     ]);

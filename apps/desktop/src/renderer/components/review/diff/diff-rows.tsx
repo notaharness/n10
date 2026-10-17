@@ -8,9 +8,12 @@ import type { DiffLine } from '@n10/diff';
 import type { SplitCell } from '../../../lib/diff/diff-model.js';
 import type { CharRange } from '../../../lib/diff/word-diff.js';
 import type { LineTokens } from '../../../lib/diff/highlight.js';
+import { textRanges } from '../../../lib/diff/text-matches.js';
 import { cn } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
 import { Tip } from '../../ui/tooltip.js';
+import { LineGutter, type GutterProps } from './LineGutter.js';
+import { shiftRanges, splitRanges } from './diff-text-segments.js';
 
 export const ROW_BG: Record<DiffLine['type'], string> = {
   add: 'bg-diff-add',
@@ -55,13 +58,21 @@ export function LineContent({
   tokens,
   ranges,
   wrap,
+  searchTerm,
+  selectionTerm,
+  activeSearchStart,
 }: {
   line: DiffLine;
   tokens: LineTokens | undefined;
   ranges?: CharRange[];
   wrap?: boolean;
+  searchTerm?: string;
+  selectionTerm?: string;
+  activeSearchStart?: number;
 }) {
   const text = line.content || ' ';
+  const searchRanges = textRanges(text, searchTerm ?? '');
+  const selectionRanges = textRanges(text, selectionTerm ?? '');
   const emphasis =
     line.type === 'add'
       ? 'bg-success/25 rounded-[2px]'
@@ -74,7 +85,19 @@ export function LineContent({
   );
 
   if (!tokens) {
-    return <span className={cls}>{splitRanges(text, ranges, emphasis)}</span>;
+    return (
+      <span data-diff-code className={cls}>
+        {splitRanges(
+          text,
+          ranges,
+          emphasis,
+          '',
+          searchRanges,
+          selectionRanges,
+          activeSearchStart
+        )}
+      </span>
+    );
   }
   let pos = 0;
   const out: ReactNode[] = [];
@@ -84,51 +107,27 @@ export function LineContent({
     pos = end;
     out.push(
       <span key={start} style={{ color: tok.color }}>
-        {splitRanges(tok.content, shiftRanges(ranges, start, end), emphasis, j)}
+        {splitRanges(
+          tok.content,
+          shiftRanges(ranges, start, end),
+          emphasis,
+          j,
+          shiftRanges(searchRanges, start, end) ?? [],
+          shiftRanges(selectionRanges, start, end) ?? [],
+          activeSearchStart !== undefined &&
+            activeSearchStart >= start &&
+            activeSearchStart < end
+            ? activeSearchStart - start
+            : undefined
+        )}
       </span>
     );
   });
-  return <span className={cls}>{out}</span>;
-}
-
-function shiftRanges(
-  ranges: CharRange[] | undefined,
-  start: number,
-  end: number
-): CharRange[] | undefined {
-  if (!ranges) return undefined;
-  const out: CharRange[] = [];
-  for (const r of ranges) {
-    const s = Math.max(r.start, start);
-    const e = Math.min(r.end, end);
-    if (s < e) out.push({ start: s - start, end: e - start });
-  }
-  return out.length ? out : undefined;
-}
-
-function splitRanges(
-  text: string,
-  ranges: CharRange[] | undefined,
-  emphasis: string,
-  keyPrefix: number | string = ''
-): ReactNode {
-  if (!ranges || ranges.length === 0) return text;
-  const out: ReactNode[] = [];
-  let pos = 0;
-  ranges.forEach((r) => {
-    if (r.start > pos) out.push(text.slice(pos, r.start));
-    out.push(
-      <mark
-        key={`${keyPrefix}-${r.start}`}
-        className={cn('text-inherit', emphasis)}
-      >
-        {text.slice(r.start, r.end)}
-      </mark>
-    );
-    pos = r.end;
-  });
-  if (pos < text.length) out.push(text.slice(pos));
-  return out;
+  return (
+    <span data-diff-code className={cls}>
+      {out}
+    </span>
+  );
 }
 
 /** One unified-diff line: old/new gutter + sign + content. */
@@ -137,12 +136,30 @@ export function UnifiedRow({
   tokens,
   ranges,
   wrap,
+  gutter,
+  searchTerm,
+  selectionTerm,
+  activeSearchStart,
 }: {
   line: DiffLine;
   tokens: LineTokens | undefined;
   ranges?: CharRange[];
   wrap: boolean;
+  gutter?: GutterProps;
+  searchTerm?: string;
+  selectionTerm?: string;
+  activeSearchStart?: number;
 }) {
+  const numbers = (
+    <>
+      <span className="w-[var(--gutter,2.75rem)] pr-2 text-right tabular-nums">
+        {line.oldLine ?? ''}
+      </span>
+      <span className="w-[var(--gutter,2.75rem)] pr-2 text-right tabular-nums">
+        {line.newLine ?? ''}
+      </span>
+    </>
+  );
   return (
     <div
       className={cn('flex', wrap ? 'w-full' : 'min-w-max', ROW_BG[line.type])}
@@ -153,15 +170,18 @@ export function UnifiedRow({
           GUTTER_BG[line.type]
         )}
       >
-        <span className="w-11 pr-2 text-right tabular-nums">
-          {line.oldLine ?? ''}
-        </span>
-        <span className="w-11 pr-2 text-right tabular-nums">
-          {line.newLine ?? ''}
-        </span>
+        {gutter ? <LineGutter gutter={gutter}>{numbers}</LineGutter> : numbers}
         <SignCell type={line.type} />
       </span>
-      <LineContent line={line} tokens={tokens} ranges={ranges} wrap={wrap} />
+      <LineContent
+        line={line}
+        tokens={tokens}
+        ranges={ranges}
+        wrap={wrap}
+        searchTerm={searchTerm}
+        selectionTerm={selectionTerm}
+        activeSearchStart={activeSearchStart}
+      />
     </div>
   );
 }
@@ -173,12 +193,20 @@ export function SplitCell({
   ranges,
   side,
   wrap,
+  gutter,
+  searchTerm,
+  selectionTerm,
+  activeSearchStart,
 }: {
   cell: SplitCell | null;
   tokens: LineTokens | undefined;
   ranges?: CharRange[];
   side: 'L' | 'R';
   wrap: boolean;
+  gutter?: GutterProps;
+  searchTerm?: string;
+  selectionTerm?: string;
+  activeSearchStart?: number;
 }) {
   if (!cell) {
     return <div className="min-w-0 border-l border-border bg-muted/20" />;
@@ -199,10 +227,28 @@ export function SplitCell({
           GUTTER_BG[line.type]
         )}
       >
-        <span className="w-11 pr-2 text-right tabular-nums">{num ?? ''}</span>
+        {gutter ? (
+          <LineGutter gutter={gutter}>
+            <span className="w-[var(--gutter,2.75rem)] pr-2 text-right tabular-nums">
+              {num ?? ''}
+            </span>
+          </LineGutter>
+        ) : (
+          <span className="w-[var(--gutter,2.75rem)] pr-2 text-right tabular-nums">
+            {num ?? ''}
+          </span>
+        )}
         <SignCell type={line.type} />
       </span>
-      <LineContent line={line} tokens={tokens} ranges={ranges} wrap={wrap} />
+      <LineContent
+        line={line}
+        tokens={tokens}
+        ranges={ranges}
+        wrap={wrap}
+        searchTerm={searchTerm}
+        selectionTerm={selectionTerm}
+        activeSearchStart={activeSearchStart}
+      />
     </div>
   );
 }

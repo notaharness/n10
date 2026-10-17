@@ -14,12 +14,13 @@ vi.mock('electron', () => ({
 const { installSecondLaunch, requestedRepo, secondLaunchData } = await import(
   './second-launch.js'
 );
-const { claimLaunchRepo, releaseLaunchRepo } = await import(
-  '../host/services/launch-repo.js'
-);
+const { claimLaunchRepo, releaseLaunchRepo } = await import('./launch-repo.js');
+
+/** The window's page, by its webContents id. */
+const PAGE = 1;
 
 class FakeWindow extends EventEmitter {
-  webContents = new EventEmitter();
+  webContents = Object.assign(new EventEmitter(), { id: PAGE });
   minimized = false;
   isMinimized = () => this.minimized;
   restore = vi.fn(() => {
@@ -93,8 +94,8 @@ describe('installSecondLaunch', () => {
     app.removeAllListeners();
     open.mockReset();
     // No page has claimed, and nothing waits.
-    claimLaunchRepo();
-    releaseLaunchRepo();
+    claimLaunchRepo(PAGE);
+    releaseLaunchRepo(PAGE);
     windows.length = 0;
     installSecondLaunch(open);
     win = new FakeWindow();
@@ -114,60 +115,67 @@ describe('installSecondLaunch', () => {
     launch({ startDir: other });
     launch({ startDir: repo });
     expect(open).not.toHaveBeenCalled();
-    expect(claimLaunchRepo()).toBe(repo);
-    expect(claimLaunchRepo()).toBeNull();
+    expect(claimLaunchRepo(PAGE)).toBe(repo);
+    expect(claimLaunchRepo(PAGE)).toBeNull();
   });
 
   it('opens a launch at once in a page that has claimed', () => {
-    claimLaunchRepo();
+    claimLaunchRepo(PAGE);
     launch({ startDir: repo });
-    expect(open).toHaveBeenCalledExactlyOnceWith(repo);
+    expect(open).toHaveBeenCalledExactlyOnceWith(PAGE, repo);
   });
 
   it('keeps the claim through a navigation that has only started', () => {
     // main's will-navigate may yet refuse it, leaving the page in place.
-    claimLaunchRepo();
+    claimLaunchRepo(PAGE);
     win.webContents.emit('did-start-navigation', {
       isMainFrame: true,
       isSameDocument: false,
     });
     launch({ startDir: repo });
-    expect(open).toHaveBeenCalledExactlyOnceWith(repo);
+    expect(open).toHaveBeenCalledExactlyOnceWith(PAGE, repo);
   });
 
   it('keeps launches for the next page once another document commits', () => {
-    claimLaunchRepo();
+    claimLaunchRepo(PAGE);
     win.webContents.emit('did-navigate', {}, 'file:///index.html');
     launch({ startDir: repo });
     expect(open).not.toHaveBeenCalled();
-    expect(claimLaunchRepo()).toBe(repo);
+    expect(claimLaunchRepo(PAGE)).toBe(repo);
   });
 
   it('keeps launches for the next page once the page fails to load', () => {
-    claimLaunchRepo();
+    claimLaunchRepo(PAGE);
     win.webContents.emit('did-fail-load', {}, -6, 'FAILED', 'x', false);
     launch({ startDir: other });
-    expect(open).toHaveBeenCalledExactlyOnceWith(other);
+    expect(open).toHaveBeenCalledExactlyOnceWith(PAGE, other);
 
     win.webContents.emit('did-fail-load', {}, -6, 'FAILED', 'x', true);
     launch({ startDir: repo });
     expect(open).toHaveBeenCalledOnce();
-    expect(claimLaunchRepo()).toBe(repo);
+    expect(claimLaunchRepo(PAGE)).toBe(repo);
   });
 
   it('keeps launches for the next page once the renderer dies', () => {
-    claimLaunchRepo();
+    claimLaunchRepo(PAGE);
     win.webContents.emit('render-process-gone', {}, { reason: 'crashed' });
     launch({ startDir: repo });
     expect(open).not.toHaveBeenCalled();
-    expect(claimLaunchRepo()).toBe(repo);
+    expect(claimLaunchRepo(PAGE)).toBe(repo);
   });
 
   it('keeps launches for the next window once the window closes', () => {
-    claimLaunchRepo();
+    claimLaunchRepo(PAGE);
     win.emit('closed');
     launch({ startDir: repo });
     expect(open).not.toHaveBeenCalled();
-    expect(claimLaunchRepo()).toBe(repo);
+    expect(claimLaunchRepo(PAGE)).toBe(repo);
+  });
+
+  it('keeps the claim of another page when this one goes', () => {
+    claimLaunchRepo(PAGE + 1);
+    win.webContents.emit('render-process-gone', {}, { reason: 'crashed' });
+    launch({ startDir: repo });
+    expect(open).toHaveBeenCalledExactlyOnceWith(PAGE + 1, repo);
   });
 });

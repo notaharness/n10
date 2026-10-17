@@ -1,7 +1,6 @@
 'use client';
 
-import { Pause, Play } from 'lucide-react';
-import { useState, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import {
   Beam,
   Ground,
@@ -38,12 +37,9 @@ export function OrchestraStage({ className }: { className?: string }) {
   const reduced = useSyncExternalStore(
     subscribeReduced,
     () => window.matchMedia(REDUCED).matches,
-    () => false
+    () => true
   );
-  const [choice, setChoice] = useState<boolean | null>(null);
-  const playing = choice ?? !reduced;
-  const { show, dispatch } = useShow(playing);
-  const Icon = playing ? Pause : Play;
+  const { show, dispatch } = useShow(!reduced);
   const solids = [
     { key: 'podium', at: PODIUM, node: <Podium /> },
     ...PLAYERS.map((spec, index) => ({
@@ -64,51 +60,27 @@ export function OrchestraStage({ className }: { className?: string }) {
 
   return (
     <figure className={className}>
-      <div className="relative">
-        <svg
-          viewBox={`${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`}
-          className="orchestra-stage h-auto w-full overflow-visible"
-          data-playing={choice === null ? undefined : String(choice)}
-          role="img"
-          aria-label="A laptop at the top, and five machines on an arc below it, one player each, every one joined to the laptop by its own beam. Reports fly to the laptop as notes and answers fly back; a machine shakes when an answer lands on it, and a bubble over it shows what was said."
-        >
-          <Ground />
-          {PLAYERS.map((spec, i) => (
-            <Beam key={spec.id} spec={spec} seconds={3 + i * 0.4} />
-          ))}
-          {solids.map((s) => (
-            <g key={s.key}>{s.node}</g>
-          ))}
-          {show.flights.map((flight) => (
-            <Note
-              key={flight.key}
-              flight={flight}
-              onLanded={(key) => dispatch({ type: 'landed', key })}
-            />
-          ))}
-        </svg>
-        <button
-          type="button"
-          onClick={() => setChoice(!playing)}
-          aria-label={playing ? 'Pause the animation' : 'Play the animation'}
-          className="text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground focus-visible:ring-fd-ring absolute right-0 bottom-0 inline-flex size-8 items-center justify-center rounded-md transition-colors outline-none focus-visible:ring-2"
-        >
-          <Icon className="size-4" aria-hidden />
-        </button>
-      </div>
-      {/* The nameplates are too small to read on a phone, so they give
-          way to this list there (see .orchestra-nameplate in global.css). */}
-      <ul className="mt-3 flex flex-wrap justify-center gap-2 font-mono text-xs sm:hidden">
-        {PLAYERS.map((spec) => (
-          <li
-            key={spec.id}
-            className="border-fd-border bg-fd-card rounded-full border px-2.5 py-1"
-          >
-            {spec.branch}
-            <span className="text-fd-muted-foreground"> · {spec.agent}</span>
-          </li>
+      <svg
+        viewBox={`${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`}
+        className="orchestra-stage h-auto w-full overflow-visible"
+        role="img"
+        aria-label="A laptop at the top, and five machines on an arc below it, one player each, every one joined to the laptop by its own beam. Reports fly to the laptop as notes and answers fly back; a machine shakes when an answer lands on it, and a bubble over it shows what was said."
+      >
+        <Ground />
+        {PLAYERS.map((spec, i) => (
+          <Beam key={spec.id} spec={spec} seconds={3 + i * 0.4} />
         ))}
-      </ul>
+        {solids.map((s) => (
+          <g key={s.key}>{s.node}</g>
+        ))}
+        {show.flights.map((flight) => (
+          <Note
+            key={flight.key}
+            flight={flight}
+            onLanded={(key) => dispatch({ type: 'landed', key })}
+          />
+        ))}
+      </svg>
       <p className="sr-only" aria-live="polite">
         {latest ? `${latest.head}: ${latest.text}` : ''}
       </p>

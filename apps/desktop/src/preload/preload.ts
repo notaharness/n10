@@ -8,7 +8,9 @@ import {
   MENU_EVENTS,
   SESSION_EVENTS,
   SYNC_EVENTS,
-  type BeamStatus,
+  UPDATE_EVENTS,
+  type UpdateSnapshot,
+  type FleetStatus,
   type CeremonyProgress,
   type DirectoryPublished,
   type N10HostApi,
@@ -18,6 +20,7 @@ import {
   type SessionDataEvent,
   type SessionExitEvent,
   type SyncNoticeEvent,
+  type DiscoveryChangedEvent,
   type BabysitChangedEvent,
 } from '../host/contract.js';
 
@@ -28,10 +31,23 @@ import {
  */
 const api: N10HostApi = {
   getVersion: () => ipcRenderer.invoke(IPC.getVersion),
+  onUpdatesChanged: (cb) => {
+    const listener = (_e: unknown, snapshot: UpdateSnapshot) => cb(snapshot);
+    ipcRenderer.on(UPDATE_EVENTS.changed, listener);
+    return () => ipcRenderer.removeListener(UPDATE_EVENTS.changed, listener);
+  },
+  getUpdates: () => ipcRenderer.invoke(IPC.getUpdates),
+  checkUpdates: () => ipcRenderer.invoke(IPC.checkUpdates),
+  setUpdatePreferences: (patch) =>
+    ipcRenderer.invoke(IPC.setUpdatePreferences, patch),
+  quitForUpdate: () => ipcRenderer.invoke(IPC.quitForUpdate),
+  updateAndRestart: () => ipcRenderer.invoke(IPC.updateAndRestart),
 
   openRepo: (cwd) => ipcRenderer.invoke(IPC.openRepo, cwd),
   getRepo: () => ipcRenderer.invoke(IPC.getRepo),
   takeLaunchRepo: () => ipcRenderer.invoke(IPC.takeLaunchRepo),
+  refreshRepo: () => ipcRenderer.invoke(IPC.refreshRepo),
+  getRepoInfo: (repo) => ipcRenderer.invoke(IPC.getRepoInfo, repo),
   listRecentRepos: () => ipcRenderer.invoke(IPC.listRecentRepos),
   selectRepoDirectory: () => ipcRenderer.invoke(IPC.selectRepoDirectory),
   selectFolder: () => ipcRenderer.invoke(IPC.selectFolder),
@@ -41,42 +57,49 @@ const api: N10HostApi = {
   updateSettingsField: (ref, value) =>
     ipcRenderer.invoke(IPC.updateSettingsField, ref, value),
 
-  getSidebarModel: () => ipcRenderer.invoke(IPC.getSidebarModel),
-  getSyncState: () => ipcRenderer.invoke(IPC.getSyncState),
+  getSidebarModel: (repo) => ipcRenderer.invoke(IPC.getSidebarModel, repo),
+  getSyncState: (repo) => ipcRenderer.invoke(IPC.getSyncState, repo),
   refreshRemote: () => ipcRenderer.invoke(IPC.refreshRemote),
   listWorktrees: () => ipcRenderer.invoke(IPC.listWorktrees),
   listBranches: () => ipcRenderer.invoke(IPC.listBranches),
-  listAllBranches: () => ipcRenderer.invoke(IPC.listAllBranches),
+  listAllBranches: (repo) => ipcRenderer.invoke(IPC.listAllBranches, repo),
   createWorktree: (branch) => ipcRenderer.invoke(IPC.createWorktree, branch),
-  removeWorktree: (branch, force) =>
-    ipcRenderer.invoke(IPC.removeWorktree, branch, force),
-  canRemoveBranch: (branch) => ipcRenderer.invoke(IPC.canRemoveBranch, branch),
+  removeWorktree: (branch, approved) =>
+    ipcRenderer.invoke(IPC.removeWorktree, branch, approved),
+  checkWorktreeRemoval: (branch) =>
+    ipcRenderer.invoke(IPC.checkWorktreeRemoval, branch),
   openInEditor: (branch) => ipcRenderer.invoke(IPC.openInEditor, branch),
 
-  fetchPullRequests: () => ipcRenderer.invoke(IPC.fetchPullRequests),
-  fetchCommentThreads: (prId) =>
-    ipcRenderer.invoke(IPC.fetchCommentThreads, prId),
+  fetchCommentThreads: (repo, prId, force) =>
+    ipcRenderer.invoke(IPC.fetchCommentThreads, repo, prId, force),
   replyToThread: (req) => ipcRenderer.invoke(IPC.replyToThread, req),
   setThreadResolved: (req) => ipcRenderer.invoke(IPC.setThreadResolved, req),
-  fetchCommentImage: (url) => ipcRenderer.invoke(IPC.fetchCommentImage, url),
-  listDraftComments: (prId) => ipcRenderer.invoke(IPC.listDraftComments, prId),
+  fetchCommentImage: (repo, url) =>
+    ipcRenderer.invoke(IPC.fetchCommentImage, repo, url),
+  listDraftComments: (repo, prId) =>
+    ipcRenderer.invoke(IPC.listDraftComments, repo, prId),
   updateDraftComment: (prId, id, patch) =>
     ipcRenderer.invoke(IPC.updateDraftComment, prId, id, patch),
   deleteDraftComment: (prId, id) =>
     ipcRenderer.invoke(IPC.deleteDraftComment, prId, id),
   postDraftComments: (req) => ipcRenderer.invoke(IPC.postDraftComments, req),
+  getGuidedReview: (repo, prId) =>
+    ipcRenderer.invoke(IPC.getGuidedReview, repo, prId),
 
   launchAgent: (req) => ipcRenderer.invoke(IPC.launchAgent, req),
   launchReviewAgent: (req) => ipcRenderer.invoke(IPC.launchReviewAgent, req),
   getSessionLaunchContext: (branch) =>
     ipcRenderer.invoke(IPC.getSessionLaunchContext, branch),
-  listAgentOptions: () => ipcRenderer.invoke(IPC.listAgentOptions),
+  listAgentOptions: (repo) => ipcRenderer.invoke(IPC.listAgentOptions, repo),
   checkoutPlan: (req) => ipcRenderer.invoke(IPC.checkoutPlan, req),
-  listSessions: () => ipcRenderer.invoke(IPC.listSessions),
+  listSessions: (repo) => ipcRenderer.invoke(IPC.listSessions, repo),
   listForeignSessions: () => ipcRenderer.invoke(IPC.listForeignSessions),
+  listOrchestratorGroups: () => ipcRenderer.invoke(IPC.listOrchestratorGroups),
   getSessionActivity: () => ipcRenderer.invoke(IPC.getSessionActivity),
-  markSessionSeen: (name) => ipcRenderer.invoke(IPC.markSessionSeen, name),
-  getSessionBuffer: (name) => ipcRenderer.invoke(IPC.getSessionBuffer, name),
+  watchSession: (name) => ipcRenderer.invoke(IPC.watchSession, name),
+  unwatchSession: (name) => ipcRenderer.invoke(IPC.unwatchSession, name),
+  showSession: (name) => ipcRenderer.invoke(IPC.showSession, name),
+  hideSession: (name) => ipcRenderer.invoke(IPC.hideSession, name),
   writeSession: (name, data) =>
     ipcRenderer.invoke(IPC.writeSession, name, data),
   resizeSession: (name, cols, rows) =>
@@ -87,12 +110,30 @@ const api: N10HostApi = {
     ipcRenderer.invoke(IPC.saveClipboardImage, data, mimeType),
   launchTerminal: (req) => ipcRenderer.invoke(IPC.launchTerminal, req),
   listTerminals: () => ipcRenderer.invoke(IPC.listTerminals),
+  listBranchSessions: (repo, branch) =>
+    ipcRenderer.invoke(IPC.listBranchSessions, repo, branch),
+  launchBranchTerminal: (req) =>
+    ipcRenderer.invoke(IPC.launchBranchTerminal, req),
   killTerminal: (name) => ipcRenderer.invoke(IPC.killTerminal, name),
-  fetchPrDescription: (prId) =>
-    ipcRenderer.invoke(IPC.fetchPrDescription, prId),
-  submitReviewVerdict: (prId, verdict) =>
-    ipcRenderer.invoke(IPC.submitReviewVerdict, prId, verdict),
-  getReviewViewer: () => ipcRenderer.invoke(IPC.getReviewViewer),
+  fetchPrDescription: (repo, prId) =>
+    ipcRenderer.invoke(IPC.fetchPrDescription, repo, prId),
+  getPullRequestSnapshot: (repo, req) =>
+    ipcRenderer.invoke(IPC.getPullRequestSnapshot, repo, req),
+  getPullRequestHistory: (repo, req) =>
+    ipcRenderer.invoke(IPC.getPullRequestHistory, repo, req),
+  recordPullRequestVisit: (repo, req) =>
+    ipcRenderer.invoke(IPC.recordPullRequestVisit, repo, req),
+  getPullRequestChecks: (repo, req) =>
+    ipcRenderer.invoke(IPC.getPullRequestChecks, repo, req),
+  getPullRequestConversation: (repo, req) =>
+    ipcRenderer.invoke(IPC.getPullRequestConversation, repo, req),
+  listReviewDrafts: (repo, req) =>
+    ipcRenderer.invoke(IPC.listReviewDrafts, repo, req),
+  saveReviewDraft: (req) => ipcRenderer.invoke(IPC.saveReviewDraft, req),
+  discardReviewDraft: (req) => ipcRenderer.invoke(IPC.discardReviewDraft, req),
+  searchMentionCandidates: (req) =>
+    ipcRenderer.invoke(IPC.searchMentionCandidates, req),
+  submitReview: (req) => ipcRenderer.invoke(IPC.submitReview, req),
 
   onSessionData: (cb) => {
     const listener = (_e: unknown, payload: SessionDataEvent) => cb(payload);
@@ -110,12 +151,14 @@ const api: N10HostApi = {
     return () => ipcRenderer.removeListener(LAUNCH_EVENTS.step, listener);
   },
 
-  fetchDiffText: (sourceBranch, targetBranch) =>
-    ipcRenderer.invoke(IPC.fetchDiffText, sourceBranch, targetBranch),
-  fetchWorktreeDiffText: (branch, targetBranch) =>
-    ipcRenderer.invoke(IPC.fetchWorktreeDiffText, branch, targetBranch),
-  fetchFileDiffText: (sourceBranch, targetBranch, file) =>
-    ipcRenderer.invoke(IPC.fetchFileDiffText, sourceBranch, targetBranch, file),
+  fetchWorktreeDiffText: (repo, branch, targetBranch) =>
+    ipcRenderer.invoke(IPC.fetchWorktreeDiffText, repo, branch, targetBranch),
+  fetchPrDiffManifest: (req) =>
+    ipcRenderer.invoke(IPC.fetchPrDiffManifest, req),
+  fetchPrDiffPatch: (req) => ipcRenderer.invoke(IPC.fetchPrDiffPatch, req),
+  fetchPrDiffImage: (req) => ipcRenderer.invoke(IPC.fetchPrDiffImage, req),
+  fetchPrRangeManifest: (req) =>
+    ipcRenderer.invoke(IPC.fetchPrRangeManifest, req),
 
   openExternal: (url) => ipcRenderer.invoke(IPC.openExternal, url),
   showContextMenu: (items) => ipcRenderer.invoke(IPC.showContextMenu, items),
@@ -131,7 +174,8 @@ const api: N10HostApi = {
     return () => ipcRenderer.removeListener(SYNC_EVENTS.notice, listener);
   },
   onDiscoveryChanged: (cb) => {
-    const listener = () => cb();
+    const listener = (_e: unknown, payload: DiscoveryChangedEvent) =>
+      cb(payload);
     ipcRenderer.on(DISCOVERY_EVENTS.changed, listener);
     return () => ipcRenderer.removeListener(DISCOVERY_EVENTS.changed, listener);
   },
@@ -142,6 +186,10 @@ const api: N10HostApi = {
   },
   getDesktopPrefs: () => ipcRenderer.invoke(IPC.getDesktopPrefs),
   setDesktopPrefs: (patch) => ipcRenderer.invoke(IPC.setDesktopPrefs, patch),
+  getKeybindings: () => ipcRenderer.invoke(IPC.getKeybindings),
+  setKeybinding: (actionId, descriptors) =>
+    ipcRenderer.invoke(IPC.setKeybinding, actionId, descriptors),
+  holdMenuShortcuts: (held) => ipcRenderer.invoke(IPC.holdMenuShortcuts, held),
   showAbout: () => ipcRenderer.invoke(IPC.showAbout),
 
   startBabysit: (prId) => ipcRenderer.invoke(IPC.startBabysit, prId),
@@ -154,8 +202,10 @@ const api: N10HostApi = {
 
   listMachines: () => ipcRenderer.invoke(IPC.listMachines),
   getBeamStatus: () => ipcRenderer.invoke(IPC.getBeamStatus),
+  setNetworkOnline: (online) =>
+    ipcRenderer.invoke(IPC.setNetworkOnline, online),
   onBeamStatusChanged: (cb) => {
-    const listener = (_e: unknown, payload: BeamStatus) => cb(payload);
+    const listener = (_e: unknown, payload: FleetStatus) => cb(payload);
     ipcRenderer.on(MACHINES_EVENTS.beamStatus, listener);
     return () =>
       ipcRenderer.removeListener(MACHINES_EVENTS.beamStatus, listener);

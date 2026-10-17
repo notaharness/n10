@@ -4,7 +4,6 @@ import type { SidebarItem } from '@n10/core';
 import { LAYOUT } from '@n10/app-core';
 import {
   buildSidebarRows,
-  getSectionKey,
   rowIcon,
   sidebarAvailableLines,
   sidebarBadgeLineOffset,
@@ -34,34 +33,6 @@ function session(over: Partial<SidebarItem & { kind: 'session' }> = {}) {
     ...over,
   } as SidebarItem;
 }
-
-describe('getSectionKey', () => {
-  it('files a worktree by its pull request, not by its kind', () => {
-    expect(getSectionKey(session())).toBe('worktrees');
-    expect(getSectionKey(session({ pr: pr() }))).toBe('pull-requests');
-    expect(getSectionKey(session({ pr: pr({ isDraft: true }) }))).toBe(
-      'draft-pull-requests'
-    );
-  });
-
-  it('files a review PR under the category it was sorted into', () => {
-    expect(
-      getSectionKey({ kind: 'review-pr', pr: pr(), category: 'needs-review' })
-    ).toBe('needs-review');
-    expect(
-      getSectionKey({ kind: 'review-pr', pr: pr(), category: 'approved' })
-    ).toBe('approved');
-  });
-
-  it('sends a draft orphan PR to the draft section', () => {
-    expect(getSectionKey({ kind: 'orphan-pr', pr: pr() })).toBe(
-      'pull-requests'
-    );
-    expect(
-      getSectionKey({ kind: 'orphan-pr', pr: pr({ isDraft: true }) })
-    ).toBe('draft-pull-requests');
-  });
-});
 
 describe('buildSidebarRows', () => {
   const items: SidebarItem[] = [

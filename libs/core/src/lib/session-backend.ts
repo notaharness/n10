@@ -1,10 +1,10 @@
 /** tmux availability and discovery policy shared by both applications. */
 import {
   canonicalWorktreePath,
+  LOCAL_MACHINE,
   terminalSessionKey,
   sessionIdentity,
 } from './session-key.js';
-import { getRepoRoot } from './repo-root.js';
 import {
   isTmuxAvailable,
   tmuxKillSession,
@@ -14,14 +14,16 @@ import type {
   DiscoveredTerminal,
   DiscoveredWorktree,
 } from './discovery/discovery-model.js';
-import { liveSessionNames } from './pty-registry.js';
+import { requireMachine } from './machine-registry.js';
+import { getSession, liveSessionNames } from './pty-registry.js';
 import {
   isTerminalSession,
   registryNameOf,
   type TaggedSession,
 } from './session-identity.js';
 import {
-  listOurSessions,
+  listOurSessionsWith,
+  readOurSessions,
   resolveRegistrySession,
   resolveSessionByName,
 } from './session-resolver.js';
@@ -54,9 +56,12 @@ export function getTmuxAvailability(): TmuxStatus | null {
 export function applySessionBackend(): void {
   if (!cachedTmuxStatus?.available) {
     throw new Error(
-      `n10 requires tmux 3.2 or newer. ${
-        cachedTmuxStatus?.reason ?? 'Availability has not been checked.'
-      } ${cachedTmuxStatus?.installHint ?? 'Install tmux and restart n10.'}`
+      `n10 requires tmux 3.2 or newer: ${
+        cachedTmuxStatus?.reason ?? 'availability has not been checked'
+      }. Install it, then start n10 again: ${
+        cachedTmuxStatus?.installHint ??
+        'see https://github.com/tmux/tmux/wiki/Installing'
+      }`
     );
   }
 }
@@ -71,9 +76,11 @@ export interface TmuxObservation {
    *  repository it belongs to, plus this repository's orphaned worktree
    *  sessions — see {@link observeTmuxSessions}. */
   terminals: DiscoveredTerminal[];
+  /** The registry names of every worktree session of this repository
+   *  the server still has, its pane live or dead, whether or not git
+   *  still lists the checkout. */
+  held: Set<string>;
 }
-
-const NOTHING: TmuxObservation = { persisted: new Set(), terminals: [] };
 
 /**
  * One fork, two answers: which worktree sessions survived, and which
@@ -103,14 +110,16 @@ const NOTHING: TmuxObservation = { persisted: new Set(), terminals: [] };
  * that worktree this session's agent. Only when nothing here already
  * holds it, though, since attaching a second client to a session this
  * process is driving is exactly what the orphan path must not do.
- * Never throws; an absent tmux server yields nothing, same as no
- * sessions.
+ * Never throws. An absent tmux server yields nothing, same as no
+ * sessions; a listing tmux could not give (a failed fork, the timeout
+ * kill) yields `null`, which says nothing about any session.
  */
 export function observeTmuxSessions(
+  root: string,
   worktrees: readonly DiscoveredWorktree[]
-): TmuxObservation {
-  const root = getRepoRoot();
-  if (!root) return NOTHING;
+): TmuxObservation | null {
+  const listed = readOurSessions();
+  if (!listed) return null;
   const ctx: ClassifyContext = {
     root,
     byPath: new Map(
@@ -120,13 +129,16 @@ export function observeTmuxSessions(
   };
   const persisted = new Set<string>();
   const terminals: DiscoveredTerminal[] = [];
-  for (const session of listOurSessions()) {
+  const held = new Set<string>();
+  for (const session of listed) {
+    if (session.type === 'worktree' && session.repo === root)
+      held.add(registryNameOf(session));
     const found = classifySession(session, ctx);
     if (!found) continue;
     if (found.kind === 'terminal') terminals.push(found.terminal);
     else persisted.add(found.name);
   }
-  return { persisted, terminals };
+  return { persisted, terminals, held };
 }
 
 interface ClassifyContext {
@@ -153,18 +165,12 @@ function classifySession(
   | { kind: 'terminal'; terminal: DiscoveredTerminal }
   | { kind: 'persisted'; name: string }
   | null {
-  const { name, path } = session;
+  const { path } = session;
   if (isTerminalSession(session)) {
     return path
       ? {
           kind: 'terminal',
-          terminal: {
-            name: terminalSessionKey(name),
-            kind: session.type,
-            path,
-            running: !session.paneDead,
-            agent: session.agent,
-          },
+          terminal: discoveredTerminal(session, session.type),
         }
       : null;
   }
@@ -175,16 +181,47 @@ function classifySession(
   if (registryName !== undefined)
     return session.paneDead ? null : { kind: 'persisted', name: registryName };
   if (ctx.owned.has(registryNameOf(session)) || !path) return null;
+  return { kind: 'terminal', terminal: discoveredTerminal(session, 'agent') };
+}
+
+/** A session as the terminal tab it comes back as, keyed on the machine
+ *  it was listed on. */
+function discoveredTerminal(
+  session: TaggedSession,
+  kind: DiscoveredTerminal['kind']
+): DiscoveredTerminal {
   return {
-    kind: 'terminal',
-    terminal: {
-      name: terminalSessionKey(name),
-      kind: 'agent',
-      path,
-      running: !session.paneDead,
-      agent: session.agent,
-    },
+    name: terminalSessionKey(session.name, session.machine),
+    kind,
+    path: session.path,
+    running: !session.paneDead,
+    agent: session.agent,
   };
+}
+
+/**
+ * Every terminal-tab session on another machine, from one listing
+ * through its executor: `shell` and `agent` sessions (Orchestra's `dir`
+ * included), whichever machine's n10 or Orchestra started them, keyed
+ * with the machine they run on. The tags say what a session is, not who
+ * listed it. That machine's worktree sessions are left out: their
+ * checkouts are its own, not this repository's.
+ *
+ * Rejects when the machine cannot be asked — no transport, a listing
+ * that failed or timed out — which says nothing about its sessions.
+ */
+export async function observeRemoteTerminals(
+  machineId: string
+): Promise<DiscoveredTerminal[]> {
+  const sessions = await listOurSessionsWith(
+    requireMachine(machineId).executor,
+    machineId
+  );
+  return sessions.flatMap((session) =>
+    isTerminalSession(session) && session.path
+      ? [discoveredTerminal(session, session.type)]
+      : []
+  );
 }
 
 /** The tmux session a registry name stands for in the open
@@ -205,13 +242,18 @@ export function hasLiveTmuxSession(sessionName: string): boolean {
 }
 
 /** Resolve a qualified terminal key to its exact tagged tmux target, across
- *  repositories. Adopted orphan worktrees also use terminal keys. */
+ *  repositories. Adopted orphan worktrees also use terminal keys. Another
+ *  machine's tmux cannot be asked synchronously: its backend's last
+ *  listing there answers, which says `gone` once tmux no longer has it. */
 export function hasPersistedTerminalSession(name: string): boolean {
-  if (cachedTmuxStatus && !cachedTmuxStatus.available) return false;
   const identity = sessionIdentity(name);
-  return (
-    identity?.kind === 'terminal' && resolveSessionByName(identity.id) !== null
-  );
+  if (identity?.kind !== 'terminal') return false;
+  if (identity.machine !== LOCAL_MACHINE) {
+    const state = getSession(name)?.pty.processState;
+    return !!state && !state.gone;
+  }
+  if (cachedTmuxStatus && !cachedTmuxStatus.available) return false;
+  return resolveSessionByName(identity.id) !== null;
 }
 
 /** Stop the tagged worktree session even when no local connection exists.

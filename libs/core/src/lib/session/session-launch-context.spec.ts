@@ -1,6 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { worktreeSessionKey } from '../session-key.js';
-const state = vi.hoisted(() => ({ agent: 'claude', dead: true, exists: true }));
+const state = vi.hoisted(() => ({
+  agent: 'claude',
+  dead: true,
+  exists: true,
+  report: 'PROGRESS 2026-01-01T00:00:00Z inbox',
+}));
 vi.mock('../session-resolver.js', () => ({
   resolveWorktreeSession: () => ({ name: 'player' }),
 }));
@@ -27,7 +32,7 @@ vi.mock('@n10/terminal-tmux', () => ({
             '@orchestra-session-type': 'worktree',
             '@orchestra-agent': state.agent,
             '@orchestra-orchestrator': 'tmux:boss',
-            '@orchestra-last-report': 'PROGRESS 2026-01-01T00:00:00Z',
+            '@orchestra-last-report': state.report,
           },
         }
       : null,
@@ -43,6 +48,7 @@ beforeEach(() => {
   state.agent = 'claude';
   state.dead = true;
   state.exists = true;
+  state.report = 'PROGRESS 2026-01-01T00:00:00Z inbox';
 });
 it.each(['test', '', 'unknown', 'gemini'])(
   'does not promise continuation for a stopped %s agent',
@@ -78,4 +84,35 @@ it('treats a vanished native target as absent', () => {
       config
     )
   ).toEqual({ exists: false, running: false, canResume: false });
+});
+
+it.each(['delivered', 'stored', 'inbox', 'queue', 'paste'])(
+  'reads a Codex report delivered by %s',
+  (outcome) => {
+    state.agent = 'codex';
+    state.report = `PROGRESS 2026-01-01T00:00:00Z ${outcome}`;
+    expect(
+      getSessionLaunchContext(
+        worktreeSessionKey('/repo/worktree', '/repo'),
+        config
+      )
+    ).toMatchObject({
+      recordedAgent: 'codex',
+      canResume: true,
+      lastReport: { kind: 'PROGRESS', timestamp: '2026-01-01T00:00:00Z' },
+    });
+  }
+);
+it.each([
+  'PROGRESS 2026-01-01T00:00:00Z',
+  'PROGRESS invalid queue',
+  'PROGRESS 2026-01-01T00:00:00Z queue extra',
+])('ignores malformed report metadata %j', (report) => {
+  state.report = report;
+  expect(
+    getSessionLaunchContext(
+      worktreeSessionKey('/repo/worktree', '/repo'),
+      config
+    ).lastReport
+  ).toBeUndefined();
 });

@@ -1,13 +1,15 @@
+import type * as WorktreeManager from '@n10/worktree-manager';
 import * as repoRoot from './repo-root.js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTmuxBackend } from '@n10/terminal-tmux';
+import { branchTip, repositoryOf } from '@n10/worktree-manager';
 import { orchestraFixture } from '../../tests/orchestra-fixture.js';
 import { diffScans } from './discovery/discovery-model.js';
 import { getSession, isSessionAlive, killSession } from './pty-registry.js';
-import { worktreeSessionKey } from './session-key.js';
+import { canonicalWorktreePath, worktreeSessionKey } from './session-key.js';
 import { resetRepoRoot } from './session-backend.js';
 import { sessionTags } from './session-identity.js';
 import { openSession } from './session/open-session.js';
@@ -70,9 +72,22 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         expect(getSession(key)).toBe(agent);
         expect(getSession(tab.name)).toBe(tab);
         expect(isSessionAlive(key)).toBe(true);
-        expect(await removeWorktreeSession(branch, true, fixture.repo)).toBe(
-          true
-        );
+        const forced = {
+          verdict: 'force',
+          reason: 'uncommitted changes',
+          risks: ['uncommitted changes'],
+          discardsUncommitted: true,
+          tip: await branchTip(branch, fixture.repo),
+          repo: await repositoryOf(fixture.repo),
+          checkout: canonicalWorktreePath(path),
+        } as const;
+        expect(
+          await removeWorktreeSession(
+            branch,
+            forced,
+            worktreeScope(fixture.repo)
+          )
+        ).toBe('removed');
         expect(isSessionAlive(key)).toBe(false);
         expect(isSessionAlive(tab.name)).toBe(true);
         killSession(tab.name);
@@ -132,6 +147,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         null,
         {
           worktrees: [{ name: key, branch, path }],
+          stranded: [],
           persisted: new Set([key]),
           terminals: [],
         },
@@ -164,4 +180,8 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       killSession(key);
     });
   }
+);
+
+const { worktreeScope } = await vi.importActual<typeof WorktreeManager>(
+  '@n10/worktree-manager'
 );

@@ -1,6 +1,10 @@
 {
   "extends": "./tsconfig.app.json",
   "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
     "tsBuildInfoFile": "dist/tsc/tsconfig.esbuild.tsbuildinfo"
   },
   "exclude": [
@@ -12,12 +16,6 @@
   "references": [
     {
       "path": "../../libs/diff/tsconfig.lib.json"
-    },
-    {
-      "path": "../../libs/terminal/tsconfig.lib.json"
-    },
-    {
-      "path": "../../libs/terminal-tmux/tsconfig.lib.json"
     },
     {
       "path": "../../libs/vcs/azure-devops/tsconfig.lib.json"
@@ -33,6 +31,9 @@
     },
     {
       "path": "../../libs/vcs/core/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/engine/tsconfig.lib.json"
     },
     {
       "path": "../../libs/core/tsconfig.lib.json"

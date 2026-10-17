@@ -8,7 +8,8 @@ export function MachineRows() {
   return (
     <div className="flex items-center justify-between gap-4 px-4 py-4">
       <p className="text-sm text-muted-foreground">
-        Manage your machines, passkeys and fleet recovery in the sidebar’s Fleet section.
+        Manage your machines, passkeys and fleet recovery in the sidebar’s Fleet
+        section.
       </p>
       <Button size="sm" variant="outline" onClick={reveal}>
         Show Fleet

@@ -1,10 +1,5 @@
 export { prepareTmuxSession } from './lib/tmux-launch.js';
-export {
-  createTmuxBackend,
-  setTmuxSessionPreparer,
-  type TmuxSessionPreparer,
-  type TmuxLaunchPlan,
-} from './lib/tmux-backend.js';
+export { createTmuxBackend, type TmuxLaunchPlan } from './lib/tmux-backend.js';
 export { sanitizeTmuxSessionName } from './lib/sanitize-tmux-session-name.js';
 export {
   isDuplicateSession,
@@ -15,6 +10,7 @@ export {
   tmuxKillSession,
   tmuxListSessions,
   tmuxListSessionsDetailed,
+  tmuxListSessionsRead,
   tmuxNewSessionDetached,
   tmuxPaneState,
   tmuxSetOption,
@@ -31,11 +27,13 @@ export { tmuxListSessionsDetailedWith } from './lib/tmux-cli-remote.js';
 export {
   createRemoteTmuxBackend,
   RemoteTmuxBackend,
-  type RemoteMachine,
-  type RemotePtyHandle,
-  type RemotePtyOpener,
-  type RemotePtyOpenParams,
 } from './lib/remote-backend.js';
+export type {
+  RemoteMachine,
+  RemotePtyHandle,
+  RemotePtyOpener,
+  RemotePtyOpenParams,
+} from './lib/remote-pty.js';
 export {
   RemoteSessionPoller,
   type PollState,

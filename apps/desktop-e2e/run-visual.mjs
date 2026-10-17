@@ -47,10 +47,20 @@ if (spawnSync('docker', ['info'], { stdio: 'ignore' }).status !== 0) {
 }
 
 // tmux is part of the application runtime. Build a small derivative of
-// the pinned Playwright image; Docker caches the package installation.
+// the pinned Playwright image with the tmux CI runs (tools/tmux); Docker
+// caches the build.
 const build = spawnSync(
   'docker',
-  ['build', '-f', resolve(HERE, 'Dockerfile.visual'), '-t', IMAGE, HERE],
+  [
+    'build',
+    '-f',
+    resolve(HERE, 'Dockerfile.visual'),
+    '--build-context',
+    `tmux-tools=${resolve(WORKSPACE, 'tools', 'tmux')}`,
+    '-t',
+    IMAGE,
+    HERE,
+  ],
   { stdio: 'inherit' }
 );
 if (build.status !== 0) process.exit(build.status ?? 1);

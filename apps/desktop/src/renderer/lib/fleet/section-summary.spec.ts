@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { BeamStatus, MachineView } from '../../../host/contract.js';
+import type { FleetStatus, MachineView } from '@n10/engine/contract';
 import { fleetSectionSummary } from './section-summary.js';
 
-const ready: BeamStatus = {
+const ready: FleetStatus = {
   state: 'ready',
   detail: null,
   enrolled: true,
@@ -67,14 +67,28 @@ describe('fleetSectionSummary', () => {
     ).toBe('This machine');
   });
 
-  it('warns when a member is offline', () => {
+  it('warns when a member is unreachable', () => {
     expect(
       fleetSectionSummary({
         beam: ready,
         machines: [self, machine({ state: 'offline' })],
         awaitingPasskey: false,
       })
-    ).toEqual({ text: '2 machines · 1 offline', tone: 'warning' });
+    ).toEqual({ text: '2 machines · 1 unreachable', tone: 'warning' });
+  });
+
+  it('names this machine as the one offline, not its unknown peers', () => {
+    expect(
+      fleetSectionSummary({
+        beam: ready,
+        machines: [
+          { ...self, state: 'offline' },
+          machine({ state: 'unknown' }),
+          machine({ peerId: 'c'.repeat(32), state: 'unknown' }),
+        ],
+        awaitingPasskey: false,
+      })
+    ).toEqual({ text: '3 machines · this machine offline', tone: 'warning' });
   });
 
   it('warns when beam is unavailable', () => {

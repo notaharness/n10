@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ReviewLedger } from '@n10/vcs-core';
 import { getRequestCounters, resetRequestCounters } from '@n10/vcs-core';
 import { azureDevOpsProvider } from './provider.js';
 import { prDetailMemo } from './pr-details.js';
@@ -20,8 +21,8 @@ import { resetAdoTransport } from './request.js';
  *   N  comment threads, one per pull request (no batch endpoint)
  *   N  status list, one per pull request (no batch endpoint)
  *
- * plus, once per half hour: `/connectiondata`, the caller's teams, and
- * the repository's id.
+ * plus, once per half hour: who the caller is, their teams and the
+ * repository's id.
  *
  * A *warm* cycle over pull requests that have not moved costs the list
  * and nothing else — not even the pipeline runs, which are only asked
@@ -158,8 +159,8 @@ describe('one sync cycle', () => {
   it('costs 2 per pull request plus a fixed handful', async () => {
     await syncCycle();
 
-    // 3 identity/repository reads + the list + the batched builds +
-    // (threads, statuses) per pull request.
+    // 3 identity/teams/repository reads + the list + the batched
+    // builds + (threads, statuses) per pull request.
     expect(counts().network).toBe(3 + 1 + 1 + 2 * PR_COUNT);
     expect(mockFetch).toHaveBeenCalledTimes(3 + 1 + 1 + 2 * PR_COUNT);
   });
@@ -178,14 +179,13 @@ describe('one sync cycle', () => {
 
   it('never re-reads who we are for half an hour', async () => {
     await syncCycle();
-    // Identity, teams and the repository id are three of the fixed
-    // handful, and none of them moves between cycles.
+    // Teams and the repository id are two of the fixed handful, and
+    // neither moves between cycles.
     afterMinutes(1);
     const urls = [] as string[];
     mockFetch.mock.calls.length = 0;
     await syncCycle();
     urls.push(...mockFetch.mock.calls.map((c) => String(c[0])));
-    expect(urls.filter((u) => u.includes('/connectiondata'))).toEqual([]);
     expect(urls.filter((u) => u.includes('/teams?'))).toEqual([]);
   });
 });
@@ -205,6 +205,112 @@ describe('a cycle over pull requests that have not moved', () => {
     // whose verdict is unknown, and there are none.
     afterMinutes(1);
     expect(await cycleCost()).toBe(1);
+  });
+
+  it('stays at the list after one pull request is opened', async () => {
+    await syncCycle();
+    afterMinutes(1);
+    // The selected pull request is two reads of its own — itself and
+    // its iterations — and touches none of the cycle's memos.
+    const answer = mockFetch.getMockImplementation();
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (/\/pullrequests\/105\/iterations\?/.test(url)) {
+        return Promise.resolve(json({ value: [] }));
+      }
+      if (/\/pullrequests\/105\?/.test(url)) {
+        return Promise.resolve(
+          json({
+            ...prs[5],
+            status: 'active',
+            lastMergeSourceCommit: { commitId: '5'.repeat(40) },
+          })
+        );
+      }
+      return answer?.(url, init);
+    });
+    resetRequestCounters('azure-devops');
+    await azureDevOpsProvider.fetchPullRequestDetail?.(AUTH, PROJECT, 105);
+    expect(counts().network).toBe(2);
+
+    expect(await cycleCost()).toBe(1);
+  });
+
+  it('reads the selected pull request’s checks with one request of its own', async () => {
+    await syncCycle();
+    // Opened: the pull request and its iterations are the detail's.
+    const answer = mockFetch.getMockImplementation();
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (/\/pullrequests\/105\/iterations\?/.test(url)) {
+        return Promise.resolve(json({ value: [] }));
+      }
+      if (/\/pullrequests\/105\?/.test(url)) {
+        return Promise.resolve(
+          json({
+            ...prs[5],
+            status: 'active',
+            repository: { id: 'repo-guid', project: { id: 'project-guid' } },
+            lastMergeSourceCommit: { commitId: '5'.repeat(40) },
+          })
+        );
+      }
+      return answer?.(url, init);
+    });
+    await azureDevOpsProvider.fetchPullRequestDetail?.(AUTH, PROJECT, 105);
+    resetRequestCounters('azure-devops');
+    // Its statuses are the cycle's; its policies are the one new read.
+    await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 105);
+    expect(counts().network).toBe(1);
+
+    afterMinutes(1);
+    expect(await cycleCost()).toBe(1);
+  });
+
+  it('reads the checks again after the user wrote to the pull request', async () => {
+    const answer = mockFetch.getMockImplementation();
+    mockFetch.mockImplementation((url: string, init?: RequestInit) =>
+      /\/pullrequests\/100\?/.test(url)
+        ? Promise.resolve(
+            json({
+              ...prs[0],
+              status: 'active',
+              repository: { id: 'repo-guid', project: { id: 'project-guid' } },
+              lastMergeSourceCommit: { commitId: '0'.repeat(40) },
+            })
+          )
+        : answer?.(url, init)
+    );
+    const policies = () =>
+      mockFetch.mock.calls.filter(([url]) =>
+        String(url).includes('/policy/evaluations?')
+      ).length;
+    await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 100);
+    await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 100);
+    expect(policies()).toBe(1);
+    await azureDevOpsProvider.replyToThread!(
+      AUTH,
+      PROJECT,
+      100,
+      { id: '5' } as never,
+      'a reply'
+    );
+    await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 100);
+    expect(policies()).toBe(2);
+    // A vote is a write too: the reviewer policies' verdict moves with it.
+    let ledger: ReviewLedger | null = null;
+    await azureDevOpsProvider.publishReview!(
+      AUTH,
+      PROJECT,
+      {
+        prId: 100,
+        head: '0'.repeat(40),
+        event: 'APPROVE',
+        body: '',
+        items: [],
+      },
+      { read: () => ledger, write: (l) => (ledger = l) }
+    );
+    await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 100);
+    expect(policies()).toBe(3);
   });
 
   it('pays again only for the pull request whose head commit moved', async () => {
@@ -586,6 +692,13 @@ describe('the same data asked for twice', () => {
     expect(counts().cached).toBeGreaterThanOrEqual(2);
   });
 
+  it('reads the conversation from the threads the sidebar already counted', async () => {
+    await syncCycle();
+    const afterCycle = counts().network;
+    await azureDevOpsProvider.fetchPullRequestConversation!(AUTH, PROJECT, 100);
+    expect(counts().network).toBe(afterCycle);
+  });
+
   it('collapses two cycles that overlap into one', async () => {
     // A forced refresh landing on top of a poll: without dedupe this
     // is two of everything, and they arrive together by definition.
@@ -606,16 +719,15 @@ describe('while Azure is refusing', () => {
     } as unknown as Response);
 
     await expect(syncCycle()).rejects.toThrow('throttling requests');
-    // Two, not one: a cycle opens with the identity reads in parallel,
-    // and the gate cannot recall a request issued before the refusal
-    // arrived. What it does stop is everything after — the burst of
-    // 2N+2 that used to follow, each member of it failing separately.
-    expect(counts().network).toBe(2);
+    // The teams read that opens a cycle takes the refusal; the gate
+    // stops everything after it — the burst of 2N+2 that would
+    // otherwise follow, each member of it failing separately.
+    expect(counts().network).toBe(1);
     expect(counts().throttled).toBeGreaterThan(0);
 
     // And the next cycle spends nothing at all until the wait Azure
     // named has elapsed.
     await expect(syncCycle()).rejects.toThrow('throttling requests');
-    expect(counts().network).toBe(2);
+    expect(counts().network).toBe(1);
   });
 });

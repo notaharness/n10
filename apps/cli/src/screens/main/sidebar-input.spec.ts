@@ -13,7 +13,6 @@ vi.mock('@n10/core', async (importOriginal) => ({
   getSpawnedAt: (name: string) => spawnedAtMap.get(name),
   hasSession: (name: string) => spawnedAtMap.has(name),
   isSessionAlive: (name: string) => spawnedAtMap.has(name),
-  stopSession: vi.fn(),
 }));
 
 import { handleSidebarInput } from './sidebar-input.js';

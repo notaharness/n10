@@ -11,11 +11,7 @@ export {
   updateComment,
   removeComment,
 } from './lib/comment-store.js';
-export {
-  postReviewComments,
-  renderCommentBody,
-  type PostContext,
-} from './lib/comment-poster.js';
+export { renderCommentBody } from './lib/comment-body.js';
 export {
   AGENT_ATTRIBUTION,
   AGENT_FOOTER,
@@ -47,6 +43,7 @@ export {
 export type {
   InsertionMap,
   RemoteInsertionMap,
+  RemotePlacementDiagnostic,
 } from './lib/comment-placement.js';
 export {
   computeInsertionMap,
@@ -77,3 +74,10 @@ export {
   EDIT_INPUT_SLACK_ROWS,
 } from './lib/comment-rows.js';
 export { handleUtilCommand } from './lib/util-command.js';
+export type {
+  GuideFile,
+  GuideSlide,
+  GuideVisual,
+  GuidedReview,
+} from './lib/guide.js';
+export { readGuide, writeGuide } from './lib/guide-store.js';

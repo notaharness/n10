@@ -10,13 +10,10 @@
  * other process's environment (the npm launcher's `N10_START_DIR`) nor
  * whether a terminal started it.
  */
-import { isAbsolute, resolve } from 'node:path';
+import { realpathSync, statSync } from 'node:fs';
+import { isAbsolute, join, resolve } from 'node:path';
 import { app, BrowserWindow } from 'electron';
-import {
-  offerLaunchRepo,
-  releaseLaunchRepo,
-} from '../host/services/launch-repo.js';
-import { canonicalRepoPath, isGitRepo } from '../host/services/repo.js';
+import { offerLaunchRepo, releaseLaunchRepo } from './launch-repo.js';
 
 /** What a second launch sends the running instance. */
 export interface SecondLaunch {
@@ -45,10 +42,29 @@ export function requestedRepo(data: unknown): string | null {
       ? (data as SecondLaunch).startDir
       : undefined;
   if (typeof startDir !== 'string' || !isAbsolute(startDir)) return null;
-  const cwd = canonicalRepoPath(startDir);
-  if (isGitRepo(cwd)) return cwd;
+  const cwd = realPath(startDir);
+  if (hasGitEntry(cwd)) return cwd;
   console.warn(`[desktop] second launch: not a git repo: ${startDir}`);
   return null;
+}
+
+// @n10/core's canonicalRepoPath and isGitRepo, which the host applies
+// when it opens the repository. Main does not load core.
+function realPath(dir: string): string {
+  try {
+    return realpathSync(dir);
+  } catch {
+    return dir;
+  }
+}
+
+function hasGitEntry(dir: string): boolean {
+  try {
+    const entry = statSync(join(dir, '.git'));
+    return entry.isDirectory() || entry.isFile();
+  } catch {
+    return false;
+  }
 }
 
 function bringForward(): void {
@@ -60,27 +76,32 @@ function bringForward(): void {
 
 /**
  * Answer every later launch: bring the window forward and, when the
- * launch named a repository, `open` it if a page has claimed launches
- * (`services/launch-repo.ts`), or keep it for the next page that does.
- * Install before the first window is created.
+ * launch named a repository, `open` it in the page that has claimed
+ * launches (`launch-repo.ts`), by its webContents id, or keep it for
+ * the next page that claims. Install before the first window is created.
  */
-export function installSecondLaunch(open: (cwd: string) => void): void {
+export function installSecondLaunch(
+  open: (viewer: number, cwd: string) => void
+): void {
   app.on('browser-window-created', (_event, win) => {
     // The claim is the page's, so it ends when another document commits,
     // an error page replaces the page, or its renderer dies. Not when a
     // navigation starts: main's will-navigate may still refuse it, and
     // the page then carries on listening.
     const contents = win.webContents;
-    contents.on('did-navigate', releaseLaunchRepo);
+    const release = () => releaseLaunchRepo(contents.id);
+    contents.on('did-navigate', release);
     contents.on('did-fail-load', (_e, _code, _text, _url, isMainFrame) => {
-      if (isMainFrame) releaseLaunchRepo();
+      if (isMainFrame) release();
     });
-    contents.on('render-process-gone', releaseLaunchRepo);
-    win.on('closed', releaseLaunchRepo);
+    contents.on('render-process-gone', release);
+    win.on('closed', release);
   });
   app.on('second-instance', (_event, _argv, _cwd, data) => {
     bringForward();
     const repo = requestedRepo(data);
-    if (repo && offerLaunchRepo(repo)) open(repo);
+    if (!repo) return;
+    const viewer = offerLaunchRepo(repo);
+    if (viewer !== null) open(viewer, repo);
   });
 }

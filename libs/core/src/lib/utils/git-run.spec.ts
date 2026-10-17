@@ -67,6 +67,16 @@ describe('runGit', () => {
     expect(exact).toEqual({ text: whole.text, truncated: false });
   });
 
+  it('hands git its input on stdin', async () => {
+    const head = await gitLine(['rev-parse', 'HEAD'], { cwd: repo });
+    const { text } = await runGit(['cat-file', '--batch-check'], {
+      cwd: repo,
+      maxBytes: 1024,
+      input: `${head}\n`,
+    });
+    expect(text).toMatch(new RegExp(`^${head} commit \\d+\\n$`));
+  });
+
   it('rejects with git’s own complaint when the command really fails', async () => {
     await expect(
       runGit(['rev-parse', '--verify', 'no-such-ref'], {

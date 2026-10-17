@@ -24,6 +24,9 @@ export interface AdoPrStatus {
   updatedDate?: string;
   /** The PR iteration (push) the status was posted against. */
   iterationId?: number;
+  /** Where the check's details are. */
+  targetUrl?: string;
+  createdBy?: { displayName?: string };
 }
 
 function mapRawState(raw: string | undefined): BuildStatusState {
@@ -85,6 +88,20 @@ function isNewer(a: AdoPrStatus, b: AdoPrStatus): boolean {
   return x.id > y.id;
 }
 
+/** Each check's newest word: one status per context, the highest
+ *  iteration, then the latest date, then the highest id. */
+export function latestStatuses(
+  statuses: readonly AdoPrStatus[]
+): AdoPrStatus[] {
+  const latest = new Map<string, AdoPrStatus>();
+  statuses.forEach((status, index) => {
+    const key = statusContextKey(status, index);
+    const seen = latest.get(key);
+    if (!seen || isNewer(status, seen)) latest.set(key, status);
+  });
+  return [...latest.values()];
+}
+
 /**
  * The current build state of a pull request, from its status list.
  *
@@ -109,17 +126,10 @@ function isNewer(a: AdoPrStatus, b: AdoPrStatus): boolean {
  * leave no mark. It still casts no vote of its own.
  */
 export function deriveBuildStatus(statuses: AdoPrStatus[]): BuildStatusState {
-  const latestPerContext = new Map<string, AdoPrStatus>();
-  statuses.forEach((status, index) => {
-    const key = statusContextKey(status, index);
-    const seen = latestPerContext.get(key);
-    if (!seen || isNewer(status, seen)) latestPerContext.set(key, status);
-  });
-
   let hasFailed = false;
   let hasPending = false;
   let hasSucceeded = false;
-  for (const status of latestPerContext.values()) {
+  for (const status of latestStatuses(statuses)) {
     if (status.state === 'notApplicable') continue;
     const mapped = mapRawState(status.state);
     if (mapped === 'failed') hasFailed = true;
@@ -133,11 +143,13 @@ export function deriveBuildStatus(statuses: AdoPrStatus[]): BuildStatusState {
   return 'none';
 }
 
-export async function fetchPrBuildStatus(
+/** Every status posted to a pull request, under the one cache entry
+ *  the list and the checks read share. */
+export async function readPrStatuses(
   config: AdoConfig,
   prId: number
-): Promise<BuildStatusState> {
-  const data = await adoGet<{ value?: unknown[] }>(
+): Promise<AdoPrStatus[]> {
+  const data = await adoGet<{ value?: AdoPrStatus[] }>(
     'fetchPrBuildStatus',
     `${config.org}/${config.project}/${config.repo}/statuses/${prId}`,
     TTL.statuses,
@@ -145,7 +157,14 @@ export async function fetchPrBuildStatus(
     authHeaders(config.pat),
     `statuses for pull request ${prId}`
   );
-  return deriveBuildStatus((data.value ?? []) as AdoPrStatus[]);
+  return data.value ?? [];
+}
+
+export async function fetchPrBuildStatus(
+  config: AdoConfig,
+  prId: number
+): Promise<BuildStatusState> {
+  return deriveBuildStatus(await readPrStatuses(config, prId));
 }
 
 // ── Combining the two routes ────────────────────────────────────────

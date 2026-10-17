@@ -43,9 +43,8 @@ function harness(
     config: {
       config: { vendorAuth: {}, vendorProject: {}, ...config } as AppConfig,
       provider: null,
-      providers: [],
       updateField,
-      reloadFromDisk: vi.fn(),
+      detect: vi.fn(() => ({ updated: true, detected: { email: 'detected' } })),
     },
     sessions: { flashStatus },
     keybinds: { resolve: () => action, setPreset },
@@ -83,4 +82,43 @@ describe('settings preset navigation', () => {
     expect(h.setPreset).toHaveBeenCalledWith('vim');
     expect(h.updateField).not.toHaveBeenCalled();
   });
+});
+
+it('passes a credential edit to the config command', () => {
+  const provider = {
+    id: 'azure-devops',
+    authFields: [{ key: 'pat', label: 'Personal Access Token', masked: true }],
+    projectFields: [],
+  };
+  const h = harness('', {}, 0);
+  h.ctx.config.provider = provider as never;
+  h.ctx.settings.editingField = 'pat';
+  h.ctx.settings.editBuffer = 'rotated';
+  h.ctx.settings.settingsFieldIndex = buildSettingsFields(
+    provider as never
+  ).findIndex((f) => f.key === 'pat');
+  handleSettingsInput('', { return: true } as KeyPress, h.ctx);
+  expect(h.updateField).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ key: 'pat', configBag: 'vendorAuth' }),
+    'rotated'
+  );
+});
+
+it.each(WRITE_ACTIONS)(
+  '%s reports a failed write without closing n10',
+  (action) => {
+    const h = harness(action);
+    h.updateField.mockImplementation(() => {
+      throw new Error('Read-only config');
+    });
+    expect(() => handleSettingsInput('', NO_KEY, h.ctx)).not.toThrow();
+    expect(h.flashStatus).toHaveBeenCalledWith('Read-only config');
+  }
+);
+
+it('runs manual detection through the config service', () => {
+  const h = harness('settings.auto-detect');
+  handleSettingsInput('', NO_KEY, h.ctx);
+  expect(h.ctx.config.detect).toHaveBeenCalledOnce();
+  expect(h.flashStatus).toHaveBeenCalledWith('Auto-detected: email');
 });

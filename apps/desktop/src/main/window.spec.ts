@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { EventEmitter } from 'node:events';
 import {
   isAllowedNavigation,
   loadTarget,
@@ -6,6 +7,7 @@ import {
   RENDERER_RELOAD_LIMIT,
   reloadAfterRendererGone,
   rendererWebPreferences,
+  showWhenReadyOrLoaded,
   windowChrome,
 } from './window.js';
 
@@ -111,5 +113,43 @@ describe('reloadAfterRendererGone', () => {
     const next = reloadAfterRendererGone(full, later);
     expect(next.reload).toBe(true);
     expect(next.history).toEqual([later]);
+  });
+});
+
+describe('showWhenReadyOrLoaded', () => {
+  function fakeWindow() {
+    const win = new EventEmitter();
+    const webContents = new EventEmitter();
+    const show = vi.fn();
+    return {
+      win: Object.assign(win, { webContents, isDestroyed: () => false, show }),
+      webContents,
+      show,
+    };
+  }
+
+  it('shows the window on its first frame', () => {
+    const { win, show } = fakeWindow();
+    showWhenReadyOrLoaded(win);
+    win.emit('ready-to-show');
+    expect(show).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a loaded window whose first frame never comes', () => {
+    const { win, webContents, show } = fakeWindow();
+    showWhenReadyOrLoaded(win);
+    webContents.emit('did-finish-load');
+    expect(show).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows once, and not again on a later reload', () => {
+    const { win, webContents, show } = fakeWindow();
+    showWhenReadyOrLoaded(win);
+    webContents.emit('did-finish-load');
+    win.emit('ready-to-show');
+    webContents.emit('did-finish-load');
+    expect(show).toHaveBeenCalledTimes(1);
+    expect(win.listenerCount('ready-to-show')).toBe(0);
+    expect(webContents.listenerCount('did-finish-load')).toBe(0);
   });
 });

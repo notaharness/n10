@@ -24,7 +24,6 @@ const baseTitle: PaneTitleState = {
   controlsOpen: false,
   sessionMenuActive: false,
   agentId: undefined,
-  aiCommand: undefined,
   prTitle: undefined,
   sessionName: null,
   terminalFocused: false,
@@ -117,7 +116,7 @@ describe('getPaneTitle', () => {
   });
   // ── Terminal mode (default) — 🤖 AgentName — label ──────────────
 
-  it('defaults to "🤖 Claude" when no session, no aiCommand configured', () => {
+  it('defaults to "🤖 Claude" without a session or configured agent', () => {
     expect(getPaneTitle(baseTitle)).toBe('\u{1F916} Claude');
   });
 
@@ -137,35 +136,35 @@ describe('getPaneTitle', () => {
     ).toBe('\u{1F916} Claude \u2014 Fix navigation bug');
   });
 
-  it('resolves agent name from aiCommand using AI_PRESETS', () => {
+  it('names the explicitly configured agent', () => {
     expect(
-      getPaneTitle({ ...baseTitle, aiCommand: 'codex', sessionName: 'branch' })
+      getPaneTitle({ ...baseTitle, agentId: 'codex', sessionName: 'branch' })
     ).toBe('\u{1F916} Codex \u2014 branch');
 
-    expect(getPaneTitle({ ...baseTitle, aiCommand: 'gemini' })).toBe(
+    expect(getPaneTitle({ ...baseTitle, agentId: 'gemini' })).toBe(
       '\u{1F916} Gemini'
     );
 
     expect(
-      getPaneTitle({ ...baseTitle, aiCommand: 'copilot', sessionName: 'x' })
+      getPaneTitle({ ...baseTitle, agentId: 'copilot', sessionName: 'x' })
     ).toBe('\u{1F916} Copilot \u2014 x');
   });
 
-  it('falls back to "Agent" for custom/unrecognized aiCommand', () => {
+  it('uses Agent for an explicitly configured test runner', () => {
     expect(
       getPaneTitle({
         ...baseTitle,
-        aiCommand: 'my-custom-tool --flag',
+        agentId: 'test',
         sessionName: 'branch',
       })
     ).toBe('\u{1F916} Agent \u2014 branch');
   });
 
-  it('uses the full default command string for Claude', () => {
+  it('names an explicitly configured Claude agent', () => {
     expect(
       getPaneTitle({
         ...baseTitle,
-        aiCommand: 'claude --continue || claude',
+        agentId: 'claude',
         sessionName: 'x',
       })
     ).toBe('\u{1F916} Claude \u2014 x');

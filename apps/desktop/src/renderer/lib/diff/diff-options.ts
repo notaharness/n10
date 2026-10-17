@@ -5,6 +5,8 @@ export interface DiffOptions {
   view: 'unified' | 'split';
   wrap: boolean;
   hideResolved: boolean;
+  /** Every file in one list, or one file at a time. */
+  layout: 'all' | 'single';
 }
 
 const KEY = 'n10.diff.options';
@@ -12,6 +14,7 @@ const DEFAULTS: DiffOptions = {
   view: 'unified',
   wrap: false,
   hideResolved: false,
+  layout: 'all',
 };
 const listeners = new Set<() => void>();
 

@@ -18,6 +18,7 @@ test.use({
     // receives. Mirrors an agent that quits on its own — but the test
     // controls *when*, so it can confirm the running state first without
     // racing a wall-clock timer.
+    agentId: 'test',
     aiCommand: fakeAgentCommand({ silent: true, exitOnInput: true }),
     keybindPreset: 'vim',
   },

@@ -1,71 +1,15 @@
-import { join } from 'node:path';
 import type { Page } from '@playwright/test';
-import { test as base, expect, fakeAgent } from './fixtures/desktop.js';
+import { expect, fakeAgent } from './fixtures/desktop.js';
 import {
   createWorktree,
   launchAgentFromRail,
   tab,
   visibleText,
 } from './setup/app.js';
-import {
-  BEAM_TEST_BINARY,
-  startMachine,
-  startTestkit,
-  type BeamMachine,
-  type Testkit,
-} from './setup/beam-testkit.js';
+import { fleetTest as test, formFleet } from './setup/beam-fleet.js';
+import { BEAM_TEST_BINARY, type BeamMachine } from './setup/beam-testkit.js';
 import { collapseFleet, openFleet } from './setup/machines.js';
 import { findN10SessionFor } from './setup/tmux.js';
-
-/** `laptop` is the daemon in the fixture HOME, which the app finds;
- *  `workbox` is another machine with a HOME of its own. */
-const test = base.extend<{
-  kit: Testkit;
-  laptop: BeamMachine;
-  workbox: BeamMachine;
-}>({
-  kit: async ({ fixtureHome }, provide) => {
-    const kit = await startTestkit(fixtureHome);
-    await provide(kit);
-    await kit.stop();
-  },
-  laptop: async ({ fixtureHome, kit }, provide) => {
-    const laptop = await startMachine(fixtureHome, kit);
-    await provide(laptop);
-    await laptop.stop();
-  },
-  workbox: async ({ fixtureHome, kit }, provide) => {
-    const workbox = await startMachine(join(fixtureHome, 'workbox'), kit);
-    await provide(workbox);
-    await workbox.stop();
-  },
-  desktop: async ({ laptop, desktop }, provide) => {
-    void laptop; // running first, so the app uses it rather than spawning one
-    await provide(desktop);
-  },
-});
-
-/** Creates the fleet from Fleet, joins `workbox` to it with the CLI,
- *  and waits for the app to show workbox connected. */
-async function formFleet(page: Page, workbox: BeamMachine): Promise<void> {
-  await openFleet({ page });
-  await page.getByRole('button', { name: 'Create a fleet' }).click();
-  await page.getByLabel('This machine’s name').fill('laptop');
-  await page.getByLabel('Fleet name').fill('home');
-  await page.getByRole('button', { name: 'Create fleet' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Fleet created' })
-  ).toBeVisible({ timeout: 60_000 });
-
-  const joined = await workbox.cli(['join', '--label', 'workbox']);
-  expect(joined.code, joined.stderr).toBe(0);
-  const rows = page.getByTestId('machine-row');
-  await expect(
-    rows.filter({ hasText: 'workbox' }).getByText('Connected')
-  ).toBeVisible({ timeout: 60_000 });
-  await expect(rows).toHaveCount(2);
-  await collapseFleet(page);
-}
 
 const BRANCH = 'agent-work';
 
@@ -115,6 +59,40 @@ test.describe('A fleet of real beam daemons @beam', () => {
     await expect(
       visibleText(desktop.page, /echo:DONE from workbox/)
     ).toBeVisible({ timeout: 30_000 });
+  });
+
+  test('without a network this machine reads offline and its member unknown', async ({
+    desktop,
+    workbox,
+  }) => {
+    const { page } = desktop;
+    await formFleet(page, workbox);
+    await openFleet(desktop);
+    const rows = page.getByTestId('machine-row');
+    const laptopRow = rows.filter({ hasText: 'laptop' });
+    const workboxRow = rows.filter({ hasText: 'workbox' });
+
+    // The operating system's word, as Chromium hears it; beam's tunnel
+    // runs over loopback and stays up.
+    await page.context().setOffline(true);
+    await expect(laptopRow.getByText('Offline', { exact: true })).toBeVisible();
+    await expect(
+      laptopRow.getByText('This machine cannot reach the fleet')
+    ).toBeVisible();
+    await expect(
+      workboxRow.getByText('Unknown', { exact: true })
+    ).toBeVisible();
+    await expect(
+      workboxRow.getByText('Unreachable', { exact: true })
+    ).toHaveCount(0);
+
+    await page.context().setOffline(false);
+    await expect(
+      workboxRow.getByText('Connected', { exact: true })
+    ).toBeVisible();
+    await expect(
+      laptopRow.getByText('This machine', { exact: true })
+    ).toBeVisible();
   });
 
   test('a member granted only mail has its report refused, naming the grant', async ({

@@ -20,7 +20,8 @@
   },
   "dependencies": {
     "react": "^19.2.4",
-    "@n10/core": "*"
+    "@n10/core": "*",
+    "@n10/engine": "*"
   },
   "devDependencies": {
     "@types/react": "^19.2.14"

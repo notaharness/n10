@@ -21,7 +21,7 @@ const alpha = {
 } as SidebarItem;
 
 function Probe({ item, name }: { item: SidebarItem; name: string }) {
-  const pane = usePaneReducer(item, name);
+  const pane = usePaneReducer(item, name, false);
   return (
     <Text>
       {pane.paneMode}|{pane.sessionMenu ? 'menu' : 'none'}

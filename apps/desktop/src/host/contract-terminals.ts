@@ -49,6 +49,10 @@ export interface TerminalSummary {
   /** `cwd` with the home directory written as `~`, for the tab. */
   displayPath: string;
   repo: string | null;
+  /** The open repository's branch whose checkout it was opened in, on
+   *  whichever machine. That branch's tab lists it; the strip gives it
+   *  no tab of its own. */
+  branch?: string;
   running: boolean;
   spawnedAt: number;
   /** The machine this terminal runs on — `'local'` or a beam peerId
@@ -57,4 +61,16 @@ export interface TerminalSummary {
   /** Local client health, independent of `running` (decisions.md D4).
    *  Absent for a local terminal. */
   connectionState?: 'connected' | 'reconnecting' | 'failed';
+}
+
+/** A shell in a branch's checkout on one machine — the review sidebar's
+ *  Launch Terminal. The checkout is created there when it has none. */
+export interface BranchTerminalRequest {
+  branch: string;
+  /** A beam peerId, or omitted for this machine (decisions.md D8). */
+  machine?: string;
+  /** Set only alongside `machine`: correlates `onLaunchStep` events. */
+  launchId?: string;
+  cols?: number;
+  rows?: number;
 }

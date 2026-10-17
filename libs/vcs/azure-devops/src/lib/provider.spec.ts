@@ -7,7 +7,7 @@ import {
   fetchPrBuildStatus,
 } from './build-status.js';
 import { deriveBuildRunStatus } from './builds.js';
-import { resetAdoTransport } from './request.js';
+import { invalidateAdoKey, resetAdoTransport } from './request.js';
 import {
   parseReviewer,
   parsePullRequest,
@@ -16,13 +16,13 @@ import {
   fetchActiveCommentCount,
   parseAdoRemoteUrl,
   azureDevOpsProvider,
-  fetchAuthenticatedUserEmail,
   fetchMyTeamIds,
-  enrichReviewersWithTeamMembership,
+} from './provider.js';
+import {
   extractMentionGuids,
   rewriteMentions,
   _clearMentionCacheForTests,
-} from './provider.js';
+} from './mentions.js';
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -62,7 +62,7 @@ function jsonResponse(data: unknown, status = 200): Response {
 // would let one test answer another's request. Every test starts from
 // an empty cache and an open throttle gate.
 beforeEach(() => {
-  resetAdoTransport();
+  azureDevOpsProvider.resetCaches?.();
 });
 
 const testAdoConfig = {
@@ -126,6 +126,51 @@ describe('parseReviewer', () => {
     expect(parseReviewer({ displayName: 'Bob', vote: 7 }).decision).toBe(
       'no-response'
     );
+  });
+
+  describe('a group reviewer', () => {
+    const myTeamIds = new Set(['team-guid-123']);
+    const team = {
+      displayName: '[proj]\\Core Team',
+      uniqueName: 'vstfs:///Classification/TeamProject/proj\\Core Team',
+      id: 'team-guid-123',
+      vote: 10,
+      isContainer: true,
+    };
+
+    it('keeps its own name and vote when the caller is in it', () => {
+      expect(parseReviewer(team, myTeamIds)).toEqual({
+        displayName: '[proj]\\Core Team',
+        identifier: 'vstfs:///Classification/TeamProject/proj\\Core Team',
+        decision: 'approved',
+        includesViewer: true,
+      });
+    });
+
+    it('is not marked when the caller is not in it', () => {
+      expect(
+        parseReviewer({ ...team, id: 'other-team' }, myTeamIds)
+      ).not.toHaveProperty('includesViewer');
+    });
+
+    it('names the groups a member voted for, by their identifier', () => {
+      const member = {
+        displayName: 'Teammate',
+        uniqueName: 'teammate@example.com',
+        vote: 10,
+        votedFor: [{ uniqueName: team.uniqueName }, {}],
+      };
+      expect(parseReviewer(member).votedFor).toEqual([team.uniqueName]);
+      expect(parseReviewer({ ...member, votedFor: [] })).not.toHaveProperty(
+        'votedFor'
+      );
+    });
+
+    it('marks only groups, never a person who shares an id', () => {
+      expect(
+        parseReviewer({ ...team, isContainer: false }, myTeamIds)
+      ).not.toHaveProperty('includesViewer');
+    });
   });
 });
 
@@ -830,127 +875,6 @@ describe('parseAdoRemoteUrl', () => {
   });
 });
 
-describe('enrichReviewersWithTeamMembership', () => {
-  const userEmail = 'alice@example.com';
-  const teamId = 'team-guid-123';
-  const myTeamIds = new Set([teamId]);
-
-  it('adds synthetic reviewer when team matches', () => {
-    const reviewers = [
-      {
-        displayName: 'My Team',
-        uniqueName: 'vstfs:///Classification/TeamProject/team-guid-123',
-        id: teamId,
-        vote: 0,
-        isContainer: true,
-      },
-    ];
-    const result = enrichReviewersWithTeamMembership(
-      reviewers,
-      myTeamIds,
-      userEmail
-    );
-    expect(result).toHaveLength(2);
-    expect(result[1]).toEqual({
-      displayName: 'My Team',
-      uniqueName: userEmail,
-      vote: 0,
-      hasDeclined: undefined,
-      isContainer: false,
-    });
-  });
-
-  it('skips when user is already an explicit reviewer', () => {
-    const reviewers = [
-      {
-        displayName: 'My Team',
-        id: teamId,
-        vote: 0,
-        isContainer: true,
-      },
-      {
-        displayName: 'Alice',
-        uniqueName: 'alice@example.com',
-        vote: 5,
-        isContainer: false,
-      },
-    ];
-    const result = enrichReviewersWithTeamMembership(
-      reviewers,
-      myTeamIds,
-      userEmail
-    );
-    expect(result).toEqual(reviewers);
-  });
-
-  it('skips when team id does not match', () => {
-    const reviewers = [
-      {
-        displayName: 'Other Team',
-        id: 'other-team-guid',
-        vote: 0,
-        isContainer: true,
-      },
-    ];
-    const result = enrichReviewersWithTeamMembership(
-      reviewers,
-      myTeamIds,
-      userEmail
-    );
-    expect(result).toHaveLength(1);
-  });
-
-  it('returns original array when myTeamIds is empty', () => {
-    const reviewers = [
-      { displayName: 'Team', id: teamId, vote: 0, isContainer: true },
-    ];
-    const result = enrichReviewersWithTeamMembership(
-      reviewers,
-      new Set(),
-      userEmail
-    );
-    expect(result).toBe(reviewers);
-  });
-
-  it('returns original array when userEmail is empty', () => {
-    const reviewers = [
-      { displayName: 'Team', id: teamId, vote: 0, isContainer: true },
-    ];
-    const result = enrichReviewersWithTeamMembership(reviewers, myTeamIds, '');
-    expect(result).toBe(reviewers);
-  });
-});
-
-describe('fetchAuthenticatedUserEmail', () => {
-  beforeEach(() => {
-    // Block body on purpose: an arrow returning the mock hands vitest
-    // a "cleanup hook", which it then calls — invoking fetch with no
-    // arguments at teardown.
-    mockFetch.mockReset();
-  });
-
-  it('returns user email on success', async () => {
-    mockFetch.mockResolvedValue(
-      jsonResponse({
-        authenticatedUser: {
-          properties: { Account: { $value: 'alice@example.com' } },
-        },
-      })
-    );
-    const email = await fetchAuthenticatedUserEmail(testAdoConfig);
-    expect(email).toBe('alice@example.com');
-    const calledUrl = mockFetch.mock.calls[0]![0] as string;
-    expect(calledUrl).toContain('/_apis/connectiondata');
-  });
-
-  it('reports a rejected token as a rejected token', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({}, 401));
-    await expect(fetchAuthenticatedUserEmail(testAdoConfig)).rejects.toThrow(
-      'Azure DevOps rejected the access token'
-    );
-  });
-});
-
 describe('fetchMyTeamIds', () => {
   beforeEach(() => {
     // Block body on purpose: an arrow returning the mock hands vitest
@@ -981,6 +905,23 @@ describe('fetchMyTeamIds', () => {
     mockFetch.mockRejectedValueOnce(new Error('network error'));
     const ids = await fetchMyTeamIds(testAdoConfig);
     expect(ids).toEqual(new Set());
+  });
+
+  it('answers a failed read with the teams last named', async () => {
+    // Membership is what files a request to the viewer's team under
+    // their review: one failed read must not move it for a cycle.
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ value: [{ id: 'team-1' }] })
+    );
+    await fetchMyTeamIds(testAdoConfig);
+    invalidateAdoKey('myorg/myproject/my-teams');
+    mockFetch.mockRejectedValueOnce(new Error('network error'));
+    expect(await fetchMyTeamIds(testAdoConfig)).toEqual(new Set(['team-1']));
+
+    // New credentials name someone else.
+    azureDevOpsProvider.resetCaches?.();
+    mockFetch.mockRejectedValueOnce(new Error('network error'));
+    expect(await fetchMyTeamIds(testAdoConfig)).toEqual(new Set());
   });
 });
 
@@ -1051,12 +992,133 @@ describe('azureDevOpsProvider', () => {
     ).toBe('https://dev.azure.com/myorg/myproject/_git/myrepo/pullrequest/42');
   });
 
+  it('names the repository a pull request ref belongs to', () => {
+    expect(
+      azureDevOpsProvider.repositoryRef?.({
+        org: 'myorg',
+        project: 'myproject',
+        repo: 'myrepo',
+      })
+    ).toEqual({
+      provider: 'azure-devops',
+      host: 'dev.azure.com/myorg',
+      repository: 'myproject/myrepo',
+    });
+    expect(
+      azureDevOpsProvider.repositoryRef?.({ org: 'myorg', repo: 'myrepo' })
+    ).toBeNull();
+  });
+
   describe('fetchPullRequests', () => {
     beforeEach(() => {
       // Block body on purpose: an arrow returning the mock hands vitest
       // a "cleanup hook", which it then calls — invoking fetch with no
       // arguments at teardown.
       mockFetch.mockReset();
+    });
+
+    it('marks the pull requests the signed-in account wrote, whatever its email', async () => {
+      // The configured email is git's, which need not be Azure's
+      // uniqueName (a personal address, a DOMAIN\\user name): the
+      // account is the authenticated identity, by id.
+      const author = (id: string, uniqueName: string) => ({ id, uniqueName });
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/_apis/connectiondata'))
+          return Promise.resolve(
+            jsonResponse({ authenticatedUser: { id: 'viewer-id' } })
+          );
+        if (url.includes('/pullrequests?'))
+          return Promise.resolve(
+            jsonResponse({
+              value: [
+                {
+                  pullRequestId: 42,
+                  sourceRefName: 'refs/heads/mine',
+                  createdBy: author('viewer-id', 'CORP\\robin'),
+                },
+                {
+                  pullRequestId: 43,
+                  sourceRefName: 'refs/heads/theirs',
+                  createdBy: author('other-id', 'robin@example.com'),
+                },
+              ],
+            })
+          );
+        return Promise.resolve(jsonResponse({ value: [] }));
+      });
+
+      const result = await azureDevOpsProvider.fetchPullRequests(
+        { pat: 'test-pat' },
+        testProject
+      );
+
+      expect(result['mine']?.viewerIsAuthor).toBe(true);
+      expect(result['theirs']?.viewerIsAuthor).toBe(false);
+    });
+
+    it('marks the signed-in account’s reviewer row, whatever its email', async () => {
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/_apis/connectiondata'))
+          return Promise.resolve(
+            jsonResponse({ authenticatedUser: { id: 'viewer-id' } })
+          );
+        if (url.includes('/pullrequests?'))
+          return Promise.resolve(
+            jsonResponse({
+              value: [
+                {
+                  pullRequestId: 43,
+                  sourceRefName: 'refs/heads/theirs',
+                  createdBy: { id: 'other-id' },
+                  reviewers: [
+                    { id: 'viewer-id', uniqueName: 'CORP\\robin', vote: 0 },
+                    { id: 'other-id', uniqueName: 'robin@example.com' },
+                  ],
+                },
+              ],
+            })
+          );
+        return Promise.resolve(jsonResponse({ value: [] }));
+      });
+
+      const result = await azureDevOpsProvider.fetchPullRequests(
+        { pat: 'test-pat' },
+        testProject
+      );
+
+      expect(
+        result['theirs']?.reviewers?.map((r) => [r.identifier, r.isViewer])
+      ).toEqual([
+        ['CORP\\robin', true],
+        ['robin@example.com', false],
+      ]);
+    });
+
+    it('leaves authorship to the email when Azure has not said who the account is', async () => {
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/_apis/connectiondata'))
+          return Promise.resolve(jsonResponse({}, 500));
+        if (url.includes('/pullrequests?'))
+          return Promise.resolve(
+            jsonResponse({
+              value: [
+                {
+                  pullRequestId: 42,
+                  sourceRefName: 'refs/heads/mine',
+                  createdBy: { id: 'viewer-id' },
+                },
+              ],
+            })
+          );
+        return Promise.resolve(jsonResponse({ value: [] }));
+      });
+
+      const result = await azureDevOpsProvider.fetchPullRequests(
+        { pat: 'test-pat' },
+        testProject
+      );
+
+      expect(result['mine']).not.toHaveProperty('viewerIsAuthor');
     });
 
     it('returns a map of branch to PR info with comment counts', async () => {
@@ -1148,6 +1210,87 @@ describe('azureDevOpsProvider', () => {
         createdByDisplayName: '',
         url: 'https://dev.azure.com/myorg/myproject/_git/myrepo/pullrequest/43',
       });
+    });
+
+    /**
+     * A team is its own reviewer row carrying its own vote, which is
+     * whichever member cast it. The reported bug: a teammate's approval
+     * of a team the caller is in came back as a second row under the
+     * caller's name, so the caller read as having approved a pull
+     * request they never opened, and one reviewer counted twice.
+     */
+    it('leaves a team’s vote on the team and only marks that the caller is in it', async () => {
+      const list = readFileSync(
+        new URL('./__fixtures__/pr-list-group-reviewers.json', import.meta.url),
+        'utf8'
+      );
+      // The caller's email is on offer, as it is from a real
+      // organization: that is what the forged row was filed under.
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/_apis/connectiondata'))
+          return Promise.resolve(
+            jsonResponse({
+              authenticatedUser: {
+                id: '9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b',
+                properties: { Account: { $value: 'me@example.com' } },
+              },
+            })
+          );
+        if (url.includes('/teams?'))
+          return Promise.resolve(
+            jsonResponse({
+              value: [{ id: '5b0f1c7e-9a53-4d0b-8e7c-2f4c61b0d9a1' }],
+            })
+          );
+        if (url.includes('/pullrequests?'))
+          return Promise.resolve(response(list));
+        return Promise.resolve(jsonResponse({ value: [] }));
+      });
+
+      const result = await azureDevOpsProvider.fetchPullRequests(
+        { pat: 'test-pat' },
+        testProject
+      );
+
+      // Every row says whether it is the caller's own, by identity:
+      // the recorded "Me" carries the authenticated id.
+      const coreTeam = {
+        displayName: '[proj]\\Core Team',
+        identifier:
+          'vstfs:///Classification/TeamProject/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c\\Core Team',
+        isViewer: false,
+        includesViewer: true,
+      };
+      expect(result['feat/teammate-approved']?.reviewers).toEqual([
+        { ...coreTeam, decision: 'approved' },
+        {
+          displayName: 'Teammate',
+          identifier: 'teammate@example.com',
+          decision: 'approved',
+          isViewer: false,
+          votedFor: [coreTeam.identifier],
+        },
+        {
+          displayName: '[proj]\\Release Approvers',
+          identifier:
+            'vstfs:///Classification/TeamProject/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c\\Release Approvers',
+          decision: 'no-response',
+          isViewer: false,
+        },
+      ]);
+      expect(result['feat/group-pending']?.reviewers).toEqual([
+        { ...coreTeam, decision: 'no-response' },
+      ]);
+      expect(result['feat/i-approved']?.reviewers).toEqual([
+        { ...coreTeam, decision: 'approved' },
+        {
+          displayName: 'Me',
+          identifier: 'me@example.com',
+          decision: 'approved',
+          isViewer: true,
+          votedFor: [coreTeam.identifier],
+        },
+      ]);
     });
   });
 
@@ -1360,6 +1503,43 @@ describe('azureDevOpsProvider', () => {
       expect(identityCall).toContain('/identities?identityIds=');
       expect(identityCall).toContain(alice);
       expect(identityCall).toContain(bob);
+    });
+
+    it('resolves mentions for the conversation while keeping the raw source', async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          value: [
+            {
+              id: 1,
+              status: 'active',
+              comments: [
+                {
+                  id: 11,
+                  commentType: 'text',
+                  content: `hi @<${alice}>`,
+                  author: { displayName: 'Me', uniqueName: 'me@example.com' },
+                  publishedDate: '2026-04-24T00:00:00Z',
+                },
+              ],
+            },
+          ],
+        })
+      );
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({ value: [{ id: alice, providerDisplayName: 'Alice' }] })
+      );
+
+      const result = await azureDevOpsProvider.fetchPullRequestConversation!(
+        { pat: 't' },
+        testProject,
+        1
+      );
+
+      expect(result.ref).toMatchObject({ provider: 'azure-devops', number: 1 });
+      expect(result.threads[0]!.comments[0]).toMatchObject({
+        source: `hi @<${alice}>`,
+        body: 'hi @Alice',
+      });
     });
 
     it('leaves original @<guid> intact when the Identities API fails', async () => {

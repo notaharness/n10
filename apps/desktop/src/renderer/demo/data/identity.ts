@@ -16,6 +16,43 @@ export const HOME = '/home/you';
 
 type Loader = () => Promise<{ default: string }>;
 
+/** A job a repository's workflows run on every pull request. */
+export interface DemoJob {
+  name: string;
+  workflow: string;
+  /** The target branch's rules require it to pass. */
+  required: boolean;
+  /** How long a run takes. */
+  seconds: number;
+}
+
+/** A team a rule set requires for changes to its paths. GitHub asks it
+ *  to review a pull request that changes them. */
+export interface DemoTeam {
+  /** GitHub's `org/slug`. */
+  slug: string;
+  name: string;
+  /** Its database id, which rule sets name it by. */
+  id: number;
+  approvals: number;
+  paths: string[];
+  /** The pull requests that change its paths, which GitHub asked it to
+   *  review. */
+  requestedOn: number[];
+}
+
+/** What a repository runs on its pull requests, and what its default
+ *  branch's rules ask of them. */
+export interface DemoCi {
+  jobs: DemoJob[];
+  /** Approving reviews the rules ask for; 0 where they ask none. */
+  approvals: number;
+  /** Review threads must be resolved. */
+  conversationResolution: boolean;
+  /** Teams a rule set requires, by path. */
+  teams?: DemoTeam[];
+}
+
 /** One repository the demo knows, as its host would read it off disk
  *  and the provider. */
 export interface RepoData {
@@ -27,6 +64,8 @@ export interface RepoData {
   /** Whole-file patches by source branch, loaded on demand. */
   diffs: Record<string, Loader>;
   descriptions: Record<number, Loader>;
+  /** Absent for a repository with no pull requests to check. */
+  ci?: DemoCi;
   branches: readonly string[];
   /** Branches with a worktree, besides the main checkout's. */
   worktrees: readonly string[];

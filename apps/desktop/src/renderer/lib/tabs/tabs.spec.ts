@@ -619,6 +619,23 @@ describe('tabs across repositories', () => {
     s = reduce(s, { type: 'close', id: id('branch:main', OTHER) });
     expect(s.tabs).toEqual([]);
   });
+
+  it('close-others spares the tabs it is told to keep', () => {
+    // An orchestrator's tab keeps the player tabs it shows.
+    let s = open(empty, 'branch:orch');
+    s = open(s, 'branch:player');
+    s = open(s, 'branch:stranger');
+    s = reduce(s, {
+      type: 'close-others',
+      id: id('branch:orch'),
+      keep: [id('branch:player')],
+    });
+    expect(s.tabs.map((t) => t.id)).toEqual([
+      id('branch:orch'),
+      id('branch:player'),
+    ]);
+    expect(s.activeId).toBe(id('branch:orch'));
+  });
 });
 
 describe('activeTabRepo', () => {
@@ -851,6 +868,23 @@ describe('terminal tabs', () => {
   it('reports the repository a terminal belongs to, and none for a plain folder', () => {
     expect(activeTabRepo(openTerminal(empty, plain))).toBeNull();
     expect(activeTabRepo(openTerminal(empty, inAlpha))).toBe(REPO);
+  });
+
+  // A terminal in a branch's checkout lives in that branch's tab, so
+  // the strip gives it none, then or after the branch is forgotten.
+  it('opens no tab for a terminal in a branch checkout, now or later', () => {
+    const inBranch: TerminalEntry = {
+      ...plain,
+      name: 'n10-shell-2',
+      cwd: `${REPO}/.claude/worktrees/topic`,
+      branch: 'topic',
+    };
+    let s = syncTerminals(empty, [inBranch]);
+    expect(s.tabs).toEqual([]);
+    s = syncTerminals(s, [{ ...inBranch, branch: undefined }]);
+    expect(s.tabs).toEqual([]);
+    // Opening it on purpose still gives it a tab.
+    expect(openTerminal(s, inBranch).tabs).toHaveLength(1);
   });
 
   // The restore path: the host lists the terminals tmux gave back, and

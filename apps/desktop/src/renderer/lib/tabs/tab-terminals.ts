@@ -19,6 +19,8 @@ export interface TerminalEntry {
   cwd: string;
   displayPath: string;
   repo: string | null;
+  /** The branch whose checkout it is in: that branch's tab lists it. */
+  branch?: string;
 }
 
 function terminalTab(entry: TerminalEntry, listed: boolean): TerminalTab {
@@ -72,9 +74,10 @@ export function openTerminal(
 /**
  * Reconcile the strip with the host's terminal listing.
  *
- * Every terminal gets a tab once — the restore path after a restart, and
- * one found by the running scan — recorded in `autoOpened` so a tab the
- * user closed stays closed while the host keeps listing the terminal.
+ * Every terminal outside a branch's checkout gets a tab once — the
+ * restore path after a restart, and one found by the running scan —
+ * recorded in `autoOpened` so a tab the user closed stays closed while
+ * the host keeps listing the terminal.
  * Opening never moves focus: a restored terminal from another
  * repository would otherwise switch the workspace at startup. A tab
  * that is already there has its stamp refreshed, and an unchanged
@@ -117,8 +120,10 @@ function openListed(state: TabsState, entries: TerminalEntry[]): TabsState {
     const seen = seenKey(entry.name);
     if (opened.has(seen)) continue;
     opened.add(seen);
-    tabs = [...tabs, terminalTab(entry, true)];
     changed = true;
+    // A branch's terminal lives in that branch's tab; seen all the same,
+    // so it gets no tab later, under a repository that does not know it.
+    if (!entry.branch) tabs = [...tabs, terminalTab(entry, true)];
   }
   if (!changed) return state;
   return { ...state, tabs, autoOpened: [...opened] };

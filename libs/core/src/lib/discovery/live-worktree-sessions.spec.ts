@@ -205,14 +205,14 @@ describe('listLiveWorktreeSessions', () => {
         spawner: 'orchestra',
         agent: 'codex',
         orchestrator: 'tmux:alpha-main',
-        lastReport: 'DONE 2026-09-14T10:22:03Z',
+        lastReport: 'DONE 2026-09-14T10:22:03Z inbox',
       },
     ];
     expect(list()).toEqual([
       expect.objectContaining({
         agent: 'codex',
         orchestrator: 'tmux:alpha-main',
-        lastReport: 'DONE 2026-09-14T10:22:03Z',
+        lastReport: 'DONE 2026-09-14T10:22:03Z inbox',
       }),
     ]);
     state.sessions = [ALPHA];

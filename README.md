@@ -29,7 +29,33 @@ Then:
 npm install -g @notaharness/n10
 ```
 
-A .deb package and an AppImage for Linux are coming ([#122](https://github.com/notaharness/n10/issues/122)).
+Desktop .deb and AppImage packages for Linux and DMG installers for macOS are
+attached to [GitHub releases](https://github.com/notaharness/n10/releases).
+On macOS, download the DMG for your Mac's architecture, open it, and drag
+`n10-desktop.app` to Applications. The app needs Git and tmux 3.2+ on your `PATH`;
+`brew install git tmux` provides them.
+
+Until the macOS app has a Developer ID signature and Apple notarization, a
+downloaded copy may show “Apple cannot check ‘n10’ for malicious software” or
+“the developer cannot be verified.” If you trust the release, try opening the
+app once, then choose **System Settings → Privacy & Security → Open Anyway**
+and confirm **Open**. On versions that offer it, right-click `n10-desktop.app` in
+Applications and choose **Open**. From a terminal, the equivalent explicit
+quarantine override is `xattr -cr /Applications/n10-desktop.app`. Only do this for a
+copy whose [SHA256SUMS](https://github.com/notaharness/n10/releases/latest)
+matches the downloaded DMG.
+
+### Nix
+
+On Linux, the flake builds `n10` offline, with `tmux`, `git` and `gh` on its `PATH`:
+
+```sh
+nix run github:notaharness/n10   # run it
+nix build                        # build ./result from a checkout
+nix develop                      # a shell with Node 24, tmux, gh and the node-pty toolchain
+```
+
+The wrapper points the `electron` package at nixpkgs' Electron through `ELECTRON_OVERRIDE_DIST_PATH`, so the desktop app does not download a binary. nixpkgs' Electron may be a different major version than the one n10 is tested against; `n10 --tui` does not use it.
 
 ## Use it
 

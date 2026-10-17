@@ -505,8 +505,7 @@
   }
 }
 
-/* Runs by default, holds still under reduced motion, and the figure's
- * button overrides either through data-playing. */
+/* Runs by default and holds still under reduced motion. */
 .n10-mesh {
   --n10-mesh-play: running;
 }
@@ -515,14 +514,6 @@
   .n10-mesh {
     --n10-mesh-play: paused;
   }
-}
-
-.n10-mesh[data-playing='true'] {
-  --n10-mesh-play: running;
-}
-
-.n10-mesh[data-playing='false'] {
-  --n10-mesh-play: paused;
 }
 
 /* The beam page's closing panel: the same isometric ground as its hero,
@@ -575,14 +566,6 @@
   .orchestra-stage {
     --orchestra-play: paused;
   }
-}
-
-.orchestra-stage[data-playing='true'] {
-  --orchestra-play: running;
-}
-
-.orchestra-stage[data-playing='false'] {
-  --orchestra-play: paused;
 }
 
 .orchestra-pool {
@@ -713,8 +696,7 @@
   fill: var(--color-fd-muted-foreground);
 }
 
-/* Unreadably small on a phone; OrchestraStage lists the players below
- * the scene there instead. */
+/* Unreadably small on a phone, where the scene goes without them. */
 @media (max-width: 639px) {
   .orchestra-nameplate {
     display: none;
@@ -822,6 +804,54 @@
 
 .dark .orchestra-panel-glow {
   opacity: 0.25;
+}
+
+/* The /conversations scene (src/components/conversations/). The
+ * script only flips data-on and two custom properties; every motion is
+ * a transition here, so reduced motion, which holds one scene, needs
+ * nothing of its own. */
+.conversations-view,
+.conversations-appear {
+  transition: opacity 320ms ease, transform 320ms ease;
+}
+
+/* A switch fades the old view out before the new one comes in, so the
+ * two transcripts never show on top of each other. */
+.conversations-view {
+  transition-duration: 180ms;
+}
+
+.conversations-view[data-on='true'] {
+  transition-delay: 180ms;
+}
+
+.conversations-view[data-on='false'],
+.conversations-appear[data-on='false'] {
+  opacity: 0;
+}
+
+.conversations-appear[data-on='false'] {
+  transform: translateY(4px);
+}
+
+.conversations-highlight {
+  transform: translateY(var(--conversations-y));
+  transition: transform 260ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.conversations-cursor {
+  transform: translate(var(--conversations-x), var(--conversations-y));
+  transition: transform 850ms cubic-bezier(0.65, 0, 0.35, 1), opacity 300ms ease;
+}
+
+.conversations-cursor[data-on='false'] {
+  opacity: 0;
+}
+
+/* Slides right a character at a time, uncovering the typed reply. */
+.conversations-type-cover[data-on='true'] {
+  transform: translateX(160px);
+  transition: transform 1.2s steps(19, end);
 }
 
 /* Theme-specific images (see theme-image.tsx): follow the site's

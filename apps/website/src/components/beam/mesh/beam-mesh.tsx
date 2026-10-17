@@ -1,7 +1,4 @@
-'use client';
-
-import { Pause, Play } from 'lucide-react';
-import { useState, useSyncExternalStore, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 import { centreLine, ribbon, shift, TRACK_WIDTH, type Vec2 } from './geometry';
 import { Ground } from './ground';
 import { Laptop, Mini, Rack, Tower } from './machines';
@@ -81,14 +78,6 @@ const beams: Beam[] = [
   },
 ];
 
-const REDUCED = '(prefers-reduced-motion: reduce)';
-
-function subscribeReduced(onChange: () => void) {
-  const query = window.matchMedia(REDUCED);
-  query.addEventListener('change', onChange);
-  return () => query.removeEventListener('change', onChange);
-}
-
 /** How far each direction's track sits from the beam's centre line. */
 const LANE = 0.18;
 
@@ -128,43 +117,22 @@ function BeamTrack({ beam }: { beam: Beam }) {
 }
 
 export function BeamMesh({ className }: { className?: string }) {
-  const reduced = useSyncExternalStore(
-    subscribeReduced,
-    () => window.matchMedia(REDUCED).matches,
-    () => false
-  );
-  // null follows the system setting; a click on the button overrides it.
-  const [choice, setChoice] = useState<boolean | null>(null);
-  const playing = choice ?? !reduced;
-  const Icon = playing ? Pause : Play;
-
   return (
     <figure className={className}>
-      <div className="relative">
-        <svg
-          viewBox="-285 -30 570 332"
-          className="n10-mesh h-auto w-full overflow-visible"
-          data-playing={choice === null ? undefined : String(choice)}
-          role="img"
-          aria-label="Four machines — a laptop, a workstation, a build box and a home server — each connected to the others by its own beam, with data moving along every beam in both directions."
-        >
-          <Ground />
-          {beams.map((beam) => (
-            <BeamTrack key={beam.id} beam={beam} />
-          ))}
-          {machines.map(({ id, cx, cy, Shape }) => (
-            <Shape key={id} cx={cx} cy={cy} />
-          ))}
-        </svg>
-        <button
-          type="button"
-          onClick={() => setChoice(!playing)}
-          aria-label={playing ? 'Pause the animation' : 'Play the animation'}
-          className="text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground focus-visible:ring-fd-ring absolute right-0 bottom-0 inline-flex size-8 items-center justify-center rounded-md transition-colors outline-none focus-visible:ring-2"
-        >
-          <Icon className="size-4" aria-hidden />
-        </button>
-      </div>
+      <svg
+        viewBox="-285 -30 570 332"
+        className="n10-mesh h-auto w-full overflow-visible"
+        role="img"
+        aria-label="Four machines — a laptop, a workstation, a build box and a home server — each connected to the others by its own beam, with data moving along every beam in both directions."
+      >
+        <Ground />
+        {beams.map((beam) => (
+          <BeamTrack key={beam.id} beam={beam} />
+        ))}
+        {machines.map(({ id, cx, cy, Shape }) => (
+          <Shape key={id} cx={cx} cy={cy} />
+        ))}
+      </svg>
     </figure>
   );
 }

@@ -35,8 +35,9 @@ function switchOutside(repoPath: string, ...args: string[]): void {
 async function expectSwitched(page: Page): Promise<void> {
   await expect(tab(page, new RegExp(OTHER))).toBeVisible({ timeout: 15_000 });
   await expect(tabs(page)).toHaveCount(1);
-  await expect(banner(page)).toContainText(OTHER);
-  await expect(banner(page)).toContainText(BRANCH);
+  await expect(banner(page)).toHaveText(
+    `Branch switched from ${BRANCH} to ${OTHER}`
+  );
 }
 
 async function expectBack(page: Page): Promise<void> {
@@ -87,7 +88,7 @@ test.describe('Switching branch inside a worktree', () => {
       await createWorktree(page, BRANCH);
       await launchAgentFromRail(page);
       await expect(
-        page.locator('[data-terminal-pane]').getByText(/\S/).first()
+        page.locator('[data-terminal-pane] .xterm-rows').getByText(/\S/).first()
       ).toBeVisible({ timeout: 15_000 });
 
       await focusTerminal(page);

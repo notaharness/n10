@@ -18,4 +18,16 @@ describe('settings fields', () => {
       'code'
     );
   });
+
+  it('offers the shell choices, with auto first', () => {
+    const field = buildSettingsFields(null).find((f) => f.key === 'shell')!;
+    expect(field.configBag).toBe('global');
+    expect(field.presets?.map((p) => p.value)).toEqual([
+      'auto',
+      'fish',
+      'zsh',
+      'bash',
+      'sh',
+    ]);
+  });
 });

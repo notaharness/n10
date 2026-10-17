@@ -1,10 +1,6 @@
-import {
-  createContext,
-  useContext,
-  useMemo,
-  useCallback,
-  useEffect,
-} from 'react';
+import type { WorktreeService, SessionService } from '@n10/engine/contract';
+import { useEngine } from './EngineContext.js';
+import { createContext, useContext, useMemo, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type {
   PullRequestInfo,
@@ -13,33 +9,33 @@ import type {
 } from '@n10/vcs-core';
 import {
   findOrphanPrs,
+  findYourPrIds,
   categorizeReviews as categorizePrReviews,
   buildSessionPrMap,
-} from '@n10/core';
+} from '@n10/core/ui';
 import { setOperationErrorHandler } from '../hooks/useAsyncOperation.js';
 import { useSessionManager } from '../hooks/useSessionManager.js';
 import { usePrData } from '../hooks/usePrData.js';
 import { useRemoteSync } from '../hooks/useRemoteSync.js';
-import { useMergedBranches } from '../hooks/useMergedBranches.js';
-import { useConflictCounts } from '../hooks/useConflictCounts.js';
 import { useConfig } from './ConfigContext.js';
 import { useBranchPickerActions } from './ModalContext.js';
 import { useToastActions } from './ToastContext.js';
 import type { ToastVariant } from './ToastContext.js';
 import type { AgentSession } from '@n10/core';
-import { sortSessionsByPrId } from '@n10/core';
+import { sortSessionsByPrId } from '@n10/core/ui';
 
 // ── Data context (consumed by SidebarProvider, changes on data refresh) ──
 
 export interface SessionDataContextValue {
   sessions: AgentSession[];
   sortedSessions: AgentSession[];
-  worktreeBranches: string[];
   prMap: BranchPrMap;
   prError: string | null;
   orphanPrs: PullRequestInfo[];
   categorizedReviews: CategorizedReviews;
   sessionPrMap: Map<string, PullRequestInfo>;
+  /** Ids of the pull requests the viewer authored. */
+  yourPrIds: ReadonlySet<number>;
   mergedBranches: Set<string>;
   conflictCounts: Map<string, number>;
   conflictsLoading: boolean;
@@ -55,8 +51,9 @@ export interface SessionActionsContextValue {
    * top-right toast stack.
    */
   flashStatus: (msg: string, variant?: ToastVariant) => void;
+  worktrees: WorktreeService;
+  commands: SessionService;
   refreshSessions: () => Promise<AgentSession[]>;
-  performDelete: (sessionName: string, branch: string) => Promise<void>;
   refreshPr: () => Promise<void>;
   triggerSync: () => Promise<void>;
 }
@@ -71,14 +68,21 @@ function describeError(err: unknown): string {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const { config, provider, providers, reloadFromDisk } = useConfig();
+  const { config, provider } = useConfig();
   const { setBranches } = useBranchPickerActions();
   const { flash } = useToastActions();
+  const { worktrees, sessions: commands } = useEngine();
 
-  const sessionMgr = useSessionManager(providers, reloadFromDisk, setBranches);
+  const sessionMgr = useSessionManager(setBranches);
 
   const { prMap, error: prError, refresh: refreshPr } = usePrData();
-  const { lastSynced, triggerSync } = useRemoteSync();
+  const {
+    lastSynced,
+    triggerSync,
+    mergedBranches,
+    conflictCounts,
+    isSyncing: conflictsLoading,
+  } = useRemoteSync();
 
   // An async op has no caller to report to — every `run` is fired and
   // forgotten — so a failure lands on the toast rail. Without this a
@@ -91,45 +95,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ),
     [flash]
   );
-
-  // The sweep runs unattended, so the toast has to wait for the delete
-  // to actually land — announcing it up front reported success for a
-  // branch that is still on disk.
-  const onMergedDelete = useCallback(
-    (sessionName: string, branch: string) => {
-      void sessionMgr
-        .performDelete(sessionName, branch)
-        .then(() => flash(`Auto-deleted merged branch: ${branch}`, 'success'))
-        .catch((err: unknown) =>
-          flash(
-            `Auto-delete of ${branch} failed: ${describeError(err)}`,
-            'warning'
-          )
-        );
-    },
-    [sessionMgr, flash]
-  );
-
-  const onRebaseInProgress = useCallback(
-    (branch: string) => {
-      flash(`Auto-delete of ${branch} skipped: rebase in progress`, 'warning');
-    },
-    [flash]
-  );
-
-  const { mergedBranches } = useMergedBranches(
-    sessionMgr.worktreeBranches,
-    lastSynced,
-    onMergedDelete,
-    onRebaseInProgress
-  );
-
-  const conflictBranches = useMemo(
-    () => sessionMgr.worktreeBranches.filter((b) => !mergedBranches.has(b)),
-    [sessionMgr.worktreeBranches, mergedBranches]
-  );
-  const { counts: conflictCounts, loading: conflictsLoading } =
-    useConflictCounts(conflictBranches, lastSynced, prMap);
 
   const orphanPrs = useMemo(() => {
     if (!provider) return [];
@@ -145,6 +110,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return categorizePrReviews(prMap, config, provider);
   }, [prMap, config, provider]);
 
+  const yourPrIds = useMemo(
+    () =>
+      provider ? findYourPrIds(prMap, config, provider) : new Set<number>(),
+    [prMap, config, provider]
+  );
+
   const sessionPrMap = useMemo(
     () => buildSessionPrMap(prMap, sessionMgr.sessions),
     [prMap, sessionMgr.sessions]
@@ -159,12 +130,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     () => ({
       sessions: sessionMgr.sessions,
       sortedSessions,
-      worktreeBranches: sessionMgr.worktreeBranches,
       prMap,
       prError,
       orphanPrs,
       categorizedReviews,
       sessionPrMap,
+      yourPrIds,
       mergedBranches,
       conflictCounts,
       conflictsLoading,
@@ -173,12 +144,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [
       sessionMgr.sessions,
       sortedSessions,
-      sessionMgr.worktreeBranches,
       prMap,
       prError,
       orphanPrs,
       categorizedReviews,
       sessionPrMap,
+      yourPrIds,
       mergedBranches,
       conflictCounts,
       conflictsLoading,
@@ -186,17 +157,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  const { refreshSessions, performDelete } = sessionMgr;
+  const { refreshSessions } = sessionMgr;
 
   const actionsValue = useMemo<SessionActionsContextValue>(
     () => ({
       flashStatus: flash,
       refreshSessions,
-      performDelete,
+      worktrees,
+      commands,
       refreshPr,
       triggerSync,
     }),
-    [flash, refreshSessions, performDelete, refreshPr, triggerSync]
+    [flash, refreshSessions, worktrees, commands, refreshPr, triggerSync]
   );
 
   return (

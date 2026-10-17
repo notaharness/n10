@@ -21,7 +21,6 @@ vi.mock('../session-resolver.js', () => ({
   resolveSessionByName: () => state.existing,
   resolveWorktreeSession: () => state.existing,
 }));
-vi.mock('../repo-root.js', () => ({ getRepoRoot: () => '/repo' }));
 import { terminalSessionKey } from '../session-key.js';
 import { launchTerminalSession } from './launch-terminal.js';
 
@@ -60,7 +59,7 @@ describe('fresh agent terminal launch against a live pane', () => {
         name: terminalSessionKey('saved'),
         fresh: true,
       })
-    ).rejects.toThrow('confirmation');
+    ).rejects.toThrow('reopen the launch dialog to replace it');
     expect(state.create).not.toHaveBeenCalled();
     expect(state.register).not.toHaveBeenCalled();
   });

@@ -1,24 +1,16 @@
-import type { ReviewDecision } from '@n10/vcs-core/types';
+import {
+  reviewersToCount,
+  type PullRequestReviewer,
+  type ReviewDecision,
+} from '@n10/vcs-core/types';
+import {
+  SIDEBAR_SECTIONS,
+  sidebarSection,
+  type SidebarSectionKey,
+} from '@n10/core/ui';
 import type { SidebarItem } from '../../../host/contract.js';
 
-export type SectionKey =
-  | 'worktrees'
-  | 'draft-pull-requests'
-  | 'pull-requests'
-  | 'needs-review'
-  | 'waiting'
-  | 'approved';
-
-export const SECTION_ORDER: SectionKey[] = [
-  'worktrees',
-  'draft-pull-requests',
-  'pull-requests',
-  'needs-review',
-  'waiting',
-  'approved',
-];
-
-export const SECTION_LABEL: Record<SectionKey, string> = {
+export const SECTION_LABEL: Record<SidebarSectionKey, string> = {
   worktrees: 'Worktrees',
   'draft-pull-requests': 'Draft Pull Requests',
   'pull-requests': 'Pull Requests',
@@ -37,22 +29,13 @@ export const SECTION_LABEL: Record<SectionKey, string> = {
 export function itemKey(item: SidebarItem): string {
   const pr = item.pr;
   if (pr) return `pr:${pr.id}`;
+  // Its branch may be checked out in a new worktree by now, which has
+  // the `branch:` key; the agent's own session tells the two apart.
+  if (item.kind === 'session' && item.session.worktreeRemoved)
+    return `removed:${item.session.name}`;
   if (item.kind === 'session')
     return `branch:${item.branch ?? item.session.label ?? item.session.name}`;
   return `pr:${item.pr.id}`;
-}
-
-export function sectionKey(item: SidebarItem): SectionKey {
-  if (item.kind === 'session') {
-    if (!item.pr) return 'worktrees';
-    return item.pr.isDraft ? 'draft-pull-requests' : 'pull-requests';
-  }
-  if (item.kind === 'orphan-pr') {
-    return item.pr.isDraft ? 'draft-pull-requests' : 'pull-requests';
-  }
-  if (item.category === 'needs-review') return 'needs-review';
-  if (item.category === 'waiting') return 'waiting';
-  return 'approved';
 }
 
 export function itemRunning(item: SidebarItem): boolean {
@@ -93,6 +76,11 @@ export function itemSessionName(item: SidebarItem): string | undefined {
   return item.sessionName;
 }
 
+/** The row of an agent still running in a worktree that is gone. */
+export function itemWorktreeRemoved(item: SidebarItem): boolean {
+  return item.kind === 'session' && item.session.worktreeRemoved === true;
+}
+
 export function itemHasWorktree(item: SidebarItem): boolean {
   if (item.kind === 'session') return true;
   return Boolean(item.sessionName);
@@ -121,28 +109,30 @@ export function applyPendingRemovals(
 ): SidebarItem[] {
   if (removing.size === 0) return items;
   return items.flatMap((item) => {
-    if (!removing.has(itemBranch(item))) return [item];
+    // Another checkout's agent, whatever its branch is called.
+    if (itemWorktreeRemoved(item) || !removing.has(itemBranch(item)))
+      return [item];
     if (item.kind === 'session') return [];
     return [{ ...item, sessionName: undefined, running: undefined }];
   });
 }
 
 export interface SidebarSection {
-  key: SectionKey;
+  key: SidebarSectionKey;
   label: string;
   items: SidebarItem[];
 }
 
 /** Group the ordered flat list into its sections (TUI order preserved). */
 export function groupSections(items: SidebarItem[]): SidebarSection[] {
-  const map = new Map<SectionKey, SidebarItem[]>();
+  const map = new Map<SidebarSectionKey, SidebarItem[]>();
   for (const item of items) {
-    const k = sectionKey(item);
+    const k = sidebarSection(item);
     const arr = map.get(k);
     if (arr) arr.push(item);
     else map.set(k, [item]);
   }
-  return SECTION_ORDER.filter((k) => map.has(k)).map((k) => ({
+  return SIDEBAR_SECTIONS.filter((k) => map.has(k)).map((k) => ({
     key: k,
     label: SECTION_LABEL[k],
     items: map.get(k) ?? [],
@@ -278,10 +268,15 @@ function toneFor(approval: ApprovalState, ci: CiState): StatusTone {
  * so beats making them read two clauses and draw the conclusion.
  */
 export function prStatusIndicator(
-  reviewers: { decision: ReviewDecision }[],
+  listed: readonly Pick<
+    PullRequestReviewer,
+    'identifier' | 'decision' | 'votedFor'
+  >[],
   buildStatus: string | undefined,
   isBlocking: (decision: ReviewDecision) => boolean
 ): PrStatusIndicator {
+  // A teammate's vote for a team is listed on both rows; it is one vote.
+  const reviewers = reviewersToCount(listed);
   const total = reviewers.length;
   const approved = reviewers.filter((r) => r.decision === 'approved').length;
   const ci = ciState(buildStatus);

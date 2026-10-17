@@ -32,7 +32,7 @@ const FAKE_AGENT_PATH = fileURLToPath(
 );
 
 /**
- * Returns a shell command (suitable for `n10Config.aiCommand`) that
+ * Returns a shell command for `n10Config.aiCommand` with `agentId: 'test'` that
  * spawns the fake-agent harness with the given scenario. See
  * `fake-agent.mjs` for the full flag reference.
  */

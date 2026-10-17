@@ -1,16 +1,23 @@
 import { useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import type { DiffLine } from '@n10/diff';
 import { contentKey } from '../content-key.js';
 import { loadDesktopPrefs } from '../desktop-prefs.js';
 import { parseDiffInWorker } from '../diff/diff-worker-client.js';
 import { measured } from '../perf.js';
-import { keys } from './query-keys.js';
+import { keys, resetProviderScopedCache } from './query-keys.js';
 import { errorMessage } from '../utils.js';
+import { repositoryKey } from '@n10/vcs-core/pr-details';
 import type {
+  GuidedReview,
   MachineView,
   RepoInfo,
   SidebarItem,
+  WorktreeRemovalCheck,
 } from '../../../host/contract.js';
 
 /**
@@ -20,6 +27,19 @@ import type {
  * them are in `mutations.ts`; the key catalog they share is in
  * `query-keys.ts`.
  */
+
+/**
+ * A query's last answer, kept on screen while the next one loads — for
+ * the same repository only. The workspace stays mounted across a switch,
+ * and another repository's rows must never stand in for this one's.
+ * Repository-scoped keys name their repository second.
+ */
+export function keepRepoAnswer(cwd: string) {
+  return <T>(
+    prev: T | undefined,
+    query: { queryKey: readonly unknown[] } | undefined
+  ): T | undefined => (query?.queryKey[1] === cwd ? prev : undefined);
+}
 
 /**
  * The boot read behind the repo gate: which repository the host is on,
@@ -37,10 +57,42 @@ import type {
  */
 export async function loadRepoGate(): Promise<RepoInfo | null> {
   const [repo] = await Promise.all([
-    window.n10.getRepo().catch(() => null),
+    window.n10.refreshRepo().catch(() => null),
     loadDesktopPrefs(),
   ]);
   return repo;
+}
+
+/** Whether two answers about the open repository name the same
+ *  provider, repository and account — what every pull request entry in
+ *  the cache was read for. */
+function sameRepoIdentity(a: RepoInfo, b: RepoInfo): boolean {
+  const repo = (r: RepoInfo) => r.repository && repositoryKey(r.repository);
+  return (
+    a.providerId === b.providerId &&
+    repo(a) === repo(b) &&
+    a.viewer?.toLowerCase() === b.viewer?.toLowerCase()
+  );
+}
+
+/**
+ * Re-read the open repository's info after its settings change.
+ *
+ * The provider, the repository it names and the account n10 acts as
+ * all come from config, and the gate's entry is otherwise only written
+ * when a repository is opened. When any of the three differs, what the
+ * provider answered was read somewhere else or as someone else, so it
+ * goes; the rest of the repository's cache stays.
+ */
+export async function refreshRepoInfo(qc: QueryClient): Promise<void> {
+  const next = await window.n10.getRepo();
+  const prev = qc.getQueryData<RepoInfo | null>(keys.repo);
+  // The host moved to another repository meanwhile: that is the
+  // gate's switch to adopt, not this.
+  if (!prev || !next || prev.cwd !== next.cwd) return;
+  if (!sameRepoIdentity(prev, next)) resetProviderScopedCache(qc, next.cwd);
+  qc.setQueryData(keys.repo, next);
+  qc.setQueryData(keys.repoInfo(next.cwd), next);
 }
 
 export function useRepoGate() {
@@ -49,6 +101,20 @@ export function useRepoGate() {
     queryFn: loadRepoGate,
     // Written by hand when the user opens or leaves a repository; there
     // is nothing to re-poll, and a refetch would re-run the prefs load.
+    staleTime: Infinity,
+  });
+}
+
+/**
+ * Any repository's info, for a pane of a repository that is not open.
+ * Written whenever a repository is opened; read from the host for one
+ * that has not been this run.
+ */
+export function useRepoInfo(cwd: string, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.repoInfo(cwd),
+    queryFn: () => window.n10.getRepoInfo(cwd),
+    enabled,
     staleTime: Infinity,
   });
 }
@@ -70,75 +136,77 @@ export function useRecentRepos() {
 }
 
 /**
- * The sidebar rows for `cwd`, from a host that answers for whichever
- * repository it has open.
+ * The sidebar rows for `cwd`, open or not, as the host answers for the
+ * repository asked.
  *
- * An answer about another repository is not this workspace's, however
- * it arrived: the host moves on before the renderer does during a
- * switch, and the workspace being left keeps polling until it unmounts.
- * Reconciling such an answer into this repo's tabs opens a tab stamped
- * with this repo for a branch that exists only in the other one — a
- * tab that then reads as the other repo's and opens it when clicked.
- * So the rows stay what they were, and a first poll with nothing to
- * keep shows nothing rather than someone else's rows.
+ * An answer stamped with another repository is not this one's, however
+ * it arrived. Reconciling it into this repo's tabs would open a tab
+ * stamped with this repo for a branch that exists only in the other one
+ * — a tab that then reads as the other repo's and opens it when
+ * clicked. So the rows stay what they were, and a first answer with
+ * nothing to keep shows nothing rather than someone else's rows.
  */
 export async function loadSidebarModel(
   cwd: string,
   previous: SidebarItem[] | undefined
 ): Promise<SidebarItem[]> {
-  const answer = await window.n10.getSidebarModel();
+  const answer = await window.n10.getSidebarModel(cwd);
   if (answer.cwd !== cwd) return previous ?? [];
   return answer.items;
 }
 
 /** Sidebar model. Local state (worktrees, alive PTYs) is cheap so we
  *  poll it every few seconds; remote PR data is cached host-side and
- *  only re-fetched on its own interval or an explicit refresh. */
-export function useSidebarModel(cwd: string) {
+ *  only re-fetched on its own interval or an explicit refresh. A pane of
+ *  a repository that is not open reads it once (`poll: false`). */
+export function useSidebarModel(
+  cwd: string,
+  { enabled = true, poll = true }: { enabled?: boolean; poll?: boolean } = {}
+) {
   const qc = useQueryClient();
   return useQuery({
     queryKey: keys.sidebar(cwd),
     queryFn: () => loadSidebarModel(cwd, qc.getQueryData(keys.sidebar(cwd))),
-    refetchInterval: 4_000,
-    placeholderData: (prev) => prev,
+    enabled,
+    refetchInterval: poll ? 4_000 : false,
+    placeholderData: keepRepoAnswer(cwd),
   });
 }
 
 export function useSyncState(cwd: string) {
   return useQuery({
     queryKey: keys.sync(cwd),
-    queryFn: () => window.n10.getSyncState(),
+    queryFn: () => window.n10.getSyncState(cwd),
     refetchInterval: 4_000,
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
   });
 }
 
 export function useAllBranches(cwd: string, enabled = true) {
   return useQuery({
     queryKey: keys.branches(cwd),
-    queryFn: () => window.n10.listAllBranches(),
+    queryFn: () => window.n10.listAllBranches(cwd),
     enabled,
     staleTime: 30_000,
   });
 }
 
-export type BranchRemovalSafety =
-  | { safe: true }
-  | { safe: false; reason: string };
-
 /**
- * Whether git will let this branch and its worktree go. A refusal is a
- * verdict, not a failure, so a host call that throws is folded into an
- * unsafe answer: the dialog reads one value and defaults to refusing
- * when it cannot tell, rather than offering a confirm button behind an
- * error state nobody renders.
+ * What removing this branch's worktree would cost, as core decides it
+ * for both shells. A refusal is a verdict, not a failure, so a host
+ * call that throws is folded into one: the dialog reads one value and
+ * defaults to refusing when it cannot tell, rather than offering a
+ * confirm button behind an error state nobody renders.
  */
-export function loadBranchRemovalSafety(
+export function loadWorktreeRemovalCheck(
   branch: string
-): Promise<BranchRemovalSafety> {
-  return window.n10.canRemoveBranch(branch).catch((err: unknown) => ({
-    safe: false as const,
+): Promise<WorktreeRemovalCheck> {
+  return window.n10.checkWorktreeRemoval(branch).catch((err: unknown) => ({
+    verdict: 'refused' as const,
     reason: errorMessage(err),
+    tip: null,
+    repo: null,
+    checkout: null,
   }));
 }
 
@@ -147,10 +215,10 @@ export function loadBranchRemovalSafety(
  * the dialog that asked for it (`gcTime: 0`) — reopening after a commit
  * or a push has to ask again instead of replaying the old answer.
  */
-export function useBranchRemovalSafety(cwd: string, branch: string) {
+export function useWorktreeRemovalCheck(cwd: string, branch: string) {
   return useQuery({
     queryKey: keys.branchRemoval(cwd, branch),
-    queryFn: () => loadBranchRemovalSafety(branch),
+    queryFn: () => loadWorktreeRemovalCheck(branch),
     staleTime: 0,
     gcTime: 0,
   });
@@ -163,28 +231,13 @@ export function useSettingsView(cwd: string) {
   });
 }
 
-export function useDiff(
-  cwd: string,
-  source: string,
-  target: string,
-  opts: { enabled?: boolean } = {}
-) {
-  return useQuery({
-    queryKey: keys.diff(cwd, source, target),
-    queryFn: () =>
-      measured('fetch', () => window.n10.fetchDiffText(source, target)),
-    enabled: opts.enabled ?? true,
-    staleTime: 60_000,
-  });
-}
-
 /**
  * The working state of a worktree, refreshed while its agent runs so
  * the diff tracks what the agent is doing instead of what it last
  * committed.
  *
- * This is deliberately a different query from `useDiff`, not a mode of
- * it. A pull request is reviewed against its commits — that is what the
+ * This is deliberately a different query from `usePrDiff`, not a mode
+ * of it. A pull request is reviewed against its commits — that is what the
  * comments anchor to and what the author asked to have read — so a PR
  * tab must not start showing somebody's uncommitted scratch work. Only
  * a worktree without a PR gets the live view.
@@ -204,12 +257,14 @@ export function useWorktreeDiff(
   return useQuery({
     queryKey: keys.worktreeDiff(cwd, branch, target),
     queryFn: () =>
-      measured('fetch', () => window.n10.fetchWorktreeDiffText(branch, target)),
+      measured('fetch', () =>
+        window.n10.fetchWorktreeDiffText(cwd, branch, target)
+      ),
     enabled: opts.enabled,
     refetchInterval: opts.live ? 2_000 : false,
     // Keep the previous patch on screen while the next one is in
     // flight, so a poll does not blank the viewer every two seconds.
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
     staleTime: 0,
   });
 }
@@ -233,10 +288,10 @@ export function useParsedDiff(text: string | undefined) {
   const content = useMemo(() => (text == null ? '' : contentKey(text)), [text]);
   return useQuery({
     queryKey: keys.parsedDiff(content),
-    // A patch that cannot be parsed is an empty one: the viewer says
-    // "no changes" instead of hanging on a spinner forever.
+    // A patch that cannot be parsed is a failed read, not an empty one:
+    // the viewer says it could not read the diff, never "no changes".
     queryFn: (): Promise<[string, DiffLine[]][]> =>
-      parseDiffInWorker(text ?? '').catch(() => []),
+      parseDiffInWorker(text ?? ''),
     enabled: text != null,
     staleTime: Infinity,
     gcTime: 0,
@@ -246,8 +301,13 @@ export function useParsedDiff(text: string | undefined) {
 export function useThreads(cwd: string, prId: number) {
   return useQuery({
     queryKey: keys.threads(cwd, prId),
-    queryFn: () => window.n10.fetchCommentThreads(prId),
-    staleTime: 30_000,
+    queryFn: ({ client, queryKey }) =>
+      window.n10.fetchCommentThreads(
+        cwd,
+        prId,
+        client.getQueryState(queryKey)?.isInvalidated ?? false
+      ),
+    staleTime: 0,
     // prId 0 = a worktree without a PR: nothing to fetch.
     enabled: prId > 0,
   });
@@ -257,7 +317,7 @@ export function useThreads(cwd: string, prId: number) {
 export function useAgentOptions(cwd: string) {
   return useQuery({
     queryKey: keys.agentOptions(cwd),
-    queryFn: () => window.n10.listAgentOptions(),
+    queryFn: () => window.n10.listAgentOptions(cwd),
   });
 }
 
@@ -265,15 +325,14 @@ export function useAgentOptions(cwd: string) {
  * Sessions the host has actually launched this run — running, or ended
  * with their final frame kept. This is the "does a PTY exist?" signal:
  * the sidebar names a would-be session for every worktree, so a name
- * alone must never be read as one existing (it is what made a fresh
- * worktree offer "Relaunch agent").
+ * alone must never be read as one existing.
  */
 export function useSessions(cwd: string) {
   return useQuery({
     queryKey: keys.sessions(cwd),
-    queryFn: () => window.n10.listSessions(),
+    queryFn: () => window.n10.listSessions(cwd),
     refetchInterval: 2_000,
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
   });
 }
 
@@ -307,6 +366,21 @@ export function useForeignSessions() {
   });
 }
 
+/**
+ * Orchestra orchestrators and their players, for the tab strip to
+ * group under. Orchestra tags a player as it spawns or adopts one,
+ * which no discovery event announces, so this polls on the same
+ * cadence as the foreign listing.
+ */
+export function useOrchestratorGroups() {
+  return useQuery({
+    queryKey: keys.orchestratorGroups,
+    queryFn: () => window.n10.listOrchestratorGroups(),
+    refetchInterval: 4_000,
+    placeholderData: (prev) => prev,
+  });
+}
+
 /** The safety net under `onMachinesChanged`, not the way the list is
  *  kept current: a real change is pushed straight into the cache, so
  *  this only has to catch a push that never arrived. `StatusBar` is
@@ -318,7 +392,7 @@ const MACHINES_POLL_MS = 5 * 60_000;
 
 /**
  * Every machine: this one first, then fleet members. Not repo-
- * scoped — survives a repo switch (CROSS_REPO_KEYS). Pushed on every
+ * scoped. Pushed on every
  * change (`onMachinesChanged` in fleet-context.tsx writes straight
  * into this cache), so the poll here is only the fallback for the
  * first load and for a missed push.
@@ -353,28 +427,44 @@ export function useSessionActivity(cwd: string) {
     queryKey: keys.activity(cwd),
     queryFn: () => window.n10.getSessionActivity(),
     refetchInterval: 1_000,
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
   });
 }
 
 export function usePrDescription(cwd: string, prId: number) {
   return useQuery({
     queryKey: keys.prDescription(cwd, prId),
-    queryFn: () => window.n10.fetchPrDescription(prId),
+    queryFn: () => window.n10.fetchPrDescription(cwd, prId),
     staleTime: 5 * 60_000,
     enabled: prId > 0,
   });
 }
 
 /** Comment image bytes (as a data URL), fetched host-side with auth. */
-export function useCommentImage(url: string) {
+export function useCommentImage(cwd: string, url: string) {
   return useQuery({
-    queryKey: keys.commentImage(url),
-    queryFn: () => window.n10.fetchCommentImage(url),
+    queryKey: keys.commentImage(cwd, url),
+    queryFn: () => window.n10.fetchCommentImage(cwd, url),
     enabled: url.length > 0,
     staleTime: Infinity,
     gcTime: 10 * 60_000,
   });
+}
+
+/** The review agent's guided review; polled so it appears when the
+ *  agent stores it. */
+export function useGuidedReview(
+  cwd: string,
+  prId: number
+): GuidedReview | null {
+  const read = useQuery({
+    queryKey: keys.guide(cwd, prId),
+    queryFn: () => window.n10.getGuidedReview(cwd, prId),
+    refetchInterval: 2_000,
+    placeholderData: keepRepoAnswer(cwd),
+    enabled: prId > 0,
+  });
+  return read.data ?? null;
 }
 
 /** Draft review comments written by the review agent; polled so they
@@ -382,9 +472,9 @@ export function useCommentImage(url: string) {
 export function useDraftComments(cwd: string, prId: number) {
   return useQuery({
     queryKey: keys.drafts(cwd, prId),
-    queryFn: () => window.n10.listDraftComments(prId),
+    queryFn: () => window.n10.listDraftComments(cwd, prId),
     refetchInterval: 2_000,
-    placeholderData: (prev) => prev,
+    placeholderData: keepRepoAnswer(cwd),
     enabled: prId > 0,
   });
 }

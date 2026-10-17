@@ -4,22 +4,16 @@ import {
   checkoutWorktree,
   createWorktree,
   removeWorktree,
-  canRemoveBranch,
   rebaseOntoMaster,
 } from './worktree.js';
+import { assessBranchRemoval, canRemoveBranch } from './removal-check.js';
 import { assertShellSafeRef, branchToSessionName } from './refs.js';
 import {
   parseWorktrees,
   listWorktrees,
   worktreeSessionName,
 } from './worktree-list.js';
-import {
-  resetWorktreeResolver,
-  setWorktreeResolver,
-  worktreesBasePath,
-  ownsWorktreePath,
-  createTemplateResolver,
-} from './worktree-resolver.js';
+import { worktreeScope } from './worktree-resolver.js';
 import {
   deleteBranch,
   listBranches,
@@ -75,17 +69,20 @@ function resolve(stdout = '') {
  * every platform, which is what git's porcelain does.
  */
 function worktreeListPorcelain(
-  entries: { branch: string; dir?: string }[],
+  entries: { branch: string; dir?: string; deleted?: boolean }[],
   root = process.cwd()
 ) {
   const cwd = root.replace(/\\/g, '/');
-  const blocks = entries.map(({ branch, dir }) =>
+  const blocks = entries.map(({ branch, dir, deleted }) =>
     [
       `worktree ${cwd}/${
         dir ?? `.claude/worktrees/${branchToSessionName(branch)}`
       }`,
       'HEAD abc123',
       `branch refs/heads/${branch}`,
+      ...(deleted
+        ? ['prunable gitdir file points to non-existent location']
+        : []),
       '',
     ].join('\0')
   );
@@ -100,7 +97,7 @@ beforeEach(() => {
     throw new Error('ENOENT');
   });
   resetMainBranchCache();
-  resetWorktreeResolver();
+  template = undefined;
 });
 
 describe('listBranches', () => {
@@ -108,18 +105,20 @@ describe('listBranches', () => {
     mockExec.mockResolvedValueOnce(
       resolve('main\nfeature/auth\nfix/bug-123\n')
     );
-    const branches = await listBranches();
+    const branches = await listBranches(process.cwd());
     expect(branches).toEqual(['main', 'feature/auth', 'fix/bug-123']);
   });
 
-  it('should return empty array when git fails', async () => {
+  it('reports a failed Git read instead of an empty success', async () => {
     mockExec.mockRejectedValueOnce(new Error('not a git repository'));
-    expect(await listBranches()).toEqual([]);
+    await expect(listBranches(process.cwd())).rejects.toThrow(
+      'not a git repository'
+    );
   });
 
   it('should filter out empty lines', async () => {
     mockExec.mockResolvedValueOnce(resolve('main\n\ndev\n'));
-    expect(await listBranches()).toEqual(['main', 'dev']);
+    expect(await listBranches(process.cwd())).toEqual(['main', 'dev']);
   });
 });
 
@@ -128,7 +127,7 @@ describe('createWorktree', () => {
     // No worktree has the branch checked out anywhere.
     mockExec.mockResolvedValueOnce(worktreeListPorcelain([]));
     mockExec.mockResolvedValueOnce(resolve());
-    const result = await createWorktree('feature/auth');
+    const result = await createWorktree('feature/auth', scope());
     expect(result).toContain('.claude/worktrees/feature-auth');
     expect(result).toMatch(/^\//); // absolute path
     expect(mockExec).toHaveBeenCalledWith(
@@ -142,7 +141,7 @@ describe('createWorktree', () => {
       .mockResolvedValueOnce(worktreeListPorcelain([]))
       .mockRejectedValueOnce(new Error('branch not found'))
       .mockResolvedValueOnce(resolve());
-    const result = await createWorktree('new-branch');
+    const result = await createWorktree('new-branch', scope());
     expect(result).toContain('.claude/worktrees/new-branch');
     expect(mockExec).toHaveBeenCalledTimes(3);
     expect(mockExec).toHaveBeenLastCalledWith(
@@ -156,7 +155,7 @@ describe('createWorktree', () => {
       .mockResolvedValueOnce(worktreeListPorcelain([]))
       .mockRejectedValueOnce(new Error('fail'))
       .mockRejectedValueOnce(new Error('fail'));
-    expect(await createWorktree('bad-branch')).toBeNull();
+    expect(await createWorktree('bad-branch', scope())).toBeNull();
   });
 
   it('rejects a derived directory occupied by a different exact branch', async () => {
@@ -164,7 +163,7 @@ describe('createWorktree', () => {
       worktreeListPorcelain([{ branch: 'feature-auth' }])
     );
     mockExistsSync.mockReturnValue(true);
-    expect(await createWorktree('feature/auth')).toBeNull();
+    expect(await createWorktree('feature/auth', scope())).toBeNull();
     expect(mockExec).toHaveBeenCalledTimes(1);
   });
 
@@ -177,7 +176,7 @@ describe('createWorktree', () => {
         { branch: 'feature/auth', dir: '.claude/worktrees/some-other-name' },
       ])
     );
-    const result = await createWorktree('feature/auth');
+    const result = await createWorktree('feature/auth', scope());
     expect(result).toContain('.claude/worktrees/some-other-name');
     // The lookup is the only git call: no `worktree add` is attempted,
     // which would fail with "already used by worktree at …".
@@ -188,11 +187,43 @@ describe('createWorktree', () => {
     );
   });
 
+  // `rm -rf` leaves git's registration behind, which keeps the branch
+  // checked out and the directory taken as far as `git worktree add`
+  // is concerned.
+  it("clears a deleted worktree's registration before checking its branch out again", async () => {
+    mockExec
+      .mockResolvedValueOnce(
+        worktreeListPorcelain([{ branch: 'feature/auth', deleted: true }])
+      )
+      .mockResolvedValueOnce(resolve())
+      .mockResolvedValueOnce(resolve());
+    const result = await createWorktree('feature/auth', scope());
+    expect(result).toContain('.claude/worktrees/feature-auth');
+    expect(mockExec.mock.calls.map(([command]) => command)).toEqual([
+      'git worktree list --porcelain -z',
+      `git worktree remove "${process.cwd()}/.claude/worktrees/feature-auth"`,
+      'git worktree add ".claude/worktrees/feature-auth" "feature/auth"',
+    ]);
+  });
+
+  it("leaves another branch's deleted worktree registered", async () => {
+    mockExec
+      .mockResolvedValueOnce(
+        worktreeListPorcelain([{ branch: 'other', deleted: true }])
+      )
+      .mockResolvedValueOnce(resolve());
+    await createWorktree('feature/auth', scope());
+    expect(mockExec).not.toHaveBeenCalledWith(
+      expect.stringContaining('worktree remove'),
+      expect.anything()
+    );
+  });
+
   it('reuses only a checkout whose exact branch matches', async () => {
     mockExec.mockResolvedValueOnce(
       worktreeListPorcelain([{ branch: 'feature/auth' }])
     );
-    const result = await createWorktree('feature/auth');
+    const result = await createWorktree('feature/auth', scope());
     expect(result).toContain('.claude/worktrees/feature-auth');
     expect(result).toMatch(/^\//);
     expect(mockExec).toHaveBeenCalledTimes(1);
@@ -208,7 +239,7 @@ describe('checkoutWorktree', () => {
     // No worktree in that repository has the branch checked out.
     mockExec.mockResolvedValueOnce(worktreeListPorcelain([]));
     mockExec.mockResolvedValueOnce(resolve());
-    const result = await checkoutWorktree('feature/auth', '/repos/one');
+    const result = await checkoutWorktree('feature/auth', scope('/repos/one'));
     expect(result).toBe('/repos/one/.claude/worktrees/feature-auth');
     expect(mockExec).toHaveBeenCalledWith(
       'git worktree add ".claude/worktrees/feature-auth" "feature/auth"',
@@ -216,11 +247,30 @@ describe('checkoutWorktree', () => {
     );
   });
 
+  it("clears a deleted worktree's registration for the branch first", async () => {
+    mockExec
+      .mockResolvedValueOnce(
+        worktreeListPorcelain(
+          [{ branch: 'feature/auth', deleted: true }],
+          '/repos/one'
+        )
+      )
+      .mockResolvedValueOnce(resolve())
+      .mockResolvedValueOnce(resolve());
+    const result = await checkoutWorktree('feature/auth', scope('/repos/one'));
+    expect(result).toBe('/repos/one/.claude/worktrees/feature-auth');
+    expect(mockExec.mock.calls.map(([command]) => command)).toEqual([
+      'git worktree list --porcelain -z',
+      'git worktree remove "/repos/one/.claude/worktrees/feature-auth"',
+      'git worktree add ".claude/worktrees/feature-auth" "feature/auth"',
+    ]);
+  });
+
   it('never creates a branch: one git refuses is a failure', async () => {
     mockExec
       .mockResolvedValueOnce(worktreeListPorcelain([]))
       .mockRejectedValueOnce(new Error('invalid reference'));
-    expect(await checkoutWorktree('missing', '/repos/one')).toBeNull();
+    expect(await checkoutWorktree('missing', scope('/repos/one'))).toBeNull();
     expect(mockExec).toHaveBeenCalledTimes(2);
     expect(
       mockExec.mock.calls.map(([command]) => command).join('\n')
@@ -236,7 +286,7 @@ describe('checkoutWorktree', () => {
 
   it('asks git about the repository it was given, not the process one', async () => {
     mockExec.mockResolvedValue(worktreeListPorcelain([]));
-    await checkoutWorktree('feature/auth', repoOne);
+    await checkoutWorktree('feature/auth', scope(repoOne));
     expect(mockExec).toHaveBeenCalledWith('git worktree list --porcelain -z', {
       encoding: 'utf8',
       cwd: repoOne,
@@ -253,7 +303,7 @@ describe('checkoutWorktree', () => {
         repoOne
       )
     );
-    const result = await checkoutWorktree('feature/auth', repoOne);
+    const result = await checkoutWorktree('feature/auth', scope(repoOne));
     expect(result).toBe(
       `${asGitReportsIt(repoOne)}/.claude/worktrees/other-name`
     );
@@ -275,7 +325,7 @@ describe('checkoutWorktree', () => {
         )
       )
       .mockResolvedValueOnce(resolve());
-    const result = await checkoutWorktree('feature/auth', repoOne);
+    const result = await checkoutWorktree('feature/auth', scope(repoOne));
     expect(result).toBe(pathResolve(repoOne, '.claude/worktrees/feature-auth'));
     expect(mockExec).toHaveBeenLastCalledWith(
       'git worktree add ".claude/worktrees/feature-auth" "feature/auth"',
@@ -288,13 +338,13 @@ describe('checkoutWorktree', () => {
       worktreeListPorcelain([{ branch: 'feature-auth' }], repoOne)
     );
     mockExistsSync.mockReturnValue(true);
-    expect(await checkoutWorktree('feature/auth', repoOne)).toBeNull();
+    expect(await checkoutWorktree('feature/auth', scope(repoOne))).toBeNull();
     expect(mockExec).toHaveBeenCalledTimes(1);
   });
 
   it('runs against the process directory when no repository is given', async () => {
     mockExec.mockResolvedValueOnce(resolve());
-    const result = await checkoutWorktree('feature/auth');
+    const result = await checkoutWorktree('feature/auth', scope());
     expect(result).toBe(
       pathResolve(process.cwd(), '.claude/worktrees/feature-auth')
     );
@@ -356,7 +406,7 @@ describe('removeWorktree', () => {
       worktreeListPorcelain([{ branch: 'feature/auth' }])
     );
     mockExec.mockResolvedValueOnce(resolve());
-    expect(await removeWorktree('feature/auth')).toBe(true);
+    expect(await removeWorktree('feature/auth', scope(), {})).toBe(true);
     expect(mockExec).toHaveBeenCalledWith(
       `git worktree remove "${cwd}/.claude/worktrees/feature-auth"`,
       { encoding: 'utf8', cwd: process.cwd() }
@@ -395,7 +445,9 @@ describe('removeWorktree', () => {
     });
 
     expect(
-      await removeWorktree('ci/perf-setup-sticky-disk', { force: true })
+      await removeWorktree('ci/perf-setup-sticky-disk', scope(), {
+        force: true,
+      })
     ).toBe(true);
     expect(mockExec).toHaveBeenCalledWith(
       `git worktree remove --force "${realDir}"`,
@@ -447,7 +499,9 @@ describe('removeWorktree', () => {
     }) as unknown as typeof readFileSync);
 
     expect(
-      await removeWorktree('ci/perf-setup-sticky-disk', { force: true })
+      await removeWorktree('ci/perf-setup-sticky-disk', scope(), {
+        force: true,
+      })
     ).toBe(true);
     expect(mockExec).toHaveBeenCalledWith(
       `git worktree remove --force "${realDir}"`,
@@ -457,7 +511,7 @@ describe('removeWorktree', () => {
 
   it('does not remove a guessed directory when git has no such branch', async () => {
     mockExec.mockResolvedValueOnce(worktreeListPorcelain([]));
-    expect(await removeWorktree('feature/auth')).toBe(false);
+    expect(await removeWorktree('feature/auth', scope(), {})).toBe(false);
     expect(mockExec).toHaveBeenCalledTimes(1);
   });
 
@@ -466,7 +520,7 @@ describe('removeWorktree', () => {
       worktreeListPorcelain([{ branch: 'nonexistent' }])
     );
     mockExec.mockRejectedValueOnce(new Error('not found'));
-    expect(await removeWorktree('nonexistent')).toBe(false);
+    expect(await removeWorktree('nonexistent', scope(), {})).toBe(false);
   });
 });
 
@@ -504,26 +558,110 @@ describe('deleteBranch', () => {
   });
 });
 
+// Every risk, not the first: a prompt that names one is the user's
+// whole picture of what they agree to lose.
+describe('assessBranchRemoval', () => {
+  function answers(outputs: Record<string, string>) {
+    mockExec.mockImplementation(((command: string) => {
+      if (command.includes('git worktree list')) {
+        return Promise.resolve(
+          worktreeListPorcelain([{ branch: 'feature/busy' }])
+        );
+      }
+      const hit = Object.keys(outputs).find((k) => command.includes(k));
+      return Promise.resolve(resolve(hit ? outputs[hit] : ''));
+    }) as unknown as typeof exec);
+  }
+
+  it('reports uncommitted changes and unpushed commits together', async () => {
+    answers({
+      'status --porcelain': ' M src/file.ts\n',
+      'git log': 'abc1234 unpushed\n',
+    });
+    expect(await assessBranchRemoval('feature/busy', scope(), {})).toEqual({
+      refusal: null,
+      risks: ['uncommitted changes', 'not pushed to upstream'],
+    });
+  });
+
+  // Git's own test: a gitlink with a checkout, or the worktree's own
+  // `modules` directory (left behind by `git rm` or `submodule deinit`).
+  it('reports a checked-out submodule, which git only removes by force', async () => {
+    answers({
+      "grep '^160000'": '160000 abc123 0\tvendor/lib\n',
+    });
+    mockExistsSync.mockImplementation((p) =>
+      String(p).endsWith('/vendor/lib/.git')
+    );
+    expect(await assessBranchRemoval('feature/busy', scope(), {})).toEqual({
+      refusal: null,
+      risks: ['submodules'],
+    });
+  });
+
+  it('reports the modules directory a removed submodule leaves behind', async () => {
+    answers({ '--git-path modules': '/repo/.git/worktrees/busy/modules\n' });
+    mockExistsSync.mockImplementation(
+      (p) => p === '/repo/.git/worktrees/busy/modules'
+    );
+    expect(await assessBranchRemoval('feature/busy', scope(), {})).toEqual({
+      refusal: null,
+      risks: ['submodules'],
+    });
+  });
+
+  // The whole status is read, and a checkout git cannot answer for is
+  // not clean: only force takes it.
+  it('reports unknown changes when git cannot read a checkout it lists', async () => {
+    answers({});
+    mockExec.mockImplementation(((command: string) => {
+      if (command.includes('git worktree list')) {
+        return Promise.resolve(
+          worktreeListPorcelain([{ branch: 'feature/busy' }])
+        );
+      }
+      if (command.includes('status --porcelain')) {
+        return Promise.reject(new Error('stdout maxBuffer length exceeded'));
+      }
+      return Promise.resolve(resolve(''));
+    }) as unknown as typeof exec);
+    expect(await assessBranchRemoval('feature/busy', scope(), {})).toEqual({
+      refusal: null,
+      risks: ['unknown changes'],
+    });
+  });
+
+  it('has no risks for a clean, pushed checkout', async () => {
+    answers({});
+    expect(await assessBranchRemoval('feature/busy', scope(), {})).toEqual({
+      refusal: null,
+      risks: [],
+    });
+  });
+});
+
 describe('canRemoveBranch', () => {
   it('should reject main as protected', async () => {
-    expect(await canRemoveBranch('main')).toEqual({
+    expect(await canRemoveBranch('main', scope(), {})).toEqual({
       safe: false,
       reason: 'protected branch',
     });
   });
 
   it('should reject master as protected', async () => {
-    expect(await canRemoveBranch('master')).toEqual({
+    expect(await canRemoveBranch('master', scope(), {})).toEqual({
       safe: false,
       reason: 'protected branch',
     });
   });
 
   it('should reject gitbutler branches as protected', async () => {
-    expect(await canRemoveBranch('gitbutler/integration')).toEqual({
-      safe: false,
-      reason: 'protected branch',
-    });
+    expect(await canRemoveBranch('gitbutler/integration', scope(), {})).toEqual(
+      {
+        safe: false,
+        reason: 'protected branch',
+      }
+    );
   });
 
   it('should reject branches with uncommitted changes', async () => {
@@ -531,7 +669,7 @@ describe('canRemoveBranch', () => {
       worktreeListPorcelain([{ branch: 'feature/dirty' }])
     );
     mockExec.mockResolvedValueOnce(resolve(' M src/file.ts\n'));
-    expect(await canRemoveBranch('feature/dirty')).toEqual({
+    expect(await canRemoveBranch('feature/dirty', scope(), {})).toEqual({
       safe: false,
       reason: 'uncommitted changes',
     });
@@ -543,10 +681,25 @@ describe('canRemoveBranch', () => {
     );
     mockExec.mockResolvedValueOnce(resolve(''));
     mockExec.mockResolvedValueOnce(resolve('abc1234 some commit\n'));
-    expect(await canRemoveBranch('feature/unpushed')).toEqual({
+    expect(await canRemoveBranch('feature/unpushed', scope(), {})).toEqual({
       safe: false,
       reason: 'not pushed to upstream',
     });
+  });
+
+  // The checkout lookup and the unpushed check both ask the named
+  // repository, not whichever one the process happens to be in.
+  it('judges the branch in the repository it is given', async () => {
+    mockExec.mockResolvedValueOnce(
+      worktreeListPorcelain([{ branch: 'feature/done' }])
+    );
+    mockExec.mockResolvedValueOnce(resolve(''));
+    mockExec.mockResolvedValueOnce(resolve(''));
+    await canRemoveBranch('feature/done', scope('/repo-b'), {});
+    const [list, , log] = mockExec.mock.calls;
+    expect(list?.[1]).toMatchObject({ cwd: '/repo-b' });
+    expect(log?.[0]).toContain('git log');
+    expect(log?.[1]).toMatchObject({ cwd: '/repo-b' });
   });
 
   it('should return safe for clean, pushed branches', async () => {
@@ -555,7 +708,9 @@ describe('canRemoveBranch', () => {
     );
     mockExec.mockResolvedValueOnce(resolve(''));
     mockExec.mockResolvedValueOnce(resolve(''));
-    expect(await canRemoveBranch('feature/done')).toEqual({ safe: true });
+    expect(await canRemoveBranch('feature/done', scope(), {})).toEqual({
+      safe: true,
+    });
   });
 
   // Regression: when the worktree dir does not match the branch name,
@@ -591,13 +746,17 @@ describe('canRemoveBranch', () => {
       return Promise.resolve(resolve());
     });
 
-    expect(await canRemoveBranch('ci/perf-setup-sticky-disk', true)).toEqual({
+    expect(
+      await canRemoveBranch('ci/perf-setup-sticky-disk', scope(), {
+        confirmedMerged: true,
+      })
+    ).toEqual({
       safe: false,
       reason: 'uncommitted changes',
     });
     expect(mockExec).toHaveBeenCalledWith(
-      `git -C "${realDir}" status --porcelain`,
-      { encoding: 'utf8' }
+      `git -C "${realDir}" status --porcelain -z --untracked-files=all --ignore-submodules=none`,
+      { encoding: 'utf8', maxBuffer: Infinity }
     );
   });
 
@@ -621,7 +780,11 @@ describe('canRemoveBranch', () => {
       throw new Error(`ENOENT: ${p}`);
     }) as unknown as typeof readFileSync);
 
-    expect(await canRemoveBranch('ci/perf-setup-sticky-disk', true)).toEqual({
+    expect(
+      await canRemoveBranch('ci/perf-setup-sticky-disk', scope(), {
+        confirmedMerged: true,
+      })
+    ).toEqual({
       safe: false,
       reason: 'rebase in progress',
     });
@@ -632,21 +795,25 @@ describe('canRemoveBranch', () => {
     mockExec.mockResolvedValueOnce(worktreeListPorcelain([]));
     mockExec.mockRejectedValueOnce(new Error('not a directory'));
     mockExec.mockResolvedValueOnce(resolve(''));
-    expect(await canRemoveBranch('feature/no-worktree')).toEqual({
+    expect(await canRemoveBranch('feature/no-worktree', scope(), {})).toEqual({
       safe: true,
     });
   });
 
   it('should skip unpushed check when confirmedMerged is true', async () => {
-    // Only the worktree lookup + status check run (status clean), no git log call
     mockExec.mockResolvedValueOnce(
       worktreeListPorcelain([{ branch: 'feature/squash-merged' }])
     );
-    mockExec.mockResolvedValueOnce(resolve(''));
-    expect(await canRemoveBranch('feature/squash-merged', true)).toEqual({
+    mockExec.mockResolvedValue(resolve(''));
+    expect(
+      await canRemoveBranch('feature/squash-merged', scope(), {
+        confirmedMerged: true,
+      })
+    ).toEqual({
       safe: true,
     });
-    expect(mockExec).toHaveBeenCalledTimes(2);
+    const commands = mockExec.mock.calls.map(([command]) => command);
+    expect(commands.some((c) => c.includes('git log'))).toBe(false);
   });
 
   it('should still reject uncommitted changes when confirmedMerged is true', async () => {
@@ -654,14 +821,20 @@ describe('canRemoveBranch', () => {
       worktreeListPorcelain([{ branch: 'feature/dirty-merged' }])
     );
     mockExec.mockResolvedValueOnce(resolve(' M src/file.ts\n'));
-    expect(await canRemoveBranch('feature/dirty-merged', true)).toEqual({
+    expect(
+      await canRemoveBranch('feature/dirty-merged', scope(), {
+        confirmedMerged: true,
+      })
+    ).toEqual({
       safe: false,
       reason: 'uncommitted changes',
     });
   });
 
   it('should still reject protected branches when confirmedMerged is true', async () => {
-    expect(await canRemoveBranch('master', true)).toEqual({
+    expect(
+      await canRemoveBranch('master', scope(), { confirmedMerged: true })
+    ).toEqual({
       safe: false,
       reason: 'protected branch',
     });
@@ -764,9 +937,22 @@ describe('listWorktrees', () => {
       )
     );
 
-    const result = await listWorktrees();
+    const result = await listWorktrees(scope());
     expect(result).toHaveLength(1);
     expect(result[0]!.branch).toBe('feature/auth');
+  });
+
+  // `rm -rf` leaves the registration, marked prunable: no checkout is
+  // left, so it is as gone as one `git worktree remove` took.
+  it('leaves out a worktree whose directory was deleted', async () => {
+    mockExec.mockResolvedValueOnce(
+      worktreeListPorcelain([
+        { branch: 'feature/auth', deleted: true },
+        { branch: 'fix/bug' },
+      ])
+    );
+    const result = await listWorktrees(scope());
+    expect(result.map((w) => w.branch)).toEqual(['fix/bug']);
   });
 
   it('should filter out bare worktrees', async () => {
@@ -785,14 +971,16 @@ describe('listWorktrees', () => {
       )
     );
 
-    const result = await listWorktrees();
+    const result = await listWorktrees(scope());
     expect(result).toHaveLength(1);
     expect(result[0]!.branch).toBe('feature/auth');
   });
 
-  it('should return empty array when git fails', async () => {
+  it('reports a failed Git read instead of an empty success', async () => {
     mockExec.mockRejectedValueOnce(new Error('not a git repository'));
-    expect(await listWorktrees()).toEqual([]);
+    await expect(listWorktrees(scope())).rejects.toThrow(
+      'not a git repository'
+    );
   });
 
   it('should return empty array when no worktrees exist', async () => {
@@ -804,13 +992,11 @@ describe('listWorktrees', () => {
       )
     );
 
-    expect(await listWorktrees()).toEqual([]);
+    expect(await listWorktrees(scope())).toEqual([]);
   });
 
-  it('should use custom resolver when set', async () => {
-    setWorktreeResolver(
-      createTemplateResolver('../{session}', '/repos/myrepo.git')
-    );
+  it('uses the resolver captured for the requested repository', async () => {
+    template = '../{session}';
     mockExec.mockResolvedValueOnce(
       resolve(
         [
@@ -834,7 +1020,7 @@ describe('listWorktrees', () => {
       )
     );
 
-    const result = await listWorktrees();
+    const result = await listWorktrees(scope('/repos/myrepo.git'));
     expect(result).toHaveLength(2);
     expect(result.map((w) => w.branch)).toEqual(['feature/auth', 'fix/bug']);
   });
@@ -859,7 +1045,7 @@ describe('listWorktrees', () => {
       )
     );
 
-    const result = await listWorktrees();
+    const result = await listWorktrees(scope());
     expect(result).toHaveLength(1);
     expect(result[0]!.branch).toBe('feature/auth');
   });
@@ -890,7 +1076,7 @@ describe('listWorktrees', () => {
       throw new Error(`ENOENT: ${p}`);
     }) as unknown as typeof readFileSync);
 
-    const result = await listWorktrees();
+    const result = await listWorktrees(scope());
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({
       path: wtPath,
@@ -918,7 +1104,7 @@ describe('listWorktrees', () => {
       throw new Error(`ENOENT: ${p}`);
     }) as unknown as typeof readFileSync);
 
-    const result = await listWorktrees();
+    const result = await listWorktrees(scope());
     expect(result).toHaveLength(1);
     expect(result[0]!.branch).toBe('feature/am-flow');
     expect(result[0]!.state).toBe('rebasing');
@@ -951,7 +1137,7 @@ describe('listWorktrees', () => {
     // The orphan has no rebase in progress, so no branch is recovered.
     // It is still listed (branch: '') and gets its identity from the
     // directory basename via worktreeSessionName.
-    const result = await listWorktrees();
+    const result = await listWorktrees(scope());
     expect(result).toHaveLength(2);
     const orphanResult = result.find((w) => w.path === orphan);
     expect(orphanResult).toEqual({ path: orphan, branch: '', bare: false });
@@ -1029,6 +1215,15 @@ describe('fetchRemote', () => {
 });
 
 describe('listAllBranches', () => {
+  it('reads the requested checkout even when process cwd names another repository', async () => {
+    mockExec.mockResolvedValueOnce(resolve('scoped-branch\n'));
+    expect(await listAllBranches('/another-repo')).toEqual(['scoped-branch']);
+    expect(mockExec).toHaveBeenLastCalledWith(
+      'git branch -a --format="%(refname:short)"',
+      expect.objectContaining({ cwd: '/another-repo' })
+    );
+  });
+
   it('should return deduplicated local and remote branches', async () => {
     mockExec.mockResolvedValueOnce(
       resolve(
@@ -1049,9 +1244,9 @@ describe('listAllBranches', () => {
     expect(await listAllBranches()).toEqual([]);
   });
 
-  it('should return empty array when git fails', async () => {
+  it('reports a failed Git read instead of an empty success', async () => {
     mockExec.mockRejectedValueOnce(new Error('not a git repository'));
-    expect(await listAllBranches()).toEqual([]);
+    await expect(listAllBranches()).rejects.toThrow('not a git repository');
   });
 });
 
@@ -1098,60 +1293,81 @@ describe('getMainBranch', () => {
 });
 
 describe('fastForwardMainBranch', () => {
-  it('should use branch -f when HEAD is not on main branch', async () => {
+  const LOCAL_FF =
+    'git fetch --no-write-fetch-head . "refs/remotes/origin/master:refs/heads/master"';
+  const notAncestor = Object.assign(new Error('not an ancestor'), { code: 1 });
+
+  it('fast-forwards through a local fetch when HEAD is not on main', async () => {
     mockExec
       .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
-      .mockResolvedValueOnce(resolve()) // fetch
       .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
-      .mockResolvedValueOnce(resolve()); // branch -f
+      .mockRejectedValueOnce(notAncestor) // merge-base --is-ancestor
+      .mockResolvedValueOnce(resolve()); // local fetch
     expect(await fastForwardMainBranch()).toBe(true);
-    expect(mockExec).toHaveBeenCalledWith('git fetch origin master', {
-      encoding: 'utf8',
-    });
-    expect(mockExec).toHaveBeenCalledWith('git symbolic-ref --short HEAD', {
-      encoding: 'utf8',
-    });
-    expect(mockExec).toHaveBeenCalledWith(
-      'git branch -f master origin/master',
+    expect(mockExec).toHaveBeenLastCalledWith(LOCAL_FF, { encoding: 'utf8' });
+  });
+
+  it('uses merge --ff-only when HEAD is on main', async () => {
+    mockExec
+      .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
+      .mockResolvedValueOnce(resolve('master\n')) // symbolic-ref HEAD
+      .mockResolvedValueOnce(resolve()); // merge --ff-only
+    expect(await fastForwardMainBranch()).toBe(true);
+    expect(mockExec).toHaveBeenLastCalledWith(
+      'git merge --ff-only "origin/master"',
       { encoding: 'utf8' }
     );
   });
 
-  it('should use merge --ff-only when HEAD IS on main branch', async () => {
+  it('runs every command in the repository it is given', async () => {
     mockExec
       .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
-      .mockResolvedValueOnce(resolve()) // fetch
-      .mockResolvedValueOnce(resolve('master\n')) // symbolic-ref HEAD
-      .mockResolvedValueOnce(resolve()); // merge --ff-only
-    expect(await fastForwardMainBranch()).toBe(true);
-    expect(mockExec).toHaveBeenCalledWith('git merge --ff-only origin/master', {
-      encoding: 'utf8',
-    });
-  });
-
-  it('should return false when fetch fails', async () => {
-    mockExec
-      .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
-      .mockRejectedValueOnce(new Error('fetch failed'));
-    expect(await fastForwardMainBranch()).toBe(false);
-    expect(mockExec).toHaveBeenCalledTimes(2); // getMainBranch + fetch
-  });
-
-  it('should return false when branch update fails', async () => {
-    mockExec
-      .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
-      .mockResolvedValueOnce(resolve()) // fetch
       .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
-      .mockRejectedValueOnce(new Error('branch update failed'));
+      .mockRejectedValueOnce(notAncestor) // merge-base --is-ancestor
+      .mockResolvedValueOnce(resolve()); // local fetch
+    await fastForwardMainBranch('/repo-b');
+    expect(mockExec.mock.calls.map((call) => call[1])).toEqual(
+      Array(4).fill({ encoding: 'utf8', cwd: '/repo-b' })
+    );
+  });
+
+  it('succeeds without an update when main already contains origin', async () => {
+    mockExec
+      .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
+      .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
+      .mockResolvedValueOnce(resolve()); // merge-base --is-ancestor
+    expect(await fastForwardMainBranch()).toBe(true);
+    expect(mockExec).toHaveBeenCalledTimes(3);
+  });
+
+  it('creates no main when the repository has none', async () => {
+    mockExec
+      .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
+      .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
+      .mockRejectedValueOnce(
+        Object.assign(new Error('bad ref'), { code: 128 })
+      );
+    expect(await fastForwardMainBranch()).toBe(false);
+    expect(mockExec).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns false when git refuses the update', async () => {
+    mockExec
+      .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
+      .mockResolvedValueOnce(resolve('feature/foo\n')) // symbolic-ref HEAD
+      .mockRejectedValueOnce(notAncestor) // merge-base --is-ancestor
+      .mockRejectedValueOnce(new Error('non-fast-forward'));
     expect(await fastForwardMainBranch()).toBe(false);
   });
 
-  it('should return false when HEAD is detached and branch -f fails', async () => {
+  it('fast-forwards through a local fetch on a detached HEAD', async () => {
     mockExec
       .mockResolvedValueOnce(resolve('refs/remotes/origin/master')) // getMainBranch
-      .mockResolvedValueOnce(resolve()) // fetch
-      .mockRejectedValueOnce(new Error('not a symbolic ref')); // symbolic-ref HEAD fails (detached)
-    expect(await fastForwardMainBranch()).toBe(false);
+      .mockRejectedValueOnce(new Error('not a symbolic ref')) // detached
+      .mockRejectedValueOnce(notAncestor) // merge-base --is-ancestor
+      .mockResolvedValueOnce(resolve()); // local fetch
+    expect(await fastForwardMainBranch()).toBe(true);
+    expect(mockExec).toHaveBeenLastCalledWith(LOCAL_FF, { encoding: 'utf8' });
   });
 });
 
@@ -1261,170 +1477,6 @@ describe('worktreeSessionName', () => {
   });
 });
 
-describe('WorktreeResolver', () => {
-  describe('default resolver', () => {
-    it('dir() matches existing worktreeDir behavior', () => {
-      // default resolver is active after resetWorktreeResolver in beforeEach
-      // We test indirectly via createWorktree which calls worktreeDir
-      // Just verify branchToSessionName is used consistently
-      expect(branchToSessionName('feature/auth')).toBe('feature-auth');
-    });
-
-    it('owns() uses startsWith and rejects paths outside base', () => {
-      const cwd = process.cwd();
-      const base = pathResolve(cwd, '.claude/worktrees');
-      // The default resolver should own paths under .claude/worktrees
-      // We test via listWorktrees behavior (tested above)
-      // Here we test createTemplateResolver as a proxy for the pattern
-      const resolver = createTemplateResolver(
-        '.claude/worktrees/{session}',
-        cwd
-      );
-      expect(resolver.owns(`${base}/feature-auth`)).toBe(true);
-      expect(resolver.owns(base)).toBe(true);
-      expect(resolver.owns(`${base}-old/stale`)).toBe(false);
-      expect(resolver.owns('/completely/different/path')).toBe(false);
-    });
-
-    it('base() is the directory owns() tests membership of', () => {
-      expect(worktreesBasePath()).toBe(
-        pathResolve(process.cwd(), '.claude/worktrees')
-      );
-    });
-  });
-
-  describe('createTemplateResolver', () => {
-    it('base() strips the template placeholder tail', () => {
-      setWorktreeResolver(
-        createTemplateResolver('../trees/{session}', '/repos/myrepo')
-      );
-      expect(worktreesBasePath()).toBe('/repos/trees');
-    });
-
-    it('with ../{session} produces sibling paths', () => {
-      const resolver = createTemplateResolver(
-        '../{session}',
-        '/repos/myrepo.git'
-      );
-      expect(resolver.dir('feature/auth')).toBe('../feature-auth');
-      expect(resolver.dir('main')).toBe('../main');
-    });
-
-    it('with {branch} preserves slashes', () => {
-      const resolver = createTemplateResolver(
-        'worktrees/{branch}',
-        '/repos/myrepo'
-      );
-      expect(resolver.dir('feature/auth')).toBe('worktrees/feature/auth');
-    });
-
-    it('owns() derives base from template', () => {
-      const resolver = createTemplateResolver(
-        '../{session}',
-        '/repos/myrepo.git'
-      );
-      // base = resolve('/repos/myrepo.git', '..') = '/repos'
-      expect(resolver.owns('/repos/feature-auth')).toBe(true);
-      expect(resolver.owns('/repos')).toBe(true);
-      expect(resolver.owns('/repos-other/foo')).toBe(false);
-      expect(resolver.owns('/other/path')).toBe(false);
-    });
-
-    it('owns() handles absolute template paths', () => {
-      const resolver = createTemplateResolver(
-        '/custom/worktrees/{session}',
-        '/any'
-      );
-      expect(resolver.owns('/custom/worktrees/feature-auth')).toBe(true);
-      expect(resolver.owns('/custom/worktrees')).toBe(true);
-      expect(resolver.owns('/custom/other')).toBe(false);
-    });
-
-    it('with default-like template matches default resolver behavior', () => {
-      const cwd = process.cwd();
-      const resolver = createTemplateResolver(
-        '.claude/worktrees/{session}',
-        cwd
-      );
-      const base = pathResolve(cwd, '.claude/worktrees');
-      expect(resolver.owns(`${base}/feature-auth`)).toBe(true);
-      expect(resolver.owns(`${base}-old/stale`)).toBe(false);
-    });
-  });
-
-  describe('owns() and the separator git reports', () => {
-    // `git worktree list --porcelain` reports forward slashes on every
-    // platform, while `path.resolve` gives backslashes on Windows. When
-    // owns() compared those literally, every worktree looked unowned and
-    // listWorktrees() returned nothing at all on Windows.
-    it('accepts the path shape git emits for a base path from resolve()', () => {
-      resetWorktreeResolver();
-      const base = worktreesBasePath();
-      const asGitReportsIt = base.replace(/\\/g, '/') + '/feature-auth';
-      expect(ownsWorktreePath(asGitReportsIt)).toBe(true);
-    });
-
-    it('still rejects a sibling directory whose name shares the prefix', () => {
-      resetWorktreeResolver();
-      const base = worktreesBasePath().replace(/\\/g, '/');
-      expect(ownsWorktreePath(base + '-old/stale')).toBe(false);
-    });
-
-    it('is case-insensitive on Windows only', () => {
-      resetWorktreeResolver();
-      const base = worktreesBasePath().replace(/\\/g, '/');
-      const shouted = base.toUpperCase() + '/FEATURE-AUTH';
-      expect(ownsWorktreePath(shouted)).toBe(process.platform === 'win32');
-    });
-  });
-
-  describe('judging ownership for a named repository', () => {
-    // A caller acting on a repository it was handed cannot rely on the
-    // process's directory: the desktop chdir()s between its awaits.
-    it('answers about the given repository, not the process one', () => {
-      resetWorktreeResolver();
-      const elsewhere = pathResolve('/repos/elsewhere');
-      const theirs = `${elsewhere.replace(/\\/g, '/')}/.claude/worktrees/x`;
-      expect(ownsWorktreePath(theirs, elsewhere)).toBe(true);
-      expect(ownsWorktreePath(theirs)).toBe(false);
-    });
-
-    it('re-resolves a relative template against the repository asked about', () => {
-      // '../{session}' is a sibling of whichever checkout is asking, so
-      // the base captured at creation is the wrong answer for another.
-      setWorktreeResolver(
-        createTemplateResolver('../{session}', pathResolve('/repos/one'))
-      );
-      expect(worktreesBasePath()).toBe(pathResolve('/repos'));
-      expect(worktreesBasePath(pathResolve('/elsewhere/two'))).toBe(
-        pathResolve('/elsewhere')
-      );
-      const theirs = `${pathResolve('/elsewhere').replace(
-        /\\/g,
-        '/'
-      )}/feature-auth`;
-      expect(ownsWorktreePath(theirs, pathResolve('/elsewhere/two'))).toBe(
-        true
-      );
-      expect(ownsWorktreePath(theirs)).toBe(false);
-    });
-
-    it('leaves an absolute template alone whichever repository asks', () => {
-      const shared = pathResolve('/custom/worktrees');
-      setWorktreeResolver(
-        createTemplateResolver(`${shared}/{session}`, pathResolve('/repos/one'))
-      );
-      expect(worktreesBasePath(pathResolve('/repos/two'))).toBe(shared);
-      expect(
-        ownsWorktreePath(
-          `${shared.replace(/\\/g, '/')}/feature-auth`,
-          pathResolve('/repos/two')
-        )
-      ).toBe(true);
-    });
-  });
-});
-
 describe('shell-safety guard for refs', () => {
   it('accepts ordinary branch names', () => {
     for (const ok of [
@@ -1464,11 +1516,15 @@ describe('shell-safety guard for refs', () => {
   });
 
   it('is enforced by the operations that shell out', async () => {
-    await expect(createWorktree('evil`id`')).rejects.toThrow(/unsafe/);
+    await expect(createWorktree('evil`id`', scope())).rejects.toThrow(/unsafe/);
     await expect(deleteBranch('evil`id`', true)).rejects.toThrow(/unsafe/);
     await expect(countConflicts('evil`id`')).rejects.toThrow(/unsafe/);
-    await expect(canRemoveBranch('evil`id`')).rejects.toThrow(/unsafe/);
-    await expect(removeWorktree('evil`id`')).rejects.toThrow(/unsafe/);
+    await expect(canRemoveBranch('evil`id`', scope(), {})).rejects.toThrow(
+      /unsafe/
+    );
+    await expect(removeWorktree('evil`id`', scope(), {})).rejects.toThrow(
+      /unsafe/
+    );
   });
 });
 
@@ -1505,7 +1561,10 @@ describe('the machine seam (D5): remote-aware functions, and explicit failure fo
           return { stdout: '', stderr: '', code: 0 };
         return { stdout: '', stderr: '', code: 0 };
       });
-      const result = await createWorktree('feature/auth', '/repo', machine);
+      const result = await createWorktree(
+        'feature/auth',
+        scope('/repo', machine)
+      );
       expect(result).toBe('/repo/.claude/worktrees/feature-auth');
       expect(mockExec).not.toHaveBeenCalled();
       expect(calls[0]!.argv).toEqual([
@@ -1535,7 +1594,10 @@ describe('the machine seam (D5): remote-aware functions, and explicit failure fo
         }
         return { stdout: '', stderr: '', code: 0 };
       });
-      const result = await createWorktree('new-branch', '/repo', machine);
+      const result = await createWorktree(
+        'new-branch',
+        scope('/repo', machine)
+      );
       expect(result).toBe('/repo/.claude/worktrees/new-branch');
       expect(attempts).toBe(1);
       expect(mockExec).not.toHaveBeenCalled();
@@ -1551,7 +1613,10 @@ describe('the machine seam (D5): remote-aware functions, and explicit failure fo
           };
         return { stdout: '', stderr: '', code: 0 };
       });
-      const result = await createWorktree('feature/auth', '/repo', machine);
+      const result = await createWorktree(
+        'feature/auth',
+        scope('/repo', machine)
+      );
       expect(result).toBe('/repo/.claude/worktrees/feature-auth');
       expect(calls).toHaveLength(1);
       expect(mockExec).not.toHaveBeenCalled();
@@ -1569,10 +1634,11 @@ describe('the machine seam (D5): remote-aware functions, and explicit failure fo
           };
         return { stdout: '', stderr: '', code: 0 };
       });
-      const ok = await removeWorktree('feature/auth', {
-        cwd: '/repo',
-        machine,
-      });
+      const ok = await removeWorktree(
+        'feature/auth',
+        scope('/repo', machine),
+        {}
+      );
       expect(ok).toBe(true);
       expect(mockExec).not.toHaveBeenCalled();
       expect(calls[1]!.argv).toEqual([
@@ -1593,10 +1659,11 @@ describe('the machine seam (D5): remote-aware functions, and explicit failure fo
           };
         return { stdout: '', stderr: 'worktree is dirty', code: 1 };
       });
-      const ok = await removeWorktree('feature/auth', {
-        cwd: '/repo',
-        machine,
-      });
+      const ok = await removeWorktree(
+        'feature/auth',
+        scope('/repo', machine),
+        {}
+      );
       expect(ok).toBe(false);
       expect(mockExec).not.toHaveBeenCalled();
     });
@@ -1607,10 +1674,11 @@ describe('the machine seam (D5): remote-aware functions, and explicit failure fo
         stderr: '',
         code: 0,
       }));
-      const ok = await removeWorktree('feature/auth', {
-        cwd: '/repo',
-        machine,
-      });
+      const ok = await removeWorktree(
+        'feature/auth',
+        scope('/repo', machine),
+        {}
+      );
       expect(ok).toBe(false);
       expect(mockExec).not.toHaveBeenCalled();
     });
@@ -1624,7 +1692,7 @@ describe('the machine seam (D5): remote-aware functions, and explicit failure fo
         code: 0,
       }));
       await expect(
-        checkoutWorktree('feature/auth', '/repo', machine)
+        checkoutWorktree('feature/auth', scope('/repo', machine))
       ).rejects.toThrow(/does not support a remote machine/);
       expect(mockExec).not.toHaveBeenCalled();
     });
@@ -1636,7 +1704,7 @@ describe('the machine seam (D5): remote-aware functions, and explicit failure fo
         code: 0,
       }));
       await expect(
-        canRemoveBranch('feature/auth', false, machine)
+        canRemoveBranch('feature/auth', scope(process.cwd(), machine), {})
       ).rejects.toThrow(/does not support a remote machine/);
       expect(mockExec).not.toHaveBeenCalled();
     });
@@ -1659,9 +1727,17 @@ describe('the machine seam (D5): remote-aware functions, and explicit failure fo
       };
       mockExec.mockResolvedValueOnce(worktreeListPorcelain([]));
       mockExec.mockResolvedValueOnce(resolve());
-      await createWorktree('feature/auth', '/repo', { id: 'local', executor });
+      await createWorktree(
+        'feature/auth',
+        scope('/repo', { id: 'local', executor })
+      );
       expect(executor.run).not.toHaveBeenCalled();
       expect(mockExec).toHaveBeenCalled();
     });
   });
 });
+
+let template: string | undefined;
+function scope(cwd = process.cwd(), machine?: Machine) {
+  return worktreeScope(cwd, { template, machine });
+}

@@ -3,13 +3,21 @@ import type { Page } from '@playwright/test';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import { killN10Sessions, tmuxAvailable } from './setup/tmux.js';
 import {
+  currentPid,
+  expectAgentFillsPane,
+  paneGrid,
+  reportedGrids,
+} from './setup/terminal-grid.js';
+import {
   createWorktree,
   focusTerminal,
   launchAgentFromRail,
   sidebarRow,
+  startSessionFromMenu,
   tab,
   tabs,
   visibleText,
+  openSessions,
 } from './setup/app.js';
 
 /**
@@ -89,15 +97,15 @@ test.describe('Two agents at once', () => {
       page.getByText(/echo:from-alpha/).filter({ visible: true })
     ).toHaveCount(0);
 
-    // Back to the first: its scrollback survived, because the pane of a
-    // tab with a live session stays mounted.
+    // Back to the first: its terminal mounts again and starts from the
+    // host's ring buffer, which still holds the exchange.
     await tab(page, /alpha/).click();
     await expect(visibleText(page, /echo:from-alpha/)).toBeVisible();
     await expect(
       page.getByText(/echo:from-beta/).filter({ visible: true })
     ).toHaveCount(0);
 
-    const sessions = await page.evaluate(() => window.n10.listSessions());
+    const sessions = await openSessions(page);
     expect(
       sessions
         .filter((s) => s.running)
@@ -115,20 +123,19 @@ test.describe('Two agents at once', () => {
     await typeAndExpectEcho(page, 'from-alpha');
     await launch(page, 'beta');
 
-    // The pane replays the host's ring buffer once, when it mounts.
-    // Anything that makes that run again on a tab switch — reading the
-    // active tab inside the subscription rather than beside it is the
-    // easy way in — writes the entire history into the terminal a
-    // second time, under the copy already there.
+    // The terminal replays the host's ring buffer once, when it mounts.
+    // Anything that makes that run again while it stays mounted — a
+    // re-render re-watching the session is the easy way in — writes the
+    // history into the terminal a second time, under the copy already
+    // there.
     await tab(page, /alpha/).click();
     await expect(visibleText(page, /echo:from-alpha/)).toBeVisible();
-    // The pane asks for the buffer as it re-renders, so this read is
-    // queued behind any the switch provoked: once it answers, a second
-    // replay would already have been written.
-    await page.evaluate(
-      (name) => window.n10.getSessionBuffer(name),
-      await sessionKey(page, 'alpha')
-    );
+    // A watch of our own is queued behind any the switch provoked: once
+    // it answers, a second replay would already have been written.
+    await page.evaluate(async (name) => {
+      await window.n10.watchSession(name);
+      await window.n10.unwatchSession(name);
+    }, await sessionKey(page, 'alpha'));
 
     await expect(page.getByText(BANNER).filter({ visible: true })).toHaveCount(
       1
@@ -145,7 +152,7 @@ test.describe('Two agents at once', () => {
     await expect
       .poll(
         async () => {
-          const s = await page.evaluate(() => window.n10.listSessions());
+          const s = await openSessions(page);
           return s.filter((x) => x.running).map((x) => sessionBranch(x.name));
         },
         { timeout: 20_000 }
@@ -162,9 +169,9 @@ test.describe('Pasting an image', () => {
 
   /**
    * A PTY carries text, so an image on the clipboard has to become a
-   * file the agent can open. wterm's own paste handler reads only
-   * `getData('text')` and silently drops everything else, which is what
-   * made pasting a screenshot look like a no-op.
+   * file the agent can open; a terminal's own paste handling reads
+   * only the text and drops everything else, which makes pasting a
+   * screenshot look like a no-op.
    *
    * Playwright cannot put an image on the real system clipboard, so the
    * paste event is synthesised — that still exercises the whole path
@@ -175,7 +182,7 @@ test.describe('Pasting an image', () => {
   async function pasteImage(page: Page, type = 'image/png') {
     await focusTerminal(page);
     await page.evaluate((mimeType) => {
-      const target = document.querySelector('textarea') ?? document.body;
+      const target = document.activeElement ?? document.body;
       const data = new DataTransfer();
       // A one-pixel PNG's worth of bytes — the host stores whatever it
       // is handed, so the content only has to be non-empty.
@@ -214,15 +221,13 @@ test.describe('Pasting an image', () => {
     }).toPass({ timeout: 30_000 });
   });
 
-  test('leaves an ordinary text paste to the terminal', async ({ desktop }) => {
-    const { page } = desktop;
-    await launch(page, 'pasting-text');
-
+  /** Paste `text` into the terminal on screen, as the clipboard would. */
+  async function pasteText(page: Page, text: string) {
     await focusTerminal(page);
-    await page.evaluate(() => {
-      const target = document.querySelector('textarea') ?? document.body;
+    await page.evaluate((t) => {
+      const target = document.activeElement ?? document.body;
       const data = new DataTransfer();
-      data.setData('text/plain', 'plain-text-paste');
+      data.setData('text/plain', t);
       target.dispatchEvent(
         new ClipboardEvent('paste', {
           clipboardData: data,
@@ -230,12 +235,34 @@ test.describe('Pasting an image', () => {
           cancelable: true,
         })
       );
-    });
+    }, text);
+  }
+
+  test('pastes ordinary text into the terminal', async ({ desktop }) => {
+    const { page } = desktop;
+    await launch(page, 'pasting-text');
+
+    await pasteText(page, 'plain-text-paste');
     // Same race as the image case: the pasted text reaches the PTY over
     // IPC, so a single Enter can beat it there.
     await expect(async () => {
       await page.keyboard.press('Enter');
       await expect(visibleText(page, /echo:plain-text-paste/)).toBeVisible({
+        timeout: 2_000,
+      });
+    }).toPass({ timeout: 30_000 });
+  });
+
+  test('pastes text without its escape bytes', async ({ desktop }) => {
+    const { page } = desktop;
+    await launch(page, 'pasting-escape');
+
+    // An ESC would let a clipboard end a bracketed paste early and
+    // type the rest as commands; without it the sequence is text.
+    await pasteText(page, 'before\x1b[201~after');
+    await expect(async () => {
+      await page.keyboard.press('Enter');
+      await expect(visibleText(page, 'echo:before[201~after')).toBeVisible({
         timeout: 2_000,
       });
     }).toPass({ timeout: 30_000 });
@@ -271,130 +298,45 @@ async function finishAgentClose(page: Page): Promise<void> {
   await expect(allTabs).toHaveCount(0);
 }
 
+/** Wait for the agent to exit, then resume it from its bar: a new
+ *  process behind the terminal that is already on screen. */
+async function resumeInPlace(page: Page) {
+  const resume = page.getByRole('button', { name: 'Resume agent' });
+  await expect(resume).toBeVisible({ timeout: 20_000 });
+  await resume.click();
+  await startSessionFromMenu(page);
+  // The bar takes rows from the pane while it shows.
+  await expect(resume).toBeHidden({ timeout: 20_000 });
+}
+
 test.describe('Terminal fit', () => {
   test.use({ n10Config: { aiCommand: fakeAgent({ printSize: true }) } });
 
-  interface Grid {
-    cols: number;
-    rows: number;
-  }
-  interface Report extends Grid {
-    /** Which agent said so. */
-    pid: string;
-  }
-
-  /** Every grid an agent has reported, oldest first. */
-  async function reportedGrids(page: Page): Promise<Report[]> {
-    const text = await page.evaluate(() => document.body.innerText);
-    return [...text.matchAll(/size:(\d+)x(\d+)#(\d+)/g)].map((m) => ({
-      cols: Number(m[1]),
-      rows: Number(m[2]),
-      pid: m[3],
-    }));
-  }
-
-  /** The agent currently reporting, once it has said anything. */
-  async function currentPid(page: Page): Promise<string> {
-    await expect
-      .poll(async () => (await reportedGrids(page)).length, {
-        timeout: 30_000,
-      })
-      .toBeGreaterThan(0);
-    return (await reportedGrids(page)).at(-1)!.pid;
-  }
-
-  /**
-   * The grid that fills the terminal on screen, measured off its own
-   * box and cell metrics — so this says nothing about how the app
-   * computes a grid, only how much of the pane the agent covers.
-   */
-  async function paneGrid(page: Page): Promise<Grid> {
-    return page.evaluate(() => {
-      const el = document.querySelector<HTMLElement>('.wterm');
-      const row = el?.querySelector<HTMLElement>('.term-row');
-      if (!el || !row) throw new Error('no terminal on screen');
-      const style = getComputedStyle(el);
-      const probe = document.createElement('div');
-      probe.className = 'term-row';
-      probe.style.position = 'absolute';
-      probe.style.visibility = 'hidden';
-      const span = document.createElement('span');
-      span.textContent = 'W'.repeat(40);
-      probe.appendChild(span);
-      el.appendChild(probe);
-      const charWidth = span.getBoundingClientRect().width / 40;
-      probe.remove();
-      const box = el.getBoundingClientRect();
-      const inner = {
-        width:
-          box.width -
-          parseFloat(style.paddingLeft) -
-          parseFloat(style.paddingRight),
-        height:
-          box.height -
-          parseFloat(style.paddingTop) -
-          parseFloat(style.paddingBottom),
-      };
-      return {
-        cols: Math.floor(inner.width / charWidth),
-        rows: Math.floor(inner.height / row.getBoundingClientRect().height),
-      };
+  // Resumed from the exited agent's bar, the terminal stays mounted
+  // and nothing about it changes size, so a fit that only speaks up
+  // when the terminal's own grid moved has nothing to say, and the new PTY
+  // keeps whatever the launch request guessed.
+  test.describe('restarted in place', () => {
+    test.use({
+      n10Config: {
+        aiCommand: fakeAgent({ printSize: true, exitAfterMs: 6_000 }),
+      },
     });
-  }
 
-  /**
-   * Wait for the agent to settle on the grid that fills its pane.
-   *
-   * `notPid` is the agent that was there before. Without it a restart
-   * reads the *previous* agent's last line — still on screen, and still
-   * correct — and passes on a terminal that never resized at all.
-   */
-  async function expectAgentFillsPane(
-    page: Page,
-    notPid?: string
-  ): Promise<void> {
-    const expected = await paneGrid(page);
-    await expect
-      .poll(
-        async () => {
-          const last = (await reportedGrids(page))
-            .filter((g) => g.pid !== notPid)
-            .at(-1);
-          return last ? { cols: last.cols, rows: last.rows } : null;
-        },
-        { timeout: 20_000 }
-      )
-      .toEqual(expected);
-  }
+    test('an agent resumed in place is given the pane it is drawn in', async ({
+      desktop,
+    }) => {
+      const { page } = desktop;
+      await createWorktree(page, 'restart');
+      await launchAgentFromRail(page);
+      await expect(visibleText(page, BANNER)).toBeVisible({ timeout: 30_000 });
 
-  test('an agent restarted in place is given the pane it is drawn in', async ({
-    desktop,
-  }) => {
-    const { page } = desktop;
-    await createWorktree(page, 'restart');
-    await launchAgentFromRail(page);
-    await expect(visibleText(page, BANNER)).toBeVisible({ timeout: 30_000 });
+      await expectAgentFillsPane(page);
+      const before = await currentPid(page);
 
-    await expectAgentFillsPane(page);
-    const before = await currentPid(page);
-
-    // Stopped from the rail, the tab stays open and the terminal stays
-    // mounted — nothing about it changes size, so a fit that only speaks
-    // up when wterm's own grid moved has nothing to say, and the new PTY
-    // keeps whatever the launch request guessed.
-    await page.getByLabel('Stop agent').filter({ visible: true }).click();
-    await expect
-      .poll(
-        async () => {
-          const s = await page.evaluate(() => window.n10.listSessions());
-          return s.filter((x) => x.running).length;
-        },
-        { timeout: 20_000 }
-      )
-      .toBe(0);
-
-    await launchAgentFromRail(page);
-    await expectAgentFillsPane(page, before);
+      await resumeInPlace(page);
+      await expectAgentFillsPane(page, before);
+    });
   });
 
   test("a tab closed and launched again comes back on the pane's grid", async ({
@@ -414,7 +356,7 @@ test.describe('Terminal fit', () => {
     await expect
       .poll(
         async () => {
-          const s = await page.evaluate(() => window.n10.listSessions());
+          const s = await openSessions(page);
           return s.filter((x) => x.running).length;
         },
         { timeout: 20_000 }
@@ -468,6 +410,54 @@ test.describe('Terminal fit', () => {
   });
 
   /**
+   * An agent launched from someone else's pull request, on its Overview.
+   * The Overview has no header bar and the terminal has one, so the
+   * grid the agent is spawned with leaves the bar's rows out: its first
+   * frame is the one the reader sees.
+   */
+  test.describe('from a pull request Overview', () => {
+    test.use({
+      repo: {
+        worktrees: [
+          { branch: 'cancel-requests', files: { 'request.ts': 'close();\n' } },
+        ],
+      },
+      n10Config: { aiCommand: fakeAgent({ printSize: true }) },
+      fakeGitHub: {
+        username: 'n10-tester',
+        prs: [
+          {
+            number: 214,
+            title: 'Handle cancelled requests',
+            headRefName: 'cancel-requests',
+            author: 'alex',
+            reviewRequests: ['n10-tester'],
+            rollup: 'SUCCESS',
+          },
+        ],
+      },
+    });
+
+    test('spawns the agent on the grid it gets under the bar', async ({
+      desktop,
+    }) => {
+      const { page } = desktop;
+      await sidebarRow(page, /#214/).first().click();
+      await expect(
+        page.getByRole('heading', { level: 1, name: /Handle cancelled/ })
+      ).toBeVisible({ timeout: 30_000 });
+      await launchAgentFromRail(page);
+      await expect(visibleText(page, BANNER)).toBeVisible({ timeout: 30_000 });
+
+      await expectAgentFillsPane(page);
+      const [spawned] = await reportedGrids(page);
+      expect({ cols: spawned.cols, rows: spawned.rows }).toEqual(
+        await paneGrid(page)
+      );
+    });
+  });
+
+  /**
    * The same restart, through tmux.
    *
    * A tmux session outlives the local PTY that shows it, and tmux sizes
@@ -478,15 +468,13 @@ test.describe('Terminal fit', () => {
     test.skip(!tmuxAvailable(), 'tmux is not installed');
     test.use({
       n10Config: {
-        aiCommand: fakeAgent({ printSize: true }),
+        aiCommand: fakeAgent({ printSize: true, exitAfterMs: 6_000 }),
       },
     });
     // Closing the app detaches rather than kills, by design.
     test.afterEach(({ desktop }) => killN10Sessions(desktop.homeDir));
 
-    test('a restarted tmux agent is given the pane too', async ({
-      desktop,
-    }) => {
+    test('a resumed tmux agent is given the pane too', async ({ desktop }) => {
       const { page } = desktop;
       await createWorktree(page, 'tmux-refit');
       await launchAgentFromRail(page);
@@ -495,18 +483,7 @@ test.describe('Terminal fit', () => {
       await expectAgentFillsPane(page);
       const before = await currentPid(page);
 
-      await page.getByLabel('Stop agent').filter({ visible: true }).click();
-      await expect
-        .poll(
-          async () => {
-            const s = await page.evaluate(() => window.n10.listSessions());
-            return s.filter((x) => x.running).length;
-          },
-          { timeout: 20_000 }
-        )
-        .toBe(0);
-
-      await launchAgentFromRail(page);
+      await resumeInPlace(page);
       await expectAgentFillsPane(page, before);
     });
   });

@@ -27,15 +27,35 @@ export interface GitOutput {
   truncated: boolean;
 }
 
-export function runGit(
+interface GitRunOptions {
+  cwd?: string;
+  maxBytes: number;
+  timeoutMs?: number;
+  input?: string;
+}
+
+export async function runGit(
   args: readonly string[],
-  opts: { cwd?: string; maxBytes: number }
+  opts: GitRunOptions
 ): Promise<GitOutput> {
-  return new Promise<GitOutput>((resolve, reject) => {
+  const { bytes, truncated } = await runGitBytes(args, opts);
+  return { text: bytes.toString('utf8'), truncated };
+}
+
+/** `runGit` for output that is not text: a blob's bytes, as git wrote them. */
+export function runGitBytes(
+  args: readonly string[],
+  opts: GitRunOptions
+): Promise<{ bytes: Buffer; truncated: boolean }> {
+  return new Promise((resolve, reject) => {
     const child = spawn('git', [...args], {
       cwd: opts.cwd,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
+    // A git that exits before reading all of its input (killed at the
+    // ceiling, say) breaks the pipe; `close` still settles the call.
+    child.stdin.on('error', () => undefined);
+    child.stdin.end(opts.input ?? '');
 
     const chunks: Buffer[] = [];
     const errChunks: Buffer[] = [];
@@ -78,15 +98,24 @@ export function runGit(
     const finish = (fn: () => void) => {
       if (settled) return;
       settled = true;
+      clearTimeout(deadline);
       fn();
     };
+
+    // This transport is for reads. Bound the child itself so a hung Git read
+    // cannot hold an engine resource lane indefinitely. Mutations use exec.
+    const deadline = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish(() => reject(new Error(`git ${args[0]} timed out`)));
+    }, opts.timeoutMs ?? 30_000);
+    deadline.unref();
 
     child.on('error', (err) => finish(() => reject(err)));
     child.on('close', (code) => {
       finish(() => {
-        const text = Buffer.concat(chunks).toString('utf8');
+        const bytes = Buffer.concat(chunks);
         // A non-zero exit after we killed it is our own doing.
-        if (truncated || code === 0) resolve({ text, truncated });
+        if (truncated || code === 0) resolve({ bytes, truncated });
         else {
           const why = Buffer.concat(errChunks).toString('utf8').trim();
           reject(

@@ -28,3 +28,20 @@ export {
 export type { HintEntry } from './hints.js';
 export { buildControlsRows, getBindingRows } from './controls-data.js';
 export type { ControlsRow } from './controls-data.js';
+export {
+  DESKTOP_ACTIONS,
+  DESKTOP_DEFAULT_BINDINGS,
+  isDesktopActionId,
+  resolveDesktopAction,
+  descriptorFromDom,
+  desktopConflict,
+  desktopBindingRefusal,
+  desktopOverrides,
+  desktopBindings,
+} from './desktop.js';
+export type {
+  DesktopActionId,
+  DesktopBindings,
+  ReservedChord,
+} from './desktop.js';
+export { withKeybindOverride } from './overrides.js';
