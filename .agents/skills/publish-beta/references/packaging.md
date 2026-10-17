@@ -90,11 +90,12 @@ the macOS workflow merges those two channel files into one release asset
 listing both architectures. The versionless ZIPs, DMGs, blockmaps, and channel
 file all receive SHA-256 entries in `SHA256SUMS`.
 
-The `github-release` job creates the GitHub release with generated notes,
-attaches every file named in `apps/desktop/release-assets.json`, the manifest,
-and `SHA256SUMS`. A rehearsal checks every installer, blockmap, channel file,
-and digest too;
-missing files fail before release creation.
+The `github-release` job runs `apps/desktop/scripts/create-github-release.sh`,
+which creates the GitHub release with generated notes and attaches every file
+named in `apps/desktop/release-assets.json`, the manifest, and `SHA256SUMS`.
+A rehearsal runs it with `--dry-run`: it checks every installer, blockmap,
+channel file, and digest, then prints the release command and download URLs.
+Missing files fail before release creation.
 During the beta-only period (`LATEST_FOLLOWS_BETA=true`), beta releases are
 marked latest so `releases/latest/download/<name>` resolves. After that
 setting becomes false, beta releases are GitHub prereleases and stable

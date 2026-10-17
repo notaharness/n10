@@ -1,6 +1,9 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
+  changeAgentComments,
+  claimAgentPost,
+  isAgentPostClaimed,
   listReviewDrafts,
   saveReviewDraft,
   submitReview,
@@ -14,7 +17,6 @@ import {
 } from '@n10/vcs-core';
 import {
   readComments,
-  updateComment,
   renderCommentBody,
   resolveComment,
   type ReviewComment,
@@ -42,7 +44,42 @@ function validatePostRequest(req: PostAgentCommentsRequest): void {
     throw new TypeError('Invalid draft ids');
 }
 
-/** Reuses core's durable submission ledger; VCS publishers own every network write. */
+function postable(
+  comments: ReviewComment[],
+  req: PostAgentCommentsRequest
+): ReviewComment[] {
+  const chosen = comments.filter(
+    (comment) =>
+      comment.status !== 'posted' && (!req.ids || req.ids.includes(comment.id))
+  );
+  if (
+    chosen.some(
+      (comment) =>
+        !resolveComment(comment.body, comment.severity).header.subject
+    )
+  )
+    throw new Error('Cannot post a comment with an empty body');
+  return chosen;
+}
+
+function patchComment(
+  repo: string,
+  prId: number,
+  id: string,
+  patch: Partial<ReviewComment>
+) {
+  changeAgentComments(repo, prId, (comments) =>
+    comments.map((comment) =>
+      comment.id === id ? { ...comment, ...patch } : comment
+    )
+  );
+}
+
+/**
+ * Reuses core's durable submission ledger; VCS publishers own every
+ * network write. A post holds the pull request's claim from its first
+ * read to its last write, so one process at a time posts its findings.
+ */
 export function createAgentPublication(
   options: ReviewContextOptions,
   repository: () => string,
@@ -53,7 +90,7 @@ export function createAgentPublication(
     ...context.sources,
     dir: join(homedir(), '.n10', 'agent-review-publications'),
   };
-  const pending = new Set<number>();
+  const isPosting = (prId: number) => isAgentPostClaimed(repository(), prId);
   function identity(prId: number) {
     requirePullRequestNumber(prId);
     const start = context.selected();
@@ -72,7 +109,7 @@ export function createAgentPublication(
     );
   }
   function requireEditable(prId: number, comment: ReviewComment) {
-    if (pending.has(prId) || comment.status === 'posting')
+    if (isPosting(prId) || comment.status === 'posting')
       throw new Error('Comment is being posted');
     if (!comment.publication) {
       if (comment.status === 'posted')
@@ -163,7 +200,7 @@ export function createAgentPublication(
       }
     ).drafts.find((draft) => draft.id === `inline:agent-${comment.id}`)
       ?.publication.state;
-    updateComment(repo, prId, comment.id, {
+    patchComment(repo, prId, comment.id, {
       status: state === 'published' ? 'posted' : 'draft',
       ...(state === 'unknown' || state === 'publishing'
         ? {}
@@ -171,28 +208,48 @@ export function createAgentPublication(
     });
     return state === 'published';
   }
+  /** Marks the chosen comments `posting` as they stand under the store
+   *  lock, so the bodies sent are the ones an edit last wrote. */
+  function markPosting(
+    repo: string,
+    req: PostAgentCommentsRequest,
+    captured: ReturnType<typeof publicationContext>
+  ) {
+    let marked: ReviewComment[] = [];
+    changeAgentComments(repo, req.prId, (stored) => {
+      const ids = new Set(postable(stored, req).map((comment) => comment.id));
+      const next = stored.map((comment) =>
+        ids.has(comment.id)
+          ? {
+              ...comment,
+              status: 'posting' as const,
+              publication: { ...captured.ref, viewer: captured.viewer },
+            }
+          : comment
+      );
+      marked = next.filter((comment) => ids.has(comment.id));
+      return next;
+    });
+    return marked;
+  }
   async function post(req: PostAgentCommentsRequest) {
     identity(req.prId);
     validatePostRequest(req);
-    if (pending.has(req.prId))
-      throw new Error('These comments are already being posted');
     const repo = repository();
-    const comments = readComments(repo, req.prId).filter(
-      (comment) =>
-        comment.status !== 'posted' &&
-        (!req.ids || req.ids.includes(comment.id))
-    );
-    if (
-      comments.some(
-        (comment) =>
-          !resolveComment(comment.body, comment.severity).header.subject
-      )
-    )
-      throw new Error('Cannot post a comment with an empty body');
-    if (!comments.length) return 0;
+    const release = claimAgentPost(repo, req.prId);
+    if (!release) throw new Error('These comments are already being posted');
+    try {
+      return await postClaimed(req, repo);
+    } finally {
+      release();
+    }
+  }
+  async function postClaimed(req: PostAgentCommentsRequest, repo: string) {
+    const preview = postable(readComments(repo, req.prId), req);
+    if (!preview.length) return 0;
     const captured = publicationContext(req);
-    for (const comment of comments) assertPublicationScope(req.prId, comment);
-    pending.add(req.prId);
+    for (const comment of preview) assertPublicationScope(req.prId, comment);
+    const comments = markPosting(repo, req, captured);
     const reconcile = () =>
       comments.reduce(
         (posted, comment) =>
@@ -200,17 +257,11 @@ export function createAgentPublication(
         0
       );
     try {
+      changed(req.prId);
       const draftIds = comments.flatMap((comment) => {
         const id = prepareDraft(req, comment, captured);
         return id ? [id] : [];
       });
-      for (const comment of comments) {
-        updateComment(repo, req.prId, comment.id, {
-          status: 'posting',
-          publication: { ...captured.ref, viewer: captured.viewer },
-        });
-      }
-      changed(req.prId);
       if (draftIds.length) {
         await submitReview(
           {
@@ -248,13 +299,12 @@ export function createAgentPublication(
         { cause: error }
       );
     } finally {
-      pending.delete(req.prId);
       changed(req.prId);
     }
   }
   return {
     post,
     requireEditable,
-    isPosting: (prId: number) => pending.has(prId),
+    isPosting,
   };
 }
