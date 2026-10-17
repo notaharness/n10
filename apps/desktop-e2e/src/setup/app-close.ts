@@ -56,7 +56,9 @@ function reap(pid: number | undefined): void {
  *  reaches through the dispatcher, which is gone once the application has
  *  closed — a test that quit the app itself arrives here with nothing left
  *  to hold, and there is then nothing to reap either. */
-function launchedProcess(app: ElectronApplication): ChildProcess | undefined {
+function launchedProcess(
+  app: Pick<ElectronApplication, 'process'>
+): ChildProcess | undefined {
   try {
     return app.process() as ChildProcess | undefined;
   } catch {
@@ -64,14 +66,18 @@ function launchedProcess(app: ElectronApplication): ChildProcess | undefined {
   }
 }
 
-/**
- * Close the app. Resolves with `null` on a clean quit, or with a
- * description of what had to be done instead — the caller attaches that
- * to the test so a run that needed the fallback still says so.
- */
+export interface DesktopCloseResult {
+  /** The Electron process exited without requiring the fallback kill. */
+  exited: boolean;
+  /** Diagnostics for a launcher whose inherited pipes did not close. */
+  note: string | null;
+}
+
+/** Close with a bounded wait, distinguishing process exit from pipe cleanup. */
 export async function closeDesktopApp(
-  app: ElectronApplication
-): Promise<string | null> {
+  app: Pick<ElectronApplication, 'process' | 'close'>,
+  timeouts = { quitMs: QUIT_TIMEOUT_MS, reapMs: REAP_TIMEOUT_MS }
+): Promise<DesktopCloseResult> {
   const child = launchedProcess(app);
   const closed = new Promise<'closed'>((resolve) => {
     child?.once('close', () => resolve('closed'));
@@ -87,24 +93,30 @@ export async function closeDesktopApp(
 
   if (
     !child ||
-    (await Promise.race([closed, quit, after(QUIT_TIMEOUT_MS)])) === 'closed'
+    ((await Promise.race([closed, quit, after(timeouts.quitMs)])) ===
+      'closed' &&
+      (child.exitCode !== null || child.signalCode !== null))
   ) {
-    await quit;
-    return null;
+    return {
+      exited: !child || child.exitCode !== null || child.signalCode !== null,
+      note: null,
+    };
   }
 
   const alive = child.exitCode === null && child.signalCode === null;
   reap(child.pid);
-  const reaped = await Promise.race([closed, after(REAP_TIMEOUT_MS)]);
-  return (
-    `The app did not close within ${QUIT_TIMEOUT_MS}ms. ` +
-    `Electron process ${child.pid} was ${
-      alive
-        ? 'still running'
-        : 'already gone, so a helper process held its stdio open'
-    }; ` +
-    `its process group was killed and the launcher ${
-      reaped === 'closed' ? 'reported the close' : 'still reported nothing'
-    }.`
-  );
+  const reaped = await Promise.race([closed, after(timeouts.reapMs)]);
+  return {
+    exited: !alive,
+    note:
+      `The app did not close within ${timeouts.quitMs}ms. ` +
+      `Electron process ${child.pid} was ${
+        alive
+          ? 'still running'
+          : 'already gone, so a helper process held its stdio open'
+      }; ` +
+      `its process group was killed and the launcher ${
+        reaped === 'closed' ? 'reported the close' : 'still reported nothing'
+      }.`,
+  };
 }

@@ -30,6 +30,7 @@ import {
 } from './launch.js';
 import { closeDesktopApp } from '../setup/app-close.js';
 import { launchAgain } from '../setup/launch-again.js';
+import { readyWindow } from './ready-window.js';
 import type { TerminalSeed } from '../setup/terminals.js';
 import {
   fakeAgent,
@@ -116,8 +117,13 @@ export interface DesktopApp {
   launchAgain: (startDir: string) => Promise<void>;
   /** Quit the app and start it again on the same HOME, tmux socket and
    *  environment, as a user closing and reopening n10 would. `app`,
-   *  `page` and `main` then answer for the new process. */
-  relaunch(): Promise<void>;
+   *  `page` and `main` then answer for the new process. `startPath`
+   *  opens another repository path, such as a relocated or symlinked
+   *  copy of the test repo. Fails if the old process did not exit. */
+  relaunch(startPath?: string): Promise<void>;
+  /** Quit the app and fail unless the process exited, for a test that
+   *  changes the repository while n10 is not running. */
+  stop(): Promise<void>;
 }
 
 export const test = base.extend<
@@ -202,30 +208,31 @@ export const test = base.extend<
     // A real token is the @integration suite reaching GitHub on purpose.
     const networkGuard = githubToken ? undefined : networkGuardBase(homeDir);
 
-    const launchEnv = appEnv({
-      homeDir,
-      repoPath,
-      startWithoutRepo,
-      githubToken,
-      ghEnv,
-      networkGuard,
-      extra: env,
-    });
+    const envFor = (startPath: string) =>
+      appEnv({
+        homeDir,
+        repoPath: startPath,
+        startWithoutRepo,
+        githubToken,
+        ghEnv,
+        networkGuard,
+        extra: env,
+      });
     const wanted = {
       ado: fakeAzureDevOps !== undefined,
       guard: networkGuard !== undefined,
     };
-    const launch = async (): Promise<ElectronApplication> => {
+    const launch = async (startPath: string): Promise<ElectronApplication> => {
       // A relaunch proves its own preloads, not the first launch's.
       forgetPreloads(homeDir);
       return electron.launch({
         args: launchArgs(wanted.guard, webgl),
         cwd: WORKSPACE_ROOT,
-        env: launchEnv,
+        env: envFor(startPath),
         timeout: 60_000,
       });
     };
-    let app = await launch();
+    let app = await launch(repoPath);
 
     const page = await app.firstWindow();
     await requirePreloads(
@@ -238,6 +245,28 @@ export const test = base.extend<
     const consoleErrors: string[] = [];
     await readyWindow(app, page, startWithoutRepo, pageErrors, consoleErrors);
 
+    // Bounded, and never the reason a test fails: see setup/app-close.ts.
+    // A test that stopped the app itself leaves nothing for teardown.
+    let stopped = false;
+    async function close() {
+      if (stopped) return { exited: true, note: null };
+      const result = await closeDesktopApp(app);
+      stopped = true;
+      if (result.note) {
+        console.warn(`[desktop-e2e] ${result.note}`);
+        await testInfo.attach('desktop-close', {
+          body: result.note,
+          contentType: 'text/plain',
+        });
+      }
+      return result;
+    }
+    async function stop(): Promise<void> {
+      const result = await close();
+      if (!result.exited)
+        throw new Error(result.note ?? 'Electron did not exit');
+    }
+
     const desktop: DesktopApp = {
       app,
       page,
@@ -249,11 +278,13 @@ export const test = base.extend<
         launchAgain({
           args: launchArgs(wanted.guard, webgl),
           cwd: WORKSPACE_ROOT,
-          env: { ...launchEnv, N10_START_DIR: startDir },
+          env: { ...envFor(repoPath), N10_START_DIR: startDir },
         }),
-      async relaunch() {
-        await closeDesktopApp(app);
-        app = await launch();
+      stop,
+      async relaunch(startPath = repoPath) {
+        await stop();
+        app = await launch(startPath);
+        stopped = false;
         const next = await app.firstWindow();
         // The test's teardown cleans up after it.
         await requirePreloads(app, missingPreloads(homeDir, wanted));
@@ -283,15 +314,7 @@ export const test = base.extend<
           contentType: 'text/plain',
         });
       }
-      // Bounded, and never the reason a test fails: see setup/app-close.ts.
-      const closeNote = await closeDesktopApp(app);
-      if (closeNote) {
-        console.warn(`[desktop-e2e] ${closeNote}`);
-        await testInfo.attach('desktop-close', {
-          body: closeNote,
-          contentType: 'text/plain',
-        });
-      }
+      await close();
       if (ownsRepo) cleanupTestRepo(repoPath);
       // Attached whether or not the test got far enough to fail on
       // them: a refused request is often why it failed.
@@ -315,46 +338,6 @@ export const test = base.extend<
     }
   },
 });
-
-/**
- * Make a launched window ready for a test. Chromium throttles
- * requestAnimationFrame in a window it considers hidden or occluded, and
- * under xvfb (or behind another window on a developer's desktop) that is
- * the normal state. Playwright's actionability check waits for two
- * consecutive stable animation frames before it will click, so a
- * throttled window makes every click hang until the timeout even though
- * the page is perfectly idle. Show, focus and un-throttle before any
- * test touches it, and collect what the renderer reports as errors.
- */
-async function readyWindow(
-  app: ElectronApplication,
-  page: Page,
-  startWithoutRepo: boolean | undefined,
-  pageErrors: string[],
-  consoleErrors: string[]
-): Promise<void> {
-  await app.evaluate(({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows()[0];
-    if (!win) return;
-    win.webContents.setBackgroundThrottling(false);
-    win.show();
-    win.focus();
-  });
-  page.on('pageerror', (err) =>
-    pageErrors.push(err.stack || err.message || String(err))
-  );
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') consoleErrors.push(msg.text());
-  });
-  await page.waitForLoadState('domcontentloaded');
-  if (startWithoutRepo) return;
-  // The workspace has rendered (not the repo picker, not a blank
-  // window) once the sidebar's actions exist.
-  await page
-    .getByRole('button', { name: 'New worktree', exact: true })
-    .first()
-    .waitFor({ state: 'visible', timeout: 30_000 });
-}
 
 /** What a test that passed must not have left behind. An uncaught
  *  renderer exception blanks a pane behind the ErrorBoundary, which a

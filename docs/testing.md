@@ -16,6 +16,18 @@ restore it. Preserve property-test counterexamples as regression cases. Tab and
 diff properties should check invariants such as valid active ids and comments
 appearing exactly once.
 
+The [worktree lifecycle map](worktree-lifecycle.md) links each transition to its
+Desktop and TUI E2E cases, including executable known failures and the separate
+removal coverage in PRs #205/#206. Run the non-removal transition files with:
+
+```sh
+npx nx e2e desktop-e2e -- worktree-transitions worktree-session-transitions worktree-path-transitions
+PORT=5187 npx nx e2e cli-e2e -- worktree-transitions worktree-session-transitions worktree-path-transitions
+```
+
+`PORT=5187` keeps the TUI host separate from a development host on the default
+5174; choose another unused port if another worktree is using 5187.
+
 ## Desktop
 
 The `desktop-e2e` targets build Electron before testing. Directly invoking
