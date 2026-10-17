@@ -1,3 +1,4 @@
+import type { CeremonyOutcome } from '@n10/engine/contract';
 import { createContext, useContext } from 'react';
 import type { MachineView } from '../../../host/contract.js';
 import type { Ceremony } from './use-ceremony.js';
@@ -32,7 +33,13 @@ export interface FleetContextValue {
   enrolment: Enrolment;
   /** The revocation dialog's machine and ceremony, kept the same way. */
   revocation: {
+    completion: {
+      label: string;
+      outcome: Extract<CeremonyOutcome, { op: 'revoke'; ok: true }>;
+    } | null;
     target: MachineView | null;
+    visible: boolean;
+    setVisible: (visible: boolean) => void;
     ceremony: Ceremony;
     open: (machine: MachineView) => void;
     close: () => void;

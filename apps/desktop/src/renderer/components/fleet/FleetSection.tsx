@@ -13,7 +13,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '../ui/collapsible.js';
-import { FocusScope } from '../../lib/fleet/use-focus-on-mount.js';
+import { FocusScope } from '../../lib/fleet/FocusScope.js';
 import { Button } from '../ui/button.js';
 import { Tip } from '../ui/tooltip.js';
 import { FleetActionsMenu } from './FleetActions.js';

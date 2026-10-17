@@ -20,8 +20,8 @@ export function ResetFleetPanel() {
         Reset fleet here?
       </h3>
       <p className="text-muted-foreground">
-        Disconnect this machine and delete its queued messages. Other machines
-        and your passkey stay unchanged.
+        Disconnect this machine and delete queued messages to its old peers.
+        Other machines and your passkey stay unchanged.
       </p>
       <form
         className="grid gap-3"
@@ -31,7 +31,8 @@ export function ResetFleetPanel() {
         }}
       >
         <p className="text-muted-foreground">
-          This won’t recover a lost passkey or undo a revocation.
+          This keeps this machine’s identity. It will not recover a lost passkey
+          or undo a revocation.
         </p>
         <div className="grid gap-1.5">
           <Label htmlFor="fleet-reset-confirm">Type reset to confirm</Label>
@@ -61,7 +62,8 @@ export function ResetFleetPanel() {
           <Button
             type="submit"
             size="sm"
-            variant="destructive"
+            variant="outline"
+            className="border-destructive text-destructive"
             disabled={busy || typed !== 'reset'}
           >
             {busy ? 'Resetting fleet…' : 'Reset fleet'}

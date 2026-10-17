@@ -13,13 +13,7 @@ export function EnrolmentFlow() {
   const { view, running, outcome } = ceremony;
   if (!view) return null;
   if (running || !outcome) {
-    return (
-      <CeremonyProgress
-        view={view}
-        cancelLabel="Cancel"
-        onCancel={ceremony.cancel}
-      />
-    );
+    return <CeremonyProgress view={view} />;
   }
   // The host re-reads beam's status after every ceremony, failed ones
   // too, so what shows behind the result is already current.

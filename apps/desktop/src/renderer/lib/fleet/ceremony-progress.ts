@@ -97,33 +97,36 @@ const PREPARING: CeremonyHeading = {
   explanation: null,
 };
 
-const PUBLISHING: Record<CeremonyOp, CeremonyHeading> = {
-  init: {
-    heading: 'Finishing setup…',
-    explanation: null,
-  },
-  join: { heading: 'Finishing setup…', explanation: null },
-  revoke: { heading: 'Revoking access…', explanation: null },
+const PUBLISHING: CeremonyHeading = {
+  heading: 'Publishing the fleet update…',
+  explanation: null,
 };
 
 const PASSKEY: Record<CeremonyOp, CeremonyHeading[]> = {
   init: [
     {
       heading: '1 of 2 · Save a passkey',
-      explanation: 'Open or scan to save your fleet’s passkey.',
+      explanation:
+        'Save a passkey, then return to this machine for the second step.',
     },
     {
       heading: '2 of 2 · Add this machine',
-      explanation: 'Use the passkey you just saved.',
+      explanation:
+        'Open the new link or scan this new QR code. Use the passkey you just saved.',
     },
   ],
   join: [
     {
       heading: 'Add this machine',
-      explanation: 'Use your fleet’s existing passkey.',
+      explanation: 'Use the same fleet passkey.',
     },
   ],
-  revoke: [{ heading: 'Confirm with your passkey', explanation: null }],
+  revoke: [
+    {
+      heading: 'Confirm with your passkey',
+      explanation: 'Use the same fleet passkey.',
+    },
+  ],
 };
 
 /** What a running ceremony says at the top, from its latest signal. */
@@ -139,6 +142,6 @@ export function ceremonyHeading(view: CeremonyView): CeremonyHeading {
     case 'notifying-peers':
       return { heading: 'Updating machines…', explanation: null };
     case 'publishing':
-      return PUBLISHING[view.op];
+      return PUBLISHING;
   }
 }

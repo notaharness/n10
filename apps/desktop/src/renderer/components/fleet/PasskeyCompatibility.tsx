@@ -19,6 +19,14 @@ export function PasskeyCompatibility({
       <CollapsibleContent className="mt-2 text-muted-foreground">
         Update your browser and passkey manager. If a passkey fails, try another
         browser or device with the same passkey.
+        <details className="mt-2">
+          <summary>Lost your passkey?</summary>
+          <p>
+            Existing connections can keep working, but you cannot add or revoke
+            machines. To start over, reset and create a new fleet on one
+            machine. Then reset and join that fleet on each other machine.
+          </p>
+        </details>
       </CollapsibleContent>
     </Collapsible>
   );

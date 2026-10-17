@@ -4,14 +4,14 @@ import type { FleetStatus, MachineView } from '../../../host/contract.js';
 import { useBeamStatus, useMachines } from '../../lib/data/queries.js';
 import { keys } from '../../lib/data/query-keys.js';
 import { useFleet } from '../../lib/fleet/fleet-context.js';
-import { publicationText } from '../../lib/fleet/publication.js';
 import { fingerprintGroups } from '../../lib/machines/machine-model.js';
 import { cn, errorMessage } from '../../lib/utils.js';
 import { MachineRow } from '../machines/MachineRow.js';
 import { Button } from '../ui/button.js';
 import { Skeleton } from '../ui/skeleton.js';
 import { AddMachinePanel } from './AddMachinePanel.js';
-import { EnrolmentFlow } from './EnrolmentFlow.js';
+import { FleetCompletion } from './FleetCompletion.js';
+import { FleetResume } from './FleetResume.js';
 import { FirstRun } from './FirstRun.js';
 import { ResetFleetPanel } from './ResetFleetPanel.js';
 
@@ -115,7 +115,20 @@ function StatusNotices({ beam }: { beam: FleetStatus }) {
   if (beam.state === 'restarting')
     return <Notice warning>Reconnecting… Status may be out of date.</Notice>;
   if (!publication.pending || !beam.enrolled) return null;
-  return <Notice>{publicationText(false)}</Notice>;
+  return (
+    <Notice>
+      {publication.pendingOperations.map((op) => (
+        <span className="block" key={op}>
+          {op === 'join'
+            ? 'This machine joined. Publishing the fleet update…'
+            : op === 'init'
+            ? 'Fleet created. Publishing the fleet update…'
+            : 'Access revoked here. Publishing the fleet update…'}
+        </span>
+      ))}
+      beam will retry while it runs.
+    </Notice>
+  );
 }
 
 /** This machine's fleet: its rows, or in their place the
@@ -159,13 +172,14 @@ function FleetBody({
 }) {
   const { enrolment, reset } = useFleet();
   const reconnecting = beam.state === 'restarting';
-  const enrolling = enrolment.ceremony.view !== null;
+  const enrolling = enrolment.mode !== null || enrolment.ceremony.view !== null;
   if (reset.open) return <ResetFleetPanel />;
   return (
     <div className="space-y-3">
-      <StatusNotices beam={beam} />
       {loadFailure}
-      {enrolling && <EnrolmentFlow />}
+      <FleetResume />
+      {beam.enrolled && <FleetCompletion />}
+      <StatusNotices beam={beam} />
       {!enrolling && !beam.enrolled && <FirstRun disabled={reconnecting} />}
       {beam.enrolled && <EnrolledBody beam={beam} machines={machines} />}
     </div>

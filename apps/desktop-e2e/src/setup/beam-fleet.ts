@@ -174,7 +174,7 @@ export async function formFleet(
   await page.getByRole('button', { name: 'Create a fleet' }).click();
   await page.getByLabel('Machine name').fill('laptop');
   await page.getByLabel('Fleet name').fill('home');
-  await page.getByRole('button', { name: 'Create fleet' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByTestId('machine-row')).toHaveCount(1, {
     timeout: 60_000,
   });

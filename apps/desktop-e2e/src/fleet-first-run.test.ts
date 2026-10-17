@@ -13,7 +13,7 @@ async function startCreate(page: Page, label = 'laptop', fleet = 'home') {
   await view.getByRole('button', { name: 'Create a fleet' }).click();
   await view.getByLabel('Machine name').fill(label);
   await view.getByLabel('Fleet name').fill(fleet);
-  await view.getByRole('button', { name: 'Create fleet' }).click();
+  await view.getByRole('button', { name: 'Continue' }).click();
 }
 
 function step(page: Page, name: string) {
@@ -36,6 +36,7 @@ test.describe('First run', () => {
     });
     await openFleet(desktop);
     const windowUrl = page.url();
+    await fleetView(page).getByText('About Fleet', { exact: true }).click();
     await fleetView(page)
       .getByRole('link', { name: 'More information' })
       .click();
@@ -48,19 +49,6 @@ test.describe('First run', () => {
     await expect(
       fleetView(page).getByRole('img', { name: 'Tailscale' })
     ).toBeVisible();
-  });
-
-  test('the beam illustration holds still under reduced motion', async ({
-    desktop,
-  }) => {
-    const { page } = desktop;
-    await openFleet(desktop);
-    const packet = fleetView(page).locator('.fleet-art-packet').first();
-    const playState = () =>
-      packet.evaluate((el) => getComputedStyle(el).animationPlayState);
-    await expect.poll(playState).toBe('running');
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await expect.poll(playState).toBe('paused');
   });
 
   test('creates a fleet through both passkey steps, each with its own link', async ({
@@ -82,7 +70,9 @@ test.describe('First run', () => {
       view.getByText('Shown in your passkey manager.')
     ).toBeVisible();
     await expect(
-      view.getByText('Save a passkey, then use it to add this machine.')
+      view.getByText(
+        'Save one passkey for your fleet, then use it to add this machine. Expect two passkey prompts.'
+      )
     ).toBeVisible();
     await expect(
       view.getByRole('button', { name: 'Passkey help' })
@@ -90,7 +80,7 @@ test.describe('First run', () => {
 
     await view.getByLabel('Machine name').fill('laptop');
     await view.getByLabel('Fleet name').fill('home');
-    await view.getByRole('button', { name: 'Create fleet' }).dblclick();
+    await view.getByRole('button', { name: 'Continue' }).dblclick();
 
     await expect(
       view.getByRole('heading', {
@@ -108,16 +98,16 @@ test.describe('First run', () => {
       view.getByText('Create fleet passkey for “home”')
     ).toBeVisible();
     await expect(view.getByRole('img', { name: /QR code/ })).toBeVisible();
-    await expect(step(page, 'Save a passkey')).toHaveAttribute(
-      'aria-current',
-      'step'
-    );
+    await expect(step(page, 'Save a passkey')).toHaveCount(0);
 
     const second = beam!.nextPasskeyStep();
     await expect(
       view.getByRole('heading', {
         name: '2 of 2 · Add this machine',
       })
+    ).toBeVisible();
+    await expect(
+      view.getByRole('button', { name: 'Open second step' })
     ).toBeVisible();
     await expect(view.getByTestId('ceremony-url')).toHaveText(second);
     await expect(view.getByText(first)).toHaveCount(0);
@@ -126,13 +116,18 @@ test.describe('First run', () => {
 
     beam!.stage('publishing');
     await expect(
-      view.getByRole('heading', { name: 'Finishing setup…' })
+      view.getByRole('heading', { name: 'Publishing the fleet update…' })
     ).toBeVisible();
     await expect(view.getByTestId('ceremony-url')).toHaveCount(0);
-    await expect(view.getByRole('button', { name: 'Cancel' })).toHaveCount(0);
+    await expect(
+      view.getByRole('button', { name: 'Cancel request' })
+    ).toHaveCount(0);
 
     beam!.finishCeremony();
     await expect(page.getByTestId('machine-row')).toHaveCount(1);
+    await expect(
+      view.getByText('Add another machine to connect your fleet.')
+    ).toBeVisible();
     await expect(view.getByTestId('ceremony-url')).toHaveCount(0);
     await expect(view.getByRole('button', { name: 'Close' })).toHaveCount(0);
   });
@@ -150,9 +145,7 @@ test.describe('First run', () => {
         'Use up to 64 characters; no /, \\, braces or control characters.'
       )
     ).toBeVisible();
-    await expect(
-      view.getByRole('button', { name: 'Create fleet' })
-    ).toBeDisabled();
+    await expect(view.getByRole('button', { name: 'Continue' })).toBeDisabled();
     await expect(view.getByLabel('Fleet name')).toHaveValue('home/office');
   });
 
@@ -172,8 +165,12 @@ test.describe('First run', () => {
       })
     ).toBeVisible();
 
-    await view.getByRole('button', { name: 'Cancel' }).click();
-    await expect(view.getByText('Passkey request cancelled.')).toBeVisible();
+    await view.getByRole('button', { name: 'Cancel request' }).click();
+    await expect(
+      view.getByText(
+        'Passkey request cancelled. No further approval is pending for this request.'
+      )
+    ).toBeVisible();
     expect(beam!.ops('ceremony.cancel')).toHaveLength(1);
     await expect(step(page, 'Add this machine')).toContainText('(stopped)');
     await expect(view.getByText(/A passkey may have been saved/)).toBeVisible();
@@ -183,7 +180,7 @@ test.describe('First run', () => {
     ).toBeVisible();
     await expect(view.getByTestId('ceremony-url')).toHaveCount(0);
 
-    await view.getByRole('button', { name: 'Try again' }).click();
+    await view.getByRole('button', { name: 'Start again' }).click();
     await expect(
       view.getByRole('heading', {
         name: '1 of 2 · Save a passkey',
@@ -192,7 +189,7 @@ test.describe('First run', () => {
     expect(beam!.ops('init.start')).toHaveLength(2);
 
     beam!.failCeremony('ceremony-timeout');
-    await expect(view.getByText(/Request expired/)).toBeVisible();
+    await expect(view.getByText(/expired after five minutes/)).toBeVisible();
     await expect(
       view.getByRole('button', { name: 'Back', exact: true })
     ).toHaveCount(0);
@@ -210,27 +207,30 @@ test.describe('First run', () => {
     await openFleet(desktop);
     const view = fleetView(page);
     await view.getByRole('button', { name: 'Join a fleet' }).click();
-    await expect(view.getByText('Use your fleet’s passkey.')).toBeVisible();
+    await expect(
+      view.getByText(
+        'Use the passkey for your existing fleet. This takes one passkey prompt.'
+      )
+    ).toBeVisible();
     await expect(view.getByLabel('Fleet name')).toHaveCount(0);
-    await view.getByRole('button', { name: 'Join fleet' }).click();
+    await view.getByRole('button', { name: 'Continue' }).click();
     await expect(
       view.getByRole('heading', { name: 'Add this machine' })
     ).toBeVisible();
-    await expect(
-      view.getByText('Use your fleet’s existing passkey.')
-    ).toBeVisible();
+    await expect(view.getByText('Use the same fleet passkey.')).toBeVisible();
 
     beam!.failCeremony('prf-unsupported', '<b>no prf.results.first</b>');
-    await expect(view.getByText(/This passkey isn’t supported/)).toBeVisible();
+    await expect(
+      view.getByText(/This passkey could not complete the request/)
+    ).toBeVisible();
     await view.getByText('Details', { exact: true }).click();
     await expect(view.getByText('<b>no prf.results.first</b>')).toBeVisible();
+    await expect(view.getByText('Use the same fleet passkey.')).toBeVisible();
     await expect(
       view.getByText(
-        'Use the same fleet passkey. A new one creates a different fleet.'
+        'Update your browser and passkey manager, then start a fresh request.',
+        { exact: true }
       )
-    ).toBeVisible();
-    await expect(
-      view.getByText(/Update your browser and passkey manager/)
     ).toBeVisible();
     await view.getByRole('button', { name: 'Back', exact: true }).click();
     await expect(
@@ -275,11 +275,11 @@ test.describe('Revoking a member', () => {
     await openFleet(desktop);
     const row = page.locator(`[data-peer-id="${WORKBOX}"]`);
     await row.getByRole('button', { name: 'Machine actions' }).click();
-    await page.getByRole('menuitem', { name: 'Revoke workbox…' }).click();
+    await page.getByRole('menuitem', { name: 'Revoke access…' }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('c0ff ee00 c0ff ee00')).toBeVisible();
     await expect(
-      dialog.getByText(/^Permanently revoke workbox’s access\./)
+      dialog.getByText(/^This permanently revokes this machine identity/)
     ).toBeVisible();
 
     await dialog.getByRole('button', { name: 'Revoke access' }).click();
@@ -288,6 +288,9 @@ test.describe('Revoking a member', () => {
     ).toBeVisible();
     await expect(dialog.getByText('Remove “workbox” from fleet')).toBeVisible();
     await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    expect(beam!.ops('ceremony.cancel')).toHaveLength(0);
+    await page.getByRole('button', { name: 'Resume passkey step' }).click();
     await expect(dialog).toBeVisible();
 
     beam!.failCeremony('bad-assertion');

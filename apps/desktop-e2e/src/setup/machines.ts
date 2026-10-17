@@ -21,7 +21,9 @@ export async function chooseFleetAction(
 }
 
 export function fleetView(page: Page) {
-  return page.getByRole('region', { name: 'Fleet' });
+  return page
+    .getByRole('region', { name: 'Fleet' })
+    .or(page.getByTestId('enrolment-dialog'));
 }
 
 /** Expands the sidebar's Fleet section, if it is not already. */

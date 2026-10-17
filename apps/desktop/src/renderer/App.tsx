@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import type { N10HostApi, RepoInfo } from '../host/contract.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { TabDragProvider } from './components/editor/TabStrip.js';
+import { EnrolmentDialog } from './components/fleet/EnrolmentDialog.js';
 import { RevokeMachineDialog } from './components/machines/RevokeMachineDialog.js';
 import { Toaster } from './components/ui/sonner.js';
 import { TooltipProvider } from './components/ui/tooltip.js';
@@ -42,6 +43,7 @@ export function App() {
                 <FleetProvider>
                   <Gate />
                   <RevocationDialog />
+                  <EnrolmentDialog />
                 </FleetProvider>
               </TabDragProvider>
             </PrewarmProvider>
@@ -53,7 +55,7 @@ export function App() {
   );
 }
 
-/** The one fleet flow in a modal (beam-fleet-ux.md §1): above the
+/** Fleet revocation (beam-fleet-ux.md §1): above the
  *  gate, so switching repositories or hiding the sidebar cannot drop a
  *  revocation waiting on its passkey. */
 function RevocationDialog() {

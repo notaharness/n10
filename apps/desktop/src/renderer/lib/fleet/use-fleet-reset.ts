@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { FleetResetOutcome } from '@n10/engine/contract';
 import { errorMessage } from '../utils.js';
@@ -33,7 +34,10 @@ export function useFleetReset(onReset: () => void) {
         (result) => {
           if (result.ok || result.code === 'connection-lost') onReset();
           setOutcome(result);
-          if (result.ok) setOpen(false);
+          if (result.ok) {
+            setOpen(false);
+            toast.success('Fleet reset here');
+          }
         },
         (err: unknown) =>
           setOutcome({ ok: false, code: 'internal', detail: errorMessage(err) })

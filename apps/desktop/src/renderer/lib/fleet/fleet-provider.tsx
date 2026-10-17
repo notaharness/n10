@@ -1,4 +1,3 @@
-import { toast } from 'sonner';
 import { useAddMachine } from './use-add-machine.js';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,7 +10,11 @@ import {
 } from 'react';
 import type { MachineView } from '../../../host/contract.js';
 import { keys } from '../data/query-keys.js';
-import { FleetContext, type FleetSectionState } from './fleet-context.js';
+import {
+  FleetContext,
+  type FleetSectionState,
+  type FleetContextValue,
+} from './fleet-context.js';
 import { useCeremony } from './use-ceremony.js';
 import { useEnrolment } from './use-enrolment.js';
 import { useFleetReset } from './use-fleet-reset.js';
@@ -122,20 +125,24 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const { settle, clear } = publication;
   const hooks = useMemo(() => ({ onSettled: settle }), [settle]);
   const enrolment = useEnrolment(hooks);
+  const [revokeVisible, setRevokeVisible] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<MachineView | null>(null);
+  const [revokeCompletion, setRevokeCompletion] =
+    useState<FleetContextValue['revocation']['completion']>(null);
   const revokeHooks = useMemo(
     () => ({
       onSettled: (outcome: Parameters<typeof settle>[0]) => {
         settle(outcome);
-        if (outcome.ok) {
-          setRevokeTarget(null);
-          toast.success('Access revoked', {
-            description: 'Unreachable machines update when they reconnect.',
+        if (outcome.ok && outcome.op === 'revoke') {
+          setRevokeCompletion({
+            label: revokeTarget?.label ?? outcome.peerId,
+            outcome,
           });
+          setRevokeTarget(null);
         }
       },
     }),
-    [settle]
+    [settle, revokeTarget]
   );
   const revokeCeremony = useCeremony(revokeHooks);
   const { leave } = enrolment;
@@ -143,18 +150,27 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     leave();
     clear();
     setAdding(false);
+    setRevokeCompletion(null);
   }, [leave, clear, setAdding]);
   const reset = useFleetReset(afterReset);
   useFleetPushes();
   useNetworkReport();
 
   const resetRevocation = revokeCeremony.reset;
+  const revocationRunning = revokeCeremony.running;
   const openRevocation = useCallback(
     (machine: MachineView) => {
+      // Resume the active request without losing its target or ceremony state.
+      if (revocationRunning) {
+        setRevokeVisible(true);
+        return;
+      }
       resetRevocation();
+      setRevokeCompletion(null);
       setRevokeTarget(machine);
+      setRevokeVisible(true);
     },
-    [resetRevocation]
+    [resetRevocation, revocationRunning]
   );
   const closeRevocation = useCallback(() => setRevokeTarget(null), []);
   const value = useMemo(
@@ -164,7 +180,10 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       setAdding,
       enrolment,
       revocation: {
+        completion: revokeCompletion,
         target: revokeTarget,
+        visible: revokeVisible,
+        setVisible: setRevokeVisible,
         ceremony: revokeCeremony,
         open: openRevocation,
         close: closeRevocation,
@@ -178,6 +197,8 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       setAdding,
       enrolment,
       revokeTarget,
+      revokeCompletion,
+      revokeVisible,
       revokeCeremony,
       closeRevocation,
       openRevocation,

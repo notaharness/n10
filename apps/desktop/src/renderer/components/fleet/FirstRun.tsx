@@ -7,7 +7,6 @@ import { openLink } from '../../lib/open-link.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
 import { Label } from '../ui/label.js';
-import { FleetIllustration } from './FleetIllustration.js';
 import { PasskeyCompatibility } from './PasskeyCompatibility.js';
 
 const BEAM_URL = 'https://beam.n10.is';
@@ -30,21 +29,12 @@ function PoweredByTailscale() {
 function Choices({ disabled }: { disabled: boolean }) {
   const { choose } = useFleet().enrolment;
   return (
-    <div className="flex flex-col items-center gap-3 text-center">
-      <h2 className="text-base font-semibold">
-        Your machines, connected anywhere
-      </h2>
-      <div className="flex flex-col items-center gap-1">
-        <FleetIllustration />
-        <PoweredByTailscale />
-      </div>
+    <div className="space-y-3">
+      <h2 className="text-xl font-semibold">Connect your machines</h2>
       <p className="text-base text-muted-foreground">
-        Connect your machines, secured with your passkey, accessible from
-        anywhere.
-        <br />
-        No VPN or SSH required.
+        Create a fleet, or join one with its passkey.
       </p>
-      <div className="flex flex-wrap justify-center gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button disabled={disabled} onClick={() => choose('create')}>
           Create a fleet
         </Button>
@@ -56,18 +46,28 @@ function Choices({ disabled }: { disabled: boolean }) {
           Join a fleet
         </Button>
       </div>
-      <Button variant="link" size="sm" asChild>
-        <a
-          href={BEAM_URL}
-          onClick={(e) => {
-            e.preventDefault();
-            openLink(BEAM_URL);
-          }}
-        >
-          <LinkIcon className="size-3.5" />
-          More information
-        </a>
-      </Button>
+      <details className="text-sm text-muted-foreground">
+        <summary>About Fleet</summary>
+        <div className="mt-2 space-y-3">
+          <p>
+            Connect your machines, secured with your passkey, accessible from
+            anywhere. No VPN or SSH required.
+          </p>
+          <PoweredByTailscale />
+          <Button variant="link" size="sm" asChild>
+            <a
+              href={BEAM_URL}
+              onClick={(e) => {
+                e.preventDefault();
+                openLink(BEAM_URL);
+              }}
+            >
+              <LinkIcon className="size-3.5" />
+              More information
+            </a>
+          </Button>
+        </div>
+      </details>
     </div>
   );
 }
@@ -95,7 +95,9 @@ function NameField({
     : undefined;
   return (
     <div className="grid gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
+      <Label className="text-sm" htmlFor={id}>
+        {label}
+      </Label>
       <Input
         id={id}
         value={value}
@@ -126,14 +128,15 @@ function NameField({
 function CreateSteps() {
   return (
     <p className="text-base text-muted-foreground">
-      Save a passkey, then use it to add this machine.
+      Save one passkey for your fleet, then use it to add this machine. Expect
+      two passkey prompts.
     </p>
   );
 }
 
 /** Create or join: the names, what the passkey steps will be, and the
  *  compatibility help, before anything starts (beam-fleet-ux.md §2). */
-function EnrolmentForm({ disabled }: { disabled: boolean }) {
+export function EnrolmentForm({ disabled }: { disabled: boolean }) {
   const e = useFleet().enrolment;
   const creating = e.mode === 'create';
   const invalid =
@@ -147,12 +150,10 @@ function EnrolmentForm({ disabled }: { disabled: boolean }) {
         e.submit();
       }}
     >
-      <h2 className="text-base font-semibold">
-        {creating ? 'Create a fleet' : 'Join a fleet'}
-      </h2>
       {!creating && (
         <p className="text-base text-muted-foreground">
-          Use your fleet’s passkey.
+          Use the passkey for your existing fleet. This takes one passkey
+          prompt.
         </p>
       )}
       <div className="grid gap-3">
@@ -176,9 +177,9 @@ function EnrolmentForm({ disabled }: { disabled: boolean }) {
       </div>
       {creating && <CreateSteps />}
       <PasskeyCompatibility />
-      <div className="flex gap-2">
+      <div className="flex justify-end gap-2">
         <Button type="submit" disabled={invalid || disabled}>
-          {creating ? 'Create fleet' : 'Join fleet'}
+          Continue
         </Button>
         <Button type="button" variant="ghost" onClick={() => e.choose(null)}>
           Back
@@ -190,10 +191,5 @@ function EnrolmentForm({ disabled }: { disabled: boolean }) {
 
 /** An unenrolled machine's way in: two choices, then that choice's form. */
 export function FirstRun({ disabled }: { disabled: boolean }) {
-  const { mode } = useFleet().enrolment;
-  return mode ? (
-    <EnrolmentForm disabled={disabled} />
-  ) : (
-    <Choices disabled={disabled} />
-  );
+  return <Choices disabled={disabled} />;
 }

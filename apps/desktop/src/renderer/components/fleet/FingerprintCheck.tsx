@@ -4,24 +4,40 @@ import { fingerprintGroups } from '../../lib/machines/machine-model.js';
 import { Button } from '../ui/button.js';
 
 /** The owner's report that the fingerprints differ, and the way out. */
-function Mismatch({ onReset }: { onReset: () => void }) {
+function Mismatch({
+  onReset,
+  onClose,
+}: {
+  onReset: () => void;
+  onClose: () => void;
+}) {
   const focus = useFocusOnMount<HTMLHeadingElement>();
   return (
     <div role="alert" className="space-y-2">
       <h3
         ref={focus}
         tabIndex={-1}
-        className="font-medium text-destructive outline-none"
+        className="text-xl font-semibold text-destructive outline-none"
       >
-        Different fleet
+        Fleet fingerprints don't match
       </h3>
       <p className="text-base">
-        Stop using remote connections. Reset here, then join with your fleet’s
+        This machine joined a different fleet. Avoid remote connections. Reset
+        this machine's fleet connection, then join with the correct fleet
         passkey.
       </p>
-      <Button size="sm" variant="destructive" onClick={onReset}>
-        Reset fleet…
-      </Button>
+      <div className="flex justify-end gap-2">
+        <Button
+          variant="outline"
+          className="border-destructive text-destructive"
+          onClick={onReset}
+        >
+          Reset fleet here…
+        </Button>
+        <Button variant="ghost" onClick={onClose}>
+          Close
+        </Button>
+      </div>
     </div>
   );
 }
@@ -34,23 +50,36 @@ function Mismatch({ onReset }: { onReset: () => void }) {
  */
 export function FingerprintCheck({ fleetId }: { fleetId: string }) {
   const { enrolment, reset } = useFleet();
-  if (enrolment.mismatch) return <Mismatch onReset={reset.show} />;
+  if (enrolment.mismatch)
+    return (
+      <Mismatch
+        onClose={() => enrolment.setVisible(false)}
+        onReset={() => {
+          enrolment.setVisible(false);
+          reset.show();
+        }}
+      />
+    );
   return (
-    <div className="space-y-2 border-t border-border pt-3">
-      <h4 className="font-medium">Check fleet fingerprint</h4>
+    <div className="space-y-3">
+      <h4 tabIndex={-1} className="text-xl font-semibold outline-none">
+        Compare fleet fingerprint
+      </h4>
+      <p className="text-sm text-muted-foreground">Fleet fingerprint</p>
       <p className="font-mono text-lg select-all">
         {fingerprintGroups(fleetId)}
       </p>
       <p className="text-base text-muted-foreground">
-        Compare with a machine already in your fleet: its Fleet … menu shows the
-        fingerprint.
+        This machine joined. Before using remote connections, compare with a
+        machine already in your fleet: Fleet … → Copy fleet fingerprint.
       </p>
-      <div className="flex gap-2">
-        <Button size="sm" onClick={enrolment.leave}>
-          Matches
-        </Button>
-        <Button size="sm" variant="outline" onClick={enrolment.reportMismatch}>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button onClick={enrolment.leave}>Matches</Button>
+        <Button variant="outline" onClick={enrolment.reportMismatch}>
           Doesn’t match
+        </Button>
+        <Button variant="ghost" onClick={() => enrolment.setVisible(false)}>
+          Check later
         </Button>
       </div>
     </div>
