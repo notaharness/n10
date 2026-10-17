@@ -1,11 +1,5 @@
-import { createHash, randomUUID } from 'node:crypto';
-import {
-  readFileSync,
-  writeFileSync,
-  mkdirSync,
-  renameSync,
-  existsSync,
-} from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import type { ReviewComment, ReviewCommentsFile } from './types.js';
@@ -35,57 +29,4 @@ export function readComments(
   } catch {
     return [];
   }
-}
-
-function writeCommentsAtomic(
-  repository: string,
-  prId: number,
-  comments: ReviewComment[]
-): void {
-  const dir = commentDirPath(repository, prId);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-  const filePath = commentFilePath(repository, prId);
-  const tmpPath = `${filePath}.${randomUUID()}.tmp`;
-  const data: ReviewCommentsFile = { prId, comments };
-  writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-  renameSync(tmpPath, filePath);
-}
-
-export function appendComment(
-  repository: string,
-  prId: number,
-  comment: ReviewComment
-): void {
-  const comments = readComments(repository, prId);
-  comments.push(comment);
-  writeCommentsAtomic(repository, prId, comments);
-}
-
-export function updateComment(
-  repository: string,
-  prId: number,
-  id: string,
-  patch: Partial<ReviewComment>
-): boolean {
-  const comments = readComments(repository, prId);
-  const idx = comments.findIndex((c) => c.id === id);
-  if (idx === -1) return false;
-  comments[idx] = { ...comments[idx], ...patch };
-  writeCommentsAtomic(repository, prId, comments);
-  return true;
-}
-
-export function removeComment(
-  repository: string,
-  prId: number,
-  id: string
-): boolean {
-  const comments = readComments(repository, prId);
-  const idx = comments.findIndex((c) => c.id === id);
-  if (idx === -1) return false;
-  comments.splice(idx, 1);
-  writeCommentsAtomic(repository, prId, comments);
-  return true;
 }
