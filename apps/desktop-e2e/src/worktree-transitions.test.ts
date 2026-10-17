@@ -4,11 +4,13 @@ import { test, expect } from './fixtures/desktop.js';
 import {
   createWorktree,
   launchAgentFromRail,
+  sessionCard,
   sidebarRow,
   tab,
   tabs,
   visibleText,
 } from './setup/app.js';
+import { visibleWithin } from './setup/lifecycle.js';
 import { listTaggedSessions } from './setup/tmux.js';
 import {
   addExternalWorktree,
@@ -22,6 +24,7 @@ for (const transition of [
     args: ['checkout', '-b', 'checked-out'],
     label: 'checked-out',
     after: [],
+    knownFailure: undefined,
   },
   {
     name: 'detach HEAD',
@@ -29,6 +32,7 @@ for (const transition of [
     args: ['checkout', '--detach'],
     label: 'transition',
     after: [['branch', '-D', 'transition', 'pre-detach']],
+    knownFailure: 'https://github.com/notaharness/n10/issues/209',
   },
 ]) {
   test(`${transition.name} preserves the checkout tab and live agent`, async ({
@@ -61,10 +65,31 @@ for (const transition of [
     await expect(tab(page, new RegExp(transition.label))).toBeVisible();
     await expect(tabs(page)).toHaveCount(1);
     expect(listTaggedSessions(homeDir)).toEqual(before);
-    await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible();
+    // The rail asks for the branch's sessions every 2 s, so the new label
+    // can be on screen before the rail has asked under it.
+    // eslint-disable-next-line playwright/no-wait-for-timeout -- what is waited out is the agent leaving the rail, which must not happen
+    await page.waitForTimeout(4_000);
+    const cardKept = await visibleWithin(
+      sessionCard(page, 'Agent').filter({ hasText: 'Running' }),
+      1_000
+    );
+    const outputKept = await visibleWithin(
+      visibleText(page, 'n10-fake-agent-ready'),
+      1_000
+    );
     execFileSync('git', ['switch', '-c', 'reattached'], { cwd });
     await expect(tab(page, /reattached/)).toBeVisible({ timeout: 15_000 });
     await expect(tabs(page)).toHaveCount(1);
+    await expect(sessionCard(page, 'Agent')).toContainText('Running', {
+      timeout: 15_000,
+    });
+    await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible();
+    // Only the agent on the detached HEAD is the recorded failure.
+    test.fail(!!transition.knownFailure, transition.knownFailure);
+    expect({ cardKept, outputKept }).toEqual({
+      cardKept: true,
+      outputKept: true,
+    });
   });
 }
 

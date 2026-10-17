@@ -15,6 +15,8 @@ const endings = [
     afterExit: (name: string) => [name, 'sentinel'],
     sameServer: true,
     remaining: ['sentinel'],
+    // The retained dead pane is the agent's, so it can be resumed.
+    offer: 'Resume agent',
     stop: (_home: string, path: string) =>
       writeFileSync(join(path, 'finish'), ''),
   },
@@ -23,6 +25,7 @@ const endings = [
     afterExit: () => ['sentinel'],
     sameServer: true,
     remaining: ['sentinel'],
+    offer: 'Launch Agent',
     stop: (home: string, _path: string, name: string) => {
       fixtureTmux(home, 'kill-session', '-t', `=${name}:`);
     },
@@ -32,6 +35,7 @@ const endings = [
     afterExit: () => [],
     sameServer: false,
     remaining: [],
+    offer: 'Launch Agent',
     stop: (home: string) => killFixtureSessions(home),
   },
 ];
@@ -81,7 +85,10 @@ for (const ending of endings) {
       .poll(
         async () =>
           (
-            await page.evaluate(() => window.n10.listSessions())
+            await page.evaluate(
+              (repo) => window.n10.listSessions(repo),
+              repoPath
+            )
           ).some((s) => s.running),
         { timeout: 15_000 }
       )
@@ -89,7 +96,7 @@ for (const ending of endings) {
     await expect(sidebarRow(page, /session-transition/)).toBeVisible();
     await expect(tabs(page)).toHaveCount(1);
     await expect(
-      page.getByRole('button', { name: /Relaunch agent/i })
+      page.getByRole('button', { name: ending.offer, exact: true })
     ).toBeVisible();
     expect(
       listTaggedSessions(homeDir)
@@ -170,7 +177,7 @@ test('n10 restart with sessions gone rediscovers the checkout', async ({
   await expect(sidebarRow(desktop.page, /restart-agent/)).toBeVisible();
   await sidebarRow(desktop.page, /restart-agent/).click();
   await expect(
-    desktop.page.getByRole('button', { name: 'Launch agent', exact: true })
+    desktop.page.getByRole('button', { name: 'Launch Agent', exact: true })
   ).toBeVisible();
   expect(listTaggedSessions(homeDir)).toEqual([]);
 });
