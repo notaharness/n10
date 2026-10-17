@@ -54,9 +54,10 @@ beta tags become GitHub prereleases.
    ```
 
 To rehearse a release, `gh workflow run release.yml` on `master` runs the
-build, installer tests, asset checksum check, and `npm publish --dry-run`,
-without the GitHub release. It cannot check the trusted publisher, which
-admits only tags.
+build, installer tests, asset checksum check, and `npm publish --dry-run`.
+Its `rehearse` job prints the `gh release create` command a tag would run and
+each asset's download URL, without creating the release. It cannot check the
+trusted publisher, which admits only tags.
 
 If a job fails, re-run the failed jobs (`gh run rerun <run-id> --failed`).
 When `publish` fails at a trusted-publisher check, nothing was published: fix

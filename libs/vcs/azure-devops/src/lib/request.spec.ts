@@ -5,6 +5,7 @@ import { isVcsError, type VcsError } from '@n10/vcs-core';
 import {
   _adoThrottleGateForTests,
   adoGet,
+  adoGetAll,
   looksLikeAdoSignIn,
   resetAdoTransport,
   TTL,
@@ -303,6 +304,84 @@ describe('throttling', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('stands down when a successful response asks for a pause with quota to spare', async () => {
+    vi.useFakeTimers();
+    try {
+      mockFetch.mockResolvedValue(
+        response('{"value":[]}', {
+          extraHeaders: { 'x-ratelimit-remaining': '10', 'retry-after': '60' },
+        })
+      );
+      await get();
+      expect((await failure(get())).kind).toBe('throttled');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(61_000);
+      await get();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not stand down on a reset time alone while quota remains', async () => {
+    // `X-RateLimit-Reset` says when the usage window drains, not that
+    // the client has to wait for it.
+    mockFetch.mockResolvedValue(
+      response('{"value":[]}', {
+        extraHeaders: {
+          'x-ratelimit-remaining': '10',
+          'x-ratelimit-reset': String(Math.ceil(Date.now() / 1000) + 300),
+        },
+      })
+    );
+    await get();
+    await get();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits as long as the server asks, past its own backoff ceiling', async () => {
+    vi.useFakeTimers();
+    try {
+      mockFetch.mockResolvedValue(
+        response('', { status: 429, extraHeaders: { 'retry-after': '600' } })
+      );
+      await failure(get());
+
+      vi.advanceTimersByTime(300_001);
+      expect((await failure(get())).kind).toBe('throttled');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(300_000);
+      mockFetch.mockResolvedValue(response('{"ok":true}'));
+      await get();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('paging', () => {
+  it('abandons a listing that never ends rather than reading forever', async () => {
+    // A server that ignores `$skip` answers every page in full.
+    const page = JSON.stringify({
+      value: Array.from({ length: 100 }, () => ({})),
+    });
+    mockFetch.mockImplementation(() => Promise.resolve(response(page)));
+    const err = await failure(
+      adoGetAll(
+        'spec',
+        'endless',
+        0,
+        'https://dev.azure.com/o/p/_apis/things?a=1',
+        headers
+      )
+    );
+    expect(err.kind).toBe('unexpected-response');
+    expect(mockFetch).toHaveBeenCalledTimes(50);
   });
 });
 

@@ -59,7 +59,9 @@ vi.mock('./repo.js', () => {
         agentComments: { resource },
         agentGuide: {
           resource: () =>
-            touch({ read: async () => ({ data: { guide: cwd }, error: null }) }),
+            touch({
+              read: async () => ({ data: { guide: cwd }, error: null }),
+            }),
         },
         diff: {
           manifest: resource,

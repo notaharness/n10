@@ -384,6 +384,10 @@ export interface N10HostApi {
   /** Validate + open a directory as the active repo. */
   openRepo(cwd: string): Promise<RepoInfo>;
   getRepo(): Promise<RepoInfo | null>;
+  /** Claim later launches for this page: resolves to the repository
+   *  one named before the page listened, and sends the rest as
+   *  `open-repo` menu commands. Call once subscribed to them. */
+  takeLaunchRepo(): Promise<string | null>;
   refreshRepo(): Promise<RepoInfo | null>;
   /** What `getRepo` says, for any repository, open or not. */
   getRepoInfo(repo: string): Promise<RepoInfo>;
@@ -714,6 +718,7 @@ export const IPC = {
   selectFolder: 'n10/shell/select-folder',
   forgetRecent: 'n10/repo/forget',
   getRepo: 'n10/repo/get',
+  takeLaunchRepo: 'n10/repo/take-launch',
   getRepoInfo: 'n10/repo/info',
   refreshRepo: 'n10/repo/refresh',
   getSettingsView: 'n10/settings/view',

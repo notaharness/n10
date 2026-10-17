@@ -10,7 +10,8 @@ export type ViewerScoped =
   | 'unwatchSession'
   | 'showSession'
   | 'hideSession'
-  | 'holdMenuShortcuts';
+  | 'holdMenuShortcuts'
+  | 'takeLaunchRepo';
 
 export type ViewerApi = {
   [K in ViewerScoped]: (
@@ -32,6 +33,17 @@ export function setMenuShortcutHold(
   menuShortcutHold = fn;
 }
 
+/** Main-process glue (`main/launch-repo.ts`, where later launches
+ *  arrive), injected by the host worker; claims nothing in tests. */
+let launchRepoClaim: (viewer: Viewer) => Promise<string | null> = async () =>
+  null;
+
+export function setLaunchRepoClaim(
+  fn: (viewer: Viewer) => Promise<string | null>
+): void {
+  launchRepoClaim = fn;
+}
+
 export function createViewerApi(): ViewerApi {
   return {
     watchSession: (viewer, name) =>
@@ -43,6 +55,7 @@ export function createViewerApi(): ViewerApi {
     hideSession: (viewer, name) =>
       Promise.resolve(sessions.hideSession(viewer, name)),
     holdMenuShortcuts: (viewer, held) => menuShortcutHold(viewer, held),
+    takeLaunchRepo: (viewer) => launchRepoClaim(viewer),
   };
 }
 
@@ -56,6 +69,7 @@ export function viewerHandlers(
     [IPC.showSession]: api.showSession,
     [IPC.hideSession]: api.hideSession,
     [IPC.holdMenuShortcuts]: api.holdMenuShortcuts,
+    [IPC.takeLaunchRepo]: api.takeLaunchRepo,
   };
 }
 
