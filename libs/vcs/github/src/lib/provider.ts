@@ -21,7 +21,7 @@ import type {
   PullRequestDetail,
   MergedBranchHeads,
 } from '@n10/vcs-core';
-import { sanitizeBody, VcsError } from '@n10/vcs-core';
+import { mergedHeadCommit, sanitizeBody, VcsError } from '@n10/vcs-core';
 import { searchGitHubMentions } from './mentions.js';
 import { GITHUB_EVENTS, publishGitHubReview } from './pr-review-publisher.js';
 import { classifyGhError, parseGhJson } from './gh-errors.js';
@@ -785,12 +785,11 @@ export const githubProvider: VcsProvider = {
     const branchSet = new Set(branches);
     const matched: MergedBranchHeads = new Map();
     for (const pr of await fetchMergedHeads(searchQuery)) {
-      // A pull request without its head commit vouches for nothing.
-      if (!branchSet.has(pr.headRefName) || !pr.headRefOid) continue;
-      matched.set(pr.headRefName, [
-        ...(matched.get(pr.headRefName) ?? []),
-        pr.headRefOid,
-      ]);
+      if (!branchSet.has(pr.headRefName)) continue;
+      // Merged either way; only a full commit id vouches for commits.
+      const heads = matched.get(pr.headRefName) ?? [];
+      const head = mergedHeadCommit(pr.headRefOid);
+      matched.set(pr.headRefName, head ? [...heads, head] : heads);
     }
     return matched;
   },

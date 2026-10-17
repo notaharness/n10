@@ -76,6 +76,7 @@ type AutoDelete = (
 
 /** Why the sweep leaves a merged branch, as the log says it. */
 const SKIPPED: Record<Exclude<MergedTip, { tip: string }>['skip'], string> = {
+  'no-head': 'its merged pull request named no head commit',
   'no-tip': 'git cannot find its tip',
   'new-work': 'it has commits its merged pull request did not',
   'unknown-head': 'the head of its merged pull request is not in this clone',

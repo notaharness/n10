@@ -5,7 +5,7 @@ import { fetchRefs } from './fetch-queue.js';
  *  the sweep may remove at. */
 export type MergedTip =
   | { tip: string }
-  | { skip: 'no-tip' | 'new-work' | 'unknown-head' };
+  | { skip: 'no-head' | 'no-tip' | 'new-work' | 'unknown-head' };
 
 /**
  * The merged heads git has in the repository at `checkout`, fetching
@@ -30,9 +30,10 @@ async function reachableHeads(
 /**
  * The branch's tip, when a merged pull request carried all of it: the
  * merged head itself, or an ancestor of one (someone pushed to the pull
- * request after this checkout last pulled). Otherwise why not: git has
- * no tip for the branch, the branch has work no merged pull request
- * had, or a merged head git cannot get leaves it unable to tell.
+ * request after this checkout last pulled). Otherwise why not: no
+ * merged pull request named its head, git has no tip for the branch,
+ * the branch has work no merged pull request had, or a merged head git
+ * cannot get leaves it unable to tell.
  */
 export async function mergedTip(
   branch: string,
@@ -40,6 +41,7 @@ export async function mergedTip(
   checkout: string,
   repo: string
 ): Promise<MergedTip> {
+  if (heads.length === 0) return { skip: 'no-head' };
   const tip = await branchTip(branch, checkout);
   if (!tip) return { skip: 'no-tip' };
   if (heads.includes(tip)) return { tip };

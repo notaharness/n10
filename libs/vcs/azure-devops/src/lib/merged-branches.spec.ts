@@ -59,7 +59,7 @@ describe('fetchMergedBranches', () => {
     );
   });
 
-  it('leaves out a pull request that came back without its source commit', async () => {
+  it('keeps a branch merged whose pull request came back without its source commit', async () => {
     mockFetch.mockResolvedValue(
       completedPrs([{ sourceRefName: 'refs/heads/feat-a' }])
     );
@@ -70,6 +70,32 @@ describe('fetchMergedBranches', () => {
       ['feat-a']
     );
 
-    expect(merged?.size).toBe(0);
+    // The badge shows; with no head, nothing vouches for its commits.
+    expect(merged).toEqual(new Map([['feat-a', []]]));
+  });
+
+  // Heads reach `git fetch origin <head>` and `git rev-parse`: an option
+  // or a ref name there is not a commit the pull request merged.
+  it('accepts only full commit ids as heads, lowercased', async () => {
+    const pr = (commitId: string) => ({
+      sourceRefName: 'refs/heads/feat-a',
+      lastMergeSourceCommit: { commitId },
+    });
+    mockFetch.mockResolvedValue(
+      completedPrs([
+        pr('--upload-pack=touch /tmp/x'),
+        pr('HEAD'),
+        pr('abc123'),
+        pr('E'.repeat(40)),
+      ])
+    );
+
+    const merged = await azureDevOpsProvider.fetchMergedBranches?.(
+      auth,
+      project,
+      ['feat-a']
+    );
+
+    expect(merged).toEqual(new Map([['feat-a', ['e'.repeat(40)]]]));
   });
 });

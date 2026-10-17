@@ -203,6 +203,19 @@ describe('sweepMergedBranches', () => {
     expect(env.deleted).toEqual([]);
   });
 
+  it('leaves a branch whose merged pull request named no head', async () => {
+    const result = await sweep({
+      provider: {
+        fetchMergedBranches: () =>
+          Promise.resolve(new Map([['feature/a', []]])),
+      } as unknown as VcsProvider,
+    });
+    expect(env.deleted).toEqual([]);
+    expect(env.checks).toBe(0);
+    // Its pull request did merge: the badge stays.
+    expect([...result.merged]).toEqual(['feature/a']);
+  });
+
   it('leaves a branch git cannot find a tip for', async () => {
     env.tips = { 'feature/a': null };
     await sweep();

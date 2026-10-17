@@ -17,7 +17,7 @@ import type {
   ReviewSubmission,
   MergedBranchHeads,
 } from '@n10/vcs-core';
-import { sanitizeBody } from '@n10/vcs-core';
+import { mergedHeadCommit, sanitizeBody } from '@n10/vcs-core';
 import { log } from '@n10/logger';
 import type { AdoConfig } from './client.js';
 import { authHeaders, baseUrl } from './client.js';
@@ -988,10 +988,11 @@ export const azureDevOpsProvider: VcsProvider = {
     const matched: MergedBranchHeads = new Map();
     for (const pr of data.value ?? []) {
       const source = (pr.sourceRefName ?? '').replace(/^refs\/heads\//, '');
-      const head = pr.lastMergeSourceCommit?.commitId;
-      // A pull request without its head commit vouches for nothing.
-      if (!branchSet.has(source) || !head) continue;
-      matched.set(source, [...(matched.get(source) ?? []), head]);
+      if (!branchSet.has(source)) continue;
+      // Merged either way; only a full commit id vouches for commits.
+      const heads = matched.get(source) ?? [];
+      const head = mergedHeadCommit(pr.lastMergeSourceCommit?.commitId);
+      matched.set(source, head ? [...heads, head] : heads);
     }
     return matched;
   },

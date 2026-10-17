@@ -143,9 +143,23 @@ export interface VcsConfigField {
  * Merged pull requests by source branch, each with the head commit it
  * carried when it merged — a branch merged more than once lists every
  * one. A merge vouches for those commits, not for the branch name: the
- * branch may have taken new work since.
+ * branch may have taken new work since. A branch whose pull requests
+ * named no usable head is still merged, with no heads.
  */
 export type MergedBranchHeads = Map<string, string[]>;
+
+const FULL_COMMIT_ID = /^[0-9a-f]{40}$/i;
+
+/**
+ * A provider's merged head as a full commit id, lowercased, or null.
+ * Anything else vouches for nothing: it would reach Git as an option
+ * (`--upload-pack=…`) or resolve as a ref name (`HEAD`).
+ */
+export function mergedHeadCommit(oid: unknown): string | null {
+  return typeof oid === 'string' && FULL_COMMIT_ID.test(oid)
+    ? oid.toLowerCase()
+    : null;
+}
 
 export interface VcsProvider {
   readonly id: string;
