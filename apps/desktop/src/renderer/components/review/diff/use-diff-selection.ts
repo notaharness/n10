@@ -3,8 +3,12 @@ import { useEffect, useState, type RefObject } from 'react';
 /** A selection inside one line, as character offsets into its code. */
 interface LineRange {
   code: HTMLElement;
+  /** The line's text when selected: a refresh can reuse the element. */
+  text: string;
   start: number;
   end: number;
+  /** Focus before anchor, as a right-to-left drag or Shift+Left makes. */
+  backward: boolean;
 }
 
 interface CodeSelection extends LineRange {
@@ -26,7 +30,15 @@ function lineRange(root: HTMLElement): LineRange | null {
   before.selectNodeContents(code);
   before.setEnd(range.startContainer, range.startOffset);
   const start = before.toString().length;
-  return { code, start, end: start + selection.toString().length };
+  return {
+    code,
+    text: code.textContent ?? '',
+    start,
+    end: start + selection.toString().length,
+    backward:
+      selection.anchorNode === range.endContainer &&
+      selection.anchorOffset === range.endOffset,
+  };
 }
 
 function codeSelection(line: LineRange | null): CodeSelection | null {
@@ -37,7 +49,24 @@ function codeSelection(line: LineRange | null): CodeSelection | null {
 }
 
 function sameRange(a: LineRange | null, b: LineRange | null): boolean {
-  return a?.code === b?.code && a?.start === b?.start && a?.end === b?.end;
+  return (
+    a?.code === b?.code &&
+    a?.start === b?.start &&
+    a?.end === b?.end &&
+    a?.backward === b?.backward
+  );
+}
+
+/** A live selection outside the line: the reader has moved on. A range
+ *  on nodes React removed is not one; it is what restoring repairs. */
+function movedOn(selection: Selection, code: HTMLElement): boolean {
+  const { anchorNode, focusNode } = selection;
+  return (
+    !selection.isCollapsed &&
+    [anchorNode, focusNode].every(
+      (node) => node?.isConnected && !code.contains(node)
+    )
+  );
 }
 
 function positionAt(code: HTMLElement, offset: number): [Node, number] | null {
@@ -53,16 +82,20 @@ function positionAt(code: HTMLElement, offset: number): [Node, number] | null {
 }
 
 function restore(root: HTMLElement, line: LineRange) {
-  if (!line.code.isConnected || sameRange(lineRange(root), line)) return;
+  const selection = window.getSelection();
+  if (
+    !selection ||
+    !line.code.isConnected ||
+    line.code.textContent !== line.text ||
+    movedOn(selection, line.code) ||
+    sameRange(lineRange(root), line)
+  )
+    return;
   const start = positionAt(line.code, line.start);
   const end = positionAt(line.code, line.end);
   if (!start || !end) return;
-  const range = document.createRange();
-  range.setStart(...start);
-  range.setEnd(...end);
-  const selection = window.getSelection();
-  selection?.removeAllRanges();
-  selection?.addRange(range);
+  const [anchor, focus] = line.backward ? [end, start] : [start, end];
+  selection.setBaseAndExtent(...anchor, ...focus);
 }
 
 /**
@@ -76,6 +109,8 @@ export function useDiffSelection(
   const [selected, setSelected] = useState<CodeSelection | null>(null);
 
   useEffect(() => {
+    // DiffPane renders the scroller unconditionally beside this hook, so
+    // the element found here stays for the effect's lifetime.
     const root = scrollRef.current;
     if (!root) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -93,9 +128,8 @@ export function useDiffSelection(
       timer = setTimeout(capture, 80);
     };
     const pointerDown = (event: PointerEvent) => {
-      if (!root.contains(event.target as Node)) return;
       held = null;
-      setSelected(null);
+      if (root.contains(event.target as Node)) setSelected(null);
     };
     const mouseUp = () => {
       clearTimeout(timer);

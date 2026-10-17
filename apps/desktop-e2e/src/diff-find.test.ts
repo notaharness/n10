@@ -144,6 +144,26 @@ test('dragging a word highlights its other occurrences', async ({
   ).toHaveCount(1);
 });
 
+// Syntax tokens often land mid-drag; the restored selection must keep
+// its direction or the drag stops extending.
+test('dragging a word right to left highlights its other occurrences', async ({
+  desktop,
+}) => {
+  const { page } = desktop;
+  await openDiff(page);
+  const bounds = await wordBounds(page, 'something', 'something', 1);
+  await page.mouse.move(bounds.x + bounds.width - 1, bounds.y);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + 2, bounds.y, { steps: 40 });
+  await page.mouse.up();
+  await expect
+    .poll(() => page.evaluate(() => getSelection()?.toString()))
+    .toBe('something');
+  await expect(
+    selectionMarks(page).filter({ hasText: /^Something$/ })
+  ).toHaveCount(1);
+});
+
 test('find and text selection retain separate highlights', async ({
   desktop,
 }) => {
