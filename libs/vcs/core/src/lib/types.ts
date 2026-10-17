@@ -139,6 +139,14 @@ export interface VcsConfigField {
   masked?: boolean;
 }
 
+/**
+ * Merged pull requests by source branch, each with the head commit it
+ * carried when it merged — a branch merged more than once lists every
+ * one. A merge vouches for those commits, not for the branch name: the
+ * branch may have taken new work since.
+ */
+export type MergedBranchHeads = Map<string, string[]>;
+
 export interface VcsProvider {
   readonly id: string;
   readonly displayName: string;
@@ -210,12 +218,13 @@ export interface VcsProvider {
    */
   repositoryRef?(project: Record<string, string>): RepositoryRef | null;
 
-  /** Return branch names (from the provided list) whose PRs have been merged */
+  /** The branches (of those given) whose pull requests merged, each
+   *  with the head commits those pull requests merged. */
   fetchMergedBranches?(
     auth: Record<string, string>,
     project: Record<string, string>,
     branches: string[]
-  ): Promise<Set<string>>;
+  ): Promise<MergedBranchHeads>;
 
   /** Fetch all comment threads for a PR (inline + general) */
   fetchCommentThreads?(
@@ -318,7 +327,6 @@ export interface VcsProvider {
     project: Record<string, string>,
     prId: number
   ): Promise<PullRequestChecks>;
-
 }
 
 // ── Remote comment threads (fetched from VCS providers) ───────────
