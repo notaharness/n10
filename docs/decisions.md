@@ -1570,6 +1570,16 @@ reports, so `lib/terminals/scheme-reports.ts` adds them with parser hooks:
 headless emulators answer nothing, so a session no window has mounted is not
 told of a switch while it happens.
 
+A terminal knows mode 2031 is set only from the output it has parsed. tmux
+3.6 sets it, and asks `CSI ? 996 n`, in the same start-up output as the
+alternate screen and bracketed paste: the client's first output, which the
+relay keeps ahead of its ring, so a terminal mounted from a truncated snapshot
+has it too. Replaying that head answers the `?996n` again, so a remount tells
+tmux the current scheme, even one that changed while nothing was mounted;
+tmux takes a repeated report as a prompt to ask for colours again, which is
+harmless. A session mounted in two windows answers each query and sends each
+switch from both; tmux reads the duplicates the same way.
+
 tmux is that program: it asks its client for colours when the client
 attaches (again on a resize, at most every 30 seconds) and answers its panes'
 OSC 10/11 from what it last read. Only tmux 3.6 and later set mode 2031 on the
