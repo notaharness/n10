@@ -127,7 +127,7 @@ Create's PRF failure says **This passkey could not finish setup.** and “Your b
 or passkey provider did not return the encryption data beam needs (WebAuthn PRF).
 Fleet creation is not complete. A passkey may still be saved.” **Start again** is
 explained by “This restarts both passkey prompts.” **Passkey compatibility** links
-to the maintained compatibility section below. Other create failures retain their
+to `https://beam.n10.is/#compat`, available outside a ceremony. Other create failures retain their
 code-specific explanation and use the same restart action when retryable.
 Join/revoke PRF failures say **This passkey could not complete the request.** and
 “Update your browser and passkey manager, then start a fresh request.” Passkey

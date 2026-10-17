@@ -125,7 +125,7 @@ export function CeremonyFailure({
       {copy.actions.includes('compatibility') && (
         <Button variant="link" className="h-auto p-0" asChild>
           <a
-            href="https://github.com/notaharness/n10/blob/master/docs/design/beam-fleet-ux.md#7-compatibility-evidence-and-exact-user-facing-help"
+            href="https://beam.n10.is/#compat"
             onClick={(event) => {
               event.preventDefault();
               openLink(event.currentTarget.href);
