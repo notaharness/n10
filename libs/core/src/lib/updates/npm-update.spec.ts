@@ -11,6 +11,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { npmUpdateFixture } from '../../testing/npm-update.js';
@@ -35,6 +36,22 @@ afterEach(async () => {
   await fixture.close();
   rmSync(fixture.home, { recursive: true, force: true });
 });
+
+function stdinTty() {
+  const input = Object.assign(new EventEmitter(), {
+    isTTY: true,
+    setRawMode: vi.fn(),
+    resume: vi.fn(),
+    pause: vi.fn(),
+  });
+  vi.spyOn(process, 'stdin', 'get').mockReturnValue(
+    input as unknown as typeof process.stdin
+  );
+  return input;
+}
+
+const installed = () =>
+  JSON.parse(readFileSync(join(fixture.root, 'package.json'), 'utf8')).version;
 
 describe.skipIf(process.platform === 'win32')('npm update transaction', () => {
   it('installs the pinned package using real npm, records the result', async () => {
@@ -185,4 +202,67 @@ describe.skipIf(process.platform === 'win32')('npm update transaction', () => {
       expect(readNpmUpdateResult(fixture.root)).toBeNull();
     }
   );
+
+  it('cancels on the first Ctrl-C, ignores the next, and npm rolls back', async () => {
+    const input = stdinTty();
+    const plan = await prepareNpmUpdate(fixture.root, fixture.version);
+    fixture.scenario.holdTarball = true;
+    const onCancel = vi.fn();
+    const run = runNpmUpdate(plan, { onCancel });
+    await vi.waitFor(() => expect(fixture.requests).toContain('/n10.tgz'), {
+      timeout: 15000,
+    });
+    input.emit('data', '\x03');
+    input.emit('data', '\x03');
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    fixture.releaseDownload();
+    expect(await run).toMatchObject({ status: 'failed' });
+    expect(installed()).toBe('1.0.0-beta.1');
+    expect(existsSync(join(fixture.root, 'main.js'))).toBe(true);
+    expect(input.setRawMode).toHaveBeenLastCalledWith(false);
+  }, 30000);
+
+  it.each([
+    ['npm succeeds', false, 'succeeded'],
+    ['npm fails', true, 'failed'],
+  ] as const)(
+    'restores cooked mode when %s',
+    async (_, fail, status) => {
+      const input = stdinTty();
+      const plan = await prepareNpmUpdate(fixture.root, fixture.version);
+      const listeners = process.listenerCount('SIGHUP');
+      fixture.scenario.fail = fail;
+      expect(await runNpmUpdate(plan)).toMatchObject({ status });
+      expect(input.setRawMode.mock.calls).toEqual([[true], [false]]);
+      expect(input.listenerCount('data')).toBe(0);
+      expect(process.listenerCount('SIGHUP')).toBe(listeners);
+    },
+    30000
+  );
+
+  it('absorbs a hangup during npm and restores cooked mode afterwards', async () => {
+    const input = stdinTty();
+    const plan = await prepareNpmUpdate(fixture.root, fixture.version);
+    const listeners = process.listenerCount('SIGHUP');
+    fixture.scenario.holdTarball = true;
+    const run = runNpmUpdate(plan);
+    await vi.waitFor(() => expect(fixture.requests).toContain('/n10.tgz'), {
+      timeout: 15000,
+    });
+    process.emit('SIGHUP');
+    fixture.releaseDownload();
+    expect(await run).toMatchObject({ status: 'succeeded' });
+    expect(input.setRawMode.mock.calls).toEqual([[true], [false]]);
+    expect(process.listenerCount('SIGHUP')).toBe(listeners);
+  }, 30000);
+
+  it('restores cooked mode when preflight rejects the update', async () => {
+    const input = stdinTty();
+    const plan = await prepareNpmUpdate(fixture.root, fixture.version);
+    expect(
+      await runNpmUpdate({ ...plan, prefix: join(fixture.home, 'elsewhere') })
+    ).toMatchObject({ status: 'failed' });
+    expect(input.setRawMode.mock.calls).toEqual([[true], [false]]);
+    expect(fixture.requests).toEqual([]);
+  }, 20000);
 });

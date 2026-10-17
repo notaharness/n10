@@ -206,6 +206,7 @@ export {
   readNpmUpdateResult,
 } from './lib/updates/npm-update.js';
 export type {
+  NpmUpdateOptions,
   NpmUpdatePlan,
   NpmUpdateResult,
 } from './lib/updates/npm-update.js';

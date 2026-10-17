@@ -1,4 +1,5 @@
 import { relaunchNpmApp } from './commands/relaunch-npm-app.js';
+import { showNpmUpdateCancelling } from './commands/npm-update-cancel.js';
 import { UpdatesContext } from './hooks/useUpdates.js';
 import type { UpdateService, NpmUpdatePlan } from '@n10/engine/contract';
 import { createInstalledUpdates, type RepositoryHandle } from '@n10/engine';
@@ -211,7 +212,9 @@ export async function runTui(args: string[], packageRoot = ''): Promise<void> {
       console.log(
         `Updating n10 to ${plan.version}… Your tmux agents keep running.`
       );
-      const result = await runNpmUpdate(plan);
+      const result = await runNpmUpdate(plan, {
+        onCancel: () => showNpmUpdateCancelling(),
+      });
       console.log(result.message);
       if (result.status === 'failed')
         console.error(`npm logs: ${result.logPath}`);

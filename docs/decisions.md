@@ -1519,18 +1519,26 @@ existing process then starts the installed entry point with inherited stdio and
 exits with its status. Pausing stdin matters: removing stream listeners alone
 does not stop a flowing stream from consuming the replacement's input. Ordinary
 TUI launches have no parent launcher or detached updater. During npm and the
-replacement session the parent absorbs tty SIGINT/SIGHUP (the foreground child
-already receives them), forwards SIGTERM, and waits for child completion.
-Ctrl-C leaves npm time to finish its native interruption cleanup, including
-pending I/O and rollback, before recording a failure and reopening n10. Keeping
-the parent alive also prevents a PTY session leader's exit from hanging up npm
-mid-install. Replacement exits use the shared launcher's exit-status mapping,
-including 128 plus the terminating signal. On a stalled download, npm ignores
-the first Ctrl-C until its fetch finishes or gives up; n10 imposes no mutation
-timeout. A second Ctrl-C can terminate npm before rollback and leave the
-installation incomplete, just as a manual npm install can. Both shells check
-that `main.js` exists before relaunching; if it is missing, they exit with status
-1 and print the pinned manual retry command last.
+replacement session the parent absorbs tty SIGHUP (the foreground child
+already receives it), forwards SIGTERM, and waits for child completion.
+While npm runs, core holds a tty stdin in raw mode, so the terminal raises no
+SIGINT and n10 reads Ctrl-C itself. The first Ctrl-C sends npm one SIGINT and
+both shells print **Cancelling update…** with the detail to keep n10 open; later
+presses are ignored, because npm handles only the first SIGINT and a second one
+terminates it mid-rollback. Without a tty on stdin the parent absorbs SIGINT
+like SIGHUP. Cooked mode returns when npm exits, fails or the
+update errors; a hung-up tty has no mode to restore. Ctrl-C leaves npm time to
+finish its native interruption cleanup, including pending I/O and rollback,
+before recording a failure and reopening n10. On a stalled download, npm defers
+that cleanup until its fetch finishes or gives up; n10 imposes no mutation
+timeout. npm exposes no signal for the moment rollback starts, so the cancelling
+detail stays until npm exits. Keeping the parent alive also prevents a PTY
+session leader's exit from hanging up npm mid-install. Replacement exits use the
+shared launcher's exit-status mapping, including 128 plus the terminating
+signal. npm killed by anything else before rollback leaves the installation
+incomplete, just as a manual npm install can. Both shells check that `main.js`
+exists before relaunching; if it is missing, they exit with status 1 and print
+the pinned manual retry command last.
 
 Desktop uses its existing Node launcher. The accepted `will-quit` path writes a
 private request, drains the host, and exits with the update handoff code. Choosing
