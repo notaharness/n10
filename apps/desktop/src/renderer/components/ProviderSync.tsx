@@ -121,8 +121,8 @@ function SyncDetails({
         <h2 className="text-lg font-semibold">{name} pull request sync</h2>
         <p className="text-base text-muted-foreground">
           Open pull requests, reviews and checks refresh about every{' '}
-          {cadence(sync.remoteIntervalMs)} while this repository is open and the
-          window is visible.
+          {cadence(Math.max(sync.remoteIntervalMs, 4_000))} while this
+          repository is open and the window is visible.
         </p>
       </div>
       <div className="space-y-3 text-base">
@@ -151,16 +151,17 @@ function SyncDetails({
           </div>
         )}
         <p className="text-sm text-muted-foreground">
-          Git updates, Merged badges and automatic worktree cleanup run about
-          every {cadence(sync.maintenanceIntervalMs)} while this repository is
-          open. Refresh now runs these checks too.
+          Git updates and Merged checks run about every{' '}
+          {cadence(sync.maintenanceIntervalMs)} while this repository is open.
+          Refresh now runs these checks too. Worktree cleanup runs only when
+          auto-delete is enabled.
         </p>
         <p className="text-sm text-muted-foreground">
           Sync never pushes commits or publishes draft comments.
         </p>
       </div>
       <div className="flex flex-wrap justify-end gap-2">
-        {sync.remoteError && (
+        {sync.remoteErrorSource === 'provider' && (
           <PopoverClose asChild>
             <Button variant="outline" onClick={onOpenSettings}>
               Open Settings

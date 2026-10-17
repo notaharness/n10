@@ -47,6 +47,7 @@ const env = vi.hoisted(() => ({
   }[],
   fetchCount: 0,
   maintenanceCount: 0,
+  maintenanceError: null as string | null,
   forgetCount: 0,
   /** The provider's side, in order: `start`, `end`, `forget`. */
   events: [] as string[],
@@ -105,7 +106,7 @@ vi.mock('./remote-sync.js', () => ({
     merged: new Set<string>(),
     conflicts: new Map<string, number>(),
     lastGitSyncAt: cwd === '/parked' ? 7 : 42,
-    error: null,
+    error: env.maintenanceError,
     loading: false,
   }),
 }));
@@ -162,6 +163,7 @@ beforeEach(async () => {
   env.pending = [];
   env.fetchCount = 0;
   env.maintenanceCount = 0;
+  env.maintenanceError = null;
   env.forgetCount = 0;
   env.events = [];
   env.now = 1_000_000;
@@ -236,6 +238,14 @@ describe('sync state', () => {
     }
   );
 
+  it('identifies maintenance failures separately from provider failures', () => {
+    env.maintenanceError = 'git fetch failed';
+    expect(sidebar.getSyncState(env.cwd)).toMatchObject({
+      remoteError: 'git fetch failed',
+      remoteErrorSource: 'maintenance',
+    });
+  });
+
   it('does not call the provider at all when it is not configured', async () => {
     env.configured = false;
     await listSidebarItems();
@@ -248,7 +258,11 @@ describe('sync state', () => {
     await flush();
     env.pending[0].reject(new Error('provider exploded'));
     await bad;
-    expect(sidebar.getSyncState(env.cwd).remoteError).toBe('provider exploded');
+    env.maintenanceError = 'git fetch failed';
+    expect(sidebar.getSyncState(env.cwd)).toMatchObject({
+      remoteError: 'provider exploded',
+      remoteErrorSource: 'provider',
+    });
   });
 });
 

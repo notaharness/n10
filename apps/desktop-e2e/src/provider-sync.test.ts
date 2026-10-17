@@ -40,7 +40,7 @@ test('automatic PR sync explains its scope and offers an immediate recheck', asy
   await expect(dialog).toContainText('about every hour');
   await expect(dialog).toContainText('window is visible');
   await expect(dialog).toContainText(
-    'Merged badges and automatic worktree cleanup'
+    'Worktree cleanup runs only when auto-delete is enabled.'
   );
   await expect(dialog).toContainText('run about every 10 minutes');
   await expect(dialog).toContainText('Refresh now runs these checks too.');
@@ -153,6 +153,7 @@ test.describe('Azure DevOps status presentation', () => {
         remoteIntervalMs: 60_000,
         maintenanceIntervalMs: 300_000,
         remoteFetches: 1,
+        remoteErrorSource: 'provider',
         remoteError:
           'Azure DevOps rejected the access token. Update it in Settings.',
       }));
@@ -209,6 +210,7 @@ test('missing credentials keep their warning and Settings tooltip on hover', asy
       maintenanceIntervalMs: 300_000,
       remoteFetches: 0,
       remoteError: null,
+      remoteErrorSource: null,
     }));
   });
   const status = page.getByRole('button', {
@@ -226,4 +228,37 @@ test('missing credentials keep their warning and Settings tooltip on hover', asy
   await expect(status).toHaveCSS('color', warningColor);
   await status.click();
   await expect(tab(page, /Settings/)).toBeVisible();
+});
+
+test('maintenance failures offer retry without provider settings and respect the sidebar cadence', async ({
+  desktop,
+}) => {
+  const { app, page } = desktop;
+  await app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('n10/sidebar/sync-state');
+    ipcMain.handle('n10/sidebar/sync-state', () => ({
+      providerId: 'github',
+      providerConfigured: true,
+      lastRemoteSyncAt: Date.now(),
+      lastGitSyncAt: null,
+      remoteSyncing: false,
+      remoteIntervalMs: 1_000,
+      maintenanceIntervalMs: 600_000,
+      remoteFetches: 1,
+      remoteError: "Couldn't fetch from origin",
+      remoteErrorSource: 'maintenance',
+    }));
+  });
+  await page
+    .getByRole('button', { name: 'GitHub PR sync: Sync failed' })
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'GitHub pull request sync' });
+  await expect
+    .soft(dialog.getByRole('button', { name: 'Open Settings' }))
+    .toHaveCount(0);
+  await expect.soft(dialog).toContainText('refresh about every 4 seconds');
+  await expect(dialog.getByRole('alert')).toContainText(
+    "Couldn't fetch from origin"
+  );
+  await expect(dialog.getByRole('button', { name: 'Retry now' })).toBeEnabled();
 });

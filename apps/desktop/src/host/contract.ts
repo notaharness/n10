@@ -304,6 +304,8 @@ export interface SyncState {
   /** ms-epoch of the last git sync pass (fetch + ff main), null if never. */
   lastGitSyncAt: number | null;
   remoteError: string | null;
+  /** Source of the displayed error; PR-provider errors take precedence. */
+  remoteErrorSource: 'provider' | 'maintenance' | null;
   remoteSyncing: boolean;
   /** PR refresh interval in ms (from config). */
   remoteIntervalMs: number;
@@ -313,8 +315,8 @@ export interface SyncState {
    * Provider fetches this process has started, successful or not.
    *
    * Monotonic and diagnostic: it is how "did that actually go and
-   * ask?" gets a yes or no. A test cannot tell a refetch from a cache hit by watching
-   * `lastRemoteSyncAt`, which only moves when a fetch succeeds.
+   * ask?" gets a yes or no. A test cannot tell a refetch from a cache
+   * hit by watching `lastRemoteSyncAt`, which only moves on success.
    */
   remoteFetches: number;
 }

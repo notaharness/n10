@@ -111,6 +111,11 @@ export function getSyncState(cwd: string): SyncState {
     lastRemoteSyncAt: remote.fetchedAt,
     lastGitSyncAt: decorations.lastGitSyncAt,
     remoteError: remote.error ?? decorations.error,
+    remoteErrorSource: remote.error
+      ? 'provider'
+      : decorations.error
+      ? 'maintenance'
+      : null,
     remoteSyncing: remote.refreshing || decorations.loading,
     remoteIntervalMs: pullRequestPollIntervalMs(config.prPollInterval),
     maintenanceIntervalMs: remoteSyncIntervalMs(config.mergePollInterval),
