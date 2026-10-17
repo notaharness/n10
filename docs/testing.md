@@ -112,14 +112,20 @@ at teardown. Seed no Azure DevOps token of your own alongside it. Provider proje
 or auto-detection replaces them.
 
 The suite is offline. `fixtures/network-guard.cjs`, loaded into the main
-process (`-r`) and the session host, refuses every connection to GitHub or
-Azure DevOps that gets past the fakes: Node sockets in both processes,
-Chromium's requests through each session's `webRequest`, and provider URLs
-handed to `shell.openExternal`, which would start the system browser. A refusal fails the
+process (`-r`) and the session host, refuses every connection off the machine
+that gets past the fakes (GitHub, Azure DevOps, the npm registry's update
+check, anything else): Node sockets in both processes, Chromium's requests
+through each session's `webRequest`, and every URL handed to
+`shell.openExternal`, which would start the system browser. Loopback stays
+open for the fakes that listen there. A refusal fails the
 test at teardown and is attached as `network-refusals`; a test that provokes
 one on purpose takes it with `takeNetworkRefusals`. The fixture runs no test
 without the guard in both processes. A test given `githubToken` runs unguarded,
-since it reaches GitHub on purpose. The fake Azure DevOps answers 401 to any
+since it reaches GitHub on purpose. Processes that are not Node (`git`, the
+`beam` daemon) are outside the guard: test repositories have only local
+remotes, and a `beam daemon` with no fleet makes no connection, so the
+offline fleet tests use the fake control socket and `@beam` beam's local
+testkit. The fake Azure DevOps answers 401 to any
 token but `acceptedPat` (by default the one it hands the app), as Azure does
 for a revoked one.
 

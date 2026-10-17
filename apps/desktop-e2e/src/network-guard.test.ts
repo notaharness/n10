@@ -1,11 +1,13 @@
 import { test, expect } from './fixtures/desktop.js';
+import { fakeUpdateRegistry } from './setup/fake-update-registry.js';
 import { takeNetworkRefusals } from './setup/network-guard.js';
 
 /**
- * The suite is offline: whatever gets past the fakes to a provider's
- * servers is refused and fails the test (`fixtures/network-guard.cjs`).
- * Here each process that could make such a request makes one, and the
- * test takes the refusals so that they do not fail it.
+ * The suite is offline: whatever gets past the fakes to another machine
+ * is refused and fails the test (`fixtures/network-guard.cjs`). Here
+ * each process that could make such a request makes one, and the test
+ * takes the refusals so that they do not fail it. Loopback, where the
+ * fakes listen, stays open.
  */
 
 test.describe('Network guard', () => {
@@ -23,7 +25,7 @@ test.describe('Network guard', () => {
     },
   });
 
-  test('refuses a provider to the session host, the main process, the window and the browser', async ({
+  test('refuses a remote host to the session host, the main process, the window and the browser', async ({
     desktop,
   }) => {
     const { app, page, homeDir } = desktop;
@@ -45,6 +47,14 @@ test.describe('Network guard', () => {
       )
     );
     expect(main).toBe('refused');
+    // Not only a provider: the update check's registry, too.
+    const registry = await app.evaluate(() =>
+      fetch('https://registry.npmjs.org/').then(
+        () => 'reached',
+        () => 'refused'
+      )
+    );
+    expect(registry).toBe('refused');
 
     // Chromium's, from the window and from the main process. `no-cors`
     // resolves on any answer, so only a refusal rejects.
@@ -71,12 +81,40 @@ test.describe('Network guard', () => {
       .poll(refusals)
       .toContain('browser: openExternal https://github.com/n10/fixture/pull/1');
 
+    // A link off the providers, too: n10's own site.
+    await app.evaluate(({ shell }) => shell.openExternal('https://n10.is/'));
+
     expect(refusals()).toEqual(
       expect.arrayContaining([
         'browser: a connection to api.github.com',
+        'browser: a connection to registry.npmjs.org',
+        'browser: openExternal https://n10.is/',
         'browser: GET https://github.com/',
         'browser: GET https://dev.azure.com/',
       ])
     );
   });
+});
+
+test('the network guard leaves loopback, where the fakes listen, open', async ({
+  desktop,
+}) => {
+  const { app, homeDir } = desktop;
+  const server = await fakeUpdateRegistry();
+  try {
+    // Node's fetch and Chromium's (`net`), from the main process.
+    const node = await app.evaluate(
+      (_, url) => fetch(url).then((r) => r.status),
+      server.url
+    );
+    const chromium = await app.evaluate(
+      ({ net }, url) => net.fetch(url).then((r) => r.status),
+      server.url
+    );
+    expect([node, chromium]).toEqual([200, 200]);
+    expect(server.requests).toHaveLength(2);
+    expect(takeNetworkRefusals(homeDir)).toEqual([]);
+  } finally {
+    await server.close();
+  }
 });

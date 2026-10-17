@@ -1,23 +1,25 @@
 /**
- * Refuses every connection the app under test makes to a pull-request
- * provider's servers, and says so.
+ * Refuses every connection the app under test makes off this machine,
+ * and says so.
  *
  * The suite runs offline: GitHub is a fake `gh` on PATH, Azure DevOps a
- * fake `fetch` in the session host. A request that gets past them — a
- * provider pointed at a real organization, a fake that did not load, a
- * code path that talks to a host directly — would otherwise reach the
- * real service and pass or fail on what it answered. This refuses it
- * and writes it to `$N10_NETWORK_GUARD.log`, which fails the test
- * (`setup/network-guard.ts`).
+ * fake `fetch` in the session host, beam a fake control socket, the
+ * update registry a loopback server. A request that gets past them — a
+ * provider pointed at a real organization, a fake that did not load, an
+ * update check, a code path that talks to a host directly — would
+ * otherwise reach the real service and pass or fail on what it
+ * answered. This refuses it and writes it to `$N10_NETWORK_GUARD.log`,
+ * which fails the test (`setup/network-guard.ts`). Loopback is the
+ * fakes' and stays open.
  *
  * Loaded into the main process (`-r` on Electron's command line) and
  * the session host (`host-preload.cjs`). Every Node socket connects
  * through `net.Socket.prototype.connect` — `fetch` and `https` included
- * — so a provider host is refused there, in place of its DNS lookup.
+ * — so a remote host is refused there, in place of its DNS lookup.
  * In the main process Chromium's own requests (the windows, Electron's
- * `net`) are refused through each session's `webRequest`, and so is a
- * provider URL handed to `shell.openExternal`, which would otherwise
- * start the system browser at it.
+ * `net`) are refused through each session's `webRequest`, and so is
+ * every URL handed to `shell.openExternal`, which would otherwise start
+ * the system browser at it.
  *
  * It fails closed: each process writes `$N10_NETWORK_GUARD.<type>.loaded`
  * once it is in place, and the fixture runs no test without both.
@@ -28,18 +30,17 @@ const net = process.getBuiltinModule('node:net');
 
 const BASE = process.env.N10_NETWORK_GUARD;
 
-const PROVIDER =
-  /(^|\.)(github\.com|githubusercontent\.com|dev\.azure\.com|visualstudio\.com)\.?$/i;
+/** Hosts that stay on this machine: names and literals, bracketed or
+ *  not. */
+const LOOPBACK = /^(localhost|127(\.\d{1,3}){3}|\[?::1\]?)\.?$/i;
 
-/** The same hosts as Chromium match patterns. */
-const PROVIDER_URLS = [
-  'github.com',
-  '*.github.com',
-  '*.githubusercontent.com',
-  'dev.azure.com',
-  '*.dev.azure.com',
-  '*.visualstudio.com',
-].map((host) => `*://${host}/*`);
+function isLoopback(host) {
+  return LOOPBACK.test(host) || /\.localhost\.?$/i.test(host);
+}
+
+/** Chromium's requests that can leave the machine; the window itself
+ *  loads from `file:`. */
+const REMOTE_URLS = ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'];
 
 function refuse(what) {
   appendFileSync(`${BASE}.log`, `${process.type}: ${what}\n`);
@@ -63,7 +64,8 @@ function guardSockets() {
   net.Socket.prototype.connect = function guardedConnect(...args) {
     const [options, cb] = normalized(args);
     const { host } = options;
-    if (typeof host !== 'string' || !PROVIDER.test(host)) {
+    // No host is a pipe, a Unix socket or Node's default, localhost.
+    if (typeof host !== 'string' || isLoopback(host)) {
       return connect.apply(this, args);
     }
     const error = refuse(`a connection to ${host}`);
@@ -74,20 +76,19 @@ function guardSockets() {
   };
 }
 
-function isProviderUrl(url) {
+function isRemoteUrl(url) {
   try {
-    return PROVIDER.test(new URL(url).hostname);
+    return !isLoopback(new URL(url).hostname);
   } catch {
     return false;
   }
 }
 
-/** The app calls it as `void shell.openExternal(url)`, so a refusal
- *  resolves: nothing opens, and the log fails the test. */
+/** Nothing opens outside the app under test. The app calls it as
+ *  `void shell.openExternal(url)`, so a refusal resolves: nothing
+ *  opens, and the log fails the test. */
 function guardOpenExternal(shell) {
-  const openExternal = shell.openExternal;
-  shell.openExternal = function guardedOpenExternal(url, options) {
-    if (!isProviderUrl(url)) return openExternal.call(this, url, options);
+  shell.openExternal = function guardedOpenExternal(url) {
     refuse(`openExternal ${url}`);
     return Promise.resolve();
   };
@@ -99,8 +100,9 @@ function guardMain() {
   guardOpenExternal(shell);
   app.on('session-created', (session) => {
     session.webRequest.onBeforeRequest(
-      { urls: PROVIDER_URLS },
+      { urls: REMOTE_URLS },
       (details, callback) => {
+        if (!isRemoteUrl(details.url)) return callback({});
         refuse(`${details.method} ${details.url}`);
         callback({ cancel: true });
       }

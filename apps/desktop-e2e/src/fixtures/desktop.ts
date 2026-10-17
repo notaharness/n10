@@ -367,8 +367,8 @@ function launchArgs(guarded: boolean, webgl?: boolean): string[] {
 /** What a test that passed must not have left behind. An uncaught
  *  renderer exception blanks a pane behind the ErrorBoundary, which a
  *  passing assertion elsewhere would happily ignore; a request the
- *  Azure DevOps fake does not model was answered 404, and one to a
- *  provider's servers was refused — failures the test did not ask for. */
+ *  Azure DevOps fake does not model was answered 404, and one off this
+ *  machine was refused — failures the test did not ask for. */
 function afterEffects(
   pageErrors: string[],
   misses: string[],
@@ -388,7 +388,7 @@ function afterEffects(
   }
   if (refusals.length > 0) {
     throw new Error(
-      `The app reached for a provider's servers outside the fakes:\n${refusals.join(
+      `The app reached off this machine, past the fakes:\n${refusals.join(
         '\n'
       )}`
     );
