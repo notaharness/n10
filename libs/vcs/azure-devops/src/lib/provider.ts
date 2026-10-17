@@ -9,7 +9,6 @@ import type {
   PullRequestRef,
   RemoteCommentThread,
   RemoteCommentReply,
-  ReviewVerdict,
   BuildStatusState,
   RepositoryRef,
   MentionCandidate,
@@ -48,7 +47,7 @@ import {
   type RawAdoThread,
 } from './pr-conversation.js';
 import { fetchPrBuildRunsBatch } from './builds.js';
-import { publishAzureReview } from './pr-review-publisher.js';
+import { AZURE_EVENTS, publishAzureReview } from './pr-review-publisher.js';
 import {
   forgetPrDetails,
   forgetRepoDetails,
@@ -75,6 +74,8 @@ interface RawReviewer {
   vote?: number;
   hasDeclined?: boolean;
   isContainer?: boolean;
+  /** Set on a member who voted on behalf of a group reviewer. */
+  votedFor?: { uniqueName?: string }[];
 }
 
 function toAdoConfig(
@@ -112,16 +113,40 @@ function invalidatePr(config: AdoConfig, prId: number): void {
   invalidateAdoCache(`${repo}/thread/${prId}/`);
 }
 
-export function parseReviewer(raw: RawReviewer): PullRequestReviewer {
+/** The groups a reviewer's vote answered for, when there are any. */
+function votedFor(raw: RawReviewer): { votedFor?: string[] } {
+  const groups = (raw.votedFor ?? [])
+    .map((g) => g.uniqueName ?? '')
+    .filter(Boolean);
+  return groups.length > 0 ? { votedFor: groups } : {};
+}
+
+/**
+ * A reviewer as Azure lists it. A group — a team, in Azure's terms a
+ * container — is its own row carrying its own vote, which is whichever
+ * member voted for it; `myTeamIds` only marks the groups the signed-in
+ * user belongs to, so that a request to the group reads as a request
+ * to them. `viewerId` marks that user's own row, by identity rather
+ * than by email.
+ */
+export function parseReviewer(
+  raw: RawReviewer,
+  myTeamIds: ReadonlySet<string> = new Set(),
+  viewerId?: string | null
+): PullRequestReviewer {
   const vote = raw.vote ?? 0;
   const validVotes: ReviewerVote[] = [10, 5, 0, -5, -10];
   const normalizedVote = validVotes.includes(vote as ReviewerVote)
     ? (vote as ReviewerVote)
     : 0;
+  const mine = !!raw.isContainer && !!raw.id && myTeamIds.has(raw.id);
   return {
     displayName: raw.displayName ?? 'Unknown',
     identifier: raw.uniqueName ?? '',
     decision: voteToDecision(normalizedVote, raw.hasDeclined ?? false),
+    ...(viewerId ? { isViewer: raw.id === viewerId } : {}),
+    ...(mine ? { includesViewer: true } : {}),
+    ...votedFor(raw),
   };
 }
 
@@ -138,6 +163,22 @@ export type ParsedPullRequest = Omit<
   mergeKey: string;
 };
 
+/** Who wrote a pull request, and whether it was the signed-in account:
+ *  said only once Azure has named that account. */
+function authorOf(
+  createdBy: { id?: string; uniqueName?: string; displayName?: string } = {},
+  viewerId: string | null | undefined
+): Pick<
+  PullRequestInfo,
+  'createdByIdentifier' | 'createdByDisplayName' | 'viewerIsAuthor'
+> {
+  return {
+    createdByIdentifier: createdBy.uniqueName ?? '',
+    createdByDisplayName: createdBy.displayName ?? '',
+    ...(viewerId ? { viewerIsAuthor: createdBy.id === viewerId } : {}),
+  };
+}
+
 export function parsePullRequest(
   raw: {
     pullRequestId?: number;
@@ -146,11 +187,13 @@ export function parsePullRequest(
     targetRefName?: string;
     isDraft?: boolean;
     reviewers?: RawReviewer[];
-    createdBy?: { uniqueName?: string; displayName?: string };
+    createdBy?: { id?: string; uniqueName?: string; displayName?: string };
     lastMergeSourceCommit?: { commitId?: string };
     lastMergeTargetCommit?: { commitId?: string };
   },
-  project: Record<string, string>
+  project: Record<string, string>,
+  myTeamIds?: ReadonlySet<string>,
+  viewerId?: string | null
 ): ParsedPullRequest {
   const sourceBranch = (raw.sourceRefName ?? '').replace(/^refs\/heads\//, '');
   const targetBranch = (raw.targetRefName ?? '').replace(/^refs\/heads\//, '');
@@ -161,9 +204,10 @@ export function parsePullRequest(
     sourceBranch,
     targetBranch,
     isDraft: raw.isDraft ?? false,
-    reviewers: (raw.reviewers ?? []).map(parseReviewer),
-    createdByIdentifier: raw.createdBy?.uniqueName ?? '',
-    createdByDisplayName: raw.createdBy?.displayName ?? '',
+    reviewers: (raw.reviewers ?? []).map((r) =>
+      parseReviewer(r, myTeamIds, viewerId)
+    ),
+    ...authorOf(raw.createdBy, viewerId),
     url: `https://dev.azure.com/${project.org}/${project.project}/_git/${project.repo}/pullrequest/${prId}`,
     headSha: raw.lastMergeSourceCommit?.commitId,
     mergeKey: mergeIdentity(raw),
@@ -215,14 +259,10 @@ export function countActiveThreads(
 }
 
 interface ConnectionData {
-  authenticatedUser?: {
-    id?: string;
-    properties?: { Account?: { $value?: string } };
-  };
+  authenticatedUser?: { id?: string };
 }
 
-/** `/connectiondata` answers both "who am I" questions, so one cached
- *  read serves the email and the identity GUID alike. */
+/** Who the access token belongs to, cached for `TTL.identity`. */
 function fetchConnectionData(config: AdoConfig): Promise<ConnectionData> {
   return adoGet<ConnectionData>(
     'fetchConnectionData',
@@ -232,13 +272,6 @@ function fetchConnectionData(config: AdoConfig): Promise<ConnectionData> {
     authHeaders(config.pat),
     `organization ${config.org}`
   );
-}
-
-export async function fetchAuthenticatedUserEmail(
-  config: AdoConfig
-): Promise<string> {
-  const data = await fetchConnectionData(config);
-  return data.authenticatedUser?.properties?.Account?.$value ?? '';
 }
 
 /** The authenticated user's identity GUID — needed to cast a reviewer
@@ -252,59 +285,66 @@ export async function fetchAuthenticatedUserId(
   return id;
 }
 
-export async function fetchMyTeamIds(config: AdoConfig): Promise<Set<string>> {
+/** What Azure last said of the signed-in account, by read: who it is
+ *  and its teams decide which pull requests are the viewer's. */
+const lastIdentity = new Map<string, unknown>();
+
+/**
+ * An identity read that answers a failure with its last answer, else
+ * `none`. A failure must not take the pull request list down, nor move
+ * the viewer's pull requests between sidebar sections for a cycle: an
+ * identity changes far less often than reads fail.
+ */
+async function lastGoodIdentity<T>(
+  key: string,
+  read: () => Promise<T>,
+  none: T
+): Promise<T> {
   try {
-    const data = await adoGet<{ value?: { id?: string }[] }>(
-      'fetchMyTeamIds',
-      `${config.org}/${config.project}/my-teams`,
-      TTL.identity,
-      `https://dev.azure.com/${config.org}/_apis/projects/${config.project}/teams?$mine=true&api-version=7.1`,
-      authHeaders(config.pat),
-      `teams in ${config.project}`
-    );
-    return new Set(
-      (data.value ?? []).map((t) => t.id).filter((id): id is string => !!id)
-    );
+    const answer = await read();
+    lastIdentity.set(key, answer);
+    return answer;
   } catch {
-    // Team membership only enriches reviewer rows; a failure here must
-    // not take the pull request list down with it.
-    return new Set();
+    return lastIdentity.has(key) ? (lastIdentity.get(key) as T) : none;
   }
 }
 
-export function enrichReviewersWithTeamMembership(
-  rawReviewers: RawReviewer[],
-  myTeamIds: Set<string>,
-  userEmail: string
-): RawReviewer[] {
-  if (myTeamIds.size === 0 || !userEmail) return rawReviewers;
-
-  const hasExplicitUser = rawReviewers.some(
-    (r) =>
-      !r.isContainer && r.uniqueName?.toLowerCase() === userEmail.toLowerCase()
+export function fetchMyTeamIds(config: AdoConfig): Promise<Set<string>> {
+  const key = `${config.org}/${config.project}/my-teams`;
+  return lastGoodIdentity(
+    key,
+    async () => {
+      const data = await adoGet<{ value?: { id?: string }[] }>(
+        'fetchMyTeamIds',
+        key,
+        TTL.identity,
+        `https://dev.azure.com/${config.org}/_apis/projects/${config.project}/teams?$mine=true&api-version=7.1`,
+        authHeaders(config.pat),
+        `teams in ${config.project}`
+      );
+      return new Set(
+        (data.value ?? []).map((t) => t.id).filter((id): id is string => !!id)
+      );
+    },
+    new Set<string>()
   );
-  if (hasExplicitUser) return rawReviewers;
+}
 
-  const result = [...rawReviewers];
-  for (const r of rawReviewers) {
-    if (r.isContainer && r.id && myTeamIds.has(r.id)) {
-      result.push({
-        displayName: r.displayName ?? 'Unknown',
-        uniqueName: userEmail,
-        vote: r.vote,
-        hasDeclined: r.hasDeclined,
-        isContainer: false,
-      });
-      break; // only add one synthetic entry
-    }
-  }
-  return result;
+/** The signed-in account's identity id, which a pull request's
+ *  `createdBy.id` is compared with; null when Azure has not said. */
+export function fetchViewerId(config: AdoConfig): Promise<string | null> {
+  return lastGoodIdentity<string | null>(
+    `${config.org}/connectiondata`,
+    () => fetchAuthenticatedUserId(config),
+    null
+  );
 }
 
 export async function fetchActivePullRequests(
   config: AdoConfig,
   project: Record<string, string>,
-  teamContext?: { myTeamIds: Set<string>; userEmail: string }
+  myTeamIds: ReadonlySet<string> = new Set(),
+  viewerId: string | null = null
 ): Promise<ParsedPullRequest[]> {
   const data = await adoGet<{ value?: unknown[] }>(
     'fetchActivePullRequests',
@@ -318,19 +358,9 @@ export async function fetchActivePullRequests(
     authHeaders(config.pat),
     `repository ${config.repo}`
   );
-  return ((data.value ?? []) as Record<string, unknown>[]).map((raw) => {
-    if (teamContext) {
-      const rawWithReviewers = raw as { reviewers?: RawReviewer[] };
-      if (rawWithReviewers.reviewers) {
-        rawWithReviewers.reviewers = enrichReviewersWithTeamMembership(
-          rawWithReviewers.reviewers,
-          teamContext.myTeamIds,
-          teamContext.userEmail
-        );
-      }
-    }
-    return parsePullRequest(raw, project);
-  });
+  return ((data.value ?? []) as Record<string, unknown>[]).map((raw) =>
+    parsePullRequest(raw, project, myTeamIds, viewerId)
+  );
 }
 
 /**
@@ -362,21 +392,6 @@ export async function fetchActiveCommentCount(
 ): Promise<number> {
   const data = await fetchRawThreads(config, prId);
   return countActiveThreads(data.value ?? []);
-}
-
-// ── Identity ────────────────────────────────────────────────────────
-
-/** Who we are and which teams we are in. Both reads are cached by the
- *  shared transport at `TTL.identity`, so this is a memory lookup on
- *  every poll but the first of each half hour. */
-async function getCachedIdentity(
-  config: AdoConfig
-): Promise<{ userEmail: string; myTeamIds: Set<string> }> {
-  const [userEmail, myTeamIds] = await Promise.all([
-    fetchAuthenticatedUserEmail(config).catch(() => ''),
-    fetchMyTeamIds(config),
-  ]);
-  return { userEmail, myTeamIds };
 }
 
 // ── Comment thread helpers ──────────────────────────────────────────
@@ -830,6 +845,8 @@ export const azureDevOpsProvider: VcsProvider = {
 
   resetCaches(): void {
     resetAdoTransport();
+    // Fetched as whoever the old credentials named.
+    lastIdentity.clear();
   },
 
   forgetPullRequestCache(project: Record<string, string>): void {
@@ -854,11 +871,16 @@ export const azureDevOpsProvider: VcsProvider = {
     const config = toAdoConfig(auth, project);
 
     return counted('fetchPullRequests', async () => {
-      const { userEmail, myTeamIds } = await getCachedIdentity(config);
-      const teamContext =
-        userEmail && myTeamIds.size > 0 ? { myTeamIds, userEmail } : undefined;
-
-      const prs = await fetchActivePullRequests(config, project, teamContext);
+      // Both cached by the transport at `TTL.identity`: a memory lookup
+      // on every poll but the first of each half hour.
+      const myTeamIds = await fetchMyTeamIds(config);
+      const viewerId = await fetchViewerId(config);
+      const prs = await fetchActivePullRequests(
+        config,
+        project,
+        myTeamIds,
+        viewerId
+      );
 
       // CI reaches a pull request by two unrelated routes and a repo
       // usually only uses one: pipelines run against the merge ref,
@@ -1031,6 +1053,8 @@ export const azureDevOpsProvider: VcsProvider = {
     return searchAdoMentions(toAdoConfig(auth, project), query);
   },
 
+  reviewEvents: AZURE_EVENTS,
+
   async publishReview(
     auth: Record<string, string>,
     project: Record<string, string>,
@@ -1083,41 +1107,5 @@ export const azureDevOpsProvider: VcsProvider = {
     prId: number
   ) {
     return fetchPullRequestChecksAzure(toAdoConfig(auth, project), prId);
-  },
-
-  async submitReviewVerdict(
-    auth: Record<string, string>,
-    project: Record<string, string>,
-    prId: number,
-    verdict: ReviewVerdict
-  ): Promise<void> {
-    const config = toAdoConfig(auth, project);
-    const userId = await fetchAuthenticatedUserId(config);
-    const votes: Record<ReviewVerdict, ReviewerVote> = {
-      approve: 10,
-      'approve-with-suggestions': 5,
-      'wait-for-author': -5,
-      reject: -10,
-    };
-    const vote = votes[verdict];
-    const url = `${baseUrl(
-      config
-    )}/pullrequests/${prId}/reviewers/${userId}?api-version=7.1`;
-    await adoSend<unknown>('submitReviewVerdict', url, {
-      method: 'PUT',
-      headers: authHeaders(config.pat),
-      body: JSON.stringify({ id: userId, vote }),
-      bodyForLog: { vote },
-    });
-    // The selected pull request's detail carries votes, and its policy
-    // evaluations the reviewer policies' verdict on them; the list is
-    // fetched with a zero TTL, so it is deduped and never stored.
-    // Wiping the repository prefix would drop threads, statuses and
-    // descriptions to fix something they do not hold. The vote a user
-    // might still see is in the shell's own model — the desktop
-    // refreshes it from services/reviews.ts.
-    const repo = `${config.org}/${config.project}/${config.repo}`;
-    invalidateAdoKey(`${repo}/detail/${prId}`);
-    invalidateAdoKey(`${repo}/policies/${prId}`);
   },
 };

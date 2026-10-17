@@ -14,7 +14,6 @@ vi.mock('@n10/logger', () => ({
 vi.mock('../pty-registry.js', () => ({ isSessionAlive: () => false }));
 vi.mock('../session-backend.js', () => ({ hasLiveTmuxSession: () => false }));
 
-import { keyForWorktree } from '../session-key.js';
 import { sweepMergedBranches, syncRemote } from './remote-sync.js';
 
 /**
@@ -116,6 +115,14 @@ describe('syncRemote', () => {
     expect(git(b.clone, 'rev-parse', 'master')).toBe(pushed);
   });
 
+  it('reports a failed fetch instead of a successful sync timestamp', async () => {
+    const b = remoteWithClone('unreachable', 'main');
+    git(b.clone, 'remote', 'set-url', 'origin', join(root, 'missing-remote'));
+    await expect(syncRemote(b.clone)).rejects.toThrow(
+      'Could not fetch from origin'
+    );
+  });
+
   it('never moves a diverged main off commits origin does not have', async () => {
     const b = remoteWithClone('b', 'main');
     git(b.clone, 'switch', '-q', 'main');
@@ -157,8 +164,8 @@ describe('sweepMergedBranches', () => {
 
   /** Sweep `repo` with `feature` reported merged and auto-delete on,
    *  and return what it asked to delete. */
-  async function sweep(repo: string): Promise<[string, string][]> {
-    const deleted: [string, string][] = [];
+  async function sweep(repo: string): Promise<[string | null, string][]> {
+    const deleted: [string | null, string][] = [];
     await sweepMergedBranches({
       provider: {
         fetchMergedBranches: () => Promise.resolve(new Set(['feature'])),
@@ -167,11 +174,12 @@ describe('sweepMergedBranches', () => {
       config: { vendorAuth: {}, vendorProject: {}, autoDeleteOnMerge: true },
       branches: ['feature'],
       warnedRebase: new Set(),
-      onAutoDelete: (sessionName, branch) => {
-        deleted.push([sessionName, branch]);
+      onAutoDelete: (branch, approved) => {
+        deleted.push([approved.checkout, branch]);
       },
       onRebaseInProgress: () => undefined,
       cwd: repo,
+      isCancelled: () => false,
     });
     return deleted;
   }
@@ -189,8 +197,6 @@ describe('sweepMergedBranches', () => {
     const b = repoWithFeature('b', false);
     process.chdir(a.repo);
 
-    expect(await sweep(b.repo)).toEqual([
-      [keyForWorktree({ path: b.checkout }, b.repo), 'feature'],
-    ]);
+    expect(await sweep(b.repo)).toEqual([[b.checkout, 'feature']]);
   });
 });

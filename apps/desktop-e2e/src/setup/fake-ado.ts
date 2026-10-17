@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { writeScenario } from './scenario-file.js';
 
 /**
  * An Azure DevOps scenario as a test declares it, and the config that
@@ -8,7 +9,7 @@ import { join } from 'node:path';
  *
  * The counterpart of `fake-gh.ts`. The Azure provider reaches Azure
  * through `fetch` with the host in every URL, so the fake is a preload
- * in the app's main process that answers `dev.azure.com` and
+ * in the app's session host that answers `dev.azure.com` and
  * `vssps.dev.azure.com` itself. The scenario says what a test means,
  * not how it is served, so another transport can serve it unchanged.
  */
@@ -66,6 +67,8 @@ export interface FakeAzureDevOps {
   acceptedPat?: string;
   /** Whose PAT it is — `/connectiondata`'s authenticated user. */
   user: { displayName: string; uniqueName: string };
+  /** The teams that user is in, by name: what `$mine=true` lists. */
+  teams?: string[];
   prs: FakeAdoPr[];
 }
 
@@ -195,6 +198,7 @@ function served(s: FakeAzureDevOps) {
       defaultBranch: 'refs/heads/main',
       project: { id: guid(project) },
     },
+    teams: (s.teams ?? []).map((name) => ({ id: guid(name), name })),
     prs: s.prs.map((pr) => pullRequest(s, pr)),
     evaluations: byId((pr) =>
       (pr.policies ?? []).map((p) => evaluation(s, pr, p))
@@ -228,7 +232,7 @@ export function installFakeAdo(
   scenario: FakeAzureDevOps
 ): { N10_FAKE_ADO: string } {
   const path = join(homeDir, 'fake-ado.json');
-  writeFileSync(path, JSON.stringify(served(scenario), null, 2), 'utf8');
+  writeScenario(path, served(scenario));
   return { N10_FAKE_ADO: path };
 }
 
@@ -238,6 +242,11 @@ export function installFakeAdo(
  *  the first window opens. */
 export function fakeAdoLoaded(homeDir: string): boolean {
   return existsSync(join(homeDir, 'fake-ado.json.loaded'));
+}
+
+/** Remove the loaded marker, before a launch that must write its own. */
+export function forgetFakeAdo(homeDir: string): void {
+  rmSync(join(homeDir, 'fake-ado.json.loaded'), { force: true });
 }
 
 /** The requests the fake had no answer for, as `METHOD url` lines. */
@@ -271,4 +280,69 @@ export function fakeAdoGlobalConfig(
       'azure-devops': { pat: scenario.pat ?? FAKE_ADO_PAT },
     },
   };
+}
+
+/** The scenario as the preload serves it now, writes included. */
+export interface ServedAdo {
+  prs: {
+    pullRequestId: number;
+    lastMergeSourceCommit: { commitId: string };
+    lastMergeTargetCommit: { commitId: string };
+    reviewers: { displayName: string; vote: number }[];
+  }[];
+  iterations: Record<number, Record<string, unknown>[]>;
+  /** Paths each pull request's latest iteration changed. */
+  changes?: Record<number, string[]>;
+  threads?: Record<number, Record<string, unknown>[]>;
+  /** Writes whose answer is lost, once each: the write is kept and the
+   *  connection drops before Azure answers. */
+  loseWrites?: ('thread' | 'reply' | 'vote')[];
+  writes?: (
+    | { kind: 'thread'; prId: number; thread: Record<string, unknown> }
+    | { kind: 'reply'; prId: number; threadId: number }
+    | { kind: 'vote'; prId: number; vote: number }
+  )[];
+}
+
+export function fakeAdoServed(homeDir: string): ServedAdo {
+  return JSON.parse(
+    readFileSync(join(homeDir, 'fake-ado.json'), 'utf8')
+  ) as ServedAdo;
+}
+
+export function updateFakeAdo(
+  homeDir: string,
+  change: (served: ServedAdo) => void
+): void {
+  const path = join(homeDir, 'fake-ado.json');
+  const served = fakeAdoServed(homeDir);
+  change(served);
+  writeScenario(path, served);
+}
+
+/**
+ * Put a pull request at real commits of the test repository, so its
+ * diff can be read and a review filed on it: its head, its target, and
+ * one iteration from one to the other changing `paths`.
+ */
+export function placeAdoPr(
+  homeDir: string,
+  prId: number,
+  at: { head: string; target: string; paths: string[] }
+): void {
+  updateFakeAdo(homeDir, (s) => {
+    const pr = s.prs.find((p) => p.pullRequestId === prId)!;
+    pr.lastMergeSourceCommit = { commitId: at.head };
+    pr.lastMergeTargetCommit = { commitId: at.target };
+    const target = { commitId: at.target };
+    s.iterations[prId] = [
+      {
+        id: 1,
+        sourceRefCommit: { commitId: at.head },
+        targetRefCommit: target,
+        commonRefCommit: target,
+      },
+    ];
+    s.changes = { ...s.changes, [prId]: at.paths };
+  });
 }

@@ -28,9 +28,19 @@ ceiling: it is a REST surface. Reasoning: `docs/decisions.md`.
   detail (`pr-overview-details.ts`) is two reads on demand and touches no
   cycle memo; its checks add the policy evaluations and share the rest: one
   read while the cycle's statuses are fresh (30 s), two after.
+- An Azure group (team) reviewer is its own row carrying the vote of
+  whichever member voted for it; that member's row names the group in
+  `votedFor`, and tallies go through `reviewersToCount` so the pair counts
+  once. `includesViewer` marks the caller's groups so `viewerEntry` can
+  stand a pending one in for them; never copy a group's vote onto a person.
+- Azure knows the viewer by the signed-in identity: the list sets
+  `viewerIsAuthor` (`createdBy.id`) and each reviewer's `isViewer` (its `id`)
+  against connectiondata's `authenticatedUser.id`; `viewerEntry` prefers
+  `isViewer`. Git's email (`matchesUser`) answers only where Azure has not said. Identity reads
+  answer a failure with their last answer until credentials change.
 - GitHub's search returns the rollup and counts with the list, so it
   implements neither `forgetPullRequestCache` nor `resetCaches`.
 - Every `gh` read — `ghQuery`, `ghRest`, the provider's GETs, `gh auth
-  status`, `gh api /user` — runs under `GH_READ_OPTIONS` and is killed at 30s
+status`, `gh api /user` — runs under `GH_READ_OPTIONS` and is killed at 30s
   (`gh-read-deadline.ts`). A mutation goes through `ghGraphQL` or `execFile`
   without them, and so does `publishReview`: never put one under a deadline.

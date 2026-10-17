@@ -22,11 +22,12 @@ import { keys } from './query-keys.js';
  * core; the renderer only shows them.
  */
 export async function loadPullRequestChecks(
+  cwd: string,
   ref: PullRequestRef,
   viewer: string | null
 ): Promise<PullRequestChecksAnswer> {
   return assertEcho(
-    await window.n10.getPullRequestChecks({ ref, viewer }),
+    await window.n10.getPullRequestChecks(cwd, { ref, viewer }),
     ref,
     viewer
   );
@@ -134,13 +135,13 @@ export function usePullRequestChecks(
     queryKey,
     queryFn: async () =>
       keepRead(
-        await loadPullRequestChecks(ref!, viewer),
+        await loadPullRequestChecks(cwd, ref!, viewer),
         qc.getQueryData<PullRequestChecksAnswer>(queryKey)
       ),
     enabled: ref != null,
     // A push is a new key; a refresh, or the list row moving at the same
     // head, reads them again.
-    staleTime: 20_000,
+    staleTime: 0,
     // After a push the last head's answer stays on screen, said to be the
     // last head's, until the new one is read.
     placeholderData: lastHeadAnswer(qc, queryKey),

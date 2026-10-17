@@ -4,6 +4,7 @@ import type {
   DetailReviewer,
   PullRequestDetail,
   PullRequestInfo,
+  PullRequestReviewer,
   ReadOutcome,
   ReviewRule,
 } from '@n10/vcs-core';
@@ -447,6 +448,30 @@ describe('asksViewer', () => {
     const failed = { state: 'failed', kind: 'network', reason: 'x' } as const;
     expect(asksViewer(ROW, 'bob', failed, rules({}))).toBe(true);
     expect(asksViewer(ROW, 'bob', detail([], false), rules({}))).toBe(true);
+  });
+
+  it('finds the viewer in the list row through a pending team of theirs', () => {
+    const failed = { state: 'failed', kind: 'network', reason: 'x' } as const;
+    const team = (over: Partial<PullRequestReviewer>): PullRequestInfo => ({
+      ...ROW,
+      reviewers: [
+        {
+          displayName: 'Web',
+          identifier: 'web-team',
+          decision: 'no-response',
+          includesViewer: true,
+          ...over,
+        },
+      ],
+    });
+    expect(asksViewer(team({}), 'bob', failed, rules({}))).toBe(true);
+    // Another member answered for it, or it is not the viewer's team.
+    expect(
+      asksViewer(team({ decision: 'approved' }), 'bob', failed, rules({}))
+    ).toBe(false);
+    expect(
+      asksViewer(team({ includesViewer: false }), 'bob', failed, rules({}))
+    ).toBe(false);
   });
 
   it('never waits on an approval already given, or on a draft', () => {

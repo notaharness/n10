@@ -7,6 +7,7 @@ import {
   listOurSessionsWith,
   resolveWorktreeSession,
 } from './session-resolver.js';
+import { holdScratchTmuxServer } from '../../vitest.setup.js';
 
 const MACHINE = 'workbox';
 
@@ -117,6 +118,7 @@ afterEach(() => {
 describe.skipIf(SKIP)(
   'listOurSessionsWith (finding 7, a real executor)',
   () => {
+    holdScratchTmuxServer();
     const REPO = `/repos/remote-${RUN}`;
     const WT = `${REPO}/.worktrees/feat-remote`;
 

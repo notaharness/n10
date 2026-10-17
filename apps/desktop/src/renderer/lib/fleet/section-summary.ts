@@ -1,4 +1,4 @@
-import type { BeamStatus, MachineView } from '../../../host/contract.js';
+import type { FleetStatus, MachineView } from '../../../host/contract.js';
 import { machinesSummary } from '../machines/machine-model.js';
 
 export type SummaryTone = 'muted' | 'warning' | 'active';
@@ -13,7 +13,7 @@ export function fleetSectionSummary({
   machines,
   awaitingPasskey,
 }: {
-  beam: BeamStatus | undefined;
+  beam: FleetStatus | undefined;
   machines: readonly MachineView[] | undefined;
   awaitingPasskey: boolean;
 }): { text: string; tone: SummaryTone } | null {

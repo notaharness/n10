@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CeremonyProgress } from '../../../host/contract-machines.js';
+import type { CeremonyProgress } from '@n10/engine/contract';
 import {
   ceremonyHeading,
   ceremonyStep,

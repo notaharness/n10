@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readConfig } from '@n10/vcs-core';
-import { requireRepo } from './repo.js';
+import { repository } from './repo.js';
 import type { CommentImagePayload } from '../contract.js';
 
 /**
@@ -102,12 +101,17 @@ export function authHeaderForUrl(
   return undefined;
 }
 
-async function authHeaderFor(url: URL): Promise<string | undefined> {
+/** The credentials of the repository whose comment shows the image:
+ *  an Azure DevOps PAT belongs to that repository's organisation. */
+async function authHeaderFor(
+  repo: string,
+  url: URL
+): Promise<string | undefined> {
   const host = url.hostname;
   const creds: ImageCredentials = {};
   if (isGitHubHost(host)) creds.githubToken = await getGhToken();
   if (isAzureHost(host)) {
-    const config = readConfig(requireRepo());
+    const config = repository(repo).config.getSnapshot().config;
     creds.azurePat = config.vendorAuth?.['pat'];
   }
   return authHeaderForUrl(url, creds);
@@ -163,11 +167,14 @@ export function sniffContentType(
   return match?.type ?? 'application/octet-stream';
 }
 
-async function download(url: string): Promise<CommentImagePayload | null> {
+async function download(
+  repo: string,
+  url: string
+): Promise<CommentImagePayload | null> {
   const parsed = new URL(url);
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
   const headers: Record<string, string> = {};
-  const auth = await authHeaderFor(parsed);
+  const auth = await authHeaderFor(repo, parsed);
   if (auth) headers['authorization'] = auth;
   const res = await fetch(url, { headers, redirect: 'follow' });
   if (!res.ok) {
@@ -188,15 +195,19 @@ async function download(url: string): Promise<CommentImagePayload | null> {
 }
 
 export function fetchCommentImage(
+  repo: string,
   url: string
 ): Promise<CommentImagePayload | null> {
-  const hit = cache.get(url);
+  // Keyed by repository too: the same URL read with another
+  // repository's credentials is another answer.
+  const key = JSON.stringify([repo, url]);
+  const hit = cache.get(key);
   if (hit) return hit;
-  const p = download(url).catch((err: unknown) => {
-    cache.delete(url); // allow retry later
+  const p = download(repo, url).catch((err: unknown) => {
+    cache.delete(key); // allow retry later
     throw err;
   });
-  cache.set(url, p);
+  cache.set(key, p);
   if (cache.size > CACHE_LIMIT) {
     const first = cache.keys().next().value;
     if (first !== undefined) cache.delete(first);

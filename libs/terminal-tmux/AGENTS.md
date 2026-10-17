@@ -1,6 +1,8 @@
 # libs/terminal-tmux — persistent session transport
 
-Requires system tmux ≥ 3.2 for per-session environment flags. The package
+Requires system tmux ≥ 3.2 for per-session environment flags; CI tests
+against 3.7, which keeps a fast-exiting pane's last output and exit status
+that earlier versions can drop (`docs/testing.md`). The package
 contains no n10 identity, agent or Orchestra policy. Core supplies an
 explicit serializable `TmuxLaunchPlan` to async `createTmuxBackend`:
 
@@ -16,9 +18,18 @@ explicit serializable `TmuxLaunchPlan` to async `createTmuxBackend`:
 `dispose()` releases the local PTY client and polling timer; the hosted process
 survives. `kill()` terminates the exact tmux session. `onExit` reports hosted
 process exit, including retained panes; `onDisconnect` reports a local client
-ending while the hosted process is still running. The backend reconnects its
-client with bounded backoff while preserving the local subscriptions and size. Native `pane_dead` and exit
+ending while the hosted process is still running, and `onAttach` fires just
+before each client's first output, the first client's included. The backend
+reconnects its client with bounded backoff while preserving the local
+subscriptions and size.
+A remote machine's poller gives up on a listing after a deadline, and passes on
+what the fleet says (`setReachable`), also to a backend that subscribes later. A
+remote backend attaches nothing while the fleet says its machine is offline or
+the poller's last listing failed, and tries at once when both clear. Native `pane_dead` and exit
 status drive lifecycle information; no global tmux hooks are installed.
+The local and remote backends replay a retained pane's final frame only once
+their client has first drawn (`ClientDraw`): its alternate screen would hide a
+frame written earlier.
 
 ## Safety and protocol
 

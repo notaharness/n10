@@ -1,0 +1,28 @@
+---
+title: Conversations
+description: A Claude Code plugin that splits your main session into focused conversations, one per topic, with Main kept for your conversation with Claude.
+---
+
+Conversations is a Claude Code plugin. Claude starts a **conversation** for
+each topic in a session, such as a CI run, a subagent's task or a message from
+another session, and posts that topic's updates there. A sidebar lists
+**Main** and every conversation, with a count of unread updates and a marker
+on conversations waiting on you.
+
+Click a conversation and the transcript shows only that topic; what you type
+there goes to that conversation. Main holds your conversation with Claude,
+with a one-line pointer to each update posted elsewhere.
+
+It works in the Claude Code terminal in fullscreen only, and doesn't need n10
+or Orchestra. The source is at
+[github.com/notaharness/plugins](https://github.com/notaharness/plugins/tree/main/conversations).
+
+## Install
+
+```text
+/plugin marketplace add notaharness/plugins
+/plugin install conversations@notaharness
+```
+
+Turn on fullscreen with `/tui fullscreen`, then run `/conversations` to open
+the sidebar.

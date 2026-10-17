@@ -10,6 +10,7 @@
  */
 // First: nothing the host starts may inherit the module it preloaded.
 import './host-env-restore.js';
+import { startUpdates, stopUpdates } from '../host/services/updates.js';
 import { applySessionBackend, killAll, probeTmuxAvailability } from '@n10/core';
 import { installHostPushes } from '../host/host-pushes.js';
 import {
@@ -24,6 +25,7 @@ import { installMachineResolver } from '../host/services/remote-machines.js';
 import { stopRemoteSyncLoop } from '../host/services/remote-sync.js';
 import { openStartupRepo } from '../host/services/repo.js';
 import { dropViewer } from '../host/services/session-watch.js';
+import { setMenuShortcutHold } from '../host/viewer-api.js';
 import { appBeamClient } from './beam/app-beam.js';
 import type { DaemonExit, OwnedDaemon } from './beam/owned-daemon.js';
 import {
@@ -117,7 +119,8 @@ function settle(message: Extract<MainToHost, { t: 'reply' }>): void {
 // Terminal clients go; the tmux sessions behind them stay. Then the
 // daemon this host started stops (D15).
 async function shutdown(): Promise<void> {
-  stopRemoteSyncLoop();
+  stopUpdates();
+  const removals = stopRemoteSyncLoop();
   stopDiscovery();
   stopAllBabysitters();
   try {
@@ -126,6 +129,7 @@ async function shutdown(): Promise<void> {
     // nothing was running
   }
   await beam.shutdown().catch(logFailure('beam shutdown'));
+  await removals;
   post({ t: 'stopped' });
   setImmediate(() => process.exit(0));
 }
@@ -153,6 +157,8 @@ port.on('message', ({ data }: { data: MainToHost }) => {
 // ── Startup ──────────────────────────────────────────────────────
 
 async function start(): Promise<void> {
+  const startDir = process.env.N10_START_DIR;
+  delete process.env.N10_START_DIR;
   const userData = process.env.N10_USER_DATA;
   if (userData) installSessionBin(userData);
   installHostPushes({
@@ -163,17 +169,23 @@ async function start(): Promise<void> {
   setFolderPicker((title) => callMain('pickFolder', title));
   setExternalOpener((url) => callMain('openExternal', url));
   setShellGlue({
+    quitForUpdate: () => callMain('quitForUpdate'),
+    quitForNpmUpdate: (plan) => callMain('quitForNpmUpdate', plan),
     contextMenu: (items) => callMain('contextMenu', items),
     appMenuPopup: () => callMain('appMenuPopup'),
     aboutBox: () => callMain('aboutBox'),
     prefsChanged: (next) =>
       void callMain('prefsChanged', next).catch(logFailure('prefs')),
   });
+  setMenuShortcutHold((viewer, held) =>
+    callMain('holdMenuShortcuts', viewer, held)
+  );
   installMachineResolver();
-  beam.start();
   await probeTmuxAvailability();
   applySessionBackend();
-  const opened = openStartupRepo();
+  beam.start();
+  const opened = openStartupRepo({ N10_START_DIR: startDir });
+  startUpdates();
   post({ t: 'ready', repo: opened ? opened.cwd : null });
 }
 

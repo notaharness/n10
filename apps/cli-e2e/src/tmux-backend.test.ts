@@ -29,6 +29,7 @@ test.skip(!tmuxAvailable(), 'tmux is not installed');
 
 test.use({
   n10Config: {
+    agentId: 'test',
     aiCommand: fakeAgentCommand({
       banner: 'n10-fake-agent-ready',
       bursts: 'inf',

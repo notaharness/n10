@@ -1,4 +1,9 @@
 import type { MenuItemConstructorOptions } from 'electron';
+import {
+  appAccelerator,
+  menuModifier,
+  type AppShortcutId,
+} from './app-shortcuts.js';
 import type { MenuCommand, ThemePreference } from './contract.js';
 
 /**
@@ -26,7 +31,8 @@ export function buildMenuTemplate(
   send: (command: MenuCommand, arg?: string) => void
 ): MenuItemConstructorOptions[] {
   const isMac = env.platform === 'darwin';
-  const mod = isMac ? 'Cmd' : 'Ctrl';
+  const mod = menuModifier(isMac);
+  const keys = (id: AppShortcutId) => appAccelerator(id, mod);
 
   const appMenu: MenuItemConstructorOptions[] = isMac
     ? [
@@ -37,7 +43,7 @@ export function buildMenuTemplate(
             { type: 'separator' },
             {
               label: 'Settings…',
-              accelerator: 'Cmd+,',
+              accelerator: keys('settings'),
               click: () => send('open-settings'),
             },
             { type: 'separator' },
@@ -58,23 +64,23 @@ export function buildMenuTemplate(
     submenu: [
       {
         label: 'Open Repository…',
-        accelerator: `${mod}+O`,
+        accelerator: keys('open-repo'),
         click: () => send('open-repo'),
       },
       {
         label: 'Switch Repository…',
-        accelerator: `${mod}+Shift+O`,
+        accelerator: keys('switch-repo'),
         click: () => send('switch-repo'),
       },
       { type: 'separator' },
       {
         label: 'New Worktree…',
-        accelerator: `${mod}+N`,
+        accelerator: keys('new-worktree'),
         click: () => send('new-worktree'),
       },
       {
         label: 'New Terminal…',
-        accelerator: `${mod}+Shift+T`,
+        accelerator: keys('new-terminal'),
         click: () => send('new-terminal'),
       },
       { type: 'separator' },
@@ -83,14 +89,14 @@ export function buildMenuTemplate(
         : [
             {
               label: 'Settings…',
-              accelerator: 'Ctrl+,',
+              accelerator: keys('settings'),
               click: () => send('open-settings'),
             } satisfies MenuItemConstructorOptions,
             { type: 'separator' } satisfies MenuItemConstructorOptions,
           ]),
       {
         label: 'Close Tab',
-        accelerator: `${mod}+W`,
+        accelerator: keys('close-tab'),
         click: () => send('close-tab'),
       },
       isMac ? { role: 'close' } : { role: 'quit' },
@@ -125,18 +131,18 @@ export function buildMenuTemplate(
     submenu: [
       {
         label: 'Command Palette…',
-        accelerator: `${mod}+Shift+P`,
+        accelerator: keys('command-palette'),
         click: () => send('command-palette'),
       },
       {
         label: 'Toggle Sidebar',
-        accelerator: `${mod}+B`,
+        accelerator: keys('toggle-sidebar'),
         click: () => send('toggle-sidebar'),
       },
       { type: 'separator' },
       {
         label: 'Refresh Pull Requests',
-        accelerator: `${mod}+R`,
+        accelerator: keys('refresh-remote'),
         click: () => send('refresh-remote'),
       },
       { type: 'separator' },

@@ -1,24 +1,32 @@
 import {
   closestCenter,
   DndContext,
+  pointerWithin,
   PointerSensor,
+  useDndContext,
+  useDroppable,
   useSensor,
   useSensors,
   type Active,
   type Announcements,
+  type CollisionDetection,
   type DragEndEvent,
   type Over,
 } from '@dnd-kit/core';
 import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
 import {
   horizontalListSortingStrategy,
+  rectSortingStrategy,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
+import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
+import { useTabs } from '../../lib/tabs/tabs.js';
 import { usePrefersReducedMotion } from '../../lib/reduced-motion.js';
+import { cn } from '../../lib/utils.js';
 import {
   ChordKeyboardSensor,
   handleTabKey,
@@ -29,6 +37,32 @@ import {
 /** How far the pointer travels before a press becomes a drag, so
  *  clicks and double clicks on a tab stay clicks. */
 const DRAG_THRESHOLD_PX = 5;
+
+/** The room after the last tab: over it, a drag is over the last tab. */
+const END_ID = 'tab-strip-end';
+
+/**
+ * What the pointer is over, or, where it is over no tab (a keyboard
+ * drag, or a border), the tab nearest the dragged one. Nearest alone
+ * would take a tab on the row above for the room at the end of the row
+ * below. That room counts as the last tab, so the sorting strategy
+ * opens the end slot there as it does over the tab, and the drop lands
+ * after it.
+ */
+function collisionsEndingAt(last: string | undefined): CollisionDetection {
+  return (args) => {
+    const within = pointerWithin(args);
+    if (within[0]?.id === END_ID)
+      return last === undefined ? [] : [{ id: last }];
+    if (within.length > 0) return within;
+    return closestCenter({
+      ...args,
+      droppableContainers: args.droppableContainers.filter(
+        (c) => c.id !== END_ID
+      ),
+    });
+  };
+}
 
 /** A tab as a screen reader hears it: its label, not its id. */
 function spoken(target: Active | Over): string {
@@ -50,20 +84,22 @@ const announcements: Announcements = {
 };
 
 /**
- * The tab row, sortable by pointer and by keyboard (see
- * `tab-keyboard.ts`: a chord lifts, so Enter and Space still activate).
- * The other tabs slide aside while one is dragged; the order only
- * changes in the model on drop.
+ * The drag and drop the tab strip sorts in, by pointer and by keyboard
+ * (see `tab-keyboard.ts`: a chord lifts, so Enter and Space still
+ * activate). The other tabs slide aside while one is dragged; the order
+ * only changes in the model on drop.
+ *
+ * Above the repository gate, beside the tabs it sorts: a tab is chosen
+ * on press, choosing another repository's tab opens that repository,
+ * and the workspace, strip included, remounts under the new one. Out
+ * here, the sensor watching the press outlives that remount, and lifts
+ * the remounted tab by its id once the pointer has travelled
+ * `DRAG_THRESHOLD_PX`.
  */
-export function TabStrip({
-  ids,
-  onMove,
-  children,
-}: {
-  ids: readonly string[];
-  onMove: (id: string, targetId: string, side: 'before' | 'after') => void;
-  children: ReactNode;
-}) {
+export function TabDragProvider({ children }: { children: ReactNode }) {
+  const tabs = useTabs();
+  const ids = tabs.tabs.map((t) => t.id);
+  const wrap = useDesktopPrefs().tabOverflow === 'wrap';
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: DRAG_THRESHOLD_PX },
@@ -79,32 +115,76 @@ export function TabStrip({
     // Dropped over a tab to its right, it lands after that tab — the
     // slot the others made room for.
     const side = ids.indexOf(id) < ids.indexOf(targetId) ? 'after' : 'before';
-    onMove(id, targetId, side);
+    tabs.moveTab(id, targetId, side);
   };
 
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
-      modifiers={[restrictToHorizontalAxis]}
+      collisionDetection={collisionsEndingAt(ids.at(-1))}
+      modifiers={wrap ? [] : [restrictToHorizontalAxis]}
       accessibility={{ announcements, screenReaderInstructions }}
       onDragEnd={onDragEnd}
     >
-      <SortableContext
-        items={[...ids]}
-        strategy={horizontalListSortingStrategy}
-      >
-        <div
-          role="tablist"
-          aria-label="Open tabs"
-          className="flex h-9 shrink-0 items-stretch overflow-x-auto border-b border-border bg-tab [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {children}
-          <div className="flex-1" aria-hidden />
-        </div>
-      </SortableContext>
+      {children}
     </DndContext>
   );
+}
+
+/**
+ * The tab row, sortable in `TabDragProvider`.
+ *
+ * More tabs than fit wrap onto more rows, or, as the desktop prefs say
+ * (`tabOverflow`, chosen from a tab's menu), scroll the one row
+ * sideways. Wrapped, the tabs are a grid to dnd-kit — its rect
+ * strategy, free to move across rows; in one row, a horizontal list.
+ */
+export function TabStrip({
+  ids,
+  children,
+}: {
+  ids: readonly string[];
+  children: ReactNode;
+}) {
+  const wrap = useDesktopPrefs().tabOverflow === 'wrap';
+  return (
+    <SortableContext
+      items={[...ids]}
+      strategy={wrap ? rectSortingStrategy : horizontalListSortingStrategy}
+    >
+      <div
+        role="tablist"
+        aria-label="Open tabs"
+        data-overflow={wrap ? 'wrap' : 'scroll'}
+        className={cn(
+          'flex shrink-0 items-stretch border-b border-border bg-tab',
+          wrap
+            ? // Every row but the last is ruled off from the one below.
+              'flex-wrap [&>[role=tab]]:-mb-px [&>[role=tab]]:border-b'
+            : 'h-9 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+        )}
+      >
+        {children}
+        <StripEnd />
+      </div>
+    </SortableContext>
+  );
+}
+
+/**
+ * The room after the last tab. Its growth outweighs the tabs', so it
+ * takes the last row's room while each full row above is shared out
+ * among its tabs. A drop target only for its rect, and only under the
+ * pointer: collisions resolve it to the last tab, and a keyboard drag,
+ * which steps from droppable to droppable, skips it.
+ */
+function StripEnd() {
+  const { activatorEvent } = useDndContext();
+  const { setNodeRef } = useDroppable({
+    id: END_ID,
+    disabled: activatorEvent instanceof KeyboardEvent,
+  });
+  return <div ref={setNodeRef} aria-hidden className="grow-[9999] basis-0" />;
 }
 
 /** A press that selects a tab as it goes down: the primary button

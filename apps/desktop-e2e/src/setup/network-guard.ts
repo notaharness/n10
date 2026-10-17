@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -39,6 +39,12 @@ const GUARDED = ['browser', 'utility'] as const;
 export function unguardedProcesses(homeDir: string): string[] {
   const base = networkGuardBase(homeDir);
   return GUARDED.filter((type) => !existsSync(`${base}.${type}.loaded`));
+}
+
+/** Remove the loaded markers, before a launch that must write its own. */
+export function forgetNetworkGuard(homeDir: string): void {
+  const base = networkGuardBase(homeDir);
+  for (const type of GUARDED) rmSync(`${base}.${type}.loaded`, { force: true });
 }
 
 /** The connections refused so far, one line each — emptied, so a test

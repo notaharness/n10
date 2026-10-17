@@ -75,6 +75,17 @@ describe('listReadiness', () => {
     );
   });
 
+  it('counts a team a listed teammate voted for as that one vote', () => {
+    const team = { ...who('Core Team')('approved'), identifier: 'core-team' };
+    const teammate = { ...bea('approved'), votedFor: ['core-team'] };
+    expect(
+      aspect(
+        { ...PR, reviewers: [team, teammate, cy('no-response')] },
+        'reviews'
+      )?.text
+    ).toBe('Approved by Bea · 1 pending');
+  });
+
   it('shows problems as advisories beside "not fully known", never as blockers', () => {
     // A failing check may be optional, and changes requested block only
     // where the provider's rules say so; neither is read here.

@@ -27,6 +27,7 @@ type SessionHost = Pick<
   | 'checkoutPlan'
   | 'listSessions'
   | 'listForeignSessions'
+  | 'listOrchestratorGroups'
   | 'getSessionActivity'
   | 'watchSession'
   | 'unwatchSession'
@@ -147,7 +148,11 @@ export function createSessionHost(
     launchAgent: (req) =>
       start(req, req.branch, PROGRAMS.agent(req, state.repo())),
     launchReviewAgent: (req) =>
-      start(req, req.pr.sourceBranch, PROGRAMS.reviewer(req.pr, state.repo())),
+      start(
+        req,
+        req.pr.sourceBranch,
+        PROGRAMS.reviewer(req.pr, state.repo(), req.guide)
+      ),
     listAgentOptions: () => later(AGENTS),
     getSessionLaunchContext: (branch) => {
       const session = inRepo(state.current, branch);
@@ -172,10 +177,10 @@ export function createSessionHost(
       await start(req, req.pr.sourceBranch, program);
       return 'spawned' as const;
     },
-    listSessions: () =>
+    listSessions: (cwd) =>
       later(
         agents()
-          .filter((s) => s.meta.repo === state.current)
+          .filter((s) => s.meta.repo === cwd)
           .map((s) => ({
             name: s.name,
             running: s.running,
@@ -194,6 +199,7 @@ export function createSessionHost(
             sessionName: s.name,
           }))
       ),
+    listOrchestratorGroups: () => later([]),
     getSessionActivity: () =>
       later(Object.fromEntries(hub.all().map((s) => [s.name, s.activity()]))),
     // The demo pushes every session's output to the page and lets the

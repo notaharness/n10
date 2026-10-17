@@ -1,6 +1,6 @@
 {
   "name": "@notaharness/n10",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.3",
   "description": "Run AI coding agents across git worktrees and review their pull requests, from a desktop app or terminal UI",
   "productName": "n10",
   "keywords": [
@@ -113,19 +113,6 @@
         "options": {
           "command": "npm install -g \"$(npm pack --silent)\"",
           "cwd": "apps/cli/dist"
-        }
-      },
-      "publish": {
-        "dependsOn": [
-          "prepare-publish"
-        ],
-        "executor": "nx:run-commands",
-        "options": {
-          "commands": [
-            "npm publish --tag beta apps/cli/dist",
-            "node apps/cli/scripts/dist-tag-latest.mjs"
-          ],
-          "parallel": false
         }
       },
       "serve": {

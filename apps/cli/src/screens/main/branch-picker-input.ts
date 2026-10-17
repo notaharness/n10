@@ -1,12 +1,10 @@
 import { worktreeSessionKey } from '@n10/core';
 import {
-  fetchRefs,
   handleTextInput,
   type KeyPress,
   isSessionAlive,
   requestSessionMenu,
 } from '@n10/core';
-import { createWorktree, listAllBranches } from '@n10/worktree-manager';
 import type { BranchPickerHandlerCtx } from './input-types.js';
 
 /**
@@ -39,8 +37,8 @@ function fetchBranches(ctx: BranchPickerHandlerCtx): void {
   void ctx.asyncOps.run('fetch-branches', async () => {
     // No "Fetching remotes…" flash — the 'fetch-branches' spinner
     // (label: "Fetching branches") already shows we're working.
-    await fetchRefs({ cwd: process.cwd(), refs: 'all' });
-    const allBranches = await listAllBranches();
+    await ctx.sessions.worktrees.fetchBranches();
+    const allBranches = ctx.sessions.worktrees.getSnapshot().allBranches;
     ctx.branchPicker.setBranches(allBranches);
     ctx.branchPicker.setBranchIndex(0);
     ctx.sessions.flashStatus('Fetched remotes');
@@ -54,8 +52,7 @@ function selectBranch(ctx: BranchPickerHandlerCtx, filtered: string[]): void {
       : ctx.branchPicker.branchFilter.trim();
   if (branch) {
     void ctx.asyncOps.run('create-worktree', async () => {
-      const worktreePath = await createWorktree(branch);
-      if (!worktreePath) return;
+      const worktreePath = await ctx.sessions.worktrees.create(branch);
       await ctx.sessions.refreshSessions();
       landInSession(ctx, worktreeSessionKey(worktreePath));
     });

@@ -1,4 +1,3 @@
-import { foreignRepoOf } from './tab-identity.js';
 import type { Tab } from './tabs-model.js';
 
 /** What the editor showed last, and what it showed before that. */
@@ -54,19 +53,12 @@ export function shownIdFor({
 
 /**
  * The panes to render, sorted by id so a swap moves none in the DOM:
- * the one on screen, unless it belongs to another repository (its data
- * cannot be read from here), and the spare, unless it is that same
- * pane or another repository's.
+ * the one on screen and the spare, unless it is that same pane. Either
+ * may belong to another repository; it renders against that one.
  */
-export function panesFor(
-  onScreen: Tab | undefined,
-  spare: Tab | null,
-  repo: string
-): Tab[] {
+export function panesFor(onScreen: Tab | undefined, spare: Tab | null): Tab[] {
   const panes: Tab[] = [];
-  if (onScreen && !foreignRepoOf(onScreen, repo)) panes.push(onScreen);
-  if (spare && spare.id !== onScreen?.id && !foreignRepoOf(spare, repo)) {
-    panes.push(spare);
-  }
+  if (onScreen) panes.push(onScreen);
+  if (spare && spare.id !== onScreen?.id) panes.push(spare);
   return panes.sort((a, b) => (a.id < b.id ? -1 : 1));
 }

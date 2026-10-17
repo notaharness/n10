@@ -1,4 +1,4 @@
-import type { MachineView } from '../../../host/contract-machines.js';
+import type { MachineView } from '@n10/engine/contract';
 import { useFleet } from '../../lib/fleet/fleet-context.js';
 import { FocusScope } from '../../lib/fleet/use-focus-on-mount.js';
 import { fingerprintGroups } from '../../lib/machines/machine-model.js';
@@ -44,9 +44,9 @@ function RevokeBody({
   return (
     <>
       <p className="text-sm">
-        Permanently revoke {label}’s access. Offline machines update when they
-        reconnect. Files and running programs stay on that machine. Resetting
-        its fleet won’t let it rejoin.
+        Permanently revoke {label}’s access. Unreachable machines update when
+        they reconnect. Files and running programs stay on that machine.
+        Resetting its fleet won’t let it rejoin.
       </p>
       <DialogFooter>
         <Button variant="ghost" onClick={onClose}>

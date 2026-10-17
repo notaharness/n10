@@ -103,6 +103,21 @@ describe('buildFlatDiff', () => {
     expect(flat.indexById.get('gone')).toBe(orphanIndex);
   });
 
+  it('sends a comment on a side shown at another revision to the orphans row', () => {
+    const flat = buildFlatDiff(
+      [['a.ts', smallFile]],
+      options({
+        threadsByFile: new Map([['a.ts', [thread('t1', 2)]]]),
+        draftsByFile: new Map([['a.ts', [draft('d1', 3)]]]),
+        anchored: { LEFT: true, RIGHT: false },
+      })
+    );
+    const orphanIndex = flat.rows.findIndex((r) => r.kind === 'orphans');
+    expect(orphanIndex).toBeGreaterThan(0);
+    expect(flat.indexById.get('t1')).toBe(orphanIndex);
+    expect(flat.indexById.get('d1')).toBe(orphanIndex);
+  });
+
   it('renders only the header for a collapsed file', () => {
     const flat = buildFlatDiff(
       [['a.ts', smallFile]],
@@ -255,5 +270,16 @@ describe("the reviewer's own drafts", () => {
     );
     expect(rows.map((r) => r.kind)).toEqual(['file-header', 'file-drafts']);
     expect(stats.get('a.ts')?.mineCount).toBe(2);
+  });
+
+  it('sends a line draft on a side shown at another revision to the orphans row', () => {
+    const { rows, indexById } = buildFlatDiff(
+      [['a.ts', smallFile]],
+      options({ mineByFile, anchored: { LEFT: true, RIGHT: false } })
+    );
+    const orphans = rows.findIndex((r) => r.kind === 'orphans');
+    expect(orphans).toBeGreaterThan(0);
+    expect(indexById.get('l')).toBe(orphans);
+    expect(indexById.get('f')).toBe(1);
   });
 });

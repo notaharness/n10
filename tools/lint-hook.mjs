@@ -8,19 +8,13 @@
  * edits later, so this reports it while the change is still in hand.
  *
  * Reads Claude Code's hook payload on stdin and exits 2 to block, with
- * ESLint's own output on stderr.
- *
- * Why it does not simply run `eslint <file>` from the repo root: ESLint 9
- * loads flat config from the working directory, and three projects here
- * carry their own — `apps/cli-e2e`, `apps/desktop-e2e` and
- * `apps/cli-wterm-host` register the Playwright plugin that the root
- * config knows nothing about. Linting an e2e file from the root reports
- * "No issues found" on a file that genuinely violates its own rules. So
- * the config that owns a file decides where it is linted from.
+ * ESLint's own output on stderr. Like the pre-commit hook, it runs
+ * ESLint from the repo root with per-file config lookup, so each file is
+ * linted under its nearest eslint.config.mjs.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** Extensions ESLint is configured for: .js .jsx .ts .tsx .mjs .cjs .mts .cts */
@@ -41,24 +35,6 @@ async function readStdin() {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-/**
- * The directory whose ESLint config governs `file`: the nearest ancestor
- * holding one, searched no higher than the repo. A file outside the repo
- * (a scratchpad note, another checkout) has none, and is not ours to lint.
- */
-function configDirFor(file) {
-  const root = resolve(repoRoot);
-  let dir = dirname(resolve(file));
-  if (relative(root, dir).startsWith('..')) return null;
-  for (;;) {
-    if (existsSync(join(dir, 'eslint.config.mjs'))) return dir;
-    if (dir === root) return null;
-    const parent = dirname(dir);
-    if (parent === dir) return null;
-    dir = parent;
-  }
-}
-
 const raw = await readStdin();
 let file;
 try {
@@ -70,8 +46,10 @@ try {
 // A file that was deleted or renamed out from under us has nothing to lint.
 if (!file || !LINTABLE.test(file) || !existsSync(file)) pass();
 
-const cwd = configDirFor(file);
-if (!cwd) pass();
+// A file outside the repo (a scratchpad note, the main checkout above a
+// worktree) is not ours to lint, and ESLint would apply that tree's config.
+const target = relative(repoRoot, resolve(file));
+if (target.startsWith('..') || isAbsolute(target)) pass();
 
 const eslint = join(repoRoot, 'node_modules', '.bin', 'eslint');
 if (!existsSync(eslint)) pass(); // Fresh worktree with no install yet.
@@ -79,8 +57,15 @@ if (!existsSync(eslint)) pass(); // Fresh worktree with no install yet.
 try {
   execFileSync(
     eslint,
-    ['--no-warn-ignored', '--max-warnings', '0', relative(cwd, resolve(file))],
-    { cwd, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' }
+    [
+      '--flag',
+      'v10_config_lookup_from_file',
+      '--no-warn-ignored',
+      '--max-warnings',
+      '0',
+      target,
+    ],
+    { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' }
   );
 } catch (err) {
   // Status 1 is "found problems"; anything else means ESLint itself fell

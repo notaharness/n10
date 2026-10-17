@@ -1,0 +1,76 @@
+name: Claude Code
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  # A maintainer mentions @claude in an issue or PR comment, a review comment
+  # or a review body. `@claude review` belongs to claude-code-review.yml.
+  claude:
+    if: |
+      contains(github.event.comment.body || github.event.review.body, '@claude') &&
+      !startsWith(github.event.comment.body || github.event.review.body, '@claude review') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
+               github.event.comment.author_association || github.event.review.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+      actions: read # Required for Claude to read CI results on PRs
+    steps:
+      # The action checks out a PR's head branch and gets a token that can push,
+      # so it must never run on a fork PR. Fork PRs get `@claude review` instead.
+      - name: Skip fork PRs
+        id: fork
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number || (github.event.issue.pull_request && github.event.issue.number) || '' }}
+        run: |
+          if [ -n "$PR" ]; then
+            fork=$(gh pr view "$PR" -R "$GITHUB_REPOSITORY" --json isCrossRepository --jq .isCrossRepository)
+            echo "fork PR: $fork"
+            echo "skip=$fork" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout repository
+        if: steps.fork.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        if: steps.fork.outputs.skip != 'true'
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      # Installed from the default branch so Claude can run `npx nx` targets.
+      # The action then checks out the PR head; Claude reruns `npm ci` when
+      # that branch changes package-lock.json.
+      - run: npm ci
+        if: steps.fork.outputs.skip != 'true'
+
+      - name: Run Claude Code
+        if: steps.fork.outputs.skip != 'true'
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --max-turns 25
+            --allowedTools "Bash(npm ci),Bash(npx nx:*)"
+
+          # Lets Claude read CI results on PRs.
+          additional_permissions: |
+            actions: read

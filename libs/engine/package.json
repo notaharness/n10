@@ -11,7 +11,12 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./contract": {
+      "types": "./src/contract.ts",
+      "import": "./src/contract.ts",
+      "default": "./src/contract.ts"
+    }
   },
   "nx": {
     "name": "@n10/engine",
@@ -23,6 +28,9 @@
   "dependencies": {
     "@n10/core": "*",
     "@n10/logger": "*",
-    "@n10/vcs-core": "*"
+    "@n10/review-comments": "*",
+    "@n10/terminal-tmux": "*",
+    "@n10/vcs-core": "*",
+    "@n10/worktree-manager": "*"
   }
 }

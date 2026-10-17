@@ -37,7 +37,6 @@ const ENTER: KeyPress = {
 
 const FORCED: DeleteConfirmState = {
   branch: 'alpha',
-  sessionName: 'wt:alpha',
   reason: 'uncommitted changes',
   mode: 'type-branch',
   approved: {
@@ -53,7 +52,6 @@ const FORCED: DeleteConfirmState = {
 
 const RUNNING: DeleteConfirmState = {
   branch: 'alpha',
-  sessionName: 'wt:alpha',
   reason: 'An agent is running here — deleting stops it',
   mode: 'yes-no',
   approved: {
@@ -74,7 +72,7 @@ function makeCtx(confirmDelete: DeleteConfirmState, confirmInput = '') {
       setConfirmInput: vi.fn(),
     },
     sessions: {
-      performDelete: vi.fn().mockResolvedValue('removed'),
+      worktrees: { remove: vi.fn().mockResolvedValue('removed') },
       flashStatus: vi.fn(),
     },
     asyncOps: {
@@ -101,8 +99,7 @@ describe('confirming a typed branch name', () => {
     handleConfirmDeleteInput('', ENTER, t.handlerCtx);
     await t.settle();
 
-    expect(t.ctx.sessions.performDelete).toHaveBeenCalledExactlyOnceWith(
-      'wt:alpha',
+    expect(t.ctx.sessions.worktrees.remove).toHaveBeenCalledExactlyOnceWith(
       'alpha',
       FORCED.approved
     );
@@ -118,7 +115,7 @@ describe('confirming a typed branch name', () => {
     handleConfirmDeleteInput('', ENTER, t.handlerCtx);
     await t.settle();
 
-    expect(t.ctx.sessions.performDelete).not.toHaveBeenCalled();
+    expect(t.ctx.sessions.worktrees.remove).not.toHaveBeenCalled();
   });
 });
 
@@ -129,8 +126,7 @@ describe('confirming a running agent’s removal', () => {
     runConfirmedDelete(RUNNING, t.handlerCtx);
     await t.settle();
 
-    expect(t.ctx.sessions.performDelete).toHaveBeenCalledExactlyOnceWith(
-      'wt:alpha',
+    expect(t.ctx.sessions.worktrees.remove).toHaveBeenCalledExactlyOnceWith(
       'alpha',
       RUNNING.approved
     );
@@ -148,7 +144,7 @@ describe('confirming a running agent’s removal', () => {
     ],
   ])('says what core kept when it answers %s', async (outcome, message) => {
     const t = makeCtx(RUNNING);
-    t.ctx.sessions.performDelete.mockResolvedValue(outcome);
+    t.ctx.sessions.worktrees.remove.mockResolvedValue(outcome);
 
     runConfirmedDelete(RUNNING, t.handlerCtx);
     await t.settle();

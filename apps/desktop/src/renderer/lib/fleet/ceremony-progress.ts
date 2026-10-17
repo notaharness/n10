@@ -1,7 +1,4 @@
-import type {
-  CeremonyProgress,
-  CeremonyRequest,
-} from '../../../host/contract-machines.js';
+import type { CeremonyProgress, CeremonyRequest } from '@n10/engine/contract';
 
 export type CeremonyOp = CeremonyRequest['op'];
 

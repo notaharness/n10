@@ -1,5 +1,6 @@
 import type { MenuCommandEvent } from '../../../host/contract-events.js';
 import type {
+  DesktopKeybindings,
   DesktopPrefs,
   N10HostApi,
   RepoInfo,
@@ -30,6 +31,8 @@ const info = (repo: RepoState): RepoInfo => ({
     repository: repo.data.slug,
   },
   viewer: VIEWER,
+  // GitHub's verdicts, as its provider declares them.
+  reviewEvents: ['COMMENT', 'APPROVE', 'REQUEST_CHANGES'],
 });
 
 const SETTINGS: SettingsFieldView[] = [
@@ -80,6 +83,8 @@ type ShellHost = Pick<
   | 'getVersion'
   | 'openRepo'
   | 'getRepo'
+  | 'refreshRepo'
+  | 'getRepoInfo'
   | 'listRecentRepos'
   | 'selectRepoDirectory'
   | 'selectFolder'
@@ -91,6 +96,9 @@ type ShellHost = Pick<
   | 'onMenuCommand'
   | 'getDesktopPrefs'
   | 'setDesktopPrefs'
+  | 'getKeybindings'
+  | 'setKeybinding'
+  | 'holdMenuShortcuts'
   | 'showAbout'
 >;
 
@@ -98,7 +106,12 @@ export function createShellHost(state: DemoState): ShellHost {
   let prefs: DesktopPrefs = {
     theme: requestedTheme() ?? 'system',
     nativeFrame: false,
+    tabOverflow: 'wrap',
+    tabCycleMru: false,
+    guidedReview: true,
+    imageCompare: 'side-by-side',
   };
+  let keybindings: DesktopKeybindings = {};
   const menuCommands = new Channel<MenuCommandEvent>();
   return {
     getVersion: () =>
@@ -108,19 +121,21 @@ export function createShellHost(state: DemoState): ShellHost {
       return info(state.open(cwd));
     },
     getRepo: () => later(info(state.repo())),
+    refreshRepo: () => later(info(state.repo())),
+    getRepoInfo: (cwd) => later(info(state.repoAt(cwd))),
     listRecentRepos: () =>
       later(
         state.recent.map((cwd, i) => ({
           cwd,
           lastOpenedAt: Date.now() - i * 3_600_000,
           valid: true,
+          color: state.colors.get(cwd) ?? 0,
         }))
       ),
     selectRepoDirectory: () => pickFolder('Open a repository'),
     selectFolder: () => pickFolder('Choose a folder'),
     forgetRecent: (cwd) => {
-      const at = state.recent.indexOf(cwd);
-      if (at >= 0) state.recent.splice(at, 1);
+      state.forget(cwd);
       return later(undefined);
     },
     getSettingsView: () => later(SETTINGS),
@@ -136,6 +151,16 @@ export function createShellHost(state: DemoState): ShellHost {
       prefs = { ...prefs, ...patch };
       return later(prefs);
     },
+    getKeybindings: () => later(keybindings),
+    setKeybinding: (actionId, descriptors) => {
+      const rest = Object.fromEntries(
+        Object.entries(keybindings).filter(([id]) => id !== actionId)
+      );
+      keybindings = descriptors ? { ...rest, [actionId]: descriptors } : rest;
+      return later(keybindings);
+    },
+    // The demo's menu is web-rendered and has no accelerators.
+    holdMenuShortcuts: () => later(undefined),
     showAbout: () => later(undefined),
   };
 }

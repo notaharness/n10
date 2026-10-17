@@ -1,3 +1,4 @@
+import { agentDraftDirectory } from './setup/agent-drafts.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/desktop.js';
@@ -23,7 +24,7 @@ test.describe('Session PATH', () => {
     // The prompt has to be up first: a keystroke sent while the shell
     // is still starting is read in cooked mode and lost.
     await expect(
-      page.locator('[data-terminal-pane]').getByText(/\S/).first()
+      page.locator('[data-terminal-pane] .xterm-rows').getByText(/\S/).first()
     ).toBeVisible({ timeout: 15_000 });
     await focusTerminal(page);
     await page.keyboard.type(
@@ -38,7 +39,10 @@ test.describe('Session PATH', () => {
     await expect(visibleText(page, /beam=\d+\.\d+\.\d+\S* dir=/)).toBeVisible();
     const stored = JSON.parse(
       readFileSync(
-        join(fixtureHome, '.n10', 'reviews', 'pr-7', 'comments.json'),
+        join(
+          agentDraftDirectory(fixtureHome, desktop.repoPath, 7),
+          'comments.json'
+        ),
         'utf8'
       )
     ) as { comments: { body: string; file: string }[] };

@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { hostEnv, restoreNodeOptions } from './host-env.js';
 
 describe('the host environment', () => {
+  it('passes the startup repo only to the host', () => {
+    expect(hostEnv({}, '/data', '/repo').N10_START_DIR).toBe('/repo');
+  });
   it('loads N10_HOST_REQUIRE into the host, and gives its children none of it', () => {
     const env = hostEnv(
       {
@@ -22,6 +25,13 @@ describe('the host environment', () => {
 
   it('leaves no NODE_OPTIONS where the app had none', () => {
     const env = hostEnv({ N10_HOST_REQUIRE: '/t/a.cjs' }, '/data');
+    restoreNodeOptions(env);
+    expect('NODE_OPTIONS' in env).toBe(false);
+  });
+
+  it('takes the preload back out when the fork dropped the empty original', () => {
+    const env = hostEnv({ N10_HOST_REQUIRE: '/t/a.cjs' }, '/data');
+    delete env.N10_HOST_NODE_OPTIONS;
     restoreNodeOptions(env);
     expect('NODE_OPTIONS' in env).toBe(false);
   });

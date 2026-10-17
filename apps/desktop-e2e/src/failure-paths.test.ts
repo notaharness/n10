@@ -10,15 +10,18 @@ import {
   focusTerminal,
   launchAgentFromRail,
   openPalette,
+  sessionCard,
   showChanges,
   showFile,
   showOverview,
   sidebarRow,
   tabs,
   visibleText,
+  openSessions,
 } from './setup/app.js';
-import { armContextMenuChoice } from './setup/menu.js';
+import { armContextMenuChoice, clickAppMenuItem } from './setup/menu.js';
 import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
+import { scrollTerminalToTop } from './setup/terminal-grid.js';
 
 /**
  * What the app does when something goes wrong.
@@ -36,11 +39,11 @@ import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
 /**
  * Wait until the host says this branch's agent has finished.
  *
- * Not the rail's "Relaunch agent" button, and deliberately so. That
- * button reads `hasSession && !running`, and `running` reaches the
- * renderer through a query polled every two seconds — so it is equally
- * true in the window between the launch creating the session and the
- * first poll that catches it alive. A wait on the button alone lands
+ * Not the rail's "Exited" card, and deliberately so. That card reads
+ * `!running`, and `running` reaches the renderer through a query
+ * polled every two seconds — so it is equally true in the window
+ * between the launch creating the session and the first poll that
+ * catches it alive. A wait on the card alone lands
  * in that window on a loaded machine and hands the test back an agent
  * that is still starting: the assertions that follow then describe a
  * live session and fail for the wrong reason.
@@ -48,7 +51,7 @@ import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
  * `listSessions()` is answered by the host from its own registry with
  * no cache in front of it, and a name only appears there once the
  * session has been created — so a session that is present and not
- * running has genuinely exited. The button is then waited on second,
+ * running has genuinely exited. The card is then waited on second,
  * because that is the exit as the user meets it.
  *
  * It is deliberately not tmux's retained "Pane is dead" notice either.
@@ -64,7 +67,7 @@ async function expectAgentExited(page: Page, branch: string): Promise<void> {
   await expect
     .poll(
       async () => {
-        const sessions = await page.evaluate(() => window.n10.listSessions());
+        const sessions = await openSessions(page);
         return (
           sessions.find((s) => sessionBranch(s.name) === branch)?.running ??
           true
@@ -73,9 +76,9 @@ async function expectAgentExited(page: Page, branch: string): Promise<void> {
       { timeout: 30_000 }
     )
     .toBe(false);
-  await expect(
-    page.getByRole('button', { name: 'Relaunch agent', exact: true })
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(sessionCard(page, 'Agent')).toContainText('Exited', {
+    timeout: 30_000,
+  });
 }
 
 test.describe('An agent that exits immediately', () => {
@@ -92,10 +95,15 @@ test.describe('An agent that exits immediately', () => {
     // The exit swaps the pane for tmux's retained frame, so what the
     // agent printed has to survive that swap. A capture that came back
     // empty would clear the terminal and leave the user with nothing.
+    // The frame is the PTY's height, taller than the pane under the exit
+    // bar, so its first line is up in the scrollback.
+    await scrollTerminalToTop(page);
     await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible();
   });
 
-  test('typing into an exited agent reports the failed delivery without a renderer exception', async ({
+  // Its pane is a read-only view of the final output: keystrokes go
+  // nowhere, and say nothing about it.
+  test('typing into an exited agent is ignored without an error', async ({
     desktop,
   }) => {
     const { page } = desktop;
@@ -105,8 +113,13 @@ test.describe('An agent that exits immediately', () => {
 
     await focusTerminal(page);
     await page.keyboard.type('hello');
+    await expect(
+      page.getByRole('button', { name: 'Resume agent' })
+    ).toBeVisible();
     expect(desktop.pageErrors).toEqual([]);
-    await expect(page.getByText(/Session .* is not running/)).toBeVisible();
+    await expect(page.getByText(/is not running|Error invoking/)).toHaveCount(
+      0
+    );
     await expect(tabs(page)).toHaveCount(1);
   });
 
@@ -197,13 +210,17 @@ test.describe('An agent command that does not exist', () => {
     // that and the terminal is never put in front, the complaint is
     // written into a pane nobody is shown, and the launch fails in
     // silence with the diff still up.
-    await expect(
-      visibleText(page, /not found|no such file|ENOENT/i)
-    ).toBeVisible({ timeout: 30_000 });
+    // Under the exit bar, the complaint is up in the scrollback.
+    await expect(async () => {
+      await scrollTerminalToTop(page);
+      await expect(
+        visibleText(page, /not found|no such file|ENOENT/i)
+      ).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 30_000 });
     await expect
       .poll(
         async () => {
-          const sessions = await page.evaluate(() => window.n10.listSessions());
+          const sessions = await openSessions(page);
           return (
             sessions.find((s) => sessionBranch(s.name) === 'broken-agent')
               ?.running ?? false
@@ -396,24 +413,23 @@ test.describe('Pull request reads that fail', () => {
     await expect(retry).toBeFocused();
     await expect(retry).not.toHaveAttribute('aria-disabled', 'true');
 
-    // Once the branch exists, Retry reads it: an empty diff, now a fact.
+    // Once the branch exists, the provider reports its head. The failed
+    // read put nothing on screen to hold, so the tab reads that head:
+    // an empty diff, now a fact.
     execFileSync('git', ['branch', 'vanished'], { cwd: desktop.repoPath });
-    await retry.click();
-    await expect(failure).toHaveCount(0);
+    await clickAppMenuItem(desktop.app, 'Refresh Pull Requests');
+    await expect(failure).toHaveCount(0, { timeout: 30_000 });
     await expect(page.getByText(/No changes between/)).toBeVisible();
   });
 
-  test('a diff that cannot be read says so, not "No changes"', async ({
+  test('a path git quotes reads as its name, not a failure', async ({
     desktop,
   }) => {
     const { page } = desktop;
     await openPr(page, 'Accented path');
     await expect(
-      page.getByRole('alert').filter({ hasText: "Couldn't show the diff" })
+      page.locator('[data-diff-scroll]').getByText('café.txt').first()
     ).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/No changes between/)).toHaveCount(0);
-    // A failed read is finished: nothing, the file tree included, is
-    // left waiting on it.
-    await expect(page.locator('[data-slot="skeleton"]')).toHaveCount(0);
+    await expect(page.getByRole('alert')).toHaveCount(0);
   });
 });

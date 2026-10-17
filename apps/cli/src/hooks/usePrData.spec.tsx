@@ -1,3 +1,4 @@
+import { reviewEngineFixture } from './review-engine-fixture.js';
 // usePrData reads its repository's list from the engine and reports
 // through useConfig/useToastActions; the last two are stubbed at their
 // module boundary, as in useSidebar.spec.tsx, because usePrData imports
@@ -9,7 +10,12 @@ import { useEffect } from 'react';
 import { Box } from 'ink';
 import { render } from 'ink-testing-library';
 import type { AppConfig, BranchPrMap, VcsProvider } from '@n10/vcs-core';
-import { createPullRequestList, type PullRequestList } from '@n10/engine';
+import {
+  createPullRequestList,
+  createRemoteSync,
+  createWorktreeService,
+  type PullRequestList,
+} from '@n10/engine';
 import { EngineProvider, usePrData } from '@n10/app-core';
 
 const flashes = vi.hoisted(() => [] as string[]);
@@ -67,8 +73,37 @@ function mount() {
     });
     return <Box />;
   }
+  const worktrees = createWorktreeService({
+    config: {
+      repo: '/repo',
+      getSnapshot: () => ({ config: { vendorAuth: {}, vendorProject: {} } }),
+      subscribe: () => () => undefined,
+    },
+  });
+  const sync = createRemoteSync({
+    config: {
+      repo: '/repo',
+      getSnapshot: () => ({
+        config: { vendorAuth: {}, vendorProject: {} },
+        provider: null,
+        vcsConfigured: false,
+        syncRevision: 0,
+      }),
+      subscribe: () => () => undefined,
+    },
+    pullRequests: list,
+    worktrees,
+  });
+  const { reviews, sessions } = reviewEngineFixture(null, list);
   const tree = () => (
-    <EngineProvider pullRequests={list} repo="/repo">
+    <EngineProvider
+      pullRequests={list}
+      repo="/repo"
+      sync={sync}
+      worktrees={worktrees}
+      reviews={reviews}
+      sessions={sessions}
+    >
       <Probe />
     </EngineProvider>
   );

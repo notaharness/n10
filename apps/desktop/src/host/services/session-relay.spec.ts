@@ -12,6 +12,7 @@ import type * as WatchModule from './session-watch.js';
 
 const state = vi.hoisted(() => ({
   onData: new Map<string, (data: string) => void>(),
+  onAttach: new Map<string, () => void>(),
   shown: new Map<string, number>(),
 }));
 
@@ -19,6 +20,7 @@ vi.mock('@n10/core', () => ({
   getSession: (name: string) => ({
     pty: {
       onData: (cb: (data: string) => void) => state.onData.set(name, cb),
+      onAttach: (cb: () => void) => state.onAttach.set(name, cb),
       onExit: () => undefined,
     },
   }),
@@ -35,6 +37,7 @@ let sent: { viewer: number; channel: string; payload: unknown }[];
 
 beforeEach(async () => {
   state.onData = new Map();
+  state.onAttach = new Map();
   state.shown = new Map();
   sent = [];
   vi.resetModules();
@@ -53,6 +56,11 @@ function start(name: string): RelayModule.RelayEntry {
 }
 
 const print = (name: string, data: string) => state.onData.get(name)?.(data);
+/** A new tmux client: announced, then its first output. */
+const reattach = (name: string, data: string) => {
+  state.onAttach.get(name)?.();
+  print(name, data);
+};
 
 describe('session output relay', () => {
   it('buffers a session nobody watches without sending it anywhere', () => {
@@ -66,15 +74,42 @@ describe('session output relay', () => {
     });
   });
 
-  it('says when the buffer no longer starts at the beginning', () => {
+  it("says when output after the client's first has been dropped", () => {
     const entry = start('a');
+    print('a', 'setup');
     print('a', 'x'.repeat(300 * 1024));
     expect(relay.relayBuffer(entry).truncated).toBe(false);
     print('a', 'y'.repeat(300 * 1024));
     const buffer = relay.relayBuffer(entry);
     expect(buffer.truncated).toBe(true);
-    expect(buffer.data).toBe('y'.repeat(300 * 1024));
-    expect(buffer.seq).toBe(2);
+    expect(buffer.seq).toBe(3);
+  });
+
+  // tmux sets the client's terminal up (alternate screen, cursor keys,
+  // bracketed paste) once, in its first output: a snapshot that lost
+  // it would start a terminal without them.
+  it("keeps the client's first output ahead of whatever the ring drops", () => {
+    const entry = start('a');
+    print('a', 'setup');
+    print('a', 'x'.repeat(300 * 1024));
+    print('a', 'y'.repeat(300 * 1024));
+    expect(relay.relayBuffer(entry).data).toBe(
+      'setup' + 'y'.repeat(300 * 1024)
+    );
+  });
+
+  it("starts over at a new client's first output", () => {
+    const entry = start('a');
+    reattach('a', 'setup');
+    print('a', 'x'.repeat(300 * 1024));
+    print('a', 'y'.repeat(300 * 1024));
+    reattach('a', 'setup again');
+    print('a', 'z');
+    expect(relay.relayBuffer(entry)).toEqual({
+      data: 'setup againz',
+      seq: 5,
+      truncated: false,
+    });
   });
 
   it('sends a watched session to the watching window only', () => {

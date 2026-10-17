@@ -22,6 +22,7 @@ import {
   type TmuxRunResult,
 } from './tmux-cli.js';
 import {
+  isNoServer,
   listSessionsArgv,
   paneStateArgs,
   parseSessionLine,
@@ -108,10 +109,11 @@ export async function tmuxPaneStateWith(
 }
 
 /**
- * A non-zero exit must never read the same as an empty, successful
- * listing — tmux missing on the remote, a socket permission error, or
- * an `exec` handler returning non-zero all say "this call could not
- * run", not "no sessions". `RemoteSessionPoller` relies on this: it
+ * No server is no sessions, as locally. Any other non-zero exit must
+ * never read the same as an empty, successful listing — tmux missing
+ * on the remote, a socket permission error, or an `exec` handler
+ * returning non-zero all say "this call could not run", not "no
+ * sessions". `RemoteSessionPoller` relies on this: it
  * only routes a *thrown* error to `onUnreachable`, matching the local
  * backend's own rule (`tmux-backend.ts`: "A failed read says nothing
  * about the pane"). Swallowing the distinction here (returning `[]`
@@ -123,6 +125,7 @@ export async function tmuxListSessionsDetailedWith(
   options: readonly string[] = []
 ): Promise<TmuxSessionInfo[]> {
   const result = await runTmuxWith(executor, listSessionsArgv(options));
+  if (isNoServer(result)) return [];
   if (result.exitCode !== 0)
     throw new Error(
       `tmux list-sessions failed (exit ${result.exitCode}): ${

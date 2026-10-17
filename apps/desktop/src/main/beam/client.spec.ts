@@ -4,10 +4,10 @@ import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type {
-  BeamStatus,
+  FleetStatus,
   DirectoryPublished,
   MachineView,
-} from '../../host/contract-machines.js';
+} from '@n10/engine/contract';
 import { setInboundMailPort } from '../../host/services/inbound-mail.js';
 import {
   cancelCeremony,
@@ -46,7 +46,7 @@ let dir: string;
 let socketPath: string;
 let daemon: FakeDaemon | null;
 let client: BeamClient | null;
-let statuses: BeamStatus[];
+let statuses: FleetStatus[];
 let pushed: MachineView[][];
 
 function enrolledDaemon(d: FakeDaemon, peers: PeerView[]): void {

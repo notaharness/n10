@@ -10,6 +10,7 @@ import type {
 import { assertAnswerFor } from '../data/pr-snapshot-query.js';
 import { readError } from '../data/read-state.js';
 import { keys, queryClient } from '../data/query-keys.js';
+import { writable } from '../data/repo-switch.js';
 import { useRepo } from '../repo-context.js';
 import {
   DraftEdits,
@@ -57,6 +58,9 @@ export interface DurableDraft {
   discard: (onUndo?: () => void, text?: string) => Promise<void>;
   /** The same, silently, for text that was sent. */
   clear: () => Promise<void>;
+  /** Drop the typed text and keep what is stored: it was sent with a
+   *  review, which records it as posted. */
+  forget: () => void;
   /** The stored drafts have not been read yet; editing waits, so the
    *  first save cannot replace a draft nobody has seen. */
   loading: boolean;
@@ -79,8 +83,8 @@ function patchCache(req: SaveRequest, draft: ReviewDraft | null): void {
 
 const edits = new DraftEdits({
   save: ({ ref, viewer, target, body }) =>
-    window.n10
-      .saveReviewDraft({ ref, viewer, target, body })
+    writable()
+      .then(() => window.n10.saveReviewDraft({ ref, viewer, target, body }))
       .catch((err: unknown) => {
         // The host's sentence, without Electron's transport wrapper.
         throw new Error(readError(err));
@@ -101,10 +105,11 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 async function loadDrafts(
+  cwd: string,
   ref: PullRequestRef,
   viewer: string | null
 ): Promise<ReviewDrafts> {
-  const answer = await window.n10.listReviewDrafts({ ref, viewer });
+  const answer = await window.n10.listReviewDrafts(cwd, { ref, viewer });
   assertAnswerFor(ref, viewer, answer);
   return answer;
 }
@@ -113,7 +118,7 @@ export function useReviewDrafts(ref: PullRequestRef | null) {
   const { repo } = useRepo();
   return useQuery({
     queryKey: keys.reviewDrafts(repo.cwd, ref, repo.viewer),
-    queryFn: () => loadDrafts(ref!, repo.viewer),
+    queryFn: () => loadDrafts(repo.cwd, ref!, repo.viewer),
     enabled: ref != null,
     // Only this renderer writes them; every write updates the entry.
     staleTime: Infinity,
@@ -142,7 +147,7 @@ export function useInlineDraftTargets(
   const { repo } = useRepo();
   const { data } = useQuery({
     queryKey: keys.reviewDrafts(repo.cwd, ref, repo.viewer),
-    queryFn: () => loadDrafts(ref!, repo.viewer),
+    queryFn: () => loadDrafts(repo.cwd, ref!, repo.viewer),
     enabled: ref != null,
     staleTime: Infinity,
     select: inlineTargetsOf,
@@ -221,8 +226,10 @@ export function useReviewDraft(
     gone();
     // By target, after any save still in flight for it: IPC answers in
     // order, so a first save that lands late is removed too.
-    return window.n10
-      .discardReviewDraft({ ref, viewer: repo.viewer, target })
+    return writable()
+      .then(() =>
+        window.n10.discardReviewDraft({ ref, viewer: repo.viewer, target })
+      )
       .then(
         () => {
           gone();
@@ -249,6 +256,7 @@ export function useReviewDraft(
     retry: () => edits.retry(key),
     discard: (onUndo, text) => remove(true, onUndo, text),
     clear: () => remove(false),
+    forget: () => edits.forget(key),
     loading: ref != null && drafts.isPending,
     readError: drafts.error ? readError(drafts.error) : null,
     durable: ref != null,

@@ -2,7 +2,7 @@ import type { MachineView } from '../../../host/contract.js';
 
 /**
  * A small beam fleet: this laptop, a desktop at home, and a Mac mini
- * that has been offline for a few days with mail queued for it.
+ * that has been unreachable for a few days with mail queued for it.
  * peerIds are beam's 32 hex digits and the fleet id its 16, randomly
  * generated for the demo.
  */

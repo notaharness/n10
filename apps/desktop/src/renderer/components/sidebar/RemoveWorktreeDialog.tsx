@@ -2,7 +2,6 @@ import { AlertTriangleIcon } from 'lucide-react';
 import { useRepo } from '../../lib/repo-context.js';
 import { useWorktreeRemovalCheck } from '../../lib/data/queries.js';
 import { useRemoveWorktree } from '../../lib/data/mutations.js';
-import { useTabs } from '../../lib/tabs/tabs.js';
 import type { WorktreeRemovalCheck } from '../../../host/contract.js';
 import { Button } from '../ui/button.js';
 import {
@@ -30,19 +29,14 @@ function blockerOf(
  */
 export function RemoveWorktreeDialog({
   branch,
-  itemKey,
   running,
   onClose,
 }: {
   branch: string;
-  /** The sidebar item's key — a PR-backed worktree's tab is keyed by
-   *  PR id, not branch, so the key can't be derived from the branch. */
-  itemKey: string;
   running: boolean;
   onClose: () => void;
 }) {
   const { repo } = useRepo();
-  const tabs = useTabs();
   const remove = useRemoveWorktree(repo.cwd);
   // `undefined` until the host answers — the confirm button stays
   // disabled for as long as that is the case.
@@ -52,20 +46,13 @@ export function RemoveWorktreeDialog({
   // The dialog closes on confirm, and the sidebar row hides itself for
   // as long as the mutation is pending (useRemovingBranches). The tab
   // waits for the host: core keeps a worktree that changed after the
-  // check, and its agent may still be running. If it is kept, the row
-  // reappears by itself and the mutation, which outlives this component,
-  // says why.
+  // check, and its agent may still be running. A removed worktree's tab
+  // closes on discovery's report, as for any removal (`TabsProvider`).
+  // If it is kept, the row reappears by itself and the mutation, which
+  // outlives this component, says why.
   const doRemove = (approved: WorktreeRemovalCheck) => {
-    // Look the tab up by item key rather than rebuilding its id: a tab
-    // keeps the id it was opened with even after `sync-items` re-keys
-    // it (worktree `branch:x` → `pr:42` once a PR appears), so the
-    // reconstructed id would miss and leave the tab open on a worktree
-    // that no longer exists.
-    const tab = tabs.tabs.find(
-      (t) => t.kind === 'item' && t.repo === repo.cwd && t.itemKey === itemKey
-    );
     onClose();
-    remove.mutate({ branch, approved, tabId: tab?.id });
+    remove.mutate({ branch, approved });
   };
 
   return (

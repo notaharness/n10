@@ -1,15 +1,15 @@
+import { hasSession } from '@n10/core';
 import { useCallback, useMemo, useState } from 'react';
 import { useInput, Box } from 'ink';
 import { Sidebar } from '../../components/Sidebar.js';
 import { useSidebarMouse } from './useSidebarMouse.js';
 import { Pane } from '../../components/Pane.js';
+import { UpdateStatus } from '../../components/UpdateStatus.js';
 import { SessionTabBar } from '../../components/SessionTabBar.js';
 import {
-  useRunningTabs,
   useNavState,
   useNavActions,
   useAsyncOps,
-  useInactiveAlertWatcher,
   useBranchPickerState,
   useBranchPickerActions,
   useDeleteConfirmState,
@@ -24,6 +24,8 @@ import {
   useSidebar,
   usePaneReducer,
 } from '@n10/app-core';
+import { useRunningTabs } from '../../hooks/useRunningTabs.js';
+import { useInactiveAlertWatcher } from '../../hooks/useInactiveAlertWatcher.js';
 import { dequeueOldest, getItemKey, getSession } from '@n10/core';
 import { TopRightOverlay } from '../../components/TopRightOverlay.js';
 import { handleSessionMenuInput, handleSidebarInput } from './main-input.js';
@@ -89,6 +91,10 @@ function attachedSession(name: string | null) {
 // unmounts and remounts it whenever `itemKey` changes (see MainTab
 // above), so `usePaneReducer`'s lazy initializer picks a fresh pane
 // mode via defaultPaneMode() — no render-time setState to reset.
+function hasRetainedTerminal(name: string | null): boolean {
+  return name !== null && hasSession(name);
+}
+
 function MainTabBody({
   terminalFocused,
   showOnboarding,
@@ -131,7 +137,8 @@ function MainTabBody({
 
   const pane = usePaneReducer(
     sidebar.selectedItem,
-    sidebar.sessionNameForTerminal
+    sidebar.sessionNameForTerminal,
+    hasRetainedTerminal(sidebar.sessionNameForTerminal)
   );
 
   // ── Input handling (modals + sidebar) ──────────────────────────
@@ -213,7 +220,6 @@ function MainTabBody({
     controlsOpen: settings.controlsOpen,
     sessionMenuActive: pane.sessionMenu !== null,
     agentId: configCtx.config.agentId,
-    aiCommand: configCtx.config.aiCommand,
     prTitle: sidebar.selectedPr?.title,
     sessionName: sidebar.sessionNameForTerminal,
     rowLabel: sidebar.selectedRowLabel,
@@ -284,7 +290,12 @@ function MainTabBody({
         />
       )}
       <Box flexDirection="column" flexGrow={1}>
-        <SessionTabBar />
+        <Box height={1}>
+          <Box flexGrow={1} overflow="hidden">
+            <SessionTabBar />
+          </Box>
+          <UpdateStatus />
+        </Box>
         <Pane focused={mainFocused} title={paneTitle} flexGrow={1}>
           <MainContent
             pane={pane}

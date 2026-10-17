@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { CeremonyProgress } from '../../host/contract-machines.js';
+import type { CeremonyProgress } from '@n10/engine/contract';
 import { runCeremony as run } from './ceremony.js';
 import { FakeDaemon, FakeOpError } from './test-support/fake-daemon.js';
 import { until } from './test-support/until.js';

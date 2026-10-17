@@ -93,6 +93,7 @@ export function TerminalView({ tab }: { tab: TerminalTab }) {
           name={tab.name}
           epoch={epoch}
           disabled={pane.inputDisabled}
+          ended={pane.showExitedBar}
         />
       </div>
     </div>

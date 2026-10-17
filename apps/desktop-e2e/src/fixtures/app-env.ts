@@ -22,7 +22,14 @@ export function appEnv(opts: {
   /** Extra knobs a test asked for. Applied before the isolation below. */
   extra: Record<string, string> | undefined;
 }): Record<string, string> {
-  const env = { ...process.env, ...opts.extra } as Record<string, string>;
+  // New terminals run the login shell from `$SHELL`, so the suite pins
+  // one rather than inherit the developer's: zsh greets a HOME without
+  // a `.zshrc` with its first-run wizard, which eats typed input.
+  const env = {
+    ...process.env,
+    SHELL: '/bin/bash',
+    ...opts.extra,
+  } as Record<string, string>;
   // On a Wayland session Electron talks to the compositor through
   // WAYLAND_DISPLAY and ignores DISPLAY altogether — so xvfb hands it
   // a virtual X server it never looks at, and the window opens on the
@@ -63,6 +70,12 @@ export function appEnv(opts: {
     N10_START_DIR: opts.startWithoutRepo ? '' : opts.repoPath,
     N10_DESKTOP_VERSION: 'e2e',
     ...(opts.githubToken ? { GH_TOKEN: opts.githubToken } : {}),
+    // The real `gh` (the @integration tests) keeps a telemetry device id
+    // under this HOME, written by whichever call the app makes first. A
+    // read the app starts just before it quits writes it while the
+    // fixture removes the HOME, and that removal then fails. Nothing a
+    // test runs should send telemetry either.
+    GH_TELEMETRY: 'false',
     // The fake `gh` has to win the PATH lookup; the Azure DevOps
     // preload finds its scenario here.
     ...opts.ghEnv,

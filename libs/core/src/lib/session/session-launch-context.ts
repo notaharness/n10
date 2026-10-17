@@ -1,5 +1,6 @@
 import {
   tmuxSessionSnapshot,
+  sameTmuxIncarnation,
   type TmuxSessionIncarnation,
 } from '@n10/terminal-tmux';
 import type { AppConfig } from '@n10/vcs-core';
@@ -9,7 +10,8 @@ import {
   isWorktreeSessionFor,
 } from '../session-identity.js';
 import { resolveWorktreeSession } from '../session-resolver.js';
-import { sessionIdentity } from '../session-key.js';
+import { getSession } from '../pty-registry.js';
+import { LOCAL_MACHINE, sessionIdentity } from '../session-key.js';
 import { isKnownAgentId, resolveAgent } from '../agents/registry.js';
 
 export type SessionIncarnation = TmuxSessionIncarnation;
@@ -71,4 +73,16 @@ function displayName(
   knownName?: string
 ): string | undefined {
   return knownName ?? (recorded === 'test' ? 'Custom' : recorded);
+}
+
+/** Compare a held local connection with native state before reusing an approval. */
+export function sessionIncarnationMatches(
+  name: string,
+  expected: SessionIncarnation
+): boolean {
+  const machine = sessionIdentity(name)?.machine ?? LOCAL_MACHINE;
+  if (machine !== LOCAL_MACHINE) return false;
+  const nativeName = getSession(name)?.pty.name;
+  const live = nativeName && tmuxSessionSnapshot(nativeName)?.incarnation;
+  return !!live && sameTmuxIncarnation(live, expected);
 }

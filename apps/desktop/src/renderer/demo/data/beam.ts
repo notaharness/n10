@@ -65,7 +65,7 @@ export const BEAM_REPO: RepoData = {
   sidebar: () => [
     {
       kind: 'session',
-      session: worktreeSession(BEAM, 'docs/relay-regions', false),
+      session: worktreeSession(BEAM, 'docs/relay-regions', true),
       branch: 'docs/relay-regions',
       isMerged: false,
     },
@@ -74,6 +74,7 @@ export const BEAM_REPO: RepoData = {
       session: worktreeSession(BEAM, PR_HOMEPAGE.sourceBranch, true, DESKTOP),
       branch: PR_HOMEPAGE.sourceBranch,
       pr: PR_HOMEPAGE,
+      authored: true,
       isMerged: false,
     },
     { kind: 'orphan-pr', pr: PR_PUBLISHING },

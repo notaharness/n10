@@ -15,10 +15,7 @@ export default [
   {
     // The suite's only fixed waits live in this one helper, which takes
     // the reason for each and records it as a test step. Everything
-    // else waits on an assertion. Scoped here rather than as an inline
-    // directive because the pre-commit hook runs eslint without this
-    // plugin registered, and a rule-specific inline disable is a hard
-    // error there.
+    // else waits on an assertion.
     files: ['src/setup/waits.ts'],
     rules: {
       'playwright/no-wait-for-timeout': 'off',
@@ -33,10 +30,7 @@ export default [
     // arguments, so a bare `test.skip()` in a body passes too. What
     // stays reported is the modifier form — `test.skip('name', fn)` and
     // `test.describe.skip(...)` — a test declared and marked skipped,
-    // which is the one that silently stops running for good. Set here
-    // rather than inline, because the pre-commit hook runs eslint
-    // without this plugin registered and an inline rule-specific
-    // directive fails there.
+    // which is the one that silently stops running for good.
     files: ['**/*.test.ts'],
     rules: {
       'playwright/no-skipped-test': ['warn', { allowConditional: true }],

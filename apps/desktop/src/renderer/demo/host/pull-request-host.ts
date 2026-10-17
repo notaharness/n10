@@ -134,8 +134,8 @@ export function demoDetail(
 
 export function createPullRequestHost(state: DemoState): PullRequestHost {
   return {
-    getPullRequestSnapshot: ({ ref }) => {
-      const repo = state.repo();
+    getPullRequestSnapshot: (cwd, { ref }) => {
+      const repo = state.repoAt(cwd);
       const pr = repo.pr(ref.number);
       return later({
         ref,
@@ -156,8 +156,8 @@ export function createPullRequestHost(state: DemoState): PullRequestHost {
     },
     // Readiness, the list and who must review, as core makes them of a
     // provider's reads.
-    getPullRequestChecks: ({ ref }) => {
-      const repo = state.repo();
+    getPullRequestChecks: (cwd, { ref }) => {
+      const repo = state.repoAt(cwd);
       const pr = repo.pr(ref.number);
       if (!pr) {
         return Promise.reject(new Error(`#${ref.number} is not in the demo`));
@@ -184,8 +184,8 @@ export function createPullRequestHost(state: DemoState): PullRequestHost {
       });
     },
     // The threads the review host holds, anchored in the real diff.
-    getPullRequestConversation: async ({ ref }) => {
-      const repo = state.repo();
+    getPullRequestConversation: async (cwd, { ref }) => {
+      const repo = state.repoAt(cwd);
       const pr = repo.pr(ref.number);
       if (!pr) throw new Error(`#${ref.number} is not in the demo`);
       const patch = load(repo.data.diffs[pr.sourceBranch]);

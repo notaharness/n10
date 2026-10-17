@@ -1,171 +1,76 @@
-import {
-  GitBranchIcon,
-  GitPullRequestIcon,
-  SettingsIcon,
-  TerminalIcon,
-  XIcon,
-} from 'lucide-react';
+import { BrainIcon } from 'lucide-react';
+import type { ReactElement } from 'react';
+import { toast } from 'sonner';
 import type {
-  ContextMenuItem,
   SessionActivitySnapshot,
   SidebarItem,
 } from '../../../host/contract.js';
+import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { usePlanCount } from '../../lib/plan/plan.js';
 import { useHoverPrewarm } from '../../lib/tabs/prewarm.js';
 import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
-import {
-  repoDisplayName,
-  tabPresentation,
-  type TabFace,
-} from '../../lib/tabs/tab-presentation.js';
+import { cutSide, tabPresentation } from '../../lib/tabs/tab-presentation.js';
 import { useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import type { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
-import { cn } from '../../lib/utils.js';
+import { cn, errorMessage } from '../../lib/utils.js';
 import { pressWithoutFocus } from './tab-keyboard.js';
+import { runTabMenu } from './tab-menu.js';
+import { playerMarks } from '../../lib/tabs/orchestrator-tabs.js';
+import { OrchestratorPlayers, type PlayerRow } from './OrchestratorPlayers.js';
+import { FACE_ICON, TabIcon } from './TabIcon.js';
+import {
+  PlanCountBadge,
+  RemovedMark,
+  RepoBand,
+  TabCloseButton,
+  tabStateClassName,
+  UnseenDot,
+} from './tab-marks.js';
+import { TabLabel } from './TabLabel.js';
 import { useSortableTab } from './TabStrip.js';
 
 type Closer = ReturnType<typeof useCloseTabs>;
 
-/** The tab's kind icon, with the agent's state hung off its corner. */
-function TabIcon({
-  Icon,
-  running,
-  snapshot,
+/** An orchestrator tab's player count, where its close button would
+ *  be: the tab closes from its menu, middle click or Delete instead.
+ *  It blinks for a hidden player that finished, which the tab's own
+ *  blink cannot show while the tab is selected. */
+function PlayerCount({
+  count,
+  attention,
 }: {
-  Icon: typeof SettingsIcon;
-  running: boolean;
-  snapshot: SessionActivitySnapshot | undefined;
+  count: number;
+  attention: boolean;
 }) {
-  return (
-    <span className="relative flex shrink-0">
-      <Icon className="size-4" />
-      {snapshot?.active ? (
-        <span className="absolute -right-1 -bottom-1 flex items-center justify-center rounded-full bg-tab-active p-0.5">
-          <span className="agent-spinner size-2.5 rounded-full" />
-        </span>
-      ) : running ? (
-        <span className="absolute -right-0.5 -bottom-0.5 size-2 rounded-full bg-success ring-2 ring-tab-active" />
-      ) : null}
-    </span>
-  );
-}
-
-const FACE_ICON: Record<TabFace, typeof SettingsIcon> = {
-  settings: SettingsIcon,
-  pr: GitPullRequestIcon,
-  branch: GitBranchIcon,
-  terminal: TerminalIcon,
-};
-
-/**
- * The tab's title, prefixed with its repository when that is not the
- * open one — the strip spans repos, and `main` alone says nothing about
- * which checkout it is.
- */
-function TabLabel({
-  label,
-  preview,
-  foreignRepo,
-}: {
-  label: string;
-  preview: boolean;
-  foreignRepo: string | null;
-}) {
-  return (
-    <span className={cn('min-w-0 flex-1 truncate', preview && 'italic')}>
-      {foreignRepo && (
-        <span className="text-muted-foreground/70">
-          {repoDisplayName(foreignRepo)}
-          <span className="px-0.5 opacity-60">/</span>
-        </span>
-      )}
-      {label}
-    </span>
-  );
-}
-
-/** How many comments this tab's PR has queued in the plan. */
-function PlanCountBadge({ count }: { count: number }) {
-  if (count <= 0) return null;
   return (
     <span
-      aria-label={`${count} comment${count === 1 ? '' : 's'} in the plan`}
-      className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] font-medium tabular-nums text-primary"
+      data-player-count
+      data-attention={attention || undefined}
+      aria-label={`${count} player${count === 1 ? '' : 's'}${
+        attention ? ', needs attention' : ''
+      }`}
+      className={cn(
+        '-mr-1.5 flex h-5 min-w-5 shrink-0 items-center justify-center rounded px-1 text-xs font-medium tabular-nums',
+        attention && 'count-attention'
+      )}
     >
       {count}
     </span>
   );
 }
 
-/** A tab that opened in the background and has not been looked at. */
-function UnseenDot() {
-  return (
-    <span
-      aria-label="Not yet opened"
-      className="size-1.5 shrink-0 rounded-full bg-primary"
-    />
-  );
-}
-
-/** Always rendered; revealed on hover, or while the tab is active.
- *  Out of the Tab order: the row is one Tab stop, and Delete closes
- *  the focused tab. */
-function TabCloseButton({
-  active,
-  onClose,
-}: {
-  active: boolean;
-  onClose: (e: React.MouseEvent) => void;
-}) {
-  return (
-    <button
-      type="button"
-      tabIndex={-1}
-      onClick={onClose}
-      aria-label="Close tab"
-      className={cn(
-        'flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100',
-        active && 'opacity-100'
-      )}
-    >
-      <XIcon className="size-3.5" />
-    </button>
-  );
-}
-
 /** The hover title: the full path, for telling two checkouts of the
- *  same repo apart — and a terminal's whole directory, since its label
- *  is cut from the front. */
-function tabTitle(tab: Tab, foreignRepo: string | null): string | undefined {
+ *  same repo apart — and a terminal's absolute directory, where its
+ *  label shows it from home. None over an orchestrator's player list,
+ *  which opens where the native tooltip would. */
+function tabTitle(
+  tab: Tab,
+  foreignRepo: string | null,
+  players: readonly PlayerRow[] | undefined
+): string | undefined {
+  if (players?.length) return undefined;
   if (foreignRepo) return foreignRepo;
   return tab.kind === 'terminal' ? tab.cwd : undefined;
-}
-
-/** The native context menu a tab offers. */
-function tabMenuItems(tab: Tab, tabCount: number): ContextMenuItem[] {
-  const items: ContextMenuItem[] = [
-    { id: 'close', label: 'Close' },
-    { id: 'close-others', label: 'Close Others', enabled: tabCount > 1 },
-    { id: 'close-all', label: 'Close All' },
-  ];
-  if (tab.preview) {
-    items.push({ type: 'separator' }, { id: 'pin', label: 'Keep Open' });
-  }
-  return items;
-}
-
-async function runTabMenu(
-  tab: Tab,
-  tabs: ReturnType<typeof useTabs>,
-  closer: Closer
-): Promise<void> {
-  const chosen = await window.n10.showContextMenu(
-    tabMenuItems(tab, tabs.tabs.length)
-  );
-  if (chosen === 'close') closer.close(tab.id);
-  else if (chosen === 'close-others') closer.closeOthers(tab.id);
-  else if (chosen === 'close-all') closer.closeAll();
-  else if (chosen === 'pin') tabs.pin(tab.id);
 }
 
 function tabClassName({
@@ -173,23 +78,97 @@ function tabClassName({
   unseen,
   dragging,
   flashing,
+  wrap,
 }: {
   active: boolean;
   unseen: boolean;
   dragging: boolean;
   flashing: boolean;
+  wrap: boolean;
 }): string {
   return cn(
-    'group relative flex h-full max-w-56 min-w-28 cursor-default items-center gap-2 border-r border-border pr-1.5 pl-3 text-base transition-colors select-none',
-    // Lifted above the tabs it slides over, and opaque across them;
-    // the active tab's own background wins below.
-    dragging && 'z-10 bg-tab',
-    active
-      ? 'bg-tab-active text-foreground'
-      : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
-    unseen && 'text-foreground',
-    // The agent finished a work streak and nobody has looked yet.
-    flashing && !active && 'tab-attention'
+    'group relative flex h-9 min-w-28 cursor-default items-center gap-2 border-r border-border px-3 text-base transition-colors select-none',
+    // Wrapped, a full row's tabs share its width (TabStrip's end takes
+    // the last row's room); in one row, each keeps its own.
+    wrap ? 'grow' : 'max-w-56',
+    // Lifted above the tabs it slides over.
+    dragging && 'z-10',
+    tabStateClassName({ active, unseen, flashing })
+  );
+}
+
+/** The tab's own state, with an orchestrator's players' folded in. */
+function tabState(
+  active: boolean,
+  unseen: boolean,
+  snapshot: SessionActivitySnapshot | undefined,
+  players: readonly PlayerRow[] | undefined
+): {
+  selected: boolean;
+  unseen: boolean;
+  flashing: boolean;
+  playerFlashing: boolean;
+} {
+  const group = playerMarks(players);
+  return {
+    selected: active || group.active,
+    unseen: unseen || group.unseen,
+    flashing: snapshot?.flashing ?? false,
+    playerFlashing: group.flashing,
+  };
+}
+
+/** What follows the label: the plan count, the removed and unseen
+ *  marks, and the close button — or, on an orchestrator's tab with
+ *  player tabs, their count in its place. */
+function TabEnd({
+  item,
+  unseen,
+  players,
+  playerFlashing,
+  onClose,
+}: {
+  item: SidebarItem | undefined;
+  unseen: boolean;
+  players: readonly PlayerRow[] | undefined;
+  playerFlashing: boolean;
+  onClose: () => void;
+}) {
+  // A plan is built inside a tab and then navigated away from, so the
+  // count has to be visible from wherever the user ends up.
+  const planCount = usePlanCount(item?.pr?.id);
+  return (
+    <>
+      <PlanCountBadge count={planCount} />
+      <RemovedMark item={item} />
+      {unseen && <UnseenDot />}
+      {players?.length ? (
+        <PlayerCount count={players.length} attention={playerFlashing} />
+      ) : (
+        <TabCloseButton
+          onClose={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/** An orchestrator's tab opens its player tabs' list on hover. Wrapped
+ *  whether or not it has any, so its first player coming or its last
+ *  going does not remount the tab. */
+function withPlayers(
+  tab: ReactElement,
+  players: readonly PlayerRow[] | undefined,
+  onClose: (id: string) => void
+): ReactElement {
+  if (!players) return tab;
+  return (
+    <OrchestratorPlayers players={players} onClose={onClose}>
+      {tab}
+    </OrchestratorPlayers>
   );
 }
 
@@ -204,6 +183,8 @@ export function TabButton({
   running = false,
   unseen = false,
   machineLabel,
+  repoColor = null,
+  players,
 }: {
   tab: Tab;
   item: SidebarItem | undefined;
@@ -223,19 +204,21 @@ export function TabButton({
   /** The tab's machine, resolved by the caller — null for a local tab,
    *  or with only the local machine registered (ux-machines.md §6, D8). */
   machineLabel?: string | null;
+  /** Its repository's colour, or null for a tab with none. */
+  repoColor?: string | null;
+  /** Set on an Orchestra orchestrator's tab: its player tabs, which the
+   *  strip shows under it rather than beside it. Their selection,
+   *  unseen mark and attention blink show on this tab. */
+  players?: readonly PlayerRow[];
 }) {
   const tabs = useTabs();
+  const { tabOverflow } = useDesktopPrefs();
   const { label, face } = tabPresentation(tab, item, machineLabel);
-  const Icon = FACE_ICON[face];
-  // A plan is built inside a tab and then navigated away from, so the
-  // count has to be visible from wherever the user ends up.
-  const planCount = usePlanCount(item?.pr?.id);
-  // Resting on a tab renders its pane ahead of the press; another
-  // repository's tab has no pane here to render.
-  const hover = useHoverPrewarm(
-    () => (active || foreignRepo ? null : tab),
-    true
-  );
+  const Icon = players ? BrainIcon : FACE_ICON[face];
+  const state = tabState(active, unseen, snapshot, players);
+  // Resting on a tab renders its pane ahead of the press, another
+  // repository's against what the app holds for that one.
+  const hover = useHoverPrewarm(() => (active ? null : tab), true);
   const { setNode, props, style, isDragging } = useSortableTab({
     id: tab.id,
     label,
@@ -249,13 +232,13 @@ export function TabButton({
     },
   });
 
-  return (
+  return withPlayers(
     <div
       ref={setNode}
       {...props}
       {...hover.handlers}
       style={style}
-      aria-selected={active}
+      aria-selected={state.selected}
       onMouseDown={(e) => {
         pressWithoutFocus(e);
         if (e.button === 1) {
@@ -267,34 +250,45 @@ export function TabButton({
       onDoubleClick={() => tabs.pin(tab.id)}
       onContextMenu={(e) => {
         e.preventDefault();
-        void runTabMenu(tab, tabs, closer);
+        runTabMenu(tab, tabs, closer, tabOverflow, players).catch(
+          (err: unknown) => toast.error(errorMessage(err))
+        );
       }}
-      title={tabTitle(tab, foreignRepo)}
+      title={tabTitle(tab, foreignRepo, players)}
       data-face={face}
-      data-unseen={unseen || undefined}
+      data-unseen={state.unseen || undefined}
+      data-orchestrator={players ? true : undefined}
       className={tabClassName({
-        active,
-        unseen,
+        active: state.selected,
+        unseen: state.unseen,
         dragging: isDragging,
-        flashing: snapshot?.flashing ?? false,
+        flashing: state.flashing,
+        wrap: tabOverflow === 'wrap',
       })}
     >
-      {active && <span className="absolute inset-x-0 top-0 h-px bg-primary" />}
       <TabIcon
         Icon={Icon}
         running={item ? itemRunning(item) : running}
         snapshot={snapshot}
+        active={state.selected}
       />
-      <TabLabel label={label} preview={tab.preview} foreignRepo={foreignRepo} />
-      <PlanCountBadge count={planCount} />
-      {unseen && <UnseenDot />}
-      <TabCloseButton
-        active={active}
-        onClose={(e) => {
-          e.stopPropagation();
-          closer.close(tab.id);
-        }}
+      <TabLabel
+        label={label}
+        preview={tab.preview}
+        foreignRepo={foreignRepo}
+        cut={cutSide(face)}
       />
-    </div>
+      <TabEnd
+        item={item}
+        unseen={state.unseen}
+        players={players}
+        playerFlashing={state.playerFlashing}
+        onClose={() => closer.close(tab.id)}
+      />
+      {/* After the close button, so its cover leaves the band whole. */}
+      <RepoBand color={repoColor} />
+    </div>,
+    players,
+    closer.close
   );
 }

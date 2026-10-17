@@ -5,7 +5,6 @@ import {
   type ActionId,
 } from '@n10/core';
 import { handleReplyModeInput } from '../../utils/reply-mode.js';
-import { updateComment, removeComment } from '@n10/review-comments';
 import { handlePlanAnnotateInput } from '../../utils/plan-annotate-mode.js';
 import type { DiffViewerHandlerCtx } from './input-types.js';
 import { DIFF_VIEWER_ACTIONS } from './diff-viewer-actions.js';
@@ -23,9 +22,18 @@ function handleInlineEditMode(
 ): void {
   if (key.escape) {
     if (ctx.commentCtx) {
-      updateComment(ctx.commentCtx.prId, editingCommentId, {
-        body: ctx.pane.editBuffer,
-      });
+      try {
+        ctx.commentCtx.service.update(ctx.commentCtx.prId, editingCommentId, {
+          body: ctx.pane.editBuffer,
+        });
+      } catch (error) {
+        ctx.sessions.flashStatus(
+          `Could not save comment: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+        return;
+      }
     }
     ctx.pane.setEditingCommentId(null);
     ctx.pane.setEditBuffer('');
@@ -51,7 +59,20 @@ function handleDeleteConfirmMode(
   pendingDeleteCommentId: string
 ): void {
   if (input === 'y' && ctx.commentCtx) {
-    removeComment(ctx.commentCtx.prId, pendingDeleteCommentId);
+    try {
+      ctx.commentCtx.service.remove(
+        ctx.commentCtx.prId,
+        pendingDeleteCommentId
+      );
+    } catch (error) {
+      ctx.sessions.flashStatus(
+        `Could not delete comment: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      ctx.pane.setPendingDeleteCommentId(null);
+      return;
+    }
     ctx.pane.setPendingDeleteCommentId(null);
     ctx.pane.setSelectedCommentId(null);
     return;

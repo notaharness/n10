@@ -3,8 +3,7 @@ import type { ElectronApplication } from '@playwright/test';
 /**
  * How late the main process runs a timer, sampled every 10 ms.
  *
- * The main process answers every renderer call and, while it hosts the
- * sessions, parses and relays every chunk of agent output as well. When
+ * The main process forwards renderer calls and host terminal events. When
  * it is busy, a click waits on it; this is the number that says how
  * long. Read as percentiles of the delay past each 10 ms tick.
  */

@@ -70,7 +70,7 @@ async function openAgentTab(page: Page, branch: string): Promise<void> {
   await page.waitForFunction(
     (b) =>
       Array.from(
-        document.querySelectorAll('[data-editor-panes] .wterm .term-row')
+        document.querySelectorAll('[data-editor-panes] .xterm-rows > div')
       ).some((r) => r.textContent?.includes(`@${b}`)),
     branch,
     { timeout: 60_000 }
@@ -156,26 +156,13 @@ function logPercentiles(samples: Samples, keys: string[]): void {
   }
 }
 
-/** Lines the active terminal can show, scrollback included. wterm
- *  renders only the rows in view, but sizes its scroller for all of
- *  them. */
-async function activeLines(page: Page): Promise<number> {
-  return page.evaluate(() => {
-    const el = document.querySelector<HTMLElement>(
-      '[data-editor-panes] .wterm'
-    );
-    const row = el?.querySelector<HTMLElement>('.term-row');
-    if (!el || !row) return NaN;
-    return Math.round(el.scrollHeight / row.getBoundingClientRect().height);
-  });
-}
-
 /** The largest ring buffer the host holds for any agent, read the way
  *  a mounting terminal reads it: a watch, answered, then released. */
 async function largestBufferKb(page: Page): Promise<number> {
   return page.evaluate(async () => {
     let most = 0;
-    for (const { name } of await window.n10.listSessions()) {
+    const repo = (await window.n10.getRepo())!.cwd;
+    for (const { name } of await window.n10.listSessions(repo)) {
       const { data } = await window.n10.watchSession(name);
       await window.n10.unwatchSession(name);
       most = Math.max(most, data.length);
@@ -218,7 +205,7 @@ async function measureOnce(repoPath: string, samples: Samples): Promise<void> {
         () => document.querySelectorAll('*').length
       ),
       terminals: await page.evaluate(
-        () => document.querySelectorAll('.wterm').length
+        () => document.querySelectorAll('[data-terminal-grid]').length
       ),
       largestBufferKb: await largestBufferKb(page),
     });
@@ -255,7 +242,6 @@ async function measureOnce(repoPath: string, samples: Samples): Promise<void> {
         bigSwitchOwnMs: t.ownMs,
       });
       await pace(page, 400);
-      collect(samples, { bigLines: await activeLines(page) });
       await timedSwitch(page, SWITCH, 'agent-0');
       await pace(page, 400);
       await timedSwitch(page, SWITCH, 'agent-1');

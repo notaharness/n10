@@ -17,13 +17,17 @@ import {
 } from '../setup/git-repo.js';
 import { killFixtureSessions } from '../setup/tmux.js';
 import { appEnv } from './app-env.js';
-import { fakeAdoLoaded, fakeAdoMisses } from '../setup/fake-ado.js';
+import { fakeAdoMisses } from '../setup/fake-ado.js';
 import {
   NETWORK_GUARD_PRELOAD,
   networkGuardBase,
   takeNetworkRefusals,
-  unguardedProcesses,
 } from '../setup/network-guard.js';
+import {
+  forgetPreloads,
+  missingPreloads,
+  requirePreloads,
+} from './preloads.js';
 import { closeDesktopApp } from '../setup/app-close.js';
 import type { TerminalSeed } from '../setup/terminals.js';
 import {
@@ -55,6 +59,13 @@ export interface DesktopOptions extends HomeSeed {
    * clone the shared sandbox repo once per file.
    */
   repoPathOverride?: string;
+  /** Give the window WebGL, in software (SwiftShader), so terminals
+   *  draw with xterm's WebGL renderer. Without it there is no GPU and
+   *  they use xterm's DOM renderer, whose rows are text to assert on. */
+  webgl?: boolean;
+  /** Create the test repo inside the app's HOME (`fixtureHome`), where
+   *  a path is home-relative, instead of a temp directory beside it. */
+  repoInHome?: boolean;
   /**
    * Hand the app a GitHub token. Its HOME is isolated, so the `gh` CLI
    * it authenticates through cannot see the developer's stored
@@ -101,6 +112,10 @@ export interface DesktopApp {
   pageErrors: string[];
   /** Evaluate in the main process (e.g. to inspect host services). */
   main: ElectronApplication['evaluate'];
+  /** Quit the app and start it again on the same HOME, tmux socket and
+   *  environment, as a user closing and reopening n10 would. `app`,
+   *  `page` and `main` then answer for the new process. */
+  relaunch(): Promise<void>;
 }
 
 export const test = base.extend<
@@ -122,10 +137,14 @@ export const test = base.extend<
   repo: [undefined, { option: true }],
   startWithoutRepo: [false, { option: true }],
   repoPathOverride: [undefined, { option: true }],
+  repoInHome: [false, { option: true }],
+  webgl: [false, { option: true }],
   githubToken: [undefined, { option: true }],
   drafts: [undefined, { option: true }],
+  guides: [undefined, { option: true }],
   fakeGitHub: [undefined, { option: true }],
   fakeAzureDevOps: [undefined, { option: true }],
+  tmuxConf: [undefined, { option: true }],
   liveSessions: [undefined, { option: true }],
   env: [undefined, { option: true }],
   liveTerminals: [undefined, { option: true }],
@@ -138,10 +157,14 @@ export const test = base.extend<
       repo,
       startWithoutRepo,
       repoPathOverride,
+      repoInHome,
+      webgl,
       githubToken,
       drafts,
+      guides,
       fakeGitHub,
       fakeAzureDevOps,
+      tmuxConf,
       liveSessions,
       env,
       liveTerminals,
@@ -153,92 +176,97 @@ export const test = base.extend<
     provide,
     testInfo
   ) => {
-    const ownsRepo = !repoPathOverride;
-    const repoPath = repoPathOverride ?? createTestRepo(repo ?? {});
+    // A repo in the fixture HOME goes with it.
+    const ownsRepo = !repoPathOverride && !repoInHome;
+    const repoPath =
+      repoPathOverride ??
+      createTestRepo({
+        ...repo,
+        ...(repoInHome ? { parent: fixtureHome } : {}),
+      });
     const homeDir = fixtureHome;
     const ghEnv = seedHome(homeDir, repoPath, {
       n10Config,
       projectConfig,
       desktopPrefs,
       drafts,
+      guides,
       fakeGitHub,
       fakeAzureDevOps,
+      tmuxConf,
     });
 
     seedTmux(repoPath, homeDir, liveSessions, liveTerminals);
     // A real token is the @integration suite reaching GitHub on purpose.
     const networkGuard = githubToken ? undefined : networkGuardBase(homeDir);
 
-    const app = await electron.launch({
-      args: launchArgs(networkGuard !== undefined),
-      cwd: WORKSPACE_ROOT,
-      env: appEnv({
-        homeDir,
-        repoPath,
-        startWithoutRepo,
-        githubToken,
-        ghEnv,
-        networkGuard,
-        extra: env,
-      }),
-      timeout: 60_000,
+    const launchEnv = appEnv({
+      homeDir,
+      repoPath,
+      startWithoutRepo,
+      githubToken,
+      ghEnv,
+      networkGuard,
+      extra: env,
     });
+    const wanted = {
+      ado: fakeAzureDevOps !== undefined,
+      guard: networkGuard !== undefined,
+    };
+    const launch = async (): Promise<ElectronApplication> => {
+      // A relaunch proves its own preloads, not the first launch's.
+      forgetPreloads(homeDir);
+      return electron.launch({
+        args: launchArgs(wanted.guard, webgl),
+        cwd: WORKSPACE_ROOT,
+        env: launchEnv,
+        timeout: 60_000,
+      });
+    };
+    let app = await launch();
 
     const page = await app.firstWindow();
     await requirePreloads(
       app,
-      missingPreloads(homeDir, {
-        ado: fakeAzureDevOps !== undefined,
-        guard: networkGuard !== undefined,
-      }),
+      missingPreloads(homeDir, wanted),
       () => ownsRepo && cleanupTestRepo(repoPath)
     );
 
-    // Chromium throttles requestAnimationFrame in a window it considers
-    // hidden or occluded, and under xvfb (or behind another window on a
-    // developer's desktop) that is the normal state. Playwright's
-    // actionability check waits for two consecutive stable animation
-    // frames before it will click, so a throttled window makes every
-    // click hang until the timeout even though the page is perfectly
-    // idle. Show, focus and un-throttle before any test touches it.
-    await app.evaluate(({ BrowserWindow }) => {
-      const win = BrowserWindow.getAllWindows()[0];
-      if (!win) return;
-      win.webContents.setBackgroundThrottling(false);
-      win.show();
-      win.focus();
-    });
-
     const pageErrors: string[] = [];
     const consoleErrors: string[] = [];
-    page.on('pageerror', (err) =>
-      pageErrors.push(err.stack || err.message || String(err))
-    );
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') consoleErrors.push(msg.text());
-    });
+    await readyWindow(app, page, startWithoutRepo, pageErrors, consoleErrors);
 
-    await page.waitForLoadState('domcontentloaded');
-    if (!startWithoutRepo) {
-      // The workspace has rendered (not the repo picker, not a blank
-      // window) once the sidebar's actions exist.
-      await page
-        .getByRole('button', { name: 'New worktree', exact: true })
-        .first()
-        .waitFor({ state: 'visible', timeout: 30_000 });
-    }
-
+    const desktop: DesktopApp = {
+      app,
+      page,
+      repoPath,
+      homeDir,
+      pageErrors,
+      main: app.evaluate.bind(app),
+      async relaunch() {
+        await closeDesktopApp(app);
+        app = await launch();
+        const next = await app.firstWindow();
+        // The test's teardown cleans up after it.
+        await requirePreloads(app, missingPreloads(homeDir, wanted));
+        await readyWindow(
+          app,
+          next,
+          startWithoutRepo,
+          pageErrors,
+          consoleErrors
+        );
+        Object.assign(desktop, {
+          app,
+          page: next,
+          main: app.evaluate.bind(app),
+        });
+      },
+    };
     let used = false;
     let refusals: string[] = [];
     try {
-      await provide({
-        app,
-        page,
-        repoPath,
-        homeDir,
-        pageErrors,
-        main: app.evaluate.bind(app),
-      });
+      await provide(desktop);
       used = true;
     } finally {
       if (consoleErrors.length) {
@@ -280,9 +308,49 @@ export const test = base.extend<
   },
 });
 
+/**
+ * Make a launched window ready for a test. Chromium throttles
+ * requestAnimationFrame in a window it considers hidden or occluded, and
+ * under xvfb (or behind another window on a developer's desktop) that is
+ * the normal state. Playwright's actionability check waits for two
+ * consecutive stable animation frames before it will click, so a
+ * throttled window makes every click hang until the timeout even though
+ * the page is perfectly idle. Show, focus and un-throttle before any
+ * test touches it, and collect what the renderer reports as errors.
+ */
+async function readyWindow(
+  app: ElectronApplication,
+  page: Page,
+  startWithoutRepo: boolean | undefined,
+  pageErrors: string[],
+  consoleErrors: string[]
+): Promise<void> {
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win) return;
+    win.webContents.setBackgroundThrottling(false);
+    win.show();
+    win.focus();
+  });
+  page.on('pageerror', (err) =>
+    pageErrors.push(err.stack || err.message || String(err))
+  );
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  await page.waitForLoadState('domcontentloaded');
+  if (startWithoutRepo) return;
+  // The workspace has rendered (not the repo picker, not a blank
+  // window) once the sidebar's actions exist.
+  await page
+    .getByRole('button', { name: 'New worktree', exact: true })
+    .first()
+    .waitFor({ state: 'visible', timeout: 30_000 });
+}
+
 /** Electron's arguments. The network guard goes first, before any of
  *  the app's code. */
-function launchArgs(guarded: boolean): string[] {
+function launchArgs(guarded: boolean, webgl?: boolean): string[] {
   return [
     ...(guarded ? ['-r', NETWORK_GUARD_PRELOAD] : []),
     APP_DIR,
@@ -291,36 +359,9 @@ function launchArgs(guarded: boolean): string[] {
     '--no-sandbox',
     '--disable-gpu',
     '--ozone-platform=x11',
+    // WebGL with no GPU, which Chromium allows only when asked.
+    ...(webgl ? ['--enable-unsafe-swiftshader'] : []),
   ];
-}
-
-/** The preloads a test needs that are not in place. */
-function missingPreloads(
-  homeDir: string,
-  wanted: { ado: boolean; guard: boolean }
-): string[] {
-  const missing = wanted.guard
-    ? unguardedProcesses(homeDir).map((type) => `the network guard (${type})`)
-    : [];
-  if (wanted.ado && !fakeAdoLoaded(homeDir)) {
-    missing.push('the Azure DevOps fake');
-  }
-  return missing;
-}
-
-/** Stop unless every preload the test needs loaded. The Azure DevOps
- *  fake writes the token, so without it the app has no credentials and
- *  has asked Azure nothing; the network guard refuses what gets past
- *  the fakes. A run without either is stopped all the same. */
-async function requirePreloads(
-  app: ElectronApplication,
-  missing: string[],
-  cleanup: () => void
-): Promise<void> {
-  if (missing.length === 0) return;
-  await closeDesktopApp(app);
-  cleanup();
-  throw new Error(`Did not load: ${missing.join(', ')}`);
 }
 
 /** What a test that passed must not have left behind. An uncaught

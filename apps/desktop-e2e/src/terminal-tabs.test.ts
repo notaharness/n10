@@ -67,7 +67,7 @@ test.describe('Terminal tabs', () => {
     // be up first — a keystroke sent while the shell is still starting
     // is read in cooked mode and lost.
     await expect(
-      page.locator('[data-terminal-pane]').getByText(/\S/).first()
+      page.locator('[data-terminal-pane] .xterm-rows').getByText(/\S/).first()
     ).toBeVisible({ timeout: 15_000 });
     await focusTerminal(page);
     await page.keyboard.type('echo n10-shell-$((40+2))\n', { delay: 20 });
@@ -101,7 +101,7 @@ test.describe('Terminal tabs', () => {
     await expect(tab).toHaveCount(1);
 
     await expect(
-      page.locator('[data-terminal-pane]').getByText(/\S/).first()
+      page.locator('[data-terminal-pane] .xterm-rows').getByText(/\S/).first()
     ).toBeVisible({ timeout: 15_000 });
     await focusTerminal(page);
     await page.keyboard.type('exit\n', { delay: 20 });
@@ -184,7 +184,7 @@ test.describe('Terminal tabs', () => {
       const tab = terminalTabs(page);
       await expect(tab).toHaveCount(1);
       await expect(tab).toHaveAttribute('aria-selected', 'true');
-      await expect(tab).not.toContainText('picked-repo/');
+      await expect(tab).not.toHaveAccessibleName(/^picked-repo\//);
     } finally {
       cleanupTestRepo(other);
     }
@@ -314,5 +314,64 @@ test.describe('Agent terminals', () => {
     // tmux emits terminal control sequences around its repaint. Assert
     // the agent's displayed seed line rather than matching raw ANSI bytes.
     await expect(visibleText(page, /^seed:\s*$/)).toBeVisible();
+  });
+});
+
+test.describe('Terminal shell', () => {
+  const SHELL = '/bin/bash';
+
+  /** Open a shell terminal and have it name the shell it is running. */
+  async function openedShell(desktop: {
+    app: Parameters<typeof openNewTerminalDialog>[0];
+    page: Parameters<typeof openNewTerminalDialog>[1];
+  }) {
+    const { app, page } = desktop;
+    await openNewTerminalDialog(app, page);
+    await confirmNewTerminal(page, 'Shell');
+    await expect(
+      page.locator('[data-terminal-pane] .xterm-rows').getByText(/\S/).first()
+    ).toBeVisible({ timeout: 15_000 });
+    await focusTerminal(page);
+    await page.keyboard.type('echo shell-$(ps -o comm= -p $$)\n', {
+      delay: 20,
+    });
+    return page;
+  }
+
+  test.describe('configured', () => {
+    test.use({ env: { SHELL: '/bin/sh' }, n10Config: { shell: 'bash' } });
+
+    test('a new terminal runs the shell from the Shell setting', async ({
+      desktop,
+    }) => {
+      const page = await openedShell(desktop);
+      await expect(visibleText(page, 'shell-bash')).toBeVisible({
+        timeout: 15_000,
+      });
+    });
+  });
+
+  test.describe('auto', () => {
+    test.use({ env: { SHELL } });
+
+    test('a new terminal runs the login shell from $SHELL', async ({
+      desktop,
+    }) => {
+      const page = await openedShell(desktop);
+      await expect(visibleText(page, 'shell-bash')).toBeVisible({
+        timeout: 15_000,
+      });
+    });
+  });
+
+  test.describe('auto without a runnable $SHELL', () => {
+    test.use({ env: { SHELL: '/nonexistent/shell' } });
+
+    test('a new terminal runs sh', async ({ desktop }) => {
+      const page = await openedShell(desktop);
+      await expect(visibleText(page, 'shell-sh')).toBeVisible({
+        timeout: 15_000,
+      });
+    });
   });
 });

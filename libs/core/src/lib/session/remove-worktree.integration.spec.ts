@@ -1,3 +1,4 @@
+import type * as WorktreeManager from '@n10/worktree-manager';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -82,33 +83,39 @@ const branchExists = () => git(repo, 'branch', '--list', 'feature') !== '';
 
 describe('removing a worktree as confirmed', () => {
   it('removes a clear worktree and its branch', async () => {
-    const check = await checkWorktreeRemoval('feature', repo);
+    const check = await checkWorktreeRemoval('feature', worktreeScope(repo));
     expect(check.verdict).toBe('clear');
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe('removed');
+    expect(
+      await removeWorktreeSession('feature', check, worktreeScope(repo))
+    ).toBe('removed');
 
     expect(existsSync(worktree)).toBe(false);
     expect(branchExists()).toBe(false);
   });
 
   it('keeps a commit made after the check', async () => {
-    const check = await checkWorktreeRemoval('feature', repo);
+    const check = await checkWorktreeRemoval('feature', worktreeScope(repo));
     const later = commit(worktree, 'unpushed.txt');
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
+    expect(
+      await removeWorktreeSession('feature', check, worktreeScope(repo))
+    ).toBe('changed');
 
     expect(existsSync(worktree)).toBe(true);
     expect(git(repo, 'rev-parse', 'feature')).toBe(later);
   });
 
   it('keeps a file written after a check that found nothing to force', async () => {
-    const check = await checkWorktreeRemoval('feature', repo);
+    const check = await checkWorktreeRemoval('feature', worktreeScope(repo));
     writeFileSync(
       join(worktree, 'draft.txt'),
       'written while the prompt was open'
     );
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
+    expect(
+      await removeWorktreeSession('feature', check, worktreeScope(repo))
+    ).toBe('changed');
 
     expect(existsSync(join(worktree, 'draft.txt'))).toBe(true);
     expect(branchExists()).toBe(true);
@@ -116,13 +123,15 @@ describe('removing a worktree as confirmed', () => {
 
   it('forces past the uncommitted changes the user confirmed', async () => {
     writeFileSync(join(worktree, 'draft.txt'), 'seen in the prompt');
-    const check = await checkWorktreeRemoval('feature', repo);
+    const check = await checkWorktreeRemoval('feature', worktreeScope(repo));
     expect(check).toMatchObject({
       verdict: 'force',
       reason: 'uncommitted changes',
     });
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe('removed');
+    expect(
+      await removeWorktreeSession('feature', check, worktreeScope(repo))
+    ).toBe('removed');
 
     expect(existsSync(worktree)).toBe(false);
     expect(branchExists()).toBe(false);
@@ -133,7 +142,9 @@ describe('removing a worktree as confirmed', () => {
     commit(worktree, 'unpushed.txt');
     writeFileSync(join(worktree, 'draft.txt'), 'scratch');
 
-    expect(await checkWorktreeRemoval('feature', repo)).toMatchObject({
+    expect(
+      await checkWorktreeRemoval('feature', worktreeScope(repo))
+    ).toMatchObject({
       verdict: 'force',
       risks: ['uncommitted changes', 'not pushed to upstream'],
     });
@@ -143,14 +154,16 @@ describe('removing a worktree as confirmed', () => {
   // files written since the check.
   it('keeps a file written after confirming unpushed commits', async () => {
     commit(worktree, 'unpushed.txt');
-    const check = await checkWorktreeRemoval('feature', repo);
+    const check = await checkWorktreeRemoval('feature', worktreeScope(repo));
     expect(check).toMatchObject({
       verdict: 'force',
       risks: ['not pushed to upstream'],
     });
     writeFileSync(join(worktree, 'draft.txt'), 'written after the check');
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
+    expect(
+      await removeWorktreeSession('feature', check, worktreeScope(repo))
+    ).toBe('changed');
 
     expect(existsSync(join(worktree, 'draft.txt'))).toBe(true);
     expect(branchExists()).toBe(true);
@@ -159,7 +172,7 @@ describe('removing a worktree as confirmed', () => {
   // A rebase leaves the branch ref alone until it finishes: an amended
   // commit at an `edit` stop lives only in the checkout's HEAD.
   it('keeps a checkout that started a rebase after the check', async () => {
-    const check = await checkWorktreeRemoval('feature', repo);
+    const check = await checkWorktreeRemoval('feature', worktreeScope(repo));
     execFileSync('git', ['rebase', '-i', 'HEAD~1'], {
       cwd: worktree,
       env: {
@@ -172,7 +185,9 @@ describe('removing a worktree as confirmed', () => {
     git(worktree, 'add', '.');
     git(worktree, 'commit', '-q', '--amend', '-m', 'amended during rebase');
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
+    expect(
+      await removeWorktreeSession('feature', check, worktreeScope(repo))
+    ).toBe('changed');
 
     expect(existsSync(join(worktree, 'amended.txt'))).toBe(true);
   });
@@ -181,23 +196,27 @@ describe('removing a worktree as confirmed', () => {
   it('asks to force past a checked-out submodule, then removes it', async () => {
     addSubmodule();
 
-    const check = await checkWorktreeRemoval('feature', repo);
+    const check = await checkWorktreeRemoval('feature', worktreeScope(repo));
     expect(check).toMatchObject({
       verdict: 'force',
       risks: ['submodules'],
     });
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe('removed');
+    expect(
+      await removeWorktreeSession('feature', check, worktreeScope(repo))
+    ).toBe('removed');
     expect(existsSync(worktree)).toBe(false);
   });
 
   // `--force` past a submodule would also take the file.
   it('keeps a file written after confirming a submodule', async () => {
     addSubmodule();
-    const check = await checkWorktreeRemoval('feature', repo);
+    const check = await checkWorktreeRemoval('feature', worktreeScope(repo));
     writeFileSync(join(worktree, 'draft.txt'), 'written after the check');
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
+    expect(
+      await removeWorktreeSession('feature', check, worktreeScope(repo))
+    ).toBe('changed');
 
     expect(existsSync(join(worktree, 'draft.txt'))).toBe(true);
   });
@@ -210,9 +229,11 @@ describe('removing a worktree as confirmed', () => {
     git(worktree, 'commit', '-q', '-m', 'drop sub');
     git(worktree, 'push', '-q', 'origin', 'feature');
 
-    const check = await checkWorktreeRemoval('feature', repo);
+    const check = await checkWorktreeRemoval('feature', worktreeScope(repo));
     expect(check).toMatchObject({ verdict: 'force', risks: ['submodules'] });
-    expect(await removeWorktreeSession('feature', check, repo)).toBe('removed');
+    expect(
+      await removeWorktreeSession('feature', check, worktreeScope(repo))
+    ).toBe('removed');
   });
 
   // An agent that clones something into its checkout and commits it
@@ -227,9 +248,11 @@ describe('removing a worktree as confirmed', () => {
     git(worktree, 'commit', '-q', '-m', 'vendor it');
     git(worktree, 'push', '-q', 'origin', 'feature');
 
-    const check = await checkWorktreeRemoval('feature', repo);
+    const check = await checkWorktreeRemoval('feature', worktreeScope(repo));
     expect(check).toMatchObject({ verdict: 'force', risks: ['submodules'] });
-    expect(await removeWorktreeSession('feature', check, repo)).toBe('removed');
+    expect(
+      await removeWorktreeSession('feature', check, worktreeScope(repo))
+    ).toBe('removed');
   });
 
   // A user's `status.showUntrackedFiles=no` must not hide a file the
@@ -238,7 +261,9 @@ describe('removing a worktree as confirmed', () => {
     git(repo, 'config', 'status.showUntrackedFiles', 'no');
     writeFileSync(join(worktree, 'draft.txt'), 'untracked');
 
-    expect(await checkWorktreeRemoval('feature', repo)).toMatchObject({
+    expect(
+      await checkWorktreeRemoval('feature', worktreeScope(repo))
+    ).toMatchObject({
       verdict: 'force',
       risks: ['uncommitted changes'],
     });
@@ -247,14 +272,16 @@ describe('removing a worktree as confirmed', () => {
   // Another checkout at the same commit is not the one the user judged.
   it('keeps a checkout that replaced the one judged', async () => {
     writeFileSync(join(worktree, 'scratch.txt'), 'seen in the prompt');
-    const check = await checkWorktreeRemoval('feature', repo);
+    const check = await checkWorktreeRemoval('feature', worktreeScope(repo));
     expect(check).toMatchObject({ verdict: 'force' });
     git(repo, 'worktree', 'remove', '--force', worktree);
     const other = join(repo, '.claude', 'worktrees', 'feature-again');
     git(repo, 'worktree', 'add', '-q', other, 'feature');
     writeFileSync(join(other, 'draft.txt'), 'never judged');
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
+    expect(
+      await removeWorktreeSession('feature', check, worktreeScope(repo))
+    ).toBe('changed');
     expect(existsSync(join(other, 'draft.txt'))).toBe(true);
   });
 
@@ -273,16 +300,18 @@ describe('removing a worktree as confirmed', () => {
       cloned,
       'origin/feature'
     );
-    const check = await checkWorktreeRemoval('feature', clone);
+    const check = await checkWorktreeRemoval('feature', worktreeScope(clone));
     expect(check.tip).toBe(git(repo, 'rev-parse', 'feature'));
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
+    expect(
+      await removeWorktreeSession('feature', check, worktreeScope(repo))
+    ).toBe('changed');
     expect(existsSync(worktree)).toBe(true);
   });
 
   // `git branch -D` can fail too: a stale ref lock, say.
   it('says the branch was kept when git would not delete it', async () => {
-    const check = await checkWorktreeRemoval('feature', repo);
+    const check = await checkWorktreeRemoval('feature', worktreeScope(repo));
     const common = git(
       repo,
       'rev-parse',
@@ -291,18 +320,20 @@ describe('removing a worktree as confirmed', () => {
     );
     writeFileSync(join(common, 'refs', 'heads', 'feature.lock'), '');
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe(
-      'kept-branch'
-    );
+    expect(
+      await removeWorktreeSession('feature', check, worktreeScope(repo))
+    ).toBe('kept-branch');
     expect(existsSync(worktree)).toBe(false);
     expect(branchExists()).toBe(true);
   });
 
   it('keeps a checkout that switched to another branch', async () => {
-    const check = await checkWorktreeRemoval('feature', repo);
+    const check = await checkWorktreeRemoval('feature', worktreeScope(repo));
     git(worktree, 'switch', '-q', '-c', 'other');
 
-    expect(await removeWorktreeSession('feature', check, repo)).toBe('changed');
+    expect(
+      await removeWorktreeSession('feature', check, worktreeScope(repo))
+    ).toBe('changed');
     expect(existsSync(worktree)).toBe(true);
     expect(branchExists()).toBe(true);
   });
@@ -328,3 +359,7 @@ function addSubmodule(): void {
   git(worktree, 'commit', '-q', '-m', 'add sub');
   git(worktree, 'push', '-q', 'origin', 'feature');
 }
+
+const { worktreeScope } = await vi.importActual<typeof WorktreeManager>(
+  '@n10/worktree-manager'
+);

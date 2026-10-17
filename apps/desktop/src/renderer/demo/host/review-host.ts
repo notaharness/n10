@@ -3,15 +3,14 @@ import type {
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
-import { isOid } from '@n10/vcs-core/pr-details';
 import { VIEWER } from '../data/identity.js';
 import { later } from './hub.js';
 import type { DemoState } from './state.js';
 
 /**
- * Pull requests, their threads, drafts and diffs, for whichever
- * repository is open. Diffs and descriptions are the real ones, loaded
- * only when a tab asks for them.
+ * Pull requests, their threads and drafts, for whichever repository
+ * is open. Descriptions are the real ones, loaded only when a tab asks
+ * for them; diffs are `pr-diff-host.ts`.
  */
 export async function load(
   loader: (() => Promise<{ default: string }>) | undefined
@@ -78,16 +77,13 @@ type ReviewHost = Pick<
   | 'replyToThread'
   | 'setThreadResolved'
   | 'fetchPrDescription'
-  | 'submitReviewVerdict'
-  | 'getReviewViewer'
   | 'fetchCommentImage'
   | 'listDraftComments'
   | 'updateDraftComment'
   | 'deleteDraftComment'
   | 'postDraftComments'
-  | 'fetchDiffText'
+  | 'getGuidedReview'
   | 'fetchWorktreeDiffText'
-  | 'fetchFileDiffText'
 >;
 
 export function createReviewHost(state: DemoState): ReviewHost {
@@ -110,9 +106,9 @@ export function createReviewHost(state: DemoState): ReviewHost {
   const setDrafts = (prId: number, next: ReviewComment[]) => {
     repo().drafts[prId] = next;
   };
-  const diffOf = (branch: string) => load(repo().data.diffs[branch]);
   return {
-    fetchCommentThreads: (prId) => later(repo().threadsOf(prId), 120),
+    fetchCommentThreads: (cwd, prId) =>
+      later(state.repoAt(cwd).threadsOf(prId), 120),
     replyToThread: ({ prId, thread, body }) => {
       if (thread.replyKind === 'github-issue-comment') {
         const current = repo().threadsOf(prId);
@@ -129,22 +125,13 @@ export function createReviewHost(state: DemoState): ReviewHost {
       editThreads(prId, (t) => ({ ...t, isResolved: resolved }), thread.id);
       return later(undefined);
     },
-    fetchPrDescription: (prId) => load(repo().data.descriptions[prId]),
-    submitReviewVerdict: (prId, verdict) => {
-      const pr = repo().pr(prId);
-      const decision = verdict.startsWith('approve')
-        ? 'approved'
-        : 'changes-requested';
-      repo().updatePr(prId, {
-        reviewers: (pr?.reviewers ?? []).map((r) =>
-          r.identifier === VIEWER ? { ...r, decision } : r
-        ),
-      });
-      return later(undefined);
-    },
-    getReviewViewer: () => later({ identifier: VIEWER }),
+    fetchPrDescription: (cwd, prId) =>
+      load(state.repoAt(cwd).data.descriptions[prId]),
     fetchCommentImage: () => later(null),
-    listDraftComments: (prId) => later(drafts(prId)),
+    listDraftComments: (cwd, prId) =>
+      later(state.repoAt(cwd).drafts[prId] ?? []),
+    getGuidedReview: (cwd, prId) =>
+      later(state.repoAt(cwd).guides[prId] ?? null),
     updateDraftComment: (prId, id, patch) => {
       setDrafts(
         prId,
@@ -174,15 +161,6 @@ export function createReviewHost(state: DemoState): ReviewHost {
       repo().recount(prId);
       return later(chosen.length, 400);
     },
-    fetchDiffText: async (source) => {
-      const pr = repo()
-        .pullRequests()
-        .find((p) => p.sourceBranch === source);
-      const head = pr && isOid(pr.headSha) ? pr.headSha : '0'.repeat(40);
-      return { text: await diffOf(source), head };
-    },
     fetchWorktreeDiffText: () => later(''),
-    fetchFileDiffText: async (source, _target, file) =>
-      fileSection(await diffOf(source), file),
   };
 }

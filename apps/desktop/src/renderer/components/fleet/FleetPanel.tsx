@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import type { BeamStatus, MachineView } from '../../../host/contract.js';
+import type { FleetStatus, MachineView } from '../../../host/contract.js';
 import { useBeamStatus, useMachines } from '../../lib/data/queries.js';
 import { keys } from '../../lib/data/query-keys.js';
 import { useFleet } from '../../lib/fleet/fleet-context.js';
@@ -110,7 +110,7 @@ function FleetRows({
 
 /** Reconnecting, or an observed write still pending once the card
  *  that reported it has gone, while this machine is still enrolled. */
-function StatusNotices({ beam }: { beam: BeamStatus }) {
+function StatusNotices({ beam }: { beam: FleetStatus }) {
   const { publication } = useFleet();
   if (beam.state === 'restarting')
     return <Notice warning>Reconnecting… Status may be out of date.</Notice>;
@@ -124,7 +124,7 @@ function EnrolledBody({
   beam,
   machines,
 }: {
-  beam: BeamStatus;
+  beam: FleetStatus;
   machines: MachineView[] | undefined;
 }) {
   const { adding, setAdding } = useFleet();
@@ -153,7 +153,7 @@ function FleetBody({
   machines,
   loadFailure,
 }: {
-  beam: BeamStatus;
+  beam: FleetStatus;
   machines: MachineView[] | undefined;
   loadFailure: ReactNode;
 }) {
@@ -173,7 +173,7 @@ function FleetBody({
 }
 
 /** beam can answer for its fleet: connected, and past starting. */
-function answering(beam: BeamStatus | undefined): beam is BeamStatus {
+function answering(beam: FleetStatus | undefined): beam is FleetStatus {
   return !!beam && beam.state !== 'connecting' && beam.state !== 'starting';
 }
 

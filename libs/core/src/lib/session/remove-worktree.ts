@@ -7,11 +7,10 @@ import {
   repositoryOf,
   type RemovalRisk,
   type WorktreeInfo,
+  type WorktreeScope,
 } from '@n10/worktree-manager';
-import { rescanSessionDiscovery } from '../discovery/session-discovery.js';
 import { isSessionAlive } from '../pty-registry.js';
 import { stopSession } from './stop-session.js';
-import { getRepoRoot } from '../repo-root.js';
 import { canonicalWorktreePath, keyForWorktree } from '../session-key.js';
 
 /**
@@ -79,21 +78,18 @@ function forcesPast(risks: readonly RemovalRisk[]): boolean {
   return risks.some((risk) => FORCED_RISKS.has(risk));
 }
 
-function cwdFor(repo: string | undefined): string {
-  return repo ?? getRepoRoot() ?? process.cwd();
-}
-
 /** The checkout that has `branch`, if any. */
 async function checkoutFor(
   branch: string,
-  cwd: string
+  scope: WorktreeScope
 ): Promise<WorktreeInfo | null> {
-  return (await listWorktrees(cwd)).find((w) => w.branch === branch) ?? null;
+  return (await listWorktrees(scope)).find((w) => w.branch === branch) ?? null;
 }
 
 /** Which repository and checkout a verdict is about, and the tip. */
-async function judgedAt(branch: string, cwd: string) {
-  const checkout = await checkoutFor(branch, cwd);
+async function judgedAt(branch: string, scope: WorktreeScope) {
+  const { cwd } = scope;
+  const checkout = await checkoutFor(branch, scope);
   return {
     checkout,
     at: {
@@ -107,13 +103,13 @@ async function judgedAt(branch: string, cwd: string) {
 /** Decide what removing `branch`'s worktree needs from the user. */
 export async function checkWorktreeRemoval(
   branch: string,
-  repo?: string
+  scope: WorktreeScope
 ): Promise<WorktreeRemovalCheck> {
-  const cwd = cwdFor(repo);
+  const { cwd } = scope;
   // Read first: a commit that lands during the checks below then reads
   // as a moved branch, never as one the verdict covered.
-  const { checkout, at } = await judgedAt(branch, cwd);
-  const { refusal, risks } = await assessBranchRemoval(branch, { cwd });
+  const { checkout, at } = await judgedAt(branch, scope);
+  const { refusal, risks } = await assessBranchRemoval(branch, scope);
   if (refusal) return { verdict: 'refused', reason: refusal, ...at };
   if (risks.length > 0) {
     const reason = risks.join(', ');
@@ -148,9 +144,9 @@ export async function clearVerdictAt(
 async function judgedCheckout(
   branch: string,
   approved: WorktreeRemovalCheck,
-  cwd: string
+  scope: WorktreeScope
 ): Promise<WorktreeInfo | null> {
-  const { checkout, at } = await judgedAt(branch, cwd);
+  const { checkout, at } = await judgedAt(branch, scope);
   const same =
     checkout !== null &&
     at.tip === approved.tip &&
@@ -158,8 +154,7 @@ async function judgedCheckout(
     at.repo === approved.repo &&
     at.checkout === approved.checkout;
   if (!same) return null;
-  const { refusal, risks } = await assessBranchRemoval(branch, {
-    cwd,
+  const { refusal, risks } = await assessBranchRemoval(branch, scope, {
     confirmedMerged: true,
   });
   const named = approved.verdict === 'force' ? approved.risks : [];
@@ -180,26 +175,20 @@ async function judgedCheckout(
  *  branch it was created for, which another worktree may have checked
  *  out since.
  *
- *  Resolves once session discovery has seen the result, so the shells
- *  learn of this removal the way they learn of one made outside n10.
- *  Discovery reports only the removal of a worktree it has seen, and a
- *  worktree made moments ago may not have had a scan yet — so it looks
- *  once before the removal as well as after. */
+ */
 export async function removeWorktreeSession(
   branch: string,
   approved: WorktreeRemovalCheck,
-  repo?: string
+  scope: WorktreeScope
 ): Promise<WorktreeRemovalOutcome> {
   if (approved.verdict === 'refused') return 'refused';
-  const cwd = cwdFor(repo);
-  await rescanSessionDiscovery();
-  const checkout = await judgedCheckout(branch, approved, cwd);
+  const { cwd } = scope;
+  const checkout = await judgedCheckout(branch, approved, scope);
   if (!checkout) return 'changed';
   stopSession(keyForWorktree(checkout, cwd));
-  const outcome = (await judgedCheckout(branch, approved, cwd))
-    ? await removeJudged(branch, approved, cwd)
+  const outcome = (await judgedCheckout(branch, approved, scope))
+    ? await removeJudged(branch, approved, scope)
     : 'changed';
-  await rescanSessionDiscovery();
   return outcome;
 }
 
@@ -209,10 +198,11 @@ export async function removeWorktreeSession(
 async function removeJudged(
   branch: string,
   approved: WorktreeRemovalCheck,
-  cwd: string
+  scope: WorktreeScope
 ): Promise<WorktreeRemovalOutcome> {
+  const { cwd } = scope;
   const force = approved.verdict === 'force' && forcesPast(approved.risks);
-  if (!(await removeWorktree(branch, { force, cwd }))) return 'git-refused';
+  if (!(await removeWorktree(branch, scope, { force }))) return 'git-refused';
   if ((await branchTip(branch, cwd)) !== approved.tip) return 'kept-branch';
   return (await deleteBranch(branch, true, cwd)) ? 'removed' : 'kept-branch';
 }

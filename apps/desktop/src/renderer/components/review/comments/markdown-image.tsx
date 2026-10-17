@@ -7,6 +7,7 @@ import {
   type Ref,
 } from 'react';
 import { useCommentImage } from '../../../lib/data/queries.js';
+import { useRepo } from '../../../lib/repo-context.js';
 import { refocusAfter } from '../../../lib/focus.js';
 import { openLink } from '../../../lib/open-link.js';
 import { cn } from '../../../lib/utils.js';
@@ -159,7 +160,8 @@ function notShown(src: unknown, alt: string | undefined): string | null {
 export function CommentImage({ src, alt }: ComponentProps<'img'>) {
   const unshown = notShown(src, alt);
   const url = unshown == null ? (src as string) : '';
-  const img = useCommentImage(url);
+  const { repo } = useRepo();
+  const img = useCommentImage(repo.cwd, url);
   const [retried, setRetried] = useState(false);
   // A retry clears the query's error while it runs; the reason the last
   // read failed still stands until it settles.

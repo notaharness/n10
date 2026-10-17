@@ -1,8 +1,9 @@
-import type { ElectronApplication, Locator, Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
 import {
   createWorktree,
   launchAgentFromRail,
+  resizeWindow,
   showChanges,
   sidebarRow,
   visibleText,
@@ -111,21 +112,6 @@ async function top(locator: Locator): Promise<number> {
   return box.y;
 }
 
-async function resize(
-  app: ElectronApplication,
-  width: number,
-  height: number
-): Promise<void> {
-  await app.evaluate(
-    ({ BrowserWindow }, [w, h]) => {
-      const window = BrowserWindow.getAllWindows()[0];
-      window.setMinimumSize(0, 0);
-      window.setContentSize(w, h);
-    },
-    [width, height]
-  );
-}
-
 /** Where an element stops being visible on the right: its own edge,
  *  cut by every scrolling or clipping box it sits in, up to the pane. */
 function visibleRight(el: Element): number {
@@ -137,6 +123,27 @@ function visibleRight(el: Element): number {
     if (box.classList.contains('@container')) break;
   }
   return right;
+}
+
+/** Turn the wheel over an element and wait until the page has seen it
+ *  and painted twice: long enough for any scroll it starts to show. */
+async function wheelOver(locator: Locator, dy: number): Promise<void> {
+  const page = locator.page();
+  await locator.hover();
+  // Listening before the wheel turns; a handle, so the promise is not
+  // awaited here.
+  const seen = await page.evaluateHandle(() => ({
+    painted: new Promise<void>((resolve) =>
+      addEventListener(
+        'wheel',
+        () =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        { once: true, passive: true }
+      )
+    ),
+  }));
+  await page.mouse.wheel(0, dy);
+  await seen.evaluate((s) => s.painted);
 }
 
 async function openPr(page: Page, row: RegExp): Promise<void> {
@@ -159,7 +166,7 @@ async function backToReview(page: Page): Promise<void> {
 }
 
 test.describe('Pull request Overview', () => {
-  test("opens someone else's pull request on its Overview, with the next step first", async ({
+  test("opens someone else's pull request on its Overview, with the next step in its heading", async ({
     desktop,
   }) => {
     const { page } = desktop;
@@ -174,11 +181,12 @@ test.describe('Pull request Overview', () => {
     await expect(
       page.getByRole('button', { name: 'Open on GitHub' })
     ).toBeVisible();
-    const next = page.getByRole('region', { name: 'Next step' });
-    await expect(next).toContainText('Your review is requested');
-    // One way in to a review: Review changes, and no instant vote.
+    // No banner restates the request the sidebar already lists; the
+    // next step is the heading's button, beside the pull request's
+    // actions. One way in to a review: Review changes, and no instant vote.
+    await expect(page.getByText('Your review is requested')).toHaveCount(0);
     await expect(
-      next.getByRole('button', { name: 'Review changes' })
+      page.getByRole('button', { name: 'Review changes' })
     ).toBeVisible();
     await expect(page.getByRole('button', { name: /^Approve/ })).toHaveCount(0);
     await expect(
@@ -262,50 +270,13 @@ test.describe('Pull request Overview', () => {
     const { page } = desktop;
     await openPr(page, /#215/);
 
-    const next = page.getByRole('region', { name: 'Next step' });
-    await expect(next).toContainText('1 unresolved thread');
-    await next.getByRole('button', { name: 'Respond to feedback' }).focus();
+    await page.getByRole('button', { name: 'Respond to feedback' }).focus();
     await page.keyboard.press('Enter');
 
     // The diff went to the thread, and the keyboard with it.
     await expect(
       page.locator('[data-thread]', { hasText: 'Why keep the old name?' })
     ).toBeFocused();
-  });
-
-  test.describe('with an open thread', () => {
-    test.use({
-      fakeGitHub: {
-        ...GITHUB,
-        prs: [
-          {
-            ...GITHUB.prs[0],
-            threads: [
-              {
-                id: 'T9',
-                path: 'request.ts',
-                line: 2,
-                comments: [{ author: 'bea', body: 'Can this close twice?' }],
-              },
-            ],
-          },
-          GITHUB.prs[1],
-        ],
-      },
-    });
-
-    test('leads a reviewer from the unresolved count to the first open thread', async ({
-      desktop,
-    }) => {
-      const { page } = desktop;
-      await openPr(page, /#214/);
-      const next = page.getByRole('region', { name: 'Next step' });
-      await next.getByRole('button', { name: '1 unresolved thread' }).click();
-
-      await expect(
-        page.locator('[data-thread]', { hasText: 'Can this close twice?' })
-      ).toBeFocused();
-    });
   });
 
   test('copies the link from the native More menu', async ({ desktop }) => {
@@ -320,10 +291,74 @@ test.describe('Pull request Overview', () => {
       .toBe('https://github.com/n10/fixture/pull/214');
   });
 
+  test.describe('with a long diff behind it', () => {
+    test.use({
+      repo: {
+        worktrees: [
+          {
+            branch: 'cancel-requests',
+            files: {
+              'request.ts': Array.from(
+                { length: 200 },
+                (_, i) => `export const step${i} = ${i};`
+              ).join('\n'),
+            },
+          },
+          {
+            branch: 'tidy-retry',
+            files: { 'retry.ts': 'export const retryDelay = 100;\n' },
+          },
+        ],
+      },
+    });
+
+    test('stays put under the wheel in a window taller than it', async ({
+      desktop,
+    }) => {
+      const { app, page } = desktop;
+      await resizeWindow(app, 1360, 1400);
+      await openPr(page, /#214/);
+
+      // The Overview fits, so it has nothing to scroll, and nothing
+      // around it scrolls instead: not the diff kept behind it.
+      const title = overviewTitle(page, 'Handle cancelled requests');
+      await expect(title).toBeVisible();
+      // The diff behind it has its lines, or there is nothing to spill.
+      // Hidden, so not a role query; this tab's pane, not a spare's.
+      const hiddenDiff = page
+        .locator('[data-terminal-pane]')
+        .filter({ has: title })
+        .locator('[data-diff-scroll]');
+      await expect
+        .poll(() =>
+          hiddenDiff.evaluate((el) => el.scrollHeight > el.clientHeight)
+        )
+        .toBe(true);
+      const before = await top(title);
+      await wheelOver(title, 600);
+      expect(await top(title)).toBe(before);
+
+      // The diff scrolled to its end takes the wheel no further.
+      await showChanges(page);
+      const changes = page.getByRole('region', { name: 'Changes' });
+      await wheelOver(changes, 100_000);
+      await expect
+        .poll(() =>
+          changes.evaluate(
+            (el) => el.scrollHeight - el.clientHeight - el.scrollTop
+          )
+        )
+        .toBeLessThan(1);
+      const edge = await top(changes);
+      await wheelOver(changes, 600);
+      expect(await top(changes)).toBe(edge);
+    });
+  });
+
   test('says where reviews stand in words at 1024×768', async ({ desktop }) => {
     const { app, page } = desktop;
     await openPr(page, /#214/);
-    await resize(app, 1024, 768);
+    await resizeWindow(app, 1024, 768);
     await page.getByRole('button', { name: 'Hide sidebar' }).click();
 
     // An approval beside a pending request is not called met: GitHub
@@ -349,7 +384,7 @@ test.describe('Pull request Overview', () => {
   }) => {
     const { app, page } = desktop;
     await openPr(page, /#214/);
-    await resize(app, 1360, 860);
+    await resizeWindow(app, 1360, 860);
     await page.getByRole('button', { name: 'Hide sidebar' }).click();
 
     const completion = page.getByRole('region', { name: 'Completion' });
@@ -394,7 +429,7 @@ test.describe('Pull request Overview', () => {
   }) => {
     const { app, page } = desktop;
     await openPr(page, /#214/);
-    await resize(app, 800, 600);
+    await resizeWindow(app, 800, 600);
 
     // The review rail folds away as its own control would, so the
     // content is not squeezed beside it, and comes back with room.
@@ -422,7 +457,7 @@ test.describe('Pull request Overview', () => {
     ).toBeVisible();
     await expect(header.locator('[data-reviewer-summary]')).toBeHidden();
 
-    await resize(app, 1360, 860);
+    await resizeWindow(app, 1360, 860);
     await expect(showRail).toHaveCount(0);
     await expect(launch).toBeVisible();
   });
@@ -431,7 +466,7 @@ test.describe('Pull request Overview', () => {
     desktop,
   }) => {
     const { app, page } = desktop;
-    await resize(app, 1360, 860);
+    await resizeWindow(app, 1360, 860);
     await openPr(page, /#214/);
     const back = prHeader(page).getByRole('button', { name: 'Back to review' });
     const pressBack = async () => {

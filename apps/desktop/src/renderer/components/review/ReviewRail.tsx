@@ -1,14 +1,16 @@
 import { PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react';
-import type { ReviewComment } from '../../../host/contract.js';
+import type { GuidedReview, ReviewComment } from '../../../host/contract.js';
 import { Button } from '../ui/button.js';
 import { ScrollArea } from '../ui/scroll-area.js';
 import { Tip } from '../ui/tooltip.js';
-import { FileTree, type FileEntry } from './diff/FileTree.js';
+import { FileTree, type FileEntry, type FileListing } from './diff/FileTree.js';
+import type { SessionCard } from '../../lib/review/session-cards.js';
 import {
-  AgentSection,
+  GuideSection,
   PlanSection,
   ReviewReadySection,
 } from './ReviewRailSections.js';
+import { SessionsSection } from './SessionCards.js';
 
 /** What is left of the rail while it is hidden: the button back. */
 export function CollapsedRail({ onShow }: { onShow: () => void }) {
@@ -29,20 +31,24 @@ export function CollapsedRail({ onShow }: { onShow: () => void }) {
 }
 
 /**
- * The review rail: the agent, the review and plan when they have
+ * The review rail: the sessions, the guide, the review and plan when they have
  * something, and the files. The Overview is the top of the review
  * and where every Back leads, and it carries the conversation, so the
  * rail lists neither.
  */
 export function ReviewRail({
-  running,
-  busy,
-  hasSession,
-  agentActive,
-  onSelectAgent,
-  onLaunch,
-  onStop,
+  sessions,
+  shownSession,
+  agentBusy,
+  terminalBusy,
+  onOpenSession,
+  onLaunchAgent,
+  onLaunchTerminal,
+  onStopSession,
   onHide,
+  guide,
+  guideActive,
+  onGuide,
   drafts,
   reviewActive,
   onReview,
@@ -53,18 +59,24 @@ export function ReviewRail({
   planActive,
   onPlan,
   entries,
+  listing,
   diffLoading,
   selectedFile,
   onSelectFile,
 }: {
-  running: boolean;
-  busy: boolean;
-  hasSession: boolean;
-  agentActive: boolean;
-  onSelectAgent: () => void;
-  onLaunch: () => void;
-  onStop: () => void;
+  sessions: SessionCard[];
+  /** The session whose terminal the pane shows now, if any. */
+  shownSession: string | null;
+  agentBusy: boolean;
+  terminalBusy: boolean;
+  onOpenSession: (name: string) => void;
+  onLaunchAgent: () => void;
+  onLaunchTerminal: () => void;
+  onStopSession: (card: SessionCard) => void;
   onHide: () => void;
+  guide: GuidedReview | null;
+  guideActive: boolean;
+  onGuide: () => void;
   drafts: ReviewComment[];
   reviewActive: boolean;
   onReview: () => void;
@@ -76,6 +88,8 @@ export function ReviewRail({
   planActive: boolean;
   onPlan: () => void;
   entries: FileEntry[];
+  /** A pull request's listing: completeness and what is not shown. */
+  listing?: FileListing;
   diffLoading: boolean;
   selectedFile: string | null;
   onSelectFile: (path: string) => void;
@@ -98,19 +112,20 @@ export function ReviewRail({
         </Tip>
       </div>
 
-      {/* Agent — a running row you can select to view the terminal, or
-          a launch button (opening the session/review menu) otherwise. */}
       <div className="shrink-0 border-b border-border px-2 pb-2">
-        <AgentSection
-          running={running}
-          busy={busy}
-          hasSession={hasSession}
-          agentActive={agentActive}
-          onSelectAgent={onSelectAgent}
-          onLaunch={onLaunch}
-          onStop={onStop}
+        <SessionsSection
+          cards={sessions}
+          activeName={shownSession}
+          agentBusy={agentBusy}
+          terminalBusy={terminalBusy}
+          onLaunchAgent={onLaunchAgent}
+          onLaunchTerminal={onLaunchTerminal}
+          onOpen={onOpenSession}
+          onStop={onStopSession}
         />
       </div>
+
+      <GuideSection guide={guide} active={guideActive} onOpen={onGuide} />
 
       <ReviewReadySection
         drafts={drafts}
@@ -130,6 +145,7 @@ export function ReviewRail({
       <ScrollArea className="min-h-0 flex-1">
         <FileTree
           entries={entries}
+          listing={listing}
           loading={diffLoading}
           selected={selectedFile}
           onSelect={onSelectFile}

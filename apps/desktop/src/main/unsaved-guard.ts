@@ -1,3 +1,4 @@
+import { cancelUpdateQuit } from './quit.js';
 /**
  * Asked before the window unloads with text that could not be saved.
  *
@@ -23,5 +24,6 @@ export function installUnsavedGuard(win: BrowserWindow): void {
     });
     // Preventing the event lets the unload go ahead.
     if (choice === 1) event.preventDefault();
+    else cancelUpdateQuit();
   });
 }

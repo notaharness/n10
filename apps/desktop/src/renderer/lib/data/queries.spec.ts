@@ -1,12 +1,14 @@
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, describe, expect, it } from 'vitest';
 import type {
+  DesktopPrefs,
   N10HostApi,
   RepoInfo,
   SidebarItem,
 } from '../../../host/contract.js';
-import { keys, resetRepoScopedCache } from './query-keys.js';
+import { keys, resetProviderScopedCache } from './query-keys.js';
 import {
+  keepRepoAnswer,
   loadWorktreeRemovalCheck,
   loadRepoGate,
   loadSidebarModel,
@@ -42,6 +44,7 @@ const REPO: RepoInfo = {
   vcsConfigured: false,
   repository: null,
   viewer: null,
+  reviewEvents: [],
 };
 
 /** The value of `p`, or 'pending' if it has not settled by the time
@@ -62,9 +65,16 @@ function deferred<T>() {
 describe('loadRepoGate', () => {
   it('reports no repository when the host cannot name one', async () => {
     stubHost({
-      getRepo: () => Promise.reject(new Error('host is not ready')),
+      refreshRepo: () => Promise.reject(new Error('host is not ready')),
       getDesktopPrefs: () =>
-        Promise.resolve({ theme: 'system' as const, nativeFrame: false }),
+        Promise.resolve({
+          theme: 'system' as const,
+          nativeFrame: false,
+          tabOverflow: 'wrap' as const,
+          tabCycleMru: false,
+          guidedReview: true,
+          imageCompare: 'side-by-side' as const,
+        }),
     });
 
     // A rejection here must not surface as a failed query: the gate
@@ -74,9 +84,9 @@ describe('loadRepoGate', () => {
   });
 
   it('waits for the desktop prefs before reporting the repository', async () => {
-    const prefs = deferred<{ theme: 'system'; nativeFrame: boolean }>();
+    const prefs = deferred<DesktopPrefs>();
     stubHost({
-      getRepo: () => Promise.resolve(REPO),
+      refreshRepo: () => Promise.resolve(REPO),
       getDesktopPrefs: () => prefs.promise,
     });
 
@@ -86,13 +96,20 @@ describe('loadRepoGate', () => {
     // with are not — resolving now would paint the wrong one first.
     expect(await state(gate)).toBe('pending');
 
-    prefs.resolve({ theme: 'system', nativeFrame: false });
+    prefs.resolve({
+      theme: 'system',
+      nativeFrame: false,
+      tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
+      imageCompare: 'side-by-side',
+    });
     expect(await gate).toEqual(REPO);
   });
 
   it('reports the repository even when the prefs cannot be read', async () => {
     stubHost({
-      getRepo: () => Promise.resolve(REPO),
+      refreshRepo: () => Promise.resolve(REPO),
       getDesktopPrefs: () => Promise.reject(new Error('no prefs file')),
     });
 
@@ -118,12 +135,14 @@ describe('pull request snapshots', () => {
   it('asks as the account it knows, and keeps an answer about that pull request', async () => {
     const asked: unknown[] = [];
     stubHost({
-      getPullRequestSnapshot: (req) => {
+      getPullRequestSnapshot: (_repo, req) => {
         asked.push(req);
         return Promise.resolve({ ref: req.ref, viewer: 'bob' } as never);
       },
     });
-    await expect(loadPullRequestSnapshot(REF, 'bob')).resolves.toMatchObject({
+    await expect(
+      loadPullRequestSnapshot('/repo', REF, 'bob')
+    ).resolves.toMatchObject({
       ref: REF,
     });
     expect(asked).toEqual([{ ref: REF, viewer: 'bob' }]);
@@ -132,24 +151,24 @@ describe('pull request snapshots', () => {
   it('says so when it knows no account, rather than leaving the account open', async () => {
     const asked: unknown[] = [];
     stubHost({
-      getPullRequestSnapshot: (req) => {
+      getPullRequestSnapshot: (_repo, req) => {
         asked.push(req);
         return Promise.resolve({ ref: req.ref, viewer: null } as never);
       },
     });
-    await loadPullRequestSnapshot(REF, null);
+    await loadPullRequestSnapshot('/repo', REF, null);
     expect(asked).toEqual([{ ref: REF, viewer: null }]);
   });
 
   it('refuses an answer read as another account (Q8)', async () => {
     stubHost({
-      getPullRequestSnapshot: (req) =>
+      getPullRequestSnapshot: (_repo, req) =>
         Promise.resolve({ ref: req.ref, viewer: 'carol' } as never),
     });
-    await expect(loadPullRequestSnapshot(REF, 'bob')).rejects.toThrow(
+    await expect(loadPullRequestSnapshot('/repo', REF, 'bob')).rejects.toThrow(
       'Expected an answer read as bob, got one read as carol'
     );
-    await expect(loadPullRequestSnapshot(REF, null)).rejects.toThrow(
+    await expect(loadPullRequestSnapshot('/repo', REF, null)).rejects.toThrow(
       'Expected an answer read as no account, got one read as carol'
     );
   });
@@ -173,10 +192,10 @@ describe('pull request snapshots', () => {
     // different one now. A fresh entry must be read, not the old one's.
     const qc = new QueryClient();
     const read = (ref: typeof REF & { id: string }) =>
-      qc.fetchQuery({
+      qc.query({
         queryKey: keys.prSnapshot('/repo', ref, 'alice'),
         queryFn: () => Promise.resolve({ ref }),
-        staleTime: 60_000,
+        staleTime: 0,
       });
     await read({ ...REF, id: 'R_OLD' });
     await expect(read({ ...REF, id: 'R_NEW' })).resolves.toEqual({
@@ -184,21 +203,12 @@ describe('pull request snapshots', () => {
     });
   });
 
-  it('drops every snapshot with the repository it belonged to', () => {
-    const qc = new QueryClient();
-    qc.setQueryData(keys.prSnapshot('/repo', REF, 'bob'), { ref: REF });
-    resetRepoScopedCache(qc);
-    expect(
-      qc.getQueryData(keys.prSnapshot('/repo', REF, 'bob'))
-    ).toBeUndefined();
-  });
-
   it('refuses an answer that names another pull request', async () => {
     stubHost({
       getPullRequestSnapshot: () =>
         Promise.resolve({ ref: { ...REF, repository: 'acme/lib' } } as never),
     });
-    await expect(loadPullRequestSnapshot(REF, null)).rejects.toThrow(
+    await expect(loadPullRequestSnapshot('/repo', REF, null)).rejects.toThrow(
       'Expected an answer about github.com/acme/app#42, got one about github.com/acme/lib#42'
     );
   });
@@ -215,7 +225,15 @@ describe('refreshRepoInfo', () => {
       repository: 'acme/app',
     },
     viewer: 'bob',
+    reviewEvents: [],
   };
+
+  const HISTORY = keys.prHistory(
+    '/repo',
+    { ...GITHUB_REPO.repository!, number: 42 },
+    'bob',
+    'visit'
+  );
 
   function seeded(repo: RepoInfo) {
     const qc = new QueryClient();
@@ -223,7 +241,8 @@ describe('refreshRepoInfo', () => {
     qc.setQueryData(keys.threads('/repo', 42), { threads: [] });
     qc.setQueryData(keys.sidebar('/repo'), ['row']);
     qc.setQueryData(keys.settings('/repo'), { fields: [] });
-    qc.setQueryData(keys.diff('/repo', 'undo', 'main'), 'patch');
+    qc.setQueryData(keys.worktreeDiff('/repo', 'undo', 'main'), 'patch');
+    qc.setQueryData(HISTORY, { lastVisit: null });
     return qc;
   }
 
@@ -252,10 +271,13 @@ describe('refreshRepoInfo', () => {
       expect(qc.getQueryData(keys.repo)).toEqual(next);
       expect(qc.getQueryData(keys.threads('/repo', 42))).toBeUndefined();
       expect(qc.getQueryData(keys.sidebar('/repo'))).toBeUndefined();
+      expect(qc.getQueryData(HISTORY)).toBeUndefined();
       // The settings page that made the change keeps its answer, and
       // git's diff never came from the provider.
       expect(qc.getQueryData(keys.settings('/repo'))).toEqual({ fields: [] });
-      expect(qc.getQueryData(keys.diff('/repo', 'undo', 'main'))).toBe('patch');
+      expect(qc.getQueryData(keys.worktreeDiff('/repo', 'undo', 'main'))).toBe(
+        'patch'
+      );
     }
   );
 
@@ -296,7 +318,7 @@ describe('pull request conversations', () => {
   it('resolves with a conversation the provider read', async () => {
     const asked: unknown[] = [];
     stubHost({
-      getPullRequestConversation: (req) => {
+      getPullRequestConversation: (_repo, req) => {
         asked.push(req);
         return Promise.resolve({
           ref: req.ref,
@@ -307,14 +329,14 @@ describe('pull request conversations', () => {
       },
     });
     await expect(
-      loadPullRequestConversation(REF, 'bob')
+      loadPullRequestConversation('/repo', REF, 'bob')
     ).resolves.toMatchObject({ conversation: { state: 'read' } });
     expect(asked).toEqual([{ ref: REF, viewer: 'bob' }]);
   });
 
   it('rejects a failed read with its kind and retry time, never empty data', async () => {
     stubHost({
-      getPullRequestConversation: (req) =>
+      getPullRequestConversation: (_repo, req) =>
         Promise.resolve({
           ref: req.ref,
           viewer: 'bob',
@@ -327,7 +349,7 @@ describe('pull request conversations', () => {
           },
         } as never),
     });
-    const failure = loadPullRequestConversation(REF, 'bob');
+    const failure = loadPullRequestConversation('/repo', REF, 'bob');
     await expect(failure).rejects.toBeInstanceOf(ProviderReadError);
     await expect(failure).rejects.toMatchObject({
       message: 'GitHub is rate limiting n10',
@@ -341,19 +363,19 @@ describe('pull request conversations', () => {
       getPullRequestConversation: () =>
         Promise.resolve({ ref: { ...REF, number: 43 } } as never),
     });
-    await expect(loadPullRequestConversation(REF, null)).rejects.toThrow(
-      /got one about github.com\/acme\/app#43/
-    );
+    await expect(
+      loadPullRequestConversation('/repo', REF, null)
+    ).rejects.toThrow(/got one about github.com\/acme\/app#43/);
   });
 
   it('refuses an answer read as another account', async () => {
     stubHost({
-      getPullRequestConversation: (req) =>
+      getPullRequestConversation: (_repo, req) =>
         Promise.resolve({ ref: req.ref, viewer: 'carol' } as never),
     });
-    await expect(loadPullRequestConversation(REF, 'bob')).rejects.toThrow(
-      /read as carol/
-    );
+    await expect(
+      loadPullRequestConversation('/repo', REF, 'bob')
+    ).rejects.toThrow(/read as carol/);
   });
 
   it('does not ask again straight away after a rate limit or a rejected credential', () => {
@@ -365,18 +387,12 @@ describe('pull request conversations', () => {
     expect(retryRead(3, failure('server'))).toBe(false);
   });
 
-  it('files repo A #42 and repo B #42 apart and drops both with the repository (Q8)', () => {
+  it('files repo A #42 and repo B #42 apart (Q8)', () => {
     const a = REF;
     const b = { ...REF, repository: 'acme/lib' };
     expect(keys.prConversation('/repo', a, 'bob')).not.toEqual(
       keys.prConversation('/repo', b, 'bob')
     );
-    const qc = new QueryClient();
-    qc.setQueryData(keys.prConversation('/repo', a, 'bob'), { ref: REF });
-    resetRepoScopedCache(qc);
-    expect(
-      qc.getQueryData(keys.prConversation('/repo', a, 'bob'))
-    ).toBeUndefined();
   });
 });
 
@@ -422,59 +438,32 @@ describe('loadWorktreeRemovalCheck', () => {
   });
 });
 
-describe('resetRepoScopedCache', () => {
-  function seeded() {
+describe('resetProviderScopedCache', () => {
+  it('drops what the provider answered for that repository alone', () => {
     const qc = new QueryClient();
-    qc.setQueryData(keys.repo, REPO);
     qc.setQueryData(keys.sidebar('/repo'), ['row']);
-    qc.setQueryData(keys.settings('/repo'), { fields: [] });
+    qc.setQueryData(keys.sidebar('/other'), ['other row']);
     qc.setQueryData(keys.threads('/repo', 7), { threads: [] });
-    qc.setQueryData(keys.version, { app: '1', electron: '2' });
-    qc.setQueryData(keys.terminals, [{ name: 'n10-shell' }]);
-    qc.getMutationCache().build(qc, { mutationFn: () => Promise.resolve(1) });
-    return qc;
-  }
-
-  // Terminals belong to directories, not to the repository being left;
-  // dropping them would blank every terminal tab on a switch until the
-  // next poll, and a restored terminal's tab is opened off this list.
-  it('keeps the terminal listing, which no repository owns', () => {
-    const qc = seeded();
-    resetRepoScopedCache(qc);
-    expect(qc.getQueryData(keys.terminals)).toEqual([{ name: 'n10-shell' }]);
-  });
-
-  it('keeps the open repository so the gate never blanks', () => {
-    const qc = seeded();
-
-    resetRepoScopedCache(qc);
-
-    // Dropping this entry would drop the gate's observer back into its
-    // pending state, flashing "Connecting to host…" between the repo
-    // being left and the one being opened.
-    expect(qc.getQueryData(keys.repo)).toEqual(REPO);
-  });
-
-  it('drops everything that belonged to the repository being left', () => {
-    const qc = seeded();
-
-    resetRepoScopedCache(qc);
-
+    qc.setQueryData(keys.sessions('/repo'), []);
+    qc.setQueryData(keys.commentImage('/repo', 'https://x/y.png'), 'data:');
+    resetProviderScopedCache(qc, '/repo');
     expect(qc.getQueryData(keys.sidebar('/repo'))).toBeUndefined();
-    expect(qc.getQueryData(keys.settings('/repo'))).toBeUndefined();
     expect(qc.getQueryData(keys.threads('/repo', 7))).toBeUndefined();
-    expect(qc.getQueryData(keys.version)).toBeUndefined();
+    expect(
+      qc.getQueryData(keys.commentImage('/repo', 'https://x/y.png'))
+    ).toBeUndefined();
+    // Another repository's answers, and what git or tmux answered, stay.
+    expect(qc.getQueryData(keys.sidebar('/other'))).toEqual(['other row']);
+    expect(qc.getQueryData(keys.sessions('/repo'))).toEqual([]);
   });
+});
 
-  it('drops in-flight mutation state', () => {
-    const qc = seeded();
-    expect(qc.getMutationCache().getAll()).toHaveLength(1);
-
-    resetRepoScopedCache(qc);
-
-    // A worktree removal pending in the old repo would otherwise keep
-    // hiding a same-named sidebar row in the new one.
-    expect(qc.getMutationCache().getAll()).toHaveLength(0);
+describe('keepRepoAnswer', () => {
+  it('keeps the last answer only while the repository is the same', () => {
+    const keep = keepRepoAnswer('/repo');
+    expect(keep(['row'], { queryKey: keys.sidebar('/repo') })).toEqual(['row']);
+    expect(keep(['row'], { queryKey: keys.sidebar('/other') })).toBeUndefined();
+    expect(keep(['row'], undefined)).toBeUndefined();
   });
 });
 

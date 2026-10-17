@@ -70,18 +70,19 @@ export function resetMainBranchCache(): void {
  * echo them back as names like `'main'`, which would fail
  * `assertShellSafeRef` and defeat the `origin/` strip in
  * {@link dedupeBranchNames}. */
-export async function listBranches(): Promise<string[]> {
+export async function listBranches(cwd: string): Promise<string[]> {
   try {
-    const { stdout } = await exec('git branch --format="%(refname:short)"', {
-      encoding: 'utf8',
-    });
+    const { stdout } = await exec(
+      'git branch --format="%(refname:short)"',
+      gitOptions(cwd)
+    );
     return stdout
       .trim()
       .split('\n')
       .filter((b) => b.length > 0);
   } catch (e) {
     log('error', 'listBranches', 'git branch failed', e);
-    return [];
+    throw e;
   }
 }
 
@@ -120,15 +121,16 @@ export function dedupeBranchNames(output: string): string[] {
 }
 
 /** List local + remote git branches (remote branches stripped of origin/ prefix, deduplicated) */
-export async function listAllBranches(): Promise<string[]> {
+export async function listAllBranches(cwd?: string): Promise<string[]> {
   try {
-    const { stdout } = await exec('git branch -a --format="%(refname:short)"', {
-      encoding: 'utf8',
-    });
+    const { stdout } = await exec(
+      'git branch -a --format="%(refname:short)"',
+      gitOptions(cwd)
+    );
     return dedupeBranchNames(stdout);
   } catch (e) {
     log('error', 'listAllBranches', 'git branch -a failed', e);
-    return [];
+    throw e;
   }
 }
 

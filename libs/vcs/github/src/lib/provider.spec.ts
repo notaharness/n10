@@ -450,9 +450,7 @@ describe('the read deadline', () => {
     await githubProvider.replyToThread!({}, project, 1, thread, 'ok');
     ghSuccess({ data: {} });
     await githubProvider.setThreadResolved!({}, project, 1, thread, true);
-    ghSuccess({});
-    await githubProvider.submitReviewVerdict!({}, project, 1, 'approve');
-    expect(mockExecFile).toHaveBeenCalledTimes(4);
+    expect(mockExecFile).toHaveBeenCalledTimes(3);
     for (const call of mockExecFile.mock.calls) {
       expect(execOptionsOf(call)).toBeUndefined();
     }

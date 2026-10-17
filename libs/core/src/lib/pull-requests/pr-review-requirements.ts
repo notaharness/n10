@@ -10,7 +10,7 @@ import type {
   ReviewRule,
 } from '@n10/vcs-core';
 // The browser-safe subpath: `@n10/core/readiness` exports this module.
-import { asksForReview } from '@n10/vcs-core/types';
+import { asksForReview, viewerEntry } from '@n10/vcs-core/types';
 
 /**
  * Who must review a pull request, and why, in the providers' own terms.
@@ -222,8 +222,8 @@ export function reviewRequirements(
 /**
  * Their approval would count: they are required, a rule counts anyone's
  * and is not yet met, or a required group still waits and they may be
- * in it (membership is not read). Where the rule is not known, the
- * provider's asking stands.
+ * in it (the detail read does not say who is). Where the rule is not
+ * known, the provider's asking stands.
  */
 function counts(
   reviewer: DetailReviewer,
@@ -241,7 +241,8 @@ function counts(
  * The provider asks the viewer for a review that would count. A draft
  * asks no one yet, and an approval asked for again already counts. The
  * detail read decides where it names the viewer, since it knows whether
- * their approval is required; the list row decides where it does not.
+ * their approval is required; the list row decides where it does not,
+ * by the viewer's own entry or a pending group of theirs (`viewerEntry`).
  */
 export function asksViewer(
   row: PullRequestInfo | null,
@@ -256,7 +257,9 @@ export function asksViewer(
     const rule = rules?.state === 'read' ? rules.value.reviews : null;
     return stillAsked(own) && counts(own, rule, read.value.items);
   }
-  const entry = row.reviewers?.find((r) => sameId(r.identifier, viewer));
+  const entry =
+    row.reviewers &&
+    viewerEntry(row.reviewers, (r) => sameId(r.identifier, viewer));
   return entry != null && stillAsked(entry);
 }
 

@@ -33,7 +33,7 @@ describe('hasOrphanedFetch', () => {
   });
 
   it('is not data at rest, observed or not', async () => {
-    await client.fetchQuery({ queryKey: ['b'], queryFn: () => 1 });
+    await client.query({ queryKey: ['b'], queryFn: () => 1 });
     expect(hasOrphanedFetch(client)).toBe(false);
   });
 });

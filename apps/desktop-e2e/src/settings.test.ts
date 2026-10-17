@@ -15,7 +15,7 @@ const PLACEHOLDER = '••••••••';
  *  writes. */
 const AZURE: FakeAzureDevOps = {
   pat: PAT,
-  user: { displayName: 'n10 tester', uniqueName: 'n10-tester@example.com' },
+  user: { displayName: 'Reviewer', uniqueName: 'reviewer@example.test' },
   prs: [],
 };
 
@@ -108,15 +108,22 @@ test.describe('Settings', () => {
       desktop,
     }) => {
       const { page } = desktop;
-      const syncState = () => page.evaluate(() => window.n10.getSyncState());
+      const syncState = () =>
+        page.evaluate(async () =>
+          window.n10.getSyncState((await window.n10.getRepo())!.cwd)
+        );
 
       // Let the launch fetch finish and record a failure, so there is a
-      // stale error to clear.
+      // stale error to clear and the write cannot borrow its fetch.
       await expect
-        .poll(async () => (await syncState()).remoteError, {
-          timeout: 20_000,
-        })
-        .not.toBeNull();
+        .poll(
+          async () => {
+            const state = await syncState();
+            return state.remoteError !== null && !state.remoteSyncing;
+          },
+          { timeout: 20_000 }
+        )
+        .toBe(true);
       const before = (await syncState()).remoteFetches;
 
       const after = await page.evaluate(async (rotated) => {
@@ -129,7 +136,7 @@ test.describe('Settings', () => {
         );
         // Read straight after the save, before the fetch it started
         // has had time to land.
-        return window.n10.getSyncState();
+        return window.n10.getSyncState((await window.n10.getRepo())!.cwd);
       }, ROTATED);
 
       expect(after.remoteFetches).toBeGreaterThan(before);

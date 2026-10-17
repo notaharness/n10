@@ -37,11 +37,12 @@ export function pullRequestRefFor(
  * or read as a different account, is an error, never data in this entry.
  */
 export async function loadPullRequestSnapshot(
+  cwd: string,
   ref: PullRequestRef,
   viewer: string | null
 ): Promise<PullRequestSnapshot> {
   return assertEcho(
-    await window.n10.getPullRequestSnapshot({ ref, viewer }),
+    await window.n10.getPullRequestSnapshot(cwd, { ref, viewer }),
     ref,
     viewer
   );
@@ -95,8 +96,8 @@ export function usePullRequestSnapshot(
 ) {
   return useQuery({
     queryKey: keys.prSnapshot(cwd, ref ?? NO_REF, viewer),
-    queryFn: () => loadPullRequestSnapshot(ref!, viewer),
+    queryFn: () => loadPullRequestSnapshot(cwd, ref!, viewer),
     enabled: ref != null,
-    staleTime: 60_000,
+    staleTime: 0,
   });
 }

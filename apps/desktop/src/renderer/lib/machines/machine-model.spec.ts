@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { MachineView } from '../../../host/contract-machines.js';
+import type { MachineView } from '@n10/engine/contract';
 import {
+  preferredMachineChoice,
   fingerprintGroups,
   hasPeerMachines,
   inboundMailRows,
@@ -60,10 +61,28 @@ describe('machinePresentation', () => {
     const p = machinePresentation(
       machine({ state: 'offline', lastSeenAt: Date.now() - 5 * 60_000 })
     );
-    expect(p.label).toBe('Offline');
+    expect(p.label).toBe('Unreachable');
     expect(p.tone).toBe('muted');
     expect(p.secondary).toBe('Last seen 5m ago');
     expect(machinePresentation(machine()).secondary).toBe('Never connected');
+  });
+
+  it('this machine cut off: it is the one offline, and a peer is unknown', () => {
+    expect(
+      machinePresentation(
+        machine({ state: 'offline', isLocal: true, path: null })
+      )
+    ).toEqual({
+      label: 'Offline',
+      tone: 'destructive',
+      secondary: 'This machine cannot reach the fleet',
+    });
+    expect(machinePresentation(machine({ state: 'unknown' }))).toEqual({
+      label: 'Unknown',
+      tone: 'muted',
+      secondary: '',
+    });
+    expect(isMachineSelectable(machine({ state: 'unknown' }))).toBe(false);
   });
 
   it('revoked here and revoked by the fleet are both destructive, and read apart', () => {
@@ -85,6 +104,7 @@ describe('machinePresentation', () => {
     const states = [
       'connected',
       'offline',
+      'unknown',
       'revoked',
       'revoked-by-fleet',
     ] as const;
@@ -190,6 +210,45 @@ describe('isMachineSelectable', () => {
   });
 });
 
+describe('preferredMachineChoice', () => {
+  const PEER = 'bbbbbbbbbbbbbbbb';
+  const agentMachine = machine({ peerId: PEER, state: 'connected' });
+
+  it('starts on the preferred machine', () => {
+    expect(preferredMachineChoice([local, agentMachine], null, PEER)).toEqual({
+      value: PEER,
+      remote: PEER,
+      unavailable: null,
+    });
+  });
+
+  it('keeps an unavailable preferred machine, naming it, instead of switching here', () => {
+    const away = machine({ peerId: PEER, state: 'offline' });
+    expect(preferredMachineChoice([local, away], null, PEER)).toEqual({
+      value: PEER,
+      remote: PEER,
+      unavailable: away,
+    });
+  });
+
+  it('follows the reader’s pick, and this machine when that is preferred', () => {
+    expect(
+      preferredMachineChoice([local, agentMachine], 'aaaaaaaaaaaaaaaa', PEER)
+    ).toEqual({
+      value: 'aaaaaaaaaaaaaaaa',
+      remote: undefined,
+      unavailable: null,
+    });
+    expect(
+      preferredMachineChoice([local, agentMachine], null, 'local')
+    ).toEqual({
+      value: 'aaaaaaaaaaaaaaaa',
+      remote: undefined,
+      unavailable: null,
+    });
+  });
+});
+
 describe('machineChoice', () => {
   const reachable = machine({ peerId: 'bbbbbbbbbbbbbbbb', state: 'connected' });
 
@@ -243,7 +302,7 @@ describe('machineSelectOptions', () => {
       machine({ state: 'offline', lastSeenAt: Date.now() - 60_000 }),
     ]);
     expect(opt.disabled).toBe(true);
-    expect(opt.reason).toMatch(/^Offline — Last seen/);
+    expect(opt.reason).toMatch(/^Unreachable — Last seen/);
   });
 });
 

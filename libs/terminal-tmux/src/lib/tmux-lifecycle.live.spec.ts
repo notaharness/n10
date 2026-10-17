@@ -1,7 +1,7 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SessionBackend, SessionSpec } from '@n10/terminal';
 import { execFileSync } from 'node:child_process';
-import { assertScratchTmuxSocket } from '../../vitest.setup.js';
+import { holdScratchTmuxServer } from '../../vitest.setup.js';
 import * as tmuxCli from './tmux-cli.js';
 import { tmuxSessionSnapshot } from './tmux-snapshot.js';
 import { createTmuxBackend } from './tmux-backend.js';
@@ -37,7 +37,7 @@ async function retained(command: string): Promise<SessionBackend> {
   backends.push(backend);
   return backend;
 }
-beforeAll(assertScratchTmuxSocket);
+holdScratchTmuxServer();
 afterEach(() => {
   for (const backend of backends.splice(0)) backend.kill();
 });
@@ -87,7 +87,7 @@ describe('retained tmux process lifecycle', () => {
     const literal = [';', 'trailing;', 'backslash\\;', 'quoted "value"\nnext;'];
     request.args = [
       '-c',
-      'printf "<%s>\\n" "$@"; printf "seed:<%s>\\n" "$SESSION_SEED"',
+      'printf "<%s>\\n" "$@"; printf "seed:<%s>\\n" "$SESSION_SEED"; exec sleep 30',
       'test-agent',
       ...literal,
     ];
@@ -99,13 +99,17 @@ describe('retained tmux process lifecycle', () => {
       retainOnExit: true,
     });
     backends.push(backend);
+    // The process stays up once it has printed, its last line last:
+    // tmux before 3.7 can drop what a pane wrote just before its
+    // process exited.
     await vi.waitFor(() =>
-      expect(tmuxPaneState(backend.name!)?.paneDead).toBe(true)
+      expect(tmuxCli.tmuxCapturePane(backend.name!)).toContain(
+        'seed:<prompt;\nend;>'
+      )
     );
     expect(tmuxShowOption(backend.name!, '@literal')).toBe('metadata;');
     const output = tmuxCli.tmuxCapturePane(backend.name!);
     for (const argument of literal) expect(output).toContain(`<${argument}>`);
-    expect(output).toContain('seed:<prompt;\nend;>');
   });
   it('replaces only the approved process and applies metadata after the guarded launch', async () => {
     const first = await retained('sleep 30');
@@ -338,7 +342,7 @@ describe('retained tmux process lifecycle', () => {
   it('injects launch-specific environment into an already-running server', async () => {
     await retained('sleep 30');
     const request = spec(
-      'printf "env:%s:%s\\n" "$HOME" "$SESSION_SEED"; exit 0'
+      'printf "env:%s:%s\\n" "$HOME" "$SESSION_SEED"; exec sleep 30'
     );
     request.env = { ...process.env, HOME: '/tmp/alternate-home' };
     request.envAdditions = { SESSION_SEED: 'literal seed' };
@@ -349,15 +353,12 @@ describe('retained tmux process lifecycle', () => {
       retainOnExit: true,
     });
     backends.push(backend);
+    // The process stays up once it has printed, as above.
     await vi.waitFor(() =>
-      expect(tmuxPaneState(backend.name!)?.paneDead).toBe(true)
+      expect(tmuxCli.tmuxCapturePane(backend.name!)).toContain(
+        'env:/tmp/alternate-home:literal seed'
+      )
     );
-    const output = execFileSync(
-      'tmux',
-      ['capture-pane', '-p', '-S', '-', '-t', `=${backend.name}:`],
-      { encoding: 'utf8' }
-    );
-    expect(output).toContain('env:/tmp/alternate-home:literal seed');
   });
   it('reports logical exit when another program removes the tmux session', async () => {
     const backend = await retained('sleep 30');

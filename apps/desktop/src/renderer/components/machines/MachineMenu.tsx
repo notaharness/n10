@@ -1,15 +1,10 @@
 import { MoreHorizontalIcon } from 'lucide-react';
+import { useRef } from 'react';
 import { toast } from 'sonner';
-import type {
-  MachineGrant,
-  MachineView,
-} from '../../../host/contract-machines.js';
-import { copyText } from '../../lib/copy-text.js';
+import type { MachineGrant, MachineView } from '@n10/engine/contract';
 import { useSetMachineGrant } from '../../lib/data/mutations-machines.js';
-import {
-  fingerprintGroups,
-  isFleetMember,
-} from '../../lib/machines/machine-model.js';
+import { copyFingerprint } from '../../lib/machines/copy-fingerprint.js';
+import { isFleetMember } from '../../lib/machines/machine-model.js';
 import { errorMessage } from '../../lib/utils.js';
 import { Button } from '../ui/button.js';
 import {
@@ -30,12 +25,6 @@ const GRANTS: { grant: MachineGrant; label: string }[] = [
   { grant: 'none', label: 'No access' },
 ];
 
-/** Copies the 64-bit fingerprint as displayed, not the full peerId
- *  (beam-fleet-ux.md §1). */
-export function copyFingerprint(peerId: string): void {
-  copyText(fingerprintGroups(peerId), 'Fingerprint copied');
-}
-
 /** A machine row's actions: alias, grant and revoke for a member (beam
  *  docs/08), copying the fingerprint for any row. */
 export function MachineMenu({
@@ -51,6 +40,10 @@ export function MachineMenu({
 }) {
   const grant = useSetMachineGrant();
   const member = isFleetMember(machine);
+  // Renaming opens a field that takes focus, so it opens once the menu
+  // has closed: the open menu holds focus, and closing hands it back to
+  // the menu's button, which would blur the field and commit it.
+  const renaming = useRef(false);
   const setGrant = (next: MachineGrant) =>
     grant.mutate(
       { peerId: machine.peerId, grant: next },
@@ -64,9 +57,22 @@ export function MachineMenu({
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        align="end"
+        onCloseAutoFocus={(event) => {
+          if (!renaming.current) return;
+          renaming.current = false;
+          event.preventDefault();
+          onRename();
+        }}
+      >
         {member && (
-          <DropdownMenuItem disabled={disabled} onSelect={onRename}>
+          <DropdownMenuItem
+            disabled={disabled}
+            onSelect={() => {
+              renaming.current = true;
+            }}
+          >
             Rename locally…
           </DropdownMenuItem>
         )}

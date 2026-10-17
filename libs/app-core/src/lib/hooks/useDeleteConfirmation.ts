@@ -5,7 +5,6 @@ export type DeleteConfirmMode = 'type-branch' | 'yes-no';
 
 export interface DeleteConfirmState {
   branch: string;
-  sessionName: string;
   reason: string;
   // 'type-branch' = high friction (typing the branch name) for branches
   // with uncommitted/unpushed work that would be lost on disk.

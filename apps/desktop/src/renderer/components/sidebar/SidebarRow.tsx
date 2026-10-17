@@ -18,10 +18,10 @@ import { babysitBadge } from '../../lib/sidebar/babysit-badge.js';
 import {
   itemBranch,
   itemHasWorktree,
-  itemKey,
   itemRunning,
   itemSessionName,
   itemTitle,
+  itemWorktreeRemoved,
 } from '../../lib/sidebar/sidebar-model.js';
 import {
   isPrRowCommand,
@@ -43,12 +43,15 @@ import { usePullRequestRow } from './use-pull-request-row.js';
 function RowBadges({
   merged,
   rebasing,
+  removed,
   conflictCount,
   babysit,
   machineLabel,
 }: {
   merged: boolean;
   rebasing: boolean;
+  /** The worktree is gone and its agent still runs. */
+  removed: boolean;
   conflictCount: number;
   babysit: BabysitStatus | undefined;
   /** The row's session machine, resolved by the caller — only when
@@ -90,6 +93,11 @@ function RowBadges({
       {rebasing && (
         <span className="shrink-0 rounded bg-warning/15 px-1 text-[10px] font-medium text-warning">
           rebasing
+        </span>
+      )}
+      {removed && (
+        <span className="shrink-0 rounded bg-warning/15 px-1 text-[10px] font-medium text-warning">
+          worktree removed
         </span>
       )}
       {conflictCount > 0 && (
@@ -189,6 +197,7 @@ export function SidebarRow({
         running,
         hasPr: Boolean(pr),
         babysitting: Boolean(item.babysit),
+        worktreeRemoved: itemWorktreeRemoved(item),
       })
     );
     if (!isSidebarRowCommand(chosen)) return;
@@ -265,6 +274,7 @@ export function SidebarRow({
             <RowBadges
               merged={merged}
               rebasing={rebasing}
+              removed={itemWorktreeRemoved(item)}
               conflictCount={conflictCount}
               babysit={item.babysit}
               machineLabel={machineLabel}
@@ -289,7 +299,6 @@ export function SidebarRow({
       {confirmRemove && (
         <RemoveWorktreeDialog
           branch={branch}
-          itemKey={itemKey(item)}
           running={running}
           onClose={() => setConfirmRemove(false)}
         />

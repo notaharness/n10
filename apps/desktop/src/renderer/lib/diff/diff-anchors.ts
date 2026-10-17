@@ -5,7 +5,7 @@ import type {
 } from '../../../host/contract.js';
 import type { InlineTarget } from '../review/my-drafts.js';
 import { anchorKey, lineAnchors } from './diff-model.js';
-import type { FlatRow } from './diff-virtual.js';
+import type { FlatRow } from './diff-rows-model.js';
 
 /** Where comments hang in the flat diff: the line each one ends on, or
  *  the file's tail when its line is not in the diff. */

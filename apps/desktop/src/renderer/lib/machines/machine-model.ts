@@ -3,7 +3,7 @@ import type {
   InboundMailItem,
   MachineState,
   MachineView,
-} from '../../../host/contract-machines.js';
+} from '@n10/engine/contract';
 import { relativeTime } from '../utils.js';
 
 /**
@@ -19,9 +19,13 @@ export interface MachinePresentation {
   secondary: string;
 }
 
+// beam's `offline` is a peer no tunnel reaches, which may be the peer or
+// this machine's route to it, so a peer reads "Unreachable". "Offline" is
+// for this machine's own row, when the operating system reports no network.
 const STATE_LABEL: Record<MachineState, string> = {
   connected: 'Connected',
-  offline: 'Offline',
+  offline: 'Unreachable',
+  unknown: 'Unknown',
   revoked: 'Revoked',
   'revoked-by-fleet': 'Access revoked',
 };
@@ -29,6 +33,7 @@ const STATE_LABEL: Record<MachineState, string> = {
 const STATE_TONE: Record<MachineState, MachineTone> = {
   connected: 'success',
   offline: 'muted',
+  unknown: 'muted',
   revoked: 'destructive',
   'revoked-by-fleet': 'destructive',
 };
@@ -48,6 +53,9 @@ function secondaryText(machine: MachineView): string {
       return machine.lastSeenAt == null
         ? 'Never connected'
         : `Last seen ${relativeTime(machine.lastSeenAt)}`;
+    // Why is told once: this machine's own row, or the Fleet panel's
+    // reconnecting notice.
+    case 'unknown':
     case 'revoked':
       return '';
     case 'revoked-by-fleet':
@@ -57,7 +65,13 @@ function secondaryText(machine: MachineView): string {
 
 export function machinePresentation(machine: MachineView): MachinePresentation {
   if (machine.isLocal) {
-    return { label: 'This machine', tone: 'success', secondary: '' };
+    return machine.state === 'offline'
+      ? {
+          label: 'Offline',
+          tone: 'destructive',
+          secondary: 'This machine cannot reach the fleet',
+        }
+      : { label: 'This machine', tone: 'success', secondary: '' };
   }
   return {
     label: STATE_LABEL[machine.state],
@@ -144,24 +158,27 @@ export function isFleetMember(machine: MachineView): boolean {
 }
 
 /**
- * `3 machines`, or `3 machines · 1 offline` / `3 machines · 2 queued`
- * when something needs attention (offline takes priority over mail
- * waiting). Counts this machine; `null` with no other machine (D8).
+ * `3 machines`, or `3 machines · this machine offline` /
+ * `3 machines · 1 unreachable` / `3 machines · 2 queued` when something
+ * needs attention, in that order. Counts this machine; `null` with no
+ * other machine (D8).
  */
 export function machinesSummary(
   machines: readonly MachineView[]
 ): { text: string; offline: boolean } | null {
   if (!hasPeerMachines(machines)) return null;
   const members = machines.filter(isFleetMember);
-  const offline = members.filter((m) => m.state === 'offline').length;
+  const unreachable = members.filter((m) => m.state === 'offline').length;
   const queued = members.reduce((sum, m) => sum + m.queued, 0);
+  const cutOff = machines.some((m) => m.isLocal && m.state === 'offline');
   const count = members.length + 1; // + this machine
   let suffix = '';
-  if (offline > 0) suffix = ` · ${offline} offline`;
+  if (cutOff) suffix = ' · this machine offline';
+  else if (unreachable > 0) suffix = ` · ${unreachable} unreachable`;
   else if (queued > 0) suffix = ` · ${queued} queued`;
   return {
     text: `${count} machine${count === 1 ? '' : 's'}${suffix}`,
-    offline: offline > 0,
+    offline: cutOff || unreachable > 0,
   };
 }
 
@@ -199,6 +216,35 @@ export function machineChoice(
       ? value
       : undefined;
   return { value, remote };
+}
+
+/** A picker that starts on `preferred` (`'local'` or a peerId): the
+ *  machine a launch belongs on until the reader picks another. Unlike
+ *  {@link machineChoice}, a preferred machine that is unavailable stays
+ *  picked and is named in `unavailable`, since falling back to this
+ *  machine would launch where nobody asked; the caller holds the launch
+ *  until it is back or another is picked. A machine the reader picks
+ *  falls back as {@link machineChoice}'s does. */
+export function preferredMachineChoice(
+  machines: readonly MachineView[],
+  chosen: string | null,
+  preferred: string
+): {
+  value: string;
+  remote: string | undefined;
+  unavailable: MachineView | null;
+} {
+  const preferredPeer =
+    chosen === null
+      ? machines.find((m) => m.peerId === preferred && !m.isLocal)
+      : undefined;
+  if (!preferredPeer)
+    return { ...machineChoice(machines, chosen), unavailable: null };
+  return {
+    value: preferredPeer.peerId,
+    remote: preferredPeer.peerId,
+    unavailable: isMachineSelectable(preferredPeer) ? null : preferredPeer,
+  };
 }
 
 export interface MachineOption {

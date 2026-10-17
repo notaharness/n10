@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type * as ReviewCommentsModule from '@n10/review-comments';
 import {
-  readComments,
-  updateComment,
-  postReviewComments,
   type ReviewComment,
   type CommentPositionInfo,
   type RowMapEntry,
@@ -20,29 +16,12 @@ import {
 import { handleDiffViewerInput } from './diff-viewer-input.js';
 import type { DiffViewerHandlerCtx } from './input-types.js';
 
-// This suite covers handleDiffViewerInput's 22 action branches minus
-// the three diff-viewer.plan-* actions, which already have dedicated
-// coverage in ./plan-input.spec.ts (toggle/annotate/checkout against
-// a real plan store) — duplicating them here would be tautological
-// restating of that suite, not new characterization.
-//
-// Two branches are deliberately left untested: the inline-edit-mode
-// and delete-confirm-mode key handling (lines ~129–166) are exempt
-// from keybind resolution and sit *above* action dispatch, like reply
-// mode — but only the reply-mode bypass was asked for, and the other
-// two would mean re-deriving another shell's y/n and text-editing
-// contract instead of pinning one of the 22 listed actions.
-
-vi.mock('@n10/review-comments', async (importOriginal) => {
-  const actual = await importOriginal<typeof ReviewCommentsModule>();
-  return {
-    ...actual,
-    readComments: vi.fn().mockReturnValue([]),
-    updateComment: vi.fn(),
-    removeComment: vi.fn(),
-    postReviewComments: vi.fn().mockResolvedValue(undefined),
-  };
-});
+const agentComments = {
+  read: vi.fn(),
+  update: vi.fn(),
+  remove: vi.fn(),
+  post: vi.fn(),
+};
 
 vi.mock('../../utils/editor-edit.js', () => ({
   openCommentInEditor: vi.fn().mockReturnValue('/tmp/n10-comment-fake.md'),
@@ -234,6 +213,7 @@ function makeCtx(
 /** Draft-comment half of the handler context. */
 function makeCommentCtx(opts: CtxOpts) {
   return {
+    service: agentComments,
     comments: opts.comments ?? [],
     prId: opts.prId ?? PR_ID,
     positions: opts.positions ?? new Map(),
@@ -256,8 +236,8 @@ function makeRemoteCtx(opts: CtxOpts) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(readComments).mockReturnValue([]);
-  vi.mocked(postReviewComments).mockResolvedValue(undefined);
+  agentComments.read.mockReturnValue([]);
+  agentComments.post.mockResolvedValue(undefined);
 });
 
 // ── back ────────────────────────────────────────────────────────
@@ -632,48 +612,10 @@ describe('diff-viewer handler — post-comment', () => {
     });
     handleDiffViewerInput('p', makeKey(), ctx);
     expect(run).not.toHaveBeenCalled();
-    expect(updateComment).not.toHaveBeenCalled();
+    expect(agentComments.update).not.toHaveBeenCalled();
   });
 
-  it('flashes when no vendor is configured', () => {
-    const pane = makePane({ selectedCommentId: 'd1' });
-    const ctx = makeCtx(pane, {
-      comments: [makeComment({ id: 'd1', status: 'draft' })],
-      config: {},
-    });
-    handleDiffViewerInput('p', makeKey(), ctx);
-    expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
-      'No provider set up — open settings'
-    );
-    expect(updateComment).not.toHaveBeenCalled();
-  });
-
-  it('flashes for an unsupported vendor', () => {
-    const pane = makePane({ selectedCommentId: 'd1' });
-    const ctx = makeCtx(pane, {
-      comments: [makeComment({ id: 'd1', status: 'draft' })],
-      config: { vendor: 'gitlab' },
-    });
-    handleDiffViewerInput('p', makeKey(), ctx);
-    expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
-      "Can't post comments for this repository"
-    );
-  });
-
-  it('flashes when a github PR is missing its head SHA', () => {
-    const pane = makePane({ selectedCommentId: 'd1' });
-    const ctx = makeCtx(pane, {
-      comments: [makeComment({ id: 'd1', status: 'draft' })],
-      config: { vendor: 'github' },
-      headSha: undefined,
-    });
-    handleDiffViewerInput('p', makeKey(), ctx);
-    expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
-      "Couldn't post: refresh pull requests and try again"
-    );
-  });
-
-  it('marks the comment posting and hands off to asyncOps.run', () => {
+  it('hands posting to asyncOps.run', () => {
     const pane = makePane({ selectedCommentId: 'd1' });
     const run = vi.fn();
     const ctx = makeCtx(pane, {
@@ -684,7 +626,6 @@ describe('diff-viewer handler — post-comment', () => {
       asyncOpsRun: run,
     });
     handleDiffViewerInput('p', makeKey(), ctx);
-    expect(updateComment).toHaveBeenCalledWith(7, 'd1', { status: 'posting' });
     expect(run).toHaveBeenCalledWith('post-comment', expect.any(Function));
   });
 
@@ -692,7 +633,7 @@ describe('diff-viewer handler — post-comment', () => {
     const pane = makePane({ selectedCommentId: 'd1' });
     const d1 = makeComment({ id: 'd1', status: 'draft', lineStart: 1 });
     const d2 = makeComment({ id: 'd2', status: 'draft', lineStart: 2 });
-    vi.mocked(readComments).mockReturnValue([{ ...d1, status: 'posted' }, d2]);
+    agentComments.read.mockReturnValue([{ ...d1, status: 'posted' }, d2]);
     const refresh = vi.fn();
     let captured: (() => Promise<void>) | undefined;
     const run = vi.fn((_key: string, fn: () => Promise<void>) => {
@@ -708,18 +649,19 @@ describe('diff-viewer handler — post-comment', () => {
     });
     handleDiffViewerInput('p', makeKey(), ctx);
     await captured!();
-    expect(postReviewComments).toHaveBeenCalledWith(
-      [d1],
-      expect.objectContaining({ vendor: 'github', prId: 7, headSha: 'sha1' })
-    );
+    expect(agentComments.post).toHaveBeenCalledWith({
+      ids: ['d1'],
+      prId: 7,
+      headSha: 'sha1',
+    });
     expect(refresh).toHaveBeenCalled();
     expect(pane.selectedCommentId).toBe('d2');
     expect(ctx.sessions.flashStatus).toHaveBeenCalledWith('Comment posted');
   });
 
-  it('on failure, reverts the comment to draft and flashes the error', async () => {
+  it('on failure, flashes the engine error', async () => {
     const pane = makePane({ selectedCommentId: 'd1' });
-    vi.mocked(postReviewComments).mockRejectedValue(new Error('network down'));
+    agentComments.post.mockRejectedValue(new Error('network down'));
     let captured: (() => Promise<void>) | undefined;
     const run = vi.fn((_key: string, fn: () => Promise<void>) => {
       captured = fn;
@@ -733,7 +675,6 @@ describe('diff-viewer handler — post-comment', () => {
     });
     handleDiffViewerInput('p', makeKey(), ctx);
     await captured!();
-    expect(updateComment).toHaveBeenCalledWith(7, 'd1', { status: 'draft' });
     expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
       'Post failed: network down'
     );
@@ -924,4 +865,37 @@ describe('diff-viewer handler — reply-mode bypass', () => {
     expect(pane.paneMode).toBe('diff-file');
     expect(pane.diffViewFile).toBe('a.ts');
   });
+});
+
+it('keeps edited text when the engine refuses an uncertain comment edit', () => {
+  const pane = makePane({ editingCommentId: 'd1', editBuffer: 'unsaved text' });
+  const ctx = makeCtx(pane, { comments: [makeComment({ id: 'd1' })] });
+  agentComments.update.mockImplementationOnce(() => {
+    throw new Error('Retry posting before editing');
+  });
+  expect(() =>
+    handleDiffViewerInput('', makeKey({ escape: true }), ctx)
+  ).not.toThrow();
+  expect(pane.editBuffer).toBe('unsaved text');
+  expect(pane.editingCommentId).toBe('d1');
+  expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
+    expect.stringContaining('Retry posting')
+  );
+});
+
+it('keeps selection when the engine refuses comment deletion', () => {
+  const pane = makePane({
+    pendingDeleteCommentId: 'd1',
+    selectedCommentId: 'd1',
+  });
+  const ctx = makeCtx(pane, { comments: [makeComment({ id: 'd1' })] });
+  agentComments.remove.mockImplementationOnce(() => {
+    throw new Error('Already posted');
+  });
+  expect(() => handleDiffViewerInput('y', makeKey(), ctx)).not.toThrow();
+  expect(pane.selectedCommentId).toBe('d1');
+  expect(pane.pendingDeleteCommentId).toBeNull();
+  expect(ctx.sessions.flashStatus).toHaveBeenCalledWith(
+    expect.stringContaining('Already posted')
+  );
 });
