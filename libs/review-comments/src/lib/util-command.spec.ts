@@ -9,6 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import type { DiffLine } from '@n10/diff';
 import type { ReviewComment } from './types.js';
 import type * as Util from './util-command.js';
 import { parseArgs } from './util-command.js';
@@ -50,68 +51,83 @@ describe('parseArgs', () => {
 });
 
 /**
- * What `add-comment` actually writes.
- *
- * The command is the agent's whole interface to the review — a
- * subprocess with no state — so the file it leaves behind is the
- * contract, and asserting on the parsed flags alone would not have
- * caught a field that never reached disk.
+ * What `add-comment` hands the store. The command is the agent's whole
+ * interface to the review — a subprocess with no state — so the draft
+ * it stores is the contract; core's `agent-comment-store.spec.ts`
+ * covers the file it lands in.
  */
 describe('add-comment', () => {
-  let home: string;
-  let originalHome: string | undefined;
   let util: typeof Util;
+  let appended: { prId: number; comment: ReviewComment }[];
+  let exit: ReturnType<typeof vi.spyOn>;
+  let errors: string[];
 
   const PR = 7;
+  const HEAD = 'c0ffee'.padEnd(40, '0');
   const BASE = [
     `--pr=${PR}`,
+    '--base=main',
     '--file=src/undo.c',
     '--lineStart=12',
     '--lineEnd=12',
     '--severity=major',
     '--body=The undo stack is never bounded.',
   ];
+  /** src/undo.c's diff: one hunk, new lines 10-14 with 12 added. */
+  const hunk: DiffLine[] = [
+    { type: 'hunk-header', content: '@@ -10,4 +10,5 @@' },
+    { type: 'context', content: 'a', oldLine: 10, newLine: 10 },
+    { type: 'context', content: 'b', oldLine: 11, newLine: 11 },
+    { type: 'add', content: 'c', newLine: 12 },
+    { type: 'context', content: 'd', oldLine: 12, newLine: 13 },
+    { type: 'context', content: 'e', oldLine: 13, newLine: 14 },
+  ];
+  const diff = vi.fn<NonNullable<Util.UtilContext['diff']>>((_base, file) => ({
+    ok: true,
+    head: HEAD,
+    lines: file === 'src/undo.c' ? hunk : null,
+  }));
+  const run = (args: string[]) =>
+    util.handleUtilCommand(['add-comment', ...args], '/repo', {
+      appendComment: (prId, comment) => {
+        appended.push({ prId, comment });
+      },
+      diff,
+      head: () => HEAD,
+    });
+  /** A refusal: exit 1, these lines on stderr, and nothing stored. */
+  const refused = async (args: string[]) => {
+    await expect(run(args)).rejects.toThrow('exit');
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(appended).toEqual([]);
+    return errors;
+  };
 
   beforeEach(async () => {
-    originalHome = process.env.HOME;
-    home = mkdtempSync(join(tmpdir(), 'n10-util-'));
-    process.env.HOME = home;
-    // ~/.n10 is resolved once at import time, so the module chain has
-    // to be re-imported after HOME moves.
-    vi.resetModules();
     util = await import('./util-command.js');
+    appended = [];
+    errors = [];
+    diff.mockClear();
+    vi.spyOn(console, 'error').mockImplementation((line: string) => {
+      errors.push(line);
+    });
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    exit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('exit');
+    });
   });
 
   afterEach(() => {
-    if (originalHome === undefined) delete process.env.HOME;
-    else process.env.HOME = originalHome;
-    rmSync(home, { recursive: true, force: true });
+    vi.restoreAllMocks();
   });
 
-  /**
-   * Read the drafts file the way the reader does — off disk, at the
-   * path the agent's subprocess wrote it to. Going through the store's
-   * own API instead would prove the two agree with each other and
-   * nothing about the file that is actually the contract.
-   */
   const stored = (): ReviewComment[] => {
-    const path = join(
-      home,
-      '.n10',
-      'reviews',
-      createHash('sha256').update('/repo').digest('hex').slice(0, 32),
-      `pr-${PR}`,
-      'comments.json'
-    );
-    return (
-      JSON.parse(readFileSync(path, 'utf8')) as {
-        comments: ReviewComment[];
-      }
-    ).comments;
+    expect(appended.every((entry) => entry.prId === PR)).toBe(true);
+    return appended.map((entry) => entry.comment);
   };
 
-  it('writes the draft the flags describe', async () => {
-    await util.handleUtilCommand(['add-comment', ...BASE], '/repo');
+  it('stores the draft the flags describe', async () => {
+    await run(BASE);
     expect(stored()).toHaveLength(1);
     expect(stored()[0]).toMatchObject({
       file: 'src/undo.c',
@@ -128,10 +144,7 @@ describe('add-comment', () => {
    *  draft is only a file and a line, and nothing downstream can tell
    *  which thread it answers. */
   it('records the thread a draft answers', async () => {
-    await util.handleUtilCommand(
-      ['add-comment', ...BASE, '--thread=PRRT_kwDOAbC123'],
-      '/repo'
-    );
+    await run([...BASE, '--thread=PRRT_kwDOAbC123']);
     expect(stored()[0].threadId).toBe('PRRT_kwDOAbC123');
   });
 
@@ -140,40 +153,121 @@ describe('add-comment', () => {
    *  order, the rail dot, the TUI chip, the posted body — reads the
    *  stored one. */
   it('raises the stored severity to match a louder header in the body', async () => {
-    await util.handleUtilCommand(
-      [
-        'add-comment',
-        `--pr=${PR}`,
-        '--file=src/undo.c',
-        '--lineStart=12',
-        '--lineEnd=12',
-        '--severity=nit',
-        '--body=question (blocking): does this drop writes on crash?',
-      ],
-      '/repo'
-    );
+    await run([
+      `--pr=${PR}`,
+      '--base=main',
+      '--file=src/undo.c',
+      '--lineStart=12',
+      '--lineEnd=12',
+      '--severity=nit',
+      '--body=question (blocking): does this drop writes on crash?',
+    ]);
     expect(stored()[0].severity).toBe('critical');
   });
 
   it('will not let an accidental label quieten the declared severity', async () => {
-    await util.handleUtilCommand(
-      [
-        'add-comment',
-        `--pr=${PR}`,
-        '--file=src/undo.c',
-        '--lineStart=12',
-        '--lineEnd=12',
-        '--severity=critical',
-        '--body=Note: this drops writes on crash',
-      ],
-      '/repo'
-    );
+    await run([
+      `--pr=${PR}`,
+      '--base=main',
+      '--file=src/undo.c',
+      '--lineStart=12',
+      '--lineEnd=12',
+      '--severity=critical',
+      '--body=Note: this drops writes on crash',
+    ]);
     expect(stored()[0].severity).toBe('critical');
   });
 
   it('leaves threadId off a draft that answers nothing', async () => {
-    await util.handleUtilCommand(['add-comment', ...BASE], '/repo');
+    await run(BASE);
     expect(stored()[0].threadId).toBeUndefined();
+  });
+
+  it('pins the draft to the commit its diff was read at', async () => {
+    await run(BASE);
+    expect(diff).toHaveBeenCalledWith('main', 'src/undo.c');
+    expect(stored()[0].head).toBe(HEAD);
+  });
+
+  it('takes --lineEnd to be --lineStart when it is left out', async () => {
+    await run(BASE.filter((arg) => !arg.startsWith('--lineEnd')));
+    expect(stored()[0]).toMatchObject({ lineStart: 12, lineEnd: 12 });
+  });
+
+  it('writes a draft on a whole file when no lines are named', async () => {
+    await run(BASE.filter((arg) => !arg.startsWith('--line')));
+    expect(stored()[0]).toMatchObject({
+      file: 'src/undo.c',
+      lineStart: null,
+      lineEnd: null,
+    });
+  });
+
+  it('writes a draft on the pull request when no file is named', async () => {
+    await run([
+      `--pr=${PR}`,
+      '--severity=minor',
+      '--body=Nothing tests the retry path.',
+    ]);
+    expect(diff).not.toHaveBeenCalled();
+    expect(stored()[0]).toMatchObject({
+      file: null,
+      lineStart: null,
+      lineEnd: null,
+      head: HEAD,
+      body: 'Nothing tests the retry path.',
+    });
+  });
+
+  it('refuses lines outside the diff and says which lines it has', async () => {
+    const args = BASE.map((arg) =>
+      arg.startsWith('--line') ? arg.replace('12', '40') : arg
+    );
+    expect(await refused(args)).toEqual([
+      'src/undo.c: line 40 on RIGHT must fit within one diff range in ' +
+        'main...HEAD at c0ffee0. Valid ranges on this side: 10–14. Set ' +
+        '--lineStart and --lineEnd within one range, or omit both to ' +
+        'comment on the whole file.',
+    ]);
+  });
+
+  it('refuses a range that runs out of the diff', async () => {
+    const args = BASE.map((arg) =>
+      arg.startsWith('--lineEnd') ? '--lineEnd=15' : arg
+    );
+    expect((await refused(args))[0]).toMatch(
+      /^src\/undo\.c: lines 12–15 on RIGHT must fit within one diff range/
+    );
+  });
+
+  it('refuses a file the pull request does not change', async () => {
+    const args = BASE.map((arg) =>
+      arg.startsWith('--file') ? '--file=src/other.c' : arg
+    );
+    expect(await refused(args)).toEqual([
+      'src/other.c is unchanged in main...HEAD at c0ffee0. Choose a ' +
+        'changed file, or omit --file to comment on the pull request itself.',
+    ]);
+  });
+
+  it('refuses a file anchor without --base and says what to pass', async () => {
+    expect(await refused(BASE.filter((arg) => arg !== '--base=main'))).toEqual([
+      '--file requires --base=<target branch>, for example --base=main.',
+      'Omit --file to comment on the pull request itself.',
+    ]);
+    expect(diff).not.toHaveBeenCalled();
+  });
+
+  it('passes on why the diff could not be read', async () => {
+    diff.mockReturnValueOnce({ ok: false, error: 'No branch main here.' });
+    expect(await refused(BASE)).toEqual(['No branch main here.']);
+  });
+
+  it('refuses lines without a file', async () => {
+    const args = BASE.filter((arg) => !arg.startsWith('--file'));
+    expect((await refused(args))[0]).toBe(
+      '--lineStart, --lineEnd and --side need --file'
+    );
   });
 });
 
@@ -235,7 +329,7 @@ describe('add-guide', () => {
     await util.handleUtilCommand(
       ['add-guide', `--pr=${PR}`, `--file=${file}`],
       '/repo',
-      { head: () => 'abc123' }
+      { appendComment: () => undefined, head: () => 'abc123' }
     );
     expect(JSON.parse(readFileSync(guideAt(), 'utf8'))).toMatchObject({
       prId: PR,
@@ -250,7 +344,8 @@ describe('add-guide', () => {
     await expect(
       util.handleUtilCommand(
         ['add-guide', `--pr=${PR}`, `--file=${file}`],
-        '/repo'
+        '/repo',
+        { appendComment: () => undefined }
       )
     ).rejects.toThrow('exit');
     expect(exit).toHaveBeenCalledWith(1);

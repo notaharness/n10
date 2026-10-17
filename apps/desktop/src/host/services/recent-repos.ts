@@ -74,9 +74,7 @@ export function recordOpen(
   now = Date.now()
 ): RecentRepo[] {
   const color = recents.find((r) => r.cwd === cwd)?.color;
-  const rest = recents
-    .filter((r) => r.cwd !== cwd)
-    .slice(0, MAX_RECENTS - 1);
+  const rest = recents.filter((r) => r.cwd !== cwd).slice(0, MAX_RECENTS - 1);
   return withColors([
     { cwd, lastOpenedAt: now, ...(color === undefined ? {} : { color }) },
     ...rest,

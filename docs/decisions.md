@@ -429,6 +429,28 @@ Sidebar snapshots carry their repository identity. Drop mismatched answers in
 the renderer, and recheck identity between host awaits, to prevent rows from a
 new repository entering the previous repository's tab state.
 
+A later launch opens its start directory in the running app. The new process
+resolves that directory as a first launch would and sends it as the
+single-instance lock's `additionalData`. `argv` is not used: Chromium may
+reorder and extend it, and it carries neither the launcher's environment nor
+whether a terminal started the process. The running app passes over a
+directory that is not a repository, as startup does, and a relative one, which
+it would resolve against the wrong working directory. The renderer receives the
+directory as `open-repo` with a path. The repository gate handles that command
+above both screens, so the start screen and the workspace open it as the picker
+does; a launch naming the repository on screen changes nothing.
+
+Main cannot see when a page has subscribed to menu commands, so the page claims
+launches (`takeLaunchRepo`) once subscribed and the gate has its first answer,
+taking any launch that waited. The claim lives in main (`main/launch-repo.ts`),
+where launches arrive and the page's lifecycle is visible, so the host hands
+`takeLaunchRepo` back to main with the asking window. Main sends later launches
+only to the page that has claimed. The claim ends when another document commits, an error page replaces
+the page, its renderer dies or the window closes; not when a navigation starts,
+since `will-navigate` may refuse it and leave the page listening. A launch
+during startup, a reload or renderer recovery therefore waits for the next page
+instead of going to one that is not listening.
+
 Use native menus and dialogs where the OS supports the interaction. The review
 workspace has a navigation rail and one content pane. The diff owns its toolbar.
 
@@ -964,16 +986,62 @@ unscoped path is read. The standalone utility resolves this identity through cor
 Only observed resources attach a nonrecursive watcher; the last observer
 leaving closes it.
 
+A finding goes on lines, a whole file, or the pull request: a null `file` or
+null lines, as `RemoteCommentThread` says it. `n10 util add-comment` checks a
+line or file anchor against the pull request's diff before storing it, so an
+anchor the provider would refuse (GitHub answers 422) never becomes a draft. The
+utility runs where no provider is configured, so the diff is the checkout's
+own: from where HEAD left `--base` (`origin/<base>`, else the local branch) to
+HEAD, three lines of context, renames detected (core `agent-comment-diff.ts`).
+The review prompt writes `--base` from the pull request's target. The finding
+records that HEAD as `head`, and a post refuses a line or file finding whose
+`head` is not the head it files on: its lines belong to that commit.
+Findings on the pull request are filed as the review's summary, joined under
+one attribution: core's submission files a summary with the review, while a
+conversation comment is posted on its own. The summary is one draft, so which
+findings it holds is read from the findings (`agent-post-plan.ts`): one still
+carrying a publication went out in the summary last sent. While that summary's
+outcome is unknown, only those are sent, and it goes again as it was; a new
+finding waits for the next post. Once it is published, they are marked posted
+and a new summary carries the rest. The diff's comment navigation skips them;
+the desktop walkthrough and the TUI's PR comments pane show and post them.
+
 Agent publication uses core’s draft submission machinery in the separate
 `~/.n10/agent-review-publications` store, keyed by provider repository, PR and
 account. Human writing stays in `review-drafts`. Every network write goes through
-`VcsProvider.publishReview`; review-comments contains storage and formatting only.
+`VcsProvider.publishReview`; review-comments contains paths, reads and formatting
+only, and core owns every write.
 Selected findings are submitted as one native review with one verdict. A partial
 retry resumes the same durable submission and skips confirmed findings; the
 error reports how many findings were posted.
 Completed findings stay posted after a later failure. An uncertain outcome retains
 its ledger and account binding, blocks edits, and is reconciled on retry. Restarted
 processes can retry findings left posting without inventing a second write path.
+
+The findings file has writers in several processes: `n10 util add-comment`, edits in
+the TUI and the desktop, and publication. Each reads, changes and writes it under
+`comments.json.lock` (core `changeAgentComments`, `file-lock.ts`), so none drops
+another's change. The lock is synchronous: a section is a few milliseconds of file
+work, so a waiter blocks no longer than the synchronous write it replaces, and
+nothing in one process can interleave with it; an asynchronous lock would reorder
+one process's writes and open its own check-then-write gaps. A post holds a
+separate claim, `posting.lock`, across its network calls, so one process at a time
+posts a pull request's findings. A comment marked `posting` reads as a draft unless
+some process holds that claim, and edits check it under the store lock.
+
+A lock file holds its owner's host, pid and a nonce. Release removes only a lock
+still holding its own token. A holder on this machine is judged by its pid alone,
+never by age, so a stopped TUI or a slow network never loses its claim; a holder
+that cannot be checked counts as gone after a minute. Breaking a lock happens under
+a second `.break` lock and only if the file still holds the token judged gone, so
+two waiters cannot both break it and both get in. A lock written before the
+machine last booted is gone whatever its pid now names, since after a power loss
+that pid can belong to a live, even root, process. Known limit: within one boot, a
+lock left by a crashed process whose pid has since been reused stays until that
+process exits.
+
+A write reads the file strictly: no file is no findings, but a file it cannot open
+or parse fails the write and leaves the file as it is, where a reader shows nothing.
 
 ## Guided review
 

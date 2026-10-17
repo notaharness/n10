@@ -7,11 +7,8 @@ export {
   commentDirPath,
   commentFilePath,
   readComments,
-  appendComment,
-  updateComment,
-  removeComment,
 } from './lib/comment-store.js';
-export { renderCommentBody } from './lib/comment-body.js';
+export { renderCommentBody, renderSummaryBody } from './lib/comment-body.js';
 export {
   AGENT_ATTRIBUTION,
   AGENT_FOOTER,
@@ -73,7 +70,7 @@ export {
   estimateReplyInputRows,
   EDIT_INPUT_SLACK_ROWS,
 } from './lib/comment-rows.js';
-export { handleUtilCommand } from './lib/util-command.js';
+export { handleUtilCommand, type CommentDiff } from './lib/util-command.js';
 export type {
   GuideFile,
   GuideSlide,

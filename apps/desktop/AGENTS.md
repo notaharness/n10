@@ -54,6 +54,12 @@ Every rule below has its reasoning in `docs/decisions.md`.
   repo, so the pane stays mounted across the switch. Repository writes wait
   on `writable()` (`lib/data/repo-switch.ts`): mutations do through the
   `MutationCache`; a direct bridge write must call it.
+- A later launch sends its start directory as the single-instance lock's
+  `additionalData` (`main/second-launch.ts`), never through `argv`. The
+  running app sends it to the claiming page as `open-repo` with a path, which
+  the gate in `App.tsx` handles for both screens. Launches wait in
+  `main/launch-repo.ts` until a page claims them (`takeLaunchRepo`, which the
+  host hands to main).
 - The reads a pane or the sidebar makes name the repository they read
   (`getSidebarModel(repo)`, sync state, branch lists, the review reads,
   sessions, branch sessions, agent options, worktree diffs; diff requests
@@ -207,10 +213,13 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - The tab strip wraps or scrolls as the `tabOverflow` desktop pref says,
   chosen from a tab's menu (radio items). Wrapped, dnd-kit sorts it with
   `rectSortingStrategy` and no axis lock; full rows share their width, and
-  the strip's end (`StripEnd`) takes the last row's room. Collisions go by
-  pointer first, then nearest centre; the strip's end resolves to the last
-  tab and is disabled for keyboard drags. The strip's `DndContext`
-  (`TabDragProvider`) sits above the repository gate. A label that does not
+  the strip's end (`StripEnd`) takes the last row's room. Either way the
+  dragged tab stays inside the strip (`restrictToParentElement`): past its
+  end it would widen a scrolling box that auto-scroll then chases.
+  Collisions go by pointer first, then nearest centre; the strip's end
+  resolves to the last tab and is disabled for keyboard drags. The
+  strip's `DndContext` (`TabDragProvider`) sits above the repository
+  gate. A label that does not
   fit is cut by measurement (`TabLabel.tsx`, `lib/tabs/label-cut.ts`), from
   the start for branch names and paths, from the end for titles (`cutSide`),
   with the whole label as its tooltip. A repository's colour is its recents

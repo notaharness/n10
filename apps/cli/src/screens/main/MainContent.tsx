@@ -213,6 +213,7 @@ export function MainContent({
             terminal={terminal}
             terminalFocused={terminalFocused}
             diffBundle={diffBundle}
+            selectedPr={selectedPr}
           />
         );
       case 'planCheckout':

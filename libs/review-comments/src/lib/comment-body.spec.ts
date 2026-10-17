@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { renderCommentBody } from './comment-body.js';
+import { renderCommentBody, renderSummaryBody } from './comment-body.js';
 import { AGENT_FOOTER } from './conventional.js';
 import type { ReviewComment } from './types.js';
 const comment = (body: string, severity: ReviewComment['severity'] = 'minor') =>
@@ -27,3 +27,14 @@ it.each(['critical', 'major', 'minor', 'nit'] as const)(
     );
   }
 );
+it('writes findings on the pull request as one summary, signed once', () => {
+  const body = renderSummaryBody([
+    comment('No tests cover the retry.', 'major'),
+    comment('The changelog is missing.', 'nit'),
+  ]);
+  expect(body).toMatch(
+    /^issue \(non-blocking\): No tests cover the retry\.\n\nnitpick \(non-blocking\): The changelog is missing\.\n/
+  );
+  expect(body.split(AGENT_FOOTER)).toHaveLength(2);
+  expect(body.endsWith(AGENT_FOOTER)).toBe(true);
+});
