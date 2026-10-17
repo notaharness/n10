@@ -22,10 +22,7 @@ import type {
 } from '@n10/vcs-core';
 import { sanitizeBody, VcsError } from '@n10/vcs-core';
 import { searchGitHubMentions } from './mentions.js';
-import {
-  GITHUB_EVENTS,
-  publishGitHubReview,
-} from './pr-review-publisher.js';
+import { GITHUB_EVENTS, publishGitHubReview } from './pr-review-publisher.js';
 import { classifyGhError, parseGhJson } from './gh-errors.js';
 import { ghGraphQL, ghQuery } from './gh-graphql.js';
 import { GH_READ_OPTIONS } from './gh-read-deadline.js';
