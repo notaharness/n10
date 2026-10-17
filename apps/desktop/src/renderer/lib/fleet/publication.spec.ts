@@ -56,19 +56,24 @@ describe('publicationKey', () => {
 });
 
 describe('pendingAfter', () => {
-  const none: ReadonlySet<string> = new Set();
+  const none: ReadonlyMap<string, Succeeded> = new Map();
 
   it('adds a success’s write while it is pending', () => {
     expect(pendingAfter(none, joined(false))).toEqual(
-      new Set([`member/${SELF}`])
+      new Map([[`member/${SELF}`, joined(false)]])
     );
-    expect(pendingAfter(new Set([`member/${SELF}`]), revoked(false))).toEqual(
-      new Set([`member/${SELF}`, `revoke/${OTHER}`])
+    expect(
+      pendingAfter(new Map([[`member/${SELF}`, joined(false)]]), revoked(false))
+    ).toEqual(
+      new Map([
+        [`member/${SELF}`, joined(false)],
+        [`revoke/${OTHER}`, revoked(false)],
+      ])
     );
   });
 
   it('keeps earlier writes through a published, failed or cancelled ceremony', () => {
-    const earlier = new Set([`member/${SELF}`]);
+    const earlier = new Map([[`member/${SELF}`, joined(false)]]);
     expect(pendingAfter(earlier, revoked(true))).toBe(earlier);
     expect(pendingAfter(earlier, refused)).toBe(earlier);
   });

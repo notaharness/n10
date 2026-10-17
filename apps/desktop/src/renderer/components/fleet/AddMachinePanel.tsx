@@ -20,7 +20,11 @@ export function AddMachinePanel({
   return (
     <div className="space-y-3 text-base" data-testid="add-machine-panel">
       <div className="flex items-center justify-between">
-        <h3 ref={heading} tabIndex={-1} className="font-medium outline-none">
+        <h3
+          ref={heading}
+          tabIndex={-1}
+          className="text-xl font-semibold outline-none"
+        >
           Add a machine
         </h3>
         <Tip label="Close instructions">
@@ -35,16 +39,13 @@ export function AddMachinePanel({
         </Tip>
       </div>
       <section className="space-y-1">
-        <h4 className="font-medium">Next · your other machine</h4>
         <p className="text-muted-foreground">
-          Open n10 Desktop → Fleet → Join a fleet. Use your existing fleet
+          On your other machine, open n10 → Fleet → Join a fleet. Use your fleet
           passkey.
         </p>
       </section>
       <section className="space-y-1.5">
-        <p className="text-muted-foreground">
-          Or run this on the other machine:
-        </p>
+        <p className="text-muted-foreground">Using a terminal?</p>
         <div className="flex items-center gap-1">
           <code className="min-w-0 flex-1 break-words rounded bg-muted px-2 py-1 font-mono text-sm select-all">
             {JOIN_COMMAND}
@@ -65,9 +66,7 @@ export function AddMachinePanel({
         </p>
       </section>
       <div className="space-y-1 border-y border-border py-2">
-        <p className="text-sm text-muted-foreground">
-          Compare its fleet fingerprint with this:
-        </p>
+        <p className="text-sm text-muted-foreground">Fleet fingerprint</p>
         <div className="flex items-center gap-1">
           <p
             className="min-w-0 flex-1 font-mono select-all"
@@ -86,9 +85,12 @@ export function AddMachinePanel({
             </Button>
           </Tip>
         </div>
+        <p className="text-sm text-muted-foreground">
+          Compare this after the other machine joins.
+        </p>
       </div>
       <p role="status" className="text-sm text-muted-foreground">
-        Waiting for a new machine…
+        No new machine detected yet
       </p>
     </div>
   );

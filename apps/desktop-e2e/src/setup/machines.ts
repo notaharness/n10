@@ -23,11 +23,7 @@ export async function chooseFleetAction(
 export function fleetView(page: Page) {
   return page
     .getByRole('region', { name: 'Fleet' })
-    .or(
-      page
-        .getByRole('dialog')
-        .filter({ has: page.getByRole('button', { name: 'Keep working' }) })
-    );
+    .or(page.getByTestId('enrolment-dialog'));
 }
 
 /** Expands the sidebar's Fleet section, if it is not already. */

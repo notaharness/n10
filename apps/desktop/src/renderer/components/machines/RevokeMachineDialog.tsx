@@ -4,6 +4,7 @@ import { useFleet } from '../../lib/fleet/fleet-context.js';
 import { FocusScope } from '../../lib/fleet/FocusScope.js';
 import { fingerprintGroups } from '../../lib/machines/machine-model.js';
 import { CeremonyFailure } from '../fleet/CeremonyFailure.js';
+import { CeremonyFooter } from '../fleet/CeremonyFooter.js';
 import { CeremonyProgress } from '../fleet/CeremonyProgress.js';
 import { Button } from '../ui/button.js';
 import {
@@ -23,15 +24,9 @@ function RevokeBody({
   revoke: () => void;
   onClose: () => void;
 }) {
-  const { view, running, outcome, cancel } = useFleet().revocation.ceremony;
+  const { view, running, outcome } = useFleet().revocation.ceremony;
   if (view && running) {
-    return (
-      <CeremonyProgress
-        view={view}
-        cancelLabel="Cancel request"
-        onCancel={cancel}
-      />
-    );
+    return <CeremonyProgress view={view} />;
   }
   if (outcome && !outcome.ok) {
     return (
@@ -45,7 +40,7 @@ function RevokeBody({
   }
   return (
     <>
-      <p className="text-sm">
+      <p className="text-base">
         This permanently revokes this machine identity. Files and programs
         remain. Offline machines learn when they reconnect. Reset cannot restore
         revoked access.
@@ -56,7 +51,7 @@ function RevokeBody({
         </Button>
         <Button
           variant="outline"
-          className="border-destructive/50 text-destructive"
+          className="border-destructive text-destructive"
           onClick={revoke}
         >
           Revoke access
@@ -76,7 +71,7 @@ export function RevokeMachineDialog({ machine }: { machine: MachineView }) {
   const content = useRef<HTMLDivElement>(null);
   const { revocation, section } = useFleet();
   const { ceremony, close, visible, setVisible } = revocation;
-  const { running, start, reset } = ceremony;
+  const { start, reset } = ceremony;
   const onClose = () => {
     reset();
     close();
@@ -108,11 +103,11 @@ export function RevokeMachineDialog({ machine }: { machine: MachineView }) {
           if (document.hasFocus()) section.reveal();
         }}
       >
-        <DialogHeader>
-          <DialogTitle tabIndex={-1}>
+        <DialogHeader className={ceremony.view ? 'sr-only' : undefined}>
+          <DialogTitle className="text-xl" tabIndex={-1}>
             Revoke access to {machine.label}?
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             Machine fingerprint{' '}
             <span className="font-mono text-foreground select-all">
               {fingerprintGroups(machine.peerId)}
@@ -122,15 +117,7 @@ export function RevokeMachineDialog({ machine }: { machine: MachineView }) {
         <FocusScope>
           <RevokeBody revoke={revoke} onClose={onClose} />
         </FocusScope>
-        {running && (
-          <Button
-            variant="ghost"
-            className="justify-self-end"
-            onClick={() => setVisible(false)}
-          >
-            Keep working
-          </Button>
-        )}
+        <CeremonyFooter ceremony={ceremony} onHide={() => setVisible(false)} />
       </DialogContent>
     </Dialog>
   );

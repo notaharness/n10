@@ -4,13 +4,13 @@ import type { FleetStatus, MachineView } from '../../../host/contract.js';
 import { useBeamStatus, useMachines } from '../../lib/data/queries.js';
 import { keys } from '../../lib/data/query-keys.js';
 import { useFleet } from '../../lib/fleet/fleet-context.js';
-import { publicationText } from '../../lib/fleet/publication.js';
 import { fingerprintGroups } from '../../lib/machines/machine-model.js';
 import { cn, errorMessage } from '../../lib/utils.js';
 import { MachineRow } from '../machines/MachineRow.js';
 import { Button } from '../ui/button.js';
 import { Skeleton } from '../ui/skeleton.js';
 import { AddMachinePanel } from './AddMachinePanel.js';
+import { FleetCompletion } from './FleetCompletion.js';
 import { FleetResume } from './FleetResume.js';
 import { FirstRun } from './FirstRun.js';
 import { ResetFleetPanel } from './ResetFleetPanel.js';
@@ -117,9 +117,16 @@ function StatusNotices({ beam }: { beam: FleetStatus }) {
   if (!publication.pending || !beam.enrolled) return null;
   return (
     <Notice>
-      <span>{publicationText(false)}</span>
-      <br />
-      Directory publication is pending; beam will retry while it runs.
+      {publication.pendingOperations.map((op) => (
+        <span className="block" key={op}>
+          {op === 'join'
+            ? 'This machine joined. Publishing the fleet update…'
+            : op === 'init'
+            ? 'Fleet created. Publishing the fleet update…'
+            : 'Access revoked here. Publishing the fleet update…'}
+        </span>
+      ))}
+      beam will retry while it runs.
     </Notice>
   );
 }
@@ -169,9 +176,10 @@ function FleetBody({
   if (reset.open) return <ResetFleetPanel />;
   return (
     <div className="space-y-3">
-      <StatusNotices beam={beam} />
       {loadFailure}
       <FleetResume />
+      {beam.enrolled && <FleetCompletion />}
+      <StatusNotices beam={beam} />
       {!enrolling && !beam.enrolled && <FirstRun disabled={reconnecting} />}
       {beam.enrolled && <EnrolledBody beam={beam} machines={machines} />}
     </div>

@@ -5,50 +5,54 @@ import { openLink } from '../../lib/open-link.js';
 import { QrCode } from '../machines/QrCode.js';
 import { Button } from '../ui/button.js';
 
-/**
- * One passkey step's link: its QR code, what it asks for as the page
- * will show it, and the link itself (beam-fleet-ux.md §2, §6).
- */
-export function PasskeyPrompt({ url }: { url: string }) {
+/** Browser first; the full-size QR is an alternative route to the same step. */
+export function PasskeyPrompt({
+  url,
+  secondStep = false,
+}: {
+  url: string;
+  secondStep?: boolean;
+}) {
   const summary = ceremonySummary(url);
   return (
-    <div className="flex flex-wrap justify-center gap-2">
-      <QrCode value={url} />
-      <div className="min-w-0 flex-1 basis-48 space-y-2 text-base">
-        {summary && (
-          <dl className="grid gap-1 border-y border-border py-3 select-text [&_dd]:mb-2">
-            <dt className="text-muted-foreground">Action</dt>
+    <div className="space-y-4 text-base">
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={() => openLink(url)}>
+          <ExternalLinkIcon className="size-3.5" />
+          {secondStep ? 'Open second step' : 'Open in browser'}
+        </Button>
+        <Button variant="outline" onClick={() => copyText(url, 'Link copied')}>
+          <CopyIcon className="size-3.5" />
+          Copy link
+        </Button>
+      </div>
+      <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">
+          Or scan with your phone.
+        </p>
+        <QrCode value={url} />
+      </div>
+      {summary && (
+        <div className="space-y-2 border-y border-border py-3">
+          <p>Before approving, check that these details match the page.</p>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 select-text">
+            <dt className="text-sm text-muted-foreground">Action</dt>
             <dd className="break-words">{summary.action}</dd>
-            <dt className="text-muted-foreground">Machine</dt>
+            <dt className="text-sm text-muted-foreground">Machine</dt>
             <dd className="break-words">{summary.machine}</dd>
-            <dt className="text-muted-foreground">Machine fingerprint</dt>
+            <dt className="text-sm text-muted-foreground">
+              Machine fingerprint
+            </dt>
             <dd className="font-mono select-all">{summary.fingerprint}</dd>
           </dl>
-        )}
-        <p>
-          Check the action, machine name and machine fingerprint on the page.
-        </p>
-        <p className="sr-only" title={url} data-testid="ceremony-url">
-          {url}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => openLink(url)}>
-            <ExternalLinkIcon className="size-3.5" />
-            Open in browser
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => copyText(url, 'Link copied')}
-          >
-            <CopyIcon className="size-3.5" />
-            Copy link
-          </Button>
         </div>
-        <p className="text-muted-foreground">
-          Keep this link private. Requests expire after five minutes.
-        </p>
-      </div>
+      )}
+      <p className="sr-only" title={url} data-testid="ceremony-url">
+        {url}
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Keep this link private. Requests expire after five minutes.
+      </p>
     </div>
   );
 }

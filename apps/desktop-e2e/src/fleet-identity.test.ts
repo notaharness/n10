@@ -112,7 +112,7 @@ test.describe('An enrolled machine', () => {
     await page.getByRole('button', { name: 'Add a machine' }).click();
     const panel = fleetView(page);
     await expect(
-      panel.getByText(/Open n10 Desktop → Fleet → Join a fleet/)
+      panel.getByText(/On your other machine, open n10 → Fleet → Join a fleet/)
     ).toBeVisible();
     await expect(panel.getByText('beam join --label my-server')).toBeVisible();
     await expect(panel.getByText('3f9a 0c4e 7d12 e805')).toBeVisible();
@@ -193,21 +193,24 @@ test.describe('Joining a fleet', () => {
     await finishJoin(page, beam!);
     const view = fleetView(page);
     await expect(
-      view.getByRole('heading', { name: 'Check fleet fingerprint' })
+      view.getByRole('heading', { name: 'Compare fleet fingerprint' })
     ).toBeVisible();
     await expect(view.getByRole('button', { name: 'Close' })).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Keep working' }).click();
+    await page.getByRole('button', { name: 'Check later' }).click();
+    await expect(
+      page.getByText('Fleet fingerprint not checked', { exact: true })
+    ).toBeVisible();
     await collapseFleet(page);
     await openFleet(desktop);
-    await page.getByRole('button', { name: 'Resume setup' }).click();
+    await page.getByRole('button', { name: 'Compare fingerprint' }).click();
     await view.getByRole('button', { name: 'Matches' }).click();
     await expect(
-      view.getByRole('heading', { name: 'Check fleet fingerprint' })
+      view.getByRole('heading', { name: 'Compare fleet fingerprint' })
     ).toHaveCount(0);
   });
 
-  test('a mismatch says to stop and offers only the reset', async ({
+  test('a mismatch explains recovery and offers a local reset', async ({
     desktop,
     beam,
   }) => {
@@ -217,14 +220,12 @@ test.describe('Joining a fleet', () => {
     const view = fleetView(page);
     await view.getByRole('button', { name: 'Doesn’t match' }).click();
     await expect(
-      view.getByRole('heading', { name: 'Different fleet' })
+      view.getByRole('heading', { name: "Fleet fingerprints don't match" })
     ).toBeVisible();
-    await expect(
-      view.getByText(/Stop using remote connections\./)
-    ).toBeVisible();
+    await expect(view.getByText(/Avoid remote connections\./)).toBeVisible();
     await view
       .getByRole('alert')
-      .getByRole('button', { name: 'Reset fleet…' })
+      .getByRole('button', { name: 'Reset fleet here…' })
       .click();
     await expect(
       view.getByRole('heading', {
@@ -246,7 +247,9 @@ test.describe('A pending directory write', () => {
     await openFleet(desktop);
     await finishCreatePending(page, beam!);
     const view = fleetView(page);
-    const pending = view.getByText('Saved here. Waiting to sync…');
+    const pending = view.getByText(
+      'Fleet created. Publishing the fleet update…'
+    );
     await expect(pending).toBeVisible();
 
     await expect(view.getByRole('button', { name: 'Close' })).toHaveCount(0);
@@ -260,9 +263,9 @@ test.describe('A pending directory write', () => {
     await openFleet(desktop);
     await finishCreatePending(page, beam!);
     const view = fleetView(page);
-    await expect(view.getByText(/Waiting to sync/)).toBeVisible();
+    await expect(view.getByText(/Publishing the fleet update/)).toBeVisible();
     beam!.published('member', SELF_PEER_ID);
-    await expect(view.getByText(/Waiting to sync/)).toHaveCount(0);
+    await expect(view.getByText(/Publishing the fleet update/)).toHaveCount(0);
   });
 });
 

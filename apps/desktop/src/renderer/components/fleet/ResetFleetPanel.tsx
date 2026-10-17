@@ -63,7 +63,7 @@ export function ResetFleetPanel() {
             type="submit"
             size="sm"
             variant="outline"
-            className="border-destructive/50 text-destructive"
+            className="border-destructive text-destructive"
             disabled={busy || typed !== 'reset'}
           >
             {busy ? 'Resetting fleet…' : 'Reset fleet'}

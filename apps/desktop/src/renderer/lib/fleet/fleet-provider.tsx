@@ -1,4 +1,3 @@
-import { toast } from 'sonner';
 import { useAddMachine } from './use-add-machine.js';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,7 +10,11 @@ import {
 } from 'react';
 import type { MachineView } from '../../../host/contract.js';
 import { keys } from '../data/query-keys.js';
-import { FleetContext, type FleetSectionState } from './fleet-context.js';
+import {
+  FleetContext,
+  type FleetSectionState,
+  type FleetContextValue,
+} from './fleet-context.js';
 import { useCeremony } from './use-ceremony.js';
 import { useEnrolment } from './use-enrolment.js';
 import { useFleetReset } from './use-fleet-reset.js';
@@ -124,26 +127,22 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const enrolment = useEnrolment(hooks);
   const [revokeVisible, setRevokeVisible] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<MachineView | null>(null);
+  const [revokeCompletion, setRevokeCompletion] =
+    useState<FleetContextValue['revocation']['completion']>(null);
   const revokeHooks = useMemo(
     () => ({
       onSettled: (outcome: Parameters<typeof settle>[0]) => {
         settle(outcome);
-        if (outcome.ok) {
-          setRevokeTarget(null);
-          toast.success('Access revoked here', {
-            description:
-              outcome.op === 'revoke'
-                ? `Acknowledged by ${
-                    outcome.acknowledgedBy
-                  } peers. Offline peers learn when they reconnect.${
-                    outcome.published === true ? ' Published.' : ''
-                  }`
-                : undefined,
+        if (outcome.ok && outcome.op === 'revoke') {
+          setRevokeCompletion({
+            label: revokeTarget?.label ?? outcome.peerId,
+            outcome,
           });
+          setRevokeTarget(null);
         }
       },
     }),
-    [settle]
+    [settle, revokeTarget]
   );
   const revokeCeremony = useCeremony(revokeHooks);
   const { leave } = enrolment;
@@ -151,6 +150,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     leave();
     clear();
     setAdding(false);
+    setRevokeCompletion(null);
   }, [leave, clear, setAdding]);
   const reset = useFleetReset(afterReset);
   useFleetPushes();
@@ -160,6 +160,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const openRevocation = useCallback(
     (machine: MachineView) => {
       resetRevocation();
+      setRevokeCompletion(null);
       setRevokeTarget(machine);
       setRevokeVisible(true);
     },
@@ -173,6 +174,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       setAdding,
       enrolment,
       revocation: {
+        completion: revokeCompletion,
         target: revokeTarget,
         visible: revokeVisible,
         setVisible: setRevokeVisible,
@@ -189,6 +191,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       setAdding,
       enrolment,
       revokeTarget,
+      revokeCompletion,
       revokeVisible,
       revokeCeremony,
       closeRevocation,

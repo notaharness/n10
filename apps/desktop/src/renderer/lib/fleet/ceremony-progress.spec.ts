@@ -120,14 +120,15 @@ describe('ceremonyHeading', () => {
     expect(heading([preparing])).toBe('Getting ready…');
     expect(heading([create])).toBe('1 of 2 · Save a passkey');
     expect(heading([create, sign])).toBe('2 of 2 · Add this machine');
-    expect(heading([create, sign, publishing])).toBe('Finishing setup…');
+    expect(heading([create, sign, publishing])).toBe(
+      'Publishing the fleet update…'
+    );
   });
 
   it('tells a joining machine not to create another passkey', () => {
     expect(ceremonyHeading(walk('join', [sign]))).toEqual({
       heading: 'Add this machine',
-      explanation:
-        'Use your fleet’s passkey there. Come back here to see the result.',
+      explanation: 'Use the same fleet passkey.',
     });
     expect(
       ceremonyHeading(

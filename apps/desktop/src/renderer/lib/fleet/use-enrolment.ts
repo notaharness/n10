@@ -1,4 +1,3 @@
-import { toast } from 'sonner';
 import { useCallback, useMemo, useState } from 'react';
 import type { CeremonyRequest } from '@n10/engine/contract';
 import { useCeremony, type CeremonyHooks } from './use-ceremony.js';
@@ -12,6 +11,7 @@ type EnrolmentMode = 'create' | 'join';
  */
 export function useEnrolment(hooks: CeremonyHooks) {
   const { onSettled } = hooks;
+  const [created, setCreated] = useState(false);
   const [visible, setVisible] = useState(false);
   const completion = useMemo<CeremonyHooks>(
     () => ({
@@ -21,7 +21,7 @@ export function useEnrolment(hooks: CeremonyHooks) {
           dismiss();
           setMode(null);
           setVisible(false);
-          toast.success('Fleet created');
+          setCreated(true);
         }
       },
     }),
@@ -50,15 +50,18 @@ export function useEnrolment(hooks: CeremonyHooks) {
     setMode(null);
     setVisible(false);
     setMismatch(false);
+    setCreated(false);
   }, [reset]);
   const choose = useCallback((next: EnrolmentMode | null) => {
     setMode(next);
+    setCreated(false);
     setVisible(next !== null);
   }, []);
   const reportMismatch = useCallback(() => setMismatch(true), []);
 
   return useMemo(
     () => ({
+      created,
       ceremony,
       mode,
       label,
@@ -74,6 +77,7 @@ export function useEnrolment(hooks: CeremonyHooks) {
       reportMismatch,
     }),
     [
+      created,
       ceremony,
       mode,
       label,

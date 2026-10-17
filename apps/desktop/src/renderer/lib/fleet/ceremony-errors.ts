@@ -118,8 +118,7 @@ export function failureCopy(code: string): FailureCopy {
 
 /** A PRF failure while joining or revoking: the fix is a supported
  *  provider for the same passkey, not a new one. */
-export const SAME_PASSKEY_NOTE =
-  'Use the same fleet passkey. A new one creates a different fleet.';
+export const SAME_PASSKEY_NOTE = 'Use the same fleet passkey.';
 
 /** Shown on top of any failure of a fleet's creation once its first
  *  passkey prompt was offered: a passkey may already exist. */

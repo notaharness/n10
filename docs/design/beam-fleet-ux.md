@@ -22,60 +22,67 @@ Names and fingerprints remain selectable text. Status reflects observed machine
 connectivity, never presumed browser or remote progress.
 
 Create/join forms and passkey requests use the existing controlled Radix Dialog.
-Controllers and dialog visibility live above the repository gate. **Keep working**,
-close and Escape hide the dialog without cancelling its request. Fleet shows
-**Passkey step in progress** and **Resume setup** while a request runs; a completed
-join retains **Check fleet fingerprint** until answered. Forms and failed requests
-also remain resumable. Closing returns focus to Fleet; resuming focuses the current
-heading. Background progress never opens a hidden dialog or focuses another app.
-**Cancel request** is the separate operation that asks beam to cancel.
+Controllers and dialog visibility live above the repository gate. Close and Escape
+hide without cancelling. A single request footer offers **Cancel request** while
+cancellable and **Keep working**; answered requests have state-specific actions.
+**Resume passkey step** appears only while a passkey action is pending; other work
+uses **View progress**, **Review request** or **Finish fleet setup**. Closing returns
+focus to Fleet; resuming focuses the current heading. Hidden progress never opens
+or focuses a dialog. Dialog headings use the 18px token, body 13px, labels 12px.
+Destructive outlines use the full destructive token, including in dark mode.
 
 ## 2. Create, join and add
 
-First run offers **Your machines, connected anywhere**, **Create a fleet** and
-**Join a fleet**. The existing beam illustration, Tailscale attribution and
-**More information** link remain. Forms ask for **Machine name** and, when
-creating, **Fleet name** with “Shown in your passkey manager.” Blank names use
-daemon defaults; invalid input stays intact.
+First run offers **Connect your machines**, “Create a fleet, or join one with its
+passkey.” and the **Create a fleet** / **Join a fleet** buttons. **About Fleet**
+holds the longer explanation, Tailscale attribution and **More information** link.
+Forms ask for **Machine name** and, when creating, **Fleet name** with “Shown in
+your passkey manager.” Blank names use daemon defaults; invalid input stays intact.
 
 Create explains “Save one passkey for your fleet, then use it to add this machine.
 Expect two passkey prompts.” Join explains “Use the passkey for your existing
 fleet. This takes one passkey prompt.” **Continue** starts the request.
 
 Create steps are **1 of 2 · Save a passkey** and **2 of 2 · Add this machine**.
-Join uses **Add this machine**. The handoff says **Next · browser or phone**;
-create’s first step says “Save the passkey there. Come back here for the second
-link.” Its second says “Use the passkey you just saved.” Join says “Use your
-fleet’s passkey there. Come back here to see the result.” Each ceremony event
-replaces the link and QR, including when hidden. The host opens each new link.
+Completed steps remain indicated, without duplicating the active heading.
+**Continue on beam.n10.is.** sits directly below the heading. The second step says
+“Open the new link or scan this new QR code. Use the passkey you just saved.” and
+offers **Open second step**. Other passkey steps offer **Open in browser**.
+Join/revoke say “Use the same fleet passkey.” Each ceremony event replaces the
+link and full-size QR, including when hidden. The host opens each new link.
 
-The comparison labels are **Action**, **Machine**, **Machine fingerprint**.
-Action values remain exactly `Create fleet passkey for “{fleetName}”`,
+The normal-size primary browser button and secondary **Copy link** precede the
+QR, labelled “Or scan with your phone.” Below it: “Before approving, check that
+these details match the page.” The comparison labels are **Action**, **Machine**,
+**Machine fingerprint**. Action values remain `Create fleet passkey for “{fleetName}”`,
 `Add “{machine}” to fleet`, and `Remove “{machine}” from fleet`, derived from the
-current URL. The fingerprint is grouped in fours. “Check the action, machine
-name and machine fingerprint on the page.” **Open in browser**, **Copy link**
-and QR refer to identical URL bytes. “Keep this link private. Requests expire
-after five minutes.” The raw URL is not painted in the dialog.
+current URL. The fingerprint is grouped in fours. All routes use identical URL
+bytes. “Keep this link private. Requests expire after five minutes.” The raw URL
+is not painted in the dialog.
 
 Only daemon stages produce **Finding machines…**, **Updating machines…** or
-**Finishing setup…**. Successful create closes the dialog and announces
-**Fleet created**. Successful join shows **Check fleet fingerprint**:
-“This machine joined. Before using remote connections, compare with a machine
-already in your fleet: Fleet … → Copy fleet fingerprint.” **Matches** dismisses
-it; **Doesn’t match** shows **Different fleet** and “Stop using remote connections.
-Reset here, then join with your fleet’s passkey.” **Reset fleet…** opens the inline
-confirmation. This is a human reminder, not a transport gate. It survives hidden
-dialogs, collapse and repository changes for the current app session; restart
-persistence is optional in the design and is not implemented.
+**Publishing the fleet update…**. Successful create closes the dialog and leaves
+inline **Fleet created** / “Add another machine to connect your fleet.” Successful
+join shows **Compare fleet fingerprint**: “This machine joined. Before using remote
+connections, compare with a machine already in your fleet: Fleet … → Copy fleet
+fingerprint.” **Matches** dismisses it. **Check later** hides it, leaving **Fleet
+fingerprint not checked** and **Compare fingerprint** in the sidebar.
+
+**Doesn’t match** shows **Fleet fingerprints don't match** and “This machine joined
+a different fleet. Avoid remote connections. Reset this machine's fleet connection,
+then join with the correct fleet passkey.” **Reset fleet here…** opens the inline
+confirmation; **Close** hides the dialog with its warning retained. This human
+reminder gates no connections. It survives hidden dialogs, collapse and repository
+changes for the current app session; restart persistence is not implemented.
 
 **Add a machine** stays inline:
 
-- **Next · your other machine** — “Open n10 Desktop → Fleet → Join a fleet.
-  Use your existing fleet passkey.”
-- “Or run this on the other machine:” `beam join --label my-server`, with
-  **Copy command**. “Open its link or scan its QR code.”
-- “Compare its fleet fingerprint with this:” with **Copy fleet fingerprint**.
-- “Waiting for a new machine…” until a new verified identity is observed.
+- “On your other machine, open n10 → Fleet → Join a fleet. Use your fleet passkey.”
+- **Using a terminal?** then `beam join --label my-server`, with **Copy command**.
+  “Open its link or scan its QR code.”
+- **Fleet fingerprint**, with **Copy fleet fingerprint**, then
+  “Compare this after the other machine joins.”
+- “No new machine detected yet” until a new verified identity is observed.
 
 Known identities are captured when instructions open. Rename/reconnect cannot
 complete adding. A new identity closes instructions and announces **{machine}
@@ -87,9 +94,11 @@ Revoke confirms **Revoke access to {machine}?**, with **Machine fingerprint**:
 “This permanently revokes this machine identity. Files and programs remain.
 Offline machines learn when they reconnect. Reset cannot restore revoked access.”
 **Revoke access** starts the request. The active dialog can be hidden and resumed.
-Only the successful wait result closes it and announces **Access revoked here**,
-with “Acknowledged by {n} peers. Offline peers learn when they reconnect.” The
-acknowledgement count is result-time evidence; the row shows **Revoked**.
+Only the successful wait result closes it and leaves inline **Access to {machine}
+revoked here.**, with “Acknowledged by {n} machines when revocation completed.
+Offline machines learn when they reconnect.” **Published** appears only after a
+known successful publication or its matching event. The acknowledgement count
+is result-time evidence; the row shows **Revoked**.
 
 **Reset fleet here?** stays inline: “Disconnect this machine and delete queued
 messages to its old peers. Other machines and your passkey stay unchanged.”
@@ -103,15 +112,27 @@ the typed confirmation and offers mapped explanation and **Details**.
 
 Only daemon wait results establish completion. Browser delivery, prompt opening
 and browser cancellation are not Desktop signals. Pending publication remains
-inline after a dialog closes: **Saved here. Waiting to sync…** and “Directory
-publication is pending; beam will retry while it runs.” Only matching publication
-events clear it. No durable publication inventory is inferred after restart.
+inline after a dialog closes, below any human action: **This machine joined.
+Publishing the fleet update…**, **Fleet created. Publishing the fleet update…** or
+**Access revoked here. Publishing the fleet update…**, followed by “beam will retry
+while it runs.” Only matching publication events clear pending operations. No
+durable publication inventory is inferred after restart.
 
-`lib/fleet/ceremony-errors.ts` maps daemon codes to recovery copy from the guided
-design. Cancellation and expiry are explicit; expiry offers **Start a fresh
-request**. Wrong passkey, missing PRF, directory read, storage and uncertain
-completion remain distinct. Failed links disappear. **Details** contains selectable
-plain text, never interpreted HTML. A PRF failure says “This passkey could not complete the request.” and “Update your browser and passkey manager, then start a fresh request.” The precise PRF explanation stays in **Details**; **Passkey help** opens alongside it.
+`lib/fleet/ceremony-errors.ts` maps daemon codes to recovery copy. Cancellation,
+expiry, wrong passkey, missing PRF, directory read, storage and uncertain completion
+remain distinct. Failed links disappear. **Details** contains selectable plain
+text, never interpreted HTML.
+
+Create's PRF failure says **This passkey could not finish setup.** and “Your browser
+or passkey provider did not return the encryption data beam needs (WebAuthn PRF).
+Fleet creation is not complete. A passkey may still be saved.” **Start again** is
+explained by “This restarts both passkey prompts.” **Passkey compatibility** links
+to the maintained compatibility section below. Other create failures retain their
+code-specific explanation and use the same restart action when retryable.
+Join/revoke PRF failures say **This passkey could not complete the request.** and
+“Update your browser and passkey manager, then start a fresh request.” Passkey
+failures remind “Use the same fleet passkey.” PRF diagnostics stay under **Details**
+for join/revoke. Expired join/revoke requests offer **Start a fresh request**.
 
 Connection loss says **Reconnecting… Status may be out of date.** Mutations are
 disabled until status is available. Existing status/peer refresh and publication

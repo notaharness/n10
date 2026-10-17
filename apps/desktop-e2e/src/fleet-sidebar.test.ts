@@ -28,7 +28,7 @@ test.describe('Fleet in the sidebar', () => {
       await openFleet(desktop);
       await expect(
         fleetView(page).getByRole('heading', {
-          name: 'Your machines, connected anywhere',
+          name: 'Connect your machines',
         })
       ).toBeVisible();
       await expect(
@@ -80,7 +80,7 @@ test.describe('Fleet in the sidebar', () => {
     await page.keyboard.press('Escape');
     await collapseFleet(page);
     await openFleet(desktop);
-    await page.getByRole('button', { name: 'Resume setup' }).click();
+    await page.getByRole('button', { name: 'Finish fleet setup' }).click();
     await expect(fleet.getByLabel('Machine name')).toHaveValue('laptop');
     await fleet.getByRole('button', { name: 'Continue' }).click();
     await expect(fleet.getByTestId('ceremony-url')).toBeVisible();
@@ -92,7 +92,7 @@ test.describe('Fleet in the sidebar', () => {
     await page.getByRole('button', { name: 'Hide sidebar' }).click();
     await clickAppMenuItem(desktop.app, 'Toggle Sidebar');
     await openFleet(desktop);
-    await page.getByRole('button', { name: 'Resume setup' }).click();
+    await page.getByRole('button', { name: 'Resume passkey step' }).click();
     await expect(fleet.getByTestId('ceremony-url')).toHaveText(
       beam!.currentUrl
     );
@@ -121,7 +121,7 @@ test.describe('Fleet in the sidebar', () => {
     await expect(fleetToggle(page)).toBeFocused();
     await clickAppMenuItem(desktop.app, 'Switch Repository…');
     await openFleet(desktop);
-    await page.getByRole('button', { name: 'Resume setup' }).click();
+    await page.getByRole('button', { name: 'Resume passkey step' }).click();
     await expect(
       page.getByRole('heading', { name: '2 of 2 · Add this machine' })
     ).toBeFocused();

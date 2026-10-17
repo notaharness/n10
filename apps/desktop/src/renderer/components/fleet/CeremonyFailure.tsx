@@ -7,7 +7,7 @@ import {
 } from '../../lib/fleet/ceremony-errors.js';
 import { useFocusOnMount } from '../../lib/fleet/use-focus-on-mount.js';
 import { Button } from '../ui/button.js';
-import { PasskeyCompatibility } from './PasskeyCompatibility.js';
+import { openLink } from '../../lib/open-link.js';
 
 interface Handlers {
   retry?: () => void;
@@ -31,6 +31,46 @@ function runnable(actions: NextAction[], handlers: Handlers) {
     offered.push('close');
   }
   return offered;
+}
+
+function FailureExplanation({
+  op,
+  code,
+  reachedPasskey,
+}: {
+  op: CeremonyOp;
+  code: string;
+  reachedPasskey: boolean;
+}) {
+  const createPrf = op === 'init' && code === 'prf-unsupported';
+  return (
+    <>
+      <h3 className="text-xl font-semibold">
+        {createPrf
+          ? 'This passkey could not finish setup.'
+          : failureCopy(code).explanation}
+      </h3>
+      {createPrf && (
+        <p>
+          Your browser or passkey provider did not return the encryption data
+          beam needs (WebAuthn PRF). Fleet creation is not complete. A passkey
+          may still be saved.
+        </p>
+      )}
+      {code === 'prf-unsupported' && !createPrf && (
+        <p>
+          Update your browser and passkey manager, then start a fresh request.
+        </p>
+      )}
+      {op === 'init' && reachedPasskey && !createPrf && (
+        <p>{CREATE_FAILURE_NOTE}</p>
+      )}
+      {op !== 'init' &&
+        ['prf-unsupported', 'wrong-passkey', 'bad-assertion'].includes(
+          code
+        ) && <p>{SAME_PASSKEY_NOTE}</p>}
+    </>
+  );
 }
 
 /**
@@ -62,16 +102,11 @@ export function CeremonyFailure({
         role="alert"
         className="space-y-2 text-base outline-none"
       >
-        <p className="text-destructive">{copy.explanation}</p>
-        {code === 'prf-unsupported' && (
-          <p>
-            Update your browser and passkey manager, then start a fresh request.
-          </p>
-        )}
-        {op === 'init' && reachedPasskey && <p>{CREATE_FAILURE_NOTE}</p>}
-        {op !== 'init' && code === 'prf-unsupported' && (
-          <p>{SAME_PASSKEY_NOTE}</p>
-        )}
+        <FailureExplanation
+          op={op}
+          code={code}
+          reachedPasskey={reachedPasskey}
+        />
       </div>
       <details className="text-sm text-muted-foreground">
         <summary>Details</summary>
@@ -88,17 +123,33 @@ export function CeremonyFailure({
         )}
       </details>
       {copy.actions.includes('compatibility') && (
-        <PasskeyCompatibility defaultOpen />
+        <Button variant="link" className="h-auto p-0" asChild>
+          <a
+            href="https://github.com/notaharness/n10/blob/master/docs/design/beam-fleet-ux.md#7-compatibility-evidence-and-exact-user-facing-help"
+            onClick={(event) => {
+              event.preventDefault();
+              openLink(event.currentTarget.href);
+            }}
+          >
+            Passkey compatibility
+          </a>
+        </Button>
       )}
-      <div className="flex gap-2">
+      {op === 'init' && copy.actions.includes('retry') && handlers.retry && (
+        <p className="text-sm text-muted-foreground">
+          This restarts both passkey prompts.
+        </p>
+      )}
+      <div className="flex justify-end gap-2">
         {runnable(copy.actions, handlers).map((a, i) => (
           <Button
             key={a}
-            size="sm"
             variant={i === 0 ? 'default' : 'outline'}
             onClick={handlers[a]}
           >
-            {a === 'retry' && code === 'ceremony-timeout'
+            {a === 'retry' && op === 'init'
+              ? 'Start again'
+              : a === 'retry' && code === 'ceremony-timeout'
               ? 'Start a fresh request'
               : LABEL[a]}
           </Button>

@@ -3,13 +3,6 @@ import type { CeremonyOutcome, DirectoryPublished } from '@n10/engine/contract';
 
 type Succeeded = Extract<CeremonyOutcome, { ok: true }>;
 
-/** Whether an enrolment's or revocation's directory write landed
- *  (beam docs/06: `published: true | "pending"`). Pending is not a
- *  failure: beam retries while it runs. */
-export function publicationText(published: boolean): string {
-  return published ? 'Synced' : 'Saved here. Waiting to sync…';
-}
-
 /** A `directory.published` event's write. */
 export function landedKey({ kind, peerId }: DirectoryPublished): string {
   return `${kind}/${peerId}`;
@@ -27,11 +20,11 @@ export function publicationKey(outcome: Succeeded): string {
 /** The writes observed pending after a ceremony: a success that left
  *  its write pending adds it; anything else wrote nothing new. */
 export function pendingAfter(
-  pending: ReadonlySet<string>,
+  pending: ReadonlyMap<string, Succeeded>,
   outcome: CeremonyOutcome
-): ReadonlySet<string> {
+): ReadonlyMap<string, Succeeded> {
   if (!outcome.ok || outcome.published) return pending;
-  return new Set(pending).add(publicationKey(outcome));
+  return new Map(pending).set(publicationKey(outcome), outcome);
 }
 
 /**
@@ -42,7 +35,9 @@ export function pendingAfter(
  */
 export function usePublication() {
   const [landed, setLanded] = useState<ReadonlySet<string>>(new Set());
-  const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
+  const [pending, setPending] = useState<ReadonlyMap<string, Succeeded>>(
+    new Map()
+  );
 
   useEffect(
     () =>
@@ -57,7 +52,7 @@ export function usePublication() {
     []
   );
   const clear = useCallback(() => {
-    setPending(new Set());
+    setPending(new Map());
     setLanded(new Set());
   }, []);
   const isPublished = useCallback(
@@ -69,7 +64,14 @@ export function usePublication() {
   return useMemo(
     () => ({
       /** A write is still waiting for its event. */
-      pending: [...pending].some((key) => !landed.has(key)),
+      pending: [...pending.keys()].some((key) => !landed.has(key)),
+      pendingOperations: [
+        ...new Set(
+          [...pending]
+            .filter(([key]) => !landed.has(key))
+            .map(([, outcome]) => outcome.op)
+        ),
+      ],
       isPublished,
       settle,
       clear,

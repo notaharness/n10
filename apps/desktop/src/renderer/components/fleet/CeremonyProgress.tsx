@@ -3,13 +3,11 @@ import {
   INIT_STEPS,
   ceremonyHeading,
   initStepStatuses,
-  pastPasskeys,
   type CeremonyView,
   type StepStatus,
 } from '../../lib/fleet/ceremony-progress.js';
 import { useFocusOnMount } from '../../lib/fleet/use-focus-on-mount.js';
 import { cn } from '../../lib/utils.js';
-import { Button } from '../ui/button.js';
 import { PasskeyPrompt } from './PasskeyPrompt.js';
 
 const STEP_ICON: Record<StepStatus, typeof CheckIcon> = {
@@ -36,10 +34,12 @@ export function InitSteps({
   failed?: boolean;
 }) {
   const statuses = initStepStatuses(view, failed);
+  if (!failed && !statuses.includes('done')) return null;
   return (
-    <ol className="flex flex-wrap gap-x-5 gap-y-2 border-b border-border pb-3 pr-5 text-base">
+    <ol className="flex flex-wrap gap-x-5 gap-y-2 border-b border-border pb-3 pr-5 text-sm">
       {INIT_STEPS.map((step, i) => {
         const status = statuses[i];
+        if (!failed && status !== 'done') return null;
         const Icon = STEP_ICON[status];
         return (
           <li
@@ -69,21 +69,10 @@ export function InitSteps({
 /**
  * A running ceremony: its steps for a fleet's creation, what it is
  * doing now, and while beam waits on a passkey, that step's link.
- * `cancelLabel` names the explicit cancel, which waits for beam.
  */
-export function CeremonyProgress({
-  view,
-  cancelLabel,
-  onCancel,
-}: {
-  view: CeremonyView;
-  cancelLabel: string;
-  onCancel: () => void;
-}) {
+export function CeremonyProgress({ view }: { view: CeremonyView }) {
   const { heading, explanation } = ceremonyHeading(view);
   const focus = useFocusOnMount<HTMLHeadingElement>();
-  // Past the passkey steps there is nothing left to cancel.
-  const cancellable = !pastPasskeys(view);
   return (
     <div className="space-y-4">
       {view.op === 'init' && <InitSteps view={view} />}
@@ -91,31 +80,22 @@ export function CeremonyProgress({
         <h3
           ref={focus}
           tabIndex={-1}
-          className="text-lg font-semibold outline-none"
+          className="text-xl font-semibold outline-none"
         >
           {heading}
         </h3>
         {view.passkeyUrl && (
-          <p className="text-base font-medium">Next · browser or phone</p>
+          <p className="text-base">Continue on beam.n10.is.</p>
         )}
         {explanation && (
           <p className="text-base text-muted-foreground">{explanation}</p>
         )}
       </div>
       {view.passkeyUrl && !view.cancelling && (
-        <PasskeyPrompt url={view.passkeyUrl} />
-      )}
-      {cancellable && (
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={view.cancelling}
-          // The second click of a double click on the button that
-          // started this can land here once the progress replaces it.
-          onClick={(e) => e.detail < 2 && onCancel()}
-        >
-          {cancelLabel}
-        </Button>
+        <PasskeyPrompt
+          url={view.passkeyUrl}
+          secondStep={view.op === 'init' && view.step === 2}
+        />
       )}
     </div>
   );
