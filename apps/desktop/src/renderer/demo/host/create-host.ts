@@ -1,7 +1,10 @@
 import type { N10HostApi } from '../../../host/contract.js';
+import { createUpdatesHost } from './updates-host.js';
 import { PROGRAMS } from '../programs/index.js';
 import { createBranchSessionHost } from './branch-session-host.js';
 import { createFleetHost } from './fleet-host.js';
+import { createHistoryHost } from './history-host.js';
+import { createPrDiffHost } from './pr-diff-host.js';
 import { createPullRequestHost } from './pull-request-host.js';
 import { createDraftsHost } from './review-drafts-host.js';
 import { createMentionsHost } from './mentions-host.js';
@@ -24,8 +27,11 @@ export function createDemoHost(): N10HostApi {
   const sessions = createSessionHost(state, hub);
   return {
     ...createShellHost(state),
+    ...createUpdatesHost(),
     ...createWorktreeHost(state, hub),
     ...createReviewHost(state),
+    ...createPrDiffHost(state),
+    ...createHistoryHost(state),
     ...createPullRequestHost(state),
     ...createDraftsHost(),
     ...createMentionsHost(),

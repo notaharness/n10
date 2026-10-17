@@ -30,10 +30,14 @@ export class ProviderReadError extends Error {
  * read; a failed read rejects with {@link ProviderReadError}.
  */
 export async function loadPullRequestConversation(
+  cwd: string,
   ref: PullRequestRef,
   viewer: string | null
 ): Promise<PullRequestConversationRead> {
-  const answer = await window.n10.getPullRequestConversation({ ref, viewer });
+  const answer = await window.n10.getPullRequestConversation(cwd, {
+    ref,
+    viewer,
+  });
   assertAnswerFor(ref, viewer, answer);
   const read = answer.conversation;
   if (read.state === 'failed') {
@@ -66,7 +70,7 @@ export function usePullRequestConversation(
 ) {
   return useQuery({
     queryKey: keys.prConversation(cwd, ref ?? NO_REF, viewer),
-    queryFn: () => loadPullRequestConversation(ref!, viewer),
+    queryFn: () => loadPullRequestConversation(cwd, ref!, viewer),
     enabled: ref != null,
     staleTime: 0,
     retry: retryRead,

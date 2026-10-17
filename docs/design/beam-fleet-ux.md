@@ -30,7 +30,7 @@ part of it. It appears where it is compared: **Add a machine**, the post-join ch
 and the Fleet actions menu, which is where a joining machine's owner finds it on a
 machine already in the fleet once the add instructions have closed.
 Rows show name, connection state and fingerprint; queue and access
-badges appear when relevant. Offline and revoked states use text and colour.
+badges appear when relevant. Unreachable and revoked states use text and colour.
 An otherwise empty fleet says
 “Your other machines will appear here.” Shared primitives and colour tokens serve both
 themes. Fleet stays within the sidebar’s scroll area.
@@ -76,10 +76,10 @@ adding. **Close instructions** lets the owner leave early; there is no Done butt
 ## 3. Revoke and reset
 
 Revocation uses a modal with target name and fingerprint. It explains permanence,
-offline propagation, that files and programs remain, and that reset cannot restore
+propagation to unreachable machines, that files and programs remain, and that reset cannot restore
 revoked access. **Revoke access** starts the passkey request; **Cancel** is explicit
 while running. Success closes the modal, updates the row and announces **Access
-revoked**, with the offline propagation reminder.
+revoked**, with the propagation reminder.
 
 **Reset fleet here?** stays inline. It explains disconnection and queued-message loss,
 that other machines and the passkey are unchanged, and that reset cannot recover a
@@ -147,7 +147,7 @@ Decode `n` and `l` with `URLSearchParams`, validate them, then interpolate as te
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `c`           | “Step 1 of 2 · Create your fleet passkey”. “Save a passkey for {fleetName} at beam.n10.is. This creates the fleet’s credential. A second prompt will authorize {label} and unlock its encrypted directory.” | **Create passkey** / “Waiting for your passkey manager to create the passkey…”               |
 | `a`           | “Authorize {label}”. “Use your fleet’s passkey to sign this machine’s membership and unlock the encrypted directory. If you just created a fleet passkey, this is step 2 of 2.”                             | **Authorize machine** / “Waiting for your fleet passkey…”                                    |
-| `r`           | “Remove {label} from your fleet”. “Use your fleet’s passkey to permanently revoke this machine identity. Offline machines learn when they reconnect.”                                                       | destructive **Authorize removal** / “Waiting for your fleet passkey to sign the revocation…” |
+| `r`           | “Remove {label} from your fleet”. “Use your fleet’s passkey to permanently revoke this machine identity. Unreachable machines learn when they reconnect.”                                                   | destructive **Authorize removal** / “Waiting for your fleet passkey to sign the revocation…” |
 
 `o=a` is shared by init step 2 and join. The page cannot reliably tell which it is. Do not label every `a` as step 2 or use referrer/session storage to guess. After `c` succeeds, the page cannot open the second URL: it does not have it. The originating desktop/terminal supplies it.
 

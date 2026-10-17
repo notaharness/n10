@@ -8,6 +8,7 @@ import {
   sessionCard,
   sessionCards,
   tab,
+  openSessions,
 } from './setup/app.js';
 
 const BRANCH = 'agent-work';
@@ -28,7 +29,7 @@ function closeTabButton(page: Page) {
 }
 
 async function sessionRunning(page: Page): Promise<boolean> {
-  const sessions = await page.evaluate(() => window.n10.listSessions());
+  const sessions = await openSessions(page);
   return (
     sessions.find((s) => sessionBranch(s.name) === SESSION)?.running ?? false
   );
@@ -54,14 +55,12 @@ test.describe('Agent sessions', () => {
 
     await launchAgent(page);
     await expect(sessionCard(page, 'Agent')).toContainText('Running');
-    // A stopped agent stays listed, to be launched again.
+    // Stopping ends its tmux session, so nothing is left to list.
     await page.evaluate(
       (name) => window.n10.killSession(name),
       await sessionKey(page, BRANCH)
     );
-    await expect(sessionCard(page, 'Agent')).toContainText('Exited', {
-      timeout: 15_000,
-    });
+    await expect(sessionCards(page)).toHaveCount(0, { timeout: 15_000 });
   });
 
   test('launching an agent starts a session and shows its output', async ({
@@ -71,7 +70,7 @@ test.describe('Agent sessions', () => {
     await createWorktree(page, BRANCH);
     await launchAgent(page);
 
-    const sessions = await page.evaluate(() => window.n10.listSessions());
+    const sessions = await openSessions(page);
     expect(sessions.map((s) => sessionBranch(s.name))).toContain(SESSION);
     expect(
       sessions.find((s) => sessionBranch(s.name) === SESSION)?.running

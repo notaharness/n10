@@ -360,6 +360,8 @@ const OVERVIEW_GITHUB: FakeGitHub = {
 
 const OVERVIEW_REPO = {
   name: 'n10-visual',
+  // The Overview shows the head: the same commit on every run.
+  commitDate: '2026-01-01T00:00:00Z',
   worktrees: [
     {
       branch: 'cancel-requests',
@@ -415,7 +417,9 @@ test.describe('Visual (overview) @visual', () => {
     // Electron updates the native control overlay after the content resize.
     // Its button width is unchanged; wait for CSS env() geometry to catch up.
     await expect(titlebar).toHaveCSS('padding-right', controlsInset);
-    await expect(page.getByText('Your review is requested')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Review changes' })
+    ).toBeVisible();
     await expect(page).toHaveScreenshot('pr-overview-narrow.png', shot);
   });
 });

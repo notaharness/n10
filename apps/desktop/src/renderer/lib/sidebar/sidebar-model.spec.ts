@@ -12,9 +12,9 @@ import {
   itemSessionName,
   itemTitle,
   unresolvedCommentsLabel,
-  SECTION_ORDER,
   liveSessionName,
 } from './sidebar-model.js';
+import { SIDEBAR_SECTIONS } from '@n10/core/ui';
 
 /**
  * The desktop keys editor tabs by `itemKey`, and the tab strip survives
@@ -46,6 +46,20 @@ function session(name: string, running = false) {
 
 describe('itemKey identity across kinds', () => {
   const thePr = pr();
+
+  // Its branch may be checked out in a new worktree, keyed by branch.
+  it('keys an agent whose worktree is gone by its session', () => {
+    const stranded: SidebarItem = {
+      kind: 'session',
+      session: {
+        ...session('stranded', true),
+        label: 'feature/colour',
+        worktreeRemoved: true,
+      },
+      isMerged: false,
+    };
+    expect(itemKey(stranded)).toBe('removed:stranded');
+  });
 
   const asOrphan: SidebarItem = { kind: 'orphan-pr', pr: thePr };
   const asReview: SidebarItem = {
@@ -127,6 +141,7 @@ describe('groupSections', () => {
       kind: 'session',
       session: session('drafty'),
       pr: pr({ id: 2, isDraft: true }),
+      authored: true,
       isMerged: false,
     },
     { kind: 'orphan-pr', pr: pr({ id: 3 }) },
@@ -145,7 +160,7 @@ describe('groupSections', () => {
       'approved',
     ]);
     // …which is the declared order, filtered to what is present.
-    expect(keys).toEqual(SECTION_ORDER.filter((k) => keys.includes(k)));
+    expect(keys).toEqual(SIDEBAR_SECTIONS.filter((k) => keys.includes(k)));
   });
 
   it('omits empty sections rather than rendering headers with no rows', () => {
@@ -227,6 +242,23 @@ describe('applyPendingRemovals', () => {
     const [row] = applyPendingRemovals([reviewRow], new Set([branch]));
     expect(itemHasWorktree(row)).toBe(false);
     expect(itemRunning(row)).toBe(false);
+  });
+
+  // The row of an agent whose worktree is gone, labelled with the same
+  // branch: a removal of the branch's new checkout is not its.
+  it('leaves an agent whose worktree is gone alone', () => {
+    const stranded: SidebarItem = {
+      kind: 'session',
+      session: {
+        ...session('stranded', true),
+        label: branch,
+        worktreeRemoved: true,
+      },
+      isMerged: false,
+    };
+    expect(applyPendingRemovals([stranded], new Set([branch]))).toEqual([
+      stranded,
+    ]);
   });
 
   it('leaves rows for other branches completely alone', () => {

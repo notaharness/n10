@@ -8,18 +8,34 @@ const {
   listWorktreesMock,
   listPersistedMock,
   listTerminalsMock,
+  listHeldMock,
+  remoteTerminalsMock,
   isSessionAliveMock,
   sessionNamesMock,
   watchMock,
   basePathMock,
+  released,
+  strandedMock,
+  exitSubscribers,
+  stopped,
 } = vi.hoisted(() => ({
   listWorktreesMock: vi.fn<(scope: WorktreeScope) => Promise<WorktreeInfo[]>>(),
   listPersistedMock: vi.fn<() => Set<string>>(),
   listTerminalsMock: vi.fn<() => DiscoveredTerminal[]>(),
+  listHeldMock: vi.fn<() => Set<string> | null>(),
+  remoteTerminalsMock:
+    vi.fn<(machine: string) => Promise<DiscoveredTerminal[]>>(),
   isSessionAliveMock: vi.fn<(name: string) => boolean>(),
   sessionNamesMock: vi.fn<() => string[]>(),
   watchMock: vi.fn(),
   basePathMock: vi.fn<() => string>(),
+  released: [] as string[],
+  strandedMock:
+    vi.fn<
+      (keep: (name: string) => boolean) => { name: string; path?: string }[]
+    >(),
+  exitSubscribers: new Set<(name: string) => void>(),
+  stopped: [] as string[],
 }));
 
 vi.mock('node:fs', () => ({
@@ -37,10 +53,29 @@ vi.mock('@n10/core', async (original) => ({
   sessionNames: () => sessionNamesMock(),
   hasSessionConnection: (name: string) => isSessionAliveMock(name),
   isSessionAlive: (name: string) => isSessionAliveMock(name),
-  observeTmuxSessions: () => ({
-    persisted: listPersistedMock(),
-    terminals: listTerminalsMock(),
-  }),
+  // A null `held` stands for a listing tmux could not give.
+  observeTmuxSessions: () => {
+    const held = listHeldMock();
+    return (
+      held && {
+        persisted: listPersistedMock(),
+        terminals: listTerminalsMock(),
+        held,
+      }
+    );
+  },
+  observeRemoteTerminals: (machine: string) => remoteTerminalsMock(machine),
+  releaseExitedSession: (name: string) => released.push(name),
+  strandedSessionRows: (
+    _repo: string,
+    _isAlive: unknown,
+    keep: (name: string) => boolean
+  ) => strandedMock(keep),
+  stopSession: (name: string) => stopped.push(name),
+  onSessionExit: (cb: (name: string) => void) => {
+    exitSubscribers.add(cb);
+    return () => exitSubscribers.delete(cb);
+  },
 }));
 
 import { startSessionDiscovery } from './session-discovery.js';
@@ -86,9 +121,14 @@ beforeEach(() => {
   listWorktreesMock.mockReset().mockResolvedValue([]);
   listPersistedMock.mockReset().mockReturnValue(new Set());
   listTerminalsMock.mockReset().mockReturnValue([]);
+  listHeldMock.mockReset().mockReturnValue(new Set());
+  remoteTerminalsMock.mockReset().mockResolvedValue([]);
   isSessionAliveMock.mockReset().mockImplementation((name) => alive.has(name));
   basePathMock.mockReset().mockReturnValue('/repo/.claude/worktrees');
   watchMock.mockReset().mockReturnValue({ close: vi.fn(), on: vi.fn() });
+  released.length = 0;
+  strandedMock.mockReset().mockReturnValue([]);
+  stopped.length = 0;
 });
 
 afterEach(() => {
@@ -238,12 +278,65 @@ describe('startSessionDiscovery', () => {
     });
   });
 
+  // An exited agent's dead pane is not polled: the scan is what sees
+  // its session go, and nothing is left to read or resume.
+  // Its dead pane is no longer `persisted`, but tmux still holds it.
+  it('releases an exited agent once tmux no longer holds its session', async () => {
+    const exited = wtKey('feature-a');
+    const running = wtKey('feature-b');
+    alive.add(running);
+    sessionNamesMock.mockReturnValue([exited, running]);
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a', 'feature-b'));
+    listPersistedMock.mockReturnValue(new Set([running]));
+    listHeldMock.mockReturnValue(new Set([exited, running]));
+    const { discovery, onChanged } = start();
+    await discovery.scanNow();
+    expect(released).toEqual([]);
+    onChanged.mockClear();
+
+    listHeldMock.mockReturnValue(new Set([running]));
+    await discovery.scanNow();
+    expect(released).toEqual([exited]);
+    expect(onChanged).toHaveBeenCalledOnce();
+  });
+
+  // A failed fork or a timeout says nothing about what tmux holds: read
+  // as nothing, every terminal would end and never come back.
+  it('drops a scan tmux could not list, as for a failed git listing', async () => {
+    const exited = wtKey('feature-a');
+    const terminal: DiscoveredTerminal = {
+      name: terminalSessionKey('repo-shell'),
+      kind: 'shell',
+      path: '/repo',
+    };
+    alive.add(terminal.name);
+    sessionNamesMock.mockReturnValue([exited, terminal.name]);
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    listTerminalsMock.mockReturnValue([terminal]);
+    listHeldMock.mockReturnValue(new Set([exited]));
+    const { discovery, onChanged } = start();
+    await discovery.scanNow();
+    const before = discovery.lastScan();
+    onChanged.mockClear();
+
+    listHeldMock.mockReturnValue(null);
+    await expect(discovery.scanNow()).resolves.toBeUndefined();
+    expect(onChanged).not.toHaveBeenCalled();
+    expect(released).toEqual([]);
+    expect(discovery.lastScan()).toBe(before);
+
+    listHeldMock.mockReturnValue(new Set([exited]));
+    await discovery.scanNow();
+    expect(onChanged).not.toHaveBeenCalled();
+  });
+
   // The path is what a shell closes a tab by; the name alone would not
   // say which checkout went.
   it('announces a removed worktree with its checkout', async () => {
     listWorktreesMock.mockResolvedValue(worktrees('feature-a', 'feature-b'));
     const { discovery, onChanged } = start();
     await discovery.scanNow();
+    onChanged.mockClear();
 
     listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
     await discovery.scanNow();
@@ -259,10 +352,119 @@ describe('startSessionDiscovery', () => {
     });
   });
 
+  // A worktree added between the shell's first listing and this scan
+  // would otherwise never reach the shell: nothing reads as appeared.
+  it('announces a first scan that sees a worktree', async () => {
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    const { discovery, onChanged } = start();
+    await discovery.scanNow();
+    expect(onChanged).toHaveBeenCalledOnce();
+  });
+
+  // Nothing to have missed: no worktree, or a baseline to diff against.
+  it('says nothing on a first scan with no worktrees or from a baseline', async () => {
+    const empty = start();
+    await empty.discovery.scanNow();
+    expect(empty.onChanged).not.toHaveBeenCalled();
+    empty.discovery.stop();
+
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    const first = start();
+    await first.discovery.scanNow();
+    const baseline = first.discovery.lastScan();
+    first.discovery.stop();
+    const again = start({ baseline });
+    await again.discovery.scanNow();
+    expect(again.onChanged).not.toHaveBeenCalled();
+  });
+
+  /** A running agent's worktree, removed and stranded by one scan. */
+  async function strandedAgent() {
+    const key = wtKey('feature-a');
+    const path = '/repo/.claude/worktrees/feature-a';
+    alive.add(key);
+    sessionNamesMock.mockReturnValue([key]);
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    const started = start();
+    await started.discovery.scanNow();
+    listWorktreesMock.mockResolvedValue([]);
+    strandedMock.mockReturnValue([{ name: key, path }]);
+    await started.discovery.scanNow();
+    return { ...started, key, path };
+  }
+
+  // Something recreated the directory: git still does not list it, and
+  // the agent runs on.
+  it('keeps a worktree stranded while its agent runs, its directory back', async () => {
+    const { discovery, onChanged, key, path } = await strandedAgent();
+    onChanged.mockClear();
+    strandedMock.mockImplementation((keep) =>
+      keep(key) ? [{ name: key, path }] : []
+    );
+    await discovery.scanNow();
+    expect(onChanged).not.toHaveBeenCalled();
+    expect(stopped).toEqual([]);
+  });
+
+  // Whatever takes a worktree out of the stranded set, a running agent
+  // is never ended for it.
+  it('never ends a running agent whose worktree is no longer stranded', async () => {
+    const { discovery, key } = await strandedAgent();
+    strandedMock.mockReturnValue([]);
+    await discovery.scanNow();
+    expect(alive.has(key)).toBe(true);
+    expect(stopped).toEqual([]);
+  });
+
+  // Its agent outlived it, so the shells keep showing the agent until
+  // it exits — and learn it has gone as soon as it does.
+  it('holds back a removed worktree until its agent exits', async () => {
+    const key = wtKey('feature-a');
+    const path = '/repo/.claude/worktrees/feature-a';
+    alive.add(key);
+    sessionNamesMock.mockReturnValue([key]);
+    listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+    const { discovery, onChanged } = start();
+    await discovery.scanNow();
+    onChanged.mockClear();
+
+    listWorktreesMock.mockResolvedValue([]);
+    strandedMock.mockReturnValue([{ name: key, path }]);
+    await discovery.scanNow();
+    expect(onChanged).toHaveBeenCalledTimes(1);
+    expect(onChanged.mock.calls[0]![0]).toMatchObject({
+      disappeared: [],
+      stranded: [{ name: key, path }],
+    });
+
+    // tmux keeps the dead pane, which reads as an orphan agent terminal.
+    alive.delete(key);
+    strandedMock.mockReturnValue([]);
+    listTerminalsMock.mockReturnValue([
+      {
+        name: terminalSessionKey('repo-feature-a'),
+        kind: 'agent',
+        path,
+        running: false,
+      },
+    ]);
+    for (const cb of exitSubscribers) cb(key);
+    // Well short of the next tick: the exit itself prompts the scan.
+    await vi.advanceTimersByTimeAsync(1);
+    expect(onChanged).toHaveBeenCalledTimes(2);
+    expect(onChanged.mock.calls[1]![0]).toMatchObject({
+      disappeared: [{ name: key, path }],
+      adoptableTerminals: [],
+    });
+    // Nothing is left to show or restart in a worktree that is gone.
+    expect(stopped).toEqual([key]);
+  });
+
   it('says nothing when nothing changed', async () => {
     listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
     const { discovery, onChanged } = start();
     await discovery.scanNow();
+    onChanged.mockClear();
     await discovery.scanNow();
     await discovery.scanNow();
     expect(onChanged).not.toHaveBeenCalled();
@@ -311,6 +513,7 @@ describe('startSessionDiscovery', () => {
         });
       const { discovery, onChanged } = start({ adopt });
       await discovery.scanNow();
+      onChanged.mockClear();
       await discovery.scanNow();
       expect(adopt).toHaveBeenCalledTimes(2);
       expect(onChanged).toHaveBeenCalledTimes(1);
@@ -324,7 +527,9 @@ describe('startSessionDiscovery', () => {
       listPersistedMock.mockReturnValue(new Set([wtKey('feature-a')]));
       const adopt = vi.fn().mockRejectedValue(new Error('no worktree'));
       const { discovery, onChanged } = start({ adopt });
-      for (let i = 0; i < 6; i++) await discovery.scanNow();
+      await discovery.scanNow();
+      onChanged.mockClear();
+      for (let i = 0; i < 5; i++) await discovery.scanNow();
       expect(onChanged).not.toHaveBeenCalled();
     });
 
@@ -430,6 +635,148 @@ describe('startSessionDiscovery', () => {
       expect(onChanged).not.toHaveBeenCalled();
     });
 
+    describe('on another machine', () => {
+      const PEER = 'a'.repeat(32);
+      const SILENT = 'f'.repeat(32);
+      const remoteTerm: DiscoveredTerminal = {
+        name: terminalSessionKey('n10-shell-9f8e7d', PEER),
+        kind: 'shell',
+        path: '/home/far/notes',
+      };
+      const connected = { remoteMachines: () => [PEER] };
+      /** A machine's listing runs beside the scan, not inside it. */
+      const settle = () => vi.advanceTimersByTimeAsync(0);
+      /** A listing that never answers, as a peer that went quiet gives. */
+      const silent = () => new Promise<DiscoveredTerminal[]>(() => undefined);
+
+      // The restore path for a terminal opened on another machine: its
+      // tmux session there outlived this process, and nothing else
+      // brings its tab back.
+      it('attaches on the first scan to a terminal that outlived the last run', async () => {
+        remoteTerminalsMock.mockResolvedValue([remoteTerm]);
+        const { discovery, adoptTerminal, onChanged } = start(connected);
+        await discovery.scanNow();
+        await settle();
+        expect(remoteTerminalsMock).toHaveBeenCalledWith(PEER);
+        expect(adoptTerminal).toHaveBeenCalledWith(remoteTerm);
+        expect(onChanged).toHaveBeenCalledWith(
+          expect.objectContaining({ adoptableTerminals: [remoteTerm] })
+        );
+      });
+
+      it('announces one killed from outside once its machine lists without it', async () => {
+        sessionNamesMock.mockReturnValue([remoteTerm.name]);
+        const { discovery, onChanged } = start(connected);
+        await discovery.scanNow();
+        await settle();
+        expect(onChanged).toHaveBeenCalledWith(
+          expect.objectContaining({ endedTerminals: [remoteTerm.name] })
+        );
+      });
+
+      // An unreachable machine never says a session ended: the fleet
+      // not listing it as connected, or a listing that fails.
+      it('never ends one on a machine the fleet does not list', async () => {
+        sessionNamesMock.mockReturnValue([remoteTerm.name]);
+        const { discovery, onChanged } = start({ remoteMachines: () => [] });
+        await discovery.scanNow();
+        await settle();
+        expect(onChanged).not.toHaveBeenCalled();
+      });
+
+      it('never ends one on a machine whose listing failed', async () => {
+        alive.add(remoteTerm.name);
+        sessionNamesMock.mockReturnValue([remoteTerm.name]);
+        remoteTerminalsMock.mockResolvedValue([remoteTerm]);
+        const { discovery, onChanged } = start(connected);
+        await discovery.scanNow();
+        await settle();
+        remoteTerminalsMock.mockRejectedValue(new Error('timed out'));
+        await discovery.scanNow();
+        await settle();
+        expect(remoteTerminalsMock).toHaveBeenCalledTimes(2);
+        expect(onChanged).not.toHaveBeenCalled();
+      });
+
+      it('never ends one launched while the listing was out', async () => {
+        remoteTerminalsMock.mockImplementation(async () => {
+          sessionNamesMock.mockReturnValue([remoteTerm.name]);
+          return [];
+        });
+        const { discovery, onChanged } = start(connected);
+        await discovery.scanNow();
+        await settle();
+        expect(onChanged).not.toHaveBeenCalled();
+      });
+
+      // A peer the fleet still lists can stop answering; its listing
+      // then takes until its deadline.
+      it('holds back no scan of this machine while it does not answer', async () => {
+        remoteTerminalsMock.mockImplementation(silent);
+        listTerminalsMock.mockReturnValue([shellTerm]);
+        const { discovery, adoptTerminal } = start(connected);
+        const scanned = discovery.scanNow().then(() => true);
+        await settle();
+        expect(await Promise.race([scanned, Promise.resolve(false)])).toBe(
+          true
+        );
+        expect(adoptTerminal).toHaveBeenCalledWith(shellTerm);
+      });
+
+      it('holds back no other machine while it does not answer', async () => {
+        remoteTerminalsMock.mockImplementation((machine) =>
+          machine === SILENT ? silent() : Promise.resolve([remoteTerm])
+        );
+        const { discovery, adoptTerminal } = start({
+          remoteMachines: () => [SILENT, PEER],
+        });
+        await discovery.scanNow();
+        await settle();
+        expect(adoptTerminal).toHaveBeenCalledWith(remoteTerm);
+      });
+
+      it('is asked again only once its listing is done', async () => {
+        remoteTerminalsMock.mockImplementation(silent);
+        const { discovery } = start(connected);
+        for (let i = 0; i < 3; i++) await discovery.scanNow();
+        await settle();
+        expect(remoteTerminalsMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('is acted on when its answer arrives, after later scans', async () => {
+        let answer: (terminals: DiscoveredTerminal[]) => void = () => undefined;
+        remoteTerminalsMock.mockReturnValueOnce(
+          new Promise((resolve) => (answer = resolve))
+        );
+        const { discovery, adoptTerminal } = start(connected);
+        await discovery.scanNow();
+        await discovery.scanNow();
+        expect(adoptTerminal).not.toHaveBeenCalled();
+        answer([remoteTerm]);
+        await settle();
+        expect(adoptTerminal).toHaveBeenCalledWith(remoteTerm);
+      });
+
+      // This machine's scans list none of its sessions, so they must not
+      // forget its attach failures.
+      it('retires one that keeps failing to attach', async () => {
+        remoteTerminalsMock.mockResolvedValue([remoteTerm]);
+        const adoptTerminal = vi.fn().mockRejectedValue(new Error('gone'));
+        const { discovery } = start({ ...connected, adoptTerminal });
+        for (let i = 0; i < 6; i++) {
+          await discovery.scanNow();
+          await settle();
+        }
+        expect(adoptTerminal).toHaveBeenCalledTimes(3);
+      });
+
+      it('lists no machine for a shell that cannot adopt terminals', async () => {
+        start({ ...connected, adoptTerminal: undefined });
+        await vi.runOnlyPendingTimersAsync();
+        expect(remoteTerminalsMock).not.toHaveBeenCalled();
+      });
+    });
+
     it('announces a terminal killed from outside', async () => {
       alive.add(shellTerm.name);
       listTerminalsMock.mockReturnValue([shellTerm]);
@@ -468,6 +815,7 @@ describe('startSessionDiscovery', () => {
       listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
       const { discovery, onChanged } = start();
       await discovery.scanNow();
+      onChanged.mockClear();
 
       listWorktreesMock.mockResolvedValue([]);
       await discovery.scanNow();
@@ -485,6 +833,29 @@ describe('startSessionDiscovery', () => {
 
       await discovery.scanNow();
       expect(listWorktreesMock.mock.calls.length).toBe(before);
+    });
+  });
+
+  // A repository's scanner stops while another repository is open, and
+  // a fresh one starts on the way back.
+  describe('a baseline from an earlier scanner', () => {
+    it('reports on the first scan what went while nothing watched', async () => {
+      listWorktreesMock.mockResolvedValue(worktrees('feature-a', 'feature-b'));
+      const first = start();
+      await first.discovery.scanNow();
+      const baseline = first.discovery.lastScan();
+      first.discovery.stop();
+
+      listWorktreesMock.mockResolvedValue(worktrees('feature-a'));
+      const { discovery, onChanged } = start({ baseline });
+      await discovery.scanNow();
+      expect(onChanged).toHaveBeenCalledTimes(1);
+      expect(onChanged.mock.calls[0]![0]).toMatchObject({
+        disappeared: [expect.objectContaining({ name: wtKey('feature-b') })],
+      });
+      expect(discovery.lastScan()?.worktrees).toEqual([
+        expect.objectContaining({ name: wtKey('feature-a') }),
+      ]);
     });
   });
 

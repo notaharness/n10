@@ -1,6 +1,8 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterAll, beforeAll } from 'vitest';
 
 /**
  * Put every tmux command this project's tests run onto a throwaway
@@ -36,6 +38,20 @@ delete process.env.TMUX;
 delete process.env.TMUX_PANE;
 
 /**
+ * Keep the scratch server off the developer's session bus. A tmux
+ * built with systemd support (Debian's and Ubuntu's are) asks the user
+ * manager over D-Bus for a new scope around every pane it spawns, and
+ * waits for the job: about 100 ms a pane on an idle machine, over a
+ * second once a full parallel run has many servers asking at once. A
+ * bus that answers nothing makes tmux skip the scope, and leaves no
+ * test units behind in the developer's systemd.
+ */
+process.env.DBUS_SESSION_BUS_ADDRESS = `unix:path=${join(
+  FIXTURE_HOME,
+  'no-session-bus'
+)}`;
+
+/**
  * Fail loudly if the socket a test is about to use is not the scratch
  * one. Call it from any suite that creates or kills real tmux sessions:
  * the point is that a lost environment variable stops the suite instead
@@ -56,4 +72,29 @@ export function assertScratchTmuxSocket(): void {
       }, not this run's scratch dir ${SCRATCH_SOCKET_DIR}.`
     );
   }
+}
+
+const ANCHOR = 'scratch-anchor';
+
+/**
+ * For a suite that creates and kills real sessions: check the socket,
+ * then keep the scratch server up from the suite's first test to its
+ * last.
+ *
+ * tmux exits with its last session, and a client that connects while
+ * it is going down fails with "server exited unexpectedly" (or "no
+ * server running"). A suite that kills every session it made after
+ * each test races that shutdown with the next test's first command;
+ * one idle session held for the whole file means the server only
+ * exits once the file is done with it.
+ */
+export function holdScratchTmuxServer(): void {
+  beforeAll(() => {
+    assertScratchTmuxSocket();
+    execFileSync('tmux', ['new-session', '-d', '-s', ANCHOR, 'sleep 3600']);
+  });
+  afterAll(() => {
+    assertScratchTmuxSocket();
+    execFileSync('tmux', ['kill-session', '-t', `=${ANCHOR}:`]);
+  });
 }

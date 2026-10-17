@@ -9,16 +9,21 @@ const {
   tmuxListSessionsMock,
   execFileSyncMock,
   liveSessionNamesMock,
+  remoteListMock,
+  getSessionMock,
 } = vi.hoisted(() => {
   return {
     isTmuxAvailableMock: vi.fn<() => Promise<TmuxStatus>>(),
     tmuxKillSessionMock: vi.fn<(name: string) => void>(),
-    tmuxListSessionsMock: vi.fn<() => TmuxSessionInfo[]>(),
+    tmuxListSessionsMock: vi.fn<() => TmuxSessionInfo[] | null>(),
     execFileSyncMock: vi.fn(),
     // Stands in for the PTY registry's own bookkeeping: which bare
     // session names this process currently holds alive, independent of
     // whatever the worktree list or tmux happen to report this scan.
     liveSessionNamesMock: vi.fn<() => string[]>(),
+    /** Another machine's `list-sessions`, by the machine asked. */
+    remoteListMock: vi.fn<(machine: string) => Promise<TmuxSessionInfo[]>>(),
+    getSessionMock: vi.fn<(name: string) => unknown>(),
   };
 });
 
@@ -29,12 +34,19 @@ vi.mock('node:child_process', () => ({
 vi.mock('@n10/terminal-tmux', () => ({
   isTmuxAvailable: () => isTmuxAvailableMock(),
   tmuxKillSession: (name: string) => tmuxKillSessionMock(name),
-  tmuxListSessionsDetailed: () => tmuxListSessionsMock(),
+  tmuxListSessionsDetailed: () => tmuxListSessionsMock() ?? [],
+  tmuxListSessionsRead: () => tmuxListSessionsMock(),
+  tmuxListSessionsDetailedWith: (executor: { machine: string }) =>
+    remoteListMock(executor.machine),
+}));
+vi.mock('./machine-registry.js', () => ({
+  requireMachine: (id: string) => ({ id, executor: { machine: id } }),
 }));
 vi.mock('@n10/worktree-manager', () => ({
   branchToSessionName: (branch: string) => branch.replace(/\//g, '-'),
 }));
 vi.mock('./pty-registry.js', () => ({
+  getSession: (name: string) => getSessionMock(name),
   liveSessionNames: () => liveSessionNamesMock(),
 }));
 import {
@@ -43,10 +55,20 @@ import {
   hasLiveTmuxSession,
   hasPersistedTerminalSession,
   killPersistedTmuxSession,
+  observeRemoteTerminals,
   observeTmuxSessions,
   probeTmuxAvailability,
   resetRepoRoot,
 } from './session-backend.js';
+
+/** The observation, for a listing tmux gave. */
+function observed(
+  ...args: Parameters<typeof observeTmuxSessions>
+): NonNullable<ReturnType<typeof observeTmuxSessions>> {
+  const seen = observeTmuxSessions(...args);
+  if (!seen) throw new Error('tmux could not list its sessions');
+  return seen;
+}
 
 const TMUX_MISSING: TmuxStatus = {
   available: false,
@@ -102,6 +124,8 @@ beforeEach(async () => {
   tmuxListSessionsMock.mockReturnValue([]);
   liveSessionNamesMock.mockReset();
   liveSessionNamesMock.mockReturnValue([]);
+  remoteListMock.mockReset().mockResolvedValue([]);
+  getSessionMock.mockReset().mockReturnValue(undefined);
   // getRepoRoot memoizes for the process, so a test that let it resolve
   // to null would decide every later one. Reset and let it find /repo.
   resetRepoRoot();
@@ -362,7 +386,7 @@ describe('observeTmuxSessions', () => {
       ours('whatever', 'worktree', '/repo', 'feat/a', dirOf('feat-a')),
       ours('repo-feat-b', 'worktree', '/repo', 'feat-b', dirOf('feat-b')),
     ]);
-    const seen = observeTmuxSessions('/repo', [
+    const seen = observed('/repo', [
       wt('feat-a', 'feat/a'),
       wt('feat-b', 'feat-b'),
       wt('gone', 'gone'),
@@ -383,9 +407,10 @@ describe('observeTmuxSessions', () => {
       foreign('repo-feat-a', dirOf('feat-a')),
       foreign('repo-shell', '/repo'),
     ]);
-    expect(observeTmuxSessions('/repo', [wt('feat-a', 'feat-a')])).toEqual({
+    expect(observed('/repo', [wt('feat-a', 'feat-a')])).toEqual({
       persisted: new Set(),
       terminals: [],
+      held: expect.any(Set),
     });
   });
 
@@ -393,9 +418,10 @@ describe('observeTmuxSessions', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('feat-a', 'worktree', '/other', 'feat-a', '/other/wt/feat-a'),
     ]);
-    expect(observeTmuxSessions('/repo', [wt('feat-a', 'feat-a')])).toEqual({
+    expect(observed('/repo', [wt('feat-a', 'feat-a')])).toEqual({
       persisted: new Set(),
       terminals: [],
+      held: expect.any(Set),
     });
   });
 
@@ -406,7 +432,7 @@ describe('observeTmuxSessions', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('repo-hotfix', 'worktree', '/repo', 'hotfix-dir', dirOf('hotfix')),
     ]);
-    const seen = observeTmuxSessions('/repo', [wt('hotfix', '')]);
+    const seen = observed('/repo', [wt('hotfix', '')]);
     expect(seen.persisted).toEqual(
       new Set([worktreeSessionKey(dirOf('hotfix'))])
     );
@@ -422,7 +448,7 @@ describe('observeTmuxSessions', () => {
       ours('repo-agent-2', 'agent', '/repo', null, '/repo'),
       ours('odd-name', 'shell', '/repo', null, '/repo'),
     ]);
-    expect(observeTmuxSessions('/repo', []).terminals).toEqual([
+    expect(observed('/repo', []).terminals).toEqual([
       {
         name: terminalSessionKey('notes-shell'),
         kind: 'shell',
@@ -455,9 +481,7 @@ describe('observeTmuxSessions', () => {
       ours('repo-old-branch', 'worktree', '/repo', 'old-branch', dirOf('dir')),
       ours('repo-stray', 'worktree', '/repo', 'new-branch', '/wt/gone'),
     ]);
-    const seen = observeTmuxSessions('/repo', [
-      wt('new-branch', 'new-branch', 'dir'),
-    ]);
+    const seen = observed('/repo', [wt('new-branch', 'new-branch', 'dir')]);
     expect(seen.persisted).toEqual(new Set([worktreeSessionKey(dirOf('dir'))]));
     expect(seen.terminals).toEqual([
       {
@@ -479,9 +503,7 @@ describe('observeTmuxSessions', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('repo-old-branch', 'worktree', '/repo', 'old/branch', '/wt/dir'),
     ]);
-    const seen = observeTmuxSessions('/repo', [
-      wt('new-branch', 'new-branch', 'dir'),
-    ]);
+    const seen = observed('/repo', [wt('new-branch', 'new-branch', 'dir')]);
     expect(seen.terminals).toEqual([]);
   });
 
@@ -492,10 +514,42 @@ describe('observeTmuxSessions', () => {
         paneDead: true,
       },
     ]);
-    expect(observeTmuxSessions('/repo', [wt('done', 'done')])).toEqual({
+    expect(observed('/repo', [wt('done', 'done')])).toEqual({
       persisted: new Set(),
       terminals: [],
+      held: expect.any(Set),
     });
+  });
+
+  // An exited agent's dead pane is still its session; only this repo's
+  // worktree sessions count, whatever git lists.
+  it('names the worktree sessions the server holds, live or dead', () => {
+    tmuxListSessionsMock.mockReturnValue([
+      ours('repo-live', 'worktree', '/repo', 'live', dirOf('live')),
+      {
+        ...ours('repo-done', 'worktree', '/repo', 'done', dirOf('done')),
+        paneDead: true,
+      },
+      ours('repo-gone', 'worktree', '/repo', 'gone', dirOf('gone')),
+      ours('other', 'worktree', '/other', 'x', '/other/wt/x'),
+      ours('repo-shell', 'shell', '/repo', null, '/repo'),
+    ]);
+    expect(
+      observed('/repo', [wt('live', 'live'), wt('done', 'done')]).held
+    ).toEqual(
+      new Set([
+        worktreeSessionKey(dirOf('live')),
+        worktreeSessionKey(dirOf('done')),
+        worktreeSessionKey(dirOf('gone')),
+      ])
+    );
+  });
+
+  // A listing tmux could not give says nothing about what it holds.
+  // A listing tmux could not give says nothing about any session.
+  it('observes nothing when tmux could not be asked', () => {
+    tmuxListSessionsMock.mockReturnValue(null);
+    expect(observeTmuxSessions('/repo', [wt('feat-a', 'feat-a')])).toBe(null);
   });
 
   it('retains exited terminal metadata for restoration', () => {
@@ -503,7 +557,7 @@ describe('observeTmuxSessions', () => {
     session.paneDead = true;
     session.options!['@orchestra-agent'] = 'codex';
     tmuxListSessionsMock.mockReturnValue([session]);
-    expect(observeTmuxSessions('/repo', []).terminals).toEqual([
+    expect(observed('/repo', []).terminals).toEqual([
       {
         name: terminalSessionKey('repo-agent'),
         kind: 'agent',
@@ -515,7 +569,7 @@ describe('observeTmuxSessions', () => {
   });
 
   it('costs one fork for both answers', () => {
-    observeTmuxSessions('/repo', [wt('a', 'a'), wt('b', 'b')]);
+    observed('/repo', [wt('a', 'a'), wt('b', 'b')]);
     expect(tmuxListSessionsMock).toHaveBeenCalledTimes(1);
   });
 
@@ -529,7 +583,7 @@ describe('observeTmuxSessions', () => {
       ours('repo-shell', 'shell', '/repo', null, ''),
       ours('repo-old', 'worktree', '/repo', 'old', ''),
     ]);
-    expect(observeTmuxSessions('/repo', []).terminals).toEqual([]);
+    expect(observed('/repo', []).terminals).toEqual([]);
   });
 
   it('observes the explicit repository even when process cwd is outside Git', () => {
@@ -540,9 +594,92 @@ describe('observeTmuxSessions', () => {
     tmuxListSessionsMock.mockReturnValue([
       ours('x', 'worktree', '/repo', 'feat-a', dirOf('feat-a')),
     ]);
-    expect(observeTmuxSessions('/repo', [wt('feat-a', 'feat-a')])).toEqual({
+    expect(observed('/repo', [wt('feat-a', 'feat-a')])).toEqual({
       persisted: new Set([worktreeSessionKey(dirOf('feat-a'), '/repo')]),
       terminals: [],
+      held: new Set([worktreeSessionKey(dirOf('feat-a'), '/repo')]),
     });
+  });
+});
+
+const PEER = 'b'.repeat(32);
+
+/** A terminal session as Orchestra or another machine's n10 tags it. */
+function startedElsewhere(
+  name: string,
+  type: string,
+  spawner: string,
+  path: string
+): TmuxSessionInfo {
+  return {
+    name,
+    created: 1,
+    paneDead: false,
+    path,
+    options: {
+      '@orchestra-spawner': spawner,
+      '@orchestra-session-type': type,
+      '@orchestra-orchestrator': `beam:${'c'.repeat(32)}/claude:abc`,
+    },
+  };
+}
+
+describe('another machine’s terminals', () => {
+  it('lists every terminal session there by its tags, keyed with that machine', async () => {
+    remoteListMock.mockResolvedValue([
+      ours('notes', 'shell', '/home/far', null, '/home/far/notes'),
+      startedElsewhere('player', 'dir', 'orchestra', '/home/far/work'),
+      ours('wt', 'worktree', '/home/far/app', 'main', '/home/far/app/wt'),
+      foreign('untagged', '/home/far'),
+    ]);
+    await expect(observeRemoteTerminals(PEER)).resolves.toEqual([
+      {
+        name: terminalSessionKey('notes', PEER),
+        kind: 'shell',
+        path: '/home/far/notes',
+        running: true,
+      },
+      {
+        name: terminalSessionKey('player', PEER),
+        kind: 'agent',
+        path: '/home/far/work',
+        running: true,
+      },
+    ]);
+    expect(remoteListMock).toHaveBeenCalledWith(PEER);
+  });
+
+  // Failing to ask a machine says nothing about its sessions.
+  it('rejects when the machine cannot be listed', async () => {
+    remoteListMock.mockRejectedValue(new Error('peer offline'));
+    await expect(observeRemoteTerminals(PEER)).rejects.toThrow('peer offline');
+  });
+
+  it('are retained while their backend last found the session, whatever this machine’s tmux holds', () => {
+    const name = terminalSessionKey('agent-1', PEER);
+    tmuxListSessionsMock.mockReturnValue([
+      ours('agent-1', 'agent', '/repo', null, '/repo'),
+    ]);
+    const held = (processState: object) =>
+      getSessionMock.mockReturnValue({ pty: { processState } });
+    held({ running: false, exitCode: 0 });
+    expect(hasPersistedTerminalSession(name)).toBe(true);
+    held({ running: false, gone: true });
+    expect(hasPersistedTerminalSession(name)).toBe(false);
+    getSessionMock.mockReturnValue(undefined);
+    expect(hasPersistedTerminalSession(name)).toBe(false);
+  });
+});
+
+describe('terminals another machine started here', () => {
+  it('are reported by their tags, not by who started them', () => {
+    tmuxListSessionsMock.mockReturnValue([
+      startedElsewhere('far-shell', 'shell', 'n10', '/home/dev'),
+      startedElsewhere('far-player', 'dir', 'orchestra', '/home/dev/work'),
+    ]);
+    expect(observed('/repo', []).terminals.map((t) => t.name)).toEqual([
+      terminalSessionKey('far-shell'),
+      terminalSessionKey('far-player'),
+    ]);
   });
 });

@@ -26,6 +26,11 @@
       "types": "./src/ui.ts",
       "import": "./src/ui.ts",
       "default": "./src/ui.ts"
+    },
+    "./testing/npm-update": {
+      "types": "./src/testing/npm-update.ts",
+      "import": "./src/testing/npm-update.ts",
+      "default": "./src/testing/npm-update.ts"
     }
   },
   "nx": {
@@ -43,6 +48,10 @@
     "@n10/terminal-pty": "*",
     "@n10/terminal-tmux": "*",
     "@n10/vcs-core": "*",
-    "@n10/worktree-manager": "*"
+    "@n10/worktree-manager": "*",
+    "semver": "^7.8.5"
+  },
+  "devDependencies": {
+    "@types/semver": "^7.8.0"
   }
 }

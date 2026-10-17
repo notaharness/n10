@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { DesktopPrefs } from '../contract.js';
@@ -15,6 +21,9 @@ const DEFAULTS: DesktopPrefs = {
   theme: 'system',
   nativeFrame: false,
   tabOverflow: 'wrap',
+  tabCycleMru: false,
+  guidedReview: true,
+  imageCompare: 'side-by-side',
 };
 
 function prefsPath(): string {
@@ -37,6 +46,9 @@ export function saveDesktopPrefs(patch: Partial<DesktopPrefs>): DesktopPrefs {
   const path = prefsPath();
   const dir = join(path, '..');
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(path, JSON.stringify(next, null, 2), 'utf8');
+  // Replaced whole: the main process reads this file too, and a read
+  // that caught it half-written would fall back to the defaults.
+  writeFileSync(`${path}.tmp`, JSON.stringify(next, null, 2), 'utf8');
+  renameSync(`${path}.tmp`, path);
   return next;
 }

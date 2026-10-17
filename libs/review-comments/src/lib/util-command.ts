@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { appendComment } from './comment-store.js';
+import { validateGuide } from './guide.js';
+import { guideInstructions } from './guide-instructions.js';
+import { writeGuide } from './guide-store.js';
 import { resolveComment } from './conventional.js';
 import type { CommentSeverity, ReviewComment } from './types.js';
 
@@ -104,9 +108,49 @@ function handleAddComment(args: string[], repository: string): void {
   console.log(comment.id);
 }
 
+/** What the agent's checkout tells the command, read only when needed. */
+export interface UtilContext {
+  /** The commit checked out where the command runs. */
+  head?: () => string | undefined;
+}
+
+function readGuideFile(path: string): unknown {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    console.error(
+      `Could not read ${path} as JSON: ${(error as Error).message}`
+    );
+    process.exit(1);
+  }
+}
+
+function handleAddGuide(
+  args: string[],
+  repository: string,
+  context: UtilContext
+): void {
+  const parsed = parseArgs(args);
+  const prId = parseInt(parsed.pr ?? '', 10);
+  if (isNaN(prId) || !parsed.file) {
+    console.error('Usage: n10 util add-guide --pr=<id> --file=<path to JSON>');
+    console.error('Run `n10 util guide-help` for the format.');
+    process.exit(1);
+  }
+  const checked = validateGuide(readGuideFile(parsed.file));
+  if (!checked.ok) {
+    console.error('The guide was not stored. Fix these and run it again:');
+    for (const issue of checked.issues) console.error(`- ${issue}`);
+    process.exit(1);
+  }
+  const stored = writeGuide(repository, prId, checked.guide, context.head?.());
+  console.log(`Stored the guide for #${prId}: ${stored.slides.length} slides.`);
+}
+
 export async function handleUtilCommand(
   args: string[],
-  repository: string
+  repository: string,
+  context: UtilContext = {}
 ): Promise<void> {
   const subcommand = args[0];
 
@@ -114,8 +158,16 @@ export async function handleUtilCommand(
     handleAddComment(args.slice(1), repository);
     return;
   }
+  if (subcommand === 'add-guide') {
+    handleAddGuide(args.slice(1), repository, context);
+    return;
+  }
+  if (subcommand === 'guide-help') {
+    console.log(guideInstructions(parseArgs(args.slice(1)).pr));
+    return;
+  }
 
   console.error(`Unknown util subcommand: ${subcommand}`);
-  console.error('Available subcommands: add-comment');
+  console.error('Available subcommands: add-comment, add-guide, guide-help');
   process.exit(1);
 }

@@ -137,7 +137,7 @@ test.describe('An enrolled machine', () => {
       fleetView(page).getByTestId('add-machine-panel')
     ).toBeVisible();
     beam!.peerChanged({ peerId: WORKBOX, label: 'renamed', state: 'offline' });
-    await expect(fleetToggle(page)).toContainText('1 offline');
+    await expect(fleetToggle(page)).toContainText('1 unreachable');
     await expect(page.getByText('renamed joined', { exact: true })).toHaveCount(
       0
     );

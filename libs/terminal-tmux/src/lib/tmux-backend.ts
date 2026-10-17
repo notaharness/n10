@@ -46,10 +46,8 @@ class TmuxBackend implements SessionBackend {
    *  dispatched before the hosted process was, and so answer stale. */
   private inspecting: Promise<void> | null = null;
   private readonly draw = new ClientDraw();
-  private state = {
+  private state: NonNullable<SessionBackend['processState']> = {
     running: true,
-    exitCode: undefined as number | undefined,
-    signal: undefined as number | undefined,
   };
   readonly name: string;
 
@@ -188,7 +186,7 @@ class TmuxBackend implements SessionBackend {
     // `state.running` and the timer untouched; the next tick tries again.
     if (read.status === 'failed') return;
     if (read.status !== 'ok') {
-      this.concludeExit();
+      this.concludeExit(undefined, undefined, true);
       return;
     }
     // `paneDead` alone, deliberately. An exit status arrives only once
@@ -203,8 +201,17 @@ class TmuxBackend implements SessionBackend {
     this.concludeExit(read.state.exitCode, read.state.exitSignal);
   }
 
-  private concludeExit(exitCode?: number, signal?: number): void {
-    this.state = { running: false, exitCode, signal };
+  private concludeExit(
+    exitCode?: number,
+    signal?: number,
+    gone?: boolean
+  ): void {
+    this.state = {
+      running: false,
+      exitCode,
+      signal,
+      ...(gone ? { gone } : {}),
+    };
     clearInterval(this.timer);
     clearTimeout(this.reconnectTimer);
     clearTimeout(this.stableTimer);
@@ -281,6 +288,12 @@ class TmuxBackend implements SessionBackend {
   offDisconnect(cb: () => void): void {
     this.disconnects.delete(cb);
   }
+  onAttach(cb: () => void): void {
+    this.draw.onStart(cb);
+  }
+  offAttach(cb: () => void): void {
+    this.draw.offStart(cb);
+  }
 
   /** Detach the local client without terminating the hosted process. A
    *  deliberate detach is not a connection failure (finding 10):
@@ -296,6 +309,7 @@ class TmuxBackend implements SessionBackend {
     this.data.clear();
     this.exits.clear();
     this.disconnects.clear();
+    this.draw.clear();
     this.inner.dispose();
   }
 

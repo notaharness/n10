@@ -10,6 +10,7 @@ import {
   launchSession,
   LOCAL_MACHINE,
   onSessionExit,
+  strandedSessionRows,
   worktreeSessionRow,
 } from '@n10/core';
 import type {
@@ -17,6 +18,7 @@ import type {
   DiscoveredTerminal,
   DiscoveredWorktree,
   DiscoveryDelta,
+  DiscoveryScan,
 } from '@n10/core';
 import { logError } from '@n10/logger';
 import type { WorktreeConfig } from '../worktrees/api.js';
@@ -43,35 +45,57 @@ export interface SessionSnapshot {
 export interface SessionWatchPorts extends SessionLaunchPorts {
   size(): { cols: number; rows: number };
   adoptTerminal?(terminal: DiscoveredTerminal): void | Promise<void>;
+  /** The connected machines whose terminals discovery lists too. */
+  remoteMachines?(): readonly string[];
   changed?(delta: DiscoveryDelta): void;
 }
 export type SessionService = ReturnType<typeof createSessionService>;
 
-/** Observation ends with the repository handle; existing PTY clients survive. */
+/** Observation ends when the repository is parked; existing PTY clients
+ *  survive it. */
 export function createSessionService(options: {
   config: WorktreeConfig;
   worktrees: WorktreeService;
   isCurrent(): boolean;
   connections?: ReturnType<typeof createSessionConnections>;
+  /** Each repository's last discovery scan, kept across handles: a
+   *  reopened repository's scanner starts from it, so worktrees removed
+   *  while another repository was open are reported removed. */
+  lastScans?: Map<string, DiscoveryScan>;
 }) {
   const { config, worktrees, isCurrent } = options;
+  const lastScans = options.lastScans ?? new Map<string, DiscoveryScan>();
   const connections = options.connections ?? createSessionConnections();
-  let disposed = false;
   let discovery: SessionDiscovery | undefined;
   let stopWatch: (() => void) | undefined;
   let snapshot: SessionSnapshot = { sessions: [], error: null };
   const listeners = new Set<() => void>();
   function publish(): void {
-    if (disposed) return;
-    connections.observe();
+    // A row per worktree, then one per agent still running in a
+    // worktree that is gone, so it can be seen and stopped. One
+    // discovery holds stranded stays so while git does not list it,
+    // whatever recreated its directory.
+    const rows = worktrees
+      .getSnapshot()
+      .worktrees.map((wt) =>
+        worktreeSessionRow(wt, isSessionAlive, config.repo)
+      );
+    const listed = new Set(rows.map((row) => row.name));
+    const stranded = new Set(
+      discovery?.lastScan()?.stranded.map((wt) => wt.name)
+    );
     const next = {
-      sessions: worktrees
-        .getSnapshot()
-        .worktrees.map((wt) =>
-          worktreeSessionRow(wt, isSessionAlive, config.repo)
+      sessions: [
+        ...rows,
+        ...strandedSessionRows(
+          config.repo,
+          isSessionAlive,
+          (name) => stranded.has(name) && !listed.has(name)
         ),
+      ],
       error: worktrees.getSnapshot().error,
     };
+    scanUnseen();
     if (isDeepStrictEqual(next, snapshot)) return;
     snapshot = next;
     for (const listener of listeners) {
@@ -82,7 +106,19 @@ export function createSessionService(options: {
       }
     }
   }
-  const unsubscribeWorktrees = worktrees.subscribe(publish);
+  /** Discovery reports only the removal of a worktree it has seen, and a
+   *  shell can show any worktree this resource lists. One discovery has
+   *  not seen yet is scanned for now rather than at the next tick, or a
+   *  removal before that tick would go unreported. */
+  function scanUnseen(): void {
+    const seen = discovery?.lastScan();
+    if (!seen) return;
+    const paths = new Set(seen.worktrees.map((wt) => wt.path));
+    const listed = worktrees.getSnapshot().worktrees;
+    // `scanNow` settles every scan itself and never rejects.
+    if (listed.some((wt) => !paths.has(wt.path))) void discovery?.scanNow();
+  }
+  worktrees.subscribe(publish);
   async function refresh(): Promise<AgentSession[]> {
     await worktrees.refresh();
     publish();
@@ -129,21 +165,26 @@ export function createSessionService(options: {
   const commands = createSessionCommands({
     ...options,
     changed: publish,
-    isCurrent: () => !disposed && isCurrent(),
+    isCurrent,
   });
   return {
     ...createPlanCommands({
       config,
-      isCurrent: () => !disposed && isCurrent(),
+      isCurrent,
       changed: refresh,
     }),
     ...commands,
+    /** Stopping kills the session without an exit to report, so
+     *  discovery looks at once: a stranded worktree is gone with it. */
+    stop(name: string): void {
+      commands.stop(name);
+      void discovery?.scanNow();
+    },
     /** The agents and `terminals` working in `branch`'s checkouts. */
     branchSessions(
       branch: string,
       terminals: readonly BranchTerminal[]
     ): BranchSessions {
-      connections.observe();
       const agents = connections.read(config.repo);
       return branchSessions({
         branch,
@@ -155,7 +196,6 @@ export function createSessionService(options: {
     /** The branch whose checkout `terminal` is in: its review tab lists
      *  it. Undefined for any other directory, the main checkout's too. */
     terminalBranch(terminal: Pick<BranchTerminal, 'machine' | 'cwd'>) {
-      connections.observe();
       return terminalBranch(
         terminal,
         knownCheckouts(connections.read(config.repo))
@@ -175,7 +215,6 @@ export function createSessionService(options: {
       return snapshot.sessions;
     },
     connections() {
-      connections.observe();
       return connections.read(config.repo);
     },
     scanNow: async () => {
@@ -183,15 +222,16 @@ export function createSessionService(options: {
     },
     watch(ports: SessionWatchPorts): () => void {
       stopWatch?.();
-      if (disposed) return () => undefined;
       let stopped = false;
-      const live = () => !stopped && !disposed && isCurrent();
+      const live = () => !stopped && isCurrent();
       const scanner = startSessionDiscovery({
         repo: config.repo,
         scope: worktrees.scope,
+        baseline: lastScans.get(config.repo),
         isCurrent: live,
         adopt: (wt) => adopt(wt, ports, live),
         adoptTerminal: ports.adoptTerminal,
+        remoteMachines: ports.remoteMachines,
         onChanged(delta) {
           void refresh();
           ports.changed?.(delta);
@@ -201,7 +241,10 @@ export function createSessionService(options: {
       const offExit = onSessionExit(publish);
       void refresh();
       const stop = () => {
+        if (stopped) return;
         stopped = true;
+        const scan = scanner.lastScan();
+        if (scan) lastScans.set(config.repo, scan);
         scanner.stop();
         offExit();
         if (discovery === scanner) discovery = undefined;
@@ -209,11 +252,10 @@ export function createSessionService(options: {
       stopWatch = stop;
       return stop;
     },
-    dispose() {
-      disposed = true;
+    /** Another repository was selected: stop observing this one. Its
+     *  rows stay; the next watch starts from its last scan. */
+    park() {
       stopWatch?.();
-      unsubscribeWorktrees();
-      listeners.clear();
     },
   };
 }

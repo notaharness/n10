@@ -56,6 +56,7 @@ const EVENT_METHODS = [
   'onDiscoveryChanged',
   'onBabysitChanged',
   'onMachinesChanged',
+  'onUpdatesChanged',
   'onBeamStatusChanged',
   'onCeremonyProgress',
   'onDirectoryPublished',

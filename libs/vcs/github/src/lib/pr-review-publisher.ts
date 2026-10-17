@@ -71,10 +71,7 @@ export async function publishGitHubReview(
   if (pr.headRefOid !== submission.head) {
     throw new ReviewPublishError(
       'moved',
-      `The pull request has new commits since ${submission.head.slice(
-        0,
-        7
-      )}; review them before submitting`
+      'The pull request has new commits since the one you read; load them before submitting.'
     );
   }
   await run.openReview(pr);
@@ -341,7 +338,7 @@ class Run {
 }
 
 /** The verdicts `submitPullRequestReview` takes. */
-const GITHUB_EVENTS: readonly ReviewEvent[] = [
+export const GITHUB_EVENTS: readonly ReviewEvent[] = [
   'COMMENT',
   'APPROVE',
   'REQUEST_CHANGES',

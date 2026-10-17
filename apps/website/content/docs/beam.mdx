@@ -48,7 +48,7 @@ on an existing member. If they differ, reset the new machine with
 ## Revoking a machine
 
 Once the approved result returns, revocation applies locally and spreads to
-connected peers. Offline peers learn it when they reconnect. The worker can
+connected peers. Unreachable peers learn it when they reconnect. The worker can
 withhold records, so a fresh machine may admit a revoked key until it learns
 otherwise. There is no per-connection freshness authority.
 

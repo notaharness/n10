@@ -37,10 +37,15 @@ export function beamEnv(
   };
 }
 
+/** Files executed outside Electron must use the unpacked copy. */
+export function unpackedPath(path: string): string {
+  return path.replace(/([\\/])app\.asar(?=[\\/])/, '$1app.asar.unpacked');
+}
+
 /** The beam binary for this platform, from the `@notaharness/beam`
  *  package the desktop depends on. Throws where it has none. */
 export function beamBinary(): string {
   const require = createRequire(import.meta.url);
   const beam = require('@notaharness/beam') as { binaryPath(): string };
-  return beam.binaryPath();
+  return unpackedPath(beam.binaryPath());
 }

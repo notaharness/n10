@@ -10,6 +10,7 @@ afterEach(() => vi.useRealTimers());
 it('kills a hung read and rejects so the engine can release its read lane', async () => {
   vi.useFakeTimers();
   const child = Object.assign(new EventEmitter(), {
+    stdin: new PassThrough(),
     stdout: new PassThrough(),
     stderr: new PassThrough(),
     kill: vi.fn(),

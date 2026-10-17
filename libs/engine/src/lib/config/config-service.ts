@@ -1,3 +1,4 @@
+import { assertSelected } from '../kernel/selection.js';
 import { isDeepStrictEqual } from 'node:util';
 import {
   readConfig,
@@ -37,6 +38,8 @@ export interface ConfigServiceOptions {
   repo: string;
   providers: VcsProvider[];
   pullRequests: Pick<PullRequestList, 'credentialsChanged' | 'read'>;
+  /** Whether the repository is the selected one: only it takes writes. */
+  isCurrent?(): boolean;
 }
 
 /** One repository's config. No timers, ambient cwd, or React-owned writes. */
@@ -94,12 +97,14 @@ export function createConfigService(
       return result;
     },
     updateField(field, value) {
+      assertSelected(options.isCurrent);
       // Read current disk state so a second field write preserves other edits.
       // Re-read after persistence to apply provider selection and global fallbacks.
       persistConfigField(field, value, readConfig(repo).vendor, repo);
       reload();
     },
     updateKeybindFields(updater) {
+      assertSelected(options.isCurrent);
       const current = readConfig(repo);
       persistKeybindFields(
         updater({

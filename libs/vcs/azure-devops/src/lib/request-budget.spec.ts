@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ReviewLedger } from '@n10/vcs-core';
 import { getRequestCounters, resetRequestCounters } from '@n10/vcs-core';
 import { azureDevOpsProvider } from './provider.js';
 import { prDetailMemo } from './pr-details.js';
@@ -20,7 +21,8 @@ import { resetAdoTransport } from './request.js';
  *   N  comment threads, one per pull request (no batch endpoint)
  *   N  status list, one per pull request (no batch endpoint)
  *
- * plus, once per half hour: the caller's teams and the repository's id.
+ * plus, once per half hour: who the caller is, their teams and the
+ * repository's id.
  *
  * A *warm* cycle over pull requests that have not moved costs the list
  * and nothing else — not even the pipeline runs, which are only asked
@@ -90,8 +92,13 @@ function serveEverything(): void {
         })
       );
     if (url.includes('/teams?')) return Promise.resolve(json({ value: [] }));
-    if (url.includes('/pullrequests?'))
-      return Promise.resolve(json({ value: prs }));
+    if (url.includes('/pullrequests?')) {
+      // Paged as Azure pages it: 101 rows when `$top` is not given.
+      const params = new URL(url).searchParams;
+      const skip = Number(params.get('$skip') ?? 0);
+      const top = Number(params.get('$top') ?? 101);
+      return Promise.resolve(json({ value: prs.slice(skip, skip + top) }));
+    }
     if (url.includes('/build/builds'))
       return Promise.resolve(
         json({
@@ -157,10 +164,10 @@ describe('one sync cycle', () => {
   it('costs 2 per pull request plus a fixed handful', async () => {
     await syncCycle();
 
-    // 2 teams/repository reads + the list + the batched builds +
-    // (threads, statuses) per pull request.
-    expect(counts().network).toBe(2 + 1 + 1 + 2 * PR_COUNT);
-    expect(mockFetch).toHaveBeenCalledTimes(2 + 1 + 1 + 2 * PR_COUNT);
+    // 3 identity/teams/repository reads + the list + the batched
+    // builds + (threads, statuses) per pull request.
+    expect(counts().network).toBe(3 + 1 + 1 + 2 * PR_COUNT);
+    expect(mockFetch).toHaveBeenCalledTimes(3 + 1 + 1 + 2 * PR_COUNT);
   });
 
   it('asks for every pipeline run once, not once per row', async () => {
@@ -294,11 +301,18 @@ describe('a cycle over pull requests that have not moved', () => {
     await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 100);
     expect(policies()).toBe(2);
     // A vote is a write too: the reviewer policies' verdict moves with it.
-    await azureDevOpsProvider.submitReviewVerdict!(
+    let ledger: ReviewLedger | null = null;
+    await azureDevOpsProvider.publishReview!(
       AUTH,
       PROJECT,
-      100,
-      'approve'
+      {
+        prId: 100,
+        head: '0'.repeat(40),
+        event: 'APPROVE',
+        body: '',
+        items: [],
+      },
+      { read: () => ledger, write: (l) => (ledger = l) }
     );
     await azureDevOpsProvider.fetchPullRequestChecks?.(AUTH, PROJECT, 100);
     expect(policies()).toBe(3);
@@ -346,9 +360,9 @@ describe('a cycle over pull requests that have not moved', () => {
     // all at once — which is the shape a sliding-window rate limit
     // actually cares about.
     prs = makePrs(200);
-    // The list, the runs listing, and a budget of each kind. Not four
-    // hundred.
-    const ceiling = 1 + 1 + 25 + 25;
+    // The list's pages, the runs listing, and a budget of each kind.
+    // Not four hundred.
+    const ceiling = 3 + 1 + 25 + 25;
     expect(await cycleCost()).toBeLessThanOrEqual(3 + ceiling);
 
     for (let i = 0; i < 4; i++) {
@@ -694,7 +708,7 @@ describe('the same data asked for twice', () => {
     // A forced refresh landing on top of a poll: without dedupe this
     // is two of everything, and they arrive together by definition.
     await Promise.all([syncCycle(), syncCycle()]);
-    expect(counts().network).toBe(2 + 1 + 1 + 2 * PR_COUNT);
+    expect(counts().network).toBe(3 + 1 + 1 + 2 * PR_COUNT);
     expect(counts().deduped).toBeGreaterThan(0);
   });
 });

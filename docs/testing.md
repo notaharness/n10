@@ -21,6 +21,48 @@ appearing exactly once.
 The `desktop-e2e` targets build Electron before testing. Directly invoking
 `run-e2e.mjs` or `run-visual.mjs` does not; run `npx nx build desktop` first.
 
+To check the Linux installers, build them on an x64 or arm64 Linux host, then
+run the Docker smoke script with that architecture's .deb and AppImage. The
+script apt-installs the .deb in clean Ubuntu 24.04, launches the deb and the
+AppImage in extraction and normal modes under Xvfb, and requires the startup
+repository, renderer, and a shell PTY through the packaged session host.
+Normal AppImage launch uses a mapped `/dev/fuse` and Ubuntu's `fuse3`; extraction
+mode also exercises the fallback for machines without FUSE. The script gives
+tmux a scratch socket under a container HOME and never touches the host's tmux
+server. It also checks the missing-tmux startup message.
+
+```sh
+NX_DAEMON=false npx nx package-linux desktop
+bash apps/desktop/scripts/test-linux-packages.sh \
+  apps/desktop/dist/installers/*amd64.deb \
+  apps/desktop/dist/installers/*x86_64.AppImage
+```
+
+On arm64, use `*arm64.deb` and `*arm64.AppImage` instead. Pass exactly one file
+of each format; clear stale installer output if a glob matches more than one.
+
+To check a macOS installer on a Mac of the same architecture, build it with Nx
+and run the DMG smoke script. It mounts the DMG, copies the app into an
+isolated Applications directory, checks its ad-hoc or Developer ID signature,
+then opens a Git repository, loads the renderer, starts a shell PTY through
+the packaged host, captures the installed app, and quits. Git and tmux 3.2+
+must be available; the GitHub runners install tmux with Homebrew. The tmux
+socket lives under the test's temporary HOME. The script captures 1600×900
+light and dark PNGs beside the requested screenshot path, with `-light` and
+`-dark` suffixes.
+
+```sh
+NX_DAEMON=false npx nx package-macos desktop
+arch=$(uname -m)
+if [ "$arch" = x86_64 ]; then arch=x64; fi
+bash apps/desktop/scripts/test-macos-package.sh \
+  "apps/desktop/dist/installers/n10-desktop-$arch.dmg" \
+  /tmp/n10-installed.png
+```
+
+CI runs this on `macos-14` (arm64) and `macos-15-intel` (x64), uploading the
+screenshots as artifacts.
+
 `src/fixtures/desktop.ts` creates a repo and isolated HOME, seeds optional Git
 states, supplies a scriptable fake agent and fails on renderer exceptions.
 Every test uses a private tmux socket inside its fixture HOME and kills only
@@ -109,6 +151,18 @@ Both suites' tmux helpers must assert that their socket directory belongs to a
 fixture HOME and unset TMUX before any operation. All terminal tests require
 tmux 3.2 or newer. Never kill the default server or use `kill-server`.
 See `libs/terminal-tmux/AGENTS.md`.
+
+CI runs every tmux suite against tmux 3.7 or later. Earlier versions can
+lose what a fast-exiting pane last wrote, and its exit status. The pane
+reads as dead, but the output never reaches the pane and
+`pane_dead_status` never appears. On tmux 3.4, a pane running `exit 17`
+loses its status in 6 of 60 runs on an idle machine and 19 of 60 under
+load; 3.7 kept it every time. The tests assert both, so locally they can
+fail on an older tmux. The version is pinned in `tools/tmux/build-tmux.sh`,
+which `.github/actions/setup-tmux` builds and caches for the runner jobs and
+`apps/desktop-e2e/Dockerfile.visual` builds into the visual image.
+`tools/tmux/require-tmux.sh` fails the job on anything older. The product
+itself still requires only 3.2.
 
 Failures retain traces, screenshots and video in `test-output/`.
 `error-context.md` is useful for text inspection. Open a trace with
@@ -207,6 +261,8 @@ GH_TOKEN=<integration-pat> gh api \
 - **CI** (`.github/workflows/ci.yml`) — runs `nx affected -t lint test build typecheck e2e`. Runs `npx playwright install --with-deps chromium` before `nx affected` (needed for `cli-e2e`). Uploads `apps/cli-e2e/test-output/` as an artifact on failure. Integration tests skipped (no `GH_TOKEN`).
 - **Integration Tests** (`.github/workflows/integration.yml`) — runs `npx nx e2e:integration cli-e2e` with `GH_TOKEN` from the `INTEGRATION_TEST_PAT` secret. Triggers on PRs, pushes to master, and manual dispatch. Uses `concurrency` with `cancel-in-progress: false` because the test repo is shared state.
 - **Package** (`.github/workflows/package.yml`) — packs `@notaharness/n10` and runs `apps/cli/scripts/test-installed.sh` on the tarball in a clean container. Triggers on PRs touching packaging; the Release workflow calls it before publishing.
+- **Linux packages** (`.github/workflows/linux-packages.yml`) — builds the desktop's .deb and AppImage on x64 and arm64 runners, installs the deb in clean Ubuntu and launches both formats under Xvfb. The AppImage runs in extraction mode and normally with FUSE 3. Triggers on PRs touching the installer configuration; the Release workflow calls it.
+- **macOS packages** (`.github/workflows/macos-packages.yml`) — builds DMG and ZIP assets on Apple Silicon and Intel runners, installs each DMG, and checks the renderer and a shell PTY. Triggers on PRs touching the macOS installer; the Release workflow calls it.
 - **Release** (`.github/workflows/release.yml`) — publishes on a `v*` tag; see the `publish-beta` skill.
 
 ## Orchestra interoperability
@@ -220,7 +276,7 @@ and failed report delivery. It does not exercise a model or CLI plugin manager.
 
 The archive, provenance, checksum and update instructions live in
 `libs/core/tests/fixtures/README.md`. Tests require no network or agent login;
-tmux is installed in CI, and the live suites skip locally when it is absent.
+tmux 3.7 is installed in CI (see above), and the live suites skip locally when it is absent.
 `terminal-allocation.integration.spec.ts` exercises names becoming occupied or
 free between a tab's preliminary name probe and the backend's allocation.
 

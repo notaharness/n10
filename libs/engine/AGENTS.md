@@ -17,21 +17,29 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   project, credentials generation) — never by secrets. One request per scope;
   a forced read queues exactly one request behind the one out. `refresh`
   forgets the provider memo when its own request starts. Failures keep the last
-  good list with the error. Eviction never takes the scope a watched repository
-  shows: its watch would read it back and evict the next. Tests drive time with fake timers and a matching
-  `now`.
+  good list with the error. Eviction never takes a scope a repository shows;
+  past its bound it drops only scopes a config change left behind. Tests drive
+  time with fake timers and a matching `now`.
 
 - **Config** (`config/`): one explicit repo per service, stable snapshots and
   synchronous commands. Persist and re-read effective config before invalidating
   PR caches or notifying subscribers. A no-op reload preserves snapshot identity;
   a failed write publishes nothing. The sync service observes syncRevision directly. Keep secrets in Node; only the host's masked form crosses IPC.
 
-- **Repositories** (`repositories/`): canonicalize Git’s root before replacing
-  the selected handle. Each handle owns one config service; its subscription is
-  the sole channel for config-derived metadata. Selection returns a handle
-  synchronously and does not keep another metadata store. Detection and config reads use that path, never process cwd.
-  Shells select startup repositories and own recents; opening must not detach
-  sessions belonging to the previously selected repository.
+- **Repositories** (`repositories/`): canonicalize Git’s root before selecting
+  or reading a handle. Every handle opened or read (`get`) stays for the life of
+  the service; selecting another parks the previous one, stopping its
+  observation and keeping its data. A parked handle's reads serve what they
+  hold and refresh behind it past `PARKED_REPOSITORY_TTL_MS`
+  (`kernel/read-freshness.ts`), except the live checkout diff; parking lets
+  go of diff patches. Writes refuse any but the selected handle
+  (`kernel/selection.ts`, review context `selected`/`assertWritable`).
+  Each handle owns one config service; its subscription is the sole channel
+  for config-derived metadata. Selection returns a handle synchronously and
+  does not keep another metadata store. Detection and config reads use that
+  path, never process cwd. Shells select startup repositories and own
+  recents; opening must not detach sessions belonging to the previously
+  selected repository.
 
 - **Sync** (`sync/`): one captured repository, one active pass and at most one
   queued manual refresh. Skip busy timer ticks. Config revisions cancel stale
@@ -49,8 +57,13 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
 - **Reviews** (`reviews/`): repository/account-scoped resources own freshness,
   coalescing and invalidation. Failures retain same-scope answers; identity changes
   reset them. Parse untrusted PR identity before provider work and check it again
-  after awaits. Diff resources pin source and target commits with explicit cwd;
-  parsing Git metadata stays a core primitive, rendering stays shell-specific.
+  after awaits. Diff reads (`diff-reads.ts`) resolve a request to exact commits
+  through core's `resolvePrComparison` and own the manifest and patches read
+  between them: commit-keyed reads never expire, branch resolution does. A
+  request names its repository and is answered `other-repo` for any other.
+  History reads (`history-reads.ts`) share one `VisitBaselines` per repository
+  service, so a visit begun before a repository switch is the same visit after.
+  Parsing Git output stays a core primitive, rendering stays shell-specific.
 
 - **Review commands**: capture repo/account before awaiting, resolve thread ids
   from the scoped resource, and invalidate related resources after confirmed
@@ -63,7 +76,15 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   launch/stop commands. Discovery uses `worktrees.scope()` live; tmux observation
   takes the captured repository. Launches capture config before awaiting, reject
   a repository switch before spawning, and serialize by request and resolved key.
-  Repository disposal stops observation, never the connected agents. Shells supply
+  Parking stops observation, never the connected agents; the
+  next watch's discovery starts from the last scan, so removals in between
+  are reported. Connections list the agents the registry holds; one whose
+  tmux session is gone (`processState.gone`) is released as it ends, while an
+  exited one with its dead pane kept stays while tmux holds its session
+  (`observeTmuxSessions().held`); a dead pane is not `persisted`.
+  A worktree removed under a running local agent is `stranded`: its agent
+  keeps a row (`strandedSessionRows`) and discovery reports the worktree gone
+  only once the agent exits or is stopped, then ends its session. Shells supply
   dimensions, relays and terminal-tab presentation. Core keeps pure observations,
   tags, PTY activity classification and native guarded launch/removal operations.
   `branchSessions` (`branch-sessions.ts`) decides which agents and terminals
@@ -77,6 +98,9 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   a fresh remote terminal opens where its machine resolves the directory (D18).
   An old client's exit cannot drop its successor; agent panes remain while their
   native target exists. Shells adapt started/ended callbacks to output delivery.
+  Discovery lists connected machines' terminals too (`terminal-discovery.ts`),
+  each beside the local scan, never inside it; only a successful listing of a
+  machine ends its terminals.
 
 - **Babysitters** (`babysitters/`): one retained watch per repository/PR. Coalesce
   starts; stop and worktree removal cancel pending lookups before watch creation.
@@ -92,7 +116,13 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   mail relay, reconnection and native daemon ownership stay in shell adapters.
   `refresh` retains last-good rows and an error; `listMachines` rejects that
   error for callers that require a successful read, including IPC and ownership
-  checks. Machine data types are exported by browser-safe `@n10/engine/contract`.
+  checks. A peer's change between connected and not is passed to core's
+  machine registry (`setMachineReachable`), so its sessions wait to reconnect.
+  beam's `offline` says no tunnel is up, not which end lost it: with no
+  network as the shell reports it (`receiveNetwork`), this machine's row
+  is `offline`; with that or beam's connection lost (`restarting`), every
+  peer's is `unknown` (`fleet-reach.ts`). Revocations stand.
+  Machine data types are exported by browser-safe `@n10/engine/contract`.
 
 - **Plans** (`plans/`): `sessions.checkoutPlan` captures config and scope before
   lookup, checks repository lifetime before mutation, coalesces identical sends

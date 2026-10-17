@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { VisitBaselines } from '@n10/core';
 import { readConfig } from '@n10/vcs-core';
 import type { VcsProvider } from '@n10/vcs-core';
 import {
@@ -51,6 +52,7 @@ export function reviewEngineFixture(
     pullRequests,
     worktrees,
     isCurrent: () => true,
+    baselines: new VisitBaselines('/nonexistent'),
   });
   const sessions = createSessionService({
     config,

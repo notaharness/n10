@@ -17,6 +17,7 @@ export interface MachineExecutor {
 }
 export {
   tmuxListSessionsDetailed,
+  tmuxListSessionsRead,
   tmuxPaneState,
   tmuxPaneStateAsync,
   type TmuxPaneState,

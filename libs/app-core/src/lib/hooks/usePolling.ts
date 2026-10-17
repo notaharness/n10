@@ -16,13 +16,24 @@ export function usePolling<T>(
 ): PollingState<T> {
   const [value, setValue] = useState<T | undefined>(undefined);
   const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(enabled);
   const mountedRef = useRef(true);
   const fnRef = useRef(fn);
-  fnRef.current = fn;
 
-  const refresh = useCallback(async (): Promise<void> => {
-    setLoading(true);
+  // The effect below fetches on mount without setting `loading` itself, so
+  // a new schedule starts the loading state during render instead.
+  const schedule = enabled ? intervalMs : null;
+  const [prevSchedule, setPrevSchedule] = useState(schedule);
+  if (prevSchedule !== schedule) {
+    setPrevSchedule(schedule);
+    if (schedule !== null) setLoading(true);
+  }
+
+  useEffect(() => {
+    fnRef.current = fn;
+  });
+
+  const poll = useCallback(async (): Promise<void> => {
     try {
       const v = await fnRef.current();
       if (mountedRef.current) {
@@ -36,6 +47,11 @@ export function usePolling<T>(
     }
   }, []);
 
+  const refresh = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    await poll();
+  }, [poll]);
+
   useEffect(() => {
     mountedRef.current = true;
     if (!enabled) {
@@ -43,13 +59,13 @@ export function usePolling<T>(
         mountedRef.current = false;
       };
     }
-    void refresh();
+    void poll();
     const timer = setInterval(() => void refresh(), intervalMs);
     return () => {
       mountedRef.current = false;
       clearInterval(timer);
     };
-  }, [enabled, intervalMs, refresh]);
+  }, [enabled, intervalMs, poll, refresh]);
 
   return { value, error, loading, refresh };
 }

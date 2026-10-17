@@ -1,11 +1,9 @@
 import {
   buildReviewLaunchRequest,
   getSession,
-  noteInput,
-  noteResize,
   snapshot as activitySnapshot,
 } from '@n10/core';
-import { activeRepository, requireRepo } from './repo.js';
+import { activeRepository, repository, requireRepo } from './repo.js';
 import { machines } from './machines.js';
 import { machineFor } from './remote-machines.js';
 import { broadcastLaunchStep } from './session-relay.js';
@@ -30,6 +28,7 @@ import type {
 
 export type { SessionLaunchRequest, SessionSummary };
 export { isForeignSession, isOwnSessionAlive } from './session-registry.js';
+export { resizeSession, writeSession } from './session-io.js';
 
 /** What launching or reattaching an agent hands back to the caller. */
 interface LaunchResult {
@@ -102,7 +101,9 @@ export async function launchReviewAgent(req: ReviewLaunchRequest): Promise<{
 }> {
   requireRepo();
   const branch = req.pr.sourceBranch;
-  const request = buildReviewLaunchRequest(req.pr, req.instruction);
+  const request = buildReviewLaunchRequest(req.pr, req.instruction, {
+    guide: req.guide,
+  });
   return launchAgent({
     branch,
     intent: 'seed',
@@ -133,30 +134,8 @@ export async function checkoutPlan(
   return result.outcome;
 }
 
-export function listSessions(): SessionSummary[] {
-  return activeRepository().sessions.connections();
-}
-
-export function writeSession(name: string, data: string): void {
-  const entry = getSession(name);
-  if (!entry || entry.exited) throw new Error(`Session ${name} is not running`);
-  if (entry.pty.connectionState && entry.pty.connectionState !== 'connected') {
-    throw new Error(
-      'The terminal is reconnecting. Try again when it reconnects.'
-    );
-  }
-  // Same as the TUI's input forwarder: without this, the terminal
-  // echoing keystrokes back would count as agent activity.
-  noteInput(name);
-  entry.pty.write(data);
-}
-
-export function resizeSession(name: string, cols: number, rows: number): void {
-  const entry = getSession(name);
-  if (!entry) return;
-  // SIGWINCH redraws aren't agent activity either.
-  noteResize(name);
-  entry.pty.resize(cols, rows);
+export function listSessions(repo: string): SessionSummary[] {
+  return repository(repo).sessions.connections();
 }
 
 /** Debounced agent-activity snapshots for every session this host has
@@ -214,8 +193,12 @@ export function reconnectSession(name: string): void {
   getSession(name)?.pty.reconnect?.();
 }
 
+/** Any session this host relays, open repository or parked: its name
+ *  is qualified by its repository, so it is never another one's, and
+ *  its live output already reaches whoever watches it. A parked
+ *  repository's pane, held ready, starts from this. */
 export function getSessionBuffer(name: string): SessionBuffer {
-  const entry = ownSession(name);
+  const entry = known.get(name);
   if (entry) return relayBuffer(entry);
   // A terminal tab belongs to a directory, not to the open repository,
   // so its scrollback is answered whatever repository that is.

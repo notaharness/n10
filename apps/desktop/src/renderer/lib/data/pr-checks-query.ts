@@ -22,11 +22,12 @@ import { keys } from './query-keys.js';
  * core; the renderer only shows them.
  */
 export async function loadPullRequestChecks(
+  cwd: string,
   ref: PullRequestRef,
   viewer: string | null
 ): Promise<PullRequestChecksAnswer> {
   return assertEcho(
-    await window.n10.getPullRequestChecks({ ref, viewer }),
+    await window.n10.getPullRequestChecks(cwd, { ref, viewer }),
     ref,
     viewer
   );
@@ -134,7 +135,7 @@ export function usePullRequestChecks(
     queryKey,
     queryFn: async () =>
       keepRead(
-        await loadPullRequestChecks(ref!, viewer),
+        await loadPullRequestChecks(cwd, ref!, viewer),
         qc.getQueryData<PullRequestChecksAnswer>(queryKey)
       ),
     enabled: ref != null,

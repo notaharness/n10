@@ -11,11 +11,27 @@ export type {
   WorktreeService,
   ReviewService,
   SessionService,
-  DiffRequest,
-  DiffRefs,
+  PrDiffImageRequest,
+  PrDiffImageResult,
+  PrDiffManifestRequest,
+  PrDiffPatchRequest,
+  PrRangeManifestRequest,
+  PrRangeManifestResult,
+  PrDiffManifestResult,
+  PrDiffPatchResult,
+  PrDiffError,
+  OtherRepoError,
   ReadResource,
   ReadSnapshot,
   SyncNotice,
   BranchSession,
   BranchSessions,
 } from './index.js';
+export type {
+  UpdateService,
+  UpdateSnapshot,
+  UpdatePreferences,
+  UpdateInstallation,
+} from './lib/updates/api.js';
+
+export type { NpmUpdatePlan, NpmUpdateResult } from '@n10/core';

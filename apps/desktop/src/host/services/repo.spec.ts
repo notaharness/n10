@@ -25,9 +25,11 @@ import {
   refreshRepo,
   forgetRecentRepo,
   getRepo,
+  getRepoInfo,
   listRecentRepos,
   openRepo,
   openStartupRepo,
+  repository,
 } from './repo.js';
 import { saveRecents } from './recent-repos.js';
 import type { RecentRepo } from '@n10/vcs-core';
@@ -121,6 +123,25 @@ describe('opening a repository', () => {
     // A failed switch must not strand the app between two repos.
     expect(getRepo()?.cwd).toBe(gitDir);
     expect(activeRepoIs(gitDir)).toBe(true);
+  });
+
+  it('describes and reads another repository without opening it', () => {
+    const opened = vi.fn();
+    setRepoOpenedListener(opened);
+    openRepo(gitDir);
+    opened.mockClear();
+    const other = join(gitDir, '..', 'other');
+    execFileSync('git', ['init', '--quiet', other]);
+    expect(getRepoInfo(other).cwd).toBe(realpathSync(other));
+    expect(repository(other).parked()).toBe(true);
+    expect(getRepo()?.cwd).toBe(gitDir);
+    expect(activeRepoIs(gitDir)).toBe(true);
+    expect(opened).not.toHaveBeenCalled();
+    // Opened later, it is the handle that was read.
+    const read = repository(other);
+    openRepo(other);
+    expect(repository(other)).toBe(read);
+    expect(read.parked()).toBe(false);
   });
 
   it('tracks which repo long-running work belongs to', () => {
@@ -220,4 +241,33 @@ it('refreshes config explicitly without making snapshot reads publish', () => {
   expect(reload).not.toHaveBeenCalled();
   expect(refreshRepo()?.cwd).toBe(gitDir);
   expect(reload).toHaveBeenCalledOnce();
+});
+
+describe('the verdicts a repository can file', () => {
+  it('are the provider’s, once it can file a review there', () => {
+    execFileSync(
+      'git',
+      ['remote', 'add', 'origin', 'https://github.com/acme/app.git'],
+      { cwd: gitDir }
+    );
+    expect(openRepo(gitDir).reviewEvents).toEqual([
+      'COMMENT',
+      'APPROVE',
+      'REQUEST_CHANGES',
+    ]);
+  });
+
+  it('are none while the provider is not set up for the repository', () => {
+    // GitHub, but no remote to name the repository: nothing to file a
+    // review on.
+    openRepo(gitDir);
+    activeConfigService().updateField(
+      { label: 'Provider', key: 'vendor', configBag: 'project' },
+      'github'
+    );
+    const info = refreshRepo()!;
+    expect(info.providerId).toBe('github');
+    expect(info.vcsConfigured).toBe(false);
+    expect(info.reviewEvents).toEqual([]);
+  });
 });

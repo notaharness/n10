@@ -5,7 +5,7 @@
  * (gliding cursor, real typing), records with ffmpeg (x11grab) and
  * downscales to palette-optimized GIFs.
  *
- *   node apps/desktop-e2e/demo/capture.mjs [worktrees|review|review-in-place|plan|babysit|tui|all]
+ *   node apps/desktop-e2e/demo/capture.mjs [worktrees|review|review-in-place|plan|babysit|tab-switching|tui|all]
  *
  * Requires `nx build desktop` first, plus Xvfb and ffmpeg on PATH.
  * Output lands in docs/media/.
@@ -164,7 +164,7 @@ function cleanupSessions(home) {
 
 async function launchApp(
   scenario,
-  { theme = 'dark', env = {}, size = DIP } = {}
+  { theme = 'dark', env = {}, size = DIP, prefs = {} } = {}
 ) {
   const parentEnv = { ...process.env };
   delete parentEnv.WAYLAND_DISPLAY;
@@ -184,7 +184,7 @@ async function launchApp(
   const { writeFileSync } = await import('node:fs');
   writeFileSync(
     join(scenario.home, '.n10', 'desktop-prefs.json'),
-    JSON.stringify({ theme, nativeFrame: false })
+    JSON.stringify({ theme, nativeFrame: false, ...prefs })
   );
 
   const app = await electron.launch({
@@ -865,6 +865,149 @@ async function demoBabysit(scenario) {
   });
 }
 
+/**
+ * A caption pill naming the chord about to be pressed. The app hears
+ * its tab chords on the window in the capture phase and stops them, so
+ * the caption cannot listen for keys itself: the take sets it before
+ * each press. Demo layer only; nothing of it is in the app.
+ */
+async function installKeyCaption(page) {
+  await page.evaluate(() => {
+    const pill = document.createElement('div');
+    pill.id = 'demo-keys';
+    Object.assign(pill.style, {
+      position: 'fixed',
+      left: '50%',
+      bottom: '48px',
+      transform: 'translateX(-50%)',
+      padding: '10px 22px',
+      borderRadius: '12px',
+      background: 'rgba(20,20,24,0.88)',
+      color: '#fff',
+      font: '600 26px ui-sans-serif, system-ui, sans-serif',
+      letterSpacing: '0.02em',
+      boxShadow: '0 6px 24px rgba(0,0,0,0.45)',
+      pointerEvents: 'none',
+      zIndex: '2147483647',
+      opacity: '0',
+    });
+    document.body.appendChild(pill);
+  });
+}
+
+async function caption(page, text) {
+  await page.evaluate((t) => {
+    const pill = document.getElementById('demo-keys');
+    if (!pill) return;
+    pill.textContent = t;
+    pill.style.opacity = t ? '1' : '0';
+  }, text);
+}
+
+/**
+ * Switching tabs from the keyboard, in under three seconds: four tabs
+ * (three worktrees and a shell), Ctrl+PgDn twice and
+ * Ctrl+PgUp once along the strip, then a held Ctrl+Tab walking back
+ * through recently used tabs, which goes where the strip order would not.
+ */
+async function demoTabs(scenario) {
+  const size = { width: 1060, height: 640 };
+  const { app, page } = await launchApp(scenario, {
+    size,
+    prefs: { tabCycleMru: true },
+  });
+  const aside = page.locator('aside');
+  // A double click pins the row's tab; on an idle worktree it also
+  // offers a session, declined here.
+  const offer = page.getByRole('button', { name: 'Start new session' });
+  const pin = async (name) => {
+    await aside.getByRole('button', { name, exact: true }).dblclick();
+    if (
+      await offer.waitFor({ timeout: 3000 }).then(
+        () => true,
+        () => false
+      )
+    ) {
+      await page.keyboard.press('Escape');
+      await offer.waitFor({ state: 'hidden' });
+    }
+  };
+  const tab = (name) => page.getByRole('tab', { name });
+  const shown = (name) =>
+    tab(name).and(page.locator('[aria-selected="true"]')).waitFor();
+
+  // The strip: three worktrees with a shell among them.
+  await pin('command-palette');
+  await tab(/command-palette/).waitFor();
+  await app.evaluate(({ Menu }) => {
+    const find = (items) => {
+      for (const item of items) {
+        if (item.label === 'New Terminal…') return item;
+        const hit = item.submenu && find(item.submenu.items);
+        if (hit) return hit;
+      }
+      return undefined;
+    };
+    find(Menu.getApplicationMenu().items).click();
+  });
+  const dialog = page.getByRole('dialog').filter({ hasText: 'New terminal' });
+  await dialog.getByRole('radio', { name: /^Shell / }).click();
+  await dialog.getByRole('button', { name: 'Open terminal' }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  const terminal = page.locator('[role="tab"][data-face="terminal"]');
+  await terminal.waitFor();
+  // A plain prompt on a clear screen: no user or host on show.
+  await sleep(1500);
+  await page.keyboard.type("PS1='atlas $ '; clear\n");
+  await sleep(500);
+  await pin('session-restore');
+  await tab(/session-restore/).waitFor();
+  await pin('perf-flamegraph');
+  await tab(/perf-flamegraph/).waitFor();
+  // Most recent: command-palette, then perf — so the walk at the end
+  // has somewhere to go back to.
+  await tab(/command-palette/).click();
+  await shown(/command-palette/);
+  await park(page);
+  await installKeyCaption(page);
+  await sleep(2500); // the shell's prompt
+
+  const rec = startRecording('tab-switching');
+  await sleep(900);
+  const beat = 470;
+  const press = async (text, key) => {
+    await caption(page, text);
+    await page.keyboard.press(key);
+    await sleep(beat);
+  };
+  await press('Ctrl + PgDn', 'Control+PageDown');
+  await press('Ctrl + PgDn ×2', 'Control+PageDown');
+  await shown(/session-restore/);
+  await press('Ctrl + PgUp', 'Control+PageUp');
+  // Held: each Tab steps one further back in recent use, past the
+  // session tab the strip would offer next to command-palette.
+  await page.keyboard.down('Control');
+  await press('Ctrl + Tab · recent', 'Tab');
+  await caption(page, 'Ctrl + Tab Tab · recent');
+  await page.keyboard.press('Tab');
+  await sleep(200);
+  await page.keyboard.up('Control');
+  await shown(/command-palette/);
+  await sleep(900);
+  await caption(page, '');
+  await sleep(500);
+
+  await rec.stop();
+  await app.close();
+  toGif('tab-switching', {
+    fps: 10,
+    colors: 128,
+    start: 0.75,
+    end: 3.75,
+    crop: { x: 0, y: 0, width: size.width * 2, height: size.height * 2 },
+  });
+}
+
 // ── Main ─────────────────────────────────────────────────────────
 
 const which = process.argv[2] ?? 'all';
@@ -884,6 +1027,7 @@ const demos = {
   'review-in-place': demoReviewInPlace,
   plan: demoPlan,
   babysit: demoBabysit,
+  'tab-switching': demoTabs,
   tui: demoTui,
 };
 const picked =

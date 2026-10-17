@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import type * as Core from '@n10/core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   FleetStatus,
   CeremonyProgress,
@@ -6,6 +7,12 @@ import type {
 } from './machine-types.js';
 import { createMachineService } from './machine-service.js';
 import type { MachinesPort } from './machine-ports.js';
+const reachability = vi.hoisted(() => [] as [string, boolean][]);
+vi.mock('@n10/core', async (original) => ({
+  ...(await original<typeof Core>()),
+  setMachineReachable: (id: string, reachable: boolean) =>
+    reachability.push([id, reachable]),
+}));
 let service: ReturnType<typeof createMachineService>;
 
 const PEER = 'b'.repeat(32);
@@ -60,6 +67,7 @@ function fakePort(): MachinesPort & { calls: [string, unknown[]][] } {
 
 beforeEach(() => {
   service = createMachineService();
+  reachability.length = 0;
 });
 
 describe('without a port installed', () => {
@@ -106,6 +114,93 @@ describe('with a port installed', () => {
       service.runCeremony({ op: 'revoke', peerId: PEER })
     ).resolves.toMatchObject({ ok: true, op: 'revoke' });
     expect(seen).toEqual([PROGRESS]);
+  });
+});
+
+// Its sessions learn from the fleet, not from a listing that may hang.
+describe('a peer going offline and back', () => {
+  const peer = (state: MachineView['state']): MachineView => ({
+    ...localMachine(),
+    peerId: PEER,
+    label: 'workbox',
+    isLocal: false,
+    state,
+  });
+
+  it('tells its sessions of each change, and only of changes', () => {
+    service.receiveMachines([localMachine(), peer('connected')]);
+    service.receiveMachines([localMachine(), peer('connected')]);
+    service.receiveMachines([localMachine(), peer('offline')]);
+    service.receiveMachines([localMachine(), peer('offline')]);
+    service.receiveMachines([localMachine(), peer('connected')]);
+    expect(reachability).toEqual([
+      [PEER, false],
+      [PEER, true],
+    ]);
+  });
+
+  it('tells them of a peer first heard of offline', () => {
+    service.receiveMachines([peer('offline')]);
+    expect(reachability).toEqual([[PEER, false]]);
+  });
+});
+
+// beam's `offline` says no tunnel is up, not which end lost it.
+describe('this machine cut off from its fleet', () => {
+  const peer = (state: MachineView['state']): MachineView => ({
+    ...localMachine(),
+    peerId: PEER,
+    label: 'workbox',
+    isLocal: false,
+    state,
+  });
+  const revoked = { ...peer('revoked'), peerId: 'c'.repeat(32) };
+  const status = (state: FleetStatus['state']): FleetStatus => ({
+    state,
+    detail: null,
+    enrolled: true,
+    fleetId: 'f'.repeat(64),
+  });
+  const states = () =>
+    service.getSnapshot().machines.map((m) => [m.label, m.state]);
+
+  it('shows this machine offline and its peers unknown without a network', () => {
+    service.receiveStatus(status('ready'));
+    service.receiveMachines([localMachine(), peer('offline'), revoked]);
+    service.receiveNetwork(false);
+    expect(states()).toEqual([
+      ['my-mac', 'offline'],
+      ['workbox', 'unknown'],
+      ['workbox', 'revoked'],
+    ]);
+    service.receiveNetwork(true);
+    expect(states()).toEqual([
+      ['my-mac', 'connected'],
+      ['workbox', 'offline'],
+      ['workbox', 'revoked'],
+    ]);
+  });
+
+  it('distrusts the rows it last heard while beam’s connection is lost', () => {
+    const seen: MachineView[][] = [];
+    service.subscribe((event) => {
+      if (event.type === 'machines') seen.push(event.machines);
+    });
+    service.receiveStatus(status('ready'));
+    service.receiveMachines([localMachine(), peer('connected')]);
+    service.receiveStatus(status('restarting'));
+    // n10's connection to beam, not this machine's network.
+    expect(seen.at(-1)?.map((m) => m.state)).toEqual(['connected', 'unknown']);
+    expect(reachability).toEqual([[PEER, false]]);
+    service.receiveStatus(status('ready'));
+    expect(states()).toEqual([
+      ['my-mac', 'connected'],
+      ['workbox', 'connected'],
+    ]);
+    expect(reachability).toEqual([
+      [PEER, false],
+      [PEER, true],
+    ]);
   });
 });
 

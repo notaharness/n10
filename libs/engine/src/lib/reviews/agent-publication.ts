@@ -56,7 +56,7 @@ export function createAgentPublication(
   const pending = new Set<number>();
   function identity(prId: number) {
     requirePullRequestNumber(prId);
-    const start = context.current();
+    const start = context.selected();
     if (!start.repository || !start.vcsConfigured)
       throw new Error('No review provider is configured');
     return {
@@ -223,7 +223,7 @@ export function createAgentPublication(
           {
             ...sources,
             publish: (submission, ledger) => {
-              context.assertUnchanged(captured.start);
+              context.assertWritable(captured.start);
               return captured.publish(
                 captured.start.config.vendorAuth,
                 captured.start.config.vendorProject,

@@ -62,7 +62,8 @@ export function getThemePreference(): ThemePreference {
   return preference;
 }
 
-function getResolvedTheme(): ResolvedTheme {
+/** The theme painted now, for code outside React. */
+export function getResolvedTheme(): ResolvedTheme {
   return resolved;
 }
 

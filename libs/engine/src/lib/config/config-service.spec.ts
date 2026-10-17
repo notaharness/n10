@@ -37,7 +37,7 @@ function field(
   return { key, configBag, label: key };
 }
 
-function harness(repo = '/repo-a') {
+function harness(repo = '/repo-a', isCurrent?: () => boolean) {
   const events: string[] = [];
   const pullRequests = {
     credentialsChanged: vi.fn(() => {
@@ -52,6 +52,7 @@ function harness(repo = '/repo-a') {
     repo,
     providers,
     pullRequests,
+    isCurrent,
   });
   service.subscribe(() => {
     events.push('snapshot');
@@ -91,6 +92,18 @@ describe('config commands', () => {
       revision: 1,
       syncRevision: 1,
     });
+  });
+
+  it('refuses writes while its repository is parked, and leaves disk alone', () => {
+    const { service, events } = harness('/repo-a', () => false);
+    expect(() =>
+      service.updateField(field('token', 'vendorAuth'), 'new')
+    ).toThrow('not open');
+    expect(() => service.updateKeybindFields((prev) => prev)).toThrow(
+      'not open'
+    );
+    expect(readConfig('/repo-a').vendorAuth.token).toBe('old');
+    expect(events).toEqual([]);
   });
 
   it('writes the captured repository regardless of process cwd', () => {

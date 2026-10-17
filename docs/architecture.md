@@ -41,6 +41,8 @@ apps/desktop/                    — Electron GUI shell, shipped inside `@notaha
   src/main/beam/                 — Client of the beam daemon's control socket: machines, remote exec/pty, ceremonies, mail relay, and the daemon the app starts
   src/preload/preload.ts         — Typed contextBridge → window.n10
   src/host/menu-template.ts      — Pure native app menu template, used by main and the web demo
+  build/                         — Optional desktop icon resources, discovered by electron-builder
+  electron-builder.yml           — The Linux installers, built by scripts/package-linux.mjs (`package-linux` target)
   src/host/contract.ts           — Single source of truth for the bridge API + IPC channel names (incl. MenuCommand, ContextMenuItem, DesktopPrefs)
   src/host/services/             — Host adapters (engine snapshots/commands, IPC events, scrollback, desktop preferences)
   src/renderer/                  — Vite + React 19 + Tailwind v4 web app (no Node access)
@@ -51,12 +53,15 @@ apps/desktop/                    — Electron GUI shell, shipped inside `@notaha
     components/review/comments/  — reviewer threads: ThreadCard, CommentMarkdown, ConversationPanel…
     components/review/diff/      — the viewer: DiffPane, VirtualDiffList, diff-rows, FileTree, SnippetView…
     components/review/drafts/    — the agent's drafts + walkthrough: DraftCard, DraftEditor, ReviewStepper…
+    components/review/guide/     — the agent's guided review: GuidePane (cover, slides, steps), GuideSlide, MermaidDiagram
+    components/review/finish/    — filing a review: FinishReview (the form in the diff), FinishParts
     lib/                         — grouped by subsystem, not one flat folder (see below)
     lib/data/                    — queries.ts (TanStack Query over window.n10), mutations.ts, query-keys.ts
     lib/diff/                    — diff-model.ts (fold, split pairing), diff-virtual.ts, word-diff.ts, highlight.ts, thread-model.ts
     lib/tabs/                    — tabs-model.ts (pure reducer: preview/pinned, `sync-items`), tabs.tsx, use-close-tabs.tsx
     lib/plan/                    — plan-model.ts (rows, numbering), plan.ts, use-plan-checkout.ts
-    lib/review/                  — review-model.ts (what the workspace shows), review-verdict.ts, severity.ts, use-comment-navigator.ts
+    lib/review/                  — review-model.ts (what the workspace shows), review-submission.ts, severity.ts, use-comment-navigator.ts
+    lib/guide/                   — guide-model.ts (layout, steps, staleness), mermaid.ts (lazy, strict, themed by tokens)
     lib/sidebar/                 — sidebar-model.ts, sidebar-row-menu.ts, attention.ts
     lib/*.ts                     — what belongs to no subsystem: utils, theme, terminal-grid, content-key, settings-*
     screens/                     — RepoOpen (repo picker) and Workspace (shell + shortcuts)
@@ -100,7 +105,7 @@ libs/core/                       — Shell-agnostic operations. No React, Ink, E
   src/lib/babysit/               — Pure observation model and briefing composition
   src/ui.ts                      — Browser-safe presentation and input models
   src/plan.ts                    — Browser-safe entry (`@n10/core/plan`) for the renderer
-  src/lib/utils/                 — Git reads and presentation helpers (diff-fetcher, sidebar-items, virtual-viewport…)
+  src/lib/utils/                 — Git reads and presentation helpers (worktree-diff, sidebar-items, virtual-viewport…)
   src/lib/settings/              — Settings field model, coercion and explicitly scoped config writes
   src/lib/agents/                — Agent registry
   src/lib/activity.ts            — Agent activity registry; pty-registry.ts — PTY session lifecycle
@@ -155,5 +160,6 @@ Both shells observe or read that snapshot and call its commands. The
 `worktree-manager` package implements Git operations over an immutable
 `WorktreeScope` (repository, path resolver and optional remote machine), without
 a process-wide selected resolver. Config path edits invalidate the resource;
-repository switches dispose its subscription without detaching session clients.
+repository switches park the handle, keeping its resources, without detaching
+session clients.
 ESLint forbids shells from calling these Git reads, mutations or scope factories.

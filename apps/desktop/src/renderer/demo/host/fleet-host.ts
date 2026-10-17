@@ -31,6 +31,7 @@ type FleetHost = Pick<
   | 'openExternal'
   | 'listMachines'
   | 'getBeamStatus'
+  | 'setNetworkOnline'
   | 'onBeamStatusChanged'
   | 'setMachineAlias'
   | 'setMachineGrant'
@@ -256,6 +257,7 @@ export function createFleetHost(): FleetHost {
     },
     listMachines: () => later(fleet.machines()),
     getBeamStatus: () => later(fleet.beamStatus()),
+    setNetworkOnline: () => later(undefined),
     onBeamStatusChanged: fleet.status.subscribe,
     setMachineAlias: (peerId, alias) => {
       fleet.setAlias(peerId, alias);

@@ -54,18 +54,24 @@ export function fakeAgent(
     printSize?: boolean;
     /** End each streamed line with `@<checkout directory>`. */
     tag?: boolean;
+    /** Turn on this mouse tracking mode (SGR) and print `mouse:` reports. */
+    mouse?: 1000 | 1002 | 1003;
+    /** Ask for modifyOtherKeys and print each input chunk as `key:`. */
+    keys?: boolean;
+    /** Turn on bracketed paste and application cursor keys. */
+    modes?: boolean;
+    /** On the first input, print this many bytes in paced slices, then
+     *  `flood-done`. */
+    flood?: number;
   } = {}
 ): string {
   const flags = [`--banner=n10-fake-agent-ready`];
-  if (opts.stream) flags.push('--stream');
-  if (opts.tag) flags.push('--tag');
-  if (opts.echo) flags.push('--echo');
-  if (opts.printSeed) flags.push('--print-seed');
-  if (opts.printSize) flags.push('--print-size');
-  if (opts.streamMs != null) flags.push(`--stream-ms=${opts.streamMs}`);
-  if (opts.intervalMs != null) flags.push(`--interval-ms=${opts.intervalMs}`);
-  if (opts.exitAfterMs != null)
-    flags.push(`--exit-after-ms=${opts.exitAfterMs}`);
+  // Each option is the agent's flag of the same name, in kebab case.
+  for (const [key, value] of Object.entries(opts)) {
+    const flag = `--${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+    if (value === true) flags.push(flag);
+    else if (typeof value === 'number') flags.push(`${flag}=${value}`);
+  }
   return ['node', FAKE_AGENT, ...flags].join(' ');
 }
 
@@ -88,6 +94,9 @@ export interface HomeSeed {
    * `n10 util add-comment` would have left them.
    */
   drafts?: Record<number, unknown[]>;
+  /** Guided reviews, keyed by pull request id, as `n10 util add-guide`
+   *  would have stored them. */
+  guides?: Record<number, unknown>;
   /**
    * Serve the app a pull request (and its review threads) from a fake
    * `gh` on PATH, with the matching project config written for it.
@@ -101,6 +110,11 @@ export interface HomeSeed {
    * matching config written for it.
    */
   fakeAzureDevOps?: FakeAzureDevOps;
+  /**
+   * Written to $HOME/.tmux.conf, which the test's tmux server reads when
+   * the app starts it.
+   */
+  tmuxConf?: string;
 }
 
 /**
@@ -145,6 +159,11 @@ export function seedHome(
 
   seedProjectConfig(n10, repoPath, opts);
   seedDrafts(n10, repoPath, opts.drafts);
+  seedGuides(n10, repoPath, opts.guides);
+
+  if (opts.tmuxConf !== undefined) {
+    writeFileSync(join(homeDir, '.tmux.conf'), opts.tmuxConf, 'utf8');
+  }
 
   if (opts.desktopPrefs) {
     writeFileSync(
@@ -160,6 +179,15 @@ export function seedHome(
       ? installFakeAdo(homeDir, opts.fakeAzureDevOps)
       : {}),
   };
+}
+
+/** Per-project config for another repository a test opens. */
+export function seedRepoConfig(
+  homeDir: string,
+  repoPath: string,
+  projectConfig: Record<string, unknown>
+): void {
+  seedProjectConfig(join(homeDir, '.n10'), repoPath, { projectConfig });
 }
 
 function seedProjectConfig(
@@ -197,6 +225,22 @@ function seedDrafts(
     writeFileSync(
       join(dir, 'comments.json'),
       JSON.stringify({ prId: Number(prId), comments }, null, 2),
+      'utf8'
+    );
+  }
+}
+
+function seedGuides(
+  n10: string,
+  repoPath: string,
+  guides: Record<number, unknown> | undefined
+): void {
+  for (const [prId, guide] of Object.entries(guides ?? {})) {
+    const dir = agentDraftDirectory(dirname(n10), repoPath, Number(prId));
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'guide.json'),
+      JSON.stringify(guide, null, 2),
       'utf8'
     );
   }

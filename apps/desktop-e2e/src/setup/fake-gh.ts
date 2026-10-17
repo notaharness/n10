@@ -1,12 +1,7 @@
-import {
-  chmodSync,
-  copyFileSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeScenario } from './scenario-file.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -22,7 +17,9 @@ export interface FakePr {
   title: string;
   headRefName: string;
   baseRefName?: string;
-  /** The head commit GitHub reports; `f` × 40 when left off. */
+  /** The head GitHub reports. Defaults to `headRefName`'s tip in the
+   *  test repository; set it to a commit the repository lacks to play
+   *  a push this clone has not fetched. */
   headRefOid?: string;
   /** Defaults to the scenario's username, which makes it *your* PR and
    *  puts it under "Pull Requests" rather than a review bucket. */
@@ -58,17 +55,30 @@ export interface FakePr {
   )[];
   threads?: FakeThread[];
   generalComments?: { author: string; body: string; createdAt?: string }[];
+  /** What its revision history reports: commits and force-pushes,
+   *  oldest first, and the reviews the signed-in user (or, with
+   *  `mine: false`, someone else) submitted. Left out, the history is
+   *  the head alone and no review. */
+  history?: {
+    events?: (
+      | { commit: string; at?: string }
+      | { forcePush: { before: string | null; after: string }; at?: string }
+    )[];
+    reviews?: { commit: string; at?: string; mine?: boolean }[];
+  };
   /** Timeline entries, as GraphQL `PullRequestTimelineItems` nodes. */
   events?: Record<string, unknown>[];
   /** Reads that answer with GitHub's 502 until cleared with
    *  `updateFakeGh`: the description, the threads query, the selected
-   *  pull request's detail, its checks, and the conversation queries. */
+   *  pull request's detail, its checks, the conversation queries, and
+   *  the revision history. */
   failing?: {
     body?: boolean;
     threads?: boolean;
     detail?: boolean;
     checks?: boolean;
     conversation?: boolean;
+    history?: boolean;
   };
   /** Check runs and statuses on the head, for the checks read. */
   checks?: FakeCheck[];
@@ -135,6 +145,9 @@ export interface FakeGitHub {
   /** The signed-in user. PRs they authored are "yours". */
   username?: string;
   prs: FakePr[];
+  /** Head branches of the signed-in user's merged pull requests: what
+   *  the merged-branch sweep finds. */
+  merged?: string[];
   /** Who `mentionableUsers` finds: a login or name containing the
    *  query, ignoring case, first eight. */
   mentionable?: { login: string; name?: string }[];
@@ -197,7 +210,7 @@ export function updateFakeGh(
   const path = fakeGhScenarioPath(homeDir);
   const scenario = JSON.parse(readFileSync(path, 'utf8')) as FakeGitHub;
   mutate(scenario);
-  writeFileSync(path, JSON.stringify(scenario, null, 2), 'utf8');
+  writeScenario(path, scenario);
 }
 
 export function installFakeGh(
@@ -216,7 +229,7 @@ export function installFakeGh(
   );
 
   const scenarioPath = fakeGhScenarioPath(homeDir);
-  writeFileSync(scenarioPath, JSON.stringify(scenario, null, 2), 'utf8');
+  writeScenario(scenarioPath, scenario);
 
   return {
     PATH: binDir,

@@ -71,6 +71,9 @@ The reasoning behind each rule is in `docs/decisions.md`.
   their explicit scope. Allocate the final tmux name before creating the registry
   key. Native pane state controls exit, not client disconnect. The engine owns
   agent retention and shell-exit cleanup; tab presentation belongs to the shell.
+  A shell terminal runs `resolveShell` (`terminal/shell.ts`): the Shell setting,
+  else `$SHELL`, else sh, probed on the machine the terminal opens on (its own
+  executor when remote), never this process's environment.
 
 - **Session launch** (`session/`) receives the resolved checkout and explicit
   config; it replaces a live session only with native incarnation approval. Force-remove is offered only
@@ -85,6 +88,11 @@ The reasoning behind each rule is in `docs/decisions.md`.
 - **Babysit** (`babysit/`): pure baseline/observation model and prompt composition.
   The engine owns watch lifetime, freshness, polling and delivery coordination.
   The baseline records what the agent was told, not merely what was observed.
+- **Sidebar sections** (`utils/sidebar-items.ts` `sidebarSection`): both
+  shells group by it. The provider's authorship (`findYourPrIds`:
+  `viewerIsAuthor`, else `matchesUser`) puts a pull request under the
+  viewer's own sections; a local worktree or agent never does. Someone else's checked-out PR outside every review bucket is
+  a worktree row.
 - **Pull request lookup** (`pull-requests/pull-request-lookup.ts`): the
   `found`/`gone`/`unknown` answer a babysitter reads. The list behind it is
   `@n10/engine`'s.
@@ -96,6 +104,18 @@ The reasoning behind each rule is in `docs/decisions.md`.
   keeps every file. Untracked files are assembled by hand, never `git add -N`,
   and symlinks render as mode-120000 patches. Git-backed cases live in
   `worktree-diff.integration.spec.ts`.
+- **PR diffs** (`pull-requests/pr-comparison.ts`, `pr-diff-manifest.ts`):
+  resolve to head, target and merge-base ids once, then read by id. A head
+  the clone lacks is an error, never the local branch. The manifest lists
+  every file; the patch reports truncation as data, not a placeholder file.
+  The engine's review reads own their caching and freshness.
+- **Revision history** (`pull-requests/pr-history.ts`, `review-checkpoints.ts`,
+  `pr-revision-range.ts`): a range resolves to exact commits or names the
+  revision it lacks; nothing stands in for it. Visits live per account and
+  pull request under `~/.n10/review-checkpoints` (`pr-store-file.ts`); the
+  last visit is fixed per visit, which the caller names. Recorded heads are
+  kept under `refs/n10/retained/`. The engine owns the history
+  resource and the baselines' lifetime.
 - `asyncOps.run` never rejects; errors go through `setOperationErrorHandler`.
 - `keybindings/registry.ts` is the action catalog and carries a 900-line
   ceiling on purpose. Presets: Normie, Vim.

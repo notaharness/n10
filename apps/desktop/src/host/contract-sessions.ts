@@ -39,3 +39,24 @@ export interface ForeignSessionSummary {
   /** Its qualified core registry key (repository plus checkout). */
   sessionName: string;
 }
+
+/**
+ * An Orchestra orchestrator's session and the sessions that report to
+ * it. Core's `orchestratorGroups` decides membership from Orchestra's
+ * tags; a marked orchestrator is listed with no players too.
+ */
+export interface OrchestratorGroupSummary {
+  orchestrator: OrchestraMemberSummary;
+  players: OrchestraMemberSummary[];
+}
+
+/** A session of a group, by what its tab can carry: the core registry
+ *  key (a terminal tab's `name`, a worktree row's session name), and for
+ *  a worktree session its repository and checkout, which a tab from
+ *  another repository is stamped with. */
+export interface OrchestraMemberSummary {
+  key: string;
+  repo: string;
+  /** `''` for a terminal. */
+  worktree: string;
+}

@@ -115,167 +115,32 @@ describe('adoptPullRequest', () => {
 });
 
 describe('nextStep', () => {
-  it('asks a requested reviewer to review the changes', () => {
-    const pr = { ...PR, reviewers: [bea('no-response')] };
-    expect(nextStep(pr, 'reviewer', 'bea')).toEqual({
-      summary: 'Your review is requested',
-      detail: null,
+  it('asks a reviewer to review the changes, and only to view a draft’s', () => {
+    expect(nextStep(PR, 'reviewer')).toEqual({
       action: 'review-changes',
       label: 'Review changes',
     });
-  });
-
-  it.each([
-    ['approved', 'You approved this pull request'],
-    ['changes-requested', 'You asked for changes'],
-    ['waiting-for-author', 'You are waiting for the author'],
-    ['rejected', 'You rejected this pull request'],
-    ['declined', 'You declined to review'],
-  ] as const)('tells a reviewer who voted %s so', (decision, summary) => {
-    const pr = { ...PR, reviewers: [bea(decision)] };
-    expect(nextStep(pr, 'reviewer', 'bea').summary).toBe(summary);
-  });
-
-  it('never says your review is requested on a draft', () => {
-    const pr = { ...PR, isDraft: true, reviewers: [bea('no-response')] };
-    expect(nextStep(pr, 'reviewer', 'bea')).toMatchObject({
-      summary: 'Draft: not ready for review yet',
+    expect(nextStep({ ...PR, isDraft: true }, 'reviewer')).toEqual({
+      action: 'review-changes',
       label: 'View changes',
     });
   });
 
-  it('leads a reviewer from the unresolved count to the first open thread', () => {
-    const pr = {
-      ...PR,
-      activeCommentCount: 2,
-      reviewers: [bea('no-response')],
-    };
-    expect(nextStep(pr, 'reviewer', 'bea')).toMatchObject({
-      detail: '2 unresolved threads',
-      detailAction: 'show-unresolved',
-      action: 'review-changes',
-    });
-    // No account: the detail says so, and leads nowhere.
-    expect(nextStep(pr, 'reviewer', null)).not.toHaveProperty('detailAction');
-  });
-
-  describe('asked through a team the reviewer is in', () => {
-    const team = (decision: Decision) => ({
-      identifier: 'core-team',
-      displayName: 'Core Team',
-      decision,
-      includesViewer: true,
-    });
-
-    it('says their review is requested while the team has not answered', () => {
-      const pr = { ...PR, reviewers: [team('no-response')] };
-      expect(nextStep(pr, 'reviewer', 'bea').summary).toBe(
-        'Your review is requested'
-      );
-    });
-
-    it('never gives them a teammate’s vote for the team', () => {
-      const pr = { ...PR, reviewers: [team('approved')] };
-      expect(nextStep(pr, 'reviewer', 'bea').summary).toBe(
-        'Not reviewed by you yet'
-      );
-    });
-
-    it('goes by their own vote when they have one', () => {
-      const pr = { ...PR, reviewers: [team('no-response'), bea('approved')] };
-      expect(nextStep(pr, 'reviewer', 'bea').summary).toBe(
-        'You approved this pull request'
-      );
-    });
-  });
-
-  it('says a review is requested only where the provider asks for it', () => {
-    // On GitHub, a reply in a thread lists the reader without a request.
-    const pr = {
-      ...PR,
-      reviewers: [{ ...bea('no-response'), requested: false }],
-    };
-    expect(nextStep(pr, 'reviewer', 'bea').summary).toBe(
-      'Not reviewed by you yet'
-    );
-  });
-
-  it('claims nothing about "you" without an account', () => {
-    expect(nextStep(PR, 'reviewer', null)).toMatchObject({
-      summary: "Can't show your review",
-      detail: 'No account is configured for this repository.',
-    });
-    expect(nextStep(PR, 'reviewer', 'carol').summary).toBe(
-      'Not reviewed by you yet'
-    );
-  });
-
-  it('sends an author with unresolved threads to them, and only says how many', () => {
-    const pr = { ...PR, activeCommentCount: 2, reviewers: [bea('approved')] };
-    // Who owes the next move on each thread is not something a count says.
-    expect(nextStep(pr, 'author', 'alex')).toEqual({
-      summary: '2 unresolved threads',
-      detail: null,
+  it('sends an author with unresolved threads to them, else to the changes', () => {
+    expect(nextStep({ ...PR, activeCommentCount: 2 }, 'author')).toEqual({
       action: 'show-unresolved',
       label: 'Respond to feedback',
     });
-  });
-
-  it.each([
-    ['rejected', 'Rejected by Bea'],
-    ['waiting-for-author', 'Waiting for author: Bea'],
-    ['changes-requested', 'Changes requested by Bea'],
-  ] as const)(
-    'tells an author about a %s vote in its own words',
-    (d, summary) => {
-      expect(
-        nextStep({ ...PR, reviewers: [bea(d)] }, 'author', 'alex').summary
-      ).toBe(summary);
-    }
-  );
-
-  it('names who asked an author for changes before anything else', () => {
-    const pr = { ...PR, isDraft: true, reviewers: [bea('changes-requested')] };
-    expect(nextStep(pr, 'author', 'alex').summary).toBe(
-      'Changes requested by Bea'
-    );
-  });
-
-  it('says a draft is a draft, and who approved a ready one', () => {
-    expect(nextStep({ ...PR, isDraft: true }, 'author', 'alex').summary).toBe(
-      'Draft'
-    );
-    const approvers = [
-      bea('approved'),
-      { identifier: 'cy', displayName: 'Cy', decision: 'approved' as const },
-    ];
-    expect(
-      nextStep({ ...PR, reviewers: approvers }, 'author', 'alex').summary
-    ).toBe('Approved by Bea and 1 other');
-  });
-
-  it('names the teammate who voted for a team, not the team as well', () => {
-    const team = {
-      identifier: 'core-team',
-      displayName: 'Core Team',
-      decision: 'approved' as const,
-    };
-    const reviewers = [team, { ...bea('approved'), votedFor: ['core-team'] }];
-    expect(nextStep({ ...PR, reviewers }, 'author', 'alex').summary).toBe(
-      'Approved by Bea'
-    );
-  });
-
-  it('says what the row shows about reviews, never that one is required', () => {
-    // Whether a review is required is the provider's, in Completion.
-    expect(nextStep(PR, 'author', 'alex')).toMatchObject({
-      summary: 'No reviewers requested',
-      detail: null,
+    expect(nextStep(PR, 'author')).toEqual({
+      action: 'review-changes',
+      label: 'View changes',
     });
-    expect(
-      nextStep({ ...PR, reviewers: [bea('no-response')] }, 'author', 'alex')
-        .summary
-    ).toBe('No approvals yet');
+  });
+
+  it('leads a reviewer to the changes whatever is unresolved', () => {
+    expect(nextStep({ ...PR, activeCommentCount: 2 }, 'reviewer').action).toBe(
+      'review-changes'
+    );
   });
 });
 

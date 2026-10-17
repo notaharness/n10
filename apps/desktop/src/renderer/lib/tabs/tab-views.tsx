@@ -31,6 +31,8 @@ export interface TabView {
   file?: string | null;
   anchor?: LinePoint;
   step?: number;
+  /** The guided review's slide; 0 is its cover. */
+  slide?: number;
 }
 
 export type TabViews = Map<string, TabView>;

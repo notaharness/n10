@@ -1,9 +1,12 @@
 import type { DiffLine } from '@n10/diff';
 import type {
+  PrDiffManifestFile,
   RemoteCommentThread,
   ReviewComment,
 } from '../../../host/contract.js';
 import { contentKey } from '../content-key.js';
+import { unavailableOf } from '../diff/coverage.js';
+import type { FileBody } from '../diff/diff-bodies.js';
 import type { FileEntry } from '../../components/review/diff/FileTree.js';
 
 /**
@@ -15,7 +18,7 @@ import type { FileEntry } from '../../components/review/diff/FileTree.js';
  */
 
 /** Which pane of the review workspace is showing. */
-export type Mode = 'diff' | 'agent' | 'review' | 'overview' | 'plan';
+export type Mode = 'diff' | 'agent' | 'review' | 'guide' | 'overview' | 'plan';
 
 /** What each mode needs in order to be showable at all. */
 export interface ModeContext {
@@ -23,6 +26,8 @@ export interface ModeContext {
   hasSession: boolean;
   /** At least one unposted agent draft. */
   hasDrafts: boolean;
+  /** The review agent wrote a guided review. */
+  hasGuide: boolean;
   /** The tab is a pull request, not a bare worktree. */
   hasPr: boolean;
   /** At least one comment queued in this PR's plan. */
@@ -42,6 +47,7 @@ export interface ModeContext {
 export function resolveMode(mode: Mode, ctx: ModeContext): Mode {
   if (mode === 'agent' && ctx.hasSession) return 'agent';
   if (mode === 'review' && ctx.hasDrafts) return 'review';
+  if (mode === 'guide' && ctx.hasGuide) return 'guide';
   if (mode === 'overview' && ctx.hasPr) return 'overview';
   if (mode === 'plan' && ctx.hasPlan) return 'plan';
   return 'diff';
@@ -141,6 +147,32 @@ export function buildFileEntries(
     comments: (threadsByFile.get(filename) ?? []).filter((t) => !t.isResolved)
       .length,
     drafts: (draftsByFile.get(filename) ?? []).length,
+  }));
+}
+
+/**
+ * A pull request's files as the rail lists them: every file the
+ * manifest names, read or not, with git's own counts and change kind.
+ * The blob ids are the revision: they change exactly when the file's
+ * content does.
+ */
+export function buildManifestEntries(
+  files: readonly PrDiffManifestFile[],
+  threadsByFile: Map<string, RemoteCommentThread[]>,
+  draftsByFile: Map<string, ReviewComment[]>,
+  bodies: ReadonlyMap<string, FileBody>
+): FileEntry[] {
+  return files.map((f) => ({
+    path: f.path,
+    revision: `${f.oldOid ?? ''}..${f.newOid ?? ''}`,
+    additions: f.additions,
+    deletions: f.deletions,
+    comments: (threadsByFile.get(f.path) ?? []).filter((t) => !t.isResolved)
+      .length,
+    drafts: (draftsByFile.get(f.path) ?? []).length,
+    change: { status: f.status, oldPath: f.oldPath },
+    binary: f.kind === 'binary',
+    unavailable: unavailableOf(bodies.get(f.path)) ?? undefined,
   }));
 }
 

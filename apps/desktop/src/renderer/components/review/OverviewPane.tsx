@@ -13,7 +13,7 @@ import {
 } from '../../lib/review/overview-model.js';
 import { GeneralComposer } from './overview/GeneralComposer.js';
 import { PrActivity } from './overview/PrActivity.js';
-import { PrAttention } from './overview/PrAttention.js';
+import { StepButton } from './overview/StepButton.js';
 import { PrChecks } from './overview/PrChecks.js';
 import { PrDescription } from './overview/PrDescription.js';
 import { PrIdentity } from './overview/PrIdentity.js';
@@ -23,15 +23,26 @@ import { cn } from '../../lib/utils.js';
 import { PrActions } from './PrHeader.js';
 
 /**
- * One column below 900 px of pane width — identity, next step,
- * reviewers, completion, then the description and the conversation —
- * and from there a reading column beside a context column: the
- * description and conversation run down the left while the reviewers
- * and completion stack on the right. The last row takes up whatever the
- * reading column needs, so the right column never spreads out to match.
+ * One column below 900 px of pane width — reviewers, completion, then
+ * the description and the conversation — and from
+ * there a reading column beside a context column: the description and
+ * conversation run down the left while the reviewers and completion
+ * stack on the right. The last row takes up whatever the reading column
+ * needs, so the right column never spreads out to match.
  */
 const LAYOUT =
-  "mx-auto grid max-w-[1120px] gap-x-8 gap-y-6 px-6 py-6 [grid-template-areas:'head'_'next'_'people'_'ready'_'main'] @min-[900px]:grid-cols-[minmax(0,1fr)_260px] @min-[900px]:grid-rows-[auto_auto_auto_auto_1fr] @min-[900px]:[grid-template-areas:'head_head'_'next_next'_'main_people'_'main_ready'_'main_.']";
+  "mx-auto grid max-w-[1120px] gap-x-8 gap-y-6 px-6 py-6 [grid-template-areas:'people'_'ready'_'main'] @min-[900px]:grid-cols-[minmax(0,1fr)_260px] @min-[900px]:grid-rows-[auto_auto_1fr] @min-[900px]:[grid-template-areas:'main_people'_'main_ready'_'main_.']";
+
+/**
+ * The heading spans the pane, its title in line with the column below
+ * and its actions at the pane's end. The next step's button there sits
+ * where the diff's toolbar puts Finish review (`DiffToolbar`): 46 px
+ * down, for the bar and the toolbar's padding the Overview goes
+ * without, and 24 px in from the scrollbar's gutter, which is kept
+ * whether or not the pane scrolls, in line with the column's end
+ * until the pane is wider than the column.
+ */
+const HEAD = 'pt-[46px] pr-6 pl-[max(1.5rem,calc((100cqw-1120px)/2+1.5rem))]';
 
 /**
  * The Overview or, nested in it, the check list; the list stays until
@@ -97,9 +108,13 @@ export function OverviewPane({
   const pane = useRef<HTMLDivElement>(null);
   const checksButton = useRef<HTMLButtonElement>(null);
   const nested = useNestedChecks(pr.id, pane, checksButton);
+  const step = nextStep(pr, role);
 
   return (
-    <div ref={pane} className="@container relative h-full overflow-auto">
+    <div
+      ref={pane}
+      className="@container relative h-full overflow-auto [scrollbar-gutter:stable]"
+    >
       {nested.showing && (
         <PrChecks
           read={read}
@@ -114,17 +129,18 @@ export function OverviewPane({
       {/* Kept mounted under the check list: the activity's filter,
           search, held updates and resolved threads stay as the reader
           left them. */}
-      <div className={cn(LAYOUT, nested.showing && 'hidden')}>
+      <div className={cn(HEAD, nested.showing && 'hidden')}>
         <PrIdentity
           pr={pr}
-          actions={<PrActions pr={pr} />}
-          className="[grid-area:head]"
+          actions={
+            <>
+              <PrActions pr={pr} />
+              <StepButton step={step} onAction={onAction} />
+            </>
+          }
         />
-        <PrAttention
-          step={nextStep(pr, role, repo.viewer)}
-          onAction={onAction}
-          className="[grid-area:next]"
-        />
+      </div>
+      <div className={cn(LAYOUT, nested.showing && 'hidden')}>
         <div className="[grid-area:people]">
           <PrReviewers
             reviewers={pr.reviewers ?? []}

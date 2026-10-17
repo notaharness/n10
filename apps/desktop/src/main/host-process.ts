@@ -43,6 +43,7 @@ export const HOST_UNAVAILABLE = {
 type Shell = Omit<ShellCalls, 'spawnDaemon' | 'stopDaemon' | 'killDaemon'>;
 
 export interface HostProcessOptions {
+  startDir?: string;
   shell: Shell;
   pushes: HostPushes;
   /** The theme in effect, which every host is told when it starts. */
@@ -207,7 +208,15 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
       {
         serviceName: 'n10 host',
         stdio: 'inherit',
-        env: hostEnv(process.env, app.getPath('userData')),
+        env: hostEnv(
+          {
+            ...process.env,
+            N10_UPDATE_ROOT: app.getAppPath(),
+            N10_UPDATE_PACKAGED: app.isPackaged ? '1' : '0',
+          },
+          app.getPath('userData'),
+          options.startDir
+        ),
       }
     );
     child = host;

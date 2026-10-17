@@ -1,5 +1,11 @@
 import { basename } from 'node:path';
-import { expect, type Locator, type Page } from '@playwright/test';
+import {
+  expect,
+  type ElectronApplication,
+  type Locator,
+  type Page,
+} from '@playwright/test';
+import { armContextMenuChoice } from './menu.js';
 
 /**
  * Locators for the desktop shell, in one place.
@@ -69,13 +75,17 @@ export function visibleText(page: Page, text: string | RegExp): Locator {
 /**
  * Focus the on-screen terminal so keystrokes reach the agent.
  *
- * wterm keeps a hidden textarea and focuses it itself; clicking the
- * rendered output instead moves focus off it, and everything typed
- * afterwards goes nowhere.
+ * xterm takes keys through a textarea it keeps out of sight, zero-sized
+ * and off to the left, so it is found by its class rather than by
+ * being visible.
  */
 export async function focusTerminal(page: Page): Promise<void> {
-  const input = page.locator('textarea').filter({ visible: true }).first();
-  await input.waitFor({ state: 'visible' });
+  const input = page
+    .locator(
+      '[data-editor-panes] > :not([data-spare-pane]) .xterm-helper-textarea'
+    )
+    .first();
+  await input.waitFor({ state: 'attached' });
   await input.focus();
 }
 
@@ -139,28 +149,33 @@ export async function createWorktree(
   const createRow = page.getByRole('option', {
     name: new RegExp(`Create branch\\s*${branch}\\s*and open a worktree`),
   });
-  const checkoutRow = page
-    .getByRole('option', { name: new RegExp(`^${branch}$`) })
-    .first();
+  const exact = { name: new RegExp(`^${branch}$`) };
+  const checkoutRow = page.getByRole('option', exact).first();
   await createRow
     .or(checkoutRow)
     .first()
     .waitFor({ state: 'visible', timeout: 15_000 });
+  // Creating a branch, or checking out one listed under "Check out
+  // branch", makes a worktree; a row for an existing worktree is a jump.
+  const checksOut =
+    (await createRow.count()) > 0 ||
+    (await page
+      .getByRole('group', { name: 'Check out branch' })
+      .getByRole('option', exact)
+      .count()) > 0;
   await ((await createRow.count()) > 0 ? createRow : checkoutRow).click();
 
   await paletteInput(page).waitFor({ state: 'hidden' });
 
-  // A checkout lands in the new worktree's session menu, and a modal
-  // dialog hides the rest of the app from role queries (aria-hidden),
-  // sidebar included — so the menu has to go before the row can be
-  // waited on. Dismissing it here leaves the caller a quiet tab;
+  // A checkout lands in the new worktree's session menu once the
+  // worktree exists, and a modal dialog hides the rest of the app from
+  // role queries (aria-hidden), sidebar included. The sidebar can show
+  // the new row before then, so a checkout waits for the menu itself
+  // and dismisses it, leaving the caller a quiet tab;
   // `launchAgentFromRail` reopens it when the test wants an agent. A
-  // branch that already had a worktree is a jump, not a checkout, and
-  // opens no menu.
+  // jump opens no menu.
+  if (checksOut) await dismissSessionMenu(page, 30_000);
   const row = sidebarRow(page, new RegExp(branch));
-  const menu = sessionMenu(page);
-  await menu.or(row).first().waitFor({ state: 'visible', timeout: 30_000 });
-  if (await menu.isVisible()) await dismissSessionMenu(page);
   await row.waitFor({ state: 'visible', timeout: 30_000 });
 }
 
@@ -199,9 +214,12 @@ export async function startSessionFromMenu(page: Page): Promise<void> {
 }
 
 /** Close the open menu without launching anything. */
-export async function dismissSessionMenu(page: Page): Promise<void> {
+export async function dismissSessionMenu(
+  page: Page,
+  timeout = 15_000
+): Promise<void> {
   const menu = sessionMenu(page);
-  await menu.waitFor({ state: 'visible', timeout: 15_000 });
+  await menu.waitFor({ state: 'visible', timeout });
   await page.keyboard.press('Escape');
   await menu.waitFor({ state: 'hidden' });
 }
@@ -229,13 +247,12 @@ export async function showOverview(page: Page): Promise<void> {
 
 /**
  * From a pull request's Overview, where it opens with no agent running,
- * on to its changes the way a reader goes: the next step's button,
- * which reads Review changes, View changes or Respond to feedback, and
- * leads to the diff whichever it is.
+ * on to its changes the way a reader goes: the next step's button in
+ * its heading, which reads Review changes, View changes or Respond to
+ * feedback, and leads to the diff whichever it is.
  */
 export async function showChanges(page: Page): Promise<void> {
   await page
-    .getByRole('region', { name: 'Next step' })
     .getByRole('button', {
       name: /^(Review changes|View changes|Respond to feedback)$/,
     })
@@ -273,11 +290,16 @@ export async function showFile(page: Page): Promise<void> {
  * the agent's output.
  */
 export async function launchAgentFromRail(page: Page): Promise<void> {
-  await page
+  const launch = page
     .getByRole('button', { name: /(Re)?launch agent/i })
     .filter({ visible: true })
-    .first()
-    .click();
+    .first();
+  // Right after a tab switch the tab left can still be on screen, its
+  // own Launch button with it, and a click waits on whichever button it
+  // found first even once that pane is hidden. Each try finds it again.
+  await expect(async () => {
+    await launch.click({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
   await startSessionFromMenu(page);
 }
 
@@ -313,4 +335,37 @@ export async function expectAdjoining(
   const [a, b] = await Promise.all([left.boundingBox(), right.boundingBox()]);
   if (!a || !b) throw new Error('tab is not laid out');
   expect(b.x).toBeCloseTo(a.x + a.width, 0);
+}
+
+/** Open the session menu from the agent card's native menu. */
+export async function openAgentMenuFromCard(
+  app: ElectronApplication,
+  page: Page
+): Promise<void> {
+  await armContextMenuChoice(app, 'Launch additional agent');
+  await sessionCard(page, 'Agent').click({ button: 'right' });
+}
+
+/** Size the window's content, below its own minimum if asked. */
+export async function resizeWindow(
+  app: ElectronApplication,
+  width: number,
+  height: number
+): Promise<void> {
+  await app.evaluate(
+    ({ BrowserWindow }, [w, h]) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      window.setMinimumSize(0, 0);
+      window.setContentSize(w, h);
+    },
+    [width, height]
+  );
+}
+
+/** The open repository's sessions, as the host lists them. */
+export function openSessions(page: Page) {
+  return page.evaluate(async () => {
+    const repo = await window.n10.getRepo();
+    return repo ? window.n10.listSessions(repo.cwd) : [];
+  });
 }

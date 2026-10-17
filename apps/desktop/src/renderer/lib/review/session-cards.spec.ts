@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchSession, MachineView } from '../../../host/contract.js';
 import {
+  cardStatus,
   newSessionNames,
   sessionCards,
   shownSession,
@@ -20,6 +21,29 @@ const session = (over: Partial<BranchSession>): BranchSession => ({
   running: true,
   spawnedAt: 1,
   ...over,
+});
+
+// Another machine's agent that cannot be reached may still be running
+// there: neither Running here nor Exited, and not in Running's green.
+describe('cardStatus', () => {
+  const card = (over: Partial<BranchSession>) =>
+    sessionCards([session({ machine: PEER, ...over })], machines)[0]!;
+
+  it('says what each state is, in its own tone', () => {
+    expect(cardStatus(card({}))).toEqual({ label: 'Running', tone: 'success' });
+    expect(cardStatus(card({ connectionState: 'connected' }))).toEqual({
+      label: 'Running',
+      tone: 'success',
+    });
+    for (const connectionState of ['reconnecting', 'failed'] as const)
+      expect(cardStatus(card({ connectionState }))).toEqual({
+        label: 'Waiting to reconnect',
+        tone: 'warning',
+      });
+    expect(
+      cardStatus(card({ running: false, connectionState: 'reconnecting' }))
+    ).toEqual({ label: 'Exited', tone: 'muted' });
+  });
 });
 
 describe('sessionCards', () => {

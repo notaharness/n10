@@ -1,3 +1,4 @@
+import { setUpdatesNotifier } from './services/updates.js';
 /**
  * Everything the host pushes to windows without being asked, plus the
  * per-repo background work that produces most of it. Each service
@@ -11,6 +12,7 @@ import {
   MACHINES_EVENTS,
   SYNC_EVENTS,
   THEME_EVENTS,
+  UPDATE_EVENTS,
 } from './contract.js';
 import { setRepoOpenedListener } from './services/repo.js';
 import {
@@ -44,6 +46,7 @@ export interface HostPushes {
  *  Call once, before the first repo is opened. */
 export function installHostPushes({ broadcast, sendTo }: HostPushes): void {
   setSessionBroadcaster(broadcast, sendTo);
+  setUpdatesNotifier((snapshot) => broadcast(UPDATE_EVENTS.changed, snapshot));
 
   // Per-repo background work, (re)started whenever a repo is opened.
   // The sync loop's user-facing events (auto-deleted merged branch, …)
@@ -63,9 +66,9 @@ export function installHostPushes({ broadcast, sendTo }: HostPushes): void {
   setRemoteUpdatedNotifier(() => broadcast(SYNC_EVENTS.remote));
 
   // Same idea for the local half: a worktree or session that appeared
-  // outside this process changes what the sidebar should show, and the
-  // renderer is serving it from a query cache.
-  setDiscoveryNotifier(() => broadcast(DISCOVERY_EVENTS.changed));
+  // or went away changes what the sidebar should show, and the renderer
+  // is serving it from a query cache.
+  setDiscoveryNotifier((event) => broadcast(DISCOVERY_EVENTS.changed, event));
 
   // A babysitter started an agent (a row and a session) or ended; its
   // status otherwise rides on the sidebar item.

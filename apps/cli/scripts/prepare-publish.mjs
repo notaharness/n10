@@ -20,6 +20,7 @@ import {
   copyFileSync,
   cpSync,
   existsSync,
+  mkdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -61,7 +62,9 @@ copyFileSync(
 );
 
 // The desktop app keeps its build layout: main/ finds preload/ and
-// renderer/ beside it.
+// renderer/ beside it. Only the runtime ships: no source maps, and no
+// declarations, which the esbuild executor writes into its outputPath
+// whenever the build tsconfig emits them.
 rmSync(resolve(distDir, 'desktop'), { recursive: true, force: true });
 for (const part of ['main', 'preload', 'renderer']) {
   const from = resolve(desktopDir, 'dist', part);
@@ -70,8 +73,15 @@ for (const part of ['main', 'preload', 'renderer']) {
   }
   cpSync(from, resolve(distDir, 'desktop', part), {
     recursive: true,
-    filter: (path) => !path.endsWith('.map'),
+    filter: (path) => !path.endsWith('.map') && !path.endsWith('.d.ts'),
   });
+}
+// The npm app reads only these two at runtime. The SVG, ICNS and Linux
+// hicolor ladder stay in apps/desktop/build for native package recipes.
+const iconsOut = resolve(distDir, 'desktop', 'build');
+mkdirSync(iconsOut, { recursive: true });
+for (const icon of ['icon.png', 'icon.ico']) {
+  copyFileSync(resolve(desktopDir, 'build', icon), resolve(iconsOut, icon));
 }
 
 const out = {

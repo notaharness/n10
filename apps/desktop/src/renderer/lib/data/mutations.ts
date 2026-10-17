@@ -6,12 +6,7 @@ import {
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { keys } from './query-keys.js';
-import {
-  verdictDecision,
-  withViewerVerdict,
-} from '../review/review-verdict.js';
 import { errorMessage } from '../utils.js';
-import { useTabs } from '../tabs/tabs.js';
 import { keptNotice } from './removal-notice.js';
 import type {
   PlanCheckoutRequest,
@@ -21,9 +16,7 @@ import type {
   ResolveRequest,
   ReviewComment,
   ReviewLaunchRequest,
-  ReviewVerdict,
   SessionLaunchRequest,
-  SidebarItem,
   WorktreeRemovalCheck,
 } from '../../../host/contract.js';
 
@@ -58,60 +51,6 @@ function useInvalidator(cwd: string) {
 
 // ── Mutations ────────────────────────────────────────────────────
 
-export function useSubmitVerdict(cwd: string, providerId?: string) {
-  const qc = useQueryClient();
-  const inv = useInvalidator(cwd);
-  return useMutation({
-    mutationFn: ({ prId, verdict }: { prId: number; verdict: ReviewVerdict }) =>
-      window.n10.submitReviewVerdict(prId, verdict),
-    // Optimistic: the vote succeeds virtually always, so reflect it in
-    // the cached sidebar model immediately (reviewer dots, PR bar and
-    // row badges all derive from it) and roll back only on error.
-    onMutate: async ({ prId, verdict }) => {
-      const viewer = await qc
-        .fetchQuery({
-          queryKey: keys.reviewViewer(cwd),
-          queryFn: () => window.n10.getReviewViewer(),
-          staleTime: Infinity,
-        })
-        .catch(() => null);
-      if (!viewer) return { prev: undefined };
-      const key = keys.sidebar(cwd);
-      await qc.cancelQueries({ queryKey: key });
-      const prev = qc.getQueryData<SidebarItem[]>(key);
-      if (prev) {
-        const decision = verdictDecision(verdict, providerId);
-        qc.setQueryData<SidebarItem[]>(
-          key,
-          prev.map((item) => {
-            if (item.pr?.id !== prId) return item;
-            const reviewers = withViewerVerdict(
-              item.pr.reviewers ?? [],
-              viewer.identifier,
-              decision
-            );
-            return { ...item, pr: { ...item.pr, reviewers } };
-          })
-        );
-      }
-      return { prev };
-    },
-    onError: (_e, _v, ctx) => {
-      if (ctx?.prev) qc.setQueryData(keys.sidebar(cwd), ctx.prev);
-    },
-    // The host already re-read the pull request list as part of
-    // submitting the verdict — plain invalidation would refetch the
-    // sidebar from a TTL cache (prPollInterval, a minute by default)
-    // and hand back pre-verdict reviewers, reverting the optimistic
-    // patch a frame later. Asking for a *refresh* here as well would
-    // spend a second forced cycle, and tell the provider to forget
-    // rows a vote changed nothing about.
-    onSettled: () => {
-      void inv.sidebar();
-    },
-  });
-}
-
 export function useCreateWorktree(cwd: string) {
   const inv = useInvalidator(cwd);
   return useMutation({
@@ -129,7 +68,6 @@ const REMOVE_WORKTREE_KEY = ['remove-worktree'] as const;
 
 export function useRemoveWorktree(cwd: string) {
   const inv = useInvalidator(cwd);
-  const tabs = useTabs();
   return useMutation({
     mutationKey: REMOVE_WORKTREE_KEY,
     mutationFn: ({
@@ -138,17 +76,14 @@ export function useRemoveWorktree(cwd: string) {
     }: {
       branch: string;
       approved: WorktreeRemovalCheck;
-      /** The worktree's tab, closed once the worktree is gone. */
-      tabId?: string;
     }) => window.n10.removeWorktree(branch, approved),
     // Reported here rather than through `mutate`'s own callbacks: the
     // confirm dialog closes as soon as it fires, and per-call callbacks
     // are dropped when their component unmounts. Mutation-level ones run
     // either way, so the outcome is never swallowed.
-    onSuccess: (outcome, { branch, tabId }) => {
-      // A kept worktree keeps its tab: its agent may still be running.
-      const gone = outcome === 'removed' || outcome === 'kept-branch';
-      if (gone && tabId) tabs.close(tabId, cwd);
+    // A removed worktree's tab closes on discovery's report of it
+    // (`TabsProvider`), however it was removed.
+    onSuccess: (outcome, { branch }) => {
       const notice = keptNotice(branch, outcome);
       if (notice) toast.warning(notice);
       else toast.success(`Removed worktree ${branch}`);

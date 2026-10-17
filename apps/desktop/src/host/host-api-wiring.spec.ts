@@ -33,17 +33,29 @@ function recorder(moduleName: string, names: string[]) {
   );
 }
 
+vi.mock('./services/updates.js', () =>
+  recorder('updates', [
+    'getUpdates',
+    'checkUpdates',
+    'setUpdatePreferences',
+    'prepareNpmUpdate',
+  ])
+);
 vi.mock('./services/repo.js', () =>
   recorder('repo', [
     'openRepo',
     'getRepo',
     'refreshRepo',
+    'getRepoInfo',
     'listRecentRepos',
     'forgetRecentRepo',
   ])
 );
 vi.mock('./services/settings.js', () =>
   recorder('settings', ['getSettingsView', 'updateSettingsFromView'])
+);
+vi.mock('./services/keybindings.js', () =>
+  recorder('keybindings', ['getDesktopKeybindings', 'setDesktopKeybinding'])
 );
 vi.mock('./services/sidebar.js', () =>
   recorder('sidebar', ['getSidebarSnapshot', 'getSyncState', 'refreshRemote'])
@@ -66,9 +78,10 @@ vi.mock('./services/reviews.js', () =>
     'replyToThread',
     'setThreadResolved',
     'fetchPrDescription',
-    'submitReviewVerdict',
-    'getReviewViewer',
-    'getDiffText',
+    'getPrDiffManifest',
+    'getPrDiffPatch',
+    'getPrDiffImage',
+    'getPrRangeManifest',
   ])
 );
 vi.mock('./services/sessions.js', () =>
@@ -103,6 +116,9 @@ vi.mock('./services/branch-sessions.js', () =>
 vi.mock('./services/foreign-sessions.js', () =>
   recorder('foreignSessions', ['listForeignSessions'])
 );
+vi.mock('./services/orchestrators.js', () =>
+  recorder('orchestrators', ['listOrchestratorGroups'])
+);
 vi.mock('./services/comment-images.js', () =>
   recorder('commentImages', ['fetchCommentImage'])
 );
@@ -114,6 +130,9 @@ vi.mock('./services/pr-checks.js', () =>
 );
 vi.mock('./services/pr-details.js', () =>
   recorder('prDetails', ['getPullRequestSnapshot'])
+);
+vi.mock('./services/pr-history.js', () =>
+  recorder('prHistory', ['getPullRequestHistory', 'recordPullRequestVisit'])
 );
 vi.mock('./services/pr-conversation.js', () =>
   recorder('prConversation', ['getPullRequestConversation'])
@@ -135,6 +154,7 @@ vi.mock('./services/drafts.js', () =>
     'updateDraftComment',
     'deleteDraftComment',
     'postDraftComments',
+    'getGuidedReview',
   ])
 );
 vi.mock('./services/babysit.js', () =>
@@ -148,6 +168,7 @@ vi.mock('./services/machines.js', () =>
   recorder('machines', [
     'listMachines',
     'getBeamStatus',
+    'setNetworkOnline',
     'setMachineAlias',
     'setMachineGrant',
     'runCeremony',
@@ -175,6 +196,7 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ['openRepo', ['/repo'], 'repo.openRepo'],
   ['getRepo', [], 'repo.getRepo'],
   ['refreshRepo', [], 'repo.refreshRepo'],
+  ['getRepoInfo', ['/repo'], 'repo.getRepoInfo'],
   ['listRecentRepos', [], 'repo.listRecentRepos'],
   ['forgetRecent', ['/repo'], 'repo.forgetRecentRepo'],
 
@@ -185,13 +207,13 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     'settings.updateSettingsFromView',
   ],
 
-  ['getSidebarModel', [], 'sidebar.getSidebarSnapshot'],
-  ['getSyncState', [], 'sidebar.getSyncState'],
+  ['getSidebarModel', ['/repo'], 'sidebar.getSidebarSnapshot'],
+  ['getSyncState', ['/repo'], 'sidebar.getSyncState'],
   ['refreshRemote', [], 'sidebar.refreshRemote'],
 
   ['listWorktrees', [], 'worktrees.listWorktrees'],
   ['listBranches', [], 'worktrees.listBranches'],
-  ['listAllBranches', [], 'worktrees.listAllBranches'],
+  ['listAllBranches', ['/repo'], 'worktrees.listAllBranches'],
   ['createWorktree', ['feature'], 'worktrees.createWorktree'],
   [
     'removeWorktree',
@@ -209,24 +231,38 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ['checkWorktreeRemoval', ['feature'], 'worktrees.checkWorktreeRemoval'],
   ['openInEditor', ['feature'], 'worktrees.openInEditor'],
 
-  ['fetchCommentThreads', [7, true], 'reviews.fetchCommentThreads'],
-  ['fetchPrDescription', [7], 'reviews.fetchPrDescription'],
+  ['fetchCommentThreads', ['/repo', 7, true], 'reviews.fetchCommentThreads'],
+  ['fetchPrDescription', ['/repo', 7], 'reviews.fetchPrDescription'],
   [
     'getPullRequestSnapshot',
-    [{ ref: { number: 7 } }],
+    ['/repo', { ref: { number: 7 } }],
     'prDetails.getPullRequestSnapshot',
   ],
   [
+    'getPullRequestHistory',
+    ['/repo', { ref: { number: 7 }, visitId: 'v1' }],
+    'prHistory.getPullRequestHistory',
+  ],
+  [
+    'recordPullRequestVisit',
+    ['/repo', { ref: { number: 7 }, visit: {} }],
+    'prHistory.recordPullRequestVisit',
+  ],
+  [
     'getPullRequestChecks',
-    [{ ref: { number: 7 } }],
+    ['/repo', { ref: { number: 7 } }],
     'prChecks.getPullRequestChecks',
   ],
   [
     'getPullRequestConversation',
-    [{ ref: { number: 7 } }],
+    ['/repo', { ref: { number: 7 } }],
     'prConversation.getPullRequestConversation',
   ],
-  ['listReviewDrafts', [{ ref: { number: 7 } }], 'reviewDrafts.listDrafts'],
+  [
+    'listReviewDrafts',
+    ['/repo', { ref: { number: 7 } }],
+    'reviewDrafts.listDrafts',
+  ],
   ['saveReviewDraft', [{ ref: { number: 7 } }], 'reviewDrafts.saveDraft'],
   ['discardReviewDraft', [{ ref: { number: 7 } }], 'reviewDrafts.discardDraft'],
   ['submitReview', [{ ref: { number: 7 } }], 'reviewDrafts.submitReview'],
@@ -245,38 +281,61 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     [{ prId: 7, thread: { id: 't' }, resolved: true }],
     'reviews.setThreadResolved',
   ],
-  ['submitReviewVerdict', [7, 'approve'], 'reviews.submitReviewVerdict'],
-  ['getReviewViewer', [], 'reviews.getReviewViewer'],
-  ['fetchDiffText', ['feature', 'main'], 'reviews.getDiffText'],
+  [
+    'fetchPrDiffManifest',
+    [{ repo: '/r', sourceBranch: 'feature', targetBranch: 'main' }],
+    'reviews.getPrDiffManifest',
+  ],
+  [
+    'fetchPrDiffPatch',
+    [{ repo: '/r', mergeBaseOid: 'a', headOid: 'b' }],
+    'reviews.getPrDiffPatch',
+  ],
+  ['fetchPrDiffImage', [{ repo: '/r', oid: 'a' }], 'reviews.getPrDiffImage'],
+  [
+    'fetchPrRangeManifest',
+    [{ repo: '/r', from: 'a', to: 'b', target: 'c' }],
+    'reviews.getPrRangeManifest',
+  ],
   [
     'fetchWorktreeDiffText',
-    ['feature', 'main'],
+    ['/repo', 'feature', 'main'],
     'worktrees.getWorktreeDiffText',
   ],
 
-  ['fetchCommentImage', ['https://x/y.png'], 'commentImages.fetchCommentImage'],
+  [
+    'fetchCommentImage',
+    ['/repo', 'https://x/y.png'],
+    'commentImages.fetchCommentImage',
+  ],
   [
     'saveClipboardImage',
     [new Uint8Array([1, 2]), 'image/png'],
     'clipboardImage.saveClipboardImage',
   ],
 
-  ['listDraftComments', [7], 'drafts.listDraftComments'],
+  ['listDraftComments', ['/repo', 7], 'drafts.listDraftComments'],
   ['updateDraftComment', [7, 'id', { body: 'x' }], 'drafts.updateDraftComment'],
   ['deleteDraftComment', [7, 'id'], 'drafts.deleteDraftComment'],
   ['postDraftComments', [{ prId: 7 }], 'drafts.postDraftComments'],
+  ['getGuidedReview', ['/repo', 7], 'drafts.getGuidedReview'],
 
   ['launchAgent', [{ branch: 'b' }], 'sessions.launchAgent'],
-  ['launchReviewAgent', [{ pr: {} }], 'sessions.launchReviewAgent'],
-  ['listAgentOptions', [], 'sessions.listAgentOptions'],
+  [
+    'launchReviewAgent',
+    [{ pr: {}, guide: true }],
+    'sessions.launchReviewAgent',
+  ],
+  ['listAgentOptions', ['/repo'], 'sessions.listAgentOptions'],
   ['getSessionLaunchContext', ['feature'], 'sessions.getSessionLaunchContext'],
   [
     'checkoutPlan',
     [{ pr: {}, prompt: 'p', mode: 'inject' }],
     'sessions.checkoutPlan',
   ],
-  ['listSessions', [], 'sessions.listSessions'],
+  ['listSessions', ['/repo'], 'sessions.listSessions'],
   ['listForeignSessions', [], 'foreignSessions.listForeignSessions'],
+  ['listOrchestratorGroups', [], 'orchestrators.listOrchestratorGroups'],
   ['getSessionActivity', [], 'sessions.getSessionActivity'],
   ['writeSession', ['b', 'ls\n'], 'sessions.writeSession'],
   ['resizeSession', ['b', 120, 40], 'sessions.resizeSession'],
@@ -290,21 +349,39 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ],
   ['listTerminals', [], 'branchSessions.listTerminals'],
   ['killTerminal', ['n10-shell'], 'terminals.killTerminal'],
-  ['listBranchSessions', ['feature'], 'branchSessions.listBranchSessions'],
+  [
+    'listBranchSessions',
+    ['/repo', 'feature'],
+    'branchSessions.listBranchSessions',
+  ],
   [
     'launchBranchTerminal',
     [{ branch: 'feature', machine: 'peer' }],
     'branchSessions.launchBranchTerminal',
   ],
 
+  ['getUpdates', [], 'updates.getUpdates'],
+  ['checkUpdates', [], 'updates.checkUpdates'],
+  [
+    'setUpdatePreferences',
+    [{ channel: 'stable' }],
+    'updates.setUpdatePreferences',
+  ],
   ['getDesktopPrefs', [], 'prefs.loadDesktopPrefs'],
   ['getTheme', [], 'theme.getTheme'],
+  ['getKeybindings', [], 'keybindings.getDesktopKeybindings'],
+  [
+    'setKeybinding',
+    ['desktop.tabs.next', null],
+    'keybindings.setDesktopKeybinding',
+  ],
 
   ['startBabysit', [7], 'babysit.startBabysit'],
   ['stopBabysit', [7], 'babysit.stopBabysit'],
 
   ['listMachines', [], 'machines.listMachines'],
   ['getBeamStatus', [], 'machines.getBeamStatus'],
+  ['setNetworkOnline', [false], 'machines.setNetworkOnline'],
   [
     'setMachineAlias',
     ['bbbbbbbbbbbbbbbb', 'workbox'],
@@ -318,6 +395,35 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
 ];
 
 describe('host API wiring', () => {
+  it('Quit to update reaches the shell quit path', async () => {
+    const { setShellGlue } = await import('./register-handlers.js');
+    const quit = vi.fn(async () => undefined);
+    setShellGlue({
+      quitForUpdate: quit,
+      quitForNpmUpdate: async () => undefined,
+      contextMenu: async () => null,
+      appMenuPopup: async () => undefined,
+      aboutBox: async () => undefined,
+      prefsChanged: () => undefined,
+    });
+    await api.quitForUpdate();
+    expect(quit).toHaveBeenCalledOnce();
+  });
+  it('prepares the npm update before asking the shell to quit', async () => {
+    const { setShellGlue } = await import('./register-handlers.js');
+    const quit = vi.fn(async () => undefined);
+    setShellGlue({
+      quitForNpmUpdate: quit,
+      quitForUpdate: async () => undefined,
+      contextMenu: async () => null,
+      appMenuPopup: async () => undefined,
+      aboutBox: async () => undefined,
+      prefsChanged: () => undefined,
+    });
+    await api.updateAndRestart();
+    expect(calls).toEqual([{ fn: 'updates.prepareNpmUpdate', args: [] }]);
+    expect(quit).toHaveBeenCalledWith('updates.prepareNpmUpdate');
+  });
   it.each(WIRING)('%s reaches %s', async (method, args, expected) => {
     // The table is heterogeneous by construction — each row has its own
     // signature — so the call is made through the widest function type
@@ -338,6 +444,9 @@ describe('host API wiring', () => {
       'showContextMenu',
       'showAppMenu',
       'showAbout',
+      'quitForUpdate',
+      'updateAndRestart',
+      'onUpdatesChanged',
       'setDesktopPrefs', // also notifies main.ts; covered separately
       'onSessionData',
       'onSessionExit',
@@ -372,6 +481,14 @@ describe('host API wiring', () => {
       expect(calls).toEqual([{ fn: expected, args: [7, 'b'] }]);
     }
   );
+
+  it('holdMenuShortcuts asks the main process for the asking window', async () => {
+    const { setMenuShortcutHold } = await import('./viewer-api.js');
+    const hold = vi.fn(async () => undefined);
+    setMenuShortcutHold(hold);
+    await createViewerApi().holdMenuShortcuts(7, true);
+    expect(hold).toHaveBeenCalledWith(7, true);
+  });
 
   it('reports the running versions rather than a service call', () => {
     // getVersion is the one method that answers from the process

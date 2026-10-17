@@ -166,8 +166,13 @@ export function createTerminalService(ports: TerminalPorts) {
       killSession(name);
       forget(name);
     },
+    /** Discovery's word that the session is gone. This machine's tmux is
+     *  asked again; another machine's word is the listing discovery just
+     *  took there, since its backend stops polling a dead pane. */
     forget(name: string) {
-      if (hasPersistedTerminalSession(name) || !known.has(name)) return;
+      const local = sessionIdentity(name)?.machine === LOCAL_MACHINE;
+      if (!known.has(name) || (local && hasPersistedTerminalSession(name)))
+        return;
       forget(name);
       detachSession(name);
     },

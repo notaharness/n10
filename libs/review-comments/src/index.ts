@@ -74,3 +74,10 @@ export {
   EDIT_INPUT_SLACK_ROWS,
 } from './lib/comment-rows.js';
 export { handleUtilCommand } from './lib/util-command.js';
+export type {
+  GuideFile,
+  GuideSlide,
+  GuideVisual,
+  GuidedReview,
+} from './lib/guide.js';
+export { readGuide, writeGuide } from './lib/guide-store.js';

@@ -48,6 +48,9 @@ describe('loadDesktopPrefs', () => {
       theme: 'system',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
+      imageCompare: 'side-by-side',
     });
   });
 
@@ -59,6 +62,9 @@ describe('loadDesktopPrefs', () => {
       theme: 'system',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
+      imageCompare: 'side-by-side',
     });
   });
 
@@ -70,6 +76,9 @@ describe('loadDesktopPrefs', () => {
       theme: 'dark',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
+      imageCompare: 'side-by-side',
     });
   });
 
@@ -79,12 +88,18 @@ describe('loadDesktopPrefs', () => {
         theme: 'light',
         nativeFrame: true,
         tabOverflow: 'scroll',
+        tabCycleMru: true,
+        guidedReview: true,
+        imageCompare: 'slider',
       })
     );
     expect(loadDesktopPrefs()).toEqual({
       theme: 'light',
       nativeFrame: true,
       tabOverflow: 'scroll',
+      tabCycleMru: true,
+      guidedReview: true,
+      imageCompare: 'slider',
     });
   });
 });
@@ -96,11 +111,17 @@ describe('saveDesktopPrefs', () => {
       theme: 'dark',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
+      imageCompare: 'side-by-side',
     });
     expect(JSON.parse(readFileSync(prefsPath(), 'utf8'))).toEqual({
       theme: 'dark',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
+      imageCompare: 'side-by-side',
     });
   });
 
@@ -112,6 +133,9 @@ describe('saveDesktopPrefs', () => {
       theme: 'light',
       nativeFrame: true,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
+      imageCompare: 'side-by-side',
     });
   });
 
@@ -122,6 +146,9 @@ describe('saveDesktopPrefs', () => {
       theme: 'system',
       nativeFrame: true,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
+      imageCompare: 'side-by-side',
     });
   });
 
@@ -131,6 +158,9 @@ describe('saveDesktopPrefs', () => {
       theme: 'dark',
       nativeFrame: false,
       tabOverflow: 'wrap',
+      tabCycleMru: false,
+      guidedReview: true,
+      imageCompare: 'side-by-side',
     });
     expect(loadDesktopPrefs().theme).toBe('dark');
   });

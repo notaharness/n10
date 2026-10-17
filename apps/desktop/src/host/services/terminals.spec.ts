@@ -114,6 +114,12 @@ vi.mock('@n10/core', () => ({
 
 let terminals: typeof TerminalsModule;
 
+// Each test re-imports the service over fresh module state. Loading its
+// module graph the first time means transforming all of it, which a
+// full parallel run can stretch past a hook's timeout; done here, while
+// the file is collected, every hook after re-evaluates cached modules.
+await import('./terminals.js');
+
 beforeEach(async () => {
   state.alive = new Set();
   state.spawns = [];

@@ -81,13 +81,17 @@ describe('shownIdFor', () => {
 
 describe('panesFor', () => {
   it('renders the pane on screen and the spare, in id order', () => {
-    expect(panesFor(b, a, REPO)).toEqual([a, b]);
-    expect(panesFor(a, b, REPO)).toEqual([a, b]);
+    expect(panesFor(b, a)).toEqual([a, b]);
+    expect(panesFor(a, b)).toEqual([a, b]);
   });
 
-  it('renders neither a repeat of the pane on screen nor another repository', () => {
-    expect(panesFor(a, a, REPO)).toEqual([a]);
-    expect(panesFor(a, item('x', '/other'), REPO)).toEqual([a]);
-    expect(panesFor(item('x', '/other'), a, REPO)).toEqual([a]);
+  it('renders the pane on screen once', () => {
+    expect(panesFor(a, a)).toEqual([a]);
+  });
+
+  it('renders another repository’s tab, on screen or held ready', () => {
+    const other = item('x', '/other');
+    expect(panesFor(a, other)).toEqual([a, other]);
+    expect(panesFor(other, a)).toEqual([a, other]);
   });
 });

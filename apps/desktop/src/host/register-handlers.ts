@@ -1,3 +1,4 @@
+import type { NpmUpdatePlan } from '@n10/engine/contract';
 import { realpathSync } from 'node:fs';
 import type {
   ContextMenuItem,
@@ -6,15 +7,18 @@ import type {
   ResolveRequest,
 } from './contract.js';
 import { IPC } from './contract.js';
+import * as updates from './services/updates.js';
 import * as repo from './services/repo.js';
 import * as prefs from './services/desktop-prefs.js';
 import * as theme from './services/theme.js';
 import * as settings from './services/settings.js';
+import * as keybindings from './services/keybindings.js';
 import * as sidebar from './services/sidebar.js';
 import * as worktrees from './services/worktrees.js';
 import * as reviews from './services/reviews.js';
 import * as sessions from './services/sessions.js';
 import * as foreignSessions from './services/foreign-sessions.js';
+import * as orchestrators from './services/orchestrators.js';
 import * as terminals from './services/terminals.js';
 import * as branchSessions from './services/branch-sessions.js';
 import * as commentImages from './services/comment-images.js';
@@ -24,6 +28,7 @@ import * as mentions from './services/mentions.js';
 import * as prChecks from './services/pr-checks.js';
 import * as prConversation from './services/pr-conversation.js';
 import * as prDetails from './services/pr-details.js';
+import * as prHistory from './services/pr-history.js';
 import * as reviewDrafts from './services/review-drafts.js';
 import * as babysit from './services/babysit.js';
 import * as machines from './services/machines.js';
@@ -48,6 +53,12 @@ export { createViewerApi, type ViewerApi };
 
 export function createHostApi(): HostApi {
   return {
+    getUpdates: updates.getUpdates,
+    checkUpdates: updates.checkUpdates,
+    setUpdatePreferences: updates.setUpdatePreferences,
+    quitForUpdate: () => quitForUpdate(),
+    updateAndRestart: async () =>
+      quitForNpmUpdate(await updates.prepareNpmUpdate()),
     getVersion: () =>
       Promise.resolve({
         app: process.env.N10_DESKTOP_VERSION ?? 'dev',
@@ -58,6 +69,7 @@ export function createHostApi(): HostApi {
 
     openRepo: (cwd) => Promise.resolve(repo.openRepo(cwd)),
     getRepo: () => Promise.resolve(repo.getRepo()),
+    getRepoInfo: (cwd) => Promise.resolve(repo.getRepoInfo(cwd)),
     refreshRepo: () => Promise.resolve(repo.refreshRepo()),
     listRecentRepos: () => Promise.resolve(repo.listRecentRepos()),
     selectRepoDirectory: () => pickFolder('Open repository'),
@@ -68,38 +80,40 @@ export function createHostApi(): HostApi {
     updateSettingsField: (ref, value) =>
       Promise.resolve(settings.updateSettingsFromView(ref, value)),
 
-    getSidebarModel: () => sidebar.getSidebarSnapshot(),
-    getSyncState: () => Promise.resolve(sidebar.getSyncState()),
+    getSidebarModel: (cwd) => sidebar.getSidebarSnapshot(cwd),
+    getSyncState: (cwd) => Promise.resolve(sidebar.getSyncState(cwd)),
     refreshRemote: () => sidebar.refreshRemote(),
     listWorktrees: () => worktrees.listWorktrees(),
     listBranches: () => worktrees.listBranches(),
-    listAllBranches: () => worktrees.listAllBranches(),
+    listAllBranches: (cwd) => worktrees.listAllBranches(cwd),
     createWorktree: (branch) => worktrees.createWorktree(branch),
     removeWorktree: (branch, approved) =>
       worktrees.removeWorktree(branch, approved),
     checkWorktreeRemoval: (branch) => worktrees.checkWorktreeRemoval(branch),
     openInEditor: (branch) => worktrees.openInEditor(branch),
 
-    fetchCommentThreads: (prId, force) =>
-      reviews.fetchCommentThreads(prId, force),
+    fetchCommentThreads: (cwd, prId, force) =>
+      reviews.fetchCommentThreads(cwd, prId, force),
     replyToThread: (req: ReplyRequest) => reviews.replyToThread(req),
     setThreadResolved: (req: ResolveRequest) => reviews.setThreadResolved(req),
-    fetchPrDescription: (prId) => reviews.fetchPrDescription(prId),
-    getPullRequestSnapshot: (req) => prDetails.getPullRequestSnapshot(req),
-    getPullRequestChecks: (req) => prChecks.getPullRequestChecks(req),
-    getPullRequestConversation: (req) =>
-      prConversation.getPullRequestConversation(req),
-    listReviewDrafts: (req) => reviewDrafts.listDrafts(req),
+    fetchPrDescription: (cwd, prId) => reviews.fetchPrDescription(cwd, prId),
+    getPullRequestSnapshot: (cwd, req) =>
+      prDetails.getPullRequestSnapshot(cwd, req),
+    getPullRequestHistory: (cwd, req) =>
+      prHistory.getPullRequestHistory(cwd, req),
+    recordPullRequestVisit: (cwd, req) =>
+      prHistory.recordPullRequestVisit(cwd, req),
+    getPullRequestChecks: (cwd, req) => prChecks.getPullRequestChecks(cwd, req),
+    getPullRequestConversation: (cwd, req) =>
+      prConversation.getPullRequestConversation(cwd, req),
+    listReviewDrafts: (cwd, req) => reviewDrafts.listDrafts(cwd, req),
     saveReviewDraft: (req) => reviewDrafts.saveDraft(req),
     discardReviewDraft: (req) => reviewDrafts.discardDraft(req),
     searchMentionCandidates: (req) => mentions.searchMentionCandidates(req),
     submitReview: (req) => reviewDrafts.submitReview(req),
-    submitReviewVerdict: (prId, verdict) =>
-      reviews.submitReviewVerdict(prId, verdict),
-    getReviewViewer: () => Promise.resolve(reviews.getReviewViewer()),
-    fetchCommentImage: (url) => commentImages.fetchCommentImage(url),
-    listDraftComments: (prId) =>
-      Promise.resolve(drafts.listDraftComments(prId)),
+    fetchCommentImage: (cwd, url) => commentImages.fetchCommentImage(cwd, url),
+    listDraftComments: (cwd, prId) => drafts.listDraftComments(cwd, prId),
+    getGuidedReview: (cwd, prId) => drafts.getGuidedReview(cwd, prId),
     updateDraftComment: (prId, id, patch) =>
       Promise.resolve(drafts.updateDraftComment(prId, id, patch)),
     deleteDraftComment: (prId, id) =>
@@ -110,11 +124,13 @@ export function createHostApi(): HostApi {
     launchReviewAgent: (req) => sessions.launchReviewAgent(req),
     getSessionLaunchContext: (branch) =>
       sessions.getSessionLaunchContext(branch),
-    listAgentOptions: () => Promise.resolve(sessions.listAgentOptions()),
+    listAgentOptions: (cwd) => Promise.resolve(sessions.listAgentOptions(cwd)),
     checkoutPlan: (req) => sessions.checkoutPlan(req),
-    listSessions: () => Promise.resolve(sessions.listSessions()),
+    listSessions: (cwd) => Promise.resolve(sessions.listSessions(cwd)),
     listForeignSessions: () =>
       Promise.resolve(foreignSessions.listForeignSessions()),
+    listOrchestratorGroups: () =>
+      Promise.resolve(orchestrators.listOrchestratorGroups()),
     getSessionActivity: () => Promise.resolve(sessions.getSessionActivity()),
     writeSession: (name, data) =>
       Promise.resolve(sessions.writeSession(name, data)),
@@ -128,8 +144,8 @@ export function createHostApi(): HostApi {
     launchTerminal: (req) => terminals.launchTerminal(req),
     listTerminals: () => Promise.resolve(branchSessions.listTerminals()),
     killTerminal: (name) => Promise.resolve(terminals.killTerminal(name)),
-    listBranchSessions: (branch) =>
-      Promise.resolve(branchSessions.listBranchSessions(branch)),
+    listBranchSessions: (cwd, branch) =>
+      Promise.resolve(branchSessions.listBranchSessions(cwd, branch)),
     launchBranchTerminal: (req) => branchSessions.launchBranchTerminal(req),
     onSessionData: () => {
       // Events are pushed via setSessionBroadcaster; the preload side
@@ -139,10 +155,12 @@ export function createHostApi(): HostApi {
     onSessionExit: () => () => undefined,
     onLaunchStep: () => () => undefined,
 
-    fetchDiffText: (sourceBranch, targetBranch) =>
-      reviews.getDiffText(sourceBranch, targetBranch),
-    fetchWorktreeDiffText: (branch, targetBranch) =>
-      worktrees.getWorktreeDiffText(branch, targetBranch),
+    fetchWorktreeDiffText: (cwd, branch, targetBranch) =>
+      worktrees.getWorktreeDiffText(cwd, branch, targetBranch),
+    fetchPrDiffManifest: (req) => reviews.getPrDiffManifest(req),
+    fetchPrDiffPatch: (req) => reviews.getPrDiffPatch(req),
+    fetchPrDiffImage: (req) => reviews.getPrDiffImage(req),
+    fetchPrRangeManifest: (req) => reviews.getPrRangeManifest(req),
 
     openExternal: (url) => externalOpener(url),
     showContextMenu: (items) => contextMenu(items),
@@ -159,6 +177,9 @@ export function createHostApi(): HostApi {
     },
     getTheme: () => Promise.resolve(theme.getTheme()),
     onThemeChanged: () => () => undefined,
+    getKeybindings: () => Promise.resolve(keybindings.getDesktopKeybindings()),
+    setKeybinding: (actionId, descriptors) =>
+      Promise.resolve(keybindings.setDesktopKeybinding(actionId, descriptors)),
     showAbout: () => aboutBox(),
 
     startBabysit: (prId) => babysit.startBabysit(prId),
@@ -167,6 +188,7 @@ export function createHostApi(): HostApi {
 
     listMachines: () => machines.listMachines(),
     getBeamStatus: () => machines.getBeamStatus(),
+    setNetworkOnline: (online) => machines.setNetworkOnline(online),
     onBeamStatusChanged: () => () => undefined,
     setMachineAlias: (peerId, alias) => machines.setMachineAlias(peerId, alias),
     setMachineGrant: (peerId, grant) => machines.setMachineGrant(peerId, grant),
@@ -177,6 +199,7 @@ export function createHostApi(): HostApi {
     onDirectoryPublished: () => () => undefined,
     dismissInboundMail: (id) => inboundMail.dismissInboundMail(id),
     onMachinesChanged: () => () => undefined,
+    onUpdatesChanged: () => () => undefined,
   };
 }
 
@@ -199,6 +222,9 @@ let contextMenu: (
   items: ContextMenuItem[]
 ) => Promise<string | null> = async () => null;
 let appMenuPopup: () => Promise<void> = async () => undefined;
+let quitForNpmUpdate: (plan: NpmUpdatePlan) => Promise<void> = async () =>
+  undefined;
+let quitForUpdate: () => Promise<void> = async () => undefined;
 let aboutBox: () => Promise<void> = async () => undefined;
 let prefsChanged: (next: prefs.DesktopPrefsLike) => void = () => undefined;
 
@@ -222,11 +248,15 @@ export function setExternalOpener(fn: (url: string) => Promise<void>): void {
 }
 
 export function setShellGlue(glue: {
+  quitForUpdate?: () => Promise<void>;
+  quitForNpmUpdate?: (plan: NpmUpdatePlan) => Promise<void>;
   contextMenu: (items: ContextMenuItem[]) => Promise<string | null>;
   appMenuPopup: () => Promise<void>;
   aboutBox: () => Promise<void>;
   prefsChanged: (next: prefs.DesktopPrefsLike) => void;
 }): void {
+  quitForUpdate = glue.quitForUpdate ?? quitForUpdate;
+  quitForNpmUpdate = glue.quitForNpmUpdate ?? quitForNpmUpdate;
   contextMenu = glue.contextMenu;
   appMenuPopup = glue.appMenuPopup;
   aboutBox = glue.aboutBox;
@@ -243,15 +273,11 @@ export function registerHostHandlers(
   api: HostApi = createHostApi(),
   viewerApi: ViewerApi = createViewerApi()
 ): void {
-  // Each channel's method is the one of the same name; window-scoped
-  // ones are registered below with the window that asked.
-  const viewerChannels = viewerHandlers(viewerApi);
-  const methods = api as unknown as Record<string, HostMethod | undefined>;
-  const handlers = Object.entries(IPC)
-    .filter(([, channel]) => !(channel in viewerChannels))
-    .map(([method, channel]) => [channel, methods[method]] as const);
-
-  for (const [channel, fn] of handlers) {
+  const viewer = viewerHandlers(viewerApi);
+  const methods = api as Partial<Record<string, HostMethod>>;
+  for (const [method, channel] of Object.entries(IPC)) {
+    if (channel in viewer) continue;
+    const fn = methods[method];
     if (!fn) throw new Error(`No host implementation for ${channel}`);
     // Electron's ipcMain.handle passes the IpcMainInvokeEvent as the
     // first listener arg; the contract methods only want the payload.
@@ -260,7 +286,7 @@ export function registerHostHandlers(
     );
   }
 
-  for (const [channel, fn] of Object.entries(viewerChannels)) {
+  for (const [channel, fn] of Object.entries(viewer)) {
     register.handle(channel, (event, ...args: unknown[]) =>
       relayErrors(fn, [viewerOf(event), ...args])
     );

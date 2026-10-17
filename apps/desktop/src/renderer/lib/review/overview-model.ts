@@ -1,11 +1,8 @@
 import {
-  asksForReview,
-  holdingVerdict,
   reviewersToCount,
   type PullRequestInfo,
   type PullRequestReviewer,
   type ReviewDecision,
-  viewerEntry,
 } from '@n10/vcs-core/types';
 import type { Mode } from './review-model.js';
 
@@ -13,11 +10,9 @@ import type { Mode } from './review-model.js';
  * What the pull request Overview says, decided from the data it has.
  *
  * Everything here reads the pull request list's row: whose pull request
- * it is, where the tab opens, and the reader's next step, in facts the
- * row states. Nothing here decides what blocks: which verdict holds a
- * pull request back is vcs-core's (`holdingVerdict`), as is whether the
- * provider asks a reviewer (`asksForReview`), and whether a review is
- * required is core's readiness, which the Completion section shows.
+ * it is, where the tab opens, and the reader's next step. Nothing here
+ * decides what blocks: whether a review is required is core's
+ * readiness, which the Completion section shows.
  */
 
 export type ReviewRole = 'author' | 'reviewer';
@@ -122,149 +117,30 @@ export function adoptPullRequest(
   return { ...state, hasPr, mode: state.chosen ? state.mode : initial };
 }
 
-/** The viewer's own entry among the reviewers, or else a group of
- *  theirs that is still asked (`viewerEntry`). */
-export function viewerReview(
-  pr: PullRequestInfo,
-  viewer: string | null
-): PullRequestReviewer | undefined {
-  if (viewer == null) return undefined;
-  const me = viewer.toLowerCase();
-  return viewerEntry(
-    pr.reviewers ?? [],
-    (r) => r.identifier.toLowerCase() === me
-  );
-}
-
-/** What the primary button in the attention strip does. */
+/** What the Overview's next-step button does. */
 export type AttentionAction = 'review-changes' | 'show-unresolved';
 
+/** The Overview's next-step button: what it says and where it leads. */
 export interface NextStep {
-  /** One sentence: the state that matters most to this reader. */
-  summary: string;
-  /** Supporting facts, or null. */
-  detail: string | null;
-  /** Where the detail leads, when it names something to go to. */
-  detailAction?: AttentionAction;
   action: AttentionAction;
   label: string;
 }
 
-function names(reviewers: readonly PullRequestReviewer[]): string {
-  const [first, ...rest] = reviewers.map((r) => r.displayName);
-  if (rest.length === 0) return first ?? '';
-  return `${first} and ${rest.length} other${rest.length === 1 ? '' : 's'}`;
-}
-
-/** A holding verdict in its provider's own words: Azure's -10 and -5
- *  are different votes, and GitHub has only the third. */
-const HOLDING_PHRASE: Record<
-  NonNullable<ReturnType<typeof holdingVerdict>>['decision'],
-  (who: string) => string
-> = {
-  rejected: (who) => `Rejected by ${who}`,
-  'waiting-for-author': (who) => `Waiting for author: ${who}`,
-  'changes-requested': (who) => `Changes requested by ${who}`,
-};
-
-function unresolvedDetail(pr: PullRequestInfo): string | null {
-  const n = pr.activeCommentCount ?? 0;
-  if (n === 0) return null;
-  return `${n} unresolved thread${n === 1 ? '' : 's'}`;
-}
-
-/** What a reviewer's own verdict says back to them. */
-const OWN_VERDICT: Partial<Record<PullRequestReviewer['decision'], string>> = {
-  approved: 'You approved this pull request',
-  'changes-requested': 'You asked for changes',
-  'waiting-for-author': 'You are waiting for the author',
-  rejected: 'You rejected this pull request',
-  declined: 'You declined to review',
-};
-
-function reviewerStep(pr: PullRequestInfo, viewer: string | null): NextStep {
-  const unresolved = unresolvedDetail(pr);
-  // The count leads to the first open thread, as the header's does.
-  const step = {
-    detail: unresolved,
-    ...(unresolved && { detailAction: 'show-unresolved' as const }),
-    action: 'review-changes' as const,
-    label: 'Review changes',
-  };
-  // A draft is not asking for review yet, which is also why the sidebar
-  // keeps it out of Needs your review.
-  if (pr.isDraft) {
-    return {
-      ...step,
-      summary: 'Draft: not ready for review yet',
-      label: 'View changes',
-    };
+/**
+ * The reader's next step, by role. A reviewer reviews the changes, or
+ * views a draft's; an author with unresolved threads goes to them, and
+ * otherwise views the changes. Deterministic: the same row always
+ * says the same thing.
+ */
+export function nextStep(pr: PullRequestInfo, role: ReviewRole): NextStep {
+  if (role === 'author' && (pr.activeCommentCount ?? 0) > 0) {
+    return { action: 'show-unresolved', label: 'Respond to feedback' };
   }
-  if (viewer == null) {
-    return {
-      summary: "Can't show your review",
-      detail: 'No account is configured for this repository.',
-      action: step.action,
-      label: step.label,
-    };
-  }
-  const mine = viewerReview(pr, viewer);
-  const own = mine && OWN_VERDICT[mine.decision];
-  if (own) return { ...step, summary: own };
+  const reviewing = role === 'reviewer' && !pr.isDraft;
   return {
-    ...step,
-    summary:
-      mine && asksForReview(mine)
-        ? 'Your review is requested'
-        : 'Not reviewed by you yet',
+    action: 'review-changes',
+    label: reviewing ? 'Review changes' : 'View changes',
   };
-}
-
-function authorStep(pr: PullRequestInfo): NextStep {
-  const reviewers = reviewersToCount(pr.reviewers ?? []);
-  const unresolved = unresolvedDetail(pr);
-  const view = { action: 'review-changes' as const, label: 'View changes' };
-  // The count is the fact; who owes the next move on each thread is not
-  // something it says.
-  if (unresolved) {
-    return {
-      summary: unresolved,
-      detail: null,
-      action: 'show-unresolved',
-      label: 'Respond to feedback',
-    };
-  }
-  const holding = holdingVerdict(reviewers);
-  if (holding) {
-    return {
-      ...view,
-      summary: HOLDING_PHRASE[holding.decision](names(holding.by)),
-      detail: null,
-    };
-  }
-  if (pr.isDraft) return { ...view, summary: 'Draft', detail: null };
-  const approved = reviewers.filter((r) => r.decision === 'approved');
-  if (approved.length > 0) {
-    return { ...view, summary: `Approved by ${names(approved)}`, detail: null };
-  }
-  // What the row says, not whether a review is required: that is
-  // Completion's, from the provider.
-  return {
-    ...view,
-    summary:
-      reviewers.length === 0 ? 'No reviewers requested' : 'No approvals yet',
-    detail: null,
-  };
-}
-
-/** The reader's next step, by role. Deterministic: the same row always
- *  says the same thing. */
-export function nextStep(
-  pr: PullRequestInfo,
-  role: ReviewRole,
-  viewer: string | null
-): NextStep {
-  return role === 'author' ? authorStep(pr) : reviewerStep(pr, viewer);
 }
 
 /** The reviewers still asked for a verdict, one row per vote

@@ -8,6 +8,7 @@ import {
   getNavHintKeys,
   keysToDisplayString,
   resolveAction,
+  withKeybindOverride,
 } from '@n10/core/ui';
 import type { HintEntry } from '@n10/core';
 import type { InputContext, KeyDescriptor } from '@n10/core';
@@ -133,31 +134,16 @@ export function KeybindProvider({ children }: { children: ReactNode }) {
 
   const updateBinding = useCallback(
     (actionId: string, descriptors: KeyDescriptor[]) => {
-      updateKeybindFields((prev) => {
-        const prevOverrides =
-          (prev.keybindOverrides as Record<string, KeyDescriptor[]>) ?? {};
-        return {
-          ...prev,
-          keybindOverrides: { ...prevOverrides, [actionId]: descriptors },
-        };
-      });
+      updateKeybindFields((prev) =>
+        withKeybindOverride(prev, actionId, descriptors)
+      );
     },
     [updateKeybindFields]
   );
 
   const resetBinding = useCallback(
     (actionId: string) => {
-      updateKeybindFields((prev) => {
-        const prevOverrides =
-          (prev.keybindOverrides as Record<string, KeyDescriptor[]>) ?? {};
-        const rest = Object.fromEntries(
-          Object.entries(prevOverrides).filter(([k]) => k !== actionId)
-        );
-        return {
-          ...prev,
-          keybindOverrides: Object.keys(rest).length > 0 ? rest : undefined,
-        };
-      });
+      updateKeybindFields((prev) => withKeybindOverride(prev, actionId, null));
     },
     [updateKeybindFields]
   );

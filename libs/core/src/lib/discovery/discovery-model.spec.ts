@@ -20,9 +20,10 @@ function term(
 function scan(
   worktrees: DiscoveredWorktree[],
   persisted: string[] = [],
-  terminals: DiscoveredTerminal[] = []
+  terminals: DiscoveredTerminal[] = [],
+  stranded: DiscoveredWorktree[] = []
 ): DiscoveryScan {
-  return { worktrees, persisted: new Set(persisted), terminals };
+  return { worktrees, stranded, persisted: new Set(persisted), terminals };
 }
 
 const nothingAlive = () => false;
@@ -49,6 +50,55 @@ describe('diffScans', () => {
       );
       expect(delta.disappeared).toEqual([wt('feature-b')]);
       expect(delta.changed).toBe(true);
+    });
+
+    // An agent outlives its worktree, so to the shells the worktree is
+    // not gone until the agent is.
+    describe('removed under a running agent', () => {
+      const stranded = (...names: string[]) =>
+        scan(
+          [],
+          [],
+          [],
+          names.map((name) => wt(name))
+        );
+
+      it('is stranded, not gone, while the agent runs', () => {
+        const delta = diffScans(
+          scan([wt('feature-a')]),
+          stranded('feature-a'),
+          nothingAlive
+        );
+        expect(delta.stranded).toEqual([wt('feature-a')]);
+        expect(delta.disappeared).toEqual([]);
+        expect(delta.changed).toBe(true);
+      });
+
+      it('is reported stranded once', () => {
+        const delta = diffScans(
+          stranded('feature-a'),
+          stranded('feature-a'),
+          nothingAlive
+        );
+        expect(delta.stranded).toEqual([]);
+        expect(delta.changed).toBe(false);
+      });
+
+      it('is gone once the agent is', () => {
+        const delta = diffScans(stranded('feature-a'), scan([]), nothingAlive);
+        expect(delta.disappeared).toEqual([wt('feature-a')]);
+        expect(delta.changed).toBe(true);
+      });
+
+      it('appears again when its checkout comes back', () => {
+        const delta = diffScans(
+          stranded('feature-a'),
+          scan([wt('feature-a')]),
+          nothingAlive
+        );
+        expect(delta.appeared).toEqual([wt('feature-a')]);
+        expect(delta.disappeared).toEqual([]);
+      });
     });
 
     it('reports nothing when the set is unchanged', () => {

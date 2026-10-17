@@ -13,15 +13,31 @@ interface DataSource {
  * once keeps its last output in history, above those rows. A final
  * frame replayed before that first draw is hidden behind it for good:
  * the viewer is left with "Pane is dead" and not the reason.
+ *
+ * It also announces each client's first output as it arrives, before
+ * the listeners bound after `track` see it: the backend's `onAttach`.
  */
 export class ClientDraw {
   private drawn: Promise<void> = Promise.resolve();
+  private readonly starts = new Set<() => void>();
+
+  onStart(cb: () => void): void {
+    this.starts.add(cb);
+  }
+  offStart(cb: () => void): void {
+    this.starts.delete(cb);
+  }
+  /** Forget every `onStart` listener: the backend is going away. */
+  clear(): void {
+    this.starts.clear();
+  }
 
   /** Follow `client`, just attached, until its first output. */
   track(client: DataSource): void {
     this.drawn = new Promise<void>((resolve) => {
       const first = () => {
         client.offData(first);
+        for (const cb of [...this.starts]) cb();
         resolve();
       };
       client.onData(first);

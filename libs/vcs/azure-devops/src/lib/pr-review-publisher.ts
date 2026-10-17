@@ -41,6 +41,16 @@ export interface AdoReviewApi {
   me(): Promise<string>;
 }
 
+/** The verdicts Azure DevOps files: a comment casts no vote. */
+export const AZURE_EVENTS: readonly ReviewEvent[] = [
+  'COMMENT',
+  'APPROVE',
+  'APPROVE_WITH_SUGGESTIONS',
+  'WAIT_FOR_AUTHOR',
+  'REJECT',
+  'RESET_VOTE',
+];
+
 /** Azure's vote for each verdict it has; `COMMENT` casts none. */
 const VOTES: Partial<Record<ReviewEvent, number>> = {
   APPROVE: 10,
@@ -69,10 +79,7 @@ export async function publishAzureReview(
   if (pr.lastMergeSourceCommit?.commitId !== submission.head) {
     throw new ReviewPublishError(
       'moved',
-      `The pull request has new commits since ${submission.head.slice(
-        0,
-        7
-      )}; review them before submitting`
+      'The pull request has new commits since the one you read; load them before submitting.'
     );
   }
   const run = new Run(api, store, submission, await api.me());

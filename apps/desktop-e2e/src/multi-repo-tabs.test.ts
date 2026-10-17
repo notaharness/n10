@@ -8,8 +8,11 @@ import {
   tab,
   tabs,
   visibleText,
+  openSessions,
 } from './setup/app.js';
+import { execFileSync } from 'node:child_process';
 import { renameSync } from 'node:fs';
+import { join } from 'node:path';
 import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 
 /**
@@ -90,6 +93,32 @@ test.describe('Tabs across repositories', () => {
     await expect(tab(page, new RegExp(BRANCH))).toHaveCount(0);
   });
 
+  // Nothing watches a repository while another is open, so the removal
+  // is found when alpha opens again — and its tab has to go then rather
+  // than wait on a row that will never come back.
+  test('a worktree removed while its repository was closed takes its tab with it', async ({
+    desktop,
+  }) => {
+    const { page, repoPath } = desktop;
+    await createWorktree(page, BRANCH);
+    await expect(tab(page, new RegExp(BRANCH))).toBeVisible();
+
+    await switchRepo(page, otherRepo);
+    await expect(
+      tab(page, new RegExp(`${ALPHA}\\s*/\\s*${BRANCH}`))
+    ).toBeVisible();
+    execFileSync(
+      'git',
+      ['worktree', 'remove', join(repoPath, '.claude', 'worktrees', BRANCH)],
+      { cwd: repoPath, stdio: 'ignore' }
+    );
+
+    await switchRepo(page, repoPath);
+    await expect(tab(page, new RegExp(BRANCH))).toHaveCount(0, {
+      timeout: 20_000,
+    });
+  });
+
   test('two repositories keep a tab each for the same branch name', async ({
     desktop,
   }) => {
@@ -130,7 +159,7 @@ test.describe('Tabs across repositories', () => {
     // close cannot have killed it — the agent is still there when
     // alpha comes back.
     await switchRepo(page, repoPath);
-    const sessions = await page.evaluate(() => window.n10.listSessions());
+    const sessions = await openSessions(page);
     expect(
       sessions.find((s) => sessionBranch(s.name) === BRANCH)?.running
     ).toBe(true);
@@ -170,7 +199,7 @@ test.describe('Tabs across repositories', () => {
     await expect(foreign).toHaveCount(0);
 
     // Beta's agent survived its neighbour's tab closing.
-    const sessions = await page.evaluate(() => window.n10.listSessions());
+    const sessions = await openSessions(page);
     expect(
       sessions.find((s) => sessionBranch(s.name) === SHARED)?.running
     ).toBe(true);

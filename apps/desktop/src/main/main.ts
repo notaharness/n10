@@ -1,5 +1,11 @@
+import { installQuitHandler, quitForUpdate, quitForNpmUpdate } from './quit.js';
 import { join } from 'node:path';
+import { isatty } from 'node:tty';
 import { app, BrowserWindow, dialog, Menu, nativeTheme, shell } from 'electron';
+import {
+  holdMenuShortcuts,
+  releaseMenuShortcutsOnLoad,
+} from './menu-shortcuts.js';
 import {
   MENU_EVENTS,
   type ContextMenuItem,
@@ -14,6 +20,14 @@ import { MAIN_MARKS, mark } from './boot-marks.js';
 import { pickFolderWithDialog } from './folder-picker.js';
 import { buildMenuTemplate } from '../host/menu-template.js';
 import { installUnsavedGuard } from './unsaved-guard.js';
+import { installDockIcon, windowIcon } from './app-icon.js';
+import { showAbout } from './about.js';
+import {
+  appIdentity,
+  importLoginShellPath,
+  launchStartDir,
+} from './launch-env.js';
+import { runQaSteps } from './qa-steps.js';
 import {
   installProcessDiagnostics,
   installRendererRecovery,
@@ -30,8 +44,20 @@ mark(MAIN_MARKS.module);
 
 const DIST = join(import.meta.dirname, '..');
 const DEV_SERVER_URL = process.env.N10_VITE_URL;
-const APP_VERSION = process.env.N10_DESKTOP_VERSION ?? 'dev';
-const IS_DEV = Boolean(DEV_SERVER_URL) || APP_VERSION === 'dev';
+const { version: APP_VERSION, isDev: IS_DEV } = appIdentity(
+  app.getName(),
+  app.getVersion(),
+  process.env
+);
+const FROM_TERMINAL = isatty(0);
+const START_DIR = launchStartDir({
+  env: process.env,
+  argv: process.argv,
+  cwd: process.cwd(),
+  packaged: app.isPackaged,
+  fromTerminal: FROM_TERMINAL,
+});
+delete process.env.N10_START_DIR;
 
 let prefs: DesktopPrefs = loadDesktopPrefs();
 let host: HostProcess | null = null;
@@ -55,23 +81,6 @@ function installAppMenu(): void {
     sendMenuCommand
   );
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-}
-
-function showAbout(): Promise<void> {
-  return dialog
-    .showMessageBox({
-      type: 'info',
-      title: 'About n10 Desktop',
-      message: 'n10 Desktop',
-      detail: [
-        `Version ${APP_VERSION}`,
-        `Electron ${process.versions.electron} · Chromium ${process.versions.chrome} · Node ${process.versions.node}`,
-        '',
-        'Worktrees, agents and reviews for one repository.',
-      ].join('\n'),
-      buttons: ['OK'],
-    })
-    .then(() => undefined);
 }
 
 function popupContextMenu(items: ContextMenuItem[]): Promise<string | null> {
@@ -138,6 +147,7 @@ function createMainWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     title: 'n10',
+    icon: windowIcon(DIST),
     show: false,
     autoHideMenuBar: false,
     ...chrome,
@@ -178,63 +188,9 @@ function createMainWindow(): BrowserWindow {
   });
 
   installRendererRecovery(win);
+  releaseMenuShortcutsOnLoad(win.webContents);
   installUnsavedGuard(win);
   return win;
-}
-
-// ── Headless QA hook ─────────────────────────────────────────────
-// N10_QA_STEPS='[{"js":"...","waitMs":500,"shot":"/tmp/a.png"}]'
-// runs each step's JS in the page, waits, captures a PNG, then quits.
-// Dev/CI only — lets us screenshot the real app under xvfb.
-
-interface QaStep {
-  js?: string;
-  waitMs?: number;
-  shot?: string;
-}
-
-async function runQaSteps(win: BrowserWindow): Promise<void> {
-  const raw = process.env.N10_QA_STEPS;
-  if (!raw) return;
-  let steps: QaStep[] = [];
-  try {
-    steps = JSON.parse(raw) as QaStep[];
-  } catch (err) {
-    console.error('[desktop] bad N10_QA_STEPS:', err);
-    app.quit();
-    return;
-  }
-  const { writeFile } = await import('node:fs/promises');
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  // Hidden/occluded windows may never paint, which makes capturePage
-  // hang — force the window visible and un-throttled for the run.
-  win.show();
-  win.focus();
-  win.webContents.setBackgroundThrottling(false);
-  console.log(`[desktop] qa: ${steps.length} steps`);
-  await sleep(1500);
-  let i = 0;
-  for (const step of steps) {
-    i += 1;
-    try {
-      if (step.js) {
-        const r: unknown = await win.webContents.executeJavaScript(
-          step.js,
-          true
-        );
-        console.log(`[desktop] qa step ${i} js →`, r);
-      }
-      await sleep(step.waitMs ?? 600);
-      if (step.shot) {
-        const img = await win.webContents.capturePage();
-        await writeFile(step.shot, img.toPNG());
-        console.log(`[desktop] qa step ${i} shot → ${step.shot}`);
-      }
-    } catch (err) {
-      console.error(`[desktop] qa step ${i} failed:`, err);
-    }
-  }
-  app.quit();
 }
 
 // ── The session host ─────────────────────────────────────────────
@@ -243,9 +199,12 @@ async function runQaSteps(win: BrowserWindow): Promise<void> {
 
 function startHost(): HostProcess {
   const host = startHostProcess({
+    startDir: START_DIR,
     pushes: windowPushes,
     theme: resolvedTheme,
     shell: {
+      quitForUpdate,
+      quitForNpmUpdate,
       pickFolder: pickFolderWithDialog,
       openExternal: async (url) => {
         if (!/^https?:/i.test(url)) throw new Error(`Refusing to open ${url}`);
@@ -257,12 +216,13 @@ function startHost(): HostProcess {
         const win = BrowserWindow.getFocusedWindow() ?? undefined;
         menu?.popup({ window: win });
       },
-      aboutBox: showAbout,
+      aboutBox: () => showAbout(APP_VERSION),
       prefsChanged: async (next) => {
         prefs = next;
         nativeTheme.themeSource = next.theme; // recolors overlay + native menus
         installAppMenu(); // theme radio state lives in the menu
       },
+      holdMenuShortcuts,
     },
     // The new host has no watches; reloaded pages watch again.
     onRespawn: () => {
@@ -313,6 +273,8 @@ if (!app.requestSingleInstanceLock()) {
     .whenReady()
     .then(async () => {
       mark(MAIN_MARKS.ready);
+      installDockIcon(DIST);
+      if (app.isPackaged && !FROM_TERMINAL) await importLoginShellPath();
       nativeTheme.themeSource = prefs.theme;
       installAppMenu();
       // Only the instance that holds the lock starts a host, so only it
@@ -351,18 +313,4 @@ app.on('window-all-closed', () => {
   }
 });
 
-// The host releases its terminal clients (the tmux-hosted processes
-// survive app exit) and stops the beam daemon the app started (D15).
-// `app.exit`, because an `app.quit` from here can land inside this quit
-// and be ignored.
-let quitting = false;
-app.on('will-quit', (event) => {
-  event.preventDefault();
-  if (quitting) return;
-  quitting = true;
-  // A relaunch while this one waits on the host must win, not quit into it.
-  app.releaseSingleInstanceLock();
-  (host?.stop() ?? Promise.resolve())
-    .catch((err: unknown) => console.error('[desktop] host stop', err))
-    .finally(() => app.exit());
-});
+installQuitHandler(() => host);

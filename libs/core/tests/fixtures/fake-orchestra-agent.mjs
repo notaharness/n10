@@ -1,26 +1,30 @@
 // Installed as `codex` on the fixture PATH. Only the agent CLI and queue
 // transport are fake; the installed Orchestra scripts and tmux are real.
-import { existsSync, writeFileSync, appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 process.title = 'codex';
 const home = process.env.HOME;
 const args = process.argv.slice(2);
+/** Whole or not at all: the spec waits for these files to appear and
+ *  reads them at once. */
+function writeRecord(name, value) {
+  const path = join(home, name);
+  writeFileSync(`${path}.tmp`, JSON.stringify(value));
+  renameSync(`${path}.tmp`, path);
+}
 if (args[0] === 'queue') {
   if (existsSync(join(home, 'refuse-queue'))) process.exit(1);
   appendFileSync(join(home, 'deliveries.jsonl'), JSON.stringify(args) + '\n');
   process.exit(0);
 }
-writeFileSync(
-  join(home, 'agent-start.json'),
-  JSON.stringify({
-    args,
-    cwd: process.cwd(),
-    pid: process.pid,
-    tmux: process.env.TMUX ?? null,
-  })
-);
+writeRecord('agent-start.json', {
+  args,
+  cwd: process.cwd(),
+  pid: process.pid,
+  tmux: process.env.TMUX ?? null,
+});
 const report = join(
   home,
   '.claude/plugins/orchestra/skills/player/scripts/report.sh'
@@ -34,12 +38,9 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     encoding: 'utf8',
     env: process.env,
   });
-  writeFileSync(
-    join(home, 'report-result.json'),
-    JSON.stringify({
-      status: result.status,
-      stdout: result.stdout,
-      stderr: result.stderr,
-    })
-  );
+  writeRecord('report-result.json', {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  });
 });

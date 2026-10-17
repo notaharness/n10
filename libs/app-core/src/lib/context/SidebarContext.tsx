@@ -202,6 +202,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
           ? sessionCtx.categorizedReviews
           : { needsReview: [], waitingForAuthor: [], approvedByYou: [] },
         sessionCtx.sessionPrMap,
+        sessionCtx.yourPrIds,
         sessionCtx.mergedBranches,
         sessionCtx.conflictCounts
       ),
@@ -210,6 +211,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
       sessionCtx.orphanPrs,
       sessionCtx.categorizedReviews,
       sessionCtx.sessionPrMap,
+      sessionCtx.yourPrIds,
       sessionCtx.mergedBranches,
       sessionCtx.conflictCounts,
       vcsConfigured,

@@ -11,10 +11,10 @@ import type { LaunchStep, TerminalKind } from '../../../host/contract.js';
 import { useRecentRepos } from '../../lib/data/queries.js';
 import { useRepo } from '../../lib/repo-context.js';
 import { basename, errorMessage } from '../../lib/utils.js';
+import { useMachineChoice } from '../../lib/machines/use-machine-choice.js';
 import {
   MachineChoiceSelect,
   RemoteLaunchProgress,
-  useMachineChoice,
 } from './NewTerminalMachineChoice.js';
 import { Button } from '../ui/button.js';
 import {

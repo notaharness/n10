@@ -14,6 +14,7 @@ test('a settings edit updates the visible value and persisted config', async ({
     'Editor \\(project\\)',
     'Email',
     'Worktree Path',
+    'Shell',
     'Auto Hide Sidebar',
     'Jump to Inactive Session on Ctrl\\+Space',
     'Diff File List Tree',

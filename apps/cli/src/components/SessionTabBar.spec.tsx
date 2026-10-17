@@ -127,6 +127,19 @@ describe('SessionTabBar', () => {
     expect(text).not.toContain('#99');
   });
 
+  // Its agent outlived the worktree: the entry stays, and says so.
+  it('marks a running agent whose worktree is gone', () => {
+    const stranded = makeSessionItem('alpha');
+    if (stranded.kind === 'session') stranded.session.worktreeRemoved = true;
+    setSidebar([stranded, makeSessionItem('beta')]);
+    setSessions(new Map());
+
+    const text = stripAnsi(render(<SessionTabBar />).lastFrame() ?? '');
+    expect(text).toContain('1 alpha removed');
+    expect(text).toContain('2 beta');
+    expect(text).not.toContain('beta removed');
+  });
+
   it('renders #<prId> when the session has a PR', () => {
     const pr123 = makePr(123);
     setSidebar([

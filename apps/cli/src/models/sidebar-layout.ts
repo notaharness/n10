@@ -11,7 +11,12 @@
  * without rendering a terminal.
  */
 import { LAYOUT } from '@n10/app-core';
-import { computeScrollWindow, type SidebarItem } from '@n10/core';
+import {
+  computeScrollWindow,
+  sidebarSection,
+  type SidebarItem,
+  type SidebarSectionKey,
+} from '@n10/core';
 
 // Rows the sidebar does NOT get for scrollable items:
 //   - Pane border (top + bottom)       → LAYOUT.PANE_BORDER_ROWS
@@ -21,26 +26,8 @@ import { computeScrollWindow, type SidebarItem } from '@n10/core';
 const SIDEBAR_CHROME_ROWS = LAYOUT.PANE_BORDER_ROWS + LAYOUT.PANE_TITLE_ROWS;
 const LEGEND_LINES = 2; // "passed/failed/pending" + "needs attention/approved"
 
-export type SectionKey =
-  | 'worktrees'
-  | 'pull-requests'
-  | 'draft-pull-requests'
-  | 'needs-review'
-  | 'waiting'
-  | 'approved';
-
-export function getSectionKey(item: SidebarItem): SectionKey {
-  if (item.kind === 'session') {
-    if (!item.pr) return 'worktrees';
-    return item.pr.isDraft ? 'draft-pull-requests' : 'pull-requests';
-  }
-  if (item.kind === 'orphan-pr')
-    return item.pr.isDraft ? 'draft-pull-requests' : 'pull-requests';
-  return item.category;
-}
-
 export const SECTION_LABELS: Record<
-  SectionKey,
+  SidebarSectionKey,
   { title: string; color: string }
 > = {
   worktrees: { title: 'Worktrees', color: 'cyan' },
@@ -52,7 +39,7 @@ export const SECTION_LABELS: Record<
 };
 
 export type RenderRow =
-  | { type: 'header'; key: SectionKey; count: number; first: boolean }
+  | { type: 'header'; key: SidebarSectionKey; count: number; first: boolean }
   | { type: 'item'; item: SidebarItem; itemIndex: number };
 
 /** Interleave section headers into the item list. Each header carries
@@ -60,18 +47,18 @@ export type RenderRow =
  *  arrive already grouped, so the two agree. */
 export function buildSidebarRows(items: SidebarItem[]): RenderRow[] {
   const result: RenderRow[] = [];
-  let lastSection: SectionKey | null = null;
+  let lastSection: SidebarSectionKey | null = null;
   let isFirst = true;
 
   // Count items per section for the header
-  const sectionCounts = new Map<SectionKey, number>();
+  const sectionCounts = new Map<SidebarSectionKey, number>();
   for (const item of items) {
-    const key = getSectionKey(item);
+    const key = sidebarSection(item);
     sectionCounts.set(key, (sectionCounts.get(key) ?? 0) + 1);
   }
 
   items.forEach((item, idx) => {
-    const section = getSectionKey(item);
+    const section = sidebarSection(item);
     // Insert section header at every section transition
     if (section !== lastSection) {
       result.push({

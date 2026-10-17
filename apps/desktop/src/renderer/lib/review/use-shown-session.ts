@@ -49,7 +49,8 @@ export function useShownSession(
 export function useSessionBanner(shown: SessionCard | undefined) {
   const machines = useMachines();
   const reconnect = useReconnectSession();
-  if (!shown) return { connectionBanner: null, inputDisabled: false };
+  if (!shown)
+    return { connectionBanner: null, inputDisabled: false, ended: false };
   const pane = terminalPaneState({
     kind: shown.title === 'Terminal' ? 'shell' : 'agent',
     running: shown.running,
@@ -64,7 +65,11 @@ export function useSessionBanner(shown: SessionCard | undefined) {
         reconnecting: reconnect.isPending,
       }
     : null;
-  return { connectionBanner, inputDisabled: pane.inputDisabled };
+  return {
+    connectionBanner,
+    inputDisabled: pane.inputDisabled,
+    ended: pane.showExitedBar,
+  };
 }
 
 /**
@@ -99,6 +104,9 @@ export function useSessionPane(
     banner,
     hasSession: shown !== undefined,
     shownName: shown?.name ?? null,
+    /** The shown session is this checkout's own agent, which the
+     *  session menu launches. */
+    shownIsAgent: shown?.kind === 'agent',
     epoch: shown?.spawnedAt ?? 0,
   };
 }

@@ -1,6 +1,6 @@
 import { readResourceValue } from '@n10/engine';
-import { activeReviewService } from './repo.js';
+import { repository } from './repo.js';
 
-export async function getPullRequestChecks(request: unknown) {
-  return readResourceValue(activeReviewService().checks(request));
+export async function getPullRequestChecks(repo: string, request: unknown) {
+  return readResourceValue(repository(repo).reviews.checks(request));
 }

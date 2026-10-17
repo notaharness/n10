@@ -27,31 +27,43 @@ const EMPTY_COMMENTS: PullRequestComments = {
 /** Provider reads share the same repo/account scope and read lanes in both shells. */
 export function createProviderReads(options: ReviewContextOptions) {
   const context = createReviewContext(options);
-  const comments = createResourceCache<PullRequestComments>(REVIEW_READ_TTL_MS);
-  const descriptions = createResourceCache<string>(REVIEW_READ_TTL_MS);
+  const { freshness } = options;
+  const comments = createResourceCache<PullRequestComments>(
+    REVIEW_READ_TTL_MS,
+    { freshness }
+  );
+  const descriptions = createResourceCache<string>(REVIEW_READ_TTL_MS, {
+    freshness,
+  });
   const snapshots = createResourceCache<PullRequestSnapshot>(
     REVIEW_READ_TTL_MS,
-    32,
-    ({ detail }) =>
-      detail.state !== 'failed' &&
-      (detail.state !== 'read' ||
-        (detail.value.reviewers?.state !== 'failed' &&
-          detail.value.iteration?.state !== 'failed'))
+    {
+      freshness,
+      cacheable: ({ detail }) =>
+        detail.state !== 'failed' &&
+        (detail.state !== 'read' ||
+          (detail.value.reviewers?.state !== 'failed' &&
+            detail.value.iteration?.state !== 'failed')),
+    }
   );
   const checks = createResourceCache<PullRequestChecksAnswer>(
     REVIEW_READ_TTL_MS,
-    32,
-    ({ checks, requirements }) =>
-      checks.state !== 'failed' &&
-      requirements.reviewers.state !== 'failed' &&
-      (checks.state !== 'read' ||
-        (checks.value.checks.state !== 'failed' &&
-          checks.value.rules.state !== 'failed'))
+    {
+      freshness,
+      cacheable: ({ checks, requirements }) =>
+        checks.state !== 'failed' &&
+        requirements.reviewers.state !== 'failed' &&
+        (checks.state !== 'read' ||
+          (checks.value.checks.state !== 'failed' &&
+            checks.value.rules.state !== 'failed')),
+    }
   );
   const conversations = createResourceCache<PullRequestConversationRead>(
     REVIEW_READ_TTL_MS,
-    32,
-    ({ conversation }) => conversation.state !== 'failed'
+    {
+      freshness,
+      cacheable: ({ conversation }) => conversation.state !== 'failed',
+    }
   );
   const caches = [comments, descriptions, snapshots, checks, conversations];
   function request(value: unknown) {
@@ -149,9 +161,6 @@ export function createProviderReads(options: ReviewContextOptions) {
     },
     reset() {
       for (const cache of caches) cache.reset();
-    },
-    dispose() {
-      for (const cache of caches) cache.dispose();
     },
   };
 }

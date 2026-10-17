@@ -10,14 +10,12 @@ import {
   parseMentionSearchRequest,
   searchMentions,
 } from '@n10/core';
-import {
-  createReviewContext,
-  type ReviewContextOptions,
-} from './review-context.js';
+import { createReviewContext } from './review-context.js';
+import type { ReviewCommandOptions } from './review-commands.js';
 
 /** Account-scoped draft persistence and publication over core's durable ledger. */
 export function createReviewDraftCommands(
-  options: ReviewContextOptions,
+  options: ReviewCommandOptions,
   invalidate: () => void
 ) {
   const context = createReviewContext(options);
@@ -26,25 +24,27 @@ export function createReviewDraftCommands(
       return listReviewDrafts(parseDraftsRequest(request), context.sources);
     },
     async save(request: unknown) {
+      context.selected();
       return saveReviewDraft(parseSaveDraftRequest(request), context.sources);
     },
     async discard(request: unknown) {
+      context.selected();
       discardReviewDraft(parseDiscardDraftRequest(request), context.sources);
     },
     async submit(request: unknown) {
       const req = parseSubmitReviewRequest(request);
-      const start = context.current();
+      const start = context.selected();
       const { provider, config, vcsConfigured } = start;
       const publish = vcsConfigured
         ? provider?.publishReview?.bind(provider)
         : undefined;
       try {
-        return await submitReview(req, {
+        const filed = await submitReview(req, {
           ...context.sources,
           publish:
             publish &&
             ((submission, ledger) => {
-              context.assertUnchanged(start);
+              context.assertWritable(start);
               return publish(
                 config.vendorAuth,
                 config.vendorProject,
@@ -53,14 +53,19 @@ export function createReviewDraftCommands(
               );
             }),
         });
+        return filed;
       } finally {
         // A failed publication can still have filed individual comments.
         invalidate();
+        // A verdict changes the reviewers the list shows. The answer does
+        // not wait for it, and a read never rejects: a failure stays in
+        // the list's snapshot.
+        void options.pullRequests.read(options.config.repo, { force: true });
       }
     },
     async mentions(request: unknown) {
       const req = parseMentionSearchRequest(request);
-      const { config, provider, vcsConfigured } = context.current();
+      const { config, provider, vcsConfigured } = context.selected();
       const search = vcsConfigured
         ? provider?.searchMentionCandidates?.bind(provider)
         : undefined;

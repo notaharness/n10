@@ -74,6 +74,7 @@ export const BEAM_REPO: RepoData = {
       session: worktreeSession(BEAM, PR_HOMEPAGE.sourceBranch, true, DESKTOP),
       branch: PR_HOMEPAGE.sourceBranch,
       pr: PR_HOMEPAGE,
+      authored: true,
       isMerged: false,
     },
     { kind: 'orphan-pr', pr: PR_PUBLISHING },

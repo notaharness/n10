@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   terminal: vi.fn(),
   forget: vi.fn(),
   guard: vi.fn(),
+  fleet: [] as { peerId: string; isLocal: boolean; state: string }[],
 }));
 vi.mock('./repo.js', () => ({
   activeRepository: () => ({
@@ -22,7 +23,10 @@ vi.mock('./sessions.js', () => ({
   defaultPaneSize: () => ({ cols: 120, rows: 40 }),
 }));
 vi.mock('./machines.js', () => ({
-  machines: { refuseIfRemoteOwns: state.guard },
+  machines: {
+    refuseIfRemoteOwns: state.guard,
+    getSnapshot: () => ({ machines: state.fleet }),
+  },
 }));
 vi.mock('./terminals.js', () => ({
   adoptTerminal: state.terminal,
@@ -90,9 +94,15 @@ describe('desktop session observation adapter', () => {
     await ports().adoptTerminal?.(terminal);
     expect(state.terminal).toHaveBeenCalledWith(terminal);
     const delta = diffScans(
-      { worktrees: [], persisted: new Set(), terminals: [terminal] },
       {
         worktrees: [],
+        stranded: [],
+        persisted: new Set(),
+        terminals: [terminal],
+      },
+      {
+        worktrees: [],
+        stranded: [],
         persisted: new Set(),
         terminals: [],
       },
@@ -101,5 +111,43 @@ describe('desktop session observation adapter', () => {
     ports().changed?.(delta);
     expect(state.forget).toHaveBeenCalledWith('terminal');
     expect(notify).toHaveBeenCalledOnce();
+  });
+
+  // A worktree's tab remembers its checkout, not its branch.
+  it('has discovery list the terminals of each machine the fleet says is connected', () => {
+    state.fleet = [
+      { peerId: 'self', isLocal: true, state: 'connected' },
+      { peerId: 'up', isLocal: false, state: 'connected' },
+      { peerId: 'down', isLocal: false, state: 'offline' },
+    ];
+    startDiscoveryForRepo('/repo-a');
+    expect(ports().remoteMachines?.()).toEqual(['up']);
+  });
+
+  it('names the repository and the checkouts that are gone', () => {
+    const notify = vi.fn();
+    setDiscoveryNotifier(notify);
+    startDiscoveryForRepo('/repo-a');
+    const gone = {
+      name: 'wt',
+      branch: 'feature',
+      path: '/repo-a/.claude/worktrees/feature',
+    };
+    ports().changed?.(
+      diffScans(
+        {
+          worktrees: [gone],
+          stranded: [],
+          persisted: new Set(),
+          terminals: [],
+        },
+        { worktrees: [], stranded: [], persisted: new Set(), terminals: [] },
+        () => false
+      )
+    );
+    expect(notify).toHaveBeenCalledWith({
+      repo: '/repo-a',
+      removedWorktrees: ['/repo-a/.claude/worktrees/feature'],
+    });
   });
 });

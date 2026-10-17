@@ -1,5 +1,6 @@
 import type { MenuCommandEvent } from '../../../host/contract-events.js';
 import type {
+  DesktopKeybindings,
   DesktopPrefs,
   N10HostApi,
   RepoInfo,
@@ -31,6 +32,8 @@ const info = (repo: RepoState): RepoInfo => ({
     repository: repo.data.slug,
   },
   viewer: VIEWER,
+  // GitHub's verdicts, as its provider declares them.
+  reviewEvents: ['COMMENT', 'APPROVE', 'REQUEST_CHANGES'],
 });
 
 const SETTINGS: SettingsFieldView[] = [
@@ -82,6 +85,7 @@ type ShellHost = Pick<
   | 'openRepo'
   | 'getRepo'
   | 'refreshRepo'
+  | 'getRepoInfo'
   | 'listRecentRepos'
   | 'selectRepoDirectory'
   | 'selectFolder'
@@ -95,6 +99,9 @@ type ShellHost = Pick<
   | 'setDesktopPrefs'
   | 'getTheme'
   | 'onThemeChanged'
+  | 'getKeybindings'
+  | 'setKeybinding'
+  | 'holdMenuShortcuts'
   | 'showAbout'
 >;
 
@@ -103,7 +110,11 @@ export function createShellHost(state: DemoState): ShellHost {
     theme: requestedTheme() ?? 'system',
     nativeFrame: false,
     tabOverflow: 'wrap',
+    tabCycleMru: false,
+    guidedReview: true,
+    imageCompare: 'side-by-side',
   };
+  let keybindings: DesktopKeybindings = {};
   const menuCommands = new Channel<MenuCommandEvent>();
   // No `nativeTheme` in a page: the preference over the browser's own
   // colour scheme.
@@ -121,6 +132,7 @@ export function createShellHost(state: DemoState): ShellHost {
     },
     getRepo: () => later(info(state.repo())),
     refreshRepo: () => later(info(state.repo())),
+    getRepoInfo: (cwd) => later(info(state.repoAt(cwd))),
     listRecentRepos: () =>
       later(
         state.recent.map((cwd, i) => ({
@@ -152,6 +164,16 @@ export function createShellHost(state: DemoState): ShellHost {
     },
     getTheme: () => later(resolved()),
     onThemeChanged: themes.subscribe,
+    getKeybindings: () => later(keybindings),
+    setKeybinding: (actionId, descriptors) => {
+      const rest = Object.fromEntries(
+        Object.entries(keybindings).filter(([id]) => id !== actionId)
+      );
+      keybindings = descriptors ? { ...rest, [actionId]: descriptors } : rest;
+      return later(keybindings);
+    },
+    // The demo's menu is web-rendered and has no accelerators.
+    holdMenuShortcuts: () => later(undefined),
     showAbout: () => later(undefined),
   };
 }

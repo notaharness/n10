@@ -14,6 +14,7 @@ import {
   tmuxKillSession,
   tmuxListSessions,
   tmuxListSessionsDetailed,
+  tmuxListSessionsRead,
   tmuxNewSessionDetached,
   tmuxPaneState,
   tmuxSetOption,
@@ -349,6 +350,21 @@ describe('tmuxListSessionsDetailed', () => {
       throw Object.assign(new Error('exit'), { status: 1 });
     });
     expect(tmuxListSessionsDetailed()).toEqual([]);
+  });
+
+  // A failed fork or the timeout kill says nothing about the sessions.
+  it('reads a listing tmux could not give as unknown, no server as empty', () => {
+    mockedExec.mockImplementationOnce(() => {
+      throw Object.assign(new Error('spawn tmux EAGAIN'), { code: 'EAGAIN' });
+    });
+    expect(tmuxListSessionsRead()).toBeNull();
+    mockedExec.mockImplementationOnce(() => {
+      throw Object.assign(new Error('exit'), {
+        status: 1,
+        stderr: 'no server running on /tmp/tmux-1000/default\n',
+      });
+    });
+    expect(tmuxListSessionsRead()).toEqual([]);
   });
 
   // A caller that wants session user options along with each name pays

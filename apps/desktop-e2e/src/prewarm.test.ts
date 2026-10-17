@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import {
   createWorktree,
@@ -7,6 +7,14 @@ import {
   tab,
   visibleText,
 } from './setup/app.js';
+import {
+  centre,
+  markHeldReady,
+  moveTo,
+  restOn,
+  shownTerminal,
+  spareText,
+} from './setup/prewarm.js';
 
 /**
  * The editor keeps one pane besides the one on screen: the tab the
@@ -16,56 +24,10 @@ import {
  */
 
 const BANNER = 'n10-fake-agent-ready';
-/** Long enough for a pointer at rest to settle: hoverIntent samples
- *  every 100 ms. */
-const REST_MS = 300;
-
 async function launch(page: Page, branch: string): Promise<void> {
   await createWorktree(page, branch);
   await launchAgentFromRail(page);
   await expect(visibleText(page, BANNER)).toBeVisible({ timeout: 30_000 });
-}
-
-async function centre(target: Locator): Promise<[number, number]> {
-  const box = await target.boundingBox();
-  if (!box) throw new Error('not laid out');
-  return [box.x + box.width / 2, box.y + box.height / 2];
-}
-
-async function moveTo(page: Page, target: Locator): Promise<void> {
-  await page.mouse.move(...(await centre(target)), { steps: 4 });
-}
-
-/**
- * Rest the pointer on `target` for exactly `ms` of the page's time:
- * the clock stands still while the pointer gets there, runs `ms`, and
- * goes on from there as usual. `away` moves the pointer off before the
- * clock goes on.
- */
-async function restOn(
-  page: Page,
-  target: Locator,
-  ms = REST_MS,
-  { away = false } = {}
-): Promise<void> {
-  // A little ahead of the page's time, which runs on during the call.
-  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 50);
-  await moveTo(page, target);
-  await page.clock.runFor(ms);
-  if (away) {
-    await page.mouse.move(5, 5);
-    await page.clock.runFor(REST_MS);
-  }
-  await page.clock.resume();
-}
-
-/** The terminal in the pane held ready, if any, and what it shows. */
-function spareText(page: Page): Promise<string | null> {
-  return page.evaluate(
-    () =>
-      document.querySelector<HTMLElement>('[data-spare-pane] .wterm')
-        ?.textContent ?? null
-  );
 }
 
 test.describe('A pane held ready', () => {
@@ -88,16 +50,11 @@ test.describe('A pane held ready', () => {
     const { page } = desktop;
     await restOn(page, tab(page, /alpha/));
     await expect.poll(() => spareText(page)).toContain('@alpha');
-    await page.evaluate(() => {
-      const el = document.querySelector<HTMLElement>(
-        '[data-spare-pane] .wterm'
-      );
-      if (el) el.dataset.heldReady = 'yes';
-    });
+    await markHeldReady(page);
 
     await page.mouse.down();
     await expect(tab(page, /alpha/)).toHaveAttribute('aria-selected', 'true');
-    const shown = page.locator('.wterm').filter({ visible: true });
+    const shown = shownTerminal(page);
     await expect(shown).toHaveCount(1);
     await expect(shown).toHaveAttribute('data-held-ready', 'yes');
     await page.mouse.up();
@@ -123,7 +80,7 @@ test.describe('A pane held ready', () => {
       const count = () =>
         w.held.push(
           document.querySelectorAll('[data-spare-pane]').length,
-          document.querySelectorAll('.wterm').length - 1
+          document.querySelectorAll('[data-terminal-grid]').length - 1
         );
       new MutationObserver(count).observe(document.body, {
         childList: true,
@@ -149,7 +106,7 @@ test.describe('A pane held ready', () => {
     await page.mouse.down();
     await expect(
       page
-        .locator('.wterm')
+        .locator('[data-terminal-grid]')
         .filter({ visible: true })
         .getByText('@alpha')
         .first()

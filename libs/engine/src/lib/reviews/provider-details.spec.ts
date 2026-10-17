@@ -102,13 +102,13 @@ describe('getPullRequestSnapshot', () => {
     ).rejects.toThrow('The account changed from alice to bob');
   });
 
-  it('refuses to answer once another repository was opened during the read', async () => {
+  it('answers a repository parked during the read', async () => {
     env.onLookup = () => {
       env.open = false;
     };
-    await expect(getPullRequestSnapshot({ ref: REF })).rejects.toThrow(
-      'This repository is no longer open'
-    );
+    await expect(getPullRequestSnapshot({ ref: REF })).resolves.toMatchObject({
+      ref: REF,
+    });
   });
 
   it('refuses to answer once the config names another repository during the read', async () => {
@@ -173,13 +173,13 @@ describe('getPullRequestChecks', () => {
     expect(env.lookups).toEqual([]);
   });
 
-  it('refuses to answer once another repository was opened during the read', async () => {
+  it('answers a repository parked during the read', async () => {
     env.onLookup = () => {
       env.open = false;
     };
-    await expect(getPullRequestChecks({ ref: REF })).rejects.toThrow(
-      'This repository is no longer open'
-    );
+    await expect(getPullRequestChecks({ ref: REF })).resolves.toMatchObject({
+      ref: REF,
+    });
   });
 
   it("reads the provider's checks with the repository's own config", async () => {

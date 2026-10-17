@@ -1,3 +1,4 @@
+import { useUpdateEvents } from '../lib/data/updates.js';
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -17,6 +18,7 @@ export function useHostEvents(
   terminalEnded: (name: string) => void
 ): void {
   const qc = useQueryClient();
+  useUpdateEvents();
 
   // The host's remote sync loop toasts its events (auto-deleted merged
   // branch, blocked auto-delete) and the sidebar refetches to match.
@@ -56,10 +58,11 @@ export function useHostEvents(
     return off;
   }, [qc, terminalEnded]);
 
-  // Worktrees and agent sessions can also appear without this process
-  // being involved — a second n10, a script, an operator with tmux.
-  // The host notices and says so; the sidebar is a query cache, so it
-  // has to be told to look again.
+  // Worktrees and agent sessions can also appear or go without this
+  // process being involved — a second n10, a script, an operator with
+  // tmux or `rm -rf` — and n10's own removals are reported the same way.
+  // The sidebar is a query cache, so it has to be told to look again.
+  // (A removed worktree's tabs close in `TabsProvider`.)
   useEffect(() => {
     const off = window.n10.onDiscoveryChanged(() => {
       void qc.invalidateQueries({ queryKey: keys.sidebar(cwd) });
@@ -68,6 +71,7 @@ export function useHostEvents(
       // may be another repository's agent too.
       void qc.invalidateQueries({ queryKey: keys.terminals });
       void qc.invalidateQueries({ queryKey: keys.foreignSessions });
+      void qc.invalidateQueries({ queryKey: keys.orchestratorGroups });
       // A worktree added from outside usually brought a branch with it.
       void qc.invalidateQueries({ queryKey: keys.branches(cwd) });
     });

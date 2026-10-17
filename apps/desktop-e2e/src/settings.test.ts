@@ -90,7 +90,10 @@ test.describe('Settings', () => {
     desktop,
   }) => {
     const { page } = desktop;
-    const syncState = () => page.evaluate(() => window.n10.getSyncState());
+    const syncState = () =>
+      page.evaluate(async () =>
+        window.n10.getSyncState((await window.n10.getRepo())!.cwd)
+      );
 
     // Wait for the initial list so the write cannot borrow its fetch.
     await expect
@@ -114,7 +117,7 @@ test.describe('Settings', () => {
       );
       // Read straight after the save. What is asserted below is that
       // a fetch was started, independently of when its answer arrives.
-      return window.n10.getSyncState();
+      return window.n10.getSyncState((await window.n10.getRepo())!.cwd);
     });
 
     expect(after.remoteFetches).toBeGreaterThan(before);

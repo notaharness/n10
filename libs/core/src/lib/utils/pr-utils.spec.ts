@@ -10,6 +10,7 @@ import type {
 } from '@n10/vcs-core';
 import {
   findOrphanPrs,
+  findYourPrIds,
   categorizeReviews,
   buildSessionPrMap,
 } from './pr-utils.js';
@@ -77,6 +78,50 @@ describe('findOrphanPrs', () => {
     };
     const result = findOrphanPrs(prMap, new Set(), mockConfig, mockProvider);
     expect(result).toEqual([]);
+  });
+});
+
+describe('findYourPrIds', () => {
+  it('names the pull requests the provider says the viewer authored', () => {
+    // Reviewing a pull request, or checking out its branch, does not
+    // make it yours: only its author field does.
+    const prMap: BranchPrMap = {
+      'feature/branch-1': makePr({ id: 1 }),
+      'feature/branch-2': makePr({
+        id: 2,
+        createdByIdentifier: 'other@test.com',
+        reviewers: [
+          {
+            displayName: 'Me',
+            identifier: 'me@test.com',
+            decision: 'approved',
+          },
+        ],
+      }),
+      'feature/branch-3': null,
+    };
+    expect(findYourPrIds(prMap, mockConfig, mockProvider)).toEqual(
+      new Set([1])
+    );
+  });
+
+  it('takes the provider’s word on the signed-in account over the configured email', () => {
+    // Azure names the account by its authenticated identity; git's email
+    // need not be its uniqueName.
+    const prMap: BranchPrMap = {
+      'feature/branch-1': makePr({
+        id: 1,
+        createdByIdentifier: 'CORP\\me',
+        viewerIsAuthor: true,
+      }),
+      'feature/branch-2': makePr({ id: 2, viewerIsAuthor: false }),
+    };
+    expect(findYourPrIds(prMap, mockConfig, mockProvider)).toEqual(
+      new Set([1])
+    );
+    expect(
+      findOrphanPrs(prMap, new Set(), mockConfig, mockProvider).map((p) => p.id)
+    ).toEqual([1]);
   });
 });
 
@@ -193,6 +238,26 @@ describe('categorizeReviews', () => {
     expect(result.needsReview).toEqual([]);
     expect(result.approvedByYou).toEqual([]);
     expect(result.waitingForAuthor).toEqual([]);
+  });
+
+  it('files a request by the reviewer row the provider marks as the viewer', () => {
+    // An Azure uniqueName need not be git's email.
+    const prMap: BranchPrMap = {
+      'feature/branch-1': makePr({
+        id: 1,
+        createdByIdentifier: 'other@test.com',
+        reviewers: [
+          {
+            displayName: 'Me',
+            identifier: 'CORP\\me',
+            decision: 'no-response',
+            isViewer: true,
+          },
+        ],
+      }),
+    };
+    const reviews = categorizeReviews(prMap, mockConfig, mockProvider);
+    expect(reviews.needsReview.map((p) => p.id)).toEqual([1]);
   });
 
   it('skips PRs where user is not a reviewer', () => {

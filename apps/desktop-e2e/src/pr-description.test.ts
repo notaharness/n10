@@ -72,6 +72,8 @@ const GITHUB: FakeGitHub = {
   prs: [
     {
       number: 301,
+      // Links resolve at this head; this clone lacks it.
+      headRefOid: HEAD,
       title: 'Roll out cancellation behind a flag',
       headRefName: 'rollout',
       author: 'alex',

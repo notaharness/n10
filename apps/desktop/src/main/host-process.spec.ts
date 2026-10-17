@@ -30,7 +30,7 @@ const electron = vi.hoisted(() => ({
 }));
 
 vi.mock('electron', () => ({
-  app: { getPath: () => '/data' },
+  app: { getPath: () => '/data', getAppPath: () => '/app', isPackaged: false },
   ipcMain: {
     handle: (channel: string, fn: (event: unknown) => unknown) =>
       electron.handlers.set(channel, fn),
@@ -65,12 +65,15 @@ function start(
   const onRespawn = vi.fn();
   const host = startHostProcess({
     shell: {
+      quitForUpdate: async () => undefined,
+      quitForNpmUpdate: async () => undefined,
       pickFolder: async () => null,
       openExternal: async () => undefined,
       contextMenu: async () => null,
       appMenuPopup: async () => undefined,
       aboutBox: async () => undefined,
       prefsChanged: async () => undefined,
+      holdMenuShortcuts: async () => undefined,
       ...shell,
     },
     pushes: { broadcast: () => undefined, sendTo: () => undefined },

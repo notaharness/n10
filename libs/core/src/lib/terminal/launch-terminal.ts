@@ -2,7 +2,9 @@ import type { AppConfig } from '@n10/vcs-core';
 import type { NamedPtyEntry } from '../pty-registry.js';
 import { buildAgentLaunch } from '../session/launch-session.js';
 import { openSession } from '../session/open-session.js';
-import { sessionIdentity } from '../session-key.js';
+import { requireMachine } from '../machine-registry.js';
+import { LOCAL_MACHINE, sessionIdentity } from '../session-key.js';
+import { resolveShell } from './shell.js';
 import type { TerminalKind } from './terminal-name.js';
 
 export interface TerminalLaunchParams {
@@ -36,6 +38,18 @@ function terminalIdentity(params: TerminalLaunchParams) {
   };
 }
 
+/** A login shell of the configured kind, resolved on the machine the
+ *  terminal opens on. */
+async function shellLaunch(config: AppConfig, machine: string | undefined) {
+  const executor =
+    machine && machine !== LOCAL_MACHINE
+      ? requireMachine(machine).executor
+      : undefined;
+  return {
+    spec: { cmd: await resolveShell(config.shell, executor), args: ['-l'] },
+  };
+}
+
 /** Terminal intent is explicit in core; no tags are used as internal flags. */
 export async function launchTerminalSession(
   params: TerminalLaunchParams
@@ -57,7 +71,7 @@ export async function launchTerminalSession(
     rows: params.rows,
     build: (previous, restarting) =>
       params.kind === 'shell'
-        ? { spec: { cmd: '', args: [] } }
+        ? shellLaunch(params.config, identity.machine)
         : buildAgentLaunch(
             {
               config: params.config,

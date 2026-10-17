@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeScenario } from './scenario-file.js';
 
 /**
  * An Azure DevOps scenario as a test declares it, and the config that
@@ -63,6 +64,8 @@ export interface FakeAzureDevOps {
   pat?: string;
   /** Whose PAT it is — `/connectiondata`'s authenticated user. */
   user: { displayName: string; uniqueName: string };
+  /** The teams that user is in, by name: what `$mine=true` lists. */
+  teams?: string[];
   prs: FakeAdoPr[];
 }
 
@@ -198,6 +201,7 @@ function served(s: FakeAzureDevOps) {
       defaultBranch: 'refs/heads/main',
       project: { id: guid(project) },
     },
+    teams: (s.teams ?? []).map((name) => ({ id: guid(name), name })),
     prs: s.prs.map((pr) => pullRequest(s, pr)),
     evaluations: byId((pr) =>
       (pr.policies ?? []).map((p) => evaluation(s, pr, p))
@@ -230,7 +234,7 @@ export function installFakeAdo(
   scenario: FakeAzureDevOps
 ): { N10_FAKE_ADO: string; N10_HOST_REQUIRE: string } {
   const path = join(homeDir, 'fake-ado.json');
-  writeFileSync(path, JSON.stringify(served(scenario), null, 2), 'utf8');
+  writeScenario(path, served(scenario));
   return { N10_FAKE_ADO: path, N10_HOST_REQUIRE: FAKE_ADO_PRELOAD };
 }
 
@@ -273,4 +277,69 @@ export function fakeAdoGlobalConfig(
       'azure-devops': { pat: scenario.pat ?? FAKE_ADO_PAT },
     },
   };
+}
+
+/** The scenario as the preload serves it now, writes included. */
+export interface ServedAdo {
+  prs: {
+    pullRequestId: number;
+    lastMergeSourceCommit: { commitId: string };
+    lastMergeTargetCommit: { commitId: string };
+    reviewers: { displayName: string; vote: number }[];
+  }[];
+  iterations: Record<number, Record<string, unknown>[]>;
+  /** Paths each pull request's latest iteration changed. */
+  changes?: Record<number, string[]>;
+  threads?: Record<number, Record<string, unknown>[]>;
+  /** Writes whose answer is lost, once each: the write is kept and the
+   *  connection drops before Azure answers. */
+  loseWrites?: ('thread' | 'reply' | 'vote')[];
+  writes?: (
+    | { kind: 'thread'; prId: number; thread: Record<string, unknown> }
+    | { kind: 'reply'; prId: number; threadId: number }
+    | { kind: 'vote'; prId: number; vote: number }
+  )[];
+}
+
+export function fakeAdoServed(homeDir: string): ServedAdo {
+  return JSON.parse(
+    readFileSync(join(homeDir, 'fake-ado.json'), 'utf8')
+  ) as ServedAdo;
+}
+
+export function updateFakeAdo(
+  homeDir: string,
+  change: (served: ServedAdo) => void
+): void {
+  const path = join(homeDir, 'fake-ado.json');
+  const served = fakeAdoServed(homeDir);
+  change(served);
+  writeScenario(path, served);
+}
+
+/**
+ * Put a pull request at real commits of the test repository, so its
+ * diff can be read and a review filed on it: its head, its target, and
+ * one iteration from one to the other changing `paths`.
+ */
+export function placeAdoPr(
+  homeDir: string,
+  prId: number,
+  at: { head: string; target: string; paths: string[] }
+): void {
+  updateFakeAdo(homeDir, (s) => {
+    const pr = s.prs.find((p) => p.pullRequestId === prId)!;
+    pr.lastMergeSourceCommit = { commitId: at.head };
+    pr.lastMergeTargetCommit = { commitId: at.target };
+    const target = { commitId: at.target };
+    s.iterations[prId] = [
+      {
+        id: 1,
+        sourceRefCommit: { commitId: at.head },
+        targetRefCommit: target,
+        commonRefCommit: target,
+      },
+    ];
+    s.changes = { ...s.changes, [prId]: at.paths };
+  });
 }

@@ -8,6 +8,7 @@ import {
   type ListRead,
   type PullRequestDetail,
 } from '@n10/vcs-core';
+import type { ReviewLedger } from '@n10/vcs-core';
 import { azureDevOpsProvider } from './provider.js';
 import { resetAdoTransport } from './request.js';
 
@@ -452,7 +453,7 @@ describe('fetchPullRequestDetail (Azure DevOps): cache', () => {
     }
   });
 
-  it('reads again after this account votes', async () => {
+  it('reads again after this account files a review', async () => {
     serve();
     await read();
     await read();
@@ -472,13 +473,22 @@ describe('fetchPullRequestDetail (Azure DevOps): cache', () => {
       }
       return Promise.resolve(json(fixture('pr-detail')));
     });
-    await azureDevOpsProvider.submitReviewVerdict?.(
+    let ledger: ReviewLedger | null = null;
+    await azureDevOpsProvider.publishReview!(
       AUTH,
       PROJECT,
-      4211,
-      'approve'
+      {
+        prId: 4211,
+        head: '3'.repeat(40),
+        event: 'APPROVE',
+        body: '',
+        items: [],
+      },
+      { read: () => ledger, write: (l) => (ledger = l) }
     );
+    // The publication reads the pull request itself, uncached.
+    const published = reads();
     await read();
-    expect(reads()).toBe(2);
+    expect(reads()).toBe(published + 1);
   });
 });

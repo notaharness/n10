@@ -44,9 +44,9 @@ function RevokeBody({
   return (
     <>
       <p className="text-sm">
-        Permanently revoke {label}’s access. Offline machines update when they
-        reconnect. Files and running programs stay on that machine. Resetting
-        its fleet won’t let it rejoin.
+        Permanently revoke {label}’s access. Unreachable machines update when
+        they reconnect. Files and running programs stay on that machine.
+        Resetting its fleet won’t let it rejoin.
       </p>
       <DialogFooter>
         <Button variant="ghost" onClick={onClose}>

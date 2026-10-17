@@ -91,13 +91,12 @@ describe('getPullRequestConversation', () => {
     });
   });
 
-  it('refuses the answer when the repository closed during the read', async () => {
+  it('answers a repository parked during the read', async () => {
     env.onRead = () => {
       env.open = false;
     };
-    await expect(getPullRequestConversation({ ref: REF })).rejects.toThrow(
-      /no longer open/
-    );
+    const read = await getPullRequestConversation({ ref: REF });
+    expect(read.conversation.state).toBe('read');
   });
 
   it('reports an unconfigured provider as unsupported, not empty', async () => {
