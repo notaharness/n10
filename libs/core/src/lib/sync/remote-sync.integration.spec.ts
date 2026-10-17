@@ -168,7 +168,10 @@ describe('sweepMergedBranches', () => {
     const deleted: [string | null, string][] = [];
     await sweepMergedBranches({
       provider: {
-        fetchMergedBranches: () => Promise.resolve(new Set(['feature'])),
+        fetchMergedBranches: () =>
+          Promise.resolve(
+            new Map([['feature', [git(repo, 'rev-parse', 'feature')]]])
+          ),
       } as never,
       vcsConfigured: true,
       config: { vendorAuth: {}, vendorProject: {}, autoDeleteOnMerge: true },

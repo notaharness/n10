@@ -15,8 +15,9 @@ import type {
   LedgerStore,
   PublishedReview,
   ReviewSubmission,
+  MergedBranchHeads,
 } from '@n10/vcs-core';
-import { sanitizeBody } from '@n10/vcs-core';
+import { mergedHeadCommit, sanitizeBody } from '@n10/vcs-core';
 import { log } from '@n10/logger';
 import type { AdoConfig } from './client.js';
 import { authHeaders, baseUrl } from './client.js';
@@ -826,6 +827,13 @@ async function setAdoThreadResolved(
 
 // ── VcsProvider implementation ──────────────────────────────────────
 
+/** A completed pull request, as far as the merged-branch sweep reads it. */
+interface CompletedPr {
+  sourceRefName?: string;
+  /** The source commit the pull request merged. */
+  lastMergeSourceCommit?: { commitId?: string };
+}
+
 /** How far back the merged-branch sweep looks for completed pull requests. */
 const MERGED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -962,8 +970,8 @@ export const azureDevOpsProvider: VcsProvider = {
     auth: Record<string, string>,
     project: Record<string, string>,
     branches: string[]
-  ): Promise<Set<string>> {
-    if (branches.length === 0) return new Set();
+  ): Promise<MergedBranchHeads> {
+    if (branches.length === 0) return new Map();
     const config = toAdoConfig(auth, project);
     // A failed lookup answers with no merged branches rather than
     // throwing: the sweep that consumes this deletes branches, and
@@ -975,7 +983,7 @@ export const azureDevOpsProvider: VcsProvider = {
     // merges, the direction a failure already errs in, so past a
     // thousand in the window the sweep uses the first thousand.
     const since = new Date(Date.now() - MERGED_WINDOW_MS).toISOString();
-    const rows = await adoGetAll<{ sourceRefName?: string }>(
+    const rows = await adoGetAll<CompletedPr>(
       'fetchMergedBranches',
       `${config.org}/${config.project}/${config.repo}/completed-prs`,
       TTL.mergedPrs,
@@ -985,12 +993,16 @@ export const azureDevOpsProvider: VcsProvider = {
       authHeaders(config.pat),
       `repository ${config.repo}`,
       { truncateAfterPages: 10 }
-    ).catch(() => [] as { sourceRefName?: string }[]);
+    ).catch(() => [] as CompletedPr[]);
     const branchSet = new Set(branches);
-    const matched = new Set<string>();
+    const matched: MergedBranchHeads = new Map();
     for (const pr of rows) {
       const source = (pr.sourceRefName ?? '').replace(/^refs\/heads\//, '');
-      if (branchSet.has(source)) matched.add(source);
+      if (!branchSet.has(source)) continue;
+      // Merged either way; only a full commit id vouches for commits.
+      const heads = matched.get(source) ?? [];
+      const head = mergedHeadCommit(pr.lastMergeSourceCommit?.commitId);
+      matched.set(source, head ? [...heads, head] : heads);
     }
     return matched;
   },
