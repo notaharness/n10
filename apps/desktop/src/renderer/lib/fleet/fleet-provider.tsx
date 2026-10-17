@@ -157,14 +157,20 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   useNetworkReport();
 
   const resetRevocation = revokeCeremony.reset;
+  const revocationRunning = revokeCeremony.running;
   const openRevocation = useCallback(
     (machine: MachineView) => {
+      // Resume the active request without losing its target or ceremony state.
+      if (revocationRunning) {
+        setRevokeVisible(true);
+        return;
+      }
       resetRevocation();
       setRevokeCompletion(null);
       setRevokeTarget(machine);
       setRevokeVisible(true);
     },
-    [resetRevocation]
+    [resetRevocation, revocationRunning]
   );
   const closeRevocation = useCallback(() => setRevokeTarget(null), []);
   const value = useMemo(
