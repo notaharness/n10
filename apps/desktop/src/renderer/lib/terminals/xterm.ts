@@ -1,10 +1,11 @@
-import { Terminal, type ITheme } from '@xterm/xterm';
+import { Terminal, type IDisposable, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { toast } from 'sonner';
 import type { ResolvedTheme } from '../theme.js';
 import { errorMessage, isMac } from '../utils.js';
+import { replays } from './replays.js';
 import { installSchemeReports } from './scheme-reports.js';
 
 /**
@@ -16,6 +17,14 @@ import { installSchemeReports } from './scheme-reports.js';
 export interface DesktopTerminal {
   term: Terminal;
   fit: FitAddon;
+  /** Write the program's output. */
+  write(data: string): void;
+  /** Write output the program has been answered for before: a
+   *  session's snapshot (`replays`). */
+  replay(data: string): void;
+  /** What the terminal sends the program: keys, pastes and its replies
+   *  to output, but not to a replay. */
+  onData(listener: (data: string) => void): IDisposable;
   setTheme(theme: ResolvedTheme): void;
   dispose(): void;
 }
@@ -256,10 +265,14 @@ export function openTerminal(
   term.onWriteParsed(modes);
   const schemes = installSchemeReports(term, theme);
   host.dataset.terminalTheme = theme;
+  const replayed = replays(term);
 
   return {
     term,
     fit,
+    write: (data) => term.write(data),
+    replay: (data) => replayed.write(data, schemes.replayed),
+    onData: replayed.onData,
     setTheme: (next) => {
       // The palette first: a program told of the switch asks for the
       // colours next.

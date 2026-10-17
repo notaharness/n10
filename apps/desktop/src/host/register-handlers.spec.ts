@@ -83,7 +83,12 @@ describe('registerHostHandlers', () => {
       ...createViewerApi(),
       watchSession: (viewer: number, name: string) => {
         seen.push([viewer, name]);
-        return Promise.resolve({ data: '', seq: 0, truncated: false });
+        return Promise.resolve({
+          data: '',
+          seq: 0,
+          truncated: false,
+          replayed: 0,
+        });
       },
     };
     registerHostHandlers(registrar, createHostApi(), viewerApi);

@@ -393,6 +393,22 @@ leaves the setup in the ring, where it can be dropped as before. A snapshot whos
 ring has dropped output still bounces the grid so the application repaints the
 screen the ring no longer holds.
 
+The setup includes tmux's queries to its client: device attributes (DA1, DA2)
+and its colours (OSC 10/11). xterm answers each query it parses. tmux waits
+for one answer to each, and tmux 3.6+ passes an answer it is not waiting for
+to the pane as typed input. So the relay records the last chunk a terminal
+has been sent (`RelayEntry.shown`): pushed live to a watching window, or
+handed out in a snapshot. A snapshot says how much of it, from its start, came
+before that (`SessionBuffer.replayed`), and the terminal writes that part as a
+replay (`lib/terminals/replays.ts`): what `onData` sends between that write and
+its callback, which xterm runs once the write is parsed, is dropped. The rest,
+output no terminal has answered (a client that attached while nothing watched
+it), is written as output, and its queries are answered. xterm does not say
+which data is a reply, so keys pressed while a replay is parsed are dropped
+with them. The renderer asks for its watch a microtask after mounting: a
+snapshot StrictMode's first mount asked for and dropped unwritten would count
+as shown.
+
 ## Desktop repositories and tabs
 
 The host selects one repository and keeps the others it has read parked
@@ -1609,10 +1625,12 @@ A terminal knows mode 2031 is set only from the output it has parsed. tmux
 3.6 sets it, and asks `CSI ? 996 n`, in the same start-up output as the
 alternate screen and bracketed paste: the client's first output, which the
 relay keeps ahead of its ring, so a terminal mounted from a truncated snapshot
-has it too. Replaying that head answers the `?996n` again, so a remount tells
-tmux the current scheme, even one that changed while nothing was mounted;
-tmux takes a repeated report as a prompt to ask for colours again, which is
-harmless. A session mounted in two windows answers each query and sends each
+has it too. A remount replays that head without answering it (see the
+session relay's queries), so once the replay is parsed a terminal with 2031
+set sends the current scheme (`SchemeReports.replayed`): tmux learns of a
+switch made while nothing was mounted. tmux forwards only an actual change to
+the pane, and takes a repeated report as a prompt to ask for colours again,
+which is harmless. A session mounted in two windows answers each query and sends each
 switch from both; tmux reads the duplicates the same way.
 
 tmux is that program: it asks its client for colours when the client

@@ -219,6 +219,7 @@ describe('launchTerminal', () => {
       data: '$ ls\r\n',
       seq: 2,
       truncated: false,
+      replayed: 0,
     });
   });
 });
@@ -264,6 +265,7 @@ describe('adoptTerminal', () => {
       data: 'one output',
       seq: 1,
       truncated: false,
+      replayed: 0,
     });
   });
 

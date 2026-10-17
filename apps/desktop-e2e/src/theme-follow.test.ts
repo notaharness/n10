@@ -26,6 +26,19 @@ setTimeout(() => {
 }, 1000);
 `;
 
+/** Asks to be told of colour-scheme changes (mode 2031) and prints
+ *  each report it gets, until killed. */
+const WATCH_SCHEME = `
+process.stdin.setRawMode(true);
+process.stdout.write('\\x1b[?2031h');
+console.log('watching');
+process.stdin.on('data', (data) => {
+  for (const m of String(data).matchAll(/\\x1b\\[\\?997;(\\d)n/g)) {
+    console.log('scheme ' + (m[1] === '1' ? 'dark' : 'light'));
+  }
+});
+`;
+
 /**
  * Following the system theme: the UI and its terminals paint from one
  * signal, Electron's `nativeTheme`, which both OS scheme changes and
@@ -112,5 +125,39 @@ test.describe('Theme', () => {
         timeout: 15_000,
       });
     }
+  });
+
+  // tmux learns of a switch from its client terminal, xterm. A switch
+  // while the tab had no terminal reaches tmux when one mounts again,
+  // once the snapshot it replays is written.
+  test('a program in a terminal that was not on screen is told of a switch when it is back', async ({
+    desktop,
+  }) => {
+    const { app, page, repoPath } = desktop;
+    writeFileSync(join(repoPath, 'watch-scheme.cjs'), WATCH_SCHEME);
+    await switchSystemTheme(app, 'dark');
+    await openShell(app, page);
+    await focusTerminal(page);
+    await page.keyboard.type('node watch-scheme.cjs\n', { delay: 20 });
+    await expect(visibleText(page, 'watching')).toBeVisible({
+      timeout: 15_000,
+    });
+
+    // Two more tabs: the first is neither on screen nor held ready.
+    await openShell(app, page);
+    await openShell(app, page);
+    await expect(page.locator('[data-terminal-grid]')).toHaveCount(2);
+    await switchSystemTheme(app, 'light');
+    await expect
+      .poll(() => painted(page))
+      .toEqual({
+        ui: 'light',
+        terminal: 'light',
+      });
+
+    await terminalTabs(page).first().click();
+    await expect(visibleText(page, 'scheme light')).toBeVisible({
+      timeout: 15_000,
+    });
   });
 });

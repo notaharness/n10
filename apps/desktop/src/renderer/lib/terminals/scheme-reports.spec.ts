@@ -54,6 +54,17 @@ describe('colour-scheme reports', () => {
     expect(replies).toHaveLength(2);
   });
 
+  // A remounted terminal answers nothing in its replay, `?996n`
+  // included, so it tells the program the scheme once it is parsed.
+  it('reports the scheme after a replay that set mode 2031', async () => {
+    terminal('light');
+    reports.replayed();
+    expect(replies).toEqual([]);
+    await write('\x1b[?2031h');
+    reports.replayed();
+    expect(replies).toEqual(['\x1b[?997;2n']);
+  });
+
   it('stops reporting after a full reset', async () => {
     terminal('dark');
     await write('\x1b[?2031h\x1bc');

@@ -10,6 +10,9 @@ export interface SchemeReports extends IDisposable {
   /** The theme the terminal paints with now. A program that enabled
    *  mode 2031 is told when its scheme changes. */
   set(theme: ResolvedTheme): void;
+  /** A replay has been parsed (`replays`). Its queries went unanswered,
+   *  so a program that enabled mode 2031 in it is told the scheme. */
+  replayed(): void;
 }
 
 function schemeReport(theme: ResolvedTheme): string {
@@ -75,6 +78,9 @@ export function installSchemeReports(
       if (next === theme) return;
       theme = next;
       if (updates) reply(schemeReport(next));
+    },
+    replayed: () => {
+      if (updates) reply(schemeReport(theme));
     },
     dispose: () => {
       for (const handler of handlers) handler.dispose();

@@ -41,6 +41,8 @@ export interface RelayEntry {
    *  per client and never repeats, so a snapshot without it starts a
    *  terminal without those modes. `null` until that output arrives. */
   head: string | null;
+  /** The seq `head` arrived as. */
+  headSeq: number;
   /** Ring buffer of the output after `head` (bounded by BUFFER_LIMIT):
    *  with it, everything a terminal mounted on a tab switch starts from. */
   chunks: string[];
@@ -52,10 +54,23 @@ export interface RelayEntry {
   seq: number;
   /** Output has been dropped between `head` and `chunks`. */
   truncated: boolean;
+  /** seq of the last chunk a terminal has been sent, live or in a
+   *  snapshot. That terminal answered what the chunk asks (tmux's
+   *  queries to its client), so a terminal replaying it later must not
+   *  answer again (`SessionBuffer.replayed`). */
+  shown: number;
 }
 
 export function newRelayEntry(seq = 0): RelayEntry {
-  return { head: null, chunks: [], bytes: 0, seq, truncated: false };
+  return {
+    head: null,
+    headSeq: seq,
+    chunks: [],
+    bytes: 0,
+    seq,
+    truncated: false,
+    shown: seq,
+  };
 }
 
 /** Start relaying the registry session under `name` into `entry`.
@@ -72,11 +87,14 @@ export function attachRelay(name: string, entry: RelayEntry): void {
   });
   session.pty.onData((data) => {
     entry.seq += 1;
-    if (entry.head === null) entry.head = data;
-    else keep(entry, data);
+    if (entry.head === null) {
+      entry.head = data;
+      entry.headSeq = entry.seq;
+    } else keep(entry, data);
     const payload = { name, data, seq: entry.seq };
     for (const viewer of viewersOf(name)) {
       sendTo?.(viewer, SESSION_EVENTS.data, payload);
+      entry.shown = entry.seq;
     }
   });
   session.pty.onExit((code) => {
@@ -107,12 +125,29 @@ function keep(entry: RelayEntry, data: string): void {
   }
 }
 
+/** How much of the snapshot, from its start, a terminal has been sent
+ *  before: output is shown in order, so it is a prefix. */
+function shownLength(entry: RelayEntry): number {
+  if (entry.head === null || entry.headSeq > entry.shown) return 0;
+  let length = entry.head.length;
+  const first = entry.seq - entry.chunks.length + 1;
+  for (let i = 0; i < entry.chunks.length && first + i <= entry.shown; i++) {
+    length += entry.chunks[i].length;
+  }
+  return length;
+}
+
+/** What a terminal mounting now starts from. It is handed to one, so
+ *  all of it counts as shown from here on. */
 export function relayBuffer(entry: RelayEntry): SessionBuffer {
-  return {
+  const buffer = {
     data: (entry.head ?? '') + entry.chunks.join(''),
     seq: entry.seq,
     truncated: entry.truncated,
+    replayed: shownLength(entry),
   };
+  entry.shown = entry.seq;
+  return buffer;
 }
 
 /** Named progress for a remote launch (ux-machines.md §5), keyed to
