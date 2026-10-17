@@ -2,7 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import { AZURE_REVIEWERS } from './fixtures/azure-reviewers.js';
 import { test, expect } from './fixtures/desktop.js';
 import { sidebarRow } from './setup/app.js';
-import type { FakeGitHub } from './setup/fake-gh.js';
+import { hoursAgo, type FakeGitHub } from './setup/fake-gh.js';
 
 /**
  * The Overview's reviewer rules and activity cards, pixel for pixel in
@@ -18,10 +18,6 @@ const shot = {
   caret: 'hide',
   maxDiffPixels: 0,
 } as const;
-
-/** Hours before the run, so "3h ago" reads the same on every run. */
-const hoursAgo = (h: number) =>
-  new Date(Date.now() - h * 3_600_000).toISOString();
 
 const GITHUB: FakeGitHub = {
   username: 'n10-tester',

@@ -1,4 +1,4 @@
-import type { FakePr } from '../setup/fake-gh.js';
+import { twoDaysAgoAt as at, type FakePr } from '../setup/fake-gh.js';
 
 /**
  * A pull request's conversation as a reviewer meets it: a summary-only
@@ -7,9 +7,6 @@ import type { FakePr } from '../setup/fake-gh.js';
  * and pushes and a team review request between them. Small enough to
  * read in a screenshot; `conversation-q2.ts` is the one for counts.
  */
-
-const at = (h: number, m = 0) =>
-  `2026-09-20T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00Z`;
 
 const alex = { __typename: 'User', login: 'alex' };
 
