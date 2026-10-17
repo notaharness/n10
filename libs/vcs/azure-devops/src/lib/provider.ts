@@ -359,9 +359,7 @@ export async function fetchActivePullRequests(
     authHeaders(config.pat),
     `repository ${config.repo}`
   );
-  return rows.map((raw) =>
-    parsePullRequest(raw, project, myTeamIds, viewerId)
-  );
+  return rows.map((raw) => parsePullRequest(raw, project, myTeamIds, viewerId));
 }
 
 /**

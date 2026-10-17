@@ -1,8 +1,14 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useInput } from 'ink';
+import type { PullRequestInfo } from '@n10/vcs-core';
 import { GeneralCommentsPane } from '../reviews/GeneralCommentsPane.js';
 import type { TerminalLayout, PaneModeValue, DiffBundle } from '@n10/app-core';
-import { useSessionActions, LAYOUT } from '@n10/app-core';
+import {
+  useAsyncOps,
+  useEngine,
+  useSessionActions,
+  LAYOUT,
+} from '@n10/app-core';
 import { useScrollWheel } from '../../hooks/useScrollWheel.js';
 import { handleReplyModeInput } from '../../utils/reply-mode.js';
 
@@ -11,22 +17,37 @@ interface GeneralCommentsContainerProps {
   terminal: TerminalLayout;
   terminalFocused: boolean;
   diffBundle: DiffBundle;
+  selectedPr: PullRequestInfo | undefined;
 }
 
-// Owns the 'comments' pane — lists PR-level (non-inline) comments fetched
-// from the VCS provider. Navigation is simple: j/k to move selection, esc
-// to return to pr-detail. The comments stream comes in via diffBundle so
-// we reuse the single provider fetch started in MainContent.
+// Owns the 'comments' pane — lists PR-level (non-inline) comments: the
+// review agent's unposted findings on the pull request, which [p] posts,
+// then those fetched from the VCS provider. Navigation is simple: j/k to
+// move selection, esc to return to pr-detail. The comments stream comes
+// in via diffBundle so we reuse the single provider fetch started in
+// MainContent.
 export function GeneralCommentsContainer({
   pane,
   terminal,
   terminalFocused,
   diffBundle,
+  selectedPr,
 }: GeneralCommentsContainerProps) {
   const generalComments = diffBundle.remote.generalComments;
+  const drafts = useMemo(
+    () =>
+      diffBundle.comments.filter(
+        (comment) => comment.file === null && comment.status !== 'posted'
+      ),
+    [diffBundle.comments]
+  );
   const viewportHeight = Math.max(1, terminal.paneRows - 2);
-  const count = generalComments.length;
+  const count = drafts.length + generalComments.length;
   const { flashStatus } = useSessionActions();
+  const { reviews } = useEngine();
+  const asyncOps = useAsyncOps();
+  const selectedThread =
+    generalComments[pane.generalCommentsIndex - drafts.length];
 
   /** Move the cursor and keep it inside the viewport. */
   const moveSelection = (delta: 1 | -1) => {
@@ -72,7 +93,7 @@ export function GeneralCommentsContainer({
    *  reply is never written against comments that have already moved
    *  on in the cache this pane reads from. */
   const startReply = () => {
-    const target = generalComments[pane.generalCommentsIndex];
+    const target = selectedThread;
     if (!target) return;
     pane.setReplyingToThreadId(target.id);
     pane.setReplyBuffer('');
@@ -80,8 +101,28 @@ export function GeneralCommentsContainer({
     flashStatus('Checking for new comments...');
   };
 
+  /** Post the selected finding on the pull request, at the head the
+   *  sidebar last read. */
+  const postDraft = () => {
+    const draft = drafts[pane.generalCommentsIndex];
+    if (!draft || draft.status !== 'draft' || !selectedPr) return;
+    void asyncOps.run('post-comment', async () => {
+      try {
+        await reviews.agentComments.post({
+          prId: selectedPr.id,
+          ids: [draft.id],
+          headSha: selectedPr.headSha,
+        });
+        flashStatus('Comment posted');
+        diffBundle.remote.refresh();
+      } catch (err) {
+        flashStatus(`Post failed: ${(err as Error).message}`);
+      }
+    });
+  };
+
   const toggleResolved = () => {
-    const target = generalComments[pane.generalCommentsIndex];
+    const target = selectedThread;
     if (!target) return;
     const newResolved = !target.isResolved;
     flashStatus(newResolved ? 'Resolving thread...' : 'Reopening thread...');
@@ -122,12 +163,14 @@ export function GeneralCommentsContainer({
       else if (input === 'k' || key.upArrow) moveSelection(-1);
       else if (input === 'r') startReply();
       else if (input === 'v') toggleResolved();
+      else if (input === 'p') postDraft();
     },
     { isActive: !terminalFocused }
   );
 
   return (
     <GeneralCommentsPane
+      drafts={drafts}
       comments={generalComments}
       selectedIndex={pane.generalCommentsIndex}
       scrollOffset={pane.generalCommentsScrollOffset}
