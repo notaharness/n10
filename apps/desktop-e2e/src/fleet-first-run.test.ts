@@ -234,7 +234,7 @@ test.describe('First run', () => {
 
     beam!.failCeremony('prf-unsupported', '<b>no prf.results.first</b>');
     await expect(
-      view.getByText(/This passkey did not provide WebAuthn PRF/)
+      view.getByText(/This passkey could not complete the request/)
     ).toBeVisible();
     await view.getByText('Details', { exact: true }).click();
     await expect(view.getByText('<b>no prf.results.first</b>')).toBeVisible();
@@ -244,7 +244,10 @@ test.describe('First run', () => {
       )
     ).toBeVisible();
     await expect(
-      view.getByText(/Update your browser and passkey manager/)
+      view.getByText(
+        'Update your browser and passkey manager, then start a fresh request.',
+        { exact: true }
+      )
     ).toBeVisible();
     await view.getByRole('button', { name: 'Back', exact: true }).click();
     await expect(

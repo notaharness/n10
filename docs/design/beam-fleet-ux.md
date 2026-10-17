@@ -111,7 +111,7 @@ events clear it. No durable publication inventory is inferred after restart.
 design. Cancellation and expiry are explicit; expiry offers **Start a fresh
 request**. Wrong passkey, missing PRF, directory read, storage and uncertain
 completion remain distinct. Failed links disappear. **Details** contains selectable
-plain text, never interpreted HTML. **Passkey help** opens on PRF failure.
+plain text, never interpreted HTML. A PRF failure says “This passkey could not complete the request.” and “Update your browser and passkey manager, then start a fresh request.” The precise PRF explanation stays in **Details**; **Passkey help** opens alongside it.
 
 Connection loss says **Reconnecting… Status may be out of date.** Mutations are
 disabled until status is available. Existing status/peer refresh and publication

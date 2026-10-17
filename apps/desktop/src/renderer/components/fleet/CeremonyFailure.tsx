@@ -63,6 +63,11 @@ export function CeremonyFailure({
         className="space-y-2 text-base outline-none"
       >
         <p className="text-destructive">{copy.explanation}</p>
+        {code === 'prf-unsupported' && (
+          <p>
+            Update your browser and passkey manager, then start a fresh request.
+          </p>
+        )}
         {op === 'init' && reachedPasskey && <p>{CREATE_FAILURE_NOTE}</p>}
         {op !== 'init' && code === 'prf-unsupported' && (
           <p>{SAME_PASSKEY_NOTE}</p>
@@ -70,6 +75,9 @@ export function CeremonyFailure({
       </div>
       <details className="text-sm text-muted-foreground">
         <summary>Details</summary>
+        {code === 'prf-unsupported' && (
+          <p>This passkey did not provide WebAuthn PRF.</p>
+        )}
         <p>
           <code className="font-mono text-foreground select-all">{code}</code>
         </p>

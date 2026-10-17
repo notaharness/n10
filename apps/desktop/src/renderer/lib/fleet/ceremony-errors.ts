@@ -23,7 +23,7 @@ const INTERNAL: FailureCopy = {
 
 const CATALOGUE: Record<string, FailureCopy> = {
   'prf-unsupported': {
-    explanation: 'This passkey did not provide WebAuthn PRF.',
+    explanation: 'This passkey could not complete the request.',
     actions: ['compatibility', 'retry', 'back'],
   },
   'ceremony-cancelled': {
