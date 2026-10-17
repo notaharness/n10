@@ -5,11 +5,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReviewSubmission, LedgerStore } from '@n10/vcs-core';
 import { freshLedger, ReviewPublishError } from '@n10/vcs-core';
 import {
-  appendComment,
-  readComments,
-  updateComment,
-  type ReviewComment,
-} from '@n10/review-comments';
+  appendAgentComment,
+  changeAgentComments,
+  claimAgentPost,
+} from '@n10/core';
+import { readComments, type ReviewComment } from '@n10/review-comments';
 import { reviewReadFixture } from './review-read-fixture.js';
 import { createAgentComments } from './agent-comments.js';
 
@@ -83,7 +83,7 @@ function setup() {
   );
   const changed = vi.fn();
   const service = createAgentComments(fixture.options, changed);
-  appendComment('/repo/.git', 7, comment);
+  appendAgentComment('/repo/.git', 7, comment);
   return { service, publish, changed };
 }
 it('publishes signed findings through the configured publisher with the exact side, range and head', async () => {
@@ -142,7 +142,7 @@ it('resumes an unanswered publication with its durable ledger and refuses editin
 });
 it('submits findings as one native review and resumes the batch after a partial failure', async () => {
   const f = setup();
-  appendComment('/repo/.git', 7, { ...comment, id: 'two' });
+  appendAgentComment('/repo/.git', 7, { ...comment, id: 'two' });
   f.publish.mockImplementationOnce(async (submission, ledger) => {
     expect(submission.items).toHaveLength(2);
     ledger.write({ ...freshLedger(head), inFlight: 'review' });
@@ -180,7 +180,9 @@ it('submits findings as one native review and resumes the batch after a partial 
 it('recovers a finding whose published ledger was saved before its store status', async () => {
   const f = setup();
   await f.service.post({ prId: 7, headSha: head, event: 'APPROVE' });
-  updateComment('/repo/.git', 7, 'one', { status: 'draft' });
+  changeAgentComments('/repo/.git', 7, (comments) =>
+    comments.map((c) => (c.id === 'one' ? { ...c, status: 'draft' } : c))
+  );
   expect(
     await f.service.post({ prId: 7, headSha: head, event: 'APPROVE' })
   ).toBe(1);
@@ -219,6 +221,28 @@ it('keeps posted comments immutable and refuses missing draft ids', async () => 
   expect(() => f.service.remove(7, 'missing')).toThrow('no longer exists');
 });
 
+it('defers to a post another process is running', async () => {
+  const f = setup();
+  // The claim is the file another shell holds; this process's own
+  // claim stands in for it.
+  const release = claimAgentPost('/repo/.git', 7);
+  changeAgentComments('/repo/.git', 7, (comments) =>
+    comments.map((c) => ({ ...c, status: 'posting' }))
+  );
+  await expect(f.service.post({ prId: 7, headSha: head })).rejects.toThrow(
+    'already being posted'
+  );
+  expect(f.service.read(7)[0].status).toBe('posting');
+  expect(() => f.service.update(7, 'one', { body: 'changed' })).toThrow(
+    'being posted'
+  );
+  expect(f.publish).not.toHaveBeenCalled();
+  // That post stopped without settling: the finding is a draft again.
+  release?.();
+  expect(f.service.read(7)[0].status).toBe('draft');
+  expect(await f.service.post({ prId: 7, headSha: head })).toBe(1);
+});
+
 it('keeps a finding unsent when a resumed review does not contain it', async () => {
   const f = setup();
   f.publish.mockResolvedValueOnce({ reviewId: 'r', items: {}, resumed: null });
@@ -234,11 +258,11 @@ it('observes external agent writes only while subscribed', async () => {
   const listener = vi.fn();
   const off = resource.subscribe(listener);
   await resource.read();
-  appendComment('/repo/.git', 7, { ...comment, id: 'external' });
+  appendAgentComment('/repo/.git', 7, { ...comment, id: 'external' });
   await vi.waitFor(() => expect(resource.getSnapshot().data).toHaveLength(2));
   off();
   listener.mockClear();
-  appendComment('/repo/.git', 7, { ...comment, id: 'after-close' });
+  appendAgentComment('/repo/.git', 7, { ...comment, id: 'after-close' });
   await new Promise((resolve) => setTimeout(resolve, 30));
   expect(listener).not.toHaveBeenCalled();
 });

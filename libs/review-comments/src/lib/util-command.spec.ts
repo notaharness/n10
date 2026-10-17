@@ -50,17 +50,14 @@ describe('parseArgs', () => {
 });
 
 /**
- * What `add-comment` actually writes.
- *
- * The command is the agent's whole interface to the review — a
- * subprocess with no state — so the file it leaves behind is the
- * contract, and asserting on the parsed flags alone would not have
- * caught a field that never reached disk.
+ * What `add-comment` hands the store. The command is the agent's whole
+ * interface to the review — a subprocess with no state — so the draft
+ * it stores is the contract; core's `agent-comment-store.spec.ts`
+ * covers the file it lands in.
  */
 describe('add-comment', () => {
-  let home: string;
-  let originalHome: string | undefined;
   let util: typeof Util;
+  let appended: { prId: number; comment: ReviewComment }[];
 
   const PR = 7;
   const BASE = [
@@ -71,47 +68,29 @@ describe('add-comment', () => {
     '--severity=major',
     '--body=The undo stack is never bounded.',
   ];
+  const context = {
+    appendComment: (prId: number, comment: ReviewComment) => {
+      appended.push({ prId, comment });
+    },
+  };
 
   beforeEach(async () => {
-    originalHome = process.env.HOME;
-    home = mkdtempSync(join(tmpdir(), 'n10-util-'));
-    process.env.HOME = home;
-    // ~/.n10 is resolved once at import time, so the module chain has
-    // to be re-imported after HOME moves.
-    vi.resetModules();
+    appended = [];
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
     util = await import('./util-command.js');
   });
 
   afterEach(() => {
-    if (originalHome === undefined) delete process.env.HOME;
-    else process.env.HOME = originalHome;
-    rmSync(home, { recursive: true, force: true });
+    vi.restoreAllMocks();
   });
 
-  /**
-   * Read the drafts file the way the reader does — off disk, at the
-   * path the agent's subprocess wrote it to. Going through the store's
-   * own API instead would prove the two agree with each other and
-   * nothing about the file that is actually the contract.
-   */
   const stored = (): ReviewComment[] => {
-    const path = join(
-      home,
-      '.n10',
-      'reviews',
-      createHash('sha256').update('/repo').digest('hex').slice(0, 32),
-      `pr-${PR}`,
-      'comments.json'
-    );
-    return (
-      JSON.parse(readFileSync(path, 'utf8')) as {
-        comments: ReviewComment[];
-      }
-    ).comments;
+    expect(appended.every((entry) => entry.prId === PR)).toBe(true);
+    return appended.map((entry) => entry.comment);
   };
 
-  it('writes the draft the flags describe', async () => {
-    await util.handleUtilCommand(['add-comment', ...BASE], '/repo');
+  it('stores the draft the flags describe', async () => {
+    await util.handleUtilCommand(['add-comment', ...BASE], '/repo', context);
     expect(stored()).toHaveLength(1);
     expect(stored()[0]).toMatchObject({
       file: 'src/undo.c',
@@ -130,7 +109,8 @@ describe('add-comment', () => {
   it('records the thread a draft answers', async () => {
     await util.handleUtilCommand(
       ['add-comment', ...BASE, '--thread=PRRT_kwDOAbC123'],
-      '/repo'
+      '/repo',
+      context
     );
     expect(stored()[0].threadId).toBe('PRRT_kwDOAbC123');
   });
@@ -150,7 +130,8 @@ describe('add-comment', () => {
         '--severity=nit',
         '--body=question (blocking): does this drop writes on crash?',
       ],
-      '/repo'
+      '/repo',
+      context
     );
     expect(stored()[0].severity).toBe('critical');
   });
@@ -166,13 +147,14 @@ describe('add-comment', () => {
         '--severity=critical',
         '--body=Note: this drops writes on crash',
       ],
-      '/repo'
+      '/repo',
+      context
     );
     expect(stored()[0].severity).toBe('critical');
   });
 
   it('leaves threadId off a draft that answers nothing', async () => {
-    await util.handleUtilCommand(['add-comment', ...BASE], '/repo');
+    await util.handleUtilCommand(['add-comment', ...BASE], '/repo', context);
     expect(stored()[0].threadId).toBeUndefined();
   });
 });
@@ -235,7 +217,7 @@ describe('add-guide', () => {
     await util.handleUtilCommand(
       ['add-guide', `--pr=${PR}`, `--file=${file}`],
       '/repo',
-      { head: () => 'abc123' }
+      { appendComment: () => undefined, head: () => 'abc123' }
     );
     expect(JSON.parse(readFileSync(guideAt(), 'utf8'))).toMatchObject({
       prId: PR,
@@ -250,7 +232,8 @@ describe('add-guide', () => {
     await expect(
       util.handleUtilCommand(
         ['add-guide', `--pr=${PR}`, `--file=${file}`],
-        '/repo'
+        '/repo',
+        { appendComment: () => undefined }
       )
     ).rejects.toThrow('exit');
     expect(exit).toHaveBeenCalledWith(1);
