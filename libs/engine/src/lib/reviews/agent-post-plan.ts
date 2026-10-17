@@ -51,9 +51,11 @@ export function assertWrittenAt(comments: ReviewComment[], head: string) {
   if (!stale.length) return;
   const one = stale.length === 1;
   throw new Error(
-    `${one ? 'A comment was' : `${stale.length} comments were`} written on ` +
-      `another commit than the pull request's head (${head.slice(0, 7)}). ` +
-      `Discard ${one ? 'it' : 'them'} or run the review again.`
+    `${one ? 'This comment was' : `${stale.length} comments were`} drafted ` +
+      'against a different commit than the pull request’s current head ' +
+      `(${head.slice(0, 7)}). Discard ${
+        one ? 'it' : 'them'
+      } or rerun the review.`
   );
 }
 

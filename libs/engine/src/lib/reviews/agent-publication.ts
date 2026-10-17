@@ -202,7 +202,7 @@ export function createAgentPublication(
       changed(req.prId);
       if (waiting && !settled)
         throw new Error(
-          'A comment on the pull request may already be posted. Post it again first'
+          'An earlier pull request comment may already be posted. Retry that comment first so n10 can check.'
         );
       return settled;
     }

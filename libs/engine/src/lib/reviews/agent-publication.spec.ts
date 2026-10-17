@@ -429,7 +429,9 @@ it('resends an unanswered summary as it was, and holds a new finding for the nex
   // Only the new finding chosen: nothing can go until the first is known.
   await expect(
     f.service.post({ prId: 7, ids: ['pr-2'], headSha: head })
-  ).rejects.toThrow('may already be posted');
+  ).rejects.toThrow(
+    'An earlier pull request comment may already be posted. Retry that comment first so n10 can check.'
+  );
 
   expect(await f.service.post({ prId: 7, headSha: head })).toBe(1);
   const resent = f.publish.mock.calls[1][0];
@@ -464,7 +466,7 @@ it('refuses findings on code written on another commit than the head', async () 
     comments.map((item) => ({ ...item, head: 'b'.repeat(40) }))
   );
   await expect(f.service.post({ prId: 7, headSha: head })).rejects.toThrow(
-    "A comment was written on another commit than the pull request's head (aaaaaaa). Discard it or run the review again."
+    'This comment was drafted against a different commit than the pull request’s current head (aaaaaaa). Discard it or rerun the review.'
   );
   expect(f.publish).not.toHaveBeenCalled();
   expect(f.service.read(7)[0].status).toBe('draft');
