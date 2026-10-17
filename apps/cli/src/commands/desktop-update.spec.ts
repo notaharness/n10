@@ -11,8 +11,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { desktopUpdateHandoff } from './desktop-update.js';
 
 const runtime = vi.hoisted(() => ({
-  runNpmUpdate: vi.fn(),
+  runNpmUpdate:
+    vi.fn<
+      (plan: unknown, options: { onCancel: () => void }) => Promise<unknown>
+    >(),
   relaunchNpmApp: vi.fn(),
+  showNpmUpdateCancelling: vi.fn(),
 }));
 vi.mock('./desktop-update-runtime.js', () => runtime);
 let home: string;
@@ -55,7 +59,11 @@ describe('existing desktop launcher npm handoff', () => {
     writeFileSync(handoff.request, JSON.stringify(plan));
     expect(runtime.runNpmUpdate).not.toHaveBeenCalled();
     await expect(handoff.finish(42)).resolves.toBe(23);
-    expect(runtime.runNpmUpdate).toHaveBeenCalledWith(plan);
+    expect(runtime.runNpmUpdate).toHaveBeenCalledWith(plan, {
+      onCancel: expect.any(Function),
+    });
+    runtime.runNpmUpdate.mock.calls[0][1].onCancel();
+    expect(runtime.showNpmUpdateCancelling).toHaveBeenCalledOnce();
     expect(runtime.relaunchNpmApp).toHaveBeenCalledWith(root, 'desktop');
     expect(runtime.runNpmUpdate.mock.invocationCallOrder[0]).toBeLessThan(
       runtime.relaunchNpmApp.mock.invocationCallOrder[0]

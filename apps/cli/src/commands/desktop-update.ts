@@ -22,16 +22,17 @@ export function desktopUpdateHandoff(root: string) {
       try {
         if (code !== 42) return code;
         // Load all update/relaunch code before npm can replace the package.
-        const { runNpmUpdate, relaunchNpmApp } = await import(
-          './desktop-update-runtime.js'
-        );
+        const { runNpmUpdate, relaunchNpmApp, showNpmUpdateCancelling } =
+          await import('./desktop-update-runtime.js');
         const plan = JSON.parse(readFileSync(request, 'utf8')) as NpmUpdatePlan;
         if (plan.root !== realpathSync(root))
           throw new Error(
             'Update request belongs to a different installation.'
           );
         command = `npm i -g @notaharness/n10@${plan.version}`;
-        const result = await runNpmUpdate(plan);
+        const result = await runNpmUpdate(plan, {
+          onCancel: () => showNpmUpdateCancelling(),
+        });
         console.log(result.message);
         if (result.status === 'failed')
           console.error(`npm logs: ${result.logPath}`);
