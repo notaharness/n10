@@ -65,3 +65,39 @@ export function motion(tab: Locator) {
     transition: el.style.transition,
   }));
 }
+
+/** The scroll extent of every box that scrolls sideways, from the tab
+ *  strip out to the window: what a tab carried past the strip's end
+ *  would widen. */
+export function sidewaysScroll(page: Page) {
+  return page.evaluate(() => {
+    const out: { scrollWidth: number; scrollLeft: number }[] = [];
+    for (
+      let el = document.querySelector('[role=tablist]');
+      el;
+      el = el.parentElement
+    ) {
+      if (/auto|scroll/.test(getComputedStyle(el).overflowX))
+        out.push({ scrollWidth: el.scrollWidth, scrollLeft: el.scrollLeft });
+    }
+    return out;
+  });
+}
+
+/** Where an element's box ends on the right, as laid out and moved. */
+export function rightEdge(l: Locator) {
+  return l.evaluate((el) => el.getBoundingClientRect().right);
+}
+
+/** Let `n` frames pass: time for a drag's auto-scroll to run. */
+export function frames(page: Page, n: number) {
+  return page.evaluate(
+    (count) =>
+      new Promise<void>((done) => {
+        const step = (left: number) =>
+          left === 0 ? done() : requestAnimationFrame(() => step(left - 1));
+        step(count);
+      }),
+    n
+  );
+}
