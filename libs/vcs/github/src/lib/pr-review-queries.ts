@@ -122,15 +122,35 @@ export function threadVariables(
   };
 }
 
-/** The comment an add answered with: a reply's, or a thread's first. */
-export function commentIdOf(answer: unknown): string {
-  const data = (answer as { data?: Record<string, unknown> }).data ?? {};
+/** The comment an add answered with: a reply's, or a thread's first.
+ *  `undefined` when the answer names none. */
+export function commentIdOf(answer: unknown): string | undefined {
+  const data = dataOf(answer);
   const reply = data['addPullRequestReviewThreadReply'] as
-    | { comment: { id: string } }
+    | { comment?: { id?: unknown } | null }
+    | null
     | undefined;
-  if (reply) return reply.comment.id;
-  const thread = data['addPullRequestReviewThread'] as {
-    thread: { comments: { nodes: { id: string }[] } };
-  };
-  return thread.thread.comments.nodes[0]!.id;
+  if (reply) return named(reply.comment?.id);
+  const thread = data['addPullRequestReviewThread'] as
+    | { thread?: { comments?: { nodes?: { id?: unknown }[] } } | null }
+    | null
+    | undefined;
+  return named(thread?.thread?.comments?.nodes?.[0]?.id);
+}
+
+/** The review a start answered with; `undefined` when it names none. */
+export function reviewIdOf(answer: unknown): string | undefined {
+  const start = dataOf(answer)['addPullRequestReview'] as
+    | { pullRequestReview?: { id?: unknown } | null }
+    | null
+    | undefined;
+  return named(start?.pullRequestReview?.id);
+}
+
+function dataOf(answer: unknown): Record<string, unknown> {
+  return (answer as { data?: Record<string, unknown> } | null)?.data ?? {};
+}
+
+function named(id: unknown): string | undefined {
+  return typeof id === 'string' && id !== '' ? id : undefined;
 }

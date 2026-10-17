@@ -30,6 +30,7 @@ import {
   threadVariables,
   DELETE_COMMENT,
   DELETE_REVIEW,
+  reviewIdOf,
   START_REVIEW,
   SUBMIT_REVIEW,
   UPDATE_COMMENT,
@@ -164,13 +165,11 @@ class Run {
         'You have a pending review on GitHub for this pull request. Submit or discard it there first'
       );
     }
-    const answer = (await this.step('review', () =>
+    const answer = await this.step('review', () =>
       this.gql(START_REVIEW, { pr: pr.id, commit: head })
-    )) as {
-      data: { addPullRequestReview: { pullRequestReview: { id: string } } };
-    };
+    );
     this.save({
-      reviewId: answer.data.addPullRequestReview.pullRequestReview.id,
+      reviewId: answered(reviewIdOf(answer), 'review', null),
       inFlight: null,
     });
   }
@@ -247,7 +246,7 @@ class Run {
             ...threadVariables(item.place),
           })
     );
-    this.record(item, commentIdOf(answer));
+    this.record(item, answered(commentIdOf(answer), 'comment', item.key));
   }
 
   /** Comments an earlier attempt added for drafts no longer chosen:
@@ -346,6 +345,22 @@ export const GITHUB_EVENTS: readonly ReviewEvent[] = [
 
 /** Steps that are not an item's; each is accounted for where it is sent. */
 const STEPS = new Set(['review', 'discard', 'submit']);
+
+/** An id GitHub answered a write with. An answer without one says
+ *  nothing of whether the write landed, so it is taken as lost: the step
+ *  stays in flight and the next attempt looks for it first. */
+function answered(
+  id: string | undefined,
+  what: 'review' | 'comment',
+  item: string | null
+): string {
+  if (id) return id;
+  throw new ReviewPublishError(
+    'unknown',
+    `GitHub returned no ${what} ID. n10 will check whether the ${what} was posted before retrying.`,
+    { item }
+  );
+}
 
 function without<T>(record: Record<string, T>, key: string): Record<string, T> {
   return Object.fromEntries(Object.entries(record).filter(([k]) => k !== key));
