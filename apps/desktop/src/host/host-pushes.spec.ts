@@ -22,6 +22,7 @@ vi.mock('./services/discovery.js', () => ({
 }));
 vi.mock('./services/sessions.js', () => ({ setSessionBroadcaster: vi.fn() }));
 vi.mock('./services/babysit.js', () => ({ setBabysitNotifier: vi.fn() }));
+vi.mock('./services/theme.js', () => ({ onThemeChange: vi.fn() }));
 vi.mock('./services/machines.js', () => ({
   setBeamStatusNotifier: vi.fn(),
   setCeremonyProgressNotifier: vi.fn(),

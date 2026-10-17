@@ -5,6 +5,7 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { toast } from 'sonner';
 import type { ResolvedTheme } from '../theme.js';
 import { errorMessage, isMac } from '../utils.js';
+import { installSchemeReports } from './scheme-reports.js';
 
 /**
  * xterm.js as the desktop runs it: one place for the options, the
@@ -189,11 +190,15 @@ function loadWebgl(
  * the addon, as its docs advise, and xterm carries on with its DOM
  * renderer.
  *
+ * xterm answers a program's colour queries (OSC 10/11) from its theme;
+ * `installSchemeReports` adds the colour-scheme reports it lacks.
+ *
  * `host` says which renderer draws (`data-terminal-renderer`, `webgl`
- * or `dom`), the grid (`data-terminal-grid`, `<cols>x<rows>`), the
- * screen (`data-terminal-buffer`, `normal` or `alternate`) and how
- * cursor keys are sent (`data-terminal-cursor-keys`, `normal` or
- * `application`), for whoever inspects the page.
+ * or `dom`), the theme (`data-terminal-theme`, `light` or `dark`), the
+ * grid (`data-terminal-grid`, `<cols>x<rows>`), the screen
+ * (`data-terminal-buffer`, `normal` or `alternate`) and how cursor keys
+ * are sent (`data-terminal-cursor-keys`, `normal` or `application`), for
+ * whoever inspects the page.
  */
 export function openTerminal(
   host: HTMLElement,
@@ -249,14 +254,21 @@ export function openTerminal(
   };
   modes();
   term.onWriteParsed(modes);
+  const schemes = installSchemeReports(term, theme);
+  host.dataset.terminalTheme = theme;
 
   return {
     term,
     fit,
     setTheme: (next) => {
+      // The palette first: a program told of the switch asks for the
+      // colours next.
       term.options.theme = terminalTheme(next);
+      host.dataset.terminalTheme = next;
+      schemes.set(next);
     },
     dispose: () => {
+      schemes.dispose();
       dropWebgl();
       term.dispose();
     },

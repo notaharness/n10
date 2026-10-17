@@ -1576,3 +1576,45 @@ installation may require running that command from the terminal. Windows,
 local installs and packaged apps keep the manual path. Native packaged updates
 remain a separate increment. GitHub's prerelease flag is not a channel selector:
 a beta release may be marked as a non-prerelease.
+
+## Theme
+
+The desktop paints one theme: Electron's `nativeTheme`, which folds the
+preference (`themeSource`) into the OS colour scheme, including the
+xdg-desktop-portal `color-scheme` Electron reads on Linux. The main process
+posts it to the host at fork and on every `'updated'`; windows read it from
+the host and repaint on its push. The renderer's `prefers-color-scheme` only
+seeds the first paint: a class set from its change event beside a terminal
+that re-read `matches` on each render could disagree.
+
+Programs in a terminal learn the theme the way they would from any terminal,
+and only the terminal on screen answers: the renderer's xterm, whose replies
+reach the PTY through `onData`. xterm answers OSC 10/11 itself from
+`options.theme`, the palette it paints with. It lacks the colour-scheme
+reports, so `lib/terminals/scheme-reports.ts` adds them with parser hooks:
+`CSI ? 996 n`, DECRQM for mode 2031 (xterm would say "not recognized"), and
+`CSI ? 997 ; 1|2 n` on a switch while the program has 2031 set. The host's
+headless emulators answer nothing, so a session no window has mounted is not
+told of a switch while it happens.
+
+A terminal knows mode 2031 is set only from the output it has parsed. tmux
+3.6 sets it, and asks `CSI ? 996 n`, in the same start-up output as the
+alternate screen and bracketed paste: the client's first output, which the
+relay keeps ahead of its ring, so a terminal mounted from a truncated snapshot
+has it too. Replaying that head answers the `?996n` again, so a remount tells
+tmux the current scheme, even one that changed while nothing was mounted;
+tmux takes a repeated report as a prompt to ask for colours again, which is
+harmless. A session mounted in two windows answers each query and sends each
+switch from both; tmux reads the duplicates the same way.
+
+tmux is that program: it asks its client for colours when the client
+attaches (again on a resize, at most every 30 seconds) and answers its panes'
+OSC 10/11 from what it last read. Only tmux 3.6 and later set mode 2031 on the
+client, ask again when the client reports a scheme change, and pass the change
+on to panes that enabled it; that is what lets a running program, such as
+Claude Code with its auto theme, follow a switch. tmux derives a pane's scheme
+from the client's background and re-derives it on each colour reply, so on a
+switch the pane is told the old scheme (after the foreground reply) before the
+new one. Older tmux answers from the colours it read at attach or at the last
+such resize, so after a switch only terminals attached since then report the
+new theme; nothing native makes it ask again.

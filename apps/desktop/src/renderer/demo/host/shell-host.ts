@@ -4,6 +4,7 @@ import type {
   DesktopPrefs,
   N10HostApi,
   RepoInfo,
+  ResolvedTheme,
   SettingsFieldView,
 } from '../../../host/contract.js';
 import { VIEWER } from '../data/identity.js';
@@ -97,6 +98,8 @@ type ShellHost = Pick<
   | 'onMenuCommand'
   | 'getDesktopPrefs'
   | 'setDesktopPrefs'
+  | 'getTheme'
+  | 'onThemeChanged'
   | 'getKeybindings'
   | 'setKeybinding'
   | 'holdMenuShortcuts'
@@ -114,6 +117,13 @@ export function createShellHost(state: DemoState): ShellHost {
   };
   let keybindings: DesktopKeybindings = {};
   const menuCommands = new Channel<MenuCommandEvent>();
+  // No `nativeTheme` in a page: the preference over the browser's own
+  // colour scheme.
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+  const themes = new Channel<ResolvedTheme>();
+  const resolved = (): ResolvedTheme =>
+    prefs.theme !== 'system' ? prefs.theme : media.matches ? 'dark' : 'light';
+  media.addEventListener('change', () => themes.emit(resolved()));
   return {
     getVersion: () =>
       later({ app: '1.0.0', electron: '44.0.0', node: '24.4.0', chrome: '' }),
@@ -152,8 +162,11 @@ export function createShellHost(state: DemoState): ShellHost {
     getDesktopPrefs: () => later(prefs),
     setDesktopPrefs: (patch) => {
       prefs = { ...prefs, ...patch };
+      themes.emit(resolved());
       return later(prefs);
     },
+    getTheme: () => later(resolved()),
+    onThemeChanged: themes.subscribe,
     getKeybindings: () => later(keybindings),
     setKeybinding: (actionId, descriptors) => {
       const rest = Object.fromEntries(

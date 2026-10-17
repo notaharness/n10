@@ -8,6 +8,7 @@ import {
   MENU_EVENTS,
   SESSION_EVENTS,
   SYNC_EVENTS,
+  THEME_EVENTS,
   UPDATE_EVENTS,
   type UpdateSnapshot,
   type FleetStatus,
@@ -17,6 +18,7 @@ import {
   type LaunchStepEvent,
   type MachinesChangedEvent,
   type MenuCommandEvent,
+  type ResolvedTheme,
   type SessionDataEvent,
   type SessionExitEvent,
   type SyncNoticeEvent,
@@ -186,6 +188,12 @@ const api: N10HostApi = {
   },
   getDesktopPrefs: () => ipcRenderer.invoke(IPC.getDesktopPrefs),
   setDesktopPrefs: (patch) => ipcRenderer.invoke(IPC.setDesktopPrefs, patch),
+  getTheme: () => ipcRenderer.invoke(IPC.getTheme),
+  onThemeChanged: (cb) => {
+    const listener = (_e: unknown, theme: ResolvedTheme) => cb(theme);
+    ipcRenderer.on(THEME_EVENTS.changed, listener);
+    return () => ipcRenderer.removeListener(THEME_EVENTS.changed, listener);
+  },
   getKeybindings: () => ipcRenderer.invoke(IPC.getKeybindings),
   setKeybinding: (actionId, descriptors) =>
     ipcRenderer.invoke(IPC.setKeybinding, actionId, descriptors),

@@ -325,6 +325,10 @@ export interface SyncState {
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
+/** The theme in effect: Electron's `nativeTheme`, which folds the
+ *  preference (its `themeSource`) into the OS colour scheme. */
+export type ResolvedTheme = 'light' | 'dark';
+
 export interface DesktopPrefs {
   theme: ThemePreference;
   /** Use the OS window frame + native menu bar instead of the custom
@@ -692,6 +696,9 @@ export interface N10HostApi {
   onBabysitChanged(cb: (event: BabysitChangedEvent) => void): () => void;
   getDesktopPrefs(): Promise<DesktopPrefs>;
   setDesktopPrefs(patch: Partial<DesktopPrefs>): Promise<DesktopPrefs>;
+  /** The theme in effect; its changes arrive on `onThemeChanged`. */
+  getTheme(): Promise<ResolvedTheme>;
+  onThemeChanged(cb: (theme: ResolvedTheme) => void): () => void;
   /** The rebound desktop shortcuts, kept in the global config. */
   getKeybindings(): Promise<DesktopKeybindings>;
   /** Rebind one desktop shortcut, or with null restore its default.
@@ -789,6 +796,7 @@ export const IPC = {
   showAppMenu: 'n10/shell/app-menu',
   getDesktopPrefs: 'n10/shell/prefs/get',
   setDesktopPrefs: 'n10/shell/prefs/set',
+  getTheme: 'n10/shell/theme',
   getKeybindings: 'n10/keybindings/get',
   setKeybinding: 'n10/keybindings/set',
   holdMenuShortcuts: 'n10/keybindings/hold-menu',
@@ -804,7 +812,7 @@ export const IPC = {
   cancelCeremony: 'n10/machines/ceremony/cancel',
   resetFleet: 'n10/machines/fleet-reset',
   dismissInboundMail: 'n10/machines/dismiss-inbound-mail',
-} as const;
+} as const satisfies { [K in keyof N10HostApi]?: string };
 
 /** Error thrown by host handlers when no repo has been opened yet. */
 export class NoActiveRepoError extends Error {
