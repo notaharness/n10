@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { CopyButton } from '@/components/copy-button';
 import { cn } from '@/lib/cn';
 
@@ -41,6 +42,13 @@ export function InstallStrip({ className }: { className?: string }) {
       </ul>
       <p className="text-fd-muted-foreground mt-3 text-center text-xs">
         Linux and macOS ·{' '}
+        <Link
+          href="/download"
+          className="hover:text-fd-foreground underline decoration-fd-border underline-offset-4 transition-colors"
+        >
+          Linux packages
+        </Link>{' '}
+        ·{' '}
         <a
           href="https://github.com/notaharness/n10/blob/master/LICENSE"
           className="hover:text-fd-foreground underline decoration-fd-border underline-offset-4 transition-colors"

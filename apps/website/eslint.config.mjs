@@ -1,8 +1,22 @@
 import next from '@next/eslint-plugin-next';
 import baseConfig from '../../eslint.config.mjs';
 
+const boundaryOptions = baseConfig.find(
+  (config) => config.rules?.['@nx/enforce-module-boundaries']
+).rules['@nx/enforce-module-boundaries'][1];
+
 export default [
   ...baseConfig,
+  {
+    // The website and release pipeline share asset names, not desktop code.
+    files: ['src/lib/release-assets.ts'],
+    rules: {
+      '@nx/enforce-module-boundaries': [
+        'error',
+        { ...boundaryOptions, allow: ['../../../desktop/release-assets.json'] },
+      ],
+    },
+  },
   {
     files: ['**/*.{ts,tsx}'],
     plugins: { '@next/next': next },

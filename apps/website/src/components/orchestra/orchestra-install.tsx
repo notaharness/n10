@@ -1,6 +1,6 @@
-import { withCode, wrapAtSpaces } from '@/components/inline-code';
+import { withCode } from '@/components/inline-code';
 import Link from 'next/link';
-import { CopyButton } from '@/components/copy-button';
+import { CommandLines } from '@/components/command-lines';
 import { buttonVariants } from '@/components/ui/button';
 
 const routes = [
@@ -37,19 +37,7 @@ export function OrchestraInstall() {
             {routes.map((route) => (
               <div key={route.title}>
                 <h3 className="font-semibold">{route.title}</h3>
-                <div className="n10-frame bg-fd-background divide-fd-border mt-3 flex flex-col divide-y overflow-hidden rounded-lg">
-                  {route.lines.map((line) => (
-                    <div
-                      key={line}
-                      className="flex items-center gap-2 py-1.5 pr-1.5 pl-4"
-                    >
-                      <code className="min-w-0 flex-1 font-mono text-[13px]">
-                        {wrapAtSpaces(line)}
-                      </code>
-                      <CopyButton text={line} label={`Copy: ${line}`} />
-                    </div>
-                  ))}
-                </div>
+                <CommandLines lines={route.lines} className="mt-3" />
                 <p className="text-fd-muted-foreground mt-3 text-sm">
                   {withCode(route.then)}
                 </p>
