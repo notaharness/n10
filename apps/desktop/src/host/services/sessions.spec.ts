@@ -843,6 +843,7 @@ describe('session buffer', () => {
       data: 'one two',
       seq: 2,
       truncated: false,
+      replayed: 0,
     });
   });
 
@@ -851,6 +852,7 @@ describe('session buffer', () => {
       data: '',
       seq: 0,
       truncated: false,
+      replayed: 0,
     });
   });
 

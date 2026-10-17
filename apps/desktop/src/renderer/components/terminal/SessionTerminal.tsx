@@ -34,7 +34,9 @@ function paneGrid(el: HTMLElement, xterm: DesktopTerminal) {
  * answers the host's ring buffer to start from and sends every chunk
  * after it. That is all the scrollback a terminal has on arriving —
  * under tmux, whose own history is the record, a screen or so. `seq`
- * ordering drops any live chunk the snapshot already held. While its
+ * ordering drops any live chunk the snapshot already held. The
+ * snapshot is a replay: what the terminal would answer in it goes
+ * nowhere (`replays`). While its
  * pane is on screen it also shows the session (`showSession`), which
  * counts as seeing: its output does not ask for the user's attention.
  * A spare terminal holds no focus and sees nothing.
@@ -133,7 +135,7 @@ export function SessionTerminal({
 
   useEffect(() => {
     if (!xterm) return undefined;
-    const data = xterm.term.onData(write);
+    const data = xterm.onData(write);
     const resized = xterm.term.onResize(({ cols, rows }) => resize(cols, rows));
     return () => {
       data.dispose();
@@ -156,7 +158,7 @@ export function SessionTerminal({
     if (!xterm || !el) return;
     const grid = paneGrid(el, xterm);
     if (grid) xterm.term.resize(grid.cols, grid.rows);
-    feedRef.current?.attach((data) => xterm.term.write(data));
+    feedRef.current?.attach(xterm);
   }, [xterm, name]);
 
   // Pastes go through `term.paste`, which brackets them when the app

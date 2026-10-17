@@ -212,6 +212,8 @@ export function createSessionHost(
           data: session?.output ?? '',
           seq: session?.seq ?? 0,
           truncated: false,
+          // No program behind it to answer.
+          replayed: 0,
         },
         20
       );

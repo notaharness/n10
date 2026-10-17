@@ -71,6 +71,7 @@ describe('session output relay', () => {
       data: 'hello',
       seq: 1,
       truncated: false,
+      replayed: 0,
     });
   });
 
@@ -109,6 +110,60 @@ describe('session output relay', () => {
       data: 'setup againz',
       seq: 5,
       truncated: false,
+      replayed: 0,
+    });
+  });
+
+  // A terminal answers the queries in what it is sent (tmux's, to its
+  // client); one replaying them later must not answer again (#370).
+  describe('what a terminal has been sent before', () => {
+    it('is nothing for output no terminal was sent', () => {
+      const entry = start('a');
+      print('a', 'setup');
+      print('a', 'screen');
+      expect(relay.relayBuffer(entry).replayed).toBe(0);
+    });
+
+    it('is the whole snapshot once one has been handed out', () => {
+      const entry = start('a');
+      print('a', 'setup');
+      relay.relayBuffer(entry);
+      print('a', 'more');
+      expect(relay.relayBuffer(entry).replayed).toBe('setup'.length);
+    });
+
+    it('is what was pushed to a watching window, and not what came after', () => {
+      const entry = start('a');
+      watch.watch(1, 'a');
+      print('a', 'setup');
+      print('a', 'seen');
+      watch.unwatch(1, 'a');
+      print('a', 'unseen');
+      expect(relay.relayBuffer(entry)).toMatchObject({
+        data: 'setupseenunseen',
+        replayed: 'setupseen'.length,
+      });
+    });
+
+    it('counts the head and the ring the ring has kept', () => {
+      const entry = start('a');
+      watch.watch(1, 'a');
+      print('a', 'setup');
+      print('a', 'x'.repeat(300 * 1024));
+      print('a', 'y'.repeat(300 * 1024));
+      watch.unwatch(1, 'a');
+      print('a', 'z');
+      expect(relay.relayBuffer(entry).replayed).toBe(
+        'setup'.length + 300 * 1024
+      );
+    });
+
+    it("is nothing of a new client's output", () => {
+      const entry = start('a');
+      print('a', 'setup');
+      relay.relayBuffer(entry);
+      reattach('a', 'setup again');
+      expect(relay.relayBuffer(entry).replayed).toBe(0);
     });
   });
 

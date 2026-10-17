@@ -229,6 +229,10 @@ export interface SessionBuffer {
    *  way through the stream: without the attach's full redraw, it only
    *  repaints what changed after it. */
   truncated: boolean;
+  /** How much of `data`, from its start, a terminal has been sent
+   *  before. That terminal answered the queries in it, so a terminal
+   *  starting from it now writes it as a replay, answering nothing. */
+  replayed: number;
 }
 
 // ── Settings ─────────────────────────────────────────────────────

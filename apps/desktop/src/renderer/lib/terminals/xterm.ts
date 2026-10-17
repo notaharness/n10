@@ -1,10 +1,11 @@
-import { Terminal, type ITheme } from '@xterm/xterm';
+import { Terminal, type IDisposable, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { toast } from 'sonner';
 import type { ResolvedTheme } from '../theme.js';
 import { errorMessage, isMac } from '../utils.js';
+import { replays } from './replays.js';
 
 /**
  * xterm.js as the desktop runs it: one place for the options, the
@@ -15,6 +16,14 @@ import { errorMessage, isMac } from '../utils.js';
 export interface DesktopTerminal {
   term: Terminal;
   fit: FitAddon;
+  /** Write the program's output. */
+  write(data: string): void;
+  /** Write output the program has been answered for before: a
+   *  session's snapshot (`replays`). */
+  replay(data: string): void;
+  /** What the terminal sends the program: keys, pastes and its replies
+   *  to output, but not to a replay. */
+  onData(listener: (data: string) => void): IDisposable;
   setTheme(theme: ResolvedTheme): void;
   dispose(): void;
 }
@@ -249,10 +258,14 @@ export function openTerminal(
   };
   modes();
   term.onWriteParsed(modes);
+  const replayed = replays(term);
 
   return {
     term,
     fit,
+    write: (data) => term.write(data),
+    replay: (data) => replayed.write(data),
+    onData: replayed.onData,
     setTheme: (next) => {
       term.options.theme = terminalTheme(next);
     },

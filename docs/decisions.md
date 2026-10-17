@@ -386,6 +386,22 @@ leaves the setup in the ring, where it can be dropped as before. A snapshot whos
 ring has dropped output still bounces the grid so the application repaints the
 screen the ring no longer holds.
 
+The setup includes tmux's queries to its client: device attributes (DA1, DA2)
+and its colours (OSC 10/11). xterm answers each query it parses. tmux waits
+for one answer to each, and tmux 3.6+ passes an answer it is not waiting for
+to the pane as typed input. So the relay records the last chunk a terminal
+has been sent (`RelayEntry.shown`): pushed live to a watching window, or
+handed out in a snapshot. A snapshot says how much of it, from its start, came
+before that (`SessionBuffer.replayed`), and the terminal writes that part as a
+replay (`lib/terminals/replays.ts`): what `onData` sends between that write and
+its callback, which xterm runs once the write is parsed, is dropped. The rest,
+output no terminal has answered (a client that attached while nothing watched
+it), is written as output, and its queries are answered. xterm does not say
+which data is a reply, so keys pressed while a replay is parsed are dropped
+with them. The renderer asks for its watch a microtask after mounting: a
+snapshot StrictMode's first mount asked for and dropped unwritten would count
+as shown.
+
 ## Desktop repositories and tabs
 
 The host selects one repository and keeps the others it has read parked

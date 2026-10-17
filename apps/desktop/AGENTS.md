@@ -241,6 +241,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   bounces the grid for a full repaint only when the snapshot is `truncated`.
   The snapshot starts with the tmux client's first output, its terminal
   setup, kept ahead of the ring (`session-relay.ts`, decisions.md).
+  The part a terminal was sent before (`SessionBuffer.replayed`) is written
+  as a replay (`lib/terminals/replays.ts`): xterm's answers to the queries
+  in it do not reach the PTY.
   `paneTerminalGrid` opens a hidden terminal inside `[data-terminal-pane]`
   for the launch estimate. The grid takes the whole pane: no padding. A terminal releases its
   WebGL context when it goes (`loadWebgl`): Chromium keeps 16 and evicts
