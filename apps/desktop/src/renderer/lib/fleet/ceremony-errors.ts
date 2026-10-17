@@ -67,7 +67,7 @@ const CATALOGUE: Record<string, FailureCopy> = {
   },
   'revoked-peer': {
     explanation:
-      'Access revoked. Reset this machine to rejoin with a new approval.',
+      'Access revoked. Reset this machine, then get approval to rejoin.',
     actions: ['close'],
   },
   'unknown-peer': {
