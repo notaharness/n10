@@ -123,6 +123,6 @@ export interface FleetFailure {
   detail: string | null;
 }
 
-/** `fleet.reset` (beam docs/06): this machine leaves its fleet, keeping
- *  its identity. */
+/** `fleet.reset` (beam docs/06): this machine leaves its fleet, and its
+ *  next enrolment is under a new identity. */
 export type FleetResetOutcome = { ok: true } | FleetFailure;

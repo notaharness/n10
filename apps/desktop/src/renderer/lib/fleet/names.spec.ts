@@ -38,6 +38,14 @@ describe('nameError', () => {
     }
   });
 
+  it('refuses bidirectional controls, as beam’s unicode.Bidi_Control does', () => {
+    for (const point of [
+      0x061c, 0x200e, 0x200f, 0x202a, 0x202e, 0x2066, 0x2069,
+    ]) {
+      expect(nameError(`a${String.fromCodePoint(point)}b`)).toBe(NAME_RULE);
+    }
+  });
+
   it('refuses a lone surrogate, which is not a scalar value', () => {
     expect(nameError('a\ud800b')).toBe(NAME_RULE);
   });

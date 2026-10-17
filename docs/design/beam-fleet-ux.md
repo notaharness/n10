@@ -102,8 +102,8 @@ is result-time evidence; the row shows **Revoked**.
 
 **Reset fleet here?** stays inline: “Disconnect this machine and delete queued
 messages to its old peers. Other machines and your passkey stay unchanged.”
-“This keeps this machine’s identity. It will not recover a lost passkey or undo
-a revocation.” **Type reset to confirm** must equal `reset`; double submission
+“This machine gets a new identity. After it rejoins this fleet, revoke its old
+one from another machine. A reset won’t recover a lost passkey.” **Type reset to confirm** must equal `reset`; double submission
 is prevented. Successful socket completion announces **Fleet reset here**, clears
 local ceremony/publication UI, and returns to first-run choices. Failure retains
 the typed confirmation and offers mapped explanation and **Details**.
