@@ -8,7 +8,8 @@ name: Release
 # During that beta-only period its GitHub release is latest as well, so the
 # versionless download URLs resolve. Once false, beta releases are prereleases.
 # Run by hand, it rehearses the release of the selected ref's version:
-# the same builds, with npm publish --dry-run and no GitHub release.
+# the same builds, with npm publish --dry-run, and prints the GitHub release
+# it would create instead of creating it.
 on:
   push:
     tags: ['v*']
@@ -148,6 +149,7 @@ jobs:
         with:
           sparse-checkout: |
             apps/desktop/release-assets.json
+            apps/desktop/scripts/create-github-release.sh
             apps/desktop/scripts/prepare-release-assets.sh
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v4
@@ -162,11 +164,17 @@ jobs:
           pattern: release-*
           path: assets
           merge-multiple: true
-      - run: bash apps/desktop/scripts/prepare-release-assets.sh apps/desktop/release-assets.json assets
+      # Prints the release a vX.Y.Z tag would create, and its download URLs.
+      - run: bash apps/desktop/scripts/create-github-release.sh --dry-run apps/desktop/release-assets.json assets
+        env:
+          RELEASE_TAG: v${{ needs.version.outputs.version }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+          MOVE_LATEST: ${{ needs.version.outputs.move-latest }}
       - run: npm publish --dry-run --tag "$DIST_TAG" ./package/*.tgz
 
   # Attach every file release-assets.json names from release-* artifacts,
-  # plus the manifest and per-file checksums for user verification.
+  # plus the manifest and per-file checksums for user verification. The
+  # rehearsal runs the same script with --dry-run.
   github-release:
     if: github.event_name == 'push'
     needs: [version, publish]
@@ -178,6 +186,7 @@ jobs:
         with:
           sparse-checkout: |
             apps/desktop/release-assets.json
+            apps/desktop/scripts/create-github-release.sh
             apps/desktop/scripts/prepare-release-assets.sh
           sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v4
@@ -185,21 +194,9 @@ jobs:
           pattern: release-*
           path: assets
           merge-multiple: true
-      - run: |
-          manifest=apps/desktop/release-assets.json
-          bash apps/desktop/scripts/prepare-release-assets.sh "$manifest" assets
-          assets=("$manifest" assets/SHA256SUMS)
-          for name in $(jq -er '.[][][]' "$manifest"); do
-            assets+=("assets/$name")
-          done
-          if [ "$PRERELEASE" = true ] && [ "$MOVE_LATEST" != true ]; then
-            channel=(--prerelease)
-          else
-            channel=(--latest)
-          fi
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-            --verify-tag --generate-notes "${channel[@]}" "${assets[@]}"
+      - run: bash apps/desktop/scripts/create-github-release.sh apps/desktop/release-assets.json assets
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
           PRERELEASE: ${{ needs.version.outputs.prerelease }}
           MOVE_LATEST: ${{ needs.version.outputs.move-latest }}

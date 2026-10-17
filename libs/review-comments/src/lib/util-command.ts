@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { appendComment } from './comment-store.js';
 import { validateGuide } from './guide.js';
 import { guideInstructions } from './guide-instructions.js';
 import { writeGuide } from './guide-store.js';
@@ -33,7 +32,7 @@ export function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
-function handleAddComment(args: string[], repository: string): void {
+function handleAddComment(args: string[], context: UtilContext): void {
   const parsed = parseArgs(args);
 
   const missing: string[] = [];
@@ -104,12 +103,15 @@ function handleAddComment(args: string[], repository: string): void {
     ...(parsed.thread ? { threadId: parsed.thread } : {}),
   };
 
-  appendComment(repository, prId, comment);
+  context.appendComment(prId, comment);
   console.log(comment.id);
 }
 
-/** What the agent's checkout tells the command, read only when needed. */
+/** What the caller supplies the command: the store it writes to, and
+ *  what the agent's checkout tells it, read only when needed. */
 export interface UtilContext {
+  /** Stores a new draft; the caller owns the store and its locking. */
+  appendComment: (prId: number, comment: ReviewComment) => void;
   /** The commit checked out where the command runs. */
   head?: () => string | undefined;
 }
@@ -150,12 +152,12 @@ function handleAddGuide(
 export async function handleUtilCommand(
   args: string[],
   repository: string,
-  context: UtilContext = {}
+  context: UtilContext
 ): Promise<void> {
   const subcommand = args[0];
 
   if (subcommand === 'add-comment') {
-    handleAddComment(args.slice(1), repository);
+    handleAddComment(args.slice(1), context);
     return;
   }
   if (subcommand === 'add-guide') {
