@@ -286,3 +286,74 @@ it('refuses to publish once the repository is parked mid-post', async () => {
   );
   expect(f.publish).not.toHaveBeenCalled();
 });
+
+it('posts a finding on a whole file as a file comment', async () => {
+  const f = setup();
+  f.service.remove(7, 'one');
+  appendComment('/repo/.git', 7, {
+    ...comment,
+    id: 'file',
+    lineStart: null,
+    lineEnd: null,
+  });
+  expect(await f.service.post({ prId: 7, headSha: head })).toBe(1);
+  expect(f.publish.mock.calls[0][0].items).toEqual([
+    expect.objectContaining({
+      key: 'inline:agent-file',
+      place: { kind: 'file', path: 'a.ts' },
+    }),
+  ]);
+  expect(f.service.read(7)[0].status).toBe('posted');
+});
+
+it('posts findings on the pull request as the review summary, and a later one as a new summary', async () => {
+  const f = setup();
+  const onPr = (id: string, body: string): ReviewComment => ({
+    ...comment,
+    id,
+    body,
+    file: null,
+    lineStart: null,
+    lineEnd: null,
+  });
+  appendComment('/repo/.git', 7, onPr('pr-1', 'No test covers the retry.'));
+  appendComment('/repo/.git', 7, onPr('pr-2', 'The changelog is missing.'));
+  expect(await f.service.post({ prId: 7, headSha: head })).toBe(3);
+  const first = f.publish.mock.calls[0][0];
+  expect(first.items.map((item) => item.key)).toEqual(['inline:agent-one']);
+  expect(first.summaryKey).toBe('summary');
+  expect(first.body).toMatch(
+    /No test covers the retry\.\n\n.*The changelog is missing\./
+  );
+  expect(f.service.read(7).map((item) => item.status)).toEqual([
+    'posted',
+    'posted',
+    'posted',
+  ]);
+
+  // The summary already posted said other findings: this one is new.
+  appendComment('/repo/.git', 7, onPr('pr-3', 'The docs still say v1.'));
+  expect(await f.service.post({ prId: 7, headSha: head })).toBe(1);
+  const second = f.publish.mock.calls[1][0];
+  expect(second.items).toEqual([]);
+  expect(second.body).toContain('The docs still say v1.');
+  expect(second.body).not.toContain('retry');
+  expect(f.service.read(7)[2].status).toBe('posted');
+});
+
+it('recovers findings on the pull request from a summary already posted with them', async () => {
+  const f = setup();
+  f.service.remove(7, 'one');
+  appendComment('/repo/.git', 7, {
+    ...comment,
+    id: 'pr',
+    file: null,
+    lineStart: null,
+    lineEnd: null,
+  });
+  await f.service.post({ prId: 7, headSha: head });
+  updateComment('/repo/.git', 7, 'pr', { status: 'draft' });
+  expect(await f.service.post({ prId: 7, headSha: head })).toBe(1);
+  expect(f.publish).toHaveBeenCalledOnce();
+  expect(f.service.read(7)[0].status).toBe('posted');
+});

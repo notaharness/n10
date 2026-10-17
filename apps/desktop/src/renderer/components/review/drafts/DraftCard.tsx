@@ -27,6 +27,7 @@ import {
   useUpdateDraft,
 } from '../../../lib/data/mutations.js';
 import { useThreads } from '../../../lib/data/queries.js';
+import { draftPlace } from '../../../lib/diff/diff-model.js';
 import { totalCommentCount } from '../../../lib/diff/thread-model.js';
 import { cn, errorMessage } from '../../../lib/utils.js';
 import { Button } from '../../ui/button.js';
@@ -234,9 +235,7 @@ export function DraftCard({
       { onError: (e) => toast.error(errorMessage(e)) }
     );
 
-  const location = `${draft.file}:${draft.lineStart}${
-    draft.lineEnd !== draft.lineStart ? `-${draft.lineEnd}` : ''
-  }`;
+  const location = draftPlace(draft);
 
   return (
     <div

@@ -92,12 +92,15 @@ export function unpostedDrafts(
   return drafts.filter((d) => d.status !== 'posted');
 }
 
+/** Drafts keyed by file; ones on the pull request itself drop out. */
 export function groupDraftsByFile(
   drafts: readonly ReviewComment[]
 ): Map<string, ReviewComment[]> {
   const map = new Map<string, ReviewComment[]>();
-  for (const d of drafts)
+  for (const d of drafts) {
+    if (d.file == null) continue;
     (map.get(d.file) ?? map.set(d.file, []).get(d.file)!).push(d);
+  }
   return map;
 }
 
@@ -222,7 +225,9 @@ export function buildCommentRows(
   const rows: CommentRow[] = [];
   for (const t of general) rows.push(generalRow(t));
   for (const t of inlineThreads) rows.push(inlineRow(t, order));
-  for (const d of drafts) rows.push(draftRow(d, order));
+  // A draft on the pull request itself has no row in the diff; the
+  // walkthrough shows it.
+  for (const d of drafts) if (d.file !== null) rows.push(draftRow(d, order));
   rows.sort(compareCommentRows);
   return rows;
 }
@@ -262,8 +267,8 @@ function draftRow(d: ReviewComment, order: Map<string, number>): CommentRow {
     resolved: false,
     resolvable: false,
     file: d.file,
-    line: d.lineStart,
-    fileRank: order.get(d.file) ?? Number.MAX_SAFE_INTEGER,
+    line: d.lineStart ?? 0,
+    fileRank: order.get(d.file ?? '') ?? Number.MAX_SAFE_INTEGER,
   };
 }
 

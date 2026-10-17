@@ -114,6 +114,24 @@ describe('computeInsertionMap', () => {
     expect(map.insertions.get(0)).toHaveLength(1);
     expect(map.outOfDiff).toHaveLength(0);
   });
+
+  it('puts a comment on the whole file below the diff, with no line', () => {
+    const diffLines = makeDiffLines([{ oldLine: 1, newLine: 1 }]);
+    const comments = [
+      makeComment({ id: 'file', lineStart: null, lineEnd: null }),
+    ];
+    expect(computeInsertionMap(diffLines, comments)).toMatchObject({
+      insertions: new Map(),
+      outOfDiff: [comments[0]],
+    });
+    const { lines } = interleaveComments(diffLines, comments, 'file');
+    expect(lines.filter((l) => l.type === 'diff' && l.highlighted)).toEqual([]);
+    const separators = lines.flatMap((l) =>
+      l.type === 'separator' ? [l.rendered] : []
+    );
+    expect(separators.some((r) => /line \d/.test(r))).toBe(false);
+    expect(lines.at(-1)).toMatchObject({ type: 'thread-local' });
+  });
 });
 
 // ── New schema: interleaveComments emits thread/comment entries ────

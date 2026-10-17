@@ -957,6 +957,22 @@ unscoped path is read. The standalone utility resolves this identity through cor
 Only observed resources attach a nonrecursive watcher; the last observer
 leaving closes it.
 
+A finding goes on lines, a whole file, or the pull request: a null `file` or
+null lines, as `RemoteCommentThread` says it. `n10 util add-comment` checks a
+line or file anchor against the pull request's diff before storing it, so an
+anchor the provider would refuse (GitHub answers 422) never becomes a draft. The
+utility runs where no provider is configured, so the diff is the checkout's
+own: from where HEAD left `--base` (`origin/<base>`, else the local branch) to
+HEAD, three lines of context, renames detected (core `agent-comment-diff.ts`).
+The review prompt writes `--base` from the pull request's target. The finding
+records that HEAD as `head`; it is not checked against the provider's head.
+Findings on the pull request are filed as the review's summary, joined under
+one attribution: core's submission files a summary with the review, while a
+conversation comment is posted on its own. A summary already published that
+does not say this post's findings belonged to an earlier post, so the post
+starts a new one. The diff's comment navigation skips them; the walkthrough
+shows them.
+
 Agent publication uses core’s draft submission machinery in the separate
 `~/.n10/agent-review-publications` store, keyed by provider repository, PR and
 account. Human writing stays in `review-drafts`. Every network write goes through

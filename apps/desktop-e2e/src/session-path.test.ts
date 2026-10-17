@@ -28,7 +28,7 @@ test.describe('Session PATH', () => {
     ).toBeVisible({ timeout: 15_000 });
     await focusTerminal(page);
     await page.keyboard.type(
-      'n10 util add-comment --pr=7 --file=a.ts --lineStart=1 --lineEnd=1 --severity=nit --body=from-a-session' +
+      'n10 util add-comment --pr=7 --severity=nit --body=from-a-session' +
         ' && echo "beam=$(beam version) dir=$BEAM_CONFIG_DIR"\n',
       { delay: 10 }
     );
@@ -45,9 +45,9 @@ test.describe('Session PATH', () => {
         ),
         'utf8'
       )
-    ) as { comments: { body: string; file: string }[] };
+    ) as { comments: { body: string; file: string | null }[] };
     expect(stored.comments).toEqual([
-      expect.objectContaining({ file: 'a.ts', body: 'from-a-session' }),
+      expect.objectContaining({ file: null, body: 'from-a-session' }),
     ]);
   });
 });

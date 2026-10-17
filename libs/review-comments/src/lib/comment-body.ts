@@ -22,3 +22,19 @@ export function renderCommentBody(comment: ReviewComment): string {
   const { header } = resolveComment(comment.body, comment.severity);
   return withAgentFooter(formatConventionalComment(header));
 }
+
+/**
+ * The review's own text, from the findings on the pull request itself:
+ * each one as `renderCommentBody` writes it, one attribution for all.
+ */
+export function renderSummaryBody(comments: ReviewComment[]): string {
+  return withAgentFooter(
+    comments
+      .map((comment) =>
+        formatConventionalComment(
+          resolveComment(comment.body, comment.severity).header
+        ).trimEnd()
+      )
+      .join('\n\n')
+  );
+}

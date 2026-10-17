@@ -104,6 +104,13 @@ describe('draftAt', () => {
     expect(draftAt({ path: 'src/b.ts', lineStart: 3 }, drafts)).toBeUndefined();
   });
 
+  it('ignores a comment on the whole file', () => {
+    const whole = { ...draft(1, 1), lineStart: null, lineEnd: null };
+    expect(
+      draftAt({ path: 'src/a.ts', lineStart: 3 }, [whole])
+    ).toBeUndefined();
+  });
+
   it('ignores a comment on removed lines', () => {
     expect(
       draftAt({ path: 'src/a.ts', lineStart: 3 }, [draft(3, 3, 'LEFT')])

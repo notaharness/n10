@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import type { DiffLine } from '@n10/diff';
+import {
+  anchorOutsideDiff,
+  readAnchor,
+  type CommentAnchor,
+} from './comment-anchor.js';
 import { appendComment } from './comment-store.js';
 import { validateGuide } from './guide.js';
 import { guideInstructions } from './guide-instructions.js';
@@ -13,6 +19,10 @@ const VALID_SEVERITIES = new Set<CommentSeverity>([
   'minor',
   'nit',
 ]);
+
+const ADD_COMMENT_USAGE =
+  'Usage: n10 util add-comment --pr=<id> --severity=<critical|major|minor|nit> --body=<text> ' +
+  '[--base=<target branch> --file=<path> [--lineStart=<n> [--lineEnd=<n>] [--side=LEFT|RIGHT]]] [--thread=<id>]';
 
 export function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -33,60 +43,68 @@ export function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
-function handleAddComment(args: string[], repository: string): void {
-  const parsed = parseArgs(args);
+function fail(...lines: string[]): never {
+  for (const line of lines) console.error(line);
+  process.exit(1);
+}
 
-  const missing: string[] = [];
-  for (const field of [
-    'pr',
-    'file',
-    'lineStart',
-    'lineEnd',
-    'severity',
-    'body',
-  ]) {
-    if (!parsed[field]) missing.push(field);
-  }
-  if (missing.length > 0) {
-    console.error(`Missing required fields: ${missing.join(', ')}`);
-    console.error(
-      'Usage: n10 util add-comment --pr=<id> --file=<path> --lineStart=<n> --lineEnd=<n> --severity=<critical|major|minor|nit> --body=<text> [--side=LEFT|RIGHT] [--thread=<id>]'
-    );
-    process.exit(1);
-  }
-
+function readRequired(parsed: Record<string, string>) {
+  const missing = ['pr', 'severity', 'body'].filter((field) => !parsed[field]);
+  if (missing.length > 0)
+    fail(`Missing required fields: ${missing.join(', ')}`, ADD_COMMENT_USAGE);
   const severity = parsed.severity as CommentSeverity;
-  if (!VALID_SEVERITIES.has(severity)) {
-    console.error(
+  if (!VALID_SEVERITIES.has(severity))
+    fail(
       `Invalid severity "${parsed.severity}". Must be: critical, major, minor, nit`
     );
-    process.exit(1);
-  }
-
-  const side = (parsed.side as 'LEFT' | 'RIGHT') ?? 'RIGHT';
-  if (side !== 'LEFT' && side !== 'RIGHT') {
-    console.error('Invalid side. Must be LEFT or RIGHT');
-    process.exit(1);
-  }
-
   const prId = parseInt(parsed.pr, 10);
-  if (isNaN(prId)) {
-    console.error('--pr must be a number');
-    process.exit(1);
-  }
+  if (isNaN(prId)) fail('--pr must be a number');
+  return { prId, severity };
+}
 
-  const lineStart = parseInt(parsed.lineStart, 10);
-  const lineEnd = parseInt(parsed.lineEnd, 10);
-  if (isNaN(lineStart) || isNaN(lineEnd)) {
-    console.error('--lineStart and --lineEnd must be numbers');
-    process.exit(1);
-  }
+/**
+ * The anchor, checked against the pull request's diff at the commit
+ * checked out here, and that commit: the line numbers belong to it.
+ * Nothing is stored when the diff cannot take the comment.
+ */
+function placeComment(
+  parsed: Record<string, string>,
+  context: UtilContext
+): { anchor: CommentAnchor; head: string | undefined } {
+  const read = readAnchor(parsed);
+  if (!read.ok) fail(read.error, ADD_COMMENT_USAGE);
+  const { anchor } = read;
+  if (anchor.file === null) return { anchor, head: context.head?.() };
+  if (!parsed.base)
+    fail(
+      '--file needs --base=<branch the pull request merges into>, e.g. --base=main.',
+      'Leave out --file to comment on the pull request itself.'
+    );
+  if (!context.diff) fail('This n10 cannot read the pull request diff.');
+  const diff = context.diff(parsed.base, anchor.file);
+  if (!diff.ok) fail(diff.error);
+  const at = `the diff of ${parsed.base}...HEAD at ${diff.head.slice(0, 7)}`;
+  const outside = anchorOutsideDiff(
+    { ...anchor, file: anchor.file },
+    diff.lines,
+    at
+  );
+  if (outside) fail(outside);
+  return { anchor, head: diff.head };
+}
+
+function handleAddComment(
+  args: string[],
+  repository: string,
+  context: UtilContext
+): void {
+  const parsed = parseArgs(args);
+  const { prId, severity } = readRequired(parsed);
+  const { anchor, head } = placeComment(parsed, context);
 
   const comment: ReviewComment = {
     id: randomUUID(),
-    file: parsed.file,
-    lineStart,
-    lineEnd,
+    ...anchor,
     // A body that opens with its own Conventional Comments header is
     // stating a severity too, and the two must not be able to
     // disagree — the louder wins. Settled once, here, so everything
@@ -94,13 +112,13 @@ function handleAddComment(args: string[], repository: string): void {
     // dot, the TUI chip, the posted body) says the same thing.
     severity: resolveComment(parsed.body, severity).severity,
     body: parsed.body,
-    side,
     status: 'draft',
     createdAt: new Date().toISOString(),
+    ...(head ? { head } : {}),
     // Optional: the provider's id for the review thread this draft
     // answers. Recorded so the reader (and a later agent reading the
     // plan) can see which conversation the draft is about; posting
-    // still opens a new thread at --file/--lineStart.
+    // still opens a new thread at the draft's own anchor.
     ...(parsed.thread ? { threadId: parsed.thread } : {}),
   };
 
@@ -108,10 +126,23 @@ function handleAddComment(args: string[], repository: string): void {
   console.log(comment.id);
 }
 
+/** The pull request's diff of one file, as the checkout here has it. */
+export type CommentDiff =
+  | {
+      ok: true;
+      /** The commit the diff was read at: the one checked out. */
+      head: string;
+      /** The file's lines in the diff; null when it is not changed. */
+      lines: DiffLine[] | null;
+    }
+  | { ok: false; error: string };
+
 /** What the agent's checkout tells the command, read only when needed. */
 export interface UtilContext {
   /** The commit checked out where the command runs. */
   head?: () => string | undefined;
+  /** `file`'s diff from where HEAD branched off `base` to HEAD. */
+  diff?: (base: string, file: string) => CommentDiff;
 }
 
 function readGuideFile(path: string): unknown {
@@ -155,7 +186,7 @@ export async function handleUtilCommand(
   const subcommand = args[0];
 
   if (subcommand === 'add-comment') {
-    handleAddComment(args.slice(1), repository);
+    handleAddComment(args.slice(1), repository, context);
     return;
   }
   if (subcommand === 'add-guide') {

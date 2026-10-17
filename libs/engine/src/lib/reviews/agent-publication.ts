@@ -1,11 +1,6 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import {
-  listReviewDrafts,
-  saveReviewDraft,
-  submitReview,
-  type DraftTarget,
-} from '@n10/core';
+import { listReviewDrafts, saveReviewDraft, submitReview } from '@n10/core';
 import {
   isOid,
   sameRepository,
@@ -15,10 +10,10 @@ import {
 import {
   readComments,
   updateComment,
-  renderCommentBody,
   resolveComment,
   type ReviewComment,
 } from '@n10/review-comments';
+import { agentDraftId, agentDrafts, type AgentDraft } from './agent-drafts.js';
 import {
   createReviewContext,
   requirePullRequestNumber,
@@ -65,10 +60,10 @@ export function createAgentPublication(
       viewer: start.viewer,
     };
   }
-  function draftState(prId: number, id: string) {
+  function draftState(prId: number, comment: ReviewComment) {
     const { ref, viewer } = identity(prId);
     return listReviewDrafts({ ref, viewer }, sources).drafts.find(
-      (draft) => draft.id === `inline:agent-${id}`
+      (draft) => draft.id === agentDraftId(comment)
     );
   }
   function requireEditable(prId: number, comment: ReviewComment) {
@@ -80,7 +75,7 @@ export function createAgentPublication(
       return;
     }
     assertPublicationScope(prId, comment);
-    const state = draftState(prId, comment.id)?.publication.state;
+    const state = draftState(prId, comment)?.publication.state;
     if (comment.status === 'posted' || state === 'published')
       throw new Error('Comment is already posted');
     if (state === 'unknown' || state === 'publishing')
@@ -112,40 +107,28 @@ export function createAgentPublication(
     return { ...captured, publish, head: req.headSha };
   }
   function prepareDraft(
-    req: PostAgentCommentsRequest,
-    comment: ReviewComment,
+    draft: AgentDraft,
     captured: ReturnType<typeof publicationContext>
   ): string | null {
-    const { ref, viewer, head } = captured;
-    const target: DraftTarget = {
-      kind: 'inline',
-      key: `agent-${comment.id}`,
-      anchor: {
-        path: comment.file,
-        previousPath: null,
-        head,
-        lines: [],
-        range: {
-          start: comment.lineStart,
-          end: comment.lineEnd,
-          startSide: comment.side,
-          side: comment.side,
-        },
-      },
-    };
-    const existing = draftState(req.prId, comment.id);
-    if (existing?.publication.state === 'published') return null;
+    const { ref, viewer } = captured;
+    const existing = listReviewDrafts({ ref, viewer }, sources).drafts.find(
+      (stored) => stored.id === draft.id
+    );
+    const state = existing?.publication.state;
+    // A published summary holds these findings only if it says them;
+    // otherwise it was an earlier post's, and this one starts anew.
     if (
-      !existing ||
-      existing.publication.state === 'unpublished' ||
-      existing.publication.state === 'failed'
-    ) {
+      state === 'published' &&
+      (draft.target.kind !== 'summary' || existing?.body === draft.body)
+    )
+      return null;
+    if (state !== 'publishing' && state !== 'unknown') {
       saveReviewDraft(
-        { ref, viewer, target, body: renderCommentBody(comment) },
+        { ref, viewer, target: draft.target, body: draft.body },
         sources
       );
     }
-    return `inline:agent-${comment.id}`;
+    return draft.id;
   }
   function recover(
     prId: number,
@@ -161,8 +144,8 @@ export function createAgentPublication(
         repository: () => captured.ref,
         viewer: () => captured.viewer,
       }
-    ).drafts.find((draft) => draft.id === `inline:agent-${comment.id}`)
-      ?.publication.state;
+    ).drafts.find((draft) => draft.id === agentDraftId(comment))?.publication
+      .state;
     updateComment(repo, prId, comment.id, {
       status: state === 'published' ? 'posted' : 'draft',
       ...(state === 'unknown' || state === 'publishing'
@@ -200,8 +183,8 @@ export function createAgentPublication(
         0
       );
     try {
-      const draftIds = comments.flatMap((comment) => {
-        const id = prepareDraft(req, comment, captured);
+      const draftIds = agentDrafts(comments, captured.head).flatMap((draft) => {
+        const id = prepareDraft(draft, captured);
         return id ? [id] : [];
       });
       for (const comment of comments) {
