@@ -357,7 +357,7 @@ function answered(
   if (id) return id;
   throw new ReviewPublishError(
     'unknown',
-    `GitHub answered without the new ${what}'s id; n10 will check what was posted before trying again`,
+    `GitHub returned no ${what} ID. n10 will check whether the ${what} was posted before retrying.`,
     { item }
   );
 }

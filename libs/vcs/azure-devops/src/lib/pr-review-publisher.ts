@@ -292,7 +292,7 @@ class Run {
     if (typeof id === 'number' && Number.isInteger(id)) return String(id);
     throw new ReviewPublishError(
       'unknown',
-      "Azure DevOps answered without the new comment's id; n10 will check what was posted before trying again",
+      'Azure DevOps returned no comment ID. n10 will check whether the comment was posted before retrying.',
       { item: key, posted: this.posted() }
     );
   }

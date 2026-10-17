@@ -330,6 +330,8 @@ describe('publishing an Azure DevOps review', () => {
     ado.blank.add('reply');
     expect(await failed(publish(ado, store))).toMatchObject({
       failure: 'unknown',
+      message:
+        'Azure DevOps returned no comment ID. n10 will check whether the comment was posted before retrying.',
       item: 'reply',
       posted: { range: '101', file: '102' },
     });

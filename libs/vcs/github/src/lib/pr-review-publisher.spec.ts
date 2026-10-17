@@ -397,7 +397,12 @@ describe('publishing a GitHub review', () => {
     const store = memory();
     gh.blank.add('AddReviewThread');
     const err = await publish(gh, store).catch((e: unknown) => e);
-    expect(err).toMatchObject({ failure: 'unknown', item: 'range' });
+    expect(err).toMatchObject({
+      failure: 'unknown',
+      message:
+        'GitHub returned no comment ID. n10 will check whether the comment was posted before retrying.',
+      item: 'range',
+    });
     expect(store.get()).toMatchObject({ added: {}, inFlight: 'range' });
     await publish(gh, store);
     expect(count(gh, 'AddReviewThread')).toBe(2);
@@ -419,7 +424,12 @@ describe('publishing a GitHub review', () => {
     const gh = new FakeGitHub();
     const store = memory();
     gh.blank.add('StartReview');
-    expect(await failure(publish(gh, store))).toBe('unknown');
+    const err = await publish(gh, store).catch((e: unknown) => e);
+    expect(err).toMatchObject({
+      failure: 'unknown',
+      message:
+        'GitHub returned no review ID. n10 will check whether the review was posted before retrying.',
+    });
     expect(store.get()).toMatchObject({ reviewId: null, inFlight: 'review' });
     await publish(gh, store);
     expect(count(gh, 'StartReview')).toBe(1);
