@@ -21,6 +21,7 @@ import { TabViewsHost } from './lib/tabs/tab-views.js';
 import { TabsProvider, useTabs } from './lib/tabs/tabs.js';
 import { useRepoFollowsTabs } from './lib/tabs/use-repo-follows-tabs.js';
 import { useTabSwitching } from './lib/tabs/use-tab-switching.js';
+import { useEnvironmentNotices } from './lib/use-environment-notices.js';
 
 declare global {
   interface Window {
@@ -68,6 +69,7 @@ function Gate() {
   const { data: repo, isPending } = useRepoGate();
   const { repoOpened } = useTabs();
   const shownCwd = repo?.cwd;
+  useEnvironmentNotices(repo);
   // Committed, so on screen: what a failed switch refused may go again.
   useEffect(() => {
     if (shownCwd) repoShown(shownCwd);

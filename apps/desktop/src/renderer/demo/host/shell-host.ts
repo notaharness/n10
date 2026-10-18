@@ -34,6 +34,7 @@ const info = (repo: RepoState): RepoInfo => ({
   viewer: VIEWER,
   // GitHub's verdicts, as its provider declares them.
   reviewEvents: ['COMMENT', 'APPROVE', 'REQUEST_CHANGES'],
+  notices: [],
 });
 
 const SETTINGS: SettingsFieldView[] = [

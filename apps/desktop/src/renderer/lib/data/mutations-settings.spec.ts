@@ -23,6 +23,7 @@ const REPO: RepoInfo = {
   },
   viewer: 'bob',
   reviewEvents: [],
+  notices: [],
 };
 
 describe('saving a setting', () => {

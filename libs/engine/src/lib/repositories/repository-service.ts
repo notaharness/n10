@@ -12,7 +12,9 @@ import {
 } from '../worktrees/api.js';
 import {
   defaultCheckpointDir,
+  environmentNotices,
   resolveRepositoryRoot,
+  type EnvironmentNotice,
   VisitBaselines,
   type DiscoveryScan,
 } from '@n10/core';
@@ -33,6 +35,9 @@ export interface RepositoryHandle {
   readonly worktrees: WorktreeService;
   readonly reviews: ReviewService;
   readonly sessions: SessionService;
+  /** Unsupported setups found when it opened (a WSL 1 distro, a Windows
+   *  drive); the repository works regardless. */
+  readonly notices: readonly EnvironmentNotice[];
   /** Another repository is selected: this one is not observed, and its
    *  reads serve what they hold (`PARKED_REPOSITORY_TTL_MS`). */
   parked(): boolean;
@@ -119,6 +124,7 @@ export function createRepositoryService(
       worktrees,
       reviews,
       sessions,
+      notices: environmentNotices(cwd),
       parked,
       prewarm() {
         // Neither rejects: failures keep the last answer and say so in

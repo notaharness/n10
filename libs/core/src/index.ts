@@ -111,6 +111,10 @@ export * from './lib/discovery/worktree-origin.js';
 export * from './lib/discovery/live-worktree-sessions.js';
 export * from './lib/discovery/orchestrator-groups.js';
 
+// ── Host environment ─────────────────────────────────────────────
+export * from './lib/environment/wsl.js';
+export * from './lib/environment/environment-notices.js';
+
 // ── Pure utilities ───────────────────────────────────────────────
 export * from './lib/utils/sidebar-items.js';
 export * from './lib/utils/session-sort.js';

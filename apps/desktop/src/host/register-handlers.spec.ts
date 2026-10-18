@@ -67,6 +67,7 @@ describe('registerHostHandlers', () => {
           repository: null,
           viewer: null,
           reviewEvents: [],
+          notices: [],
         });
       },
     };

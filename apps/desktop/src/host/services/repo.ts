@@ -134,6 +134,7 @@ function repoInfo(current: RepositoryHandle): RepoInfo {
       vcsConfigured && provider?.publishReview
         ? provider.reviewEvents ?? []
         : [],
+    notices: current.notices,
   };
 }
 

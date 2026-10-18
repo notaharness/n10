@@ -40,7 +40,11 @@ export type {
   ReviewComment,
 };
 import type { WorktreeInfo } from '@n10/worktree-manager';
-import type { DesktopBindings, KeyDescriptor } from '@n10/core';
+import type {
+  DesktopBindings,
+  EnvironmentNotice,
+  KeyDescriptor,
+} from '@n10/core';
 import type {
   BranchPrMap,
   PullRequestComments,
@@ -172,6 +176,9 @@ export interface RepoInfo {
   /** The verdicts a review can be filed with here, in the provider's
    *  own terms and order; empty when reviews can't be filed. */
   reviewEvents: readonly ReviewEvent[];
+  /** Unsupported setups it was opened in (a WSL 1 distro, a Windows
+   *  drive), shown once as warnings; it works regardless. */
+  notices: readonly EnvironmentNotice[];
 }
 
 // ── Sessions (agent terminals) ───────────────────────────────────

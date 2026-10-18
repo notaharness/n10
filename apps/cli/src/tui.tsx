@@ -42,6 +42,7 @@ import {
   applySessionBackend,
   probeTmuxAvailability,
   resetRepoRoot,
+  type EnvironmentNotice,
 } from '@n10/core';
 import {
   repoTitle,
@@ -49,6 +50,7 @@ import {
   restoreWindowTitle,
 } from './utils/window-title.js';
 import { waitForExit } from './utils/wait-for-exit.js';
+import { useEnvironmentNotices } from './hooks/useEnvironmentNotices.js';
 import { MainTab } from './screens/main/MainTab.js';
 
 // ── Provider registry ──────────────────────────────────────────────
@@ -69,13 +71,16 @@ async function drainAndDetach(stop: () => Promise<void>) {
 function App({
   updates,
   restart,
+  notices,
 }: {
   updates: UpdateService;
   restart: (plan: NpmUpdatePlan) => Promise<void>;
+  notices: readonly EnvironmentNotice[];
 }) {
   const { exit } = useApp();
   const { sync } = useEngine();
   const { flash } = useToastActions();
+  useEnvironmentNotices(notices);
   // Give manual operations and automatic removals one shared grace period.
   // Ink unmounts the UI; the entry point must also detach PTY clients and exit.
   const handleExit = useCallback(
@@ -187,6 +192,8 @@ export async function runTui(args: string[], packageRoot = ''): Promise<void> {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
+  // Kept in the scrollback above the UI as well as shown in it.
+  for (const notice of repo.notices) console.error(`n10: ${notice.message}`);
 
   const worktrees = repo.worktrees;
   const sync = createRemoteSync({
@@ -250,7 +257,11 @@ export async function runTui(args: string[], packageRoot = ''): Promise<void> {
                     <ToastProvider>
                       <SessionProvider>
                         <SidebarProvider>
-                          <App updates={updates} restart={restart} />
+                          <App
+                            updates={updates}
+                            restart={restart}
+                            notices={repo.notices}
+                          />
                         </SidebarProvider>
                       </SessionProvider>
                     </ToastProvider>
