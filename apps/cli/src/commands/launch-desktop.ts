@@ -42,6 +42,24 @@ export function sandboxArgs(
 }
 
 /**
+ * Why Electron would find no display to open a window on, or null when
+ * it has one. Inside WSL the display comes from WSLg, which sets
+ * `DISPLAY` and `WAYLAND_DISPLAY` in every process it starts; without
+ * either, Electron dies with an X error that names neither WSLg nor the
+ * terminal UI.
+ */
+export function missingDisplay(
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env
+): string | null {
+  if (platform !== 'linux' || env.DISPLAY || env.WAYLAND_DISPLAY) return null;
+  if (env.WSL_DISTRO_NAME) {
+    return 'n10: the desktop app needs WSLg, and this WSL session has no display. From Windows, run `wsl --update` and then `wsl --shutdown`, and open a new terminal. Or run `n10 --tui`.';
+  }
+  return 'n10: the desktop app needs a graphical session (DISPLAY and WAYLAND_DISPLAY are unset). Run `n10 --tui` for the terminal UI.';
+}
+
+/**
  * Why requiring the electron package failed: it is missing, or its
  * first-run download failed, which Electron has already explained on
  * stderr. A root-owned install (`sudo npm install -g`) cannot download
@@ -104,6 +122,11 @@ export function launchDesktop(root: string, version: string): Promise<number> {
     console.error(
       'n10: this build has no desktop app. From source, run `npx nx serve desktop`.'
     );
+    return Promise.resolve(1);
+  }
+  const noDisplay = missingDisplay();
+  if (noDisplay) {
+    console.error(noDisplay);
     return Promise.resolve(1);
   }
   const require = createRequire(import.meta.url);

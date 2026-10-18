@@ -4,6 +4,7 @@ import {
   electronFailure,
   electronSpawnOptions,
   exitStatus,
+  missingDisplay,
   sandboxArgs,
   superviseChild,
 } from './launch-desktop.js';
@@ -73,6 +74,41 @@ describe('sandboxArgs', () => {
     };
     expect(sandboxArgs(ELECTRON, 'darwin', unused)).toEqual([]);
     expect(sandboxArgs(ELECTRON, 'win32', unused)).toEqual([]);
+  });
+});
+
+describe('missingDisplay', () => {
+  it('lets Electron start on an X11 or Wayland display', () => {
+    expect(missingDisplay('linux', { DISPLAY: ':0' })).toBeNull();
+    expect(
+      missingDisplay('linux', { WAYLAND_DISPLAY: 'wayland-0' })
+    ).toBeNull();
+    expect(
+      missingDisplay('linux', {
+        WSL_DISTRO_NAME: 'Ubuntu-24.04',
+        DISPLAY: ':0',
+        WAYLAND_DISPLAY: 'wayland-0',
+      })
+    ).toBeNull();
+  });
+
+  it('points WSL without a display at WSLg and the terminal UI', () => {
+    const message = missingDisplay('linux', {
+      WSL_DISTRO_NAME: 'Ubuntu-24.04',
+    });
+    expect(message).toContain('WSLg');
+    expect(message).toContain('wsl --update');
+    expect(message).toContain('n10 --tui');
+  });
+
+  it('points a Linux session without a display at the terminal UI', () => {
+    const message = missingDisplay('linux', {});
+    expect(message).toContain('n10 --tui');
+    expect(message).not.toContain('WSL');
+  });
+
+  it('leaves other platforms alone', () => {
+    expect(missingDisplay('darwin', {})).toBeNull();
   });
 });
 
