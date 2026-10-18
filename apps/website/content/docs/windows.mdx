@@ -1,0 +1,161 @@
+---
+title: Windows (WSL)
+description: Run n10 on Windows inside WSL 2.
+---
+
+On Windows, run n10 inside WSL 2. Install Node.js, Git, tmux and your agents
+in the Linux distribution, and keep repositories and worktrees there too.
+Use Windows Terminal for the terminal UI or WSLg for n10 Desktop.
+
+The terminal UI is the supported way to use n10 on Windows. n10 Desktop
+through WSLg is experimental.
+
+## Supported setup
+
+- Windows 11 on x64
+- The Microsoft Store version of WSL, updated with `wsl --update`, running WSL 2
+- Ubuntu 24.04 LTS
+- Windows Terminal
+
+Other distributions, ARM64 and Windows 10 are untested. WSL 1 and native
+Windows execution are unsupported. n10 requires tmux inside WSL.
+
+## Set up WSL
+
+In PowerShell:
+
+```powershell
+wsl --install -d Ubuntu-24.04
+```
+
+Restart Windows if asked, then open **Ubuntu 24.04** from the Start menu and
+create your Linux user. To confirm it runs on WSL 2:
+
+```powershell
+wsl --list --verbose
+```
+
+The `VERSION` column should say `2`. If it says `1`, run
+`wsl --set-version Ubuntu-24.04 2` from PowerShell.
+
+## Install the prerequisites
+
+Every command from here on runs in the Ubuntu terminal, not in PowerShell.
+
+```sh
+sudo apt update
+sudo apt install -y git tmux build-essential python3 gh
+```
+
+n10 needs Node.js 22.12 or newer, which is newer than Ubuntu's own `nodejs`
+package. Install it inside WSL with nvm, following the Linux instructions on
+[nodejs.org](https://nodejs.org/en/download). WSL can find Windows programs
+on its `PATH`, so check that these tools use their Linux installations:
+
+```sh
+command -v node npm git tmux
+node -p process.platform
+```
+
+The paths should point to Linux installations, not Windows drives such as
+`/mnt/c/`. The last line should print `linux`.
+
+Install your agents inside WSL as well, following each one's Linux
+instructions, and sign in from the Ubuntu terminal. Signing in on Windows does
+not sign you in inside WSL. The same goes for GitHub:
+
+```sh
+gh auth login
+```
+
+## Keep repositories in Linux
+
+Clone repositories into your Linux home, for example `~/src`:
+
+```sh
+mkdir -p ~/src && cd ~/src
+git clone https://github.com/you/app.git
+```
+
+Paths such as `/mnt/c/` access Windows drives. Git operations across this
+filesystem boundary can be slower, and permissions and line endings can
+differ. n10 opens repositories there with an unsupported-location warning.
+Worktrees go inside the repository by default, so they stay on Linux too. If
+you set **Worktree Path**, keep it in your Linux home.
+
+To browse your Linux files from Windows, open `\\wsl$\Ubuntu-24.04\home` in
+File Explorer. Use Linux Git for this checkout, including in your editor's
+Git integration.
+
+## Install and run n10
+
+```sh
+npm install -g @notaharness/n10
+cd ~/src/app
+n10 --tui
+```
+
+With nvm, global packages install into your home directory, so neither the
+install nor n10's own updates need `sudo`.
+
+## Sessions
+
+Agents run in tmux inside WSL. Quitting n10 or closing Windows Terminal
+detaches from them. Reopening n10 in the repository reattaches while those
+sessions are still running.
+
+Stopping the distribution, running `wsl --shutdown` or restarting Windows
+ends its sessions. n10 does not automatically restart the agents.
+
+## Links and the clipboard
+
+Clicking a pull request link opens it in your Windows default browser,
+through `wslview` when the `wslu` package is installed and through
+`explorer.exe` otherwise. If you set `BROWSER`, n10 uses that instead. If
+nothing opens, hold Shift while dragging to select the link, then press
+Ctrl+Shift+C to copy it.
+
+With Windows Terminal's default shortcuts, copy selected text with
+Ctrl+Shift+C and paste with Ctrl+Shift+V.
+
+## n10 Desktop (experimental)
+
+On Windows 11, WSL 2 includes WSLg, which shows Linux windows on the Windows
+desktop. From a repository:
+
+```sh
+n10
+```
+
+If n10 reports no display, check your WSLg setup. To update and restart WSL,
+save your work first: `wsl --shutdown` stops all WSL distributions and ends
+their tmux and agent sessions. Then run these commands in PowerShell:
+
+```powershell
+wsl --update
+wsl --shutdown
+```
+
+Open a new Ubuntu terminal and run `n10` again. You can use `n10 --tui`
+without WSLg.
+
+In WSL 2, an npm install uses Chromium's sandbox when unprivileged user
+namespaces are available. If n10 warns that it is running without the
+sandbox, install the `.deb` from [Download](/download), which sets up the
+sandbox:
+
+```sh
+sudo apt install ./n10-desktop_amd64.deb
+n10-desktop
+```
+
+System notifications, image paste and graphics-driver compatibility are
+untested. Report problems in an
+[issue](https://github.com/notaharness/n10/issues).
+
+## Not supported
+
+- WSL 1
+- Repositories or worktrees on a Windows drive (`/mnt/c/...`)
+- Windows-side Node.js, Git or agents
+- Running one n10 across several distributions or Linux users

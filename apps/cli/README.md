@@ -33,7 +33,7 @@ The first launch of the desktop app downloads Electron's binary (~100–200 MB);
 
 ### Windows
 
-Run it under WSL 2, which gives you the unix environment the agent and tmux backends expect. WSLg renders the desktop app as a normal Windows window. Keep your repositories on the Linux filesystem (`~/code/...`) rather than `/mnt/c/...`; git across the filesystem boundary is much slower.
+Run n10 inside WSL 2, with Node.js, Git, tmux and your agents installed in the Linux distribution. Use `n10 --tui`; n10 Desktop through WSLg is experimental. Keep repositories and worktrees on the Linux filesystem, such as `~/src`. See [Windows (WSL)](https://n10.is/docs/windows) for setup and supported configurations.
 
 ## What it does
 
