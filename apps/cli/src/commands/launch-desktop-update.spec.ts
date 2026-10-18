@@ -13,13 +13,18 @@ import { launchDesktop } from './launch-desktop.js';
 
 const mocks = vi.hoisted(() => ({
   spawn: vi.fn(),
+  // The sandbox probe: no user namespaces, as on most CI runners.
+  spawnSync: vi.fn().mockReturnValue({ status: 1 }),
   runNpmUpdate: vi
     .fn()
     .mockResolvedValue({ status: 'succeeded', message: 'Updated' }),
   relaunchNpmApp: vi.fn().mockResolvedValue(23),
   showNpmUpdateCancelling: vi.fn(),
 }));
-vi.mock('node:child_process', () => ({ spawn: mocks.spawn }));
+vi.mock('node:child_process', () => ({
+  spawn: mocks.spawn,
+  spawnSync: mocks.spawnSync,
+}));
 vi.mock('node:module', () => ({
   createRequire: () => () => '/fixture/electron',
 }));
@@ -37,6 +42,8 @@ it('passes the private request to Electron and finishes the update only after ex
   mkdirSync(join(root, 'desktop/main'), { recursive: true });
   writeFileSync(join(root, 'desktop/main/main.js'), '');
   vi.stubEnv('HOME', home);
+  // A display to launch on, which unit-test runners do not have.
+  vi.stubEnv('DISPLAY', ':0');
   const child = Object.assign(new EventEmitter(), { kill: vi.fn() });
   mocks.spawn.mockReturnValue(child);
   const finished = launchDesktop(root, '1.0.0-beta.1');
