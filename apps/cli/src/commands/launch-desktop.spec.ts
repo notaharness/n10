@@ -19,52 +19,71 @@ function helper(uid: number, mode: number) {
 }
 
 describe('sandboxArgs', () => {
+  const noNamespaces = () => false;
+  const namespaces = () => true;
+  const missing = () => {
+    throw new Error('ENOENT');
+  };
+
   it('keeps the sandbox when root owns a setuid helper', () => {
-    expect(sandboxArgs(ELECTRON, 'linux', helper(0, 0o104755))).toEqual([]);
+    expect(
+      sandboxArgs(ELECTRON, 'linux', helper(0, 0o104755), {}, noNamespaces)
+    ).toEqual([]);
   });
 
   it('disables it when the user owns the helper, as npm leaves it', () => {
-    expect(sandboxArgs(ELECTRON, 'linux', helper(1000, 0o104755))).toEqual([
-      '--no-sandbox',
-    ]);
+    expect(
+      sandboxArgs(ELECTRON, 'linux', helper(1000, 0o104755), {}, noNamespaces)
+    ).toEqual(['--no-sandbox']);
   });
 
   it('disables it when the helper lacks the setuid bit', () => {
-    expect(sandboxArgs(ELECTRON, 'linux', helper(0, 0o100755))).toEqual([
+    expect(
+      sandboxArgs(ELECTRON, 'linux', helper(0, 0o100755), {}, noNamespaces)
+    ).toEqual(['--no-sandbox']);
+  });
+
+  it('disables it when there is no helper', () => {
+    expect(sandboxArgs(ELECTRON, 'linux', missing, {}, noNamespaces)).toEqual([
       '--no-sandbox',
     ]);
   });
 
-  it('disables it when there is no helper', () => {
-    const missing = () => {
-      throw new Error('ENOENT');
-    };
-    expect(sandboxArgs(ELECTRON, 'linux', missing)).toEqual(['--no-sandbox']);
+  it('keeps it for an npm install where user namespaces work, as in WSL', () => {
+    expect(
+      sandboxArgs(ELECTRON, 'linux', helper(1000, 0o104755), {}, namespaces)
+    ).toEqual([]);
+    expect(sandboxArgs(ELECTRON, 'linux', missing, {}, namespaces)).toEqual([]);
   });
 
   describe('with ELECTRON_OVERRIDE_DIST_PATH', () => {
     const env = { ELECTRON_OVERRIDE_DIST_PATH: '/opt/electron' };
 
     it('keeps the sandbox on a build with no helper, as a distribution ships', () => {
-      const missing = () => {
-        throw new Error('ENOENT');
-      };
-      expect(sandboxArgs(ELECTRON, 'linux', missing, env)).toEqual([]);
+      expect(
+        sandboxArgs(ELECTRON, 'linux', missing, env, noNamespaces)
+      ).toEqual([]);
     });
 
     it('disables it for a stock dist whose helper is not set up', () => {
       expect(
-        sandboxArgs(ELECTRON, 'linux', helper(1000, 0o100755), env)
+        sandboxArgs(
+          ELECTRON,
+          'linux',
+          helper(1000, 0o100755),
+          env,
+          noNamespaces
+        )
       ).toEqual(['--no-sandbox']);
-      expect(sandboxArgs(ELECTRON, 'linux', helper(0, 0o100755), env)).toEqual([
-        '--no-sandbox',
-      ]);
+      expect(
+        sandboxArgs(ELECTRON, 'linux', helper(0, 0o100755), env, noNamespaces)
+      ).toEqual(['--no-sandbox']);
     });
 
     it('keeps it when the helper is setuid root', () => {
-      expect(sandboxArgs(ELECTRON, 'linux', helper(0, 0o104755), env)).toEqual(
-        []
-      );
+      expect(
+        sandboxArgs(ELECTRON, 'linux', helper(0, 0o104755), env, noNamespaces)
+      ).toEqual([]);
     });
   });
 
@@ -72,8 +91,8 @@ describe('sandboxArgs', () => {
     const unused = () => {
       throw new Error('not consulted');
     };
-    expect(sandboxArgs(ELECTRON, 'darwin', unused)).toEqual([]);
-    expect(sandboxArgs(ELECTRON, 'win32', unused)).toEqual([]);
+    expect(sandboxArgs(ELECTRON, 'darwin', unused, {}, unused)).toEqual([]);
+    expect(sandboxArgs(ELECTRON, 'win32', unused, {}, unused)).toEqual([]);
   });
 });
 

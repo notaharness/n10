@@ -1,7 +1,7 @@
 import { superviseChild } from './child-supervision.js';
 export { superviseChild, exitStatus } from './child-supervision.js';
 import { desktopUpdateHandoff } from './desktop-update.js';
-import { spawn, type SpawnOptions } from 'node:child_process';
+import { spawn, spawnSync, type SpawnOptions } from 'node:child_process';
 import {
   accessSync,
   constants as fsConstants,
@@ -13,32 +13,52 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
 /**
- * Electron's setuid sandbox helper works only when root owns it with the
- * setuid bit. An npm install leaves it owned by the user, and Electron then
- * aborts with SIGTRAP, so the app runs unsandboxed instead.
+ * Chromium sandboxes its Linux processes in unprivileged user namespaces
+ * when the kernel lets it, and falls back to its setuid helper otherwise.
+ * That helper works only when root owns it with the setuid bit; an npm
+ * install leaves it owned by the user, and Electron then aborts with
+ * SIGTRAP, so with neither the app runs unsandboxed.
  *
  * An Electron the user points at with ELECTRON_OVERRIDE_DIST_PATH may be a
- * distribution's build, which has no helper and sandboxes through user
- * namespaces, so Chromium's sandbox stays on. An unpacked stock release has
- * the helper, and is held to the same rule as an npm install.
+ * distribution's build, which has no helper and is trusted to sandbox
+ * without one. An unpacked stock release has the helper, and is held to the
+ * same rule as an npm install.
  */
 export function sandboxArgs(
   electron: string,
   platform: NodeJS.Platform = process.platform,
   stat: (path: string) => Pick<Stats, 'uid' | 'mode'> = statSync,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  userNamespaces: () => boolean = canSandboxInNamespaces
 ): string[] {
   if (platform !== 'linux') return [];
+  let helperMissing = false;
   try {
     const helper = stat(join(dirname(electron), 'chrome-sandbox'));
-    return helper.uid === 0 && (helper.mode & 0o4755) === 0o4755
-      ? []
-      : ['--no-sandbox'];
+    if (helper.uid === 0 && (helper.mode & 0o4755) === 0o4755) return [];
   } catch {
-    // No helper: a supplied build sandboxes without it, and an npm one
-    // has nothing to sandbox with.
-    return env.ELECTRON_OVERRIDE_DIST_PATH ? [] : ['--no-sandbox'];
+    helperMissing = true;
   }
+  if (userNamespaces()) return [];
+  return helperMissing && env.ELECTRON_OVERRIDE_DIST_PATH
+    ? []
+    : ['--no-sandbox'];
+}
+
+/**
+ * Whether this user can create the namespaces Chromium's sandbox uses.
+ * Creating a bare user namespace is not enough to tell: Ubuntu's AppArmor
+ * restriction (`apparmor_restrict_unprivileged_userns`) allows it but
+ * withholds the capabilities inside, so the probe maps root and creates
+ * network and PID namespaces as the sandbox does.
+ */
+export function canSandboxInNamespaces(): boolean {
+  const probe = spawnSync(
+    'unshare',
+    ['--user', '--map-root-user', '--net', '--pid', '--fork', 'true'],
+    { stdio: 'ignore', timeout: 2_000 }
+  );
+  return probe.status === 0;
 }
 
 /**
@@ -54,9 +74,9 @@ export function missingDisplay(
 ): string | null {
   if (platform !== 'linux' || env.DISPLAY || env.WAYLAND_DISPLAY) return null;
   if (env.WSL_DISTRO_NAME) {
-    return 'n10: the desktop app needs WSLg, and this WSL session has no display. From Windows, run `wsl --update` and then `wsl --shutdown`, and open a new terminal. Or run `n10 --tui`.';
+    return 'n10: no display is available in this WSL session. Run `n10 --tui`, or check your WSLg setup (`wsl --update` from Windows).';
   }
-  return 'n10: the desktop app needs a graphical session (DISPLAY and WAYLAND_DISPLAY are unset). Run `n10 --tui` for the terminal UI.';
+  return 'n10: no graphical session is available (DISPLAY and WAYLAND_DISPLAY are unset). Run `n10 --tui`.';
 }
 
 /**
