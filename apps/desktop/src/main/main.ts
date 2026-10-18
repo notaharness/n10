@@ -7,7 +7,6 @@ import {
   dialog,
   Menu,
   nativeTheme,
-  shell,
   webContents,
 } from 'electron';
 import {
@@ -38,6 +37,7 @@ import {
   launchStartDir,
 } from './launch-env.js';
 import { runQaSteps } from './qa-steps.js';
+import { openExternal, openLinkFromPage } from './open-external.js';
 import {
   installProcessDiagnostics,
   installRendererRecovery,
@@ -184,7 +184,7 @@ function createMainWindow(): BrowserWindow {
 
   // Links in PR comments etc. open in the system browser, never in-app.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:/i.test(url)) void shell.openExternal(url);
+    openLinkFromPage(url);
     return { action: 'deny' };
   });
 
@@ -194,7 +194,7 @@ function createMainWindow(): BrowserWindow {
   win.webContents.on('will-navigate', (event, url) => {
     if (isAllowedNavigation(url, DEV_SERVER_URL)) return;
     event.preventDefault();
-    if (/^https?:/i.test(url)) void shell.openExternal(url);
+    openLinkFromPage(url);
   });
 
   installRendererRecovery(win);
@@ -216,10 +216,7 @@ function startHost(): HostProcess {
       quitForUpdate,
       quitForNpmUpdate,
       pickFolder: pickFolderWithDialog,
-      openExternal: async (url) => {
-        if (!/^https?:/i.test(url)) throw new Error(`Refusing to open ${url}`);
-        await shell.openExternal(url);
-      },
+      openExternal,
       contextMenu: popupContextMenu,
       appMenuPopup: async () => {
         const menu = Menu.getApplicationMenu();
