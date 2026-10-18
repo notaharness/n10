@@ -49,7 +49,7 @@ case "$suite" in
   desktop)
     npx --no install-electron
     # What a user's npm install does on WSLg: `n10`, sandboxed, on WSLg's
-    # Wayland. Display :0's socket must be WSLg's, however it is linked in.
+    # display. Display :0's socket must be WSLg's, however it is linked in.
     if [ "${DISPLAY-}" != ':0' ] ||
       ! [ /tmp/.X11-unix/X0 -ef /mnt/wslg/.X11-unix/X0 ]; then
       echo "no WSLg display: DISPLAY=${DISPLAY-<unset>}" >&2
