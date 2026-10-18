@@ -8,16 +8,19 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 
+# --exec hands bash the script as one argument; without it the login shell
+# would parse and expand it first.
 function In-Distro([string] $script) {
-  wsl -d $Distro -u $User -- bash -c $script
+  wsl -d $Distro -u $User --exec /bin/bash -c $script
 }
 
 Write-Host '== init and wsl.conf'
-In-Distro 'ps -p 1 -o comm=; cat /etc/wsl.conf 2>/dev/null || echo "no /etc/wsl.conf"'
+In-Distro 'ps -p 1 -o comm=; cat /etc/wsl.conf 2>/dev/null || echo no /etc/wsl.conf'
 
-# A scratch socket directory, as n10's own tests use; TMUX is unset here.
-$socket = 'export TMUX_TMPDIR=$HOME/.lifetime-tmux; mkdir -p $TMUX_TMPDIR'
-In-Distro "$socket; tmux new-session -d -s lifetime 'sleep 100000'; tmux list-sessions"
+# A scratch socket directory, as n10's own tests use. TMUX would override
+# TMUX_TMPDIR, so it is unset.
+$socket = 'set -e; unset TMUX; export TMUX_TMPDIR=$HOME/.lifetime-tmux; mkdir -p $TMUX_TMPDIR'
+In-Distro "$socket; tmux new-session -d -s lifetime 'sleep 100000'; tmux display-message -p -t lifetime '#{socket_path}'"
 if ($LASTEXITCODE -ne 0) { throw 'could not start the tmux session' }
 
 Write-Host "== no wsl.exe attached for $IdleSeconds s"
@@ -28,5 +31,5 @@ for ($t = 0; $t -lt $IdleSeconds; $t += 15) {
 }
 
 Write-Host '== reattach'
-In-Distro "$socket; tmux has-session -t lifetime && tmux list-sessions && tmux kill-session -t lifetime"
+In-Distro "$socket; tmux has-session -t lifetime; tmux display-message -p -t lifetime '#{socket_path}'; tmux kill-session -t lifetime"
 if ($LASTEXITCODE -ne 0) { throw 'the tmux session did not survive' }
