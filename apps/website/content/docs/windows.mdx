@@ -1,16 +1,17 @@
 ---
 title: Windows (WSL)
-description: Run n10 on Windows inside WSL 2.
+description: Experimental support for running n10 on Windows inside WSL 2.
 ---
 
 On Windows, run n10 inside WSL 2. Install Node.js, Git, tmux and your agents
 in the Linux distribution, and keep repositories and worktrees there too.
 Use Windows Terminal for the terminal UI or WSLg for n10 Desktop.
 
-The terminal UI is the supported way to use n10 on Windows. n10 Desktop
-through WSLg is experimental.
+Windows support through WSL 2 is experimental, including both the terminal
+UI and n10 Desktop through WSLg. Report problems in an
+[issue](https://github.com/notaharness/n10/issues).
 
-## Supported setup
+## Recommended setup
 
 - Windows 11 on x64
 - The Microsoft Store version of WSL, updated with `wsl --update`, running WSL 2
@@ -118,7 +119,7 @@ Ctrl+Shift+C to copy it.
 With Windows Terminal's default shortcuts, copy selected text with
 Ctrl+Shift+C and paste with Ctrl+Shift+V.
 
-## n10 Desktop (experimental)
+## n10 Desktop
 
 On Windows 11, WSL 2 includes WSLg, which shows Linux windows on the Windows
 desktop. From a repository:
