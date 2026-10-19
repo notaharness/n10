@@ -32,7 +32,7 @@ tools/tmux/build-tmux.sh "$HOME/.cache/n10-tmux"
 export PATH="$HOME/.cache/n10-tmux/bin:$PATH"
 tools/tmux/require-tmux.sh
 
-npm ci --no-audit --no-fund
+npm ci --no-audit --no-fund || npm ci --no-audit --no-fund
 
 # The runner's environment does not cross into WSL (WSLENV is unset), so
 # CI and GITHUB_ACTIONS, which stop Ink painting, are absent here.

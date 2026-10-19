@@ -1,25 +1,34 @@
 name: WSL2
 
 # The offline TUI and desktop suites inside a real WSL2 distro on a hosted
-# Windows runner, and n10 Desktop launched sandboxed on WSLg's display.
+# Windows runner, and the desktop app launched sandboxed on WSLg's display.
 # GitHub documents nested virtualization on its runners as possible but
 # unsupported, so a run that cannot boot WSL2 fails here rather than
-# falling back to WSL1 or passing without coverage.
+# falling back to WSL1 or passing without coverage. It runs nightly, and on
+# pull requests that change the job itself.
 
 on:
-  push:
-    branches:
-      - master
-  pull_request:
+  schedule:
+    - cron: '17 3 * * *'
   workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/wsl.yml
+      - tools/wsl/**
+
+concurrency:
+  group: wsl-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 env:
   DISTRO: n10-ci
-  ROOTFS: https://cloud-images.ubuntu.com/wsl/releases/24.04/current
+  # A dated release, so its checksum can be pinned here.
+  ROOTFS: https://cloud-images.ubuntu.com/wsl/releases/24.04/20240423
   ROOTFS_FILE: ubuntu-noble-wsl-amd64-24.04lts.rootfs.tar.gz
+  ROOTFS_SHA256: 2a790896740b14d637dbdc583cce1ba081ac53b9e9cdb46dc09a2f73abbd9934
   # wsl.exe otherwise writes UTF-16, which the log shows as spaced-out text.
   WSL_UTF8: '1'
 
@@ -31,7 +40,7 @@ jobs:
       fail-fast: false
       matrix:
         suite: [cli, desktop]
-    timeout-minutes: 75
+    timeout-minutes: 90
     defaults:
       run:
         shell: pwsh
@@ -40,6 +49,8 @@ jobs:
       - run: git config --global core.autocrlf false
 
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Report the runner's WSL
         run: |
@@ -50,21 +61,21 @@ jobs:
         run: |
           $dir = "$env:RUNNER_TEMP\wsl"
           New-Item -ItemType Directory -Force $dir | Out-Null
-          Invoke-WebRequest "$env:ROOTFS/$env:ROOTFS_FILE" -OutFile "$dir\$env:ROOTFS_FILE"
-          Invoke-WebRequest "$env:ROOTFS/SHA256SUMS" -OutFile "$dir\SHA256SUMS"
-          $expected = (Select-String -Path "$dir\SHA256SUMS" -Pattern " \*?$([regex]::Escape($env:ROOTFS_FILE))$").Line.Split(' ')[0]
+          Invoke-WebRequest "$env:ROOTFS/$env:ROOTFS_FILE" -OutFile "$dir\$env:ROOTFS_FILE" -MaximumRetryCount 3 -RetryIntervalSec 10
           $actual = (Get-FileHash "$dir\$env:ROOTFS_FILE" -Algorithm SHA256).Hash
-          if ($actual -ne $expected) { throw "rootfs checksum mismatch: $actual, expected $expected" }
+          if ($actual -ne $env:ROOTFS_SHA256) { throw "rootfs checksum mismatch: $actual, expected $env:ROOTFS_SHA256" }
           wsl --import $env:DISTRO "$dir\$env:DISTRO" "$dir\$env:ROOTFS_FILE" --version 2
           if ($LASTEXITCODE -ne 0) { throw "wsl --import exited $LASTEXITCODE" }
           wsl --list --verbose
 
       - name: Require a booted WSL2 kernel
+        timeout-minutes: 5
         run: |
           wsl -d $env:DISTRO --cd $env:GITHUB_WORKSPACE -- bash tools/wsl/probe.sh
           if ($LASTEXITCODE -ne 0) { throw "probe exited $LASTEXITCODE" }
 
       - name: Provision the distro
+        timeout-minutes: 15
         run: |
           wsl -d $env:DISTRO -u root --cd $env:GITHUB_WORKSPACE -- bash tools/wsl/provision.sh n10 24 .
           if ($LASTEXITCODE -ne 0) { throw "provision exited $LASTEXITCODE" }
@@ -74,9 +85,11 @@ jobs:
       # terminal that started it.
       - name: Session lifetime in WSL2
         if: matrix.suite == 'cli'
+        timeout-minutes: 5
         run: ./tools/wsl/session-lifetime.ps1 -Distro $env:DISTRO -User n10
 
       - name: ${{ matrix.suite }}-e2e in WSL2
+        timeout-minutes: ${{ matrix.suite == 'cli' && 30 || 55 }}
         run: |
           wsl -d $env:DISTRO -u n10 --cd $env:GITHUB_WORKSPACE -- bash tools/wsl/run-e2e.sh ${{ matrix.suite }}
           if ($LASTEXITCODE -ne 0) { throw "run-e2e exited $LASTEXITCODE" }

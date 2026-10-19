@@ -19,7 +19,17 @@ log="$HOME/sandbox-smoke.log"
 app="$PWD/apps/cli/dist"
 (cd "$repo" && exec setsid node "$app/main.js") >"$log" 2>&1 &
 launcher=$!
-stop() { kill -TERM "$launcher" 2>/dev/null || true; wait "$launcher" 2>/dev/null || true; }
+# The launcher forwards TERM to Electron, which runs in a session of its
+# own. Whatever is left after 15 s is killed by its command line.
+stop() {
+  kill -TERM "$launcher" 2>/dev/null || true
+  for _ in $(seq 15); do
+    kill -0 "$launcher" 2>/dev/null || break
+    sleep 1
+  done
+  pkill -KILL -f -- "$app" 2>/dev/null || true
+  wait "$launcher" 2>/dev/null || true
+}
 trap 'stop; cat "$log"' EXIT
 
 renderer=''
@@ -33,6 +43,10 @@ if [ -z "$renderer" ]; then
   exit 1
 fi
 sleep 3
+if ! [ -d /proc/"$renderer" ]; then
+  echo "renderer $renderer exited within 3 s of starting" >&2
+  exit 1
+fi
 
 echo "renderer $renderer: $(tr '\0' ' ' </proc/"$renderer"/cmdline | cut -c1-200)"
 echo "display: $(tr '\0' '\n' </proc/"$renderer"/cmdline | grep -- '--ozone-platform' || echo 'no --ozone-platform')"
