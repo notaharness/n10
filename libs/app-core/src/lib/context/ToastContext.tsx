@@ -41,7 +41,8 @@ export interface ToastStateValue {
 }
 
 export interface ToastActionsValue {
-  flash: (message: string, variant?: ToastVariant) => void;
+  /** Shown for `durationMs`, 3 seconds unless a message needs reading. */
+  flash: (message: string, variant?: ToastVariant, durationMs?: number) => void;
   dismiss: (id: string) => void;
 }
 
@@ -90,7 +91,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 
   const flash = useCallback(
-    (message: string, variant: ToastVariant = 'info') => {
+    (
+      message: string,
+      variant: ToastVariant = 'info',
+      durationMs = TOAST_DURATION_MS
+    ) => {
       const id = String(nextIdRef.current++);
       setToasts((prev) => {
         const next = [...prev, { id, message, variant }];
@@ -103,7 +108,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         }
         return next.slice(overflowCount);
       });
-      const handle = setTimeout(() => dismiss(id), TOAST_DURATION_MS);
+      const handle = setTimeout(() => dismiss(id), durationMs);
       timersRef.current.set(id, handle);
     },
     [clearTimer, dismiss]

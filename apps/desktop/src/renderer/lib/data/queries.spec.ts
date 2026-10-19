@@ -45,6 +45,7 @@ const REPO: RepoInfo = {
   repository: null,
   viewer: null,
   reviewEvents: [],
+  notices: [],
 };
 
 /** The value of `p`, or 'pending' if it has not settled by the time
@@ -226,6 +227,7 @@ describe('refreshRepoInfo', () => {
     },
     viewer: 'bob',
     reviewEvents: [],
+    notices: [],
   };
 
   const HISTORY = keys.prHistory(
