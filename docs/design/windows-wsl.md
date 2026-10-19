@@ -145,7 +145,7 @@ Keep Orchestra's Bash/tmux integration inside WSL. No Git Bash mux translation, 
 4. Run offline CLI e2e in real WSL2, then manually complete one Claude and one Codex worktree workflow with normal sandboxing, Git fetch/push, review display and resume. Add only fixes demonstrated by these runs; update the current “WSL is untested” documentation only after the gate passes.
 5. Document terminal clipboard and browser fallback, Linux SSH/GCM choices, and shutdown semantics. No WSLg, Beam enrolment or native installer is required for this phase.
 
-Acceptance: fresh install works without native Windows Node/Git; worktree create/reuse and guarded removal work; Unicode, resize and paste work; closing n10/terminal then reopening reconnects to the same live agent while the distro is running; missing tmux errors clearly. Reboot/distro termination is explicitly not session persistence. A documentation-only implementation is sufficient if these gates pass without code changes.
+Acceptance: fresh install works without native Windows Node/Git; worktree create/reuse and guarded removal work; Unicode, resize and paste work; closing n10 and Windows Terminal, waiting more than a minute with no WSL terminal open, then reopening reconnects to the same live agent while the distro is running; missing tmux errors clearly. Reboot/distro termination is explicitly not session persistence. A documentation-only implementation is sufficient if these gates pass without code changes.
 
 ### Phase 2 — qualify the Linux desktop under WSLg
 
