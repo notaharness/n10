@@ -27,7 +27,9 @@ export function Track({
         strokeDasharray={pending ? '4 5' : undefined}
         opacity={0.5}
       />
-      {!pending && <path d={d} pathLength={100} className="n10-diagram-packet" />}
+      {!pending && (
+        <path d={d} pathLength={100} className="n10-diagram-packet" />
+      )}
     </g>
   );
 }
