@@ -3,13 +3,20 @@ export function demoMayFocus(): boolean {
   return document.documentElement.dataset.n10Demo !== 'passive';
 }
 
+/** Layers that close on Escape themselves: dialogs, menus, popovers. */
+const OVERLAY =
+  '[role=dialog], [role=alertdialog], [role=menu], [data-radix-popper-content-wrapper]';
+
 /**
  * In the website's embedded demo, Escape or Ctrl+Space hands focus back to
  * the page: the demo goes passive and tells the page, which refocuses its
- * entry button. Returns whether it handled the key.
+ * entry button. An Escape pressed inside a dialog, menu or popover is left
+ * to close it, so a second Escape leaves the demo. Returns whether it
+ * handled the key.
  */
 export function leaveDemo(event: KeyboardEvent): boolean {
-  const escape = event.key === 'Escape';
+  const escape =
+    event.key === 'Escape' && !document.activeElement?.closest(OVERLAY);
   const chord =
     event.ctrlKey &&
     !event.shiftKey &&
