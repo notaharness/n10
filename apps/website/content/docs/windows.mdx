@@ -5,14 +5,14 @@ description: Experimental support for running n10 on Windows inside WSL 2.
 
 <Callout type="warn" title="Experimental">
   Windows support through WSL 2 is experimental, for n10 on WSLg and for the
-  terminal UI. Report problems in an
+  TUI. Report problems in an
   [issue](https://github.com/notaharness/n10/issues).
 </Callout>
 
 On Windows, run n10 inside WSL 2. Install Node.js, Git, tmux and your agents
 in the Linux distribution, and keep repositories and worktrees there too.
 n10 opens its window on the Windows desktop through WSLg; without WSLg, the
-terminal UI runs in Windows Terminal.
+TUI runs in Windows Terminal.
 
 ## Recommended setup
 
@@ -26,7 +26,7 @@ Windows execution are unsupported. n10 requires tmux inside WSL.
 
 ## Set up WSL
 
-In PowerShell:
+Open PowerShell as administrator:
 
 ```powershell
 wsl --install -d Ubuntu-24.04
@@ -44,11 +44,11 @@ The `VERSION` column should say `2`. If it says `1`, run
 
 ## Install the prerequisites
 
-Every command from here on runs in the Ubuntu terminal, not in PowerShell.
+Run the following commands in the Ubuntu terminal. Later steps explicitly marked PowerShell run in Windows.
 
 ```sh
 sudo apt update
-sudo apt install -y git tmux build-essential python3 gh
+sudo apt install -y git tmux build-essential python3 gh curl
 ```
 
 n10 needs Node.js 22.12 or newer, which is newer than Ubuntu's own `nodejs`
@@ -65,8 +65,8 @@ The paths should point to Linux installations, not Windows drives such as
 `/mnt/c/`. The last line should print `linux`.
 
 Install your agents inside WSL as well, following each one's Linux
-instructions, and sign in from the Ubuntu terminal. Signing in on Windows does
-not sign you in inside WSL. The same goes for GitHub:
+instructions, and sign in from the Ubuntu terminal. Check authentication inside WSL even if you have already signed in on Windows.
+For GitHub:
 
 ```sh
 gh auth login
@@ -116,8 +116,8 @@ wsl --shutdown
 Open a new Ubuntu terminal and run `n10` again.
 
 If n10 prints `n10: running without Chromium's sandbox.` as it starts, the
-`.deb` package can set the sandbox up. Download and install it inside WSL,
-then start n10 with `n10-desktop`; `n10` keeps starting the npm install:
+`.deb` package may help. On x64 Ubuntu, download and install it inside WSL,
+then run `n10-desktop`. The `n10` command still launches the npm installation:
 
 ```sh
 curl -LO https://github.com/notaharness/n10/releases/latest/download/n10-desktop_amd64.deb
@@ -125,8 +125,17 @@ sudo apt install ./n10-desktop_amd64.deb
 n10-desktop
 ```
 
-If n10 stops as it starts and the error says no sandbox is usable, run
-`N10_NO_SANDBOX=1 n10` to start without Chromium's sandbox.
+If n10 stops unexpectedly, it may print this hint:
+
+```text
+n10: stopped unexpectedly. If the error above says no sandbox is usable, run `N10_NO_SANDBOX=1 n10` to start without Chromium's sandbox.
+```
+
+Using that command prints:
+
+```text
+n10: running without Chromium's sandbox (N10_NO_SANDBOX=1).
+```
 
 System notifications, image paste and graphics-driver compatibility are
 untested. Report problems in an
@@ -145,13 +154,13 @@ ends its sessions. n10 does not automatically restart the agents.
 
 ## Links and the clipboard
 
-Clicking a pull request link opens it in your Windows default browser,
-through `wslview` when the `wslu` package is installed and through
-`explorer.exe` otherwise. If you set `BROWSER`, n10 uses that instead. If
-nothing opens in the terminal UI, hold Shift while dragging to select the
-link, then press Ctrl+Shift+C to copy it.
+With WSL's Windows integration enabled, pull request links open in your
+Windows default browser when `wslview` or `explorer.exe` is available.
+If you set `BROWSER`, n10 uses your Linux browser configuration instead.
+If a link does not open in the TUI, hold Shift while dragging to select it,
+then press Ctrl+Shift+C to copy it.
 
-In the terminal UI, with Windows Terminal's default shortcuts, copy selected
+In the TUI, with Windows Terminal's default shortcuts, copy selected
 text with Ctrl+Shift+C and paste with Ctrl+Shift+V.
 
 ## Not supported
