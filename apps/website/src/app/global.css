@@ -75,6 +75,18 @@
   --color-fd-ring: #7d8c6c;
 }
 
+/* No rubber-band bounce past either end of a page. Where a browser
+ * bounces the root anyway (iOS Safari, in some cases), the revealed
+ * canvas is the page's own background rather than black. */
+html {
+  background-color: var(--color-fd-background);
+}
+
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
 /* The n10 mark (src/components/logo.tsx). Only the 10 pane moves, by
  * --n10-logo-split, which the component sets from its overlap; the 0
  * moves a little further within it, by --n10-logo-zero-split, so both
