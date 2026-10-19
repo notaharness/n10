@@ -1,0 +1,133 @@
+import { ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import type { ReactNode } from 'react';
+import { BeamMesh } from '@/components/beam/mesh/beam-mesh';
+
+/**
+ * Beam, which works on its own and composes with n10: copy beside the
+ * /beam page's mesh, framed on a sage pane.
+ */
+function CompanionSection({
+  label,
+  title,
+  children,
+  links,
+  scene,
+}: {
+  label: string;
+  title: string;
+  children: ReactNode;
+  links: { text: string; href: string }[];
+  scene: ReactNode;
+}) {
+  return (
+    <div className="grid items-center gap-10 md:grid-cols-12 md:gap-14">
+      <div className="min-w-0 md:col-span-5">
+        <p className="text-fd-primary font-mono text-xs tracking-wide">
+          {label}
+        </p>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+          {title}
+        </h2>
+        <div className="text-fd-muted-foreground mt-4 flex flex-col gap-3 leading-relaxed text-pretty">
+          {children}
+        </div>
+        <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2">
+          {links.map(({ text, href }) => (
+            <Link
+              key={href}
+              href={href}
+              className="text-fd-primary group inline-flex items-center gap-1 text-sm font-medium"
+            >
+              {text}
+              <ArrowRight
+                className="size-3.5 transition-transform group-hover:translate-x-0.5"
+                aria-hidden
+              />
+            </Link>
+          ))}
+        </div>
+      </div>
+      <div className="relative min-w-0 md:col-span-7">
+        <div
+          aria-hidden
+          className="n10-pane n10-pane--sage absolute top-6 -right-3 -bottom-3 left-6 rounded-xl"
+        />
+        <div className="n10-frame bg-fd-card relative overflow-hidden rounded-xl">
+          {scene}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Tailscale's wordmark from their press kit (tailscale.com/press),
+ * unmodified: the black version on light backgrounds, the white one on
+ * dark, with the clear space their brand toolkit asks for.
+ */
+function TailscaleCredit() {
+  return (
+    <div className="border-fd-border mt-2 flex flex-wrap items-center gap-x-4 gap-y-3 border-t pt-5 text-sm">
+      <span>
+        Built on{' '}
+        <Link
+          href="https://github.com/tailscale/tailcat"
+          className="hover:text-fd-foreground decoration-fd-border underline underline-offset-4 transition-colors"
+        >
+          Tailcat
+        </Link>{' '}
+        from
+      </span>
+      <Link href="https://tailscale.com" className="p-2">
+        <img
+          src="/media/tailscale-logo-black.svg"
+          alt="Tailscale"
+          loading="lazy"
+          className="n10-only-light h-8 w-auto"
+        />
+        <img
+          src="/media/tailscale-logo-white.svg"
+          alt="Tailscale"
+          loading="lazy"
+          className="n10-only-dark h-8 w-auto"
+        />
+      </Link>
+    </div>
+  );
+}
+
+export function BeamFeature() {
+  return (
+    <CompanionSection
+      label="Beam"
+      title="Connect to your machines without SSH"
+      links={[
+        { text: 'Read the guide', href: '/docs/guides/fleet' },
+        { text: 'About Beam', href: '/beam' },
+      ]}
+      scene={<BeamMesh className="mx-auto w-full px-6 pt-4 pb-2" />}
+    >
+      <p>
+        Beam makes connecting simpler than SSH: one passkey, no SSH keys, no
+        port forwarding and no Tailscale account. Run your agents locally, or
+        pair a machine in n10 to run a worktree, tmux session and agent there.
+      </p>
+      <p>
+        Machines connect to each other over WireGuard through Tailscale&apos;s
+        infrastructure via Tailcat. Your connection information is stored
+        encrypted by your passkey for your convenience and never reaches us
+        unencrypted. This is verifiable by looking at outbound network requests
+        on beam.n10.is. Read more about{' '}
+        <Link
+          href="https://github.com/notaharness/beam/blob/main/docs/01-model.md"
+          className="text-fd-primary font-medium"
+        >
+          our security model
+        </Link>
+        .
+      </p>
+      <TailscaleCredit />
+    </CompanionSection>
+  );
+}

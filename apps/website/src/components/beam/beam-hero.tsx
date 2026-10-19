@@ -53,13 +53,6 @@ export function BeamHero() {
         </div>
         <BeamMesh className="mx-auto w-full max-w-xl lg:max-w-none" />
       </div>
-      {/* The mesh draws its ground out past its own box; this lets the
-          rays sink into the page instead of stopping at the section's
-          edge. */}
-      <div
-        aria-hidden
-        className="to-fd-background pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent"
-      />
     </section>
   );
 }

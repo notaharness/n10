@@ -1,0 +1,273 @@
+/*
+ * Shared language for the homepage illustrations (ILLUSTRATIONS.md).
+ * Fills are opaque mixes over --ill-ground, the colour actually behind
+ * the drawing, so stacked surfaces occlude cleanly and the overlap of a
+ * sage and a sand plane is drawn explicitly in olive instead of blended.
+ * Lines mix the brand colour toward the foreground: darker on light
+ * pages, lighter on dark ones, so they keep their contrast in both.
+ */
+.ill {
+  --ill-ground: var(--color-fd-background);
+  --ill-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ill-fg: var(--color-fd-foreground);
+  --ill-muted: var(--color-fd-muted-foreground);
+  --ill-primary: var(--color-fd-primary);
+  --ill-rule: color-mix(
+    in srgb,
+    var(--color-fd-foreground) 20%,
+    var(--ill-ground)
+  );
+  --ill-faint: color-mix(
+    in srgb,
+    var(--color-fd-foreground) 13%,
+    var(--ill-ground)
+  );
+  --ill-surface: color-mix(
+    in srgb,
+    var(--color-fd-card) 70%,
+    var(--ill-ground)
+  );
+  --ill-sage: color-mix(in srgb, var(--n10-sage) 18%, var(--ill-ground));
+  --ill-sage-strong: color-mix(in srgb, var(--n10-sage) 34%, var(--ill-ground));
+  --ill-sage-line: color-mix(in srgb, var(--n10-sage) 68%, var(--ill-fg));
+  --ill-sand: color-mix(in srgb, var(--n10-sand) 20%, var(--ill-ground));
+  --ill-sand-strong: color-mix(in srgb, var(--n10-sand) 38%, var(--ill-ground));
+  --ill-sand-line: color-mix(in srgb, var(--n10-sand) 60%, var(--ill-fg));
+  --ill-mix: color-mix(in srgb, var(--n10-mix) 34%, var(--ill-ground));
+  --ill-mix-line: color-mix(in srgb, var(--n10-mix) 80%, var(--ill-fg));
+  position: relative;
+  width: 100%;
+  container-type: inline-size;
+}
+
+.dark .ill {
+  --ill-sage: color-mix(in srgb, var(--n10-sage) 14%, var(--ill-ground));
+  --ill-sage-strong: color-mix(in srgb, var(--n10-sage) 26%, var(--ill-ground));
+  --ill-sand: color-mix(in srgb, var(--n10-sand) 12%, var(--ill-ground));
+  --ill-sand-strong: color-mix(in srgb, var(--n10-sand) 24%, var(--ill-ground));
+  --ill-mix: color-mix(in srgb, var(--n10-mix) 30%, var(--ill-ground));
+  --ill-faint: color-mix(
+    in srgb,
+    var(--color-fd-foreground) 17%,
+    var(--ill-ground)
+  );
+}
+
+.review-chapter .ill {
+  --ill-ground: color-mix(
+    in srgb,
+    var(--n10-sage) 7%,
+    var(--color-fd-background)
+  );
+}
+
+.ill > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  font-family: var(--font-sans);
+}
+
+.ill svg :is(path, rect, line, polyline, polygon, circle):not(.n10-logo *) {
+  vector-effect: non-scaling-stroke;
+}
+
+/* Strokes: 1.5 primary, 1 secondary, in CSS px at every size. */
+.ill .o {
+  stroke-width: 1.5;
+}
+.ill .o2 {
+  stroke-width: 1;
+}
+
+.ill .grid {
+  fill: none;
+  stroke: var(--color-fd-border);
+  stroke-width: 1;
+}
+.ill .frame {
+  fill: none;
+  stroke: var(--ill-rule);
+  stroke-width: 1;
+}
+
+.ill .surface {
+  fill: var(--ill-surface);
+  stroke: var(--ill-rule);
+}
+.ill .ground {
+  fill: var(--ill-ground);
+  stroke: var(--ill-rule);
+}
+.ill .sage {
+  fill: var(--ill-sage);
+  stroke: var(--ill-sage-line);
+}
+.ill .sage-strong {
+  fill: var(--ill-sage-strong);
+  stroke: var(--ill-sage-line);
+}
+.ill .sand {
+  fill: var(--ill-sand);
+  stroke: var(--ill-sand-line);
+}
+.ill .sand-strong {
+  fill: var(--ill-sand-strong);
+  stroke: var(--ill-sand-line);
+}
+.ill .mix {
+  fill: var(--ill-mix);
+  stroke: var(--ill-mix-line);
+}
+.ill .solid-sage {
+  fill: var(--n10-sage);
+}
+.ill .solid-sand {
+  fill: var(--n10-sand);
+}
+.ill .solid-mix {
+  fill: var(--n10-mix);
+}
+.ill .focus {
+  stroke: var(--ill-primary);
+}
+.ill .no-stroke {
+  stroke: none;
+}
+
+/* Placeholder text: bars stand in for prose and code. */
+.ill .bar {
+  fill: var(--ill-faint);
+}
+.ill .bar-strong {
+  fill: var(--ill-rule);
+}
+
+.ill .wire {
+  fill: none;
+  stroke: var(--ill-muted);
+  stroke-width: 1.5;
+}
+.ill .wire-primary {
+  fill: none;
+  stroke: var(--ill-primary);
+  stroke-width: 1.5;
+}
+.ill .wire-dash {
+  stroke-dasharray: 4 4;
+}
+.ill .head {
+  fill: var(--ill-muted);
+}
+.ill .head-primary {
+  fill: var(--ill-primary);
+}
+
+.ill .btn {
+  fill: var(--ill-primary);
+}
+.ill .pointer {
+  fill: var(--ill-fg);
+  stroke: var(--ill-ground);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+.ill .tick {
+  fill: none;
+  stroke: var(--ill-primary);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ill .tick-on {
+  stroke: var(--color-fd-primary-foreground);
+}
+
+/*
+ * Labels are sized in board units (the shared 640-wide frame), divided by
+ * the drawing's own fit scale, so a label renders at the same CSS px in
+ * every piece: size × container width / 640. Each tier keeps essential
+ * labels at 12–15px across the container widths the page uses (335–418
+ * compact, 460–620 full, up to 720 wide); compact drawings drop their
+ * secondary labels instead of shrinking the essential ones.
+ */
+.ill > svg {
+  --t1n: 23;
+  --t2n: 13.3;
+}
+@container (min-width: 460px) {
+  .ill > svg {
+    --t1n: 17;
+    --t2n: 14;
+  }
+}
+@container (min-width: 620px) {
+  .ill > svg {
+    --t1n: 13.3;
+    --t2n: 11.5;
+  }
+}
+.ill text {
+  fill: var(--ill-fg);
+}
+.ill .t1 {
+  font-size: calc(var(--t1n) / var(--fit, 1) * 1px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.ill .t2 {
+  font-size: calc(var(--t2n) / var(--fit, 1) * 1px);
+  fill: var(--ill-muted);
+}
+.ill .mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+}
+.ill .muted {
+  fill: var(--ill-muted);
+}
+.ill .on-primary {
+  fill: var(--color-fd-primary-foreground);
+}
+
+@container (max-width: 459px) {
+  .ill .t2,
+  .ill .desk {
+    display: none;
+  }
+}
+
+@container (min-width: 460px) {
+  .ill .phone {
+    display: none;
+  }
+}
+
+/* Transient elements rest hidden; their keyframes show them in passing. */
+.ill .gone {
+  opacity: 0;
+}
+
+/* Playback states, set by illustration.tsx. */
+.ill[data-anim='ready'] *,
+.ill[data-vis='0'] * {
+  animation-play-state: paused !important;
+}
+
+.ill :is(g, text, rect, path, polygon, polyline):not(.n10-logo *) {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* The fitted drawing scales from the board's origin, not its own centre. */
+.ill g.ill-art {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  transition: opacity 450ms var(--ill-ease);
+}
+
+/* Between loops the drawing fades out, restarts, and fades back in. */
+.ill[data-fade] .ill-art {
+  opacity: 0;
+}

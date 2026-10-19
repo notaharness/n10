@@ -1,0 +1,115 @@
+/*
+ * Beam's isometric scene in the illustrations' language
+ * (components/illustrations/illustrations.css). The machines keep their
+ * shared classes, restyled here only, so the Orchestra stage and the
+ * Beam page's diagrams are unaffected. Faces are lit from above: the top
+ * lightest and the right face darkest, in both themes.
+ */
+.ill[data-ill='mesh'] {
+  --iso-top: var(--ill-surface);
+  --iso-left: color-mix(in srgb, var(--ill-fg) 7%, var(--ill-ground));
+  --iso-right: color-mix(in srgb, var(--ill-fg) 14%, var(--ill-ground));
+  --iso-inset: color-mix(in srgb, var(--ill-fg) 24%, var(--ill-ground));
+  --iso-line: color-mix(in srgb, var(--ill-fg) 34%, var(--ill-ground));
+}
+
+.dark .ill[data-ill='mesh'] {
+  --iso-top: color-mix(in srgb, var(--ill-fg) 16%, var(--ill-ground));
+  --iso-left: color-mix(in srgb, var(--ill-fg) 8%, var(--ill-ground));
+  --iso-right: color-mix(in srgb, var(--ill-fg) 3%, var(--ill-ground));
+  --iso-inset: color-mix(in srgb, black 40%, var(--ill-ground));
+  --iso-line: color-mix(in srgb, var(--ill-fg) 30%, var(--ill-ground));
+}
+
+/* In a card frame the drawing sits on the card, not the page. */
+.n10-frame .ill[data-ill='mesh'] {
+  --ill-ground: var(--color-fd-card);
+}
+
+.ill[data-ill='mesh'] .grid {
+  opacity: 0.7;
+}
+
+.ill[data-ill='mesh'] .n10-iso-face {
+  stroke: var(--iso-line);
+  stroke-width: 1;
+}
+.ill[data-ill='mesh'] .n10-iso-face--top {
+  fill: var(--iso-top);
+}
+.ill[data-ill='mesh'] .n10-iso-face--left {
+  fill: var(--iso-left);
+}
+.ill[data-ill='mesh'] .n10-iso-face--right {
+  fill: var(--iso-right);
+}
+.ill[data-ill='mesh'] .n10-iso-inset {
+  fill: var(--iso-inset);
+}
+.ill[data-ill='mesh'] .n10-iso-screen {
+  fill: var(--ill-ground);
+  stroke: var(--iso-line);
+  stroke-width: 1;
+}
+/* Flat style: no blurred shadows; the screen shows this scene's shell. */
+.ill[data-ill='mesh'] :is(.n10-iso-shadow, .n10-iso-code) {
+  display: none;
+}
+/* Machines are online throughout; the loop, not a blink, carries motion. */
+.ill[data-ill='mesh'] .n10-iso-led {
+  animation: none;
+  fill: var(--n10-sage);
+}
+
+.ill[data-ill='mesh'] .band-sage {
+  fill: var(--ill-sage);
+}
+.ill[data-ill='mesh'] .band-sand {
+  fill: var(--ill-sand);
+}
+.ill[data-ill='mesh'] :is(.lane-sage, .lane-sand) {
+  fill: none;
+  stroke-linejoin: round;
+}
+.ill[data-ill='mesh'] .lane-sage {
+  stroke: var(--ill-sage-line);
+}
+.ill[data-ill='mesh'] .lane-sand {
+  stroke: var(--ill-sand-line);
+}
+
+.ill[data-ill='mesh'] .relay--top {
+  fill: color-mix(in srgb, var(--n10-sand) 22%, var(--iso-top));
+}
+.ill[data-ill='mesh'] .relay--left {
+  fill: color-mix(in srgb, var(--n10-sand) 22%, var(--iso-left));
+}
+.ill[data-ill='mesh'] .relay--right {
+  fill: color-mix(in srgb, var(--n10-sand) 22%, var(--iso-right));
+}
+.ill[data-ill='mesh'] .relay-on {
+  fill: none;
+  stroke: var(--n10-sand);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.ill[data-ill='mesh'] .ts-dot {
+  fill: var(--ill-fg);
+}
+.ill[data-ill='mesh'] .ts-dot--dim {
+  fill-opacity: 0.4;
+}
+
+.ill[data-ill='mesh'] :is(.screen-prompt, .screen-out) {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.ill[data-ill='mesh'] .screen-prompt {
+  stroke: var(--ill-sand-line);
+}
+.ill[data-ill='mesh'] .screen-out {
+  stroke: var(--ill-sage-line);
+}

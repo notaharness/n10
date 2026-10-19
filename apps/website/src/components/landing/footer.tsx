@@ -1,9 +1,10 @@
 import Link from 'next/link';
+import { RELEASES_URL } from '@/lib/release-assets';
 import { Logo } from '@/components/logo';
 
 const links = [
   { text: 'Docs', href: '/docs' },
-  { text: 'Download', href: '/download' },
+  { text: 'Releases', href: RELEASES_URL },
   { text: 'Beam', href: '/beam' },
   { text: 'Orchestra', href: '/orchestra' },
   { text: 'Conversations', href: '/conversations' },

@@ -221,17 +221,12 @@
         ]
       },
       "test": {
-        "executor": "nx:run-commands",
-        "cache": true,
-        "options": {
-          "command": "node --experimental-strip-types --test scripts/platform.test.mjs",
-          "cwd": "apps/website"
-        },
         "dependsOn": []
       }
     }
   },
   "dependencies": {
+    "@radix-ui/react-dropdown-menu": "^2.1.24",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "fumadocs-core": "16.15.8",

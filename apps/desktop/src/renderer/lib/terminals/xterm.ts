@@ -3,6 +3,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { toast } from 'sonner';
+import { leaveDemo } from '../demo-focus.js';
 import type { ResolvedTheme } from '../theme.js';
 import { errorMessage, isMac } from '../utils.js';
 import { replays } from './replays.js';
@@ -127,6 +128,7 @@ function openLink(event: MouseEvent, uri: string): void {
  */
 function terminalKey(term: Terminal, event: KeyboardEvent): boolean {
   if (event.type !== 'keydown') return true;
+  if (leaveDemo(event)) return false;
   const mod = event.ctrlKey || event.metaKey;
   if (mod && event.key === 'c' && term.hasSelection()) return false;
   if (mod && event.key === 'v') return false;

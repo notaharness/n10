@@ -2,7 +2,7 @@
 
 Regenerates the GIFs in `docs/media/`. The hero stills beside them are
 screenshots of the website's desktop demo, taken by
-`node apps/website/scripts/record-media/record.mjs hero`.
+`node apps/website/scripts/hero-stills/record.mjs`.
 
 ```sh
 npx nx build desktop                              # for the desktop demos

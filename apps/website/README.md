@@ -100,30 +100,56 @@ That is the path `src/components/landing/desktop-demo.tsx` loads in its
 iframe; the page sits under `demo/` because of how `desktop:build-demo`
 lays out its output.
 
-## Media
+## The landing page
 
-The landing page's feature clips (`public/media/<clip>-<theme>.{webm,mp4}`
-and `<clip>-<theme>-poster.webp`) exist in both themes. `DemoVideo`
-(`src/components/demo-video.tsx`) plays the one matching the site's theme
-and swaps recordings on a toggle without a reload, at the same time into
-the clip; its poster is a `ThemeImage`, so only the shown theme's still
-is fetched.
+`src/app/(home)/page.tsx` composes the page from `src/components/landing/`;
+its layout lives in `src/app/(home)/landing.css`. The chapters follow the
+reader's role: coding, reviewing, Auto-fix, orchestrating, then Beam.
 
-`scripts/record-media/record.mjs` re-records them. The desktop clips are
-scripted with Playwright against the standalone demo (`sync-demo`), on
-Playwright's fake clock, so each run produces the same frames. The `tui`
-clip films the real TUI through `cli-wterm-host` against the README
-demo's fixture repository. `scripts/convert-media.mjs` encodes the frames.
-The `hero` target instead writes the root README's stills,
-`docs/media/hero.png` and `hero-light.png`: the demo at rest, at 2x.
+The hero's downloads (`landing/home-downloads.tsx`) point at the latest
+GitHub release through `src/lib/release-assets.ts`, which reads the asset
+names from `apps/desktop/release-assets.json`, the file the release
+pipeline names its uploads from. `src/lib/platform.ts` guesses the
+visitor's OS and CPU to highlight a button: macOS gets the matching
+`.dmg`, and the Linux button opens a menu of AppImage and `.deb` for the
+detected CPU, or both CPUs when it is unknown. Nothing on the site names a
+release version. `/download` redirects permanently to the homepage's
+install section (`next.config.mjs`).
+
+The live demo (`landing/desktop-demo.tsx`) is inert until the visitor
+activates it, so Tab passes over it and nothing in it takes focus on load.
+Escape or Ctrl+Space inside it returns focus to the page. It is hidden at
+1100px and below.
+
+### Illustrations
+
+`src/components/illustrations/` holds the animated SVG diagrams. Each one
+renders through `Illustration` (`illustration.tsx`), which fits the drawing
+into a shared 640-unit frame and plays it once it is mostly in view. The
+server renders the final composition, and that is what readers who prefer
+reduced motion see, so every diagram has to make sense at rest. Sequences
+are written as `timeline()` beats (`timeline.ts`) and loop: hold the final
+frame, fade, restart.
+
+Draw n10's mechanics, not decoration: what owns a checkout, where a session
+runs, who sends or posts a message. No robots, invented UI or ornamental
+circuitry. Use the palette tokens (`--n10-sage` for local worktrees and
+sessions, `--n10-sand` for review material or another machine, `--n10-mix`
+for their overlap), rectangular panes with 0–4 unit radii, and Geist Mono
+for branch names, paths and commands. A failure is labelled, not only
+coloured. Essential labels render at 12–15 CSS px at every width the page
+gives a diagram (down to about 335px on phones); drop secondary labels
+rather than shrink them. Each piece has an accessible title and
+description, and decorative parts stay out of the accessibility tree.
+
+## README stills
+
+The root README's hero stills, `docs/media/hero.png` and `hero-light.png`,
+are the desktop demo at rest at 2x. `scripts/hero-stills/record.mjs` takes
+them with Playwright on a fake clock, so each run produces the same image.
 
 ```sh
 npx nx run website:sync-demo
-npx nx run-many -t build -p cli cli-wterm-host
-node apps/website/scripts/record-media/record.mjs            # every clip, both themes
-node apps/website/scripts/record-media/record.mjs plan --theme=light
+node apps/website/scripts/hero-stills/record.mjs            # both themes
+node apps/website/scripts/hero-stills/record.mjs --theme=light
 ```
-
-It needs ffmpeg, and tmux for the `tui` clip. The output changes only
-when a clip is re-recorded, so run it by hand and commit the result
-rather than making the build depend on ffmpeg and a browser.

@@ -11,8 +11,7 @@ const config = {
   images: {
     // Deployed on Cloudflare Workers via OpenNext; the default Next
     // image optimizer needs a Node/Vercel-shaped host it doesn't get
-    // there. Assets are shipped pre-sized instead (see
-    // scripts/convert-media.mjs).
+    // there. Assets are shipped pre-sized instead.
     unoptimized: true,
   },
   async redirects() {
@@ -22,6 +21,8 @@ const config = {
         destination: '/docs/guides/auto-fix',
         permanent: true,
       },
+      // The download page's buttons live in the homepage hero now.
+      { source: '/download', destination: '/#install', permanent: true },
     ];
   },
 };

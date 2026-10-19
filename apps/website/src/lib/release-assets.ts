@@ -1,7 +1,6 @@
 import releaseAssets from '../../../desktop/release-assets.json';
 
 export type Arch = keyof typeof releaseAssets.linux;
-export const archs = Object.keys(releaseAssets.linux) as Arch[];
 export const RELEASES_URL = 'https://github.com/notaharness/n10/releases';
 
 export function releaseAssetUrl(name: string) {

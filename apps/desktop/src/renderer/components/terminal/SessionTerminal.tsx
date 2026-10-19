@@ -9,6 +9,7 @@ import {
   type DesktopTerminal,
 } from '../../lib/terminals/xterm.js';
 import { usePaneShown } from '../../lib/tabs/pane-shown.js';
+import { demoMayFocus } from '../../lib/demo-focus.js';
 import { getResolvedTheme, useTheme } from '../../lib/theme.js';
 import { errorMessage } from '../../lib/utils.js';
 
@@ -216,7 +217,7 @@ export function SessionTerminal({
   // row's takes it).
   useEffect(() => {
     if (!xterm) return undefined;
-    if (!blocked && shown) {
+    if (!blocked && shown && demoMayFocus()) {
       const raf = requestAnimationFrame(() => xterm.term.focus());
       return () => cancelAnimationFrame(raf);
     }
