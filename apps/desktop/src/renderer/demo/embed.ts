@@ -45,16 +45,33 @@ export function requestedTheme(): 'light' | 'dark' | null {
 export function listenToEmbedder(): void {
   // Non-terminal controls keep ordinary Tab navigation; the terminal uses
   // xterm's custom key handler for the same return-to-page chord.
-  window.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' || !(event.target instanceof Element && event.target.closest('.xterm'))) leaveDemo(event);
-  }, true);
+  window.addEventListener(
+    'keydown',
+    (event) => {
+      if (
+        event.key === 'Escape' ||
+        !(event.target instanceof Element && event.target.closest('.xterm'))
+      )
+        leaveDemo(event);
+    },
+    true
+  );
   window.addEventListener('message', (event) => {
-    if (event.source !== window.parent || event.origin !== window.location.origin || !isEmbedMessage(event.data)) return;
+    if (
+      event.source !== window.parent ||
+      event.origin !== window.location.origin ||
+      !isEmbedMessage(event.data)
+    )
+      return;
     const { playing, theme, interactive } = event.data;
     if (typeof interactive === 'boolean') {
-      document.documentElement.dataset.n10Demo = interactive ? 'active' : 'passive';
+      document.documentElement.dataset.n10Demo = interactive
+        ? 'active'
+        : 'passive';
       if (interactive) {
-        const target = document.querySelector<HTMLElement>('.xterm-helper-textarea') ?? document.querySelector<HTMLElement>('button');
+        const target =
+          document.querySelector<HTMLElement>('.xterm-helper-textarea') ??
+          document.querySelector<HTMLElement>('button');
         target?.focus({ preventScroll: true });
       }
     }

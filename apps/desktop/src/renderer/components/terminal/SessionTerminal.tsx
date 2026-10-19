@@ -1,4 +1,3 @@
-import { demoMayFocus } from '../../lib/demo-focus.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -10,6 +9,7 @@ import {
   type DesktopTerminal,
 } from '../../lib/terminals/xterm.js';
 import { usePaneShown } from '../../lib/tabs/pane-shown.js';
+import { demoMayFocus } from '../../lib/demo-focus.js';
 import { getResolvedTheme, useTheme } from '../../lib/theme.js';
 import { errorMessage } from '../../lib/utils.js';
 

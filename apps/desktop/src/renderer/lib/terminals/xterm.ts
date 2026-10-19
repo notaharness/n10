@@ -1,9 +1,9 @@
-import { leaveDemo } from '../demo-focus.js';
 import { Terminal, type IDisposable, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { toast } from 'sonner';
+import { leaveDemo } from '../demo-focus.js';
 import type { ResolvedTheme } from '../theme.js';
 import { errorMessage, isMac } from '../utils.js';
 import { replays } from './replays.js';
