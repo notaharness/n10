@@ -35,9 +35,10 @@ describe('missingDisplay', () => {
 
   it('points WSL 1 without a display at WSL 2 and the terminal UI', () => {
     const message = missingDisplay('linux', {}, wsl1);
+    expect(message).toContain('WSL 1 session');
     expect(message).toContain('wsl --set-version Ubuntu 2');
     expect(message).toContain('n10 --tui');
-    expect(message).not.toContain('WSLg');
+    expect(message).not.toContain('wsl --update');
     expect(missingDisplay('linux', {}, { ...wsl1, distro: null })).toContain(
       'wsl --set-version <distro> 2'
     );

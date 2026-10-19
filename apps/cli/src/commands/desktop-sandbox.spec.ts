@@ -174,8 +174,10 @@ describe('unsandboxedWarning', () => {
     );
   });
 
-  it('points a blocked system at the .deb', () => {
-    expect(unsandboxedWarning({})).toContain('.deb');
+  it('says only that the sandbox is off when the launcher decided', () => {
+    expect(unsandboxedWarning({})).toBe(
+      "n10: running without Chromium's sandbox."
+    );
   });
 });
 

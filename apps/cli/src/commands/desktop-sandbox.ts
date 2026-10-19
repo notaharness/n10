@@ -84,7 +84,7 @@ export function unsandboxedWarning(
 ): string {
   return env.N10_NO_SANDBOX === '1'
     ? "n10: running without Chromium's sandbox (N10_NO_SANDBOX=1)."
-    : "n10: running without Chromium's sandbox, because this system blocks it. To keep the sandbox, install the .deb from https://github.com/notaharness/n10/releases/latest and run `n10-desktop`.";
+    : "n10: running without Chromium's sandbox.";
 }
 
 /**
@@ -98,5 +98,5 @@ export function sandboxAbortHint(
 ): string | null {
   if (platform !== 'linux' || args.includes('--no-sandbox')) return null;
   if (status !== 128 + constants.signals.SIGTRAP) return null;
-  return "n10: Electron stopped unexpectedly. If it reported that no sandbox is usable, run `N10_NO_SANDBOX=1 n10` to start without Chromium's sandbox.";
+  return "n10: stopped unexpectedly. If the error above says no sandbox is usable, run `N10_NO_SANDBOX=1 n10` to start without Chromium's sandbox.";
 }

@@ -26,9 +26,9 @@ export function missingDisplay(
 ): string | null {
   if (platform !== 'linux' || env.DISPLAY || env.WAYLAND_DISPLAY) return null;
   if (wsl?.version === 1) {
-    return `n10: the desktop app needs WSL 2. From Windows, run \`wsl --set-version ${
+    return `n10: no display is available in this WSL 1 session. To use WSLg, upgrade to WSL 2 by running \`wsl --set-version ${
       wsl.distro ?? '<distro>'
-    } 2\`, or run \`n10 --tui\`.`;
+    } 2\` from Windows. You can also run \`n10 --tui\`.`;
   }
   if (wsl) {
     return 'n10: no display is available in this WSL session. Run `n10 --tui`, or check your WSLg setup (`wsl --update` from Windows).';
