@@ -17,7 +17,7 @@ export function OrchestraHero() {
           others. Each player works in its own tmux session, in a Git worktree
           or an existing directory, with Claude Code, Codex, Gemini, Copilot or
           OpenCode. It runs on this machine, and reaches your other machines
-          through n10 Desktop or Beam.
+          through n10 or Beam.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Link href="#install" className={buttonVariants({ size: 'lg' })}>

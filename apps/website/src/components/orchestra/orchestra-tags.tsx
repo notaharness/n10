@@ -50,7 +50,7 @@ const tools = [
     name: 'n10',
     href: '/',
     blurb:
-      'n10 reads the same tags and lists worktree players beside its own worktrees. n10 Desktop delivers a remote player’s reports into the orchestrator’s pane or Claude session; for a Codex orchestrator, run Orchestra’s `relay.sh`.',
+      'n10 reads the same tags and lists worktree players beside its own worktrees. It also delivers a remote player’s reports into the orchestrator’s pane or Claude session; for a Codex orchestrator, run Orchestra’s `relay.sh`.',
   },
   {
     name: 'Beam',

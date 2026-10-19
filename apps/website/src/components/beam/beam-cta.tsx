@@ -26,8 +26,7 @@ export function BeamCta() {
             <CopyButton text={INSTALL} label="Copy the Beam install command" />
           </div>
           <p className="text-fd-muted-foreground mx-auto mt-4 max-w-md text-sm text-pretty">
-            Beam is a Go binary for macOS and Linux. n10 Desktop includes it in
-            the{' '}
+            Beam is a Go binary for macOS and Linux. n10 includes it in the{' '}
             <Link
               href="/docs/guides/fleet"
               className="underline underline-offset-4"
