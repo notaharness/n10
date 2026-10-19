@@ -1,19 +1,18 @@
 # Windows support through WSL
 
-Status: proposal. Windows support means WSL2; tmux remains required.
-This replaces the native execution direction in [#346](https://github.com/notaharness/n10/pull/346), subject to design approval. It does not close or merge that stack. This PR contains no product implementation or claim of completed Windows qualification.
+Status: accepted. Windows support is experimental and runs n10 inside WSL 2; tmux remains required. It supersedes the native-execution direction of [#346](https://github.com/notaharness/n10/pull/346).
 
 ## Recommendation and support boundary
 
-Ship the Ink TUI inside WSL first, using the existing Linux execution path. Qualify Linux Electron through WSLg next; defer a native Windows Electron shell until measured WSLg limitations justify a separate Windows-to-Linux host transport.
+Ship n10 inside WSL 2 as experimental: the app on the Windows desktop through WSLg is the primary path, and `n10 --tui` in Windows Terminal is the fallback where WSLg is unavailable. Defer a native Windows Electron shell until measured WSLg limitations justify a separate Windows-to-Linux host transport.
 
-Phase 1's supported baseline should be Windows 11 x64, current Store WSL2, Ubuntu 24.04 LTS, Windows Terminal, Linux Node/npm and tmux 3.2+. This is a deliberately narrow n10 qualification target, not the minimum OS version Microsoft permits. Other distros, ARM64, WSL1, mounted Windows repositories and native Windows agents are outside the initial claim. Missing or broken tmux must remain a startup error.
+The recommended baseline is Windows 11 x64, current Store WSL2, Ubuntu 24.04 LTS, Windows Terminal, Linux Node/npm and tmux 3.2+. This is a deliberately narrow n10 qualification target, not the minimum OS version Microsoft permits. Other distros, ARM64, WSL1, mounted Windows repositories and native Windows agents are outside the claim. Since #386, a repository opened on WSL 1 or on a mounted Windows drive opens with a startup warning ([wsl.ts](../../libs/core/src/lib/environment/wsl.ts), [environment-notices.ts](../../libs/core/src/lib/environment/environment-notices.ts)). Missing or broken tmux must remain a startup error.
 
-The useful deliverable is a Windows developer creating a worktree, running Claude or Codex, reviewing its diff/PR, quitting n10 and reattaching to the same tmux session. A desktop installer is not necessary for this workflow. No mux owner, replacement session manager, Windows service or native Windows terminal backend is needed.
+The useful deliverable is a Windows developer creating a worktree, running Claude or Codex, reviewing its diff/PR, quitting n10 and reattaching to the same tmux session, in the app on WSLg, with the TUI as the fallback. A desktop installer is not necessary for this workflow. No mux owner, replacement session manager, Windows service or native Windows terminal backend is needed.
 
 ## Where the pieces run
 
-| Concern         | A1: TUI in WSL (phase 1)                                                      | A2: Linux Electron through WSLg                                                        | B: Windows Electron with WSL backend                                                          |
+| Concern         | A1: TUI in WSL (fallback)                                                     | A2: App in WSL via WSLg (primary)                                                      | B: Windows Electron with WSL backend                                                          |
 | --------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | UI              | Ink in Linux; Windows Terminal displays the WSL terminal                      | Renderer, main and host utility process are Linux processes; WSLg presents the windows | Renderer/preload/main are Windows processes; headless host runs in the selected distro        |
 | Program         | Core, engine and app-core run in Linux                                        | Core/engine in Linux host; app-core in renderer                                        | Core/engine in Linux host; browser-safe renderer bindings stay Windows                        |
@@ -41,7 +40,7 @@ flowchart LR
 
 ### Other credible options
 
-A Windows shortcut launching `wsl.exe` into `n10 --tui`, or a Linux desktop entry exposed through WSLg, can improve discovery without moving execution. This is the preferred convenience increment after qualification; the shortcut must select the intended distro/user and not inherit a Windows working directory accidentally. WSL's documented commands support explicit distro, user and executable selection. [WSL commands](https://learn.microsoft.com/en-us/windows/wsl/basic-commands)
+A Windows shortcut launching `wsl.exe` into `n10`, or a Linux desktop entry exposed through WSLg, can improve discovery without moving execution; WSLg already puts a `.deb`'s desktop entry in the Start menu. This is the preferred convenience increment after qualification; the shortcut must select the intended distro/user and not inherit a Windows working directory accidentally. WSL's documented commands support explicit distro, user and executable selection. [WSL commands](https://learn.microsoft.com/en-us/windows/wsl/basic-commands)
 
 A browser frontend served from WSL is credible longer term, but the existing `apps/cli-wterm-host` is a TUI testing bridge, not a production desktop server. Turning it or the desktop demo into a product entails authenticated HTTP/WebSocket access, origin checks, lifecycle, filesystem UI and browser clipboard/notification permissions. It avoids Electron packaging but adds another shell and exposed endpoint. Do not make it a prerequisite for Windows support.
 
@@ -55,7 +54,7 @@ Clone into `~/src/<repo>` inside the distro. Keep worktrees on that Linux filesy
 
 `/mnt/c/...` is a mounted Windows drive; `\\wsl$\Ubuntu-24.04\home\...` (also exposed through `\\wsl.localhost\...`) is Windows access to Linux files. Neither UNC spelling is a Linux working directory. Microsoft recommends keeping files beside the OS running the tools for performance; cross-filesystem Git/npm workloads are a poor default. Windows Explorer access is useful for inspection, not as n10's execution path. [Filesystem guidance](https://learn.microsoft.com/en-us/windows/wsl/filesystems), [interop and path translation](https://learn.microsoft.com/en-us/windows/dev-environment/wsl-interop)
 
-Phase 1 documents `/mnt/c` as unqualified rather than inventing an absolute performance guarantee. Qualification should record worktree creation, Git status/diff and file-watch behavior on Linux storage, plus a mounted-drive comparison. Case sensitivity, symlinks, executable modes and line endings make mixed Windows/Linux Git access another reason to avoid sharing one checkout between both toolchains.
+n10 warns at startup when a repository is on a mounted Windows drive (#386); `/mnt/c` stays unqualified rather than inventing an absolute performance guarantee. Qualification should record worktree creation, Git status/diff and file-watch behavior on Linux storage, plus a mounted-drive comparison. Case sensitivity, symlinks, executable modes and line endings make mixed Windows/Linux Git access another reason to avoid sharing one checkout between both toolchains.
 
 For B, identify a repository by distro, Linux user and backend-canonical absolute path. A Windows file dialog returning a UNC path must not feed Windows `realpath`, Git or watchers and then claim Linux identity. Prefer a backend directory browser; translate only for explicit Explorer/editor actions. A distro switch changes the execution target and cannot silently reuse another distro's saved sessions or credentials.
 
@@ -71,7 +70,7 @@ For SSH, recommend an agent and keys managed inside WSL with a valid Linux `SSH_
 
 ### Links, Beam passkeys and networking
 
-The TUI's [open-url.ts](../../apps/cli/src/utils/open-url.ts) selects `xdg-open` on Linux and suppresses opener failures. WSL therefore does not enter its Windows branch. Linux Electron delegates through its Linux external opener. Neither establishes that a stock distro opens the Windows default browser correctly. Prototype the installed opener first; if needed, add a small supported WSL opener adapter with argv-safe URL handling, not shell interpolation. Document a copyable URL fallback and preserve user-configured handlers.
+Inside WSL with interop, `urlOpenCommand`/`windowsOpener` ([open-url.ts](../../libs/core/src/lib/environment/open-url.ts)) open http(s) links with `wslview`, or `explorer.exe` if that is missing, spawned argv-only. A user-set `BROWSER` keeps `xdg-open`. Desktop main uses it through [open-external.ts](../../apps/desktop/src/main/open-external.ts). A click reaching the Windows default browser on a real desktop is still unverified; the docs keep a copyable URL fallback.
 
 Beam belongs in WSL alongside tmux for A and B: Linux binary, Linux control socket, Linux config and machine identity. Its existing ceremony prints a URL/QR code and accepts completion in another browser or on a phone; the browser result returns through its relay ceremony, not a callback that requires a Windows process to open the distro's Unix socket. Thus Windows browser handoff does not require native Windows Beam. [Beam CLI ceremony](https://github.com/notaharness/beam/blob/main/docs/07-cli.md), [ceremony implementation](https://github.com/notaharness/beam/blob/main/internal/ceremony/ceremony.go)
 
@@ -92,6 +91,8 @@ Linux notification delivery to the Windows notification center is not establishe
 For A1 use `@notaharness/n10` installed with Linux npm; `n10 --tui` avoids the Electron download path. Preserve the existing engine update preferences and Linux npm update/restart behavior. User-owned npm installation avoids requiring elevation for updates. Qualification must cover shutdown/drain, upgrade and reattach.
 
 For A2 start with the same npm install and `n10`; alternatively use the existing Linux `.deb` and its `n10-desktop` entry. Prefer `.deb` over making AppImage/FUSE setup part of the first WSLg guide. Linux packaging already stages Linux node-pty and Beam in [electron-builder.yml](../../apps/desktop/electron-builder.yml). Test a clean install, launch, uninstall and update in WSL, with Chromium sandbox enabled. Disabling the sandbox is not the support recipe.
+
+An npm install's setuid `chrome-sandbox` is unusable, so the launcher ([desktop-sandbox.ts](../../apps/cli/src/commands/desktop-sandbox.ts), #388) keeps the sandbox through unprivileged user namespaces when an `unshare --user --map-root-user --net --pid --fork` probe passes, unless AppArmor's `apparmor_restrict_unprivileged_userns` is 1. WSL 2 has no such restriction and runs sandboxed: CI verified a renderer in seccomp mode 2 in its own user namespace. Otherwise it falls back to `--no-sandbox` with a warning; `N10_NO_SANDBOX=1` forces that fallback, and the Windows guide (#389) points to the `.deb`.
 
 There is no Windows executable to Authenticode-sign in A. Retain existing release integrity/distribution practices; packaged Linux updates remain manual/package-managed. Electron's built-in `autoUpdater` does not support Linux. [Electron updater](https://www.electronjs.org/docs/latest/api/auto-updater)
 
@@ -137,21 +138,19 @@ Keep Orchestra's Bash/tmux integration inside WSL. No Git Bash mux translation, 
 
 ## Phases and acceptance gates
 
-### Phase 1 — minimal useful Windows support: TUI in WSL
+### Phase 1 — experimental release: the app on WSLg plus the TUI fallback, npm install
 
-1. Qualify a clean Windows 11 x64/WSL2 Ubuntu installation; record Windows, WSL/kernel, terminal, Node, tmux, n10 and agent versions. Use Linux home storage and ordinary user permissions.
-2. Publish a focused setup/troubleshooting guide: Windows `wsl --install -d Ubuntu-24.04`, reboot if requested, create the Linux user, install Linux Git/tmux/Node/npm and agents, authenticate, clone in `~/src`, install n10 and run `n10 --tui`. The guide must pin the Node requirement from the release manifest rather than copy a possibly stale apt default.
-3. Verify executable resolution with `command -v node npm git tmux claude codex` and `node -p 'process.platform'` (expected `linux`). Check `tmux -V`, `git --version` and agent versions; report missing tools individually.
-4. Run offline CLI e2e in real WSL2, then manually complete one Claude and one Codex worktree workflow with normal sandboxing, Git fetch/push, review display and resume. Add only fixes demonstrated by these runs; update the current “WSL is untested” documentation only after the gate passes.
-5. Document terminal clipboard and browser fallback, Linux SSH/GCM choices, and shutdown semantics. No WSLg, Beam enrolment or native installer is required for this phase.
+1. Publish a focused setup/troubleshooting guide: Windows `wsl --install -d Ubuntu-24.04`, reboot if requested, create the Linux user, install Linux Git/tmux/Node/npm and agents, authenticate, clone in `~/src`, install n10 with npm and run `n10`; `n10 --tui` only without WSLg. The guide must pin the Node requirement from the release manifest rather than copy a possibly stale apt default.
+2. Verify executable resolution with `command -v node npm git tmux claude codex` and `node -p 'process.platform'` (expected `linux`). Check `tmux -V`, `git --version` and agent versions; report missing tools individually.
+3. Run the offline CLI and desktop e2e suites in real WSL2 (hosted CI, below).
+4. Document terminal clipboard and browser fallback, Linux SSH/GCM choices, and shutdown semantics.
+5. Public docs label Windows experimental until the qualification gate passes.
 
-Acceptance: fresh install works without native Windows Node/Git; worktree create/reuse and guarded removal work; Unicode, resize and paste work; closing n10 and Windows Terminal, waiting more than a minute with no WSL terminal open, then reopening reconnects to the same live agent while the distro is running; missing tmux errors clearly. Reboot/distro termination is explicitly not session persistence. A documentation-only implementation is sufficient if these gates pass without code changes.
+### Qualification gate — removes the experimental label
 
-### Phase 2 — qualify the Linux desktop under WSLg
+On a real Windows 11 x64 desktop with the baseline above, run `wsl --update`, check WSLg, and exercise npm `n10` and the packaged `.deb` with sandbox enabled: host startup, rendering/input, diff/review navigation, tabs, font/DPI behavior, clipboard, link opening, folder selection, theme and quit/reconnect. Test GPU defaults first; record hardware/driver failures without promising a global workaround. Complete one Claude and one Codex worktree workflow with normal sandboxing, Git fetch/push, review display and resume, in the app and in the TUI.
 
-Run `wsl --update` and check WSLg availability on the same baseline. Exercise npm `n10` and the packaged `.deb` with sandbox enabled: host startup, rendering/input, diff/review navigation, tabs, font/DPI behavior, clipboard, link opening, folder selection, theme and quit/reconnect. Test GPU defaults first; record hardware/driver failures without promising a global workaround.
-
-Test host crash, Windows sleep/wake, WSL restart, npm update/restart and package replacement. Add a desktop-entry/shortcut guide once it works. Keep notifications explicitly limited until verified. Acceptance requires a usable installed app on a real Windows desktop, not an Xvfb screenshot. This phase may ship as experimental independently of the supported TUI.
+Test host crash, Windows sleep/wake, WSL restart, npm update/restart and package replacement. Close n10 and Windows Terminal, wait more than a minute with no WSL terminal open, then reopen and reattach to the same live agent while the distro is running. Fresh install works without native Windows Node/Git; worktree create/reuse and guarded removal work; Unicode, resize and paste work in the TUI; missing tmux errors clearly. Reboot/distro termination is explicitly not session persistence. Keep notifications explicitly limited until verified. Acceptance requires a usable installed app on a real Windows desktop, not an Xvfb screenshot.
 
 ### Phase 3 — optional native shell feasibility, then a separate decision
 
@@ -161,11 +160,11 @@ Only start if WSLg produces concrete blockers (for example input/accessibility o
 
 Existing Linux unit, CLI and desktop e2e remain the bulk of regression coverage. A Windows process running Linux-like fixtures is not a WSL test, and Linux Xvfb is not a WSLg test.
 
-GitHub's runner-image source includes WSL2 installation, but that alone does not prove a particular hosted runner can boot the required distro. Pin an image (initial candidate `windows-2025`), inspect `wsl --version` and `wsl --list --verbose`, provision an isolated distro, and require a successful WSL2 boot before treating the job as coverage. WSL2 needs virtualization; do not silently fall back to WSL1 or count a skipped job as qualification. [Runner WSL setup](https://github.com/actions/runner-images/blob/main/images/windows/scripts/build/Install-WSL2.ps1), [GitHub runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
+Hosted `windows-2025` runners boot WSL2 (#385, [wsl.yml](../../.github/workflows/wsl.yml)). The job imports a pinned Ubuntu 24.04 rootfs as a WSL 2 distro and fails unless the distro's kernel is `*-microsoft-standard-WSL2`; it never falls back to WSL1 or counts a skipped job as coverage. It runs nightly (`cron: 17 3 * * *`), on `workflow_dispatch`, and on pull requests touching `.github/workflows/wsl.yml` or `tools/wsl/**`. [Runner WSL setup](https://github.com/actions/runner-images/blob/main/images/windows/scripts/build/Install-WSL2.ps1), [GitHub runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
 
-Copy/clone the tested revision into the distro's Linux filesystem, run `npm ci` there and use `NX_DAEMON=false npx nx e2e cli-e2e`; run the existing desktop suite there headlessly for Linux host regression. Use scripted agents, scratch HOME/socket directories and unset `TMUX`; terminate only fixture-owned sessions. No real agent credentials or production Beam ceremonies in CI. Cache keys must distinguish Linux architecture/runtime, not merely the outer Windows runner.
+The job clones the tested revision into the distro's Linux filesystem, runs `npm ci` there, then `cli-e2e` and the WSL detection specs against the real kernel. `desktop-e2e` runs on Xvfb inside WSL: at WSLg's 1024×768 headless output 10 tests fail on layout. WSLg itself gets a sandboxed launch smoke of the npm package's `n10`. A 120 s unattended check proves a tmux session outlives the `wsl.exe` that started it. Use scripted agents, scratch HOME/socket directories and unset `TMUX`; terminate only fixture-owned sessions. No real agent credentials or production Beam ceremonies in CI. Cache keys must distinguish Linux architecture/runtime, not merely the outer Windows runner.
 
-If hosted virtualization/provisioning is unreliable, use a disposable self-hosted Windows 11 WSL2 runner for this gate and keep ordinary hosted Linux CI. WSLg input, GPU, clipboard, Windows browser/PRF, sleep and notification behavior require an interactive Windows machine regardless. Automated GUI coverage can follow once that environment is reproducible.
+Should hosted virtualization become unreliable, a disposable self-hosted Windows 11 WSL2 runner is the contingency. WSLg input, GPU, clipboard, Windows browser/PRF, sleep and notification behavior require an interactive Windows machine regardless. Automated GUI coverage can follow once that environment is reproducible.
 
 | First experiment                                | Evidence required                                                               | Consequence                                                                         |
 | ----------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -173,20 +172,20 @@ If hosted virtualization/provisioning is unreliable, use a disposable self-hoste
 | Close/reopen, host crash, distro stop and sleep | Session identity/process survival versus reconnect state                        | Establishes honest lifetime guarantees; no auto-respawn of missing agents           |
 | Browser handoff and Beam PRF                    | Windows browser or phone completes ceremony; opener failure remains recoverable | Adapter only if needed; fleet can remain unqualified without delaying local support |
 | Packaged Electron under WSLg                    | Sandbox-on install/render/input/clipboard and update result                     | Determines whether A2 is supportable before investment in B                         |
-| Hosted WSL2 runner boot                         | Actual WSL2 distro and offline e2e results                                      | Chooses hosted versus disposable self-hosted qualification                          |
+| Hosted WSL2 runner boot                         | Actual WSL2 distro and offline e2e results                                      | Resolved by #385: hosted `windows-2025`, nightly                                    |
 | Native shell transport, only if needed          | Duplex bytes, backpressure, EOF/crash and version mismatch                      | Go/no-go for B before repository-wide changes                                       |
 
 ## Open questions with recommended defaults
 
-| Question                                                | Recommendation                                                                                                                                     |
-| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Which Windows/distro/architecture baseline?             | Windows 11 x64 + current Store WSL2 + Ubuntu 24.04 LTS; qualify ARM64 and other distros separately.                                                |
-| What is the initial support promise?                    | TUI local worktrees/agents/reviews only; WSLg desktop experimental until phase 2 passes.                                                           |
-| Must repos on `/mnt/c` work?                            | Do not qualify initially; recommend Linux home for both repo and worktrees. Measure before broadening.                                             |
-| Which Git/SSH credentials should onboarding use?        | Linux authentication by default, optional documented Windows GCM for HTTPS; no automatic key/config migration or SSH bridge.                       |
-| Must native passkeys and notifications work for launch? | No; copyable Beam ceremony/phone fallback, in-app notifications. Qualify PRF explicitly before claiming fleet support.                             |
-| How many distros/users can one n10 target?              | One executing distro/user per launch; no combined inventory. Any future native shell stores explicit target identity.                              |
-| What survives close, sleep or reboot?                   | UI close detaches while WSL is running; test sleep/reconnect; no survival promise across distro termination/reboot and no implicit agent restart.  |
-| What is the CI platform?                                | Try pinned hosted Windows WSL2 provisioning first; require a disposable Windows 11 runner if it cannot reliably boot. Keep manual WSLg acceptance. |
-| When is native Windows Electron justified?              | Only by measured WSLg shortcomings; a separate host-transport decision, not a prerequisite. Reuse #349 then, with a signing/update plan.           |
-| What happens to the paused stacks?                      | Supersede their n10 native-execution roadmap after review; preserve independent fixes and leave Beam's native scope to its own decision.           |
+| Question                                                | Recommendation                                                                                                                                    |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Which Windows/distro/architecture baseline?             | Windows 11 x64 + current Store WSL2 + Ubuntu 24.04 LTS; qualify ARM64 and other distros separately.                                               |
+| What is the initial support promise?                    | Experimental: n10 on WSLg (primary) and `n10 --tui` (fallback), installed with Linux npm; the label stays until the real-desktop gate passes.     |
+| Must repos on `/mnt/c` work?                            | Do not qualify initially; recommend Linux home for both repo and worktrees. Measure before broadening.                                            |
+| Which Git/SSH credentials should onboarding use?        | Linux authentication by default, optional documented Windows GCM for HTTPS; no automatic key/config migration or SSH bridge.                      |
+| Must native passkeys and notifications work for launch? | No; copyable Beam ceremony/phone fallback, in-app notifications. Qualify PRF explicitly before claiming fleet support.                            |
+| How many distros/users can one n10 target?              | One executing distro/user per launch; no combined inventory. Any future native shell stores explicit target identity.                             |
+| What survives close, sleep or reboot?                   | UI close detaches while WSL is running; test sleep/reconnect; no survival promise across distro termination/reboot and no implicit agent restart. |
+| What is the CI platform?                                | Hosted `windows-2025` WSL2, nightly; manual WSLg acceptance on a real Windows 11 machine.                                                         |
+| When is native Windows Electron justified?              | Only by measured WSLg shortcomings; a separate host-transport decision, not a prerequisite. Reuse #349 then, with a signing/update plan.          |
+| What happens to the paused stacks?                      | Supersede their n10 native-execution roadmap after review; preserve independent fixes and leave Beam's native scope to its own decision.          |
