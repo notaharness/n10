@@ -311,7 +311,7 @@ describe('sweepMergedBranches', () => {
 });
 
 /**
- * The badge and the babysitter must agree about a branch, so both
+ * The badge and the auto-fixer must agree about a branch, so both
  * judge it the same way: a pull request on the remote refs against its
  * target, a bare branch locally against origin's main.
  */

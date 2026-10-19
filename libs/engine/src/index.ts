@@ -6,7 +6,7 @@ export * from './lib/sync/api.js';
 export * from './lib/worktrees/api.js';
 export * from './lib/reviews/api.js';
 export * from './lib/sessions/api.js';
-export * from './lib/babysitters/api.js';
+export * from './lib/auto-fix/api.js';
 export * from './lib/machines/api.js';
 export * from './lib/plans/api.js';
 export * from './lib/updates/api.js';

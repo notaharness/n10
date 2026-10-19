@@ -1,7 +1,7 @@
 /**
  * Whether a branch still merges into what it is for.
  *
- * One predicate for the sidebar badge and the babysitter, so the two
+ * One predicate for the sidebar badge and the auto-fixer, so the two
  * cannot disagree about the same branch. A branch with a pull request
  * is judged on the remote side — `origin/<target>` against
  * `origin/<source>` — because that is what the request will merge, and

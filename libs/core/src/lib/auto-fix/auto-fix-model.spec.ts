@@ -1,18 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import type { RemoteCommentThread } from '@n10/vcs-core';
 import {
-  BABYSIT_DEBOUNCE_MS,
-  BABYSIT_MAX_WAIT_MS,
+  AUTO_FIX_DEBOUNCE_MS,
+  AUTO_FIX_MAX_WAIT_MS,
   diffAgainstReported,
-  initialBabysitState,
+  initialAutoFixState,
   isDue,
   observe,
   observeThread,
   takeReport,
-  type BabysitObservation,
-  type BabysitThread,
-} from './babysit-model.js';
-import { composeBabysitPrompt } from './babysit-prompt.js';
+  type AutoFixObservation,
+  type AutoFixThread,
+} from './auto-fix-model.js';
+import { composeAutoFixPrompt } from './auto-fix-prompt.js';
 
 const MIN = 60_000;
 
@@ -20,11 +20,11 @@ function thread(
   id: string,
   comments: { author: string; body: string }[],
   lastCommentIsOwn = false
-): BabysitThread {
+): AutoFixThread {
   return { id, file: 'src/a.ts', line: 3, comments, lastCommentIsOwn };
 }
 
-function seen(over: Partial<BabysitObservation> = {}): BabysitObservation {
+function seen(over: Partial<AutoFixObservation> = {}): AutoFixObservation {
   return {
     buildStatus: 'succeeded',
     headSha: 'abc',
@@ -38,7 +38,7 @@ const alice = { author: 'alice', body: 'rename this' };
 const bob = { author: 'bob', body: 'agreed' };
 
 describe('diffAgainstReported', () => {
-  const reported = initialBabysitState().reported;
+  const reported = initialAutoFixState().reported;
 
   it('is quiet when CI is green, no threads and no conflicts', () => {
     expect(diffAgainstReported(reported, seen())).toBeNull();
@@ -173,26 +173,26 @@ describe('diffAgainstReported', () => {
 
 describe('observe / isDue / takeReport', () => {
   it('has nothing due while nothing is pending', () => {
-    const state = observe(initialBabysitState(), seen(), 0);
-    expect(isDue(state, BABYSIT_MAX_WAIT_MS * 2)).toBe(false);
+    const state = observe(initialAutoFixState(), seen(), 0);
+    expect(isDue(state, AUTO_FIX_MAX_WAIT_MS * 2)).toBe(false);
     expect(takeReport(state, 0)).toBeNull();
   });
 
   it('sends after the update has been quiet for the debounce', () => {
     let state = observe(
-      initialBabysitState(),
+      initialAutoFixState(),
       seen({ buildStatus: 'failed' }),
       0
     );
-    expect(isDue(state, BABYSIT_DEBOUNCE_MS - 1)).toBe(false);
-    expect(isDue(state, BABYSIT_DEBOUNCE_MS)).toBe(true);
+    expect(isDue(state, AUTO_FIX_DEBOUNCE_MS - 1)).toBe(false);
+    expect(isDue(state, AUTO_FIX_DEBOUNCE_MS)).toBe(true);
     state = observe(state, seen({ buildStatus: 'failed' }), 5 * MIN);
-    expect(isDue(state, BABYSIT_DEBOUNCE_MS)).toBe(true);
+    expect(isDue(state, AUTO_FIX_DEBOUNCE_MS)).toBe(true);
   });
 
   it('restarts the quiet period when the update grows', () => {
     let state = observe(
-      initialBabysitState(),
+      initialAutoFixState(),
       seen({ buildStatus: 'failed' }),
       0
     );
@@ -207,7 +207,7 @@ describe('observe / isDue / takeReport', () => {
 
   it('sends anyway once the update has waited the maximum', () => {
     let state = observe(
-      initialBabysitState(),
+      initialAutoFixState(),
       seen({ buildStatus: 'failed' }),
       0
     );
@@ -226,18 +226,18 @@ describe('observe / isDue / takeReport', () => {
         i * 5 * MIN
       );
     }
-    expect(isDue(state, BABYSIT_MAX_WAIT_MS)).toBe(true);
+    expect(isDue(state, AUTO_FIX_MAX_WAIT_MS)).toBe(true);
   });
 
   it('drops the pending update when the news goes away', () => {
-    let state = observe(initialBabysitState(), seen({ conflictCount: 2 }), 0);
+    let state = observe(initialAutoFixState(), seen({ conflictCount: 2 }), 0);
     state = observe(state, seen({ conflictCount: 0 }), MIN);
     expect(state.pendingSince).toBeNull();
-    expect(isDue(state, BABYSIT_MAX_WAIT_MS)).toBe(false);
+    expect(isDue(state, AUTO_FIX_MAX_WAIT_MS)).toBe(false);
   });
 
   it('reports conflicts that came back after being resolved', () => {
-    let state = observe(initialBabysitState(), seen({ conflictCount: 3 }), 0);
+    let state = observe(initialAutoFixState(), seen({ conflictCount: 3 }), 0);
     state = takeReport(state, 10 * MIN)!.state;
     state = observe(state, seen({ conflictCount: 0 }), 11 * MIN);
     expect(state.pendingSince).toBeNull();
@@ -248,14 +248,14 @@ describe('observe / isDue / takeReport', () => {
 
   it('takes the report and remembers all of it as told', () => {
     const state = observe(
-      initialBabysitState(),
+      initialAutoFixState(),
       seen({
         buildStatus: 'failed',
         threads: [thread('t1', [alice]), thread('t2', [alice, bob])],
       }),
       0
     );
-    const taken = takeReport(state, BABYSIT_DEBOUNCE_MS);
+    const taken = takeReport(state, AUTO_FIX_DEBOUNCE_MS);
     expect(taken?.report.newThreads.map((t) => t.id)).toEqual(['t1', 't2']);
     expect(taken?.state.reported).toEqual({
       buildStatus: 'failed',
@@ -264,9 +264,9 @@ describe('observe / isDue / takeReport', () => {
       threadComments: { t1: 1, t2: 2 },
     });
     expect(taken?.state.pendingSince).toBeNull();
-    expect(taken?.state.lastDeliveredAt).toBe(BABYSIT_DEBOUNCE_MS);
+    expect(taken?.state.lastDeliveredAt).toBe(AUTO_FIX_DEBOUNCE_MS);
     expect(
-      observe(taken!.state, state.latest!, BABYSIT_DEBOUNCE_MS + MIN)
+      observe(taken!.state, state.latest!, AUTO_FIX_DEBOUNCE_MS + MIN)
         .pendingSince
     ).toBeNull();
   });
@@ -274,7 +274,7 @@ describe('observe / isDue / takeReport', () => {
   it('does not let a pending build overwrite a reported verdict', () => {
     const state = observe(
       {
-        ...initialBabysitState(),
+        ...initialAutoFixState(),
         reported: {
           buildStatus: 'failed',
           headSha: 'abc',
@@ -319,7 +319,7 @@ describe('observeThread', () => {
   });
 });
 
-describe('composeBabysitPrompt', () => {
+describe('composeAutoFixPrompt', () => {
   const pr = {
     id: 42,
     title: 'Add thing',
@@ -328,7 +328,7 @@ describe('composeBabysitPrompt', () => {
   };
 
   it('numbers threads, names their ids and states CI and conflicts', () => {
-    const prompt = composeBabysitPrompt(pr, {
+    const prompt = composeAutoFixPrompt(pr, {
       buildStatus: 'failed',
       lastToldBuildStatus: undefined,
       ciChanged: true,
@@ -355,7 +355,7 @@ describe('composeBabysitPrompt', () => {
   });
 
   it('omits the comments section when there are none', () => {
-    const prompt = composeBabysitPrompt(pr, {
+    const prompt = composeAutoFixPrompt(pr, {
       buildStatus: 'succeeded',
       lastToldBuildStatus: 'failed',
       ciChanged: true,
@@ -373,7 +373,7 @@ describe('composeBabysitPrompt', () => {
   });
 
   it('says when the conflict check could not run, and puts a running build in context', () => {
-    const prompt = composeBabysitPrompt(pr, {
+    const prompt = composeAutoFixPrompt(pr, {
       buildStatus: 'pending',
       lastToldBuildStatus: 'failed',
       ciChanged: false,

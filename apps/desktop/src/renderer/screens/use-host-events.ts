@@ -6,7 +6,7 @@ import { keys } from '../lib/data/query-keys.js';
 
 /**
  * The workspace's subscriptions to what the host pushes — sync
- * notices, remote updates, session exits, discovery, babysit events —
+ * notices, remote updates, session exits, discovery, auto-fix events —
  * and the query invalidation each one owes. Split from `Workspace`,
  * which routes menu commands and shortcuts and was a catalogue already.
  *
@@ -78,15 +78,15 @@ export function useHostEvents(
     return off;
   }, [qc, cwd]);
 
-  // A babysat pull request's status rides on its sidebar item, so the
+  // The  of a pull request under auto-fix rides on its sidebar item, so the
   // poll shows it. The host pushes only what a poll would show too
   // late: an agent it started (a row and a session), or a watch that
   // ended with its pull request.
   useEffect(() => {
-    const off = window.n10.onBabysitChanged((event) => {
+    const off = window.n10.onAutoFixChanged((event) => {
       if (event.ended) {
         toast.info(
-          `Stopped babysitting #${event.ended.prId}: the pull request is no longer open`
+          `Auto-fix off for #${event.ended.prId}: the pull request is no longer open`
         );
       }
       void qc.invalidateQueries({ queryKey: keys.sidebar(cwd) });

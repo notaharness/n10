@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Two loops fetch in the same repository — the sync pass and every
- * babysitter — and git refuses the second while the first holds a ref
+ * auto-fixer — and git refuses the second while the first holds a ref
  * lock. So fetches of one repository run one at a time, and a fetch
  * that would only repeat a recent one is answered from it.
  */
@@ -71,7 +71,7 @@ describe('fetchRefs', () => {
     const sitter = fetchRefs({ cwd: '/a', refs: ['main', 'feat'] });
     await flush();
     // The second waits: git would refuse it while the first holds the
-    // ref locks, and the babysitter would read that as a failed check.
+    // ref locks, and the auto-fixer would read that as a failed check.
     expect(git.log).toEqual(['start all@/a']);
     git.release[0](true);
     await flush();

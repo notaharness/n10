@@ -8,7 +8,7 @@ import type {
   PullRequestInfo,
   VcsProvider,
 } from '@n10/vcs-core';
-import type { BabysitStatus } from '@n10/core';
+import type { AutoFixStatus } from '@n10/core';
 import type { PullRequestLookup } from '@n10/core';
 
 const mocks = vi.hoisted(() => ({
@@ -36,7 +36,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@n10/logger', () => ({ logError: mocks.logError }));
-// No `createWorktree` here on purpose: the babysitter must never reach
+// No `createWorktree` here on purpose: the auto-fixer must never reach
 // the variant that invents a branch, and an import of it would fail
 // loudly rather than pass through a stub.
 vi.mock('@n10/worktree-manager', async (original) => ({
@@ -61,10 +61,10 @@ vi.mock('@n10/core', async (original) => ({
   launchSession: (params: unknown) => mocks.launchSession(params),
 }));
 
-const { startPrBabysitter, babysitTimingFromEnv } = await import(
-  './pr-babysitter.js'
+const { startPrAutoFixer, autoFixTimingFromEnv } = await import(
+  './pr-auto-fixer.js'
 );
-const { observePullRequest } = await import('./babysit-observe.js');
+const { observePullRequest } = await import('./auto-fix-observe.js');
 
 const MIN = 60_000;
 
@@ -264,9 +264,9 @@ describe('observePullRequest', () => {
   });
 });
 
-describe('startPrBabysitter', () => {
+describe('startPrAutoFixer', () => {
   let clock = 0;
-  const statuses: BabysitStatus[] = [];
+  const statuses: AutoFixStatus[] = [];
   let lookup: () => Promise<PullRequestLookup>;
   const failing = { ...pr, buildStatus: 'failed' as const };
 
@@ -291,8 +291,8 @@ describe('startPrBabysitter', () => {
     vi.useRealTimers();
   });
 
-  function start(over: Partial<Parameters<typeof startPrBabysitter>[0]> = {}) {
-    return startPrBabysitter({
+  function start(over: Partial<Parameters<typeof startPrAutoFixer>[0]> = {}) {
+    return startPrAutoFixer({
       pr,
       cwd: '/repo',
       getProvider: () => providerWith(noComments),
@@ -578,17 +578,17 @@ describe('startPrBabysitter', () => {
 
   it('takes its cadence from the environment when the caller sets none', async () => {
     expect(
-      babysitTimingFromEnv({
-        N10_BABYSIT_POLL_MS: '1000',
-        N10_BABYSIT_DEBOUNCE_MS: '500',
+      autoFixTimingFromEnv({
+        N10_AUTO_FIX_POLL_MS: '1000',
+        N10_AUTO_FIX_DEBOUNCE_MS: '500',
       })
     ).toEqual({ intervalMs: 1000, timing: { debounceMs: 500 } });
-    expect(babysitTimingFromEnv({ N10_BABYSIT_POLL_MS: 'soon' })).toEqual({
+    expect(autoFixTimingFromEnv({ N10_AUTO_FIX_POLL_MS: 'soon' })).toEqual({
       intervalMs: undefined,
       timing: undefined,
     });
 
-    vi.stubEnv('N10_BABYSIT_DEBOUNCE_MS', '500');
+    vi.stubEnv('N10_AUTO_FIX_DEBOUNCE_MS', '500');
     try {
       const sitter = start();
       await sitter.pollNow();

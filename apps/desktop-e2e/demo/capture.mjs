@@ -5,7 +5,7 @@
  * (gliding cursor, real typing), records with ffmpeg (x11grab) and
  * downscales to palette-optimized GIFs.
  *
- *   node apps/desktop-e2e/demo/capture.mjs [worktrees|review|review-in-place|plan|babysit|tab-switching|tui|all]
+ *   node apps/desktop-e2e/demo/capture.mjs [worktrees|review|review-in-place|plan|auto-fix|tab-switching|tui|all]
  *
  * Requires `nx build desktop` first, plus Xvfb and ffmpeg on PATH.
  * Output lands in docs/media/.
@@ -801,7 +801,7 @@ async function chooseFromNextContextMenu(
 }
 
 /**
- * Babysitting: a pull request with a red build and an open review
+ * Auto-fixing: a pull request with a red build and an open review
  * thread, watched from the sidebar. The cadence is shortened through
  * the environment (the real debounce is ten minutes), so the update
  * lands within the take: no agent is running on the branch, so one is
@@ -809,7 +809,7 @@ async function chooseFromNextContextMenu(
  * Cropped to the sidebar and the top of the pane, so the row's badge
  * and the prompt are legible at README size.
  */
-async function demoBabysit(scenario) {
+async function demoAutoFix(scenario) {
   // A smaller window than the other takes, cropped to exactly its
   // bounds: the GIF then shrinks it by half rather than by almost
   // two thirds, which is what keeps the row's badge and the prompt
@@ -817,11 +817,11 @@ async function demoBabysit(scenario) {
   const size = { width: 1060, height: 640 };
   const { app, page } = await launchApp(scenario, {
     size,
-    env: { N10_BABYSIT_DEBOUNCE_MS: '3500', N10_BABYSIT_POLL_MS: '1500' },
+    env: { N10_AUTO_FIX_DEBOUNCE_MS: '3500', N10_AUTO_FIX_POLL_MS: '1500' },
   });
   await installCursor(page);
   await sleep(600);
-  const rec = startRecording('babysit');
+  const rec = startRecording('auto-fix');
   await sleep(700);
 
   const row = page
@@ -829,12 +829,12 @@ async function demoBabysit(scenario) {
     .getByRole('button', { name: /Retry transient/ });
   await glide(page, row, { dwell: 700 });
   const box = await row.boundingBox();
-  await chooseFromNextContextMenu(app, 'Babysit pull request', {
+  await chooseFromNextContextMenu(app, 'Turn on Auto-fix', {
     after: 1600,
     at: { x: box.x + box.width / 2, y: box.y + box.height / 2 },
   });
   await row.click({ button: 'right' });
-  const badge = row.getByText(/babysitting|update pending/);
+  const badge = row.getByText(/Auto-fix|update pending/);
   await badge.waitFor({ state: 'visible', timeout: 15_000 });
   await glide(page, badge, { dwell: 1800 });
   // Somewhere harmless: the empty part of the sidebar, well away from
@@ -843,7 +843,7 @@ async function demoBabysit(scenario) {
     page.mouse.move(size.width * 0.14, size.height * 0.8, { steps: 20 });
   await rest();
 
-  // The babysitter starts an agent and its tab opens. Fold the review
+  // The auto-fixer starts an agent and its tab opens. Fold the review
   // rail away before the agent prints, so the update gets the width.
   const hideRail = page.getByRole('button', { name: 'Hide review sidebar' });
   await hideRail.waitFor({ state: 'visible', timeout: 40_000 });
@@ -858,7 +858,7 @@ async function demoBabysit(scenario) {
 
   await rec.stop();
   await app.close();
-  toGif('babysit', {
+  toGif('auto-fix', {
     fps: 10,
     colors: 128,
     crop: { x: 0, y: 0, width: size.width * 2, height: size.height * 2 },
@@ -1026,7 +1026,7 @@ const demos = {
   review: demoReview,
   'review-in-place': demoReviewInPlace,
   plan: demoPlan,
-  babysit: demoBabysit,
+  'auto-fix': demoAutoFix,
   'tab-switching': demoTabs,
   tui: demoTui,
 };

@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import {
-  BABYSIT_EVENTS,
+  AUTO_FIX_EVENTS,
   DISCOVERY_EVENTS,
   IPC,
   LAUNCH_EVENTS,
@@ -23,7 +23,7 @@ import {
   type SessionExitEvent,
   type SyncNoticeEvent,
   type DiscoveryChangedEvent,
-  type BabysitChangedEvent,
+  type AutoFixChangedEvent,
 } from '../host/contract.js';
 
 /**
@@ -200,12 +200,12 @@ const api: N10HostApi = {
   holdMenuShortcuts: (held) => ipcRenderer.invoke(IPC.holdMenuShortcuts, held),
   showAbout: () => ipcRenderer.invoke(IPC.showAbout),
 
-  startBabysit: (prId) => ipcRenderer.invoke(IPC.startBabysit, prId),
-  stopBabysit: (prId) => ipcRenderer.invoke(IPC.stopBabysit, prId),
-  onBabysitChanged: (cb) => {
-    const listener = (_e: unknown, payload: BabysitChangedEvent) => cb(payload);
-    ipcRenderer.on(BABYSIT_EVENTS.changed, listener);
-    return () => ipcRenderer.removeListener(BABYSIT_EVENTS.changed, listener);
+  startAutoFix: (prId) => ipcRenderer.invoke(IPC.startAutoFix, prId),
+  stopAutoFix: (prId) => ipcRenderer.invoke(IPC.stopAutoFix, prId),
+  onAutoFixChanged: (cb) => {
+    const listener = (_e: unknown, payload: AutoFixChangedEvent) => cb(payload);
+    ipcRenderer.on(AUTO_FIX_EVENTS.changed, listener);
+    return () => ipcRenderer.removeListener(AUTO_FIX_EVENTS.changed, listener);
   },
 
   listMachines: () => ipcRenderer.invoke(IPC.listMachines),

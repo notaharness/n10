@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { BabysitStatus } from '../../../host/contract.js';
-import { babysitBadge } from './babysit-badge.js';
+import type { AutoFixStatus } from '../../../host/contract.js';
+import { autoFixBadge } from './auto-fix-badge.js';
 
 const MIN = 60_000;
 
-function status(over: Partial<BabysitStatus> = {}): BabysitStatus {
+function status(over: Partial<AutoFixStatus> = {}): AutoFixStatus {
   return {
     prId: 7,
     sourceBranch: 'feat',
@@ -19,17 +19,17 @@ function status(over: Partial<BabysitStatus> = {}): BabysitStatus {
   };
 }
 
-describe('babysitBadge', () => {
+describe('autoFixBadge', () => {
   it('says it is watching when there is nothing to report', () => {
-    expect(babysitBadge(status(), 0)).toEqual({
-      label: 'babysitting',
+    expect(autoFixBadge(status(), 0)).toEqual({
+      label: 'Auto-fix',
       title: 'Watching CI, review threads and conflicts',
       tone: 'info',
     });
   });
 
   it('says an update is waiting, and for how long', () => {
-    const badge = babysitBadge(
+    const badge = autoFixBadge(
       status({ phase: 'pending', pendingSince: 0 }),
       7 * MIN
     );
@@ -38,7 +38,7 @@ describe('babysitBadge', () => {
   });
 
   it('says why a due update is being held', () => {
-    const badge = babysitBadge(
+    const badge = autoFixBadge(
       status({ phase: 'pending', pendingSince: 0, held: 'agent-busy' }),
       MIN
     );
@@ -46,7 +46,7 @@ describe('babysitBadge', () => {
   });
 
   it('counts deliveries and flags a failed poll', () => {
-    const badge = babysitBadge(
+    const badge = autoFixBadge(
       status({
         deliveries: 2,
         lastDeliveredAt: 60 * MIN,

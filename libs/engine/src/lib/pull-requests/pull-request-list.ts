@@ -3,7 +3,7 @@
  *
  * Everything that wants to know what the provider says about a
  * repository's pull requests — the TUI's sidebar, the desktop's
- * sidebar polling every few seconds, a babysitter asking about one row
+ * sidebar polling every few seconds, an auto-fixer asking about one row
  * every minute — reads it from here, so the provider is asked once per
  * interval however many readers there are. `prPollInterval` is the
  * TTL, honoured verbatim.

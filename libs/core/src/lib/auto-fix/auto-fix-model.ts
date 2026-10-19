@@ -1,8 +1,8 @@
 import type { BuildStatusState, RemoteCommentThread } from '@n10/vcs-core';
 
-// ── Babysitting a pull request ───────────────────────────────────
+// ── Auto-fixing a pull request ───────────────────────────────────
 //
-// A babysat pull request is watched for three things — CI, unresolved
+// A pull request under auto-fix is watched for three things — CI, unresolved
 // review comments and conflicts with the target branch — and the agent
 // working on it is told about them in one message, once things have
 // settled, and only while it is idle. This module is the pure half: it
@@ -20,41 +20,41 @@ import type { BuildStatusState, RemoteCommentThread } from '@n10/vcs-core';
 /** How long an update has to stay unchanged before it is sent. A
  *  reviewer leaves comments in a burst; sending after the first one
  *  would interrupt the agent once per comment. */
-export const BABYSIT_DEBOUNCE_MS = 10 * 60_000;
+export const AUTO_FIX_DEBOUNCE_MS = 10 * 60_000;
 /** A steady trickle of changes would otherwise postpone an update
  *  forever, so a pending update is sent regardless once this old. */
-export const BABYSIT_MAX_WAIT_MS = 30 * 60_000;
+export const AUTO_FIX_MAX_WAIT_MS = 30 * 60_000;
 /** How often the pull request is re-read. The cheap part: the cached
  *  list and a local merge check. */
-export const BABYSIT_POLL_MS = 60_000;
+export const AUTO_FIX_POLL_MS = 60_000;
 /** How often the expensive part runs regardless of what the cheap
  *  part saw: the provider's thread list and a git fetch of both refs.
  *  A reply to an existing thread moves no count the list carries, so
  *  it is found on this cadence at the latest. */
-export const BABYSIT_REMOTE_REFRESH_MS = 5 * 60_000;
+export const AUTO_FIX_REMOTE_REFRESH_MS = 5 * 60_000;
 /** How long the agent's session has to have been silent before an
  *  update is typed into it. The activity registry's own idle threshold
  *  is two seconds, which a tool call or a permission prompt exceeds. */
-export const BABYSIT_IDLE_MS = 30_000;
+export const AUTO_FIX_IDLE_MS = 30_000;
 
 /** Why a due update has not gone out. */
-export type BabysitHold =
+export type AutoFixHold =
   | 'agent-busy'
   | 'foreign-session'
   | 'branch-unavailable'
   /** The watch stopped, or the repository changed, mid-checkout. */
   | 'interrupted';
 
-/** What a shell shows about a babysat pull request. Carried on its
+/** What a shell shows about a pull request under auto-fix. Carried on its
  *  sidebar item, so a row wears its badge without a query of its own. */
-export interface BabysitStatus {
+export interface AutoFixStatus {
   prId: number;
   sourceBranch: string;
   /** `pending`: an update is waiting to be sent. `ended`: the pull
    *  request is gone (merged or closed) and watching has stopped. */
   phase: 'watching' | 'pending' | 'ended';
   /** Set while a due update is being withheld, and why. */
-  held: BabysitHold | null;
+  held: AutoFixHold | null;
   lastPolledAt: number | null;
   pendingSince: number | null;
   lastDeliveredAt: number | null;
@@ -65,7 +65,7 @@ export interface BabysitStatus {
 /** The part of a status a reader would notice changing: the phase, a
  *  hold, a delivery, an error. Two statuses with the same signature
  *  differ at most in when they were last polled. */
-export function statusSignature(status: BabysitStatus): string {
+export function statusSignature(status: AutoFixStatus): string {
   return [
     status.phase,
     status.held ?? '',
@@ -75,7 +75,7 @@ export function statusSignature(status: BabysitStatus): string {
 }
 
 /** One unresolved thread, as it stood when observed. */
-export interface BabysitThread {
+export interface AutoFixThread {
   id: string;
   file: string | null;
   line: number | null;
@@ -88,13 +88,13 @@ export interface BabysitThread {
 }
 
 /** What one poll of the pull request found. */
-export interface BabysitObservation {
+export interface AutoFixObservation {
   buildStatus: BuildStatusState | undefined;
   /** The commit CI is reporting on. A verdict on a new commit is a new
    *  verdict even when it reads the same as the last one. */
   headSha: string | undefined;
   /** Unresolved threads only. */
-  threads: BabysitThread[];
+  threads: AutoFixThread[];
   /** Files that conflict with the latest target branch, or null when
    *  the check could not run. */
   conflictCount: number | null;
@@ -109,7 +109,7 @@ export interface ReportedSummary {
   threadComments: Record<string, number>;
 }
 
-export interface BabysitReport {
+export interface AutoFixReport {
   /** The status as it stands now — always included so the message
    *  answers "how is CI" even when CI is not what changed. */
   buildStatus: BuildStatusState | undefined;
@@ -123,12 +123,12 @@ export interface BabysitReport {
   /** Null when the check could not run this time. */
   conflictCount: number | null;
   /** Threads the agent has not seen, or that gained comments since. */
-  newThreads: BabysitThread[];
+  newThreads: AutoFixThread[];
 }
 
-export interface BabysitState {
+export interface AutoFixState {
   reported: ReportedSummary;
-  latest: BabysitObservation | null;
+  latest: AutoFixObservation | null;
   /** Identity of the pending report, for telling "same update, still
    *  waiting" from "the update grew". */
   pendingKey: string | null;
@@ -138,12 +138,12 @@ export interface BabysitState {
   lastDeliveredAt: number | null;
 }
 
-export function initialBabysitState(): BabysitState {
+export function initialAutoFixState(): AutoFixState {
   return {
     // Nothing has been reported, so whatever is outstanding when
-    // babysitting starts — a red build, three open threads — is the
+    // auto-fixing starts — a red build, three open threads — is the
     // first update. Starting from the current state instead would
-    // make "babysit" on a pull request that already needs work do
+    // make "auto-fix" on a pull request that already needs work do
     // nothing until something else happened.
     reported: {
       buildStatus: undefined,
@@ -170,8 +170,8 @@ function isSettled(status: BuildStatusState | undefined): boolean {
  */
 function newThreads(
   reported: ReportedSummary,
-  threads: BabysitThread[]
-): BabysitThread[] {
+  threads: AutoFixThread[]
+): AutoFixThread[] {
   return threads.filter((thread) => {
     const known = reported.threadComments[thread.id];
     if (known === undefined) return true;
@@ -189,7 +189,7 @@ function newThreads(
  */
 function ciIsNews(
   reported: ReportedSummary,
-  observation: BabysitObservation
+  observation: AutoFixObservation
 ): boolean {
   const { buildStatus, headSha } = observation;
   if (!isSettled(buildStatus)) return false;
@@ -205,8 +205,8 @@ function ciIsNews(
  *  saying. */
 export function diffAgainstReported(
   reported: ReportedSummary,
-  observation: BabysitObservation
-): BabysitReport | null {
+  observation: AutoFixObservation
+): AutoFixReport | null {
   const ciChanged = ciIsNews(reported, observation);
   const { conflictCount } = observation;
   const conflictsChanged =
@@ -225,7 +225,7 @@ export function diffAgainstReported(
   };
 }
 
-function reportKey(report: BabysitReport): string {
+function reportKey(report: AutoFixReport): string {
   const threads = report.newThreads
     .map((t) => `${t.id}:${t.comments.length}`)
     .sort()
@@ -245,7 +245,7 @@ function reportKey(report: BabysitReport): string {
  */
 function absorb(
   reported: ReportedSummary,
-  observation: BabysitObservation
+  observation: AutoFixObservation
 ): ReportedSummary {
   if (observation.conflictCount === 0 && reported.conflictCount !== 0) {
     return { ...reported, conflictCount: 0 };
@@ -255,10 +255,10 @@ function absorb(
 
 /** Fold a fresh observation in: start, extend or drop the pending update. */
 export function observe(
-  state: BabysitState,
-  observation: BabysitObservation,
+  state: AutoFixState,
+  observation: AutoFixObservation,
   now: number
-): BabysitState {
+): AutoFixState {
   const reported = absorb(state.reported, observation);
   const report = diffAgainstReported(reported, observation);
   const key = report ? reportKey(report) : null;
@@ -292,12 +292,12 @@ export interface DeliveryTiming {
 
 /** Whether the pending update has been quiet for long enough to send. */
 export function isDue(
-  state: BabysitState,
+  state: AutoFixState,
   now: number,
   timing: DeliveryTiming = {}
 ): boolean {
-  const debounceMs = timing.debounceMs ?? BABYSIT_DEBOUNCE_MS;
-  const maxWaitMs = timing.maxWaitMs ?? BABYSIT_MAX_WAIT_MS;
+  const debounceMs = timing.debounceMs ?? AUTO_FIX_DEBOUNCE_MS;
+  const maxWaitMs = timing.maxWaitMs ?? AUTO_FIX_MAX_WAIT_MS;
   if (state.pendingSince === null || state.quietSince === null) return false;
   return (
     now - state.quietSince >= debounceMs ||
@@ -313,9 +313,9 @@ export function isDue(
  * conflict check that could not run leaves the count where it was.
  */
 export function takeReport(
-  state: BabysitState,
+  state: AutoFixState,
   now: number
-): { report: BabysitReport; state: BabysitState } | null {
+): { report: AutoFixReport; state: AutoFixState } | null {
   if (!state.latest || state.pendingKey === null) return null;
   const report = diffAgainstReported(state.reported, state.latest);
   if (!report) return null;
@@ -344,11 +344,11 @@ export function takeReport(
   };
 }
 
-/** Project a provider thread onto what the babysitter keeps of it. */
+/** Project a provider thread onto what the auto-fixer keeps of it. */
 export function observeThread(
   thread: RemoteCommentThread,
   isOwn: (author: string) => boolean
-): BabysitThread {
+): AutoFixThread {
   const comments = thread.comments.map((c) => ({
     author: c.author,
     body: c.body,

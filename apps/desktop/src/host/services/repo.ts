@@ -1,4 +1,4 @@
-import { startBabysitForRepo, stopBabysitForBranch } from './babysit.js';
+import { startAutoFixForRepo, stopAutoFixForBranch } from './auto-fix.js';
 import { canonicalRepoPath, isGitRepo, resetRepoRoot } from '@n10/core';
 import {
   createRepositoryService,
@@ -21,7 +21,7 @@ import {
   type RecentRepo,
 } from './recent-repos.js';
 
-// The babysit module imports this one: its bindings are read on call,
+// The auto-fix module imports this one: its bindings are read on call,
 // not while the modules load.
 const repositories = createRepositoryService({
   providers: PROVIDERS,
@@ -31,8 +31,8 @@ const repositories = createRepositoryService({
     ? { parkedTtl: Number(process.env.N10_PARKED_TTL_MS) }
     : {}),
   worktreeWatchers: {
-    suspend: (repo, branch) => stopBabysitForBranch(repo, branch),
-    resume: (repo, id) => startBabysitForRepo(repo, id),
+    suspend: (repo, branch) => stopAutoFixForBranch(repo, branch),
+    resume: (repo, id) => startAutoFixForRepo(repo, id),
     isCurrent: activeRepoIs,
   },
 });

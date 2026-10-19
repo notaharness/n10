@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import type { VcsProvider } from '@n10/vcs-core';
-import { createBabysitterService } from './babysitter-service.js';
+import { createAutoFixerService } from './auto-fixer-service.js';
 
 const state = vi.hoisted(() => ({
   cwd: '/repo',
@@ -20,8 +20,8 @@ const state = vi.hoisted(() => ({
   stopped: [] as number[],
 }));
 
-vi.mock('./pr-babysitter.js', () => ({
-  startPrBabysitter: (opts: {
+vi.mock('./pr-auto-fixer.js', () => ({
+  startPrAutoFixer: (opts: {
     pr: PullRequestInfo;
     cwd: string;
     getProvider: () => unknown;
@@ -57,14 +57,14 @@ const pr = (id: number): PullRequestInfo => ({
   createdByDisplayName: 'Me',
 });
 
-let service: ReturnType<typeof createBabysitterService>;
+let service: ReturnType<typeof createAutoFixerService>;
 const mod = {
-  startBabysit: (id: number) => service.start(state.cwd, id),
-  stopBabysit: (id: number) => service.stop(state.cwd, id),
-  babysatStatuses: (repo: string) => service.getSnapshot(repo),
-  stopBabysitForBranch: (repo: string, branch: string) =>
+  startAutoFix: (id: number) => service.start(state.cwd, id),
+  stopAutoFix: (id: number) => service.stop(state.cwd, id),
+  autoFixStatuses: (repo: string) => service.getSnapshot(repo),
+  stopAutoFixForBranch: (repo: string, branch: string) =>
     service.stopBranch(repo, branch),
-  stopAllBabysitters: () => service.dispose(),
+  stopAllAutoFixers: () => service.dispose(),
 };
 const changes: unknown[] = [];
 
@@ -76,7 +76,7 @@ beforeEach(() => {
   state.adopted.length = 0;
   state.stopped.length = 0;
   changes.length = 0;
-  service = createBabysitterService({
+  service = createAutoFixerService({
     config: (repo) => ({
       config: { vendorAuth: {}, vendorProject: {} },
       provider: `provider@${repo}` as unknown as VcsProvider,
@@ -105,10 +105,10 @@ beforeEach(() => {
   });
 });
 
-describe('babysit service', () => {
-  it('starts one babysitter per pull request and lists it', async () => {
-    await mod.startBabysit(7);
-    await mod.startBabysit(7);
+describe('auto-fix service', () => {
+  it('starts one auto-fixer per pull request and lists it', async () => {
+    await mod.startAutoFix(7);
+    await mod.startAutoFix(7);
     expect(state.started.map((s) => s.prId)).toEqual([7]);
     // The repository is handed over at start: the host chdir()s when
     // another one is opened, and the watcher's git must not follow.
@@ -117,39 +117,39 @@ describe('babysit service', () => {
     // reach a watcher that started under the previous one.
     expect(state.started[0].getProvider()).toBe('provider@/repo');
     expect(
-      [...mod.babysatStatuses(state.cwd).values()].map((s) => s.prId)
+      [...mod.autoFixStatuses(state.cwd).values()].map((s) => s.prId)
     ).toEqual([7]);
-    expect(mod.babysatStatuses('/repo').get(7)).toMatchObject({ prId: 7 });
+    expect(mod.autoFixStatuses('/repo').get(7)).toMatchObject({ prId: 7 });
     // Starting is the renderer's own doing; it refetches the sidebar
     // itself, so nothing is pushed.
     expect(changes).toEqual([]);
   });
 
   it('refuses a pull request the sidebar does not have', async () => {
-    await expect(mod.startBabysit(99)).rejects.toThrow('#99');
-    expect([...mod.babysatStatuses(state.cwd).values()]).toEqual([]);
+    await expect(mod.startAutoFix(99)).rejects.toThrow('#99');
+    expect([...mod.autoFixStatuses(state.cwd).values()]).toEqual([]);
   });
 
   it('stops and forgets, and tolerates stopping nothing', async () => {
-    await mod.startBabysit(7);
-    mod.stopBabysit(7);
-    mod.stopBabysit(7);
+    await mod.startAutoFix(7);
+    mod.stopAutoFix(7);
+    mod.stopAutoFix(7);
     expect(state.stopped).toEqual([7]);
-    expect([...mod.babysatStatuses(state.cwd).values()]).toEqual([]);
-    expect(mod.babysatStatuses('/repo').size).toBe(0);
+    expect([...mod.autoFixStatuses(state.cwd).values()]).toEqual([]);
+    expect(mod.autoFixStatuses('/repo').size).toBe(0);
   });
 
-  it('drops a babysitter that ended on its own and says which', async () => {
-    await mod.startBabysit(7);
+  it('drops an auto-fixer that ended on its own and says which', async () => {
+    await mod.startAutoFix(7);
     state.started[0].onStatus({ prId: 7, phase: 'ended' });
-    expect([...mod.babysatStatuses(state.cwd).values()]).toEqual([]);
+    expect([...mod.autoFixStatuses(state.cwd).values()]).toEqual([]);
     expect(changes.at(-1)).toEqual({
       ended: { prId: 7, sourceBranch: 'feat/7' },
     });
   });
 
-  it('adopts a session the babysitter spawned, under the pull request branch, and says so', async () => {
-    await mod.startBabysit(7);
+  it('adopts a session the auto-fixer spawned, under the pull request branch, and says so', async () => {
+    await mod.startAutoFix(7);
     state.cwd = '/other';
     state.started[0].onSpawned?.('feat-7', '/wt/feat-7');
     expect(state.adopted).toEqual([{ name: 'feat-7', repo: '/repo' }]);
@@ -159,45 +159,45 @@ describe('babysit service', () => {
   });
 
   it('pushes nothing for a status that merely moved', async () => {
-    await mod.startBabysit(7);
+    await mod.startAutoFix(7);
     state.started[0].onStatus({ prId: 7, phase: 'pending' });
     expect(changes).toEqual([]);
   });
 
-  it('keeps babysitters per repository and sits out ticks while another is open', async () => {
-    await mod.startBabysit(7);
+  it('keeps auto-fixers per repository and sits out ticks while another is open', async () => {
+    await mod.startAutoFix(7);
     state.cwd = '/other';
     state.prs = [pr(7)];
-    expect([...mod.babysatStatuses(state.cwd).values()]).toEqual([]);
-    expect(mod.babysatStatuses('/repo').size).toBe(1);
+    expect([...mod.autoFixStatuses(state.cwd).values()]).toEqual([]);
+    expect(mod.autoFixStatuses('/repo').size).toBe(1);
     expect(state.started[0].isCurrent()).toBe(false);
-    await mod.startBabysit(7);
+    await mod.startAutoFix(7);
     expect(state.started).toHaveLength(2);
     expect(state.started[1].cwd).toBe('/other');
     state.cwd = '/repo';
     expect(
-      [...mod.babysatStatuses(state.cwd).values()].map((s) => s.prId)
+      [...mod.autoFixStatuses(state.cwd).values()].map((s) => s.prId)
     ).toEqual([7]);
     expect(state.started[0].isCurrent()).toBe(true);
   });
 
-  it('stops the babysitter of a branch whose worktree is being removed', async () => {
-    await mod.startBabysit(7);
-    await mod.startBabysit(8);
-    mod.stopBabysitForBranch('/repo', 'feat/7');
-    mod.stopBabysitForBranch('/repo', 'feat/none');
+  it('stops the auto-fixer of a branch whose worktree is being removed', async () => {
+    await mod.startAutoFix(7);
+    await mod.startAutoFix(8);
+    mod.stopAutoFixForBranch('/repo', 'feat/7');
+    mod.stopAutoFixForBranch('/repo', 'feat/none');
     expect(state.stopped).toEqual([7]);
     expect(
-      [...mod.babysatStatuses(state.cwd).values()].map((s) => s.prId)
+      [...mod.autoFixStatuses(state.cwd).values()].map((s) => s.prId)
     ).toEqual([8]);
   });
 
-  it('stops every babysitter of every repository on exit', async () => {
-    await mod.startBabysit(7);
-    await mod.startBabysit(8);
-    mod.stopAllBabysitters();
+  it('stops every auto-fixer of every repository on exit', async () => {
+    await mod.startAutoFix(7);
+    await mod.startAutoFix(8);
+    mod.stopAllAutoFixers();
     expect(state.stopped.sort()).toEqual([7, 8]);
-    expect([...mod.babysatStatuses(state.cwd).values()]).toEqual([]);
+    expect([...mod.autoFixStatuses(state.cwd).values()]).toEqual([]);
   });
 });
 

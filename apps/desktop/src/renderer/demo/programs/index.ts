@@ -9,7 +9,7 @@ import type { RepoState } from '../host/state.js';
 import { ClaudeCode, type Beat } from './claude/claude-code.js';
 import { FLEET } from './claude/script-fleet.js';
 import { HOMEPAGE } from './claude/script-homepage.js';
-import { babysitHomepage } from './claude/script-babysit.js';
+import { autoFixHomepage } from './claude/script-auto-fix.js';
 import { reviewScript } from './claude/script-review.js';
 import { tabsPlanBeats } from './claude/script-tabs.js';
 import { Zsh } from './zsh.js';
@@ -169,13 +169,13 @@ export const PROGRAMS = {
     });
   },
 
-  /** A pull request just babysat: beam #39 has news for its agent.
-   *  Returns a cancel for when babysitting stops. */
-  babysit(pr: PullRequestInfo, repo: RepoState, hub: SessionHub): () => void {
+  /** A pull request just put under auto-fix: beam #39 has news for its agent.
+   *  Returns a cancel for when auto-fixing stops. */
+  autoFix(pr: PullRequestInfo, repo: RepoState, hub: SessionHub): () => void {
     const agent = hub.get(HOMEPAGE_SESSION)?.program;
     if (repo.cwd !== BEAM || pr.id !== PR_HOMEPAGE.id) return () => undefined;
     if (!(agent instanceof ClaudeCode)) return () => undefined;
-    return babysitHomepage(repo, agent);
+    return autoFixHomepage(repo, agent);
   },
 
   shell(cwd: string, branch?: string): Zsh {

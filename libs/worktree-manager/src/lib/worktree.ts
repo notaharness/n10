@@ -195,7 +195,7 @@ export async function checkoutWorktree(
   // not the process's, since a caller here may outlive a change of
   // directory — is what stops a branch that is already checked out
   // somewhere from reading as "no worktree, and git refused to make
-  // one", which for a babysitter means silently doing nothing.
+  // one", which for an auto-fixer means silently doing nothing.
   const { present, deleted } = await listWorktreeRegistrations(scope);
   const existing = present.find((w) => w.branch === branch);
   if (existing) return existing.path;

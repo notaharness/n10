@@ -4,7 +4,7 @@ import { armContextMenuChoice } from './setup/menu.js';
 import type { FakeGitHub } from './setup/fake-gh.js';
 
 /**
- * Babysitting a pull request: the row's context menu starts a watcher
+ * Auto-fixing a pull request: the row's context menu starts a watcher
  * on the host, the row says so, and when the pull request needs work
  * the agent is told — here by being started with the update as its
  * prompt, since no agent is running in the worktree.
@@ -49,10 +49,10 @@ test.use({
     ],
   },
   n10Config: { aiCommand: fakeAgent({ printSeed: true }) },
-  env: { N10_BABYSIT_DEBOUNCE_MS: '500', N10_BABYSIT_POLL_MS: '1000' },
+  env: { N10_AUTO_FIX_DEBOUNCE_MS: '500', N10_AUTO_FIX_POLL_MS: '1000' },
 });
 
-test.describe('Babysitting a pull request', () => {
+test.describe('Auto-fix on a pull request', () => {
   test('the row menu starts and stops it, and the row wears the badge', async ({
     desktop,
   }) => {
@@ -60,13 +60,13 @@ test.describe('Babysitting a pull request', () => {
     const row = sidebarRow(page, /Add undo support|#42/).first();
     await expect(row).toBeVisible({ timeout: 30_000 });
 
-    await armContextMenuChoice(app, 'Babysit pull request');
+    await armContextMenuChoice(app, 'Turn on Auto-fix');
     await row.click({ button: 'right' });
-    await expect(row.getByText(/babysitting|update pending/)).toBeVisible();
+    await expect(row.getByText(/Auto-fix|update pending/)).toBeVisible();
 
-    await armContextMenuChoice(app, 'Stop babysitting');
+    await armContextMenuChoice(app, 'Turn off Auto-fix');
     await row.click({ button: 'right' });
-    await expect(row.getByText(/babysitting|update pending/)).toHaveCount(0);
+    await expect(row.getByText(/Auto-fix|update pending/)).toHaveCount(0);
   });
 
   test('starts an agent with the update once the news has settled', async ({
@@ -76,10 +76,10 @@ test.describe('Babysitting a pull request', () => {
     const row = sidebarRow(page, /Add undo support|#42/).first();
     await expect(row).toBeVisible({ timeout: 30_000 });
 
-    await armContextMenuChoice(app, 'Babysit pull request');
+    await armContextMenuChoice(app, 'Turn on Auto-fix');
     await row.click({ button: 'right' });
 
-    // No agent was running, so the babysitter starts one in the
+    // No agent was running, so the auto-fixer starts one in the
     // worktree with the update as its opening prompt: the failed build
     // and the unresolved thread, named by the id the provider uses.
     await expect(

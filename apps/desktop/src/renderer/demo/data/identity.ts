@@ -1,6 +1,6 @@
 import type { PullRequestInfo } from '@n10/vcs-core';
 import type {
-  BabysitStatus,
+  AutoFixStatus,
   PullRequestComments,
   SidebarItem,
 } from '../../../host/contract.js';
@@ -112,7 +112,7 @@ export function prUrl(slug: string, id: number): string {
   return `https://github.com/${slug}/pull/${id}`;
 }
 
-export const babysitting = (pr: PullRequestInfo): BabysitStatus => ({
+export const autoFixing = (pr: PullRequestInfo): AutoFixStatus => ({
   prId: pr.id,
   sourceBranch: pr.sourceBranch,
   phase: 'watching',

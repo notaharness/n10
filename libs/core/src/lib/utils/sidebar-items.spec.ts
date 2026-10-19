@@ -249,10 +249,10 @@ describe('buildSidebarItems', () => {
     ]);
   });
 
-  it('puts a babysat pull request’s status on its row, whichever kind the row is', () => {
-    // The desktop row wears its badge from the item, so a babysat pull
-    // request has to carry the status whether it is a worktree row, an
-    // orphan or a review — and a row that is not babysat has no key at
+  it('puts the auto-fix status on a pull request’s row, whichever kind the row is', () => {
+    // The desktop row wears its badge from the item, so a pull request under
+    // auto-fix has to carry the status whether it is a worktree row, an
+    // orphan or a review — and a row that is not under auto-fix has no key at
     // all, so the item's shape says what it carries.
     const session: AgentSession = {
       name: 'feature-branch-1',
@@ -273,7 +273,7 @@ describe('buildSidebarItems', () => {
       deliveries: 0,
       lastError: null,
     });
-    const babysat = new Map([
+    const autoFix = new Map([
       [1, status(1)],
       [3, status(3)],
     ]);
@@ -286,11 +286,11 @@ describe('buildSidebarItems', () => {
       NOT_YOURS,
       new Set(),
       new Map(),
-      babysat
+      autoFix
     );
 
-    expect(items.map((i) => i.babysit?.prId)).toEqual([1, undefined, 3]);
-    expect('babysit' in items[1]).toBe(false);
+    expect(items.map((i) => i.autoFix?.prId)).toEqual([1, undefined, 3]);
+    expect('autoFix' in items[1]).toBe(false);
   });
 
   it('returns empty array when all inputs are empty', () => {

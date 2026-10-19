@@ -131,7 +131,7 @@ const shellOperationPaths = [
 ];
 
 const engineDomains = [
-  'babysitters',
+  'auto-fix',
   'config',
   'machines',
   'plans',

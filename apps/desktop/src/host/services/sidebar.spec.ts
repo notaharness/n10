@@ -52,10 +52,10 @@ const env = vi.hoisted(() => ({
   /** The provider's side, in order: `start`, `end`, `forget`. */
   events: [] as string[],
   now: 1_000_000,
-  /** Last babysat map handed to buildSidebarItems. */
-  lastBabysat: null as ReadonlyMap<number, unknown> | null,
-  /** cwd → babysit statuses the babysit service answers with. */
-  babysat: new Map<string, Map<number, unknown>>(),
+  /** Last auto-fix map handed to buildSidebarItems. */
+  lastAutoFix: null as ReadonlyMap<number, unknown> | null,
+  /** cwd → auto-fix statuses the auto-fix service answers with. */
+  autoFix: new Map<string, Map<number, unknown>>(),
   /** The pull request list's background read, as a handle prewarms. */
   refreshInBackground: null as ((cwd: string) => void) | null,
 }));
@@ -93,8 +93,8 @@ vi.mock('./repo.js', () => {
   };
 });
 
-vi.mock('./babysit.js', () => ({
-  babysatStatuses: (cwd: string) => env.babysat.get(cwd) ?? new Map(),
+vi.mock('./auto-fix.js', () => ({
+  autoFixStatuses: (cwd: string) => env.autoFix.get(cwd) ?? new Map(),
 }));
 
 vi.mock('./remote-sync.js', () => ({
@@ -136,9 +136,9 @@ vi.mock('@n10/core', async (importOriginal) => ({
     _yours: unknown,
     _merged: unknown,
     _conflicts: unknown,
-    babysat: ReadonlyMap<number, unknown>
+    autoFix: ReadonlyMap<number, unknown>
   ) => {
-    env.lastBabysat = babysat;
+    env.lastAutoFix = autoFix;
     return sessions;
   },
 }));
@@ -167,8 +167,8 @@ beforeEach(async () => {
   env.forgetCount = 0;
   env.events = [];
   env.now = 1_000_000;
-  env.lastBabysat = null;
-  env.babysat = new Map();
+  env.lastAutoFix = null;
+  env.autoFix = new Map();
 
   vi.spyOn(Date, 'now').mockImplementation(() => env.now);
   vi.resetModules();
@@ -334,7 +334,7 @@ describe('after the credentials change', () => {
 });
 
 /**
- * A babysitter reads its pull request through the sidebar's list, so
+ * An auto-fixer reads its pull request through the sidebar's list, so
  * a watched row costs the provider nothing beyond the list the sidebar
  * fetches anyway.
  */
@@ -384,14 +384,14 @@ describe('sidebar model', () => {
     expect(items[0].state).toBe('rebasing');
   });
 
-  it('decorates the rows with the babysitters of the open repository', async () => {
-    env.babysat.set('/repo-a', new Map([[7, { prId: 7 }]]));
-    env.babysat.set('/repo-b', new Map([[8, { prId: 8 }]]));
+  it('decorates the rows with the auto-fixers of the open repository', async () => {
+    env.autoFix.set('/repo-a', new Map([[7, { prId: 7 }]]));
+    env.autoFix.set('/repo-b', new Map([[8, { prId: 8 }]]));
     const model = listSidebarItems();
     await flush();
     settle(0);
     await model;
-    expect([...(env.lastBabysat?.keys() ?? [])]).toEqual([7]);
+    expect([...(env.lastAutoFix?.keys() ?? [])]).toEqual([7]);
   });
 
   it('omits the state key entirely for a normal worktree', async () => {

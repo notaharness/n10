@@ -209,7 +209,7 @@ export async function sweepMergedBranches(opts: {
 }
 
 /**
- * Batch conflict counting, by the one predicate the babysitter uses
+ * Batch conflict counting, by the one predicate the auto-fixer uses
  * too (`conflicts.ts`): a branch with a pull request in `prMap` is
  * judged on the remote refs against its target; the rest locally
  * against origin's main branch. A branch that fails to check counts 0.

@@ -1,19 +1,19 @@
 import type { PullRequestInfo, CategorizedReviews } from '@n10/vcs-core';
 import type { AgentSession, ReviewCategory, SidebarItem } from '../types.js';
-import type { BabysitStatus } from '../babysit/babysit-model.js';
+import type { AutoFixStatus } from '../auto-fix/auto-fix-model.js';
 
-/** Babysit statuses by pull request id. */
-export type BabysatMap = ReadonlyMap<number, BabysitStatus>;
+/** Auto-fix statuses by pull request id. */
+export type AutoFixMap = ReadonlyMap<number, AutoFixStatus>;
 
-/** The `babysit` field for a pull request, present only when it is
- *  being babysat — an absent key, not an undefined one, so an item's
+/** The `autoFix` field for a pull request, present only when it is
+ *  under auto-fix — an absent key, not an undefined one, so an item's
  *  shape says what it carries. */
-function babysitOf(
+function autoFixOf(
   pr: PullRequestInfo | undefined,
-  babysat: BabysatMap
-): { babysit: BabysitStatus } | Record<string, never> {
-  const status = pr && babysat.get(pr.id);
-  return status ? { babysit: status } : {};
+  autoFix: AutoFixMap
+): { autoFix: AutoFixStatus } | Record<string, never> {
+  const status = pr && autoFix.get(pr.id);
+  return status ? { autoFix: status } : {};
 }
 
 /** The branches every review section covers, in one set. */
@@ -80,7 +80,7 @@ function bucketSessions(
   yours: ReadonlySet<number>,
   mergedBranches: Set<string>,
   conflictCounts: Map<string, number>,
-  babysat: BabysatMap
+  autoFix: AutoFixMap
 ): SessionBuckets {
   const buckets: SessionBuckets = { noPr: [], draftPr: [], activePr: [] };
 
@@ -98,7 +98,7 @@ function bucketSessions(
       branch,
       isMerged: branch ? mergedBranches.has(branch) : false,
       conflictCount: branch ? conflictCounts.get(branch) : undefined,
-      ...babysitOf(pr, babysat),
+      ...autoFixOf(pr, autoFix),
     };
 
     const section = sidebarSection(item);
@@ -126,7 +126,7 @@ export function buildSidebarItems(
   yours: ReadonlySet<number>,
   mergedBranches: Set<string>,
   conflictCounts: Map<string, number>,
-  babysat: BabysatMap = new Map()
+  autoFix: AutoFixMap = new Map()
 ): SidebarItem[] {
   const sessions = bucketSessions(
     sortedSessions,
@@ -135,7 +135,7 @@ export function buildSidebarItems(
     yours,
     mergedBranches,
     conflictCounts,
-    babysat
+    autoFix
   );
 
   const sessionByBranch = new Map<string, AgentSession>();
@@ -153,7 +153,7 @@ export function buildSidebarItems(
   const orphanItem = (pr: PullRequestInfo): SidebarItem => ({
     kind: 'orphan-pr',
     pr,
-    ...babysitOf(pr, babysat),
+    ...autoFixOf(pr, autoFix),
   });
 
   const reviewItem =
@@ -166,7 +166,7 @@ export function buildSidebarItems(
         category,
         running: session?.running,
         sessionName: session?.name,
-        ...babysitOf(pr, babysat),
+        ...autoFixOf(pr, autoFix),
       };
     };
 

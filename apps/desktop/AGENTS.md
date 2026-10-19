@@ -12,7 +12,7 @@ Every rule below has its reasoning in `docs/decisions.md`.
 
 - The session host is `main/host-worker.ts`, an Electron utility process
   named `n10 host`: every host service, the PTY attach clients with their
-  emulators, ring buffers and relay, discovery, babysitters and the beam
+  emulators, ring buffers and relay, discovery, auto-fixers and the beam
   client. `main/host-process.ts` forks it, forwards every `IPC` channel by
   name and carries its pushes (`host/host-pushes.ts`) to the windows
   (`main/host-events.ts`). What only the main process can do (dialogs,
@@ -72,10 +72,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
   (`getSyncDecorations(cwd)`). Sidebar answers are stamped with the repo they
   describe and the renderer drops answers for another (`loadSidebarModel`).
 - The pull request list is `@n10/engine`'s, one instance in
-  `services/pull-requests.ts`; `services/sidebar.ts`, babysitters, the sync
+  `services/pull-requests.ts`; `services/sidebar.ts`, auto-fixers, the sync
   loop and settings effects all go through it. The renderer is told only of
   changes it would paint. Do not call the provider's list from a second place.
-- Engine babysitters (`services/babysit.ts` adapts their events) live per repo in
+- Engine auto-fixers (`services/auto-fix.ts` adapts their events) live per repo in
   memory, sit out while another repo is open, stop when their worktree is removed, and push only
   `spawned` and `ended`; everything else rides on the sidebar poll.
 - `libs/engine/src/lib/sessions/terminal-service.ts` owns process-wide terminal lifecycle;

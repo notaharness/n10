@@ -15,6 +15,15 @@ const config = {
     // scripts/convert-media.mjs).
     unoptimized: true,
   },
+  async redirects() {
+    return [
+      {
+        source: '/docs/guides/babysit',
+        destination: '/docs/guides/auto-fix',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 const withMDX = createMDX();

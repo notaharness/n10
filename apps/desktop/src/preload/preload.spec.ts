@@ -54,7 +54,7 @@ const EVENT_METHODS = [
   'onSyncNotice',
   'onRemoteUpdated',
   'onDiscoveryChanged',
-  'onBabysitChanged',
+  'onAutoFixChanged',
   'onMachinesChanged',
   'onUpdatesChanged',
   'onBeamStatusChanged',

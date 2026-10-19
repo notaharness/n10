@@ -21,7 +21,7 @@ vi.mock('./services/discovery.js', () => ({
   setDiscoveryNotifier: vi.fn(),
 }));
 vi.mock('./services/sessions.js', () => ({ setSessionBroadcaster: vi.fn() }));
-vi.mock('./services/babysit.js', () => ({ setBabysitNotifier: vi.fn() }));
+vi.mock('./services/auto-fix.js', () => ({ setAutoFixNotifier: vi.fn() }));
 vi.mock('./services/theme.js', () => ({ onThemeChange: vi.fn() }));
 vi.mock('./services/machines.js', () => ({
   setBeamStatusNotifier: vi.fn(),

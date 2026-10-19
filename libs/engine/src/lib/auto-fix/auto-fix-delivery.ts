@@ -1,5 +1,5 @@
 import {
-  BABYSIT_IDLE_MS,
+  AUTO_FIX_IDLE_MS,
   idleFor,
   isSessionAlive,
   deliverToRunningSession,
@@ -7,7 +7,7 @@ import {
   worktreeSessionKey,
   sessionKeyForBranch,
 } from '@n10/core';
-import type { BabysitHold } from '@n10/core';
+import type { AutoFixHold } from '@n10/core';
 import type { AppConfig, PullRequestInfo } from '@n10/vcs-core';
 import {
   checkoutWorktree,
@@ -15,11 +15,11 @@ import {
   worktreeScope,
   type WorktreeScope,
 } from '@n10/worktree-manager';
-import type { PrBabysitterOptions } from './babysit-types.js';
+import type { PrAutoFixerOptions } from './auto-fix-types.js';
 
 type Delivery =
   | { outcome: 'injected' | 'spawned' }
-  | { outcome: 'held'; held: BabysitHold }
+  | { outcome: 'held'; held: AutoFixHold }
   | { outcome: 'failed'; error: string };
 
 /** Whether the branch can be checked out in `cwd` at all — locally, or
@@ -31,11 +31,11 @@ async function branchAvailable(branch: string, cwd: string): Promise<boolean> {
 
 /** Type the update into the live session, if it has been quiet. */
 function injectIntoLive(
-  opts: PrBabysitterOptions,
+  opts: PrAutoFixerOptions,
   name: string,
   prompt: string
 ): Delivery {
-  if (idleFor(name) < (opts.idleMs ?? BABYSIT_IDLE_MS)) {
+  if (idleFor(name) < (opts.idleMs ?? AUTO_FIX_IDLE_MS)) {
     return { outcome: 'held', held: 'agent-busy' };
   }
   return deliverToRunningSession(name, prompt)
@@ -45,12 +45,12 @@ function injectIntoLive(
 
 /**
  * Start an agent in the worktree with the update as its opening
- * prompt. Babysitting is opt-in per pull request, and an agent that
+ * prompt. Auto-fixing is opt-in per pull request, and an agent that
  * exits between updates is the normal case, so the next update starts
  * one rather than waiting for the user to notice.
  */
 async function spawnForUpdate(
-  opts: PrBabysitterOptions,
+  opts: PrAutoFixerOptions,
   pr: PullRequestInfo,
   prompt: string,
   live: () => boolean,
@@ -93,7 +93,7 @@ async function spawnForUpdate(
 /** Hand the update to the agent: typed into its session when one is
  *  running, or as the opening prompt of a new one. */
 export async function deliver(
-  opts: PrBabysitterOptions,
+  opts: PrAutoFixerOptions,
   pr: PullRequestInfo,
   prompt: string,
   live: () => boolean
